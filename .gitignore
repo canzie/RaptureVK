@@ -30,3 +30,24 @@
 *.exe
 *.out
 *.app
+
+# Build folder
+build/
+
+# Bin folder
+bin/
+
+# Debug folder
+debug/
+
+# Release folder
+release/
+
+# vscode
+.vscode/
+
+# git
+.git
+
+# vendor
+vendor/
