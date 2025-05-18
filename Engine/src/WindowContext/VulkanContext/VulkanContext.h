@@ -17,6 +17,12 @@ namespace Rapture {
         }
     };
 
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+    };
+
     class VulkanContext {
     public:
         VulkanContext(WindowContext* windowContext);
@@ -25,7 +31,7 @@ namespace Rapture {
     private:
         void createInstance(WindowContext* windowContext);
         void checkExtensionSupport();
-
+        bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 
         std::vector<const char*> getRequiredExtensions(WindowContext* windowContext);
 
@@ -48,6 +54,20 @@ namespace Rapture {
         // surface
         void createWindowsSurface(WindowContext* windowContext);
         
+        // swapchain
+        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+        VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+        VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+        VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, WindowContext* windowContext);
+
+        void createSwapChain(WindowContext* windowContext);
+
+        void createImageViews();
+
+        void createGraphicsPipeline();
+
+        VkShaderModule createShaderModule(const std::vector<char>& code);
+
     private:
 
         VkApplicationInfo m_applicationInfo;
@@ -65,7 +85,17 @@ namespace Rapture {
 
         VkDebugUtilsMessengerEXT m_debugMessenger;
 
+        VkSwapchainKHR m_swapChain;
+
+
         std::vector<const char*> m_validationLayers;
+        std::vector<const char*> m_deviceExtensions;
+
+        std::vector<VkImage> m_swapChainImages;
+        std::vector<VkImageView> m_swapChainImageViews;
+
+        VkFormat m_swapChainImageFormat;
+        VkExtent2D m_swapChainExtent;
 
     };
 

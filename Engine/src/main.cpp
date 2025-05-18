@@ -19,5 +19,7 @@ int main() {
         delete app;
     }
 
+    std::getchar();
+
     return 0;
 }
