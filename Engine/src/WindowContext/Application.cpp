@@ -16,6 +16,8 @@ namespace Rapture {
         m_vulkanContext = std::unique_ptr<VulkanContext>(new VulkanContext(m_window.get()));
 		s_instance = this;
 
+        m_vulkanContext->createResources();
+
         ApplicationEvents::onWindowClose().addListener([this]() {
             m_running = false;
         });
@@ -44,11 +46,13 @@ namespace Rapture {
 
         while (m_running) {
 
-
-
-
             m_window->onUpdate();
+
+            m_vulkanContext->drawFrame(m_window.get());
+
         }
+
+        m_vulkanContext->waitIdle();
 
     }
 

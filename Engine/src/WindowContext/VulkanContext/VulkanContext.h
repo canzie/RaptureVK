@@ -1,5 +1,12 @@
+#pragma once
+
 #include <vulkan/vulkan.h>
 #include "WindowContext/WindowContext.h"
+
+#include "Buffers/Buffers.h"
+
+#include "RenderTargets/FrameBuffers/FrameBuffer.h"
+#include "RenderTargets/SwapChains/SwapChain.h"
 
 #include <optional>
 #include <vector>
@@ -28,6 +35,18 @@ namespace Rapture {
         VulkanContext(WindowContext* windowContext);
         ~VulkanContext();
 
+        void createResources();
+
+
+        void drawFrame(WindowContext* windowContext);
+        void waitIdle();
+
+        VkDevice getLogicalDevice() const { return *m_device; }
+        VkSurfaceKHR getSurface() const { return m_surface; }
+        VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
+        QueueFamilyIndices getQueueFamilyIndices() const;
+
+
     private:
         void createInstance(WindowContext* windowContext);
         void checkExtensionSupport();
@@ -44,7 +63,7 @@ namespace Rapture {
         bool isDeviceSuitable(VkPhysicalDevice device);
 
         // queue families
-        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const;
 
 
         // logical device
@@ -60,21 +79,43 @@ namespace Rapture {
         VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, WindowContext* windowContext);
 
-        void createSwapChain(WindowContext* windowContext);
-
-        void createImageViews();
+        void createSwapChain();
 
         void createGraphicsPipeline();
 
         VkShaderModule createShaderModule(const std::vector<char>& code);
 
+        void createRenderPass();
+    
+        void createFramebuffers();
+
+        void createCommandPool();
+        void createCommandBuffer();
+
+        void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+        void createSyncObjects();
+
+        void recreateSwapChain(WindowContext* windowContext);
+
+        void cleanupSwapChain();
+
+        void createVertexBuffer();
+        void createIndexBuffer();
+
+        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
     private:
+
+        bool m_framebufferResized = false;
+
+        uint32_t m_currentFrame = 0;
 
         VkApplicationInfo m_applicationInfo;
         VkInstanceCreateInfo m_instanceCreateInfo;
         VkInstance m_instance;
         VkPhysicalDevice m_physicalDevice;
-        VkDevice m_device;
+        std::shared_ptr<VkDevice> m_device;
 
         VkQueue m_graphicsQueue;
         VkQueue m_computeQueue;
@@ -85,17 +126,32 @@ namespace Rapture {
 
         VkDebugUtilsMessengerEXT m_debugMessenger;
 
-        VkSwapchainKHR m_swapChain;
+        SwapChain m_swapChain;
 
+        VkPipelineLayout m_pipelineLayout;
+        VkRenderPass m_renderPass;
+        VkPipeline m_graphicsPipeline;
+
+        VkCommandPool m_commandPool;
+
+        std::vector<VkCommandBuffer> m_commandBuffers;
 
         std::vector<const char*> m_validationLayers;
         std::vector<const char*> m_deviceExtensions;
 
-        std::vector<VkImage> m_swapChainImages;
-        std::vector<VkImageView> m_swapChainImageViews;
 
-        VkFormat m_swapChainImageFormat;
-        VkExtent2D m_swapChainExtent;
+        std::vector<VkDynamicState> m_dynamicStates;
+
+        std::vector<FrameBuffer> m_swapChainFramebuffers;
+
+
+        std::vector<VkSemaphore> m_imageAvailableSemaphores;
+        std::vector<VkSemaphore> m_renderFinishedSemaphores;
+        std::vector<VkFence> m_inFlightFences;
+
+
+        std::shared_ptr<Buffer> m_indexBuffer;
+        std::shared_ptr<Buffer> m_vertexBuffer;
 
     };
 

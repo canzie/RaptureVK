@@ -28,6 +28,7 @@ namespace Rapture {
 
 		virtual void* getNativeWindowContext() = 0;
 
+		virtual void getFramebufferSize(int* width, int* height) const = 0;
 
         virtual const char** getExtensions() = 0;
         virtual uint32_t getExtensionCount() = 0;

@@ -35,7 +35,7 @@ void GlfwWindowContext::initWindow() {
     // For Vulkan, you'll need to tell GLFW not to create an OpenGL context
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    //glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     m_glfwWindow = glfwCreateWindow(m_context_data.width, m_context_data.height, m_title, nullptr, nullptr);
     if (!m_glfwWindow) {
@@ -79,6 +79,10 @@ void* GlfwWindowContext::getNativeWindowContext() {
     return m_glfwWindow;
 }
 
+void GlfwWindowContext::getFramebufferSize(int *width, int *height) const
+{
+    glfwGetFramebufferSize(m_glfwWindow, width, height);
+}
 
 const char **GlfwWindowContext::getExtensions()
 {

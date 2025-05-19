@@ -1,3 +1,5 @@
+#pragma once
+
 #include "WindowContext.h"
 #include "VulkanContext/VulkanContext.h"
 
@@ -12,6 +14,10 @@ namespace Rapture {
         virtual ~Application();
 
         void run();
+
+        const VulkanContext& getVulkanContext() const { return *m_vulkanContext; }
+        const WindowContext& getWindowContext() const { return *m_window; }
+        static Application& getInstance() { return *s_instance; }
 
     private:
 		bool m_running = true;
