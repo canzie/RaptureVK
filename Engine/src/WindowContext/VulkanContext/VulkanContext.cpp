@@ -3,8 +3,6 @@
 #include "VulkanContextHelpers.h"
 
 
-
-
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
 
@@ -40,6 +38,7 @@ namespace Rapture {
     };
 
     VulkanContext::VulkanContext(WindowContext* windowContext)
+    : m_renderPass(nullptr), m_graphicsPipeline(nullptr), m_shader(nullptr)
     {
 
     m_applicationInfo = {};
@@ -75,6 +74,7 @@ namespace Rapture {
 void VulkanContext::createResources() {
 
     createSwapChain();
+    createDefaultShader();
     createRenderPass();
     createGraphicsPipeline();
     createFramebuffers();
@@ -94,7 +94,7 @@ VulkanContext::~VulkanContext()
 
     m_vertexBuffer->destoryObjects();
     m_indexBuffer->destoryObjects();
-
+    m_shader.reset();
 
     for (size_t i = 0; i < imageCount; i++) {
         vkDestroySemaphore(*m_device, m_renderFinishedSemaphores[i], nullptr);
@@ -565,33 +565,6 @@ void VulkanContext::createSwapChain()
 
 void VulkanContext::createGraphicsPipeline()
 {
-    const std::string vertShaderPath = "E:/Dev/Games/RaptureVK/Engine/assets/shaders/SPIRV/vert.spv";
-    const std::string fragShaderPath = "E:/Dev/Games/RaptureVK/Engine/assets/shaders/SPIRV/frag.spv";
-
-    auto vertShaderCode = readFile(vertShaderPath);
-    auto fragShaderCode = readFile(fragShaderPath);
-
-    VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-    VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
-
-
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = vertShaderModule;
-    vertShaderStageInfo.pName = "main";
-    vertShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
-
-    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module = fragShaderModule;
-    fragShaderStageInfo.pName = "main";
-    fragShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
-
-    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
-
-
 
 
     std::vector<VkDynamicState> dynamicStates = {
@@ -683,116 +656,69 @@ void VulkanContext::createGraphicsPipeline()
     colorBlending.blendConstants[2] = 0.0f; // Optional
     colorBlending.blendConstants[3] = 0.0f; // Optional
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0; // Optional
-    pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
-    pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-    pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
-
-    if (vkCreatePipelineLayout(*m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to create pipeline layout!");
-        throw std::runtime_error("failed to create pipeline layout!");
-    }
-
-
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = nullptr; // Optional
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-
-    pipelineInfo.layout = m_pipelineLayout;
-    pipelineInfo.renderPass = m_renderPass;
-    pipelineInfo.subpass = 0;
-
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-    pipelineInfo.basePipelineIndex = -1; // Optional
-
-    if (vkCreateGraphicsPipelines(*m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to create graphics pipeline!");
-        throw std::runtime_error("failed to create graphics pipeline!");
-    }
+    GraphicsPipelineConfiguration config;
+    config.renderPass = m_renderPass;
+    config.dynamicState = dynamicState;
+    config.inputAssemblyState = inputAssembly;
+    config.viewportState = viewportState;
+    config.rasterizationState = rasterizer;
+    config.multisampleState = multisampling;
+    config.colorBlendState = colorBlending;
+    config.commonColorBlendAttachmentState = colorBlendAttachment;
+    config.vertexInputState = vertexInputInfo;
 
 
-
-    vkDestroyShaderModule(*m_device, fragShaderModule, nullptr);
-    vkDestroyShaderModule(*m_device, vertShaderModule, nullptr);
-
+    m_graphicsPipeline = std::make_shared<GraphicsPipeline>(config);
 }
 
-VkShaderModule VulkanContext::createShaderModule(const std::vector<char>& code)
-{
-    VkShaderModuleCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(*m_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to create shader module!");
-        throw std::runtime_error("failed to create shader module!");
-    }
-
-    return shaderModule;
-}
 
 
 
 void VulkanContext::createRenderPass()
 {
-
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = m_swapChain.getImageFormat();
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    if (vkCreateRenderPass(*m_device, &renderPassInfo, nullptr, &m_renderPass) != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to create render pass!");
-        throw std::runtime_error("failed to create render pass!");
+    if (m_swapChain.getImageFormat() == VK_FORMAT_UNDEFINED) {
+        RP_CORE_ERROR("Attempted to create render pass before swap chain was initialized!");
+        throw std::runtime_error("Attempted to create render pass before swap chain was initialized!");
     }
 
+
+
+
+    // Create the color attachment description
+    SubpassAttachmentUsage colorAttachment{};
+    
+    // Zero out the structures first
+    VkAttachmentDescription attachmentDesc = {};
+    VkAttachmentReference attachmentRef = {};
+
+    // Fill in the attachment description
+    attachmentDesc.format = m_swapChain.getImageFormat();
+    attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    // Fill in the attachment reference
+    attachmentRef.attachment = 0;
+    attachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // Assign the properly initialized structures
+    colorAttachment.attachmentDescription = attachmentDesc;
+    colorAttachment.attachmentReference = attachmentRef;
+
+    // Create the subpass info
+    SubpassInfo subpassInfo{};
+    subpassInfo.colorAttachments.push_back(colorAttachment);
+    subpassInfo.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpassInfo.shaderProgram = m_shader;
+    subpassInfo.name = "presentation subpass";
+
+    // Create the renderpass with the subpass info
+    std::vector<SubpassInfo> subpasses = { subpassInfo };
+    m_renderPass = std::make_shared<Renderpass>(subpasses);
 }
 
 void VulkanContext::createFramebuffers()
@@ -801,7 +727,7 @@ void VulkanContext::createFramebuffers()
     m_swapChainFramebuffers.reserve(m_swapChain.getImageViews().size());
 
     for (uint32_t i = 0; i < m_swapChain.getImageViews().size(); i++) {
-        m_swapChainFramebuffers.emplace_back(m_swapChain, i, m_renderPass);
+        m_swapChainFramebuffers.emplace_back(m_swapChain, i, m_renderPass->getRenderPassVk());
     }
 }
 
@@ -851,7 +777,7 @@ void VulkanContext::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t 
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = m_renderPass;
+    renderPassInfo.renderPass = m_renderPass->getRenderPassVk();
     renderPassInfo.framebuffer = m_swapChainFramebuffers[imageIndex].getFramebufferVk();
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = m_swapChain.getExtent();
@@ -861,7 +787,7 @@ void VulkanContext::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t 
     renderPassInfo.pClearValues = &clearColor;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
+    m_graphicsPipeline->bind(commandBuffer, 0);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -920,9 +846,9 @@ void VulkanContext::createSyncObjects()
 void VulkanContext::recreateSwapChain(WindowContext* windowContext)
 {
     int width = 0, height = 0;
-    glfwGetFramebufferSize((GLFWwindow*)windowContext->getNativeWindowContext(), &width, &height);
+    windowContext->getFramebufferSize(&width, &height);
     while (width == 0 || height == 0) {
-        glfwGetFramebufferSize((GLFWwindow*)windowContext->getNativeWindowContext(), &width, &height);
+        windowContext->getFramebufferSize(&width, &height);
         glfwWaitEvents();
     }
 
@@ -950,11 +876,19 @@ void VulkanContext::cleanupSwapChain()
         static_cast<uint32_t>(m_commandBuffers.size()), 
         m_commandBuffers.data());
 
-    vkDestroyPipeline(*m_device, m_graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(*m_device, m_pipelineLayout, nullptr);
-    vkDestroyRenderPass(*m_device, m_renderPass, nullptr);
+    m_graphicsPipeline.reset();
+    m_renderPass.reset();
 
     m_swapChain.destroy();
+}
+
+void VulkanContext::createDefaultShader()
+{
+    const std::filesystem::path vertShaderPath = "E:/Dev/Games/RaptureVK/Engine/assets/shaders/SPIRV/vert.spv";
+    const std::filesystem::path fragShaderPath = "E:/Dev/Games/RaptureVK/Engine/assets/shaders/SPIRV/frag.spv";
+
+
+    m_shader = std::make_shared<Shader>(vertShaderPath, fragShaderPath);
 }
 
 void VulkanContext::createVertexBuffer()

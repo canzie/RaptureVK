@@ -1,7 +1,7 @@
 #pragma once
 
 #include "RenderTargets/SwapChains/SwapChain.h"
-
+#include "Renderpass.h"
 
 #include <cstdint>
 #include <vulkan/vulkan.h>
@@ -26,8 +26,10 @@ namespace Rapture {
 class FrameBuffer {
 public:
 
+
     FrameBuffer(const FramebufferSpecification& specification, VkRenderPass renderPass);
     FrameBuffer(const SwapChain& swapChain, uint32_t SCImageViewIndex, VkRenderPass renderPass);
+
 
     ~FrameBuffer();
 

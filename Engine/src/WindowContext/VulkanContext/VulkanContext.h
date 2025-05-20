@@ -7,6 +7,9 @@
 
 #include "RenderTargets/FrameBuffers/FrameBuffer.h"
 #include "RenderTargets/SwapChains/SwapChain.h"
+#include "RenderTargets/FrameBuffers/Renderpass.h"
+#include "Pipelines/GraphicsPipeline.h"
+#include "Shaders/Shader.h"
 
 #include <optional>
 #include <vector>
@@ -83,7 +86,6 @@ namespace Rapture {
 
         void createGraphicsPipeline();
 
-        VkShaderModule createShaderModule(const std::vector<char>& code);
 
         void createRenderPass();
     
@@ -98,6 +100,8 @@ namespace Rapture {
         void recreateSwapChain(WindowContext* windowContext);
 
         void cleanupSwapChain();
+
+        void createDefaultShader();
 
         void createVertexBuffer();
         void createIndexBuffer();
@@ -129,8 +133,10 @@ namespace Rapture {
         SwapChain m_swapChain;
 
         VkPipelineLayout m_pipelineLayout;
-        VkRenderPass m_renderPass;
-        VkPipeline m_graphicsPipeline;
+        std::shared_ptr<Renderpass> m_renderPass;
+        std::shared_ptr<GraphicsPipeline> m_graphicsPipeline;
+
+        std::shared_ptr<Shader> m_shader;
 
         VkCommandPool m_commandPool;
 

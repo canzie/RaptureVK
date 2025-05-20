@@ -12,9 +12,7 @@ namespace Rapture {
     FrameBuffer::FrameBuffer(const FramebufferSpecification& specification, VkRenderPass renderPass)
         : m_specification(specification), m_renderPass(renderPass), m_framebuffer(VK_NULL_HANDLE)
     {
-        
         invalidate();
-
     }
 
     FrameBuffer::FrameBuffer(const SwapChain &swapChain, uint32_t SCImageViewIndex, VkRenderPass renderPass)
