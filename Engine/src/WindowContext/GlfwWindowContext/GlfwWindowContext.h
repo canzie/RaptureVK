@@ -20,6 +20,7 @@ public:
 
     void* getNativeWindowContext() override;
     void getFramebufferSize(int* width, int* height) const override;
+    void waitEvents() const override;
 
     const char** getExtensions() override;
     uint32_t getExtensionCount() override;

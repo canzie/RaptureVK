@@ -1,105 +1,128 @@
 #include "Buffers.h"
 
+
+#include "Buffers/CommandBuffers/CommandPool.h"
+#include "WindowContext/Application.h"
+
 #include "Logging/Log.h"
 #include "stdexcept"
 
 namespace Rapture {
 
-    Buffer::Buffer(VkDeviceSize size, std::shared_ptr<VkDevice> device, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkPhysicalDevice physicalDevice) {
-     
-
-        m_Device = device;
-
-        m_Usage = usage;
-        m_Properties = properties;
-
-        createBuffer(size, properties, physicalDevice);
+    Buffer::Buffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator)
+    : m_Allocator(allocator), m_usage(usage), m_Size(size)
+    {
 
     }
 
-
     Buffer::~Buffer() {
+        destoryObjects();
     }
 
     void Buffer::destoryObjects()
     {
-        if (auto device = m_Device.lock()) {
-            vkDestroyBuffer(*device, m_Buffer, nullptr);
-            vkFreeMemory(*device, m_Memory, nullptr);
-        }
+        vmaDestroyBuffer(m_Allocator, m_Buffer, m_Allocation);
     }
 
-    void Buffer::addData(void* newData, VkDeviceSize size, VkDeviceSize offset)
+    void Buffer::addData(void *newData, VkDeviceSize size, VkDeviceSize offset)
     {
-        if (!(m_Properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
-            RP_CORE_ERROR("Buffer::addData - Vertex buffer is not host visible!");
+        // Check for buffer overflow
+        if (offset + size > m_Size) {
+            RP_CORE_ERROR("Buffer::addData - Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}", size, offset, m_Size);
+            return;
+        }
+
+        if (!(m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
+            RP_CORE_ERROR("Buffer::addData - Buffer is not host visible! Use addDataGPU for device local buffers.");
             return;
         }
     
-        if (auto device = m_Device.lock()) {
-            void* data;
-            vkMapMemory(*device, m_Memory, 0, size, 0, &data);
-            memcpy(data, newData, (size_t) size);
-            vkUnmapMemory(*device, m_Memory);
-        }
-        
-    }
-
-
-    void Buffer::createBuffer( 
-        VkDeviceSize size, 
-        VkMemoryPropertyFlags properties,
-        VkPhysicalDevice physicalDevice)
-    { 
-        auto device = m_Device.lock();
-        
-        if (!device) {
-            RP_CORE_ERROR("failed to create vertex buffer!");
+        void* mappedData;
+        if (vmaMapMemory(m_Allocator, m_Allocation, &mappedData) != VK_SUCCESS) {
+            RP_CORE_ERROR("Buffer::addData - Failed to map memory!");
             return;
         }
 
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = size;
-        bufferInfo.usage = m_Usage;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        // Copy the data
+        char* dst = (char*)mappedData + offset;
+        memcpy(dst, newData, size);
 
-        if (vkCreateBuffer(*device, &bufferInfo, nullptr, &m_Buffer) != VK_SUCCESS) {
-            RP_CORE_ERROR("failed to create vertex buffer!");
-            throw std::runtime_error("failed to create vertex buffer!");
+        // If memory is not host coherent, we need to flush
+        if (!(m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+            vmaFlushAllocation(m_Allocator, m_Allocation, offset, size);
         }
 
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(*device, m_Buffer, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties, physicalDevice);
-
-        if (vkAllocateMemory(*device, &allocInfo, nullptr, &m_Memory) != VK_SUCCESS) {
-            RP_CORE_ERROR("failed to allocate vertex buffer memory!");
-            throw std::runtime_error("failed to allocate vertex buffer memory!");
-        }
-
-        vkBindBufferMemory(*device, m_Buffer, m_Memory, 0);
-        
-
+        vmaUnmapMemory(m_Allocator, m_Allocation);
     }
 
-    uint32_t Buffer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, VkPhysicalDevice physicalDevice) {
+
+    void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+    {
+        auto& app = Application::getInstance();
+        auto queueFamilyIndices = app.getVulkanContext().getQueueFamilyIndices();
+
+        CommandPoolConfig config;
+        config.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+        config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        config.threadId = 0;
+
+        auto commandPool = CommandPoolManager::createCommandPool(config);
 
 
-        VkPhysicalDeviceMemoryProperties memProperties;
-        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+        // Create command buffer for transfer
+        auto commandBuffer = commandPool->getCommandBuffer();
 
-        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-            if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-                return i;
-            }
+        // Begin command buffer
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+        VkBufferCopy copyRegion{};
+        copyRegion.srcOffset = 0;
+        copyRegion.dstOffset = 0;
+        copyRegion.size = size;
+        vkCmdCopyBuffer(commandBuffer->getCommandBufferVk(), srcBuffer, dstBuffer, 1, &copyRegion);
+
+        commandBuffer->end();
+        // Submit command buffer
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        VkCommandBuffer commandBuffers[] = {commandBuffer->getCommandBufferVk()};
+        submitInfo.pCommandBuffers = commandBuffers;
+
+        vkQueueSubmit(app.getVulkanContext().getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(app.getVulkanContext().getGraphicsQueue());
+    }
+
+    void Buffer::createBuffer()
+    { 
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = m_Size;
+        bufferInfo.usage = m_usageFlags;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo allocInfo = {};
+        // Set VMA usage flags based on Vulkan memory properties
+        if ((m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) && (m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+            // Used for staging buffers or CPU-writable/readable buffers that the GPU also reads
+            allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        } else if (m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+            // Host visible, but maybe not coherent.
+            allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU; 
+        } else if (m_propertiesFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+            // Device local, not CPU accessible directly
+            allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        } else {
+            allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
         }
 
-        throw std::runtime_error("failed to find suitable memory type!");
 
+        if (vmaCreateBuffer(m_Allocator, &bufferInfo, &allocInfo, &m_Buffer, &m_Allocation, nullptr) != VK_SUCCESS) {
+            RP_CORE_ERROR("failed to create buffer!");
+            throw std::runtime_error("failed to create buffer!");
+        }
     }
 }

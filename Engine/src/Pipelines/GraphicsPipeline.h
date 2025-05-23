@@ -49,9 +49,11 @@ public:
     void buildPipelines(const GraphicsPipelineConfiguration& config);
 
     void bind(VkCommandBuffer commandBuffer, uint32_t subpassIndex);
+
+    VkPipelineLayout getPipelineLayoutVk(uint32_t subpassIndex);
     
 private:
-    void createPipelineLayout(uint32_t subpassIndex);
+    void createPipelineLayout(uint32_t subpassIndex, std::shared_ptr<Shader> shader);
     void createPipeline(const GraphicsPipelineConfiguration& config, uint32_t subpassIndex);
 
 

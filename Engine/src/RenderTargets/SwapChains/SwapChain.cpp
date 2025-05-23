@@ -13,7 +13,11 @@ namespace Rapture {
     m_swapChainImageViews(), 
     m_swapChainImageFormat(),
     m_swapChainExtent(), 
-    m_imageCount(0) {}
+    m_imageCount(0) {
+
+        //invalidate();
+
+    }
 
 
 SwapChain::~SwapChain() {
@@ -56,6 +60,10 @@ void SwapChain::invalidate() {
     auto& windowContext = app.getWindowContext();
     auto device = app.getVulkanContext().getLogicalDevice();
 
+    if (device == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("SwapChain::invalidate - logical device is nullptr!");
+        throw std::runtime_error("SwapChain::invalidate - logical device is nullptr!");
+    }
 
     for (size_t i = 0; i < m_swapChainImageViews.size(); i++) {
         if (m_swapChainImageViews[i] != VK_NULL_HANDLE) {

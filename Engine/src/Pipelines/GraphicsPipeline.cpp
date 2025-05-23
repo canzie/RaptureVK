@@ -54,7 +54,7 @@ void GraphicsPipeline::buildPipelines(const GraphicsPipelineConfiguration &confi
             throw std::runtime_error("GraphicsPipeline::buildPipelines - subpass has no shader program!");
         }
 
-        createPipelineLayout(i);
+        createPipelineLayout(i, config.renderPass->getSubpassInfo(i).shaderProgram);
         createPipeline(config, i);
         m_pipelines[i].name = config.renderPass->getSubpassInfo(i).name + " Graphics Pipeline";
     }
@@ -66,16 +66,20 @@ void GraphicsPipeline::bind(VkCommandBuffer commandBuffer, uint32_t subpassIndex
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines[subpassIndex].pipeline);
 }
 
-void GraphicsPipeline::createPipelineLayout(uint32_t subpassIndex) {
+VkPipelineLayout GraphicsPipeline::getPipelineLayoutVk(uint32_t subpassIndex)
+{
+    return m_pipelines[subpassIndex].pipelineLayout;
+}
+
+void GraphicsPipeline::createPipelineLayout(uint32_t subpassIndex, std::shared_ptr<Shader> shader) {
 
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
-    // TODO: add layouts based on the subpass shaders
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0; // Optional
-    pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
+    pipelineLayoutInfo.setLayoutCount = shader->getDescriptorSetLayouts().size(); // Optional
+    pipelineLayoutInfo.pSetLayouts = shader->getDescriptorSetLayouts().data(); // Optional
     pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
     pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
 

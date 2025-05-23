@@ -31,6 +31,8 @@ GLM_VERSION="1.0.1"            # Tag version for GLM
 ENTT_VERSION_TAG="v3.13.0"     # Full tag for EnTT
 SPDLOG_VERSION_TAG="v1.14.1"   # Full tag for spdlog
 STB_IMAGE_VERSION="master"     # Or a specific commit/tag
+VMA_VERSION_TAG="v3.3.0"       # Full tag for Vulkan Memory Allocator
+SPIRV_REFLECT_VERSION_TAG="main"    # Main branch for SPIRV-Reflect
 
 GLFW_URL="https://github.com/glfw/glfw/releases/download/${GLFW_VERSION}/glfw-${GLFW_VERSION}.zip"
 GLM_URL="https://github.com/g-truc/glm/archive/refs/tags/${GLM_VERSION}.zip" # Changed to archive zip
@@ -39,6 +41,8 @@ IMGUI_BRANCH="docking"
 ENTT_URL="https://github.com/skypjack/entt/archive/refs/tags/${ENTT_VERSION_TAG}.zip"
 SPDLOG_URL="https://github.com/gabime/spdlog/archive/refs/tags/${SPDLOG_VERSION_TAG}.zip"
 STB_IMAGE_H_URL="https://raw.githubusercontent.com/nothings/stb/${STB_IMAGE_VERSION}/stb_image.h"
+VMA_URL="https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/${VMA_VERSION_TAG}.zip"
+SPIRV_REFLECT_URL="https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/heads/${SPIRV_REFLECT_VERSION_TAG}.zip"
 
 # Function to download files (tries curl, then wget)
 download() {
@@ -73,6 +77,8 @@ printf "%-13s %-19s %s\n" "ImGui" "${IMGUI_BRANCH} (branch)" "${IMGUI_REPO}"
 printf "%-13s %-19s %s\n" "EnTT" "${ENTT_VERSION_TAG}" "${ENTT_URL}"
 printf "%-13s %-19s %s\n" "spdlog" "${SPDLOG_VERSION_TAG}" "${SPDLOG_URL}"
 printf "%-13s %-19s %s\n" "stb_image" "${STB_IMAGE_VERSION} (tag/commit)" "${STB_IMAGE_H_URL}"
+printf "%-13s %-19s %s\n" "VMA" "${VMA_VERSION_TAG}" "${VMA_URL}"
+printf "%-13s %-19s %s\n" "SPIRV-Reflect" "${SPIRV_REFLECT_VERSION_TAG}" "${SPIRV_REFLECT_URL}"
 echo "================================================================================"
 ABSOLUTE_VENDOR_DIR="$(cd "$(dirname "$0")" && pwd)/${VENDOR_DIR_NAME}" # Get absolute path robustly
 echo "All libraries will be placed in: ${ABSOLUTE_VENDOR_DIR}"
@@ -218,11 +224,60 @@ EOF
 if [ $? -ne 0 ]; then echo "ERROR: Failed to create stb_image.cpp."; exit 1; fi
 echo "stb_image setup complete."
 
+# --- Vulkan Memory Allocator (VMA) ---
+VMA_VERSION_NO_V=${VMA_VERSION_TAG#v} # Remove 'v' prefix for directory name
+echo
+echo "Setting up Vulkan Memory Allocator ${VMA_VERSION_TAG} (extracted dir expected: VulkanMemoryAllocator-${VMA_VERSION_NO_V})..."
+rm -rf VulkanMemoryAllocator "VulkanMemoryAllocator-${VMA_VERSION_NO_V}" vma.zip # Clean up old
+download "${VMA_URL}" "vma.zip"
+echo "Extracting Vulkan Memory Allocator..."
+unzip -q vma.zip -d . # Extract here
+if [ $? -ne 0 ]; then echo "ERROR: Failed to extract Vulkan Memory Allocator."; rm -f vma.zip; exit 1; fi
+
+EXTRACTED_VMA_DIR="VulkanMemoryAllocator-${VMA_VERSION_NO_V}"
+if [ ! -d "${EXTRACTED_VMA_DIR}" ]; then
+    echo "ERROR: Expected extracted directory "${EXTRACTED_VMA_DIR}" not found."
+    exit 1
+fi
+mv "${EXTRACTED_VMA_DIR}" "VulkanMemoryAllocator"
+rm -f vma.zip
+echo "Vulkan Memory Allocator setup complete."
+
+# --- SPIRV-Reflect ---
+echo
+echo "Setting up SPIRV-Reflect (${SPIRV_REFLECT_VERSION_TAG} branch)..."
+rm -rf SPIRV-Reflect SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG} spirv_reflect.zip # Clean up old
+download "${SPIRV_REFLECT_URL}" "spirv_reflect.zip"
+echo "Extracting SPIRV-Reflect..."
+unzip -q spirv_reflect.zip -d . # Extract here
+if [ $? -ne 0 ]; then echo "ERROR: Failed to extract SPIRV-Reflect."; rm -f spirv_reflect.zip; exit 1; fi
+
+# The extraction creates a directory like SPIRV-Reflect-main
+if [ -d "SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG}" ]; then
+    # Move required files to SPIRV-Reflect directory
+    mkdir -p SPIRV-Reflect
+    # Copy the key files
+    cp "SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG}/spirv_reflect.h" "SPIRV-Reflect/"
+    cp "SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG}/spirv_reflect.c" "SPIRV-Reflect/"
+    cp -R "SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG}/include" "SPIRV-Reflect/"
+    # Copy license and readme for compliance
+    cp "SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG}/LICENSE" "SPIRV-Reflect/"
+    cp "SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG}/README.md" "SPIRV-Reflect/"
+    # Clean up extracted directory
+    rm -rf "SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG}"
+else
+    echo "ERROR: Expected SPIRV-Reflect-${SPIRV_REFLECT_VERSION_TAG} directory not found after extraction."
+    exit 1
+fi
+
+rm -f spirv_reflect.zip
+echo "SPIRV-Reflect setup complete."
+
 # --- Final Directory Verification ---
 echo
 echo "--- Verifying final directory structure in $PWD ---"
 echo "Your vendor_libraries.cmake file should be configured for these directory names."
-EXPECTED_DIRS=("GLFW" "glm" "imgui" "entt" "spdlog" "stb_image")
+EXPECTED_DIRS=("GLFW" "glm" "imgui" "entt" "spdlog" "stb_image" "VulkanMemoryAllocator" "SPIRV-Reflect")
 ALL_FOUND=true
 for DIR_NAME in "${EXPECTED_DIRS[@]}"; do
     if [ -d "$DIR_NAME" ]; then

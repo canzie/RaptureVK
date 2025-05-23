@@ -1,13 +1,21 @@
 #pragma once
 
 #include "glm/glm.hpp"
-#include "Vulkan/vulkan.h"
+
+#include "vma/vk_mem_alloc.h"
 
 #include <array>
 #include <memory>
 #include <vector>
 
 namespace Rapture {
+
+enum class BufferUsage {
+    STATIC, // gpu only
+    DYNAMIC, // host visible
+    STREAM, // coherent
+    STAGING // host visible and coherent
+};
 
 
 struct Vertex {
@@ -44,35 +52,41 @@ struct Vertex {
 
     class Buffer {
     public:
-        Buffer(VkDeviceSize size, std::shared_ptr<VkDevice> device, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkPhysicalDevice physicalDevice);
-        ~Buffer();
+        Buffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator);
+
+        virtual ~Buffer();
 
         //TODO: temp way to destroy object, once the device has been abstracted, destroy in object destructor
-        // for now we cant save the device as the VulkanContext destructor ill delete the device before this object goes out of scope
+        // for now we cant save the device as the VulkanContext destructor will delete the device before this object goes out of scope
 
-        void destoryObjects();
+        virtual void destoryObjects();
 
+        virtual void addData(void* newData, VkDeviceSize size, VkDeviceSize offset);
+        // needs to be subclass specific because of the staging buffer being created
+        // could probably find a way around it but its fine
+        virtual void addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset) = 0;
 
-        void addData(void* newData, VkDeviceSize size, VkDeviceSize offset);
+        VkBuffer& getBufferVk() { return m_Buffer; }
+        VkDeviceSize getSize() const { return m_Size; }
 
-        VkBuffer& getBuffer() { return m_Buffer; }
-        VkDeviceMemory& getMemory() { return m_Memory; }
+        virtual VkBufferUsageFlags getBufferUsage() = 0;
+        virtual VkMemoryPropertyFlags getMemoryPropertyFlags() = 0;
 
+    protected:
+        void createBuffer();
+        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
-
-
-    private:
-        void createBuffer(VkDeviceSize size, VkMemoryPropertyFlags properties, VkPhysicalDevice physicalDevice);
-
-        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, VkPhysicalDevice physicalDevice);
-
-    private:
+    protected:
         VkBuffer m_Buffer;
-        VkDeviceMemory m_Memory;
-        VkBufferUsageFlags m_Usage;
-        VkMemoryPropertyFlags m_Properties;
+        VkBufferUsageFlags m_usageFlags;
+        VkMemoryPropertyFlags m_propertiesFlags;
+        VmaAllocation m_Allocation;
+        VkDeviceSize m_Size;
 
-        std::weak_ptr<VkDevice> m_Device;
+        BufferUsage m_usage;
+
+        VmaAllocator m_Allocator;
+
 
     };
 

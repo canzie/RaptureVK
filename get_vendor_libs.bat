@@ -23,6 +23,8 @@ set GLM_VERSION=1.0.1
 set ENTT_VERSION_TAG=v3.13.0
 set SPDLOG_VERSION_TAG=v1.14.1
 set STB_IMAGE_VERSION=master
+set VMA_VERSION_TAG=v3.3.0
+set SPIRV_REFLECT_VERSION_TAG=main
 
 set GLFW_URL=https://github.com/glfw/glfw/releases/download/%GLFW_VERSION%/glfw-%GLFW_VERSION%.zip
 set GLM_URL=https://github.com/g-truc/glm/archive/refs/tags/%GLM_VERSION%.zip
@@ -31,6 +33,8 @@ set IMGUI_BRANCH=docking
 set ENTT_URL=https://github.com/skypjack/entt/archive/refs/tags/%ENTT_VERSION_TAG%.zip
 set SPDLOG_URL=https://github.com/gabime/spdlog/archive/refs/tags/%SPDLOG_VERSION_TAG%.zip
 set STB_IMAGE_H_URL=https://raw.githubusercontent.com/nothings/stb/%STB_IMAGE_VERSION%/stb_image.h
+set VMA_URL=https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/%VMA_VERSION_TAG%.zip
+set SPIRV_REFLECT_URL=https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/heads/%SPIRV_REFLECT_VERSION_TAG%.zip
 
 REM --- Display Summary and Ask for Confirmation ---
 echo.
@@ -44,6 +48,8 @@ CALL :PrintLibInfo "ImGui" "%IMGUI_BRANCH% (branch)" "%IMGUI_REPO%"
 CALL :PrintLibInfo "EnTT" "%ENTT_VERSION_TAG%" "%ENTT_URL%"
 CALL :PrintLibInfo "spdlog" "%SPDLOG_VERSION_TAG%" "%SPDLOG_URL%"
 CALL :PrintLibInfo "stb_image" "%STB_IMAGE_VERSION% (tag/commit)" "%STB_IMAGE_H_URL%"
+CALL :PrintLibInfo "VMA" "%VMA_VERSION_TAG%" "%VMA_URL%"
+CALL :PrintLibInfo "SPIRV-Reflect" "%SPIRV_REFLECT_VERSION_TAG%" "%SPIRV_REFLECT_URL%"
 echo ================================================================================
 
 REM Get the initial full path of the target vendor directory for display
@@ -152,11 +158,6 @@ if not exist "entt-%ENTT_VERSION_NO_V%" (
     exit /b 1
 )
 
-echo Listing contents of "entt-%ENTT_VERSION_NO_V%\single_include\entt" (expected entt.hpp):
-dir "entt-%ENTT_VERSION_NO_V%\single_include\entt" /b
-echo DEBUG: Pausing before EnTT setup. Check directory listings above.
-pause
-
 REM Create target structure: entt/include/entt/
 mkdir entt\include\entt 2>nul
 if not exist "entt\include\entt" (
@@ -226,11 +227,74 @@ echo Creating stb_image.cpp...
 ) > stb_image\stb_image.cpp
 echo stb_image setup complete.
 
+REM --- Vulkan Memory Allocator (VMA) ---
+echo.
+set VMA_VERSION_NO_V=%VMA_VERSION_TAG:v=%
+echo Setting up Vulkan Memory Allocator %VMA_VERSION_TAG% (extracted dir expected: VulkanMemoryAllocator-%VMA_VERSION_NO_V%)...
+if exist VulkanMemoryAllocator rmdir /s /q VulkanMemoryAllocator 2>nul
+if exist VulkanMemoryAllocator-%VMA_VERSION_NO_V% rmdir /s /q VulkanMemoryAllocator-%VMA_VERSION_NO_V% 2>nul
+curl -L %VMA_URL% -o vma.zip
+if errorlevel 1 ( echo ERROR: Failed to download Vulkan Memory Allocator. && pause && exit /b 1 )
+echo Extracting Vulkan Memory Allocator...
+tar -xf vma.zip
+if errorlevel 1 ( echo ERROR: Failed to extract Vulkan Memory Allocator. && pause && exit /b 1 )
+
+if not exist "VulkanMemoryAllocator-%VMA_VERSION_NO_V%" (
+    echo ERROR: Expected extracted directory "VulkanMemoryAllocator-%VMA_VERSION_NO_V%" not found.
+    pause
+    exit /b 1
+)
+ren "VulkanMemoryAllocator-%VMA_VERSION_NO_V%" VulkanMemoryAllocator
+if errorlevel 1 ( 
+    echo ERROR: Failed to rename "VulkanMemoryAllocator-%VMA_VERSION_NO_V%" to VulkanMemoryAllocator.
+    pause
+    exit /b 1
+)
+del vma.zip
+echo Vulkan Memory Allocator setup complete.
+
+REM --- SPIRV-Reflect ---
+echo.
+echo Setting up SPIRV-Reflect (%SPIRV_REFLECT_VERSION_TAG% branch)...
+if exist SPIRV-Reflect rmdir /s /q SPIRV-Reflect 2>nul
+if exist SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG% rmdir /s /q SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG% 2>nul
+curl -L %SPIRV_REFLECT_URL% -o spirv_reflect.zip
+if errorlevel 1 ( echo ERROR: Failed to download SPIRV-Reflect. && pause && exit /b 1 )
+echo Extracting SPIRV-Reflect...
+tar -xf spirv_reflect.zip
+if errorlevel 1 ( echo ERROR: Failed to extract SPIRV-Reflect. && pause && exit /b 1 )
+
+if not exist "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%" (
+    echo ERROR: Expected extracted directory "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%" not found.
+    pause
+    exit /b 1
+)
+
+REM Create target directory
+mkdir SPIRV-Reflect 2>nul
+if not exist "SPIRV-Reflect" (
+    echo ERROR: Failed to create directory SPIRV-Reflect. Check permissions.
+    pause
+    exit /b 1
+)
+
+REM Copy key files
+copy "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%\spirv_reflect.h" "SPIRV-Reflect\"
+copy "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%\spirv_reflect.c" "SPIRV-Reflect\"
+xcopy /E /I /Y "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%\include" "SPIRV-Reflect\include"
+copy "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%\LICENSE" "SPIRV-Reflect\"
+copy "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%\README.md" "SPIRV-Reflect\"
+
+REM Clean up
+rmdir /s /q "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%"
+del spirv_reflect.zip
+echo SPIRV-Reflect setup complete.
+
 REM --- Final Directory Verification ---
 echo.
 echo --- Verifying final directory structure in %CD% --- 
 echo Your vendor_libraries.cmake file should be configured for these directory names.
-set EXPECTED_DIRS=GLFW glm imgui entt spdlog stb_image
+set EXPECTED_DIRS=GLFW glm imgui entt spdlog stb_image VulkanMemoryAllocator SPIRV-Reflect
 for %%D in (%EXPECTED_DIRS%) do (
     if exist "%%D" (
         echo   [FOUND]   %%D

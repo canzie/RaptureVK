@@ -84,6 +84,11 @@ void GlfwWindowContext::getFramebufferSize(int *width, int *height) const
     glfwGetFramebufferSize(m_glfwWindow, width, height);
 }
 
+void GlfwWindowContext::waitEvents() const
+{
+    glfwWaitEvents();
+}
+
 const char **GlfwWindowContext::getExtensions()
 {
     uint32_t glfwExtensionCount = 0;
