@@ -50,6 +50,7 @@ namespace Rapture {
     m_deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
 
 
     //checkExtensionSupport();
@@ -482,6 +483,23 @@ void VulkanContext::createLogicalDevice()
     } else {
         RP_CORE_WARN("Feature EXT::vertexAttributeRobustness is NOT supported.");
     }
+
+    // --- VK_KHR_dynamic_rendering ---
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeaturesToEnable{};
+    dynamicRenderingFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+
+    // Query specifically for this extension's features
+    VkPhysicalDeviceFeatures2 queryDynamicRendering = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryDynamicRendering.pNext = &dynamicRenderingFeaturesToEnable; // Temporarily chain for querying
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryDynamicRendering);
+
+    if (dynamicRenderingFeaturesToEnable.dynamicRendering) {
+        RP_CORE_INFO("Feature KHR::dynamicRendering is supported and will be enabled.");
+        *ppNextChain = &dynamicRenderingFeaturesToEnable;
+        ppNextChain = &dynamicRenderingFeaturesToEnable.pNext;
+    } else {
+        RP_CORE_WARN("Feature KHR::dynamicRendering is NOT supported.");
+    }
     
     // Ensure the end of the chain is nullptr if no more features are added
     *ppNextChain = nullptr;
@@ -528,6 +546,21 @@ void VulkanContext::createLogicalDevice()
 
     // Store vertex attribute robustness state
     m_isVertexAttributeRobustnessEnabled = attributeRobustnessFeaturesToEnable.vertexAttributeRobustness;
+
+    // Store dynamic rendering state and load function pointers
+    if (dynamicRenderingFeaturesToEnable.dynamicRendering) {
+        vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
+        vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
+        if (!vkCmdBeginRenderingKHR || !vkCmdEndRenderingKHR) {
+            RP_CORE_ERROR("Failed to load dynamic rendering function pointers!");
+            m_isDynamicRenderingEnabled = false;
+        } else {
+            m_isDynamicRenderingEnabled = true;
+            RP_CORE_INFO("Successfully loaded dynamic rendering function pointers.");
+        }
+    } else {
+        m_isDynamicRenderingEnabled = false;
+    }
 
     // retrieve queues
     m_queues[indices.graphicsFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());

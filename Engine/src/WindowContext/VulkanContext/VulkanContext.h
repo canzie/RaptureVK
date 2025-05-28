@@ -39,9 +39,12 @@ class VulkanContext {
 
         bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
         bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
+        bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
 
         // Extension function pointers
         PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
+        PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR = nullptr;
+        PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR = nullptr;
 
         // 
         void createRecourses(WindowContext* windowContext);
@@ -108,6 +111,7 @@ class VulkanContext {
 
         bool m_isVertexInputDynamicStateEnabled;
         bool m_isVertexAttributeRobustnessEnabled;
+        bool m_isDynamicRenderingEnabled;
 
     };
 
