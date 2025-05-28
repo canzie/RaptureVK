@@ -51,3 +51,7 @@ release/
 
 # vendor
 vendor/
+
+# keep cmake file in vendor
+
+!Engine/vendor/vendor_libraries.cmake
