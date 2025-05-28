@@ -50,8 +50,5 @@ release/
 .git
 
 # vendor
-vendor/
-
-# keep cmake file in vendor
-
+Engine/vendor/*
 !Engine/vendor/vendor_libraries.cmake
