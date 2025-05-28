@@ -8,10 +8,14 @@
 
 #include "WindowContext/Application.h"
 
+#include "Shaders/Shader.h"
+
 namespace Rapture {
 
-// Define the static member variable
-VkDescriptorPool BaseMaterial::s_DescriptorPool = VK_NULL_HANDLE;
+
+
+bool MaterialManager::s_initialized = false;
+
 
 std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::s_materials;
 
@@ -24,32 +28,34 @@ std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::
             throw std::runtime_error("Material::BaseMaterial - shader has no descriptor set layout for a material!");
         }
 
-        m_descriptorSetLayout = shader->getDescriptorSetLayouts()[1];
+        m_descriptorSetLayout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
         // get descriptor info
         // assume only 1 descriptor in that set for now
-        auto info = m_shader->getMaterialSets()[0];
+        auto infos = m_shader->getMaterialSets();
 
         if (name.empty()) {
-            m_name = info.name;
+            m_name = infos[0].name;
         } else {
             m_name = name;
         }
 
         m_sizeBytes = 0;
-
+        for (auto& info : infos) {
         // get descriptor set layout
-        for (auto& parameter : info.params) {
-            auto param = MaterialParameter(parameter);
-            if (param.m_info.parameterId != ParameterID::UNKNOWN) {
-                m_parameterMap[param.m_info.parameterId] = param;
-                m_sizeBytes += param.m_info.size;
-            } else {
-                RP_CORE_ERROR("Material::BaseMaterial - unknown parameter id: {0} and type: {1}", parameter.name, parameter.type);
+            for (auto& parameter : info.params) {
+                auto param = MaterialParameter(parameter, info.binding);
+        
+                if (param.m_info.parameterId != ParameterID::UNKNOWN) {
+                    m_parameterMap[param.m_info.parameterId] = param;
+                    m_sizeBytes += param.m_info.size;
+                } else {
+                    RP_CORE_ERROR("Material::BaseMaterial - unknown parameter id: {0} and type: {1}", parameter.name, parameter.type);
+                }
             }
         }
         
         if (m_sizeBytes == 0) {
-            RP_CORE_ERROR("Material::BaseMaterial - no valid parameters found in material set {0}", info.name);
+            RP_CORE_ERROR("Material::BaseMaterial - no valid parameters found in material set {0}", infos[0].name);
             throw std::runtime_error("Material::BaseMaterial - no valid parameters found in material set {0}");
         }
 
@@ -59,41 +65,39 @@ std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::
     {
         s_materials.clear();
 
-        auto& app = Application::getInstance();
-        auto device = app.getVulkanContext().getLogicalDevice();
-
-        VkDescriptorPoolSize poolSize{};
-        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSize.descriptorCount = 100;
-
-        VkDescriptorPoolCreateInfo poolInfo{};
-        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = 1;
-        poolInfo.pPoolSizes = &poolSize;
-
-        poolInfo.maxSets = 100;
-
-        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &BaseMaterial::s_DescriptorPool) != VK_SUCCESS) {
-            RP_CORE_ERROR("failed to create descriptor pool!");
-            throw std::runtime_error("failed to create descriptor pool!");
-        }
-
         // create material for simple shader
         // load shader
-        const std::filesystem::path vertShaderPath = "E:/Dev/Games/RaptureVK/Engine/assets/shaders/SPIRV/default.vs.spv";
+        const std::filesystem::path basicShaderPath = "E:/Dev/Games/RaptureVK/Engine/assets/shaders/SPIRV/default.vs.spv";
 
-        auto [shader, handle] = AssetManager::importAsset<Shader>(vertShaderPath);
+        auto [basicShader, basicShaderHandle] = AssetManager::importAsset<Shader>(basicShaderPath);
         // create material in a try catch
         try {
-            auto material = std::make_shared<BaseMaterial>(shader);
+            auto material = std::make_shared<BaseMaterial>(basicShader, "material");
             auto name = material->getName();
             if (name.empty()) {
-                name = std::to_string(handle) + "_material";
+                name = std::to_string(basicShaderHandle) + "_material";
             }
             s_materials[name] = material;
         } catch (const std::exception& e) {
             RP_CORE_ERROR("MaterialManager::init - {}", e.what());
         }
+
+        const std::filesystem::path pbrShaderPath = "E:/Dev/Games/RaptureVK/Engine/assets/shaders/SPIRV/pbr.vs.spv";
+
+        auto [pbrShader, pbrShaderHandle] = AssetManager::importAsset<Shader>(pbrShaderPath);
+        // create material in a try catch
+        try {
+            auto material = std::make_shared<BaseMaterial>(pbrShader, "PBR");
+            auto name = material->getName();
+            if (name.empty()) {
+                name = std::to_string(pbrShaderHandle) + "_material";
+            }
+            s_materials[name] = material;
+        } catch (const std::exception& e) {
+            RP_CORE_ERROR("MaterialManager::init - {}", e.what());
+        }
+
+        s_initialized = true;
     }
 
     void MaterialManager::shutdown()
@@ -104,11 +108,16 @@ std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::
         // destroy all materials
         s_materials.clear();
 
-        vkDestroyDescriptorPool(device, BaseMaterial::s_DescriptorPool, nullptr);
+        s_initialized = false;
     }
 
     std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &name)
     {
+        if (!s_initialized) {
+            RP_CORE_ERROR("MaterialManager::getMaterial - material manager not initialized!");
+            return nullptr;
+        }
+
         if (s_materials.find(name) == s_materials.end()) {
             RP_CORE_ERROR("MaterialManager::getMaterial - material '{0}' not found!", name);
             return nullptr;

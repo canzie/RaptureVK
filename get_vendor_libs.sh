@@ -33,6 +33,7 @@ SPDLOG_VERSION_TAG="v1.14.1"   # Full tag for spdlog
 STB_IMAGE_VERSION="master"     # Or a specific commit/tag
 VMA_VERSION_TAG="v3.3.0"       # Full tag for Vulkan Memory Allocator
 SPIRV_REFLECT_VERSION_TAG="main"    # Main branch for SPIRV-Reflect
+YYJSON_VERSION_TAG="0.11.1"      # Full tag for yyjson
 
 GLFW_URL="https://github.com/glfw/glfw/releases/download/${GLFW_VERSION}/glfw-${GLFW_VERSION}.zip"
 GLM_URL="https://github.com/g-truc/glm/archive/refs/tags/${GLM_VERSION}.zip" # Changed to archive zip
@@ -43,6 +44,7 @@ SPDLOG_URL="https://github.com/gabime/spdlog/archive/refs/tags/${SPDLOG_VERSION_
 STB_IMAGE_H_URL="https://raw.githubusercontent.com/nothings/stb/${STB_IMAGE_VERSION}/stb_image.h"
 VMA_URL="https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/${VMA_VERSION_TAG}.zip"
 SPIRV_REFLECT_URL="https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/heads/${SPIRV_REFLECT_VERSION_TAG}.zip"
+YYJSON_URL="https://github.com/ibireme/yyjson/archive/refs/tags/${YYJSON_VERSION_TAG}.zip"
 
 # Function to download files (tries curl, then wget)
 download() {
@@ -79,6 +81,7 @@ printf "%-13s %-19s %s\n" "spdlog" "${SPDLOG_VERSION_TAG}" "${SPDLOG_URL}"
 printf "%-13s %-19s %s\n" "stb_image" "${STB_IMAGE_VERSION} (tag/commit)" "${STB_IMAGE_H_URL}"
 printf "%-13s %-19s %s\n" "VMA" "${VMA_VERSION_TAG}" "${VMA_URL}"
 printf "%-13s %-19s %s\n" "SPIRV-Reflect" "${SPIRV_REFLECT_VERSION_TAG}" "${SPIRV_REFLECT_URL}"
+printf "%-13s %-19s %s\n" "yyjson" "${YYJSON_VERSION_TAG}" "${YYJSON_URL}"
 echo "================================================================================"
 ABSOLUTE_VENDOR_DIR="$(cd "$(dirname "$0")" && pwd)/${VENDOR_DIR_NAME}" # Get absolute path robustly
 echo "All libraries will be placed in: ${ABSOLUTE_VENDOR_DIR}"
@@ -273,11 +276,45 @@ fi
 rm -f spirv_reflect.zip
 echo "SPIRV-Reflect setup complete."
 
+# --- yyjson ---
+echo
+echo "Setting up yyjson ${YYJSON_VERSION_TAG}..."
+rm -rf yyjson yyjson-${YYJSON_VERSION_TAG} yyjson.zip # Clean up old
+download "${YYJSON_URL}" "yyjson.zip"
+echo "Extracting yyjson..."
+unzip -q yyjson.zip -d . # Extract here
+if [ $? -ne 0 ]; then echo "ERROR: Failed to extract yyjson."; rm -f yyjson.zip; exit 1; fi
+
+EXTRACTED_YYJSON_DIR="yyjson-${YYJSON_VERSION_TAG}"
+TARGET_YYJSON_DIR="yyjson"
+
+if [ ! -d "${EXTRACTED_YYJSON_DIR}" ]; then
+    echo "ERROR: Expected extracted directory ${EXTRACTED_YYJSON_DIR} not found for yyjson."
+    exit 1
+fi
+
+mkdir -p "${TARGET_YYJSON_DIR}"
+if [ ! -f "${EXTRACTED_YYJSON_DIR}/src/yyjson.h" ] || [ ! -f "${EXTRACTED_YYJSON_DIR}/src/yyjson.c" ]; then
+    echo "ERROR: yyjson.h or yyjson.c not found in ${EXTRACTED_YYJSON_DIR}/src."
+    exit 1
+fi
+
+mv "${EXTRACTED_YYJSON_DIR}/src/yyjson.h" "${TARGET_YYJSON_DIR}/"
+mv "${EXTRACTED_YYJSON_DIR}/src/yyjson.c" "${TARGET_YYJSON_DIR}/"
+# Copy license for compliance
+if [ -f "${EXTRACTED_YYJSON_DIR}/LICENSE" ]; then
+    cp "${EXTRACTED_YYJSON_DIR}/LICENSE" "${TARGET_YYJSON_DIR}/"
+fi
+
+rm -rf "${EXTRACTED_YYJSON_DIR}"
+rm -f yyjson.zip
+echo "yyjson setup complete."
+
 # --- Final Directory Verification ---
 echo
 echo "--- Verifying final directory structure in $PWD ---"
 echo "Your vendor_libraries.cmake file should be configured for these directory names."
-EXPECTED_DIRS=("GLFW" "glm" "imgui" "entt" "spdlog" "stb_image" "VulkanMemoryAllocator" "SPIRV-Reflect")
+EXPECTED_DIRS=("GLFW" "glm" "imgui" "entt" "spdlog" "stb_image" "VulkanMemoryAllocator" "SPIRV-Reflect" "yyjson")
 ALL_FOUND=true
 for DIR_NAME in "${EXPECTED_DIRS[@]}"; do
     if [ -d "$DIR_NAME" ]; then

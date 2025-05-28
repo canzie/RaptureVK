@@ -25,6 +25,7 @@ set SPDLOG_VERSION_TAG=v1.14.1
 set STB_IMAGE_VERSION=master
 set VMA_VERSION_TAG=v3.3.0
 set SPIRV_REFLECT_VERSION_TAG=main
+set YYJSON_VERSION_TAG=0.11.1
 
 set GLFW_URL=https://github.com/glfw/glfw/releases/download/%GLFW_VERSION%/glfw-%GLFW_VERSION%.zip
 set GLM_URL=https://github.com/g-truc/glm/archive/refs/tags/%GLM_VERSION%.zip
@@ -35,6 +36,7 @@ set SPDLOG_URL=https://github.com/gabime/spdlog/archive/refs/tags/%SPDLOG_VERSIO
 set STB_IMAGE_H_URL=https://raw.githubusercontent.com/nothings/stb/%STB_IMAGE_VERSION%/stb_image.h
 set VMA_URL=https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/%VMA_VERSION_TAG%.zip
 set SPIRV_REFLECT_URL=https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/heads/%SPIRV_REFLECT_VERSION_TAG%.zip
+set YYJSON_URL=https://github.com/ibireme/yyjson/archive/refs/tags/%YYJSON_VERSION_TAG%.zip
 
 REM --- Display Summary and Ask for Confirmation ---
 echo.
@@ -50,6 +52,7 @@ CALL :PrintLibInfo "spdlog" "%SPDLOG_VERSION_TAG%" "%SPDLOG_URL%"
 CALL :PrintLibInfo "stb_image" "%STB_IMAGE_VERSION% (tag/commit)" "%STB_IMAGE_H_URL%"
 CALL :PrintLibInfo "VMA" "%VMA_VERSION_TAG%" "%VMA_URL%"
 CALL :PrintLibInfo "SPIRV-Reflect" "%SPIRV_REFLECT_VERSION_TAG%" "%SPIRV_REFLECT_URL%"
+CALL :PrintLibInfo "yyjson" "%YYJSON_VERSION_TAG%" "%YYJSON_URL%"
 echo ================================================================================
 
 REM Get the initial full path of the target vendor directory for display
@@ -290,11 +293,56 @@ rmdir /s /q "SPIRV-Reflect-%SPIRV_REFLECT_VERSION_TAG%"
 del spirv_reflect.zip
 echo SPIRV-Reflect setup complete.
 
+REM --- yyjson ---
+echo.
+set YYJSON_VERSION_NO_V=%YYJSON_VERSION_TAG:v=%
+echo Setting up yyjson %YYJSON_VERSION_TAG% (extracted dir expected: yyjson-%YYJSON_VERSION_NO_V%)...
+if exist yyjson rmdir /s /q yyjson 2>nul
+if exist yyjson-%YYJSON_VERSION_NO_V% rmdir /s /q yyjson-%YYJSON_VERSION_NO_V% 2>nul
+curl -L %YYJSON_URL% -o yyjson.zip
+if errorlevel 1 ( echo ERROR: Failed to download yyjson. && pause && exit /b 1 )
+echo Extracting yyjson...
+tar -xf yyjson.zip
+if errorlevel 1 ( echo ERROR: Failed to extract yyjson. && pause && exit /b 1 )
+
+set EXTRACTED_YYJSON_DIR=yyjson-%YYJSON_VERSION_NO_V%
+set TARGET_YYJSON_DIR=yyjson
+
+if not exist "%EXTRACTED_YYJSON_DIR%" (
+    echo ERROR: Expected extracted directory "%EXTRACTED_YYJSON_DIR%" not found for yyjson.
+    pause
+    exit /b 1
+)
+
+mkdir "%TARGET_YYJSON_DIR%" 2>nul
+
+if not exist "%EXTRACTED_YYJSON_DIR%\src\yyjson.h" (
+    echo ERROR: yyjson.h not found in %EXTRACTED_YYJSON_DIR%\src.
+    pause
+    exit /b 1
+)
+if not exist "%EXTRACTED_YYJSON_DIR%\src\yyjson.c" (
+    echo ERROR: yyjson.c not found in %EXTRACTED_YYJSON_DIR%\src.
+    pause
+    exit /b 1
+)
+
+move "%EXTRACTED_YYJSON_DIR%\src\yyjson.h" "%TARGET_YYJSON_DIR%\"
+move "%EXTRACTED_YYJSON_DIR%\src\yyjson.c" "%TARGET_YYJSON_DIR%\"
+
+if exist "%EXTRACTED_YYJSON_DIR%\LICENSE" (
+    copy "%EXTRACTED_YYJSON_DIR%\LICENSE" "%TARGET_YYJSON_DIR%\"
+)
+
+rmdir /s /q "%EXTRACTED_YYJSON_DIR%"
+del yyjson.zip
+echo yyjson setup complete.
+
 REM --- Final Directory Verification ---
 echo.
 echo --- Verifying final directory structure in %CD% --- 
 echo Your vendor_libraries.cmake file should be configured for these directory names.
-set EXPECTED_DIRS=GLFW glm imgui entt spdlog stb_image VulkanMemoryAllocator SPIRV-Reflect
+set EXPECTED_DIRS=GLFW glm imgui entt spdlog stb_image VulkanMemoryAllocator SPIRV-Reflect yyjson
 for %%D in (%EXPECTED_DIRS%) do (
     if exist "%%D" (
         echo   [FOUND]   %%D

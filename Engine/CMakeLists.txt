@@ -26,10 +26,10 @@ else()
 endif()
 
 # Create engine library
-# add_library(${ENGINE_NAME} STATIC ${ENGINE_SOURCES})
+add_library(${ENGINE_NAME} STATIC ${ENGINE_SOURCES})
 
 # Create engine executable (changed from library)
-add_executable(${ENGINE_NAME} ${ENGINE_SOURCES})
+#add_executable(${ENGINE_NAME} ${ENGINE_SOURCES})
 
 # Include directories
 target_include_directories(${ENGINE_NAME} PUBLIC

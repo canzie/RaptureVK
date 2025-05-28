@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <memory>
 #include <utility>
+#include <filesystem>
 
 #include "AssetManagerBase.h"
 #include "Asset.h"
@@ -27,6 +28,8 @@ namespace Rapture {
 
             std::pair<std::shared_ptr<Asset>, AssetHandle> importAsset(std::filesystem::path path, std::vector<uint32_t> indices = {0}, AssetType assetType = AssetType::None);
 
+            std::pair<std::shared_ptr<Asset>, AssetHandle> importDefaultAsset(AssetType assetType);
+
             const AssetRegistry& getAssetRegistry() const { return m_assetRegistry; }
             const AssetMap& getLoadedAssets() const { return m_loadedAssets; }
 
@@ -35,6 +38,9 @@ namespace Rapture {
             AssetType determineAssetType(const std::string& path);
             
             AssetRegistry m_assetRegistry;
+            
+            // Track default asset handles to avoid recreating them
+            std::unordered_map<AssetType, AssetHandle> m_defaultAssetHandles;
     };
 
 

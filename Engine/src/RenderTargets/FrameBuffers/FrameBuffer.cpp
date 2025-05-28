@@ -14,13 +14,22 @@ namespace Rapture {
     {
         invalidate();
     }
+    
 
     FrameBuffer::FrameBuffer(const SwapChain &swapChain, uint32_t SCImageViewIndex, VkRenderPass renderPass)
         : m_renderPass(renderPass), m_framebuffer(VK_NULL_HANDLE)
     {
         m_specification.width = swapChain.getExtent().width;
         m_specification.height = swapChain.getExtent().height;
+        
+        // Add color attachment (swapchain image)
         m_specification.attachments = {swapChain.getImageViews()[SCImageViewIndex]};
+        
+        // Add depth attachment if available
+        if (swapChain.getDepthTexture()) {
+            m_specification.attachments.push_back(swapChain.getDepthTexture()->getImageView());
+        }
+        
         m_specification.swapChainTarget = true;
         invalidate();
     }
@@ -48,7 +57,15 @@ namespace Rapture {
     {
         m_specification.width = swapChain.getExtent().width;
         m_specification.height = swapChain.getExtent().height;
+        
+        // Add color attachment (swapchain image)
         m_specification.attachments = {swapChain.getImageViews()[SCImageViewIndex]};
+        
+        // Add depth attachment if available
+        if (swapChain.getDepthTexture()) {
+            m_specification.attachments.push_back(swapChain.getDepthTexture()->getImageView());
+        }
+        
         invalidate();
     }
 

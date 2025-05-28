@@ -20,8 +20,8 @@ class UniformBuffer : public Buffer {
         UniformBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator, void* data = nullptr);
         ~UniformBuffer();
 
-        void createDescriptorSet(VkDescriptorSetLayout layout, VkDescriptorPool descriptorPool, uint32_t binding);
-        VkDescriptorSet getDescriptorSet() const { return m_descriptorSet; }
+        // Get descriptor buffer info for use in descriptor sets
+        VkDescriptorBufferInfo getDescriptorBufferInfo() const;
         
         virtual VkBufferUsageFlags getBufferUsage() override;
         virtual VkMemoryPropertyFlags getMemoryPropertyFlags() override;
@@ -31,7 +31,6 @@ class UniformBuffer : public Buffer {
 
 
     private:
-        VkDescriptorSet m_descriptorSet;
 
         
         

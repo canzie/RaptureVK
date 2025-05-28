@@ -1,11 +1,29 @@
 #include "IndexBuffer.h"
 #include "Logging/Log.h"
 
+#include "Utils/GLTypes.h"
+
 namespace Rapture {
 
 
-IndexBuffer::IndexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator)
-    : Buffer(size, usage, allocator)
+
+
+
+VkIndexType getIndexTypeVk(uint32_t indexType) {
+    switch (indexType) {
+        case UNSIGNED_SHORT_TYPE:
+            return VK_INDEX_TYPE_UINT16;
+        case UNSIGNED_INT_TYPE: // UNSIGNED_INT
+            return VK_INDEX_TYPE_UINT32;
+        case UNSIGNED_BYTE_TYPE: // UNSIGNED_BYTE
+            return VK_INDEX_TYPE_UINT8;
+        default:
+            return VK_INDEX_TYPE_UINT16; // Default to uint32
+    }
+}
+
+IndexBuffer::IndexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator, VkIndexType indexType)
+    : Buffer(size, usage, allocator), m_indexType(indexType)
 {
 
     m_usageFlags = getBufferUsage();
@@ -13,6 +31,12 @@ IndexBuffer::IndexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allo
         
     createBuffer();
 }   
+
+IndexBuffer::IndexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator, uint32_t indexType)
+    : IndexBuffer(size, usage, allocator, getIndexTypeVk(indexType)) {}   
+
+
+
 
 IndexBuffer::~IndexBuffer()
 {
@@ -55,7 +79,7 @@ void IndexBuffer::addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset)
     }
 
     // Create a staging buffer
-    IndexBuffer stagingBuffer(size, BufferUsage::STAGING, m_Allocator);
+    IndexBuffer stagingBuffer(size, BufferUsage::STAGING, m_Allocator, m_indexType);
 
 
     // Copy data to staging buffer

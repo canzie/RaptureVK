@@ -48,6 +48,11 @@ VkMemoryPropertyFlags VertexBuffer::getMemoryPropertyFlags() {
 
 }
 
+void VertexBuffer::setBufferLayout(const BufferLayout& bufferLayout)
+{
+    m_bufferLayout = bufferLayout;
+}
+
 
 void VertexBuffer::addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset)
 {

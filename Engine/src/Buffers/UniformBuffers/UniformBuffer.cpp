@@ -26,43 +26,14 @@ UniformBuffer::UniformBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator 
 UniformBuffer::~UniformBuffer() {
 }
 
-
-void UniformBuffer::createDescriptorSet(VkDescriptorSetLayout layout, VkDescriptorPool descriptorPool, uint32_t binding)
-{
-
-    auto& app = Application::getInstance();
-    auto device = app.getVulkanContext().getLogicalDevice();
-
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &layout;
-
-    if (vkAllocateDescriptorSets(device, &allocInfo, &m_descriptorSet) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-
+VkDescriptorBufferInfo UniformBuffer::getDescriptorBufferInfo() const {
     VkDescriptorBufferInfo bufferInfo{};
     bufferInfo.buffer = m_Buffer;
     bufferInfo.offset = 0;
     bufferInfo.range = m_Size;
-
-    VkWriteDescriptorSet descriptorWrite{};
-    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = m_descriptorSet;
-    descriptorWrite.dstBinding = binding;
-    descriptorWrite.dstArrayElement = 0;
-
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pBufferInfo = &bufferInfo;
-    descriptorWrite.pImageInfo = nullptr; // Optional
-    descriptorWrite.pTexelBufferView = nullptr; // Optional
-
-    vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
-    
+    return bufferInfo;
 }
+
 
 VkBufferUsageFlags UniformBuffer::getBufferUsage()
 {

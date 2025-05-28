@@ -39,10 +39,6 @@ public:
 		}
 	}
 	
-	// Alias for publish to maintain compatibility with existing code
-	void invoke(Args... args) const {
-		publish(args...);
-	}
 
 	// Clear all listeners from this event bus
 	void clearListeners() {

@@ -25,9 +25,9 @@ namespace Rapture {
     // any common resources are stored in the first set
     // any data related to the material (albedo, metallic, emmisive, ...) will be in a seperate set
     enum class DESCRIPTOR_SET_INDICES : uint8_t {
-        COMMON_RESOURCES = 0,
-        MATERIAL = 1,
-        BUFFER_RESOURCES = 2,
+        COMMON_RESOURCES = 0, // updated once per frame, global resources
+        MATERIAL = 1, // updated per material
+        OBJECT_RESOURCES = 2, // updated per object
         EXTRA_RESOURCES = 3
     };
 

@@ -13,12 +13,12 @@ namespace Rapture {
 
     struct CommandPoolConfig {
 
-        uint32_t threadId=0;
+        size_t threadId=0;
         uint32_t queueFamilyIndex;
         VkCommandPoolCreateFlags flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
         uint32_t hash() const {
-            return std::hash<uint32_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^ std::hash<VkCommandPoolCreateFlags>()(flags);
+            return std::hash<size_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^ std::hash<VkCommandPoolCreateFlags>()(flags);
         }
     };
 

@@ -3,6 +3,7 @@
 #include "Utils/UUID.h"
 #include "Logging/Log.h"
 #include "Materials/Material.h"
+#include "Textures/Texture.h"
 
 #include "WindowContext/Application.h"
 
@@ -24,6 +25,7 @@ namespace Rapture {
         }
         m_loadedAssets.clear();
         m_assetRegistry.clear();
+        m_defaultAssetHandles.clear();
     }
 
     bool AssetManagerEditor::isAssetHandleValid(AssetHandle handle) const {
@@ -123,6 +125,62 @@ namespace Rapture {
 
     }
 
+    std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefaultAsset(AssetType assetType)
+    {
+        // Check if we already have a default asset of this type
+        auto it = m_defaultAssetHandles.find(assetType);
+        if (it != m_defaultAssetHandles.end()) {
+            AssetHandle existingHandle = it->second;
+            // Verify the asset is still loaded and valid
+            if (isAssetLoaded(existingHandle)) {
+                return std::make_pair(getAsset(existingHandle), existingHandle);
+            } else {
+                // Asset was unloaded somehow, remove the handle and recreate
+                RP_CORE_WARN("AssetManagerEditor::importDefaultAsset - Default {} asset was unloaded, recreating", AssetTypeToString(assetType));
+                m_defaultAssetHandles.erase(it);
+            }
+        }
+
+        switch (assetType) {
+            case AssetType::Texture: {
+                // Create default white texture
+                auto defaultTexture = Texture::createDefaultWhiteTexture();
+                if (!defaultTexture) {
+                    RP_CORE_ERROR("AssetManagerEditor::importDefaultAsset - Failed to create default white texture");
+                    return std::make_pair(nullptr, AssetHandle());
+                }
+                defaultTexture->setReadyForSampling(true);
+
+                // Generate a handle for the default texture
+                AssetHandle handle = UUIDGenerator::Generate();
+
+                // Create metadata for the default texture
+                AssetMetadata metadata;
+                metadata.m_assetType = AssetType::Texture;
+                metadata.m_filePath = "<default_white_texture>"; // Special path to indicate default asset
+                metadata.m_indices = {0};
+
+                // Wrap the texture in an Asset object
+                AssetVariant assetVariant = defaultTexture;
+                std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
+                std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+                asset->m_handle = handle;
+
+                // Register the asset
+                m_assetRegistry.insert_or_assign(handle, metadata);
+                m_loadedAssets.insert_or_assign(handle, asset);
+                
+                // Track this as a default asset
+                m_defaultAssetHandles[assetType] = handle;
+
+                RP_CORE_INFO("AssetManagerEditor::importDefaultAsset - Created default white texture with handle");
+                return std::make_pair(asset, handle);
+            }
+            default:
+                RP_CORE_WARN("AssetManagerEditor::importDefaultAsset - Default asset type {} not implemented", AssetTypeToString(assetType));
+                return std::make_pair(nullptr, AssetHandle());
+        }
+    }
 
     AssetType AssetManagerEditor::determineAssetType(const std::string& path) {
         std::filesystem::path filePath(path);
@@ -136,7 +194,7 @@ namespace Rapture {
         // Determine asset type based on file extension
         if (extension == ".png" || extension == ".jpg" || extension == ".jpeg" || 
             extension == ".tga" || extension == ".bmp" || extension == ".hdr") {
-            return AssetType::None;
+            return AssetType::Texture;
         }
         else if (extension == ".gltf") {
             return AssetType::None;

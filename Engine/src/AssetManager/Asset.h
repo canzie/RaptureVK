@@ -13,15 +13,24 @@ namespace Rapture {
     // Forward declarations to break circular dependency
     class Material;
     class Shader; // Forward declare Shader
+    class Texture;
 
     using AssetHandle = UUID;
     // NOTE: i dont like this but dont know variants well enough and dont want to change the entire codebase
-    using AssetVariant = std::variant<std::monostate, std::shared_ptr<Material>, std::shared_ptr<Shader>>;
+    using AssetVariant = std::variant<std::monostate, std::shared_ptr<Material>, std::shared_ptr<Shader>, std::shared_ptr<Texture>>;
 
     enum class AssetType {
         None = 0,
         Material,
-        Shader
+        Shader,
+        Texture
+    };
+
+    enum class AssetStatus {
+        REQUESTED,
+        LOADING,
+        LOADED,
+        FAILED
     };
 
     inline std::string AssetTypeToString(AssetType type) {
@@ -29,6 +38,7 @@ namespace Rapture {
             case AssetType::None: return "None";
             case AssetType::Material: return "Material";
             case AssetType::Shader: return "Shader";
+            case AssetType::Texture: return "Texture";
             default: return "Unknown";
         }
     }
@@ -71,6 +81,7 @@ namespace Rapture {
 
     public:
         AssetHandle m_handle;
+        AssetStatus m_status = AssetStatus::REQUESTED;
         //AssetType getAssetType() const;
 
     private:

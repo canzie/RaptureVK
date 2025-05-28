@@ -15,6 +15,7 @@
 
 #include "glm/glm.hpp"
 
+#include "Textures/Texture.h"
 
 namespace Rapture {
 
@@ -30,6 +31,9 @@ enum class ParameterID : uint16_t {
     // Roughness parameters
     ROUGHNESS,
     ROUGHNESS_MAP,
+
+
+    METALLIC_ROUGHNESS_MAP,
     
     // Normal mapping
     NORMAL,
@@ -38,6 +42,7 @@ enum class ParameterID : uint16_t {
     // Additional texture maps
     HEIGHT_MAP,
     AO_MAP,
+    AO,
     
     // Extended PBR parameters
     EMISSIVE,
@@ -56,8 +61,7 @@ enum class MaterialParameterTypes {
     FLOAT, INT, UINT, UINT64, BOOL,
     VEC2, VEC3, VEC4, UVEC2, UVEC3, UVEC4, IVEC2, IVEC3, IVEC4,
     MAT3, MAT4,
-    TEXTURE_2D, TEXTURE_CUBE, TEXTURE_3D,
-    SAMPLER,
+    TEXTURE, COMBINED_IMAGE_SAMPLER, SAMPLER,
     UNKNOWN
 };
 
@@ -77,8 +81,9 @@ struct MaterialParameterInfo {
 
 MaterialParameterTypes stringToMaterialParameterType(const std::string& str);
 std::string parameterTypeToString(MaterialParameterTypes type);
+std::string parameterIdToString(ParameterID id);
 
-using MaterialTypes = std::variant<std::monostate, int32_t, uint32_t, uint64_t, bool, float, glm::vec2, glm::vec3, glm::vec4, glm::mat3, glm::mat4>;
+using MaterialTypes = std::variant<std::monostate, int32_t, uint32_t, uint64_t, bool, float, glm::vec2, glm::vec3, glm::vec4, glm::mat3, glm::mat4, std::shared_ptr<Texture>>;
 
 
 class MaterialParameter {
@@ -91,7 +96,7 @@ public:
         // will use their default member initializers if present, or be zero/false.
     }
 
-    MaterialParameter(const DescriptorParamInfo& info);
+    MaterialParameter(const DescriptorParamInfo& info, uint32_t binding = 0);
 
     float     asFloat()  { return std::get<float>(m_value); }
     int32_t   asInt()    { return std::get<int32_t>(m_value); }

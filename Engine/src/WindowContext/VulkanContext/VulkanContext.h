@@ -1,66 +1,50 @@
 #pragma once
 
-
 #include <vma/vk_mem_alloc.h>
 
 #include "WindowContext/WindowContext.h"
+#include "WindowContext/VulkanContext/VulkanTypes.h"
+#include "WindowContext/VulkanContext/VulkanQueue.h"
 
-#include "Buffers/Buffers.h"
-
-#include "RenderTargets/FrameBuffers/FrameBuffer.h"
-#include "RenderTargets/SwapChains/SwapChain.h"
-#include "RenderTargets/FrameBuffers/Renderpass.h"
-#include "Pipelines/GraphicsPipeline.h"
-#include "Shaders/Shader.h"
-
-#include "Buffers/CommandBuffers/CommandPool.h"
-#include "Buffers/CommandBuffers/CommandBuffer.h"
-
-#include <optional>
 #include <vector>
-
+#include <map>
+#include <memory>
+#include <mutex>
 
 namespace Rapture {
 
-    struct QueueFamilyIndices {
-        std::optional<uint32_t> graphicsFamily;
-        std::optional<uint32_t> computeFamily;
-        std::optional<uint32_t> presentFamily;
-
-        bool isComplete() {
-            return graphicsFamily.has_value() && computeFamily.has_value() && presentFamily.has_value();
-        }
-    };
-
-    struct SwapChainSupportDetails {
-        VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> presentModes;
-    };
-
-
+class SwapChain;
+class Renderpass;
 
 class VulkanContext {
     public:
         VulkanContext(WindowContext* windowContext);
         ~VulkanContext();
 
-
-        //void drawFrame(WindowContext* windowContext);
         void waitIdle();
 
-        VkDevice getLogicalDevice() const { return *m_device; }
+        VkDevice getLogicalDevice() const { return m_device; }
         VkSurfaceKHR getSurface() const { return m_surface; }
         VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
-        QueueFamilyIndices getQueueFamilyIndices() const;
+        VkInstance getInstance() const { return m_instance; }
+        QueueFamilyIndices getQueueFamilyIndices() const { return m_queueFamilyIndices; }
+        std::shared_ptr<SwapChain> getSwapChain() const { return m_swapChain; }
 
         VmaAllocator getVmaAllocator() const { return m_vmaAllocator; }
 
-        VkQueue getGraphicsQueue() const { return m_graphicsQueue; }
-        VkQueue getComputeQueue() const { return m_computeQueue; }
-        VkQueue getTransferQueue() const { return m_transferQueue; }
-        VkQueue getPresentQueue() const { return m_presentQueue; }
+        std::shared_ptr<VulkanQueue> getGraphicsQueue() const;
+        std::shared_ptr<VulkanQueue> getComputeQueue() const;
+        std::shared_ptr<VulkanQueue> getTransferQueue() const;
+        std::shared_ptr<VulkanQueue> getPresentQueue() const;
 
+        bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
+        bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
+
+        // Extension function pointers
+        PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
+
+        // 
+        void createRecourses(WindowContext* windowContext);
 
     private:
         void createInstance(WindowContext* windowContext);
@@ -83,22 +67,13 @@ class VulkanContext {
 
         // logical device
         void createLogicalDevice();
-
-
-        // surface
         void createWindowsSurface(WindowContext* windowContext);
         
         // swapchain
         SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-        VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-        VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-        VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, WindowContext* windowContext);
 
 
         void createVmaAllocator();
-
-
-
 
     private:
 
@@ -107,26 +82,32 @@ class VulkanContext {
         VkInstanceCreateInfo m_instanceCreateInfo;
         VkInstance m_instance;
         VkPhysicalDevice m_physicalDevice;
-        std::shared_ptr<VkDevice> m_device;
+        VkDevice m_device;
 
-        VkQueue m_graphicsQueue;
-        VkQueue m_computeQueue;
-        VkQueue m_transferQueue;
-        VkQueue m_presentQueue;
+        std::shared_ptr<SwapChain> m_swapChain;
+        std::shared_ptr<Renderpass> m_renderpass;
+
+        int m_graphicsQueueIndex;
+        int m_computeQueueIndex;
+        int m_transferQueueIndex;
+        int m_presentQueueIndex;
+
+        std::map<uint32_t, std::shared_ptr<VulkanQueue>> m_queues;
 
         VkSurfaceKHR m_surface;
 
         VkDebugUtilsMessengerEXT m_debugMessenger;
 
 
-
-
         std::vector<const char*> m_validationLayers;
         std::vector<const char*> m_deviceExtensions;
 
-
+        QueueFamilyIndices m_queueFamilyIndices;
 
         VmaAllocator m_vmaAllocator;
+
+        bool m_isVertexInputDynamicStateEnabled;
+        bool m_isVertexAttributeRobustnessEnabled;
 
     };
 

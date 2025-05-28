@@ -1,17 +1,26 @@
 #include "AssetImporter.h"
 
-
 #include "Logging/Log.h"
 
 #include "Shaders/Shader.h"
+#include "Textures/Texture.h"
+#include "AssetLoadRequests.h"
 #include <filesystem>
 #include <string>
 #include <regex>
 #include <optional>
 #include <map>
 #include <vector>
+#include <variant>
+#include "Events/AssetEvents.h"
 
 namespace Rapture {
+
+bool AssetImporter::s_isInitialized = false;
+std::queue<LoadRequest> AssetImporter::s_pendingRequests;
+std::vector<std::thread> AssetImporter::s_workerThreads;
+std::atomic<bool> AssetImporter::s_threadRunning = false;
+std::mutex AssetImporter::s_queueMutex;
 
 // Helper function to find related shader file paths
 std::optional<std::filesystem::path> getRelatedShaderPath(
@@ -78,7 +87,6 @@ std::optional<std::filesystem::path> getRelatedShaderPath(
     return std::nullopt;
 }
 
-    bool AssetImporter::s_isInitialized = false;
 
 
 
@@ -160,6 +168,9 @@ std::optional<std::filesystem::path> getRelatedShaderPath(
         AssetVariant assetVariant = shader;
         std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
         std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+        asset->m_status = AssetStatus::LOADED;
+        asset->m_handle = handle;
+        AssetEvents::onAssetLoaded().publish(handle);
 
         return asset;
     }
@@ -169,7 +180,112 @@ std::optional<std::filesystem::path> getRelatedShaderPath(
         return nullptr;
     }
 
+    std::shared_ptr<Asset> AssetImporter::loadTexture(const AssetHandle &handle, const AssetMetadata &metadata)
+    {
+        // Start worker thread if not already running
+        if (!s_threadRunning) {
+            RP_CORE_ERROR("TextureLibrary: Thread not running, failed to load texture '{0}'", metadata.m_filePath.string());
+            return nullptr;
+        }
+
+        auto tex = std::make_shared<Texture>(metadata.m_filePath.string(), TextureFilter::Linear, TextureWrap::Repeat, true);
+        //tex->setReadyForSampling(false);
 
 
+        
+        AssetVariant assetVariant = tex;
+        std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
+        std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+        asset->m_status = AssetStatus::LOADING;
+        asset->m_handle = handle;
+
+        LoadRequest request;
+        request.asset = asset;
+        request.callback = [](std::shared_ptr<Asset> _asset) {
+            _asset->getUnderlyingAsset<Texture>()->setReadyForSampling(true);
+            _asset->m_status = AssetStatus::LOADED;
+            AssetEvents::onAssetLoaded().publish(_asset->m_handle);
+            //RP_CORE_TRACE("AssetImporter::loadTexture - Texture loaded: {}", _asset->m_handle);
+        };
+
+
+        // Add the texture to the pending requests
+        {
+            std::lock_guard<std::mutex> lock(s_queueMutex);
+            s_pendingRequests.push(request);
+        }
+
+
+        return asset;
+    }
+
+    void AssetImporter::assetLoadThread()
+    {
+        RP_CORE_INFO("AssetImporter: Asset loading thread started");
+        
+        while (s_threadRunning) {
+            LoadRequest request;
+            bool hasRequest = false;
+            
+            // Check if shutdown was requested before accessing the mutex
+            if (!s_threadRunning) break;
+            
+            // Get a request from the queue
+            {
+                std::lock_guard<std::mutex> lock(s_queueMutex);
+                if (!s_pendingRequests.empty()) {
+                    request = s_pendingRequests.front();
+                    s_pendingRequests.pop();
+                    hasRequest = true;
+                }
+            }
+            
+            // Check if shutdown was requested after acquiring a request
+            if (!s_threadRunning) break;
+            
+            if (hasRequest) {
+                size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+
+                if (request.asset->getUnderlyingAsset<Texture>()) {
+                    std::shared_ptr<Texture> tex = request.asset->getUnderlyingAsset<Texture>();
+                    tex->loadImageFromFile(threadId);
+
+                    if (request.callback) {
+                        request.callback(request.asset);
+                    }
+                }
+            } else {
+                // No work to do, sleep to avoid busy waiting
+                // Use shorter sleep durations to respond to shutdown quicker
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        }
+        
+    }
+
+void AssetImporter::shutdownWorkers()
+{
+    RP_CORE_INFO("AssetImporter: Shutting down worker threads");
+    
+    // Set the flag to false to signal threads to stop
+    if (s_threadRunning.exchange(false)) {
+        // Wait for the thread to join if joinable
+        if (s_workerThreads.size() > 0 && s_workerThreads[0].joinable()) {
+            RP_CORE_INFO("AssetImporter: Waiting for worker thread to join");
+            for (auto& thread : s_workerThreads) {
+                if (thread.joinable()) {
+                    thread.join();
+                }
+            }
+            s_workerThreads.clear();
+            RP_CORE_INFO("AssetImporter: Worker threads joined successfully");
+        } else {
+            RP_CORE_WARN("AssetImporter: Worker threads not joinable");
+        }
+    } else {
+        RP_CORE_INFO("AssetImporter: Worker threads already stopped");
+    }
 
 }
+}
+

@@ -14,7 +14,7 @@ namespace Rapture {
     class AssetManagerBase {
         public:
             AssetManagerBase(){
-                AssetImporter::init();
+                AssetImporter::init(4);
             };
             virtual ~AssetManagerBase(){
                 AssetImporter::shutdown();

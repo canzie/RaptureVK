@@ -86,14 +86,14 @@ namespace Rapture {
 
         commandBuffer->end();
         // Submit command buffer
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        VkCommandBuffer commandBuffers[] = {commandBuffer->getCommandBufferVk()};
-        submitInfo.pCommandBuffers = commandBuffers;
 
-        vkQueueSubmit(app.getVulkanContext().getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(app.getVulkanContext().getGraphicsQueue());
+        auto& vulkanContext = app.getVulkanContext();
+    
+        auto queue = vulkanContext.getGraphicsQueue();
+        queue->addCommandBuffer(commandBuffer);
+        queue->submitCommandBuffers(VK_NULL_HANDLE);
+        queue->waitIdle();
+        
     }
 
     void Buffer::createBuffer()

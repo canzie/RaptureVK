@@ -1,10 +1,11 @@
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
-
-#include <cstdio>
+#include "RenderTargets/SwapChains/SwapChain.h"
 
 int main() {
+    /*
     Rapture::Log::Init();
+    Rapture::SwapChain::renderMode = Rapture::RenderMode::PRESENTATION;
 
     auto* app = Rapture::CreateApplicationWindow(800, 600, "Rapture Engine");
 
@@ -18,8 +19,7 @@ int main() {
         // Cleanup
         delete app;
     }
-
-    std::getchar();
+    */
 
     return 0;
 }

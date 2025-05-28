@@ -1,0 +1,260 @@
+#include "DescriptorSet.h"
+#include "Logging/Log.h"
+#include "WindowContext/Application.h"
+#include "Buffers/UniformBuffers/UniformBuffer.h"
+#include "Textures/Texture.h"
+
+#include <stdexcept>
+#include <algorithm>
+#include <array>
+
+namespace Rapture {
+
+// Static member definitions
+VkDescriptorPool DescriptorSet::s_pool = VK_NULL_HANDLE;
+uint32_t DescriptorSet::s_poolRefCount = 0;
+uint32_t DescriptorSet::s_poolBufferCount = 0;
+uint32_t DescriptorSet::s_poolTextureCount = 0;
+uint32_t DescriptorSet::s_poolStorageBufferCount = 0;
+uint32_t DescriptorSet::s_poolInputAttachmentCount = 0;
+
+DescriptorSet::DescriptorSet(const DescriptorSetBindings& bindings) 
+    : m_layout(bindings.layout), m_set(VK_NULL_HANDLE) {
+    
+    auto& app = Application::getInstance();
+    m_device = app.getVulkanContext().getLogicalDevice();
+
+    // Increment reference count and create pool if needed
+    s_poolRefCount++;
+    if (s_pool == VK_NULL_HANDLE) {
+        createDescriptorPool();
+    }
+
+    if (s_poolRefCount > s_maxSets) {
+        RP_CORE_ERROR("DescriptorSet::DescriptorSet - too many descriptor sets!");
+        throw std::runtime_error("DescriptorSet::DescriptorSet - too many descriptor sets!");
+    }
+
+    // simply checks if we still have space in the pool. should never really exceed the limits
+    // but i dont want to 😞🔫
+    updateUsedCounts(bindings);
+
+
+
+    // Allocate descriptor set from pool
+    allocateDescriptorSet();
+    
+    // Write descriptor set data
+    writeDescriptorSet(bindings);
+}
+
+DescriptorSet::~DescriptorSet() {
+    // Layout is managed externally (by shader reflection), so we don't destroy it
+    
+    // Decrement counters
+    s_poolBufferCount -= m_usedBuffers;
+    s_poolTextureCount -= m_usedTextures;
+    s_poolStorageBufferCount -= m_usedStorageBuffers;
+    s_poolInputAttachmentCount -= m_usedInputAttachments;
+    
+    // Decrement reference count and destroy pool if no more references
+    s_poolRefCount--;
+    if (s_poolRefCount == 0 && s_pool != VK_NULL_HANDLE) {
+        destroyDescriptorPool();
+    }
+    
+    // Descriptor set is automatically freed when pool is destroyed/reset
+}
+
+void DescriptorSet::createDescriptorPool() {
+    // Define pool sizes for different descriptor types
+    std::array<VkDescriptorPoolSize, 4> poolSizes{};
+    
+    // Uniform buffers
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = s_maxBuffers;
+    
+    // Combined image samplers (textures)
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = s_maxTextures;
+    
+    // Storage buffers
+    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[2].descriptorCount = s_maxStorageBuffers;
+    
+    // Input attachments
+    poolSizes[3].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+    poolSizes[3].descriptorCount = s_maxInputAttachments;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = s_maxSets;
+
+    VkResult result = vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &s_pool);
+    if (result != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create descriptor pool! VkResult: {}", static_cast<int>(result));
+        throw std::runtime_error("Failed to create descriptor pool");
+    }
+    
+    RP_CORE_INFO("Created descriptor pool with {} max sets", s_maxSets);
+}
+
+void DescriptorSet::allocateDescriptorSet() {
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = s_pool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &m_layout;
+
+    {
+        std::lock_guard<std::mutex> lock(m_descriptorUpdateMutex);
+
+        VkResult result = vkAllocateDescriptorSets(m_device, &allocInfo, &m_set);
+        if (result != VK_SUCCESS) {
+            RP_CORE_ERROR("Failed to allocate descriptor set! VkResult: {}", static_cast<int>(result));
+            throw std::runtime_error("Failed to allocate descriptor set");
+        }
+    }
+}
+
+void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
+    std::vector<VkWriteDescriptorSet> descriptorWrites;
+    std::vector<VkDescriptorBufferInfo> bufferInfos;
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    
+    std::lock_guard<std::mutex> lock(m_descriptorUpdateMutex);
+
+
+    // Reserve space to avoid reallocation
+    descriptorWrites.reserve(bindings.bindings.size());
+    bufferInfos.reserve(bindings.bindings.size());
+    imageInfos.reserve(bindings.bindings.size());
+
+    for (const auto& binding : bindings.bindings) {
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = m_set;
+        descriptorWrite.dstBinding = binding.binding;
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType = binding.type;
+        descriptorWrite.descriptorCount = binding.count;
+
+        // Use visitor pattern to handle different resource types
+        // goofy claude magic, dont even know if this is better than doing has_alternative
+        std::visit([&](const auto& resource) {
+            using T = std::decay_t<decltype(resource)>;
+            
+            if constexpr (std::is_same_v<T, std::shared_ptr<UniformBuffer>>) {
+                // Handle UniformBuffer
+                if (resource) {
+                    bufferInfos.push_back(resource->getDescriptorBufferInfo());
+                    descriptorWrite.pBufferInfo = &bufferInfos.back();
+                } else {
+                    RP_CORE_WARN("UniformBuffer is null for binding {}", binding.binding);
+                    return; // Skip this binding
+                }
+            } else if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>) {
+                // Handle Texture
+                if (resource) {
+                    imageInfos.push_back(resource->getDescriptorImageInfo());
+                    descriptorWrite.pImageInfo = &imageInfos.back();
+                } else {
+                    RP_CORE_WARN("Texture is null for binding {}", binding.binding);
+                    return; // Skip this binding
+                }
+            }
+            
+            descriptorWrites.push_back(descriptorWrite);
+        }, binding.resource);
+    }
+
+    if (!descriptorWrites.empty()) {
+        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(descriptorWrites.size()), 
+                              descriptorWrites.data(), 0, nullptr);
+    }
+}
+
+void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
+{
+        // Check if adding this descriptor set would exceed any limits
+    uint32_t newBuffers = 0, newTextures = 0, newStorageBuffers = 0, newInputAttachments = 0;
+    
+    for (const auto& binding : bindings.bindings) {
+        switch (binding.type) {
+            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                newBuffers += binding.count;
+                break;
+            case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+            case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+            case VK_DESCRIPTOR_TYPE_SAMPLER:
+                newTextures += binding.count;
+                break;
+            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+                newStorageBuffers += binding.count;
+                break;
+            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+                newInputAttachments += binding.count;
+                break;
+            default:
+                RP_CORE_WARN("Unknown descriptor type: {}", static_cast<int>(binding.type));
+                break;
+        }
+    }
+
+    // Check limits before allocating
+    if (s_poolBufferCount + newBuffers > s_maxBuffers) {
+        throw std::runtime_error("DescriptorSet: Uniform buffer limit exceeded! Current: " + 
+                                std::to_string(s_poolBufferCount) + ", Requested: " + 
+                                std::to_string(newBuffers) + ", Max: " + std::to_string(s_maxBuffers));
+    }
+    
+    if (s_poolTextureCount + newTextures > s_maxTextures) {
+        throw std::runtime_error("DescriptorSet: Texture/Sampler limit exceeded! Current: " + 
+                                std::to_string(s_poolTextureCount) + ", Requested: " + 
+                                std::to_string(newTextures) + ", Max: " + std::to_string(s_maxTextures));
+    }
+    
+    if (s_poolStorageBufferCount + newStorageBuffers > s_maxStorageBuffers) {
+        throw std::runtime_error("DescriptorSet: Storage buffer limit exceeded! Current: " + 
+                                std::to_string(s_poolStorageBufferCount) + ", Requested: " + 
+                                std::to_string(newStorageBuffers) + ", Max: " + std::to_string(s_maxStorageBuffers));
+    }
+    
+    if (s_poolInputAttachmentCount + newInputAttachments > s_maxInputAttachments) {
+        throw std::runtime_error("DescriptorSet: Input attachment limit exceeded! Current: " + 
+                                std::to_string(s_poolInputAttachmentCount) + ", Requested: " + 
+                                std::to_string(newInputAttachments) + ", Max: " + std::to_string(s_maxInputAttachments));
+    }
+
+    // Update counters
+    s_poolBufferCount += newBuffers;
+    s_poolTextureCount += newTextures;
+    s_poolStorageBufferCount += newStorageBuffers;
+    s_poolInputAttachmentCount += newInputAttachments;
+
+    // Store what this descriptor set is using for cleanup
+    m_usedBuffers = newBuffers;
+    m_usedTextures = newTextures;
+    m_usedStorageBuffers = newStorageBuffers;
+    m_usedInputAttachments = newInputAttachments;
+}
+
+void DescriptorSet::updateDescriptorSet(const DescriptorSetBindings& bindings) {
+    writeDescriptorSet(bindings);
+}
+
+void DescriptorSet::destroyDescriptorPool() {
+    if (s_pool != VK_NULL_HANDLE) {
+        auto& app = Application::getInstance();
+        VkDevice device = app.getVulkanContext().getLogicalDevice();
+        
+        vkDestroyDescriptorPool(device, s_pool, nullptr);
+        s_pool = VK_NULL_HANDLE;
+        RP_CORE_INFO("Destroyed descriptor pool");
+    }
+}
+
+} 

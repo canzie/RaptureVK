@@ -25,10 +25,12 @@ namespace Rapture {
 
 class FrameBuffer {
 public:
-
-
-    FrameBuffer(const FramebufferSpecification& specification, VkRenderPass renderPass);
-    FrameBuffer(const SwapChain& swapChain, uint32_t SCImageViewIndex, VkRenderPass renderPass);
+	// New primary constructor using Renderpass and subpass index
+	//FrameBuffer(const Renderpass& renderpass, uint32_t subpassIndex, uint32_t width, uint32_t height, const std::vector<VkImageView>& imageViews);
+	
+	// Legacy constructors for compatibility
+	FrameBuffer(const FramebufferSpecification& specification, VkRenderPass renderPass);
+	FrameBuffer(const SwapChain& swapChain, uint32_t SCImageViewIndex, VkRenderPass renderPass);
 
 
     ~FrameBuffer();

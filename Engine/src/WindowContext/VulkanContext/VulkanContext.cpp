@@ -2,6 +2,9 @@
 #include "Logging/Log.h"
 #include "VulkanContextHelpers.h"
 
+#include "RenderTargets/SwapChains/SwapChain.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
+#include "Buffers/CommandBuffers/CommandBuffer.h"
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
@@ -26,30 +29,27 @@
 
 namespace Rapture {
 
-    const std::vector<Vertex> g_vertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
-    };
-
-    const std::vector<uint16_t> g_indices = {
-        0, 1, 2, 2, 3, 0
-    };
 
     VulkanContext::VulkanContext(WindowContext* windowContext)
     {
 
     m_applicationInfo = {};
     m_instanceCreateInfo = {};
-    m_instance = nullptr;
-    m_device = nullptr;
+    m_instance = VK_NULL_HANDLE;
+    m_device = VK_NULL_HANDLE;
+    m_physicalDevice = VK_NULL_HANDLE;
+    m_surface = VK_NULL_HANDLE;
+    m_vmaAllocator = VK_NULL_HANDLE;
+    m_debugMessenger = VK_NULL_HANDLE;
+    m_swapChain = nullptr;
 
     if (enableValidationLayers) {
         m_validationLayers.push_back("VK_LAYER_KHRONOS_validation");
     }
 
     m_deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME);
 
 
     //checkExtensionSupport();
@@ -61,6 +61,7 @@ namespace Rapture {
     createLogicalDevice();
     createVmaAllocator();
 
+    m_queueFamilyIndices = findQueueFamilies(m_physicalDevice);
 
 
 }
@@ -69,12 +70,16 @@ namespace Rapture {
 VulkanContext::~VulkanContext()
 {
 
+    m_swapChain.reset();
+
     if (m_vmaAllocator) {
         vmaDestroyAllocator(m_vmaAllocator);
     }
 
+    m_queues.clear();
+
     if (m_device) {
-        vkDestroyDevice(*m_device, nullptr);
+        vkDestroyDevice(m_device, nullptr);
     }
 
     if (enableValidationLayers) {
@@ -94,12 +99,66 @@ VulkanContext::~VulkanContext()
 
 void VulkanContext::waitIdle()
 {
-    vkDeviceWaitIdle(*m_device);
+    vkDeviceWaitIdle(m_device);
 }
 
-QueueFamilyIndices VulkanContext::getQueueFamilyIndices() const
+
+std::shared_ptr<VulkanQueue> VulkanContext::getGraphicsQueue() const
 {
-    return findQueueFamilies(m_physicalDevice);
+    if (m_graphicsQueueIndex == -1) {
+        RP_CORE_ERROR("Graphics queue index is -1!");
+        throw std::runtime_error("Graphics queue index is -1!");
+    }
+    if (m_queues.find(m_graphicsQueueIndex) == m_queues.end()) {
+        RP_CORE_ERROR("Graphics queue index is not found!");
+        throw std::runtime_error("Graphics queue index is not found!");
+    }
+    return m_queues.find(m_graphicsQueueIndex)->second;
+}
+
+std::shared_ptr<VulkanQueue> VulkanContext::getComputeQueue() const
+{
+    if (m_computeQueueIndex == -1) {
+        RP_CORE_ERROR("Compute queue index is -1!");
+        throw std::runtime_error("Compute queue index is -1!");
+    }
+    if (m_queues.find(m_computeQueueIndex) == m_queues.end()) {
+        RP_CORE_ERROR("Compute queue index is not found!");
+        throw std::runtime_error("Compute queue index is not found!");
+    }
+    return m_queues.find(m_computeQueueIndex)->second;
+}
+
+std::shared_ptr<VulkanQueue> VulkanContext::getTransferQueue() const
+{
+    if (m_transferQueueIndex == -1) {
+        RP_CORE_ERROR("Transfer queue index is -1!");
+        throw std::runtime_error("Transfer queue index is -1!");
+    }
+    if (m_queues.find(m_transferQueueIndex) == m_queues.end()) {
+        RP_CORE_ERROR("Transfer queue index is not found!");
+        throw std::runtime_error("Transfer queue index is not found!");
+    }
+    return m_queues.find(m_transferQueueIndex)->second;
+}
+
+std::shared_ptr<VulkanQueue> VulkanContext::getPresentQueue() const
+{
+    if (m_presentQueueIndex == -1) {
+        RP_CORE_ERROR("Present queue index is -1!");
+        throw std::runtime_error("Present queue index is -1!");
+    }
+    if (m_queues.find(m_presentQueueIndex) == m_queues.end()) {
+        RP_CORE_ERROR("Present queue index is not found!");
+        throw std::runtime_error("Present queue index is not found!");
+    }
+    return m_queues.find(m_presentQueueIndex)->second;
+}
+
+void VulkanContext::createRecourses(WindowContext* windowContext)
+{
+    m_swapChain = std::make_shared<SwapChain>(m_device, m_surface, m_physicalDevice, m_queueFamilyIndices, windowContext);
+    m_swapChain->invalidate();
 }
 
 void VulkanContext::createInstance(WindowContext *windowContext)
@@ -116,7 +175,7 @@ void VulkanContext::createInstance(WindowContext *windowContext)
     m_applicationInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
     m_applicationInfo.pEngineName = "Rapture Engine";
     m_applicationInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-    m_applicationInfo.apiVersion = VK_API_VERSION_1_4;
+    m_applicationInfo.apiVersion = VK_API_VERSION_1_3;
 
     RP_CORE_INFO("Creating Vulkan instance with API version: {}.{}.{}", 
         VK_VERSION_MAJOR(m_applicationInfo.apiVersion),
@@ -274,7 +333,6 @@ void VulkanContext::pickPhysicalDevice()
     }
 
 
-
 }
 
 bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
@@ -286,8 +344,8 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
 
     RP_CORE_INFO("GPU: {0}", deviceProperties.deviceName);
 
+    
     QueueFamilyIndices indices = findQueueFamilies(device);
-
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
     bool swapChainAdequate = false;
@@ -308,6 +366,7 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
 
     int i = 0;
     for (const auto& queueFamily : queueFamilies) {
@@ -334,7 +393,6 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
     }
 
 
-
     return indices;
     
 }
@@ -343,7 +401,6 @@ void VulkanContext::createLogicalDevice()
 {
 
     QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
-
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
@@ -357,15 +414,87 @@ void VulkanContext::createLogicalDevice()
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
+    // Main structure to enable features; this will be pointed to by VkDeviceCreateInfo.pNext
+    VkPhysicalDeviceFeatures2 physicalDeviceFeaturesToEnable{};
+    physicalDeviceFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
-    deviceFeatures.geometryShader = VK_TRUE;
+    // --- Handle Vulkan 1.0 Core Features ---
+    // Query all supported Vulkan 1.0 features into the .features member.
+    // vkGetPhysicalDeviceFeatures(m_physicalDevice, &physicalDeviceFeaturesToEnable.features); // Alternative
+    // Or, more consistently with VkPhysicalDeviceFeatures2:
+    VkPhysicalDeviceFeatures2 coreFeaturesQuery = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &coreFeaturesQuery);
+    physicalDeviceFeaturesToEnable.features = coreFeaturesQuery.features; // Copy initially queried core features.
+
+    // Ensure geometryShader is enabled if supported (as an example of a core feature)
+    if (physicalDeviceFeaturesToEnable.features.geometryShader) {
+        RP_CORE_INFO("Core::geometryShader is supported and enabled.");
+    } else {
+        RP_CORE_WARN("Core::geometryShader is NOT supported. If required, this could be an issue.");
+        // If it's critical and not supported, you might throw an error or adapt.
+        // For now, we'll try to enable it, and Vulkan will ignore if not supported (though we already know its status).
+    }
+    // physicalDeviceFeaturesToEnable.features.geometryShader remains as queried (true if supported, false otherwise)
+    // If you wanted to force it ON and it was a settable feature you'd do it here, but geometryShader is typically just reported.
+    // If you want to *request* it, and it's supported, it will be enabled. If not supported, request is ignored.
+    // The most robust is to check support and then request. If geometryShader is critical, one might check
+    // coreFeaturesQuery.features.geometryShader and throw if not present.
+
+    // Initialize pNext pointer for chaining extension features
+    void** ppNextChain = &physicalDeviceFeaturesToEnable.pNext;
+
+    // --- VK_EXT_vertex_input_dynamic_state ---
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT dynamicStateFeaturesToEnable{};
+    dynamicStateFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
+    
+    // Query specifically for this extension's features
+    VkPhysicalDeviceFeatures2 queryDynamicState = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryDynamicState.pNext = &dynamicStateFeaturesToEnable; // Temporarily chain for querying
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryDynamicState);
+    // After the call, dynamicStateFeaturesToEnable.vertexInputDynamicState holds the support status
+
+    if (dynamicStateFeaturesToEnable.vertexInputDynamicState) {
+        RP_CORE_INFO("Feature EXT::vertexInputDynamicState is supported and will be enabled.");
+        // The struct dynamicStateFeaturesToEnable is already populated with sType and the feature set to VK_TRUE.
+        // We just need to chain it into the main physicalDeviceFeaturesToEnable.pNext chain.
+        *ppNextChain = &dynamicStateFeaturesToEnable;
+        ppNextChain = &dynamicStateFeaturesToEnable.pNext; // Advance the tail of our chain
+    } else {
+        RP_CORE_WARN("Feature EXT::vertexInputDynamicState is NOT supported.");
+    }
+
+    // --- VK_EXT_vertex_attribute_robustness ---
+    VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT attributeRobustnessFeaturesToEnable{};
+    attributeRobustnessFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_ROBUSTNESS_FEATURES_EXT;
+
+    // Query specifically for this extension's features
+    VkPhysicalDeviceFeatures2 queryAttributeRobustness = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryAttributeRobustness.pNext = &attributeRobustnessFeaturesToEnable; // Temporarily chain for querying
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryAttributeRobustness);
+    // After the call, attributeRobustnessFeaturesToEnable.vertexAttributeRobustness holds the support status
+
+    if (attributeRobustnessFeaturesToEnable.vertexAttributeRobustness) {
+        RP_CORE_INFO("Feature EXT::vertexAttributeRobustness is supported and will be enabled.");
+        // The struct attributeRobustnessFeaturesToEnable is already populated with sType and the feature set to VK_TRUE.
+        // Chain it.
+        *ppNextChain = &attributeRobustnessFeaturesToEnable;
+        ppNextChain = &attributeRobustnessFeaturesToEnable.pNext; // Advance the tail of our chain
+    } else {
+        RP_CORE_WARN("Feature EXT::vertexAttributeRobustness is NOT supported.");
+    }
+    
+    // Ensure the end of the chain is nullptr if no more features are added
+    *ppNextChain = nullptr;
+
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    createInfo.pEnabledFeatures = &deviceFeatures;
+    
+    createInfo.pNext = &physicalDeviceFeaturesToEnable; // Point to the head of our features chain
+    createInfo.pEnabledFeatures = nullptr; // Must be nullptr if pNext includes VkPhysicalDeviceFeatures2
+
     createInfo.enabledExtensionCount = static_cast<uint32_t>(m_deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = m_deviceExtensions.data();
 
@@ -376,26 +505,49 @@ void VulkanContext::createLogicalDevice()
         createInfo.enabledLayerCount = 0;
     }
 
-    VkDevice device;
 
-    if (vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+    if (vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to create logical device!");
         throw std::runtime_error("failed to create logical device!");
     }
 
-    m_device = std::make_shared<VkDevice>(device);
+
+    // Load extension function pointers
+    if (dynamicStateFeaturesToEnable.vertexInputDynamicState) {
+        vkCmdSetVertexInputEXT = (PFN_vkCmdSetVertexInputEXT)vkGetDeviceProcAddr(m_device, "vkCmdSetVertexInputEXT");
+        if (!vkCmdSetVertexInputEXT) {
+            RP_CORE_ERROR("Failed to load vkCmdSetVertexInputEXT function pointer!");
+            m_isVertexInputDynamicStateEnabled = false;
+        } else {
+            m_isVertexInputDynamicStateEnabled = true;
+            RP_CORE_INFO("Successfully loaded vkCmdSetVertexInputEXT function pointer.");
+        }
+    } else {
+        m_isVertexInputDynamicStateEnabled = false;
+    }
+
+    // Store vertex attribute robustness state
+    m_isVertexAttributeRobustnessEnabled = attributeRobustnessFeaturesToEnable.vertexAttributeRobustness;
 
     // retrieve queues
-    vkGetDeviceQueue(*m_device, indices.graphicsFamily.value(), 0, &m_graphicsQueue);
-    vkGetDeviceQueue(*m_device, indices.presentFamily.value(), 0, &m_presentQueue);
+    m_queues[indices.graphicsFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());
+    m_queues[indices.presentFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.presentFamily.value());
 
+    m_graphicsQueueIndex = indices.graphicsFamily.value();
+    m_presentQueueIndex = indices.presentFamily.value();
+    m_computeQueueIndex = -1;
+    m_transferQueueIndex = -1;
 
+    RP_CORE_INFO("Logical device created successfully!");
 }
+
+
 void VulkanContext::createWindowsSurface(WindowContext *windowContext)
 {
     if (glfwCreateWindowSurface(m_instance, (GLFWwindow*)windowContext->getNativeWindowContext(), nullptr, &m_surface) != VK_SUCCESS) {
         throw std::runtime_error("failed to create window surface!");
     }
+    RP_CORE_INFO("Window surface created successfully!");
 }
 
 SwapChainSupportDetails VulkanContext::querySwapChainSupport(VkPhysicalDevice device)
@@ -423,47 +575,6 @@ SwapChainSupportDetails VulkanContext::querySwapChainSupport(VkPhysicalDevice de
     return details;
 }
 
-VkSurfaceFormatKHR VulkanContext::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats)
-{
-    for (const auto& availableFormat : availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return availableFormat;
-        }
-    }
-
-    return availableFormats[0];
-
-
-}
-
-VkPresentModeKHR VulkanContext::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes)
-{
-    for (const auto& availablePresentMode : availablePresentModes) {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return availablePresentMode;
-        }
-    }
-
-    return VK_PRESENT_MODE_FIFO_KHR;}
-VkExtent2D VulkanContext::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, WindowContext *windowContext)
-{
-    if (capabilities.currentExtent.width != (std::numeric_limits<uint32_t>::max)()) {
-        return capabilities.currentExtent;
-    } else {
-        int width, height;
-        glfwGetFramebufferSize((GLFWwindow*)windowContext->getNativeWindowContext(), &width, &height);
-
-        VkExtent2D actualExtent = {
-            static_cast<uint32_t>(width),
-            static_cast<uint32_t>(height)
-        };
-
-        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-        actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-
-        return actualExtent;
-    }
-}
 
 
 void VulkanContext::createVmaAllocator()
@@ -488,9 +599,9 @@ void VulkanContext::createVmaAllocator()
     RP_CORE_INFO("Creating VMA allocator create info...");
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.physicalDevice = m_physicalDevice;
-    allocatorInfo.device = *m_device;
+    allocatorInfo.device = m_device;
     allocatorInfo.instance = m_instance;
-    allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
+    allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_3;
     
     RP_CORE_INFO("Calling vmaCreateAllocator...");
     VkResult result = vmaCreateAllocator(&allocatorInfo, &m_vmaAllocator);

@@ -6,44 +6,45 @@
 
 #include "Buffers/IndexBuffers/IndexBuffer.h"
 #include "Buffers/VertexBuffers/VertexBuffer.h"
+#include "Buffers/VertexBuffers/BufferLayout.h"
 
 namespace Rapture
 {
 
 
-    struct AllocatorParams {
-        void* vertexData = nullptr;
-        size_t vertexDataSize = 0;
-        const void* indexData = nullptr;
-        size_t indexDataSize = 0;
-        size_t indexCount = 0;
-        unsigned int indexType = 0;
-    };
+struct AllocatorParams {
+    void* vertexData = nullptr;
+    uint32_t vertexDataSize = 0;
+    void* indexData = nullptr;
+    uint32_t indexDataSize = 0;
+    uint32_t indexCount = 0;
+    uint32_t indexType = 0;
+    
+    BufferLayout bufferLayout;
+};
 
-	class Mesh
-	{
+class Mesh
+{
 
-	public:
-		Mesh(std::string filepath);
-        //Mesh(std::string filepath, bool useGLTF2=false);
-		Mesh() = default;
-		~Mesh();
+public:
+    Mesh(AllocatorParams& params);
+    Mesh();
+    ~Mesh();
 
-        void setMeshData(const AllocatorParams& params);
+    void setMeshData(AllocatorParams& params);
+
+    std::shared_ptr<VertexBuffer> getVertexBuffer() const { return m_vertexBuffer; }
+    std::shared_ptr<IndexBuffer> getIndexBuffer() const { return m_indexBuffer; }
+
+    uint32_t getIndexCount() const { return m_indexCount; }
 
 
+private:
+    uint32_t m_indexCount;
+    std::shared_ptr<VertexBuffer> m_vertexBuffer;
+    std::shared_ptr<IndexBuffer> m_indexBuffer;
 
-
-
-	private:
-		// indices in the IBO that draw this sub mesh
-		//size_t m_indexCount;
-		//size_t m_offsetBytes;
-
-        std::shared_ptr<VertexBuffer> m_vertexBuffer;
-        std::shared_ptr<IndexBuffer> m_indexBuffer;
-
-	};
+};
 
 
 

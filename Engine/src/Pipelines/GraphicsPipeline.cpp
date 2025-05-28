@@ -4,6 +4,7 @@
 #include "WindowContext/Application.h"
 
 #include <stdexcept>
+#include <glm/glm.hpp>
 
 
 namespace Rapture {
@@ -76,12 +77,18 @@ void GraphicsPipeline::createPipelineLayout(uint32_t subpassIndex, std::shared_p
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
+    // Define push constant range for model matrix
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT; // Accessible in vertex shader
+    pushConstantRange.offset = 0;                              // Start at beginning
+    pushConstantRange.size = sizeof(glm::mat4) + sizeof(glm::vec3);               // Size of model matrix (64 bytes)
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = shader->getDescriptorSetLayouts().size(); // Optional
-    pipelineLayoutInfo.pSetLayouts = shader->getDescriptorSetLayouts().data(); // Optional
-    pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-    pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+    pipelineLayoutInfo.setLayoutCount = shader->getDescriptorSetLayouts().size();
+    pipelineLayoutInfo.pSetLayouts = shader->getDescriptorSetLayouts().data();
+    pipelineLayoutInfo.pushConstantRangeCount = 1;                    // We have 1 push constant range
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;     // Pointer to our range
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_pipelines[subpassIndex].pipelineLayout) != VK_SUCCESS) {
         RP_CORE_ERROR("GraphicsPipeline::createPipelineLayout - failed to create pipeline layout!");

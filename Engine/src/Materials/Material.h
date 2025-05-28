@@ -27,8 +27,6 @@ class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
         VkDescriptorSetLayout getDescriptorSetLayout() const { return m_descriptorSetLayout; }
 
     protected:
-        // pool used for every material
-        static VkDescriptorPool s_DescriptorPool;
     
     private:
         std::string m_name;
@@ -51,6 +49,7 @@ class MaterialManager {
         static std::shared_ptr<BaseMaterial> getMaterial(const std::string& name);
         static void printMaterialNames();
     private:
+        static bool s_initialized;
         static std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> s_materials;
 };
 
