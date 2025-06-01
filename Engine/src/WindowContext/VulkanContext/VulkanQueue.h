@@ -24,6 +24,8 @@ namespace Rapture
 
         VkQueue getQueueVk() const { return m_queue; }
 
+        void clear();
+
     private:
         std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
         VkDevice m_device;

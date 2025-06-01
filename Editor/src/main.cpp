@@ -6,7 +6,7 @@
 // The main entry point of the application
 int main(int argc, char** argv) {
     Rapture::Log::Init();
-    Rapture::SwapChain::renderMode = Rapture::RenderMode::PRESENTATION;
+    Rapture::SwapChain::renderMode = Rapture::RenderMode::OFFSCREEN;
 
     auto* app = Rapture::CreateApplicationWindow(800, 600, "Rapture Editor");
 

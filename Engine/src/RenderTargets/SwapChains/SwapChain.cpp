@@ -33,6 +33,7 @@ void SwapChain::destroy() {
         return;
     }
 
+    destroySyncObjects();
 
     for (size_t i = 0; i < m_swapChainImageViews.size(); i++) {
         if (m_swapChainImageViews[i] != VK_NULL_HANDLE) {
@@ -53,12 +54,22 @@ void SwapChain::destroy() {
     m_imageCount = 0;
 }
 
-void SwapChain::invalidate() {
+void SwapChain::presentImage()
+{
+
+
+
+}
+
+void SwapChain::invalidate()
+{
 
     if (m_device == VK_NULL_HANDLE) {
         RP_CORE_ERROR("SwapChain::invalidate - logical device is nullptr!");
         throw std::runtime_error("SwapChain::invalidate - logical device is nullptr!");
     }
+
+    destroySyncObjects();
 
     for (size_t i = 0; i < m_swapChainImageViews.size(); i++) {
         if (m_swapChainImageViews[i] != VK_NULL_HANDLE) {
@@ -130,7 +141,7 @@ if (renderMode == RenderMode::PRESENTATION) {
 
     createImageViews();
     createDepthTexture();
-
+    createSyncObjects();
 }
 
 void SwapChain::createImageViews() {
@@ -182,6 +193,119 @@ void SwapChain::createDepthTexture() {
     RP_CORE_INFO("Created depth texture: {}x{}", depthSpec.width, depthSpec.height);
 }
 
+void SwapChain::createSyncObjects()
+{
+    if (m_imageCount == 0) {
+        RP_CORE_WARN("SwapChain::createSyncObjects - Attempted to create sync objects with imageCount 0.");
+        return;
+    }
+
+    m_imageAvailableSemaphores.resize(m_imageCount);
+    m_renderFinishedSemaphores.resize(m_imageCount);
+    m_inFlightFences.resize(m_imageCount);
+
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < m_imageCount; i++) {
+        if (vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS) {
+            RP_CORE_ERROR("failed to create synchronization objects for frame {0}!", i);
+            throw std::runtime_error("failed to create synchronization objects for a frame!");
+        }
+    }
+    m_semaphoreIndexToFrameIndexMap.resize(m_imageCount);
+}
+
+void SwapChain::destroySyncObjects()
+{
+    for (size_t i = 0; i < m_imageCount; i++) {
+        if (i < m_renderFinishedSemaphores.size() && m_renderFinishedSemaphores[i] != VK_NULL_HANDLE) {
+            vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
+            m_renderFinishedSemaphores[i] = VK_NULL_HANDLE;
+        }
+        if (i < m_imageAvailableSemaphores.size() && m_imageAvailableSemaphores[i] != VK_NULL_HANDLE) {
+            vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
+            m_imageAvailableSemaphores[i] = VK_NULL_HANDLE;
+        }
+        if (i < m_inFlightFences.size() && m_inFlightFences[i] != VK_NULL_HANDLE) {
+            vkDestroyFence(m_device, m_inFlightFences[i], nullptr);
+            m_inFlightFences[i] = VK_NULL_HANDLE;
+        }
+    }
+    m_imageAvailableSemaphores.clear();
+    m_renderFinishedSemaphores.clear();
+    m_inFlightFences.clear();
+
+    m_semaphoreIndexToFrameIndexMap.clear();
+}
+
+VkSemaphore SwapChain::getImageAvailableSemaphore(uint32_t frameIndex) const {
+    if (frameIndex < m_imageAvailableSemaphores.size()) {
+        return m_imageAvailableSemaphores[frameIndex];
+    }
+    RP_CORE_ERROR("SwapChain::getImageAvailableSemaphore - Invalid frame index {} requested.", frameIndex);
+    return VK_NULL_HANDLE; // Or throw
+}
+
+VkSemaphore SwapChain::getRenderFinishedSemaphore(uint32_t frameIndex) const {
+    if (frameIndex < m_renderFinishedSemaphores.size()) {
+        return m_renderFinishedSemaphores[frameIndex];
+    }
+    RP_CORE_ERROR("SwapChain::getRenderFinishedSemaphore - Invalid frame index {} requested.", frameIndex);
+    return VK_NULL_HANDLE; // Or throw
+}
+
+VkFence SwapChain::getInFlightFence(uint32_t frameIndex) const {
+    if (frameIndex < m_inFlightFences.size()) {
+        return m_inFlightFences[frameIndex];
+    }
+    RP_CORE_ERROR("SwapChain::getInFlightFence - Invalid frame index {} requested.", frameIndex);
+    return VK_NULL_HANDLE; // Or throw
+}
+
+int SwapChain::acquireImage(uint32_t semaphoreIndex)
+{
+    SwapChainImageAvailability& availability = m_semaphoreIndexToFrameIndexMap[semaphoreIndex];
+    if (availability.isAquired) {
+        return availability.frameIndex;
+    } else {
+
+        vkWaitForFences(m_device, 1, &m_inFlightFences[semaphoreIndex], VK_TRUE, UINT64_MAX);
+
+        VkSemaphore currentImageAvailableSemaphore = m_imageAvailableSemaphores[semaphoreIndex];
+        VkResult result = vkAcquireNextImageKHR(m_device, m_swapChain, UINT64_MAX, currentImageAvailableSemaphore, VK_NULL_HANDLE, &availability.frameIndex);
+        
+        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+            // resize
+            return -1; 
+        } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+            RP_CORE_ERROR("SwapChain::acquireImage - failed to acquire swap chain image!");
+            throw std::runtime_error("SwapChain::acquireImage - failed to acquire swap chain image!");
+        }
+    
+        vkResetFences(m_device, 1, &m_inFlightFences[semaphoreIndex]);
+    }
+
+    availability.isAquired = true;
+    return availability.frameIndex;
+}
+
+// resets the given frame index to not acquired
+void SwapChain::signalImageAvailability(uint32_t frameIndex)
+{
+    for (size_t i = 0; i < m_semaphoreIndexToFrameIndexMap.size(); i++) {
+        if (m_semaphoreIndexToFrameIndexMap[i].frameIndex == frameIndex) {
+            m_semaphoreIndexToFrameIndexMap[i].isAquired = false;
+        }
+    }
+}
+
 SwapChainSupportDetails2 SwapChain::querySwapChainSupport()
 {
     SwapChainSupportDetails2 details;
@@ -210,6 +334,7 @@ SwapChainSupportDetails2 SwapChain::querySwapChainSupport()
 
 VkSurfaceFormatKHR SwapChain::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats) {
     for (const auto& availableFormat : availableFormats) {
+
         if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
         }

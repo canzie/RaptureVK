@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include <string>
+#include <vector>
 
 namespace Rapture {
 
@@ -19,7 +20,12 @@ struct PipelineData {
 };
 
 
+struct FramebufferSpecification {
+    std::vector<VkFormat> colorAttachments;
+    VkFormat depthAttachment = VK_FORMAT_UNDEFINED;
+    VkFormat stencilAttachment = VK_FORMAT_UNDEFINED;
 
+};
 
 
 

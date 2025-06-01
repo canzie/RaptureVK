@@ -5,6 +5,8 @@
 #include "Loaders/glTF2.0/glTFLoader.h"
 #include "Scenes/SceneManager.h"
 
+#include "Buffers/CommandBuffers/CommandPool.h"
+
 #include "Utils/Timestep.h"
 
 namespace Rapture {
@@ -56,6 +58,9 @@ namespace Rapture {
 
         m_project->setProjectRootDirectory(root_dir);
         m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/SPIRV");
+        
+        CommandPoolManager::init();
+        
         ForwardRenderer::init();
 
         ModelLoadersCache::init();
@@ -82,11 +87,16 @@ namespace Rapture {
 
     Application::~Application() {
 
+        m_vulkanContext->waitIdle();
+
         ModelLoadersCache::clear();
         m_project.reset();
 
         ForwardRenderer::shutdown();
 
+        m_layerStack.clear();
+
+        CommandPoolManager::shutdown(); 
 
         // Shutdown the event system and clear all listeners
         EventRegistry::getInstance().shutdown();
@@ -106,14 +116,7 @@ namespace Rapture {
 
             m_window->onUpdate();
             
-            auto& sceneManager = SceneManager::getInstance();
-            auto activeScene = sceneManager.getActiveScene();
-            
-            // Only render if we have an active scene
-            if (activeScene) {
-                ForwardRenderer::drawFrame(activeScene);
-            }
-            //m_vulkanContext->drawFrame(m_window.get());
+
 
         }
 

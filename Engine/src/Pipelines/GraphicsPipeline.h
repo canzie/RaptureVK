@@ -1,13 +1,14 @@
 #pragma once
 
 #include "Pipeline.h"
-
-#include "RenderTargets/FrameBuffers/Renderpass.h"
+#include "Shaders/Shader.h"
 
 #include <vulkan/vulkan.h>
 #include <optional>
 #include <vector>
 #include <memory>
+
+
 namespace Rapture {
 
 
@@ -15,26 +16,28 @@ namespace Rapture {
 struct GraphicsPipelineConfiguration {
     
 
-    VkPipelineVertexInputStateCreateInfo                vertexInputState;
-    VkPipelineDynamicStateCreateInfo                    dynamicState;
-    VkPipelineViewportStateCreateInfo                   viewportState;
-    VkPipelineInputAssemblyStateCreateInfo              inputAssemblyState;
+    VkPipelineVertexInputStateCreateInfo                  vertexInputState;
+    VkPipelineDynamicStateCreateInfo                      dynamicState;
+    VkPipelineViewportStateCreateInfo                     viewportState;
+    VkPipelineInputAssemblyStateCreateInfo                inputAssemblyState;
     
-    VkPipelineRasterizationStateCreateInfo              rasterizationState;
+    VkPipelineRasterizationStateCreateInfo                rasterizationState;
     
-    VkPipelineMultisampleStateCreateInfo                multisampleState;
+    VkPipelineMultisampleStateCreateInfo                  multisampleState;
    
     std::optional<VkPipelineDepthStencilStateCreateInfo>  depthStencilState;
 
 
-    VkPipelineColorBlendAttachmentState                 commonColorBlendAttachmentState;
+    VkPipelineColorBlendAttachmentState                   commonColorBlendAttachmentState;
     // References commonColorBlendAttachmentState
-    VkPipelineColorBlendStateCreateInfo                 colorBlendState; 
+    VkPipelineColorBlendStateCreateInfo                   colorBlendState; 
 
-    // e.g., VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR
+    // e.g., VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, ...
     //std::vector<VkDynamicState>                         dynamicStates; 
 
-    std::shared_ptr<Renderpass>                         renderPass;
+    FramebufferSpecification                               framebufferSpec;
+    std::shared_ptr<Shader>                                shader;
+
 };
 
 
@@ -44,22 +47,22 @@ public:
     GraphicsPipeline(const GraphicsPipelineConfiguration& config);
     ~GraphicsPipeline();
 
-    void destroy();
-
     void buildPipelines(const GraphicsPipelineConfiguration& config);
 
-    void bind(VkCommandBuffer commandBuffer, uint32_t subpassIndex);
+    void bind(VkCommandBuffer commandBuffer);
 
-    VkPipelineLayout getPipelineLayoutVk(uint32_t subpassIndex);
+    VkPipeline getPipelineVk() const { return m_pipeline; }
+    VkPipelineLayout getPipelineLayoutVk() const { return m_pipelineLayout; }
     
 private:
-    void createPipelineLayout(uint32_t subpassIndex, std::shared_ptr<Shader> shader);
-    void createPipeline(const GraphicsPipelineConfiguration& config, uint32_t subpassIndex);
+    void createPipelineLayout(const GraphicsPipelineConfiguration& config);
+    void createPipeline(const GraphicsPipelineConfiguration& config);
 
 
 private:
 
-    std::vector<PipelineData> m_pipelines;
+    VkPipeline m_pipeline;
+    VkPipelineLayout m_pipelineLayout;
 };
 
 

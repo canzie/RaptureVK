@@ -5,6 +5,7 @@
 #include "vulkan/vulkan.h"
 #include "Textures/Texture.h"
 #include <memory>
+#include <vector>
 
 namespace Rapture {
 
@@ -17,6 +18,11 @@ namespace Rapture {
     enum class RenderMode {
         PRESENTATION,
         OFFSCREEN
+    };
+
+    struct SwapChainImageAvailability {
+        bool isAquired = false;
+        uint32_t frameIndex = 0;
     };
 
     class SwapChain {
@@ -36,6 +42,15 @@ namespace Rapture {
         std::shared_ptr<Texture> getDepthTexture() const { return m_depthTexture; }
         VkFormat getDepthImageFormat() const { return VK_FORMAT_D32_SFLOAT; }
         
+        VkSemaphore getImageAvailableSemaphore(uint32_t frameIndex) const;
+        VkSemaphore getRenderFinishedSemaphore(uint32_t frameIndex) const;
+        VkFence getInFlightFence(uint32_t frameIndex) const;
+
+        int acquireImage(uint32_t semaphoreIndex);
+        void signalImageAvailability(uint32_t frameIndex);
+
+        void presentImage();
+
         void invalidate();
 
         static RenderMode renderMode;
@@ -43,6 +58,8 @@ namespace Rapture {
     private:
         void createImageViews();
         void createDepthTexture();
+        void createSyncObjects();
+        void destroySyncObjects();
 
         SwapChainSupportDetails2 querySwapChainSupport();
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
@@ -66,6 +83,12 @@ namespace Rapture {
         QueueFamilyIndices m_queueFamilyIndices{};
 
         WindowContext* m_windowContext = nullptr;
+
+        std::vector<VkSemaphore> m_imageAvailableSemaphores;
+        std::vector<VkSemaphore> m_renderFinishedSemaphores;
+        std::vector<VkFence> m_inFlightFences;
+
+        std::vector<SwapChainImageAvailability> m_semaphoreIndexToFrameIndexMap;
     };
 
 }

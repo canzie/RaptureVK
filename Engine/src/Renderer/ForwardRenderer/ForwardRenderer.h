@@ -1,11 +1,9 @@
 #pragma once
 
 
-#include "RenderTargets/FrameBuffers/Renderpass.h"
 #include "Pipelines/GraphicsPipeline.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "RenderTargets/SwapChains/SwapChain.h"
-#include "RenderTargets/FrameBuffers/FrameBuffer.h"
 #include "Shaders/Shader.h"
 #include "Buffers/IndexBuffers/IndexBuffer.h"
 #include "Buffers/VertexBuffers/VertexBuffer.h"
@@ -66,24 +64,26 @@ class ForwardRenderer {
         static void shutdown();
 
         static void drawFrame(std::shared_ptr<Scene> activeScene);
-        static std::shared_ptr<Renderpass> getRenderpass() { return m_renderPass; }
+
+        static void recreateSwapChain();
+
 
     private:
         // will be moved to material system
         static void setupShaders();
 
-        static void setupRenderPass();
+        static FramebufferSpecification getMainFramebufferSpecification();
         static void setupGraphicsPipeline();
-        static void setupFramebuffers();
         static void setupCommandPool();
         static void setupCommandBuffers();
-        static void setupSyncObjects();
+
+        static void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
+        static void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
 
         static void cleanupSwapChain();
 
-        static void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, std::shared_ptr<Scene> activeScene);
+        static void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t imageIndex, std::shared_ptr<Scene> activeScene);
 
-        static void recreateSwapChain();
 
         static void createUniformBuffers();
         static void updateUniformBuffers();
@@ -95,9 +95,7 @@ class ForwardRenderer {
 
 
     private:
-        static std::shared_ptr<Renderpass> m_renderPass;
         static std::shared_ptr<GraphicsPipeline> m_graphicsPipeline;
-        static std::vector<std::shared_ptr<FrameBuffer>> m_framebuffers;
         static std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
         static std::shared_ptr<CommandPool> m_commandPool;
 

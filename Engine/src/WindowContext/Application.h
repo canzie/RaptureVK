@@ -31,6 +31,7 @@ namespace Rapture {
         static Application& getInstance() { return *s_instance; }
 
 
+
     private:
 		bool m_running = true;
 		bool m_isMinimized = false;

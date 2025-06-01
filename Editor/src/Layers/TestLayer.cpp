@@ -1,18 +1,18 @@
 #include "TestLayer.h"
 
 
-
-// Vendor includes
-#include <imgui.h>
-
 #include "WindowContext/Application.h"
 #include "Logging/Log.h"
 #include "Scenes/SceneManager.h"
 #include "Utils/Timestep.h"
 #include "Components/Components.h"
-#include <filesystem>
+#include "Renderer/ForwardRenderer/ForwardRenderer.h"
 
 #include "Loaders/glTF2.0/glTFLoader.h"
+
+#include <filesystem>
+#include <imgui.h>
+
 
 TestLayer::~TestLayer()
 {
@@ -161,6 +161,11 @@ void TestLayer::onUpdate(float ts)
     
     // Notify about camera changes (for ImGuizmo)
     notifyCameraChange();
+
+
+    Rapture::ForwardRenderer::drawFrame(activeScene);
+    
+
 }
 
 

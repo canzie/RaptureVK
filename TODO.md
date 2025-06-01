@@ -35,7 +35,3 @@ then a material base would belong to a pipeline, like every shader in the GBuffe
 - ui
 - game?
 
-- Can you help me trasition my current engine from a standard renderpass/framebuffer pipeline to a dynamic rendering pipeline? the one introduced in vulkan 1.3. please make a plan on what needs to be updated and its dependencies otf the things you need to remove, then implement the new rendering pipeline
-
-
-

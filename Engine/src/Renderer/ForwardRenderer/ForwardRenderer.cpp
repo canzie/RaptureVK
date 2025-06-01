@@ -1,5 +1,3 @@
-
-
 #include "ForwardRenderer.h"
 
 #include "Logging/Log.h"
@@ -24,19 +22,13 @@ namespace Rapture {
 
 
     // Static member definitions
-    std::shared_ptr<Renderpass> ForwardRenderer::m_renderPass = nullptr;
     std::shared_ptr<Shader> ForwardRenderer::m_shader = nullptr;
     std::shared_ptr<GraphicsPipeline> ForwardRenderer::m_graphicsPipeline = nullptr;
     std::shared_ptr<CommandPool> ForwardRenderer::m_commandPool = nullptr;
 
     std::shared_ptr<SwapChain> ForwardRenderer::m_swapChain = nullptr;
 
-    std::vector<std::shared_ptr<FrameBuffer>> ForwardRenderer::m_framebuffers = {};
     std::vector<std::shared_ptr<CommandBuffer>> ForwardRenderer::m_commandBuffers = {};
-
-    std::vector<VkSemaphore> ForwardRenderer::m_imageAvailableSemaphores = {};
-    std::vector<VkSemaphore> ForwardRenderer::m_renderFinishedSemaphores = {};
-    std::vector<VkFence> ForwardRenderer::m_inFlightFences = {};
 
     // Camera uniform buffers (binding 0)
     std::vector<std::shared_ptr<UniformBuffer>> ForwardRenderer::m_cameraUniformBuffers = {};
@@ -73,7 +65,7 @@ namespace Rapture {
         m_presentQueue = app.getVulkanContext().getPresentQueue();
 
         ApplicationEvents::onWindowResize().addListener([](unsigned int width, unsigned int height) {
-            m_framebufferResized = true;
+            //m_framebufferResized = true;
         });
 
         InputEvents::onMouseScrolled().addListener([](float x, float y) {
@@ -91,19 +83,15 @@ namespace Rapture {
         createDescriptorPool();
         createDescriptorSets();
 
-        setupRenderPass();
         setupGraphicsPipeline();
-        setupFramebuffers();
         setupCommandPool();
         
         setupCommandBuffers();
-        setupSyncObjects();
 }
 
 void ForwardRenderer::shutdown()
 {
     
-    int imageCount = m_swapChain->getImageCount();
     cleanupSwapChain();
     m_swapChain.reset();
 
@@ -119,14 +107,7 @@ void ForwardRenderer::shutdown()
     AssetManager::shutdown();
     m_shader.reset();
 
-    for (size_t i = 0; i < imageCount; i++) {
-        vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
-        vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
-        vkDestroyFence(m_device, m_inFlightFences[i], nullptr);
-    }
-
     m_commandPool.reset();
-    CommandPoolManager::shutdown();
 
     m_graphicsQueue.reset();
     m_presentQueue.reset();
@@ -134,73 +115,73 @@ void ForwardRenderer::shutdown()
 
 void ForwardRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
 {
-    vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+    int imageIndexi = m_swapChain->acquireImage(m_currentFrame);
 
-    uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(m_device, m_swapChain->getSwapChainVk(), UINT64_MAX, m_imageAvailableSemaphores[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        m_framebufferResized = false;
+    if (imageIndexi == -1) {
         recreateSwapChain();
         return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        RP_CORE_ERROR("failed to acquire swap chain image!");
-        throw std::runtime_error("failed to acquire swap chain image!");
     }
+    uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
 
-    vkResetFences(m_device, 1, &m_inFlightFences[m_currentFrame]);
 
     updateUniformBuffers();
     updateLights(activeScene);
 
     m_commandBuffers[m_currentFrame]->reset();
-    recordCommandBuffer(m_commandBuffers[m_currentFrame]->getCommandBufferVk(), imageIndex, activeScene);
+    recordCommandBuffer(m_commandBuffers[m_currentFrame], imageIndex, activeScene);
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-
-    VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[m_currentFrame]};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
 
     m_graphicsQueue->addCommandBuffer(m_commandBuffers[m_currentFrame]);
 
-    m_graphicsQueue->submitCommandBuffers(submitInfo, m_inFlightFences[m_currentFrame]);
+
+    // --- BEGIN SUBMISSION LOGIC FOR FORWARD RENDERER (COMMON TO BOTH MODES) ---
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore frWaitSemaphores[1]; // Semaphores FR's submission waits on
+    VkPipelineStageFlags frWaitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    VkSemaphore frSignalSemaphores[1]; // Semaphores FR's submission signals
+
+    if (SwapChain::renderMode == RenderMode::PRESENTATION) {
+        frWaitSemaphores[0] = m_swapChain->getImageAvailableSemaphore(m_currentFrame);
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = frWaitSemaphores;
+        submitInfo.pWaitDstStageMask = frWaitStages;
+
+        frSignalSemaphores[0] = m_swapChain->getRenderFinishedSemaphore(m_currentFrame);
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = frSignalSemaphores;
+
+        m_graphicsQueue->submitCommandBuffers(submitInfo, m_swapChain->getInFlightFence(m_currentFrame));
 
 
-if (SwapChain::renderMode == RenderMode::PRESENTATION) {
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
+        // Presentation must wait for rendering to be complete.
+        // frSignalSemaphores contains the renderFinishedSemaphore for PRESENTATION mode.
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = frSignalSemaphores; 
 
-    VkSwapchainKHR swapChains[] = {m_swapChain->getSwapChainVk()};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-    presentInfo.pResults = nullptr; // Optional
+        VkSwapchainKHR swapChains[] = {m_swapChain->getSwapChainVk()};
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+        presentInfo.pImageIndices = &imageIndex; // imageIndex from vkAcquireNextImageKHR
+        presentInfo.pResults = nullptr; // Optional
 
+        VkResult result = m_presentQueue->presentQueue(presentInfo); // Re-uses 'result' variable from vkAcquireNextImageKHR
+        m_swapChain->signalImageAvailability(imageIndex);
 
-    result = m_presentQueue->presentQueue(presentInfo);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        recreateSwapChain();
-        return;
-    } else if (result != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to present swap chain image!");
-        throw std::runtime_error("failed to present swap chain image!");
+            recreateSwapChain();
+            return; // Must return after recreating swap chain, as current frame's resources are invalid.
+        } else if (result != VK_SUCCESS) {
+            RP_CORE_ERROR("failed to present swap chain image in ForwardRenderer!");
+            throw std::runtime_error("failed to present swap chain image in ForwardRenderer!");
+        }
     }
-}else{
-    // Offscreen rendering
-    // TODO: Implement offscreen rendering
-}
+    // --- END PRESENTATION LOGIC ---
 
     m_currentFrame = (m_currentFrame + 1) % m_swapChain->getImageCount();
 
@@ -218,72 +199,20 @@ void ForwardRenderer::setupShaders()
 
 }
 
-void ForwardRenderer::setupRenderPass()
+FramebufferSpecification ForwardRenderer::getMainFramebufferSpecification()
 {
     if (m_swapChain->getImageFormat() == VK_FORMAT_UNDEFINED) {
         RP_CORE_ERROR("ForwardRenderer - Attempted to create render pass before swap chain was initialized!");
         throw std::runtime_error("ForwardRenderer - Attempted to create render pass before swap chain was initialized!");
     }
 
-    // Create the color attachment description
-    SubpassAttachmentUsage colorAttachment{};
-    SubpassAttachmentUsage depthAttachment{};
+    FramebufferSpecification spec;
+    spec.depthAttachment = m_swapChain->getDepthImageFormat();
+    //spec.stencilAttachment = m_swapChain->getDepthImageFormat();
+    spec.colorAttachments.push_back(m_swapChain->getImageFormat());
 
-    // Zero out the structures first
-    VkAttachmentDescription attachmentDesc = {};
-    VkAttachmentReference attachmentRef = {};
+    return spec;
 
-    // Fill in the attachment description
-    // this is a default swapchain setup for presentation
-    attachmentDesc.format = m_swapChain->getImageFormat();
-    attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    // Fill in the attachment reference
-    attachmentRef.attachment = 0;
-    attachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    // Assign the properly initialized structures
-    colorAttachment.attachmentDescription = attachmentDesc;
-    colorAttachment.attachmentReference = attachmentRef;
-
-
-    // Create the depth attachment description
-    VkAttachmentDescription depthAttachmentDesc = {};
-    depthAttachmentDesc.format = m_swapChain->getDepthImageFormat(); // Use format from SwapChain
-    depthAttachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // We don't need to store depth data after render pass
-    depthAttachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachmentDesc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef = {};
-    depthAttachmentRef.attachment = 1; // Second attachment
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    depthAttachment.attachmentDescription = depthAttachmentDesc;
-    depthAttachment.attachmentReference = depthAttachmentRef;
-
-    
-
-    // Create the subpass info
-    SubpassInfo subpassInfo{};
-    subpassInfo.colorAttachments.push_back(colorAttachment);
-    subpassInfo.depthStencilAttachment = depthAttachment;
-    subpassInfo.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpassInfo.shaderProgram = m_shader;
-    subpassInfo.name = "ForwardRenderer presentation subpass";
-
-    // Create the renderpass with the subpass info
-    std::vector<SubpassInfo> subpasses = { subpassInfo };
-    m_renderPass = std::make_shared<Renderpass>(subpasses);
 }
 
 void ForwardRenderer::setupGraphicsPipeline()
@@ -389,7 +318,6 @@ void ForwardRenderer::setupGraphicsPipeline()
     
 
     GraphicsPipelineConfiguration config;
-    config.renderPass = m_renderPass;
     config.dynamicState = dynamicState;
     config.inputAssemblyState = inputAssembly;
     config.viewportState = viewportState;
@@ -399,21 +327,13 @@ void ForwardRenderer::setupGraphicsPipeline()
     config.commonColorBlendAttachmentState = colorBlendAttachment;
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
-
+    config.framebufferSpec = getMainFramebufferSpecification();
+    config.shader = m_shader;
 
     m_graphicsPipeline = std::make_shared<GraphicsPipeline>(config);
 
 }
-void ForwardRenderer::setupFramebuffers()
-{
-    m_framebuffers.clear();
-    m_framebuffers.reserve(m_swapChain->getImageViews().size());
 
-    for (uint32_t i = 0; i < m_swapChain->getImageViews().size(); i++) {
-        auto framebuffer = std::make_shared<FrameBuffer>(*m_swapChain, i, m_renderPass->getRenderPassVk());
-        m_framebuffers.push_back(framebuffer);
-    }
-}
 
 void ForwardRenderer::setupCommandPool()
 {
@@ -436,72 +356,144 @@ void ForwardRenderer::setupCommandBuffers()
 
 }
 
-void ForwardRenderer::setupSyncObjects()
+void ForwardRenderer::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer)
+{
+    auto& app = Application::getInstance();
+    auto& vulkanContext = app.getVulkanContext();
+
+    VkImageMemoryBarrier colorBarrier{};
+    // Image layout transitions for dynamic rendering
+    colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Always start from undefined for the first transition
+    colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    colorBarrier.image = m_swapChain->getImages()[m_currentFrame];
+    colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    colorBarrier.subresourceRange.baseMipLevel = 0;
+    colorBarrier.subresourceRange.levelCount = 1;
+    colorBarrier.subresourceRange.baseArrayLayer = 0;
+    colorBarrier.subresourceRange.layerCount = 1;
+    colorBarrier.srcAccessMask = 0;  // No access before
+    colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    
+
+    VkImageMemoryBarrier depthBarrier{};
+    if (m_swapChain->getDepthTexture() && m_swapChain->getDepthTexture()->getImage()) {
+        depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        depthBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Always start from undefined for depth
+        depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        depthBarrier.image = m_swapChain->getDepthTexture()->getImage();
+        depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (m_swapChain->getDepthImageFormat() == VK_FORMAT_D32_SFLOAT_S8_UINT || m_swapChain->getDepthImageFormat() == VK_FORMAT_D24_UNORM_S8_UINT) {
+            depthBarrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+        depthBarrier.subresourceRange.baseMipLevel = 0;
+        depthBarrier.subresourceRange.levelCount = 1;
+        depthBarrier.subresourceRange.baseArrayLayer = 0;
+        depthBarrier.subresourceRange.layerCount = 1;
+        depthBarrier.srcAccessMask = 0;
+        depthBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        VkImageMemoryBarrier barriers[2] = {depthBarrier, colorBarrier};
+
+        vkCmdPipelineBarrier(
+            commandBuffer->getCommandBufferVk(),
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            0,
+            0, nullptr,
+            0, nullptr,
+            2, barriers
+        );
+    } else {
+         vkCmdPipelineBarrier(
+            commandBuffer->getCommandBufferVk(),
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &colorBarrier
+        );
+    }
+}
+
+void ForwardRenderer::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer)
 {
 
-    m_imageAvailableSemaphores.resize(m_swapChain->getImageCount());
-    m_renderFinishedSemaphores.resize(m_swapChain->getImageCount());
-    m_inFlightFences.resize(m_swapChain->getImageCount());
+    VkRenderingAttachmentInfoKHR colorAttachmentInfo{};
+    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+    colorAttachmentInfo.imageView = m_swapChain->getImageViews()[m_currentFrame];
+    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    
 
-    VkSemaphoreCreateInfo semaphoreInfo{};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-    VkFenceCreateInfo fenceInfo{};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    for (size_t i = 0; i < m_swapChain->getImageCount(); i++) {
-        if (vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS ||
-            vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS) {
-            RP_CORE_ERROR("failed to create synchronization objects for frame {0}!", i);
-            throw std::runtime_error("failed to create synchronization objects for a frame!");
-        }
+    VkRenderingAttachmentInfoKHR depthAttachmentInfo{};
+    bool hasDepth = m_swapChain->getDepthTexture() && m_swapChain->getDepthTexture()->getImageView() != VK_NULL_HANDLE;
+    if (hasDepth) {
+        depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+        depthAttachmentInfo.imageView = m_swapChain->getDepthTexture()->getImageView();
+        depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Or STORE if needed later
+        depthAttachmentInfo.clearValue.depthStencil = {1.0f, 0};
     }
+
+
+    VkRenderingInfoKHR renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    renderingInfo.renderArea.offset = {0, 0};
+    renderingInfo.renderArea.extent = m_swapChain->getExtent();
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachmentInfo;
+    renderingInfo.pDepthAttachment = hasDepth ? &depthAttachmentInfo : VK_NULL_HANDLE;
+    renderingInfo.pStencilAttachment = VK_NULL_HANDLE; // Not used currently
+
+    vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 
 }
 
 void ForwardRenderer::cleanupSwapChain()
 {
-    m_framebuffers.clear();
 
-    // currently closes each command buffer sequentially
-    // could make something to close them all at once
+    m_currentFrame = 0;
+
     m_commandBuffers.clear();
 
     m_graphicsPipeline.reset();
-    m_renderPass.reset();
 
     m_swapChain->destroy();
 }
-void ForwardRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, std::shared_ptr<Scene> activeScene)
+void ForwardRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t imageIndex, std::shared_ptr<Scene> activeScene)
 {
+
+
+
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     beginInfo.pInheritanceInfo = nullptr; // Optional
 
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+    if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to begin recording command buffer!");
         throw std::runtime_error("failed to begin recording command buffer!");
     }
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = m_renderPass->getRenderPassVk();
-    renderPassInfo.framebuffer = m_framebuffers[imageIndex]->getFramebufferVk();
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = m_swapChain->getExtent();
+    // Get the VulkanContext to check if dynamic vertex input is supported
+    auto& app = Application::getInstance();
+    auto& vulkanContext = app.getVulkanContext();
 
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
 
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
-
-    uint32_t subpassIndex = 0;
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    m_graphicsPipeline->bind(commandBuffer, subpassIndex);
+    setupDynamicRenderingMemoryBarriers(commandBuffer);
+    beginDynamicRendering(commandBuffer);
+    m_graphicsPipeline->bind(commandBuffer->getCommandBufferVk());
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -510,17 +502,14 @@ void ForwardRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_
     viewport.height = static_cast<float>(m_swapChain->getExtent().height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    vkCmdSetViewport(commandBuffer->getCommandBufferVk(), 0, 1, &viewport);
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
     scissor.extent = m_swapChain->getExtent();
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    // Get the VulkanContext to check if dynamic vertex input is supported
-    auto& app = Application::getInstance();
-    auto& vulkanContext = app.getVulkanContext();
-    
+
 
     // Get entities with TransformComponent and MeshComponent
     auto& registry = activeScene->getRegistry();
@@ -559,7 +548,7 @@ void ForwardRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_
             auto attributeDescriptions = bufferLayout.getAttributeDescriptions2EXT();
             
             // Use the function pointer from VulkanContext
-            vulkanContext.vkCmdSetVertexInputEXT(commandBuffer, 
+            vulkanContext.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 
                 1, &bindingDescription,
                 static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
         }
@@ -569,8 +558,8 @@ void ForwardRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_
         pushConstants.model = transform.transformMatrix();
         pushConstants.camPos = transform.translation();
 
-        vkCmdPushConstants(commandBuffer, 
-            m_graphicsPipeline->getPipelineLayoutVk(subpassIndex),
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
+            m_graphicsPipeline->getPipelineLayoutVk(),
             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
             0, 
             sizeof(PushConstants), 
@@ -579,27 +568,56 @@ void ForwardRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_
         // Bind vertex buffers
         VkBuffer vertexBuffers[] = {mesh->getVertexBuffer()->getBufferVk()};
         VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
 
 
         
         // Bind descriptor sets (only view/proj and material now)materialComp.material->getDescriptorSet()
         VkDescriptorSet descriptorSets[] = {m_descriptorSets[m_currentFrame], materialComp.material->getDescriptorSet()};
         uint32_t descriptorSetCount = sizeof(descriptorSets) / sizeof(descriptorSets[0]);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline->getPipelineLayoutVk(subpassIndex), 
+        vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline->getPipelineLayoutVk(), 
             0, descriptorSetCount, descriptorSets, 0, nullptr);
         
         // Bind index buffer
-        vkCmdBindIndexBuffer(commandBuffer, mesh->getIndexBuffer()->getBufferVk(), 0, mesh->getIndexBuffer()->getIndexType());
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), mesh->getIndexBuffer()->getBufferVk(), 0, mesh->getIndexBuffer()->getIndexType());
         
         // Draw the mesh
-        vkCmdDrawIndexed(commandBuffer, mesh->getIndexCount(), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), mesh->getIndexCount(), 1, 0, 0, 0);
     }
     
 
-    vkCmdEndRenderPass(commandBuffer);
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
 
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+    // only transition to present layout if in presentation mode
+if (SwapChain::renderMode == RenderMode::PRESENTATION) {
+    // Add pipeline barrier to transition to present layout
+    VkImageMemoryBarrier presentBarrier{};
+    presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    presentBarrier.image = m_swapChain->getImages()[imageIndex];  
+    presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    presentBarrier.subresourceRange.baseMipLevel = 0;
+    presentBarrier.subresourceRange.levelCount = 1;
+    presentBarrier.subresourceRange.baseArrayLayer = 0;
+    presentBarrier.subresourceRange.layerCount = 1;
+    presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    presentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+
+    vkCmdPipelineBarrier(
+        commandBuffer->getCommandBufferVk(),
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &presentBarrier
+    );
+}
+
+    if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to record command buffer!");
         throw std::runtime_error("failed to record command buffer!");
     }
@@ -625,10 +643,10 @@ void ForwardRenderer::recreateSwapChain()
 
 
     m_swapChain->recreate();
-    setupRenderPass();
     setupGraphicsPipeline();
-    setupFramebuffers();
     setupCommandBuffers();
+
+    m_currentFrame = 0;
 }
 
 void ForwardRenderer::createUniformBuffers()

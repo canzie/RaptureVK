@@ -39,6 +39,35 @@ Sampler::Sampler(const TextureSpecification& spec) {
     }
 }
 
+Sampler::Sampler(VkFilter filter, VkSamplerAddressMode wrap)
+{
+    auto& app = Application::getInstance();
+    VkDevice device = app.getVulkanContext().getLogicalDevice();
+
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = filter;
+    samplerInfo.minFilter = filter;
+    samplerInfo.addressModeU = wrap;
+    samplerInfo.addressModeV = wrap;
+    samplerInfo.addressModeW = wrap;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = 16.0f; // Could be made configurable
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 1.0f;
+
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &m_sampler) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create texture sampler!");
+        throw std::runtime_error("Failed to create texture sampler!");
+    }
+}
+
 Sampler::~Sampler() {
     auto& app = Application::getInstance();
     VkDevice device = app.getVulkanContext().getLogicalDevice();
@@ -229,7 +258,168 @@ void Texture::loadImageFromFile(size_t threadId) {
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
 }
 
-void Texture::createImage() {
+void Texture::copyFromImage(
+    VkImage image, 
+    VkImageLayout otherLayout, 
+    VkImageLayout newLayout,
+    VkSemaphore waitSemaphore,
+    VkSemaphore signalSemaphore) {
+    if (m_image == VK_NULL_HANDLE || image == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("Cannot copy image: One or both VkImages are VK_NULL_HANDLE");
+        throw std::runtime_error("Cannot copy image: One or both VkImages are VK_NULL_HANDLE");
+    }
+
+    auto& app = Application::getInstance();
+    auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
+    
+    // Get or create a command pool for graphics operations
+    CommandPoolConfig poolConfig{};
+    poolConfig.queueFamilyIndex = app.getVulkanContext().getQueueFamilyIndices().graphicsFamily.value();
+    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    
+    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandBuffer = commandPool->getCommandBuffer();
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+
+    // Transition source image to transfer source optimal
+    VkImageMemoryBarrier sourceBarrier{};
+    sourceBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    sourceBarrier.oldLayout = otherLayout;
+    sourceBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    sourceBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    sourceBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    sourceBarrier.image = image;
+    sourceBarrier.subresourceRange.aspectMask = getImageAspectFlags(m_spec.format);
+    sourceBarrier.subresourceRange.baseMipLevel = 0;
+    sourceBarrier.subresourceRange.levelCount = m_spec.mipLevels;
+    sourceBarrier.subresourceRange.baseArrayLayer = 0;
+    sourceBarrier.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    sourceBarrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    sourceBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+    // Transition destination image to transfer destination optimal
+    VkImageMemoryBarrier destBarrier{};
+    destBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    destBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    destBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    destBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    destBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    destBarrier.image = m_image;
+    destBarrier.subresourceRange.aspectMask = getImageAspectFlags(m_spec.format);
+    destBarrier.subresourceRange.baseMipLevel = 0;
+    destBarrier.subresourceRange.levelCount = m_spec.mipLevels;
+    destBarrier.subresourceRange.baseArrayLayer = 0;
+    destBarrier.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    destBarrier.srcAccessMask = 0;
+    destBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    VkImageMemoryBarrier imageMemoryBarriers[] = {sourceBarrier, destBarrier};
+
+    // Execute the layout transitions
+    vkCmdPipelineBarrier(
+        commandBuffer->getCommandBufferVk(),
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        2, imageMemoryBarriers
+    );
+
+    // Copy the image with component mapping to handle color channel ordering
+    VkImageCopy copyRegion{};
+    copyRegion.srcSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    copyRegion.srcSubresource.mipLevel = 0;
+    copyRegion.srcSubresource.baseArrayLayer = 0;
+    copyRegion.srcSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    copyRegion.srcOffset = {0, 0, 0};
+    copyRegion.dstSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    copyRegion.dstSubresource.mipLevel = 0;
+    copyRegion.dstSubresource.baseArrayLayer = 0;
+    copyRegion.dstSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    copyRegion.dstOffset = {0, 0, 0};
+    copyRegion.extent = {m_spec.width, m_spec.height, m_spec.depth};
+
+    // Create a blit command to handle the color channel swap
+    VkImageBlit blitRegion{};
+    blitRegion.srcSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    blitRegion.srcSubresource.mipLevel = 0;
+    blitRegion.srcSubresource.baseArrayLayer = 0;
+    blitRegion.srcSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    blitRegion.srcOffsets[0] = {0, 0, 0};
+    blitRegion.srcOffsets[1] = {(int32_t)m_spec.width, (int32_t)m_spec.height, 1};
+    blitRegion.dstSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.dstSubresource.baseArrayLayer = 0;
+    blitRegion.dstSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    blitRegion.dstOffsets[0] = {0, 0, 0};
+    blitRegion.dstOffsets[1] = {(int32_t)m_spec.width, (int32_t)m_spec.height, 1};
+
+    // Use blit instead of copy to handle color channel ordering
+    vkCmdBlitImage(
+        commandBuffer->getCommandBufferVk(),
+        image,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        m_image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &blitRegion,
+        VK_FILTER_NEAREST
+    );
+
+    // Transition source image back to original layout
+    sourceBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    sourceBarrier.newLayout = otherLayout;
+    sourceBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    sourceBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+    // Transition destination image to final layout
+    destBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    destBarrier.newLayout = newLayout;
+    destBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    destBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    VkImageMemoryBarrier finalBarriers[] = {sourceBarrier, destBarrier};
+
+    // Execute the final layout transitions
+    vkCmdPipelineBarrier(
+        commandBuffer->getCommandBufferVk(),
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        2, finalBarriers
+    );
+
+    commandBuffer->end();
+
+    // Submit the command buffer
+    graphicsQueue->addCommandBuffer(commandBuffer);
+    VkSubmitInfo submitInfo{};
+    if (waitSemaphore != VK_NULL_HANDLE) {
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = &waitSemaphore;
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_TRANSFER_BIT};
+        submitInfo.pWaitDstStageMask = waitStages;
+    }
+    if (signalSemaphore != VK_NULL_HANDLE) {
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &signalSemaphore;
+    }
+
+    graphicsQueue->submitCommandBuffers(submitInfo, VK_NULL_HANDLE);
+    graphicsQueue->waitIdle();
+}
+
+void Texture::createImage()
+{
     auto& app = Application::getInstance();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
 
@@ -261,7 +451,6 @@ void Texture::createImage() {
         RP_CORE_ERROR("Failed to create image!");
         throw std::runtime_error("Failed to create image!");
     }
-    
 }
 
 void Texture::createImageView() {
@@ -283,14 +472,13 @@ void Texture::createImageView() {
         RP_CORE_ERROR("Failed to create texture image view!");
         throw std::runtime_error("Failed to create texture image view!");
     }
-    
 }
 
 VkDescriptorImageInfo Texture::getDescriptorImageInfo() const {
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageInfo.imageView = m_imageView;
-    imageInfo.sampler = m_sampler->getSampler();
+    imageInfo.sampler = m_sampler->getSamplerVk();
     return imageInfo;
 }
 

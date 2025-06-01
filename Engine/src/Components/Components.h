@@ -162,6 +162,7 @@ namespace Rapture {
         void update(float deltaTime, TransformComponent& transform, CameraComponent& camera)
         {
             controller.update(deltaTime, transform, camera);
+
         }
     };
 

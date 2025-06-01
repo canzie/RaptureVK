@@ -10,9 +10,10 @@ namespace Rapture {
 class Sampler {
 public:
     Sampler(const TextureSpecification& spec);
+    Sampler(VkFilter filter, VkSamplerAddressMode wrap);
     ~Sampler();
 
-    VkSampler getSampler() const { return m_sampler; }
+    VkSampler getSamplerVk() const { return m_sampler; }
 
 private:
     VkSampler m_sampler;
@@ -54,6 +55,8 @@ public:
     bool isReadyForSampling() const {
         return m_readyForSampling;
     }
+
+    void copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLayout newLayout, VkSemaphore waitSemaphore=VK_NULL_HANDLE, VkSemaphore signalSemaphore=VK_NULL_HANDLE);
 
 private:
     void createImage();
