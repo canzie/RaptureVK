@@ -3,6 +3,8 @@
 #include <cstdint>
 #include "Vulkan/Vulkan.h"
 
+#include "Logging/Log.h"
+
 namespace Rapture {
 
 // Texture filtering modes
@@ -53,7 +55,7 @@ struct TextureSpecification {
     bool srgb = true; // to distinguish between UNORM and SRGB for relevant formats
     uint32_t width = 0;
     uint32_t height = 0;
-    uint32_t depth = 0; // For 3D textures
+    uint32_t depth = 1; // For 3D textures
 
     uint32_t mipLevels = 1; // Added for mipmapping
 };
@@ -65,7 +67,7 @@ inline VkImageType toVkImageType(TextureType type) {
         case TextureType::TEXTURE2D: case TextureType::TEXTURE2D_ARRAY: return VK_IMAGE_TYPE_2D;
         case TextureType::TEXTURE3D: return VK_IMAGE_TYPE_3D;
         default: 
-            // TODO: Log error or assert
+            RP_CORE_ERROR("Texture::toVkImageType() - Unsupported type!");
             return VK_IMAGE_TYPE_MAX_ENUM; 
     }
 }
@@ -77,7 +79,7 @@ inline VkImageViewType toVkImageViewType(TextureType type) {
         case TextureType::TEXTURE3D: return VK_IMAGE_VIEW_TYPE_3D;
         case TextureType::TEXTURE2D_ARRAY: return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
         default: 
-            // TODO: Log error or assert
+            RP_CORE_ERROR("Texture::toVkImageViewType() - Unsupported type!");
             return VK_IMAGE_VIEW_TYPE_MAX_ENUM; 
     }
 }
@@ -95,7 +97,7 @@ inline VkFormat toVkFormat(TextureFormat format, bool srgb = true) {
         case TextureFormat::D32F:        return VK_FORMAT_D32_SFLOAT;
         case TextureFormat::D24S8:       return VK_FORMAT_D24_UNORM_S8_UINT;
         default: 
-            // TODO: Log error or assert
+            RP_CORE_ERROR("Texture::toVkFormat() - Unsupported format!");
             return VK_FORMAT_UNDEFINED;
     }
 }
@@ -107,7 +109,7 @@ inline VkSamplerAddressMode toVkSamplerAddressMode(TextureWrap wrapMode) {
         case TextureWrap::Repeat:         return VK_SAMPLER_ADDRESS_MODE_REPEAT;
         case TextureWrap::ClampToBorder:  return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
         default:
-            // TODO: Log error or assert
+            RP_CORE_ERROR("Texture::toVkSamplerAddressMode() - Unsupported wrap mode!");
             return VK_SAMPLER_ADDRESS_MODE_MAX_ENUM;
     }
 }
@@ -123,7 +125,7 @@ inline VkFilter toVkFilter(TextureFilter filter) {
         case TextureFilter::LinearMipmapLinear:
             return VK_FILTER_LINEAR;
         default:
-            // TODO: Log error or assert
+            RP_CORE_ERROR("Texture::toVkFilter() - Unsupported filter!");
             return VK_FILTER_MAX_ENUM;
     }
 }
@@ -140,7 +142,7 @@ inline VkSamplerMipmapMode toVkSamplerMipmapMode(TextureFilter filter) {
         case TextureFilter::Linear:  // No mipmapping involved
             return VK_SAMPLER_MIPMAP_MODE_NEAREST; // Or LINEAR, effectively ignored if mipLevels = 1
         default:
-            // TODO: Log error or assert
+            RP_CORE_ERROR("Texture::toVkSamplerMipmapMode() - Unsupported filter!");
             return VK_SAMPLER_MIPMAP_MODE_MAX_ENUM;
     }
 }

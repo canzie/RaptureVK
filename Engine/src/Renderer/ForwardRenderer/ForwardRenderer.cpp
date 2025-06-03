@@ -3,7 +3,6 @@
 #include "Logging/Log.h"
 #include "WindowContext/VulkanContext/VulkanContext.h"
 #include "WindowContext/Application.h"
-#include "Components/Components.h"
 #include "Scenes/Entities/Entity.h"
 #include "Scenes/SceneManager.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
@@ -13,6 +12,7 @@
 #include "Events/InputEvents.h"
 
 #include "AssetManager/AssetManager.h"
+#include "Logging/TracyProfiler.h"
 
 #include <chrono>
 #include <mutex>
@@ -50,7 +50,6 @@ namespace Rapture {
     std::vector<VkDescriptorSet> ForwardRenderer::m_descriptorSets = {};
 
 
-    bool ForwardRenderer::m_framebufferResized = false;
     uint32_t ForwardRenderer::m_currentFrame = 0;
     
     float ForwardRenderer::m_zoom = 0.0f;
@@ -64,9 +63,7 @@ namespace Rapture {
         m_graphicsQueue = app.getVulkanContext().getGraphicsQueue();
         m_presentQueue = app.getVulkanContext().getPresentQueue();
 
-        ApplicationEvents::onWindowResize().addListener([](unsigned int width, unsigned int height) {
-            //m_framebufferResized = true;
-        });
+
 
         InputEvents::onMouseScrolled().addListener([](float x, float y) {
             m_zoom += y;
@@ -93,7 +90,6 @@ void ForwardRenderer::shutdown()
 {
     
     cleanupSwapChain();
-    m_swapChain.reset();
 
 
     // Now safe to destroy VMA allocator
@@ -115,6 +111,8 @@ void ForwardRenderer::shutdown()
 
 void ForwardRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
 {
+    RAPTURE_PROFILE_FUNCTION();
+    
     int imageIndexi = m_swapChain->acquireImage(m_currentFrame);
 
     if (imageIndexi == -1) {
@@ -324,7 +322,6 @@ void ForwardRenderer::setupGraphicsPipeline()
     config.rasterizationState = rasterizer;
     config.multisampleState = multisampling;
     config.colorBlendState = colorBlending;
-    config.commonColorBlendAttachmentState = colorBlendAttachment;
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = getMainFramebufferSpecification();
@@ -460,20 +457,24 @@ void ForwardRenderer::beginDynamicRendering(std::shared_ptr<CommandBuffer> comma
 
 }
 
-void ForwardRenderer::cleanupSwapChain()
-{
+void ForwardRenderer::cleanupSwapChain() {
 
-    m_currentFrame = 0;
+    vkDeviceWaitIdle(m_device);
+
 
     m_commandBuffers.clear();
 
     m_graphicsPipeline.reset();
 
     m_swapChain->destroy();
+
+    m_currentFrame = 0;
 }
+
 void ForwardRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t imageIndex, std::shared_ptr<Scene> activeScene)
 {
 
+    RAPTURE_PROFILE_FUNCTION();
 
 
     VkCommandBufferBeginInfo beginInfo{};
@@ -517,6 +518,10 @@ void ForwardRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> command
     
 
     for (auto entity : view) {
+
+        RAPTURE_PROFILE_SCOPE("Draw Mesh");
+
+
         auto& transform = view.get<TransformComponent>(entity);
         auto& meshComp = view.get<MeshComponent>(entity);
         auto& materialComp = view.get<MaterialComponent>(entity);
@@ -621,7 +626,6 @@ if (SwapChain::renderMode == RenderMode::PRESENTATION) {
         RP_CORE_ERROR("failed to record command buffer!");
         throw std::runtime_error("failed to record command buffer!");
     }
-
 }
 
 void ForwardRenderer::recreateSwapChain()
@@ -637,16 +641,12 @@ void ForwardRenderer::recreateSwapChain()
     }
 
     
-    vkDeviceWaitIdle(m_device);
-
     cleanupSwapChain();
 
 
     m_swapChain->recreate();
     setupGraphicsPipeline();
     setupCommandBuffers();
-
-    m_currentFrame = 0;
 }
 
 void ForwardRenderer::createUniformBuffers()

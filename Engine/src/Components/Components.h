@@ -25,6 +25,8 @@
 #include <memory>
 
 
+    // Maximum number of lights supported
+    static constexpr uint32_t MAX_LIGHTS = 16;
 
 namespace Rapture {
 
@@ -308,6 +310,19 @@ struct LightComponent
 
 };
 
+// Light data structure for shader
+struct LightData {
+    alignas(16) glm::vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)
+    alignas(16) glm::vec4 direction;     // w = range
+    alignas(16) glm::vec4 color;         // w = intensity
+    alignas(16) glm::vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = unused, w = unused
+};
+
+// Light uniform buffer object (binding 1)
+struct LightUniformBufferObject {
+    alignas(4) uint32_t numLights = 0;
+    LightData lights[MAX_LIGHTS];
+};
 
 }
 

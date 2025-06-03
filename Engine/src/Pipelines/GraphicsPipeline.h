@@ -28,7 +28,6 @@ struct GraphicsPipelineConfiguration {
     std::optional<VkPipelineDepthStencilStateCreateInfo>  depthStencilState;
 
 
-    VkPipelineColorBlendAttachmentState                   commonColorBlendAttachmentState;
     // References commonColorBlendAttachmentState
     VkPipelineColorBlendStateCreateInfo                   colorBlendState; 
 
@@ -37,6 +36,7 @@ struct GraphicsPipelineConfiguration {
 
     FramebufferSpecification                               framebufferSpec;
     std::shared_ptr<Shader>                                shader;
+
 
 };
 
@@ -59,7 +59,7 @@ private:
     void createPipeline(const GraphicsPipelineConfiguration& config);
 
 
-private:
+protected:
 
     VkPipeline m_pipeline;
     VkPipelineLayout m_pipelineLayout;

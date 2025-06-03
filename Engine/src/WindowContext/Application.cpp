@@ -1,7 +1,9 @@
 #include "Application.h"
 #include "Logging/Log.h"
+#include "Logging/TracyProfiler.h"
 
 #include "Renderer/ForwardRenderer/ForwardRenderer.h"
+#include "Renderer/DeferredShading/DeferredRenderer.h"
 #include "Loaders/glTF2.0/glTFLoader.h"
 #include "Scenes/SceneManager.h"
 
@@ -34,6 +36,9 @@ namespace Rapture {
 
         m_vulkanContext->createRecourses(m_window.get());
 
+        TracyProfiler::init();
+
+
         // Initialize project - this will setup default world and scene
         m_project = std::make_unique<Project>();
         auto working_dir = std::filesystem::current_path();
@@ -57,11 +62,25 @@ namespace Rapture {
         }
 
         m_project->setProjectRootDirectory(root_dir);
-        m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/SPIRV");
+        m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/");
         
         CommandPoolManager::init();
-        
+        CommandPoolConfig config;
+        config.queueFamilyIndex = m_vulkanContext->getQueueFamilyIndices().graphicsFamily.value();
+        config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+        auto commandPool = CommandPoolManager::createCommandPool(config);
+        auto commandBuffer = commandPool->getCommandBuffer(true);
+
+        TracyProfiler::initGPUContext(
+            m_vulkanContext->getPhysicalDevice(), 
+            m_vulkanContext->getLogicalDevice(), 
+            m_vulkanContext->getGraphicsQueue()->getQueueVk(), 
+            commandBuffer->getCommandBufferVk()
+        );
+
         ForwardRenderer::init();
+        //DeferredRenderer::init();
 
         ModelLoadersCache::init();
 
@@ -87,12 +106,16 @@ namespace Rapture {
 
     Application::~Application() {
 
+		TracyProfiler::shutdown();
+
+
         m_vulkanContext->waitIdle();
 
         ModelLoadersCache::clear();
         m_project.reset();
 
         ForwardRenderer::shutdown();
+        //DeferredRenderer::shutdown();
 
         m_layerStack.clear();
 
@@ -107,6 +130,9 @@ namespace Rapture {
     void Application::run() {
 
         while (m_running) {
+            TracyProfiler::beginFrame();
+
+
             Timestep::onUpdate();
 
             for (auto layer : m_layerStack)
@@ -116,9 +142,10 @@ namespace Rapture {
 
             m_window->onUpdate();
             
-
-
+            TracyProfiler::collectGPUData();
+            TracyProfiler::endFrame();
         }
+
 
         m_vulkanContext->waitIdle();
 

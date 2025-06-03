@@ -49,6 +49,12 @@ void Shader::createGraphicsShader(const std::filesystem::path& vertexPath, const
     m_materialSets = extractMaterialSets(vertexCode);
     std::vector<DescriptorInfo> fragmentMaterialSets = extractMaterialSets(fragmentCode);
 
+    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{vertexCode, VK_SHADER_STAGE_VERTEX_BIT}, {fragmentCode, VK_SHADER_STAGE_FRAGMENT_BIT}});
+    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Print push constant reflection data
+    RP_CORE_INFO("Push Constant Reflection Data:");
+    printPushConstantLayouts(pushConstantInfos);
 
     // Helper lambda to check if a descriptor is already in the material sets
     auto isDescriptorDuplicate = [](const std::vector<DescriptorInfo>& sets, const DescriptorInfo& info) {
@@ -366,6 +372,26 @@ void Rapture::printDescriptorSetInfos(const std::vector<DescriptorSetInfo>& setI
     RP_CORE_INFO("Found {0} descriptor set(s):", setInfos.size());
     for (const auto& setInfo : setInfos) {
         printDescriptorSetInfo(setInfo);
+    }
+}
+
+void printPushConstantLayout(const PushConstantInfo& pushConstantInfo) {
+    RP_CORE_INFO("Push Constant Block:");
+    RP_CORE_INFO("\t Name: {0}", pushConstantInfo.name);
+    RP_CORE_INFO("\t Offset: {0} bytes", pushConstantInfo.offset);
+    RP_CORE_INFO("\t Size: {0} bytes", pushConstantInfo.size);
+    RP_CORE_INFO("\t Stages: {0}", shaderStageFlagsToString(pushConstantInfo.stageFlags));
+}
+
+void printPushConstantLayouts(const std::vector<PushConstantInfo>& pushConstantInfos) {
+    if (pushConstantInfos.empty()) {
+        RP_CORE_INFO("No push constants found in shader");
+        return;
+    }
+
+    RP_CORE_INFO("Found {0} push constant block(s):", pushConstantInfos.size());
+    for (const auto& pushConstantInfo : pushConstantInfos) {
+        printPushConstantLayout(pushConstantInfo);
     }
 }
 

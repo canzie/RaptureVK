@@ -11,7 +11,8 @@
 #include "Materials/MaterialInstance.h"
 #include "Scenes/Scene.h"
 #include "WindowContext/VulkanContext/VulkanQueue.h"
-
+#include "Cameras/CameraCommon.h"
+#include "Components/Components.h"
 
 #include <memory>
 #include <vector>
@@ -31,25 +32,6 @@ namespace Rapture {
     // Maximum number of lights supported
     static constexpr uint32_t MAX_LIGHTS = 16;
 
-    // Camera/View uniform buffer object (binding 0)
-    struct CameraUniformBufferObject {
-        glm::mat4 view = glm::mat4(1.0f);
-        glm::mat4 proj = glm::mat4(1.0f);
-    };
-
-    // Light data structure for shader
-    struct LightData {
-        alignas(16) glm::vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)
-        alignas(16) glm::vec4 direction;     // w = range
-        alignas(16) glm::vec4 color;         // w = intensity
-        alignas(16) glm::vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = unused, w = unused
-    };
-
-    // Light uniform buffer object (binding 1)
-    struct LightUniformBufferObject {
-        alignas(4) uint32_t numLights = 0;
-        LightData lights[MAX_LIGHTS];
-    };
 
     struct PushConstants {
         glm::mat4 model = glm::mat4(1.0f);
@@ -84,6 +66,7 @@ class ForwardRenderer {
 
         static void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t imageIndex, std::shared_ptr<Scene> activeScene);
 
+        
 
         static void createUniformBuffers();
         static void updateUniformBuffers();

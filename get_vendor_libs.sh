@@ -34,6 +34,7 @@ STB_IMAGE_VERSION="master"     # Or a specific commit/tag
 VMA_VERSION_TAG="v3.3.0"       # Full tag for Vulkan Memory Allocator
 SPIRV_REFLECT_VERSION_TAG="main"    # Main branch for SPIRV-Reflect
 YYJSON_VERSION_TAG="0.11.1"      # Full tag for yyjson
+TRACY_VERSION_TAG="0.12.0"      # Version for Tracy profiler
 
 GLFW_URL="https://github.com/glfw/glfw/releases/download/${GLFW_VERSION}/glfw-${GLFW_VERSION}.zip"
 GLM_URL="https://github.com/g-truc/glm/archive/refs/tags/${GLM_VERSION}.zip" # Changed to archive zip
@@ -45,6 +46,7 @@ STB_IMAGE_H_URL="https://raw.githubusercontent.com/nothings/stb/${STB_IMAGE_VERS
 VMA_URL="https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/${VMA_VERSION_TAG}.zip"
 SPIRV_REFLECT_URL="https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/heads/${SPIRV_REFLECT_VERSION_TAG}.zip"
 YYJSON_URL="https://github.com/ibireme/yyjson/archive/refs/tags/${YYJSON_VERSION_TAG}.zip"
+TRACY_URL="https://github.com/wolfpld/tracy/archive/refs/tags/v${TRACY_VERSION_TAG}.zip"
 
 # Function to download files (tries curl, then wget)
 download() {
@@ -82,6 +84,7 @@ printf "%-13s %-19s %s\n" "stb_image" "${STB_IMAGE_VERSION} (tag/commit)" "${STB
 printf "%-13s %-19s %s\n" "VMA" "${VMA_VERSION_TAG}" "${VMA_URL}"
 printf "%-13s %-19s %s\n" "SPIRV-Reflect" "${SPIRV_REFLECT_VERSION_TAG}" "${SPIRV_REFLECT_URL}"
 printf "%-13s %-19s %s\n" "yyjson" "${YYJSON_VERSION_TAG}" "${YYJSON_URL}"
+printf "%-13s %-19s %s\n" "Tracy" "${TRACY_VERSION_TAG}" "${TRACY_URL}"
 echo "================================================================================"
 ABSOLUTE_VENDOR_DIR="$(cd "$(dirname "$0")" && pwd)/${VENDOR_DIR_NAME}" # Get absolute path robustly
 echo "All libraries will be placed in: ${ABSOLUTE_VENDOR_DIR}"
@@ -310,11 +313,38 @@ rm -rf "${EXTRACTED_YYJSON_DIR}"
 rm -f yyjson.zip
 echo "yyjson setup complete."
 
+# --- Tracy Profiler ---
+echo
+echo "Setting up Tracy profiler v${TRACY_VERSION_TAG}..."
+rm -rf tracy "tracy-v${TRACY_VERSION_TAG}" tracy.zip # Clean up old
+download "${TRACY_URL}" "tracy.zip"
+echo "Extracting Tracy..."
+unzip -q tracy.zip -d . # Extract here
+if [ $? -ne 0 ]; then echo "ERROR: Failed to extract Tracy."; rm -f tracy.zip; exit 1; fi
+
+EXTRACTED_TRACY_DIR="tracy-${TRACY_VERSION_TAG}"
+if [ ! -d "${EXTRACTED_TRACY_DIR}" ]; then
+    echo "ERROR: Expected extracted directory ${EXTRACTED_TRACY_DIR} not found for Tracy."
+    echo "Listing contents of current directory:"
+    ls -la
+    exit 1
+fi
+
+# Move the entire Tracy directory
+mv "${EXTRACTED_TRACY_DIR}" "tracy"
+if [ $? -ne 0 ]; then 
+    echo "ERROR: Failed to move Tracy directory."
+    exit 1
+fi
+
+rm -f tracy.zip
+echo "Tracy setup complete."
+
 # --- Final Directory Verification ---
 echo
 echo "--- Verifying final directory structure in $PWD ---"
 echo "Your vendor_libraries.cmake file should be configured for these directory names."
-EXPECTED_DIRS=("GLFW" "glm" "imgui" "entt" "spdlog" "stb_image" "VulkanMemoryAllocator" "SPIRV-Reflect" "yyjson")
+EXPECTED_DIRS=("GLFW" "glm" "imgui" "entt" "spdlog" "stb_image" "VulkanMemoryAllocator" "SPIRV-Reflect" "yyjson" "tracy")
 ALL_FOUND=true
 for DIR_NAME in "${EXPECTED_DIRS[@]}"; do
     if [ -d "$DIR_NAME" ]; then

@@ -46,9 +46,10 @@ namespace Rapture {
     };
 
     void printDescriptorSetInfo(const DescriptorSetInfo& setInfo);
-
     void printDescriptorSetInfos(const std::vector<DescriptorSetInfo>& setInfos);
 
+    void printPushConstantLayout(const PushConstantInfo& pushConstantInfo);
+    void printPushConstantLayouts(const std::vector<PushConstantInfo>& pushConstantInfos);
 
 
     std::string shaderTypeToString(ShaderType type);
@@ -80,6 +81,8 @@ namespace Rapture {
 
         const std::vector<DescriptorInfo>& getMaterialSets() const { return m_materialSets; }
 
+        const std::vector<VkPushConstantRange>& getPushConstantLayouts() const { return m_pushConstantLayouts; }
+
     private:
         // Add new private methods
         std::vector<DescriptorSetInfo> collectDescriptorSetInfo(const std::vector<char>& vertexSpirv, const std::vector<char>& fragmentSpirv);
@@ -89,6 +92,8 @@ namespace Rapture {
         std::vector<VkPipelineShaderStageCreateInfo> m_stages;
         std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
         std::vector<DescriptorSetInfo> m_descriptorSetInfos;  // Store for later use
+
+        std::vector<VkPushConstantRange> m_pushConstantLayouts;
 
         std::vector<DescriptorInfo> m_materialSets;
     };

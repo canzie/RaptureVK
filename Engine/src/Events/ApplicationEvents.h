@@ -12,7 +12,8 @@ namespace ApplicationEvents {
     using WindowFocusEvent = EventBus<>;
     using WindowLostFocusEvent = EventBus<>;
     using WindowMovedEvent = EventBus<unsigned int /*xPos*/, unsigned int /*yPos*/>;
-
+    using SwapChainRecreatedEvent = EventBus<std::shared_ptr<SwapChain>>;
+    using RequestSwapChainRecreationEvent = EventBus<>;
     // Application Lifecycle Events
 
 
@@ -32,8 +33,13 @@ namespace ApplicationEvents {
     inline WindowMovedEvent& onWindowMoved() {
         return EventRegistry::getInstance().getEventBus<unsigned int, unsigned int>("WindowMoved");
     }
+    inline SwapChainRecreatedEvent& onSwapChainRecreated() {
+        return EventRegistry::getInstance().getEventBus<std::shared_ptr<SwapChain>>("SwapChainRecreated");
+    }
 
-
+    inline RequestSwapChainRecreationEvent& onRequestSwapChainRecreation() {
+        return EventRegistry::getInstance().getEventBus<>("RequestSwapChainRecreation");
+    }
 
 } // namespace ApplicationEvents
 } // namespace Rapture

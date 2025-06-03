@@ -21,6 +21,8 @@
 #include "imguiPanels/ProprtiesPanel.h"
 #include "imguiPanels/BrowserPanel.h"
 
+#include "RenderTargets/SwapChains/SwapChain.h"
+
 class ImGuiLayer : public Rapture::Layer
 {
 public:
@@ -41,6 +43,8 @@ private:
     void beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageView targetImageView);
     void endDynamicRendering(VkCommandBuffer commandBuffer);
     void onResize();
+
+    void handleSwapChainRecreation(std::shared_ptr<Rapture::SwapChain> newSwapChain);
 
 private:
     float m_Time = 0.0f;

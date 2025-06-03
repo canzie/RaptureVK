@@ -44,7 +44,10 @@ namespace Rapture {
     m_swapChain = nullptr;
 
     if (enableValidationLayers) {
+        RP_CORE_INFO("Validation layers enabled!");
         m_validationLayers.push_back("VK_LAYER_KHRONOS_validation");
+    } else {
+        RP_CORE_INFO("Validation layers disabled!");
     }
 
     m_deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);

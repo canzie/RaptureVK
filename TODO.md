@@ -11,19 +11,23 @@ then a material base would belong to a pipeline, like every shader in the GBuffe
 
 
 
-- lights
-- imgui
-- tracy
-- deferred rendering
-- shadow mapping
-- compute shaders
-- skybox
-- static meshes
-- materials in the asset manager
-- ddgi
+- deferred rendering pipeline
+
+- ray picking
 - stencil selection box
-- mouse picking
 - imgizmo
+
+- skybox
+
+- shadow mapping
+
+- compute shaders
+- ddgi
+
+- static meshes
+
+- materials in the asset manager
+
 - physics
 - animations
 - giga serializaiton

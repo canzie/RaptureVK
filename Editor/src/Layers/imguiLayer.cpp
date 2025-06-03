@@ -11,7 +11,7 @@
 #include "Events/ApplicationEvents.h"
 
 #include "../imguiPanels/imguiPanelStyleLinear.h"
-
+#include "Logging/TracyProfiler.h"
 
 static void check_vk_result(VkResult err)
 {
@@ -173,6 +173,8 @@ void ImGuiLayer::onDetach()
 
 void ImGuiLayer::renderImGui()
 {
+    RAPTURE_PROFILE_FUNCTION();
+
     auto& app = Rapture::Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();
@@ -248,6 +250,8 @@ void ImGuiLayer::renderImGui()
 
 void ImGuiLayer::onUpdate(float ts)
 {
+    RAPTURE_PROFILE_FUNCTION();
+
     auto& app = Rapture::Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();

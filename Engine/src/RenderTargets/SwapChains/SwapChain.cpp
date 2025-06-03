@@ -69,17 +69,8 @@ void SwapChain::invalidate()
         throw std::runtime_error("SwapChain::invalidate - logical device is nullptr!");
     }
 
-    destroySyncObjects();
-
-    for (size_t i = 0; i < m_swapChainImageViews.size(); i++) {
-        if (m_swapChainImageViews[i] != VK_NULL_HANDLE) {
-            vkDestroyImageView(m_device, m_swapChainImageViews[i], nullptr);
-        }
-    } 
-
-    if (m_swapChain != VK_NULL_HANDLE) {
-        vkDestroySwapchainKHR(m_device, m_swapChain, nullptr);
-    }
+    // destroy if old swapchain exists to prevent memory leaks
+    destroy();
 
     SwapChainSupportDetails2 swapChainSupport = querySwapChainSupport();
 

@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <imgui.h>
 
+#include "Logging/TracyProfiler.h"
 
 TestLayer::~TestLayer()
 {
@@ -119,7 +120,7 @@ void TestLayer::notifyCameraChange()
 void TestLayer::onUpdate(float ts)
 {
 
-    
+    RAPTURE_PROFILE_SCOPE("TestLayer::onUpdate");
     // Get the active scene from SceneManager
     auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
     if (!activeScene) return;

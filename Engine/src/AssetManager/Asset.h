@@ -19,6 +19,7 @@ namespace Rapture {
     // NOTE: i dont like this but dont know variants well enough and dont want to change the entire codebase
     using AssetVariant = std::variant<std::monostate, std::shared_ptr<Material>, std::shared_ptr<Shader>, std::shared_ptr<Texture>>;
 
+
     enum class AssetType {
         None = 0,
         Material,

@@ -319,6 +319,72 @@ else()
     message(FATAL_ERROR "yyjson.h or yyjson.c not found in ${YYJSON_DIR}. Please ensure the library is correctly downloaded and placed by the get_vendor_libs script, then re-run CMake.")
 endif()
 
+
+# ==================== Tracy Profiler ====================
+# Only look in Engine/vendor for libraries
+set(TRACY_DIR "${CMAKE_SOURCE_DIR}/Engine/vendor/tracy")
+message(STATUS "Looking for Tracy at ${TRACY_DIR}")
+
+# Configure Tracy build options
+set(TRACY_ENABLE ON CACHE BOOL "Enable Tracy profiler" FORCE)
+set(TRACY_ON_DEMAND OFF CACHE BOOL "Enable Tracy on-demand mode" FORCE)
+set(TRACY_NO_BROADCAST OFF CACHE BOOL "Disable broadcast client discovery" FORCE)
+set(TRACY_NO_CODE_TRANSFER OFF CACHE BOOL "Disable code transfer" FORCE)
+set(TRACY_NO_CONTEXT_SWITCH OFF CACHE BOOL "Disable context switch" FORCE)
+set(TRACY_NO_EXIT OFF CACHE BOOL "Don't exit on client disconnect" FORCE)
+set(TRACY_NO_FRAME_IMAGE OFF CACHE BOOL "Disable capture frame image support" FORCE)
+set(TRACY_NO_SAMPLING OFF CACHE BOOL "Disable sampling" FORCE)
+set(TRACY_NO_VERIFY OFF CACHE BOOL "Disable zone validation" FORCE)
+set(TRACY_NO_VSYNC_CAPTURE OFF CACHE BOOL "Disable VSync capture" FORCE)
+
+# Check if Tracy has its own CMakeLists.txt
+if(EXISTS "${TRACY_DIR}/CMakeLists.txt")
+    message(STATUS "Building Tracy from source using CMakeLists.txt")
+    add_subdirectory(${TRACY_DIR} tracy EXCLUDE_FROM_ALL)
+    # Create tracy::client target if it doesn't exist
+    if(NOT TARGET tracy::client)
+        add_library(tracy::client ALIAS TracyClient)
+    endif()
+# Check if Tracy has a public directory (newer Tracy versions)
+elseif(EXISTS "${TRACY_DIR}/public/TracyClient.cpp")
+    message(STATUS "Building Tracy from public source files")
+    
+    # Create Tracy client library
+    add_library(TracyClient STATIC
+        "${TRACY_DIR}/public/TracyClient.cpp"
+    )
+    
+    target_include_directories(TracyClient PUBLIC "${TRACY_DIR}/public")
+    
+    # Create an alias for consistent usage
+    add_library(tracy::client ALIAS TracyClient)
+# Try fallback location for Tracy source files (backward compatibility)
+elseif(EXISTS "${TRACY_DIR}/TracyClient.cpp")
+    message(STATUS "Building Tracy from root source files")
+    
+    # Create Tracy client library
+    add_library(TracyClient STATIC
+        "${TRACY_DIR}/TracyClient.cpp"
+    )
+    
+    target_include_directories(TracyClient PUBLIC "${TRACY_DIR}")
+    
+    # Create an alias for consistent usage
+    add_library(tracy::client ALIAS TracyClient)
+else()
+    message(FATAL_ERROR "Tracy not found in ${TRACY_DIR}. Please clone Tracy from https://github.com/wolfpld/tracy.git")
+endif()
+
+# Ensure the tracy::client target exists
+if(NOT TARGET tracy::client)
+    message(FATAL_ERROR "Failed to create tracy::client target. Check Tracy configuration.")
+endif()
+
+# Add global Tracy definition
+if(TRACY_ENABLE)
+    add_compile_definitions(TRACY_ENABLE)
+endif()
+
 # ==================== Link all libraries to vendor_libraries ====================
 target_link_libraries(vendor_libraries INTERFACE
     glfw
@@ -331,12 +397,14 @@ target_link_libraries(vendor_libraries INTERFACE
     spirv_reflect # Link SPIRV-Reflect
     yyjson         # Link yyjson
     Vulkan::Vulkan
+    tracy::client
 )
 
 # Add Windows-specific libraries for GLFW
 if(WIN32)
     target_link_libraries(vendor_libraries INTERFACE gdi32 user32 shell32)
 endif()
+
 
 # Include directories for all vendor libraries
 # Vulkan include directories are handled by linking Vulkan::Vulkan
@@ -351,6 +419,7 @@ target_include_directories(vendor_libraries INTERFACE
     ${VMA_DIR}/include    # Add VMA include directory
     ${SPIRV_REFLECT_DIR}  # Add SPIRV-Reflect include directory
     ${YYJSON_DIR}         # Add yyjson include directory
+    ${TRACY_DIR}/public
 )
 # Ensure correct include paths for EnTT and spdlog if they were found recursively
 if(ENTT_INCLUDE_DIR)

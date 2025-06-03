@@ -27,6 +27,7 @@ namespace Rapture {
         VulkanContext& getVulkanContext() { return *m_vulkanContext; }
         const WindowContext& getWindowContext() const { return *m_window; }
         WindowContext& getWindowContext() { return *m_window; }
+        const Project& getProject() const { return *m_project; }
 
         static Application& getInstance() { return *s_instance; }
 

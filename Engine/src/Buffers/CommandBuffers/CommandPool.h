@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <memory>
 #include <functional>
+#include <string>
 
 namespace Rapture {
 
@@ -12,7 +13,7 @@ namespace Rapture {
     class CommandBuffer;
 
     struct CommandPoolConfig {
-
+        std::string name = "CommandPool";
         size_t threadId=0;
         uint32_t queueFamilyIndex;
         VkCommandPoolCreateFlags flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -32,7 +33,7 @@ namespace Rapture {
             ~CommandPool();
 
             VkCommandPool getCommandPoolVk() const { return m_commandPool; }
-            std::shared_ptr<CommandBuffer> getCommandBuffer();
+            std::shared_ptr<CommandBuffer> getCommandBuffer(bool stayAlive=false);
             std::vector<std::shared_ptr<CommandBuffer>> getCommandBuffers(uint32_t count);
 
         private:
@@ -42,6 +43,9 @@ namespace Rapture {
             uint32_t m_hash;
 
             VkDevice m_device;
+
+            // only added when stayAlive=true, can be usefull for liefetime commandbuffers which rapture does not manage directly
+            std::vector<std::shared_ptr<CommandBuffer>> m_savedCommandBuffers;
     };
 
 

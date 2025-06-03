@@ -418,10 +418,38 @@ void Texture::copyFromImage(
     graphicsQueue->waitIdle();
 }
 
+VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask)
+{
+    VkImageMemoryBarrier barrier{};
+    // Image layout transitions for dynamic rendering
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;  // Always start from undefined for the first transition
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = m_image;
+    barrier.subresourceRange.aspectMask = isDepthFormat(m_spec.format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    if (m_spec.format == TextureFormat::D24S8) {
+        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = srcAccessMask;  // No access before
+    barrier.dstAccessMask = dstAccessMask;
+    return barrier;
+}
+
 void Texture::createImage()
 {
     auto& app = Application::getInstance();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    if (m_spec.width == 0 || m_spec.height == 0 || m_spec.depth == 0) {
+        RP_CORE_ERROR("Texture::createImage() - Invalid texture specification --- dimesnions should be greater than 0! width: {}, height: {}, depth: {}", m_spec.width, m_spec.height, m_spec.depth);
+        throw std::runtime_error("Texture::createImage() - Invalid texture specification!");
+    }
 
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -448,8 +476,8 @@ void Texture::createImage()
     allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
     if (vmaCreateImage(allocator, &imageInfo, &allocInfo, &m_image, &m_allocation, nullptr) != VK_SUCCESS) {
-        RP_CORE_ERROR("Failed to create image!");
-        throw std::runtime_error("Failed to create image!");
+        RP_CORE_ERROR("Texture::createImage() - Failed to create image!");
+        throw std::runtime_error("Texture::createImage() - Failed to create image!");
     }
 }
 

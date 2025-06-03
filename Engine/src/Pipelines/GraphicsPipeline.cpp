@@ -51,18 +51,13 @@ void GraphicsPipeline::createPipelineLayout(const GraphicsPipelineConfiguration&
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
-    // TODO: add push constant reflection data to the shader
-    VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT; // Accessible in vertex shader
-    pushConstantRange.offset = 0;                              // Start at beginning
-    pushConstantRange.size = sizeof(glm::mat4) + sizeof(glm::vec3);               // Size of model matrix (64 bytes)
-
+    
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = config.shader->getDescriptorSetLayouts().size();
     pipelineLayoutInfo.pSetLayouts = config.shader->getDescriptorSetLayouts().data();
-    pipelineLayoutInfo.pushConstantRangeCount = 1;                    // We have 1 push constant range
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;     // Pointer to our range
+    pipelineLayoutInfo.pushConstantRangeCount = config.shader->getPushConstantLayouts().size();
+    pipelineLayoutInfo.pPushConstantRanges = config.shader->getPushConstantLayouts().data();
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
         RP_CORE_ERROR("GraphicsPipeline::createPipelineLayout - failed to create pipeline layout!");

@@ -3,6 +3,10 @@
 
 #include "Shaders/Shader.h"
 
+#include <map>
+#include <algorithm>
+#include <utility> // For std::pair
+
 namespace Rapture {
 
 void reflectShaderInfo(const std::vector<char>& spirvCode) {
@@ -265,6 +269,96 @@ std::vector<DescriptorInfo> extractMaterialSets(const std::vector<char> &spirvCo
 
     // Clean up   
     spvReflectDestroyShaderModule(&module);    
-    return result;}
+    return result;
+}
+
+std::vector<PushConstantInfo> getCombinedPushConstantRanges(
+    const std::vector<std::pair<const std::vector<char>&, VkShaderStageFlags>>& shaderCodeWithStages
+) {
+    // Use a map to merge push constant ranges by offset and size, combining stage flags.
+    // The key is a pair of {offset, size}, the value is PushConstantInfo.
+    std::map<std::pair<uint32_t, uint32_t>, PushConstantInfo> mergedPushConstants;
+
+    for (const auto& shaderDataPair : shaderCodeWithStages) {
+        const std::vector<char>& spirvCode = shaderDataPair.first;
+        VkShaderStageFlags stageHint = shaderDataPair.second; // Hint for the primary stage of this SPIR-V
+
+        const uint32_t* spirvData = reinterpret_cast<const uint32_t*>(spirvCode.data());
+        size_t spirvSize = spirvCode.size();
+
+        SpvReflectShaderModule module;
+        SpvReflectResult result = spvReflectCreateShaderModule(spirvSize, spirvData, &module);
+        if (result != SPV_REFLECT_RESULT_SUCCESS) {
+            RP_CORE_ERROR("Failed to create reflection data for shader stage (hint: {0}) for push constants!", stageHint);
+            // Optionally, continue to process other shaders or return an empty vector
+            continue;
+        }
+
+        uint32_t count = 0;
+        result = spvReflectEnumeratePushConstantBlocks(&module, &count, nullptr);
+        if (result == SPV_REFLECT_RESULT_SUCCESS && count > 0) {
+            std::vector<SpvReflectBlockVariable*> spvPushConstants(count);
+            result = spvReflectEnumeratePushConstantBlocks(&module, &count, spvPushConstants.data());
+
+            if (result == SPV_REFLECT_RESULT_SUCCESS) {
+                for (const auto* spvPcBlock : spvPushConstants) {
+                    if (!spvPcBlock) continue;
+
+                    // SPIR-V Reflect gives the shader stage for the *module* itself.
+                    // If a push constant is truly used by multiple stages, it will appear in multiple modules.
+                    VkShaderStageFlags actualStageFlags = module.shader_stage;
+                    if (actualStageFlags == 0) { // If module.shader_stage is not specific, use the hint.
+                        actualStageFlags = stageHint;
+                    }
+
+                    std::pair<uint32_t, uint32_t> key = {spvPcBlock->offset, spvPcBlock->size};
+                    std::string name = spvPcBlock->name ? spvPcBlock->name : "unnamed_push_constant";
+
+                    auto it = mergedPushConstants.find(key);
+                    if (it != mergedPushConstants.end()) {
+                        // This push constant (offset, size) already exists, merge stage flags
+                        it->second.stageFlags |= actualStageFlags;
+                        // Optional: Name merging strategy (e.g., if names differ, append or log)
+                        if (it->second.name == "unnamed_push_constant" && name != "unnamed_push_constant") {
+                            it->second.name = name; // Prefer a non-default name
+                        } else if (it->second.name != name && name != "unnamed_push_constant") {
+                             // You might want a more sophisticated naming strategy for conflicts
+                            RP_CORE_WARN("Push constant at offset {0}, size {1} has conflicting names: '{2}' and '{3}'. Using '{2}'.",
+                                         key.first, key.second, it->second.name, name);
+                        }
+                    } else {
+                        // New push constant range
+                        PushConstantInfo pcInfo;
+                        pcInfo.offset = spvPcBlock->offset;
+                        pcInfo.size = spvPcBlock->size;
+                        pcInfo.stageFlags = actualStageFlags;
+                        pcInfo.name = name;
+                        mergedPushConstants[key] = pcInfo;
+                    }
+                }
+            }
+        }
+        spvReflectDestroyShaderModule(&module);
+    }
+
+    // Convert map to vector
+    std::vector<PushConstantInfo> resultVector;
+    resultVector.reserve(mergedPushConstants.size());
+    for (const auto& pair : mergedPushConstants) {
+        resultVector.push_back(pair.second);
+    }
+
+    // Sort by offset for predictable order, then by size as a secondary criterion.
+    std::sort(resultVector.begin(), resultVector.end(), [](const PushConstantInfo& a, const PushConstantInfo& b) {
+        if (a.offset != b.offset) {
+            return a.offset < b.offset;
+        }
+        return a.size < b.size; // Could also sort by name or stageFlags if needed for tie-breaking
+    });
+
+    return resultVector;
+}
+
+
 
 } // namespace Rapture
