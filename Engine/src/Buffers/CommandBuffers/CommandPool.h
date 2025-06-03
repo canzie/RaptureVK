@@ -46,6 +46,7 @@ namespace Rapture {
 
             // only added when stayAlive=true, can be usefull for liefetime commandbuffers which rapture does not manage directly
             std::vector<std::shared_ptr<CommandBuffer>> m_savedCommandBuffers;
+
     };
 
 

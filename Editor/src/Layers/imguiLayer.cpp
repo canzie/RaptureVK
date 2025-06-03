@@ -265,6 +265,8 @@ void ImGuiLayer::onUpdate(float ts)
     // Acquire next swapchain image
     int imageIndexi = swapChain->acquireImage(m_currentFrame);
     if (imageIndexi == -1) {
+        //Rapture::ApplicationEvents::onRequestSwapChainRecreation().publish();
+
         Rapture::ForwardRenderer::recreateSwapChain();
         m_currentFrame = 0;
         graphicsQueue->clear();

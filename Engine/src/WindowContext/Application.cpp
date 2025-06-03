@@ -65,19 +65,7 @@ namespace Rapture {
         m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/");
         
         CommandPoolManager::init();
-        CommandPoolConfig config;
-        config.queueFamilyIndex = m_vulkanContext->getQueueFamilyIndices().graphicsFamily.value();
-        config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        auto commandPool = CommandPoolManager::createCommandPool(config);
-        auto commandBuffer = commandPool->getCommandBuffer(true);
-
-        TracyProfiler::initGPUContext(
-            m_vulkanContext->getPhysicalDevice(), 
-            m_vulkanContext->getLogicalDevice(), 
-            m_vulkanContext->getGraphicsQueue()->getQueueVk(), 
-            commandBuffer->getCommandBufferVk()
-        );
 
         ForwardRenderer::init();
         //DeferredRenderer::init();
@@ -142,7 +130,6 @@ namespace Rapture {
 
             m_window->onUpdate();
             
-            TracyProfiler::collectGPUData();
             TracyProfiler::endFrame();
         }
 

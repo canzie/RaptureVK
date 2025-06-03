@@ -92,7 +92,7 @@ void ForwardRenderer::shutdown()
     cleanupSwapChain();
 
 
-    // Now safe to destroy VMA allocator
+    m_swapChain.reset();
 
 
     vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
@@ -461,12 +461,12 @@ void ForwardRenderer::cleanupSwapChain() {
 
     vkDeviceWaitIdle(m_device);
 
+    m_swapChain->recreate();
 
     m_commandBuffers.clear();
 
     m_graphicsPipeline.reset();
 
-    m_swapChain->destroy();
 
     m_currentFrame = 0;
 }
@@ -644,7 +644,7 @@ void ForwardRenderer::recreateSwapChain()
     cleanupSwapChain();
 
 
-    m_swapChain->recreate();
+    //m_swapChain->recreate();
     setupGraphicsPipeline();
     setupCommandBuffers();
 }
