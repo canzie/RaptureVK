@@ -68,7 +68,7 @@ namespace Rapture {
 
 
         ForwardRenderer::init();
-        //DeferredRenderer::init();
+        DeferredRenderer::init();
 
         ModelLoadersCache::init();
 
@@ -103,7 +103,7 @@ namespace Rapture {
         m_project.reset();
 
         ForwardRenderer::shutdown();
-        //DeferredRenderer::shutdown();
+        DeferredRenderer::shutdown();
 
         m_layerStack.clear();
 

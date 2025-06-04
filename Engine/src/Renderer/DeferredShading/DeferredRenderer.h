@@ -42,15 +42,16 @@ class DeferredRenderer {
 
         static void drawFrame(std::shared_ptr<Scene> activeScene);
 
-        static void recreateSwapChain();
+        static void onSwapChainRecreated();
+
+        // Getter for GBuffer pass
+        static std::shared_ptr<GBufferPass> getGBufferPass() { return m_gbufferPass; }
 
 
     private:
 
         // sets up command pools and buffers
         static void setupCommandResources();
-
-        static void cleanupSwapChain();
 
         static void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t imageIndex);
 

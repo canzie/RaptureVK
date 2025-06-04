@@ -65,6 +65,22 @@ namespace Rapture {
     createLogicalDevice();
     createVmaAllocator();
 
+    ApplicationEvents::onRequestSwapChainRecreation().addListener([this, windowContext]() {
+
+        int width = 0, height = 0;
+        windowContext->getFramebufferSize(&width, &height);
+        while (width == 0 || height == 0) {
+            windowContext->getFramebufferSize(&width, &height);
+            windowContext->waitEvents();
+        }
+
+        vkDeviceWaitIdle(m_device);
+
+        m_swapChain->recreate();
+        ApplicationEvents::onSwapChainRecreated().publish(m_swapChain);
+    });
+
+
     m_queueFamilyIndices = findQueueFamilies(m_physicalDevice);
 
 
@@ -566,11 +582,20 @@ void VulkanContext::createLogicalDevice()
     }
 
     // retrieve queues
-    m_queues[indices.graphicsFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());
-    m_queues[indices.presentFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.presentFamily.value());
+    if (indices.graphicsFamily.value() == indices.presentFamily.value()) {
+        // If graphics and present queues are from the same family, use the same instance
+        auto queue = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());
+        m_queues[indices.graphicsFamily.value()] = queue;
+        m_graphicsQueueIndex = indices.graphicsFamily.value();
+        m_presentQueueIndex = indices.graphicsFamily.value();
+    } else {
+        // If they're from different families, create separate instances
+        m_queues[indices.graphicsFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());
+        m_queues[indices.presentFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.presentFamily.value());
+        m_graphicsQueueIndex = indices.graphicsFamily.value();
+        m_presentQueueIndex = indices.presentFamily.value();
+    }
 
-    m_graphicsQueueIndex = indices.graphicsFamily.value();
-    m_presentQueueIndex = indices.presentFamily.value();
     m_computeQueueIndex = -1;
     m_transferQueueIndex = -1;
 

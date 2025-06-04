@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include "Events/ApplicationEvents.h"
+
 namespace Rapture {
 
     RenderMode SwapChain::renderMode = RenderMode::PRESENTATION;
@@ -274,6 +276,8 @@ int SwapChain::acquireImage(uint32_t semaphoreIndex)
         
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
             // resize
+            ApplicationEvents::onRequestSwapChainRecreation().publish();
+
             return -1; 
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             RP_CORE_ERROR("SwapChain::acquireImage - failed to acquire swap chain image!");

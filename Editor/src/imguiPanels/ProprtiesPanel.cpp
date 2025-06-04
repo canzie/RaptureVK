@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "Logging/TracyProfiler.h"
+
 // Implementation of HelpMarker function
 void PropertiesPanel::HelpMarker(const char* desc)
 {
@@ -37,6 +39,8 @@ PropertiesPanel::~PropertiesPanel()
 
 void PropertiesPanel::render()
 {
+    RAPTURE_PROFILE_FUNCTION();
+
     ImGui::Begin("Properties");
 
     if (auto entity = m_selectedEntity.lock()) {

@@ -1,5 +1,5 @@
 #include "ViewportPanel.h"
-
+#include "Logging/TracyProfiler.h"
 
 ViewportPanel::ViewportPanel()
 {
@@ -9,6 +9,7 @@ ViewportPanel::ViewportPanel()
 
 void ViewportPanel::renderSceneViewport(ImTextureID textureID)
 {
+    RAPTURE_PROFILE_FUNCTION();
 
     ImGui::Begin("Viewport");
 

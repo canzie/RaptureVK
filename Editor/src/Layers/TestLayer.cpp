@@ -7,6 +7,7 @@
 #include "Utils/Timestep.h"
 #include "Components/Components.h"
 #include "Renderer/ForwardRenderer/ForwardRenderer.h"
+#include "Renderer/DeferredShading/DeferredRenderer.h"
 
 #include "Loaders/glTF2.0/glTFLoader.h"
 
@@ -165,7 +166,7 @@ void TestLayer::onUpdate(float ts)
 
 
     Rapture::ForwardRenderer::drawFrame(activeScene);
-    
+    //Rapture::DeferredRenderer::drawFrame(activeScene);
 
 }
 

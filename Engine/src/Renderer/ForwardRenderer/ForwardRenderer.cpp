@@ -84,6 +84,10 @@ namespace Rapture {
         setupCommandPool();
         
         setupCommandBuffers();
+
+        ApplicationEvents::onSwapChainRecreated().addListener([](std::shared_ptr<SwapChain> swapChain) {
+            recreateSwapChain();
+        });
 }
 
 void ForwardRenderer::shutdown()
@@ -116,7 +120,9 @@ void ForwardRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
     int imageIndexi = m_swapChain->acquireImage(m_currentFrame);
 
     if (imageIndexi == -1) {
-        recreateSwapChain();
+        //ApplicationEvents::onRequestSwapChainRecreation().publish();
+
+        //recreateSwapChain();
         return;
     }
     uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
@@ -171,8 +177,9 @@ void ForwardRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
         m_swapChain->signalImageAvailability(imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            ApplicationEvents::onRequestSwapChainRecreation().publish();
 
-            recreateSwapChain();
+            //recreateSwapChain();
             return; // Must return after recreating swap chain, as current frame's resources are invalid.
         } else if (result != VK_SUCCESS) {
             RP_CORE_ERROR("failed to present swap chain image in ForwardRenderer!");
@@ -421,8 +428,8 @@ void ForwardRenderer::setupDynamicRenderingMemoryBarriers(std::shared_ptr<Comman
 void ForwardRenderer::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer)
 {
 
-    VkRenderingAttachmentInfoKHR colorAttachmentInfo{};
-    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+    VkRenderingAttachmentInfo colorAttachmentInfo{};
+    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachmentInfo.imageView = m_swapChain->getImageViews()[m_currentFrame];
     colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -431,10 +438,10 @@ void ForwardRenderer::beginDynamicRendering(std::shared_ptr<CommandBuffer> comma
     
 
 
-    VkRenderingAttachmentInfoKHR depthAttachmentInfo{};
+    VkRenderingAttachmentInfo depthAttachmentInfo{};
     bool hasDepth = m_swapChain->getDepthTexture() && m_swapChain->getDepthTexture()->getImageView() != VK_NULL_HANDLE;
     if (hasDepth) {
-        depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+        depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         depthAttachmentInfo.imageView = m_swapChain->getDepthTexture()->getImageView();
         depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -443,8 +450,8 @@ void ForwardRenderer::beginDynamicRendering(std::shared_ptr<CommandBuffer> comma
     }
 
 
-    VkRenderingInfoKHR renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
     renderingInfo.renderArea.extent = m_swapChain->getExtent();
     renderingInfo.layerCount = 1;
@@ -459,9 +466,9 @@ void ForwardRenderer::beginDynamicRendering(std::shared_ptr<CommandBuffer> comma
 
 void ForwardRenderer::cleanupSwapChain() {
 
-    vkDeviceWaitIdle(m_device);
+    
 
-    m_swapChain->recreate();
+    //m_swapChain->recreate();
 
     m_commandBuffers.clear();
 
@@ -630,17 +637,7 @@ if (SwapChain::renderMode == RenderMode::PRESENTATION) {
 
 void ForwardRenderer::recreateSwapChain()
 {
-    auto& app = Application::getInstance();
-    auto& windowContext = app.getWindowContext();
 
-    int width = 0, height = 0;
-    windowContext.getFramebufferSize(&width, &height);
-    while (width == 0 || height == 0) {
-        windowContext.getFramebufferSize(&width, &height);
-        windowContext.waitEvents();
-    }
-
-    
     cleanupSwapChain();
 
 

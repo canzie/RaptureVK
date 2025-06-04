@@ -13,14 +13,12 @@ layout(location = 4) out vec3 outBitangent;
 
 
 
-layout(std140, binding = 0) uniform BaseTransformMats {
-	mat4 u_proj;
-	mat4 u_view;
-};
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+    mat4 view;
+    mat4 proj;
+} ubo;
 
-layout(std140, binding = 6) uniform BoneMatrices {
-    mat4 u_BoneTransforms[100]; // Array of bone transforms
-};
+
 
 // Push constant for per-object data
 layout(push_constant) uniform PushConstants {
@@ -46,7 +44,7 @@ void main() {
     outTexCoord = aTexCoord;
     
     // Calculate position in view space
-    vec4 viewPos = u_view * vec4(outFragPosDepth.xyz, 1.0);
+    vec4 viewPos = ubo.view * vec4(outFragPosDepth.xyz, 1.0);
 
     // Store the negative Z value (common convention, depth increases into the screen)
     // Ensure this matches how cascade splits are calculated on the CPU.
@@ -54,5 +52,5 @@ void main() {
     outFragPosDepth.w = -viewPos.z;
 
     // Final clip space position
-    gl_Position = u_proj * viewPos; // Use viewPos directly for projection
+    gl_Position = ubo.proj * viewPos; // Use viewPos directly for projection
 }

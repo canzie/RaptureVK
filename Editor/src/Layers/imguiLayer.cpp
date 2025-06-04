@@ -43,6 +43,12 @@ ImGuiLayer::ImGuiLayer()
     m_defaultTextureDescriptorSets.clear();
     m_defaultTextureDescriptorSets.resize(swapChain->getImageCount());
 
+    Rapture::ApplicationEvents::onSwapChainRecreated().addListener([this](std::shared_ptr<Rapture::SwapChain> swapChain) {
+        m_gbufferPanel.updateDescriptorSets();
+    });
+
+
+
 }
 
 ImGuiLayer::~ImGuiLayer()
@@ -74,6 +80,8 @@ ImGuiLayer::~ImGuiLayer()
 
 void ImGuiLayer::onAttach()
 {
+    RAPTURE_PROFILE_FUNCTION();
+
     Rapture::RP_INFO("Attaching ImGuiLayer...");
 
     // Create Framebuffers
@@ -223,7 +231,7 @@ void ImGuiLayer::renderImGui()
 
     m_propertiesPanel.render();
     m_browserPanel.render();
-
+    m_gbufferPanel.render();
 
     //ImGui::ShowDemoWindow();
 
@@ -235,8 +243,6 @@ void ImGuiLayer::renderImGui()
         }
         if (ImGui::BeginMenu("View"))
         {
-            
-
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
@@ -245,7 +251,6 @@ void ImGuiLayer::renderImGui()
     ImGui::End(); // End dockspace
     ImGui::Render();
     ImGui::EndFrame();
-
 }
 
 void ImGuiLayer::onUpdate(float ts)
@@ -265,9 +270,7 @@ void ImGuiLayer::onUpdate(float ts)
     // Acquire next swapchain image
     int imageIndexi = swapChain->acquireImage(m_currentFrame);
     if (imageIndexi == -1) {
-        //Rapture::ApplicationEvents::onRequestSwapChainRecreation().publish();
-
-        Rapture::ForwardRenderer::recreateSwapChain();
+        //Rapture::ForwardRenderer::recreateSwapChain();
         m_currentFrame = 0;
         graphicsQueue->clear();
         this->onResize();
@@ -336,7 +339,8 @@ void ImGuiLayer::onUpdate(float ts)
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 
-        Rapture::ForwardRenderer::recreateSwapChain();
+        //Rapture::ForwardRenderer::recreateSwapChain();
+        Rapture::ApplicationEvents::onRequestSwapChainRecreation().publish();
         m_currentFrame = 0;
         this->onResize();
 
@@ -354,6 +358,8 @@ void ImGuiLayer::onUpdate(float ts)
 
 void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImageView)
 {
+    RAPTURE_PROFILE_FUNCTION();
+
     auto& app = Rapture::Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();
@@ -383,12 +389,14 @@ void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImag
 
 void ImGuiLayer::beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageView targetImageView)
 {
+        RAPTURE_PROFILE_FUNCTION();
+
     auto& app = Rapture::Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();
 
-    VkRenderingAttachmentInfoKHR colorAttachmentInfo{};
-    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+    VkRenderingAttachmentInfo colorAttachmentInfo{};
+    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachmentInfo.pNext = nullptr;
     colorAttachmentInfo.imageView = targetImageView;
     colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -399,8 +407,8 @@ void ImGuiLayer::beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageVie
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
 
-    VkRenderingInfoKHR renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.pNext = nullptr;
     renderingInfo.flags = 0;
     renderingInfo.renderArea = {{0, 0}, {swapChain->getExtent().width, swapChain->getExtent().height}};
@@ -414,8 +422,9 @@ void ImGuiLayer::beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageVie
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
 }
 
-void ImGuiLayer::endDynamicRendering(VkCommandBuffer commandBuffer)
-{
+void ImGuiLayer::endDynamicRendering(VkCommandBuffer commandBuffer) {
+    RAPTURE_PROFILE_FUNCTION();
+
     auto& app = Rapture::Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();

@@ -6,6 +6,7 @@
 
 #include "Events/GameEvents.h"
 #include "Scenes/SceneManager.h"
+#include "Logging/TracyProfiler.h"
 
 BrowserPanel::BrowserPanel() {
     // Register for scene activation events - store the ID for cleanup
@@ -35,6 +36,7 @@ BrowserPanel::~BrowserPanel() {
 }
 
 void BrowserPanel::render() {
+    RAPTURE_PROFILE_FUNCTION();
 
     ImGui::Begin("Entity Browser");
 

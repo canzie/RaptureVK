@@ -20,6 +20,7 @@
 #include "imguiPanels/ViewportPanel.h"
 #include "imguiPanels/ProprtiesPanel.h"
 #include "imguiPanels/BrowserPanel.h"
+#include "imguiPanels/GBufferPanel.h"
 
 #include "RenderTargets/SwapChains/SwapChain.h"
 
@@ -68,4 +69,5 @@ private:
     ViewportPanel m_viewportPanel;
     PropertiesPanel m_propertiesPanel;
     BrowserPanel m_browserPanel;
+    GBufferPanel m_gbufferPanel;
 };

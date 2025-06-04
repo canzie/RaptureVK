@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
     Rapture::Log::Init();
     Rapture::SwapChain::renderMode = Rapture::RenderMode::OFFSCREEN;
 
-    auto* app = Rapture::CreateApplicationWindow(800, 600, "Rapture Editor");
+    auto* app = Rapture::CreateApplicationWindow(1920, 1080, "Rapture Editor");
 
     if (app) {
         // Simple log without format string

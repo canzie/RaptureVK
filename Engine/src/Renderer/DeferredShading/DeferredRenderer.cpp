@@ -6,6 +6,8 @@
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 
+#include "Events/ApplicationEvents.h"
+
 namespace Rapture {
 
     // Maximum number of lights supported
@@ -38,11 +40,16 @@ void DeferredRenderer::init() {
     m_swapChain = vc.getSwapChain();
     m_vmaAllocator = vc.getVmaAllocator();
 
+    m_graphicsQueue = vc.getGraphicsQueue();
+    m_presentQueue = vc.getPresentQueue();
+
     setupCommandResources();
 
-    m_gbufferPass = std::make_shared<GBufferPass>(10.0f, 10.0f, m_swapChain->getImageCount());
+    m_gbufferPass = std::make_shared<GBufferPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount());
 
-
+    ApplicationEvents::onSwapChainRecreated().addListener([](std::shared_ptr<SwapChain> swapChain) {
+        onSwapChainRecreated();
+    });
 }
 
 void DeferredRenderer::shutdown() {
@@ -73,9 +80,9 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
     int imageIndexi = m_swapChain->acquireImage(m_currentFrame);
 
     if (imageIndexi == -1) {
-        recreateSwapChain();
         return;
     }
+
     uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
 
 
@@ -91,8 +98,14 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
 
 }
 
-void DeferredRenderer::recreateSwapChain()
+void DeferredRenderer::onSwapChainRecreated()
 {
+    m_gbufferPass.reset();
+    m_gbufferPass = std::make_shared<GBufferPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount());
+
+    m_commandBuffers.clear();
+    setupCommandResources();
+    m_currentFrame = 0;  // Reset current frame
 }
 
 void DeferredRenderer::setupCommandResources()
@@ -109,9 +122,7 @@ void DeferredRenderer::setupCommandResources()
     m_commandBuffers = m_commandPool->getCommandBuffers(m_swapChain->getImageCount());
 }
 
-void DeferredRenderer::cleanupSwapChain()
-{
-}
+
 
 void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t imageIndex) {
 
