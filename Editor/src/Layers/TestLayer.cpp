@@ -57,7 +57,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Create camera entity
     m_cameraEntity = std::make_shared<Rapture::Entity>(activeScene->createEntity("Main Camera"));
-    
+    activeScene->setMainCamera(m_cameraEntity);
+
     // Add transform component (position camera back a bit)
     auto& transform = m_cameraEntity->addComponent<Rapture::TransformComponent>(
         glm::vec3(0.0f, 0.0f, 3.0f),  // Position
@@ -68,6 +69,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     // Add camera component
     auto& camera = m_cameraEntity->addComponent<Rapture::CameraComponent>(90.0f, 16.0f/9.0f, 0.1f, 100.0f);
     camera.isMainCamera = true;
+
     
     // Add camera controller component and set up input
     auto& controller = m_cameraEntity->addComponent<Rapture::CameraControllerComponent>();
@@ -165,8 +167,8 @@ void TestLayer::onUpdate(float ts)
     notifyCameraChange();
 
 
-    Rapture::ForwardRenderer::drawFrame(activeScene);
-    //Rapture::DeferredRenderer::drawFrame(activeScene);
+    //Rapture::ForwardRenderer::drawFrame(activeScene);
+    Rapture::DeferredRenderer::drawFrame(activeScene);
 
 }
 

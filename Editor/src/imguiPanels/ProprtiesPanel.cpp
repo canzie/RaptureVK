@@ -50,6 +50,12 @@ void PropertiesPanel::render()
         if (entity->hasComponent<Rapture::MaterialComponent>()) {
             renderMaterialComponent();
         }
+        if (entity->hasComponent<Rapture::LightComponent>()) {
+            renderLightComponent();
+        }
+        if (entity->hasComponent<Rapture::CameraComponent>()) {
+            renderCameraComponent();
+        }
     }
 
     ImGui::End();
@@ -77,6 +83,53 @@ void PropertiesPanel::renderMaterialComponent()
                 }
             }
 
+        }
+    }
+}
+
+void PropertiesPanel::renderLightComponent()
+{
+    if (auto entity = m_selectedEntity.lock()) {
+        if (ImGui::CollapsingHeader("Light Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto& light = entity->getComponent<Rapture::LightComponent>();
+
+            // Light Type
+            const char* lightTypeNames[] = { "Point", "Directional", "Spot" };
+            int currentType = static_cast<int>(light.type);
+            if (ImGui::Combo("Type", &currentType, lightTypeNames, IM_ARRAYSIZE(lightTypeNames))) {
+                light.type = static_cast<Rapture::LightType>(currentType);
+            }
+
+            // Color
+            if (ImGui::ColorEdit3("Color", glm::value_ptr(light.color))) {
+                // Value already updated by ImGui
+            }
+
+            // Intensity
+            ImGui::DragFloat("Intensity", &light.intensity, 0.01f, 0.0f, 100.0f);
+
+            // Range (for Point and Spot lights)
+            if (light.type == Rapture::LightType::Point || light.type == Rapture::LightType::Spot) {
+                ImGui::DragFloat("Range", &light.range, 0.1f, 0.0f, 1000.0f);
+            }
+
+            // Spot Light Angles (for Spot lights only)
+            if (light.type == Rapture::LightType::Spot) {
+                float innerAngleDegrees = glm::degrees(light.innerConeAngle);
+                float outerAngleDegrees = glm::degrees(light.outerConeAngle);
+                if (ImGui::DragFloat("Inner Cone Angle", &innerAngleDegrees, 0.1f, 0.0f, outerAngleDegrees)) {
+                    light.innerConeAngle = glm::radians(innerAngleDegrees);
+                }
+                if (ImGui::DragFloat("Outer Cone Angle", &outerAngleDegrees, 0.1f, innerAngleDegrees, 89.0f)) {
+                    light.outerConeAngle = glm::radians(outerAngleDegrees);
+                }
+            }
+
+            // Is Active
+            ImGui::Checkbox("Is Active", &light.isActive);
+
+            // Casts Shadow
+            ImGui::Checkbox("Casts Shadow", &light.castsShadow);
         }
     }
 }
@@ -235,6 +288,42 @@ void PropertiesPanel::renderTransformComponent()
     }
     }
 
+}
+
+void PropertiesPanel::renderCameraComponent()
+{
+    if (auto entity = m_selectedEntity.lock()) {
+        if (ImGui::CollapsingHeader("Camera Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto& cameraComponent = entity->getComponent<Rapture::CameraComponent>();
+
+            bool cameraChanged = false;
+
+            // FOV
+            if (ImGui::DragFloat("FOV", &cameraComponent.fov, 0.1f, 1.0f, 179.0f)) {
+                cameraChanged = true;
+            }
+
+            // Aspect Ratio
+            if (ImGui::DragFloat("Aspect Ratio", &cameraComponent.aspectRatio, 0.01f, 0.1f, 10.0f)) {
+                cameraChanged = true;
+            }
+
+            // Near Plane
+            if (ImGui::DragFloat("Near Plane", &cameraComponent.nearPlane, 0.01f, 0.01f, cameraComponent.farPlane - 0.01f)) {
+                cameraChanged = true;
+            }
+
+            // Far Plane
+            if (ImGui::DragFloat("Far Plane", &cameraComponent.farPlane, 0.1f, cameraComponent.nearPlane + 0.01f, 10000.0f)) {
+                cameraChanged = true;
+            }
+
+
+            if (cameraChanged) {
+                cameraComponent.updateProjectionMatrix(cameraComponent.fov, cameraComponent.aspectRatio, cameraComponent.nearPlane, cameraComponent.farPlane);
+            }
+        }
+    }
 }
 
 

@@ -11,6 +11,7 @@ namespace Rapture {
     struct SceneSettings {
         std::string sceneName;
         bool frustumCullingEnabled = false;
+        std::shared_ptr<Entity> mainCamera;
     };
     
     class Scene {
@@ -30,6 +31,8 @@ namespace Rapture {
         const SceneSettings& getSettings() const { return m_config; }
 
         std::string getSceneName() const { return m_config.sceneName; }
+
+        void setMainCamera(std::shared_ptr<Entity> camera) { m_config.mainCamera = camera; }
 
     private:
         entt::registry m_Registry;

@@ -45,8 +45,8 @@ namespace Rapture
         submitInfo.pCommandBuffers = commandBuffers.data();
 
         if (vkQueueSubmit(m_queue, 1, &submitInfo, fence) != VK_SUCCESS) {
-            RP_CORE_ERROR("VulkanQueue::submitCommandBuffers - failed to submit draw command buffer!");
-            throw std::runtime_error("VulkanQueue::submitCommandBuffers - failed to submit draw command buffer!");
+            RP_CORE_ERROR("VulkanQueue::submitCommandBuffers(1) - failed to submit draw command buffer!");
+            throw std::runtime_error("VulkanQueue::submitCommandBuffers(1) - failed to submit draw command buffer!");
         }
         m_commandBuffers.clear();
     }
@@ -55,6 +55,7 @@ namespace Rapture
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         std::lock_guard<std::mutex> lock2(m_commandBufferMutex);
+
 
         std::vector<VkCommandBuffer> commandBuffers;
         for (auto& commandBuffer : m_commandBuffers)
@@ -68,8 +69,8 @@ namespace Rapture
         }
         
         if (vkQueueSubmit(m_queue, 1, &submitInfo, fence) != VK_SUCCESS) {
-            RP_CORE_ERROR("VulkanQueue::submitCommandBuffers - failed to submit draw command buffer!");
-            throw std::runtime_error("VulkanQueue::submitCommandBuffers - failed to submit draw command buffer!");
+            RP_CORE_ERROR("VulkanQueue::submitCommandBuffers(2) - failed to submit draw command buffer!");
+            throw std::runtime_error("VulkanQueue::submitCommandBuffers(2) - failed to submit draw command buffer!");
         }
         m_commandBuffers.clear();
     }

@@ -13,7 +13,9 @@
 #include "WindowContext/VulkanContext/VulkanQueue.h"
 #include "Cameras/CameraCommon.h"
 #include "Components/Components.h"
+
 #include "Renderer/DeferredShading/GBufferPass.h"
+#include "Renderer/DeferredShading/LightingPass.h"
 
 #include <memory>
 #include <vector>
@@ -59,6 +61,8 @@ class DeferredRenderer {
 
     private:
         static std::shared_ptr<GBufferPass> m_gbufferPass;
+        static std::shared_ptr<LightingPass> m_lightingPass;
+
         static std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
         static std::shared_ptr<CommandPool> m_commandPool;
 

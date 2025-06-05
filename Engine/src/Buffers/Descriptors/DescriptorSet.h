@@ -10,6 +10,13 @@
 
 namespace Rapture {
 
+    // TODO create a caching system for descriptor sets
+    // because right now we need the shader to give us the layout, which means each instance of a shader needs to create a new descriptor set
+    // for a possible equal layout.
+    // e.g. the gbuffer pass cant create the set because it does not have the layout, so the users need to create a set individually, leading to possible copies
+    // we can fix this by using a cache system, this way we support both identical and slightly different ones.
+    // we can go even further and log a warn when a layout can be optimised to be identical to a cached one.
+
 // Forward declarations
 class UniformBuffer;
 class Texture;

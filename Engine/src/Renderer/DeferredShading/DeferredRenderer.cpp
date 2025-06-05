@@ -29,7 +29,7 @@ namespace Rapture {
     uint32_t DeferredRenderer::m_currentFrame = 0;
     std::shared_ptr<VulkanQueue> DeferredRenderer::m_graphicsQueue = nullptr;
     std::shared_ptr<VulkanQueue> DeferredRenderer::m_presentQueue = nullptr;
-
+    std::shared_ptr<LightingPass> DeferredRenderer::m_lightingPass = nullptr;
 
 void DeferredRenderer::init() {
 
@@ -46,6 +46,7 @@ void DeferredRenderer::init() {
     setupCommandResources();
 
     m_gbufferPass = std::make_shared<GBufferPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount());
+    m_lightingPass = std::make_shared<LightingPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount(), m_gbufferPass);
 
     ApplicationEvents::onSwapChainRecreated().addListener([](std::shared_ptr<SwapChain> swapChain) {
         onSwapChainRecreated();
@@ -56,8 +57,10 @@ void DeferredRenderer::shutdown() {
     // Wait for device to finish operations
     vkDeviceWaitIdle(m_device);
 
-    // Clean up GBuffer pass
+
+    m_lightingPass.reset();
     m_gbufferPass.reset();
+
 
     // Clean up command buffers and pool
     m_commandBuffers.clear();
@@ -98,13 +101,21 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
 
 }
 
-void DeferredRenderer::onSwapChainRecreated()
-{
+void DeferredRenderer::onSwapChainRecreated() {
+    // Wait for all operations to complete
+    vkDeviceWaitIdle(m_device);
+
+    m_lightingPass.reset();
     m_gbufferPass.reset();
-    m_gbufferPass = std::make_shared<GBufferPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount());
+
 
     m_commandBuffers.clear();
+
+    m_gbufferPass = std::make_shared<GBufferPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount());
+    m_lightingPass = std::make_shared<LightingPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount(), m_gbufferPass);
     setupCommandResources();
+
+
     m_currentFrame = 0;  // Reset current frame
 }
 
@@ -139,8 +150,10 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
         throw std::runtime_error("failed to begin recording command buffer!");
     }
 
-    m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame); // does not need imageIndex because it does not use the swapchain images
-    //m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex); // <-- this one does
+    m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+    
+    m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex, m_currentFrame);
+    
 
     if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to record command buffer!");

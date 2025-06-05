@@ -34,6 +34,13 @@ public:
     std::shared_ptr<Texture> getMaterialTexture() const { return m_materialTextures[m_currentFrame]; }
     std::shared_ptr<Texture> getDepthTexture() const { return m_depthStencilTextures[m_currentFrame]; }
 
+    std::vector<std::shared_ptr<Texture>> getPositionDepthTextures() const { return m_positionDepthTextures; }
+    std::vector<std::shared_ptr<Texture>> getNormalTextures() const { return m_normalTextures; }
+    std::vector<std::shared_ptr<Texture>> getAlbedoSpecTextures() const { return m_albedoSpecTextures; }
+    std::vector<std::shared_ptr<Texture>> getMaterialTextures() const { return m_materialTextures; }
+    std::vector<std::shared_ptr<Texture>> getDepthTextures() const { return m_depthStencilTextures; }
+
+
 
 private:
     void createTextures();
@@ -48,6 +55,7 @@ private:
     void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
 
     void updateUniformBuffer(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+
 
 private:
     std::weak_ptr<Shader> m_shader; 

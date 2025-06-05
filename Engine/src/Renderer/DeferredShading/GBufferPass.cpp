@@ -29,7 +29,24 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
 }
 
 GBufferPass::~GBufferPass() {
-    
+    // Wait for device to finish operations
+    vkDeviceWaitIdle(m_device);
+
+    // Clean up descriptor sets
+    m_descriptorSets.clear();
+
+    // Clean up camera UBOs
+    m_cameraUBOs.clear();
+
+    // Clean up textures
+    m_positionDepthTextures.clear();
+    m_normalTextures.clear();
+    m_albedoSpecTextures.clear();
+    m_materialTextures.clear();
+    m_depthStencilTextures.clear();
+
+    // Clean up pipeline
+    m_pipeline.reset();
 }
 
 // order of the color attachments is important, it NEEDS to be the same order as the fragment shaders output attachments
@@ -321,6 +338,7 @@ void GBufferPass::updateUniformBuffer(std::shared_ptr<Scene> activeScene, uint32
     m_cameraUBOs[currentFrame]->addData((void*)&ubo, sizeof(ubo), 0);
 
 }
+
 
 void GBufferPass::createTextures()
 {

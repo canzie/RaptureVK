@@ -10,12 +10,13 @@ then a material base would belong to a pipeline, like every shader in the GBuffe
 
 
 
+TODO
+ - create a standalone queue submit for places like buffers and images, since they dont need to be pushing already saved command buffers since those might need a fence/semaphore
 
-- deferred rendering pipeline
-
-- ray picking
-- stencil selection box
 - imgizmo
+- frustum culling
+- stencil selection box
+- ray picking
 
 - skybox
 

@@ -18,6 +18,8 @@ public:
 private:
     void renderMaterialComponent();
     void renderTransformComponent();
+    void renderLightComponent();
+    void renderCameraComponent();
 
 private:
 

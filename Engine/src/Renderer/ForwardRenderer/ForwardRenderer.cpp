@@ -120,9 +120,7 @@ void ForwardRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
     int imageIndexi = m_swapChain->acquireImage(m_currentFrame);
 
     if (imageIndexi == -1) {
-        //ApplicationEvents::onRequestSwapChainRecreation().publish();
 
-        //recreateSwapChain();
         return;
     }
     uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
@@ -467,8 +465,8 @@ void ForwardRenderer::beginDynamicRendering(std::shared_ptr<CommandBuffer> comma
 void ForwardRenderer::cleanupSwapChain() {
 
     
+    vkDeviceWaitIdle(m_device);
 
-    //m_swapChain->recreate();
 
     m_commandBuffers.clear();
 
