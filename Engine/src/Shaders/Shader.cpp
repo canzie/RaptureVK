@@ -8,7 +8,11 @@
 namespace Rapture {
 
 Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath) {
-    createGraphicsShader(vertexPath, fragmentPath);
+    if (fragmentPath.empty()) {
+        createGraphicsShader(vertexPath);
+    } else {
+        createGraphicsShader(vertexPath, fragmentPath);
+    }
     createDescriptorSetLayout();
     
     // Test SPIRV-Reflect library by reflecting on our shaders
@@ -37,6 +41,7 @@ Shader::~Shader() {
 
 void Shader::createGraphicsShader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath)
 {
+
     std::vector<char> vertexCode = readFile(vertexPath);
     std::vector<char> fragmentCode = readFile(fragmentPath);
 
@@ -87,6 +92,35 @@ void Shader::createGraphicsShader(const std::filesystem::path& vertexPath, const
 
     m_stages.push_back(vertShaderStageInfo);
     m_stages.push_back(fragShaderStageInfo);
+
+}
+
+void Shader::createGraphicsShader(const std::filesystem::path &vertexPath) {
+
+    std::vector<char> vertexCode = readFile(vertexPath);
+
+    // Collect descriptor information before creating shader modules
+    m_descriptorSetInfos = collectDescriptorSetInfo(vertexCode, {});
+
+    createShaderModule(vertexCode, ShaderType::VERTEX);
+
+
+    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{vertexCode, VK_SHADER_STAGE_VERTEX_BIT}});
+    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Print push constant reflection data
+    RP_CORE_INFO("Push Constant Reflection Data:");
+    printPushConstantLayouts(pushConstantInfos);
+
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = m_sources[ShaderType::VERTEX];
+    vertShaderStageInfo.pName = "main";
+    vertShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
+
+    m_stages.push_back(vertShaderStageInfo);
 
 }
 
@@ -271,7 +305,9 @@ std::vector<DescriptorSetInfo> Shader::collectDescriptorSetInfo(
 
     // Process both shader stages
     processShaderModule(vertexSpirv, VK_SHADER_STAGE_VERTEX_BIT);
-    processShaderModule(fragmentSpirv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    if (!fragmentSpirv.empty()) {
+        processShaderModule(fragmentSpirv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    }
 
     // Convert map to vector, sorted by set number
     std::vector<DescriptorSetInfo> result;

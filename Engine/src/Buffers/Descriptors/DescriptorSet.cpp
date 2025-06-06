@@ -159,7 +159,7 @@ void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
             } else if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>) {
                 // Handle Texture
                 if (resource) {
-                    imageInfos.push_back(resource->getDescriptorImageInfo());
+                    imageInfos.push_back(resource->getDescriptorImageInfo(binding.viewType));
                     descriptorWrite.pImageInfo = &imageInfos.back();
                 } else {
                     RP_CORE_WARN("Texture is null for binding {}", binding.binding);

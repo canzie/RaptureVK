@@ -4,6 +4,7 @@
 
 #include "Scenes/Entities/Entity.h"
 #include <memory>
+#include "imgui_impl_vulkan.h"
 
 class PropertiesPanel {
 public:
@@ -20,10 +21,13 @@ private:
     void renderTransformComponent();
     void renderLightComponent();
     void renderCameraComponent();
+    void renderShadowComponent();
 
 private:
 
     std::weak_ptr<Rapture::Entity> m_selectedEntity;
+
+    VkDescriptorSet m_currentShadowMapDescriptorSet;
 
     size_t m_entitySelectedListenerId;
 };

@@ -80,8 +80,7 @@ Sampler::~Sampler() {
 // Texture implementation
 Texture::Texture(const std::string& path, TextureFilter filter, TextureWrap wrap, bool isLoadingAsync) 
     : m_path(path), m_loadFromFile(true), 
-    m_image(VK_NULL_HANDLE), m_imageView(VK_NULL_HANDLE), 
-    m_allocation(VK_NULL_HANDLE), m_spec({}), m_sampler(nullptr) {
+    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_spec({}), m_sampler(nullptr) {
     
     
     // First, create specification from image file
@@ -100,8 +99,7 @@ Texture::Texture(const std::string& path, TextureFilter filter, TextureWrap wrap
 
 Texture::Texture(const TextureSpecification& spec) 
     : m_spec(spec), m_loadFromFile(false), 
-    m_image(VK_NULL_HANDLE), m_imageView(VK_NULL_HANDLE),
-     m_allocation(VK_NULL_HANDLE), m_sampler(nullptr) {
+    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_sampler(nullptr) {
     
     
     m_sampler = std::make_unique<Sampler>(spec);
@@ -126,10 +124,17 @@ Texture::~Texture() {
         vkDestroyImageView(device, m_imageView, nullptr);
     }
     
+    if (m_imageViewDepthOnly != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, m_imageViewDepthOnly, nullptr);
+    }
+    
+    if (m_imageViewStencilOnly != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, m_imageViewStencilOnly, nullptr);
+    }
+    
     if (m_image != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE) {
         vmaDestroyImage(allocator, m_image, m_allocation);
     }
-
 }
 
 void Texture::createSpecificationFromImageFile(const std::string& path, TextureFilter filter, TextureWrap wrap) {
@@ -423,7 +428,7 @@ VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkI
     VkImageMemoryBarrier barrier{};
     // Image layout transitions for dynamic rendering
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;  // Always start from undefined for the first transition
+    barrier.oldLayout = oldLayout;
     barrier.newLayout = newLayout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -436,7 +441,7 @@ VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkI
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = srcAccessMask;  // No access before
+    barrier.srcAccessMask = srcAccessMask;
     barrier.dstAccessMask = dstAccessMask;
     return barrier;
 }
@@ -500,12 +505,59 @@ void Texture::createImageView() {
         RP_CORE_ERROR("Failed to create texture image view!");
         throw std::runtime_error("Failed to create texture image view!");
     }
+
+    // Create additional views for depth-stencil formats
+    if (isDepthFormat(m_spec.format) && hasStencilComponent(m_spec.format)) {
+
+        // Create depth-only view
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+        viewInfo.components.g = VK_COMPONENT_SWIZZLE_R;
+        viewInfo.components.b = VK_COMPONENT_SWIZZLE_R;
+        viewInfo.components.a = VK_COMPONENT_SWIZZLE_ONE;
+        if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageViewDepthOnly) != VK_SUCCESS) {
+            RP_CORE_ERROR("Failed to create depth-only image view!");
+            throw std::runtime_error("Failed to create depth-only image view!");
+        }
+
+        // Create stencil-only view
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+        // Force R,G,B to stencil value (usually read into R), and Alpha to ONE for stencil view.
+        viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+        viewInfo.components.g = VK_COMPONENT_SWIZZLE_G;
+        viewInfo.components.b = VK_COMPONENT_SWIZZLE_B;
+        viewInfo.components.a = VK_COMPONENT_SWIZZLE_A;
+        if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageViewStencilOnly) != VK_SUCCESS) {
+            RP_CORE_ERROR("Failed to create stencil-only image view!");
+            throw std::runtime_error("Failed to create stencil-only image view!");
+        }
+    }
 }
 
-VkDescriptorImageInfo Texture::getDescriptorImageInfo() const {
+VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) const {
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = m_imageView;
+    switch (viewType) {
+        case TextureViewType::DEFAULT:
+        case TextureViewType::COLOR:
+            imageInfo.imageView = m_imageView;
+            break;
+        case TextureViewType::STENCIL:
+            imageInfo.imageView = m_imageViewStencilOnly;
+            break;
+        case TextureViewType::DEPTH:
+            imageInfo.imageView = m_imageViewDepthOnly;
+            break;
+        default:
+            RP_CORE_WARN("Texture::getDescriptorImageInfo - Invalid texture view type! Using default view.");
+            imageInfo.imageView = m_imageView;
+            break;
+    }
+    if ( imageInfo.imageView == VK_NULL_HANDLE) {
+        RP_CORE_WARN("Texture::getDescriptorImageInfo - Invalid texture view type! Using default view.");
+        imageInfo.imageView = m_imageView;
+    }
+
     imageInfo.sampler = m_sampler->getSamplerVk();
     return imageInfo;
 }

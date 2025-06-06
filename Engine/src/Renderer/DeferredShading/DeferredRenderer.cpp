@@ -30,6 +30,12 @@ namespace Rapture {
     std::shared_ptr<VulkanQueue> DeferredRenderer::m_graphicsQueue = nullptr;
     std::shared_ptr<VulkanQueue> DeferredRenderer::m_presentQueue = nullptr;
     std::shared_ptr<LightingPass> DeferredRenderer::m_lightingPass = nullptr;
+    std::shared_ptr<StencilBorderPass> DeferredRenderer::m_stencilBorderPass = nullptr;
+    std::vector<std::shared_ptr<UniformBuffer>> DeferredRenderer::m_cameraUBOs = {};
+    float DeferredRenderer::m_width = 0.0f;
+    float DeferredRenderer::m_height = 0.0f;
+    std::shared_ptr<BindlessDescriptorArray> DeferredRenderer::m_bindlessDescriptorArray = nullptr;
+
 
 void DeferredRenderer::init() {
 
@@ -43,10 +49,33 @@ void DeferredRenderer::init() {
     m_graphicsQueue = vc.getGraphicsQueue();
     m_presentQueue = vc.getPresentQueue();
 
-    setupCommandResources();
+    m_width = static_cast<float>(m_swapChain->getExtent().width);
+    m_height = static_cast<float>(m_swapChain->getExtent().height);
 
-    m_gbufferPass = std::make_shared<GBufferPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount());
-    m_lightingPass = std::make_shared<LightingPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount(), m_gbufferPass);
+    m_bindlessDescriptorArray = BindlessDescriptorManager::getPool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+    setupCommandResources();
+    createUniformBuffers(m_swapChain->getImageCount());
+
+    m_gbufferPass = std::make_shared<GBufferPass>(
+        static_cast<float>(m_swapChain->getExtent().width), 
+        static_cast<float>(m_swapChain->getExtent().height), 
+        m_swapChain->getImageCount(),
+        m_cameraUBOs
+    );
+
+    m_lightingPass = std::make_shared<LightingPass>(
+        static_cast<float>(m_swapChain->getExtent().width), 
+        static_cast<float>(m_swapChain->getExtent().height), 
+        m_swapChain->getImageCount(), m_gbufferPass);
+
+    m_stencilBorderPass = std::make_shared<StencilBorderPass>(
+        static_cast<float>(m_swapChain->getExtent().width), 
+        static_cast<float>(m_swapChain->getExtent().height), 
+        m_swapChain->getImageCount(), 
+        m_gbufferPass->getDepthTextures(),
+        m_cameraUBOs
+    );
 
     ApplicationEvents::onSwapChainRecreated().addListener([](std::shared_ptr<SwapChain> swapChain) {
         onSwapChainRecreated();
@@ -58,6 +87,7 @@ void DeferredRenderer::shutdown() {
     vkDeviceWaitIdle(m_device);
 
 
+    m_stencilBorderPass.reset();
     m_lightingPass.reset();
     m_gbufferPass.reset();
 
@@ -105,14 +135,33 @@ void DeferredRenderer::onSwapChainRecreated() {
     // Wait for all operations to complete
     vkDeviceWaitIdle(m_device);
 
+    m_stencilBorderPass.reset();
     m_lightingPass.reset();
     m_gbufferPass.reset();
 
+    m_width = static_cast<float>(m_swapChain->getExtent().width);
+    m_height = static_cast<float>(m_swapChain->getExtent().height);
+
+    m_cameraUBOs.clear();
+    createUniformBuffers(m_swapChain->getImageCount());
 
     m_commandBuffers.clear();
 
-    m_gbufferPass = std::make_shared<GBufferPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount());
+    m_gbufferPass = std::make_shared<GBufferPass>(
+        static_cast<float>(m_swapChain->getExtent().width), 
+        static_cast<float>(m_swapChain->getExtent().height), 
+        m_swapChain->getImageCount(),
+        m_cameraUBOs
+    );    
     m_lightingPass = std::make_shared<LightingPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount(), m_gbufferPass);
+    m_stencilBorderPass = std::make_shared<StencilBorderPass>(
+        static_cast<float>(m_swapChain->getExtent().width), 
+        static_cast<float>(m_swapChain->getExtent().height), 
+        m_swapChain->getImageCount(), 
+        m_gbufferPass->getDepthTextures(), 
+        m_cameraUBOs
+    );
+
     setupCommandResources();
 
 
@@ -145,15 +194,32 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     beginInfo.pInheritanceInfo = nullptr; // Optional
 
+    updateCameraUBOs(activeScene, m_currentFrame);
+    updateShadowMaps(activeScene);
+    
     if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to begin recording command buffer!");
         throw std::runtime_error("failed to begin recording command buffer!");
     }
 
+    auto& registry = activeScene->getRegistry();
+    auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
+    for (auto entity : lightView) {
+        auto& lightComp = lightView.get<LightComponent>(entity);
+        auto& transformComp = lightView.get<TransformComponent>(entity);
+        auto& shadowComp = lightView.get<ShadowComponent>(entity);
+    
+        if (shadowComp.shadowMap && (lightComp.hasChanged(m_currentFrame) || transformComp.hasChanged(m_currentFrame))) {
+            shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+        }
+    }
+
     m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
     
     m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex, m_currentFrame);
-    
+
+    m_stencilBorderPass->recordCommandBuffer(commandBuffer, imageIndex, m_currentFrame, activeScene);
+
 
     if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to record command buffer!");
@@ -161,5 +227,71 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
     }
 
 
+}
+void DeferredRenderer::updateCameraUBOs(std::shared_ptr<Scene> activeScene, uint32_t currentFrame) {
+
+    RAPTURE_PROFILE_FUNCTION();
+
+    CameraUniformBufferObject ubo{};
+
+    // Try to find the main camera in the scene
+    auto& registry = activeScene->getRegistry();
+    auto cameraView = registry.view<TransformComponent, CameraComponent>();
+    
+    bool foundMainCamera = false;
+    for (auto entity : cameraView) {
+        auto& camera = cameraView.get<CameraComponent>(entity);
+        if (camera.isMainCamera) {
+            // Update camera aspect ratio based on current swapchain extent
+            float aspectRatio = m_width / m_height;
+            if (camera.aspectRatio != aspectRatio) {
+                camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane, camera.farPlane);
+            }
+            
+            // Use the camera's view matrix
+            ubo.view = camera.camera.getViewMatrix();
+            ubo.proj = camera.camera.getProjectionMatrix();
+            foundMainCamera = true;
+            break;
+        }
+    }
+    
+    // Fallback to default camera if no main camera found
+    if (!foundMainCamera) {
+        RP_CORE_WARN("No main camera found in scene, using default view matrix");
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(45.0f), m_width / m_height, 0.1f, 10.0f);
+    }
+
+    
+    // Fix projection matrix for Vulkan coordinate system
+    ubo.proj[1][1] *= -1;
+
+    m_cameraUBOs[currentFrame]->addData((void*)&ubo, sizeof(ubo), 0);
+
+
+}
+
+void DeferredRenderer::createUniformBuffers(uint32_t framesInFlight) {
+    for (int i = 0; i < framesInFlight; i++) {
+        m_cameraUBOs.push_back(std::make_shared<UniformBuffer>(sizeof(CameraUniformBufferObject), BufferUsage::STREAM, m_vmaAllocator));
+    }
+
+}
+
+void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
+
+    auto& registry = activeScene->getRegistry();
+    auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
+
+    for (auto entity : lightView) {
+        auto& lightComp = lightView.get<LightComponent>(entity);
+        auto& transformComp = lightView.get<TransformComponent>(entity);
+        auto& shadowComp = lightView.get<ShadowComponent>(entity);
+
+        if (shadowComp.shadowMap && (lightComp.hasChanged(m_currentFrame) || transformComp.hasChanged(m_currentFrame))) {
+            shadowComp.shadowMap->updateViewMatrix(lightComp, transformComp);
+        }
+    }
 }
 }

@@ -212,13 +212,9 @@ void LightingPass::createPipeline() {
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &colorBlendAttachment;
-    colorBlending.blendConstants[0] = 0.0f; // Optional
-    colorBlending.blendConstants[1] = 0.0f; // Optional
-    colorBlending.blendConstants[2] = 0.0f; // Optional
-    colorBlending.blendConstants[3] = 0.0f; // Optional
+
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -329,7 +325,7 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
         auto& tagComp = lightView.get<TagComponent>(entity);
         
 
-        if (lightComp.hasChanged() || transform.hasChanged()) {
+        if (true) {
             lightsChanged = true;
             break;
         }
@@ -440,6 +436,7 @@ if (m_swapChain != nullptr) {
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 
 }
+
 }
 
 void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer) {

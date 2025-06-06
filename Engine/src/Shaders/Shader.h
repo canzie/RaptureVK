@@ -59,12 +59,14 @@ namespace Rapture {
 
     class Shader {
     public:
-        Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
+        Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath="");
         Shader(const std::filesystem::path& computePath);
         ~Shader();
 
         // constructors for different shaders types
         void createGraphicsShader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
+        void createGraphicsShader(const std::filesystem::path& vertexPath);
+
         void createComputeShader(const std::filesystem::path& computePath);
 
         // helper functions
@@ -96,6 +98,7 @@ namespace Rapture {
         std::vector<VkPushConstantRange> m_pushConstantLayouts;
 
         std::vector<DescriptorInfo> m_materialSets;
+
     };
 
 

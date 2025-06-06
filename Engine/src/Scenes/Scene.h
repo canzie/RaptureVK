@@ -10,7 +10,7 @@ namespace Rapture {
 
     struct SceneSettings {
         std::string sceneName;
-        bool frustumCullingEnabled = false;
+        bool frustumCullingEnabled = true;
         std::shared_ptr<Entity> mainCamera;
     };
     

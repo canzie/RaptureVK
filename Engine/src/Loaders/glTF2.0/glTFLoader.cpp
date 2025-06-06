@@ -765,6 +765,12 @@ namespace Rapture {
             if (name == "POSITION") {
                 positionOffset = attrOffsets[i] / sizeof(float);
                 foundPosition = true;
+
+                if (entity.hasComponent<BoundingBoxComponent>() && calculatedBounds) {
+                    entity.getComponent<BoundingBoxComponent>().localBoundingBox = BoundingBox(minBounds, maxBounds);
+                } else if (calculatedBounds) {
+                    entity.addComponent<BoundingBoxComponent>(minBounds, maxBounds);
+                }
             }
         }
 

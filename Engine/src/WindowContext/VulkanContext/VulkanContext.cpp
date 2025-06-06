@@ -463,6 +463,32 @@ void VulkanContext::createLogicalDevice()
     // Initialize pNext pointer for chaining extension features
     void** ppNextChain = &physicalDeviceFeaturesToEnable.pNext;
 
+    // --- VK_EXT_descriptor_indexing features ---
+    // Initialize and query descriptor indexing features
+    m_descriptorIndexingFeatures = {};
+    m_descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    
+    VkPhysicalDeviceFeatures2 queryDescriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryDescriptorIndexing.pNext = &m_descriptorIndexingFeatures;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryDescriptorIndexing);
+    
+    // Log descriptor indexing feature support
+    if (m_descriptorIndexingFeatures.descriptorBindingPartiallyBound) {
+        RP_CORE_INFO("Feature descriptorBindingPartiallyBound is supported and will be enabled.");
+    } else {
+        RP_CORE_WARN("Feature descriptorBindingPartiallyBound is NOT supported. Bindless textures will be limited.");
+    }
+    
+    if (m_descriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind) {
+        RP_CORE_INFO("Feature descriptorBindingSampledImageUpdateAfterBind is supported and will be enabled.");
+    } else {
+        RP_CORE_WARN("Feature descriptorBindingSampledImageUpdateAfterBind is NOT supported. Bindless textures will be limited.");
+    }
+    
+    // Chain descriptor indexing features into the creation info
+    *ppNextChain = &m_descriptorIndexingFeatures;
+    ppNextChain = &m_descriptorIndexingFeatures.pNext;
+
     // --- VK_EXT_vertex_input_dynamic_state ---
     VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT dynamicStateFeaturesToEnable{};
     dynamicStateFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;

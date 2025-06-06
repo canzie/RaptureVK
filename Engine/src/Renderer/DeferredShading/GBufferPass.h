@@ -12,6 +12,7 @@
 #include "Textures/Texture.h"
 #include "WindowContext/VulkanContext/VulkanContext.h"
 #include "Components/Components.h"
+#include "Events/GameEvents.h"
 
 #include <memory>
 
@@ -19,7 +20,7 @@ namespace Rapture {
 
 class GBufferPass {
 public:
-    GBufferPass(float width, float height, uint32_t framesInFlight);
+    GBufferPass(float width, float height, uint32_t framesInFlight, std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs);
     ~GBufferPass();
 
     static FramebufferSpecification getFramebufferSpecification();
@@ -46,7 +47,6 @@ private:
     void createTextures();
     void createPipeline();
     void createDescriptorSets(uint32_t framesInFlight);
-    void createCameraUBO(uint32_t framesInFlight);
 
     void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
 
@@ -54,7 +54,6 @@ private:
 
     void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
 
-    void updateUniformBuffer(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
 
 
 private:
@@ -82,9 +81,11 @@ private:
 
     std::vector<std::shared_ptr<UniformBuffer>> m_cameraUBOs;
     std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets;
-    std::vector<CameraUniformBufferObject> m_cameraUBOData;
 
     bool m_isFirstFrame = true;
+
+    std::shared_ptr<Entity> m_selectedEntity;
+    size_t m_entitySelectedListenerId;
 };
 
 }

@@ -71,8 +71,7 @@ namespace Rapture {
 
         m_swapChain = app.getVulkanContext().getSwapChain();
 
-        AssetManager::init();
-        MaterialManager::init();
+
 
         setupShaders();
 
@@ -103,8 +102,7 @@ void ForwardRenderer::shutdown()
 
     m_cameraUniformBuffers.clear();
     m_lightUniformBuffers.clear();
-    MaterialManager::shutdown();
-    AssetManager::shutdown();
+
     m_shader.reset();
 
     m_commandPool.reset();
@@ -815,7 +813,7 @@ void ForwardRenderer::updateLights(std::shared_ptr<Scene> activeScene) {
         auto& tagComp = lightView.get<TagComponent>(entity);
         
 
-        if (lightComp.hasChanged() || transform.hasChanged()) {
+        if (lightComp.hasChanged(m_currentFrame) || transform.hasChanged(m_currentFrame)) {
             lightsChanged = true;
             break;
         }

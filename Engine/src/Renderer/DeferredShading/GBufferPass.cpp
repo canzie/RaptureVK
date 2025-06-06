@@ -12,8 +12,12 @@ struct PushConstants {
     glm::mat4 model;
 };
 
-GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
-    : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_currentFrame(0) {
+GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight, std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs)
+    : m_width(width), m_height(height), 
+    m_framesInFlight(framesInFlight), m_currentFrame(0), 
+    m_selectedEntity(nullptr),
+    m_cameraUBOs(cameraUBOs) {
+
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
     
@@ -22,15 +26,20 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     
     createPipeline();
     createTextures();
-    createCameraUBO(framesInFlight);
     createDescriptorSets(framesInFlight);
     
-    
+    m_entitySelectedListenerId = GameEvents::onEntitySelected().addListener(
+        [this](std::shared_ptr<Rapture::Entity> entity) {
+            m_selectedEntity = entity;
+        }
+    );
 }
 
 GBufferPass::~GBufferPass() {
     // Wait for device to finish operations
     vkDeviceWaitIdle(m_device);
+
+    GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId); 
 
     // Clean up descriptor sets
     m_descriptorSets.clear();
@@ -53,7 +62,7 @@ GBufferPass::~GBufferPass() {
 FramebufferSpecification GBufferPass::getFramebufferSpecification() {
     FramebufferSpecification spec;
     spec.depthAttachment = VK_FORMAT_D24_UNORM_S8_UINT;
-    //spec.stencilAttachment = m_swapChain->getDepthImageFormat();
+    spec.stencilAttachment = VK_FORMAT_D24_UNORM_S8_UINT;
     spec.colorAttachments.push_back(VK_FORMAT_R32G32B32A32_SFLOAT); // position
     spec.colorAttachments.push_back(VK_FORMAT_R16G16B16A16_SFLOAT ); // normal a=???
     spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_SRGB); // albedo + specular
@@ -70,7 +79,6 @@ void GBufferPass::recordCommandBuffer(
     RAPTURE_PROFILE_FUNCTION();
 
     m_currentFrame = currentFrame;  // Update current frame index
-    updateUniformBuffer(activeScene, currentFrame);
 
     setupDynamicRenderingMemoryBarriers(commandBuffer);
     beginDynamicRendering(commandBuffer);
@@ -95,8 +103,14 @@ void GBufferPass::recordCommandBuffer(
 
     // Get entities with TransformComponent and MeshComponent
     auto& registry = activeScene->getRegistry();
-    auto view = registry.view<TransformComponent, MeshComponent, MaterialComponent>();
-    
+    auto view = registry.view<TransformComponent, MeshComponent, MaterialComponent, BoundingBoxComponent>();
+    auto mainCamera = activeScene->getSettings().mainCamera;
+
+    CameraComponent* cameraComp = nullptr;
+
+    if (mainCamera) {
+        cameraComp = mainCamera->tryGetComponent<CameraComponent>();
+    }
 
     for (auto entity : view) {
 
@@ -106,6 +120,7 @@ void GBufferPass::recordCommandBuffer(
         auto& transform = view.get<TransformComponent>(entity);
         auto& meshComp = view.get<MeshComponent>(entity);
         auto& materialComp = view.get<MaterialComponent>(entity);
+        auto& boundingBoxComp = view.get<BoundingBoxComponent>(entity);
 
         // Check if mesh is valid and not loading
         if (!meshComp.mesh || meshComp.isLoading) {
@@ -122,7 +137,38 @@ void GBufferPass::recordCommandBuffer(
         if (!mesh->getVertexBuffer() || !mesh->getIndexBuffer()) {
             continue;
         }
+        if (transform.hasChanged(m_currentFrame)){
+            boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
+        }
+
+        if (cameraComp && activeScene->getSettings().frustumCullingEnabled){
+            if (cameraComp->frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside){
+                continue;
+            }
+        }
         
+        // Check if current entity is the selected one
+        bool isSelected = false;
+        if (m_selectedEntity) {
+            // Assuming m_selectedEntity->getHandle() returns entt::entity
+            // and 'entity' is of type entt::entity
+            if (m_selectedEntity->getHandle() == entity) {
+                isSelected = true;
+            }
+        }
+
+        if (isSelected) {
+            // Set stencil reference to 1 for the selected entity
+            vkCmdSetStencilReference(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 1);
+            // Enable stencil writing for selected entity
+            vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0xFF);
+        } else {
+            // Set stencil reference to 0 for non-selected entities
+            vkCmdSetStencilReference(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0);
+            // Disable stencil writing for non-selected entities
+            vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0x00);
+        }
+
         // Get the vertex buffer layout
         auto& bufferLayout = mesh->getVertexBuffer()->getBufferLayout();
         
@@ -171,6 +217,7 @@ void GBufferPass::recordCommandBuffer(
         
         // Draw the mesh
         vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), mesh->getIndexCount(), 1, 0, 0, 0);
+    
     }
     
 
@@ -216,14 +263,17 @@ void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBu
     m_colorAttachmentInfo[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     m_colorAttachmentInfo[3].clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
 
+    // Depth-stencil attachment configuration
     m_depthAttachmentInfo = {};
     m_depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     m_depthAttachmentInfo.imageView = m_depthStencilTextures[m_currentFrame]->getImageView();
     m_depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     m_depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     m_depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    // Clear depth to 1.0f (far) and stencil to 0
     m_depthAttachmentInfo.clearValue.depthStencil = {1.0f, 0};
 
+    // Configure dynamic rendering info
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
@@ -232,7 +282,7 @@ void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBu
     renderingInfo.colorAttachmentCount = 4;
     renderingInfo.pColorAttachments = m_colorAttachmentInfo;
     renderingInfo.pDepthAttachment = &m_depthAttachmentInfo;
-    renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
+    renderingInfo.pStencilAttachment = &m_depthAttachmentInfo;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
@@ -297,47 +347,7 @@ void GBufferPass::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer
         5, barriers);  
 }
 
-void GBufferPass::updateUniformBuffer(std::shared_ptr<Scene> activeScene, uint32_t currentFrame) {
-    RAPTURE_PROFILE_FUNCTION();
 
-    CameraUniformBufferObject ubo{};
-
-    // Try to find the main camera in the scene
-    auto& registry = activeScene->getRegistry();
-    auto cameraView = registry.view<TransformComponent, CameraComponent>();
-    
-    bool foundMainCamera = false;
-    for (auto entity : cameraView) {
-        auto& camera = cameraView.get<CameraComponent>(entity);
-        if (camera.isMainCamera) {
-            // Update camera aspect ratio based on current swapchain extent
-            float aspectRatio = m_width / m_height;
-            if (camera.aspectRatio != aspectRatio) {
-                camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane, camera.farPlane);
-            }
-            
-            // Use the camera's view matrix
-            ubo.view = camera.camera.getViewMatrix();
-            ubo.proj = camera.camera.getProjectionMatrix();
-            foundMainCamera = true;
-            break;
-        }
-    }
-    
-    // Fallback to default camera if no main camera found
-    if (!foundMainCamera) {
-        RP_CORE_WARN("No main camera found in scene, using default view matrix");
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(glm::radians(45.0f), m_width / m_height, 0.1f, 10.0f);
-    }
-
-    
-    // Fix projection matrix for Vulkan coordinate system
-    ubo.proj[1][1] *= -1;
-
-    m_cameraUBOs[currentFrame]->addData((void*)&ubo, sizeof(ubo), 0);
-
-}
 
 
 void GBufferPass::createTextures()
@@ -392,7 +402,9 @@ void GBufferPass::createPipeline()
     std::vector<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR,
-        VK_DYNAMIC_STATE_VERTEX_INPUT_EXT
+        VK_DYNAMIC_STATE_VERTEX_INPUT_EXT,
+        VK_DYNAMIC_STATE_STENCIL_REFERENCE, // Added for dynamic stencil reference
+        VK_DYNAMIC_STATE_STENCIL_WRITE_MASK // Added for dynamic stencil write mask
     };
 
     VkPipelineDynamicStateCreateInfo dynamicState{};
@@ -448,10 +460,7 @@ void GBufferPass::createPipeline()
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampling.minSampleShading = 1.0f; // Optional
-    multisampling.pSampleMask = nullptr; // Optional
-    multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
-    multisampling.alphaToOneEnable = VK_FALSE; // Optional
+
 
     VkPipelineColorBlendAttachmentState colorBlendAttachments[4];
     for (int i = 0; i < 4; ++i) {
@@ -479,9 +488,20 @@ void GBufferPass::createPipeline()
     depthStencil.depthWriteEnable = VK_TRUE;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
-    depthStencil.stencilTestEnable = VK_FALSE;
-    depthStencil.front = {};
-    depthStencil.back = {};
+    depthStencil.stencilTestEnable = VK_TRUE;
+    
+    // Front face stencil operations
+    depthStencil.front.failOp = VK_STENCIL_OP_KEEP;      // Keep current value if stencil test fails
+    depthStencil.front.passOp = VK_STENCIL_OP_REPLACE;   // Replace with reference value when stencil test passes
+    depthStencil.front.depthFailOp = VK_STENCIL_OP_REPLACE; // Replace with reference value even if depth test fails
+    depthStencil.front.compareOp = VK_COMPARE_OP_ALWAYS; // Always pass the stencil test
+    depthStencil.front.compareMask = 0xFF;               // Compare all bits
+    depthStencil.front.writeMask = 0xFF;                 // Write all bits in stencil buffer
+    depthStencil.front.reference = 0;                    // Default reference value (will be overridden by vkCmdSetStencilReference)
+    
+    // Back face stencil operations (same as front face)
+    depthStencil.back = depthStencil.front;
+    
     depthStencil.minDepthBounds = 0.0f;
     depthStencil.maxDepthBounds = 1.0f;
     
@@ -516,12 +536,7 @@ void GBufferPass::createPipeline()
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
 
-void GBufferPass::createCameraUBO(uint32_t framesInFlight)
-{
-    for (int i = 0; i < framesInFlight; i++) {
-        m_cameraUBOs.push_back(std::make_shared<UniformBuffer>(sizeof(CameraUniformBufferObject), BufferUsage::STREAM, m_vmaAllocator));
-    }
-}
+
 
 void GBufferPass::createDescriptorSets(uint32_t framesInFlight)
 {
@@ -534,7 +549,7 @@ void GBufferPass::createDescriptorSets(uint32_t framesInFlight)
     std::vector<DescriptorSetBindings> bindings(framesInFlight);
     for (int i = 0; i < framesInFlight; i++) {
         // TODO: binding index, currently set to 0, should change to use a constant DESCRIPTOR SET CAMERA INDEX 
-        bindings[i].bindings.push_back({0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, m_cameraUBOs[i]});
+        bindings[i].bindings.push_back({0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, TextureViewType::DEFAULT, m_cameraUBOs[i]});
         bindings[i].layout = layout;
     }
 

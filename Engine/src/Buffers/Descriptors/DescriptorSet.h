@@ -8,6 +8,8 @@
 
 #include <mutex>
 
+#include "Textures/TextureCommon.h"
+
 namespace Rapture {
 
     // TODO create a caching system for descriptor sets
@@ -25,7 +27,7 @@ struct DescriptorSetBinding {
     uint32_t binding;
     VkDescriptorType type;
     uint32_t count;
-    
+    TextureViewType viewType = TextureViewType::DEFAULT;
     // Use variant to hold different resource types
     std::variant<std::shared_ptr<UniformBuffer>, std::shared_ptr<Texture>> resource;
 };

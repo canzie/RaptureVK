@@ -8,6 +8,7 @@
 #include "Scenes/SceneManager.h"
 
 #include "Buffers/CommandBuffers/CommandPool.h"
+#include "Buffers/Descriptors/BindlessDescriptorManager.h"
 
 #include "Utils/Timestep.h"
 
@@ -66,6 +67,15 @@ namespace Rapture {
         
         CommandPoolManager::init();
 
+        AssetManager::init();
+        MaterialManager::init();
+
+        BindlessDescriptorArrayConfig config;
+        config.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        config.capacity = 512;
+        config.name = "GlobalBindlessTexturePool";
+
+        BindlessDescriptorManager::init({config});
 
         ForwardRenderer::init();
         DeferredRenderer::init();
@@ -94,18 +104,22 @@ namespace Rapture {
 
     Application::~Application() {
 
+        m_vulkanContext->waitIdle();
+
 		TracyProfiler::shutdown();
 
-
-        m_vulkanContext->waitIdle();
 
         ModelLoadersCache::clear();
         m_project.reset();
 
         ForwardRenderer::shutdown();
         DeferredRenderer::shutdown();
+        BindlessDescriptorManager::shutdown();
 
         m_layerStack.clear();
+
+        MaterialManager::shutdown();
+        AssetManager::shutdown();
 
         CommandPoolManager::shutdown(); 
 

@@ -13,13 +13,16 @@
 #include "Components/Systems/Transforms.h"
 #include "Components/Systems/CameraController.h"
 #include "Components/Systems/EntityNode.h"
-
+#include "Components/Systems/BoundingBox.h"
+#include "Renderer/Frustum/Frustum.h"
+#include "Renderer/Shadows/ShadowMapping/ShadowMapping.h"
 #include "Cameras/PerspectiveCamera/PerspectiveCamera.h"
 
 #include "Meshes/Mesh.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include "Materials/MaterialInstance.h"
+
 
 #include <string>
 #include <memory>
@@ -55,6 +58,8 @@ namespace Rapture {
 
         private:
             mutable std::size_t m_lastHash = 0;
+            mutable uint32_t m_lastFrame = 10; // random number larger than framesinglight
+            mutable bool changedThisFrame = false;
 
         public:
         TransformComponent()=default;
@@ -88,14 +93,20 @@ namespace Rapture {
             return hash;
         }
 
-        bool hasChanged() const
+        bool hasChanged(uint32_t currentFrame) const
         {
-            uint32_t currentHash = calculateCurrentHash();
-            if (m_lastHash != currentHash) {
-                m_lastHash = currentHash;
-                return true;
+            if (m_lastFrame != currentFrame) {
+                m_lastFrame = currentFrame;
+                changedThisFrame = false;
+
+                uint32_t currentHash = calculateCurrentHash();
+                if (m_lastHash != currentHash) {
+                    m_lastHash = currentHash;
+                    changedThisFrame = true;
+                    return true;
+                }
             }
-            return false;
+            return changedThisFrame;
         }
 	};
 
@@ -103,6 +114,7 @@ namespace Rapture {
     struct CameraComponent
     {
         PerspectiveCamera camera;
+        Frustum frustum;
         
         float fov;
         float aspectRatio;
@@ -116,6 +128,8 @@ namespace Rapture {
             : fov(fovy), aspectRatio(ar), nearPlane(near_), farPlane(far_)
         {
             camera = PerspectiveCamera(fovy, ar, near_, far_);
+            frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
+
         }
 
         void updateProjectionMatrix(float fovy, float ar, float near_, float far_)
@@ -125,6 +139,8 @@ namespace Rapture {
             nearPlane = near_;
             farPlane = far_;
             camera.updateProjectionMatrix(fovy, ar, near_, far_);
+            frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
+
         }
 
         // Update view matrix from transform component
@@ -141,6 +157,8 @@ namespace Rapture {
             front = glm::normalize(front);
             
             camera.updateViewMatrix(position, front);
+            frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
+
         }
 
                 // Update view matrix from transform component
@@ -148,6 +166,7 @@ namespace Rapture {
         {
             glm::vec3 position = transform.translation();
             camera.updateViewMatrix(position, front);
+            frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
         }
     };
 
@@ -240,6 +259,8 @@ struct LightComponent
     
     private:
         mutable uint32_t m_lastHash = 0;
+        mutable uint32_t m_lastFrame = 10; // random number larger than framesinglight
+        mutable bool changedThisFrame = false;
 
     public:
     // Constructors
@@ -298,14 +319,45 @@ struct LightComponent
         return hash;
     }
 
-    bool hasChanged() const {
-
-        uint32_t currentHash = calculateCurrentHash();
-        if (m_lastHash != currentHash) {
-            m_lastHash = currentHash;
-            return true;
+    bool hasChanged(uint32_t currentFrame) const {
+        if (m_lastFrame != currentFrame) {
+            m_lastFrame = currentFrame;
+            changedThisFrame = false;
+            uint32_t currentHash = calculateCurrentHash();
+            if (m_lastHash != currentHash) {
+                m_lastHash = currentHash;
+                changedThisFrame = true;
+                return true;
+            }
         }
-        return false;
+        return changedThisFrame;
+    }
+
+};
+
+struct ShadowComponent {
+    std::unique_ptr<ShadowMap> shadowMap;
+
+    
+    ShadowComponent(float width, float height) {
+        shadowMap = std::make_unique<ShadowMap>(width, height);
+    }
+};
+
+struct BoundingBoxComponent {
+    // start off as invalid
+    BoundingBox localBoundingBox;
+    BoundingBox worldBoundingBox;
+
+
+    BoundingBoxComponent() = default;
+    BoundingBoxComponent(glm::vec3 min, glm::vec3 max) {
+        localBoundingBox = BoundingBox(min, max);
+        worldBoundingBox = localBoundingBox;
+    }
+
+    void updateWorldBoundingBox(const glm::mat4& transform) {
+            worldBoundingBox = localBoundingBox.transform(transform);
     }
 
 };

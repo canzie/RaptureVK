@@ -99,6 +99,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         45.0f                          // Outer cone angle
     );
 
+    light1.addComponent<Rapture::ShadowComponent>(2048, 2048);
+
 
     Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
 }

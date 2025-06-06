@@ -16,6 +16,7 @@
 
 #include "Renderer/DeferredShading/GBufferPass.h"
 #include "Renderer/DeferredShading/LightingPass.h"
+#include "Renderer/StencilBorderPass.h"
 
 #include <memory>
 #include <vector>
@@ -24,6 +25,9 @@
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "Meshes/Mesh.h"
+
+
+#include "Buffers/Descriptors/BindlessDescriptorManager.h"
 
 namespace Rapture {
 
@@ -57,16 +61,24 @@ class DeferredRenderer {
 
         static void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t imageIndex);
 
+        static void updateCameraUBOs(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
 
+        static void createUniformBuffers(uint32_t framesInFlight);
+
+        static void updateShadowMaps(std::shared_ptr<Scene> activeScene);
 
     private:
         static std::shared_ptr<GBufferPass> m_gbufferPass;
         static std::shared_ptr<LightingPass> m_lightingPass;
+        static std::shared_ptr<StencilBorderPass> m_stencilBorderPass;
 
         static std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
         static std::shared_ptr<CommandPool> m_commandPool;
 
         static std::shared_ptr<Shader> m_shader;
+
+
+        static std::vector<std::shared_ptr<UniformBuffer>> m_cameraUBOs;
 
 
         static VmaAllocator m_vmaAllocator;
@@ -78,6 +90,11 @@ class DeferredRenderer {
 
         static std::shared_ptr<VulkanQueue> m_graphicsQueue;
         static std::shared_ptr<VulkanQueue> m_presentQueue;
+
+        static float m_width;
+        static float m_height;
+
+        static std::shared_ptr<BindlessDescriptorArray> m_bindlessDescriptorArray;
 
         
 

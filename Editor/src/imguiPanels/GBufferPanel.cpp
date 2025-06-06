@@ -22,8 +22,22 @@ GBufferPanel::~GBufferPanel() {
 }
 
 void GBufferPanel::renderTexture(const char* label, std::shared_ptr<Rapture::Texture> texture, VkDescriptorSet& descriptorSet) {
-    if (!texture || !texture->getImageView() || !texture->getSampler().getSamplerVk()) {
+    if (!texture) {
         ImGui::TextWrapped("%s: (Texture data not available or invalid)", label);
+        ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x));
+        return;
+    }
+
+    // Determine which image view to use based on the label
+    VkImageView imageView = texture->getImageView();
+    if (strstr(label, "Depth View") && texture->getDepthOnlyImageView()) {
+        imageView = texture->getDepthOnlyImageView();
+    } else if (strstr(label, "Stencil View") && texture->getStencilOnlyImageView()) {
+        imageView = texture->getStencilOnlyImageView();
+    }
+
+    if (!imageView || !texture->getSampler().getSamplerVk()) {
+        ImGui::TextWrapped("%s: (Texture view or sampler not available)", label);
         ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x));
         return;
     }
@@ -31,7 +45,7 @@ void GBufferPanel::renderTexture(const char* label, std::shared_ptr<Rapture::Tex
     if (descriptorSet == VK_NULL_HANDLE) {
         descriptorSet = ImGui_ImplVulkan_AddTexture(
             texture->getSampler().getSamplerVk(),
-            texture->getImageView(),
+            imageView,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
         if (descriptorSet == VK_NULL_HANDLE) {
@@ -68,15 +82,22 @@ void GBufferPanel::render() {
         return;
     }
 
-    // Ensure we have enough descriptor sets. Should match the number of G-Buffer textures.
-    // Typically: Position, Normal, Albedo, Material, Depth
-    const size_t numTextures = 5; 
-    if (m_gbufferDescriptorSets.size() != numTextures) {
+    // Calculate expected number of textures
+    size_t expectedTextures = 4; // Position, Normal, Albedo, Material
+    auto depthTexture = gbufferPass->getDepthTexture();
+    if (depthTexture && Rapture::hasStencilComponent(depthTexture->getSpecification().format)) {
+        expectedTextures += 2; // Additional views for depth and stencil
+    } else {
+        expectedTextures += 1; // Single depth view
+    }
+
+    // Ensure we have enough descriptor sets
+    if (m_gbufferDescriptorSets.size() != expectedTextures) {
         updateDescriptorSets(); // Attempt to re-initialize if size mismatch
-        if (m_gbufferDescriptorSets.size() != numTextures) {
-             ImGui::TextWrapped("Error: Could not initialize descriptor sets for all G-Buffer textures. Check logs.");
-             ImGui::End();
-             return;
+        if (m_gbufferDescriptorSets.size() != expectedTextures) {
+            ImGui::TextWrapped("Error: Could not initialize descriptor sets for all G-Buffer textures. Check logs.");
+            ImGui::End();
+            return;
         }
     }
     
@@ -106,8 +127,39 @@ void GBufferPanel::render() {
                 "Albedo (RGB), Spec (A). Should be visible if materials are set.");
     renderEntry("Material Props", gbufferPass->getMaterialTexture(), "(RGBA8 UNORM)", 
                 "Metallic (R), Roughness (G), AO (B). Should be visible.");
-    renderEntry("Depth/Stencil View", gbufferPass->getDepthTexture(), "(D24S8)", 
-                "Depth format. Cannot be directly viewed as color. This view is likely invalid.");
+
+    // Special handling for depth texture to show both depth and stencil views if available
+    if (depthTexture && Rapture::hasStencilComponent(depthTexture->getSpecification().format)) {
+        // Depth-only view
+        ImGui::BeginGroup();
+        std::string depthLabel = "Depth View (D24S8)";
+        if (depthTexture->getDepthOnlyImageView()) {
+            renderTexture(depthLabel.c_str(), depthTexture, m_gbufferDescriptorSets[currentTextureIndex]);
+        } else {
+            ImGui::TextWrapped("%s: (Depth view not available)", depthLabel.c_str());
+            ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x));
+        }
+        ImGui::EndGroup();
+        ImGui::NextColumn();
+        currentTextureIndex++;
+
+        // Stencil-only view
+        ImGui::BeginGroup();
+        std::string stencilLabel = "Stencil View (D24S8)";
+        if (depthTexture->getStencilOnlyImageView()) {
+            renderTexture(stencilLabel.c_str(), depthTexture, m_gbufferDescriptorSets[currentTextureIndex]);
+        } else {
+            ImGui::TextWrapped("%s: (Stencil view not available)", stencilLabel.c_str());
+            ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x));
+        }
+        ImGui::EndGroup();
+        ImGui::NextColumn();
+        currentTextureIndex++;
+    } else {
+        // Regular depth texture display
+        renderEntry("Depth View", depthTexture, "(D24S8)", 
+                    "Normalized depth (D24_UNORM). Displayed as Red channel (Red=far, Black=near).");
+    }
 
     ImGui::Columns(1); // Reset columns
     ImGui::End();
@@ -129,9 +181,16 @@ void GBufferPanel::updateDescriptorSets() {
         return;
     }
 
-    // Recreate descriptor sets for all G-Buffer textures
-    // The order here must match the order used in render()
-    const size_t numTextures = 5; // Position, Normal, Albedo, Material, Depth
+    // Calculate total number of textures needed
+    size_t numTextures = 4; // Position, Normal, Albedo, Material
+    auto depthTexture = gbufferPass->getDepthTexture();
+    if (depthTexture && Rapture::hasStencilComponent(depthTexture->getSpecification().format)) {
+        numTextures += 2; // Additional views for depth and stencil
+    } else {
+        numTextures += 1; // Single depth view
+    }
+
+    // Resize descriptor sets array
     m_gbufferDescriptorSets.resize(numTextures, VK_NULL_HANDLE);
     
     // Textures are created (or attempted) in renderTexture on first use if null.
@@ -146,8 +205,18 @@ void GBufferPanel::updateDescriptorSets() {
     initSetSlot(gbufferPass->getNormalTexture(), 1);
     initSetSlot(gbufferPass->getAlbedoTexture(), 2);
     initSetSlot(gbufferPass->getMaterialTexture(), 3);
-    initSetSlot(gbufferPass->getDepthTexture(), 4);
+    
+    // Handle depth texture
+    if (depthTexture) {
+        if (Rapture::hasStencilComponent(depthTexture->getSpecification().format)) {
+            // Both depth and stencil views
+            initSetSlot(depthTexture, 4); // Depth view
+            initSetSlot(depthTexture, 5); // Stencil view
+        } else {
+            // Single depth view
+            initSetSlot(depthTexture, 4);
+        }
+    }
     
     m_initialized = true;
-    // Rapture::RP_CORE_INFO("GBufferPanel: Descriptor sets prepared for lazy initialization.");
 }

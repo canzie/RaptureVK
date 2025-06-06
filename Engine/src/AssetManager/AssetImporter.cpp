@@ -124,6 +124,7 @@ std::optional<std::filesystem::path> getRelatedShaderPath(
 
         // Handle Compute Shaders (Standalone)
         if (initialStageType == "compute") {
+            RP_CORE_ERROR("AssetImporter::loadShader - Compute shaders are not supported yet");
             return nullptr;
         }
         // Handle Graphics Shaders (Vertex + Fragment required, Geometry optional)
@@ -137,15 +138,14 @@ std::optional<std::filesystem::path> getRelatedShaderPath(
                 return nullptr;
             }
             if (!fragmentPathOpt) {
-                RP_CORE_ERROR("AssetImporter::loadShader - Could not find fragment shader related to: {}", initialPath.string());
-                return nullptr;
+                RP_CORE_INFO("AssetImporter::loadShader - No fragment shader found, assuming vertex only shader for: {}", initialPath.string());
             }
 
             // Optionally find geometry shader
             auto geometryPathOpt = getRelatedShaderPath(initialPath, "geometry");
 
             std::filesystem::path vertexPath = *vertexPathOpt;
-            std::filesystem::path fragmentPath = *fragmentPathOpt;
+            std::filesystem::path fragmentPath = fragmentPathOpt ? *fragmentPathOpt : std::filesystem::path();
 
             if (geometryPathOpt) {
                 std::filesystem::path geometryPath = *geometryPathOpt;

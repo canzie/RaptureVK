@@ -36,12 +36,15 @@ public:
     // Getters
     VkImage getImage() const { return m_image; }
     VkImageView getImageView() const { return m_imageView; }
+    VkImageView getDepthOnlyImageView() const { return m_imageViewDepthOnly; }
+    VkImageView getStencilOnlyImageView() const { return m_imageViewStencilOnly; }
     const Sampler& getSampler() const { return *m_sampler; }
     const TextureSpecification& getSpecification() const { return m_spec; }
     VkFormat getFormat() const { return toVkFormat(m_spec.format); }
     
+
     // Get descriptor image info for use in descriptor sets
-    VkDescriptorImageInfo getDescriptorImageInfo() const;
+    VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType=TextureViewType::DEFAULT) const;
     
     // Static method to create a default white texture
     static std::shared_ptr<Texture> createDefaultWhiteTexture();
@@ -78,8 +81,12 @@ private:
     
     std::unique_ptr<Sampler> m_sampler;
     VkImage m_image;
-    VkImageView m_imageView;
+    VkImageView m_imageView{VK_NULL_HANDLE};
+    VkImageView m_imageViewStencilOnly{VK_NULL_HANDLE};
+    VkImageView m_imageViewDepthOnly{VK_NULL_HANDLE};
+
     VmaAllocation m_allocation;
+
 
     TextureSpecification m_spec;
 

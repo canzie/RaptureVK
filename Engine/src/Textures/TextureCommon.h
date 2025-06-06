@@ -46,6 +46,13 @@ enum class TextureType : uint8_t {
     TEXTURE2D_ARRAY
 };
 
+enum class TextureViewType : uint8_t {
+    DEFAULT,
+    STENCIL,
+    DEPTH,
+    COLOR
+};
+
 
 struct TextureSpecification {
     TextureType type = TextureType::TEXTURE2D;

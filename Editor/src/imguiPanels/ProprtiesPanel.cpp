@@ -3,6 +3,8 @@
 #include "Events/GameEvents.h"
 
 #include "Components/Components.h"
+#include "Textures/Texture.h"
+
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -30,11 +32,17 @@ PropertiesPanel::PropertiesPanel()
         [this](std::shared_ptr<Rapture::Entity> entity) {
             m_selectedEntity = entity;
     });
+    
+    m_currentShadowMapDescriptorSet = VK_NULL_HANDLE;
 }
 
 PropertiesPanel::~PropertiesPanel()
 {
     Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
+
+    if (m_currentShadowMapDescriptorSet != VK_NULL_HANDLE) {
+        ImGui_ImplVulkan_RemoveTexture(m_currentShadowMapDescriptorSet);
+    }
 }
 
 void PropertiesPanel::render()
@@ -55,6 +63,10 @@ void PropertiesPanel::render()
         }
         if (entity->hasComponent<Rapture::CameraComponent>()) {
             renderCameraComponent();
+        }
+        // Check for shadow component only if entity has both transform and light components
+        if (entity->hasAllComponents<Rapture::TransformComponent, Rapture::LightComponent, Rapture::ShadowComponent>()) {
+            renderShadowComponent();
         }
     }
 
@@ -324,6 +336,54 @@ void PropertiesPanel::renderCameraComponent()
             }
         }
     }
+}
+
+void PropertiesPanel::renderShadowComponent() {
+
+    if (auto entity = m_selectedEntity.lock()) {
+        if (ImGui::CollapsingHeader("Shadow Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto& shadow = entity->getComponent<Rapture::ShadowComponent>();
+            auto& light = entity->getComponent<Rapture::LightComponent>();
+
+            // Only show shadow map if the light casts shadows
+            if (shadow.shadowMap) {
+                auto shadowTexture = shadow.shadowMap->getShadowTexture();
+                if (shadowTexture) {
+                    // Get the texture dimensions
+                    const auto& spec = shadowTexture->getSpecification();
+                    float aspectRatio = static_cast<float>(spec.width) / static_cast<float>(spec.height);
+                    
+                    // Calculate display size while maintaining aspect ratio
+                    float displayWidth = ImGui::GetContentRegionAvail().x;
+                    float displayHeight = displayWidth / aspectRatio;
+                    
+                    // Create ImGui descriptor for the shadow map texture
+                    VkDescriptorImageInfo imageInfo = shadowTexture->getDescriptorImageInfo();
+                    if (m_currentShadowMapDescriptorSet != VK_NULL_HANDLE) {
+                        ImGui_ImplVulkan_RemoveTexture(m_currentShadowMapDescriptorSet);
+                    }
+                    m_currentShadowMapDescriptorSet = ImGui_ImplVulkan_AddTexture(
+                        imageInfo.sampler,
+                        imageInfo.imageView,
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                    );
+                    
+                    // Display the shadow map texture
+                    ImGui::Text("Shadow Map (%dx%d)", spec.width, spec.height);
+                    ImGui::Image(
+                        (ImTextureID)m_currentShadowMapDescriptorSet,
+                        ImVec2(displayWidth, displayHeight)
+                    );
+
+
+                }
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Shadow map not available");
+                ImGui::Text("Enable 'Casts Shadow' in the Light Component to generate shadow maps");
+            }
+        }
+    }
+
 }
 
 

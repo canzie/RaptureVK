@@ -10,5 +10,9 @@ C:/VulkanSDK/1.4.313.0/Bin/glslc.exe -fshader-stage=fragment shaders/glsl/GBuffe
 C:/VulkanSDK/1.4.313.0/Bin/glslc.exe -fshader-stage=vertex shaders/glsl/DeferredLighting.vs.glsl -o shaders/SPIRV/DeferredLighting.vs.spv
 C:/VulkanSDK/1.4.313.0/Bin/glslc.exe -fshader-stage=fragment shaders/glsl/DeferredLighting.fs.glsl -o shaders/SPIRV/DeferredLighting.fs.spv
 
+C:/VulkanSDK/1.4.313.0/Bin/glslc.exe -fshader-stage=vertex shaders/glsl/StencilBorder.vs.glsl -o shaders/SPIRV/StencilBorder.vs.spv
+C:/VulkanSDK/1.4.313.0/Bin/glslc.exe -fshader-stage=fragment shaders/glsl/StencilBorder.fs.glsl -o shaders/SPIRV/StencilBorder.fs.spv
+
+C:/VulkanSDK/1.4.313.0/Bin/glslc.exe -fshader-stage=vertex shaders/glsl/Shadows/ShadowPass.vs.glsl -o shaders/SPIRV/Shadows/ShadowPass.vs.spv
 
 pause

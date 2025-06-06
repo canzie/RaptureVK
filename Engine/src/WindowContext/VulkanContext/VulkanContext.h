@@ -40,6 +40,11 @@ class VulkanContext {
         bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
         bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
         bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
+        
+        // Get descriptor indexing features
+        const VkPhysicalDeviceDescriptorIndexingFeatures& getDescriptorIndexingFeatures() const { 
+            return m_descriptorIndexingFeatures; 
+        }
 
         // Extension function pointers
         PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
@@ -112,7 +117,9 @@ class VulkanContext {
         bool m_isVertexInputDynamicStateEnabled;
         bool m_isVertexAttributeRobustnessEnabled;
         bool m_isDynamicRenderingEnabled;
-
+        
+        // Store descriptor indexing features support
+        VkPhysicalDeviceDescriptorIndexingFeatures m_descriptorIndexingFeatures{};
     };
 
 }
