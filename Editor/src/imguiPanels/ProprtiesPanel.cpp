@@ -358,7 +358,7 @@ void PropertiesPanel::renderShadowComponent() {
                     float displayHeight = displayWidth / aspectRatio;
                     
                     // Create ImGui descriptor for the shadow map texture
-                    VkDescriptorImageInfo imageInfo = shadowTexture->getDescriptorImageInfo();
+                    VkDescriptorImageInfo imageInfo = shadowTexture->getDescriptorImageInfo(Rapture::TextureViewType::DEPTH);
                     if (m_currentShadowMapDescriptorSet != VK_NULL_HANDLE) {
                         ImGui_ImplVulkan_RemoveTexture(m_currentShadowMapDescriptorSet);
                     }

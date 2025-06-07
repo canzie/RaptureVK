@@ -60,6 +60,7 @@ struct TextureSpecification {
     TextureWrap wrap = TextureWrap::Repeat;
     TextureFilter filter = TextureFilter::Linear;
     bool srgb = true; // to distinguish between UNORM and SRGB for relevant formats
+    bool shadowComparison = false; // Enable shadow comparison sampling for depth textures
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t depth = 1; // For 3D textures

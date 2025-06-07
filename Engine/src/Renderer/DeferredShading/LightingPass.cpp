@@ -1,6 +1,9 @@
 #include "LightingPass.h"
 #include "WindowContext/Application.h"
 
+#include "Renderer/Shadows/ShadowCommon.h"
+#include "Renderer/Shadows/ShadowMapping/ShadowMapping.h"
+
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 
@@ -11,8 +14,18 @@ struct PushConstants {
     glm::vec3 cameraPos;
 };
 
-LightingPass::LightingPass(float width, float height, uint32_t framesInFlight, std::shared_ptr<GBufferPass> gBufferPass)
-    : m_framesInFlight(framesInFlight), m_currentFrame(0), m_width(width), m_height(height), m_gBufferPass(gBufferPass) {
+LightingPass::LightingPass(
+    float width, 
+    float height, 
+    uint32_t framesInFlight, 
+    std::shared_ptr<GBufferPass> gBufferPass, 
+    std::vector<std::shared_ptr<UniformBuffer>> shadowDataUBOs)
+    : m_framesInFlight(framesInFlight), 
+    m_currentFrame(0), 
+    m_width(width), 
+    m_height(height), 
+    m_gBufferPass(gBufferPass), 
+    m_shadowDataUBOs(shadowDataUBOs) {
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -120,10 +133,15 @@ void LightingPass::recordCommandBuffer(
         &pushConstants);
 
     // Bind descriptor sets using frameInFlightIndex for GBuffer/UBO consistency
-    VkDescriptorSet descriptorSetsToBind[] = {m_descriptorSets[frameInFlightIndex]->getDescriptorSet()};
-    uint32_t descriptorSetCount = sizeof(descriptorSetsToBind) / sizeof(descriptorSetsToBind[0]);
+    // First bind set 0 (common resources)
+    VkDescriptorSet commonResourcesSet = m_descriptorSets[frameInFlightIndex]->getDescriptorSet();
     vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
-        0, descriptorSetCount, descriptorSetsToBind, 0, nullptr);
+        static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::COMMON_RESOURCES), 1, &commonResourcesSet, 0, nullptr);
+    
+    // Then bind set 3 (bindless shadow textures)
+    VkDescriptorSet bindlessSet = ShadowMap::getBindlessShadowMaps()->getDescriptorSet();
+    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
+        static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::EXTRA_RESOURCES), 1, &bindlessSet, 0, nullptr);
     
         
     // Draw 6 vertices for 2 triangles
@@ -302,6 +320,12 @@ void LightingPass::createDescriptorSets(uint32_t framesInFlight) {
         binding.resource = m_lightUBOs[i];
         bindings.bindings.push_back(binding);
 
+        binding.binding = 5;
+        binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.count = 1;
+        binding.resource = m_shadowDataUBOs[i];
+        bindings.bindings.push_back(binding);
+
         m_descriptorSets[i] = std::make_shared<DescriptorSet>(bindings);
     
     }
@@ -325,7 +349,7 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
         auto& tagComp = lightView.get<TagComponent>(entity);
         
 
-        if (true) {
+        if (true) { // to force true for testing
             lightsChanged = true;
             break;
         }
@@ -353,7 +377,8 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
         }
         
         LightData& lightData = lightUbo.lights[lightUbo.numLights];
-        
+
+
         // Position and light type
         glm::vec3 position = transform.translation();
         float lightTypeFloat = static_cast<float>(lightComp.type);
@@ -363,12 +388,8 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
         // Direction and range
         glm::vec3 direction = glm::vec3(0.0f, 0.0f, -1.0f); // Default forward direction
         if (lightComp.type == LightType::Directional || lightComp.type == LightType::Spot) {
-            // Calculate direction from rotation
-            glm::vec3 eulerAngles = transform.rotation();
-            glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(eulerAngles.x), glm::vec3(1.0f, 0.0f, 0.0f));
-            rotationMatrix = glm::rotate(rotationMatrix, glm::radians(eulerAngles.y), glm::vec3(0.0f, 1.0f, 0.0f));
-            rotationMatrix = glm::rotate(rotationMatrix, glm::radians(eulerAngles.z), glm::vec3(0.0f, 0.0f, 1.0f));
-            direction = glm::normalize(glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+            glm::quat rotationQuat = transform.transforms.getRotationQuat();
+            direction = glm::normalize(rotationQuat * glm::vec3(0, 0, -1)); // Forward vector
         }
         lightData.direction = glm::vec4(direction, lightComp.range);
         
@@ -383,6 +404,8 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
         } else {
             lightData.spotAngles = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
         }
+        
+        lightData.spotAngles.z = (uint32_t)entity;
         
         lightUbo.numLights++;
     }

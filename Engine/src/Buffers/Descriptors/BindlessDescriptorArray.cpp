@@ -322,4 +322,9 @@ void BindlessDescriptorSubAllocation::free(uint32_t index) {
     }
 }
 
+VkDescriptorSet BindlessDescriptorSubAllocation::getDescriptorSet() const
+{
+    return m_parent->getSet();
+}
+
 } // namespace Rapture 

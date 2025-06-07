@@ -74,6 +74,8 @@ namespace Rapture {
         config.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         config.capacity = 512;
         config.name = "GlobalBindlessTexturePool";
+        config.setBindingIndex = 3; // set=3
+        config.bindingIndex = 0; // binding=0
 
         BindlessDescriptorManager::init({config});
 

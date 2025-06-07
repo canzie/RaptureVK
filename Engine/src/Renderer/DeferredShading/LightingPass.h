@@ -21,7 +21,7 @@ namespace Rapture {
 
 class LightingPass {
 public:
-    LightingPass(float width, float height, uint32_t framesInFlight, std::shared_ptr<GBufferPass> gBufferPass);
+    LightingPass(float width, float height, uint32_t framesInFlight, std::shared_ptr<GBufferPass> gBufferPass, std::vector<std::shared_ptr<UniformBuffer>> shadowDataUBOs);
     ~LightingPass();
 
     FramebufferSpecification getFramebufferSpecification();
@@ -61,6 +61,7 @@ private:
 
 
     std::vector<std::shared_ptr<UniformBuffer>> m_lightUBOs;
+    std::vector<std::shared_ptr<UniformBuffer>> m_shadowDataUBOs;
     std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets; // all sets are in set 0
 
     std::shared_ptr<GBufferPass> m_gBufferPass;

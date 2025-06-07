@@ -54,6 +54,8 @@ namespace Rapture {
     m_deviceExtensions.push_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 
 
     //checkExtensionSupport();
@@ -472,20 +474,13 @@ void VulkanContext::createLogicalDevice()
     queryDescriptorIndexing.pNext = &m_descriptorIndexingFeatures;
     vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryDescriptorIndexing);
     
-    // Log descriptor indexing feature support
-    if (m_descriptorIndexingFeatures.descriptorBindingPartiallyBound) {
-        RP_CORE_INFO("Feature descriptorBindingPartiallyBound is supported and will be enabled.");
-    } else {
-        RP_CORE_WARN("Feature descriptorBindingPartiallyBound is NOT supported. Bindless textures will be limited.");
-    }
+    // Enable required descriptor indexing features
+    m_descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    m_descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+    m_descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+    m_descriptorIndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
     
-    if (m_descriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind) {
-        RP_CORE_INFO("Feature descriptorBindingSampledImageUpdateAfterBind is supported and will be enabled.");
-    } else {
-        RP_CORE_WARN("Feature descriptorBindingSampledImageUpdateAfterBind is NOT supported. Bindless textures will be limited.");
-    }
-    
-    // Chain descriptor indexing features into the creation info
+    // Chain the descriptor indexing features
     *ppNextChain = &m_descriptorIndexingFeatures;
     ppNextChain = &m_descriptorIndexingFeatures.pNext;
 
@@ -529,6 +524,8 @@ void VulkanContext::createLogicalDevice()
         RP_CORE_WARN("Feature EXT::vertexAttributeRobustness is NOT supported.");
     }
 
+
+
     // --- VK_KHR_dynamic_rendering ---
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeaturesToEnable{};
     dynamicRenderingFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
@@ -544,6 +541,25 @@ void VulkanContext::createLogicalDevice()
         ppNextChain = &dynamicRenderingFeaturesToEnable.pNext;
     } else {
         RP_CORE_WARN("Feature KHR::dynamicRendering is NOT supported.");
+    }
+
+    // --- VK_KHR_robustness2 ---
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2FeaturesToEnable{};
+    robustness2FeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
+
+    // Query specifically for this extension's features
+    VkPhysicalDeviceFeatures2 queryRobustness2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryRobustness2.pNext = &robustness2FeaturesToEnable; // Temporarily chain for querying
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryRobustness2);
+
+    if (robustness2FeaturesToEnable.nullDescriptor) {
+        RP_CORE_INFO("Feature KHR::robustness2::nullDescriptor is supported and will be enabled.");
+        // Enable null descriptor feature to handle sparse descriptor sets
+        robustness2FeaturesToEnable.nullDescriptor = VK_TRUE;
+        *ppNextChain = &robustness2FeaturesToEnable;
+        ppNextChain = &robustness2FeaturesToEnable.pNext;
+    } else {
+        RP_CORE_WARN("Feature KHR::robustness2::nullDescriptor is NOT supported.");
     }
     
     // Ensure the end of the chain is nullptr if no more features are added
@@ -591,6 +607,9 @@ void VulkanContext::createLogicalDevice()
 
     // Store vertex attribute robustness state
     m_isVertexAttributeRobustnessEnabled = attributeRobustnessFeaturesToEnable.vertexAttributeRobustness;
+
+    // Store robustness2 state
+    m_isNullDescriptorEnabled = robustness2FeaturesToEnable.nullDescriptor;
 
     // Store dynamic rendering state and load function pointers
     if (dynamicRenderingFeaturesToEnable.dynamicRendering) {

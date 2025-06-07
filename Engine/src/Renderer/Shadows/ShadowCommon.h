@@ -6,7 +6,7 @@
 
 
 #define MAX_CASCADES 4
-#define MAX_SHADOW_CASTERS 8
+#define MAX_SHADOW_CASTERS 16
 
 namespace Rapture {
 

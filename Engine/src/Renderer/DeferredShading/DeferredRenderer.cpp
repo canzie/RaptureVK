@@ -7,6 +7,7 @@
 #include "Logging/TracyProfiler.h"
 
 #include "Events/ApplicationEvents.h"
+#include "Renderer/Shadows/ShadowCommon.h"
 
 namespace Rapture {
 
@@ -32,6 +33,7 @@ namespace Rapture {
     std::shared_ptr<LightingPass> DeferredRenderer::m_lightingPass = nullptr;
     std::shared_ptr<StencilBorderPass> DeferredRenderer::m_stencilBorderPass = nullptr;
     std::vector<std::shared_ptr<UniformBuffer>> DeferredRenderer::m_cameraUBOs = {};
+    std::vector<std::shared_ptr<UniformBuffer>> DeferredRenderer::m_shadowDataUBOs = {};
     float DeferredRenderer::m_width = 0.0f;
     float DeferredRenderer::m_height = 0.0f;
     std::shared_ptr<BindlessDescriptorArray> DeferredRenderer::m_bindlessDescriptorArray = nullptr;
@@ -67,7 +69,7 @@ void DeferredRenderer::init() {
     m_lightingPass = std::make_shared<LightingPass>(
         static_cast<float>(m_swapChain->getExtent().width), 
         static_cast<float>(m_swapChain->getExtent().height), 
-        m_swapChain->getImageCount(), m_gbufferPass);
+        m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs);
 
     m_stencilBorderPass = std::make_shared<StencilBorderPass>(
         static_cast<float>(m_swapChain->getExtent().width), 
@@ -143,6 +145,7 @@ void DeferredRenderer::onSwapChainRecreated() {
     m_height = static_cast<float>(m_swapChain->getExtent().height);
 
     m_cameraUBOs.clear();
+    m_shadowDataUBOs.clear();
     createUniformBuffers(m_swapChain->getImageCount());
 
     m_commandBuffers.clear();
@@ -153,7 +156,13 @@ void DeferredRenderer::onSwapChainRecreated() {
         m_swapChain->getImageCount(),
         m_cameraUBOs
     );    
-    m_lightingPass = std::make_shared<LightingPass>(static_cast<float>(m_swapChain->getExtent().width), static_cast<float>(m_swapChain->getExtent().height), m_swapChain->getImageCount(), m_gbufferPass);
+    m_lightingPass = std::make_shared<LightingPass>(
+        static_cast<float>(m_swapChain->getExtent().width), 
+        static_cast<float>(m_swapChain->getExtent().height), 
+        m_swapChain->getImageCount(), 
+        m_gbufferPass, 
+        m_shadowDataUBOs
+    );
     m_stencilBorderPass = std::make_shared<StencilBorderPass>(
         static_cast<float>(m_swapChain->getExtent().width), 
         static_cast<float>(m_swapChain->getExtent().height), 
@@ -275,7 +284,14 @@ void DeferredRenderer::updateCameraUBOs(std::shared_ptr<Scene> activeScene, uint
 void DeferredRenderer::createUniformBuffers(uint32_t framesInFlight) {
     for (int i = 0; i < framesInFlight; i++) {
         m_cameraUBOs.push_back(std::make_shared<UniformBuffer>(sizeof(CameraUniformBufferObject), BufferUsage::STREAM, m_vmaAllocator));
+        m_shadowDataUBOs.push_back(std::make_shared<UniformBuffer>(sizeof(ShadowStorageLayout), BufferUsage::DYNAMIC, m_vmaAllocator));
+    
+        ShadowStorageLayout shadowDataLayout{};
+        shadowDataLayout.shadowCount = 0;
+        m_shadowDataUBOs[i]->addData((void*)&shadowDataLayout, sizeof(shadowDataLayout), 0);
     }
+
+    
 
 }
 
@@ -284,14 +300,38 @@ void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
     auto& registry = activeScene->getRegistry();
     auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
 
+    ShadowStorageLayout shadowDataLayout{};
+    uint32_t shadowIndex = 0;
+
     for (auto entity : lightView) {
         auto& lightComp = lightView.get<LightComponent>(entity);
         auto& transformComp = lightView.get<TransformComponent>(entity);
         auto& shadowComp = lightView.get<ShadowComponent>(entity);
 
-        if (shadowComp.shadowMap && (lightComp.hasChanged(m_currentFrame) || transformComp.hasChanged(m_currentFrame))) {
+        if (shadowComp.shadowMap) {
             shadowComp.shadowMap->updateViewMatrix(lightComp, transformComp);
+            
+
+            // Always populate shadow data for existing shadow maps
+            ShadowBufferData shadowBufferData{};
+            shadowBufferData.type = static_cast<int>(lightComp.type);
+            shadowBufferData.cascadeCount = 1;
+            shadowBufferData.lightIndex = (uint32_t)entity;
+            shadowBufferData.textureHandle = shadowComp.shadowMap->getTextureHandle();
+            shadowBufferData.cascadeMatrices[0] = shadowComp.shadowMap->getLightViewProjection();
+            shadowBufferData.cascadeSplitsViewSpace[0] = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+
+            // Store in the array
+            shadowDataLayout.shadowData[shadowIndex] = shadowBufferData;
+            shadowIndex++;
         }
+    }
+
+    shadowDataLayout.shadowCount = shadowIndex;
+
+    // Update all shadow data UBOs
+    for (int i = 0; i < m_swapChain->getImageCount(); i++) {
+        m_shadowDataUBOs[i]->addData((void*)&shadowDataLayout, sizeof(shadowDataLayout), 0);
     }
 }
 }

@@ -18,7 +18,7 @@ struct PushConstants {
 std::unique_ptr<BindlessDescriptorSubAllocation> ShadowMap::s_bindlessShadowMaps = nullptr;
 
 ShadowMap::ShadowMap(float width, float height, std::shared_ptr<BindlessDescriptorArray> bindlessShadowMaps)
-    : m_width(width), m_height(height), m_shadowMapIndex(UINT32_MAX) {
+    : m_width(width), m_height(height), m_shadowMapIndex(UINT32_MAX), m_lightViewProjection(glm::mat4(1.0f)) {
 
     if (s_bindlessShadowMaps == nullptr) {
         s_bindlessShadowMaps = bindlessShadowMaps->createSubAllocation(64, "Bindless Shadow Map Descriptor Array Sub-Allocation");
@@ -42,7 +42,7 @@ ShadowMap::ShadowMap(float width, float height, std::shared_ptr<BindlessDescript
 }
 
 ShadowMap::ShadowMap(float width, float height) 
-    : m_width(width), m_height(height), m_shadowMapIndex(UINT32_MAX) {
+    : m_width(width), m_height(height), m_shadowMapIndex(UINT32_MAX), m_lightViewProjection(glm::mat4(1.0f)) {
 
     if (s_bindlessShadowMaps == nullptr) {
         auto bindlessDescriptorArray = BindlessDescriptorManager::getPool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -81,7 +81,7 @@ void ShadowMap::createUniformBuffers() {
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
         m_shadowUBOs[i] = std::make_shared<UniformBuffer>(
             sizeof(ShadowMapData),
-            BufferUsage::DYNAMIC,
+            BufferUsage::STREAM,
             m_allocator
         );
     }
@@ -190,53 +190,75 @@ void ShadowMap::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> 
 void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const TransformComponent& transformComp) {
     RAPTURE_PROFILE_FUNCTION();
 
-
     ShadowMapData shadowMapData;
 
     glm::vec3 lightPosition = transformComp.translation();
     glm::vec3 lightDirection;
+    glm::mat4 lightProj;
+
+        // Calculate light direction based on light type
+    if (lightComp.type == LightType::Directional || lightComp.type == LightType::Spot) {
+        // Calculate light direction from rotation
+        glm::quat rotationQuat = transformComp.transforms.getRotationQuat();
+        lightDirection = glm::normalize(rotationQuat * glm::vec3(0, 0, -1)); // Forward vector
+    } 
+    else {
+        // Point light - use default direction
+        lightDirection = glm::vec3(0.0f, -1.0f, 0.0f); // Down direction
+    }
+
+    // Calculate light view matrix
+    glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    if (abs(glm::dot(lightDirection, lightUp)) > 0.99f) {
+        // If light is pointing directly up or down, use a different up vector
+        lightUp = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
     
-    // Get light direction based on the transform rotation
-    glm::vec3 eulerAngles = transformComp.rotation();
-    lightDirection.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-    lightDirection.y = sin(glm::radians(eulerAngles.x));
-    lightDirection.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-    lightDirection = glm::normalize(lightDirection);
-    
-    // Create view matrix (lookAt from light position toward light direction)
+    // Create the light's view matrix
     glm::mat4 viewMatrix = glm::lookAt(
-        lightPosition,
-        lightPosition + lightDirection, 
-        glm::vec3(0.0f, 1.0f, 0.0f)
+        lightPosition,               // Light position
+        lightPosition + lightDirection,    // Look at center (Point along the light direction)
+        lightUp                 // Up vector
     );
     
-    // Create projection matrix based on light type
-    glm::mat4 projMatrix;
-    
     if (lightComp.type == LightType::Directional) {
-        // Orthographic projection for directional lights
-        float orthoSize = 20.0f; // This should be adjusted based on scene size
-        projMatrix = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 0.1f, 100.0f);
+
+
+    } else {
+        // Perspective projection for spot/point light
+        float aspect = 1.0f; // Shadow map is square
+        
+        if (lightComp.type == LightType::Spot) {
+            // For spotlights, use more aggressive near plane scaling
+            float nearPlane = glm::max(0.1f, lightComp.range * 0.001f); // Much closer near plane
+            float farPlane = lightComp.range * 1.2f; // Extend beyond light range for better coverage
+            
+            // Use slightly wider angle for shadows to avoid edge artifacts
+            float shadowConeAngle = lightComp.outerConeAngle * 1.1f; // 10% wider angle for shadows
+            float fovRadians = glm::max(shadowConeAngle * 2.0f, glm::radians(5.0f));
+            
+            lightProj = glm::perspective(fovRadians, aspect, nearPlane, farPlane);
+        } else {
+            // Point light settings (default)
+            float nearPlane = 0.1f;
+            lightProj = glm::perspective(glm::radians(90.0f), aspect, nearPlane, lightComp.range);
+        }
     }
-    else if (lightComp.type == LightType::Spot) {
-        // Perspective projection for spot lights
-        float aspectRatio = m_width / m_height;
-        float fov = 2.0f * lightComp.outerConeAngle;
-        projMatrix = glm::perspective(fov, aspectRatio, 0.1f, lightComp.range);
-    }
-    else { // Point light
-        // Use perspective projection for each face if implementing point light shadows
-        // For now, use a simple perspective projection
-        float aspectRatio = m_width / m_height;
-        projMatrix = glm::perspective(glm::radians(90.0f), aspectRatio, 0.1f, lightComp.range);
-    }
+
     
+    // Update the frustum for culling using the original matrices (before Vulkan fix)
+    m_frustum.update(lightProj, viewMatrix);
+    
+    // Apply Vulkan coordinate system fix for Y-axis after frustum update
+    lightProj[1][1] *= -1;
+
     // Store the light's view-projection matrix
-    shadowMapData.lightViewProjection = projMatrix * viewMatrix;
+    shadowMapData.lightViewProjection = lightProj * viewMatrix;
+    m_lightViewProjection = shadowMapData.lightViewProjection;
     
-    // Update the frustum for culling
-    m_frustum.update(projMatrix, viewMatrix);
+
     
+
     // Update all UBOs with the new projection matrix
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
         m_shadowUBOs[i]->addData(&shadowMapData, sizeof(ShadowMapData), 0);
@@ -412,7 +434,7 @@ void ShadowMap::createPipeline() {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;  // Use front face culling for shadow mapping
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_TRUE;  // Enable depth bias
     rasterizer.depthBiasConstantFactor = 2.0f;  // Adjust these values based on your needs
@@ -488,6 +510,7 @@ void ShadowMap::createShadowTexture() {
     spec.type = TextureType::TEXTURE2D;
     spec.wrap = TextureWrap::ClampToEdge;
     spec.srgb = false;
+    spec.shadowComparison = true; // Enable shadow comparison sampling
 
     m_shadowTexture = std::make_shared<Texture>(spec);
 

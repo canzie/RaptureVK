@@ -367,7 +367,7 @@ struct LightData {
     alignas(16) glm::vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)
     alignas(16) glm::vec4 direction;     // w = range
     alignas(16) glm::vec4 color;         // w = intensity
-    alignas(16) glm::vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = unused, w = unused
+    alignas(16) glm::vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = entity id, w = unused
 };
 
 // Light uniform buffer object (binding 1)

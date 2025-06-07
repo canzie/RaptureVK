@@ -56,6 +56,7 @@ public:
     uint32_t getCapacity() const { return m_capacity; }
     uint32_t getStartIndex() const { return m_startIndex; }
 
+    VkDescriptorSet getDescriptorSet() const;
 
 private:
     BindlessDescriptorArray* m_parent;

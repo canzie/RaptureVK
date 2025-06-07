@@ -42,6 +42,12 @@ public:
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTexture; }
 
+    uint32_t getTextureHandle() const { return m_shadowMapIndex; }
+
+    glm::mat4 getLightViewProjection() const { return m_lightViewProjection; }
+
+    static BindlessDescriptorSubAllocation* getBindlessShadowMaps() { return s_bindlessShadowMaps.get(); }
+
 private:
     void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
     void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
@@ -52,6 +58,8 @@ private:
     float m_height;
     uint32_t m_currentFrame = 0;
     uint32_t m_framesInFlight = 3; // Default, will be updated
+
+    glm::mat4 m_lightViewProjection;
 
     std::shared_ptr<Texture> m_shadowTexture;
     std::shared_ptr<GraphicsPipeline> m_pipeline;

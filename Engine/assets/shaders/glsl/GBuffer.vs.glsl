@@ -3,7 +3,7 @@
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
-layout(location = 3) in vec3 aTangent;
+layout(location = 3) in vec4 aTangent;
 
 layout(location = 0) out vec4 outFragPosDepth;
 layout(location = 1) out vec3 outNormal;
@@ -31,14 +31,17 @@ void main() {
     // Transform to world space
     outFragPosDepth.xyz = vec3(pushConstants.model * vec4(aPosition, 1.0));
     outNormal = normalize(mat3(pushConstants.model) * aNormal);
-    outTangent = normalize(mat3(pushConstants.model) * aTangent);
-    outBitangent = normalize(mat3(pushConstants.model) * cross(aNormal, aTangent));
+    outTangent = normalize(mat3(pushConstants.model) * aTangent.xyz);
+    
+    // Calculate bitangent using glTF convention with handedness from tangent.w
+    vec3 bitangent = cross(aNormal, aTangent.xyz) * aTangent.w;
+    outBitangent = normalize(mat3(pushConstants.model) * bitangent);
     
 
     // Re-orthogonalize tangent with respect to normal
     outTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
-    // Recalculate bitangent to ensure orthogonal basis
-    outBitangent = cross(outNormal, outTangent);
+    // Recalculate bitangent to ensure orthogonal basis, preserving handedness
+    outBitangent = cross(outNormal, outTangent) * sign(dot(outBitangent, cross(outNormal, outTangent)));
 
 
     outTexCoord = aTexCoord;

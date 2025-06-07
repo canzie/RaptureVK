@@ -26,8 +26,16 @@ Sampler::Sampler(const TextureSpecification& spec) {
     samplerInfo.maxAnisotropy = 16.0f; // Could be made configurable
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    
+    // Enable shadow comparison for depth textures when requested
+    if (spec.shadowComparison && isDepthFormat(spec.format)) {
+        samplerInfo.compareEnable = VK_TRUE;
+        samplerInfo.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL; // Standard depth comparison
+    } else {
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    }
+    
     samplerInfo.mipmapMode = toVkSamplerMipmapMode(spec.filter);
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.minLod = 0.0f;
@@ -161,7 +169,7 @@ void Texture::createSpecificationFromImageFile(const std::string& path, TextureF
     // Set default values for other properties
     m_spec.filter = TextureFilter::Linear;
     m_spec.wrap = TextureWrap::Repeat;
-    m_spec.srgb = true; // Assume sRGB for color textures
+    m_spec.srgb = false; // Assume sRGB for color textures
     m_spec.mipLevels = 1; // No mipmapping for now
 }
 
@@ -501,13 +509,14 @@ void Texture::createImageView() {
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
 
+
     if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageView) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create texture image view!");
         throw std::runtime_error("Failed to create texture image view!");
     }
 
     // Create additional views for depth-stencil formats
-    if (isDepthFormat(m_spec.format) && hasStencilComponent(m_spec.format)) {
+    if (isDepthFormat(m_spec.format)) {
 
         // Create depth-only view
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -519,7 +528,8 @@ void Texture::createImageView() {
             RP_CORE_ERROR("Failed to create depth-only image view!");
             throw std::runtime_error("Failed to create depth-only image view!");
         }
-
+    }
+    if (hasStencilComponent(m_spec.format)) {
         // Create stencil-only view
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
         // Force R,G,B to stencil value (usually read into R), and Alpha to ONE for stencil view.

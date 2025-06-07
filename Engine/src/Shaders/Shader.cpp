@@ -2,6 +2,7 @@
 
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
+#include "Buffers/Descriptors/BindlessDescriptorManager.h"
 
 #include <fstream>
 
@@ -197,6 +198,51 @@ void Shader::createDescriptorSetLayout()
     // Create a new layout for each descriptor set
     for (const auto& setInfo : m_descriptorSetInfos) {
         createDescriptorSetLayoutFromInfo(setInfo);
+    }
+
+    // Check if shader actually uses set 3 for bindless descriptors
+    bool hasSet3 = false;
+    for (const auto& setInfo : m_descriptorSetInfos) {
+        if (setInfo.setNumber == 3) {
+            hasSet3 = true;
+            break;
+        }
+    }
+    
+    // If shader uses set 3, ensure intermediate sets have dummy layouts and set 3 has bindless layout
+    if (hasSet3) {
+        auto bindlessDescriptorArray = BindlessDescriptorManager::getPool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        if (bindlessDescriptorArray) {
+            Application& app = Application::getInstance();
+            VkDevice device = app.getVulkanContext().getLogicalDevice();
+            
+            // Ensure we have at least 4 slots for sets 0, 1, 2, 3
+            if (m_descriptorSetLayouts.size() <= 3) {
+                m_descriptorSetLayouts.resize(4, VK_NULL_HANDLE);
+            }
+            
+            // Create empty layouts for any missing intermediate sets (1, 2)
+            for (size_t i = 0; i < 3; ++i) {
+                if (m_descriptorSetLayouts[i] == VK_NULL_HANDLE) {
+                    VkDescriptorSetLayoutCreateInfo emptyLayoutInfo{};
+                    emptyLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                    emptyLayoutInfo.bindingCount = 0;
+                    emptyLayoutInfo.pBindings = nullptr;
+                    
+                    VkDescriptorSetLayout emptyLayout;
+                    if (vkCreateDescriptorSetLayout(device, &emptyLayoutInfo, nullptr, &emptyLayout) == VK_SUCCESS) {
+                        m_descriptorSetLayouts[i] = emptyLayout;
+                        RP_CORE_INFO("Created empty descriptor set layout for intermediate set {}", i);
+                    } else {
+                        RP_CORE_ERROR("Failed to create empty descriptor set layout for set {}", i);
+                    }
+                }
+            }
+            
+            // Now set the bindless layout for set 3 (overriding any existing layout)
+            m_descriptorSetLayouts[3] = bindlessDescriptorArray->getLayout();
+            RP_CORE_INFO("Set bindless descriptor set layout for set 3");
+        }
     }
 
     if (m_descriptorSetLayouts.empty()) {
