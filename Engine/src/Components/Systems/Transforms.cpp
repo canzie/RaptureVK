@@ -128,6 +128,8 @@ void Transforms::recalculateTransform()
 }
 
 
+// extract the translation, rotation, and scale from the transform matrix
+// this updates the translation, rotation, and scale variables
 void Transforms::decomposeTransform()
 {
     // 1. Extract translation directly - always accurate and efficient

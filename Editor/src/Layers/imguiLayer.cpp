@@ -13,6 +13,9 @@
 #include "../imguiPanels/imguiPanelStyleLinear.h"
 #include "Logging/TracyProfiler.h"
 
+#include "vendor/ImGuizmo/ImGuizmo.h"
+
+
 static void check_vk_result(VkResult err)
 {
     if (err == VK_SUCCESS)
@@ -266,6 +269,7 @@ void ImGuiLayer::onUpdate(float ts)
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    ImGuizmo::BeginFrame();
 
     // Acquire next swapchain image
     int imageIndexi = swapChain->acquireImage(m_currentFrame);
