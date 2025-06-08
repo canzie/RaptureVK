@@ -90,8 +90,8 @@ namespace Rapture {
         auto& vulkanContext = app.getVulkanContext();
     
         auto queue = vulkanContext.getGraphicsQueue();
-        queue->addCommandBuffer(commandBuffer);
-        queue->submitCommandBuffers(VK_NULL_HANDLE);
+        //queue->addCommandBuffer(commandBuffer);
+        queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
         queue->waitIdle();
         
     }

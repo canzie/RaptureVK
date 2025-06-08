@@ -413,7 +413,6 @@ void Texture::copyFromImage(
     commandBuffer->end();
 
     // Submit the command buffer
-    graphicsQueue->addCommandBuffer(commandBuffer);
     VkSubmitInfo submitInfo{};
     if (waitSemaphore != VK_NULL_HANDLE) {
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -426,8 +425,9 @@ void Texture::copyFromImage(
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = &signalSemaphore;
     }
+    //graphicsQueue->addCommandBuffer(commandBuffer);
 
-    graphicsQueue->submitCommandBuffers(submitInfo, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer, submitInfo, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
 }
 
@@ -709,14 +709,14 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
     commandBuffer->end();
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
-    submitInfo.pCommandBuffers = &commandBufferVk;
+    //VkSubmitInfo submitInfo{};
+    //submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    //submitInfo.commandBufferCount = 1;
+    //VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
+    //submitInfo.pCommandBuffers = &commandBufferVk;
     
-    graphicsQueue->addCommandBuffer(commandBuffer);
-    graphicsQueue->submitCommandBuffers(VK_NULL_HANDLE);
+    //graphicsQueue->addCommandBuffer(commandBuffer);
+    graphicsQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
     
 
@@ -762,16 +762,16 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
 
     commandBuffer->end();
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
-    submitInfo.pCommandBuffers = &commandBufferVk;
+    //VkSubmitInfo submitInfo{};
+    //submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    //submitInfo.commandBufferCount = 1;
+    //VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
+    //submitInfo.pCommandBuffers = &commandBufferVk;
 
     
     auto& vulkanContext = app.getVulkanContext();
-    queue->addCommandBuffer(commandBuffer);
-    queue->submitCommandBuffers(VK_NULL_HANDLE);
+    //queue->addCommandBuffer(commandBuffer);
+    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     queue->waitIdle();
 
 }

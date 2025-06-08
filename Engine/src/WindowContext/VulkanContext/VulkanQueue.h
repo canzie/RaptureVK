@@ -15,6 +15,8 @@ namespace Rapture
 
         void submitCommandBuffers(VkFence fence = nullptr);
         void submitCommandBuffers(VkSubmitInfo& submitInfo, VkFence fence = nullptr);
+        void submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSubmitInfo& submitInfo, VkFence fence = nullptr);
+        void submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFence fence = nullptr);
 
         void addCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer);
         void waitIdle(); 
