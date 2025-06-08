@@ -38,7 +38,7 @@ public:
                             std::shared_ptr<Scene> activeScene, 
                             uint32_t currentFrame);
     
-    void updateViewMatrix(const LightComponent& lightComp, const TransformComponent& transformComp);
+    void updateViewMatrix(const LightComponent& lightComp, const TransformComponent& transformComp, const glm::vec3& cameraPosition);
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTexture; }
 

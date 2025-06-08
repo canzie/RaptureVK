@@ -192,11 +192,12 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     
     // Transform to [0,1] range (NDC -> UV coordinates for texture lookup)
-    projCoords = projCoords * 0.5 + 0.5;
+    // In Vulkan, projCoords.z is already in the [0, 1] range.
+    projCoords.xy = projCoords.xy * 0.5 + 0.5;
     
     // Check if fragment is outside the light's view frustum [0, 1] range
     if(projCoords.x < 0.0 || projCoords.x > 1.0 || 
-       projCoords.y < 0.0 || projCoords.y > 1.0 || 
+       projCoords.y < 0.0 || projCoords.y > 1.0 ||
        projCoords.z < 0.0 || projCoords.z > 1.0) { // Check Z too
         return 1.0; // Outside frustum = Not shadowed (fully lit)
     }
@@ -303,6 +304,11 @@ void main() {
             attenuation = calculateAttenuation(lightPos, fragPos, lightRange);
             
         }
+        else if (abs(lightType - 1.0) < 0.1) { // Directional light
+           // Directional light: direction is constant, coming FROM the specified direction
+            lightDirWorld = normalize(-light.direction.xyz); // Negate to get vector towards light source
+            attenuation = 1.0; // No distance attenuation
+        }
         else if (abs(lightType - 2.0) < 0.1) { // Spot light
             lightDirWorld = normalize(lightPos - fragPos); 
             attenuation = calculateAttenuation(lightPos, fragPos, lightRange);
@@ -315,11 +321,6 @@ void main() {
                 light.spotAngles.y
             );
             
-        }
-        else if (abs(lightType - 1.0) < 0.1) { // Directional light
-           // Directional light: direction is constant, coming FROM the specified direction
-            lightDirWorld = normalize(-light.direction.xyz); // Negate to get vector towards light source
-            attenuation = 1.0; // No distance attenuation
         }
         else {
             // Unknown light type, skip

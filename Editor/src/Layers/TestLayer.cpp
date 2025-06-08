@@ -101,6 +101,20 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     light1.addComponent<Rapture::ShadowComponent>(2048, 2048);
 
+    // Light 2: A blue-tinted light to the left side
+    Rapture::Entity sunLight = activeScene->createEntity("Sun");
+    sunLight.addComponent<Rapture::TransformComponent>(
+        glm::vec3(-2.0f, 0.5f, -3.0f), // Position to the left of the sphere, same Z coordinate
+        glm::vec3(-1.504f, 0.0f, 0.0f),               // No rotation needed for point light
+        glm::vec3(0.2f)                // Small scale to make the cube compact
+    );
+
+    sunLight.addComponent<Rapture::LightComponent>(
+        glm::vec3(1.0f, 1.0f, 1.0f),  // Pure white color
+        1.2f                         // High intensity
+    );
+    sunLight.addComponent<Rapture::ShadowComponent>(2048, 2048);
+
 
     Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
 }

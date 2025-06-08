@@ -187,14 +187,14 @@ void ShadowMap::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> 
     );
 }
 
-void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const TransformComponent& transformComp) {
+void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const TransformComponent& transformComp, const glm::vec3& cameraPosition) {
     RAPTURE_PROFILE_FUNCTION();
 
     ShadowMapData shadowMapData;
 
     glm::vec3 lightPosition = transformComp.translation();
-    glm::vec3 lightDirection;
-    glm::mat4 lightProj;
+    glm::vec3 lightDirection = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::mat4 lightProj = glm::mat4(1.0f);
 
         // Calculate light direction based on light type
     if (lightComp.type == LightType::Directional || lightComp.type == LightType::Spot) {
@@ -204,7 +204,7 @@ void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const Transfor
     } 
     else {
         // Point light - use default direction
-        lightDirection = glm::vec3(0.0f, -1.0f, 0.0f); // Down direction
+        lightDirection = glm::vec3(0.0f, 1.0f, 0.0f); // Down direction
     }
 
     // Calculate light view matrix
@@ -222,6 +222,27 @@ void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const Transfor
     );
     
     if (lightComp.type == LightType::Directional) {
+        // For directional lights, center the shadow map around the camera's XZ position  
+        glm::vec3 sceneCenter = glm::vec3(0.0f);
+        
+        float sceneBounds = 100.0f;
+
+        // Position the light based on scene center and direction
+        glm::vec3 shadowCamPos = lightPosition;
+        shadowCamPos.y = sceneBounds;
+        shadowCamPos += lightDirection*10.0f;
+
+        // Create view matrix centered on the scene, not on the light entity
+        viewMatrix = glm::lookAt(
+            shadowCamPos,          // Position light relative to scene center
+            sceneCenter,           // Look at scene center
+            lightUp                // Up vector
+        );
+        
+        // Use appropriate size for your scene
+        float orthoSize = sceneBounds * 0.5f;
+        // Use near/far planes that encompass your entire scene
+        lightProj = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, sceneBounds*1.5f);
 
 
     } else {

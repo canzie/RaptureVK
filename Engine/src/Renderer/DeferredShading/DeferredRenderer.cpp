@@ -300,6 +300,16 @@ void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
     auto& registry = activeScene->getRegistry();
     auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
 
+    auto camera = activeScene->getSettings().mainCamera;
+    auto cameraTransform = camera->tryGetComponent<TransformComponent>();
+    glm::vec3 cameraPosition = glm::vec3(0.0f);
+    if (cameraTransform) {
+        cameraPosition = cameraTransform->translation();
+    } else {
+        RP_CORE_WARN("No camera found in scene, using default position");
+    }
+
+
     ShadowStorageLayout shadowDataLayout{};
     uint32_t shadowIndex = 0;
 
@@ -309,7 +319,7 @@ void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
         auto& shadowComp = lightView.get<ShadowComponent>(entity);
 
         if (shadowComp.shadowMap) {
-            shadowComp.shadowMap->updateViewMatrix(lightComp, transformComp);
+            shadowComp.shadowMap->updateViewMatrix(lightComp, transformComp, cameraPosition);
             
 
             // Always populate shadow data for existing shadow maps

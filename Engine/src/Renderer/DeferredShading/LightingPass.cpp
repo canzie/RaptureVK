@@ -338,7 +338,7 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
     }
 
     auto& registry = activeScene->getRegistry();
-    auto lightView = registry.view<TransformComponent, LightComponent, TagComponent>();
+    auto lightView = registry.view<TransformComponent, LightComponent>();
     
     // Check if any lights or transforms have changed
     bool lightsChanged = m_lightsChanged;
@@ -346,7 +346,6 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
     for (auto entity : lightView) {
         auto& transform = lightView.get<TransformComponent>(entity);
         auto& lightComp = lightView.get<LightComponent>(entity);
-        auto& tagComp = lightView.get<TagComponent>(entity);
         
 
         if (true) { // to force true for testing
