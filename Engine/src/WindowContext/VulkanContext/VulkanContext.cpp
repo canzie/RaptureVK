@@ -56,6 +56,12 @@ namespace Rapture {
     m_deviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    
+    // Ray tracing extensions
+    m_deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
 
 
     //checkExtensionSupport();
@@ -389,7 +395,6 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-
     int i = 0;
     for (const auto& queueFamily : queueFamilies) {
         if (indices.isComplete()) {
@@ -399,8 +404,13 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             indices.graphicsFamily = i;
         }
+        
+        // Prefer a compute queue that also supports graphics for easier synchronization
         if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-            indices.computeFamily = i;
+            if (!indices.computeFamily.has_value() || 
+                (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+                indices.computeFamily = i;
+            }
         }
 
         VkBool32 presentSupport = false;
@@ -410,13 +420,10 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
             indices.presentFamily = i;
         }
 
-
         i++;
     }
 
-
     return indices;
-    
 }
 
 void VulkanContext::createLogicalDevice()
@@ -425,6 +432,11 @@ void VulkanContext::createLogicalDevice()
     QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+    
+    // Add compute queue family if it's different from graphics/present
+    if (indices.computeFamily.has_value()) {
+        uniqueQueueFamilies.insert(indices.computeFamily.value());
+    }
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
@@ -561,6 +573,60 @@ void VulkanContext::createLogicalDevice()
     } else {
         RP_CORE_WARN("Feature KHR::robustness2::nullDescriptor is NOT supported.");
     }
+
+    // --- Ray Tracing Features ---
+    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddressFeaturesToEnable{};
+    bufferDeviceAddressFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
+    
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeaturesToEnable{};
+    accelerationStructureFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeaturesToEnable{};
+    rayTracingPipelineFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+
+    // Query buffer device address features
+    VkPhysicalDeviceFeatures2 queryBufferDeviceAddress = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryBufferDeviceAddress.pNext = &bufferDeviceAddressFeaturesToEnable;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryBufferDeviceAddress);
+
+    // Query acceleration structure features
+    VkPhysicalDeviceFeatures2 queryAccelerationStructure = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryAccelerationStructure.pNext = &accelerationStructureFeaturesToEnable;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryAccelerationStructure);
+
+    // Query ray tracing pipeline features
+    VkPhysicalDeviceFeatures2 queryRayTracingPipeline = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryRayTracingPipeline.pNext = &rayTracingPipelineFeaturesToEnable;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryRayTracingPipeline);
+
+    // Enable ray tracing features if supported
+    bool rayTracingSupported = bufferDeviceAddressFeaturesToEnable.bufferDeviceAddress &&
+                              accelerationStructureFeaturesToEnable.accelerationStructure &&
+                              rayTracingPipelineFeaturesToEnable.rayTracingPipeline;
+
+    if (rayTracingSupported) {
+        RP_CORE_INFO("Ray tracing is supported and will be enabled.");
+        
+        // Enable buffer device address
+        bufferDeviceAddressFeaturesToEnable.bufferDeviceAddress = VK_TRUE;
+        *ppNextChain = &bufferDeviceAddressFeaturesToEnable;
+        ppNextChain = &bufferDeviceAddressFeaturesToEnable.pNext;
+        
+        // Enable acceleration structure
+        accelerationStructureFeaturesToEnable.accelerationStructure = VK_TRUE;
+        *ppNextChain = &accelerationStructureFeaturesToEnable;
+        ppNextChain = &accelerationStructureFeaturesToEnable.pNext;
+        
+        // Enable ray tracing pipeline
+        rayTracingPipelineFeaturesToEnable.rayTracingPipeline = VK_TRUE;
+        *ppNextChain = &rayTracingPipelineFeaturesToEnable;
+        ppNextChain = &rayTracingPipelineFeaturesToEnable.pNext;
+        
+        m_isRayTracingEnabled = true;
+    } else {
+        RP_CORE_WARN("Ray tracing is NOT supported on this device.");
+        m_isRayTracingEnabled = false;
+    }
     
     // Ensure the end of the chain is nullptr if no more features are added
     *ppNextChain = nullptr;
@@ -626,6 +692,47 @@ void VulkanContext::createLogicalDevice()
         m_isDynamicRenderingEnabled = false;
     }
 
+    // Load ray tracing function pointers and query properties
+    if (m_isRayTracingEnabled) {
+        // Load acceleration structure function pointers
+        vkCreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)vkGetDeviceProcAddr(m_device, "vkCreateAccelerationStructureKHR");
+        vkDestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)vkGetDeviceProcAddr(m_device, "vkDestroyAccelerationStructureKHR");
+        vkGetAccelerationStructureBuildSizesKHR = (PFN_vkGetAccelerationStructureBuildSizesKHR)vkGetDeviceProcAddr(m_device, "vkGetAccelerationStructureBuildSizesKHR");
+        vkCmdBuildAccelerationStructuresKHR = (PFN_vkCmdBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(m_device, "vkCmdBuildAccelerationStructuresKHR");
+        vkGetAccelerationStructureDeviceAddressKHR = (PFN_vkGetAccelerationStructureDeviceAddressKHR)vkGetDeviceProcAddr(m_device, "vkGetAccelerationStructureDeviceAddressKHR");
+
+        // Load ray tracing pipeline function pointers
+        vkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr(m_device, "vkCreateRayTracingPipelinesKHR");
+        vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)vkGetDeviceProcAddr(m_device, "vkGetRayTracingShaderGroupHandlesKHR");
+        vkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr(m_device, "vkCmdTraceRaysKHR");
+
+        // Verify all function pointers were loaded successfully
+        if (!vkCreateAccelerationStructureKHR || !vkDestroyAccelerationStructureKHR || 
+            !vkGetAccelerationStructureBuildSizesKHR || !vkCmdBuildAccelerationStructuresKHR ||
+            !vkGetAccelerationStructureDeviceAddressKHR || !vkCreateRayTracingPipelinesKHR ||
+            !vkGetRayTracingShaderGroupHandlesKHR || !vkCmdTraceRaysKHR) {
+            RP_CORE_ERROR("Failed to load some ray tracing function pointers!");
+            m_isRayTracingEnabled = false;
+        } else {
+            RP_CORE_INFO("Successfully loaded all ray tracing function pointers.");
+            
+            // Query ray tracing properties
+            m_rayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+            m_accelerationStructureProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
+            
+            VkPhysicalDeviceProperties2 deviceProperties2{};
+            deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+            deviceProperties2.pNext = &m_rayTracingPipelineProperties;
+            m_rayTracingPipelineProperties.pNext = &m_accelerationStructureProperties;
+            
+            vkGetPhysicalDeviceProperties2(m_physicalDevice, &deviceProperties2);
+            
+            RP_CORE_INFO("Ray tracing properties queried successfully.");
+            RP_CORE_INFO("  Max ray recursion depth: {}", m_rayTracingPipelineProperties.maxRayRecursionDepth);
+            RP_CORE_INFO("  Shader group handle size: {}", m_rayTracingPipelineProperties.shaderGroupHandleSize);
+        }
+    }
+
     // retrieve queues
     if (indices.graphicsFamily.value() == indices.presentFamily.value()) {
         // If graphics and present queues are from the same family, use the same instance
@@ -641,7 +748,19 @@ void VulkanContext::createLogicalDevice()
         m_presentQueueIndex = indices.presentFamily.value();
     }
 
-    m_computeQueueIndex = -1;
+    // Create compute queue
+    if (indices.computeFamily.has_value()) {
+        // Check if compute queue family is different from already created queues
+        if (m_queues.find(indices.computeFamily.value()) == m_queues.end()) {
+            m_queues[indices.computeFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.computeFamily.value());
+        }
+        m_computeQueueIndex = indices.computeFamily.value();
+        RP_CORE_INFO("Compute queue created using family index: {}", indices.computeFamily.value());
+    } else {
+        m_computeQueueIndex = -1;
+        RP_CORE_WARN("No compute queue family found!");
+    }
+
     m_transferQueueIndex = -1;
 
     RP_CORE_INFO("Logical device created successfully!");
@@ -704,6 +823,7 @@ void VulkanContext::createVmaAllocator()
 
     RP_CORE_INFO("Creating VMA allocator create info...");
     VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     allocatorInfo.physicalDevice = m_physicalDevice;
     allocatorInfo.device = m_device;
     allocatorInfo.instance = m_instance;

@@ -46,6 +46,9 @@ public:
     // Get descriptor image info for use in descriptor sets
     VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType=TextureViewType::DEFAULT) const;
     
+    // Get descriptor image info for storage images (used in compute shaders)
+    VkDescriptorImageInfo getStorageImageDescriptorInfo() const;
+    
     // Static method to create a default white texture
     static std::shared_ptr<Texture> createDefaultWhiteTexture();
 

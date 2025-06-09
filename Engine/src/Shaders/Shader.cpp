@@ -3,6 +3,7 @@
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
 #include "Buffers/Descriptors/BindlessDescriptorManager.h"
+#include "ShaderReflections.h"
 
 #include <fstream>
 
@@ -24,6 +25,12 @@ Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::p
 
 Shader::Shader(const std::filesystem::path &computePath)
 {
+    createComputeShader(computePath);
+    createDescriptorSetLayout();
+    
+    // Test SPIRV-Reflect library by reflecting on our shaders
+    RP_CORE_INFO("Testing SPIRV-Reflect functionality for compute shader:");
+    printDescriptorSetInfos(m_descriptorSetInfos);
 }
 
 Shader::~Shader() {
@@ -128,7 +135,18 @@ void Shader::createGraphicsShader(const std::filesystem::path &vertexPath) {
 void Shader::createComputeShader(const std::filesystem::path &computePath) {
     std::vector<char> computeCode = readFile(computePath);
 
+    // Collect descriptor information before creating shader modules
+    m_descriptorSetInfos = collectDescriptorSetInfo({}, computeCode);
+
     createShaderModule(computeCode, ShaderType::COMPUTE);
+
+    // Extract push constants
+    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{computeCode, VK_SHADER_STAGE_COMPUTE_BIT}});
+    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Print push constant reflection data
+    RP_CORE_INFO("Compute Shader Push Constant Reflection Data:");
+    printPushConstantLayouts(pushConstantInfos);
 
     VkPipelineShaderStageCreateInfo computeShaderStageInfo{};
     computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -138,7 +156,6 @@ void Shader::createComputeShader(const std::filesystem::path &computePath) {
     computeShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
 
     m_stages.push_back(computeShaderStageInfo);
-    
 }
 
 void Shader::createShaderModule(const std::vector<char>& code, ShaderType type) {
@@ -349,10 +366,19 @@ std::vector<DescriptorSetInfo> Shader::collectDescriptorSetInfo(
         spvReflectDestroyShaderModule(&module);
     };
 
-    // Process both shader stages
-    processShaderModule(vertexSpirv, VK_SHADER_STAGE_VERTEX_BIT);
+    // Process shader stages
+    if (!vertexSpirv.empty()) {
+        processShaderModule(vertexSpirv, VK_SHADER_STAGE_VERTEX_BIT);
+    }
+
     if (!fragmentSpirv.empty()) {
-        processShaderModule(fragmentSpirv, VK_SHADER_STAGE_FRAGMENT_BIT);
+        if (vertexSpirv.empty()) {
+            // This is a compute shader (compute code passed as fragmentSpirv)
+            processShaderModule(fragmentSpirv, VK_SHADER_STAGE_COMPUTE_BIT);
+        } else {
+            // This is a fragment shader
+            processShaderModule(fragmentSpirv, VK_SHADER_STAGE_FRAGMENT_BIT);
+        }
     }
 
     // Convert map to vector, sorted by set number

@@ -20,15 +20,16 @@ VertexBuffer::~VertexBuffer(){
 VkBufferUsageFlags VertexBuffer::getBufferUsage() {
     switch (m_usage) {
         case BufferUsage::STATIC:
-            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
+                   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
         case BufferUsage::DYNAMIC:
-            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         case BufferUsage::STREAM:
-            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         case BufferUsage::STAGING:
             return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
-    return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; // fallback}
+    return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; // fallback
 
 }
 

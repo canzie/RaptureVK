@@ -50,4 +50,51 @@ namespace Rapture {
         }
         */
     }
-} 
+
+
+    void Scene::registerBLAS(Entity& entity) {
+
+        if (!m_tlas) {
+            m_tlas = std::make_unique<TLAS>();
+        }
+
+        auto [blas, mesh, transform] = entity.tryGetComponents<BLASComponent, MeshComponent, TransformComponent>();
+        if (!blas || !mesh || !transform) {
+            RP_CORE_ERROR("Scene::registerBLAS: Entity does not have a valid BLAS component");
+            return;
+        }
+
+        TLASInstance instance;
+        instance.blas = blas->blas;
+        instance.transform = transform->transformMatrix();
+        m_tlas->addInstance(instance);
+
+    }
+
+    void Scene::registerBLAS(std::shared_ptr<Entity> entity) {
+        if (!m_tlas) {
+            m_tlas = std::make_unique<TLAS>();
+        }
+
+        auto [blas, mesh, transform] = entity->tryGetComponents<BLASComponent, MeshComponent, TransformComponent>();
+        if (!blas || !mesh || !transform) {
+            RP_CORE_ERROR("Scene::registerBLAS: Entity does not have a valid BLAS component");
+            return;
+        }
+
+        TLASInstance instance;
+        instance.blas = blas->blas;
+        instance.transform = transform->transformMatrix();
+        m_tlas->addInstance(instance);
+    
+    }
+    void Scene::buildTLAS() {
+        if (!m_tlas) {
+            RP_CORE_ERROR("Scene::buildTLAS: TLAS is not initialized");
+            return;
+        }
+
+        m_tlas->build();
+
+    }
+}

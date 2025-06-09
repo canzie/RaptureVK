@@ -41,16 +41,36 @@ class VulkanContext {
         bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
         bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
         bool isNullDescriptorEnabled() const { return m_isNullDescriptorEnabled; }
+        bool isRayTracingEnabled() const { return m_isRayTracingEnabled; }
         
         // Get descriptor indexing features
         const VkPhysicalDeviceDescriptorIndexingFeatures& getDescriptorIndexingFeatures() const { 
             return m_descriptorIndexingFeatures; 
         }
 
+        // Get ray tracing properties
+        const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& getRayTracingPipelineProperties() const {
+            return m_rayTracingPipelineProperties;
+        }
+
+        const VkPhysicalDeviceAccelerationStructurePropertiesKHR& getAccelerationStructureProperties() const {
+            return m_accelerationStructureProperties;
+        }
+
         // Extension function pointers
         PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
         PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR = nullptr;
         PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR = nullptr;
+
+        // Ray tracing extension function pointers
+        PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR = nullptr;
+        PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR = nullptr;
+        PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR = nullptr;
+        PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR = nullptr;
+        PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR = nullptr;
+        PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR = nullptr;
+        PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR = nullptr;
+        PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR = nullptr;
 
         // 
         void createRecourses(WindowContext* windowContext);
@@ -119,9 +139,14 @@ class VulkanContext {
         bool m_isVertexAttributeRobustnessEnabled;
         bool m_isDynamicRenderingEnabled;
         bool m_isNullDescriptorEnabled;
+        bool m_isRayTracingEnabled;
         
         // Store descriptor indexing features support
         VkPhysicalDeviceDescriptorIndexingFeatures m_descriptorIndexingFeatures{};
+        
+        // Store ray tracing properties
+        VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rayTracingPipelineProperties{};
+        VkPhysicalDeviceAccelerationStructurePropertiesKHR m_accelerationStructureProperties{};
     };
 
 }

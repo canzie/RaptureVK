@@ -59,7 +59,7 @@ namespace Rapture {
 
     class Shader {
     public:
-        Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath="");
+        Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
         Shader(const std::filesystem::path& computePath);
         ~Shader();
 

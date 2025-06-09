@@ -16,6 +16,7 @@ uint32_t DescriptorSet::s_poolRefCount = 0;
 uint32_t DescriptorSet::s_poolBufferCount = 0;
 uint32_t DescriptorSet::s_poolTextureCount = 0;
 uint32_t DescriptorSet::s_poolStorageBufferCount = 0;
+uint32_t DescriptorSet::s_poolStorageImageCount = 0;
 uint32_t DescriptorSet::s_poolInputAttachmentCount = 0;
 
 DescriptorSet::DescriptorSet(const DescriptorSetBindings& bindings) 
@@ -55,6 +56,7 @@ DescriptorSet::~DescriptorSet() {
     s_poolBufferCount -= m_usedBuffers;
     s_poolTextureCount -= m_usedTextures;
     s_poolStorageBufferCount -= m_usedStorageBuffers;
+    s_poolStorageImageCount -= m_usedStorageImages;
     s_poolInputAttachmentCount -= m_usedInputAttachments;
     
     // Decrement reference count and destroy pool if no more references
@@ -68,7 +70,7 @@ DescriptorSet::~DescriptorSet() {
 
 void DescriptorSet::createDescriptorPool() {
     // Define pool sizes for different descriptor types
-    std::array<VkDescriptorPoolSize, 4> poolSizes{};
+    std::array<VkDescriptorPoolSize, 5> poolSizes{};
     
     // Uniform buffers
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -82,9 +84,13 @@ void DescriptorSet::createDescriptorPool() {
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[2].descriptorCount = s_maxStorageBuffers;
     
+    // Storage images
+    poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    poolSizes[3].descriptorCount = s_maxStorageImages;
+    
     // Input attachments
-    poolSizes[3].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    poolSizes[3].descriptorCount = s_maxInputAttachments;
+    poolSizes[4].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+    poolSizes[4].descriptorCount = s_maxInputAttachments;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -159,7 +165,11 @@ void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
             } else if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>) {
                 // Handle Texture
                 if (resource) {
-                    imageInfos.push_back(resource->getDescriptorImageInfo(binding.viewType));
+                    if (binding.useStorageImageInfo) {
+                        imageInfos.push_back(resource->getStorageImageDescriptorInfo());
+                    } else {
+                        imageInfos.push_back(resource->getDescriptorImageInfo(binding.viewType));
+                    }
                     descriptorWrite.pImageInfo = &imageInfos.back();
                 } else {
                     RP_CORE_WARN("Texture is null for binding {}", binding.binding);
@@ -180,7 +190,7 @@ void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
 void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
 {
         // Check if adding this descriptor set would exceed any limits
-    uint32_t newBuffers = 0, newTextures = 0, newStorageBuffers = 0, newInputAttachments = 0;
+    uint32_t newBuffers = 0, newTextures = 0, newStorageBuffers = 0, newStorageImages = 0, newInputAttachments = 0;
     
     for (const auto& binding : bindings.bindings) {
         switch (binding.type) {
@@ -194,6 +204,9 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
                 break;
             case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
                 newStorageBuffers += binding.count;
+                break;
+            case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+                newStorageImages += binding.count;
                 break;
             case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
                 newInputAttachments += binding.count;
@@ -223,6 +236,12 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
                                 std::to_string(newStorageBuffers) + ", Max: " + std::to_string(s_maxStorageBuffers));
     }
     
+    if (s_poolStorageImageCount + newStorageImages > s_maxStorageImages) {
+        throw std::runtime_error("DescriptorSet: Storage image limit exceeded! Current: " + 
+                                std::to_string(s_poolStorageImageCount) + ", Requested: " + 
+                                std::to_string(newStorageImages) + ", Max: " + std::to_string(s_maxStorageImages));
+    }
+    
     if (s_poolInputAttachmentCount + newInputAttachments > s_maxInputAttachments) {
         throw std::runtime_error("DescriptorSet: Input attachment limit exceeded! Current: " + 
                                 std::to_string(s_poolInputAttachmentCount) + ", Requested: " + 
@@ -233,12 +252,14 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
     s_poolBufferCount += newBuffers;
     s_poolTextureCount += newTextures;
     s_poolStorageBufferCount += newStorageBuffers;
+    s_poolStorageImageCount += newStorageImages;
     s_poolInputAttachmentCount += newInputAttachments;
 
     // Store what this descriptor set is using for cleanup
     m_usedBuffers = newBuffers;
     m_usedTextures = newTextures;
     m_usedStorageBuffers = newStorageBuffers;
+    m_usedStorageImages = newStorageImages;
     m_usedInputAttachments = newInputAttachments;
 }
 

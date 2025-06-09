@@ -92,7 +92,7 @@ namespace ImGuiPanelStyle {
     inline const ImVec4 GRUVBOX_BG4 = srgb_to_linear(OriginalGruvboxSRGB::BG4_SRGB);
 
     // Foregrounds
-    inline const ImVec4 GRUVBOX_FG0 = srgb_to_linear(OriginalGruvboxSRGB::FG0_SRGB);
+    inline const ImVec4 GRUVBOX_FG0 = srgb_to_linear(OriginalGruvboxSRGB::FG0_SRGB); 
     inline const ImVec4 GRUVBOX_FG1 = srgb_to_linear(OriginalGruvboxSRGB::FG1_SRGB);
     inline const ImVec4 GRUVBOX_FG2 = srgb_to_linear(OriginalGruvboxSRGB::FG2_SRGB);
     inline const ImVec4 GRUVBOX_FG3 = srgb_to_linear(OriginalGruvboxSRGB::FG3_SRGB);

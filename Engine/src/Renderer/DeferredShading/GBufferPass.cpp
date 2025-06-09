@@ -549,7 +549,7 @@ void GBufferPass::createDescriptorSets(uint32_t framesInFlight)
     std::vector<DescriptorSetBindings> bindings(framesInFlight);
     for (int i = 0; i < framesInFlight; i++) {
         // TODO: binding index, currently set to 0, should change to use a constant DESCRIPTOR SET CAMERA INDEX 
-        bindings[i].bindings.push_back({0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, TextureViewType::DEFAULT, m_cameraUBOs[i]});
+        bindings[i].bindings.push_back({0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, TextureViewType::DEFAULT, m_cameraUBOs[i], false});
         bindings[i].layout = layout;
     }
 

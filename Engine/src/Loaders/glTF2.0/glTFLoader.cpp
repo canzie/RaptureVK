@@ -313,7 +313,12 @@ namespace Rapture {
                 processNode(nodeEntity, firstNode);
             }
         }
-        
+        try {
+            m_scene->buildTLAS();
+        } catch (const std::runtime_error& e) {
+            RP_CORE_ERROR("glTF2Loader: Failed to build TLAS: {}", e.what());
+        }
+
         // Clean up
         cleanUp();
 
@@ -859,6 +864,13 @@ namespace Rapture {
                     }
                 }
             }
+        }
+        try {
+            entity.addComponent<BLASComponent>(meshComp.mesh);
+
+            m_scene->registerBLAS(entity);
+        } catch (const std::runtime_error& e) {
+            RP_CORE_ERROR("glTF2Loader: Failed to add BLAS component: {}", e.what());
         }
 
         // Mark the mesh as loaded

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <entt/entt.hpp>
+#include "AccelerationStructures/TLAS.h"
 
 namespace Rapture {
 
@@ -34,9 +35,16 @@ namespace Rapture {
 
         void setMainCamera(std::shared_ptr<Entity> camera) { m_config.mainCamera = camera; }
 
+        void registerBLAS(Entity& entity);
+        void registerBLAS(std::shared_ptr<Entity> entity);
+
+        void buildTLAS();
+
     private:
         entt::registry m_Registry;
         SceneSettings m_config;
+
+        std::unique_ptr<TLAS> m_tlas;
     
         friend class Entity;
     };

@@ -30,6 +30,8 @@ struct DescriptorSetBinding {
     TextureViewType viewType = TextureViewType::DEFAULT;
     // Use variant to hold different resource types
     std::variant<std::shared_ptr<UniformBuffer>, std::shared_ptr<Texture>> resource;
+    bool useStorageImageInfo = false; // Flag to use storage image descriptor info
+
 };
 
 struct DescriptorSetBindings {
@@ -70,6 +72,7 @@ private:
     uint32_t m_usedBuffers = 0;
     uint32_t m_usedTextures = 0;
     uint32_t m_usedStorageBuffers = 0;
+    uint32_t m_usedStorageImages = 0;
     uint32_t m_usedInputAttachments = 0;
     std::mutex m_descriptorUpdateMutex;
     
@@ -79,11 +82,13 @@ private:
     static uint32_t s_poolBufferCount;
     static uint32_t s_poolTextureCount;
     static uint32_t s_poolStorageBufferCount;
+    static uint32_t s_poolStorageImageCount;
     static uint32_t s_poolInputAttachmentCount;
     static const uint32_t s_maxSets = 1000;  // Maximum descriptor sets in pool
     static const uint32_t s_maxBuffers = 2000;
     static const uint32_t s_maxTextures = 4000;
     static const uint32_t s_maxStorageBuffers = 2000;
+    static const uint32_t s_maxStorageImages = 2000;
     static const uint32_t s_maxInputAttachments = 1000;
 };
 

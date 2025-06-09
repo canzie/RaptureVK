@@ -21,6 +21,9 @@
 #include "imguiPanels/ProprtiesPanel.h"
 #include "imguiPanels/BrowserPanel.h"
 #include "imguiPanels/GBufferPanel.h"
+#include "imguiPanels/ContentBrowserPanel.h"
+#include "imguiPanels/ImageViewerPanel.h"
+#include "imguiPanels/SettingsPanel.h"
 
 #include "RenderTargets/SwapChains/SwapChain.h"
 
@@ -70,4 +73,7 @@ private:
     PropertiesPanel m_propertiesPanel;
     BrowserPanel m_browserPanel;
     GBufferPanel m_gbufferPanel;
+    ContentBrowserPanel m_contentBrowserPanel;
+    ImageViewerPanel m_imageViewerPanel;
+    SettingsPanel m_settingsPanel;
 };

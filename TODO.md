@@ -21,26 +21,14 @@ then a material base would belong to a pipeline, like every shader in the GBuffe
 
 
 TODO
- - create a standalone queue submit for places like buffers and images, since they dont need to be pushing already saved command buffers since those might need a fence/semaphore
-
-- bindless textures need to be organised
-    - split the bindless arrays into categories like shadow maps, csm, etc.
-    - need either (a) a global manager or (b) a manager per class that uses it
-        -(a) ~~use enums for categorie, when adding a new type need to add it to both the enum and the class needs to add it~~
-        -(b) static array, hosted by the class, might be some code duplication in all places -> create some template/abstract class for a bindless array. 
-    
-
+- general descriptor manager
+- fix the gizmo rotation math
 
 --------------------------------
 
-- imgizmo
-- frustum culling
-- stencil selection box
 - ray picking
 
 - skybox
-
-- shadow mapping
 
 - compute shaders
 - ddgi

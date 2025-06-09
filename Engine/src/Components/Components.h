@@ -17,7 +17,7 @@
 #include "Renderer/Frustum/Frustum.h"
 #include "Renderer/Shadows/ShadowMapping/ShadowMapping.h"
 #include "Cameras/PerspectiveCamera/PerspectiveCamera.h"
-
+#include "AccelerationStructures/BLAS.h"
 #include "Meshes/Mesh.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
@@ -333,6 +333,19 @@ struct LightComponent
         return changedThisFrame;
     }
 
+};
+
+struct BLASComponent {
+    std::shared_ptr<BLAS> blas;
+
+    BLASComponent(std::shared_ptr<Mesh> mesh) {
+        try {
+            blas = std::make_shared<BLAS>(mesh);
+            blas->build();
+        } catch (const std::runtime_error& e) {
+            RP_CORE_ERROR("BLASComponent: Failed to create BLAS: {}", e.what());
+        }
+    }
 };
 
 struct ShadowComponent {

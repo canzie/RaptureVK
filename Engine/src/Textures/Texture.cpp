@@ -480,6 +480,11 @@ void Texture::createImage()
         imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     } else {
         imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        
+        // Add storage image usage for compute shaders if requested
+        if (m_spec.storageImage) {
+            imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+        }
     }
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -569,6 +574,14 @@ VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) 
     }
 
     imageInfo.sampler = m_sampler->getSamplerVk();
+    return imageInfo;
+}
+
+VkDescriptorImageInfo Texture::getStorageImageDescriptorInfo() const {
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL; // Storage images use GENERAL layout
+    imageInfo.imageView = m_imageView;
+    imageInfo.sampler = VK_NULL_HANDLE; // Storage images don't use samplers
     return imageInfo;
 }
 

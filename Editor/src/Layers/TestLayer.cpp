@@ -14,6 +14,8 @@
 #include <filesystem>
 #include <imgui.h>
 
+#include "Generators/Textures/PerlinNoiseGenerator.h"
+
 #include "Logging/TracyProfiler.h"
 
 TestLayer::~TestLayer()
@@ -115,6 +117,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     );
     sunLight.addComponent<Rapture::ShadowComponent>(2048, 2048);
 
+    auto perlinNoiseTexture = Rapture::PerlinNoiseGenerator::generateNoise(1024, 1024, 4, 0.5f, 2.0f, 8.0f);
 
     Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
 }

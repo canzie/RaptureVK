@@ -27,6 +27,11 @@ namespace Rapture {
         Texture
     };
 
+    enum class AssetStorageType {
+        Disk,
+        Virtual
+    };
+
     enum class AssetStatus {
         REQUESTED,
         LOADING,
@@ -47,18 +52,25 @@ namespace Rapture {
     struct AssetMetadata {
 
         AssetType m_assetType = AssetType::None;
+        AssetStorageType m_storageType = AssetStorageType::Disk;
+        
+        // Disk-specific data (only used when m_storageType == Disk)
         std::filesystem::path m_filePath;
         // some assets might be in the same file, the indices should point to them
         // indices will be mostly 1 element, but in case of loading multiple primitives in 1 static mesh
         // the indices will indicate which ones
         std::vector<uint32_t> m_indices;
+        
+        // Virtual-specific data (only used when m_storageType == Virtual)
+        std::string m_virtualName;
 
-        // NOTE: Very scuffed, so think about this when the assets manager works
-        std::vector<std::filesystem::path> m_cubemapPaths;
 
         operator bool() const {
             return m_assetType != AssetType::None;
         }
+        
+        bool isDiskAsset() const { return m_storageType == AssetStorageType::Disk; }
+        bool isVirtualAsset() const { return m_storageType == AssetStorageType::Virtual; }
 
     };
 

@@ -103,8 +103,9 @@ namespace Rapture {
         bufferInfo.size = m_Size;
         bufferInfo.usage = m_usageFlags;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
+        
         VmaAllocationCreateInfo allocInfo = {};
+
         // Set VMA usage flags based on Vulkan memory properties
         if ((m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) && (m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
             // Used for staging buffers or CPU-writable/readable buffers that the GPU also reads

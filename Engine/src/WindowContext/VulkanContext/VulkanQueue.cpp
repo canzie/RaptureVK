@@ -89,6 +89,9 @@ namespace Rapture
         submitInfo.pCommandBuffers = &commandBufferVk;
 
         if (vkQueueSubmit(m_queue, 1, &submitInfo, fence) != VK_SUCCESS) {
+            if (fence != VK_NULL_HANDLE) {
+                vkDestroyFence(m_device, fence, nullptr);
+            }
             RP_CORE_ERROR("VulkanQueue::submitQueue - failed to submit draw command buffer!");
             throw std::runtime_error("VulkanQueue::submitQueue - failed to submit draw command buffer!");
         }   
@@ -105,7 +108,7 @@ namespace Rapture
 
         VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
-        
+
         VkSubmitInfo submitInfo = {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.commandBufferCount = 1;
