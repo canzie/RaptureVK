@@ -91,7 +91,7 @@ namespace Rapture {
                 return nullptr;
             }
             AssetHandle handle = s_activeAssetManager->getVirtualAssetByName(virtualName);
-            if (handle.isValid()) {
+            if (UUIDGenerator::IsValid(handle)) {
                 return getAsset<T>(handle);
             }
             return nullptr;

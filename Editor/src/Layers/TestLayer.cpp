@@ -78,10 +78,15 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     controller.controller.mouseSensitivity = 0.1f;
     controller.controller.movementSpeed = 5.0f;
 
+    auto& app = Rapture::Application::getInstance();
+    auto& project = app.getProject();
+
+
+    auto rootPath = project.getProjectRootDirectory();
 
     // Load a model for testing
-    auto loader = Rapture::ModelLoadersCache::getLoader("E:/Dev/Games/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf", activeScene);
-    loader->loadModel("E:/Dev/Games/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf");
+    auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf", activeScene);
+    loader->loadModel(rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf");
 
 
 

@@ -2,11 +2,12 @@
 
 #include "Layers/Layer.h"
 
-//#include "Renderer/ForwardRenderer/ForwardRenderer.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include <cstddef>
+#include <iterator>
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -53,7 +54,8 @@ private:
 private:
     float m_Time = 0.0f;
     float m_FontScale = 1.5f; // Default font scale
-
+    bool m_framebufferNeedsResize = false;
+    size_t  m_windowResizeEventListenerID = 0; 
 
     VkDescriptorPool m_imguiPool;
     VkDevice m_device;

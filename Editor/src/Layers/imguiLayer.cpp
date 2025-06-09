@@ -2,7 +2,6 @@
 #include "WindowContext/Application.h"
 #include "Events/ApplicationEvents.h"
 #include <stdlib.h>         // abort
-#include "Renderer/ForwardRenderer/ForwardRenderer.h"
 #include "Logging/Log.h"
 #include "RenderTargets/SwapChains/SwapChain.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
@@ -50,9 +49,14 @@ ImGuiLayer::ImGuiLayer()
         m_gbufferPanel.updateDescriptorSets();
     });
 
-
-
+    m_windowResizeEventListenerID =
+      Rapture::ApplicationEvents::onWindowResize().addListener(
+          [this](unsigned int width, unsigned int height) {
+            m_framebufferNeedsResize = true;
+    });
 }
+
+
 
 ImGuiLayer::~ImGuiLayer()
 {
@@ -281,6 +285,7 @@ void ImGuiLayer::onUpdate(float ts)
         m_currentFrame = 0;
         graphicsQueue->clear();
         this->onResize();
+        m_framebufferNeedsResize = false;
 
         return;
     }
@@ -344,10 +349,11 @@ void ImGuiLayer::onUpdate(float ts)
     VkResult result = vulkanContext.getPresentQueue()->presentQueue(presentInfo); 
     swapChain->signalImageAvailability(m_currentImageIndex);
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
 
         //Rapture::ForwardRenderer::recreateSwapChain();
         Rapture::ApplicationEvents::onRequestSwapChainRecreation().publish();
+        m_framebufferNeedsResize = false;
         m_currentFrame = 0;
         this->onResize();
 

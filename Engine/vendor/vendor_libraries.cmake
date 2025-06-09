@@ -62,13 +62,19 @@ message(STATUS "Looking for GLM at ${GLM_DIR}")
 # Try to find GLM in different possible structures
 if(EXISTS "${GLM_DIR}/glm/glm.hpp")
     message(STATUS "GLM found")
+    add_library(glm INTERFACE)
+    target_include_directories(glm INTERFACE ${GLM_DIR})
     # GLM directly in vendor/glm
 elseif(EXISTS "${GLM_DIR}/glm-master/glm/glm.hpp")
     set(GLM_DIR "${GLM_DIR}/glm-master")
     message(STATUS "GLM found in glm-master")
+    add_library(glm INTERFACE)
+    target_include_directories(glm INTERFACE ${GLM_DIR})
 elseif(EXISTS "${GLM_DIR}/glm.hpp")
-    set(GLM_DIR "${GLM_DIR}")
-    message(STATUS "GLM found in glm root")
+    get_filename_component(GLM_PARENT_DIR ${GLM_DIR} DIRECTORY)
+    message(STATUS "GLM found in glm root - using parent directory ${GLM_PARENT_DIR} as include path")
+    add_library(glm INTERFACE)
+    target_include_directories(glm INTERFACE ${GLM_PARENT_DIR})
 else()
     # Search recursively for glm.hpp
     file(GLOB_RECURSE GLM_HEADER "${GLM_DIR}/**/glm/glm.hpp")
@@ -76,15 +82,15 @@ else()
     if(GLM_HEADER)
         # Get the directory containing glm/glm.hpp
         get_filename_component(GLM_PATH ${GLM_HEADER} DIRECTORY)
-        get_filename_component(GLM_DIR ${GLM_PATH} DIRECTORY)
-        message(STATUS "Found GLM using recursive search at ${GLM_DIR}")
+        get_filename_component(GLM_INCLUDE_DIR ${GLM_PATH} DIRECTORY)
+        message(STATUS "Found GLM using recursive search at ${GLM_INCLUDE_DIR}")
+        add_library(glm INTERFACE)
+        target_include_directories(glm INTERFACE ${GLM_INCLUDE_DIR})
     else()
         message(FATAL_ERROR "GLM not found. Please place GLM in Engine/vendor/glm directory.")
     endif()
 endif()
 
-add_library(glm INTERFACE)
-target_include_directories(glm INTERFACE ${GLM_DIR})
 
 # ==================== ImGui ====================
 # Only look in Engine/vendor for libraries

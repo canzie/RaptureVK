@@ -454,7 +454,7 @@ namespace {
     }
 }
 
-void Rapture::printDescriptorSetInfo(const DescriptorSetInfo& setInfo) {
+void printDescriptorSetInfo(const DescriptorSetInfo& setInfo) {
     RP_CORE_INFO("Descriptor Set {0}:", setInfo.setNumber);
     
     if (setInfo.bindings.empty()) {
@@ -471,7 +471,7 @@ void Rapture::printDescriptorSetInfo(const DescriptorSetInfo& setInfo) {
     }
 }
 
-void Rapture::printDescriptorSetInfos(const std::vector<DescriptorSetInfo>& setInfos) {
+void printDescriptorSetInfos(const std::vector<DescriptorSetInfo>& setInfos) {
     if (setInfos.empty()) {
         RP_CORE_INFO("No descriptor sets found in shader");
         return;

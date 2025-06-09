@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include "Vulkan/Vulkan.h"
+#include <vulkan/vulkan.h>
 
 #include "Logging/Log.h"
 

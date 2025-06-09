@@ -10,6 +10,9 @@ file(GLOB_RECURSE ENGINE_SOURCES
 
 
 
+# Create engine library
+add_library(${ENGINE_NAME} STATIC ${ENGINE_SOURCES})
+
 # Debug mode settings - check in multiple ways
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR RAPTURE_DEBUG)
     message(STATUS "Debug build detected - Enabling debug flags")
@@ -31,9 +34,6 @@ else()
     message(STATUS "Release build - Debug flags disabled")
     #add_definitions(-DNDEBUG)
 endif()
-
-# Create engine library
-add_library(${ENGINE_NAME} STATIC ${ENGINE_SOURCES})
 
 # Create engine executable (changed from library)
 #add_executable(${ENGINE_NAME} ${ENGINE_SOURCES})

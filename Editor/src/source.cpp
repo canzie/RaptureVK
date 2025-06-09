@@ -1,7 +1,7 @@
 #include "WindowContext/Application.h"
 #include "Logging/Log.h"
 #include "Layers/TestLayer.h"
-#include "Layers/ImGuiLayer.h"
+#include "Layers/imguiLayer.h"
 
 #include "EntryPoint.h"
 #include "Scenes/SceneManager.h"

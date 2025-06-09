@@ -1,0 +1,656 @@
+[
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/imgui.dir/vendor/imgui/imgui.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui.cpp",
+  "output": "Engine/CMakeFiles/imgui.dir/vendor/imgui/imgui.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/imgui.dir/vendor/imgui/imgui_demo.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui_demo.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui_demo.cpp",
+  "output": "Engine/CMakeFiles/imgui.dir/vendor/imgui/imgui_demo.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/imgui.dir/vendor/imgui/imgui_draw.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui_draw.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui_draw.cpp",
+  "output": "Engine/CMakeFiles/imgui.dir/vendor/imgui/imgui_draw.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/imgui.dir/vendor/imgui/imgui_tables.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui_tables.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui_tables.cpp",
+  "output": "Engine/CMakeFiles/imgui.dir/vendor/imgui/imgui_tables.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/imgui.dir/vendor/imgui/imgui_widgets.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui_widgets.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/imgui_widgets.cpp",
+  "output": "Engine/CMakeFiles/imgui.dir/vendor/imgui/imgui_widgets.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/imgui.dir/vendor/imgui/backends/imgui_impl_vulkan.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends/imgui_impl_vulkan.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends/imgui_impl_vulkan.cpp",
+  "output": "Engine/CMakeFiles/imgui.dir/vendor/imgui/backends/imgui_impl_vulkan.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/imgui.dir/vendor/imgui/backends/imgui_impl_glfw.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends/imgui_impl_glfw.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends/imgui_impl_glfw.cpp",
+  "output": "Engine/CMakeFiles/imgui.dir/vendor/imgui/backends/imgui_impl_glfw.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/stb_image.dir/vendor/stb_image/stb_image.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image/stb_image.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image/stb_image.cpp",
+  "output": "Engine/CMakeFiles/stb_image.dir/vendor/stb_image/stb_image.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/vma.dir/vendor/VulkanMemoryAllocator/src/VmaUsage.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/src/VmaUsage.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/src/VmaUsage.cpp",
+  "output": "Engine/CMakeFiles/vma.dir/vendor/VulkanMemoryAllocator/src/VmaUsage.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/cc -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -O3 -DNDEBUG -std=gnu99 -o CMakeFiles/spirv_reflect.dir/vendor/SPIRV-Reflect/spirv_reflect.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect/spirv_reflect.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect/spirv_reflect.c",
+  "output": "Engine/CMakeFiles/spirv_reflect.dir/vendor/SPIRV-Reflect/spirv_reflect.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/cc -DTRACY_ENABLE -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -O3 -DNDEBUG -std=gnu99 -o CMakeFiles/yyjson.dir/vendor/yyjson/yyjson.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson/yyjson.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson/yyjson.c",
+  "output": "Engine/CMakeFiles/yyjson.dir/vendor/yyjson/yyjson.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/AccelerationStructures/BLAS.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/AccelerationStructures/BLAS.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/AccelerationStructures/BLAS.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/AccelerationStructures/BLAS.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/AccelerationStructures/TLAS.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/AccelerationStructures/TLAS.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/AccelerationStructures/TLAS.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/AccelerationStructures/TLAS.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/AssetManager/AssetImporter.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/AssetManager/AssetImporter.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/AssetManager/AssetImporter.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/AssetManager/AssetImporter.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/AssetManager/AssetManagerEditor.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/AssetManager/AssetManagerEditor.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/AssetManager/AssetManagerEditor.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/AssetManager/AssetManagerEditor.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/AssetManager/AssetManagerStaticInitializers.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/AssetManager/AssetManagerStaticInitializers.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/AssetManager/AssetManagerStaticInitializers.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/AssetManager/AssetManagerStaticInitializers.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/Buffers.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/Buffers.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/Buffers.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/Buffers.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/CommandBuffers/CommandBuffer.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/CommandBuffers/CommandBuffer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/CommandBuffers/CommandBuffer.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/CommandBuffers/CommandBuffer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/CommandBuffers/CommandPool.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/CommandBuffers/CommandPool.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/CommandBuffers/CommandPool.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/CommandBuffers/CommandPool.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/Descriptors/BindlessDescriptorArray.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/Descriptors/BindlessDescriptorArray.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/Descriptors/BindlessDescriptorArray.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/Descriptors/BindlessDescriptorArray.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/Descriptors/BindlessDescriptorManager.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/Descriptors/BindlessDescriptorManager.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/Descriptors/BindlessDescriptorManager.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/Descriptors/BindlessDescriptorManager.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/Descriptors/DescriptorSet.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/Descriptors/DescriptorSet.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/Descriptors/DescriptorSet.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/Descriptors/DescriptorSet.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/IndexBuffers/IndexBuffer.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/IndexBuffers/IndexBuffer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/IndexBuffers/IndexBuffer.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/IndexBuffers/IndexBuffer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/StorageBuffers/StorageBuffer.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/StorageBuffers/StorageBuffer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/StorageBuffers/StorageBuffer.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/StorageBuffers/StorageBuffer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/UniformBuffers/UniformBuffer.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/UniformBuffers/UniformBuffer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/UniformBuffers/UniformBuffer.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/UniformBuffers/UniformBuffer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/VertexBuffers/BufferLayout.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/VertexBuffers/BufferLayout.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/VertexBuffers/BufferLayout.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/VertexBuffers/BufferLayout.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Buffers/VertexBuffers/VertexBuffer.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Buffers/VertexBuffers/VertexBuffer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Buffers/VertexBuffers/VertexBuffer.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Buffers/VertexBuffers/VertexBuffer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Cameras/PerspectiveCamera/PerspectiveCamera.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Cameras/PerspectiveCamera/PerspectiveCamera.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Cameras/PerspectiveCamera/PerspectiveCamera.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Cameras/PerspectiveCamera/PerspectiveCamera.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Components/Systems/BoundingBox.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Components/Systems/BoundingBox.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Components/Systems/BoundingBox.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Components/Systems/BoundingBox.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Components/Systems/CameraController.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Components/Systems/CameraController.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Components/Systems/CameraController.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Components/Systems/CameraController.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Components/Systems/EntityNode.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Components/Systems/EntityNode.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Components/Systems/EntityNode.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Components/Systems/EntityNode.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Components/Systems/Transforms.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Components/Systems/Transforms.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Components/Systems/Transforms.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Components/Systems/Transforms.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Generators/Textures/PerlinNoiseGenerator.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Generators/Textures/PerlinNoiseGenerator.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Generators/Textures/PerlinNoiseGenerator.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Generators/Textures/PerlinNoiseGenerator.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Layers/LayerStack.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Layers/LayerStack.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Layers/LayerStack.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Layers/LayerStack.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Loaders/glTF2.0/glTFLoader.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Loaders/glTF2.0/glTFLoader.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Loaders/glTF2.0/glTFLoader.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Loaders/glTF2.0/glTFLoader.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Logging/Log.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Logging/Log.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Logging/Log.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Logging/Log.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Logging/TracyProfiler.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Logging/TracyProfiler.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Logging/TracyProfiler.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Logging/TracyProfiler.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Materials/Material.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Materials/Material.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Materials/Material.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Materials/Material.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Materials/MaterialInstance.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Materials/MaterialInstance.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Materials/MaterialInstance.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Materials/MaterialInstance.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Materials/MaterialParameters.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Materials/MaterialParameters.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Materials/MaterialParameters.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Materials/MaterialParameters.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Meshes/Mesh.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Meshes/Mesh.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Meshes/Mesh.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Meshes/Mesh.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Pipelines/ComputePipeline.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Pipelines/ComputePipeline.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Pipelines/ComputePipeline.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Pipelines/ComputePipeline.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Pipelines/GraphicsPipeline.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Pipelines/GraphicsPipeline.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Pipelines/GraphicsPipeline.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Pipelines/GraphicsPipeline.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/RenderTargets/SwapChains/SwapChain.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/RenderTargets/SwapChains/SwapChain.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/RenderTargets/SwapChains/SwapChain.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/RenderTargets/SwapChains/SwapChain.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Renderer/DeferredShading/DeferredRenderer.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Renderer/DeferredShading/DeferredRenderer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Renderer/DeferredShading/DeferredRenderer.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Renderer/DeferredShading/DeferredRenderer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Renderer/DeferredShading/GBufferPass.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Renderer/DeferredShading/GBufferPass.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Renderer/DeferredShading/GBufferPass.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Renderer/DeferredShading/GBufferPass.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Renderer/DeferredShading/LightingPass.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Renderer/DeferredShading/LightingPass.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Renderer/DeferredShading/LightingPass.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Renderer/DeferredShading/LightingPass.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Renderer/ForwardRenderer/ForwardRenderer.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Renderer/ForwardRenderer/ForwardRenderer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Renderer/ForwardRenderer/ForwardRenderer.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Renderer/ForwardRenderer/ForwardRenderer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Renderer/Frustum/Frustum.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Renderer/Frustum/Frustum.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Renderer/Frustum/Frustum.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Renderer/Frustum/Frustum.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Renderer/Shadows/ShadowMapping/ShadowMapping.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Renderer/Shadows/ShadowMapping/ShadowMapping.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Renderer/Shadows/ShadowMapping/ShadowMapping.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Renderer/Shadows/ShadowMapping/ShadowMapping.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Renderer/StencilBorderPass.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Renderer/StencilBorderPass.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Renderer/StencilBorderPass.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Renderer/StencilBorderPass.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Scenes/Scene.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Scenes/Scene.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Scenes/Scene.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Scenes/Scene.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Shaders/Shader.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Shaders/Shader.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Shaders/Shader.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Shaders/Shader.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Shaders/ShaderReflections.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Shaders/ShaderReflections.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Shaders/ShaderReflections.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Shaders/ShaderReflections.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Textures/Texture.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Textures/Texture.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Textures/Texture.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Textures/Texture.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Utils/Timestep.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Utils/Timestep.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Utils/Timestep.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Utils/Timestep.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/Utils/UUID.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/Utils/UUID.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/Utils/UUID.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/Utils/UUID.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/WindowContext/Application.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/WindowContext/Application.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/WindowContext/Application.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/WindowContext/Application.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/WindowContext/GlfwWindowContext/GlfwWindowContext.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/WindowContext/GlfwWindowContext/GlfwWindowContext.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/WindowContext/GlfwWindowContext/GlfwWindowContext.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/WindowContext/GlfwWindowContext/GlfwWindowContext.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/WindowContext/VulkanContext/VulkanContext.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/WindowContext/VulkanContext/VulkanContext.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/WindowContext/VulkanContext/VulkanContext.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/WindowContext/VulkanContext/VulkanContext.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/WindowContext/VulkanContext/VulkanQueue.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/WindowContext/VulkanContext/VulkanQueue.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/WindowContext/VulkanContext/VulkanQueue.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/WindowContext/VulkanContext/VulkanQueue.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/main.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/main.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/main.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/main.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureVK.dir/src/source.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/src/source.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/src/source.cpp",
+  "output": "Engine/CMakeFiles/RaptureVK.dir/src/source.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/context.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/context.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/context.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/context.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/init.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/init.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/init.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/init.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/input.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/input.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/input.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/input.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/monitor.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/monitor.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/monitor.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/monitor.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/platform.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/platform.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/platform.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/platform.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/vulkan.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/vulkan.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/vulkan.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/vulkan.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/window.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/window.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/window.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/window.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/egl_context.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/egl_context.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/egl_context.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/egl_context.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/osmesa_context.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/osmesa_context.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/osmesa_context.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/osmesa_context.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/null_init.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/null_init.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/null_init.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/null_init.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/null_monitor.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/null_monitor.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/null_monitor.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/null_monitor.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/null_window.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/null_window.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/null_window.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/null_window.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/null_joystick.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/null_joystick.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/null_joystick.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/null_joystick.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/posix_module.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/posix_module.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/posix_module.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/posix_module.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/posix_time.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/posix_time.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/posix_time.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/posix_time.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/posix_thread.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/posix_thread.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/posix_thread.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/posix_thread.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/x11_init.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/x11_init.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/x11_init.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/x11_init.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/x11_monitor.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/x11_monitor.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/x11_monitor.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/x11_monitor.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/x11_window.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/x11_window.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/x11_window.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/x11_window.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/xkb_unicode.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/xkb_unicode.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/xkb_unicode.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/xkb_unicode.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/glx_context.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/glx_context.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/glx_context.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/glx_context.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/wl_init.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/wl_init.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/wl_init.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/wl_init.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/wl_monitor.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/wl_monitor.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/wl_monitor.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/wl_monitor.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/wl_window.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/wl_window.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/wl_window.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/wl_window.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/linux_joystick.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/linux_joystick.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/linux_joystick.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/linux_joystick.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src",
+  "command": "/usr/bin/cc -DHAVE_MEMFD_CREATE -D_DEFAULT_SOURCE -D_GLFW_WAYLAND -D_GLFW_X11 -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src -I/home/Thomas/Dev/RaptureVK/build/Engine/glfw/src -O3 -DNDEBUG -std=c99 -fPIC -Wall -o CMakeFiles/glfw.dir/posix_poll.c.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/posix_poll.c",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/src/posix_poll.c",
+  "output": "Engine/glfw/src/CMakeFiles/glfw.dir/posix_poll.c.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/spdlog",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=c++20 -o CMakeFiles/spdlog.dir/src/spdlog.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/spdlog.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/spdlog.cpp",
+  "output": "Engine/spdlog/CMakeFiles/spdlog.dir/src/spdlog.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/spdlog",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=c++20 -o CMakeFiles/spdlog.dir/src/stdout_sinks.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/stdout_sinks.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/stdout_sinks.cpp",
+  "output": "Engine/spdlog/CMakeFiles/spdlog.dir/src/stdout_sinks.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/spdlog",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=c++20 -o CMakeFiles/spdlog.dir/src/color_sinks.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/color_sinks.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/color_sinks.cpp",
+  "output": "Engine/spdlog/CMakeFiles/spdlog.dir/src/color_sinks.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/spdlog",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=c++20 -o CMakeFiles/spdlog.dir/src/file_sinks.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/file_sinks.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/file_sinks.cpp",
+  "output": "Engine/spdlog/CMakeFiles/spdlog.dir/src/file_sinks.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/spdlog",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=c++20 -o CMakeFiles/spdlog.dir/src/async.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/async.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/async.cpp",
+  "output": "Engine/spdlog/CMakeFiles/spdlog.dir/src/async.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/spdlog",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=c++20 -o CMakeFiles/spdlog.dir/src/cfg.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/cfg.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/cfg.cpp",
+  "output": "Engine/spdlog/CMakeFiles/spdlog.dir/src/cfg.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/spdlog",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -O3 -DNDEBUG -O3 -march=native -flto=auto -std=c++20 -o CMakeFiles/spdlog.dir/src/bundled_fmtlib_format.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/bundled_fmtlib_format.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/src/bundled_fmtlib_format.cpp",
+  "output": "Engine/spdlog/CMakeFiles/spdlog.dir/src/bundled_fmtlib_format.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Engine/tracy",
+  "command": "/usr/bin/c++ -DTRACY_ENABLE -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/TracyClient.dir/public/TracyClient.cpp.o -c /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public/TracyClient.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public/TracyClient.cpp",
+  "output": "Engine/tracy/CMakeFiles/TracyClient.dir/public/TracyClient.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/Layers/TestLayer.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/Layers/TestLayer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/Layers/TestLayer.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/Layers/TestLayer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/Layers/imguiLayer.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/Layers/imguiLayer.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/Layers/imguiLayer.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/Layers/imguiLayer.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/imguiPanels/BrowserPanel.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/BrowserPanel.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/BrowserPanel.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/imguiPanels/BrowserPanel.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/imguiPanels/ContentBrowserPanel.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/ContentBrowserPanel.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/ContentBrowserPanel.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/imguiPanels/ContentBrowserPanel.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/imguiPanels/GBufferPanel.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/GBufferPanel.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/GBufferPanel.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/imguiPanels/GBufferPanel.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/imguiPanels/ImageViewerPanel.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/ImageViewerPanel.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/ImageViewerPanel.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/imguiPanels/ImageViewerPanel.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/imguiPanels/ProprtiesPanel.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/ProprtiesPanel.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/ProprtiesPanel.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/imguiPanels/ProprtiesPanel.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/imguiPanels/SettingsPanel.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/SettingsPanel.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/SettingsPanel.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/imguiPanels/SettingsPanel.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/imguiPanels/ViewportPanel.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/ViewportPanel.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/imguiPanels/ViewportPanel.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/imguiPanels/ViewportPanel.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/main.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/main.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/main.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/main.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/source.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/source.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/source.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/source.cpp.o"
+},
+{
+  "directory": "/home/Thomas/Dev/RaptureVK/build/Editor",
+  "command": "/usr/bin/c++ -DFMT_HEADER_ONLY=0 -DSPDLOG_COMPILED_LIB -DTRACY_ENABLE -DVMA_STATIC_VULKAN_FUNCTIONS=1 -I/home/Thomas/Dev/RaptureVK/Editor/src -I/home/Thomas/Dev/RaptureVK/Engine/src -I/home/Thomas/Dev/RaptureVK/Engine/vendor/GLFW/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/glm -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui -I/home/Thomas/Dev/RaptureVK/Engine/vendor/imgui/backends -I/home/Thomas/Dev/RaptureVK/Engine/vendor/entt/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/spdlog/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/stb_image -I/home/Thomas/Dev/RaptureVK/Engine/vendor/VulkanMemoryAllocator/include -I/home/Thomas/Dev/RaptureVK/Engine/vendor/SPIRV-Reflect -I/home/Thomas/Dev/RaptureVK/Engine/vendor/yyjson -I/home/Thomas/Dev/RaptureVK/Engine/vendor -isystem /home/Thomas/Dev/RaptureVK/Engine/vendor/tracy/public -O3 -DNDEBUG -O3 -march=native -flto=auto -std=gnu++20 -o CMakeFiles/RaptureEditor.dir/src/vendor/ImGuizmo/ImGuizmo.cpp.o -c /home/Thomas/Dev/RaptureVK/Editor/src/vendor/ImGuizmo/ImGuizmo.cpp",
+  "file": "/home/Thomas/Dev/RaptureVK/Editor/src/vendor/ImGuizmo/ImGuizmo.cpp",
+  "output": "Editor/CMakeFiles/RaptureEditor.dir/src/vendor/ImGuizmo/ImGuizmo.cpp.o"
+}
+]

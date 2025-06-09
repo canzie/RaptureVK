@@ -6,12 +6,55 @@
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 
-#define VK_USE_PLATFORM_WIN32_KHR
+#ifdef _WIN32
+    #define VK_USE_PLATFORM_WIN32_KHR
+#elif defined(__linux__)
+    // Runtime detection for Wayland vs X11
+    #include <cstdlib>
+    static bool isWaylandSession() {
+        return std::getenv("WAYLAND_DISPLAY") != nullptr;
+    }
+    
+    #define RAPTURE_RUNTIME_WAYLAND_DETECTION
+    // We'll define the appropriate platform at runtime, but include both headers
+    #define VK_USE_PLATFORM_X11_KHR
+    #define VK_USE_PLATFORM_WAYLAND_KHR
+#endif
+
 #define GLFW_INCLUDE_VULKAN
 
 #include <GLFW/glfw3.h>
 
-#define GLFW_EXPOSE_NATIVE_WIN32
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+// Include Vulkan surface extension headers
+#include <vulkan/vulkan_wayland.h>
+// Only include X11 headers if X11 development files are available
+#ifdef __has_include
+    #if __has_include(<X11/Xlib.h>)
+        #include <X11/Xlib.h>  // Must include X11 types before vulkan_xlib.h
+        #include <vulkan/vulkan_xlib.h>
+        #define RAPTURE_HAS_X11_HEADERS
+    #endif
+#else
+    // Fallback for older compilers - try to include and let it fail gracefully
+    #ifdef VK_USE_PLATFORM_X11_KHR
+        #include <X11/Xlib.h>  // Must include X11 types before vulkan_xlib.h
+        #include <vulkan/vulkan_xlib.h>
+        #define RAPTURE_HAS_X11_HEADERS
+    #endif
+#endif
+#endif
+
+#ifdef _WIN32
+    #define GLFW_EXPOSE_NATIVE_WIN32
+#elif defined(__linux__)
+    #ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+        // Include both native headers since we detect at runtime
+        #define GLFW_EXPOSE_NATIVE_X11
+        #define GLFW_EXPOSE_NATIVE_WAYLAND
+    #endif
+#endif
+
 #include <GLFW/glfw3native.h>
 
 #include <set>
@@ -43,6 +86,16 @@ namespace Rapture {
     m_debugMessenger = VK_NULL_HANDLE;
     m_swapChain = nullptr;
 
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+    // Detect and log the windowing system being used
+    bool usingWayland = isWaylandSession();
+    if (usingWayland) {
+        RP_CORE_INFO("Detected Wayland session - using Wayland surface support");
+    } else {
+        RP_CORE_INFO("Detected X11 session - using X11 surface support");
+    }
+#endif
+
     if (enableValidationLayers) {
         RP_CORE_INFO("Validation layers enabled!");
         m_validationLayers.push_back("VK_LAYER_KHRONOS_validation");
@@ -64,7 +117,7 @@ namespace Rapture {
     m_deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
 
 
-    //checkExtensionSupport();
+    checkExtensionSupport();
     createInstance(windowContext);
     setupDebugMessenger();
     createWindowsSurface(windowContext);
@@ -245,17 +298,50 @@ void VulkanContext::checkExtensionSupport()
 {
     RP_CORE_INFO("========== Supported Vulkan extensions: ==========");
 
-
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 
     std::vector<VkExtensionProperties> extensions(extensionCount);
-
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+    bool hasWaylandSupport = false;
+    bool hasX11Support = false;
+#endif
 
     for (const auto& extension : extensions) {
         RP_CORE_INFO("\t Extension: {0}", extension.extensionName);
+        
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+        if (strcmp(extension.extensionName, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME) == 0) {
+            hasWaylandSupport = true;
+        }
+#ifdef RAPTURE_HAS_X11_HEADERS
+        if (strcmp(extension.extensionName, VK_KHR_XLIB_SURFACE_EXTENSION_NAME) == 0) {
+            hasX11Support = true;
+        }
+#endif
+#endif
     }
+
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+    bool usingWayland = isWaylandSession();
+    if (usingWayland) {
+        if (hasWaylandSupport) {
+            RP_CORE_INFO("Wayland surface extension is supported!");
+        } else {
+            RP_CORE_ERROR("Wayland surface extension is NOT supported!");
+        }
+#ifdef RAPTURE_HAS_X11_HEADERS
+    } else {
+        if (hasX11Support) {
+            RP_CORE_INFO("X11 surface extension is supported!");
+        } else {
+            RP_CORE_ERROR("X11 surface extension is NOT supported!");
+        }
+#endif
+    }
+#endif
 
     RP_CORE_INFO("========================================================\n");
 }
@@ -287,6 +373,37 @@ std::vector<const char *> VulkanContext::getRequiredExtensions(WindowContext* wi
     if (enableValidationLayers) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
+
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+    // Log the surface extension being requested
+    bool hasWaylandSurface = false;
+    bool hasX11Surface = false;
+    for (size_t i = 0; i < extensions.size(); ++i) {
+        if (strcmp(extensions[i], VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME) == 0) {
+            hasWaylandSurface = true;
+        }
+#ifdef RAPTURE_HAS_X11_HEADERS
+        if (strcmp(extensions[i], VK_KHR_XLIB_SURFACE_EXTENSION_NAME) == 0) {
+            hasX11Surface = true;
+        }
+#endif
+    }
+    
+    bool usingWayland = isWaylandSession();
+    if (usingWayland && hasWaylandSurface) {
+        RP_CORE_INFO("Requesting Wayland surface extension for Wayland session");
+#ifdef RAPTURE_HAS_X11_HEADERS
+    } else if (!usingWayland && hasX11Surface) {
+        RP_CORE_INFO("Requesting X11 surface extension for X11 session");
+#endif
+    } else if (usingWayland && !hasWaylandSurface) {
+        RP_CORE_WARN("Wayland session detected but no Wayland surface extension requested");
+#ifdef RAPTURE_HAS_X11_HEADERS
+    } else if (!usingWayland && !hasX11Surface) {
+        RP_CORE_WARN("X11 session detected but no X11 surface extension requested");
+#endif
+    }
+#endif
 
     return extensions;
 }
@@ -370,19 +487,91 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-    RP_CORE_INFO("GPU: {0}", deviceProperties.deviceName);
+    RP_CORE_INFO("Evaluating GPU: {0}", deviceProperties.deviceName);
 
+    bool isDeviceSuitable = true;
     
+    // Check queue family indices
     QueueFamilyIndices indices = findQueueFamilies(device);
-    bool extensionsSupported = checkDeviceExtensionSupport(device);
+    if (!indices.isComplete()) {
+        RP_CORE_WARN("GPU {0}: Queue families incomplete:", deviceProperties.deviceName);
+        if (!indices.graphicsFamily.has_value()) {
+            RP_CORE_WARN("  - Graphics queue family not found");
+        }
+        if (!indices.presentFamily.has_value()) {
+            RP_CORE_WARN("  - Present queue family not found");
+        }
+        if (!indices.computeFamily.has_value()) {
+            RP_CORE_WARN("  - Compute queue family not found");
+        }
+        isDeviceSuitable = false;
+    } else {
+        RP_CORE_INFO("GPU {0}: All required queue families found", deviceProperties.deviceName);
+    }
 
+    // Check device extension support
+    bool extensionsSupported = checkDeviceExtensionSupport(device);
+    if (!extensionsSupported) {
+        RP_CORE_WARN("GPU {0}: Required device extensions not supported", deviceProperties.deviceName);
+        
+        // Get available extensions for this device
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+        
+        // Create set of available extension names for quick lookup
+        std::set<std::string> availableExtensionNames;
+        for (const auto& extension : availableExtensions) {
+            availableExtensionNames.insert(extension.extensionName);
+        }
+        
+        // Log missing extensions
+        RP_CORE_WARN("  Missing required extensions:");
+        for (const auto& requiredExtension : m_deviceExtensions) {
+            if (availableExtensionNames.find(requiredExtension) == availableExtensionNames.end()) {
+                RP_CORE_WARN("    - {0}", requiredExtension);
+            }
+        }
+        isDeviceSuitable = false;
+    } else {
+        RP_CORE_INFO("GPU {0}: All required device extensions supported", deviceProperties.deviceName);
+    }
+
+    // Check swap chain support
     bool swapChainAdequate = false;
     if (extensionsSupported) {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        
+        if (!swapChainAdequate) {
+            RP_CORE_WARN("GPU {0}: Swap chain support inadequate:", deviceProperties.deviceName);
+            if (swapChainSupport.formats.empty()) {
+                RP_CORE_WARN("  - No surface formats available");
+            }
+            if (swapChainSupport.presentModes.empty()) {
+                RP_CORE_WARN("  - No present modes available");
+            }
+            isDeviceSuitable = false;
+        } else {
+            RP_CORE_INFO("GPU {0}: Swap chain support adequate ({1} formats, {2} present modes)", 
+                        deviceProperties.deviceName, 
+                        swapChainSupport.formats.size(), 
+                        swapChainSupport.presentModes.size());
+        }
+    } else {
+        RP_CORE_WARN("GPU {0}: Cannot check swap chain support - extensions not supported", deviceProperties.deviceName);
+        isDeviceSuitable = false;
     }
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate;
+    // Final result logging
+    if (isDeviceSuitable) {
+        RP_CORE_INFO("GPU {0}: Device is SUITABLE for use", deviceProperties.deviceName);
+    } else {
+        RP_CORE_WARN("GPU {0}: Device is NOT SUITABLE for use", deviceProperties.deviceName);
+    }
+
+    return isDeviceSuitable;
 }
 
 QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) const
@@ -769,10 +958,39 @@ void VulkanContext::createLogicalDevice()
 
 void VulkanContext::createWindowsSurface(WindowContext *windowContext)
 {
-    if (glfwCreateWindowSurface(m_instance, (GLFWwindow*)windowContext->getNativeWindowContext(), nullptr, &m_surface) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create window surface!");
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+    bool usingWayland = isWaylandSession();
+    if (usingWayland) {
+        RP_CORE_INFO("Creating Wayland surface...");
+    } else {
+        RP_CORE_INFO("Creating X11 surface...");
     }
+#endif
+
+    if (glfwCreateWindowSurface(m_instance, (GLFWwindow*)windowContext->getNativeWindowContext(), nullptr, &m_surface) != VK_SUCCESS) {
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+        if (usingWayland) {
+            RP_CORE_ERROR("Failed to create Wayland window surface!");
+            throw std::runtime_error("Failed to create Wayland window surface!");
+        } else {
+            RP_CORE_ERROR("Failed to create X11 window surface!");
+            throw std::runtime_error("Failed to create X11 window surface!");
+        }
+#else
+        RP_CORE_ERROR("Failed to create window surface!");
+        throw std::runtime_error("Failed to create window surface!");
+#endif
+    }
+
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+    if (usingWayland) {
+        RP_CORE_INFO("Wayland surface created successfully!");
+    } else {
+        RP_CORE_INFO("X11 surface created successfully!");
+    }
+#else
     RP_CORE_INFO("Window surface created successfully!");
+#endif
 }
 
 SwapChainSupportDetails VulkanContext::querySwapChainSupport(VkPhysicalDevice device)

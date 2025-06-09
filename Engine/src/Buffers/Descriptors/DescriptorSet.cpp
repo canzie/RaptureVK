@@ -19,6 +19,15 @@ uint32_t DescriptorSet::s_poolStorageBufferCount = 0;
 uint32_t DescriptorSet::s_poolStorageImageCount = 0;
 uint32_t DescriptorSet::s_poolInputAttachmentCount = 0;
 
+// Static const member definitions
+const uint32_t DescriptorSet::s_maxSets;
+const uint32_t DescriptorSet::s_maxBuffers;
+const uint32_t DescriptorSet::s_maxTextures;
+const uint32_t DescriptorSet::s_maxStorageBuffers;
+const uint32_t DescriptorSet::s_maxStorageImages;
+const uint32_t DescriptorSet::s_maxInputAttachments;
+
+
 DescriptorSet::DescriptorSet(const DescriptorSetBindings& bindings) 
     : m_layout(bindings.layout), m_set(VK_NULL_HANDLE) {
     

@@ -33,6 +33,7 @@
     #include <tracy/TracyVulkan.hpp>
 #endif
 
+#include <vulkan/vulkan.h>
 
 // Define profiling macros based on Tracy availability
 #if defined(RAPTURE_DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
