@@ -49,9 +49,9 @@ namespace Rapture {
             return asset->getUnderlyingAsset<T>();
         }
 
-        template<typename T>
-        static std::pair<std::shared_ptr<T>, AssetHandle> importAsset(std::filesystem::path path, std::vector<uint32_t> indices = {0}, AssetType assetType = AssetType::None) {
-            auto [asset, handle] = s_activeAssetManager->importAsset(path, indices, assetType);
+        template<typename T, typename... Args>
+        static std::pair<std::shared_ptr<T>, AssetHandle> importAsset(std::filesystem::path path, std::vector<uint32_t> indices = {0}) {
+            auto [asset, handle] = s_activeAssetManager->importAsset(path, indices);
 
             return std::make_pair(asset->getUnderlyingAsset<T>(), handle);
         }

@@ -72,7 +72,7 @@ namespace Rapture {
         return s_nullMetadata;
     }
 
-    std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(std::filesystem::path path, std::vector<uint32_t> indices, AssetType assetType)
+    std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(std::filesystem::path path, std::vector<uint32_t> indices)
     {
 
 
@@ -94,11 +94,7 @@ namespace Rapture {
         metadata.m_storageType = AssetStorageType::Disk;
         metadata.m_filePath = path;
 
-        if (assetType == AssetType::None) {
-            metadata.m_assetType = determineAssetType(path.string());
-        } else {
-            metadata.m_assetType = assetType;
-        }
+        metadata.m_assetType = determineAssetType(path.string());
 
         metadata.m_indices = indices;
 

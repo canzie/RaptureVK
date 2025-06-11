@@ -25,6 +25,15 @@ Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::p
 
 Shader::Shader(const std::filesystem::path &computePath)
 {
+
+    if (computePath.empty()) {
+        return;
+    }
+
+    if (computePath.extension() == ".glsl") {
+        // compileShaderToSPIRV
+    }
+
     createComputeShader(computePath);
     createDescriptorSetLayout();
     
