@@ -86,7 +86,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Load a model for testing
     auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf", activeScene);
-    loader->loadModel(rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf");
+    loader->loadModel((rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf").string());
 
 
 

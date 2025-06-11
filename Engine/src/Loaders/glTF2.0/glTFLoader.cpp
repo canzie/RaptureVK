@@ -20,7 +20,7 @@
 namespace Rapture {
 
     bool ModelLoadersCache::s_initialized = false;
-    std::map<std::string, std::weak_ptr<glTF2Loader>> ModelLoadersCache::s_loaders;
+    std::map<std::filesystem::path, std::weak_ptr<glTF2Loader>> ModelLoadersCache::s_loaders;
     std::mutex ModelLoadersCache::s_mutex;
 
     glTF2Loader::glTF2Loader(std::shared_ptr<Scene> scene)
