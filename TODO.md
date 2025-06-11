@@ -1,29 +1,39 @@
-for the IBO, VBO and UBOs (VkBuffer) store them in 1 VkBuffer instead of seperatly.
+
+### Components
+
+- WorldEnvironementComponent
+    - Controls stuff like wind
 
 
 
-Look into making new child classes to the renderpass, like a deferred renderer pass
-this would allow me to add mehtodss like cmdNextSubpass(Passes::GBUFFER) and cmdNextSubpass(Passes::LIGHTING) ...
-i could also do this for shadow pass, csm pass, wireframe pass, etc.
+### J*B SYSTEM
+#### Requirements
 
-then a material base would belong to a pipeline, like every shader in the GBuffer subpass  would need the same uniforms and attachements and output, ...
+- easy to add new jobs
+- easy to set dependencies between jobs
+- a way to cancel jobs and its children
+- a way to wait for a job to finish
+- lightweight
+- job queues can be static (dependency chain needs to be defined when the job queue is created)
 
 
+TODO
+- general descriptor manager
+- fix the gizmo rotation math
 
+--------------------------------
 
-- lights
-- imgui
-- tracy
-- deferred rendering
-- shadow mapping
-- compute shaders
+- ray picking
+
 - skybox
-- static meshes
-- materials in the asset manager
+
+- compute shaders
 - ddgi
-- stencil selection box
-- mouse picking
-- imgizmo
+
+- static meshes
+
+- materials in the asset manager
+
 - physics
 - animations
 - giga serializaiton
@@ -34,7 +44,4 @@ then a material base would belong to a pipeline, like every shader in the GBuffe
 - audio
 - ui
 - game?
-
-
-
 

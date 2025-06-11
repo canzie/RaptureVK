@@ -41,6 +41,8 @@ class MaterialInstance {
 
         void updateUniformBuffer(ParameterID id);
 
+        std::unordered_map<ParameterID, MaterialParameter>& getParameterMap() { return m_parameterMap; }
+
     private:
         std::string m_name;
         std::shared_ptr<DescriptorSet> m_descriptorSet;

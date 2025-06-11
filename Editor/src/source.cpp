@@ -1,7 +1,7 @@
 #include "WindowContext/Application.h"
 #include "Logging/Log.h"
 #include "Layers/TestLayer.h"
-#include "Layers/ImGuiLayer.h"
+#include "Layers/imguiLayer.h"
 
 #include "EntryPoint.h"
 #include "Scenes/SceneManager.h"
@@ -23,7 +23,7 @@ public:
         pushLayer(new TestLayer());
         
         // Push ImGui layer as an overlay so it renders on top
-        //pushOverlay(new ImGuiLayer());
+        pushOverlay(new ImGuiLayer());
     }
     
     ~EditorApp() {

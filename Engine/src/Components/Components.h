@@ -13,18 +13,23 @@
 #include "Components/Systems/Transforms.h"
 #include "Components/Systems/CameraController.h"
 #include "Components/Systems/EntityNode.h"
-
+#include "Components/Systems/BoundingBox.h"
+#include "Renderer/Frustum/Frustum.h"
+#include "Renderer/Shadows/ShadowMapping/ShadowMapping.h"
 #include "Cameras/PerspectiveCamera/PerspectiveCamera.h"
-
+#include "AccelerationStructures/BLAS.h"
 #include "Meshes/Mesh.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include "Materials/MaterialInstance.h"
 
+
 #include <string>
 #include <memory>
 
 
+    // Maximum number of lights supported
+    static constexpr uint32_t MAX_LIGHTS = 16;
 
 namespace Rapture {
 
@@ -53,6 +58,8 @@ namespace Rapture {
 
         private:
             mutable std::size_t m_lastHash = 0;
+            mutable uint32_t m_lastFrame = 10; // random number larger than framesinglight
+            mutable bool changedThisFrame = false;
 
         public:
         TransformComponent()=default;
@@ -86,14 +93,20 @@ namespace Rapture {
             return hash;
         }
 
-        bool hasChanged() const
+        bool hasChanged(uint32_t currentFrame) const
         {
-            uint32_t currentHash = calculateCurrentHash();
-            if (m_lastHash != currentHash) {
-                m_lastHash = currentHash;
-                return true;
+            if (m_lastFrame != currentFrame) {
+                m_lastFrame = currentFrame;
+                changedThisFrame = false;
+
+                uint32_t currentHash = calculateCurrentHash();
+                if (m_lastHash != currentHash) {
+                    m_lastHash = currentHash;
+                    changedThisFrame = true;
+                    return true;
+                }
             }
-            return false;
+            return changedThisFrame;
         }
 	};
 
@@ -101,6 +114,7 @@ namespace Rapture {
     struct CameraComponent
     {
         PerspectiveCamera camera;
+        Frustum frustum;
         
         float fov;
         float aspectRatio;
@@ -114,6 +128,8 @@ namespace Rapture {
             : fov(fovy), aspectRatio(ar), nearPlane(near_), farPlane(far_)
         {
             camera = PerspectiveCamera(fovy, ar, near_, far_);
+            frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
+
         }
 
         void updateProjectionMatrix(float fovy, float ar, float near_, float far_)
@@ -123,6 +139,8 @@ namespace Rapture {
             nearPlane = near_;
             farPlane = far_;
             camera.updateProjectionMatrix(fovy, ar, near_, far_);
+            frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
+
         }
 
         // Update view matrix from transform component
@@ -139,6 +157,8 @@ namespace Rapture {
             front = glm::normalize(front);
             
             camera.updateViewMatrix(position, front);
+            frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
+
         }
 
                 // Update view matrix from transform component
@@ -146,6 +166,7 @@ namespace Rapture {
         {
             glm::vec3 position = transform.translation();
             camera.updateViewMatrix(position, front);
+            frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
         }
     };
 
@@ -162,6 +183,7 @@ namespace Rapture {
         void update(float deltaTime, TransformComponent& transform, CameraComponent& camera)
         {
             controller.update(deltaTime, transform, camera);
+
         }
     };
 
@@ -237,6 +259,8 @@ struct LightComponent
     
     private:
         mutable uint32_t m_lastHash = 0;
+        mutable uint32_t m_lastFrame = 10; // random number larger than framesinglight
+        mutable bool changedThisFrame = false;
 
     public:
     // Constructors
@@ -295,18 +319,75 @@ struct LightComponent
         return hash;
     }
 
-    bool hasChanged() const {
-
-        uint32_t currentHash = calculateCurrentHash();
-        if (m_lastHash != currentHash) {
-            m_lastHash = currentHash;
-            return true;
+    bool hasChanged(uint32_t currentFrame) const {
+        if (m_lastFrame != currentFrame) {
+            m_lastFrame = currentFrame;
+            changedThisFrame = false;
+            uint32_t currentHash = calculateCurrentHash();
+            if (m_lastHash != currentHash) {
+                m_lastHash = currentHash;
+                changedThisFrame = true;
+                return true;
+            }
         }
-        return false;
+        return changedThisFrame;
     }
 
 };
 
+struct BLASComponent {
+    std::shared_ptr<BLAS> blas;
+
+    BLASComponent(std::shared_ptr<Mesh> mesh) {
+        try {
+            blas = std::make_shared<BLAS>(mesh);
+            blas->build();
+        } catch (const std::runtime_error& e) {
+            RP_CORE_ERROR("BLASComponent: Failed to create BLAS: {}", e.what());
+        }
+    }
+};
+
+struct ShadowComponent {
+    std::unique_ptr<ShadowMap> shadowMap;
+
+    
+    ShadowComponent(float width, float height) {
+        shadowMap = std::make_unique<ShadowMap>(width, height);
+    }
+};
+
+struct BoundingBoxComponent {
+    // start off as invalid
+    BoundingBox localBoundingBox;
+    BoundingBox worldBoundingBox;
+
+
+    BoundingBoxComponent() = default;
+    BoundingBoxComponent(glm::vec3 min, glm::vec3 max) {
+        localBoundingBox = BoundingBox(min, max);
+        worldBoundingBox = localBoundingBox;
+    }
+
+    void updateWorldBoundingBox(const glm::mat4& transform) {
+            worldBoundingBox = localBoundingBox.transform(transform);
+    }
+
+};
+
+// Light data structure for shader
+struct LightData {
+    alignas(16) glm::vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)
+    alignas(16) glm::vec4 direction;     // w = range
+    alignas(16) glm::vec4 color;         // w = intensity
+    alignas(16) glm::vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = entity id, w = unused
+};
+
+// Light uniform buffer object (binding 1)
+struct LightUniformBufferObject {
+    alignas(4) uint32_t numLights = 0;
+    LightData lights[MAX_LIGHTS];
+};
 
 }
 

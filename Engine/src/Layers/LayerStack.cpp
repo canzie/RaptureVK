@@ -34,3 +34,14 @@ void Rapture::LayerStack::popOverlay(Layer* overlay)
 		m_Layers.erase(it);
 	}
 }
+
+void Rapture::LayerStack::clear()
+{
+	for (auto layer : m_Layers)
+	{
+		layer->onDetach();
+		delete layer;
+	}
+	m_Layers.clear();
+	m_LayerInsertIndex = 0;
+}

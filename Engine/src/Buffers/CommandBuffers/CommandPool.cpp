@@ -31,13 +31,18 @@ namespace Rapture {
 
     CommandPool::~CommandPool()
     {
+        m_savedCommandBuffers.clear();
         vkDestroyCommandPool(m_device, m_commandPool, nullptr);
     } 
 
 
-    std::shared_ptr<CommandBuffer> CommandPool::getCommandBuffer()
+    std::shared_ptr<CommandBuffer> CommandPool::getCommandBuffer(bool stayAlive)
     {
-        return std::make_shared<CommandBuffer>(shared_from_this());
+        auto commandBuffer = std::make_shared<CommandBuffer>(shared_from_this());
+        if (stayAlive) {
+            m_savedCommandBuffers.push_back(commandBuffer);
+        }
+        return commandBuffer;
         
     }
 

@@ -20,7 +20,7 @@
 namespace Rapture {
 
     bool ModelLoadersCache::s_initialized = false;
-    std::map<std::string, std::weak_ptr<glTF2Loader>> ModelLoadersCache::s_loaders;
+    std::map<std::filesystem::path, std::weak_ptr<glTF2Loader>> ModelLoadersCache::s_loaders;
     std::mutex ModelLoadersCache::s_mutex;
 
     glTF2Loader::glTF2Loader(std::shared_ptr<Scene> scene)
@@ -313,7 +313,12 @@ namespace Rapture {
                 processNode(nodeEntity, firstNode);
             }
         }
-        
+        try {
+            m_scene->buildTLAS();
+        } catch (const std::runtime_error& e) {
+            RP_CORE_ERROR("glTF2Loader: Failed to build TLAS: {}", e.what());
+        }
+
         // Clean up
         cleanUp();
 
@@ -765,6 +770,12 @@ namespace Rapture {
             if (name == "POSITION") {
                 positionOffset = attrOffsets[i] / sizeof(float);
                 foundPosition = true;
+
+                if (entity.hasComponent<BoundingBoxComponent>() && calculatedBounds) {
+                    entity.getComponent<BoundingBoxComponent>().localBoundingBox = BoundingBox(minBounds, maxBounds);
+                } else if (calculatedBounds) {
+                    entity.addComponent<BoundingBoxComponent>(minBounds, maxBounds);
+                }
             }
         }
 
@@ -853,6 +864,13 @@ namespace Rapture {
                     }
                 }
             }
+        }
+        try {
+            entity.addComponent<BLASComponent>(meshComp.mesh);
+
+            m_scene->registerBLAS(entity);
+        } catch (const std::runtime_error& e) {
+            RP_CORE_ERROR("glTF2Loader: Failed to add BLAS component: {}", e.what());
         }
 
         // Mark the mesh as loaded

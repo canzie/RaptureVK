@@ -1,18 +1,22 @@
 #include "TestLayer.h"
 
 
-
-// Vendor includes
-#include <imgui.h>
-
 #include "WindowContext/Application.h"
 #include "Logging/Log.h"
 #include "Scenes/SceneManager.h"
 #include "Utils/Timestep.h"
 #include "Components/Components.h"
-#include <filesystem>
+#include "Renderer/ForwardRenderer/ForwardRenderer.h"
+#include "Renderer/DeferredShading/DeferredRenderer.h"
 
 #include "Loaders/glTF2.0/glTFLoader.h"
+
+#include <filesystem>
+#include <imgui.h>
+
+#include "Generators/Textures/PerlinNoiseGenerator.h"
+
+#include "Logging/TracyProfiler.h"
 
 TestLayer::~TestLayer()
 {
@@ -55,7 +59,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Create camera entity
     m_cameraEntity = std::make_shared<Rapture::Entity>(activeScene->createEntity("Main Camera"));
-    
+    activeScene->setMainCamera(m_cameraEntity);
+
     // Add transform component (position camera back a bit)
     auto& transform = m_cameraEntity->addComponent<Rapture::TransformComponent>(
         glm::vec3(0.0f, 0.0f, 3.0f),  // Position
@@ -66,16 +71,22 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     // Add camera component
     auto& camera = m_cameraEntity->addComponent<Rapture::CameraComponent>(90.0f, 16.0f/9.0f, 0.1f, 100.0f);
     camera.isMainCamera = true;
+
     
     // Add camera controller component and set up input
     auto& controller = m_cameraEntity->addComponent<Rapture::CameraControllerComponent>();
     controller.controller.mouseSensitivity = 0.1f;
     controller.controller.movementSpeed = 5.0f;
 
+    auto& app = Rapture::Application::getInstance();
+    auto& project = app.getProject();
+
+
+    auto rootPath = project.getProjectRootDirectory();
 
     // Load a model for testing
-    auto loader = Rapture::ModelLoadersCache::getLoader("E:/Dev/Games/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf", activeScene);
-    loader->loadModel("E:/Dev/Games/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf");
+    auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf", activeScene);
+    loader->loadModel((rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf").string());
 
 
 
@@ -95,6 +106,23 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         45.0f                          // Outer cone angle
     );
 
+    light1.addComponent<Rapture::ShadowComponent>(2048, 2048);
+
+    // Light 2: A blue-tinted light to the left side
+    Rapture::Entity sunLight = activeScene->createEntity("Sun");
+    sunLight.addComponent<Rapture::TransformComponent>(
+        glm::vec3(-2.0f, 0.5f, -3.0f), // Position to the left of the sphere, same Z coordinate
+        glm::vec3(-1.504f, 0.0f, 0.0f),               // No rotation needed for point light
+        glm::vec3(0.2f)                // Small scale to make the cube compact
+    );
+
+    sunLight.addComponent<Rapture::LightComponent>(
+        glm::vec3(1.0f, 1.0f, 1.0f),  // Pure white color
+        1.2f                         // High intensity
+    );
+    sunLight.addComponent<Rapture::ShadowComponent>(2048, 2048);
+
+    auto perlinNoiseTexture = Rapture::PerlinNoiseGenerator::generateNoise(1024, 1024, 4, 0.5f, 2.0f, 8.0f);
 
     Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
 }
@@ -119,7 +147,7 @@ void TestLayer::notifyCameraChange()
 void TestLayer::onUpdate(float ts)
 {
 
-    
+    RAPTURE_PROFILE_SCOPE("TestLayer::onUpdate");
     // Get the active scene from SceneManager
     auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
     if (!activeScene) return;
@@ -161,6 +189,11 @@ void TestLayer::onUpdate(float ts)
     
     // Notify about camera changes (for ImGuizmo)
     notifyCameraChange();
+
+
+    //Rapture::ForwardRenderer::drawFrame(activeScene);
+    Rapture::DeferredRenderer::drawFrame(activeScene);
+
 }
 
 

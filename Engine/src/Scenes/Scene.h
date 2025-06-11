@@ -2,6 +2,7 @@
 
 #include <string>
 #include <entt/entt.hpp>
+#include "AccelerationStructures/TLAS.h"
 
 namespace Rapture {
 
@@ -10,7 +11,8 @@ namespace Rapture {
 
     struct SceneSettings {
         std::string sceneName;
-        bool frustumCullingEnabled = false;
+        bool frustumCullingEnabled = true;
+        std::shared_ptr<Entity> mainCamera;
     };
     
     class Scene {
@@ -31,9 +33,18 @@ namespace Rapture {
 
         std::string getSceneName() const { return m_config.sceneName; }
 
+        void setMainCamera(std::shared_ptr<Entity> camera) { m_config.mainCamera = camera; }
+
+        void registerBLAS(Entity& entity);
+        void registerBLAS(std::shared_ptr<Entity> entity);
+
+        void buildTLAS();
+
     private:
         entt::registry m_Registry;
         SceneSettings m_config;
+
+        std::unique_ptr<TLAS> m_tlas;
     
         friend class Entity;
     };

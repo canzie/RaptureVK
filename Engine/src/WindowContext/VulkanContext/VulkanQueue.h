@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vulkan/vulkan.h"
+#include <vulkan/vulkan.h>
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include <mutex>
@@ -15,6 +15,8 @@ namespace Rapture
 
         void submitCommandBuffers(VkFence fence = nullptr);
         void submitCommandBuffers(VkSubmitInfo& submitInfo, VkFence fence = nullptr);
+        void submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSubmitInfo& submitInfo, VkFence fence = nullptr);
+        void submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFence fence = nullptr);
 
         void addCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer);
         void waitIdle(); 
@@ -23,6 +25,8 @@ namespace Rapture
         VkResult presentQueue(VkPresentInfoKHR& presentInfo);
 
         VkQueue getQueueVk() const { return m_queue; }
+
+        void clear();
 
     private:
         std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;

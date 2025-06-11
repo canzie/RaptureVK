@@ -26,12 +26,49 @@ Sampler::Sampler(const TextureSpecification& spec) {
     samplerInfo.maxAnisotropy = 16.0f; // Could be made configurable
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    
+    // Enable shadow comparison for depth textures when requested
+    if (spec.shadowComparison && isDepthFormat(spec.format)) {
+        samplerInfo.compareEnable = VK_TRUE;
+        samplerInfo.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL; // Standard depth comparison
+    } else {
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    }
+    
     samplerInfo.mipmapMode = toVkSamplerMipmapMode(spec.filter);
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = static_cast<float>(spec.mipLevels);
+
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &m_sampler) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create texture sampler!");
+        throw std::runtime_error("Failed to create texture sampler!");
+    }
+}
+
+Sampler::Sampler(VkFilter filter, VkSamplerAddressMode wrap)
+{
+    auto& app = Application::getInstance();
+    VkDevice device = app.getVulkanContext().getLogicalDevice();
+
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = filter;
+    samplerInfo.minFilter = filter;
+    samplerInfo.addressModeU = wrap;
+    samplerInfo.addressModeV = wrap;
+    samplerInfo.addressModeW = wrap;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = 16.0f; // Could be made configurable
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 1.0f;
 
     if (vkCreateSampler(device, &samplerInfo, nullptr, &m_sampler) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create texture sampler!");
@@ -51,8 +88,7 @@ Sampler::~Sampler() {
 // Texture implementation
 Texture::Texture(const std::string& path, TextureFilter filter, TextureWrap wrap, bool isLoadingAsync) 
     : m_path(path), m_loadFromFile(true), 
-    m_image(VK_NULL_HANDLE), m_imageView(VK_NULL_HANDLE), 
-    m_allocation(VK_NULL_HANDLE), m_spec({}), m_sampler(nullptr) {
+    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_spec({}), m_sampler(nullptr) {
     
     
     // First, create specification from image file
@@ -71,8 +107,7 @@ Texture::Texture(const std::string& path, TextureFilter filter, TextureWrap wrap
 
 Texture::Texture(const TextureSpecification& spec) 
     : m_spec(spec), m_loadFromFile(false), 
-    m_image(VK_NULL_HANDLE), m_imageView(VK_NULL_HANDLE),
-     m_allocation(VK_NULL_HANDLE), m_sampler(nullptr) {
+    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_sampler(nullptr) {
     
     
     m_sampler = std::make_unique<Sampler>(spec);
@@ -97,10 +132,17 @@ Texture::~Texture() {
         vkDestroyImageView(device, m_imageView, nullptr);
     }
     
+    if (m_imageViewDepthOnly != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, m_imageViewDepthOnly, nullptr);
+    }
+    
+    if (m_imageViewStencilOnly != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, m_imageViewStencilOnly, nullptr);
+    }
+    
     if (m_image != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE) {
         vmaDestroyImage(allocator, m_image, m_allocation);
     }
-
 }
 
 void Texture::createSpecificationFromImageFile(const std::string& path, TextureFilter filter, TextureWrap wrap) {
@@ -127,7 +169,7 @@ void Texture::createSpecificationFromImageFile(const std::string& path, TextureF
     // Set default values for other properties
     m_spec.filter = TextureFilter::Linear;
     m_spec.wrap = TextureWrap::Repeat;
-    m_spec.srgb = true; // Assume sRGB for color textures
+    m_spec.srgb = false; // Assume sRGB for color textures
     m_spec.mipLevels = 1; // No mipmapping for now
 }
 
@@ -229,9 +271,198 @@ void Texture::loadImageFromFile(size_t threadId) {
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
 }
 
-void Texture::createImage() {
+void Texture::copyFromImage(
+    VkImage image, 
+    VkImageLayout otherLayout, 
+    VkImageLayout newLayout,
+    VkSemaphore waitSemaphore,
+    VkSemaphore signalSemaphore) {
+    if (m_image == VK_NULL_HANDLE || image == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("Cannot copy image: One or both VkImages are VK_NULL_HANDLE");
+        throw std::runtime_error("Cannot copy image: One or both VkImages are VK_NULL_HANDLE");
+    }
+
+    auto& app = Application::getInstance();
+    auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
+    
+    // Get or create a command pool for graphics operations
+    CommandPoolConfig poolConfig{};
+    poolConfig.queueFamilyIndex = app.getVulkanContext().getQueueFamilyIndices().graphicsFamily.value();
+    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    
+    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandBuffer = commandPool->getCommandBuffer();
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+
+    // Transition source image to transfer source optimal
+    VkImageMemoryBarrier sourceBarrier{};
+    sourceBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    sourceBarrier.oldLayout = otherLayout;
+    sourceBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    sourceBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    sourceBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    sourceBarrier.image = image;
+    sourceBarrier.subresourceRange.aspectMask = getImageAspectFlags(m_spec.format);
+    sourceBarrier.subresourceRange.baseMipLevel = 0;
+    sourceBarrier.subresourceRange.levelCount = m_spec.mipLevels;
+    sourceBarrier.subresourceRange.baseArrayLayer = 0;
+    sourceBarrier.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    sourceBarrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    sourceBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+    // Transition destination image to transfer destination optimal
+    VkImageMemoryBarrier destBarrier{};
+    destBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    destBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    destBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    destBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    destBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    destBarrier.image = m_image;
+    destBarrier.subresourceRange.aspectMask = getImageAspectFlags(m_spec.format);
+    destBarrier.subresourceRange.baseMipLevel = 0;
+    destBarrier.subresourceRange.levelCount = m_spec.mipLevels;
+    destBarrier.subresourceRange.baseArrayLayer = 0;
+    destBarrier.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    destBarrier.srcAccessMask = 0;
+    destBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    VkImageMemoryBarrier imageMemoryBarriers[] = {sourceBarrier, destBarrier};
+
+    // Execute the layout transitions
+    vkCmdPipelineBarrier(
+        commandBuffer->getCommandBufferVk(),
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        2, imageMemoryBarriers
+    );
+
+    // Copy the image with component mapping to handle color channel ordering
+    VkImageCopy copyRegion{};
+    copyRegion.srcSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    copyRegion.srcSubresource.mipLevel = 0;
+    copyRegion.srcSubresource.baseArrayLayer = 0;
+    copyRegion.srcSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    copyRegion.srcOffset = {0, 0, 0};
+    copyRegion.dstSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    copyRegion.dstSubresource.mipLevel = 0;
+    copyRegion.dstSubresource.baseArrayLayer = 0;
+    copyRegion.dstSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    copyRegion.dstOffset = {0, 0, 0};
+    copyRegion.extent = {m_spec.width, m_spec.height, m_spec.depth};
+
+    // Create a blit command to handle the color channel swap
+    VkImageBlit blitRegion{};
+    blitRegion.srcSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    blitRegion.srcSubresource.mipLevel = 0;
+    blitRegion.srcSubresource.baseArrayLayer = 0;
+    blitRegion.srcSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    blitRegion.srcOffsets[0] = {0, 0, 0};
+    blitRegion.srcOffsets[1] = {(int32_t)m_spec.width, (int32_t)m_spec.height, 1};
+    blitRegion.dstSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.dstSubresource.baseArrayLayer = 0;
+    blitRegion.dstSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    blitRegion.dstOffsets[0] = {0, 0, 0};
+    blitRegion.dstOffsets[1] = {(int32_t)m_spec.width, (int32_t)m_spec.height, 1};
+
+    // Use blit instead of copy to handle color channel ordering
+    vkCmdBlitImage(
+        commandBuffer->getCommandBufferVk(),
+        image,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        m_image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &blitRegion,
+        VK_FILTER_NEAREST
+    );
+
+    // Transition source image back to original layout
+    sourceBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    sourceBarrier.newLayout = otherLayout;
+    sourceBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    sourceBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+    // Transition destination image to final layout
+    destBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    destBarrier.newLayout = newLayout;
+    destBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    destBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    VkImageMemoryBarrier finalBarriers[] = {sourceBarrier, destBarrier};
+
+    // Execute the final layout transitions
+    vkCmdPipelineBarrier(
+        commandBuffer->getCommandBufferVk(),
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        2, finalBarriers
+    );
+
+    commandBuffer->end();
+
+    // Submit the command buffer
+    VkSubmitInfo submitInfo{};
+    if (waitSemaphore != VK_NULL_HANDLE) {
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = &waitSemaphore;
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_TRANSFER_BIT};
+        submitInfo.pWaitDstStageMask = waitStages;
+    }
+    if (signalSemaphore != VK_NULL_HANDLE) {
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &signalSemaphore;
+    }
+    //graphicsQueue->addCommandBuffer(commandBuffer);
+
+    graphicsQueue->submitQueue(commandBuffer, submitInfo, VK_NULL_HANDLE);
+    graphicsQueue->waitIdle();
+}
+
+VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask)
+{
+    VkImageMemoryBarrier barrier{};
+    // Image layout transitions for dynamic rendering
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = m_image;
+    barrier.subresourceRange.aspectMask = isDepthFormat(m_spec.format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    if (m_spec.format == TextureFormat::D24S8) {
+        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = srcAccessMask;
+    barrier.dstAccessMask = dstAccessMask;
+    return barrier;
+}
+
+void Texture::createImage()
+{
     auto& app = Application::getInstance();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    if (m_spec.width == 0 || m_spec.height == 0 || m_spec.depth == 0) {
+        RP_CORE_ERROR("Texture::createImage() - Invalid texture specification --- dimesnions should be greater than 0! width: {}, height: {}, depth: {}", m_spec.width, m_spec.height, m_spec.depth);
+        throw std::runtime_error("Texture::createImage() - Invalid texture specification!");
+    }
 
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -248,7 +479,12 @@ void Texture::createImage() {
     if (isDepthFormat(m_spec.format)) {
         imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     } else {
-    imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        
+        // Add storage image usage for compute shaders if requested
+        if (m_spec.storageImage) {
+            imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+        }
     }
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -258,10 +494,9 @@ void Texture::createImage() {
     allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
     if (vmaCreateImage(allocator, &imageInfo, &allocInfo, &m_image, &m_allocation, nullptr) != VK_SUCCESS) {
-        RP_CORE_ERROR("Failed to create image!");
-        throw std::runtime_error("Failed to create image!");
+        RP_CORE_ERROR("Texture::createImage() - Failed to create image!");
+        throw std::runtime_error("Texture::createImage() - Failed to create image!");
     }
-    
 }
 
 void Texture::createImageView() {
@@ -279,18 +514,74 @@ void Texture::createImageView() {
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
 
+
     if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageView) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create texture image view!");
         throw std::runtime_error("Failed to create texture image view!");
     }
-    
+
+    // Create additional views for depth-stencil formats
+    if (isDepthFormat(m_spec.format)) {
+
+        // Create depth-only view
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+        viewInfo.components.g = VK_COMPONENT_SWIZZLE_R;
+        viewInfo.components.b = VK_COMPONENT_SWIZZLE_R;
+        viewInfo.components.a = VK_COMPONENT_SWIZZLE_ONE;
+        if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageViewDepthOnly) != VK_SUCCESS) {
+            RP_CORE_ERROR("Failed to create depth-only image view!");
+            throw std::runtime_error("Failed to create depth-only image view!");
+        }
+    }
+    if (hasStencilComponent(m_spec.format)) {
+        // Create stencil-only view
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+        // Force R,G,B to stencil value (usually read into R), and Alpha to ONE for stencil view.
+        viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+        viewInfo.components.g = VK_COMPONENT_SWIZZLE_G;
+        viewInfo.components.b = VK_COMPONENT_SWIZZLE_B;
+        viewInfo.components.a = VK_COMPONENT_SWIZZLE_A;
+        if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageViewStencilOnly) != VK_SUCCESS) {
+            RP_CORE_ERROR("Failed to create stencil-only image view!");
+            throw std::runtime_error("Failed to create stencil-only image view!");
+        }
+    }
 }
 
-VkDescriptorImageInfo Texture::getDescriptorImageInfo() const {
+VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) const {
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    switch (viewType) {
+        case TextureViewType::DEFAULT:
+        case TextureViewType::COLOR:
+            imageInfo.imageView = m_imageView;
+            break;
+        case TextureViewType::STENCIL:
+            imageInfo.imageView = m_imageViewStencilOnly;
+            break;
+        case TextureViewType::DEPTH:
+            imageInfo.imageView = m_imageViewDepthOnly;
+            break;
+        default:
+            RP_CORE_WARN("Texture::getDescriptorImageInfo - Invalid texture view type! Using default view.");
+            imageInfo.imageView = m_imageView;
+            break;
+    }
+    if ( imageInfo.imageView == VK_NULL_HANDLE) {
+        RP_CORE_WARN("Texture::getDescriptorImageInfo - Invalid texture view type! Using default view.");
+        imageInfo.imageView = m_imageView;
+    }
+
+    imageInfo.sampler = m_sampler->getSamplerVk();
+    return imageInfo;
+}
+
+VkDescriptorImageInfo Texture::getStorageImageDescriptorInfo() const {
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL; // Storage images use GENERAL layout
     imageInfo.imageView = m_imageView;
-    imageInfo.sampler = m_sampler->getSampler();
+    imageInfo.sampler = VK_NULL_HANDLE; // Storage images don't use samplers
     return imageInfo;
 }
 
@@ -431,14 +722,14 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
     commandBuffer->end();
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
-    submitInfo.pCommandBuffers = &commandBufferVk;
+    //VkSubmitInfo submitInfo{};
+    //submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    //submitInfo.commandBufferCount = 1;
+    //VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
+    //submitInfo.pCommandBuffers = &commandBufferVk;
     
-    graphicsQueue->addCommandBuffer(commandBuffer);
-    graphicsQueue->submitCommandBuffers(VK_NULL_HANDLE);
+    //graphicsQueue->addCommandBuffer(commandBuffer);
+    graphicsQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
     
 
@@ -484,16 +775,16 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
 
     commandBuffer->end();
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
-    submitInfo.pCommandBuffers = &commandBufferVk;
+    //VkSubmitInfo submitInfo{};
+    //submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    //submitInfo.commandBufferCount = 1;
+    //VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
+    //submitInfo.pCommandBuffers = &commandBufferVk;
 
     
     auto& vulkanContext = app.getVulkanContext();
-    queue->addCommandBuffer(commandBuffer);
-    queue->submitCommandBuffers(VK_NULL_HANDLE);
+    //queue->addCommandBuffer(commandBuffer);
+    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     queue->waitIdle();
 
 }

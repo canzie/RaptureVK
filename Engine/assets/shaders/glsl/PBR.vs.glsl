@@ -3,7 +3,7 @@
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
-layout(location = 3) in vec4 aTangent;
+layout(location = 3) in vec3 aTangent;
 
 layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec2 fragTexCoord;
@@ -39,7 +39,7 @@ void main() {
     fragTangent = T;
     
     // Calculate bitangent using the handedness sign from aTangent.w
-    fragBitangent = normalize(cross(N, T) * aTangent.w);
+    fragBitangent = normalize(cross(N, T));
     
     // Pass through other attributes
     fragTexCoord = aTexCoord;

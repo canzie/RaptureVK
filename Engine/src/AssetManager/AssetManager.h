@@ -62,6 +62,49 @@ namespace Rapture {
             auto [asset, handle] = s_activeAssetManager->importDefaultAsset(assetType);
             return std::make_pair(asset->getUnderlyingAsset<T>(), handle);
         }
+        
+        // Virtual asset registration methods
+        static AssetHandle registerVirtualAsset(
+            std::shared_ptr<AssetVariant> asset,
+            const std::string& virtualName,
+            AssetType assetType
+        ) {
+            if (!s_isInitialized || !s_activeAssetManager) {
+                RP_CORE_ERROR("AssetManager not initialized");
+                return AssetHandle();
+            }
+            return s_activeAssetManager->registerVirtualAsset(asset, virtualName, assetType);
+        }
+        
+        static bool unregisterVirtualAsset(AssetHandle handle) {
+            if (!s_isInitialized || !s_activeAssetManager) {
+                RP_CORE_ERROR("AssetManager not initialized");
+                return false;
+            }
+            return s_activeAssetManager->unregisterVirtualAsset(handle);
+        }
+        
+        template<typename T>
+        static std::shared_ptr<T> getVirtualAsset(const std::string& virtualName) {
+            if (!s_isInitialized || !s_activeAssetManager) {
+                RP_CORE_ERROR("AssetManager not initialized");
+                return nullptr;
+            }
+            AssetHandle handle = s_activeAssetManager->getVirtualAssetByName(virtualName);
+            if (UUIDGenerator::IsValid(handle)) {
+                return getAsset<T>(handle);
+            }
+            return nullptr;
+        }
+        
+        static std::vector<AssetHandle> getVirtualAssetsByType(AssetType type) {
+            if (!s_isInitialized || !s_activeAssetManager) {
+                RP_CORE_ERROR("AssetManager not initialized");
+                return {};
+            }
+            return s_activeAssetManager->getVirtualAssetsByType(type);
+        }
+
 
 
 

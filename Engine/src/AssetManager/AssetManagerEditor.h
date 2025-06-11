@@ -30,8 +30,22 @@ namespace Rapture {
 
             std::pair<std::shared_ptr<Asset>, AssetHandle> importDefaultAsset(AssetType assetType);
 
+            
+            AssetHandle registerVirtualAsset(
+                std::shared_ptr<AssetVariant> asset,
+                const std::string& virtualName, 
+                AssetType assetType
+            );
+            
+            bool unregisterVirtualAsset(AssetHandle handle);
+            
+            // Virtual asset query methods
+            AssetHandle getVirtualAssetByName(const std::string& virtualName) const;
+            std::vector<AssetHandle> getVirtualAssetsByType(AssetType type) const;
+
             const AssetRegistry& getAssetRegistry() const { return m_assetRegistry; }
             const AssetMap& getLoadedAssets() const { return m_loadedAssets; }
+            
 
         private:
             // Determine asset type from file extension

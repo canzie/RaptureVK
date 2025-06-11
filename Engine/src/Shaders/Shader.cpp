@@ -2,13 +2,19 @@
 
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
+#include "Buffers/Descriptors/BindlessDescriptorManager.h"
+#include "ShaderReflections.h"
 
 #include <fstream>
 
 namespace Rapture {
 
 Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath) {
-    createGraphicsShader(vertexPath, fragmentPath);
+    if (fragmentPath.empty()) {
+        createGraphicsShader(vertexPath);
+    } else {
+        createGraphicsShader(vertexPath, fragmentPath);
+    }
     createDescriptorSetLayout();
     
     // Test SPIRV-Reflect library by reflecting on our shaders
@@ -19,6 +25,12 @@ Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::p
 
 Shader::Shader(const std::filesystem::path &computePath)
 {
+    createComputeShader(computePath);
+    createDescriptorSetLayout();
+    
+    // Test SPIRV-Reflect library by reflecting on our shaders
+    RP_CORE_INFO("Testing SPIRV-Reflect functionality for compute shader:");
+    printDescriptorSetInfos(m_descriptorSetInfos);
 }
 
 Shader::~Shader() {
@@ -37,6 +49,7 @@ Shader::~Shader() {
 
 void Shader::createGraphicsShader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath)
 {
+
     std::vector<char> vertexCode = readFile(vertexPath);
     std::vector<char> fragmentCode = readFile(fragmentPath);
 
@@ -49,6 +62,12 @@ void Shader::createGraphicsShader(const std::filesystem::path& vertexPath, const
     m_materialSets = extractMaterialSets(vertexCode);
     std::vector<DescriptorInfo> fragmentMaterialSets = extractMaterialSets(fragmentCode);
 
+    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{vertexCode, VK_SHADER_STAGE_VERTEX_BIT}, {fragmentCode, VK_SHADER_STAGE_FRAGMENT_BIT}});
+    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Print push constant reflection data
+    RP_CORE_INFO("Push Constant Reflection Data:");
+    printPushConstantLayouts(pushConstantInfos);
 
     // Helper lambda to check if a descriptor is already in the material sets
     auto isDescriptorDuplicate = [](const std::vector<DescriptorInfo>& sets, const DescriptorInfo& info) {
@@ -84,10 +103,50 @@ void Shader::createGraphicsShader(const std::filesystem::path& vertexPath, const
 
 }
 
+void Shader::createGraphicsShader(const std::filesystem::path &vertexPath) {
+
+    std::vector<char> vertexCode = readFile(vertexPath);
+
+    // Collect descriptor information before creating shader modules
+    m_descriptorSetInfos = collectDescriptorSetInfo(vertexCode, {});
+
+    createShaderModule(vertexCode, ShaderType::VERTEX);
+
+
+    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{vertexCode, VK_SHADER_STAGE_VERTEX_BIT}});
+    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Print push constant reflection data
+    RP_CORE_INFO("Push Constant Reflection Data:");
+    printPushConstantLayouts(pushConstantInfos);
+
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = m_sources[ShaderType::VERTEX];
+    vertShaderStageInfo.pName = "main";
+    vertShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
+
+    m_stages.push_back(vertShaderStageInfo);
+
+}
+
 void Shader::createComputeShader(const std::filesystem::path &computePath) {
     std::vector<char> computeCode = readFile(computePath);
 
+    // Collect descriptor information before creating shader modules
+    m_descriptorSetInfos = collectDescriptorSetInfo({}, computeCode);
+
     createShaderModule(computeCode, ShaderType::COMPUTE);
+
+    // Extract push constants
+    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{computeCode, VK_SHADER_STAGE_COMPUTE_BIT}});
+    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Print push constant reflection data
+    RP_CORE_INFO("Compute Shader Push Constant Reflection Data:");
+    printPushConstantLayouts(pushConstantInfos);
 
     VkPipelineShaderStageCreateInfo computeShaderStageInfo{};
     computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -97,7 +156,6 @@ void Shader::createComputeShader(const std::filesystem::path &computePath) {
     computeShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
 
     m_stages.push_back(computeShaderStageInfo);
-    
 }
 
 void Shader::createShaderModule(const std::vector<char>& code, ShaderType type) {
@@ -157,6 +215,51 @@ void Shader::createDescriptorSetLayout()
     // Create a new layout for each descriptor set
     for (const auto& setInfo : m_descriptorSetInfos) {
         createDescriptorSetLayoutFromInfo(setInfo);
+    }
+
+    // Check if shader actually uses set 3 for bindless descriptors
+    bool hasSet3 = false;
+    for (const auto& setInfo : m_descriptorSetInfos) {
+        if (setInfo.setNumber == 3) {
+            hasSet3 = true;
+            break;
+        }
+    }
+    
+    // If shader uses set 3, ensure intermediate sets have dummy layouts and set 3 has bindless layout
+    if (hasSet3) {
+        auto bindlessDescriptorArray = BindlessDescriptorManager::getPool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        if (bindlessDescriptorArray) {
+            Application& app = Application::getInstance();
+            VkDevice device = app.getVulkanContext().getLogicalDevice();
+            
+            // Ensure we have at least 4 slots for sets 0, 1, 2, 3
+            if (m_descriptorSetLayouts.size() <= 3) {
+                m_descriptorSetLayouts.resize(4, VK_NULL_HANDLE);
+            }
+            
+            // Create empty layouts for any missing intermediate sets (1, 2)
+            for (size_t i = 0; i < 3; ++i) {
+                if (m_descriptorSetLayouts[i] == VK_NULL_HANDLE) {
+                    VkDescriptorSetLayoutCreateInfo emptyLayoutInfo{};
+                    emptyLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                    emptyLayoutInfo.bindingCount = 0;
+                    emptyLayoutInfo.pBindings = nullptr;
+                    
+                    VkDescriptorSetLayout emptyLayout;
+                    if (vkCreateDescriptorSetLayout(device, &emptyLayoutInfo, nullptr, &emptyLayout) == VK_SUCCESS) {
+                        m_descriptorSetLayouts[i] = emptyLayout;
+                        RP_CORE_INFO("Created empty descriptor set layout for intermediate set {}", i);
+                    } else {
+                        RP_CORE_ERROR("Failed to create empty descriptor set layout for set {}", i);
+                    }
+                }
+            }
+            
+            // Now set the bindless layout for set 3 (overriding any existing layout)
+            m_descriptorSetLayouts[3] = bindlessDescriptorArray->getLayout();
+            RP_CORE_INFO("Set bindless descriptor set layout for set 3");
+        }
     }
 
     if (m_descriptorSetLayouts.empty()) {
@@ -263,9 +366,20 @@ std::vector<DescriptorSetInfo> Shader::collectDescriptorSetInfo(
         spvReflectDestroyShaderModule(&module);
     };
 
-    // Process both shader stages
-    processShaderModule(vertexSpirv, VK_SHADER_STAGE_VERTEX_BIT);
-    processShaderModule(fragmentSpirv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    // Process shader stages
+    if (!vertexSpirv.empty()) {
+        processShaderModule(vertexSpirv, VK_SHADER_STAGE_VERTEX_BIT);
+    }
+
+    if (!fragmentSpirv.empty()) {
+        if (vertexSpirv.empty()) {
+            // This is a compute shader (compute code passed as fragmentSpirv)
+            processShaderModule(fragmentSpirv, VK_SHADER_STAGE_COMPUTE_BIT);
+        } else {
+            // This is a fragment shader
+            processShaderModule(fragmentSpirv, VK_SHADER_STAGE_FRAGMENT_BIT);
+        }
+    }
 
     // Convert map to vector, sorted by set number
     std::vector<DescriptorSetInfo> result;
@@ -340,7 +454,7 @@ namespace {
     }
 }
 
-void Rapture::printDescriptorSetInfo(const DescriptorSetInfo& setInfo) {
+void printDescriptorSetInfo(const DescriptorSetInfo& setInfo) {
     RP_CORE_INFO("Descriptor Set {0}:", setInfo.setNumber);
     
     if (setInfo.bindings.empty()) {
@@ -357,7 +471,7 @@ void Rapture::printDescriptorSetInfo(const DescriptorSetInfo& setInfo) {
     }
 }
 
-void Rapture::printDescriptorSetInfos(const std::vector<DescriptorSetInfo>& setInfos) {
+void printDescriptorSetInfos(const std::vector<DescriptorSetInfo>& setInfos) {
     if (setInfos.empty()) {
         RP_CORE_INFO("No descriptor sets found in shader");
         return;
@@ -366,6 +480,26 @@ void Rapture::printDescriptorSetInfos(const std::vector<DescriptorSetInfo>& setI
     RP_CORE_INFO("Found {0} descriptor set(s):", setInfos.size());
     for (const auto& setInfo : setInfos) {
         printDescriptorSetInfo(setInfo);
+    }
+}
+
+void printPushConstantLayout(const PushConstantInfo& pushConstantInfo) {
+    RP_CORE_INFO("Push Constant Block:");
+    RP_CORE_INFO("\t Name: {0}", pushConstantInfo.name);
+    RP_CORE_INFO("\t Offset: {0} bytes", pushConstantInfo.offset);
+    RP_CORE_INFO("\t Size: {0} bytes", pushConstantInfo.size);
+    RP_CORE_INFO("\t Stages: {0}", shaderStageFlagsToString(pushConstantInfo.stageFlags));
+}
+
+void printPushConstantLayouts(const std::vector<PushConstantInfo>& pushConstantInfos) {
+    if (pushConstantInfos.empty()) {
+        RP_CORE_INFO("No push constants found in shader");
+        return;
+    }
+
+    RP_CORE_INFO("Found {0} push constant block(s):", pushConstantInfos.size());
+    for (const auto& pushConstantInfo : pushConstantInfos) {
+        printPushConstantLayout(pushConstantInfo);
     }
 }
 

@@ -10,7 +10,8 @@ namespace Rapture {
     class Scene;
     class World;
     class Entity;
-    
+    class SwapChain;
+
 /**
  * EventBus - A templated event dispatcher for the observer pattern
  * Allows subscribing to and publishing events with arbitrary parameters

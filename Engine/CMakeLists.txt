@@ -10,23 +10,30 @@ file(GLOB_RECURSE ENGINE_SOURCES
 
 
 
+# Create engine library
+add_library(${ENGINE_NAME} STATIC ${ENGINE_SOURCES})
+
 # Debug mode settings - check in multiple ways
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR RAPTURE_DEBUG)
     message(STATUS "Debug build detected - Enabling debug flags")
     add_definitions(-DRAPTURE_DEBUG)
     add_definitions(-D_DEBUG)
-elseif(MSVC)
-    # For MSVC, check if we're in debug configuration
-    add_compile_definitions($<$<CONFIG:Debug>:RAPTURE_DEBUG>)
-    add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
-    
-    message(STATUS "MSVC build - Debug flags will be enabled in Debug configuration only")
+    add_definitions(-DRAPTURE_TRACY_PROFILING_ENABLED=1)
+    add_definitions(-DTRACY_ENABLE)
+    add_definitions(-DTRACY_MEMORY)
+    if(MSVC)
+        target_compile_options(${ENGINE_NAME} PRIVATE /W4 /WX)
+        add_compile_definitions($<$<CONFIG:Debug>:RAPTURE_DEBUG>)
+        add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
+        message(STATUS "MSVC Debug build - Enabling debug flags")
+    else()
+        target_compile_options(${ENGINE_NAME} PRIVATE -Wall -Wextra -pedantic -Werror)
+        message(STATUS "GCC Debug build - Enabling debug flags")
+    endif()
 else()
     message(STATUS "Release build - Debug flags disabled")
+    #add_definitions(-DNDEBUG)
 endif()
-
-# Create engine library
-add_library(${ENGINE_NAME} STATIC ${ENGINE_SOURCES})
 
 # Create engine executable (changed from library)
 #add_executable(${ENGINE_NAME} ${ENGINE_SOURCES})

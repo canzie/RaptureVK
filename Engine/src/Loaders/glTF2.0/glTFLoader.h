@@ -234,7 +234,7 @@ namespace Rapture
             s_initialized = true;
         }
 
-        static std::shared_ptr<glTF2Loader> getLoader(const std::string& filepath, std::shared_ptr<Scene> scene=nullptr){
+        static std::shared_ptr<glTF2Loader> getLoader(const std::filesystem::path& filepath, std::shared_ptr<Scene> scene=nullptr){
             if (!s_initialized){
                 RP_CORE_ERROR("ModelLoadersCache - Not initialized");
                 return nullptr;
@@ -244,7 +244,7 @@ namespace Rapture
                 if (auto loader = s_loaders[filepath].lock()){
                     return loader;
                 } else {
-                    RP_CORE_WARN("ModelLoadersCache - Loader for '{}' expired, removing from cache", filepath);
+                    RP_CORE_WARN("ModelLoadersCache - Loader for '{}' expired, removing from cache", filepath.string());
                     s_loaders.erase(filepath);
                 }
             }
@@ -256,8 +256,8 @@ namespace Rapture
                 std::lock_guard<std::mutex> lock(s_mutex);
 
 
-                if (!loader->initialize(filepath)){
-                    RP_CORE_ERROR("ModelLoadersCache::getLoader - Failed to initialize loader for '{}'", filepath);
+                if (!loader->initialize(filepath.string())){
+                    RP_CORE_ERROR("ModelLoadersCache::getLoader - Failed to initialize loader for '{}'", filepath.string());
                     return nullptr;
                 }
                 s_loaders[filepath] = loader;
@@ -299,7 +299,7 @@ namespace Rapture
     private:
         // Maps the filepath to the loader
         static bool s_initialized;
-        static std::map<std::string, std::weak_ptr<glTF2Loader>> s_loaders;
+        static std::map<std::filesystem::path, std::weak_ptr<glTF2Loader>> s_loaders;
         static std::mutex s_mutex;
     };
 }

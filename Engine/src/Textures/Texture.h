@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vma/vk_mem_alloc.h"
+#include <vk_mem_alloc.h>
 #include "TextureCommon.h"
 #include <string>
 #include <memory>
@@ -10,9 +10,10 @@ namespace Rapture {
 class Sampler {
 public:
     Sampler(const TextureSpecification& spec);
+    Sampler(VkFilter filter, VkSamplerAddressMode wrap);
     ~Sampler();
 
-    VkSampler getSampler() const { return m_sampler; }
+    VkSampler getSamplerVk() const { return m_sampler; }
 
 private:
     VkSampler m_sampler;
@@ -35,12 +36,18 @@ public:
     // Getters
     VkImage getImage() const { return m_image; }
     VkImageView getImageView() const { return m_imageView; }
+    VkImageView getDepthOnlyImageView() const { return m_imageViewDepthOnly; }
+    VkImageView getStencilOnlyImageView() const { return m_imageViewStencilOnly; }
     const Sampler& getSampler() const { return *m_sampler; }
     const TextureSpecification& getSpecification() const { return m_spec; }
     VkFormat getFormat() const { return toVkFormat(m_spec.format); }
     
+
     // Get descriptor image info for use in descriptor sets
-    VkDescriptorImageInfo getDescriptorImageInfo() const;
+    VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType=TextureViewType::DEFAULT) const;
+    
+    // Get descriptor image info for storage images (used in compute shaders)
+    VkDescriptorImageInfo getStorageImageDescriptorInfo() const;
     
     // Static method to create a default white texture
     static std::shared_ptr<Texture> createDefaultWhiteTexture();
@@ -54,6 +61,10 @@ public:
     bool isReadyForSampling() const {
         return m_readyForSampling;
     }
+
+    void copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLayout newLayout, VkSemaphore waitSemaphore=VK_NULL_HANDLE, VkSemaphore signalSemaphore=VK_NULL_HANDLE);
+
+    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask);
 
 private:
     void createImage();
@@ -73,8 +84,12 @@ private:
     
     std::unique_ptr<Sampler> m_sampler;
     VkImage m_image;
-    VkImageView m_imageView;
+    VkImageView m_imageView{VK_NULL_HANDLE};
+    VkImageView m_imageViewStencilOnly{VK_NULL_HANDLE};
+    VkImageView m_imageViewDepthOnly{VK_NULL_HANDLE};
+
     VmaAllocation m_allocation;
+
 
     TextureSpecification m_spec;
 

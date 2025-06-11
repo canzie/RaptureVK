@@ -91,6 +91,7 @@ namespace Rapture {
 
 
         AssetMetadata metadata;
+        metadata.m_storageType = AssetStorageType::Disk;
         metadata.m_filePath = path;
 
         if (assetType == AssetType::None) {
@@ -157,6 +158,7 @@ namespace Rapture {
                 // Create metadata for the default texture
                 AssetMetadata metadata;
                 metadata.m_assetType = AssetType::Texture;
+                metadata.m_storageType = AssetStorageType::Disk; // Default assets are treated as disk assets
                 metadata.m_filePath = "<default_white_texture>"; // Special path to indicate default asset
                 metadata.m_indices = {0};
 
@@ -208,6 +210,92 @@ namespace Rapture {
         
         RP_CORE_WARN("AssetManagerEditor::determineAssetType - Unknown asset type for extension: {}", extension);
         return AssetType::None;
+    }
+
+
+    AssetHandle AssetManagerEditor::registerVirtualAsset(
+        std::shared_ptr<AssetVariant> asset,
+        const std::string& virtualName, 
+        AssetType assetType
+    ) {
+        if (!asset) {
+            RP_CORE_ERROR("AssetManagerEditor::registerVirtualAsset - Asset variant is null");
+            return AssetHandle{};
+        }
+
+        if (virtualName.empty()) {
+            RP_CORE_ERROR("AssetManagerEditor::registerVirtualAsset - Virtual name cannot be empty");
+            return AssetHandle{};
+        }
+
+        // Check if virtual asset with this name already exists
+        for (const auto& [handle, metadata] : m_assetRegistry) {
+            if (metadata.isVirtualAsset() && metadata.m_virtualName == virtualName && metadata.m_assetType != assetType) {
+                RP_CORE_WARN("AssetManagerEditor::registerVirtualAsset - Virtual asset with name '{}' already exists, returning existing handle", virtualName);
+                return handle;
+            }
+        }
+
+        // Generate new handle
+        AssetHandle handle = UUIDGenerator::Generate();
+
+        // Create Asset wrapper
+        auto assetWrapper = std::make_shared<Asset>(asset);
+        assetWrapper->m_handle = handle;
+        assetWrapper->m_status = AssetStatus::LOADED; // Virtual assets are immediately loaded
+
+        // Create metadata
+        AssetMetadata metadata;
+        metadata.m_assetType = assetType;
+        metadata.m_storageType = AssetStorageType::Virtual;
+        metadata.m_virtualName = virtualName;
+
+        // Store in maps
+        m_loadedAssets[handle] = assetWrapper;
+        m_assetRegistry[handle] = metadata;
+
+        RP_CORE_INFO("AssetManagerEditor::registerVirtualAsset - Registered virtual {} asset: '{}'", AssetTypeToString(assetType), virtualName);
+        return handle;
+    }
+
+    bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle) {
+        auto registryIt = m_assetRegistry.find(handle);
+        if (registryIt == m_assetRegistry.end()) {
+            RP_CORE_WARN("AssetManagerEditor::unregisterVirtualAsset - Asset handle not found in registry");
+            return false;
+        }
+
+        const AssetMetadata& metadata = registryIt->second;
+        if (!metadata.isVirtualAsset()) {
+            RP_CORE_ERROR("AssetManagerEditor::unregisterVirtualAsset - Cannot unregister non-virtual asset: {}", metadata.m_filePath.string());
+            return false;
+        }
+
+        // Remove from both maps
+        m_loadedAssets.erase(handle);
+        m_assetRegistry.erase(handle);
+
+        RP_CORE_INFO("AssetManagerEditor::unregisterVirtualAsset - Unregistered virtual asset: '{}'", metadata.m_virtualName);
+        return true;
+    }
+
+    AssetHandle AssetManagerEditor::getVirtualAssetByName(const std::string& virtualName) const {
+        for (const auto& [handle, metadata] : m_assetRegistry) {
+            if (metadata.isVirtualAsset() && metadata.m_virtualName == virtualName) {
+                return handle;
+            }
+        }
+        return AssetHandle{}; // Invalid handle if not found
+    }
+
+    std::vector<AssetHandle> AssetManagerEditor::getVirtualAssetsByType(AssetType type) const {
+        std::vector<AssetHandle> result;
+        for (const auto& [handle, metadata] : m_assetRegistry) {
+            if (metadata.isVirtualAsset() && metadata.m_assetType == type) {
+                result.push_back(handle);
+            }
+        }
+        return result;
     }
 
 

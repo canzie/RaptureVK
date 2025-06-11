@@ -21,7 +21,7 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
         m_name = name;
     }
 
-    RP_CORE_INFO("Creating MaterialInstance for {0} with size {1}", m_name, material->getSizeBytes());
+    //RP_CORE_INFO("Creating MaterialInstance for {0} with size {1}", m_name, material->getSizeBytes());
 
     if (allocator == nullptr) {
         RP_CORE_ERROR("MaterialInstance::MaterialInstance - allocator is nullptr!");

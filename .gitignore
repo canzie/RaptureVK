@@ -49,6 +49,12 @@ release/
 # git
 .git
 
+# cache
+.cache/
+
+
 # vendor
 Engine/vendor/*
 !Engine/vendor/vendor_libraries.cmake
+
+!Editor/vendor/*
