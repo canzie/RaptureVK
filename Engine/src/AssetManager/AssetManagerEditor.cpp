@@ -72,7 +72,7 @@ namespace Rapture {
         return s_nullMetadata;
     }
 
-    std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(std::filesystem::path path, std::vector<uint32_t> indices)
+    std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig)
     {
 
 
@@ -84,7 +84,7 @@ namespace Rapture {
 
         // 1. check if the asset is already in the registry
         for (const auto& [handle, metadata] : m_assetRegistry) {
-            if (metadata.m_filePath == path && metadata.m_indices == indices) {
+            if (metadata.m_filePath == path && metadata.m_importConfig == importConfig) {
                 return std::make_pair(getAsset(handle), handle);
             }
         }
@@ -93,10 +93,11 @@ namespace Rapture {
         AssetMetadata metadata;
         metadata.m_storageType = AssetStorageType::Disk;
         metadata.m_filePath = path;
-
+        
         metadata.m_assetType = determineAssetType(path.string());
 
-        metadata.m_indices = indices;
+        metadata.m_indices = {};
+        metadata.m_importConfig = importConfig;
 
         if (metadata.m_assetType == AssetType::None) {
             RP_CORE_ERROR("AssetManagerEditor::importAsset - Unknown asset type for extension: {}", path.extension().string());
@@ -199,7 +200,7 @@ namespace Rapture {
         }
         else if (extension == ".rmat") {
             return AssetType::Material;
-        } else if (extension == ".spv") {
+        } else if (extension == ".spv" || extension == ".glsl") {
             return AssetType::Shader;
         }
         // Add more asset types as needed

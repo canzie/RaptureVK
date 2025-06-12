@@ -23,7 +23,6 @@ set GLM_VERSION=1.0.1
 set ENTT_VERSION_TAG=v3.13.0
 set SPDLOG_VERSION_TAG=v1.14.1
 set STB_IMAGE_VERSION=master
-set VMA_VERSION_TAG=v3.3.0
 set SPIRV_REFLECT_VERSION_TAG=main
 set YYJSON_VERSION_TAG=0.11.1
 set TRACY_VERSION_TAG=0.12.0
@@ -35,7 +34,6 @@ set IMGUI_BRANCH=docking
 set ENTT_URL=https://github.com/skypjack/entt/archive/refs/tags/%ENTT_VERSION_TAG%.zip
 set SPDLOG_URL=https://github.com/gabime/spdlog/archive/refs/tags/%SPDLOG_VERSION_TAG%.zip
 set STB_IMAGE_H_URL=https://raw.githubusercontent.com/nothings/stb/%STB_IMAGE_VERSION%/stb_image.h
-set VMA_URL=https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/archive/refs/tags/%VMA_VERSION_TAG%.zip
 set SPIRV_REFLECT_URL=https://github.com/KhronosGroup/SPIRV-Reflect/archive/refs/heads/%SPIRV_REFLECT_VERSION_TAG%.zip
 set YYJSON_URL=https://github.com/ibireme/yyjson/archive/refs/tags/%YYJSON_VERSION_TAG%.zip
 set TRACY_URL=https://github.com/wolfpld/tracy/archive/refs/tags/v%TRACY_VERSION_TAG%.zip
@@ -52,7 +50,6 @@ CALL :PrintLibInfo "ImGui" "%IMGUI_BRANCH% (branch)" "%IMGUI_REPO%"
 CALL :PrintLibInfo "EnTT" "%ENTT_VERSION_TAG%" "%ENTT_URL%"
 CALL :PrintLibInfo "spdlog" "%SPDLOG_VERSION_TAG%" "%SPDLOG_URL%"
 CALL :PrintLibInfo "stb_image" "%STB_IMAGE_VERSION% (tag/commit)" "%STB_IMAGE_H_URL%"
-CALL :PrintLibInfo "VMA" "%VMA_VERSION_TAG%" "%VMA_URL%"
 CALL :PrintLibInfo "SPIRV-Reflect" "%SPIRV_REFLECT_VERSION_TAG%" "%SPIRV_REFLECT_URL%"
 CALL :PrintLibInfo "yyjson" "%YYJSON_VERSION_TAG%" "%YYJSON_URL%"
 CALL :PrintLibInfo "Tracy" "%TRACY_VERSION_TAG%" "%TRACY_URL%"
@@ -233,31 +230,6 @@ echo Creating stb_image.cpp...
 ) > stb_image\stb_image.cpp
 echo stb_image setup complete.
 
-REM --- Vulkan Memory Allocator (VMA) ---
-echo.
-set VMA_VERSION_NO_V=%VMA_VERSION_TAG:v=%
-echo Setting up Vulkan Memory Allocator %VMA_VERSION_TAG% (extracted dir expected: VulkanMemoryAllocator-%VMA_VERSION_NO_V%)...
-if exist VulkanMemoryAllocator rmdir /s /q VulkanMemoryAllocator 2>nul
-if exist VulkanMemoryAllocator-%VMA_VERSION_NO_V% rmdir /s /q VulkanMemoryAllocator-%VMA_VERSION_NO_V% 2>nul
-curl -L %VMA_URL% -o vma.zip
-if errorlevel 1 ( echo ERROR: Failed to download Vulkan Memory Allocator. && pause && exit /b 1 )
-echo Extracting Vulkan Memory Allocator...
-tar -xf vma.zip
-if errorlevel 1 ( echo ERROR: Failed to extract Vulkan Memory Allocator. && pause && exit /b 1 )
-
-if not exist "VulkanMemoryAllocator-%VMA_VERSION_NO_V%" (
-    echo ERROR: Expected extracted directory "VulkanMemoryAllocator-%VMA_VERSION_NO_V%" not found.
-    pause
-    exit /b 1
-)
-ren "VulkanMemoryAllocator-%VMA_VERSION_NO_V%" VulkanMemoryAllocator
-if errorlevel 1 ( 
-    echo ERROR: Failed to rename "VulkanMemoryAllocator-%VMA_VERSION_NO_V%" to VulkanMemoryAllocator.
-    pause
-    exit /b 1
-)
-del vma.zip
-echo Vulkan Memory Allocator setup complete.
 
 REM --- SPIRV-Reflect ---
 echo.
@@ -371,11 +343,12 @@ if errorlevel 1 (
 del tracy.zip
 echo Tracy setup complete.
 
+
 REM --- Final Directory Verification ---
 echo.
 echo --- Verifying final directory structure in %CD% --- 
 echo Your vendor_libraries.cmake file should be configured for these directory names.
-set EXPECTED_DIRS=GLFW glm imgui entt spdlog stb_image VulkanMemoryAllocator SPIRV-Reflect yyjson tracy
+set EXPECTED_DIRS=GLFW glm imgui entt spdlog stb_image SPIRV-Reflect yyjson tracy
 for %%D in (%EXPECTED_DIRS%) do (
     if exist "%%D" (
         echo   [FOUND]   %%D

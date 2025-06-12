@@ -15,6 +15,8 @@
 
 namespace Rapture {
 
+#define FILE_NOT_FOUND_ERROR(path) RP_CORE_ERROR("AssetImporter - File not found: {}", path.string());
+
 bool AssetImporter::s_isInitialized = false;
 std::queue<LoadRequest> AssetImporter::s_pendingRequests;
 std::vector<std::thread> AssetImporter::s_workerThreads;
@@ -22,9 +24,10 @@ std::atomic<bool> AssetImporter::s_threadRunning = false;
 std::mutex AssetImporter::s_queueMutex;
 
 // Helper function to find related shader file paths
-std::optional<std::filesystem::path>
-getRelatedShaderPath(const std::filesystem::path &basePath,
-                     const std::string &targetStage) {
+std::optional<std::filesystem::path> getRelatedShaderPath(
+    const std::filesystem::path &basePath,
+    const std::string &targetStage) 
+{
   if (!std::filesystem::exists(basePath)) {
     RP_CORE_WARN(
         "AssetImporter::getRelatedShaderPath - Base path does not exist: {}",
@@ -32,23 +35,7 @@ getRelatedShaderPath(const std::filesystem::path &basePath,
     return std::nullopt;
   }
 
-  auto directory = basePath.parent_path();
 
-  // First try the simple naming convention (vert.spv -> frag.spv)
-  if (targetStage == "fragment" &&
-      (basePath.filename().string().starts_with("vert"))) {
-    // Try both frag.spv and frag.fs.spv
-    std::vector<std::filesystem::path> potentialPaths = {
-        directory / "frag.spv", directory / "frag.fs.spv"};
-
-    for (const auto &path : potentialPaths) {
-      if (std::filesystem::exists(path)) {
-        return path;
-      }
-    }
-  }
-
-  // If simple naming didn't work, try the complex naming convention
   std::string basePathStr = basePath.string();
   // Regex to capture: (base_name)(.stage)(.extension)
   // Example: "path/to/MyShader.vert.glsl" ->
@@ -88,23 +75,28 @@ getRelatedShaderPath(const std::filesystem::path &basePath,
     }
   }
 
-  RP_CORE_WARN("AssetImporter::getRelatedShaderPath - Could not find related "
-               "{} shader for base path: {}",
+  RP_CORE_WARN("AssetImporter::getRelatedShaderPath - Could not find related {} shader for base path: {}",
                targetStage, basePath.string());
   return std::nullopt;
 }
 
-std::shared_ptr<Asset>
-AssetImporter::loadShader(const AssetHandle &handle,
-                          const AssetMetadata &metadata) {
+
+std::shared_ptr<Asset> AssetImporter::loadShader(const AssetHandle &handle, const AssetMetadata &metadata) {
 
   const auto &initialPath = metadata.m_filePath;
   if (!std::filesystem::exists(initialPath)) {
-    RP_CORE_ERROR(
-        "AssetImporter::loadShader - Initial shader file not found: {}",
-        initialPath.string());
+    FILE_NOT_FOUND_ERROR(initialPath);
     return nullptr;
   }
+
+  ShaderCompileInfo compileInfo = {};
+
+  if (std::holds_alternative<ShaderImportConfig>(metadata.m_importConfig)) {
+    auto shaderImportConfig = std::get<ShaderImportConfig>(metadata.m_importConfig);
+    compileInfo = shaderImportConfig.compileInfo;
+  }
+
+
 
   // Determine the type of the initial shader file
   std::string initialPathStr = initialPath.string();
@@ -127,8 +119,7 @@ AssetImporter::loadShader(const AssetHandle &handle,
 
   if (initialStageType.empty()) {
     RP_CORE_ERROR("AssetImporter::loadShader - Could not determine shader "
-                  "stage from file name: {}",
-                  initialPath.string());
+                  "stage from file name: {}", initialPath.string());
     return nullptr;
   }
 
@@ -140,17 +131,15 @@ AssetImporter::loadShader(const AssetHandle &handle,
 
     if (!computePathOpt) {
       RP_CORE_ERROR("AssetImporter::loadShader - Could not find compute shader "
-                    "related to: {}",
-                    initialPath.string());
+                    "related to: {}", initialPath.string());
       return nullptr;
     }
 
-    shader = std::make_shared<Shader>(*computePathOpt);
+    shader = std::make_shared<Shader>(*computePathOpt, compileInfo);
 
     if (!shader) {
       RP_CORE_ERROR("AssetImporter::loadShader - Failed to create or compile "
-                    "shader from {}",
-                    initialPath.string());
+                    "shader from {}", initialPath.string());
       return nullptr;
     }
 
@@ -161,61 +150,55 @@ AssetImporter::loadShader(const AssetHandle &handle,
 
     if (!vertexPathOpt) {
       RP_CORE_ERROR("AssetImporter::loadShader - Could not find vertex shader "
-                    "related to: {}",
-                    initialPath.string());
+                    "related to: {}", initialPath.string());
       return nullptr;
     }
     if (!fragmentPathOpt) {
       RP_CORE_INFO("AssetImporter::loadShader - No fragment shader found, "
-                   "assuming vertex only shader for: {}",
-                   initialPath.string());
+                   "assuming vertex only shader for: {}", initialPath.string());
     }
 
     // Optionally find geometry shader
     auto geometryPathOpt = getRelatedShaderPath(initialPath, "geometry");
 
     std::filesystem::path vertexPath = *vertexPathOpt;
-    std::filesystem::path fragmentPath =
-        fragmentPathOpt ? *fragmentPathOpt : std::filesystem::path();
+    std::filesystem::path fragmentPath = fragmentPathOpt ? *fragmentPathOpt : std::filesystem::path();
 
     if (geometryPathOpt) {
       std::filesystem::path geometryPath = *geometryPathOpt;
-      shader = std::make_shared<Shader>(vertexPath, fragmentPath);
+      shader = std::make_shared<Shader>(vertexPath, fragmentPath, compileInfo);
     } else {
-      shader = std::make_shared<Shader>(vertexPath, fragmentPath);
+      shader = std::make_shared<Shader>(vertexPath, fragmentPath, compileInfo);
     }
 
     if (!shader) {
-      RP_CORE_ERROR("AssetImporter::loadShader - Failed to create or compile "
-                    "shader from {} and {}{}",
-                    vertexPath.string(), fragmentPath.string(),
-                    geometryPathOpt ? " and " + geometryPathOpt->string() : "");
+      RP_CORE_ERROR("AssetImporter::loadShader - Failed to create or compile shader from {} and {}{}", 
+                    vertexPath.string(), fragmentPath.string(),geometryPathOpt ? " and " + geometryPathOpt->string() : "");
       return nullptr;
     }
   }
 
   // Wrap the shader in an Asset object
   AssetVariant assetVariant = shader;
-  std::shared_ptr<AssetVariant> variantPtr =
-      std::make_shared<AssetVariant>(assetVariant);
+  std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
   std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+
   asset->m_status = AssetStatus::LOADED;
   asset->m_handle = handle;
+
   AssetEvents::onAssetLoaded().publish(handle);
 
   return asset;
 }
 
 std::shared_ptr<Asset>
-AssetImporter::loadMaterial(const AssetHandle &handle,
-                            const AssetMetadata &metadata) {
+AssetImporter::loadMaterial(const AssetHandle &handle, const AssetMetadata &metadata) {
   RP_CORE_ERROR("AssetImporter::loadMaterial - Not implemented");
   return nullptr;
 }
 
 std::shared_ptr<Asset>
-AssetImporter::loadTexture(const AssetHandle &handle,
-                           const AssetMetadata &metadata) {
+AssetImporter::loadTexture(const AssetHandle &handle, const AssetMetadata &metadata) {
   // Start worker thread if not already running
   if (!s_threadRunning) {
     RP_CORE_ERROR(

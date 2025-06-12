@@ -5,7 +5,7 @@
 
 #include <memory>
 #include <vulkan/vulkan.h>
-#include <vk_mem_alloc.h>
+#include <vma/vk_mem_alloc.h>
 
 namespace Rapture {
 

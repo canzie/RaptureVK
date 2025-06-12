@@ -47,6 +47,7 @@ ImGuiLayer::ImGuiLayer()
 
     Rapture::ApplicationEvents::onSwapChainRecreated().addListener([this](std::shared_ptr<Rapture::SwapChain> swapChain) {
         m_gbufferPanel.updateDescriptorSets();
+        //onResize();
     });
 
     m_windowResizeEventListenerID =
@@ -289,6 +290,7 @@ void ImGuiLayer::onUpdate(float ts)
 
         return;
     }
+    
     m_currentImageIndex = static_cast<uint32_t>(imageIndexi);
 
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};

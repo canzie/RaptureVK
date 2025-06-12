@@ -1,3 +1,9 @@
+include(FetchContent)
+
+
+
+
+
 # Vendor Libraries Configuration
 
 # Create a vendor interface target
@@ -236,35 +242,41 @@ else()
 endif()
 
 # ==================== Vulkan Memory Allocator (VMA) ====================
-# Only look in Engine/vendor for libraries
-set(VMA_DIR "${CMAKE_SOURCE_DIR}/Engine/vendor/VulkanMemoryAllocator")
-message(STATUS "Looking for Vulkan Memory Allocator at ${VMA_DIR}")
+FetchContent_Declare(
+    VulkanMemoryAllocator
+    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+    GIT_TAG master  # Or use a specific version like "v3.0.1"
+)
 
-if(EXISTS "${VMA_DIR}/CMakeLists.txt")
-    message(STATUS "Building Vulkan Memory Allocator from source using add_subdirectory(${VMA_DIR})")
-    
-    # Configure VMA build options
-    set(VMA_STATIC_VULKAN_FUNCTIONS ON CACHE BOOL "Link statically with Vulkan" FORCE)
-    set(VMA_DYNAMIC_VULKAN_FUNCTIONS OFF CACHE BOOL "Dynamic Vulkan functions" FORCE)
-    set(VMA_BUILD_SAMPLE OFF CACHE BOOL "Build VMA sample" FORCE)
-    set(VMA_BUILD_SAMPLE_SHADERS OFF CACHE BOOL "Build VMA sample shaders" FORCE)
-    
-    # Create our own VMA target since the CMakeLists.txt in VMA doesn't provide one by default
-    add_library(vma STATIC "${VMA_DIR}/src/VmaUsage.cpp")
-    target_include_directories(vma PUBLIC "${VMA_DIR}/include")
-    target_link_libraries(vma PUBLIC Vulkan::Vulkan)
-    
-    # Define VMA_STATIC_VULKAN_FUNCTIONS for the entire project
-    target_compile_definitions(vma PUBLIC VMA_STATIC_VULKAN_FUNCTIONS=1)
-    
-    # Ensure VMA builds with the same C++ standard as the main project
-    set_target_properties(vma PROPERTIES
-        CXX_STANDARD ${CMAKE_CXX_STANDARD}
-        CXX_STANDARD_REQUIRED ON
-    )
-else()
-    message(FATAL_ERROR "VulkanMemoryAllocator/CMakeLists.txt not found in ${VMA_DIR}. Please ensure the library is correctly downloaded and placed, then re-run CMake.")
-endif()
+FetchContent_MakeAvailable(VulkanMemoryAllocator)
+
+# Create a proper vma target since VMA doesn't provide one
+add_library(vma STATIC
+    ${vulkanmemoryallocator_SOURCE_DIR}/src/VmaUsage.cpp
+)
+
+# Create a unified include path like vma/vk_mem_alloc.h
+target_include_directories(vma PUBLIC
+    ${vulkanmemoryallocator_SOURCE_DIR}/include
+)
+
+# Optional: Create a virtual include path "vma/"
+# This will ensure you can do #include <vma/vk_mem_alloc.h>
+target_include_directories(vma PUBLIC
+    $<BUILD_INTERFACE:${vulkanmemoryallocator_SOURCE_DIR}/include>
+)
+
+# Link Vulkan
+target_link_libraries(vma PUBLIC Vulkan::Vulkan)
+
+# Enable static Vulkan functions
+target_compile_definitions(vma PUBLIC VMA_STATIC_VULKAN_FUNCTIONS=1)
+
+# Match main project's C++ standard
+set_target_properties(vma PROPERTIES
+    CXX_STANDARD ${CMAKE_CXX_STANDARD}
+    CXX_STANDARD_REQUIRED ON
+)
 
 # ==================== SPIRV-Reflect ====================
 # Only look in Engine/vendor for libraries
@@ -391,6 +403,63 @@ if(TRACY_ENABLE)
     add_compile_definitions(TRACY_ENABLE)
 endif()
 
+# ==================== Shaderc ==================
+# Avoid shaderc examples, docs, tests
+set(SHADERC_SKIP_INSTALL ON CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_EXAMPLES ON CACHE BOOL "" FORCE)
+set(SHADERC_ENABLE_SPVC OFF CACHE BOOL "" FORCE)
+set(SHADERC_ENABLE_WGSL_OUTPUT OFF CACHE BOOL "" FORCE)
+set(SHADERC_ENABLE_SHARED_CRT OFF CACHE BOOL "" FORCE)
+
+# Avoid building SPIRV-Tools tests
+set(SPIRV_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SPIRV_WERROR OFF CACHE BOOL "" FORCE)
+
+# Avoid building glslang tools and SPVRemapper
+set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
+set(ENABLE_SPVREMAPPER OFF CACHE BOOL "" FORCE)
+set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE)
+set(ENABLE_OPT ON CACHE BOOL "" FORCE)  # GLSLang optimizer (enabled by default)
+set(ALLOW_EXTERNAL_SPIRV_TOOLS ON CACHE BOOL "" FORCE)  # Required for above
+
+
+# --- spirv-headers ---
+FetchContent_Declare(
+  spirv_headers
+  GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
+  GIT_TAG main
+)
+FetchContent_MakeAvailable(spirv_headers)
+
+# --- spirv-tools ---
+FetchContent_Declare(
+  spirv_tools
+  GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
+  GIT_TAG main
+)
+FetchContent_MakeAvailable(spirv_tools)
+
+# --- glslang ---
+FetchContent_Declare(
+  glslang
+  GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
+  GIT_TAG main
+)
+FetchContent_MakeAvailable(glslang)
+
+# --- shaderc ---
+FetchContent_Declare(
+  shaderc
+  GIT_REPOSITORY https://github.com/google/shaderc.git
+  GIT_TAG main
+)
+
+FetchContent_MakeAvailable(shaderc)
+
+
+
+
 # ==================== Link all libraries to vendor_libraries ====================
 target_link_libraries(vendor_libraries INTERFACE
     glfw
@@ -404,6 +473,7 @@ target_link_libraries(vendor_libraries INTERFACE
     yyjson         # Link yyjson
     Vulkan::Vulkan
     tracy::client
+    shaderc_combined
 )
 
 # Add Windows-specific libraries for GLFW
@@ -431,13 +501,20 @@ target_include_directories(vendor_libraries INTERFACE
 if(ENTT_INCLUDE_DIR)
     target_include_directories(vendor_libraries INTERFACE ${ENTT_INCLUDE_DIR})
 endif()
-if(SPDLOG_INCLUDE_DIR_MANUAL) # This variable was not set, check spdlog section logic if it was intended
-    # If spdlog was built manually, its include dir was set on the spdlog target itself.
-    # It might be already propagated via spdlog INTERFACE properties, or might need explicit addition.
-    # For safety, let's re-evaluate. The spdlog target itself gets the include dir.
-    # If spdlog is INTERFACE, it propagates. If STATIC, need to check its INTERFACE_INCLUDE_DIRECTORIES.
-    # The current spdlog setup adds include dirs to the spdlog target itself as PUBLIC.
-    # Linking spdlog should make its public include directories available.
+# It might be already propagated via spdlog INTERFACE properties, or might need explicit addition.
+# For safety, let's re-evaluate. The spdlog target itself gets the include dir.
+# If spdlog is INTERFACE, it propagates. If STATIC, need to check its INTERFACE_INCLUDE_DIRECTORIES.
+# The current spdlog setup adds include dirs to the spdlog target itself as PUBLIC.
+# Linking spdlog should make its public include directories available.
+if(TARGET spdlog)
+    get_target_property(SPDLOG_INCLUDE_DIR_PROP spdlog INTERFACE_INCLUDE_DIRECTORIES)
+    if(SPDLOG_INCLUDE_DIR_PROP)
+        target_include_directories(vendor_libraries INTERFACE ${SPDLOG_INCLUDE_DIR_PROP})
+    else()
+         target_include_directories(vendor_libraries INTERFACE ${SPDLOG_DIR}/include)
+    endif()
+else()
+    target_include_directories(vendor_libraries INTERFACE ${SPDLOG_DIR}/include)
 endif()
 
 # Ensure include directory for stb_image if found recursively

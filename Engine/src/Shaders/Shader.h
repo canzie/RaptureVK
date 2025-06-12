@@ -5,45 +5,20 @@
 #include <map>
 #include <filesystem>
 
-#include "vulkan/vulkan.h"
+
+#include <vulkan/vulkan.h>
 #include "Buffers/Buffers.h"
 #include "ShaderReflections.h"
+#include "ShaderCompilation.h"
+#include "ShaderCommon.h"
 
 // SPIRV-Reflect is now in vendor directory
 #include <spirv_reflect.h>
 
 namespace Rapture {
 
-    enum class ShaderType {
-        VERTEX,
-        FRAGMENT,
-        GEOMETRY,
-        COMPUTE
-    };
 
-    // neetly organises descriptor sets based on their usage
-    // any common resources are stored in the first set
-    // any data related to the material (albedo, metallic, emmisive, ...) will be in a seperate set
-    enum class DESCRIPTOR_SET_INDICES : uint8_t {
-        COMMON_RESOURCES = 0, // updated once per frame, global resources
-        MATERIAL = 1, // updated per material
-        OBJECT_RESOURCES = 2, // updated per object
-        EXTRA_RESOURCES = 3
-    };
 
-    // Add these new structures
-    struct DescriptorBindingInfo {
-        uint32_t binding;
-        VkDescriptorType descriptorType;
-        uint32_t descriptorCount;
-        VkShaderStageFlags stageFlags;
-        std::string name;  // For debugging/logging
-    };
-
-    struct DescriptorSetInfo {
-        uint32_t setNumber;
-        std::vector<DescriptorBindingInfo> bindings;
-    };
 
     void printDescriptorSetInfo(const DescriptorSetInfo& setInfo);
     void printDescriptorSetInfos(const std::vector<DescriptorSetInfo>& setInfos);
@@ -55,12 +30,10 @@ namespace Rapture {
     std::string shaderTypeToString(ShaderType type);
 
 
-
-
     class Shader {
     public:
-        Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
-        Shader(const std::filesystem::path& computePath);
+        Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath, ShaderCompileInfo compileInfo = {});
+        Shader(const std::filesystem::path& computePath, ShaderCompileInfo compileInfo = {});
         ~Shader();
 
         // constructors for different shaders types
@@ -99,6 +72,9 @@ namespace Rapture {
 
         std::vector<DescriptorInfo> m_materialSets;
 
+        ShaderCompileInfo m_compileInfo;
+
+        ShaderCompiler m_compiler;
     };
 
 

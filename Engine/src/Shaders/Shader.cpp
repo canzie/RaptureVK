@@ -3,13 +3,18 @@
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
 #include "Buffers/Descriptors/BindlessDescriptorManager.h"
+
 #include "ShaderReflections.h"
+
 
 #include <fstream>
 
 namespace Rapture {
 
-Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath) {
+Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath, ShaderCompileInfo compileInfo) {
+
+    m_compileInfo = compileInfo;
+
     if (fragmentPath.empty()) {
         createGraphicsShader(vertexPath);
     } else {
@@ -23,8 +28,10 @@ Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::p
 
 }
 
-Shader::Shader(const std::filesystem::path &computePath)
+Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compileInfo)
 {
+
+    m_compileInfo = compileInfo;
 
     if (computePath.empty()) {
         return;
@@ -58,9 +65,19 @@ Shader::~Shader() {
 
 void Shader::createGraphicsShader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath)
 {
+    std::vector<char> vertexCode;
+    if (vertexPath.extension() == ".spv")
+        vertexCode = readFile(vertexPath);
+    else
+        vertexCode = m_compiler.Compile(vertexPath, m_compileInfo);
 
-    std::vector<char> vertexCode = readFile(vertexPath);
-    std::vector<char> fragmentCode = readFile(fragmentPath);
+    std::vector<char> fragmentCode;
+    if (!fragmentPath.empty()) {
+        if (fragmentPath.extension() == ".spv")
+            fragmentCode = readFile(fragmentPath);
+        else
+            fragmentCode = m_compiler.Compile(fragmentPath, m_compileInfo);
+    }
 
     // Collect descriptor information before creating shader modules
     m_descriptorSetInfos = collectDescriptorSetInfo(vertexCode, fragmentCode);
@@ -114,7 +131,11 @@ void Shader::createGraphicsShader(const std::filesystem::path& vertexPath, const
 
 void Shader::createGraphicsShader(const std::filesystem::path &vertexPath) {
 
-    std::vector<char> vertexCode = readFile(vertexPath);
+    std::vector<char> vertexCode;
+    if (vertexPath.extension() == ".spv")
+        vertexCode = readFile(vertexPath);
+    else
+        vertexCode = m_compiler.Compile(vertexPath, m_compileInfo);
 
     // Collect descriptor information before creating shader modules
     m_descriptorSetInfos = collectDescriptorSetInfo(vertexCode, {});
@@ -142,7 +163,11 @@ void Shader::createGraphicsShader(const std::filesystem::path &vertexPath) {
 }
 
 void Shader::createComputeShader(const std::filesystem::path &computePath) {
-    std::vector<char> computeCode = readFile(computePath);
+    std::vector<char> computeCode;
+    if (computePath.extension() == ".spv")
+        computeCode = readFile(computePath);
+    else
+        computeCode = m_compiler.Compile(computePath, m_compileInfo);
 
     // Collect descriptor information before creating shader modules
     m_descriptorSetInfos = collectDescriptorSetInfo({}, computeCode);

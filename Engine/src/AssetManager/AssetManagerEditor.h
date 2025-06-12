@@ -26,7 +26,7 @@ namespace Rapture {
             // Get metadata for an asset
             const AssetMetadata& getAssetMetadata(AssetHandle handle) const;
 
-            std::pair<std::shared_ptr<Asset>, AssetHandle> importAsset(std::filesystem::path path, std::vector<uint32_t> indices = {0});
+            std::pair<std::shared_ptr<Asset>, AssetHandle> importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate());
 
             std::pair<std::shared_ptr<Asset>, AssetHandle> importDefaultAsset(AssetType assetType);
 

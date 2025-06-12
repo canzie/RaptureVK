@@ -22,8 +22,8 @@ SwapChain::SwapChain(VkDevice device, VkSurfaceKHR surface,
 
   m_windowResizeEventListenerID =
       ApplicationEvents::onWindowResize().addListener(
-          [this](unsigned int width, unsigned int height) {
-            m_framebufferNeedsResize = true;
+          [this](unsigned int width, unsigned int height) { // issue with this uncommented, validation layer complains about undifined layout on resize :(
+            //m_framebufferNeedsResize = true;
           });
 }
 

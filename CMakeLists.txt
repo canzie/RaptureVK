@@ -1,5 +1,8 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.11)
 project(Rapture VERSION 1.0.0 LANGUAGES C CXX)
+
+# Include FetchContent module for downloading dependencies
+include(FetchContent)
 
 find_package(Threads REQUIRED)
 

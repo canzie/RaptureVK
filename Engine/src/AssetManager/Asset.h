@@ -1,7 +1,8 @@
 #pragma once
 
-
 #include "Utils/UUID.h"
+
+#include "AssetImportConfig.h"
 
 #include <filesystem>
 #include <cstdint>
@@ -18,7 +19,6 @@ namespace Rapture {
     using AssetHandle = UUID;
     // NOTE: i dont like this but dont know variants well enough and dont want to change the entire codebase
     using AssetVariant = std::variant<std::monostate, std::shared_ptr<Material>, std::shared_ptr<Shader>, std::shared_ptr<Texture>>;
-
 
     enum class AssetType {
         None = 0,
@@ -60,7 +60,9 @@ namespace Rapture {
         // indices will be mostly 1 element, but in case of loading multiple primitives in 1 static mesh
         // the indices will indicate which ones
         std::vector<uint32_t> m_indices;
-        
+
+        AssetImportConfigVariant m_importConfig;
+
         // Virtual-specific data (only used when m_storageType == Virtual)
         std::string m_virtualName;
 
