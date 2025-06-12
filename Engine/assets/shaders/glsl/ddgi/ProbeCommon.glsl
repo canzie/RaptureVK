@@ -2,6 +2,13 @@
     Most of the logic is yoinked from the RTXGI repository, then adapted to glsl for use in my engine.
 */
 
+// Global descriptor arrays for bindless textures (set 3)
+#ifndef DESCRIPTOR_ARRAYS_DEFINED
+#define DESCRIPTOR_ARRAYS_DEFINED
+layout(set = 3, binding = 0) uniform sampler2D gTextures[];
+layout(set = 3, binding = 1) uniform sampler2DShadow gShadowMaps[];
+#endif
+
 struct ProbeVolume {
     vec3 origin;
 

@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <sys/types.h>
 #include <tuple>
 #include <type_traits>
 #include <cstdint>
@@ -33,6 +34,10 @@ class Entity {
         // Constructor for valid entity
         Entity(entt::entity handle, Scene* scene)
             : m_EntityHandle(handle), m_Scene(scene) {}
+
+        Entity(uint32_t handle, Scene* scene)
+          : m_EntityHandle(static_cast<entt::entity>(handle)), m_Scene(scene) {}
+
 
         Entity(const Entity& other) = default;
         Entity& operator=(const Entity& other) = default;

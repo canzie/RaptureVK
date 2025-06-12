@@ -1,8 +1,11 @@
 include(FetchContent)
 
+# Configure FetchContent to cache downloaded content
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "Disable updates for already downloaded content" FORCE)
+set(FETCHCONTENT_QUIET FALSE CACHE BOOL "Enable verbose output for FetchContent" FORCE)
 
-
-
+# Set cache directory for downloaded content
+set(FETCHCONTENT_BASE_DIR "${CMAKE_BINARY_DIR}/_deps" CACHE PATH "Base directory for downloaded content" FORCE)
 
 # Vendor Libraries Configuration
 
@@ -246,6 +249,8 @@ FetchContent_Declare(
     VulkanMemoryAllocator
     GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
     GIT_TAG master  # Or use a specific version like "v3.0.1"
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
 )
 
 FetchContent_MakeAvailable(VulkanMemoryAllocator)
@@ -429,6 +434,8 @@ FetchContent_Declare(
   spirv_headers
   GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
   GIT_TAG main
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(spirv_headers)
 
@@ -437,6 +444,8 @@ FetchContent_Declare(
   spirv_tools
   GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
   GIT_TAG main
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(spirv_tools)
 
@@ -445,6 +454,8 @@ FetchContent_Declare(
   glslang
   GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
   GIT_TAG main
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(glslang)
 
@@ -453,6 +464,8 @@ FetchContent_Declare(
   shaderc
   GIT_REPOSITORY https://github.com/google/shaderc.git
   GIT_TAG main
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
 )
 
 FetchContent_MakeAvailable(shaderc)

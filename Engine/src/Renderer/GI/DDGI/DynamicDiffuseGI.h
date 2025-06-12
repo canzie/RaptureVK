@@ -5,10 +5,14 @@
 
 #include <glm/glm.hpp>
 
+#include "Buffers/Buffers.h"
 #include "Scenes/Scene.h"
 #include "Textures/Texture.h"
 #include "Shaders/Shader.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
+#include "Buffers/StorageBuffers/StorageBuffer.h"
+
+
 
 #include "DDGICommon.h"
 
@@ -56,12 +60,8 @@ private:
     
     SunProperties m_SunShadowProps;
 
-    // (vaoID, BufferMetadata)
-    // we need to retain the order of the buffermetadata, when using a map we can lose this order and the buffermetadata indices might not match the ssbo
-    std::vector<std::pair<uint32_t, BufferMetadata>> m_BufferMetadataMap;
     
-    //std::shared_ptr<ShaderStorageBuffer> m_MeshInfoBuffer;
-    //std::shared_ptr<ShaderStorageBuffer> m_BufferMetadataBuffer;
+    std::shared_ptr<StorageBuffer> m_MeshInfoBuffer;
 
     //std::shared_ptr<ShaderStorageBuffer> m_DebugBuffer;
 
@@ -83,6 +83,8 @@ private:
 
 
     std::vector<glm::vec3> m_DebugProbePositions;
+
+    VmaAllocator m_allocator;
 
 
     // used to alternate between the textures each frame

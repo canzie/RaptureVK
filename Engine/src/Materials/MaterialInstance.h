@@ -3,6 +3,7 @@
 #include "Material.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
+#include "Materials/MaterialParameters.h"
 
 #include <memory>
 #include <string>
@@ -36,6 +37,9 @@ class MaterialInstance {
                 RP_CORE_WARN("MaterialInstance::setParameter: Parameter ID '{}' not found for this material", parameterIdToString(id));
             }
         }
+
+       MaterialTypes getParameter(ParameterID); 
+        
 
         bool isReady();
 

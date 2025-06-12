@@ -1,5 +1,6 @@
 #include "MaterialInstance.h"
 
+#include "Materials/MaterialParameters.h"
 #include "WindowContext/Application.h"
 #include "Textures/Texture.h"
 #include "AssetManager/AssetManager.h"
@@ -67,6 +68,17 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
 
     m_descriptorSet = std::make_shared<DescriptorSet>(bindings);
     
+
+
+
+}
+
+MaterialTypes MaterialInstance::getParameter(ParameterID id) {
+
+  if (m_parameterMap.contains(id))
+    return m_parameterMap[id].m_value;
+
+  return std::monostate();
 
 
 

@@ -67,6 +67,7 @@ namespace Rapture {
         TLASInstance instance;
         instance.blas = blas->blas;
         instance.transform = transform->transformMatrix();
+        instance.instanceCustomIndex = entity.getID();
         m_tlas->addInstance(instance);
 
     }
@@ -85,6 +86,7 @@ namespace Rapture {
         TLASInstance instance;
         instance.blas = blas->blas;
         instance.transform = transform->transformMatrix();
+        instance.instanceCustomIndex = entity->getID();
         m_tlas->addInstance(instance);
     
     }

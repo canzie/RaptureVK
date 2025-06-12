@@ -5,32 +5,12 @@
 
 namespace Rapture {
 
-struct BufferMetadata {
-    alignas(4) uint32_t positionAttributeOffsetBytes; // Offset of position *within* the stride
-    alignas(4) uint32_t texCoordAttributeOffsetBytes;
-    alignas(4) uint32_t normalAttributeOffsetBytes;
-    alignas(4) uint32_t tangentAttributeOffsetBytes;
-
-    alignas(4) uint32_t vertexStrideBytes;            // Stride of the vertex buffer in bytes
-    alignas(4) uint32_t indexType;                    // GL_UNSIGNED_INT (5125) or GL_UNSIGNED_SHORT (5123)
-
-    alignas(8) uint64_t VBOHandle;
-    alignas(8) uint64_t IBOHandle;
-};
 
 struct MeshInfo {
-    alignas(4) uint32_t RootIndex; // index of the root node in the BVH
-    alignas(8) uint64_t AlbedoTextureHandle;
-    alignas(8) uint64_t NormalTextureHandle;
-    alignas(8) uint64_t MetallicRoughnessTextureHandle;
-    alignas(4) uint32_t bufferMetadataIDX; // index for BufferMetadata array
+    alignas(4) uint32_t AlbedoTextureIndex;
+    alignas(4) uint32_t NormalTextureIndex;
+    alignas(4) uint32_t MetallicRoughnessTextureIndex;
 
-    // offset of the mesh's vertex and index data
-    alignas(4) uint32_t vertexOffsetBytes;
-    alignas(4) uint32_t indexOffsetBytes;
-
-    alignas(16) glm::mat4 Transform;
-    alignas(16) glm::mat4 InvTransform;
 };
 
 
@@ -41,7 +21,7 @@ struct SunProperties {
     alignas(16) glm::vec3 sunColor;
 
     alignas(4) float sunIntensity;
-    alignas(8) uint64_t sunShadowTextureArrayHandle; // Bindless handle for sampler2DArrayShadow
+    alignas(4) uint32_t sunShadowTextureArrayIndex; // Descriptor array index for sampler2DShadow
 };
 
 struct ProbeVolume {

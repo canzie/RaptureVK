@@ -39,6 +39,7 @@ namespace Rapture {
         void registerBLAS(std::shared_ptr<Entity> entity);
 
         void buildTLAS();
+        const TLAS& getTLAS() {return *m_tlas;}
 
     private:
         entt::registry m_Registry;

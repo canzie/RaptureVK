@@ -9,6 +9,8 @@
 #include "Events/ApplicationEvents.h"
 #include "Renderer/Shadows/ShadowCommon.h"
 
+#include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
+
 namespace Rapture {
 
 // Maximum number of lights supported
@@ -86,6 +88,9 @@ void DeferredRenderer::init() {
 
   ApplicationEvents::onSwapChainRecreated().addListener(
       [](std::shared_ptr<SwapChain> swapChain) { onSwapChainRecreated(); });
+
+
+  auto dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>();
 }
 
 void DeferredRenderer::shutdown() {

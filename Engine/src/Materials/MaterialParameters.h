@@ -4,6 +4,7 @@
 #include "Shaders/ShaderReflections.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -108,6 +109,7 @@ public:
     glm::vec4 asVec4()   { return std::get<glm::vec4>(m_value); }
     glm::mat3 asMat3()   { return std::get<glm::mat3>(m_value); }
     glm::mat4 asMat4()   { return std::get<glm::mat4>(m_value); }
+    std::shared_ptr<Texture> asTexture() { return std::get<std::shared_ptr<Texture>>(m_value); }
 
     void* asRaw() {
         switch (m_info.type) {

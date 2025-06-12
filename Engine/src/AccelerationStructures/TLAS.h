@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 #include <vulkan/vulkan.h>
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
 
 namespace Rapture {
@@ -48,6 +48,7 @@ public:
     
     // Get number of instances
     size_t getInstanceCount() const { return m_instances.size(); }
+    const std::vector<TLASInstance>& getInstances() const { return m_instances; }
 
 private:
     void createAccelerationStructure();

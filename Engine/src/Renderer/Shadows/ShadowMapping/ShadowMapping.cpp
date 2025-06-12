@@ -532,6 +532,7 @@ void ShadowMap::createShadowTexture() {
     spec.wrap = TextureWrap::ClampToEdge;
     spec.srgb = false;
     spec.shadowComparison = true; // Enable shadow comparison sampling
+    spec.storageImage = true;
 
     m_shadowTexture = std::make_shared<Texture>(spec);
 

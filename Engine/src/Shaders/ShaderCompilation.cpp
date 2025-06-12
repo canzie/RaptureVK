@@ -96,6 +96,7 @@ namespace Rapture
             options.AddMacroDefinition(macro);
         }
 
+
         shaderc::SpvCompilationResult module = m_compiler.CompileGlslToSpv(
             source, kind, path.string().c_str(), options);
 
@@ -109,6 +110,9 @@ namespace Rapture
 
         std::vector<char> spirv(spirv_size);
         memcpy(spirv.data(), spirv_data, spirv_size);
+
+
+        RP_CORE_INFO("ShaderCompiler: Compiled shader: {0} \n\t using macros: [{1}]", path.string(), fmt::join(compileInfo.macros, ", "));
 
         return spirv;
     }

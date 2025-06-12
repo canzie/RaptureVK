@@ -1,4 +1,3 @@
-#include "ProbeCommon.glsl"
 
 /*
     Most of the logic is yoinked from the RTXGI repository, then adapted to glsl for use in my engine.
@@ -9,18 +8,17 @@
     #define PI 3.14159265359
 #endif
 
-
 struct SunProperties {
     mat4 sunLightSpaceMatrix;
     vec3 sunDirectionWorld;
     vec3 sunColor;
 
     float sunIntensity;
-    uint64_t sunShadowTextureArrayHandle;
+    uint sunShadowTextureArrayIndex;
 };
 
 float calculateSunShadowFactor(vec3 hitPositionWorld, vec3 hitNormalWorld, SunProperties sunProperties) {
-    if (sunProperties.sunShadowTextureArrayHandle == 0) return 1.0; // No shadow map or handle is zero
+    if (sunProperties.sunShadowTextureArrayIndex == 0) return 1.0; // No shadow map or index is zero
 
     // Transform hit position to light clip space for the largest cascade
     vec4 hitPosLightSpace = sunProperties.sunLightSpaceMatrix * vec4(hitPositionWorld, 1.0);
@@ -44,11 +42,8 @@ float calculateSunShadowFactor(vec3 hitPositionWorld, vec3 hitNormalWorld, SunPr
 
     float comparisonDepth = projCoords.z - bias;
     
-    sampler2DShadow shadowMap = sampler2DShadow(sunProperties.sunShadowTextureArrayHandle);
-    //vec2 texelSize = 1.0 / vec2(textureSize(shadowMapArray, 0));
-    
-    // Single shadow map lookup (no PCF)
-    float shadowFactor = texture(shadowMap, vec3(projCoords.xy, comparisonDepth));
+    // Use descriptor array to access shadow map
+    float shadowFactor = texture(gShadowMaps[sunProperties.sunShadowTextureArrayIndex], vec3(projCoords.xy, comparisonDepth));
 
     return shadowFactor;
 }
