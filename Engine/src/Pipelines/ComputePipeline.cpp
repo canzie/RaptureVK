@@ -54,9 +54,9 @@ void ComputePipeline::createPipelineLayout(const ComputePipelineConfiguration& c
     
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = config.shader->getDescriptorSetLayouts().size();
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(config.shader->getDescriptorSetLayouts().size());
     pipelineLayoutInfo.pSetLayouts = config.shader->getDescriptorSetLayouts().data();
-    pipelineLayoutInfo.pushConstantRangeCount = config.shader->getPushConstantLayouts().size();
+    pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(config.shader->getPushConstantLayouts().size());
     pipelineLayoutInfo.pPushConstantRanges = config.shader->getPushConstantLayouts().data();
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {

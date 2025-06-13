@@ -1,7 +1,7 @@
 #include "ContentBrowserPanel.h"
 
 #include "imguiPanelStyleLinear.h"
-
+#include "Logging/Log.h"
 #include <algorithm>
 #include <cctype>
 
@@ -148,6 +148,7 @@ void ContentBrowserPanel::renderFileHierarchy() {
                 }
             } catch (const std::filesystem::filesystem_error& ex) {
                 // Handle permission errors gracefully
+                Rapture::RP_ERROR("ContentBrowserPanel::renderFileHierarchy - {0}", ex.what());
             }
         };
     

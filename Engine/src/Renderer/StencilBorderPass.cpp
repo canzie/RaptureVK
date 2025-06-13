@@ -41,8 +41,8 @@ StencilBorderPass::StencilBorderPass(
 
     auto shaderPath = project.getProjectShaderDirectory();
 
-    m_width = m_swapChain->getExtent().width;
-    m_height = m_swapChain->getExtent().height;
+    m_width = static_cast<float>(m_swapChain->getExtent().width);
+    m_height = static_cast<float>(m_swapChain->getExtent().height);
 
     auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/StencilBorder.vs.spv");
 

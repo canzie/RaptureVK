@@ -38,8 +38,8 @@ LightingPass::LightingPass(
 
     auto shaderPath = project.getProjectShaderDirectory();
 
-    m_width = m_swapChain->getExtent().width;
-    m_height = m_swapChain->getExtent().height;
+    m_width = static_cast<float>(m_swapChain->getExtent().width);
+    m_height = static_cast<float>(m_swapChain->getExtent().height);
 
     auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/DeferredLighting.vs.spv");
 
@@ -404,7 +404,7 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
             lightData.spotAngles = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
         }
         
-        lightData.spotAngles.z = (uint32_t)entity;
+        lightData.spotAngles.z = static_cast<float>(entity);
         
         lightUbo.numLights++;
     }

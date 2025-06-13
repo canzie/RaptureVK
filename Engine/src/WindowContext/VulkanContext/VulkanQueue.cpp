@@ -41,7 +41,7 @@ namespace Rapture
 
         VkSubmitInfo submitInfo = {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = commandBuffers.size();
+        submitInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
         submitInfo.pCommandBuffers = commandBuffers.data();
 
         if (vkQueueSubmit(m_queue, 1, &submitInfo, fence) != VK_SUCCESS) {
@@ -64,7 +64,7 @@ namespace Rapture
         }
 
         if (!commandBuffers.empty()) {
-            submitInfo.commandBufferCount = commandBuffers.size();
+            submitInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
             submitInfo.pCommandBuffers = commandBuffers.data();
         }
         

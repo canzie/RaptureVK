@@ -9,6 +9,7 @@
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
 
+
 namespace Rapture {
 
 struct TLASInstance {
@@ -18,6 +19,7 @@ struct TLASInstance {
     uint32_t mask = 0xFF;
     uint32_t shaderBindingTableRecordOffset = 0;
     VkGeometryInstanceFlagsKHR flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+    uint32_t entityID = 0;
 };
 
 class TLAS {

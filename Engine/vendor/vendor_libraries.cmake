@@ -72,18 +72,18 @@ message(STATUS "Looking for GLM at ${GLM_DIR}")
 if(EXISTS "${GLM_DIR}/glm/glm.hpp")
     message(STATUS "GLM found")
     add_library(glm INTERFACE)
-    target_include_directories(glm INTERFACE ${GLM_DIR})
+    target_include_directories(glm SYSTEM INTERFACE ${GLM_DIR})
     # GLM directly in vendor/glm
 elseif(EXISTS "${GLM_DIR}/glm-master/glm/glm.hpp")
     set(GLM_DIR "${GLM_DIR}/glm-master")
     message(STATUS "GLM found in glm-master")
     add_library(glm INTERFACE)
-    target_include_directories(glm INTERFACE ${GLM_DIR})
+    target_include_directories(glm SYSTEM INTERFACE ${GLM_DIR})
 elseif(EXISTS "${GLM_DIR}/glm.hpp")
     get_filename_component(GLM_PARENT_DIR ${GLM_DIR} DIRECTORY)
     message(STATUS "GLM found in glm root - using parent directory ${GLM_PARENT_DIR} as include path")
     add_library(glm INTERFACE)
-    target_include_directories(glm INTERFACE ${GLM_PARENT_DIR})
+    target_include_directories(glm SYSTEM INTERFACE ${GLM_PARENT_DIR})
 else()
     # Search recursively for glm.hpp
     file(GLOB_RECURSE GLM_HEADER "${GLM_DIR}/**/glm/glm.hpp")
@@ -94,7 +94,7 @@ else()
         get_filename_component(GLM_INCLUDE_DIR ${GLM_PATH} DIRECTORY)
         message(STATUS "Found GLM using recursive search at ${GLM_INCLUDE_DIR}")
         add_library(glm INTERFACE)
-        target_include_directories(glm INTERFACE ${GLM_INCLUDE_DIR})
+        target_include_directories(glm SYSTEM INTERFACE ${GLM_INCLUDE_DIR})
     else()
         message(FATAL_ERROR "GLM not found. Please place GLM in Engine/vendor/glm directory.")
     endif()
@@ -110,7 +110,7 @@ if(EXISTS "${IMGUI_DIR}/imgui.cpp")
     message(STATUS "ImGui found")
     file(GLOB IMGUI_SOURCES ${IMGUI_DIR}/*.cpp)
     add_library(imgui STATIC ${IMGUI_SOURCES})
-    target_include_directories(imgui PUBLIC 
+    target_include_directories(imgui SYSTEM PUBLIC 
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends  # Add backends directory to include paths
     )
@@ -156,7 +156,7 @@ message(STATUS "Looking for EnTT at ${ENTT_DIR}")
 if(EXISTS "${ENTT_DIR}/include/entt/entt.hpp")
     message(STATUS "EnTT found")
     add_library(entt INTERFACE)
-    target_include_directories(entt INTERFACE ${ENTT_DIR}/include)
+    target_include_directories(entt SYSTEM INTERFACE ${ENTT_DIR}/include)
 else()
     # Might be nested in a subdirectory
     file(GLOB_RECURSE ENTT_HEADER "${ENTT_DIR}/**/include/entt/entt.hpp")
@@ -168,7 +168,7 @@ else()
         
         message(STATUS "EnTT found using recursive search at ${ENTT_DIR}")
         add_library(entt INTERFACE)
-        target_include_directories(entt INTERFACE ${ENTT_INCLUDE_DIR})
+        target_include_directories(entt SYSTEM INTERFACE ${ENTT_INCLUDE_DIR})
     else()
         message(FATAL_ERROR "EnTT not found in ${ENTT_DIR}")
     endif()
@@ -220,7 +220,8 @@ if(EXISTS "${STB_IMAGE_DIR}/stb_image.h")
         file(WRITE ${STB_IMAGE_IMPL_FILE} "#define STB_IMAGE_IMPLEMENTATION\n#include \"${STB_IMAGE_DIR}/stb_image.h\"\n")
         add_library(stb_image STATIC ${STB_IMAGE_IMPL_FILE})
     endif()
-    target_include_directories(stb_image PUBLIC ${STB_IMAGE_DIR})
+    target_include_directories(stb_image SYSTEM PUBLIC ${STB_IMAGE_DIR})
+
 else()
     # Try to find recursively
     file(GLOB_RECURSE STB_IMAGE_HEADER "${CMAKE_SOURCE_DIR}/Engine/vendor/**/stb_image.h")
@@ -238,7 +239,8 @@ else()
             file(WRITE ${STB_IMAGE_IMPL_FILE_REC} "#define STB_IMAGE_IMPLEMENTATION\n#include \"${STB_IMAGE_HEADER}\"\n")
             add_library(stb_image STATIC ${STB_IMAGE_IMPL_FILE_REC})
         endif()
-        target_include_directories(stb_image PUBLIC ${STB_IMAGE_DIR_REC})
+        target_include_directories(stb_image SYSTEM PUBLIC ${STB_IMAGE_DIR_REC})
+
     else()
         message(FATAL_ERROR "stb_image.h not found in ${STB_IMAGE_DIR} or subdirectories.")
     endif()
@@ -261,13 +263,13 @@ add_library(vma STATIC
 )
 
 # Create a unified include path like vma/vk_mem_alloc.h
-target_include_directories(vma PUBLIC
+target_include_directories(vma SYSTEM PUBLIC
     ${vulkanmemoryallocator_SOURCE_DIR}/include
 )
 
 # Optional: Create a virtual include path "vma/"
 # This will ensure you can do #include <vma/vk_mem_alloc.h>
-target_include_directories(vma PUBLIC
+target_include_directories(vma SYSTEM PUBLIC
     $<BUILD_INTERFACE:${vulkanmemoryallocator_SOURCE_DIR}/include>
 )
 
@@ -297,7 +299,7 @@ if(EXISTS "${SPIRV_REFLECT_DIR}/spirv_reflect.h")
     )
     
     # Add include directories
-    target_include_directories(spirv_reflect PUBLIC ${SPIRV_REFLECT_DIR})
+    target_include_directories(spirv_reflect SYSTEM PUBLIC ${SPIRV_REFLECT_DIR})
     
     # Link with Vulkan
     target_link_libraries(spirv_reflect PUBLIC Vulkan::Vulkan)
@@ -331,7 +333,7 @@ if(EXISTS "${YYJSON_DIR}/yyjson.h" AND EXISTS "${YYJSON_DIR}/yyjson.c")
     )
     
     # Add include directories
-    target_include_directories(yyjson PUBLIC ${YYJSON_DIR})
+    target_include_directories(yyjson SYSTEM PUBLIC ${YYJSON_DIR})
     
     # Use C99 standard for yyjson.c (it's an ANSI C library)
     set_target_properties(yyjson PROPERTIES
@@ -377,7 +379,8 @@ elseif(EXISTS "${TRACY_DIR}/public/TracyClient.cpp")
         "${TRACY_DIR}/public/TracyClient.cpp"
     )
     
-    target_include_directories(TracyClient PUBLIC "${TRACY_DIR}/public")
+    
+    target_include_directories(TracyClient SYSTEM PUBLIC "${TRACY_DIR}/public")
     
     # Create an alias for consistent usage
     add_library(tracy::client ALIAS TracyClient)
@@ -389,8 +392,7 @@ elseif(EXISTS "${TRACY_DIR}/TracyClient.cpp")
     add_library(TracyClient STATIC
         "${TRACY_DIR}/TracyClient.cpp"
     )
-    
-    target_include_directories(TracyClient PUBLIC "${TRACY_DIR}")
+    target_include_directories(TracyClient SYSTEM PUBLIC "${TRACY_DIR}")
     
     # Create an alias for consistent usage
     add_library(tracy::client ALIAS TracyClient)
@@ -497,7 +499,7 @@ endif()
 
 # Include directories for all vendor libraries
 # Vulkan include directories are handled by linking Vulkan::Vulkan
-target_include_directories(vendor_libraries INTERFACE
+target_include_directories(vendor_libraries SYSTEM INTERFACE
     ${GLFW_DIR}/include
     ${GLM_DIR}
     ${IMGUI_DIR}
@@ -512,7 +514,7 @@ target_include_directories(vendor_libraries INTERFACE
 )
 # Ensure correct include paths for EnTT and spdlog if they were found recursively
 if(ENTT_INCLUDE_DIR)
-    target_include_directories(vendor_libraries INTERFACE ${ENTT_INCLUDE_DIR})
+    target_include_directories(vendor_libraries SYSTEM INTERFACE ${ENTT_INCLUDE_DIR})
 endif()
 # It might be already propagated via spdlog INTERFACE properties, or might need explicit addition.
 # For safety, let's re-evaluate. The spdlog target itself gets the include dir.
@@ -522,23 +524,23 @@ endif()
 if(TARGET spdlog)
     get_target_property(SPDLOG_INCLUDE_DIR_PROP spdlog INTERFACE_INCLUDE_DIRECTORIES)
     if(SPDLOG_INCLUDE_DIR_PROP)
-        target_include_directories(vendor_libraries INTERFACE ${SPDLOG_INCLUDE_DIR_PROP})
+        target_include_directories(vendor_libraries SYSTEM INTERFACE ${SPDLOG_INCLUDE_DIR_PROP})
     else()
-         target_include_directories(vendor_libraries INTERFACE ${SPDLOG_DIR}/include)
+         target_include_directories(vendor_libraries SYSTEM INTERFACE ${SPDLOG_DIR}/include)
     endif()
 else()
-    target_include_directories(vendor_libraries INTERFACE ${SPDLOG_DIR}/include)
+    target_include_directories(vendor_libraries SYSTEM INTERFACE ${SPDLOG_DIR}/include)
 endif()
 
 # Ensure include directory for stb_image if found recursively
 if(STB_IMAGE_DIR_REC)
-    target_include_directories(vendor_libraries INTERFACE ${STB_IMAGE_DIR_REC})
+    target_include_directories(vendor_libraries SYSTEM INTERFACE ${STB_IMAGE_DIR_REC})
 endif()
 if(VMA_DIR) # Though VMA_DIR is set directly above, this is for consistency with other blocks
-    target_include_directories(vendor_libraries INTERFACE ${VMA_DIR}/include)
+    target_include_directories(vendor_libraries SYSTEM INTERFACE ${VMA_DIR}/include)
 endif()
 if(YYJSON_DIR) # For consistency
-    target_include_directories(vendor_libraries INTERFACE ${YYJSON_DIR})
+    target_include_directories(vendor_libraries SYSTEM INTERFACE ${YYJSON_DIR})
 endif()
 
 # Cleanup variables that might conflict if this script is re-included

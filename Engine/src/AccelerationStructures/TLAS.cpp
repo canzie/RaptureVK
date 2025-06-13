@@ -124,7 +124,7 @@ void TLAS::createInstanceBuffer() {
         glm::mat4 transposed = glm::transpose(instance.transform);
         memcpy(&instanceData[i].transform, &transposed, sizeof(VkTransformMatrixKHR));
         
-        instanceData[i].instanceCustomIndex = instance.instanceCustomIndex;
+        instanceData[i].instanceCustomIndex = i;
         instanceData[i].mask = instance.mask;
         instanceData[i].instanceShaderBindingTableRecordOffset = instance.shaderBindingTableRecordOffset;
         instanceData[i].flags = instance.flags;

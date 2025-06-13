@@ -524,8 +524,8 @@ void ShadowMap::createPipeline() {
 
 void ShadowMap::createShadowTexture() {
     TextureSpecification spec;
-    spec.width = m_width;
-    spec.height = m_height;
+    spec.width = static_cast<uint32_t>(m_width);
+    spec.height = static_cast<uint32_t>(m_height);
     spec.format = TextureFormat::D32F;
     spec.filter = TextureFilter::Linear;
     spec.type = TextureType::TEXTURE2D;

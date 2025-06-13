@@ -353,36 +353,36 @@ void GBufferPass::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer
 void GBufferPass::createTextures()
 {
     TextureSpecification posDepthSpec;
-    posDepthSpec.width = m_width;
-    posDepthSpec.height = m_height;
+    posDepthSpec.width = static_cast<uint32_t>(m_width);
+    posDepthSpec.height = static_cast<uint32_t>(m_height);
     posDepthSpec.format = TextureFormat::RGBA32F;
     posDepthSpec.type = TextureType::TEXTURE2D;
     posDepthSpec.srgb = false;
 
     TextureSpecification normalSpec;
-    normalSpec.width = m_width;
-    normalSpec.height = m_height;
+    normalSpec.width = static_cast<uint32_t>(m_width);
+    normalSpec.height = static_cast<uint32_t>(m_height);
     normalSpec.format = TextureFormat::RGBA16F;
     normalSpec.type = TextureType::TEXTURE2D;
     normalSpec.srgb = false;
 
     TextureSpecification albedoSpec;
-    albedoSpec.width = m_width;
-    albedoSpec.height = m_height;
+    albedoSpec.width = static_cast<uint32_t>(m_width);
+    albedoSpec.height = static_cast<uint32_t>(m_height);
     albedoSpec.format = TextureFormat::RGBA8;
     albedoSpec.type = TextureType::TEXTURE2D;
     albedoSpec.srgb = true;
 
     TextureSpecification materialSpec;
-    materialSpec.width = m_width;
-    materialSpec.height = m_height;
+    materialSpec.width = static_cast<uint32_t>(m_width);
+    materialSpec.height = static_cast<uint32_t>(m_height);
     materialSpec.format = TextureFormat::RGBA8;
     materialSpec.type = TextureType::TEXTURE2D;
     materialSpec.srgb = false;
 
     TextureSpecification depthStencilSpec;
-    depthStencilSpec.width = m_width;
-    depthStencilSpec.height = m_height;
+    depthStencilSpec.width = static_cast<uint32_t>(m_width);
+    depthStencilSpec.height = static_cast<uint32_t>(m_height);
     depthStencilSpec.format = TextureFormat::D24S8;
     depthStencilSpec.type = TextureType::TEXTURE2D;
     depthStencilSpec.srgb = false;
@@ -547,13 +547,13 @@ void GBufferPass::createDescriptorSets(uint32_t framesInFlight)
     }
 
     std::vector<DescriptorSetBindings> bindings(framesInFlight);
-    for (int i = 0; i < framesInFlight; i++) {
+    for (unsigned int i = 0; i < framesInFlight; i++) {
         // TODO: binding index, currently set to 0, should change to use a constant DESCRIPTOR SET CAMERA INDEX 
         bindings[i].bindings.push_back({0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, TextureViewType::DEFAULT, m_cameraUBOs[i], false});
         bindings[i].layout = layout;
     }
 
-    for (int i = 0; i < framesInFlight; i++) {
+    for (unsigned int i = 0; i < framesInFlight; i++) {
         m_descriptorSets.push_back(std::make_shared<DescriptorSet>(bindings[i]));
     }
 }

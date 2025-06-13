@@ -18,9 +18,10 @@ namespace Rapture {
         uint32_t queueFamilyIndex;
         VkCommandPoolCreateFlags flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        size_t hash() const {
-            return std::hash<size_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^ std::hash<VkCommandPoolCreateFlags>()(flags);
+        uint32_t hash() const {
+            return static_cast<uint32_t>(std::hash<size_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^ std::hash<VkCommandPoolCreateFlags>()(flags));
         }
+
     };
 
 

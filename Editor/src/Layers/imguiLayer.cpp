@@ -38,7 +38,7 @@ ImGuiLayer::ImGuiLayer()
     spec.depth = 1;
     spec.type = Rapture::TextureType::TEXTURE2D;
     spec.format = Rapture::TextureFormat::RGBA8;
-    for (int i = 0; i < swapChain->getImageCount(); i++) {
+    for (uint32_t i = 0; i < swapChain->getImageCount(); i++) {
         m_swapChainTextures.push_back(std::make_shared<Rapture::Texture>(spec));
     }
 
@@ -494,7 +494,7 @@ void ImGuiLayer::onResize()
     spec.depth = 1;
     spec.type = Rapture::TextureType::TEXTURE2D;
     spec.format = Rapture::TextureFormat::RGBA8;
-    for (int i = 0; i < swapChain->getImageCount(); i++) {
+    for (uint32_t i = 0; i < swapChain->getImageCount(); i++) {
         m_swapChainTextures.push_back(std::make_shared<Rapture::Texture>(spec));
     }
 

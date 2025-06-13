@@ -281,7 +281,7 @@ void DeferredRenderer::updateCameraUBOs(std::shared_ptr<Scene> activeScene,
 }
 
 void DeferredRenderer::createUniformBuffers(uint32_t framesInFlight) {
-  for (int i = 0; i < framesInFlight; i++) {
+  for (unsigned int i = 0; i < framesInFlight; i++) {
     m_cameraUBOs.push_back(
         std::make_shared<UniformBuffer>(sizeof(CameraUniformBufferObject),
                                         BufferUsage::STREAM, m_vmaAllocator));
@@ -342,7 +342,7 @@ void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
   shadowDataLayout.shadowCount = shadowIndex;
 
   // Update all shadow data UBOs
-  for (int i = 0; i < m_swapChain->getImageCount(); i++) {
+  for (unsigned int i = 0; i < m_swapChain->getImageCount(); i++) {
     m_shadowDataUBOs[i]->addData((void *)&shadowDataLayout,
                                  sizeof(shadowDataLayout), 0);
   }

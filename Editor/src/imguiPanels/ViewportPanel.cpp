@@ -140,7 +140,7 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
             buttonCenter = ImVec2((buttonMin.x + buttonMax.x) * 0.5f, (buttonMin.y + buttonMax.y) * 0.5f);
             
             float radius = iconSize * 0.4f;
-            float segments = 16;
+            int segments = 16;
             drawList->AddCircle(buttonCenter, radius, IM_COL32(255, 255, 255, 200), segments, 2.0f);
             
             // Add arrow head at the end of the circle

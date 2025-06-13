@@ -99,7 +99,7 @@ namespace Rapture {
                 m_lastFrame = currentFrame;
                 changedThisFrame = false;
 
-                uint32_t currentHash = calculateCurrentHash();
+                size_t currentHash = calculateCurrentHash();
                 if (m_lastHash != currentHash) {
                     m_lastHash = currentHash;
                     changedThisFrame = true;
