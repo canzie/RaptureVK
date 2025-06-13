@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "imguiPanels/IconsMaterialDesign.h"
 #include <unordered_map>
 #include <string>
 #include <cmath> // For std::pow
@@ -200,15 +201,29 @@ namespace ImGuiPanelStyle {
     
     static bool s_StyleInitialized = false;
 
-    inline void InitializeFonts() {
+    inline void InitializeFonts(const std::string& rootPath) {
         ImGuiIO& io = ImGui::GetIO();
         
-        // Consider using a font that complements Gruvbox, like Fira Code or JetBrains Mono.
-        // For now, keeping your IBM Plex Mono.
-        s_RegularFont = io.Fonts->AddFontFromFileTTF("assets/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf", 16.0f);
-        s_BoldFont = io.Fonts->AddFontFromFileTTF("assets/fonts/IBM_Plex_Mono/IBMPlexMono-Bold.ttf", 16.0f);
-        s_LightFont = io.Fonts->AddFontFromFileTTF("assets/fonts/IBM_Plex_Mono/IBMPlexMono-Light.ttf", 16.0f);
-        s_ItalicFont = io.Fonts->AddFontFromFileTTF("assets/fonts/IBM_Plex_Mono/IBMPlexMono-Italic.ttf", 16.0f);
+        std::string regularFontPath = rootPath + "/assets/fonts/IBMPlexMono-Regular.ttf";
+        std::string boldFontPath = rootPath + "/assets/fonts/IBMPlexMono-Bold.ttf";
+        std::string lightFontPath = rootPath + "/assets/fonts/IBMPlexMono-Light.ttf";
+        std::string italicFontPath = rootPath + "/assets/fonts/IBMPlexMono-Italic.ttf";
+        std::string iconFontPath = rootPath + "/assets/fonts/" + FONT_ICON_FILE_NAME_MD;
+
+        s_RegularFont = io.Fonts->AddFontFromFileTTF(regularFontPath.c_str(), 16.0f);
+
+        // Add this line to merge icons into the default font
+        // The static keyword is important here to ensure the config persists through the font building process
+        static const ImWchar icons_ranges[] = { ICON_MIN_MD, ICON_MAX_MD, 0 };
+        ImFontConfig icons_config;
+        icons_config.MergeMode = true;
+        icons_config.PixelSnapH = true;
+
+        io.Fonts->AddFontFromFileTTF(iconFontPath.c_str(), 16.0f, &icons_config, icons_ranges);
+
+        s_BoldFont = io.Fonts->AddFontFromFileTTF(boldFontPath.c_str(), 16.0f);
+        s_LightFont = io.Fonts->AddFontFromFileTTF(lightFontPath.c_str(), 16.0f);
+        s_ItalicFont = io.Fonts->AddFontFromFileTTF(italicFontPath.c_str(), 16.0f);
 
         if (s_RegularFont) {
             io.FontDefault = s_RegularFont;

@@ -11,13 +11,16 @@ struct MeshInfo {
     alignas(4) uint32_t NormalTextureIndex;
     alignas(4) uint32_t MetallicRoughnessTextureIndex;
 
+    alignas(4) uint32_t bufferIndex; // index of the buffer in the bindless buffers array
+    alignas(4) uint32_t meshIndex;   // index of the mesh in the mesh array, this is the same index as the tlasinstance instanceCustomIndex
+
 };
 
 
 
 struct SunProperties {
-    alignas(16) glm::mat4 sunLightSpaceMatrix;    // Light-space matrices for each cascade
-    alignas(16) glm::vec3 sunDirectionWorld;                       // Normalized direction FROM fragment TO sun
+    alignas(16) glm::mat4 sunLightSpaceMatrix;      // Light-space matrices for each cascade
+    alignas(16) glm::vec3 sunDirectionWorld;        // Normalized direction FROM fragment TO sun
     alignas(16) glm::vec3 sunColor;
 
     alignas(4) float sunIntensity;
@@ -27,8 +30,8 @@ struct SunProperties {
 struct ProbeVolume {
     alignas(16) glm::vec3 origin;
 
-    alignas(16) glm::vec4 rotation;                           // rotation quaternion for the volume
-    alignas(16) glm::vec4 probeRayRotation;                   // rotation quaternion for probe rays
+    alignas(16) glm::vec4 rotation;                 // rotation quaternion for the volume
+    alignas(16) glm::vec4 probeRayRotation;         // rotation quaternion for probe rays
 
 
     alignas(16) glm::vec3 spacing;

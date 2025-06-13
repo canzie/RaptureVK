@@ -10,7 +10,7 @@ ContentBrowserPanel::ContentBrowserPanel() {
     m_currentDirectory = m_projectAssetsPath;
     
     // Create assets directory if it doesn't exist
-    if (!std::filesystem::exists(m_projectAssetsPath)) {
+    if (!std::filesystem::exists(m_projectAssetsPath) && m_projectAssetsPath != "") {
         std::filesystem::create_directories(m_projectAssetsPath);
     }
     
@@ -23,6 +23,11 @@ ContentBrowserPanel::ContentBrowserPanel() {
 
 ContentBrowserPanel::~ContentBrowserPanel() {
 
+}
+
+void ContentBrowserPanel::setProjectAssetsPath(std::filesystem::path projectAssetsPath) {
+    m_projectAssetsPath = projectAssetsPath;
+    
 }
 
 void ContentBrowserPanel::render() {
@@ -104,7 +109,7 @@ void ContentBrowserPanel::renderTopPane() {
     // Refresh button on the right side
     float refreshButtonWidth = 60.0f;
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - refreshButtonWidth);
-    if (ImGui::Button("Refresh", ImVec2(refreshButtonWidth, 0))) {
+    if (ImGui::Button(ICON_MD_REFRESH, ImVec2(refreshButtonWidth, 0))) {
     }
     
     ImGui::EndChild();
@@ -115,8 +120,8 @@ void ContentBrowserPanel::renderFileHierarchy() {
     ImGui::Separator();
     
     // Show directory tree starting from assets folder
-    std::function<void(const std::filesystem::path&, int)> renderDirectoryTree = 
-        [&](const std::filesystem::path& path, int depth) {
+    std::function<void(const std::filesystem::path&)> renderDirectoryTree = 
+        [&](const std::filesystem::path& path) {
             if (!std::filesystem::exists(path) || !std::filesystem::is_directory(path)) {
                 return;
             }
@@ -126,23 +131,27 @@ void ContentBrowserPanel::renderFileHierarchy() {
                     if (entry.is_directory()) {
                         std::string name = entry.path().filename().string();
                         
-                        // Indent based on depth
-                        for (int i = 0; i < depth; ++i) {
-                            ImGui::Indent(15.0f);
+                        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+                        if (entry.path() == m_currentDirectory) {
+                            flags |= ImGuiTreeNodeFlags_Selected;
+                        }
+
+                        std::string label = std::string(ICON_MD_FOLDER) + " " + name;
+                        bool node_open = ImGui::TreeNodeEx(entry.path().string().c_str(), flags, "%s", label.c_str());
+
+                        if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+                            m_currentDirectory = entry.path();
+                             // Truncate history if we navigated back and then chose a new path
+                            if (m_historyIndex < m_directoryHistory.size() - 1) {
+                                m_directoryHistory.resize(m_historyIndex + 1);
+                            }
+                            m_directoryHistory.push_back(m_currentDirectory);
+                            m_historyIndex++;
                         }
                         
-                        bool isSelected = (entry.path() == m_currentDirectory);
-                        if (ImGui::Selectable((std::string("📂 ") + name).c_str(), isSelected)) {
-                        }
-                        
-                        // Unindent
-                        for (int i = 0; i < depth; ++i) {
-                            ImGui::Unindent(15.0f);
-                        }
-                        
-                        // Recursively render subdirectories (limit depth to avoid UI clutter)
-                        if (depth < 3) {
-                            renderDirectoryTree(entry.path(), depth + 1);
+                        if (node_open) {
+                            renderDirectoryTree(entry.path());
+                            ImGui::TreePop();
                         }
                     }
                 }
@@ -151,8 +160,29 @@ void ContentBrowserPanel::renderFileHierarchy() {
                 Rapture::RP_ERROR("ContentBrowserPanel::renderFileHierarchy - {0}", ex.what());
             }
         };
-    
-    renderDirectoryTree(m_projectAssetsPath, 0);
+
+    // Special handling for the root assets path to be open by default
+    ImGuiTreeNodeFlags rootFlags = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
+    if (m_projectAssetsPath == m_currentDirectory) {
+        rootFlags |= ImGuiTreeNodeFlags_Selected;
+    }
+
+    std::string rootLabel = std::string(ICON_MD_FOLDER) + " Assets";
+    bool rootNodeOpen = ImGui::TreeNodeEx(m_projectAssetsPath.string().c_str(), rootFlags, "%s", rootLabel.c_str());
+
+    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+        m_currentDirectory = m_projectAssetsPath;
+        if (m_historyIndex < m_directoryHistory.size() - 1) {
+            m_directoryHistory.resize(m_historyIndex + 1);
+        }
+        m_directoryHistory.push_back(m_currentDirectory);
+        m_historyIndex++;
+    }
+
+    if (rootNodeOpen) {
+        renderDirectoryTree(m_projectAssetsPath);
+        ImGui::TreePop();
+    }
 }
 
 void ContentBrowserPanel::renderFileContent() {
@@ -175,13 +205,7 @@ struct FileItem {
     bool isFolder;
 };
 
-// Simulate loading file entries
-std::vector<FileItem> LoadFileItems() {
-    return {
-        {"FolderA", true}, {"Image1.png", false}, {"Model.obj", false}, {"FolderB", true},
-        {"Shader.hlsl", false}, {"Script.lua", false}, {"FolderC", true}, {"Texture.jpg", false}
-    };
-}
+
 
 void ContentBrowserPanel::renderAssetContent() {
 
@@ -195,7 +219,6 @@ void ContentBrowserPanel::renderAssetContent() {
     int itemsPerRow = std::max(1, static_cast<int>(panelSize.x / minItemWidth));
     float actualItemWidth = panelSize.x / itemsPerRow;
 
-    std::vector<FileItem> items = LoadFileItems();
 
     auto& loadedAssets = Rapture::AssetManager::getLoadedAssets();
     auto& assetRegistry = Rapture::AssetManager::getAssetRegistry();

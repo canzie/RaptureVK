@@ -51,7 +51,7 @@ void BrowserPanel::render() {
         
         // Refresh button on the right
         ImGui::SameLine(ImGui::GetWindowWidth() - 80.0f); // Adjust position as needed
-        if (ImGui::Button("Refresh")) { // TODO: Replace with icon button if FontAwesome is integrated
+        if (ImGui::Button(ICON_MD_REFRESH)) {
             m_needsHierarchyRebuild = true;
         }
         

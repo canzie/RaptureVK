@@ -146,51 +146,77 @@ void PropertiesPanel::renderLightComponent()
     }
 }
 
+void transformComponentSlider(glm::vec3& value, float sliderWidth, bool& changed, const std::string label[3]) {
+
+          // X axis (Red)
+            //ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "X:");
+            //ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.1f, 0.1f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
+            ImGui::PushItemWidth(sliderWidth);
+            if (ImGui::DragFloat(label[0].c_str(), &value.x, 0.1f)) changed = true;
+            ImGui::PopItemWidth();
+            ImGui::PopStyleColor(2);
+
+            ImGui::SameLine();
+
+            // Y axis (Green)
+            //ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Y:");
+
+            //ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.6f, 0.1f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 1.0f, 0.2f, 1.0f));
+            ImGui::PushItemWidth(sliderWidth);
+            if (ImGui::DragFloat(label[1].c_str(), &value.y, 0.1f)) changed = true;
+            ImGui::PopItemWidth();
+            ImGui::PopStyleColor(2);
+
+            ImGui::SameLine();
+            // Z axis (Blue)
+            //ImGui::TextColored(ImVec4(0.2f, 0.2f, 1.0f, 1.0f), "Z:");
+            //ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.6f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 0.2f, 1.0f, 1.0f));
+            ImGui::PushItemWidth(sliderWidth);
+            if (ImGui::DragFloat(label[2].c_str(), &value.z, 0.1f)) changed = true;
+            ImGui::PopItemWidth();
+            ImGui::PopStyleColor(2);
+
+}
+
 void PropertiesPanel::renderTransformComponent()
 {
     if (auto entity = m_selectedEntity.lock()) {
+
+
     if (ImGui::CollapsingHeader("Transform Component", ImGuiTreeNodeFlags_DefaultOpen)) {
         auto& transform = entity->getComponent<Rapture::TransformComponent>();
-        
+        ImGui::Dummy(ImVec2(0.0f, 10.0f));
+
+
         // Position with lock option
-        ImGui::BeginGroup();
-        
- 
-        // Get translation values to modify them individually
+        ImGui::BeginTable("transformTable", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp);
+
+        // ========== Position Slider ==========
+        ImGui::TableNextRow();
+
         glm::vec3 position = transform.transforms.getTranslation();
         bool positionChanged = false;
-        
-        // X axis (Red)
-        ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "X:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.1f, 0.1f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 3.0f - 10.0f);
-        if (ImGui::DragFloat("##posX", &position.x, 0.1f)) positionChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
-        
-        // Y axis (Green)
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Y:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.6f, 0.1f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 1.0f, 0.2f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2.0f - 10.0f);
-        if (ImGui::DragFloat("##posY", &position.y, 0.1f)) positionChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
-        
-        // Z axis (Blue)
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.2f, 0.2f, 1.0f, 1.0f), "Z:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.6f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 0.2f, 1.0f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 10.0f);
-        if (ImGui::DragFloat("##posZ", &position.z, 0.1f)) positionChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
+
+        ImGui::TableSetColumnIndex(0);
+
+        ImGui::Text("Position");
+
+        ImGui::TableSetColumnIndex(1);
+
+
+        float availableWidth = ImGui::GetContentRegionAvail().x;
+        float availableHeight = ImGui::GetContentRegionAvail().y;
+
+        float sliderWidth = availableWidth / 3.0f;
+
+        std::string positionLabel[3] = {"##posX", "##posY", "##posZ"};
+        transformComponentSlider(position, sliderWidth, positionChanged, positionLabel);
         
         // If position changed, update the transform
         if (positionChanged) {
@@ -198,106 +224,79 @@ void PropertiesPanel::renderTransformComponent()
             transform.transforms.setTranslation(position);
             transform.transforms.recalculateTransform();
         }
-        
-        ImGui::EndGroup();
-        
-        // Rotation with lock option
-        ImGui::BeginGroup();
-        
-        // Get rotation values
+
+        ImGui::TableSetColumnIndex(2); 
+
+        // ========== Rotation Slider ==========
+
+        ImGui::TableNextRow();
+
         glm::vec3 rotation = transform.transforms.getRotation();
         bool rotationChanged = false;
+
+        ImGui::TableSetColumnIndex(0);
+
+        ImGui::Text("Rotation");
+
+        ImGui::TableSetColumnIndex(1);
+
+
+        availableWidth = ImGui::GetContentRegionAvail().x;
+        availableHeight = ImGui::GetContentRegionAvail().y;
+
+        sliderWidth = availableWidth / 3.0f;
+
+        std::string rotationLabel[3] = {"##rotX", "##rotY", "##rotZ"};
+        transformComponentSlider(rotation, sliderWidth, rotationChanged, rotationLabel);
         
-        // X rotation (Red)
-        ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "X:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.1f, 0.1f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 3.0f - 10.0f);
-        if (ImGui::DragFloat("##rotX", &rotation.x, 0.1f)) rotationChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
-        
-        // Y rotation (Green)
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Y:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.6f, 0.1f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 1.0f, 0.2f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2.0f - 10.0f);
-        if (ImGui::DragFloat("##rotY", &rotation.y, 0.1f)) rotationChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
-        
-        // Z rotation (Blue)
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.2f, 0.2f, 1.0f, 1.0f), "Z:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.6f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 0.2f, 1.0f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 10.0f);
-        if (ImGui::DragFloat("##rotZ", &rotation.z, 0.1f)) rotationChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
-        
-        // If rotation changed, update the transform
+        // If position changed, update the transform
         if (rotationChanged) {
+
             transform.transforms.setRotation(rotation);
             transform.transforms.recalculateTransform();
         }
-        
-        ImGui::EndGroup();
-        
-        // Scale with lock option (maintain aspect ratio)
-        ImGui::BeginGroup();
-        
-        // Get scale values
+
+        ImGui::TableSetColumnIndex(2); 
+
+
+        // ========== Scale Slider ==========
+
+        ImGui::TableNextRow();
+
         glm::vec3 scale = transform.transforms.getScale();
-        // Store original scale
-        glm::vec3 originalScale = scale;
         bool scaleChanged = false;
+
+        ImGui::TableSetColumnIndex(0);
+
+        ImGui::Text("Scale");
+
+        ImGui::TableSetColumnIndex(1);
+
+
+        availableWidth = ImGui::GetContentRegionAvail().x;
+        availableHeight = ImGui::GetContentRegionAvail().y;
+
+        sliderWidth = availableWidth / 3.0f;
+
+        std::string scaleLabel[3] = {"##scaleX", "##scaleY", "##scaleZ"};
+        transformComponentSlider(scale, sliderWidth, scaleChanged, scaleLabel);
         
-        // X scale (Red)
-        ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "X:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.1f, 0.1f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 3.0f - 10.0f);
-        if (ImGui::DragFloat("##scaleX", &scale.x, 0.1f)) scaleChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
-        
-        // Y scale (Green)
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Y:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.6f, 0.1f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 1.0f, 0.2f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2.0f - 10.0f);
-        if (ImGui::DragFloat("##scaleY", &scale.y, 0.1f)) scaleChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
-        
-        // Z scale (Blue)
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.2f, 0.2f, 1.0f, 1.0f), "Z:");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.6f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 0.2f, 1.0f, 1.0f));
-        ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 10.0f);
-        if (ImGui::DragFloat("##scaleZ", &scale.z, 0.1f)) scaleChanged = true;
-        ImGui::PopItemWidth();
-        ImGui::PopStyleColor(2);
-        
-        // If scale changed, update the transform
+        // If position changed, update the transform
         if (scaleChanged) {
-            
+
             transform.transforms.setScale(scale);
             transform.transforms.recalculateTransform();
-
         }
-        ImGui::EndGroup();
+
+        ImGui::TableSetColumnIndex(2); 
+
+        
+        ImGui::EndTable();
+
+        ImGui::Dummy(ImVec2(0.0f, 20.0f));
+
     }
+    
     }
 
 }

@@ -21,11 +21,13 @@ class ContentBrowserPanel {
         ~ContentBrowserPanel();
         void render();
 
+        void setProjectAssetsPath(std::filesystem::path projectAssetsPath);
+
     private:
         // Mode and navigation
         ContentBrowserMode m_currentMode = ContentBrowserMode::FILE;
         std::filesystem::path m_currentDirectory;
-        std::filesystem::path m_projectAssetsPath = "assets"; // Default assets folder
+        std::filesystem::path m_projectAssetsPath = ""; // Default assets folder
         std::vector<std::filesystem::path> m_directoryHistory;
         int m_historyIndex = -1;
         

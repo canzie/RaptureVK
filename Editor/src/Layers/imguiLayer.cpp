@@ -32,6 +32,8 @@ ImGuiLayer::ImGuiLayer()
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();
 
+    m_contentBrowserPanel.setProjectAssetsPath(app.getProject().getProjectRootDirectory().string());
+
     Rapture::TextureSpecification spec;
     spec.width = swapChain->getExtent().width;
     spec.height = swapChain->getExtent().height;
@@ -138,6 +140,8 @@ void ImGuiLayer::onAttach()
 
     // Setup Dear ImGui style
     ImGuiPanelStyle::InitializeStyle();
+
+    ImGuiPanelStyle::InitializeFonts(app.getProject().getProjectRootDirectory().string());
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForVulkan((GLFWwindow*)window.getNativeWindowContext(), true);
