@@ -20,6 +20,7 @@
 TODO
 - general descriptor manager
 - fix the gizmo rotation math
+- completly redo the project setup structure to consitently build every lib the same way
 
 --------------------------------
 
@@ -44,4 +45,5 @@ TODO
 - audio
 - ui
 - game?
+
 

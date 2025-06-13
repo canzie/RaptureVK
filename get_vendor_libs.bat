@@ -40,6 +40,9 @@ set TRACY_URL=https://github.com/wolfpld/tracy/archive/refs/tags/v%TRACY_VERSION
 
 REM --- Display Summary and Ask for Confirmation ---
 echo.
+echo !!THIS SCRIPT IS DEPRECATED AND WILL BE REMOVED SOON!!
+echo !!USE THE CMAKE SCRIPT INSTEAD!!
+echo.
 echo The following libraries will be downloaded/set up:
 echo ================================================================================
 echo Library       Version/Branch      Source

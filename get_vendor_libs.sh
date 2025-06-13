@@ -69,6 +69,8 @@ download() {
 
 # --- Display Summary and Ask for Confirmation ---
 echo
+echo "!!THIS SCRIPT IS DEPRECATED AND WILL BE REMOVED SOON!!"
+echo "!!USE THE CMAKE SCRIPT INSTEAD!!"
 echo "The following libraries will be downloaded/set up:"
 echo "================================================================================"
 printf "%-13s %-19s %s\n" "Library" "Version/Branch" "Source"

@@ -1,7 +1,7 @@
 set(ENGINE_NAME RaptureVK)
 
 # Include vendor libraries
-include(${CMAKE_CURRENT_SOURCE_DIR}/vendor/vendor_libraries.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/vendor/vendor_libraries_self.cmake)
 
 # Collect source files
 file(GLOB_RECURSE ENGINE_SOURCES
@@ -47,12 +47,6 @@ target_include_directories(${ENGINE_NAME} PUBLIC
 target_link_libraries(${ENGINE_NAME} PUBLIC
     vendor_libraries
     Threads::Threads
-)
-
-# Add additional compile definitions
-target_compile_definitions(${ENGINE_NAME} PRIVATE
-    SPDLOG_COMPILED_LIB
-    FMT_HEADER_ONLY=0
 )
 
 # Set output directory

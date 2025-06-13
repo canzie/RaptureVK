@@ -56,5 +56,6 @@ release/
 # vendor
 Engine/vendor/*
 !Engine/vendor/vendor_libraries.cmake
+!Engine/vendor/vendor_libraries_self.cmake
 
 !Editor/vendor/*

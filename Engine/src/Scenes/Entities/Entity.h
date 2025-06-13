@@ -6,8 +6,8 @@
 #include <tuple>
 #include <type_traits>
 #include <cstdint>
-#include "entt/entt.hpp"
-#include "../Scene.h"
+#include <entt/entt.hpp>
+#include "Scenes/Scene.h"
 
 
 /*
