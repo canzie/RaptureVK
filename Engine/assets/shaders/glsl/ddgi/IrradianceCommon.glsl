@@ -29,7 +29,7 @@ float calculateSunShadowFactor(vec3 hitPositionWorld, vec3 hitNormalWorld, SunPr
     vec3 projCoords = hitPosLightSpace.xyz / hitPosLightSpace.w;
 
     // Transform to [0,1] range for texture lookup
-    projCoords = projCoords * 0.5 + 0.5;
+    projCoords.xy = projCoords.xy * 0.5 + 0.5;
 
     // Check if fragment is outside the light's view frustum [0, 1] range
     if(projCoords.x < 0.0 || projCoords.x > 1.0 ||
@@ -43,6 +43,7 @@ float calculateSunShadowFactor(vec3 hitPositionWorld, vec3 hitNormalWorld, SunPr
     float bias = max(0.005 * (1.0 - cosTheta), 0.001);
 
     float comparisonDepth = projCoords.z - bias;
+    
     
     // Use descriptor array to access shadow map
     float shadowFactor = texture(gShadowMaps[sunProperties.sunShadowTextureArrayIndex], vec3(projCoords.xy, comparisonDepth));
@@ -236,6 +237,6 @@ vec3 DDGIGetVolumeIrradiance(
     irradiance *= (1.0 / accumulatedWeights);   // Normalize by the accumulated weights
     irradiance *= irradiance;                   // Go back to linear irradiance
     irradiance *= 6.28318530718;                    // Multiply by the area of the integration domain (hemisphere) to complete the Monte Carlo Estimator equation
-
+    //irradiance *= 1.0989;
     return irradiance;
 }

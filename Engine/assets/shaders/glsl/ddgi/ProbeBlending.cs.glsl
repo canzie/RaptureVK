@@ -145,7 +145,7 @@ void main() {
         
         // Fix Y-axis inversion for Vulkan coordinate system
         ivec2 texCoords = ivec2(gl_LocalInvocationID.x, (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS - 1) - gl_LocalInvocationID.y);
-        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(texCoords, u_volume.probeNumIrradianceInteriorTexels);
+        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(ivec2(gl_LocalInvocationID.xy), u_volume.probeNumIrradianceInteriorTexels);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
         
     #endif
@@ -153,7 +153,7 @@ void main() {
 
         // Fix Y-axis inversion for Vulkan coordinate system
         ivec2 texCoords = ivec2(gl_LocalInvocationID.x, (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS - 1) - gl_LocalInvocationID.y);
-        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(texCoords, u_volume.probeNumDistanceInteriorTexels);
+        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(ivec2(gl_LocalInvocationID.xy), u_volume.probeNumDistanceInteriorTexels);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
 
     #endif
@@ -240,7 +240,7 @@ void main() {
         // Get the history weight (hysteresis) to use for the probe texel's previous value
         // If the probe was previously cleared to completely black, set the hysteresis to zero
         float hysteresis = u_volume.probeHysteresis;
-        if (dot(probeIrradianceMean, probeIrradianceMean) == 0) hysteresis = 0.f;
+        if (dot(probeIrradianceMean, probeIrradianceMean) == 0) hysteresis = 0.0;
 
     #ifdef DDGI_BLEND_RADIANCE
         // Tone-mapping gamma adjustment
@@ -316,6 +316,9 @@ void main() {
 
     // Border Texel Update Logic:
     UpdateBorderTexelsGLSL(ivec3(gl_LocalInvocationID), ivec3(gl_WorkGroupID), ivec3(gl_GlobalInvocationID));
+
+#else
+    imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0, 0.0, 1.0, 1.0));
 
 #endif
 

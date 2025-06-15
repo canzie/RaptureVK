@@ -237,11 +237,11 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         }
         
         bias = max(0.005 * (1.0 - cosTheta) * distanceScale, 0.001);
-        
+        float comparisonDepth = projCoords.z - bias; 
+
         // Use a 3x3 kernel for PCF
         for(int x = -1; x <= 1; ++x) {
             for(int y = -1; y <= 1; ++y) {
-                float comparisonDepth = projCoords.z - bias; 
                 shadowFactor += texture(gBindlessTextures[shadowInfo.textureHandle], vec3(
                     projCoords.xy + vec2(x, y) * texelSize,
                     comparisonDepth

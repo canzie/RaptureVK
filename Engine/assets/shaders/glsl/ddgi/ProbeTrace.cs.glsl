@@ -91,6 +91,7 @@ struct VertexAttributes {
     vec2 texCoord;
     vec3 normal;
     vec4 tangent;
+    vec3 bitangent;
 };
 
 // Interpolated surface data
@@ -99,6 +100,7 @@ struct SurfaceData {
     vec2 texCoord;
     vec3 normal;
     vec4 tangent;
+    vec3 bitangent;
 };
 
 /**
@@ -168,7 +170,17 @@ VertexAttributes fetchVertexAttributes(uint vertexIndex, MeshInfo meshInfo) {
 
     attrs.position = (meshInfo.modelMatrix * vec4(attrs.position, 1.0)).xyz;
     attrs.normal = normalize((meshInfo.modelMatrix * vec4(attrs.normal, 0.0)).xyz);
-    attrs.tangent = normalize(meshInfo.modelMatrix * attrs.tangent);
+    
+    // Transform only the tangent vector (xyz), preserve handedness (w)
+    vec3 worldTangent = normalize((meshInfo.modelMatrix * vec4(attrs.tangent.xyz, 0.0)).xyz);
+    attrs.tangent = vec4(worldTangent, attrs.tangent.w);
+    
+    // Re-orthogonalize tangent with respect to normal (in world space)
+    vec3 T = normalize(attrs.tangent.xyz - dot(attrs.tangent.xyz, attrs.normal) * attrs.normal);
+    attrs.tangent = vec4(T, attrs.tangent.w);
+    
+    // Calculate bitangent with proper handedness
+    attrs.bitangent = normalize(cross(attrs.normal, T) * attrs.tangent.w);
     
     return attrs;
 }
@@ -185,7 +197,18 @@ SurfaceData interpolateVertexAttributes(VertexAttributes v0, VertexAttributes v1
     surface.normal = normalize(v0.normal * weights.x + v1.normal * weights.y + v2.normal * weights.z);
     
     vec4 interpolatedTangent = v0.tangent * weights.x + v1.tangent * weights.y + v2.tangent * weights.z;
-    surface.tangent = normalize(interpolatedTangent);
+    surface.tangent = vec4(normalize(interpolatedTangent.xyz), interpolatedTangent.w);
+    
+    // Interpolate bitangent
+    surface.bitangent = normalize(v0.bitangent * weights.x + v1.bitangent * weights.y + v2.bitangent * weights.z);
+    
+    // Calculate bitangent using the same approach as GBuffer shader
+    // Re-orthogonalize tangent with respect to normal (in world space)
+    vec3 T = normalize(surface.tangent.xyz - dot(surface.tangent.xyz, surface.normal) * surface.normal);
+    surface.tangent = vec4(T, surface.tangent.w);
+    
+    // Calculate bitangent with proper handedness
+    surface.bitangent = normalize(cross(surface.normal, T) * surface.tangent.w);
     
     return surface;
 }
@@ -224,18 +247,22 @@ vec3 calculateShadingNormal(
     MeshInfo meshInfo,
     vec2 uv,
     vec3 N_geom,   // Interpolated geometric normal (world space)
-    vec4 T_geom    // Interpolated tangent (world space, w component contains handedness)
+    vec4 T_geom,   // Interpolated tangent (world space, w component contains handedness)
+    vec3 B_geom    // Pre-computed bitangent (world space)
 ) {
     vec3 finalNormal = N_geom;
 
     if (meshInfo.NormalTextureIndex != 0) {
         vec3 tangentNormal = texture(gTextures[meshInfo.NormalTextureIndex], uv).xyz;
-        tangentNormal = normalize(tangentNormal * 2.0 - 1.0);
+        tangentNormal = tangentNormal * 2.0 - 1.0;
 
-        // Extract tangent vector and handedness from glTF tangent representation
-        vec3 T = normalize(T_geom.xyz - dot(T_geom.xyz, N_geom) * N_geom);
-        vec3 B = normalize(cross(N_geom, T) * T_geom.w); // Use w component for correct handedness
-        mat3 TBN = mat3(T, B, N_geom);
+        // Use the pre-computed tangent, bitangent, and normal directly
+        vec3 N = normalize(N_geom);
+        vec3 T = normalize(T_geom.xyz);
+        vec3 B = normalize(B_geom);
+        
+        // Form TBN matrix from pre-computed vectors
+        mat3 TBN = mat3(T, B, N);
 
         finalNormal = normalize(TBN * tangentNormal);
     }
@@ -294,7 +321,7 @@ void main() {
             // Get complete surface data for the hit point
             SurfaceData surface = getSurfaceDataForHit(primitiveID, barycentrics, meshInfo);
             
-            vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent);
+            vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent, surface.bitangent);
             vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
     
             vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_SunProperties);
@@ -330,9 +357,7 @@ void main() {
         //vec3 skyboxColor = texture(u_skyboxCubemap, probeRayDirection).rgb;
         vec3 skyboxColor = vec3(0.0, 0.0, 0.0);
         // If no skybox, use green color for misses
-        if (length(skyboxColor) < 0.001) {
-            skyboxColor = u_SunProperties.sunColor; // Green for misses
-        }
+        skyboxColor = u_SunProperties.sunColor; // Green for misses
         
         DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor * u_SunProperties.sunIntensity);
     }
