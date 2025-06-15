@@ -2,6 +2,7 @@
 
 #include "imguiPanelStyleLinear.h"
 #include "Logging/Log.h"
+#include "Logging/TracyProfiler.h"
 #include <algorithm>
 #include <cctype>
 
@@ -31,7 +32,10 @@ void ContentBrowserPanel::setProjectAssetsPath(std::filesystem::path projectAsse
 }
 
 void ContentBrowserPanel::render() {
-    ImGui::Begin("Content Browser");
+    RAPTURE_PROFILE_FUNCTION();
+
+    std::string title = "Content Browser " + std::string(ICON_MD_FOLDER);
+    ImGui::Begin(title.c_str());
 
     renderTopPane();
     
@@ -69,6 +73,7 @@ void ContentBrowserPanel::render() {
 }
 
 void ContentBrowserPanel::renderTopPane() {
+    RAPTURE_PROFILE_FUNCTION();
     ImGui::BeginChild("TopPane", ImVec2(0, 20), ImGuiChildFlags_ResizeY | ImGuiChildFlags_Border);
     
     // Mode selection
@@ -116,6 +121,7 @@ void ContentBrowserPanel::renderTopPane() {
 }
 
 void ContentBrowserPanel::renderFileHierarchy() {
+    RAPTURE_PROFILE_FUNCTION();
     ImGui::Text("File Hierarchy");
     ImGui::Separator();
     
@@ -208,7 +214,7 @@ struct FileItem {
 
 
 void ContentBrowserPanel::renderAssetContent() {
-
+    RAPTURE_PROFILE_FUNCTION();
     const float padding = 32.0f;
     const float iconSize = 128.0f;
     const float minItemWidth = iconSize + padding;
@@ -225,13 +231,6 @@ void ContentBrowserPanel::renderAssetContent() {
 
     int itemIndex = 0;
     for (const auto& [handle, asset] : loadedAssets) {
-        ImGui::PushID(itemIndex++);
-
-        ImGui::BeginGroup();
-
-        // Center the icon
-        float iconPadding = (actualItemWidth - iconSize) * 0.5f;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + iconPadding);
 
         if (assetRegistry.find(handle) == assetRegistry.end()) {
             continue;
@@ -240,6 +239,22 @@ void ContentBrowserPanel::renderAssetContent() {
         if (metadata.m_assetType == Rapture::AssetType::None) {
             continue;
         }
+
+        if (metadata.isDiskAsset() && !isSearchMatch(metadata.m_filePath.filename().string(), m_searchBuffer)) {
+            continue;
+        } else if (metadata.isVirtualAsset() && !isSearchMatch(metadata.m_virtualName, m_searchBuffer)) {
+            continue;
+        }
+
+        ImGui::PushID(itemIndex++);
+
+        ImGui::BeginGroup();
+
+        // Center the icon
+        float iconPadding = (actualItemWidth - iconSize) * 0.5f;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + iconPadding);
+
+
 
         ImVec4 iconColor = getAssetTypeColor(metadata.m_assetType, false);
         ImVec4 iconColorHovered = getAssetTypeColor(metadata.m_assetType, true);
@@ -257,6 +272,7 @@ void ContentBrowserPanel::renderAssetContent() {
 
         // Set up drag source for texture assets
         if (metadata.m_assetType == Rapture::AssetType::Texture && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+            RAPTURE_PROFILE_SCOPE("Texture Drag Drop Source");
             // Set the payload to contain the asset handle
             ImGui::SetDragDropPayload("TEXTURE_ASSET", &handle, sizeof(Rapture::AssetHandle));
             
@@ -317,6 +333,8 @@ void ContentBrowserPanel::navigateForward() {
 }
 
 bool ContentBrowserPanel::isSearchMatch(const std::string& name, const std::string& searchTerm) const {
+    RAPTURE_PROFILE_FUNCTION();
+
     if (searchTerm.empty()) return true;
     
     std::string lowerName = name;

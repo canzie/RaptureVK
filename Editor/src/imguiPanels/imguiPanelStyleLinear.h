@@ -214,10 +214,11 @@ namespace ImGuiPanelStyle {
 
         // Add this line to merge icons into the default font
         // The static keyword is important here to ensure the config persists through the font building process
-        static const ImWchar icons_ranges[] = { ICON_MIN_MD, ICON_MAX_MD, 0 };
+        static const ImWchar icons_ranges[] = { (ImWchar)ICON_MIN_MD, (ImWchar)ICON_MAX_MD, 0 };
         ImFontConfig icons_config;
         icons_config.MergeMode = true;
         icons_config.PixelSnapH = true;
+        icons_config.GlyphOffset.y = 3.0f; // Vertically align icons with text
 
         io.Fonts->AddFontFromFileTTF(iconFontPath.c_str(), 16.0f, &icons_config, icons_ranges);
 

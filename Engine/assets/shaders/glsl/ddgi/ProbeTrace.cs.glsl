@@ -5,48 +5,57 @@
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_ray_query : require
 
-
-#include "ProbeCommon.glsl"
-#include "MeshCommon.glsl"
-#include "IrradianceCommon.glsl"
+#define RAY_DATA_TEXTURE
 
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 // Ray data output texture
-layout (binding = 0, rgba32f) uniform restrict writeonly image2DArray RayData;
+layout (set=0, binding = 0, rgba32f) uniform restrict writeonly image2DArray RayData;
 
 // Previous probe data
-layout (binding = 1) uniform sampler2DArray prevProbeAtlas;
-layout (binding = 2) uniform sampler2DArray prevProbeDepthAtlas;
+layout (set=0, binding = 1) uniform sampler2DArray prevProbeIrradianceAtlas;
+layout (set=0, binding = 2) uniform sampler2DArray prevProbeDistanceAtlas;
 
 // Skybox Cubemap
-layout (binding = 3) uniform samplerCube u_skyboxCubemap;
+layout (set=0, binding = 3) uniform samplerCube u_skyboxCubemap;
 
 // TLAS binding
-layout (binding = 4) uniform accelerationStructureEXT topLevelAS;
+layout (set=0, binding = 4) uniform accelerationStructureEXT topLevelAS;
+
+// Simplified MeshInfo structure matching our C++ version
+struct MeshInfo {
+    uint AlbedoTextureIndex;
+    uint NormalTextureIndex;
+    uint MetallicRoughnessTextureIndex;
+    uint iboIndex; // index of the buffer in the bindless buffers array
+    uint vboIndex; // index of the buffer in the bindless buffers array
+    uint meshIndex; // index of the mesh in the mesh array, this is the same index as the tlasinstance instanceCustomIndex
+};
+
+// Scene info buffer
+layout(std430, set=0, binding = 5) readonly buffer SceneInfo {
+    MeshInfo MeshInfos[];
+} u_sceneInfo;
+
+
+
+#include "ProbeCommon.glsl"
+#include "IrradianceCommon.glsl"
 
 // Input Uniforms / Buffers
-layout(std140, binding = 0) uniform ProbeInfo {
+layout(std140, set=1, binding = 0) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
 
 // Sun shadow uniforms
-layout(std140, binding = 1) uniform SunPropertiesUBO {
+layout(std140, set=1, binding = 1) uniform SunPropertiesUBO {
     SunProperties u_SunProperties;
 };
 
-// Scene info buffer
-layout(std430, binding = 2) readonly buffer SceneInfo {
-    MeshInfo MeshInfos[];
-} u_sceneInfo;
 
-// Buffer metadata storage
-layout(std430, binding = 3) readonly buffer BufferMetadataStorage {
-    BufferMetadata AllBufferMetadata[];
-} u_bufferMetadata;
 
-precision highp float;
+
 
 // Ray query for intersection testing
 rayQueryEXT rayQuery;
@@ -94,12 +103,16 @@ void main() {
 
     vec3 probeWorldPosition = DDGIGetProbeWorldPosition(probeCoords, u_volume);
     vec3 probeRayDirection = DDGIGetProbeRayDirection(rayIndex, u_volume);
-   
     uvec3 outputCoords = DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume);
+
 
     // Initialize ray query
     rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsOpaqueEXT, 0xFF, 
         probeWorldPosition, 0.0, probeRayDirection, u_volume.probeMaxRayDistance*1.5);
+
+
+    
+
 
     // Trace the ray
     bool hit = false;
@@ -108,13 +121,13 @@ void main() {
     vec2 hitUV;
     uint hitInstanceID;
     float hitT;
-    bool isFrontFacing;
+    bool isFrontFacing = true;
 
     while(rayQueryProceedEXT(rayQuery)) {
         if (rayQueryGetIntersectionTypeEXT(rayQuery, false) == gl_RayQueryCandidateIntersectionTriangleEXT) {
             isFrontFacing = !rayQueryGetIntersectionFrontFaceEXT(rayQuery, false);
             
-            if (!isFrontFacing) {
+            if (isFrontFacing) {
                 rayQueryConfirmIntersectionEXT(rayQuery);
             }
         }
@@ -126,59 +139,30 @@ void main() {
         hitPosition = probeWorldPosition + probeRayDirection * hitT;
         hitInstanceID = rayQueryGetIntersectionInstanceIdEXT(rayQuery, true);
         
-        // Get barycentric coordinates
-        vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
-        float w = 1.0 - barycentrics.x - barycentrics.y;
-        
-        // Get primitive ID and instance
-        uint primitiveID = rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, true);
-        MeshInfo meshInfo = u_sceneInfo.MeshInfos[hitInstanceID];
-        
-        /*
-        // Get triangle vertices and attributes
-        BufferMetadata metadata = u_bufferMetadata.AllBufferMetadata[meshInfo.bufferMetadataIDX];
-        Triangle tri = getTriangleExtras(meshInfo, primitiveID, metadata);
-        
-        // Interpolate attributes
-        hitUV = tri.uv0 * w + tri.uv1 * barycentrics.x + tri.uv2 * barycentrics.y;
-        vec3 worldNormal_geom = normalize(tri.n0 * w + tri.n1 * barycentrics.x + tri.n2 * barycentrics.y);
-        vec3 worldTangent_geom = normalize(tri.t0 * w + tri.t1 * barycentrics.x + tri.t2 * barycentrics.y);
-        
-        // Calculate final normal
-        vec3 worldShadingNormal = calculateShadingNormal(meshInfo, hitUV, worldNormal_geom, worldTangent_geom);
-        vec3 albedo = sampleAlbedo(meshInfo, hitUV);
-
-        if (!isFrontFacing) {
-            // Store backface hit
-            DDGIStoreProbeRayBackfaceHit(ivec3(outputCoords), hitT);
-            return;
-        }
-
-        // Calculate lighting
-        vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_SunProperties);
-
-        // Calculate indirect lighting
-        vec3 irradiance = vec3(0.0);
-        vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, probeRayDirection, u_volume);
-
-        irradiance = DDGIGetVolumeIrradiance(
-            hitPosition,
-            worldShadingNormal,
-            surfaceBias,
-            prevProbeAtlas,
-            prevProbeDepthAtlas,
-            u_volume);
-
-        float maxAlbedo = 0.9;
-        vec3 radiance = diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
-        
-        // Store the result
-        DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), clamp(radiance, vec3(0.0), vec3(1.0)), hitT);
-    */
+        if (isFrontFacing) {
+            // Front face hit - store red color for visualization
+            MeshInfo meshInfo = u_sceneInfo.MeshInfos[hitInstanceID];
+            
+            // Use the mesh index to verify we're accessing the correct mesh data
+            // For now, just store a red color to indicate a hit
+            vec3 hitColor = vec3(1.0, 0.0, 0.0); // Red for hits 
+            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), hitColor, hitT);
         } else {
-        // Sample skybox for misses
-        //vec3 sunColor = vec3(1.0, 1.0, 1.0);
-        //sunColor *= u_SunProperties.sunIntensity * u_SunProperties.sunColor;
-        //DDGIStoreProbeRayMiss(ivec3(outputCoords), sunColor * u_SunProperties.sunIntensity);
+            // Back face hit - store negative distance
+            DDGIStoreProbeRayBackfaceHit(ivec3(outputCoords), hitT);
+        }
+    } else {
+        // Miss - sample skybox and store blue color for visualization
+        //vec3 skyboxColor = texture(u_skyboxCubemap, probeRayDirection).rgb;
+        vec3 skyboxColor = vec3(0.0, 0.0, 0.0);
+        // If no skybox, use green color for misses
+        if (length(skyboxColor) < 0.001) {
+            skyboxColor = vec3(0.0, 1.0, 0.0); // Green for misses
+        } else {
+            skyboxColor = vec3(0.0, 0.0, 1.0); // Blue for skybox samples
+        }
+        
+        DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor);
     }
+    
 }

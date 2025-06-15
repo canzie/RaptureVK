@@ -5,7 +5,7 @@
 #include <variant>
 #include <memory>
 #include <string>
-
+#include <functional>
 #include <mutex>
 
 #include "Textures/TextureCommon.h"
@@ -20,16 +20,17 @@ namespace Rapture {
     // we can go even further and log a warn when a layout can be optimised to be identical to a cached one.
 
 // Forward declarations
-class UniformBuffer;
+class Buffer;
 class Texture;
+class TLAS;
 
 struct DescriptorSetBinding {
     uint32_t binding;
     VkDescriptorType type;
-    uint32_t count;
+    uint32_t count = 1;
     TextureViewType viewType = TextureViewType::DEFAULT;
     // Use variant to hold different resource types
-    std::variant<std::shared_ptr<UniformBuffer>, std::shared_ptr<Texture>> resource;
+    std::variant<std::shared_ptr<Buffer>, std::shared_ptr<Texture>, std::reference_wrapper<TLAS>> resource;
     bool useStorageImageInfo = false; // Flag to use storage image descriptor info
 
 };
@@ -74,6 +75,7 @@ private:
     uint32_t m_usedStorageBuffers = 0;
     uint32_t m_usedStorageImages = 0;
     uint32_t m_usedInputAttachments = 0;
+    uint32_t m_usedAccelerationStructures = 0;
     std::mutex m_descriptorUpdateMutex;
     
     // Static pool management
@@ -84,12 +86,14 @@ private:
     static uint32_t s_poolStorageBufferCount;
     static uint32_t s_poolStorageImageCount;
     static uint32_t s_poolInputAttachmentCount;
+    static uint32_t s_poolAccelerationStructureCount;
     static const uint32_t s_maxSets = 1000;  // Maximum descriptor sets in pool
     static const uint32_t s_maxBuffers = 2000;
     static const uint32_t s_maxTextures = 4000;
     static const uint32_t s_maxStorageBuffers = 2000;
     static const uint32_t s_maxStorageImages = 2000;
     static const uint32_t s_maxInputAttachments = 1000;
+    static const uint32_t s_maxAccelerationStructures = 64;
 };
 
 }

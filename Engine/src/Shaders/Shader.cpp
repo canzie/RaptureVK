@@ -2,7 +2,7 @@
 
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
-#include "Buffers/Descriptors/BindlessDescriptorManager.h"
+#include "Buffers/Descriptors/DescriptorArrayManager.h"
 
 #include "ShaderReflections.h"
 
@@ -262,7 +262,7 @@ void Shader::createDescriptorSetLayout()
     
     // If shader uses set 3, ensure intermediate sets have dummy layouts and set 3 has bindless layout
     if (hasSet3) {
-        auto bindlessDescriptorArray = BindlessDescriptorManager::getPool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        auto bindlessDescriptorArray = DescriptorArrayManager::getTextureArray();
         if (bindlessDescriptorArray) {
             Application& app = Application::getInstance();
             VkDevice device = app.getVulkanContext().getLogicalDevice();
@@ -291,7 +291,7 @@ void Shader::createDescriptorSetLayout()
             }
             
             // Now set the bindless layout for set 3 (overriding any existing layout)
-            m_descriptorSetLayouts[3] = bindlessDescriptorArray->getLayout();
+            m_descriptorSetLayouts[3] = DescriptorArrayManager::getUnifiedLayout();
             RP_CORE_INFO("Set bindless descriptor set layout for set 3");
         }
     }
@@ -468,6 +468,7 @@ namespace {
             case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC: return "UNIFORM_BUFFER_DYNAMIC";
             case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC: return "STORAGE_BUFFER_DYNAMIC";
             case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT: return "INPUT_ATTACHMENT";
+            case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: return "ACCELERATION_STRUCTURE_KHR";
             default: return "UNKNOWN";
         }
     }

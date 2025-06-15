@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <cmath>
 
 #include <glm/glm.hpp>
 
@@ -11,8 +12,10 @@
 #include "Shaders/Shader.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Buffers/StorageBuffers/StorageBuffer.h"
+#include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/Descriptors/DescriptorSet.h"
 
-
+#include "Pipelines/ComputePipeline.h"
 
 #include "DDGICommon.h"
 
@@ -34,27 +37,30 @@ public:
 
     std::vector<glm::vec3>& getDebugProbePositions() { return m_DebugProbePositions; }
 
-    std::shared_ptr<UniformBuffer> getProbeInfoBuffer() { return m_ProbeInfoBuffer; }
-    uint32_t getProbesPerRow() { return m_probesPerRow; }
 
 private:
     void castRays(std::shared_ptr<Scene> scene);
     void blendTextures();
+    void flattenTextures();
 
-    //int createBufferMetadata(std::shared_ptr<VertexArray> vao);
-    int getBufferMetadataIndex(uint32_t vaoID);
-    void readDebugBuffer();
     void initTextures();
     void updateSunProperties(std::shared_ptr<Scene> scene);
     void initProbeInfoBuffer();
+    void initializeSunProperties();
 
     void createPipelines();
+    void createDescriptorSets(std::shared_ptr<Scene> scene);
 
 private:
     std::shared_ptr<Shader> m_DDGI_ProbeTraceShader;
     std::shared_ptr<Shader> m_DDGI_ProbeIrradianceBlendingShader;
     std::shared_ptr<Shader> m_DDGI_ProbeDistanceBlendingShader;
     std::shared_ptr<Shader> m_Flatten2dArrayShader;
+
+    std::shared_ptr<ComputePipeline> m_DDGI_ProbeTracePipeline;
+    std::shared_ptr<ComputePipeline> m_DDGI_ProbeIrradianceBlendingPipeline;
+    std::shared_ptr<ComputePipeline> m_DDGI_ProbeDistanceBlendingPipeline;
+    std::shared_ptr<ComputePipeline> m_Flatten2dArrayPipeline;
 
     ProbeVolume m_ProbeVolume;
     
@@ -63,7 +69,6 @@ private:
     
     std::shared_ptr<StorageBuffer> m_MeshInfoBuffer;
 
-    //std::shared_ptr<ShaderStorageBuffer> m_DebugBuffer;
 
     std::shared_ptr<UniformBuffer> m_SunLightBuffer;
     std::shared_ptr<UniformBuffer> m_ProbeInfoBuffer;
@@ -80,11 +85,14 @@ private:
 
     std::shared_ptr<Texture> m_IrradianceTextureFlattened;
     std::shared_ptr<Texture> m_DistanceTextureFlattened;
+    std::shared_ptr<Texture> m_RayDataTextureFlattened;
 
 
     std::vector<glm::vec3> m_DebugProbePositions;
 
     VmaAllocator m_allocator;
+
+    std::shared_ptr<CommandBuffer> m_CommandBuffer;
 
 
     // used to alternate between the textures each frame
@@ -96,6 +104,9 @@ private:
 
     uint32_t m_meshCount;
     uint32_t m_probesPerRow; // Number of probes along the X-axis of the atlas texture
+
+    std::vector<std::shared_ptr<DescriptorSet>> m_rayTraceDescriptorSets;
+    std::shared_ptr<DescriptorSet> m_flattenDescriptorSet;
 
     
 };

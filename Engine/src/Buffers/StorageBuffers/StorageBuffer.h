@@ -14,8 +14,6 @@ class StorageBuffer : public Buffer {
         virtual VkBufferUsageFlags getBufferUsage() override;
         virtual VkMemoryPropertyFlags getMemoryPropertyFlags() override;
 
-        // Get descriptor buffer info for use in descriptor sets
-        VkDescriptorBufferInfo getDescriptorBufferInfo() const;
 
         virtual void addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset) override;
 

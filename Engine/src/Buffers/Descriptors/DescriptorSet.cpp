@@ -1,8 +1,10 @@
 #include "DescriptorSet.h"
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
-#include "Buffers/UniformBuffers/UniformBuffer.h"
+
+#include "Buffers/Buffers.h"
 #include "Textures/Texture.h"
+#include "AccelerationStructures/TLAS.h"
 
 #include <stdexcept>
 #include <algorithm>
@@ -18,6 +20,7 @@ uint32_t DescriptorSet::s_poolTextureCount = 0;
 uint32_t DescriptorSet::s_poolStorageBufferCount = 0;
 uint32_t DescriptorSet::s_poolStorageImageCount = 0;
 uint32_t DescriptorSet::s_poolInputAttachmentCount = 0;
+uint32_t DescriptorSet::s_poolAccelerationStructureCount = 0;
 
 // Static const member definitions
 const uint32_t DescriptorSet::s_maxSets;
@@ -26,7 +29,7 @@ const uint32_t DescriptorSet::s_maxTextures;
 const uint32_t DescriptorSet::s_maxStorageBuffers;
 const uint32_t DescriptorSet::s_maxStorageImages;
 const uint32_t DescriptorSet::s_maxInputAttachments;
-
+const uint32_t DescriptorSet::s_maxAccelerationStructures;
 
 DescriptorSet::DescriptorSet(const DescriptorSetBindings& bindings) 
     : m_layout(bindings.layout), m_set(VK_NULL_HANDLE) {
@@ -79,7 +82,7 @@ DescriptorSet::~DescriptorSet() {
 
 void DescriptorSet::createDescriptorPool() {
     // Define pool sizes for different descriptor types
-    std::array<VkDescriptorPoolSize, 5> poolSizes{};
+    std::array<VkDescriptorPoolSize, 6> poolSizes{};
     
     // Uniform buffers
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -100,6 +103,10 @@ void DescriptorSet::createDescriptorPool() {
     // Input attachments
     poolSizes[4].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
     poolSizes[4].descriptorCount = s_maxInputAttachments;
+
+    // TLAS
+    poolSizes[5].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+    poolSizes[5].descriptorCount = s_maxAccelerationStructures;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -139,6 +146,7 @@ void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
     std::vector<VkWriteDescriptorSet> descriptorWrites;
     std::vector<VkDescriptorBufferInfo> bufferInfos;
     std::vector<VkDescriptorImageInfo> imageInfos;
+    std::vector<VkWriteDescriptorSetAccelerationStructureKHR> accelerationStructureWrites;
     
     std::lock_guard<std::mutex> lock(m_descriptorUpdateMutex);
 
@@ -147,6 +155,7 @@ void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
     descriptorWrites.reserve(bindings.bindings.size());
     bufferInfos.reserve(bindings.bindings.size());
     imageInfos.reserve(bindings.bindings.size());
+    accelerationStructureWrites.reserve(bindings.bindings.size());
 
     for (const auto& binding : bindings.bindings) {
         VkWriteDescriptorSet descriptorWrite{};
@@ -157,37 +166,52 @@ void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
         descriptorWrite.descriptorType = binding.type;
         descriptorWrite.descriptorCount = binding.count;
 
-        // Use visitor pattern to handle different resource types
-        // goofy claude magic, dont even know if this is better than doing has_alternative
-        std::visit([&](const auto& resource) {
-            using T = std::decay_t<decltype(resource)>;
-            
-            if constexpr (std::is_same_v<T, std::shared_ptr<UniformBuffer>>) {
-                // Handle UniformBuffer
-                if (resource) {
-                    bufferInfos.push_back(resource->getDescriptorBufferInfo());
-                    descriptorWrite.pBufferInfo = &bufferInfos.back();
-                } else {
-                    RP_CORE_WARN("UniformBuffer is null for binding {}", binding.binding);
-                    return; // Skip this binding
-                }
-            } else if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>) {
-                // Handle Texture
-                if (resource) {
-                    if (binding.useStorageImageInfo) {
-                        imageInfos.push_back(resource->getStorageImageDescriptorInfo());
-                    } else {
-                        imageInfos.push_back(resource->getDescriptorImageInfo(binding.viewType));
-                    }
-                    descriptorWrite.pImageInfo = &imageInfos.back();
-                } else {
-                    RP_CORE_WARN("Texture is null for binding {}", binding.binding);
-                    return; // Skip this binding
-                }
+        // TODO:: add a check for the correct uniform or storage bit
+        if (std::holds_alternative<std::shared_ptr<Buffer>>(binding.resource)) {
+            auto resource = std::get<std::shared_ptr<Buffer>>(binding.resource);
+
+            if (resource) {
+                bufferInfos.push_back(resource->getDescriptorBufferInfo());
+                descriptorWrite.pBufferInfo = &bufferInfos.back();
+            } else {
+                RP_CORE_WARN("Buffer is null for binding {}", binding.binding);
+                return; // Skip this binding
             }
-            
-            descriptorWrites.push_back(descriptorWrite);
-        }, binding.resource);
+        } else if (std::holds_alternative<std::shared_ptr<Texture>>(binding.resource)) {
+            // Handle Texture
+            auto resource = std::get<std::shared_ptr<Texture>>(binding.resource);
+            if (resource) {
+                if (binding.useStorageImageInfo) {
+                    imageInfos.push_back(resource->getStorageImageDescriptorInfo());
+                } else {
+                    imageInfos.push_back(resource->getDescriptorImageInfo(binding.viewType));
+                }
+                descriptorWrite.pImageInfo = &imageInfos.back();
+            } else {
+                RP_CORE_WARN("Texture is null for binding {}", binding.binding);
+                return; // Skip this binding
+            }
+
+        } else if (std::holds_alternative<std::reference_wrapper<TLAS>>(binding.resource)) {
+            auto& resource = std::get<std::reference_wrapper<TLAS>>(binding.resource).get();
+            if (resource.getAccelerationStructure() != VK_NULL_HANDLE) {
+                // Create acceleration structure write descriptor
+                VkWriteDescriptorSetAccelerationStructureKHR accelerationStructureWrite{};
+                accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+                accelerationStructureWrite.accelerationStructureCount = 1;
+                VkAccelerationStructureKHR accelerationStructure = resource.getAccelerationStructure();
+                accelerationStructureWrite.pAccelerationStructures = &accelerationStructure;
+                
+                accelerationStructureWrites.push_back(accelerationStructureWrite);
+                
+                // Link the acceleration structure write to the main descriptor write
+                descriptorWrite.pNext = &accelerationStructureWrites.back();
+            } else {
+                RP_CORE_WARN("TLAS is null for binding {}", binding.binding);
+                return; // Skip this binding
+            }
+        }
+        descriptorWrites.push_back(descriptorWrite);
     }
 
     if (!descriptorWrites.empty()) {
@@ -199,7 +223,7 @@ void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
 void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
 {
         // Check if adding this descriptor set would exceed any limits
-    uint32_t newBuffers = 0, newTextures = 0, newStorageBuffers = 0, newStorageImages = 0, newInputAttachments = 0;
+    uint32_t newBuffers = 0, newTextures = 0, newStorageBuffers = 0, newStorageImages = 0, newInputAttachments = 0, newAccelerationStructures = 0;
     
     for (const auto& binding : bindings.bindings) {
         switch (binding.type) {
@@ -219,6 +243,9 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
                 break;
             case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
                 newInputAttachments += binding.count;
+                break;
+            case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+                newAccelerationStructures += binding.count;
                 break;
             default:
                 RP_CORE_WARN("Unknown descriptor type: {}", static_cast<int>(binding.type));
@@ -257,12 +284,19 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
                                 std::to_string(newInputAttachments) + ", Max: " + std::to_string(s_maxInputAttachments));
     }
 
+    if (s_poolAccelerationStructureCount + newAccelerationStructures > s_maxAccelerationStructures) {
+        throw std::runtime_error("DescriptorSet: Acceleration structure limit exceeded! Current: " + 
+                                std::to_string(s_poolAccelerationStructureCount) + ", Requested: " + 
+                                std::to_string(newAccelerationStructures) + ", Max: " + std::to_string(s_maxAccelerationStructures));
+    }
+
     // Update counters
     s_poolBufferCount += newBuffers;
     s_poolTextureCount += newTextures;
     s_poolStorageBufferCount += newStorageBuffers;
     s_poolStorageImageCount += newStorageImages;
     s_poolInputAttachmentCount += newInputAttachments;
+    s_poolAccelerationStructureCount += newAccelerationStructures;
 
     // Store what this descriptor set is using for cleanup
     m_usedBuffers = newBuffers;
@@ -270,6 +304,7 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
     m_usedStorageBuffers = newStorageBuffers;
     m_usedStorageImages = newStorageImages;
     m_usedInputAttachments = newInputAttachments;
+    m_usedAccelerationStructures = newAccelerationStructures;
 }
 
 void DescriptorSet::updateDescriptorSet(const DescriptorSetBindings& bindings) {

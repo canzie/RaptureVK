@@ -9,7 +9,6 @@
 #include "Events/ApplicationEvents.h"
 #include "Renderer/Shadows/ShadowCommon.h"
 
-#include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
 
 namespace Rapture {
 
@@ -40,9 +39,8 @@ std::vector<std::shared_ptr<UniformBuffer>> DeferredRenderer::m_shadowDataUBOs =
     {};
 float DeferredRenderer::m_width = 0.0f;
 float DeferredRenderer::m_height = 0.0f;
-std::shared_ptr<BindlessDescriptorArray>
-    DeferredRenderer::m_bindlessDescriptorArray = nullptr;
 bool DeferredRenderer::m_framebufferNeedsResize = false;
+std::shared_ptr<DynamicDiffuseGI> DeferredRenderer::m_dynamicDiffuseGI = nullptr;
 
 void DeferredRenderer::init() {
 
@@ -59,8 +57,6 @@ void DeferredRenderer::init() {
   m_width = static_cast<float>(m_swapChain->getExtent().width);
   m_height = static_cast<float>(m_swapChain->getExtent().height);
 
-  m_bindlessDescriptorArray = BindlessDescriptorManager::getPool(
-      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
   setupCommandResources();
   createUniformBuffers(m_swapChain->getImageCount());
@@ -90,7 +86,7 @@ void DeferredRenderer::init() {
       [](std::shared_ptr<SwapChain> swapChain) { onSwapChainRecreated(); });
 
 
-  auto dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>();
+  m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>();
 }
 
 void DeferredRenderer::shutdown() {
@@ -124,6 +120,8 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
   }
 
   uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
+
+  m_dynamicDiffuseGI->populateProbesCompute(activeScene);
 
   m_commandBuffers[m_currentFrame]->reset();
   recordCommandBuffer(m_commandBuffers[m_currentFrame], activeScene,

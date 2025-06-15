@@ -7,7 +7,6 @@
 #include "Renderer/Shadows/ShadowCommon.h"
 #include "RenderTargets/SwapChains/SwapChain.h"
 
-#include "Buffers/Descriptors/BindlessDescriptorManager.h"
 
 namespace Rapture {
 
@@ -15,38 +14,14 @@ struct PushConstants {
     glm::mat4 model;
 };
 
-std::unique_ptr<BindlessDescriptorSubAllocation> ShadowMap::s_bindlessShadowMaps = nullptr;
+std::unique_ptr<DescriptorSubAllocationBase<Texture>> ShadowMap::s_bindlessShadowMaps = nullptr;
 
-ShadowMap::ShadowMap(float width, float height, std::shared_ptr<BindlessDescriptorArray> bindlessShadowMaps)
-    : m_width(width), m_height(height), m_shadowMapIndex(UINT32_MAX), m_lightViewProjection(glm::mat4(1.0f)) {
-
-    if (s_bindlessShadowMaps == nullptr) {
-        s_bindlessShadowMaps = bindlessShadowMaps->createSubAllocation(64, "Bindless Shadow Map Descriptor Array Sub-Allocation");
-    }
-
-    createShadowTexture();
-    createPipeline();
-    
-    // Get the frame count from the application
-    auto& app = Application::getInstance();
-    auto& vulkanContext = app.getVulkanContext();
-    auto swapchain = vulkanContext.getSwapChain();
-    m_framesInFlight = swapchain->getImageCount();
-    m_allocator = vulkanContext.getVmaAllocator();
-    
-
-
-
-    createUniformBuffers();
-    createDescriptorSets();
-}
 
 ShadowMap::ShadowMap(float width, float height) 
     : m_width(width), m_height(height), m_shadowMapIndex(UINT32_MAX), m_lightViewProjection(glm::mat4(1.0f)) {
 
     if (s_bindlessShadowMaps == nullptr) {
-        auto bindlessDescriptorArray = BindlessDescriptorManager::getPool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        s_bindlessShadowMaps = bindlessDescriptorArray->createSubAllocation(64, "Bindless Shadow Map Descriptor Array Sub-Allocation");
+        s_bindlessShadowMaps = DescriptorArrayManager::createTextureSubAllocation(512, "Bindless Shadow Map Descriptor Array Sub-Allocation");
     }
 
     createShadowTexture();

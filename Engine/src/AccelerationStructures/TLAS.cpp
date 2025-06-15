@@ -135,7 +135,8 @@ void TLAS::createInstanceBuffer() {
     vmaFlushAllocation(m_allocator, m_instanceAllocation, 0, instanceBufferSize);
 }
 
-void TLAS::createAccelerationStructure() {
+void TLAS::createAccelerationStructure()
+{
     if (m_instances.empty()) {
         RP_CORE_ERROR("TLAS: Cannot create acceleration structure with no instances!");
         return;

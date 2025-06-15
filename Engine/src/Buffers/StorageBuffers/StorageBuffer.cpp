@@ -16,9 +16,9 @@ StorageBuffer::StorageBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator 
         
     createBuffer();
 
-    if (data && m_propertiesFlags == VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+    if (data && (usage == BufferUsage::DYNAMIC || usage == BufferUsage::STREAM)) {
         addData(data, size, 0);
-    } else if (data && m_propertiesFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+    } else if (data && usage == BufferUsage::STATIC) {
         addDataGPU(data, size, 0);
     }
 }
@@ -26,13 +26,6 @@ StorageBuffer::StorageBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator 
 StorageBuffer::~StorageBuffer() {
 }
 
-VkDescriptorBufferInfo StorageBuffer::getDescriptorBufferInfo() const {
-    VkDescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = m_Buffer;
-    bufferInfo.offset = 0;
-    bufferInfo.range = m_Size;
-    return bufferInfo;
-}
 
 
 VkBufferUsageFlags StorageBuffer::getBufferUsage()

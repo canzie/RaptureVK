@@ -22,7 +22,7 @@ enum class BufferUsage {
 
 
 
-class Buffer {
+class Buffer : public std::enable_shared_from_this<Buffer> {
 public:
     Buffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator);
 
@@ -40,6 +40,8 @@ public:
 
     VkBuffer& getBufferVk() { return m_Buffer; }
     VkDeviceSize getSize() const { return m_Size; }
+
+    VkDescriptorBufferInfo getDescriptorBufferInfo() const;
 
     virtual VkBufferUsageFlags getBufferUsage() = 0;
     virtual VkMemoryPropertyFlags getMemoryPropertyFlags() = 0;

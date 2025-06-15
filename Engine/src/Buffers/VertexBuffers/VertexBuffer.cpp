@@ -1,7 +1,10 @@
 #include "VertexBuffer.h"
 #include "Logging/Log.h"
+#include "Buffers/Descriptors/DescriptorArrayManager.h"
 
 namespace Rapture {
+
+std::unique_ptr<DescriptorSubAllocationBase<Buffer>> VertexBuffer::s_bindlessBuffers = nullptr;
 
 VertexBuffer::VertexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator)
     : Buffer(size, usage, allocator)
@@ -14,18 +17,22 @@ VertexBuffer::VertexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator al
 }
 
 VertexBuffer::~VertexBuffer(){
-
+    // Free the bindless descriptor if allocated
+    if (m_bindlessIndex != UINT32_MAX && s_bindlessBuffers) {
+        s_bindlessBuffers->free(m_bindlessIndex);
+    }
 }
 
 VkBufferUsageFlags VertexBuffer::getBufferUsage() {
     switch (m_usage) {
         case BufferUsage::STATIC:
             return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
-                   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+                   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; // Added for bindless access
         case BufferUsage::DYNAMIC:
-            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         case BufferUsage::STREAM:
-            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         case BufferUsage::STAGING:
             return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
@@ -54,6 +61,24 @@ void VertexBuffer::setBufferLayout(const BufferLayout& bufferLayout)
     m_bufferLayout = bufferLayout;
 }
 
+uint32_t VertexBuffer::getBindlessIndex()
+{
+    if (m_bindlessIndex != UINT32_MAX) {
+        return m_bindlessIndex;
+    }
+    
+    // Initialize the bindless buffer pool if not already done
+    if (s_bindlessBuffers == nullptr) {
+        s_bindlessBuffers = DescriptorArrayManager::createStorageSubAllocation(DescriptorArrayType::STORAGE_BUFFER, 1024, "Bindless Vertex Buffer Descriptor Array Sub-Allocation");   
+    }
+    
+    if (s_bindlessBuffers) {
+        // For now, we'll use a placeholder index based on buffer address
+        m_bindlessIndex = s_bindlessBuffers->allocate(shared_from_this());
+    }
+    
+    return m_bindlessIndex;
+}
 
 void VertexBuffer::addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset)
 {
@@ -74,7 +99,5 @@ void VertexBuffer::addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset
     copyBuffer(stagingBuffer.getBufferVk(), m_Buffer, size);
 
 }
-
-
 
 }

@@ -10,6 +10,7 @@
 #include "RenderTargets/SwapChains/SwapChain.h"
 #include "Cameras/CameraCommon.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
+#include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include <memory>
 #include <vector>

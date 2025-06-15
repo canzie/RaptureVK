@@ -26,14 +26,6 @@ UniformBuffer::UniformBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator 
 UniformBuffer::~UniformBuffer() {
 }
 
-VkDescriptorBufferInfo UniformBuffer::getDescriptorBufferInfo() const {
-    VkDescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = m_Buffer;
-    bufferInfo.offset = 0;
-    bufferInfo.range = m_Size;
-    return bufferInfo;
-}
-
 
 VkBufferUsageFlags UniformBuffer::getBufferUsage()
 {

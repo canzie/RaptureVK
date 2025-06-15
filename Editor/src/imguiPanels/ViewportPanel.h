@@ -27,8 +27,13 @@ public:
     // Add a method to render ImGuizmo for the selected entity
     void renderEntityGizmo();
     
-    
+    void setVisible(bool visible) { m_isVisible = visible; }
+    bool isVisible() const { return m_isVisible; }
+
 private:
+
+    bool m_isVisible = true;
+
     ImVec2 m_viewportPosition;  // Window position
     ImVec2 m_viewportSize;      // Window size
 

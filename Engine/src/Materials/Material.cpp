@@ -25,9 +25,7 @@ BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
                              "descriptor set layout for a material!");
   }
 
-  m_descriptorSetLayout =
-      shader->getDescriptorSetLayouts()[static_cast<uint32_t>(
-          DESCRIPTOR_SET_INDICES::MATERIAL)];
+  m_descriptorSetLayout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
   // get descriptor info
   // assume only 1 descriptor in that set for now
   auto infos = m_shader->getMaterialSets();

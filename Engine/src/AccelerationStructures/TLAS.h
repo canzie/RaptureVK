@@ -49,7 +49,7 @@ public:
     void clear();
     
     // Get number of instances
-    size_t getInstanceCount() const { return m_instances.size(); }
+    uint32_t getInstanceCount() const { return static_cast<uint32_t>(m_instances.size()); }
     const std::vector<TLASInstance>& getInstances() const { return m_instances; }
 
 private:

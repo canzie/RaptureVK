@@ -16,6 +16,7 @@
 #include "Renderer/DeferredShading/GBufferPass.h"
 #include "Renderer/DeferredShading/LightingPass.h"
 #include "Renderer/StencilBorderPass.h"
+#include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
 
 #include <memory>
 #include <vector>
@@ -24,8 +25,6 @@
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "Meshes/Mesh.h"
-
-#include "Buffers/Descriptors/BindlessDescriptorManager.h"
 
 namespace Rapture {
 
@@ -88,7 +87,8 @@ private:
   static float m_width;
   static float m_height;
 
-  static std::shared_ptr<BindlessDescriptorArray> m_bindlessDescriptorArray;
+  static std::shared_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
+
 };
 
 } // namespace Rapture

@@ -9,6 +9,8 @@
 
 #include "Events/GameEvents.h"
 
+#include <string>
+
 ViewportPanel::ViewportPanel() {
 
     m_entitySelectedListenerId = Rapture::GameEvents::onEntitySelected().addListener(
@@ -27,8 +29,13 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
 {
     RAPTURE_PROFILE_FUNCTION();
 
+    if (!m_isVisible) {
+        return;
+    }
 
-    ImGui::Begin("Viewport");
+    std::string title = "Viewport " + std::string(ICON_MD_WEB_ASSET);
+
+    ImGui::Begin(title.c_str());
 
     m_viewportPosition = ImGui::GetCursorScreenPos();
     m_viewportSize = ImGui::GetContentRegionAvail();

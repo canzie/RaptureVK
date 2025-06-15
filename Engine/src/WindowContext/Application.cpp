@@ -7,7 +7,7 @@
 #include "Renderer/ForwardRenderer/ForwardRenderer.h"
 
 #include "Buffers/CommandBuffers/CommandPool.h"
-#include "Buffers/Descriptors/BindlessDescriptorManager.h"
+#include "Buffers/Descriptors/DescriptorArrayManager.h"
 
 #include "Utils/Timestep.h"
 
@@ -69,14 +69,20 @@ Application::Application(int width, int height, const char *title)
   AssetManager::init();
   MaterialManager::init();
 
-  BindlessDescriptorArrayConfig config;
-  config.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  config.capacity = 512;
-  config.name = "GlobalBindlessTexturePool";
-  config.setBindingIndex = 3; // set=3
-  config.bindingIndex = 0;    // binding=0
+  DescriptorArrayConfig textureConfig;
+  textureConfig.arrayType = DescriptorArrayType::TEXTURE;
+  textureConfig.capacity = 512;
+  textureConfig.name = "GlobalBindlessTexturePool";
+  textureConfig.bindingIndex = 0;    // binding=0
 
-  BindlessDescriptorManager::init({config});
+  DescriptorArrayConfig storageConfig;
+  storageConfig.arrayType = DescriptorArrayType::STORAGE_BUFFER;
+  storageConfig.capacity = 4096;
+  storageConfig.name = "GlobalBindlessStorageBufferPool";
+  storageConfig.bindingIndex = 1;    // binding=0
+
+
+  DescriptorArrayManager::init({textureConfig, storageConfig});
 
   ForwardRenderer::init();
   DeferredRenderer::init();
@@ -111,7 +117,7 @@ Application::~Application() {
 
   ForwardRenderer::shutdown();
   DeferredRenderer::shutdown();
-  BindlessDescriptorManager::shutdown();
+  DescriptorArrayManager::shutdown();
 
   m_layerStack.clear();
 

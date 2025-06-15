@@ -72,7 +72,7 @@ namespace Rapture
     {
         shaderc::CompileOptions options;
         options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
-        options.SetOptimizationLevel(shaderc_optimization_level_performance);
+        options.SetOptimizationLevel(shaderc_optimization_level_zero);
 
         shaderc_shader_kind kind = getShaderKind(path);
         if (kind == (shaderc_shader_kind)-1)

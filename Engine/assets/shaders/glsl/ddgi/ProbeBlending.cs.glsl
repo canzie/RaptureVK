@@ -16,13 +16,13 @@
 
 
 
-layout (binding = 0, rgba32f) uniform restrict readonly image2DArray RayData;
+layout (set=0, binding = 0, rgba32f) uniform restrict readonly image2DArray RayData;
 
-layout (binding = 1, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;
-layout (binding = 2, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
+layout (set=0, binding = 1, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;
+layout (set=0, binding = 2, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
 
-layout (binding = 3, r11f_g11f_b10f) uniform restrict readonly image2DArray prevProbeIrradianceAtlas;
-layout (binding = 4, rg16f) uniform restrict readonly image2DArray prevProbeDistanceAtlas;
+layout (set=0, binding = 3, r11f_g11f_b10f) uniform restrict readonly image2DArray prevProbeIrradianceAtlas;
+layout (set=0, binding = 4, rg16f) uniform restrict readonly image2DArray prevProbeDistanceAtlas;
 
 // Skybox Cubemap
 
@@ -37,7 +37,7 @@ precision highp float;
 
 // Input Uniforms / Buffers
 // Contains global information about the probe grid
-layout(std140, binding = 0) uniform ProbeInfo {
+layout(std140, set=1, binding = 0) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
 

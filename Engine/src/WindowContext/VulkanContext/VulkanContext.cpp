@@ -113,6 +113,7 @@ namespace Rapture {
     // Ray tracing extensions
     m_deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
 
@@ -658,8 +659,7 @@ void VulkanContext::createLogicalDevice()
         // For now, we'll try to enable it, and Vulkan will ignore if not supported (though we already know its status).
     }
     // physicalDeviceFeaturesToEnable.features.geometryShader remains as queried (true if supported, false otherwise)
-    // If you wanted to force it ON and it was a settable feature you'd do it here, but geometryShader is typically just reported.
-    // If you want to *request* it, and it's supported, it will be enabled. If not supported, request is ignored.
+    // If you wanted to *request* it, and it's supported, it will be enabled. If not supported, request is ignored.
     // The most robust is to check support and then request. If geometryShader is critical, one might check
     // coreFeaturesQuery.features.geometryShader and throw if not present.
 
@@ -773,6 +773,9 @@ void VulkanContext::createLogicalDevice()
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeaturesToEnable{};
     rayTracingPipelineFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
 
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeaturesToEnable{};
+    rayQueryFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+
     // Query buffer device address features
     VkPhysicalDeviceFeatures2 queryBufferDeviceAddress = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
     queryBufferDeviceAddress.pNext = &bufferDeviceAddressFeaturesToEnable;
@@ -788,10 +791,16 @@ void VulkanContext::createLogicalDevice()
     queryRayTracingPipeline.pNext = &rayTracingPipelineFeaturesToEnable;
     vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryRayTracingPipeline);
 
+    // Query ray query features
+    VkPhysicalDeviceFeatures2 queryRayQuery = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryRayQuery.pNext = &rayQueryFeaturesToEnable;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryRayQuery);
+
     // Enable ray tracing features if supported
     bool rayTracingSupported = bufferDeviceAddressFeaturesToEnable.bufferDeviceAddress &&
                               accelerationStructureFeaturesToEnable.accelerationStructure &&
-                              rayTracingPipelineFeaturesToEnable.rayTracingPipeline;
+                              rayTracingPipelineFeaturesToEnable.rayTracingPipeline &&
+                              rayQueryFeaturesToEnable.rayQuery;
 
     if (rayTracingSupported) {
         RP_CORE_INFO("Ray tracing is supported and will be enabled.");
@@ -810,6 +819,11 @@ void VulkanContext::createLogicalDevice()
         rayTracingPipelineFeaturesToEnable.rayTracingPipeline = VK_TRUE;
         *ppNextChain = &rayTracingPipelineFeaturesToEnable;
         ppNextChain = &rayTracingPipelineFeaturesToEnable.pNext;
+        
+        // Enable ray query
+        rayQueryFeaturesToEnable.rayQuery = VK_TRUE;
+        *ppNextChain = &rayQueryFeaturesToEnable;
+        ppNextChain = &rayQueryFeaturesToEnable.pNext;
         
         m_isRayTracingEnabled = true;
     } else {

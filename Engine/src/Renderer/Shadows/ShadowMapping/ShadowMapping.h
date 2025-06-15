@@ -7,7 +7,8 @@
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/Descriptors/BindlessDescriptorArray.h"
+#include "Buffers/Descriptors/DescriptorArrayManager.h"
+#include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include "Renderer/Frustum/Frustum.h"
 
@@ -24,7 +25,6 @@ struct TransformComponent;
 
 class ShadowMap {
 public:
-    ShadowMap(float width, float height, std::shared_ptr<BindlessDescriptorArray> bindlessShadowMaps);
     ShadowMap(float width, float height);
 
     ~ShadowMap();
@@ -46,7 +46,7 @@ public:
 
     glm::mat4 getLightViewProjection() const { return m_lightViewProjection; }
 
-    static BindlessDescriptorSubAllocation* getBindlessShadowMaps() { return s_bindlessShadowMaps.get(); }
+    static DescriptorSubAllocationBase<Texture>* getBindlessShadowMaps() { return s_bindlessShadowMaps.get(); }
 
 private:
     void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
@@ -78,7 +78,7 @@ private:
 
     uint32_t m_shadowMapIndex = 0;
 
-    static std::unique_ptr<BindlessDescriptorSubAllocation> s_bindlessShadowMaps;
+    static std::unique_ptr<DescriptorSubAllocationBase<Texture>> s_bindlessShadowMaps;
     
     };
 

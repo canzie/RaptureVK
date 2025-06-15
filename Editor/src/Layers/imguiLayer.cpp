@@ -258,6 +258,14 @@ void ImGuiLayer::renderImGui()
         }
         if (ImGui::BeginMenu("View"))
         {
+            if (ImGui::MenuItem("Viewport")) { /* Handle exit */ }
+            if (ImGui::MenuItem("Browser")) { /* Handle exit */ }
+            if (ImGui::MenuItem("Properties")) { /* Handle exit */ }
+            if (ImGui::MenuItem("GBuffer Viewer")) { /* Handle exit */ }
+            if (ImGui::MenuItem("Content Browser")) { /* Handle exit */ }
+            if (ImGui::MenuItem("Image Viewer")) { /* Handle exit */ }
+            if (ImGui::MenuItem("Settings")) { /* Handle exit */ }
+
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();

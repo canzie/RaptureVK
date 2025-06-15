@@ -121,6 +121,10 @@ void BrowserPanel::buildHierarchyCache() {
         std::string entityName = entity.getComponent<Rapture::TagComponent>().tag;
         
         std::shared_ptr<Rapture::Entity> entityPtr = std::make_shared<Rapture::Entity>(entity);
+        if (entityPtr->hasComponent<Rapture::LightComponent>()) {
+            entityName = std::string(ICON_MD_SUNNY) + " " + entityName;
+        }
+
         entityNodeMap[entity.getID()] = std::make_shared<HierarchyNode>(entityPtr, entityName);
     }
     
@@ -229,7 +233,7 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
     // ImGui::PushID((void*)(intptr_t)node->entity->getID()); // Ensure unique IDs for buttons
     // if (ImGui::Button("...")) {} 
     // ImGui::PopID();
-    ImGui::TextUnformatted(""); // Placeholder
+    ImGui::Text(ICON_MD_VISIBILITY);
     
     // Recurse for children if the node is open and it's not a leaf
     if (!(flags & ImGuiTreeNodeFlags_Leaf) && nodeOpen) {

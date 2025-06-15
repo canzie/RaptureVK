@@ -2,9 +2,10 @@
 
 #include "Buffers/Buffers.h"
 
-
-
 namespace Rapture {
+
+template<typename T>
+class DescriptorSubAllocationBase;
 
 
 class IndexBuffer : public Buffer {
@@ -20,9 +21,16 @@ class IndexBuffer : public Buffer {
 
         VkIndexType getIndexType() const { return m_indexType; }
         
+        // Get the bindless descriptor index for this buffer
+        uint32_t getBindlessIndex();
+        
+        static DescriptorSubAllocationBase<Buffer>* getBindlessBuffers() { return s_bindlessBuffers.get(); }
+        
     private:
         VkIndexType m_indexType;
+        uint32_t m_bindlessIndex = UINT32_MAX;
         
+        static std::unique_ptr<DescriptorSubAllocationBase<Buffer>> s_bindlessBuffers;
 };
 
 }
