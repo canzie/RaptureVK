@@ -2,6 +2,7 @@
 
 
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_nonuniform_qualifier : require
 
 
 #ifdef DDGI_BLEND_RADIANCE
@@ -16,13 +17,15 @@
 
 
 
-layout (set=0, binding = 0, rgba32f) uniform restrict readonly image2DArray RayData;
+layout (set=0, binding = 0) uniform sampler2DArray RayData;
 
-layout (set=0, binding = 1, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;
-layout (set=0, binding = 2, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
-
-layout (set=0, binding = 3, r11f_g11f_b10f) uniform restrict readonly image2DArray prevProbeIrradianceAtlas;
-layout (set=0, binding = 4, rg16f) uniform restrict readonly image2DArray prevProbeDistanceAtlas;
+#ifdef DDGI_BLEND_RADIANCE
+    layout (set=0, binding = 1, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;
+    layout (set=0, binding = 2) uniform sampler2DArray prevProbeIrradianceAtlas;
+#else
+    layout (set=0, binding = 1, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
+    layout (set=0, binding = 2) uniform sampler2DArray prevProbeDistanceAtlas;
+#endif
 
 // Skybox Cubemap
 
@@ -132,19 +135,25 @@ void main() {
         //ivec3 threadCoords = ivec3(gl_WorkGroupID.x * RTXGI_DDGI_PROBE_NUM_TEXELS, gl_WorkGroupID.y * RTXGI_DDGI_PROBE_NUM_TEXELS, int(gl_GlobalInvocationID.z)) + ivec3(gl_LocalInvocationID.xyz) - ivec3(1, 1, 0);
 
 
+
+
         int rayIndex = 0;
         
     #ifdef DDGI_BLEND_RADIANCE
         uint backfaces = 0;
         uint maxBackfaces = uint((u_volume.probeNumRays - rayIndex) * u_volume.probeFixedRayBackfaceThreshold);
         
-        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(ivec2(gl_LocalInvocationID.xy), u_volume.probeNumIrradianceInteriorTexels);
+        // Fix Y-axis inversion for Vulkan coordinate system
+        ivec2 texCoords = ivec2(gl_LocalInvocationID.x, (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS - 1) - gl_LocalInvocationID.y);
+        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(texCoords, u_volume.probeNumIrradianceInteriorTexels);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
         
     #endif
     #ifdef DDGI_BLEND_DISTANCE
 
-        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(ivec2(gl_LocalInvocationID.xy), u_volume.probeNumDistanceInteriorTexels);
+        // Fix Y-axis inversion for Vulkan coordinate system
+        ivec2 texCoords = ivec2(gl_LocalInvocationID.x, (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS - 1) - gl_LocalInvocationID.y);
+        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(texCoords, u_volume.probeNumDistanceInteriorTexels);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
 
     #endif
@@ -160,8 +169,12 @@ void main() {
             ivec3 rayDataTexCoords = ivec3(DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume));
 
             // Load the ray traced radiance and hit distance
-            vec3 probeRayRadiance = imageLoad(RayData, rayDataTexCoords).rgb;
-            float probeRayDistance = imageLoad(RayData, rayDataTexCoords).a;
+            // Use texelFetch for integer coordinates, not texture()
+            vec4 probeRayData = texelFetch(RayData, rayDataTexCoords, 0);
+
+            vec3 probeRayRadiance = probeRayData.rgb;
+            float probeRayDistance = probeRayData.a;
+
 
 
     #ifdef DDGI_BLEND_RADIANCE
@@ -212,11 +225,13 @@ void main() {
         result.a = 1.0;
 
         #ifdef DDGI_BLEND_RADIANCE
-            vec3 probeIrradianceMean = imageLoad(prevProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz)).rgb;
+            // Use texelFetch for integer coordinates, not texture()
+            vec3 probeIrradianceMean = texelFetch(prevProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), 0).rgb;
         #endif
         #ifdef DDGI_BLEND_DISTANCE
             // For distance blending, load history from the previous distance atlas
-            vec2 prevDistanceData = imageLoad(prevProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz)).rg;
+            // Use texelFetch for integer coordinates, not texture()
+            vec2 prevDistanceData = texelFetch(prevProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz), 0).rg;
             // Store it in probeIrradianceMean for now to minimize changes to subsequent logic that uses .rg
             // However, it's clearer to use a separate variable if more changes are made later.
             vec3 probeIrradianceMean = vec3(prevDistanceData.r, prevDistanceData.g, 0.0);
@@ -286,7 +301,6 @@ void main() {
     #endif
     #ifdef DDGI_BLEND_RADIANCE
         imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
-
     #endif
 
 
@@ -296,15 +310,15 @@ void main() {
     // Synchronization: Ensure all interior texel calculations and stores are complete
     // before any thread attempts to read them for border updates.
     barrier();
+    
+    // Add memory barrier to ensure image writes are visible
+    memoryBarrierImage();
 
     // Border Texel Update Logic:
     UpdateBorderTexelsGLSL(ivec3(gl_LocalInvocationID), ivec3(gl_WorkGroupID), ivec3(gl_GlobalInvocationID));
 
-#else
-    imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0, 0.0, 1.0, 1.0));
 #endif
-// do border thing
-//UpdateBorderTexel(probeCoords);
+
 }
 
 

@@ -5,33 +5,31 @@
     - Controls stuff like wind
 
 
-During init we create a set of descriptors for different types
- - need custom types to differentiate between things like textures and texure arrays
+### dependencies
+trace shader
+    - needs to wait for(3 pipeline barriers):
+        - raydata texture needs to be ready from previous frame (mostly just an extra)
+        - prev textures need to be finished drawing
+
+    - will transition (1 pipeline barrier):
+        - raydata texture to shader read
+
+(flatten shader)
+    - needs to wait for (1 pipeline barrier):
+        - trace shader to finish
+    - will transition (1 pipeline barrier):
+        - flatten texture to shader read
+
+blending shaders(4):
+    - needs to wait for (1 pipeline barrier):
+        - raydata to be in shader mode
+        - prev texture needs to be in shader mode
+        - current texture needs to be in image storage mode
+    - will transition (1 pipeline barrier):
+        - blending texture to shader read
 
 
-struct DescriptorArrayType {
-    TEXTURE,
-    STORAGE_BUFFER,
-    UNIFORM_BUFFER
- };
 
- In init we create an array for each type, then allocate smaller reserved slots for each system, this keeps memory local. good for cache.
- a system can ask for a reservation given a name, type and size, and possibly lifetime.
-
-
- - we will create a different descriptor array class, so use inheritence/abstractions
-   because the buffers will need advanced logic by taking the underlying vkbuffer and just saving the allocation per array allocation.
-   this way we can save descriptor slots, the only downside is that we need to send this data to the shader and deal with offsets.
-   so the best way to start with this implementation is to either seperate only the suballocation classes or the orignal class.
-   so for now we only need storage buffer and texture support, we will add the others when they are needed.
-
-
-flow of the system should be like this:
- - an array for each type is created once.
- - a system (e.g. the shadowmapping) requests a suballocation and provides the manager a type and a size it needs (and a name for convience).
- - the system can then use that suballocation to  allocate/free resources.
- - it then needs to be possible to retrieve the descriptor set array to bind the set for usage. the bind indices can be static based on type.
-   the caller will manage the set slot.
 
 
 

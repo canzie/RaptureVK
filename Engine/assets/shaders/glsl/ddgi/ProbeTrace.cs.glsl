@@ -6,7 +6,7 @@
 #extension GL_EXT_ray_query : require
 
 #define RAY_DATA_TEXTURE
-
+#define DDGI_ENABLE_DIFFUSE_LIGHTING
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
@@ -14,14 +14,22 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 layout (set=0, binding = 0, rgba32f) uniform restrict writeonly image2DArray RayData;
 
 // Previous probe data
-layout (set=0, binding = 1) uniform sampler2DArray prevProbeIrradianceAtlas;
-layout (set=0, binding = 2) uniform sampler2DArray prevProbeDistanceAtlas;
+layout (set=2, binding = 0) uniform sampler2DArray prevProbeIrradianceAtlas;
+layout (set=2, binding = 1) uniform sampler2DArray prevProbeDistanceAtlas;
 
 // Skybox Cubemap
 layout (set=0, binding = 3) uniform samplerCube u_skyboxCubemap;
 
 // TLAS binding
 layout (set=0, binding = 4) uniform accelerationStructureEXT topLevelAS;
+
+// includes index and vertex buffers, the meshinfo contains the offsets into these buffers
+layout(set = 3, binding = 1) readonly buffer gBindlessBuffers {
+    uint data[];
+} gBuffers[];
+
+precision highp float;
+
 
 // Simplified MeshInfo structure matching our C++ version
 struct MeshInfo {
@@ -31,6 +39,18 @@ struct MeshInfo {
     uint iboIndex; // index of the buffer in the bindless buffers array
     uint vboIndex; // index of the buffer in the bindless buffers array
     uint meshIndex; // index of the mesh in the mesh array, this is the same index as the tlasinstance instanceCustomIndex
+
+    mat4 modelMatrix;
+
+    uint     positionAttributeOffsetBytes; // Offset of position *within* the stride
+    uint     texCoordAttributeOffsetBytes;
+    uint     normalAttributeOffsetBytes;
+    uint     tangentAttributeOffsetBytes;
+
+
+    uint     vertexStrideBytes;            // Stride of the vertex buffer in bytes
+    uint     indexType;                    // GL_UNSIGNED_INT (5125) or GL_UNSIGNED_SHORT (5123)
+
 };
 
 // Scene info buffer
@@ -38,7 +58,12 @@ layout(std430, set=0, binding = 5) readonly buffer SceneInfo {
     MeshInfo MeshInfos[];
 } u_sceneInfo;
 
-
+// Global descriptor arrays for bindless textures (set 3)
+#ifndef DESCRIPTOR_ARRAYS_DEFINED
+#define DESCRIPTOR_ARRAYS_DEFINED
+layout(set = 3, binding = 0) uniform sampler2D gTextures[];
+layout(set = 3, binding = 0) uniform sampler2DShadow gShadowMaps[];
+#endif
 
 #include "ProbeCommon.glsl"
 #include "IrradianceCommon.glsl"
@@ -60,6 +85,127 @@ layout(std140, set=1, binding = 1) uniform SunPropertiesUBO {
 // Ray query for intersection testing
 rayQueryEXT rayQuery;
 
+// Vertex attribute structure for clean data passing
+struct VertexAttributes {
+    vec3 position;
+    vec2 texCoord;
+    vec3 normal;
+    vec4 tangent;
+};
+
+// Interpolated surface data
+struct SurfaceData {
+    vec3 position;
+    vec2 texCoord;
+    vec3 normal;
+    vec4 tangent;
+};
+
+/**
+ * Fetches triangle indices from the index buffer
+ */
+uvec3 fetchTriangleIndices(uint primitiveID, MeshInfo meshInfo) {
+    uint baseIndex = primitiveID * 3;
+    uvec3 indices;
+    
+    if (meshInfo.indexType == 5125) { // GL_UNSIGNED_INT
+        uint indexOffset = baseIndex * 4; // 4 bytes per uint
+        indices.x = gBuffers[meshInfo.iboIndex].data[indexOffset / 4];
+        indices.y = gBuffers[meshInfo.iboIndex].data[(indexOffset + 4) / 4];
+        indices.z = gBuffers[meshInfo.iboIndex].data[(indexOffset + 8) / 4];
+    } else { // GL_UNSIGNED_SHORT (5123)
+        uint indexOffset = baseIndex * 2; // 2 bytes per ushort
+        uint packedIndices0 = gBuffers[meshInfo.iboIndex].data[indexOffset / 4];
+        uint packedIndices1 = gBuffers[meshInfo.iboIndex].data[(indexOffset + 4) / 4];
+        
+        // Extract 16-bit indices from packed 32-bit values
+        indices.x = packedIndices0 & 0xFFFF;
+        indices.y = (packedIndices0 >> 16) & 0xFFFF;
+        indices.z = packedIndices1 & 0xFFFF;
+    }
+    
+    return indices;
+}
+
+/**
+ * Fetches vertex attributes for a single vertex
+ */
+VertexAttributes fetchVertexAttributes(uint vertexIndex, MeshInfo meshInfo) {
+    VertexAttributes attrs;
+    uint vertexOffset = vertexIndex * meshInfo.vertexStrideBytes;
+    
+    // Position (assuming vec3)
+    uint posOffset = vertexOffset + meshInfo.positionAttributeOffsetBytes;
+    attrs.position = vec3(
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[posOffset / 4]),
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(posOffset + 4) / 4]),
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(posOffset + 8) / 4])
+    );
+    
+    // Texture coordinates (assuming vec2)
+    uint texOffset = vertexOffset + meshInfo.texCoordAttributeOffsetBytes;
+    attrs.texCoord = vec2(
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[texOffset / 4]),
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(texOffset + 4) / 4])
+    );
+    
+    // Normal (assuming vec3)
+    uint normalOffset = vertexOffset + meshInfo.normalAttributeOffsetBytes;
+    attrs.normal = vec3(
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[normalOffset / 4]),
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(normalOffset + 4) / 4]),
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(normalOffset + 8) / 4])
+    );
+    
+    // Tangent (assuming vec4)
+    uint tangentOffset = vertexOffset + meshInfo.tangentAttributeOffsetBytes;
+    attrs.tangent = vec4(
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[tangentOffset / 4]),
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 4) / 4]),
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 8) / 4]),
+        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 12) / 4])
+    );
+
+    attrs.position = (meshInfo.modelMatrix * vec4(attrs.position, 1.0)).xyz;
+    attrs.normal = normalize((meshInfo.modelMatrix * vec4(attrs.normal, 0.0)).xyz);
+    attrs.tangent = normalize(meshInfo.modelMatrix * attrs.tangent);
+    
+    return attrs;
+}
+
+/**
+ * Interpolates vertex attributes using barycentric coordinates
+ */
+SurfaceData interpolateVertexAttributes(VertexAttributes v0, VertexAttributes v1, VertexAttributes v2, vec2 barycentrics) {
+    vec3 weights = vec3(1.0 - barycentrics.x - barycentrics.y, barycentrics.x, barycentrics.y);
+    
+    SurfaceData surface;
+    surface.position = v0.position * weights.x + v1.position * weights.y + v2.position * weights.z;
+    surface.texCoord = v0.texCoord * weights.x + v1.texCoord * weights.y + v2.texCoord * weights.z;
+    surface.normal = normalize(v0.normal * weights.x + v1.normal * weights.y + v2.normal * weights.z);
+    
+    vec4 interpolatedTangent = v0.tangent * weights.x + v1.tangent * weights.y + v2.tangent * weights.z;
+    surface.tangent = normalize(interpolatedTangent);
+    
+    return surface;
+}
+
+/**
+ * Gets complete surface data for a ray hit
+ */
+SurfaceData getSurfaceDataForHit(uint primitiveID, vec2 barycentrics, MeshInfo meshInfo) {
+    // Fetch triangle indices
+    uvec3 indices = fetchTriangleIndices(primitiveID, meshInfo);
+    
+    // Fetch vertex data for all 3 vertices
+    VertexAttributes v0 = fetchVertexAttributes(indices.x, meshInfo);
+    VertexAttributes v1 = fetchVertexAttributes(indices.y, meshInfo);
+    VertexAttributes v2 = fetchVertexAttributes(indices.z, meshInfo);
+    
+    // Interpolate attributes
+    return interpolateVertexAttributes(v0, v1, v2, barycentrics);
+}
+
 vec3 sampleAlbedo(MeshInfo meshInfo, vec2 uv) {
     if (meshInfo.AlbedoTextureIndex == 0) {
         return vec3(1.0, 0.0, 1.0); // Default color
@@ -78,7 +224,7 @@ vec3 calculateShadingNormal(
     MeshInfo meshInfo,
     vec2 uv,
     vec3 N_geom,   // Interpolated geometric normal (world space)
-    vec3 T_geom    // Interpolated tangent (world space)
+    vec4 T_geom    // Interpolated tangent (world space, w component contains handedness)
 ) {
     vec3 finalNormal = N_geom;
 
@@ -86,8 +232,9 @@ vec3 calculateShadingNormal(
         vec3 tangentNormal = texture(gTextures[meshInfo.NormalTextureIndex], uv).xyz;
         tangentNormal = normalize(tangentNormal * 2.0 - 1.0);
 
-        vec3 T = normalize(T_geom - dot(T_geom, N_geom) * N_geom);
-        vec3 B = normalize(cross(N_geom, T));
+        // Extract tangent vector and handedness from glTF tangent representation
+        vec3 T = normalize(T_geom.xyz - dot(T_geom.xyz, N_geom) * N_geom);
+        vec3 B = normalize(cross(N_geom, T) * T_geom.w); // Use w component for correct handedness
         mat3 TBN = mat3(T, B, N_geom);
 
         finalNormal = normalize(TBN * tangentNormal);
@@ -105,13 +252,9 @@ void main() {
     vec3 probeRayDirection = DDGIGetProbeRayDirection(rayIndex, u_volume);
     uvec3 outputCoords = DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume);
 
-
     // Initialize ray query
     rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsOpaqueEXT, 0xFF, 
         probeWorldPosition, 0.0, probeRayDirection, u_volume.probeMaxRayDistance*1.5);
-
-
-    
 
 
     // Trace the ray
@@ -139,14 +282,45 @@ void main() {
         hitPosition = probeWorldPosition + probeRayDirection * hitT;
         hitInstanceID = rayQueryGetIntersectionInstanceIdEXT(rayQuery, true);
         
+        // Get additional ray intersection data
+        uint primitiveID = rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, true);
+        vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
+        uint instanceCustomIndex = rayQueryGetIntersectionInstanceCustomIndexEXT(rayQuery, true);
+        
         if (isFrontFacing) {
-            // Front face hit - store red color for visualization
-            MeshInfo meshInfo = u_sceneInfo.MeshInfos[hitInstanceID];
+            // Get mesh info using the instance custom index
+            MeshInfo meshInfo = u_sceneInfo.MeshInfos[instanceCustomIndex];
             
-            // Use the mesh index to verify we're accessing the correct mesh data
-            // For now, just store a red color to indicate a hit
-            vec3 hitColor = vec3(1.0, 0.0, 0.0); // Red for hits 
-            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), hitColor, hitT);
+            // Get complete surface data for the hit point
+            SurfaceData surface = getSurfaceDataForHit(primitiveID, barycentrics, meshInfo);
+            
+            vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent);
+            vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
+    
+            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_SunProperties);
+
+            // Indirect Lighting (recursive)
+            vec3 irradiance = vec3(0.0);
+            // Use the ray's own direction for surface bias, not the main camera direction
+            vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, probeRayDirection, u_volume);
+
+            // Get irradiance from the DDGIVolume
+            irradiance = DDGIGetVolumeIrradiance(
+                hitPosition,
+                worldShadingNormal,
+                surfaceBias,
+                prevProbeIrradianceAtlas,
+                prevProbeDistanceAtlas,
+                u_volume);
+
+            // Perfectly diffuse reflectors don't exist in the real world.
+            // Limit the BRDF albedo to a maximum value to account for the energy loss at each bounce.
+            float maxAlbedo = 0.9;
+
+            // Store the final ray radiance and hit distance
+            vec3 radiance = diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
+
+            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), clamp(radiance, vec3(0.0), vec3(1.0)), hitT);
         } else {
             // Back face hit - store negative distance
             DDGIStoreProbeRayBackfaceHit(ivec3(outputCoords), hitT);
@@ -157,12 +331,10 @@ void main() {
         vec3 skyboxColor = vec3(0.0, 0.0, 0.0);
         // If no skybox, use green color for misses
         if (length(skyboxColor) < 0.001) {
-            skyboxColor = vec3(0.0, 1.0, 0.0); // Green for misses
-        } else {
-            skyboxColor = vec3(0.0, 0.0, 1.0); // Blue for skybox samples
+            skyboxColor = u_SunProperties.sunColor; // Green for misses
         }
         
-        DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor);
+        DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor * u_SunProperties.sunIntensity);
     }
     
 }

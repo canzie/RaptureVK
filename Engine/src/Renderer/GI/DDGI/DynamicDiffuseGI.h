@@ -16,6 +16,7 @@
 #include "Buffers/Descriptors/DescriptorSet.h"
 
 #include "Pipelines/ComputePipeline.h"
+#include "WindowContext/VulkanContext/VulkanQueue.h"
 
 #include "DDGICommon.h"
 
@@ -30,18 +31,26 @@ public:
     void populateProbes(std::shared_ptr<Scene> scene);
     void populateProbesCompute(std::shared_ptr<Scene> scene);
 
-    std::shared_ptr<Texture> getRadianceTexture() { return m_RadianceTexture; } 
-    std::shared_ptr<Texture> getVisibilityTexture() { return m_VisibilityTexture; }
+    std::shared_ptr<Texture> getRadianceTexture();
+    std::shared_ptr<Texture> getVisibilityTexture();
+
+    std::shared_ptr<Texture> getPrevRadianceTexture(); 
+    std::shared_ptr<Texture> getPrevVisibilityTexture();
+
+
     std::shared_ptr<Texture> getRadianceTextureFlattened() { return m_IrradianceTextureFlattened; } 
     std::shared_ptr<Texture> getVisibilityTextureFlattened() { return m_DistanceTextureFlattened; } 
 
     std::vector<glm::vec3>& getDebugProbePositions() { return m_DebugProbePositions; }
 
+    std::shared_ptr<UniformBuffer> getProbeVolumeUniformBuffer() { return m_ProbeInfoBuffer; }
+
+    bool isFrameEven() { return m_isEvenFrame; }
 
 private:
     void castRays(std::shared_ptr<Scene> scene);
     void blendTextures();
-    void flattenTextures();
+    void flattenTextures(std::shared_ptr<Texture> flatTexture, std::shared_ptr<Texture> texture, int descriptorSetIndex);
 
     void initTextures();
     void updateSunProperties(std::shared_ptr<Scene> scene);
@@ -50,6 +59,11 @@ private:
 
     void createPipelines();
     void createDescriptorSets(std::shared_ptr<Scene> scene);
+    void createProbeTraceDescriptorSets(std::shared_ptr<Scene> scene);
+    void createProbeBlendingDescriptorSets(std::shared_ptr<Scene> scene, bool isEvenFrame);
+
+
+    void clearTextures();
 
 private:
     std::shared_ptr<Shader> m_DDGI_ProbeTraceShader;
@@ -63,7 +77,6 @@ private:
     std::shared_ptr<ComputePipeline> m_Flatten2dArrayPipeline;
 
     ProbeVolume m_ProbeVolume;
-    
     SunProperties m_SunShadowProps;
 
     
@@ -91,6 +104,7 @@ private:
     std::vector<glm::vec3> m_DebugProbePositions;
 
     VmaAllocator m_allocator;
+    std::shared_ptr<VulkanQueue> m_computeQueue;
 
     std::shared_ptr<CommandBuffer> m_CommandBuffer;
 
@@ -99,6 +113,7 @@ private:
     bool m_isEvenFrame;
 
     bool m_isPopulated;
+    bool m_isFirstFrame;
 
     float m_Hysteresis;
 
@@ -106,7 +121,12 @@ private:
     uint32_t m_probesPerRow; // Number of probes along the X-axis of the atlas texture
 
     std::vector<std::shared_ptr<DescriptorSet>> m_rayTraceDescriptorSets;
-    std::shared_ptr<DescriptorSet> m_flattenDescriptorSet;
+    std::shared_ptr<DescriptorSet> m_rayTracePrevTextureDescriptorSet[2]; // Set 2: Previous textures for probe trace
+    std::shared_ptr<DescriptorSet> m_flattenDescriptorSet[3];
+    std::shared_ptr<DescriptorSet> m_IrradianceBlendingDescriptorSet[2];
+    std::shared_ptr<DescriptorSet> m_DistanceBlendingDescriptorSet[2];
+
+    std::shared_ptr<DescriptorSet> m_probeVolumeDescriptorSet;
 
     
 };

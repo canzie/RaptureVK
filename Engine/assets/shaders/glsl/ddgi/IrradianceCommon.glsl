@@ -17,6 +17,8 @@ struct SunProperties {
     uint sunShadowTextureArrayIndex;
 };
 
+#ifdef DDGI_ENABLE_DIFFUSE_LIGHTING
+
 float calculateSunShadowFactor(vec3 hitPositionWorld, vec3 hitNormalWorld, SunProperties sunProperties) {
     if (sunProperties.sunShadowTextureArrayIndex == 0) return 1.0; // No shadow map or index is zero
 
@@ -52,8 +54,7 @@ float calculateSunShadowFactor(vec3 hitPositionWorld, vec3 hitNormalWorld, SunPr
  * Evaluate direct lighting for the current surface and the directional light.
  * should sample the shadow map for light visability
  */
-vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties)
-{   
+vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties) {   
 
     // sample shadow map here
     float shadowFactor = calculateSunShadowFactor(hitPositionWorld, shadingNormal, sunProperties);
@@ -92,6 +93,9 @@ vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorl
 
     return (brdf * lighting);
 }
+
+#endif
+
 
 
 // New function to calculate indirect diffuse from the single nearest probe
@@ -164,6 +168,7 @@ vec3 DDGIGetVolumeIrradiance(
         vec3 probeTextureUV = DDGIGetProbeUV(adjacentProbeIndex, octantCoords, volume.probeNumDistanceInteriorTexels, volume);
 
         // Sample the probe's distance texture to get the mean distance to nearby surfaces
+        // Note: Multiplied by 2.0 to compensate for the division by 2 in the blending shader
         vec2 filteredDistance = 2.0 * texture(probeDistanceAtlas, probeTextureUV).rg;
 
 

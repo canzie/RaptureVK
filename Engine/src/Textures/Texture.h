@@ -2,6 +2,7 @@
 
 #include <vk_mem_alloc.h>
 #include "TextureCommon.h"
+#include "Buffers/Descriptors/DescriptorArraySubAllocationBase.h"
 #include <string>
 #include <memory>
 
@@ -22,7 +23,7 @@ private:
 
 
 
-class Texture {
+class Texture : public std::enable_shared_from_this<Texture> {
 public:
     // Constructor for loading from file path
     // when isLoadingAsync is true, it is expected to use the loadImageFromFile manually with the given threadId
@@ -66,6 +67,9 @@ public:
 
     VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask);
 
+    uint32_t getBindlessIndex();
+
+
 private:
     void createImage();
     void createImageView();
@@ -94,6 +98,10 @@ private:
     TextureSpecification m_spec;
 
     bool m_readyForSampling = false;
+
+    uint32_t m_bindlessIndex = UINT32_MAX;
+
+    static std::unique_ptr<DescriptorSubAllocationBase<Texture>> s_bindlessTextures;
 };
 
 }

@@ -13,11 +13,15 @@ namespace Rapture
         VulkanQueue(VkDevice device, uint32_t queueFamilyIndex);
         ~VulkanQueue();
 
+        // execute saved command buffers
         void submitCommandBuffers(VkFence fence = nullptr);
         void submitCommandBuffers(VkSubmitInfo& submitInfo, VkFence fence = nullptr);
+
+        // execute immediately
         void submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSubmitInfo& submitInfo, VkFence fence = nullptr);
         void submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFence fence = nullptr);
-
+        
+        // add command buffer to queue
         void addCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer);
         void waitIdle(); 
 

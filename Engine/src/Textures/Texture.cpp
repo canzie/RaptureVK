@@ -4,11 +4,16 @@
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 
+#include "Buffers/Descriptors/DescriptorArrayManager.h"
+
 #include "stb_image.h"
 
 #include <stdexcept>
 
 namespace Rapture { 
+
+std::unique_ptr<DescriptorSubAllocationBase<Texture>> Texture::s_bindlessTextures = nullptr;
+
 
 // Sampler implementation
 Sampler::Sampler(const TextureSpecification& spec) {
@@ -83,6 +88,8 @@ Sampler::~Sampler() {
     if (m_sampler != VK_NULL_HANDLE) {
         vkDestroySampler(device, m_sampler, nullptr);
     }
+
+
 }
 
 // Texture implementation
@@ -127,6 +134,11 @@ Texture::~Texture() {
     auto& app = Application::getInstance();
     VkDevice device = app.getVulkanContext().getLogicalDevice();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    // Free the bindless descriptor if allocated
+    if (m_bindlessIndex != UINT32_MAX && s_bindlessTextures) {
+        s_bindlessTextures->free(m_bindlessIndex);
+    }
 
     if (m_imageView != VK_NULL_HANDLE) {
         vkDestroyImageView(device, m_imageView, nullptr);
@@ -452,6 +464,24 @@ VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkI
     barrier.srcAccessMask = srcAccessMask;
     barrier.dstAccessMask = dstAccessMask;
     return barrier;
+}
+
+uint32_t Texture::getBindlessIndex() {
+    if (m_bindlessIndex != UINT32_MAX) {
+        return m_bindlessIndex;
+    }
+    
+    // Initialize the bindless buffer pool if not already done
+    if (s_bindlessTextures == nullptr) {
+        s_bindlessTextures = DescriptorArrayManager::createTextureSubAllocation(1024, "Bindless Texture Descriptor Array Sub-Allocation");   
+    }
+    
+    if (s_bindlessTextures) {
+        // For now, we'll use a placeholder index based on buffer address
+        m_bindlessIndex = s_bindlessTextures->allocate(shared_from_this());
+    }
+    
+    return m_bindlessIndex;
 }
 
 void Texture::createImage()

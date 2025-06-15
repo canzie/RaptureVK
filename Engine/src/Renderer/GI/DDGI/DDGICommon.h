@@ -16,6 +16,16 @@ struct MeshInfo {
 
     alignas(4) uint32_t meshIndex;   // index of the mesh in the mesh array, this is the same index as the tlasinstance instanceCustomIndex
 
+    alignas(16) glm::mat4 modelMatrix;
+
+    alignas(4) uint32_t positionAttributeOffsetBytes; // Offset of position *within* the stride
+    alignas(4) uint32_t texCoordAttributeOffsetBytes;
+    alignas(4) uint32_t normalAttributeOffsetBytes;
+    alignas(4) uint32_t tangentAttributeOffsetBytes;
+
+
+    alignas(4) uint32_t vertexStrideBytes;            // Stride of the vertex buffer in bytes
+    alignas(4) uint32_t indexType;                    // GL_UNSIGNED_INT (5125) or GL_UNSIGNED_SHORT (5123)
 };
 
 

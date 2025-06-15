@@ -73,12 +73,12 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
 
 }
 
-MaterialTypes MaterialInstance::getParameter(ParameterID id) {
+MaterialParameter MaterialInstance::getParameter(ParameterID id) {
 
-  if (m_parameterMap.contains(id))
-    return m_parameterMap[id].m_value;
+  if (m_parameterMap.find(id) != m_parameterMap.end())
+    return m_parameterMap[id];
 
-  return std::monostate();
+  return MaterialParameter();
 
 
 

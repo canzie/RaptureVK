@@ -19,13 +19,15 @@ LightingPass::LightingPass(
     float height, 
     uint32_t framesInFlight, 
     std::shared_ptr<GBufferPass> gBufferPass, 
-    std::vector<std::shared_ptr<UniformBuffer>> shadowDataUBOs)
+    std::vector<std::shared_ptr<UniformBuffer>> shadowDataUBOs,
+    std::shared_ptr<DynamicDiffuseGI> ddgi)
     : m_framesInFlight(framesInFlight), 
     m_currentFrame(0), 
     m_width(width), 
     m_height(height), 
     m_gBufferPass(gBufferPass), 
-    m_shadowDataUBOs(shadowDataUBOs) {
+    m_shadowDataUBOs(shadowDataUBOs),
+    m_ddgi(ddgi) {
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -41,7 +43,12 @@ LightingPass::LightingPass(
     m_width = static_cast<float>(m_swapChain->getExtent().width);
     m_height = static_cast<float>(m_swapChain->getExtent().height);
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/DeferredLighting.vs.spv");
+    ShaderImportConfig shaderConfig;
+    shaderConfig.compileInfo.includePath = shaderPath / "glsl/ddgi/";
+
+
+    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/DeferredLighting.fs.glsl", shaderConfig);
+
 
 
     m_shader = shader;
@@ -138,6 +145,12 @@ void LightingPass::recordCommandBuffer(
     vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
         static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::COMMON_RESOURCES), 1, &commonResourcesSet, 0, nullptr);
     
+    // Then bind set 2 (probe atlas)
+    bool isEvenFrame = m_ddgi->isFrameEven();
+    VkDescriptorSet probeAtlasSet = m_probeAtlasDescriptorSets[isEvenFrame ? 0 : 1]->getDescriptorSet();
+    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
+        2, 1, &probeAtlasSet, 0, nullptr);
+
     // Then bind set 3 (bindless shadow textures)
     VkDescriptorSet bindlessSet = ShadowMap::getBindlessShadowMaps()->getDescriptorSet();
     vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
@@ -314,6 +327,9 @@ void LightingPass::createDescriptorSets(uint32_t framesInFlight) {
         binding.resource = m_gBufferPass->getMaterialTextures()[i];
         bindings.bindings.push_back(binding);
 
+        // probe irradiance atlas
+        // probe distance atlas
+
         binding.binding = 4;
         binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         binding.count = 1;
@@ -326,10 +342,55 @@ void LightingPass::createDescriptorSets(uint32_t framesInFlight) {
         binding.resource = m_shadowDataUBOs[i];
         bindings.bindings.push_back(binding);
 
+        // probe volume
+        binding.binding = 6;
+        binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.count = 1;
+        binding.resource = m_ddgi->getProbeVolumeUniformBuffer();
+        bindings.bindings.push_back(binding);
+
         m_descriptorSets[i] = std::make_shared<DescriptorSet>(bindings);
-    
     }
 
+    VkDescriptorSetLayout probeAtlasLayout =  m_shader.lock()->getDescriptorSetLayouts()[2];
+
+
+        DescriptorSetBindings bindings;
+        bindings.layout = probeAtlasLayout;
+
+        // first texture set
+        DescriptorSetBinding binding;
+        binding.binding = 0;
+        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.count = 1;
+        binding.resource = m_ddgi->getRadianceTexture();
+        bindings.bindings.push_back(binding);
+
+        binding.binding = 1;
+        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.count = 1;
+        binding.resource = m_ddgi->getVisibilityTexture();
+        bindings.bindings.push_back(binding);
+
+        m_probeAtlasDescriptorSets[0] = std::make_shared<DescriptorSet>(bindings);
+
+        // second texture set
+        bindings.bindings.clear();
+        binding.binding = 0;
+        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.count = 1;
+        binding.resource = m_ddgi->getPrevRadianceTexture();
+        bindings.bindings.push_back(binding);
+        
+        binding.binding = 1;
+        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.count = 1;
+        binding.resource = m_ddgi->getPrevVisibilityTexture();
+        bindings.bindings.push_back(binding);
+
+        m_probeAtlasDescriptorSets[1] = std::make_shared<DescriptorSet>(bindings);
+
+    
 }
 
 void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {

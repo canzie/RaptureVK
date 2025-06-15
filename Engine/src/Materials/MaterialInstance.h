@@ -38,7 +38,7 @@ class MaterialInstance {
             }
         }
 
-       MaterialTypes getParameter(ParameterID); 
+       MaterialParameter getParameter(ParameterID id); 
         
 
         bool isReady();

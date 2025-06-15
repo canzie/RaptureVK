@@ -61,6 +61,9 @@ void DeferredRenderer::init() {
   setupCommandResources();
   createUniformBuffers(m_swapChain->getImageCount());
 
+  m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>();
+
+
   m_gbufferPass = std::make_shared<GBufferPass>(
       static_cast<float>(m_swapChain->getExtent().width),
       static_cast<float>(m_swapChain->getExtent().height),
@@ -69,7 +72,7 @@ void DeferredRenderer::init() {
   m_lightingPass = std::make_shared<LightingPass>(
       static_cast<float>(m_swapChain->getExtent().width),
       static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs);
+      m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs, m_dynamicDiffuseGI);
 
   m_stencilBorderPass = std::make_shared<StencilBorderPass>(
       static_cast<float>(m_swapChain->getExtent().width),
@@ -86,7 +89,6 @@ void DeferredRenderer::init() {
       [](std::shared_ptr<SwapChain> swapChain) { onSwapChainRecreated(); });
 
 
-  m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>();
 }
 
 void DeferredRenderer::shutdown() {
@@ -156,7 +158,7 @@ void DeferredRenderer::onSwapChainRecreated() {
   m_lightingPass = std::make_shared<LightingPass>(
       static_cast<float>(m_swapChain->getExtent().width),
       static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs);
+      m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs, m_dynamicDiffuseGI);
   m_stencilBorderPass = std::make_shared<StencilBorderPass>(
       static_cast<float>(m_swapChain->getExtent().width),
       static_cast<float>(m_swapChain->getExtent().height),

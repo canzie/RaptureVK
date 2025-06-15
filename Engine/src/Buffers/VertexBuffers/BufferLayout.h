@@ -157,7 +157,7 @@ struct BufferLayout {
     // Add interleaved flag to the hash
     hash ^= std::hash<bool>()(isInterleaved) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
     return hash;
-}
+    }
 
     VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
@@ -191,6 +191,15 @@ struct BufferLayout {
             attributeDescriptions.push_back(attrib.getVkDescription2EXT(static_cast<uint32_t>(attrib.name), binding));
         }
         return attributeDescriptions;
+    }
+
+    uint32_t getAttributeOffset(BufferAttributeID id) const {
+        for (const auto& attrib : buffer_attribs) {
+            if (attrib.name == id) {
+                return attrib.offset;
+            }
+        }
+        return 0;
     }
 
 

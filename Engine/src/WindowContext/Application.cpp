@@ -71,7 +71,7 @@ Application::Application(int width, int height, const char *title)
 
   DescriptorArrayConfig textureConfig;
   textureConfig.arrayType = DescriptorArrayType::TEXTURE;
-  textureConfig.capacity = 512;
+  textureConfig.capacity = 2048;
   textureConfig.name = "GlobalBindlessTexturePool";
   textureConfig.bindingIndex = 0;    // binding=0
 

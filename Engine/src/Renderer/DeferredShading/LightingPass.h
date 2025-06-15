@@ -17,11 +17,20 @@
 #include "Renderer/DeferredShading/GBufferPass.h"
 #include <memory>
 
+#include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
+
 namespace Rapture {
 
 class LightingPass {
 public:
-    LightingPass(float width, float height, uint32_t framesInFlight, std::shared_ptr<GBufferPass> gBufferPass, std::vector<std::shared_ptr<UniformBuffer>> shadowDataUBOs);
+    LightingPass(
+        float width, 
+        float height, 
+        uint32_t framesInFlight, 
+        std::shared_ptr<GBufferPass> gBufferPass, 
+        std::vector<std::shared_ptr<UniformBuffer>> shadowDataUBOs, 
+        std::shared_ptr<DynamicDiffuseGI> ddgi);
+
     ~LightingPass();
 
     FramebufferSpecification getFramebufferSpecification();
@@ -63,8 +72,11 @@ private:
     std::vector<std::shared_ptr<UniformBuffer>> m_lightUBOs;
     std::vector<std::shared_ptr<UniformBuffer>> m_shadowDataUBOs;
     std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets; // all sets are in set 0
+    std::shared_ptr<DescriptorSet> m_probeAtlasDescriptorSets[2]; // set=2, we need 2, one for prev one for current set of textures
 
     std::shared_ptr<GBufferPass> m_gBufferPass;
+
+    std::shared_ptr<DynamicDiffuseGI> m_ddgi;
 
     float m_width;
     float m_height;

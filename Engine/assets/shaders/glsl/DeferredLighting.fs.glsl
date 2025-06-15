@@ -29,7 +29,15 @@ layout(set = 0, binding = 1) uniform sampler2D gNormal;
 layout(set = 0, binding = 2) uniform sampler2D gAlbedoSpec;
 layout(set = 0, binding = 3) uniform sampler2D gMetallicRoughnessAO;
 
+// DDGI textures
+layout(set = 2, binding = 0) uniform sampler2DArray probeIrradianceAtlas;  // Irradiance
+layout(set = 2, binding = 1) uniform sampler2DArray probeDistanceAtlas;    // Distance, Distance^2
+
+
 layout(set = 3, binding = 0) uniform sampler2DShadow gBindlessTextures[];
+
+#include "ProbeCommon.glsl"
+#include "IrradianceCommon.glsl"
 
 
 // Light data structure for shader
@@ -62,6 +70,10 @@ layout(std140, set = 0, binding = 5) uniform ShadowDataLayout {
     ShadowBufferData shadowData[MAX_LIGHTS];
 } u_shadowData;
 
+
+layout(std140, set = 0, binding = 6) uniform ProbeInfo {
+    ProbeVolume u_DDGI_Volume;
+};
 
 
 // Push constant for per-object data
@@ -263,6 +275,23 @@ float calculateShadow(vec3 fragPosWorld, float fragDepthView, vec3 normal, vec3 
     }
 }
 
+vec3 getIrradiance(vec3 worldPos, vec3 normal, ProbeVolume volume, vec3 cameraDirection) {
+    
+
+    vec3 surfaceBias = DDGIGetSurfaceBias(normal, cameraDirection, volume);
+
+    // Get irradiance for the world-space position in the volume
+    vec3 irradiance = DDGIGetVolumeIrradiance(
+        worldPos,
+        normal,
+        surfaceBias,
+        probeIrradianceAtlas,
+        probeDistanceAtlas,
+        volume);
+
+    return irradiance;
+}
+
 void main() {
 
 
@@ -363,7 +392,12 @@ void main() {
     }
 
     vec3 ambient = vec3(0.03) * albedo * ao;
-    vec3 color = ambient + Lo;
+
+    vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
+    vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, u_DDGI_Volume, V);
+    vec3 indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
+
+    vec3 color = indirectDiffuse + Lo;
 
 #if DEBUG_CASCADES
     // Apply cascade visualization tint if enabled and a cascade was determined
