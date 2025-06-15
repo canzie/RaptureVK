@@ -189,38 +189,43 @@ void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const Transfor
         lightUp = glm::vec3(0.0f, 0.0f, 1.0f);
     }
     
-    // Create the light's view matrix
-    glm::mat4 viewMatrix = glm::lookAt(
-        lightPosition,               // Light position
-        lightPosition + lightDirection,    // Look at center (Point along the light direction)
-        lightUp                 // Up vector
-    );
+    glm::mat4 viewMatrix;
     
     if (lightComp.type == LightType::Directional) {
-        // For directional lights, center the shadow map around the camera's XZ position  
-        glm::vec3 sceneCenter = glm::vec3(0.0f);
+        // For directional lights, position the shadow camera to cover the scene properly
+        // Use camera position as scene center for better shadow coverage
+        glm::vec3 sceneCenter = cameraPosition;
         
         float sceneBounds = 100.0f;
-
-        // Position the light based on scene center and direction
-        glm::vec3 shadowCamPos = lightPosition;
-        shadowCamPos.y = sceneBounds;
-        shadowCamPos += lightDirection*10.0f;
-
-        // Create view matrix centered on the scene, not on the light entity
+        float shadowDistance = sceneBounds * 1.5f; // Distance to place shadow camera from scene center
+        
+        // Position the shadow camera opposite to the light direction
+        // This ensures shadows are cast in the correct direction
+        glm::vec3 shadowCamPos = sceneCenter - (lightDirection * shadowDistance);
+        
+        // Create view matrix looking from shadow camera position towards scene center
         viewMatrix = glm::lookAt(
-            shadowCamPos,          // Position light relative to scene center
+            shadowCamPos,          // Shadow camera position (opposite to light direction)
             sceneCenter,           // Look at scene center
             lightUp                // Up vector
         );
         
-        // Use appropriate size for your scene
-        float orthoSize = sceneBounds * 0.5f;
-        // Use near/far planes that encompass your entire scene
-        lightProj = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, sceneBounds*1.5f);
+        // Use orthographic projection for directional lights
+        float orthoSize = sceneBounds * 0.6f; // Slightly larger to avoid edge artifacts
+        float nearPlane = 1.0f;
+        float farPlane = shadowDistance + sceneBounds; // Ensure we capture everything
+        
+        lightProj = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
 
 
     } else {
+        // Create the light's view matrix for point/spot lights
+        viewMatrix = glm::lookAt(
+            lightPosition,                      // Light position
+            lightPosition + lightDirection,     // Look at point along light direction
+            lightUp                             // Up vector
+        );
+        
         // Perspective projection for spot/point light
         float aspect = 1.0f; // Shadow map is square
         
@@ -241,7 +246,6 @@ void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const Transfor
         }
     }
 
-    
     // Update the frustum for culling using the original matrices (before Vulkan fix)
     m_frustum.update(lightProj, viewMatrix);
     
@@ -251,9 +255,6 @@ void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const Transfor
     // Store the light's view-projection matrix
     shadowMapData.lightViewProjection = lightProj * viewMatrix;
     m_lightViewProjection = shadowMapData.lightViewProjection;
-    
-
-    
 
     // Update all UBOs with the new projection matrix
     for (uint32_t i = 0; i < m_framesInFlight; i++) {

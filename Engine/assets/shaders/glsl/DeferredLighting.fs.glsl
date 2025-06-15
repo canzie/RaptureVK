@@ -19,6 +19,8 @@ layout(location = 0) in vec2 fragTexCoord;
 #define MAX_CASCADES 4
 #define MAX_SHADOW_CASTERS 4
 #define DEBUG_CASCADES 0
+#define DEBUG_DIRECTIONAL_SHADOWS 0  // Set to 1 to enable debugging
+#define DEBUG_SHADOW_COORDS 0
 
 // Define the relative width of the blend zone at the end of each cascade
 #define CASCADE_BLEND_WIDTH_PERCENT 0.15 // 10% blend width
@@ -207,10 +209,26 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
     // In Vulkan, projCoords.z is already in the [0, 1] range.
     projCoords.xy = projCoords.xy * 0.5 + 0.5;
     
+#if DEBUG_SHADOW_COORDS
+    // Debug: Visualize shadow coordinates for directional lights
+    if (shadowInfo.type == 1) { // Directional light
+        // Show coordinates as colors
+        vec3 debugColor = vec3(projCoords.xy, projCoords.z * 0.1);
+        return length(debugColor); // Return a debug value
+    }
+#endif
+    
     // Check if fragment is outside the light's view frustum [0, 1] range
     if(projCoords.x < 0.0 || projCoords.x > 1.0 || 
        projCoords.y < 0.0 || projCoords.y > 1.0 ||
        projCoords.z < 0.0 || projCoords.z > 1.0) { // Check Z too
+        
+#if DEBUG_DIRECTIONAL_SHADOWS
+        // Debug: Show fragments outside shadow frustum as red for directional lights
+        if (shadowInfo.type == 1) {
+            return 0.0; // Make them fully shadowed to see the issue
+        }
+#endif
         return 1.0; // Outside frustum = Not shadowed (fully lit)
     }
     
@@ -228,12 +246,15 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         // Apply bias to avoid shadow acne - adjust based on surface angle
         float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
         
-        // Use an adaptive bias that scales with distance (for spotlights)
+        // Use different bias strategies for different light types
         float distanceScale = 1.0;
         if (shadowInfo.type == 2) { // Spotlight
             // Increase bias with distance to handle perspective distortion
             float viewDepth = abs(fragPosLightSpace.z);
             distanceScale = mix(1.0, 3.0, clamp(viewDepth / 50.0, 0.0, 1.0));
+        } else if (shadowInfo.type == 1) { // Directional light
+            // Directional lights need less bias since they use orthographic projection
+            distanceScale = 0.5;
         }
         
         bias = max(0.005 * (1.0 - cosTheta) * distanceScale, 0.001);
@@ -337,6 +358,12 @@ void main() {
            // Directional light: direction is constant, coming FROM the specified direction
             lightDirWorld = normalize(-light.direction.xyz); // Negate to get vector towards light source
             attenuation = 1.0; // No distance attenuation
+            
+#if DEBUG_DIRECTIONAL_SHADOWS
+            // Debug: Show directional light direction as color
+            lightColor = abs(light.direction.xyz);
+            lightIntensity = 1.0;
+#endif
         }
         else if (abs(lightType - 2.0) < 0.1) { // Spot light
             lightDirWorld = normalize(lightPos - fragPos); 

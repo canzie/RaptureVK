@@ -442,6 +442,13 @@ void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
         // Position and light type
         glm::vec3 position = transform.translation();
         float lightTypeFloat = static_cast<float>(lightComp.type);
+        
+        // For directional lights, position is irrelevant - use a default position
+        // This ensures the light behaves purely based on direction
+        if (lightComp.type == LightType::Directional) {
+            position = glm::vec3(0.0f, 0.0f, 0.0f); // Position doesn't matter for directional lights
+        }
+        
         lightData.position = glm::vec4(position, lightTypeFloat);
         
         

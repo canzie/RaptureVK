@@ -213,8 +213,12 @@ void DeferredRenderer::recordCommandBuffer(
     auto &transformComp = lightView.get<TransformComponent>(entity);
     auto &shadowComp = lightView.get<ShadowComponent>(entity);
 
-    if (shadowComp.shadowMap && (lightComp.hasChanged(m_currentFrame) ||
-                                 transformComp.hasChanged(m_currentFrame))) {
+    // Always update directional light shadows for debugging, others only when changed
+    bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
+                              transformComp.hasChanged(m_currentFrame) ||
+                              lightComp.type == LightType::Directional); // Force update for directional lights
+    
+    if (shadowComp.shadowMap && shouldUpdateShadow) {
       shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene,
                                                 m_currentFrame);
     }
