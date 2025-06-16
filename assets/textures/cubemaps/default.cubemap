@@ -1,0 +1,12 @@
+[general]
+name = "basic cubemap"
+type = "cubemap"
+
+[paths]
+relative = true # are the paths provided relative to the cubemap file? if not present default to false
+top = "top.jpg"
+bottom = "bottom.jpg"
+right = "right.jpg"
+left = "left.jpg"
+back = "back.jpg"
+front = "front.jpg"

@@ -7,7 +7,7 @@
 #include <variant>
 
 namespace Rapture {
-
+    
     struct ShaderImportConfig {
 
         ShaderCompileInfo compileInfo;
@@ -25,6 +25,7 @@ namespace Rapture {
         }
 
     };
+
 
 
     using AssetImportConfigVariant = std::variant<std::monostate, ShaderImportConfig, TextureImportConfig>;

@@ -44,11 +44,23 @@ float calculateSunShadowFactor(vec3 hitPositionWorld, vec3 hitNormalWorld, SunPr
 
     float comparisonDepth = projCoords.z - bias;
     
-    
-    // Use descriptor array to access shadow map
-    float shadowFactor = texture(gShadowMaps[sunProperties.sunShadowTextureArrayIndex], vec3(projCoords.xy, comparisonDepth));
+    vec2 texelSize = 1.0 / textureSize(gShadowMaps[sunProperties.sunShadowTextureArrayIndex], 0);
 
-    return shadowFactor;
+    // Use descriptor array to access shadow map
+    float shadowFactor = 0.0;
+
+    // Use a 3x3 kernel for PCF
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            shadowFactor += texture(gShadowMaps[sunProperties.sunShadowTextureArrayIndex], vec3(
+                projCoords.xy + vec2(x, y) * texelSize,
+                comparisonDepth
+            ));
+        }
+    }
+    shadowFactor /= 9.0; // Average the results
+    
+    return clamp(shadowFactor, 0.0, 1.0);
 }
 
 /**

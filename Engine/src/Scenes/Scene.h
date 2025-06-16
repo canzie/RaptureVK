@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 #include <entt/entt.hpp>
 #include "AccelerationStructures/TLAS.h"
 
@@ -9,10 +10,13 @@ namespace Rapture {
     // Forward declaration
     class Entity;
 
+    struct SkyboxComponent;
+    
     struct SceneSettings {
         std::string sceneName;
         bool frustumCullingEnabled = true;
         std::shared_ptr<Entity> mainCamera;
+        std::shared_ptr<Entity> skybox;
     };
     
     class Scene {
@@ -28,12 +32,19 @@ namespace Rapture {
         entt::registry& getRegistry() { return m_Registry; }
         const entt::registry& getRegistry() const { return m_Registry; }
 
-        SceneSettings& getSettings() { return m_config; }
-        const SceneSettings& getSettings() const { return m_config; }
+        SceneSettings& getSettings();
+        const SceneSettings& getSettings() const;
 
-        std::string getSceneName() const { return m_config.sceneName; }
+        std::string getSceneName() const;
 
-        void setMainCamera(std::shared_ptr<Entity> camera) { m_config.mainCamera = camera; }
+        void setMainCamera(Entity camera);
+        void setMainCamera(std::shared_ptr<Entity> camera);
+
+        std::weak_ptr<Entity> getMainCamera();
+
+        void setSkybox(Entity entity);
+        std::weak_ptr<Entity> getSkybox();
+        SkyboxComponent* getSkyboxComponent();
 
         void registerBLAS(Entity& entity);
         void registerBLAS(std::shared_ptr<Entity> entity);

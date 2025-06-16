@@ -43,7 +43,8 @@ enum class TextureType : uint8_t {
     TEXTURE1D,
     TEXTURE2D,
     TEXTURE3D,
-    TEXTURE2D_ARRAY
+    TEXTURE2D_ARRAY,
+    TEXTURECUBE
 };
 
 enum class TextureViewType : uint8_t {
@@ -73,7 +74,7 @@ struct TextureSpecification {
 inline VkImageType toVkImageType(TextureType type) {
     switch (type) {
         case TextureType::TEXTURE1D: return VK_IMAGE_TYPE_1D;
-        case TextureType::TEXTURE2D: case TextureType::TEXTURE2D_ARRAY: return VK_IMAGE_TYPE_2D;
+        case TextureType::TEXTURE2D: case TextureType::TEXTURE2D_ARRAY: case TextureType::TEXTURECUBE: return VK_IMAGE_TYPE_2D;
         case TextureType::TEXTURE3D: return VK_IMAGE_TYPE_3D;
         default: 
             RP_CORE_ERROR("Texture::toVkImageType() - Unsupported type!");
@@ -87,6 +88,7 @@ inline VkImageViewType toVkImageViewType(TextureType type) {
         case TextureType::TEXTURE2D: return VK_IMAGE_VIEW_TYPE_2D;
         case TextureType::TEXTURE3D: return VK_IMAGE_VIEW_TYPE_3D;
         case TextureType::TEXTURE2D_ARRAY: return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        case TextureType::TEXTURECUBE: return VK_IMAGE_VIEW_TYPE_CUBE;
         default: 
             RP_CORE_ERROR("Texture::toVkImageViewType() - Unsupported type!");
             return VK_IMAGE_VIEW_TYPE_MAX_ENUM; 
@@ -159,6 +161,10 @@ inline VkSamplerMipmapMode toVkSamplerMipmapMode(TextureFilter filter) {
 
 inline bool isArrayType(TextureType type) {
     return type == TextureType::TEXTURE2D_ARRAY;
+}
+
+inline bool isCubeType(TextureType type) {
+    return type == TextureType::TEXTURECUBE;
 }
 
 inline bool isDepthFormat(TextureFormat format) {

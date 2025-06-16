@@ -33,24 +33,53 @@ namespace Rapture {
     }
 
     void Scene::onUpdate() {
-        // This is where you would implement scene update logic
-        // For example, system updates, physics, rendering preparation, etc.
-        
-        // Example of how you might iterate through entities with components:
-        /*
-        auto view = m_Registry.view<Transform, Velocity>();
-        for (auto entity : view) {
-            auto& transform = view.get<Transform>(entity);
-            auto& velocity = view.get<Velocity>(entity);
-            
-            // Update position based on velocity
-            transform.position.x += velocity.x * deltaTime;
-            transform.position.y += velocity.y * deltaTime;
-            transform.position.z += velocity.z * deltaTime;
-        }
-        */
+
     }
 
+    SceneSettings &Scene::getSettings() {
+        return m_config;
+    }
+
+    const SceneSettings &Scene::getSettings() const
+    {
+        return m_config;
+    }
+
+    std::string Scene::getSceneName() const
+    {
+        return m_config.sceneName;
+    }
+
+    void Scene::setMainCamera(Entity camera)
+    {
+        if (camera.isValid() && camera.hasComponent<CameraComponent>())
+            m_config.mainCamera = std::make_shared<Entity>(camera);
+    }
+
+    void Scene::setMainCamera(std::shared_ptr<Entity> camera)
+    {
+        m_config.mainCamera = camera;
+    }
+
+    std::weak_ptr<Entity> Scene::getMainCamera() {
+        return m_config.mainCamera;
+    }
+
+    void Scene::setSkybox(Entity entity) {
+        if (entity.isValid() && entity.hasComponent<SkyboxComponent>()) {
+             m_config.skybox = std::make_shared<Entity>(entity);
+        }
+    }
+
+    std::weak_ptr<Entity> Scene::getSkybox() {
+        return m_config.skybox;
+    }
+
+    SkyboxComponent* Scene::getSkyboxComponent() {
+        if (m_config.skybox && m_config.skybox->isValid())
+            return m_config.skybox->tryGetComponent<SkyboxComponent>();
+        return nullptr;
+    }
 
     void Scene::registerBLAS(Entity& entity) {
 

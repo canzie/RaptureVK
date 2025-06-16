@@ -47,6 +47,8 @@ public:
 
     bool isFrameEven() { return m_isEvenFrame; }
 
+    void updateSkybox(std::shared_ptr<Scene> scene);
+
 private:
     void castRays(std::shared_ptr<Scene> scene);
     void blendTextures();
@@ -128,7 +130,9 @@ private:
 
     std::shared_ptr<DescriptorSet> m_probeVolumeDescriptorSet;
 
-    
+    std::shared_ptr<Texture> m_skyboxTexture;
+
+    static std::shared_ptr<Texture> s_defaultSkyboxTexture;
 };
 
 }

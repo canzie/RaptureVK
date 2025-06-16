@@ -124,6 +124,12 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     auto perlinNoiseTexture = Rapture::PerlinNoiseGenerator::generateNoise(1024, 1024, 4, 0.5f, 2.0f, 8.0f);
 
+
+    auto skybox = activeScene->createEntity("Skybox");
+
+    skybox.addComponent<Rapture::SkyboxComponent>(rootPath / "assets/textures/cubemaps/default.cubemap");
+    activeScene->setSkybox(skybox);
+
     Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
 }
 

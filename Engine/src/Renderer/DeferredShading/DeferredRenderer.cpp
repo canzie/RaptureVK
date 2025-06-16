@@ -21,7 +21,6 @@ struct PushConstants {
 };
 
 // Static member definitions
-std::shared_ptr<GBufferPass> DeferredRenderer::m_gbufferPass = nullptr;
 std::vector<std::shared_ptr<CommandBuffer>> DeferredRenderer::m_commandBuffers;
 std::shared_ptr<CommandPool> DeferredRenderer::m_commandPool = nullptr;
 std::shared_ptr<Shader> DeferredRenderer::m_shader = nullptr;
@@ -31,9 +30,12 @@ std::shared_ptr<SwapChain> DeferredRenderer::m_swapChain = nullptr;
 uint32_t DeferredRenderer::m_currentFrame = 0;
 std::shared_ptr<VulkanQueue> DeferredRenderer::m_graphicsQueue = nullptr;
 std::shared_ptr<VulkanQueue> DeferredRenderer::m_presentQueue = nullptr;
+// PASSES
+std::shared_ptr<GBufferPass> DeferredRenderer::m_gbufferPass = nullptr;
 std::shared_ptr<LightingPass> DeferredRenderer::m_lightingPass = nullptr;
-std::shared_ptr<StencilBorderPass> DeferredRenderer::m_stencilBorderPass =
-    nullptr;
+std::shared_ptr<StencilBorderPass> DeferredRenderer::m_stencilBorderPass = nullptr;
+std::shared_ptr<SkyboxPass> DeferredRenderer::m_skyboxPass = nullptr;
+
 std::vector<std::shared_ptr<UniformBuffer>> DeferredRenderer::m_cameraUBOs = {};
 std::vector<std::shared_ptr<UniformBuffer>> DeferredRenderer::m_shadowDataUBOs =
     {};
@@ -80,6 +82,9 @@ void DeferredRenderer::init() {
       m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(),
       m_cameraUBOs);
 
+
+  m_skyboxPass = std::make_shared<SkyboxPass>(m_cameraUBOs, m_gbufferPass->getDepthTextures());
+
   ApplicationEvents::onWindowResize().addListener(
       [](unsigned int width, unsigned int height) {
         m_framebufferNeedsResize = true;
@@ -92,23 +97,25 @@ void DeferredRenderer::init() {
 }
 
 void DeferredRenderer::shutdown() {
-  // Wait for device to finish operations
-  vkDeviceWaitIdle(m_device);
+    // Wait for device to finish operations
+    vkDeviceWaitIdle(m_device);
 
-  m_stencilBorderPass.reset();
-  m_lightingPass.reset();
-  m_gbufferPass.reset();
+    m_skyboxPass.reset();
+    m_stencilBorderPass.reset();
+    m_lightingPass.reset();
+    m_gbufferPass.reset();
 
-  // Clean up command buffers and pool
-  m_commandBuffers.clear();
-  m_commandPool.reset();
 
-  // Clean up queues
-  m_graphicsQueue.reset();
-  m_presentQueue.reset();
+    // Clean up command buffers and pool
+    m_commandBuffers.clear();
+    m_commandPool.reset();
 
-  // Clean up swapchain
-  m_swapChain.reset();
+    // Clean up queues
+    m_graphicsQueue.reset();
+    m_presentQueue.reset();
+
+    // Clean up swapchain
+    m_swapChain.reset();
 }
 
 void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
@@ -135,40 +142,45 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
 }
 
 void DeferredRenderer::onSwapChainRecreated() {
-  // Wait for all operations to complete
-  vkDeviceWaitIdle(m_device);
+    // Wait for all operations to complete
+    vkDeviceWaitIdle(m_device);
 
-  m_stencilBorderPass.reset();
-  m_lightingPass.reset();
-  m_gbufferPass.reset();
+    m_skyboxPass.reset();
+    m_stencilBorderPass.reset();
+    m_lightingPass.reset();
+    m_gbufferPass.reset();
 
-  m_width = static_cast<float>(m_swapChain->getExtent().width);
-  m_height = static_cast<float>(m_swapChain->getExtent().height);
+    m_width = static_cast<float>(m_swapChain->getExtent().width);
+    m_height = static_cast<float>(m_swapChain->getExtent().height);
 
-  m_cameraUBOs.clear();
-  m_shadowDataUBOs.clear();
-  createUniformBuffers(m_swapChain->getImageCount());
+    m_cameraUBOs.clear();
+    m_shadowDataUBOs.clear();
+    createUniformBuffers(m_swapChain->getImageCount());
 
-  m_commandBuffers.clear();
+    m_commandBuffers.clear();
 
-  m_gbufferPass = std::make_shared<GBufferPass>(
-      static_cast<float>(m_swapChain->getExtent().width),
-      static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_cameraUBOs);
-  m_lightingPass = std::make_shared<LightingPass>(
-      static_cast<float>(m_swapChain->getExtent().width),
-      static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs, m_dynamicDiffuseGI);
-  m_stencilBorderPass = std::make_shared<StencilBorderPass>(
-      static_cast<float>(m_swapChain->getExtent().width),
-      static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(),
-      m_cameraUBOs);
+    m_gbufferPass = std::make_shared<GBufferPass>(
+        static_cast<float>(m_swapChain->getExtent().width),
+        static_cast<float>(m_swapChain->getExtent().height),
+        m_swapChain->getImageCount(), m_cameraUBOs);
+    m_lightingPass = std::make_shared<LightingPass>(
+        static_cast<float>(m_swapChain->getExtent().width),
+        static_cast<float>(m_swapChain->getExtent().height),
+        m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs, m_dynamicDiffuseGI);
+    m_stencilBorderPass = std::make_shared<StencilBorderPass>(
+        static_cast<float>(m_swapChain->getExtent().width),
+        static_cast<float>(m_swapChain->getExtent().height),
+        m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(),
+        m_cameraUBOs);
 
-  setupCommandResources();
+    m_skyboxPass = std::make_shared<SkyboxPass>(m_cameraUBOs, m_gbufferPass->getDepthTextures());
 
-  m_currentFrame = 0; // Reset current frame
-  m_framebufferNeedsResize = false;
+
+
+    setupCommandResources();
+
+    m_currentFrame = 0; // Reset current frame
+    m_framebufferNeedsResize = false;
 }
 
 void DeferredRenderer::setupCommandResources() {
@@ -198,6 +210,10 @@ void DeferredRenderer::recordCommandBuffer(
 
   updateCameraUBOs(activeScene, m_currentFrame);
   updateShadowMaps(activeScene);
+
+  if (!m_skyboxPass->hasActiveSkybox() && activeScene->getSkyboxComponent()) {
+    m_skyboxPass->setSkyboxTexture(activeScene->getSkyboxComponent()->skyboxTexture);
+  }
 
   if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) !=
       VK_SUCCESS) {
@@ -232,6 +248,8 @@ void DeferredRenderer::recordCommandBuffer(
 
   m_stencilBorderPass->recordCommandBuffer(commandBuffer, imageIndex,
                                            m_currentFrame, activeScene);
+
+  m_skyboxPass->recordCommandBuffer(commandBuffer, m_currentFrame);
 
   if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
     RP_CORE_ERROR("failed to record command buffer!");

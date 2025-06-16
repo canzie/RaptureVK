@@ -22,9 +22,11 @@ namespace Rapture {
 
     enum class AssetType {
         None = 0,
-        Material,
+        Texture,
+        Cubemap,
         Shader,
-        Texture
+        Material,
+        Model
     };
 
     enum class AssetStorageType {
@@ -45,6 +47,8 @@ namespace Rapture {
             case AssetType::Material: return "Material";
             case AssetType::Shader: return "Shader";
             case AssetType::Texture: return "Texture";
+            case AssetType::Cubemap: return "Cubemap";
+            case AssetType::Model: return "Model";
             default: return "Unknown";
         }
     }

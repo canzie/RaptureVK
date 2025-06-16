@@ -22,7 +22,7 @@
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include "Materials/MaterialInstance.h"
-
+#include "AssetManager/AssetManager.h"
 
 #include <string>
 #include <memory>
@@ -230,6 +230,25 @@ namespace Rapture {
         
         
     };
+
+struct SkyboxComponent {
+    std::shared_ptr<Texture> skyboxTexture;
+    AssetHandle skyboxTextureHandle;
+
+    SkyboxComponent() = default;
+    SkyboxComponent(std::shared_ptr<Texture> skyboxTexture) : skyboxTexture(skyboxTexture) {}
+    SkyboxComponent(std::filesystem::path skyboxTexturePath) {
+        auto [skyboxTexture, handle] = AssetManager::importAsset<Texture>(skyboxTexturePath);
+        if (!skyboxTexture) {
+            RP_CORE_ERROR("SkyboxComponent - Failed to load skybox texture: {}", skyboxTexturePath.string());
+            this->skyboxTextureHandle = AssetHandle();
+        } else {
+            this->skyboxTexture = skyboxTexture;
+            this->skyboxTextureHandle = handle;
+        }
+    }
+};
+
 
 // Light types for the LightComponent
 enum class LightType

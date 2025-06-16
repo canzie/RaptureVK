@@ -17,6 +17,7 @@
 #include "Renderer/DeferredShading/LightingPass.h"
 #include "Renderer/StencilBorderPass.h"
 #include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
+#include "Renderer/SkyboxPass.h"
 
 #include <memory>
 #include <vector>
@@ -56,8 +57,7 @@ private:
 
   static void createUniformBuffers(uint32_t framesInFlight);
 
-  static void updateCameraUBOs(std::shared_ptr<Scene> activeScene,
-                               uint32_t currentFrame);
+  static void updateCameraUBOs(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
 
   static void updateShadowMaps(std::shared_ptr<Scene> activeScene);
 
@@ -65,6 +65,7 @@ private:
   static std::shared_ptr<GBufferPass> m_gbufferPass;
   static std::shared_ptr<LightingPass> m_lightingPass;
   static std::shared_ptr<StencilBorderPass> m_stencilBorderPass;
+  static std::shared_ptr<SkyboxPass> m_skyboxPass;
 
   static std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
   static std::shared_ptr<CommandPool> m_commandPool;

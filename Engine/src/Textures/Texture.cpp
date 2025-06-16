@@ -94,12 +94,30 @@ Sampler::~Sampler() {
 
 // Texture implementation
 Texture::Texture(const std::string& path, TextureFilter filter, TextureWrap wrap, bool isLoadingAsync) 
-    : m_path(path), m_loadFromFile(true), 
+    : m_paths({path}),
     m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_spec({}), m_sampler(nullptr) {
     
     
     // First, create specification from image file
-    createSpecificationFromImageFile(path, filter, wrap);
+    createSpecificationFromImageFile(m_paths, filter, wrap);
+    
+    // Initialize sampler with the spec (will be reconstructed after spec is finalized)
+    m_sampler = std::make_unique<Sampler>(m_spec);
+    
+    // Create the image first, then load data into it
+    createImage();
+    createImageView();
+    if (!isLoadingAsync) {
+        loadImageFromFile();
+    }
+}
+
+Texture::Texture(const std::vector<std::string>& paths, TextureFilter filter, TextureWrap wrap, bool isLoadingAsync)
+    : m_paths(paths),
+    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_spec({}), m_sampler(nullptr) {
+    
+    // First, create specification from image file
+    createSpecificationFromImageFile(m_paths, filter, wrap);
     
     // Initialize sampler with the spec (will be reconstructed after spec is finalized)
     m_sampler = std::make_unique<Sampler>(m_spec);
@@ -113,9 +131,8 @@ Texture::Texture(const std::string& path, TextureFilter filter, TextureWrap wrap
 }
 
 Texture::Texture(const TextureSpecification& spec) 
-    : m_spec(spec), m_loadFromFile(false), 
+    : m_spec(spec), 
     m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_sampler(nullptr) {
-    
     
     m_sampler = std::make_unique<Sampler>(spec);
     // Create the image and image view
@@ -157,31 +174,41 @@ Texture::~Texture() {
     }
 }
 
-void Texture::createSpecificationFromImageFile(const std::string& path, TextureFilter filter, TextureWrap wrap) {
+void Texture::createSpecificationFromImageFile(const std::vector<std::string>& paths, TextureFilter filter, TextureWrap wrap) {
+    if (paths.empty()) {
+        RP_CORE_ERROR("Cannot create texture specification from empty path list.");
+        throw std::runtime_error("Cannot create texture specification from empty path list.");
+    }
+
     int width, height, channels;
     
-    // Use stbi_info to get image dimensions without loading the full image
-    if (!stbi_info(path.c_str(), &width, &height, &channels)) {
-        RP_CORE_ERROR("Failed to get image info for: {}", path);
-        throw std::runtime_error("Failed to get image info for: " + path);
+    // Use stbi_info to get image dimensions without loading the full image, using the first path as representative
+    if (!stbi_info(paths[0].c_str(), &width, &height, &channels)) {
+        RP_CORE_ERROR("Failed to get image info for: {}", paths[0]);
+        throw std::runtime_error("Failed to get image info for: " + paths[0]);
     }
-    
     
     // Set basic properties
     m_spec.width = static_cast<uint32_t>(width);
     m_spec.height = static_cast<uint32_t>(height);
-    m_spec.depth = 1; // 2D texture
-    m_spec.type = TextureType::TEXTURE2D;
+    m_spec.depth = 1; // For 2D texture or cubemap face depth
+    
+    if (paths.size() == 6) {
+        m_spec.type = TextureType::TEXTURECUBE;
+    } else if (paths.size() > 1) {
+        m_spec.type = TextureType::TEXTURE2D_ARRAY;
+        m_spec.depth = paths.size();
+    } else {
+        m_spec.type = TextureType::TEXTURE2D;
+    }
     
     // Always use RGBA8 format since we force 4 channels during loading
     m_spec.format = TextureFormat::RGBA8;
     
-
-    
     // Set default values for other properties
-    m_spec.filter = TextureFilter::Linear;
-    m_spec.wrap = TextureWrap::Repeat;
-    m_spec.srgb = false; // Assume sRGB for color textures
+    m_spec.filter = filter;
+    m_spec.wrap = wrap;
+    m_spec.srgb = false; // Assume sRGB for color textures, can be configured
     m_spec.mipLevels = 1; // No mipmapping for now
 }
 
@@ -225,27 +252,41 @@ bool Texture::validateSpecificationAgainstImageData(int width, int height, int c
 }
 
 void Texture::loadImageFromFile(size_t threadId) {
-    int width, height, channels;
-    
-    // Force 4 channels (RGBA) for consistency
-    int desiredChannels = 4;
-    stbi_uc* pixels = stbi_load(m_path.c_str(), &width, &height, &channels, desiredChannels);
-    
-    if (!pixels) {
-        RP_CORE_ERROR("Failed to load texture image: {}", m_path);
-        throw std::runtime_error("Failed to load texture image: " + m_path);
+    if (m_paths.empty()) {
+        RP_CORE_WARN("No paths provided to load image from file.");
+        return;
     }
-    
-    // Spec format is already correctly set to RGBA8
-    
-    
-    // Validate against our specification
-    validateSpecificationAgainstImageData(width, height, desiredChannels);
-    
-    VkDeviceSize imageSize = width * height * desiredChannels;
-    
+
     auto& app = Application::getInstance();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    int width, height, channels;
+    int desiredChannels = 4; // Force 4 channels (RGBA) for consistency
+    VkDeviceSize layerSize = 0;
+    VkDeviceSize imageSize = 0;
+
+    std::vector<stbi_uc*> pixelData;
+    pixelData.reserve(m_paths.size());
+
+    for (const auto& path : m_paths) {
+        stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, desiredChannels);
+        if (!pixels) {
+            RP_CORE_ERROR("Failed to load texture image: {}", path);
+            // Cleanup previously loaded images
+            for (stbi_uc* p : pixelData) {
+                stbi_image_free(p);
+            }
+            throw std::runtime_error("Failed to load texture image: " + path);
+        }
+
+        if (pixelData.empty()) { // First image
+             validateSpecificationAgainstImageData(width, height, desiredChannels);
+             layerSize = static_cast<VkDeviceSize>(width) * height * desiredChannels;
+        }
+        pixelData.push_back(pixels);
+    }
+    
+    imageSize = layerSize * m_paths.size();
     
     // Create staging buffer
     VkBuffer stagingBuffer;
@@ -261,7 +302,7 @@ void Texture::loadImageFromFile(size_t threadId) {
     allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
     
     if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
-        stbi_image_free(pixels);
+        for (stbi_uc* p : pixelData) stbi_image_free(p);
         RP_CORE_ERROR("Failed to create staging buffer for texture!");
         throw std::runtime_error("Failed to create staging buffer for texture!");
     }
@@ -269,10 +310,12 @@ void Texture::loadImageFromFile(size_t threadId) {
     // Copy pixel data to staging buffer
     void* data;
     vmaMapMemory(allocator, stagingAllocation, &data);
-    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    for (size_t i = 0; i < pixelData.size(); ++i) {
+        memcpy(static_cast<char*>(data) + (i * layerSize), pixelData[i], static_cast<size_t>(layerSize));
+    }
     vmaUnmapMemory(allocator, stagingAllocation);
     
-    stbi_image_free(pixels);
+    for (stbi_uc* p : pixelData) stbi_image_free(p);
     
     // Transition image layout and copy data
     transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, threadId);
@@ -323,7 +366,7 @@ void Texture::copyFromImage(
     sourceBarrier.subresourceRange.baseMipLevel = 0;
     sourceBarrier.subresourceRange.levelCount = m_spec.mipLevels;
     sourceBarrier.subresourceRange.baseArrayLayer = 0;
-    sourceBarrier.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    sourceBarrier.subresourceRange.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
     sourceBarrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
     sourceBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
@@ -339,7 +382,7 @@ void Texture::copyFromImage(
     destBarrier.subresourceRange.baseMipLevel = 0;
     destBarrier.subresourceRange.levelCount = m_spec.mipLevels;
     destBarrier.subresourceRange.baseArrayLayer = 0;
-    destBarrier.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    destBarrier.subresourceRange.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
     destBarrier.srcAccessMask = 0;
     destBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
@@ -361,12 +404,12 @@ void Texture::copyFromImage(
     copyRegion.srcSubresource.aspectMask = getImageAspectFlags(m_spec.format);
     copyRegion.srcSubresource.mipLevel = 0;
     copyRegion.srcSubresource.baseArrayLayer = 0;
-    copyRegion.srcSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    copyRegion.srcSubresource.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
     copyRegion.srcOffset = {0, 0, 0};
     copyRegion.dstSubresource.aspectMask = getImageAspectFlags(m_spec.format);
     copyRegion.dstSubresource.mipLevel = 0;
     copyRegion.dstSubresource.baseArrayLayer = 0;
-    copyRegion.dstSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    copyRegion.dstSubresource.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
     copyRegion.dstOffset = {0, 0, 0};
     copyRegion.extent = {m_spec.width, m_spec.height, m_spec.depth};
 
@@ -375,13 +418,13 @@ void Texture::copyFromImage(
     blitRegion.srcSubresource.aspectMask = getImageAspectFlags(m_spec.format);
     blitRegion.srcSubresource.mipLevel = 0;
     blitRegion.srcSubresource.baseArrayLayer = 0;
-    blitRegion.srcSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    blitRegion.srcSubresource.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
     blitRegion.srcOffsets[0] = {0, 0, 0};
     blitRegion.srcOffsets[1] = {(int32_t)m_spec.width, (int32_t)m_spec.height, 1};
     blitRegion.dstSubresource.aspectMask = getImageAspectFlags(m_spec.format);
     blitRegion.dstSubresource.mipLevel = 0;
     blitRegion.dstSubresource.baseArrayLayer = 0;
-    blitRegion.dstSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    blitRegion.dstSubresource.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
     blitRegion.dstOffsets[0] = {0, 0, 0};
     blitRegion.dstOffsets[1] = {(int32_t)m_spec.width, (int32_t)m_spec.height, 1};
 
@@ -460,7 +503,7 @@ VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkI
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
     barrier.srcAccessMask = srcAccessMask;
     barrier.dstAccessMask = dstAccessMask;
     return barrier;
@@ -499,9 +542,9 @@ void Texture::createImage()
     imageInfo.imageType = toVkImageType(m_spec.type);
     imageInfo.extent.width = m_spec.width;
     imageInfo.extent.height = m_spec.height;
-    imageInfo.extent.depth = isArrayType(m_spec.type) ? 1 : m_spec.depth;
+    imageInfo.extent.depth = (isArrayType(m_spec.type) || isCubeType(m_spec.type)) ? 1 : m_spec.depth;
     imageInfo.mipLevels = m_spec.mipLevels;
-    imageInfo.arrayLayers = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    imageInfo.arrayLayers = isArrayType(m_spec.type) ? m_spec.depth : (isCubeType(m_spec.type) ? 6 : 1);
     imageInfo.format = toVkFormat(m_spec.format, m_spec.srgb);
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -518,7 +561,7 @@ void Texture::createImage()
     }
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.flags = 0;
+    imageInfo.flags = isCubeType(m_spec.type) ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
 
     VmaAllocationCreateInfo allocInfo = {};
     allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -542,7 +585,7 @@ void Texture::createImageView() {
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = m_spec.mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    viewInfo.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : (isCubeType(m_spec.type) ? 6 : 1);
 
 
     if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageView) != VK_SUCCESS) {
@@ -676,6 +719,63 @@ std::shared_ptr<Texture> Texture::createDefaultWhiteTexture() {
     return defaultWhiteTexture;
 }
 
+std::shared_ptr<Texture> Texture::createDefaultWhiteCubemapTexture() {
+    // Create a 1x1 white cubemap
+    TextureSpecification spec{};
+    spec.width = 1;
+    spec.height = 1;
+    spec.depth = 1;
+    spec.type = TextureType::TEXTURECUBE;
+    spec.format = TextureFormat::RGBA8;
+    spec.filter = TextureFilter::Linear;
+    spec.wrap = TextureWrap::Repeat;
+    spec.srgb = false;
+    spec.mipLevels = 1;
+    
+    auto defaultCubemap = std::make_shared<Texture>(spec);
+    
+    auto& app = Application::getInstance();
+    VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+    
+    // Staging buffer for 6 faces
+    uint32_t whitePixel = 0xFFFFFFFF;
+    VkDeviceSize faceSize = sizeof(uint32_t);
+    VkDeviceSize imageSize = faceSize * 6;
+    
+    VkBuffer stagingBuffer;
+    VmaAllocation stagingAllocation;
+    
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = imageSize;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    
+    VmaAllocationCreateInfo allocInfo = {};
+    allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    
+    if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create staging buffer for default white cubemap!");
+        throw std::runtime_error("Failed to create staging buffer for default white cubemap!");
+    }
+    
+    void* data;
+    vmaMapMemory(allocator, stagingAllocation, &data);
+    for (int i = 0; i < 6; ++i) {
+        memcpy(static_cast<char*>(data) + (i * faceSize), &whitePixel, faceSize);
+    }
+    vmaUnmapMemory(allocator, stagingAllocation);
+    
+    defaultCubemap->transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    defaultCubemap->copyBufferToImage(stagingBuffer, 1, 1);
+    defaultCubemap->transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    
+    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+    
+    RP_CORE_INFO("Created default white cubemap texture (1x1x6 RGBA8)");
+    
+    return defaultCubemap;
+}
+
 void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, size_t threadId) {
     if (m_image == VK_NULL_HANDLE) {
         RP_CORE_ERROR("Cannot transition image layout: VkImage is VK_NULL_HANDLE");
@@ -712,7 +812,7 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = m_spec.mipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
+    barrier.subresourceRange.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
 
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
@@ -752,13 +852,7 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
     commandBuffer->end();
 
-    //VkSubmitInfo submitInfo{};
-    //submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    //submitInfo.commandBufferCount = 1;
-    //VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
-    //submitInfo.pCommandBuffers = &commandBufferVk;
-    
-    //graphicsQueue->addCommandBuffer(commandBuffer);
+
     graphicsQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
     
@@ -790,30 +884,40 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
 
     vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
 
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = getImageAspectFlags(m_spec.format);
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = isArrayType(m_spec.type) ? m_spec.depth : 1;
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {width, height, 1};
+    std::vector<VkBufferImageCopy> bufferCopyRegions;
+    uint32_t layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
+    VkDeviceSize offset = 0;
+    VkDeviceSize layerSize = static_cast<VkDeviceSize>(width) * height * 4; // Assuming RGBA8
 
-    vkCmdCopyBufferToImage(commandBuffer->getCommandBufferVk(), buffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    for (uint32_t layer = 0; layer < layerCount; ++layer) {
+        VkBufferImageCopy region{};
+        region.bufferOffset = offset;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = layer;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = {0, 0, 0};
+        region.imageExtent = {width, height, 1};
+        bufferCopyRegions.push_back(region);
+        offset += layerSize;
+    }
+
+
+    vkCmdCopyBufferToImage(
+        commandBuffer->getCommandBufferVk(), 
+        buffer, 
+        m_image, 
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+        static_cast<uint32_t>(bufferCopyRegions.size()), 
+        bufferCopyRegions.data()
+    );
 
     commandBuffer->end();
 
-    //VkSubmitInfo submitInfo{};
-    //submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    //submitInfo.commandBufferCount = 1;
-    //VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
-    //submitInfo.pCommandBuffers = &commandBufferVk;
-
     
     auto& vulkanContext = app.getVulkanContext();
-    //queue->addCommandBuffer(commandBuffer);
     queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     queue->waitIdle();
 

@@ -164,6 +164,17 @@ FetchContent_Declare(
   GIT_PROGRESS TRUE
 )
 
+# --- tomlplusplus ---
+
+FetchContent_Declare(
+    tomlplusplus
+    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+    GIT_TAG        v3.4.0
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+)
+
+
 # ==================== Make Dependencies Available ====================
 
 message(STATUS "Fetching and configuring dependencies...")
@@ -181,6 +192,7 @@ FetchContent_MakeAvailable(spirv_headers)
 FetchContent_MakeAvailable(spirv_tools)
 FetchContent_MakeAvailable(glslang)
 FetchContent_MakeAvailable(shaderc)
+FetchContent_MakeAvailable(tomlplusplus)
 message(STATUS "All dependencies are available.")
 
 # ==================== Manual Target Configuration ====================
@@ -250,6 +262,7 @@ target_link_libraries(vendor_libraries INTERFACE
     Vulkan::Vulkan
     tracy::client
     shaderc_combined
+    tomlplusplus::tomlplusplus
 )
 
 # Add Windows-specific libraries for GLFW

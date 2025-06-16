@@ -5,6 +5,7 @@
 #include "Buffers/Descriptors/DescriptorArraySubAllocationBase.h"
 #include <string>
 #include <memory>
+#include <vector>
 
 namespace Rapture {
 
@@ -20,19 +21,24 @@ private:
     VkSampler m_sampler;
 };
 
-
-
-
 class Texture : public std::enable_shared_from_this<Texture> {
 public:
     // Constructor for loading from file path
     // when isLoadingAsync is true, it is expected to use the loadImageFromFile manually with the given threadId
     Texture(const std::string& path, TextureFilter filter=TextureFilter::Linear, TextureWrap wrap=TextureWrap::Repeat, bool isLoadingAsync=false);
     
+    // Constructor for loading cubemap from multiple file paths
+    Texture(const std::vector<std::string>& paths, TextureFilter filter=TextureFilter::Linear, TextureWrap wrap=TextureWrap::Repeat, bool isLoadingAsync=false);
+
     // Constructor for creating texture from specification (no file loading)
     Texture(const TextureSpecification& spec);
     
     ~Texture();
+
+
+    void loadImageFromFile(size_t threadId=0);
+
+    void copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLayout newLayout, VkSemaphore waitSemaphore=VK_NULL_HANDLE, VkSemaphore signalSemaphore=VK_NULL_HANDLE);
 
     // Getters
     VkImage getImage() const { return m_image; }
@@ -42,18 +48,13 @@ public:
     const Sampler& getSampler() const { return *m_sampler; }
     const TextureSpecification& getSpecification() const { return m_spec; }
     VkFormat getFormat() const { return toVkFormat(m_spec.format); }
-    
 
     // Get descriptor image info for use in descriptor sets
     VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType=TextureViewType::DEFAULT) const;
-    
     // Get descriptor image info for storage images (used in compute shaders)
     VkDescriptorImageInfo getStorageImageDescriptorInfo() const;
-    
-    // Static method to create a default white texture
-    static std::shared_ptr<Texture> createDefaultWhiteTexture();
-
-    void loadImageFromFile(size_t threadId=0);
+    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask);
+    uint32_t getBindlessIndex();
 
     void setReadyForSampling(bool ready) {
         m_readyForSampling = ready;
@@ -63,16 +64,16 @@ public:
         return m_readyForSampling;
     }
 
-    void copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLayout newLayout, VkSemaphore waitSemaphore=VK_NULL_HANDLE, VkSemaphore signalSemaphore=VK_NULL_HANDLE);
-
-    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask);
-
-    uint32_t getBindlessIndex();
-
+    // Static method to create a default white texture
+    static std::shared_ptr<Texture> createDefaultWhiteTexture();
+    static std::shared_ptr<Texture> createDefaultWhiteCubemapTexture();
 
 private:
+    // creates a vulkan image using the specification
     void createImage();
+    // creates a vulkan image view using the specification and the image from createImage
     void createImageView();
+
     void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, size_t threadId=0);
     void copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height, size_t threadId=0);
     
@@ -80,11 +81,11 @@ private:
     bool validateSpecificationAgainstImageData(int width, int height, int channels);
     
     // Helper function to create spec from image file info
-    void createSpecificationFromImageFile(const std::string& path, TextureFilter filter, TextureWrap wrap);
+    void createSpecificationFromImageFile(const std::vector<std::string>& paths, TextureFilter filter, TextureWrap wrap);
 
 private:
-    std::string m_path;
-    bool m_loadFromFile;
+    
+    std::vector<std::string> m_paths;
     
     std::unique_ptr<Sampler> m_sampler;
     VkImage m_image;
@@ -93,7 +94,6 @@ private:
     VkImageView m_imageViewDepthOnly{VK_NULL_HANDLE};
 
     VmaAllocation m_allocation;
-
 
     TextureSpecification m_spec;
 

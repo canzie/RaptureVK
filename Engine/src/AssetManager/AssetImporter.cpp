@@ -23,62 +23,6 @@ std::vector<std::thread> AssetImporter::s_workerThreads;
 std::atomic<bool> AssetImporter::s_threadRunning = false;
 std::mutex AssetImporter::s_queueMutex;
 
-// Helper function to find related shader file paths
-std::optional<std::filesystem::path> getRelatedShaderPath(
-    const std::filesystem::path &basePath,
-    const std::string &targetStage) 
-{
-  if (!std::filesystem::exists(basePath)) {
-    RP_CORE_WARN(
-        "AssetImporter::getRelatedShaderPath - Base path does not exist: {}",
-        basePath.string());
-    return std::nullopt;
-  }
-
-
-  std::string basePathStr = basePath.string();
-  // Regex to capture: (base_name)(.stage)(.extension)
-  // Example: "path/to/MyShader.vert.glsl" ->
-  // ("path/to/MyShader")(".vert")(".glsl")
-  std::regex pathRegex(
-      "^(.*?)(\\.(?:vert|vs|frag|fs|geom|gs|comp|cs))(\\.[^.]+)$");
-  std::smatch match;
-
-  if (!std::regex_match(basePathStr, match, pathRegex) || match.size() != 4) {
-    RP_CORE_WARN(
-        "AssetImporter::getRelatedShaderPath - Could not parse base shader "
-        "path structure: {}. Expected format like 'name.stage.ext'.",
-        basePathStr);
-    return std::nullopt;
-  }
-
-  std::string baseName = match[1].str();
-  std::string finalExt = match[3].str();
-
-  const std::map<std::string, std::array<std::string, 2>> stageExtensions = {
-      {"vertex", {".vert", ".vs"}},
-      {"fragment", {".frag", ".fs"}},
-      {"geometry", {".geom", ".gs"}},
-      {"compute", {".comp", ".cs"}}};
-
-  if (stageExtensions.find(targetStage) == stageExtensions.end()) {
-    RP_CORE_ERROR("AssetImporter::getRelatedShaderPath - Invalid target shader "
-                  "stage requested: {}",
-                  targetStage);
-    return std::nullopt;
-  }
-
-  for (const auto &ext : stageExtensions.at(targetStage)) {
-    std::filesystem::path potentialPath = baseName + ext + finalExt;
-    if (std::filesystem::exists(potentialPath)) {
-      return potentialPath;
-    }
-  }
-
-  RP_CORE_WARN("AssetImporter::getRelatedShaderPath - Could not find related {} shader for base path: {}",
-               targetStage, basePath.string());
-  return std::nullopt;
-}
 
 
 std::shared_ptr<Asset> AssetImporter::loadShader(const AssetHandle &handle, const AssetMetadata &metadata) {
@@ -191,14 +135,12 @@ std::shared_ptr<Asset> AssetImporter::loadShader(const AssetHandle &handle, cons
   return asset;
 }
 
-std::shared_ptr<Asset>
-AssetImporter::loadMaterial(const AssetHandle &handle, const AssetMetadata &metadata) {
+std::shared_ptr<Asset> AssetImporter::loadMaterial(const AssetHandle &handle, const AssetMetadata &metadata) {
   RP_CORE_ERROR("AssetImporter::loadMaterial - Not implemented");
   return nullptr;
 }
 
-std::shared_ptr<Asset>
-AssetImporter::loadTexture(const AssetHandle &handle, const AssetMetadata &metadata) {
+std::shared_ptr<Asset> AssetImporter::loadTexture(const AssetHandle &handle, const AssetMetadata &metadata) {
   // Start worker thread if not already running
   if (!s_threadRunning) {
     RP_CORE_ERROR(
@@ -213,8 +155,7 @@ AssetImporter::loadTexture(const AssetHandle &handle, const AssetMetadata &metad
   // tex->setReadyForSampling(false);
 
   AssetVariant assetVariant = tex;
-  std::shared_ptr<AssetVariant> variantPtr =
-      std::make_shared<AssetVariant>(assetVariant);
+  std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
   std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
   asset->m_status = AssetStatus::LOADING;
   asset->m_handle = handle;
@@ -225,8 +166,7 @@ AssetImporter::loadTexture(const AssetHandle &handle, const AssetMetadata &metad
     _asset->getUnderlyingAsset<Texture>()->setReadyForSampling(true);
     _asset->m_status = AssetStatus::LOADED;
     AssetEvents::onAssetLoaded().publish(_asset->m_handle);
-    // RP_CORE_TRACE("AssetImporter::loadTexture - Texture loaded: {}",
-    // _asset->m_handle);
+
   };
 
   // Add the texture to the pending requests
@@ -236,6 +176,48 @@ AssetImporter::loadTexture(const AssetHandle &handle, const AssetMetadata &metad
   }
 
   return asset;
+}
+
+std::shared_ptr<Asset> AssetImporter::loadCubemap(const AssetHandle &handle, const AssetMetadata &metadata)
+{
+    // Start worker thread if not already running
+    if (!s_threadRunning) {
+        RP_CORE_ERROR(
+            "TextureLibrary: Thread not running, failed to load texture '{0}'",
+            metadata.m_filePath.string());
+        return nullptr;
+    }
+
+    // read the .cubemap file
+    std::vector<std::string> cubemapPaths = getCubemapPaths(metadata.m_filePath);
+    if (cubemapPaths.size() != 6) {
+        RP_CORE_ERROR("AssetImporter::loadCubemap - Cubemap file must contain exactly 6 paths. File: {}", metadata.m_filePath.string());
+        return nullptr;
+    }
+
+    auto tex = std::make_shared<Texture>(cubemapPaths, TextureFilter::Linear, TextureWrap::Repeat, true);
+
+    AssetVariant assetVariant = tex;
+    std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
+    std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+    asset->m_status = AssetStatus::LOADING;
+    asset->m_handle = handle;
+
+    LoadRequest request;
+    request.asset = asset;
+    request.callback = [](std::shared_ptr<Asset> _asset) {
+        _asset->getUnderlyingAsset<Texture>()->setReadyForSampling(true);
+        _asset->m_status = AssetStatus::LOADED;
+        AssetEvents::onAssetLoaded().publish(_asset->m_handle);
+    };
+
+    // Add the texture to the pending requests
+    {
+        std::lock_guard<std::mutex> lock(s_queueMutex);
+        s_pendingRequests.push(request);
+    }
+
+    return asset;
 }
 
 void AssetImporter::assetLoadThread() {
@@ -268,8 +250,7 @@ void AssetImporter::assetLoadThread() {
           std::hash<std::thread::id>{}(std::this_thread::get_id());
 
       if (request.asset->getUnderlyingAsset<Texture>()) {
-        std::shared_ptr<Texture> tex =
-            request.asset->getUnderlyingAsset<Texture>();
+        std::shared_ptr<Texture> tex = request.asset->getUnderlyingAsset<Texture>();
         tex->loadImageFromFile(threadId);
 
         if (request.callback) {

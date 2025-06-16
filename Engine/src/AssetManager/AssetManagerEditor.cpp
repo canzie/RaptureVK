@@ -75,8 +75,6 @@ namespace Rapture {
     std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig)
     {
 
-
-
         if (path.empty()) {
             RP_CORE_ERROR("AssetManagerEditor::importAsset - Path is empty");
             return std::make_pair(nullptr, AssetHandle());
@@ -194,6 +192,8 @@ namespace Rapture {
         if (extension == ".png" || extension == ".jpg" || extension == ".jpeg" || 
             extension == ".tga" || extension == ".bmp" || extension == ".hdr") {
             return AssetType::Texture;
+        } else if (extension == ".cubemap") {
+            return AssetType::Cubemap;
         }
         else if (extension == ".gltf") {
             return AssetType::None;

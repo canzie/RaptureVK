@@ -17,6 +17,8 @@
 
 namespace Rapture {
 
+std::shared_ptr<Texture> DynamicDiffuseGI::s_defaultSkyboxTexture = nullptr;
+
 struct FlattenPushConstants {
     int layerCount;
     int layerWidth;
@@ -40,7 +42,13 @@ DynamicDiffuseGI::DynamicDiffuseGI()
     m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
     m_Flatten2dArrayPipeline(nullptr),
     m_MeshInfoBuffer(nullptr),
-    m_SunLightBuffer(nullptr) {
+    m_SunLightBuffer(nullptr),
+    m_skyboxTexture(nullptr) {
+
+    if (!s_defaultSkyboxTexture) {
+        s_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
+    }
+    m_skyboxTexture = s_defaultSkyboxTexture;
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -156,7 +164,14 @@ void DynamicDiffuseGI::createProbeTraceDescriptorSets(std::shared_ptr<Scene> sce
         rayDataBinding.useStorageImageInfo = true;
         resourceBindings.bindings.push_back(rayDataBinding);
         
-        // TODO: add cubemap at binding 3
+        DescriptorSetBinding skyboxBinding;
+        skyboxBinding.binding = 3;
+        skyboxBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        skyboxBinding.count = 1;
+        skyboxBinding.viewType = TextureViewType::DEFAULT;
+        skyboxBinding.resource = m_skyboxTexture;
+        resourceBindings.bindings.push_back(skyboxBinding);
+        
 
         DescriptorSetBinding tlasBinding;
         tlasBinding.binding = 4;
@@ -655,7 +670,8 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
         populateProbes(scene);
     }
     
-        updateSunProperties(scene);
+    updateSunProperties(scene);
+    updateSkybox(scene);
 
     // Begin command buffer
     VkCommandBufferBeginInfo beginInfo{};
@@ -693,6 +709,20 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
     // Mark that first frame is complete
     m_isFirstFrame = false;
 
+}
+
+void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene) {
+    SkyboxComponent* skyboxComp = scene->getSkyboxComponent();
+    std::shared_ptr<Texture> newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling()) 
+                                            ? skyboxComp->skyboxTexture 
+                                            : s_defaultSkyboxTexture;
+
+    if (m_skyboxTexture != newTexture) {
+        m_skyboxTexture = newTexture;
+        if (!m_rayTraceDescriptorSets.empty()) {
+            createProbeTraceDescriptorSets(scene);
+        }
+    }
 }
 
 std::shared_ptr<Texture> DynamicDiffuseGI::getRadianceTexture() {
@@ -826,7 +856,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
     vkCmdBindDescriptorSets(m_CommandBuffer->getCommandBufferVk(),
                             VK_PIPELINE_BIND_POINT_COMPUTE,
                             m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
-                            0, m_rayTraceDescriptorSets.size(), resourceDescriptorSetVk.data(), 0, nullptr);
+                            0, static_cast<uint32_t>(m_rayTraceDescriptorSets.size()), resourceDescriptorSetVk.data(), 0, nullptr);
 
     // Set 2: Previous textures - alternate between descriptor sets based on frame
     int prevTextureSetIndex = m_isEvenFrame ? 0 : 1;
@@ -1255,9 +1285,9 @@ void DynamicDiffuseGI::updateSunProperties(std::shared_ptr<Scene> scene) {
 
     // Use default fake values for now as requested
     m_SunShadowProps.sunLightSpaceMatrix = glm::mat4(1.0f);
-    m_SunShadowProps.sunDirectionWorld = glm::normalize(glm::vec3(0.5f, -1.0f, 0.3f));
-    m_SunShadowProps.sunColor = glm::vec3(1.0f, 0.9f, 0.8f);
-    m_SunShadowProps.sunIntensity = 3.0f;
+    m_SunShadowProps.sunDirectionWorld = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
+    m_SunShadowProps.sunColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    m_SunShadowProps.sunIntensity = 0.0f;
     m_SunShadowProps.sunShadowTextureArrayIndex = 0;
 
     for (auto ent : MMview) {
@@ -1280,7 +1310,7 @@ void DynamicDiffuseGI::updateSunProperties(std::shared_ptr<Scene> scene) {
     if (!m_SunLightBuffer) {
         m_SunLightBuffer = std::make_shared<UniformBuffer>(
             sizeof(SunProperties),
-            BufferUsage::DYNAMIC,
+            BufferUsage::STREAM,
             m_allocator,
             &m_SunShadowProps
         );
@@ -1291,25 +1321,24 @@ void DynamicDiffuseGI::updateSunProperties(std::shared_ptr<Scene> scene) {
 
 void DynamicDiffuseGI::initializeSunProperties() {
     // Use default fake values for now as requested
-    SunProperties sunShadowProps = {};
-    sunShadowProps.sunLightSpaceMatrix = glm::mat4(1.0f);
-    sunShadowProps.sunDirectionWorld = glm::normalize(glm::vec3(0.5f, -1.0f, 0.3f));
-    sunShadowProps.sunColor = glm::vec3(1.0f, 0.9f, 0.8f);
-    sunShadowProps.sunIntensity = 3.0f;
-    sunShadowProps.sunShadowTextureArrayIndex = 0;
+    m_SunShadowProps = {};
+    m_SunShadowProps.sunLightSpaceMatrix = glm::mat4(1.0f);
+    m_SunShadowProps.sunDirectionWorld = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
+    m_SunShadowProps.sunColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    m_SunShadowProps.sunIntensity = 0.0f;
+    m_SunShadowProps.sunShadowTextureArrayIndex = 0;
 
-    m_SunShadowProps = sunShadowProps;
 
     // Update the sun light buffer
     if (!m_SunLightBuffer) {
         m_SunLightBuffer = std::make_shared<UniformBuffer>(
             sizeof(SunProperties),
-            BufferUsage::DYNAMIC,
+            BufferUsage::STREAM,
             m_allocator,
-            &sunShadowProps
+            &m_SunShadowProps
         );
     } else {
-        m_SunLightBuffer->addData(&sunShadowProps, sizeof(SunProperties), 0);
+        m_SunLightBuffer->addData(&m_SunShadowProps, sizeof(SunProperties), 0);
     }
 }
 

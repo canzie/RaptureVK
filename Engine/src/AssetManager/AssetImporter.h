@@ -14,6 +14,8 @@
 #include <mutex>
 #include <atomic>
 
+#include "AssetHelpers.h"
+
 namespace Rapture {
 
     using AssetImporterFunction = std::function<std::shared_ptr<Asset>(AssetHandle, const AssetMetadata&)>;
@@ -32,6 +34,7 @@ namespace Rapture {
             s_assetImporters[AssetType::Shader] = loadShader;
             s_assetImporters[AssetType::Material] = loadMaterial;
             s_assetImporters[AssetType::Texture] = loadTexture;
+            s_assetImporters[AssetType::Cubemap] = loadCubemap;
             s_isInitialized = true;
 
             if (s_threadRunning) {
@@ -84,6 +87,7 @@ namespace Rapture {
         static std::shared_ptr<Asset> loadMaterial(const AssetHandle& handle, const AssetMetadata& metadata);
 
         static std::shared_ptr<Asset> loadTexture(const AssetHandle& handle, const AssetMetadata& metadata);
+        static std::shared_ptr<Asset> loadCubemap(const AssetHandle& handle, const AssetMetadata& metadata);
 
         static void assetLoadThread();
 
