@@ -279,10 +279,11 @@ void main() {
     vec3 probeRayDirection = DDGIGetProbeRayDirection(rayIndex, u_volume);
     uvec3 outputCoords = DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume);
 
-    // Initialize ray query
-    rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsOpaqueEXT, 0xFF, 
-        probeWorldPosition, 0.0, probeRayDirection, u_volume.probeMaxRayDistance*1.5);
 
+    rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, 
+        probeWorldPosition, 0.0, probeRayDirection, u_volume.probeMaxRayDistance);
+
+    rayQueryProceedEXT(rayQuery);
 
     // Trace the ray
     bool hit = false;
@@ -293,19 +294,12 @@ void main() {
     float hitT;
     bool isFrontFacing = true;
 
-    while(rayQueryProceedEXT(rayQuery)) {
-        if (rayQueryGetIntersectionTypeEXT(rayQuery, false) == gl_RayQueryCandidateIntersectionTriangleEXT) {
-            isFrontFacing = !rayQueryGetIntersectionFrontFaceEXT(rayQuery, false);
-            
-            if (isFrontFacing) {
-                rayQueryConfirmIntersectionEXT(rayQuery);
-            }
-        }
-    }
+
+
 
     if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
         hit = true;
-        hitT = rayQueryGetIntersectionTEXT(rayQuery, true);
+        hitT = length(rayQueryGetIntersectionTEXT(rayQuery, true) * probeRayDirection);
         hitPosition = probeWorldPosition + probeRayDirection * hitT;
         hitInstanceID = rayQueryGetIntersectionInstanceIdEXT(rayQuery, true);
         
@@ -313,7 +307,8 @@ void main() {
         uint primitiveID = rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, true);
         vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
         uint instanceCustomIndex = rayQueryGetIntersectionInstanceCustomIndexEXT(rayQuery, true);
-        
+        isFrontFacing = rayQueryGetIntersectionFrontFaceEXT(rayQuery, true);
+
         if (isFrontFacing) {
             // Get mesh info using the instance custom index
             MeshInfo meshInfo = u_sceneInfo.MeshInfos[instanceCustomIndex];

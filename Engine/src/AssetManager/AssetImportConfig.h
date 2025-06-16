@@ -19,9 +19,11 @@ namespace Rapture {
     };
 
     struct TextureImportConfig {
+        bool srgb = false;
+
 
         bool operator==(const TextureImportConfig& other) const {
-            return true;
+            return srgb == other.srgb;
         }
 
     };

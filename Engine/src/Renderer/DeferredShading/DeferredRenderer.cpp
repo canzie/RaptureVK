@@ -138,6 +138,61 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
 
   m_graphicsQueue->addCommandBuffer(m_commandBuffers[m_currentFrame]);
 
+ // --- BEGIN SUBMISSION LOGIC FOR FORWARD RENDERER (COMMON TO BOTH MODES) ---
+  VkSubmitInfo submitInfo{};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+  VkSemaphore frWaitSemaphores[1]; // Semaphores FR's submission waits on
+  VkPipelineStageFlags frWaitStages[] = {
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  VkSemaphore frSignalSemaphores[1]; // Semaphores FR's submission signals
+
+  if (SwapChain::renderMode == RenderMode::PRESENTATION) {
+    frWaitSemaphores[0] =
+        m_swapChain->getImageAvailableSemaphore(m_currentFrame);
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = frWaitSemaphores;
+    submitInfo.pWaitDstStageMask = frWaitStages;
+
+    frSignalSemaphores[0] =
+        m_swapChain->getRenderFinishedSemaphore(m_currentFrame);
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = frSignalSemaphores;
+
+    m_graphicsQueue->submitCommandBuffers(
+        submitInfo, m_swapChain->getInFlightFence(m_currentFrame));
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    // Presentation must wait for rendering to be complete.
+    // frSignalSemaphores contains the renderFinishedSemaphore for PRESENTATION
+    // mode.
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = frSignalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {m_swapChain->getSwapChainVk()};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices =
+        &imageIndex;                // imageIndex from vkAcquireNextImageKHR
+    presentInfo.pResults = nullptr; // Optional
+
+    VkResult result = m_presentQueue->presentQueue(
+        presentInfo); // Re-uses 'result' variable from vkAcquireNextImageKHR
+    m_swapChain->signalImageAvailability(imageIndex);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
+      ApplicationEvents::onRequestSwapChainRecreation().publish();
+      return; // Must return after recreating swap chain, as current frame's
+              // resources are invalid.
+    } else if (result != VK_SUCCESS) {
+      RP_CORE_ERROR("failed to present swap chain image in ForwardRenderer!");
+      throw std::runtime_error(
+          "failed to present swap chain image in ForwardRenderer!");
+    }
+  }
+
   m_currentFrame = (m_currentFrame + 1) % m_swapChain->getImageCount();
 }
 

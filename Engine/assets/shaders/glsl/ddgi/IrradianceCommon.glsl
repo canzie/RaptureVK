@@ -1,4 +1,3 @@
-
 /*
     Most of the logic is yoinked from the RTXGI repository, then adapted to glsl for use in my engine.
 */

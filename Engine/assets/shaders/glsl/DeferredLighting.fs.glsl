@@ -418,7 +418,7 @@ void main() {
         Lo += contribution * attenuation * shadowFactor;
     }
 
-    vec3 ambient = vec3(0.03) * albedo * ao;
+    vec3 ambient = vec3(0.03) * albedo * ao * (1.0 - metallic);
 
     vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
     vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, u_DDGI_Volume, V);

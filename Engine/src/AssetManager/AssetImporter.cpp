@@ -149,10 +149,13 @@ std::shared_ptr<Asset> AssetImporter::loadTexture(const AssetHandle &handle, con
     return nullptr;
   }
 
-  auto tex = std::make_shared<Texture>(metadata.m_filePath.string(),
-                                       TextureFilter::Linear,
-                                       TextureWrap::Repeat, true);
-  // tex->setReadyForSampling(false);
+  TextureSpecification texSpec = TextureSpecification();
+  if (std::holds_alternative<TextureImportConfig>(metadata.m_importConfig)) {
+    auto importConfig = std::get<TextureImportConfig>(metadata.m_importConfig);
+    texSpec.srgb = importConfig.srgb;
+  }
+
+  auto tex = std::make_shared<Texture>(metadata.m_filePath.string(), texSpec, true);
 
   AssetVariant assetVariant = tex;
   std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
@@ -195,7 +198,7 @@ std::shared_ptr<Asset> AssetImporter::loadCubemap(const AssetHandle &handle, con
         return nullptr;
     }
 
-    auto tex = std::make_shared<Texture>(cubemapPaths, TextureFilter::Linear, TextureWrap::Repeat, true);
+    auto tex = std::make_shared<Texture>(cubemapPaths, TextureSpecification(), true);
 
     AssetVariant assetVariant = tex;
     std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);

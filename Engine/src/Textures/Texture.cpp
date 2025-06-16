@@ -93,13 +93,13 @@ Sampler::~Sampler() {
 }
 
 // Texture implementation
-Texture::Texture(const std::string& path, TextureFilter filter, TextureWrap wrap, bool isLoadingAsync) 
+Texture::Texture(const std::string& path, TextureSpecification spec, bool isLoadingAsync) 
     : m_paths({path}),
-    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_spec({}), m_sampler(nullptr) {
+    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_spec(spec), m_sampler(nullptr) {
     
     
     // First, create specification from image file
-    createSpecificationFromImageFile(m_paths, filter, wrap);
+    createSpecificationFromImageFile(m_paths);
     
     // Initialize sampler with the spec (will be reconstructed after spec is finalized)
     m_sampler = std::make_unique<Sampler>(m_spec);
@@ -112,12 +112,12 @@ Texture::Texture(const std::string& path, TextureFilter filter, TextureWrap wrap
     }
 }
 
-Texture::Texture(const std::vector<std::string>& paths, TextureFilter filter, TextureWrap wrap, bool isLoadingAsync)
+Texture::Texture(const std::vector<std::string>& paths, TextureSpecification spec, bool isLoadingAsync)
     : m_paths(paths),
-    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_spec({}), m_sampler(nullptr) {
+    m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_spec(spec), m_sampler(nullptr) {
     
     // First, create specification from image file
-    createSpecificationFromImageFile(m_paths, filter, wrap);
+    createSpecificationFromImageFile(m_paths);
     
     // Initialize sampler with the spec (will be reconstructed after spec is finalized)
     m_sampler = std::make_unique<Sampler>(m_spec);
@@ -174,7 +174,7 @@ Texture::~Texture() {
     }
 }
 
-void Texture::createSpecificationFromImageFile(const std::vector<std::string>& paths, TextureFilter filter, TextureWrap wrap) {
+void Texture::createSpecificationFromImageFile(const std::vector<std::string>& paths) {
     if (paths.empty()) {
         RP_CORE_ERROR("Cannot create texture specification from empty path list.");
         throw std::runtime_error("Cannot create texture specification from empty path list.");
@@ -205,11 +205,6 @@ void Texture::createSpecificationFromImageFile(const std::vector<std::string>& p
     // Always use RGBA8 format since we force 4 channels during loading
     m_spec.format = TextureFormat::RGBA8;
     
-    // Set default values for other properties
-    m_spec.filter = filter;
-    m_spec.wrap = wrap;
-    m_spec.srgb = false; // Assume sRGB for color textures, can be configured
-    m_spec.mipLevels = 1; // No mipmapping for now
 }
 
 bool Texture::validateSpecificationAgainstImageData(int width, int height, int channels) {

@@ -25,10 +25,10 @@ class Texture : public std::enable_shared_from_this<Texture> {
 public:
     // Constructor for loading from file path
     // when isLoadingAsync is true, it is expected to use the loadImageFromFile manually with the given threadId
-    Texture(const std::string& path, TextureFilter filter=TextureFilter::Linear, TextureWrap wrap=TextureWrap::Repeat, bool isLoadingAsync=false);
+    Texture(const std::string& path, TextureSpecification spec = TextureSpecification(), bool isLoadingAsync=false);
     
     // Constructor for loading cubemap from multiple file paths
-    Texture(const std::vector<std::string>& paths, TextureFilter filter=TextureFilter::Linear, TextureWrap wrap=TextureWrap::Repeat, bool isLoadingAsync=false);
+    Texture(const std::vector<std::string>& paths, TextureSpecification spec = TextureSpecification(), bool isLoadingAsync=false);
 
     // Constructor for creating texture from specification (no file loading)
     Texture(const TextureSpecification& spec);
@@ -81,7 +81,7 @@ private:
     bool validateSpecificationAgainstImageData(int width, int height, int channels);
     
     // Helper function to create spec from image file info
-    void createSpecificationFromImageFile(const std::vector<std::string>& paths, TextureFilter filter, TextureWrap wrap);
+    void createSpecificationFromImageFile(const std::vector<std::string>& paths);
 
 private:
     

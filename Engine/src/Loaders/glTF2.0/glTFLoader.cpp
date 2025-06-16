@@ -120,8 +120,20 @@ namespace Rapture {
 
         uint32_t clampedIndex = std::max(textureIndex, 0);
 
+        TextureImportConfig texImportConfig;
+        if (id == ParameterID::ALBEDO_MAP) {
+            texImportConfig.srgb = true;
+        } else if (id == ParameterID::METALLIC_ROUGHNESS_MAP) {
+            texImportConfig.srgb = false;
+        } else if (id == ParameterID::NORMAL_MAP) {
+            texImportConfig.srgb = false;
+        } else if (id == ParameterID::AO_MAP) {
+            texImportConfig.srgb = false;
+        } else if (id == ParameterID::EMISSIVE_MAP) {
+            texImportConfig.srgb = true;
+        }
 
-        auto [tex, handle] = AssetManager::importAsset<Texture>(texturePathFS);
+        auto [tex, handle] = AssetManager::importAsset<Texture>(texturePathFS, texImportConfig);
 
         if (!tex) {
             RP_CORE_ERROR("glTF2Loader::loadAndSetTexture - Failed to import or get texture {}", texturePath);

@@ -148,7 +148,6 @@ void DynamicDiffuseGI::createProbeTraceDescriptorSets(std::shared_ptr<Scene> sce
 
     m_rayTraceDescriptorSets.clear();
 
-
     // Set 0: Textures, TLAS, and SSBO descriptors (without previous textures)
     if (m_DDGI_ProbeTraceShader && m_DDGI_ProbeTraceShader->getDescriptorSetLayouts().size() > 0) {
         DescriptorSetBindings resourceBindings;
@@ -1256,8 +1255,8 @@ void DynamicDiffuseGI::initProbeInfoBuffer() {
         probeVolume.probeNumIrradianceInteriorTexels = 8;
         probeVolume.probeNumDistanceInteriorTexels = 16;
 
-        probeVolume.probeHysteresis = 0.97f;
-        probeVolume.probeMaxRayDistance = 10000.0f;
+        probeVolume.probeHysteresis = 0.93f;
+        probeVolume.probeMaxRayDistance = 100000.0f;
         probeVolume.probeNormalBias = 0.1f;
         probeVolume.probeViewBias = 0.1f;
         probeVolume.probeDistanceExponent = 10.0f;

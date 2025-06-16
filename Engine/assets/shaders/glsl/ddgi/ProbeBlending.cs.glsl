@@ -143,16 +143,12 @@ void main() {
         uint backfaces = 0;
         uint maxBackfaces = uint((u_volume.probeNumRays - rayIndex) * u_volume.probeFixedRayBackfaceThreshold);
         
-        // Fix Y-axis inversion for Vulkan coordinate system
-        ivec2 texCoords = ivec2(gl_LocalInvocationID.x, (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS - 1) - gl_LocalInvocationID.y);
         vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(ivec2(gl_LocalInvocationID.xy), u_volume.probeNumIrradianceInteriorTexels);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
         
     #endif
-    #ifdef DDGI_BLEND_DISTANCE
+    #ifdef DDGI_BLEND_DISTANCE 
 
-        // Fix Y-axis inversion for Vulkan coordinate system
-        ivec2 texCoords = ivec2(gl_LocalInvocationID.x, (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS - 1) - gl_LocalInvocationID.y);
         vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(ivec2(gl_LocalInvocationID.xy), u_volume.probeNumDistanceInteriorTexels);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
 
@@ -185,7 +181,7 @@ void main() {
 
                 // Early out: only blend ray radiance into the probe if the backface threshold hasn't been exceeded
                 if (backfaces >= maxBackfaces) {
-                    imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(-1.0, -1.0, -1.0, -1.0)); // Store BLACK
+                    imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(0.0, 0.0, 0.0, 0.0)); // Store BLACK
                     return;
                 }
                 continue;
