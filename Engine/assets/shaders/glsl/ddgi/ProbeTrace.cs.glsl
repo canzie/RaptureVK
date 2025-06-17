@@ -299,7 +299,7 @@ void main() {
 
     if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
         hit = true;
-        hitT = length(rayQueryGetIntersectionTEXT(rayQuery, true) * probeRayDirection);
+        hitT = rayQueryGetIntersectionTEXT(rayQuery, true);
         hitPosition = probeWorldPosition + probeRayDirection * hitT;
         hitInstanceID = rayQueryGetIntersectionInstanceIdEXT(rayQuery, true);
         

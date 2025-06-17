@@ -147,7 +147,7 @@ vec3 DDGIGetVolumeIrradiance(
         ivec3 adjacentProbeCoords = clamp(baseProbeCoords + adjacentProbeOffset, ivec3(0, 0, 0), ivec3(volume.gridDimensions - uvec3(1, 1, 1)));
 
         // Get the adjacent probe's index, adjusting the adjacent probe index for scrolling offsets (if present)
-        int adjacentProbeIndex = DDGIGetProbeIndex((adjacentProbeCoords + ivec3(volume.gridDimensions)) % ivec3(volume.gridDimensions), volume);
+        int adjacentProbeIndex = DDGIGetProbeIndex(adjacentProbeCoords, volume);
 
         vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume);
 
@@ -229,8 +229,16 @@ vec3 DDGIGetVolumeIrradiance(
 
         // scuffed way to recognize probes inside of geometry, a better implementation would move/relocate these probes
         
-        if (probeIrradiance.x <= 0.0 || probeIrradiance.y <= 0.0 || probeIrradiance.z <= 0.0) {
-            continue;
+        //if (probeIrradiance.x <= 0.0 || probeIrradiance.y <= 0.0 || probeIrradiance.z <= 0.0) {
+        //    continue;
+        //}
+
+        // Check for invalid probe data (black probes indicate probes inside geometry)
+        // Use length check instead of individual component checks to handle small but valid values
+        float probeLength = length(probeIrradiance);
+        if (probeLength < 0.001) {
+            // Reduce weight but don't completely skip to maintain smooth transitions
+            weight *= 0.1;
         }
 
         // Decode the tone curve, but leave a gamma = 2 curve to approximate sRGB blending

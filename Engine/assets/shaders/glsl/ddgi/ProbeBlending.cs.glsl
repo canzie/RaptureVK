@@ -296,6 +296,12 @@ void main() {
         imageStore(ProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
     #endif
     #ifdef DDGI_BLEND_RADIANCE
+        // Clamp result to prevent NaN and extreme values
+        result.rgb = clamp(result.rgb, vec3(0.0), vec3(64.0));
+        
+        // Ensure alpha is valid
+        result.a = clamp(result.a, 0.0, 1.0);
+        
         imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
     #endif
 
@@ -309,6 +315,10 @@ void main() {
     
     // Add memory barrier to ensure image writes are visible
     memoryBarrierImage();
+    
+    // Additional barrier to ensure all workgroups have completed interior processing
+    // before any workgroup starts border processing
+    memoryBarrier();
 
     // Border Texel Update Logic:
     UpdateBorderTexelsGLSL(ivec3(gl_LocalInvocationID), ivec3(gl_WorkGroupID), ivec3(gl_GlobalInvocationID));

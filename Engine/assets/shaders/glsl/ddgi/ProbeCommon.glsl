@@ -198,6 +198,17 @@ int DDGIGetProbeIndex(ivec3 probeCoords, ProbeVolume volume) {
 }
 
 /**
+ * Computes the probe index from 3D (Texture2DArray) texture coordinates.
+ */
+int DDGIGetProbeIndex(ivec3 texCoords, int probeNumTexels, ProbeVolume volume)
+{
+    int probesPerPlane = DDGIGetProbesPerPlane(ivec3(volume.gridDimensions));
+    int probeIndexInPlane = DDGIGetProbeIndexInPlane(texCoords, ivec3(volume.gridDimensions));
+
+    return (texCoords.z * probesPerPlane) + probeIndexInPlane;
+}
+
+/**
  * Computes the RayData Texture2DArray coordinates of the probe at the given probe index.
  *
  * When infinite scrolling is enabled, probeIndex is expected to be the scroll adjusted probe index.

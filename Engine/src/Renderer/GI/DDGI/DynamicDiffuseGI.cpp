@@ -1249,7 +1249,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer() {
         probeVolume.probeRayRotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
         
         probeVolume.spacing = glm::vec3(1.02f, 1.5f, 1.02f);
-        probeVolume.gridDimensions = glm::uvec3(24, 8, 24);
+        probeVolume.gridDimensions = glm::uvec3(24, 12, 24);
         
         probeVolume.probeNumRays = 256;
         probeVolume.probeNumIrradianceInteriorTexels = 8;
