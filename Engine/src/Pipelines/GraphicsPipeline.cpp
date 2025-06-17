@@ -78,6 +78,9 @@ void GraphicsPipeline::createPipeline(const GraphicsPipelineConfiguration& confi
     pipelineDynamicRenderingInfo.pColorAttachmentFormats = config.framebufferSpec.colorAttachments.data();
     pipelineDynamicRenderingInfo.depthAttachmentFormat = config.framebufferSpec.depthAttachment;
     pipelineDynamicRenderingInfo.stencilAttachmentFormat = config.framebufferSpec.stencilAttachment;
+    
+    // Add multiview support
+    pipelineDynamicRenderingInfo.viewMask = config.framebufferSpec.viewMask;
 
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};

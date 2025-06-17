@@ -24,7 +24,10 @@ struct FramebufferSpecification {
     std::vector<VkFormat> colorAttachments;
     VkFormat depthAttachment = VK_FORMAT_UNDEFINED;
     VkFormat stencilAttachment = VK_FORMAT_UNDEFINED;
-
+    
+    // Multiview support for rendering to multiple layers in one pass
+    uint32_t viewMask = 0;  // Bitmask indicating which views to render
+    uint32_t correlationMask = 0;  // Bitmask indicating correlated views for optimization
 };
 
 

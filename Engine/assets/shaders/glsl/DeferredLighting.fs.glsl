@@ -18,7 +18,7 @@ layout(location = 0) in vec2 fragTexCoord;
 #define DEBUG_SPOTLIGHTS 0
 #define MAX_CASCADES 4
 #define MAX_SHADOW_CASTERS 4
-#define DEBUG_CASCADES 0
+#define DEBUG_CASCADES 1
 #define DEBUG_DIRECTIONAL_SHADOWS 0  // Set to 1 to enable debugging
 #define DEBUG_SHADOW_COORDS 0
 
@@ -37,6 +37,7 @@ layout(set = 2, binding = 1) uniform sampler2DArray probeDistanceAtlas;    // Di
 
 
 layout(set = 3, binding = 0) uniform sampler2DShadow gBindlessTextures[];
+layout(set = 3, binding = 0) uniform sampler2DArrayShadow gBindlessShadowArray[];
 
 #include "ProbeCommon.glsl"
 #include "IrradianceCommon.glsl"
@@ -239,6 +240,40 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
 
     if (shadowInfo.cascadeCount > 1) {
 
+        // Use texture array for cascaded shadow mapping
+        texelSize = 1.0 / vec2(textureSize(gBindlessShadowArray[shadowInfo.textureHandle], 0));
+        
+        // Apply bias to avoid shadow acne - adjust based on surface angle and cascade level
+        float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
+        // Progressively reduce bias for farther cascades to reduce light leaking
+        float cascadeBiasMultiplier = 1.0 / (1.0 + float(cascadeIndex) * 0.5);
+        
+        // Use an adaptive bias that scales with distance (for spotlights)
+        float distanceScale = 1.0;
+        if (shadowInfo.type == 2) { // Spotlight
+            // Increase bias with distance to handle perspective distortion
+            float viewDepth = abs(fragPosLightSpace.z);
+            distanceScale = mix(1.0, 3.0, clamp(viewDepth / 50.0, 0.0, 1.0));
+        }else if (shadowInfo.type == 1) { // Directional light
+            // Directional lights need less bias since they use orthographic projection
+            distanceScale = 0.5;
+        }
+        
+        bias = max(0.05 * (1.0 - cosTheta) * distanceScale * cascadeBiasMultiplier, 0.005);
+        float comparisonDepth = projCoords.z - bias;
+
+        // Use a 3x3 kernel for PCF with the texture array
+        for(int x = -1; x <= 1; ++x) {
+            for(int y = -1; y <= 1; ++y) {        
+                // Use vec4 for sampler2DArrayShadow: vec4(u, v, layer, comparisonValue)
+                shadowFactor += texture(gBindlessShadowArray[shadowInfo.textureHandle], vec4(
+                    projCoords.xy + vec2(x, y) * texelSize,
+                    float(cascadeIndex),
+                    comparisonDepth
+                ));
+            }
+        }
+
     } else {
         // Use bindless shadow map
         texelSize = 1.0 / textureSize(gBindlessTextures[shadowInfo.textureHandle], 0);
@@ -288,7 +323,70 @@ float calculateShadow(vec3 fragPosWorld, float fragDepthView, vec3 normal, vec3 
 
     // Check if we're using cascaded shadow mapping
     if (shadowInfo.cascadeCount > 1) {
-        return 1.0;
+        // Select cascade based on depth and calculate blend factor
+        cascadeIndex = int(shadowInfo.cascadeCount - 1); // Assume farthest initially
+        float blendFactor = 0.0;
+        int nextCascadeIndex = -1;
+
+        // Loop through the split planes (boundary between cascade i and i+1)
+        for (int i = 0; i < int(shadowInfo.cascadeCount - 1); ++i) {
+            // Split depth marks the FAR plane of cascade 'i' in view space Z
+            // Assuming cascadeSplitsViewSpace.x holds positive linear view Z depth
+            float cascadeSplitDepth = shadowInfo.cascadeSplitsViewSpace[i].y;
+
+            // If fragment depth is less than this split depth, it belongs to cascade 'i' or earlier
+            if (fragDepthView < cascadeSplitDepth) {
+                cascadeIndex = i;
+
+                // Calculate the start depth (NEAR plane) of this cascade in view space Z
+                // Assuming positive depths, near plane of first cascade is technically 0? Or camera near plane?
+                // Using 0.0 might be problematic if near plane > 0. Check C++ split calculation.
+                float cascadeStartDepth = (i == 0) ? 0.0 : shadowInfo.cascadeSplitsViewSpace[i-1].y;
+
+                // Calculate the size of this cascade's depth range
+                float cascadeSize = cascadeSplitDepth - cascadeStartDepth;
+
+                // Avoid division by zero or negative size if splits are invalid
+                if (cascadeSize > 0.0001) {
+                    // Calculate the absolute size of the blend zone at the end of this cascade
+                    float blendZoneSize = cascadeSize * CASCADE_BLEND_WIDTH_PERCENT;
+
+                    // Calculate the start of the blend zone (depth value where blending begins)
+                    float blendZoneStart = cascadeSplitDepth - blendZoneSize;
+
+                    // Check if fragment depth is within the blend zone [blendZoneStart, cascadeSplitDepth]
+                    if (fragDepthView > blendZoneStart) {
+                        // Calculate blend factor: 0 at blendZoneStart, 1 at cascadeSplitDepth
+                        blendFactor = (fragDepthView - blendZoneStart) / blendZoneSize;
+                        blendFactor = clamp(blendFactor, 0.0, 1.0); // Ensure it's within [0, 1]
+                        nextCascadeIndex = i + 1;
+                    }
+                }
+
+                // Found the primary cascade (and potential blend zone), no need to check further splits
+                break;
+            }
+        }
+
+        cascadeIndexOut = cascadeIndex; // Output the primary cascade index
+
+        // Perform shadow calculation(s) based on whether blending is needed
+        if (blendFactor > 0.0 && nextCascadeIndex >= 0 && nextCascadeIndex < int(shadowInfo.cascadeCount)) {
+            // Blend between cascadeIndex and nextCascadeIndex
+            mat4 lightMatrix1 = shadowInfo.cascadeMatrices[cascadeIndex];
+            mat4 lightMatrix2 = shadowInfo.cascadeMatrices[nextCascadeIndex];
+
+            float shadow1 = calculateShadowForCascade(fragPosWorld, normal, lightDir, shadowInfo, lightMatrix1, cascadeIndex);
+            float shadow2 = calculateShadowForCascade(fragPosWorld, normal, lightDir, shadowInfo, lightMatrix2, nextCascadeIndex);
+
+            // Linearly interpolate between the two shadow values
+            return mix(shadow1, shadow2, blendFactor);
+        } else {
+            // No blending needed, use only the selected cascadeIndex
+            lightMatrix = shadowInfo.cascadeMatrices[cascadeIndex];
+            return calculateShadowForCascade(fragPosWorld, normal, lightDir, shadowInfo, lightMatrix, cascadeIndex);
+        }
+
     } else {
         lightMatrix = shadowInfo.cascadeMatrices[0];
         cascadeIndexOut = 0;

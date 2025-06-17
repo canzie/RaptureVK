@@ -16,6 +16,7 @@
 #include "Components/Systems/BoundingBox.h"
 #include "Renderer/Frustum/Frustum.h"
 #include "Renderer/Shadows/ShadowMapping/ShadowMapping.h"
+#include "Renderer/Shadows/CascadedShadowMapping/CascadedShadowMapping.h"
 #include "Cameras/PerspectiveCamera/PerspectiveCamera.h"
 #include "AccelerationStructures/BLAS.h"
 #include "Meshes/Mesh.h"
@@ -369,10 +370,19 @@ struct BLASComponent {
 
 struct ShadowComponent {
     std::unique_ptr<ShadowMap> shadowMap;
-
+    bool isActive = true;
     
     ShadowComponent(float width, float height) {
         shadowMap = std::make_unique<ShadowMap>(width, height);
+    }
+};
+
+struct CascadedShadowComponent {
+    std::unique_ptr<CascadedShadowMap> cascadedShadowMap;
+    bool isActive = true;
+    
+    CascadedShadowComponent(float width, float height, uint8_t numCascades, float lambda) {
+        cascadedShadowMap = std::make_unique<CascadedShadowMap>(width, height, numCascades, lambda);
     }
 };
 

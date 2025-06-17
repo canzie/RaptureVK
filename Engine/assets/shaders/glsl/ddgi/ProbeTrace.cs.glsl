@@ -271,9 +271,16 @@ vec3 calculateShadingNormal(
 }
 
 void main() {
-    ivec3 probeCoords = ivec3(gl_WorkGroupID.x, gl_WorkGroupID.z, gl_WorkGroupID.y);
-    int probeIndex = DDGIGetProbeIndex(probeCoords, u_volume);
-    int rayIndex = int(gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x);
+    // Compute the probe index for this thread (RTXGI-style)
+    int rayIndex = int(gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x);  // index of the ray to trace for this probe
+    int probePlaneIndex = int(gl_WorkGroupID.x + u_volume.gridDimensions.x * gl_WorkGroupID.y); // index of this probe within the plane of probes
+    int planeIndex = int(gl_WorkGroupID.z);                                                    // index of the plane this probe is part of
+    int probesPerPlane = DDGIGetProbesPerPlane(ivec3(u_volume.gridDimensions));
+
+    int probeIndex = (planeIndex * probesPerPlane) + probePlaneIndex;
+
+    // Get the probe's grid coordinates
+    ivec3 probeCoords = DDGIGetProbeCoords(probeIndex, u_volume);
 
     vec3 probeWorldPosition = DDGIGetProbeWorldPosition(probeCoords, u_volume);
     vec3 probeRayDirection = DDGIGetProbeRayDirection(rayIndex, u_volume);

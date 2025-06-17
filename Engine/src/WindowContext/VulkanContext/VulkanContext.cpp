@@ -109,6 +109,7 @@ namespace Rapture {
     m_deviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     
     // Ray tracing extensions
     m_deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
@@ -761,6 +762,24 @@ void VulkanContext::createLogicalDevice()
         ppNextChain = &robustness2FeaturesToEnable.pNext;
     } else {
         RP_CORE_WARN("Feature KHR::robustness2::nullDescriptor is NOT supported.");
+    }
+
+    // --- VK_KHR_multiview ---
+    VkPhysicalDeviceMultiviewFeaturesKHR multiviewFeaturesToEnable{};
+    multiviewFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR;
+
+    // Query specifically for this extension's features
+    VkPhysicalDeviceFeatures2 queryMultiview = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    queryMultiview.pNext = &multiviewFeaturesToEnable; // Temporarily chain for querying
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryMultiview);
+
+    if (multiviewFeaturesToEnable.multiview) {
+        RP_CORE_INFO("Feature KHR::multiview is supported and will be enabled.");
+        multiviewFeaturesToEnable.multiview = VK_TRUE;
+        *ppNextChain = &multiviewFeaturesToEnable;
+        ppNextChain = &multiviewFeaturesToEnable.pNext;
+    } else {
+        RP_CORE_WARN("Feature KHR::multiview is NOT supported.");
     }
 
     // --- Ray Tracing Features ---

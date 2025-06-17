@@ -19,13 +19,6 @@ namespace Rapture {
 
 std::shared_ptr<Texture> DynamicDiffuseGI::s_defaultSkyboxTexture = nullptr;
 
-struct FlattenPushConstants {
-    int layerCount;
-    int layerWidth;
-    int layerHeight;
-    int tilesPerRow;
-};
-
 DynamicDiffuseGI::DynamicDiffuseGI() 
   : m_ProbeInfoBuffer(nullptr),
     m_Hysteresis(0.96f),
@@ -36,11 +29,9 @@ DynamicDiffuseGI::DynamicDiffuseGI()
     m_DDGI_ProbeTraceShader(nullptr),
     m_DDGI_ProbeIrradianceBlendingShader(nullptr),
     m_DDGI_ProbeDistanceBlendingShader(nullptr),
-    m_Flatten2dArrayShader(nullptr),
     m_DDGI_ProbeTracePipeline(nullptr),
     m_DDGI_ProbeIrradianceBlendingPipeline(nullptr),
     m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
-    m_Flatten2dArrayPipeline(nullptr),
     m_MeshInfoBuffer(nullptr),
     m_SunLightBuffer(nullptr),
     m_skyboxTexture(nullptr) {
@@ -49,6 +40,8 @@ DynamicDiffuseGI::DynamicDiffuseGI()
         s_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
     }
     m_skyboxTexture = s_defaultSkyboxTexture;
+
+
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -96,12 +89,10 @@ void DynamicDiffuseGI::createPipelines() {
     auto [probeTraceShader, probeTraceShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", shaderProbeTraceConfig);
     auto [probeIrradianceBlendShader, probeIrradianceBlendShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderIrradianceBlendConfig);
     auto [probeDistanceBlendShader, probeDistanceBlendShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderDistanceBlendConfig);
-    auto [flattenShader, flattenShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/Flatten2dArray.cs.glsl");
 
     m_DDGI_ProbeTraceShader = probeTraceShader;
     m_DDGI_ProbeIrradianceBlendingShader = probeIrradianceBlendShader;
     m_DDGI_ProbeDistanceBlendingShader = probeDistanceBlendShader;
-    m_Flatten2dArrayShader = flattenShader;
 
     ComputePipelineConfiguration probeTraceConfig;
     probeTraceConfig.shader = m_DDGI_ProbeTraceShader;
@@ -109,13 +100,10 @@ void DynamicDiffuseGI::createPipelines() {
     probeIrradianceBlendingConfig.shader = m_DDGI_ProbeIrradianceBlendingShader;
     ComputePipelineConfiguration probeDistanceBlendingConfig;
     probeDistanceBlendingConfig.shader = m_DDGI_ProbeDistanceBlendingShader;
-    ComputePipelineConfiguration flattenConfig;
-    flattenConfig.shader = m_Flatten2dArrayShader;
 
     m_DDGI_ProbeTracePipeline = std::make_shared<ComputePipeline>(probeTraceConfig);
     m_DDGI_ProbeIrradianceBlendingPipeline = std::make_shared<ComputePipeline>(probeIrradianceBlendingConfig);
     m_DDGI_ProbeDistanceBlendingPipeline = std::make_shared<ComputePipeline>(probeDistanceBlendingConfig);
-    m_Flatten2dArrayPipeline = std::make_shared<ComputePipeline>(flattenConfig);
 
 }
 
@@ -259,70 +247,7 @@ void DynamicDiffuseGI::createProbeTraceDescriptorSets(std::shared_ptr<Scene> sce
 
 
 
-    if (m_Flatten2dArrayShader && m_Flatten2dArrayShader->getDescriptorSetLayouts().size() > 0) {
-        DescriptorSetBindings flattenResourceBindings;
-        flattenResourceBindings.layout = m_Flatten2dArrayShader->getDescriptorSetLayouts()[0];
 
-        // Binding 0: Input texture array (sampler2DArray) - this is the ray data texture array
-        DescriptorSetBinding flattenInputBinding;
-        flattenInputBinding.binding = 0;
-        flattenInputBinding.viewType = TextureViewType::DEFAULT;
-        flattenInputBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        flattenInputBinding.resource = m_RayDataTexture;
-        flattenInputBinding.useStorageImageInfo = false;
-        flattenResourceBindings.bindings.push_back(flattenInputBinding);
-
-        // Binding 1: Output flattened texture (storage image2D) - this is the flattened output
-        DescriptorSetBinding flattenOutputBinding;
-        flattenOutputBinding.binding = 1;
-        flattenOutputBinding.viewType = TextureViewType::DEFAULT;
-        flattenOutputBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        flattenOutputBinding.resource = m_RayDataTextureFlattened;
-        flattenOutputBinding.useStorageImageInfo = true;
-        flattenResourceBindings.bindings.push_back(flattenOutputBinding);
-
-        m_flattenDescriptorSet[0] = std::make_shared<DescriptorSet>(flattenResourceBindings);
-
-        // Irradiance Flattening
-        flattenResourceBindings.bindings.clear();
-        flattenInputBinding.binding = 0;
-        flattenInputBinding.viewType = TextureViewType::DEFAULT;
-        flattenInputBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        flattenInputBinding.resource = m_RadianceTexture;
-        flattenInputBinding.useStorageImageInfo = false;
-        flattenResourceBindings.bindings.push_back(flattenInputBinding);
-
-        // Binding 1: Output flattened texture (storage image2D) - this is the flattened output
-        flattenOutputBinding.binding = 1;
-        flattenOutputBinding.viewType = TextureViewType::DEFAULT;
-        flattenOutputBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        flattenOutputBinding.resource = m_IrradianceTextureFlattened;
-        flattenOutputBinding.useStorageImageInfo = true;
-        flattenResourceBindings.bindings.push_back(flattenOutputBinding);
-
-        m_flattenDescriptorSet[1] = std::make_shared<DescriptorSet>(flattenResourceBindings);
-
-
-        // Distance Flattening
-        flattenResourceBindings.bindings.clear();
-        flattenInputBinding.binding = 0;
-        flattenInputBinding.viewType = TextureViewType::DEFAULT;
-        flattenInputBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        flattenInputBinding.resource = m_VisibilityTexture;
-        flattenInputBinding.useStorageImageInfo = false;
-        flattenResourceBindings.bindings.push_back(flattenInputBinding);
-
-        // Binding 1: Output flattened texture (storage image2D) - this is the flattened output
-        flattenOutputBinding.binding = 1;
-        flattenOutputBinding.viewType = TextureViewType::DEFAULT;
-        flattenOutputBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        flattenOutputBinding.resource = m_DistanceTextureFlattened;
-        flattenOutputBinding.useStorageImageInfo = true;
-        flattenResourceBindings.bindings.push_back(flattenOutputBinding);
-
-        m_flattenDescriptorSet[2] = std::make_shared<DescriptorSet>(flattenResourceBindings);
-
-    }
 
 }
 
@@ -685,21 +610,29 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
     // Cast rays using compute shader
     castRays(scene);
     
+    // Flatten ray data texture (within the same command buffer)
+    if (m_RayDataTextureFlattened) {
+        m_RayDataTextureFlattened->update(m_CommandBuffer);
+    }
     
-    flattenTextures(m_RayDataTextureFlattened, m_RayDataTexture, 0);
+    // Blend textures
     blendTextures();
 
-    flattenTextures(m_IrradianceTextureFlattened, m_RadianceTexture, 1);
-    flattenTextures(m_DistanceTextureFlattened, m_VisibilityTexture, 2);
+    // Flatten final textures (within the same command buffer)
+    if (m_IrradianceTextureFlattened) {
+        m_IrradianceTextureFlattened->update(m_CommandBuffer);
+    }
+    if (m_DistanceTextureFlattened) {
+        m_DistanceTextureFlattened->update(m_CommandBuffer);
+    }
 
     // End command buffer
     if (vkEndCommandBuffer(m_CommandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
-        RP_CORE_ERROR("DynamicDiffuseGI::castRays - Failed to end command buffer");
+        RP_CORE_ERROR("DynamicDiffuseGI::populateProbesCompute - Failed to end command buffer");
         return;
     }
     
-
-    // Submit command buffer
+    // Submit command buffer (single submit for all operations)
     m_computeQueue->submitQueue(m_CommandBuffer);
 
     // Toggle frame flag for double buffering
@@ -1050,89 +983,7 @@ void DynamicDiffuseGI::blendTextures() {
 
 }
 
-void DynamicDiffuseGI::flattenTextures(std::shared_ptr<Texture> flatTexture, std::shared_ptr<Texture> texture, int descriptorSetIndex) {
-    if (!m_Flatten2dArrayShader || !m_RayDataTexture) {
-        RP_CORE_WARN("Cannot flatten textures: missing shader or ray data texture");
-        return;
-    }
 
-
-
-    // === BARRIER PHASE 3: Before flatten shader - prepare flattened output texture ===
-    VkImageMemoryBarrier flattenedOutputBarrier{};
-    flattenedOutputBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    flattenedOutputBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    flattenedOutputBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    flattenedOutputBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    flattenedOutputBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    flattenedOutputBarrier.image = flatTexture->getImage();
-    flattenedOutputBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    flattenedOutputBarrier.subresourceRange.baseMipLevel = 0;
-    flattenedOutputBarrier.subresourceRange.levelCount = 1;
-    flattenedOutputBarrier.subresourceRange.baseArrayLayer = 0;
-    flattenedOutputBarrier.subresourceRange.layerCount = 1;
-    flattenedOutputBarrier.srcAccessMask = 0;
-    flattenedOutputBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    
-    vkCmdPipelineBarrier(
-        m_CommandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Wait for trace shader to finish
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // This flatten operation
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &flattenedOutputBarrier
-    );
-
-    FlattenPushConstants pushConstants;
-    pushConstants.layerCount = texture->getSpecification().depth;
-    pushConstants.layerWidth = texture->getSpecification().width;
-    pushConstants.layerHeight = texture->getSpecification().height;
-    pushConstants.tilesPerRow =  static_cast<uint32_t>(ceil(sqrt(texture->getSpecification().depth)));
-
-    m_Flatten2dArrayPipeline->bind(m_CommandBuffer->getCommandBufferVk());
-
-    vkCmdPushConstants(m_CommandBuffer->getCommandBufferVk(),
-                       m_Flatten2dArrayPipeline->getPipelineLayoutVk(),
-                       VK_SHADER_STAGE_COMPUTE_BIT,
-                       0, sizeof(FlattenPushConstants), &pushConstants);
-    
-
-    // bind the m_RayDataTexture at 0 (input) and the m_RayDataTextureFlattened at 1 (output)
-    VkDescriptorSet flattenDescriptorSet = m_flattenDescriptorSet[descriptorSetIndex]->getDescriptorSet();
-    vkCmdBindDescriptorSets(m_CommandBuffer->getCommandBufferVk(),
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            m_Flatten2dArrayPipeline->getPipelineLayoutVk(),
-                            0, 1, &flattenDescriptorSet, 0, nullptr);
-
-    vkCmdDispatch(m_CommandBuffer->getCommandBufferVk(), 
-                 (flatTexture->getSpecification().width + 15) / 16, 
-                 (flatTexture->getSpecification().height + 15) / 16, 
-                 1);
-
-    // === BARRIER PHASE 4: After flatten shader - transition flattened texture for reading ===
-    VkImageMemoryBarrier flattenedReadBarrier{};
-    flattenedReadBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    flattenedReadBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    flattenedReadBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    flattenedReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    flattenedReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    flattenedReadBarrier.image = flatTexture->getImage();
-    flattenedReadBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    flattenedReadBarrier.subresourceRange.baseMipLevel = 0;
-    flattenedReadBarrier.subresourceRange.levelCount = 1;
-    flattenedReadBarrier.subresourceRange.baseArrayLayer = 0;
-    flattenedReadBarrier.subresourceRange.layerCount = 1;
-    flattenedReadBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    flattenedReadBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    
-    vkCmdPipelineBarrier(m_CommandBuffer->getCommandBufferVk(),
-                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                        0, 0, nullptr, 0, nullptr, 1, &flattenedReadBarrier);
-
-    
-}
 
 void DynamicDiffuseGI::initTextures(){
 
@@ -1179,63 +1030,12 @@ void DynamicDiffuseGI::initTextures(){
   m_PrevRadianceTexture = std::make_shared<Texture>(irradianceSpec);
   m_PrevVisibilityTexture = std::make_shared<Texture>(distanceSpec);
   
-  // Create flattened 2D textures for visualization
-  uint32_t tilesPerRow = static_cast<uint32_t>(std::ceil(std::sqrt(static_cast<float>(m_ProbeVolume.gridDimensions.y))));
-  
-  TextureSpecification flattenedSpec;
-  flattenedSpec.width = rayDataSpec.width * tilesPerRow;
-  flattenedSpec.height = rayDataSpec.height * static_cast<uint32_t>(ceil(float(rayDataSpec.depth) / tilesPerRow));
-  flattenedSpec.type = TextureType::TEXTURE2D;
-  flattenedSpec.format = TextureFormat::RGBA32F;
-  flattenedSpec.filter = TextureFilter::Nearest;
-  flattenedSpec.storageImage = true;
-  flattenedSpec.srgb = false;
-  flattenedSpec.wrap = TextureWrap::ClampToEdge;
-  
-  m_RayDataTextureFlattened = std::make_shared<Texture>(flattenedSpec);
+  // Create flattened textures using TextureFlattener
+  m_RayDataTextureFlattened = TextureFlattener::createFlattenTexture(m_RayDataTexture, "[DDGI] Flattened Ray Data Texture");
+  m_IrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_RadianceTexture, "[DDGI] Irradiance Flattened Texture");
+  m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened Texture");
 
-  TextureSpecification flattenedSpecIrradiance;
-  flattenedSpecIrradiance.width = irradianceSpec.width * tilesPerRow;
-  flattenedSpecIrradiance.height = irradianceSpec.height * static_cast<uint32_t>(ceil(float(irradianceSpec.depth) / tilesPerRow));
-  flattenedSpecIrradiance.type = TextureType::TEXTURE2D;
-  flattenedSpecIrradiance.format = TextureFormat::RGBA32F;
-  flattenedSpecIrradiance.filter = TextureFilter::Nearest;
-  flattenedSpecIrradiance.storageImage = true;
-  flattenedSpecIrradiance.srgb = false;
-  flattenedSpecIrradiance.wrap = TextureWrap::ClampToEdge;
-  
-  m_IrradianceTextureFlattened = std::make_shared<Texture>(flattenedSpecIrradiance);
-
-  TextureSpecification flattenedSpecDistance;
-  flattenedSpecDistance.width = distanceSpec.width * tilesPerRow;
-  flattenedSpecDistance.height = distanceSpec.height * static_cast<uint32_t>(ceil(float(distanceSpec.depth) / tilesPerRow));
-  flattenedSpecDistance.type = TextureType::TEXTURE2D;
-  flattenedSpecDistance.format = TextureFormat::RGBA32F;
-  flattenedSpecDistance.filter = TextureFilter::Nearest;
-  flattenedSpecDistance.storageImage = true;
-  flattenedSpecDistance.srgb = false;
-  flattenedSpecDistance.wrap = TextureWrap::ClampToEdge;
-  
-  m_DistanceTextureFlattened = std::make_shared<Texture>(flattenedSpecDistance);
-
-    // Register textures with asset manager for debugging
-    AssetVariant distFlatVariant = m_DistanceTextureFlattened;
-    std::shared_ptr<AssetVariant> distFlatVariantPtr = std::make_shared<AssetVariant>(distFlatVariant);
-    AssetManager::registerVirtualAsset(distFlatVariantPtr, "[DDGI] Distance Flattened Texture", AssetType::Texture);
-    
-    AssetVariant irradianceFlatVariant = m_IrradianceTextureFlattened;
-    std::shared_ptr<AssetVariant> irradianceFlatVariantPtr = std::make_shared<AssetVariant>(irradianceFlatVariant);
-    AssetManager::registerVirtualAsset(irradianceFlatVariantPtr, "[DDGI] Irradiance Flattened Texture", AssetType::Texture);
-
-    AssetVariant flattenedVariant = m_RayDataTextureFlattened;
-    std::shared_ptr<AssetVariant> flattenedVariantPtr = std::make_shared<AssetVariant>(flattenedVariant);
-    AssetManager::registerVirtualAsset(flattenedVariantPtr, "[DDGI] Flattened Ray Data Texture", AssetType::Texture);
-
-    clearTextures();
-
-    m_RayDataTextureFlattened->setReadyForSampling(true);
-    m_DistanceTextureFlattened->setReadyForSampling(true);
-    m_IrradianceTextureFlattened->setReadyForSampling(true);
+  clearTextures();
 
 }
 
@@ -1268,6 +1068,11 @@ void DynamicDiffuseGI::initProbeInfoBuffer() {
     
         probeVolume.probeRandomRayBackfaceThreshold = 0.1f;
         probeVolume.probeFixedRayBackfaceThreshold = 0.25f;
+
+        probeVolume.probeRelocationEnabled = 1.0f;
+        probeVolume.probeClassificationEnabled = 1.0f;
+        probeVolume.probeChangeThreshold = 0.1f;
+        probeVolume.probeMinValidSamples = 16.0f;
 
         m_ProbeVolume = probeVolume;
         

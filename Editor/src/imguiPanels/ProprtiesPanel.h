@@ -22,12 +22,14 @@ private:
     void renderLightComponent();
     void renderCameraComponent();
     void renderShadowComponent();
+    void renderCascadedShadowComponent();
 
 private:
 
     std::weak_ptr<Rapture::Entity> m_selectedEntity;
 
     VkDescriptorSet m_currentShadowMapDescriptorSet;
+    VkDescriptorSet m_currentCSMDescriptorSet;
 
     size_t m_entitySelectedListenerId;
 };

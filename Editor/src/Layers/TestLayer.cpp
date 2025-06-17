@@ -88,6 +88,9 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf", activeScene);
     loader->loadModel((rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf").string());
 
+    // Load a model for testing
+    //auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf", activeScene);
+    //loader->loadModel((rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf").string());
 
 
     Rapture::Entity light1 = activeScene->createEntity("Spot Light 1");
@@ -120,7 +123,9 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         glm::vec3(1.0f, 1.0f, 1.0f),  // Pure white color
         1.2f                         // High intensity
     );
-    sunLight.addComponent<Rapture::ShadowComponent>(4096, 4096);
+    sunLight.addComponent<Rapture::CascadedShadowComponent>(2048, 2048, 4, 0.8f);
+    auto& sm = sunLight.addComponent<Rapture::ShadowComponent>(4096, 4096);
+    sm.isActive = false;
 
     auto perlinNoiseTexture = Rapture::PerlinNoiseGenerator::generateNoise(1024, 1024, 4, 0.5f, 2.0f, 8.0f);
 

@@ -256,60 +256,75 @@ void DeferredRenderer::recordCommandBuffer(
     std::shared_ptr<CommandBuffer> commandBuffer,
     std::shared_ptr<Scene> activeScene, uint32_t imageIndex) {
 
-  RAPTURE_PROFILE_FUNCTION();
+    RAPTURE_PROFILE_FUNCTION();
 
-  VkCommandBufferBeginInfo beginInfo{};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  beginInfo.pInheritanceInfo = nullptr; // Optional
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    beginInfo.pInheritanceInfo = nullptr; // Optional
 
-  updateCameraUBOs(activeScene, m_currentFrame);
-  updateShadowMaps(activeScene);
+    updateCameraUBOs(activeScene, m_currentFrame);
+    updateShadowMaps(activeScene);
 
-  if (!m_skyboxPass->hasActiveSkybox() && activeScene->getSkyboxComponent()) {
-    m_skyboxPass->setSkyboxTexture(activeScene->getSkyboxComponent()->skyboxTexture);
-  }
-
-  if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) !=
-      VK_SUCCESS) {
-    RP_CORE_ERROR("failed to begin recording command buffer!");
-    throw std::runtime_error("failed to begin recording command buffer!");
-  }
-
-  auto &registry = activeScene->getRegistry();
-  auto lightView =
-      registry.view<LightComponent, TransformComponent, ShadowComponent>();
-  for (auto entity : lightView) {
-    auto &lightComp = lightView.get<LightComponent>(entity);
-    auto &transformComp = lightView.get<TransformComponent>(entity);
-    auto &shadowComp = lightView.get<ShadowComponent>(entity);
-
-    // Always update directional light shadows for debugging, others only when changed
-    bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
-                              transformComp.hasChanged(m_currentFrame) ||
-                              lightComp.type == LightType::Directional); // Force update for directional lights
-    
-    if (shadowComp.shadowMap && shouldUpdateShadow) {
-      shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene,
-                                                m_currentFrame);
+    if (!m_skyboxPass->hasActiveSkybox() && activeScene->getSkyboxComponent()) {
+        m_skyboxPass->setSkyboxTexture(activeScene->getSkyboxComponent()->skyboxTexture);
     }
-  }
 
-  m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene,
-                                     m_currentFrame);
+    if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) !=
+        VK_SUCCESS) {
+        RP_CORE_ERROR("failed to begin recording command buffer!");
+        throw std::runtime_error("failed to begin recording command buffer!");
+    }
 
-  m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex,
-                                      m_currentFrame);
+    auto &registry = activeScene->getRegistry();
+    auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
+    auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
 
-  m_stencilBorderPass->recordCommandBuffer(commandBuffer, imageIndex,
-                                           m_currentFrame, activeScene);
+    for (auto entity : lightView) {
+        auto &lightComp = lightView.get<LightComponent>(entity);
+        auto &transformComp = lightView.get<TransformComponent>(entity);
+        auto &shadowComp = lightView.get<ShadowComponent>(entity);
 
-  m_skyboxPass->recordCommandBuffer(commandBuffer, m_currentFrame);
+        // Always update directional light shadows for debugging, others only when changed
+        bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
+                                transformComp.hasChanged(m_currentFrame) ||
+                                lightComp.type == LightType::Directional); // Force update for directional lights
+        
+        if (shadowComp.shadowMap && shouldUpdateShadow) {
+            shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+        }
+    }
 
-  if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
-    RP_CORE_ERROR("failed to record command buffer!");
-    throw std::runtime_error("failed to record command buffer!");
-  }
+    for (auto entity : cascadedShadowView) {
+        auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
+        auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
+        auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
+
+        // Always update directional light shadows for debugging, others only when changed
+        bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
+                                transformComp.hasChanged(m_currentFrame) ||
+                                lightComp.type == LightType::Directional); // Force update for directional lights
+        
+        if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
+            shadowComp.cascadedShadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+        }
+    }
+
+    m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene,
+                                        m_currentFrame);
+
+    m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex,
+                                        m_currentFrame);
+
+    m_stencilBorderPass->recordCommandBuffer(commandBuffer, imageIndex,
+                                            m_currentFrame, activeScene);
+
+    m_skyboxPass->recordCommandBuffer(commandBuffer, m_currentFrame);
+
+    if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
+        RP_CORE_ERROR("failed to record command buffer!");
+        throw std::runtime_error("failed to record command buffer!");
+    }
 }
 void DeferredRenderer::updateCameraUBOs(std::shared_ptr<Scene> activeScene,
                                         uint32_t currentFrame) {
@@ -380,8 +395,9 @@ void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
 
   auto camera = activeScene->getSettings().mainCamera;
   auto cameraTransform = camera->tryGetComponent<TransformComponent>();
+  auto cameraComp = camera->tryGetComponent<CameraComponent>();
   glm::vec3 cameraPosition = glm::vec3(0.0f);
-  if (cameraTransform) {
+  if (cameraTransform && cameraComp) {
     cameraPosition = cameraTransform->translation();
   } else {
     RP_CORE_WARN("No camera found in scene, using default position");
@@ -391,11 +407,11 @@ void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
   uint32_t shadowIndex = 0;
 
   for (auto entity : lightView) {
-    auto &lightComp = lightView.get<LightComponent>(entity);
-    auto &transformComp = lightView.get<TransformComponent>(entity);
-    auto &shadowComp = lightView.get<ShadowComponent>(entity);
+    auto& lightComp = lightView.get<LightComponent>(entity);
+    auto& transformComp = lightView.get<TransformComponent>(entity);
+    auto& shadowComp = lightView.get<ShadowComponent>(entity);
 
-    if (shadowComp.shadowMap) {
+    if (shadowComp.shadowMap && shadowComp.isActive) {
       shadowComp.shadowMap->updateViewMatrix(lightComp, transformComp,
                                              cameraPosition);
 
@@ -416,12 +432,43 @@ void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
     }
   }
 
+  auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
+  for (auto entity : cascadedShadowView) {
+    auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
+    auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
+    auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
+
+    if (shadowComp.cascadedShadowMap && shadowComp.isActive) {
+      auto cascades = shadowComp.cascadedShadowMap->updateViewMatrix(lightComp, transformComp, *cameraComp);
+          // Always populate shadow data for existing shadow maps
+      ShadowBufferData shadowBufferData{};
+      shadowBufferData.type = static_cast<int>(lightComp.type);
+      shadowBufferData.cascadeCount = static_cast<uint32_t>(cascades.size());
+      shadowBufferData.lightIndex = (uint32_t)entity;
+      shadowBufferData.textureHandle = shadowComp.cascadedShadowMap->getTextureHandle();
+
+      for (uint8_t i = 0; i < cascades.size(); i++) {
+        shadowBufferData.cascadeMatrices[i] = cascades[i].lightViewProj;
+        shadowBufferData.cascadeSplitsViewSpace[i].x = cascades[i].nearPlane;
+        shadowBufferData.cascadeSplitsViewSpace[i].y = cascades[i].farPlane;
+        // Mark this as a texture array by setting a special flag in the last component
+        // -1.0 in w component of first cascade split indicates texture array
+        shadowBufferData.cascadeSplitsViewSpace[i].w = -1.0f;
+      }
+
+      // Store in the array
+      shadowDataLayout.shadowData[shadowIndex] = shadowBufferData;
+      shadowIndex++;
+    
+    }
+    
+  }
+
   shadowDataLayout.shadowCount = shadowIndex;
 
   // Update all shadow data UBOs
   for (unsigned int i = 0; i < m_swapChain->getImageCount(); i++) {
-    m_shadowDataUBOs[i]->addData((void *)&shadowDataLayout,
-                                 sizeof(shadowDataLayout), 0);
+    m_shadowDataUBOs[i]->addData((void *)&shadowDataLayout, sizeof(shadowDataLayout), 0);
   }
 }
 } // namespace Rapture

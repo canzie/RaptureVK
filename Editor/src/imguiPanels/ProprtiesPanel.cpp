@@ -34,6 +34,7 @@ PropertiesPanel::PropertiesPanel()
     });
     
     m_currentShadowMapDescriptorSet = VK_NULL_HANDLE;
+    m_currentCSMDescriptorSet = VK_NULL_HANDLE;
 }
 
 PropertiesPanel::~PropertiesPanel()
@@ -42,6 +43,9 @@ PropertiesPanel::~PropertiesPanel()
 
     if (m_currentShadowMapDescriptorSet != VK_NULL_HANDLE) {
         ImGui_ImplVulkan_RemoveTexture(m_currentShadowMapDescriptorSet);
+    }
+    if (m_currentCSMDescriptorSet != VK_NULL_HANDLE) {
+        ImGui_ImplVulkan_RemoveTexture(m_currentCSMDescriptorSet);
     }
 }
 
@@ -67,6 +71,10 @@ void PropertiesPanel::render()
         // Check for shadow component only if entity has both transform and light components
         if (entity->hasAllComponents<Rapture::TransformComponent, Rapture::LightComponent, Rapture::ShadowComponent>()) {
             renderShadowComponent();
+        }
+        // Check for cascaded shadow component
+        if (entity->hasAllComponents<Rapture::TransformComponent, Rapture::LightComponent, Rapture::CascadedShadowComponent>()) {
+            renderCascadedShadowComponent();
         }
     }
 
@@ -383,6 +391,100 @@ void PropertiesPanel::renderShadowComponent() {
         }
     }
 
+}
+
+void PropertiesPanel::renderCascadedShadowComponent() {
+    if (auto entity = m_selectedEntity.lock()) {
+        if (ImGui::CollapsingHeader("Cascaded Shadow Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto& csmShadow = entity->getComponent<Rapture::CascadedShadowComponent>();
+            auto& light = entity->getComponent<Rapture::LightComponent>();
+
+            if (csmShadow.cascadedShadowMap) {
+                // Lambda parameter for cascade distribution
+                float currentLambda = csmShadow.cascadedShadowMap->getLambda();
+                if (ImGui::SliderFloat("Lambda", &currentLambda, 0.0f, 1.0f, "%.3f")) {
+                    csmShadow.cascadedShadowMap->setLambda(currentLambda);
+                }
+                ImGui::SameLine();
+                HelpMarker("Controls cascade split distribution: 0.0 = linear splits, 1.0 = logarithmic splits");
+                
+                // Display cascade information
+                ImGui::Separator();
+                ImGui::Text("Cascade Information:");
+                
+                uint8_t numCascades = csmShadow.cascadedShadowMap->getNumCascades();
+                ImGui::Text("Number of Cascades: %d", numCascades);
+                
+                // Display shadow map texture information
+                ImGui::Separator();
+                auto shadowTexture = csmShadow.cascadedShadowMap->getShadowTexture();
+                auto flattenedShadowTexture = csmShadow.cascadedShadowMap->getFlattenedShadowTexture();
+                
+                if (shadowTexture) {
+                    const auto& spec = shadowTexture->getSpecification();
+                    ImGui::Text("Shadow Map Array:");
+                    ImGui::Text("  Resolution: %dx%d", spec.width, spec.height);
+                    ImGui::Text("  Layers: %d", spec.depth);
+                    ImGui::Text("  Format: %s", spec.format == Rapture::TextureFormat::D32F ? "D32F" : "Unknown");
+                    ImGui::Text("  Bindless Texture Handle: %d", csmShadow.cascadedShadowMap->getTextureHandle());
+                    for (size_t i = 0; i < csmShadow.cascadedShadowMap->getCascadeSplits().size() - 1; i++) {
+                        ImGui::Text("  Cascade %zu:", i);
+                        ImGui::Text("    Near: %.3f", csmShadow.cascadedShadowMap->getCascadeSplits()[i]);
+                        ImGui::Text("    Far: %.3f", csmShadow.cascadedShadowMap->getCascadeSplits()[i + 1]);
+                    }
+                    
+                    // Display flattened shadow map texture if available
+                    if (flattenedShadowTexture && flattenedShadowTexture->isReadyForSampling()) {
+                        ImGui::Separator();
+                        ImGui::Text("Flattened Shadow Map Visualization:");
+                        
+                        const auto& flatSpec = flattenedShadowTexture->getSpecification();
+                        float aspectRatio = static_cast<float>(flatSpec.width) / static_cast<float>(flatSpec.height);
+                        
+                        // Calculate display size while maintaining aspect ratio
+                        float displayWidth = ImGui::GetContentRegionAvail().x;
+                        float displayHeight = displayWidth / aspectRatio;
+                        
+                        // Limit the height to prevent overly tall images
+                        const float maxHeight = 400.0f;
+                        if (displayHeight > maxHeight) {
+                            displayHeight = maxHeight;
+                            displayWidth = displayHeight * aspectRatio;
+                        }
+                        
+                        // Create ImGui descriptor for the flattened shadow map texture
+                        VkDescriptorImageInfo imageInfo = flattenedShadowTexture->getDescriptorImageInfo(Rapture::TextureViewType::DEFAULT);
+                        if (m_currentCSMDescriptorSet != VK_NULL_HANDLE) {
+                            ImGui_ImplVulkan_RemoveTexture(m_currentCSMDescriptorSet);
+                        }
+                        m_currentCSMDescriptorSet = ImGui_ImplVulkan_AddTexture(
+                            imageInfo.sampler,
+                            imageInfo.imageView,
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                        );
+                        
+                        // Display the flattened shadow map texture
+                        ImGui::Text("Flattened Resolution: %dx%d", flatSpec.width, flatSpec.height);
+                        ImGui::Image(
+                            (ImTextureID)m_currentCSMDescriptorSet,
+                            ImVec2(displayWidth, displayHeight)
+                        );
+                        
+                        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Each square represents one cascade layer");
+                    } else {
+                        ImGui::Separator();
+                        ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.4f, 1.0f), "Flattened shadow map not ready");
+                    }
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Shadow map array not available");
+                }
+                
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Cascaded shadow map not available");
+                ImGui::Text("Enable 'Casts Shadow' in the Light Component to generate shadow maps");
+            }
+        }
+    }
 }
 
 

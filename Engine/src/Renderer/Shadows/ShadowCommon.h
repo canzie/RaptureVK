@@ -5,14 +5,18 @@
 #include <cstdint>
 
 
-#define MAX_CASCADES 4
-#define MAX_SHADOW_CASTERS 16
+#define MAX_CASCADES 4u
+#define MAX_SHADOW_CASTERS 16u
 
 namespace Rapture {
 
     // gets used in the ubo for drawing to the shadowmap textures
     struct ShadowMapData {
         alignas(16) glm::mat4 lightViewProjection;
+    };
+
+    struct CSMData {
+        alignas(16) glm::mat4 lightViewProjection[MAX_CASCADES];
     };
 
     // Aligned for std430 layout

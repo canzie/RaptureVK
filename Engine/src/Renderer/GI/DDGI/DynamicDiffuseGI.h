@@ -17,6 +17,7 @@
 
 #include "Pipelines/ComputePipeline.h"
 #include "WindowContext/VulkanContext/VulkanQueue.h"
+#include "Utils/TextureFlattener.h"
 
 #include "DDGICommon.h"
 
@@ -38,8 +39,8 @@ public:
     std::shared_ptr<Texture> getPrevVisibilityTexture();
 
 
-    std::shared_ptr<Texture> getRadianceTextureFlattened() { return m_IrradianceTextureFlattened; } 
-    std::shared_ptr<Texture> getVisibilityTextureFlattened() { return m_DistanceTextureFlattened; } 
+    std::shared_ptr<Texture> getRadianceTextureFlattened() { return m_IrradianceTextureFlattened ? m_IrradianceTextureFlattened->getFlattenedTexture() : nullptr; } 
+    std::shared_ptr<Texture> getVisibilityTextureFlattened() { return m_DistanceTextureFlattened ? m_DistanceTextureFlattened->getFlattenedTexture() : nullptr; } 
 
     std::vector<glm::vec3>& getDebugProbePositions() { return m_DebugProbePositions; }
 
@@ -52,7 +53,6 @@ public:
 private:
     void castRays(std::shared_ptr<Scene> scene);
     void blendTextures();
-    void flattenTextures(std::shared_ptr<Texture> flatTexture, std::shared_ptr<Texture> texture, int descriptorSetIndex);
 
     void initTextures();
     void updateSunProperties(std::shared_ptr<Scene> scene);
@@ -71,12 +71,10 @@ private:
     std::shared_ptr<Shader> m_DDGI_ProbeTraceShader;
     std::shared_ptr<Shader> m_DDGI_ProbeIrradianceBlendingShader;
     std::shared_ptr<Shader> m_DDGI_ProbeDistanceBlendingShader;
-    std::shared_ptr<Shader> m_Flatten2dArrayShader;
 
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeTracePipeline;
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeIrradianceBlendingPipeline;
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeDistanceBlendingPipeline;
-    std::shared_ptr<ComputePipeline> m_Flatten2dArrayPipeline;
 
     ProbeVolume m_ProbeVolume;
     SunProperties m_SunShadowProps;
@@ -98,9 +96,9 @@ private:
 
     std::shared_ptr<Texture> m_RayDataTexture;
 
-    std::shared_ptr<Texture> m_IrradianceTextureFlattened;
-    std::shared_ptr<Texture> m_DistanceTextureFlattened;
-    std::shared_ptr<Texture> m_RayDataTextureFlattened;
+    std::shared_ptr<FlattenTexture> m_IrradianceTextureFlattened;
+    std::shared_ptr<FlattenTexture> m_DistanceTextureFlattened;
+    std::shared_ptr<FlattenTexture> m_RayDataTextureFlattened;
 
 
     std::vector<glm::vec3> m_DebugProbePositions;
@@ -124,13 +122,13 @@ private:
 
     std::vector<std::shared_ptr<DescriptorSet>> m_rayTraceDescriptorSets;
     std::shared_ptr<DescriptorSet> m_rayTracePrevTextureDescriptorSet[2]; // Set 2: Previous textures for probe trace
-    std::shared_ptr<DescriptorSet> m_flattenDescriptorSet[3];
     std::shared_ptr<DescriptorSet> m_IrradianceBlendingDescriptorSet[2];
     std::shared_ptr<DescriptorSet> m_DistanceBlendingDescriptorSet[2];
 
     std::shared_ptr<DescriptorSet> m_probeVolumeDescriptorSet;
 
     std::shared_ptr<Texture> m_skyboxTexture;
+
 
     static std::shared_ptr<Texture> s_defaultSkyboxTexture;
 };

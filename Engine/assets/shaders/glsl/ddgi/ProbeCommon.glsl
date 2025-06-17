@@ -32,6 +32,12 @@ struct ProbeVolume {
 
     float    probeRandomRayBackfaceThreshold;
     float    probeFixedRayBackfaceThreshold;
+
+    // Additional classification and relocation parameters
+    float    probeRelocationEnabled;             // enable/disable probe relocation (0.0 = disabled, 1.0 = enabled)
+    float    probeClassificationEnabled;         // enable/disable probe classification (0.0 = disabled, 1.0 = enabled)
+    float    probeChangeThreshold;               // threshold for considering a probe's position has changed significantly
+    float    probeMinValidSamples;               // minimum number of valid ray samples required for a probe to be considered valid
 };
 
 

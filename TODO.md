@@ -7,6 +7,16 @@
 
 
 
+### DDGI - shit is hard
+- add probe relocation to the ddgi system
+- add support for different probe volumes
+- fix the weird artifacts, probably related to normals or something
+- fix brightness (sort of)
+- test system in one of the test scenes
+- try the different probe indexing method
+
+
+
 
 ### J*B SYSTEM
 #### Requirements
@@ -27,10 +37,6 @@ TODO
 --------------------------------
 
 - ray picking
-
-- add probe relocation to the ddgi system
-- add support for different probe volumes
-
 - static meshes
 
 - materials in the asset manager
