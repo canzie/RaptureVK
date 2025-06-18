@@ -252,11 +252,14 @@ void ViewportPanel::renderEntityGizmo() {
         return;
     }
     
-    Rapture::TransformComponent* transformComponent = m_selectedEntity->tryGetComponent<Rapture::TransformComponent>();
+    auto [transformComponent, bbComp] = m_selectedEntity->tryGetComponents<Rapture::TransformComponent, Rapture::BoundingBoxComponent>();
+    if (!transformComponent || !bbComp) {
+        return;
+    }
+
     glm::mat4 originalTransform = transformComponent->transforms.getTransform();
     glm::mat4 transformMatrix = originalTransform;
 
-    Rapture::BoundingBoxComponent* bbComp = m_selectedEntity->tryGetComponent<Rapture::BoundingBoxComponent>();
     glm::vec3 centerOffset = glm::vec3(0.0f);
     if (bbComp) {
         centerOffset = bbComp->localBoundingBox.getCenter();

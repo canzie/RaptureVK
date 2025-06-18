@@ -55,6 +55,8 @@ void PropertiesPanel::render()
 
     ImGui::Begin("Properties");
 
+    
+
     if (auto entity = m_selectedEntity.lock()) {
         if (entity->hasComponent<Rapture::TransformComponent>()) {
             renderTransformComponent();

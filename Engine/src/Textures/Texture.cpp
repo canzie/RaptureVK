@@ -193,8 +193,12 @@ void Texture::createSpecificationFromImageFile(const std::vector<std::string>& p
     m_spec.height = static_cast<uint32_t>(height);
     m_spec.depth = 1; // For 2D texture or cubemap face depth
     
+    // Always use RGBA8 format since we force 4 channels during loading
+    m_spec.format = TextureFormat::RGBA8;
+
     if (paths.size() == 6) {
         m_spec.type = TextureType::TEXTURECUBE;
+        //m_spec.format = TextureFormat::RGBA16F;
     } else if (paths.size() > 1) {
         m_spec.type = TextureType::TEXTURE2D_ARRAY;
         m_spec.depth = paths.size();
@@ -202,8 +206,7 @@ void Texture::createSpecificationFromImageFile(const std::vector<std::string>& p
         m_spec.type = TextureType::TEXTURE2D;
     }
     
-    // Always use RGBA8 format since we force 4 channels during loading
-    m_spec.format = TextureFormat::RGBA8;
+
     
 }
 

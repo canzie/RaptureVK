@@ -197,4 +197,22 @@ inline VkImageAspectFlags getImageAspectFlags(TextureFormat format) {
     return VK_IMAGE_ASPECT_COLOR_BIT;
 }
 
+inline uint32_t getBytesPerPixel(TextureFormat format) {
+    switch (format) {
+        case TextureFormat::RGBA8:       return 4;  // 4 channels × 1 byte
+        case TextureFormat::RGB8:        return 3;  // 3 channels × 1 byte  
+        case TextureFormat::RGBA16F:     return 8;  // 4 channels × 2 bytes
+        case TextureFormat::RGB16F:      return 6;  // 3 channels × 2 bytes
+        case TextureFormat::RGBA32F:     return 16; // 4 channels × 4 bytes
+        case TextureFormat::RGB32F:      return 12; // 3 channels × 4 bytes
+        case TextureFormat::R11G11B10F:  return 4;  // Packed format
+        case TextureFormat::RG16F:       return 4;  // 2 channels × 2 bytes
+        case TextureFormat::D32F:        return 4;  // 1 channel × 4 bytes
+        case TextureFormat::D24S8:       return 4;  // Packed format
+        default: 
+            RP_CORE_ERROR("getBytesPerPixel() - Unsupported format!");
+            return 4; // Default fallback
+    }
+}
+
 }

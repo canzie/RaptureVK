@@ -40,6 +40,9 @@ private:
 
     // Recursively renders a row in the hierarchy table
     void renderHierarchyRow(const std::shared_ptr<HierarchyNode>& node, int depth, int& rowIndex);
+
+    // context menu when rightclicking empty space
+    void renderContextMenuEmpty(std::shared_ptr<Rapture::Scene> scene);
     
     // Combined list of root nodes for the hierarchy (includes previously independent entities)
     std::vector<std::shared_ptr<HierarchyNode>> m_hierarchyRoots;
@@ -59,4 +62,7 @@ private:
 
     size_t m_sceneActivatedListenerId;
     size_t m_entitySelectedListenerId;
+
+    std::weak_ptr<Rapture::Entity> m_renamingEntity;
+    char m_entityRenameBuffer[256];
 };

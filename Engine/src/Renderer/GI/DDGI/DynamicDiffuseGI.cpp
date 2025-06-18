@@ -374,52 +374,17 @@ void DynamicDiffuseGI::clearTextures() {
     // Transition images from UNDEFINED to GENERAL layout before clearing
     std::vector<VkImageMemoryBarrier> layoutTransitions;
     
-    VkImageMemoryBarrier radianceTransition{};
-    radianceTransition.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    radianceTransition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    radianceTransition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    radianceTransition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    radianceTransition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    radianceTransition.image = m_RadianceTexture->getImage();
-    radianceTransition.subresourceRange = subresourceRange;
-    radianceTransition.srcAccessMask = 0;
-    radianceTransition.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    VkImageMemoryBarrier radianceTransition = m_RadianceTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(radianceTransition);
     
-    VkImageMemoryBarrier prevRadianceTransition{};
-    prevRadianceTransition.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    prevRadianceTransition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    prevRadianceTransition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    prevRadianceTransition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prevRadianceTransition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prevRadianceTransition.image = m_PrevRadianceTexture->getImage();
-    prevRadianceTransition.subresourceRange = subresourceRange;
-    prevRadianceTransition.srcAccessMask = 0;
-    prevRadianceTransition.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    VkImageMemoryBarrier prevRadianceTransition = m_PrevRadianceTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(prevRadianceTransition);
     
-    VkImageMemoryBarrier visibilityTransition{};
-    visibilityTransition.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    visibilityTransition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    visibilityTransition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    visibilityTransition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    visibilityTransition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    visibilityTransition.image = m_VisibilityTexture->getImage();
-    visibilityTransition.subresourceRange = subresourceRange;
-    visibilityTransition.srcAccessMask = 0;
-    visibilityTransition.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    VkImageMemoryBarrier visibilityTransition = m_VisibilityTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(visibilityTransition);
     
-    VkImageMemoryBarrier prevVisibilityTransition{};
-    prevVisibilityTransition.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    prevVisibilityTransition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    prevVisibilityTransition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    prevVisibilityTransition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prevVisibilityTransition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prevVisibilityTransition.image = m_PrevVisibilityTexture->getImage();
-    prevVisibilityTransition.subresourceRange = subresourceRange;
-    prevVisibilityTransition.srcAccessMask = 0;
-    prevVisibilityTransition.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    VkImageMemoryBarrier prevVisibilityTransition = m_PrevVisibilityTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(prevVisibilityTransition);
 
     vkCmdPipelineBarrier(
@@ -715,54 +680,30 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
     std::vector<VkImageMemoryBarrier> preTraceBarriers;
     
     // 1. Transition ray data texture to general layout for storage image access
-    VkImageMemoryBarrier rayDataWriteBarrier{};
-    rayDataWriteBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    rayDataWriteBarrier.oldLayout = m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    rayDataWriteBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    rayDataWriteBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    rayDataWriteBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    rayDataWriteBarrier.image = m_RayDataTexture->getImage();
-    rayDataWriteBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    rayDataWriteBarrier.subresourceRange.baseMipLevel = 0;
-    rayDataWriteBarrier.subresourceRange.levelCount = 1;
-    rayDataWriteBarrier.subresourceRange.baseArrayLayer = 0;
-    rayDataWriteBarrier.subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
-    rayDataWriteBarrier.srcAccessMask = m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT;
-    rayDataWriteBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    VkImageMemoryBarrier rayDataWriteBarrier = m_RayDataTexture->getImageMemoryBarrier(
+        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_IMAGE_LAYOUT_GENERAL, 
+        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
+        VK_ACCESS_SHADER_WRITE_BIT);
+
     preTraceBarriers.push_back(rayDataWriteBarrier);
 
     // 2. Ensure previous radiance texture is ready for reading
-    VkImageMemoryBarrier prevRadianceReadBarrier{};
-    prevRadianceReadBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    prevRadianceReadBarrier.oldLayout = m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    prevRadianceReadBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    prevRadianceReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prevRadianceReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prevRadianceReadBarrier.image = (m_isEvenFrame ? m_PrevRadianceTexture : m_RadianceTexture)->getImage();
-    prevRadianceReadBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    prevRadianceReadBarrier.subresourceRange.baseMipLevel = 0;
-    prevRadianceReadBarrier.subresourceRange.levelCount = 1;
-    prevRadianceReadBarrier.subresourceRange.baseArrayLayer = 0;
-    prevRadianceReadBarrier.subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
-    prevRadianceReadBarrier.srcAccessMask = m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT;
-    prevRadianceReadBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    VkImageMemoryBarrier prevRadianceReadBarrier = (m_isEvenFrame ? m_PrevRadianceTexture : m_RadianceTexture)->getImageMemoryBarrier(
+        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
+        VK_ACCESS_SHADER_READ_BIT);
+
     preTraceBarriers.push_back(prevRadianceReadBarrier);
 
     // 3. Ensure previous visibility texture is ready for reading
-    VkImageMemoryBarrier prevVisibilityReadBarrier{};
-    prevVisibilityReadBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    prevVisibilityReadBarrier.oldLayout = m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    prevVisibilityReadBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    prevVisibilityReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prevVisibilityReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prevVisibilityReadBarrier.image = (m_isEvenFrame ? m_PrevVisibilityTexture : m_VisibilityTexture)->getImage();
-    prevVisibilityReadBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    prevVisibilityReadBarrier.subresourceRange.baseMipLevel = 0;
-    prevVisibilityReadBarrier.subresourceRange.levelCount = 1;
-    prevVisibilityReadBarrier.subresourceRange.baseArrayLayer = 0;
-    prevVisibilityReadBarrier.subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
-    prevVisibilityReadBarrier.srcAccessMask = m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT;
-    prevVisibilityReadBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    VkImageMemoryBarrier prevVisibilityReadBarrier = (m_isEvenFrame ? m_PrevVisibilityTexture : m_VisibilityTexture)->getImageMemoryBarrier(
+        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
+        VK_ACCESS_SHADER_READ_BIT);
+
     preTraceBarriers.push_back(prevVisibilityReadBarrier);
     
     vkCmdPipelineBarrier(
@@ -823,20 +764,12 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
     vkCmdDispatch(m_CommandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, workGroupsZ);
 
     // === BARRIER PHASE 2: After trace shader - transition ray data for reading ===
-    VkImageMemoryBarrier rayDataReadBarrier{};
-    rayDataReadBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    rayDataReadBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    rayDataReadBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    rayDataReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    rayDataReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    rayDataReadBarrier.image = m_RayDataTexture->getImage();
-    rayDataReadBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    rayDataReadBarrier.subresourceRange.baseMipLevel = 0;
-    rayDataReadBarrier.subresourceRange.levelCount = 1;
-    rayDataReadBarrier.subresourceRange.baseArrayLayer = 0;
-    rayDataReadBarrier.subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
-    rayDataReadBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    rayDataReadBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    VkImageMemoryBarrier rayDataReadBarrier = m_RayDataTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_GENERAL, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_ACCESS_SHADER_WRITE_BIT, 
+        VK_ACCESS_SHADER_READ_BIT);
+
     
     vkCmdPipelineBarrier(
         m_CommandBuffer->getCommandBufferVk(),
@@ -861,36 +794,20 @@ void DynamicDiffuseGI::blendTextures() {
     // Ensure ray data is in shader read mode (should already be done)
     // Ensure previous textures are in shader read mode (should already be done)
     // Transition current textures to storage image mode for blending output
-    VkImageMemoryBarrier currentRadianceWriteBarrier{};
-    currentRadianceWriteBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    currentRadianceWriteBarrier.oldLayout = m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    currentRadianceWriteBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    currentRadianceWriteBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    currentRadianceWriteBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    currentRadianceWriteBarrier.image = (m_isEvenFrame ? m_RadianceTexture : m_PrevRadianceTexture)->getImage();
-    currentRadianceWriteBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    currentRadianceWriteBarrier.subresourceRange.baseMipLevel = 0;
-    currentRadianceWriteBarrier.subresourceRange.levelCount = 1;
-    currentRadianceWriteBarrier.subresourceRange.baseArrayLayer = 0;
-    currentRadianceWriteBarrier.subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
-    currentRadianceWriteBarrier.srcAccessMask = m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT;
-    currentRadianceWriteBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    VkImageMemoryBarrier currentRadianceWriteBarrier = (m_isEvenFrame ? m_RadianceTexture : m_PrevRadianceTexture)->getImageMemoryBarrier(
+        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_IMAGE_LAYOUT_GENERAL, 
+        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
+        VK_ACCESS_SHADER_WRITE_BIT);
+
     preBlendingBarriers.push_back(currentRadianceWriteBarrier);
     
-    VkImageMemoryBarrier currentVisibilityWriteBarrier{};
-    currentVisibilityWriteBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    currentVisibilityWriteBarrier.oldLayout = m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    currentVisibilityWriteBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    currentVisibilityWriteBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    currentVisibilityWriteBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    currentVisibilityWriteBarrier.image = (m_isEvenFrame ? m_VisibilityTexture : m_PrevVisibilityTexture)->getImage();
-    currentVisibilityWriteBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    currentVisibilityWriteBarrier.subresourceRange.baseMipLevel = 0;
-    currentVisibilityWriteBarrier.subresourceRange.levelCount = 1;
-    currentVisibilityWriteBarrier.subresourceRange.baseArrayLayer = 0;
-    currentVisibilityWriteBarrier.subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
-    currentVisibilityWriteBarrier.srcAccessMask = m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT;
-    currentVisibilityWriteBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    VkImageMemoryBarrier currentVisibilityWriteBarrier = (m_isEvenFrame ? m_VisibilityTexture : m_PrevVisibilityTexture)->getImageMemoryBarrier(
+        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_IMAGE_LAYOUT_GENERAL, 
+        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
+        VK_ACCESS_SHADER_WRITE_BIT);
+
     preBlendingBarriers.push_back(currentVisibilityWriteBarrier);
     
     vkCmdPipelineBarrier(
@@ -946,36 +863,21 @@ void DynamicDiffuseGI::blendTextures() {
     // Transition current textures to shader read mode for next frame and final lighting
     std::vector<VkImageMemoryBarrier> postBlendingBarriers;
     
-    VkImageMemoryBarrier currentRadianceReadBarrier{};
-    currentRadianceReadBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    currentRadianceReadBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    currentRadianceReadBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    currentRadianceReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    currentRadianceReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    currentRadianceReadBarrier.image = (m_isEvenFrame ? m_RadianceTexture : m_PrevRadianceTexture)->getImage();
-    currentRadianceReadBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    currentRadianceReadBarrier.subresourceRange.baseMipLevel = 0;
-    currentRadianceReadBarrier.subresourceRange.levelCount = 1;
-    currentRadianceReadBarrier.subresourceRange.baseArrayLayer = 0;
-    currentRadianceReadBarrier.subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
-    currentRadianceReadBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    currentRadianceReadBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    VkImageMemoryBarrier currentRadianceReadBarrier = (m_isEvenFrame ? m_RadianceTexture : m_PrevRadianceTexture)->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_GENERAL, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_ACCESS_SHADER_WRITE_BIT, 
+        VK_ACCESS_SHADER_READ_BIT);
+
+
     postBlendingBarriers.push_back(currentRadianceReadBarrier);
     
-    VkImageMemoryBarrier currentVisibilityReadBarrier{};
-    currentVisibilityReadBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    currentVisibilityReadBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    currentVisibilityReadBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    currentVisibilityReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    currentVisibilityReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    currentVisibilityReadBarrier.image = (m_isEvenFrame ? m_VisibilityTexture : m_PrevVisibilityTexture)->getImage();
-    currentVisibilityReadBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    currentVisibilityReadBarrier.subresourceRange.baseMipLevel = 0;
-    currentVisibilityReadBarrier.subresourceRange.levelCount = 1;
-    currentVisibilityReadBarrier.subresourceRange.baseArrayLayer = 0;
-    currentVisibilityReadBarrier.subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
-    currentVisibilityReadBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    currentVisibilityReadBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    VkImageMemoryBarrier currentVisibilityReadBarrier = (m_isEvenFrame ? m_VisibilityTexture : m_PrevVisibilityTexture)->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_GENERAL, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_ACCESS_SHADER_WRITE_BIT, 
+        VK_ACCESS_SHADER_READ_BIT);
+
     postBlendingBarriers.push_back(currentVisibilityReadBarrier);
     
     vkCmdPipelineBarrier(

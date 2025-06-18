@@ -11,11 +11,23 @@
 - add probe relocation to the ddgi system
 - add support for different probe volumes
 - fix the weird artifacts, probably related to normals or something
-- fix brightness (sort of)
 - test system in one of the test scenes
-- try the different probe indexing method
+- generate HDR cubemap for the skybox
+
+- !!! update/rebuild the tlas
 
 
+
+# current focus
+
+- physics
+    - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)
+    - nice way to add some primitive meshes
+    - fixing the imguizmo thing
+    - ability to EASILY draw/add either a bbox debug to a mesh or switch to wireframe, this is needed to visualise the colliders
+
+- terrain
+- optimisations
 
 
 ### J*B SYSTEM
@@ -32,19 +44,23 @@
 TODO
 - general descriptor manager
 - fix the gizmo rotation math
-- completly redo the project setup structure to consitently build every lib the same way
 
 --------------------------------
 
+# features / stuff to add
+
 - ray picking
 - static meshes
-
+- ssao
+- (lod)
+- mipmaps
 - materials in the asset manager
+- emmisive materials
+- Photometry (use camera settings to calculate the correct exposure)
 
-- physics
 - animations
 - giga serializaiton
-- terrain
+
 - post processing
 - procedural stuff
 - some limit testing

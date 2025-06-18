@@ -88,6 +88,8 @@ void BrowserPanel::render() {
             
             ImGui::EndTable();
         }
+
+        renderContextMenuEmpty(m_scene.lock());
     } else {
         ImGui::Text("No active scene available");
     }
@@ -175,8 +177,14 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
     ImGui::TableSetColumnIndex(0);
     
     // Setup flags for the tree node
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow 
-                             | ImGuiTreeNodeFlags_SpanAllColumns; // Make the node span all columns
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
+    
+    // Only span all columns if not in rename mode (to allow input field to receive clicks)
+    if (m_renamingEntity.lock() != node->entity) {
+        flags |= ImGuiTreeNodeFlags_SpanAllColumns; // Make the node span all columns
+    } else {
+        flags |= ImGuiTreeNodeFlags_AllowItemOverlap; // Allow input field to receive clicks
+    }
     
     if (node->children.empty()) {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen; // Leaf node specifics
@@ -200,23 +208,61 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
     );
     ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0 + (rowIndex % 2), rowBgColor);
     
+    bool nodeOpen = false;
+    if (m_renamingEntity.lock() == node->entity) {
+        nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)node->entity->getID(), flags, "%s", "");
+
+    } else {
     // Render the tree node itself
-    bool nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)node->entity->getID(), flags, "%s", node->entityName.c_str());
+        nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)node->entity->getID(), flags, "%s", node->entityName.c_str());
+    }
+
     
     // Handle click for selection (only if not toggling open/close)
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
         Rapture::GameEvents::onEntitySelected().publish(node->entity);
     }
+
+         if (m_renamingEntity.lock() == node->entity) {
+         ImGui::SameLine();
+
+         // Style the input field to be seamless with the table row
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));       // Remove padding to match text height
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);            // Remove border
+         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+         if (ImGui::InputText("##xx", m_entityRenameBuffer, sizeof(m_entityRenameBuffer), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CharsNoBlank | ImGuiInputTextFlags_AutoSelectAll)) {
+             node->entity->getComponent<Rapture::TagComponent>().tag = std::string(m_entityRenameBuffer);
+             m_needsHierarchyRebuild = true;
+             m_renamingEntity.reset();
+         }
+
+         ImGui::PopStyleVar(2);  // Pop the 2 style vars (FramePadding, FrameBorderSize)
+         ImGui::PopStyleColor();
+     }
     
     // Context Menu (Example)
     if (ImGui::BeginPopupContextItem()) {
-        if (ImGui::MenuItem("Properties")) {
- 
+
+        if (ImGui::MenuItem("Rename Entity")) {
+            // close the contextmenu, and let the user edit the name rendered
+            // when the user presses enter, get the tag component and update the name
+
+            strncpy(m_entityRenameBuffer, node->entityName.c_str(), sizeof(m_entityRenameBuffer) - 1);
+            m_entityRenameBuffer[sizeof(m_entityRenameBuffer) - 1] = '\0';
+            m_renamingEntity = node->entity;
+
         }
+
         // Add other actions like Delete, Duplicate, Add Child etc.
         if (ImGui::MenuItem("Delete Entity")) {
              // TODO: Implement entity deletion logic 
              Rapture::RP_WARN("Delete entity requested not implemented yet.");
+        }
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Properties")) {
+ 
         }
         ImGui::EndPopup();
     }
@@ -241,5 +287,23 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
             renderHierarchyRow(childNode, depth + 1, rowIndex);
         }
         ImGui::TreePop(); // Pop the node if it was opened and not a leaf
+    }
+}
+
+void BrowserPanel::renderContextMenuEmpty(std::shared_ptr<Rapture::Scene> scene) {
+    // Only show background context menu if we're not hovering over any item
+    // and the mouse is within the window bounds
+    if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
+        ImGui::OpenPopup("ContextMenuEmpty");
+    }
+
+    if (ImGui::BeginPopup("ContextMenuEmpty")) {
+        if (ImGui::MenuItem("Create Entity")) {
+            auto entity = scene->createEntity("New Entity");
+            if (entity.isValid()) {
+                Rapture::GameEvents::onEntitySelected().publish(std::make_shared<Rapture::Entity>(entity));
+            }
+        }
+        ImGui::EndPopup();
     }
 }
