@@ -31,12 +31,10 @@ struct MeshInfo {
 
 
 struct SunProperties {
-    alignas(16) glm::mat4 sunLightSpaceMatrix;      // Light-space matrices for each cascade
     alignas(16) glm::vec3 sunDirectionWorld;        // Normalized direction FROM fragment TO sun
     alignas(16) glm::vec3 sunColor;
 
     alignas(4) float sunIntensity;
-    alignas(4) uint32_t sunShadowTextureArrayIndex; // Descriptor array index for sampler2DShadow
 };
 
 struct ProbeVolume {

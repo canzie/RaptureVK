@@ -18,7 +18,7 @@ layout(location = 0) in vec2 fragTexCoord;
 #define DEBUG_SPOTLIGHTS 0
 #define MAX_CASCADES 4
 #define MAX_SHADOW_CASTERS 4
-#define DEBUG_CASCADES 1
+#define DEBUG_CASCADES 0
 #define DEBUG_DIRECTIONAL_SHADOWS 0  // Set to 1 to enable debugging
 #define DEBUG_SHADOW_COORDS 0
 

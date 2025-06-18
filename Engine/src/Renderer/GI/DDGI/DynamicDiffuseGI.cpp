@@ -593,6 +593,11 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
         // First populate the probe data
         populateProbes(scene);
     }
+
+    if (m_isVolumeDirty) {
+        // Update the probe volume
+        updateProbeVolume();
+    }
     
     updateSunProperties(scene);
     updateSkybox(scene);
@@ -656,6 +661,8 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene) {
         }
     }
 }
+
+
 
 std::shared_ptr<Texture> DynamicDiffuseGI::getRadianceTexture() {
 
@@ -1039,6 +1046,22 @@ void DynamicDiffuseGI::initTextures(){
 
 }
 
+void DynamicDiffuseGI::updateProbeVolume() {
+
+    if (!m_ProbeInfoBuffer) {
+        RP_CORE_ERROR("DynamicDiffuseGI::updateProbeVolume - Probe info buffer not initialized");
+        return;
+    }
+
+    if (!m_isVolumeDirty) {
+        return;
+    }
+
+    m_ProbeInfoBuffer->addDataGPU(&m_ProbeVolume, sizeof(ProbeVolume), 0);
+    m_isVolumeDirty = false;
+
+}
+
 void DynamicDiffuseGI::initProbeInfoBuffer() {
 
         ProbeVolume probeVolume;
@@ -1085,25 +1108,21 @@ void DynamicDiffuseGI::initProbeInfoBuffer() {
 void DynamicDiffuseGI::updateSunProperties(std::shared_ptr<Scene> scene) {
 
     auto& reg = scene->getRegistry();
-    auto MMview = reg.view<TransformComponent, LightComponent, ShadowComponent>();
+    auto MMview = reg.view<TransformComponent, LightComponent>();
 
     // Use default fake values for now as requested
-    m_SunShadowProps.sunLightSpaceMatrix = glm::mat4(1.0f);
     m_SunShadowProps.sunDirectionWorld = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
     m_SunShadowProps.sunColor = glm::vec3(1.0f, 1.0f, 1.0f);
     m_SunShadowProps.sunIntensity = 0.0f;
-    m_SunShadowProps.sunShadowTextureArrayIndex = 0;
 
     for (auto ent : MMview) {
-        auto [transformComp, lightComp, shadowMapComp] = MMview.get<TransformComponent, LightComponent, ShadowComponent>(ent);
+        auto [transformComp, lightComp] = MMview.get<TransformComponent, LightComponent>(ent);
 
         if (lightComp.type == LightType::Directional) {
-            m_SunShadowProps.sunLightSpaceMatrix = shadowMapComp.shadowMap->getLightViewProjection();
             glm::quat rotationQuat = transformComp.transforms.getRotationQuat();
             m_SunShadowProps.sunDirectionWorld = glm::normalize(rotationQuat * glm::vec3(0, 0, -1));
             m_SunShadowProps.sunColor = lightComp.color;
             m_SunShadowProps.sunIntensity = lightComp.intensity;
-            m_SunShadowProps.sunShadowTextureArrayIndex = shadowMapComp.shadowMap->getTextureHandle();
             break;
         }
 
@@ -1126,11 +1145,9 @@ void DynamicDiffuseGI::updateSunProperties(std::shared_ptr<Scene> scene) {
 void DynamicDiffuseGI::initializeSunProperties() {
     // Use default fake values for now as requested
     m_SunShadowProps = {};
-    m_SunShadowProps.sunLightSpaceMatrix = glm::mat4(1.0f);
     m_SunShadowProps.sunDirectionWorld = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
     m_SunShadowProps.sunColor = glm::vec3(1.0f, 1.0f, 1.0f);
     m_SunShadowProps.sunIntensity = 0.0f;
-    m_SunShadowProps.sunShadowTextureArrayIndex = 0;
 
 
     // Update the sun light buffer

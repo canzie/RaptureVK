@@ -62,7 +62,6 @@ layout(std430, set=0, binding = 5) readonly buffer SceneInfo {
 #ifndef DESCRIPTOR_ARRAYS_DEFINED
 #define DESCRIPTOR_ARRAYS_DEFINED
 layout(set = 3, binding = 0) uniform sampler2D gTextures[];
-layout(set = 3, binding = 0) uniform sampler2DShadow gShadowMaps[];
 #endif
 
 #include "ProbeCommon.glsl"
@@ -302,6 +301,8 @@ void main() {
     bool isFrontFacing = true;
 
 
+    
+
 
 
     if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
@@ -326,12 +327,12 @@ void main() {
             vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent, surface.bitangent);
             vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
     
-            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_SunProperties);
-
             // Indirect Lighting (recursive)
             vec3 irradiance = vec3(0.0);
             // Use the ray's own direction for surface bias, not the main camera direction
             vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, probeRayDirection, u_volume);
+
+            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_SunProperties);
 
             // Get irradiance from the DDGIVolume
             irradiance = DDGIGetVolumeIrradiance(
@@ -357,7 +358,7 @@ void main() {
     } else {
         // Miss - sample skybox and store blue color for visualization
         vec3 skyboxColor = texture(u_skyboxCubemap, probeRayDirection).rgb;
-        skyboxColor *= u_SunProperties.sunIntensity * u_SunProperties.sunColor;
+        //skyboxColor *= u_SunProperties.sunIntensity * u_SunProperties.sunColor;
         
         DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor);
     }

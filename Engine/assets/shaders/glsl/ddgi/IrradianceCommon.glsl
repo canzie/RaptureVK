@@ -8,80 +8,82 @@
 #endif
 
 struct SunProperties {
-    mat4 sunLightSpaceMatrix;
     vec3 sunDirectionWorld;
     vec3 sunColor;
-
     float sunIntensity;
-    uint sunShadowTextureArrayIndex;
 };
 
 #ifdef DDGI_ENABLE_DIFFUSE_LIGHTING
 
-float calculateSunShadowFactor(vec3 hitPositionWorld, vec3 hitNormalWorld, SunProperties sunProperties) {
-    if (sunProperties.sunShadowTextureArrayIndex == 0) return 1.0; // No shadow map or index is zero
-
-    // Transform hit position to light clip space for the largest cascade
-    vec4 hitPosLightSpace = sunProperties.sunLightSpaceMatrix * vec4(hitPositionWorld, 1.0);
-
-    // Perform perspective divide
-    vec3 projCoords = hitPosLightSpace.xyz / hitPosLightSpace.w;
-
-    // Transform to [0,1] range for texture lookup
-    projCoords.xy = projCoords.xy * 0.5 + 0.5;
-
-    // Check if fragment is outside the light's view frustum [0, 1] range
-    if(projCoords.x < 0.0 || projCoords.x > 1.0 ||
-       projCoords.y < 0.0 || projCoords.y > 1.0 ||
-       projCoords.z < 0.0 || projCoords.z > 1.0) { // Check Z too
-        return 1.0; // Outside frustum = Not shadowed
-    }
-
-    vec3 lightWorldDir = normalize(-sunProperties.sunDirectionWorld);
-    float cosTheta = clamp(dot(hitNormalWorld, lightWorldDir), 0.0, 1.0);
-    float bias = max(0.005 * (1.0 - cosTheta), 0.001);
-
-    float comparisonDepth = projCoords.z - bias;
+/**
+ * Computes the visibility factor for a given vector to a light using ray tracing.
+ */
+float LightVisibility(
+    vec3 worldPosition,
+    vec3 normal,
+    vec3 lightVector,
+    float tmax,
+    float normalBias,
+    float viewBias)
+{
+    // Create a visibility ray query
+    rayQueryEXT visibilityQuery;
     
-    vec2 texelSize = 1.0 / textureSize(gShadowMaps[sunProperties.sunShadowTextureArrayIndex], 0);
-
-    // Use descriptor array to access shadow map
-    float shadowFactor = 0.0;
-
-    // Use a 3x3 kernel for PCF
-    for(int x = -1; x <= 1; ++x) {
-        for(int y = -1; y <= 1; ++y) {
-            shadowFactor += texture(gShadowMaps[sunProperties.sunShadowTextureArrayIndex], vec3(
-                projCoords.xy + vec2(x, y) * texelSize,
-                comparisonDepth
-            ));
-        }
-    }
-    shadowFactor /= 9.0; // Average the results
+    vec3 rayOrigin = worldPosition + (normal * normalBias); // TODO: not using viewBias yet
+    vec3 rayDirection = normalize(lightVector);
     
-    return clamp(shadowFactor, 0.0, 1.0);
+    // Initialize ray query for visibility test
+    // Use ACCEPT_FIRST_HIT and SKIP_CLOSEST_HIT equivalent flags
+    rayQueryInitializeEXT(
+        visibilityQuery, 
+        topLevelAS, 
+        gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT, 
+        0xFF,
+        rayOrigin, 
+        0.0, 
+        rayDirection, 
+        tmax
+    );
+    
+    // Process the ray query
+    rayQueryProceedEXT(visibilityQuery);
+    
+    // Check if we hit anything (if we did, the light is occluded)
+    if (rayQueryGetIntersectionTypeEXT(visibilityQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
+        return 0.0; // Occluded
+    }
+    
+    return 1.0; // Visible
 }
 
 /**
- * Evaluate direct lighting for the current surface and the directional light.
- * should sample the shadow map for light visability
+ * Evaluate direct lighting for the current surface and the directional light using ray-traced visibility.
  */
 vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties) {   
-
-    // sample shadow map here
-    float shadowFactor = calculateSunShadowFactor(hitPositionWorld, shadingNormal, sunProperties);
-    //shadowFactor = 0.0;
-    // Early out, the light isn't visible from the surface
-    if (shadowFactor == 0.0){
+    
+    // Use ray-traced visibility instead of shadow maps
+    float normalBias = 0.01; // Small bias to avoid self-intersection
+    float viewBias = 0.0;    // Not used yet, but kept for future
+    
+    float visibility = LightVisibility(
+        hitPositionWorld,
+        shadingNormal,
+        -sunProperties.sunDirectionWorld,  // Light vector (towards sun)
+        1e27,                              // Very large tmax for directional light
+        normalBias,
+        viewBias
+    );
+    
+    // Early out if the light isn't visible from the surface
+    if (visibility <= 0.0) {
         return vec3(0.0);
     }
-
+    
     // Compute lighting
     vec3 lightDirection = normalize(-sunProperties.sunDirectionWorld);
     float NdotL = max(dot(shadingNormal, lightDirection), 0.0);
-
-    // could maybe sample skubox here, doesnt matter much right now
-    return sunProperties.sunIntensity * sunProperties.sunColor * NdotL * shadowFactor;
+    
+    return sunProperties.sunIntensity * sunProperties.sunColor * NdotL * visibility;
 }
 
 vec3 EvaluateSpotLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties)

@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
@@ -46,6 +47,8 @@ public:
 
   // Getter for GBuffer pass
   static std::shared_ptr<GBufferPass> getGBufferPass() { return m_gbufferPass; }
+
+  static std::shared_ptr<DynamicDiffuseGI> getDynamicDiffuseGI() { return m_dynamicDiffuseGI; }
 
 private:
   // sets up command pools and buffers

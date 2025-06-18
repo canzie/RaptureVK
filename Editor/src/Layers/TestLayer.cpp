@@ -124,8 +124,6 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         1.2f                         // High intensity
     );
     sunLight.addComponent<Rapture::CascadedShadowComponent>(2048, 2048, 4, 0.8f);
-    auto& sm = sunLight.addComponent<Rapture::ShadowComponent>(4096, 4096);
-    sm.isActive = false;
 
     auto perlinNoiseTexture = Rapture::PerlinNoiseGenerator::generateNoise(1024, 1024, 4, 0.5f, 2.0f, 8.0f);
 

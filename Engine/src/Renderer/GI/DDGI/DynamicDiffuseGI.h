@@ -49,6 +49,11 @@ public:
     bool isFrameEven() { return m_isEvenFrame; }
 
     void updateSkybox(std::shared_ptr<Scene> scene);
+    void updateProbeVolume();
+
+    ProbeVolume& getProbeVolume() { return m_ProbeVolume; }
+    void setProbeVolume(const ProbeVolume& probeVolume) { m_ProbeVolume = probeVolume; m_isVolumeDirty = true; }
+    void setVolumeDirty(bool dirty) { m_isVolumeDirty = dirty; }
 
 private:
     void castRays(std::shared_ptr<Scene> scene);
@@ -115,7 +120,11 @@ private:
     bool m_isPopulated;
     bool m_isFirstFrame;
 
+    bool m_isVolumeDirty;
+
     float m_Hysteresis;
+
+
 
     uint32_t m_meshCount;
     uint32_t m_probesPerRow; // Number of probes along the X-axis of the atlas texture

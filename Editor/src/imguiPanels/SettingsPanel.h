@@ -9,5 +9,8 @@ class SettingsPanel {
         ~SettingsPanel();
 
         void render();
+
+        void renderRendererSettings();
+        void renderDDGISettings();
 };
 
