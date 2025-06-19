@@ -143,6 +143,11 @@ void Application::run() {
       layer->onUpdate(Timestep::deltaTime());
     }
 
+    auto activeScene = m_project->getActiveScene();
+    if (activeScene) {
+      activeScene->onUpdate(Timestep::deltaTime());
+    }
+
     m_window->onUpdate();
 
     TracyProfiler::endFrame();

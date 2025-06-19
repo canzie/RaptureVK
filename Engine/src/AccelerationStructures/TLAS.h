@@ -35,6 +35,12 @@ public:
     
     // Update the acceleration structure (useful for dynamic scenes)
     void update();
+    
+    // Update specific instances efficiently without full rebuild
+    void updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>>& instanceUpdates);
+    
+    // Update a single instance
+    void updateInstance(uint32_t instanceIndex, const glm::mat4& newTransform);
 
     // Get the acceleration structure handle
     VkAccelerationStructureKHR getAccelerationStructure() const { return m_accelerationStructure; }
@@ -51,11 +57,13 @@ public:
     // Get number of instances
     uint32_t getInstanceCount() const { return static_cast<uint32_t>(m_instances.size()); }
     const std::vector<TLASInstance>& getInstances() const { return m_instances; }
+    std::vector<TLASInstance>& getInstances() { return m_instances; }
 
 private:
     void createAccelerationStructure();
     void createInstanceBuffer();
     void buildAccelerationStructure();
+    void updateInstanceBuffer(const std::vector<std::pair<uint32_t, glm::mat4>>& instanceUpdates);
 
 private:
     std::vector<TLASInstance> m_instances;
@@ -83,6 +91,7 @@ private:
     
     bool m_isBuilt;
     bool m_needsRebuild;
+    bool m_supportsUpdate;  // Whether the device supports AS updates
     
     // Vulkan handles
     VkDevice m_device;

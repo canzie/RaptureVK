@@ -325,11 +325,7 @@ namespace Rapture {
                 processNode(nodeEntity, firstNode);
             }
         }
-        try {
-            m_scene->buildTLAS();
-        } catch (const std::runtime_error& e) {
-            RP_CORE_ERROR("glTF2Loader: Failed to build TLAS: {}", e.what());
-        }
+
 
         // Clean up
         cleanUp();

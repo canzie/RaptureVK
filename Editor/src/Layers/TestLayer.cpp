@@ -92,6 +92,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     //auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf", activeScene);
     //loader->loadModel((rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf").string());
 
+    auto cube = activeScene->createCube("Cube");
+    auto sphere = activeScene->createSphere("Sphere");
 
     Rapture::Entity light1 = activeScene->createEntity("Spot Light 1");
     light1.addComponent<Rapture::TransformComponent>(
@@ -132,6 +134,12 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     skybox.addComponent<Rapture::SkyboxComponent>(rootPath / "assets/textures/cubemaps/default.cubemap");
     activeScene->setSkybox(skybox);
+
+    try {
+        activeScene->buildTLAS();
+    } catch (const std::runtime_error& e) {
+        Rapture::RP_ERROR("glTF2Loader: Failed to build TLAS: {}", e.what());
+    }
 
     Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
 }

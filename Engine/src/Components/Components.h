@@ -207,6 +207,11 @@ namespace Rapture {
         MeshComponent() {
             mesh = std::make_shared<Mesh>();
         };
+
+        MeshComponent(std::shared_ptr<Mesh> mesh) {
+            this->mesh = mesh;
+            isLoading = false;
+        };
     };
 
     struct InstanceComponent {

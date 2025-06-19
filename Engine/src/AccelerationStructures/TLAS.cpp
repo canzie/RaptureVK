@@ -21,6 +21,7 @@ TLAS::TLAS()
     , m_scratchSize(0)
     , m_isBuilt(false)
     , m_needsRebuild(false)
+    , m_supportsUpdate(true)  // Assume true for now, could check device features
 {
     auto& app = Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
@@ -356,6 +357,174 @@ void TLAS::update() {
     // For simplicity, we'll rebuild instead of update for now
     // In a more optimized implementation, you could use UPDATE mode
     build();
+}
+
+void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>>& instanceUpdates) {
+    if (!m_isBuilt) {
+        RP_CORE_WARN("TLAS: Cannot update unbuilt acceleration structure");
+        return;
+    }
+    
+    if (instanceUpdates.empty()) {
+        return;
+    }
+    
+    // Update the internal instance data with new transforms
+    for (const auto& [instanceIndex, newTransform] : instanceUpdates) {
+        if (instanceIndex < m_instances.size()) {
+            m_instances[instanceIndex].transform = newTransform;
+        }
+    }
+    
+    // Update instance buffer with changed instances
+    updateInstanceBuffer(instanceUpdates);
+    
+    if (m_supportsUpdate) {
+        // Use efficient update path
+        auto& app = Application::getInstance();
+        auto& vulkanContext = app.getVulkanContext();
+        
+        // Create scratch buffer for update
+        VkBufferCreateInfo scratchBufferCreateInfo{};
+        scratchBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        scratchBufferCreateInfo.size = m_scratchSize;
+        scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+        
+        VmaAllocationCreateInfo scratchAllocCreateInfo{};
+        scratchAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        
+        VkBuffer updateScratchBuffer;
+        VmaAllocation updateScratchAllocation;
+        
+        if (vmaCreateBuffer(m_allocator, &scratchBufferCreateInfo, &scratchAllocCreateInfo, 
+                           &updateScratchBuffer, &updateScratchAllocation, nullptr) != VK_SUCCESS) {
+            RP_CORE_ERROR("TLAS: Failed to create update scratch buffer!");
+            // Fall back to full rebuild
+            build();
+            return;
+        }
+        
+        // Get scratch buffer device address
+        VkBufferDeviceAddressInfo scratchAddressInfo{};
+        scratchAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+        scratchAddressInfo.buffer = updateScratchBuffer;
+        VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(m_device, &scratchAddressInfo);
+        
+        // Update build info for update mode
+        m_buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
+        m_buildInfo.srcAccelerationStructure = m_accelerationStructure;
+        m_buildInfo.dstAccelerationStructure = m_accelerationStructure;
+        m_buildInfo.scratchData.deviceAddress = scratchAddress;
+        
+        // Create command buffer for update
+        CommandPoolConfig poolConfig{};
+        poolConfig.queueFamilyIndex = vulkanContext.getQueueFamilyIndices().graphicsFamily.value();
+        poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        
+        auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
+        auto commandBuffer = commandPool->getCommandBuffer();
+        
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        
+        vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+        
+        // Update acceleration structure
+        const VkAccelerationStructureBuildRangeInfoKHR* pBuildRangeInfo = &m_buildRangeInfo;
+        vulkanContext.vkCmdBuildAccelerationStructuresKHR(
+            commandBuffer->getCommandBufferVk(),
+            1,
+            &m_buildInfo,
+            &pBuildRangeInfo
+        );
+        
+        // Add memory barrier
+        VkMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+        barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+        
+        vkCmdPipelineBarrier(
+            commandBuffer->getCommandBufferVk(),
+            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            0,
+            1, &barrier,
+            0, nullptr,
+            0, nullptr
+        );
+        
+        commandBuffer->end();
+        
+        // Submit command buffer
+        auto queue = vulkanContext.getGraphicsQueue();
+        queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+        queue->waitIdle();
+        
+        // Clean up update scratch buffer
+        vmaDestroyBuffer(m_allocator, updateScratchBuffer, updateScratchAllocation);
+        
+        // Reset build mode back to build
+        m_buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+        m_buildInfo.srcAccelerationStructure = VK_NULL_HANDLE;
+        
+        RP_CORE_INFO("TLAS: Updated {} instances efficiently", instanceUpdates.size());
+    } else {
+        // Fall back to full rebuild if update is not supported
+        RP_CORE_WARN("TLAS: Device doesn't support AS updates, falling back to rebuild");
+        build();
+    }
+}
+
+void TLAS::updateInstance(uint32_t instanceIndex, const glm::mat4& newTransform) {
+    updateInstances({{instanceIndex, newTransform}});
+}
+
+void TLAS::updateInstanceBuffer(const std::vector<std::pair<uint32_t, glm::mat4>>& instanceUpdates) {
+    if (m_instanceBuffer == VK_NULL_HANDLE || m_instances.empty()) {
+        return;
+    }
+    
+    if (instanceUpdates.empty()) {
+        return; // No changes, nothing to update
+    }
+    
+    // Get mapped data
+    VmaAllocationInfo allocInfo{};
+    vmaGetAllocationInfo(m_allocator, m_instanceAllocation, &allocInfo);
+    
+    if (!allocInfo.pMappedData) {
+        RP_CORE_ERROR("TLAS: Instance buffer is not mapped!");
+        return;
+    }
+    
+    VkAccelerationStructureInstanceKHR* instanceData = 
+        static_cast<VkAccelerationStructureInstanceKHR*>(allocInfo.pMappedData);
+    
+    // Update only changed instances
+    for (const auto& [instanceIndex, newTransform] : instanceUpdates) {
+        if (instanceIndex < m_instances.size()) {
+            // Copy transform matrix (transposed for Vulkan)
+            glm::mat4 transposed = glm::transpose(newTransform);
+            memcpy(&instanceData[instanceIndex].transform, &transposed, sizeof(VkTransformMatrixKHR));
+            
+            instanceData[instanceIndex].instanceCustomIndex = instanceIndex;
+            instanceData[instanceIndex].mask = m_instances[instanceIndex].mask;
+            instanceData[instanceIndex].instanceShaderBindingTableRecordOffset = m_instances[instanceIndex].shaderBindingTableRecordOffset;
+            instanceData[instanceIndex].flags = m_instances[instanceIndex].flags;
+            instanceData[instanceIndex].accelerationStructureReference = m_instances[instanceIndex].blas->getDeviceAddress();
+        }
+    }
+    
+    // Flush specific ranges
+    for (const auto& [instanceIndex, newTransform] : instanceUpdates) {
+        if (instanceIndex < m_instances.size()) {
+            VkDeviceSize offset = sizeof(VkAccelerationStructureInstanceKHR) * instanceIndex;
+            VkDeviceSize size = sizeof(VkAccelerationStructureInstanceKHR);
+            vmaFlushAllocation(m_allocator, m_instanceAllocation, offset, size);
+        }
+    }
 }
 
 } 

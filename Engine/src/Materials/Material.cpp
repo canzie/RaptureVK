@@ -88,7 +88,7 @@ void MaterialManager::init() {
     RP_CORE_ERROR("MaterialManager::init - {}", e.what());
   }
 
-  const std::string pbrShaderPath = "SPIRV/pbr.vs.spv";
+  const std::string pbrShaderPath = "SPIRV/GBuffer.vs.spv";
 
   auto [pbrShader, pbrShaderHandle] =
       AssetManager::importAsset<Shader>(shaderPath / pbrShaderPath);

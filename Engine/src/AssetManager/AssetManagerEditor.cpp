@@ -4,7 +4,7 @@
 #include "Logging/Log.h"
 #include "Materials/Material.h"
 #include "Textures/Texture.h"
-
+#include "Materials/MaterialInstance.h"
 #include "WindowContext/Application.h"
 
 #include <filesystem>
@@ -173,6 +173,30 @@ namespace Rapture {
                 RP_CORE_INFO("AssetManagerEditor::importDefaultAsset - Created default white texture with handle");
                 return std::make_pair(asset, handle);
             }
+            case AssetType::Material: {
+                // Create default material
+                auto baseMaterial = MaterialManager::getMaterial("PBR");
+                if (!baseMaterial) {
+                    RP_CORE_ERROR("AssetManagerEditor::importDefaultAsset - Failed to get default material");
+                    return std::make_pair(nullptr, AssetHandle());
+                }
+
+                auto defaultMaterial = std::make_shared<MaterialInstance>(baseMaterial, "Default");
+                if (!defaultMaterial) {
+                    RP_CORE_ERROR("AssetManagerEditor::importDefaultAsset - Failed to create default material");
+                    return std::make_pair(nullptr, AssetHandle());
+                }
+
+                // Generate a handle for the default material
+                AssetHandle handle = UUIDGenerator::Generate();
+
+                AssetVariant assetVariant = defaultMaterial;
+                std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
+                std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+                asset->m_handle = handle;
+
+                return std::make_pair(asset, handle);
+                }
             default:
                 RP_CORE_WARN("AssetManagerEditor::importDefaultAsset - Default asset type {} not implemented", AssetTypeToString(assetType));
                 return std::make_pair(nullptr, AssetHandle());

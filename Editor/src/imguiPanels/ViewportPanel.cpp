@@ -253,7 +253,7 @@ void ViewportPanel::renderEntityGizmo() {
     }
     
     auto [transformComponent, bbComp] = m_selectedEntity->tryGetComponents<Rapture::TransformComponent, Rapture::BoundingBoxComponent>();
-    if (!transformComponent || !bbComp) {
+    if (!transformComponent) {
         return;
     }
 

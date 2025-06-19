@@ -304,6 +304,18 @@ void BrowserPanel::renderContextMenuEmpty(std::shared_ptr<Rapture::Scene> scene)
                 Rapture::GameEvents::onEntitySelected().publish(std::make_shared<Rapture::Entity>(entity));
             }
         }
+        if (ImGui::MenuItem("Create Cube")) {
+            auto entity = scene->createCube("New Cube");
+            if (entity.isValid()) {
+                Rapture::GameEvents::onEntitySelected().publish(std::make_shared<Rapture::Entity>(entity));
+            }
+        }
+        if (ImGui::MenuItem("Create Sphere")) {
+            auto entity = scene->createSphere("New Sphere");
+            if (entity.isValid()) {
+                Rapture::GameEvents::onEntitySelected().publish(std::make_shared<Rapture::Entity>(entity));
+            }
+        }
         ImGui::EndPopup();
     }
 }

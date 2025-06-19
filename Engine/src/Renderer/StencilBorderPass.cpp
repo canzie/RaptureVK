@@ -116,7 +116,7 @@ void StencilBorderPass::recordCommandBuffer(
     PushConstants pushConstants;
     pushConstants.model = model;
     pushConstants.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    pushConstants.borderWidth = 1.4f;
+    pushConstants.borderWidth = 0.01f;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
         m_pipeline->getPipelineLayoutVk(),

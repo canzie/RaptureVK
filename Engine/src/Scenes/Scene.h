@@ -25,9 +25,12 @@ namespace Rapture {
         ~Scene();
 
         Entity createEntity(const std::string& name = "Untitled Entity");
+        Entity createCube(const std::string& name = "Untitled Entity");
+        Entity createSphere(const std::string& name = "Untitled Entity");
+        
         void destroyEntity(Entity entity);
 
-        void onUpdate();
+        void onUpdate(uint32_t dt);
 
         entt::registry& getRegistry() { return m_Registry; }
         const entt::registry& getRegistry() const { return m_Registry; }
@@ -51,6 +54,8 @@ namespace Rapture {
 
         void buildTLAS();
         const TLAS& getTLAS() {return *m_tlas;}
+
+        void updateTLAS();
 
     private:
         entt::registry m_Registry;

@@ -31,7 +31,7 @@ public:
     void update(float deltaTime) {
         // Update all active scenes
         for (auto& [name, scene] : m_scenes) {
-            scene->onUpdate();
+            scene->onUpdate(deltaTime);
         }
     }
     

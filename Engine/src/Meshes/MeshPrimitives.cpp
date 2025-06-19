@@ -164,21 +164,21 @@ Mesh Primitives::CreateSphere(float radius, uint32_t segments)
         }
     }
 
-    // Generate indices
+    // Generate indices with correct winding order (counter-clockwise)
     for (uint16_t lat = 0; lat < segments; ++lat) {
         for (uint16_t lon = 0; lon < segments; ++lon) {
             uint16_t first = lat * (segments + 1) + lon;
             uint16_t second = first + segments + 1;
 
-            // First triangle
+            // First triangle (counter-clockwise)
             indices.push_back(first);
-            indices.push_back(second);
             indices.push_back(first + 1);
+            indices.push_back(second);
 
-            // Second triangle
+            // Second triangle (counter-clockwise)
             indices.push_back(second);
-            indices.push_back(second + 1);
             indices.push_back(first + 1);
+            indices.push_back(second + 1);
         }
     }
 
@@ -244,21 +244,21 @@ Mesh Primitives::CreatePlane(float segments)
         }
     }
 
-    // Generate indices
+    // Generate indices with correct winding order (counter-clockwise)
     for (uint16_t i = 0; i < segs; ++i) {
         for (uint16_t j = 0; j < segs; ++j) {
             uint16_t first = i * (segs + 1) + j;
             uint16_t second = first + segs + 1;
 
-            // First triangle
+            // First triangle (counter-clockwise)
             indices.push_back(first);
-            indices.push_back(second);
             indices.push_back(first + 1);
+            indices.push_back(second);
 
-            // Second triangle
+            // Second triangle (counter-clockwise)
             indices.push_back(second);
-            indices.push_back(second + 1);
             indices.push_back(first + 1);
+            indices.push_back(second + 1);
         }
     }
 

@@ -21,16 +21,19 @@ layout(push_constant) uniform PushConstants {
 } pushConstants;
 
 void main() {
-    // Transform normal to world space
+    mat4 modelView = ubo.view * pushConstants.model;
+    vec4 posView = modelView * vec4(aPosition, 1.0);
+
+    // Correctly transform normal to view space to handle non-uniform scaling
+    mat3 normalMatrix = transpose(inverse(mat3(modelView)));
+    vec3 normalView = normalize(normalMatrix * aNormal);
+
+    // Extrude vertex in view space for consistent border width
+    posView.xyz += normalView * pushConstants.borderWidth;
+
+    gl_Position = ubo.proj * posView;
+    
+    // These are not used by the current fragment shader but are kept for potential future use.
     vNormal = mat3(pushConstants.model) * aNormal;
-    
-    // Calculate position in world space
-    vec4 worldPos = pushConstants.model * vec4(aPosition, 1.0);
-    vPosition = worldPos.xyz;
-    
-    // Expand vertices along normal direction for border effect
-    vec3 expandedPos = aPosition + aNormal * pushConstants.borderWidth;
-    
-    // Transform to clip space
-    gl_Position = ubo.proj * ubo.view * pushConstants.model * vec4(expandedPos, 1.0);
+    vPosition = (pushConstants.model * vec4(aPosition, 1.0)).xyz;
 }
