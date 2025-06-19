@@ -18,6 +18,26 @@
 
 namespace Rapture {
 
+
+enum class GBufferFlags : uint32_t {
+    // Vertex attribute flags (bits 0-4)
+    HAS_NORMALS = 1u,
+    HAS_TANGENTS = 2u,
+    HAS_BITANGENTS = 4u,
+    HAS_TEXCOORDS = 8u,
+    
+    // Material texture flags (bits 5-13)
+    HAS_ALBEDO_MAP = 32u,
+    HAS_NORMAL_MAP = 64u,
+    HAS_METALLIC_ROUGHNESS_MAP = 128u,
+    HAS_AO_MAP = 256u,
+    HAS_METALLIC_MAP = 512u,
+    HAS_ROUGHNESS_MAP = 1024u,
+    HAS_EMISSIVE_MAP = 2048u,
+    HAS_SPECULAR_MAP = 4096u,
+    HAS_HEIGHT_MAP = 8192u
+};
+
 class GBufferPass {
 public:
     GBufferPass(float width, float height, uint32_t framesInFlight, std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs);

@@ -10,9 +10,19 @@ layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec2 inTexCoord;
 layout(location = 3) in vec3 inTangent;
 layout(location = 4) in vec3 inBitangent;
+layout(location = 5) in flat uint inFlags; // Receive flags from vertex shader
 
 precision highp float;
 
+// Bit flag definitions (must match vertex shader)
+const uint FLAG_HAS_NORMALS = 1u;
+const uint FLAG_HAS_TANGENTS = 2u;
+const uint FLAG_HAS_BITANGENTS = 4u;
+const uint FLAG_HAS_TEXCOORDS = 8u;
+const uint FLAG_HAS_ALBEDO_MAP = 32u;
+const uint FLAG_HAS_NORMAL_MAP = 64u;
+const uint FLAG_HAS_METALLIC_ROUGHNESS_MAP = 128u;
+const uint FLAG_HAS_AO_MAP = 256u;
 
 // PBR textures
 layout(set = 1, binding = 1) uniform sampler2D u_albedoMap;
@@ -27,82 +37,80 @@ layout(set = 1, binding = 0) uniform Material {
     float metallic;
 } material;
 
-vec3 getNormalFromMapNoTangent()
-{
-    vec3 tangentNormal = texture(u_normalMap, inTexCoord).xyz * 2.0 - 1.0;
-    
-    vec3 Q1  = dFdx(inFragPosDepth.xyz);
-    vec3 Q2  = dFdy(inFragPosDepth.xyz);
-    vec2 st1 = dFdx(inTexCoord);
-    vec2 st2 = dFdy(inTexCoord);
-
-    vec3 N   = normalize(inNormal);
-    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
-    vec3 B  = normalize(cross(N, T));
-    mat3 TBN = mat3(T, B, N);
-
-    return normalize(TBN * tangentNormal);
-}
-
-// Function to calculate tangent space normal from normal map using pre-computed TBN
-vec3 getNormalFromMap()
-{
-
-    vec3 tangentNormal = texture(u_normalMap, inTexCoord).xyz * 2.0 - 1.0;
-    
-    // Use the pre-calculated tangent and bitangent
-    vec3 N = normalize(inNormal);
-    vec3 T = normalize(inTangent);
-    vec3 B = normalize(inBitangent);
-    
-    // Form TBN matrix from pre-computed vectors
-    mat3 TBN = mat3(T, B, N);
-
-    return normalize(TBN * tangentNormal);
-}
-
 void main() {
 
+    // Use flags to determine attribute availability (branchless)
+    float hasNormals = float((inFlags & FLAG_HAS_NORMALS) != 0u);
+    float hasTangents = float((inFlags & FLAG_HAS_TANGENTS) != 0u);
+    float hasBitangents = float((inFlags & FLAG_HAS_BITANGENTS) != 0u);
+    float hasTexcoords = float((inFlags & FLAG_HAS_TEXCOORDS) != 0u);
+    float hasNormalMap = float((inFlags & FLAG_HAS_NORMAL_MAP) != 0u);
+    float hasAlbedoMap = float((inFlags & FLAG_HAS_ALBEDO_MAP) != 0u);
+    float hasMetallicRoughnessMap = float((inFlags & FLAG_HAS_METALLIC_ROUGHNESS_MAP) != 0u);
+    float hasAoMap = float((inFlags & FLAG_HAS_AO_MAP) != 0u);
+
+    // Handle texture coordinates branchlessly
+    vec2 texCoord = mix(vec2(0.0, 0.0), inTexCoord, hasTexcoords);
 
     // Get material properties from textures or fallback to uniforms
-
     float roughness = material.roughness;
     float metallic = material.metallic;
     float ao = 1.0;
 
-    // Albedo
+    // Albedo with conditional texture sampling
+    vec3 albedoTexture = texture(u_albedoMap, texCoord).rgb;
+    vec3 albedo = mix(material.albedo, albedoTexture * material.albedo, hasAlbedoMap);
 
-    vec3 albedo = texture(u_albedoMap, inTexCoord).rgb * material.albedo;
+    // Roughness with conditional texture sampling
+    float roughnessTexture = texture(u_metallicRoughnessMap, texCoord).g;
+    roughness = mix(roughness, roughness * roughnessTexture, hasMetallicRoughnessMap);
     
+    // Metallic with conditional texture sampling
+    float metallicTexture = texture(u_metallicRoughnessMap, texCoord).b;
+    metallic = mix(metallic, metallic * metallicTexture, hasMetallicRoughnessMap);
 
-    // Roughness
-    roughness = roughness * texture(u_metallicRoughnessMap, inTexCoord).g;
-    
-    // Metallic
-    metallic = metallic * texture(u_metallicRoughnessMap, inTexCoord).b;
-
-    // AO
-    ao = ao * texture(u_aoMap, inTexCoord).r;
-
-    
-
+    // AO with conditional texture sampling
+    float aoTexture = texture(u_aoMap, texCoord).r;
+    ao = mix(ao, ao * aoTexture, hasAoMap);
 
     // Position (world space) and Depth (view space Z)
-    // Store World Position in rgb, and linear View-Space Z Depth in alpha
     gPositionDepth = inFragPosDepth;
     
-    // Normal
+    // Normal calculation with efficient branching
     vec3 normal;
-    if (length(inTangent) > 0.01) {
-        normal = getNormalFromMap();
-        if (length(normal) < 0.01) {
-            normal = vec3(1.0, 1.0, 1.0);
+    
+    if ((inFlags & FLAG_HAS_NORMAL_MAP) != 0u && (inFlags & FLAG_HAS_TEXCOORDS) != 0u) {
+        // We have a normal map and texture coordinates
+        vec3 tangentNormal = texture(u_normalMap, texCoord).xyz * 2.0 - 1.0;
+        
+        if ((inFlags & FLAG_HAS_TANGENTS) != 0u && (inFlags & FLAG_HAS_BITANGENTS) != 0u) {
+            // Use pre-computed TBN matrix (optimal path)
+            vec3 N = normalize(inNormal);
+            vec3 T = normalize(inTangent);
+            vec3 B = normalize(inBitangent);
+            mat3 TBN = mat3(T, B, N);
+            normal = normalize(TBN * tangentNormal);
+        } else if ((inFlags & FLAG_HAS_NORMALS) != 0u) {
+            // Fallback to derivative-based TBN
+            vec3 Q1 = dFdx(inFragPosDepth.xyz);
+            vec3 Q2 = dFdy(inFragPosDepth.xyz);
+            vec2 st1 = dFdx(texCoord);
+            vec2 st2 = dFdy(texCoord);
+            vec3 N = normalize(inNormal);
+            vec3 T = normalize(Q1 * st2.t - Q2 * st1.t);
+            vec3 B = normalize(cross(N, T));
+            mat3 TBN = mat3(T, B, N);
+            normal = normalize(TBN * tangentNormal);
+        } else {
+            // No normals available, use default
+            normal = vec3(0.0, 1.0, 0.0);
         }
     } else {
-        normal = getNormalFromMapNoTangent();
+        // Use vertex normals directly
+        normal = normalize(inNormal);
     }
 
-    gNormal = vec4(normal, 1.0); // Store normal in RGB and 1.0 in Alpha
+    gNormal = vec4(normal, 1.0);
     
     // Albedo and specular
     gAlbedoSpec = vec4(albedo, 1.0);

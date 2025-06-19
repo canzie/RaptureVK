@@ -10,6 +10,7 @@ namespace Rapture {
 
 struct PushConstants {
     glm::mat4 model;
+    uint32_t flags;
 };
 
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight, std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs)
@@ -185,6 +186,11 @@ void GBufferPass::recordCommandBuffer(
         // Push the model matrix as a push constant
         PushConstants pushConstants{};
         pushConstants.model = transform.transformMatrix();
+        
+        // Combine vertex attribute flags and material flags
+        uint32_t vertexFlags = meshComp.mesh->getVertexBuffer()->getBufferLayout().getFlags();
+        uint32_t materialFlags = materialComp.material->getMaterialFlags();
+        pushConstants.flags = vertexFlags | materialFlags;
 
         // for now assume only 1 set of pushconstants in a full shader
         VkShaderStageFlags stageFlags;

@@ -4,6 +4,7 @@
 #include "WindowContext/Application.h"
 #include "Textures/Texture.h"
 #include "AssetManager/AssetManager.h"
+#include "Renderer/DeferredShading/GBufferPass.h"
 
 namespace Rapture {
 
@@ -176,4 +177,87 @@ void MaterialInstance::updateUniformBuffer(ParameterID id)
 {
     m_uniformBuffer->addData(m_parameterMap[id].asRaw(), m_parameterMap[id].m_info.size, m_parameterMap[id].m_info.offset);
 }
+
+uint32_t MaterialInstance::getMaterialFlags() const
+{
+    if (m_flagsDirty) {
+        m_materialFlags = calculateMaterialFlags();
+        m_flagsDirty = false;
+    }
+    return m_materialFlags;
+}
+
+void MaterialInstance::recalculateMaterialFlags()
+{
+    m_flagsDirty = true;
+    getMaterialFlags(); // Force recalculation
+}
+
+uint32_t MaterialInstance::calculateMaterialFlags() const
+{
+    uint32_t flags = 0;
+
+    // Check each texture parameter and set corresponding flag using GBufferFlags enum
+    if (hasValidTexture(ParameterID::ALBEDO_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_ALBEDO_MAP);
+    }
+    
+    if (hasValidTexture(ParameterID::NORMAL_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_NORMAL_MAP);
+    }
+    
+    if (hasValidTexture(ParameterID::METALLIC_ROUGHNESS_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_METALLIC_ROUGHNESS_MAP);
+    }
+    
+    if (hasValidTexture(ParameterID::AO_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_AO_MAP);
+    }
+    
+    if (hasValidTexture(ParameterID::METALLIC_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_METALLIC_MAP);
+    }
+    
+    if (hasValidTexture(ParameterID::ROUGHNESS_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_ROUGHNESS_MAP);
+    }
+    
+    if (hasValidTexture(ParameterID::EMISSIVE_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_EMISSIVE_MAP);
+    }
+    
+    if (hasValidTexture(ParameterID::SPECULAR_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_SPECULAR_MAP);
+    }
+    
+    if (hasValidTexture(ParameterID::HEIGHT_MAP)) {
+        flags |= static_cast<uint32_t>(GBufferFlags::HAS_HEIGHT_MAP);
+    }
+
+    return flags;
+}
+
+bool MaterialInstance::hasValidTexture(ParameterID id) const
+{
+    auto it = m_parameterMap.find(id);
+    if (it == m_parameterMap.end()) {
+        return false;
+    }
+
+    const auto& param = it->second;
+    
+    // Check if it's a texture parameter
+    if (param.m_info.type != MaterialParameterTypes::COMBINED_IMAGE_SAMPLER) {
+        return false;
+    }
+
+    // Check if it holds a valid (non-null) texture
+    if (std::holds_alternative<std::shared_ptr<Texture>>(param.m_value)) {
+        auto texture = std::get<std::shared_ptr<Texture>>(param.m_value);
+        return texture != nullptr;
+    }
+
+    return false;
+}
+
 }

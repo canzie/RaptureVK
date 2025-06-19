@@ -133,7 +133,8 @@ struct BufferLayout {
     std::vector<BufferAttribute> buffer_attribs;
 	bool isInterleaved = false;     // Whether vertex data is interleaved (PNTPNT...) or not (PPP...NNN...TTT...)
 	uint32_t vertexSize = 0;          // Total size of a vertex in bytes (used for interleaved format)
-    uint32_t binding = 0;           // since we only use 1 buffer for all of the vertex data, binding should stay 1
+    uint32_t binding = 0;           // since we only use 1 buffer for all of the vertex data, binding should stay 0
+    uint32_t flags = 0;
 
     // Calculate the total vertex size for interleaved format
     uint32_t calculateVertexSize() {
@@ -200,6 +201,55 @@ struct BufferLayout {
             }
         }
         return 0;
+    }
+
+    // Calculate and cache vertex attribute flags based on available attributes
+    uint32_t calculateFlags() {
+        // Forward declaration
+        enum class GBufferFlags : uint32_t;
+        
+        // Vertex attribute flag definitions (must match GBufferFlags enum)
+        const uint32_t FLAG_HAS_NORMALS = 1u;
+        const uint32_t FLAG_HAS_TANGENTS = 2u;
+        const uint32_t FLAG_HAS_BITANGENTS = 4u;
+        const uint32_t FLAG_HAS_TEXCOORDS = 8u;
+
+        flags = 0;
+
+        // Check which vertex attributes are present
+        for (const auto& attrib : buffer_attribs) {
+            switch (attrib.name) {
+                case BufferAttributeID::NORMAL:
+                    flags |= FLAG_HAS_NORMALS;
+                    break;
+                case BufferAttributeID::TANGENT:
+                    flags |= FLAG_HAS_TANGENTS;
+                    if (attrib.type == "VEC4") {
+                        flags |= FLAG_HAS_BITANGENTS;
+                    }
+                    break;
+                case BufferAttributeID::BITANGENT:
+                    flags |= FLAG_HAS_BITANGENTS;
+                    break;
+                case BufferAttributeID::TEXCOORD_0:
+                case BufferAttributeID::TEXCOORD_1:
+                    flags |= FLAG_HAS_TEXCOORDS;
+                    break;
+                default:
+                    // Other attributes don't affect our current flags
+                    break;
+            }
+        }
+
+        return flags;
+    }
+
+    // Get the cached flags (calculates if not already done)
+    uint32_t getFlags() {
+        if (flags == 0 && !buffer_attribs.empty()) {
+            calculateFlags();
+        }
+        return flags;
     }
 
 

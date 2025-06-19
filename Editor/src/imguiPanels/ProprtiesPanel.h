@@ -23,6 +23,7 @@ private:
     void renderCameraComponent();
     void renderShadowComponent();
     void renderCascadedShadowComponent();
+    void renderMeshComponent();
 
 private:
 

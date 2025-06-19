@@ -78,6 +78,10 @@ void PropertiesPanel::render()
         if (entity->hasAllComponents<Rapture::TransformComponent, Rapture::LightComponent, Rapture::CascadedShadowComponent>()) {
             renderCascadedShadowComponent();
         }
+
+        if (entity->hasComponent<Rapture::MeshComponent>()) {
+            renderMeshComponent();
+        }
     }
 
     ImGui::End();
@@ -489,7 +493,21 @@ void PropertiesPanel::renderCascadedShadowComponent() {
     }
 }
 
+void PropertiesPanel::renderMeshComponent() {
+
+    bool isInstanced = false;
+
+    if (auto entity = m_selectedEntity.lock()) {
+        if (ImGui::CollapsingHeader("Mesh Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto& meshComponent = entity->getComponent<Rapture::MeshComponent>();
+
+            if (entity->hasComponent<Rapture::InstanceComponent>()) {
+                isInstanced = true;
+            }
+            ImGui::Checkbox("Instanced", &isInstanced);
+
+        }
+    }
 
 
-
-
+}

@@ -33,6 +33,11 @@ class MaterialInstance {
             if (m_parameterMap.find(id) != m_parameterMap.end()) {
                 m_parameterMap[id].setValue<T>(value);
                 updateUniformBuffer(id);
+                
+                // Update material flags when setting texture parameters
+                if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>) {
+                    m_flagsDirty = true;
+                }
             } else {
                 RP_CORE_WARN("MaterialInstance::setParameter: Parameter ID '{}' not found for this material", parameterIdToString(id));
             }
@@ -47,6 +52,12 @@ class MaterialInstance {
 
         std::unordered_map<ParameterID, MaterialParameter>& getParameterMap() { return m_parameterMap; }
 
+        // Get the cached material flags
+        uint32_t getMaterialFlags() const;
+
+        // Force recalculation of material flags (useful after bulk parameter changes)
+        void recalculateMaterialFlags();
+
     private:
         std::string m_name;
         std::shared_ptr<DescriptorSet> m_descriptorSet;
@@ -57,6 +68,16 @@ class MaterialInstance {
         std::shared_ptr<UniformBuffer> m_uniformBuffer;
 
         std::unordered_map<ParameterID, MaterialParameter> m_parameterMap;
+
+        // Material flags cache
+        mutable uint32_t m_materialFlags = 0;
+        mutable bool m_flagsDirty = true;
+
+        // Calculate material flags from current parameters
+        uint32_t calculateMaterialFlags() const;
+
+        // Helper to check if a texture parameter is valid (not null)
+        bool hasValidTexture(ParameterID id) const;
 
 
 };

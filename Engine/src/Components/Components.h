@@ -209,6 +209,33 @@ namespace Rapture {
         };
     };
 
+    struct InstanceComponent {
+        std::vector<MaterialComponent> materials;
+        std::vector<TransformComponent> transforms;
+        std::vector<uint32_t> instanceIDs;
+        uint32_t instanceIDCount = 0; // need this seperate variable to avoid issues when instances are added/removed
+
+        InstanceComponent(std::vector<MaterialComponent> materials, std::vector<TransformComponent> transforms) : materials(materials), transforms(transforms) {
+            for (uint32_t i = 0; i < materials.size(); i++) {
+                instanceIDs.push_back(instanceIDCount++);
+            }
+        }
+
+        InstanceComponent(MaterialComponent material, TransformComponent transform) {
+            materials.push_back(material);
+            transforms.push_back(transform);
+            instanceIDs.push_back(instanceIDCount++);
+        }
+
+        void addInstance(MaterialComponent material, TransformComponent transform) {
+            materials.push_back(material);
+            transforms.push_back(transform);
+            instanceIDs.push_back(instanceIDCount++);
+        }
+
+
+    };
+
     struct EntityNodeComponent
     {
         std::shared_ptr<EntityNode> entity_node;

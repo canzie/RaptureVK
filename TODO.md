@@ -26,6 +26,9 @@
     - fixing the imguizmo thing
     - ability to EASILY draw/add either a bbox debug to a mesh or switch to wireframe, this is needed to visualise the colliders
 
+- primitive meshes: for now we can add a primitive mesh, this will need to asign a material, mesh and transform. for the material we use some default material instance.
+    for instancing: create an instance component, when this is added AND there is a meshcomponent also, it will create a vector of instanceIDs and transforms
+    when drawing meshes, we will take entities that do not have this component, then do a seperate pass for the onesthat do, or use some if checks. the instance data should probably be on the gpu in some static buffer. then for the ui, in the mesh component part there will be a subsection with the instancing info showing the instance id and the instance specigic transform. user can select a different instance from this menu. for animation, we either dont allow those to be instanced or ignore behaviour as long as it does not crash. for materials ... maybe we just store a vector of components in the instance component.
 - terrain
 - optimisations
 
