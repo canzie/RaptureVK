@@ -7,11 +7,12 @@ namespace Rapture::Entropy {
 // SphereCollider
 // =====================================================================================================================
 
-AABBCollider SphereCollider::getAABB() const {
+void SphereCollider::getAABB(glm::vec3& min, glm::vec3& max) const {
     // TODO: Calculate world-space AABB using the sphere's center, radius, and transform.
     // For an untransformed sphere, min would be center - radius and max would be center + radius.
     // You must apply the transform to this box to get the final AABB.
-    return {};
+    min = center - radius;
+    max = center + radius;
 }
 
 bool SphereCollider::intersect(SphereCollider& other) {
@@ -53,10 +54,11 @@ bool SphereCollider::intersect(ConvexHullCollider& other) {
 // AABBCollider
 // =====================================================================================================================
 
-AABBCollider AABBCollider::getAABB() const {
+void AABBCollider::getAABB(glm::vec3& min, glm::vec3& max) const {
     // TODO: Calculate world-space AABB by transforming the 8 corners of the box and finding the new min/max.
     // For now, just returning a copy. An untransformed AABB's AABB is itself.
-    return *this;
+    min = min;
+    max = max;
 }
 
 bool AABBCollider::intersect(SphereCollider& other) {
@@ -98,9 +100,10 @@ bool AABBCollider::intersect(ConvexHullCollider& other) {
 // OBBCollider
 // =====================================================================================================================
 
-AABBCollider OBBCollider::getAABB() const {
+void OBBCollider::getAABB(glm::vec3& min, glm::vec3& max) const {
     // TODO: Calculate world-space AABB by transforming the 8 corners of the box and finding the new min/max.
-    return {};
+    min = min;
+    max = max;
 }
 
 bool OBBCollider::intersect(SphereCollider& other) {
@@ -142,10 +145,11 @@ bool OBBCollider::intersect(ConvexHullCollider& other) {
 // CapsuleCollider
 // =====================================================================================================================
 
-AABBCollider CapsuleCollider::getAABB() const {
+void CapsuleCollider::getAABB(glm::vec3& min, glm::vec3& max) const {
     // TODO: Calculate world-space AABB. This involves finding the AABBs of the two sphere ends and the cylinder body,
     // and then merging them.
-    return {};
+    min = min;
+    max = max;
 }
 
 bool CapsuleCollider::intersect(SphereCollider& other) {
@@ -187,9 +191,10 @@ bool CapsuleCollider::intersect(ConvexHullCollider& other) {
 // CylinderCollider
 // =====================================================================================================================
 
-AABBCollider CylinderCollider::getAABB() const {
+void CylinderCollider::getAABB(glm::vec3& min, glm::vec3& max) const {
     // TODO: Calculate world-space AABB for the cylinder.
-    return {};
+    min = min;
+    max = max;
 }
 
 bool CylinderCollider::intersect(SphereCollider& other) {
@@ -231,9 +236,10 @@ bool CylinderCollider::intersect(ConvexHullCollider& other) {
 // ConvexHullCollider
 // =====================================================================================================================
 
-AABBCollider ConvexHullCollider::getAABB() const {
+void ConvexHullCollider::getAABB(glm::vec3& min, glm::vec3& max) const {
     // TODO: Calculate world-space AABB by transforming all vertices and finding the min/max.
-    return {};
+    min = min;
+    max = max;
 }
 
 bool ConvexHullCollider::intersect(SphereCollider& other) {

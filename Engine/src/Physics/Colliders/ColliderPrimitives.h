@@ -50,7 +50,7 @@ namespace Rapture::Entropy {
 
         // Pure virtual functions to be implemented by derived colliders.
         virtual ColliderType getColliderType() const = 0;
-        virtual AABBCollider  getAABB() const = 0;
+        virtual void getAABB(glm::vec3& min, glm::vec3& max) const = 0;
 
         // The second dispatch, which calls the correct overload.
         virtual bool dispatch(ColliderBase& other) = 0;
@@ -67,7 +67,7 @@ namespace Rapture::Entropy {
         float radius;
 
         ColliderType getColliderType() const override { return ColliderType::Sphere; }
-        AABBCollider  getAABB() const override;
+        void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
         bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
         bool intersect(SphereCollider & other) override;
@@ -84,7 +84,7 @@ namespace Rapture::Entropy {
         float radius;
 
         ColliderType getColliderType() const override { return ColliderType::Cylinder; }
-        AABBCollider  getAABB() const override;
+        void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
         bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
         bool intersect(SphereCollider & other) override;
@@ -100,7 +100,7 @@ namespace Rapture::Entropy {
         glm::vec3 max;
 
         ColliderType getColliderType() const override { return ColliderType::AABB; }
-        AABBCollider  getAABB() const override;
+        void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
         bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
         bool intersect(SphereCollider & other) override;
@@ -117,7 +117,7 @@ namespace Rapture::Entropy {
         float radius;
 
         ColliderType getColliderType() const override { return ColliderType::Capsule; }
-        AABBCollider  getAABB() const override;
+        void getAABB(glm::vec3& min, glm::vec3& max) const override;
         
         bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
         bool intersect(SphereCollider & other) override;
@@ -134,7 +134,7 @@ namespace Rapture::Entropy {
         glm::quat orientation;
 
         ColliderType getColliderType() const override { return ColliderType::OBB; }
-        AABBCollider  getAABB() const override;
+        void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
         bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
         bool intersect(SphereCollider & other) override;
@@ -149,7 +149,7 @@ namespace Rapture::Entropy {
         std::vector<glm::vec3> vertices;
 
         ColliderType getColliderType() const override { return ColliderType::ConvexHull; }
-        AABBCollider  getAABB() const override;
+        void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
         bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
         bool intersect(SphereCollider & other) override;

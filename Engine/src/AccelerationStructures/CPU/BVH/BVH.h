@@ -13,34 +13,15 @@
 #include <memory>
 #include <vector>
 #include <glm/glm.hpp>
+#include <limits>
 
 #include "Scenes/Entities/Entity.h"
+#include "BVHCommon.h"
 
 class Scene;
 class BoundingBox;
 
-
-
-
 namespace Rapture {
-
-    
-enum class LeafType {
-    AABB
-};
-
-struct BVHNode {
-    glm::vec3 min;
-    glm::vec3 max;
-
-    EntityID entityID;  // need to make sure to check for validity when returning this entity
-    
-    uint32_t leftChildIndex;
-    uint32_t rightChildIndex;
-
-
-};
-
 
 class BVH {
 
@@ -52,8 +33,12 @@ public:
     void build(std::shared_ptr<Scene> scene);
 
     // given an aabb, return every entity intersecting with it
-    std::vector<Entity*> getIntersectingAABBs(const BoundingBox& worldAABB);
+    std::vector<EntityID> getIntersectingAABBs(const BoundingBox& worldAABB) const;
 
+
+private:
+    int recursiveBuild(std::vector<BVHNode>& primitives, int start, int end);
+    void getIntersectingAABBsRecursive(const BoundingBox& worldAABB, int nodeIndex, std::vector<EntityID>& intersectingEntities) const;
 
 private:
 

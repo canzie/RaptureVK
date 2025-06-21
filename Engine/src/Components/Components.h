@@ -25,6 +25,8 @@
 #include "Materials/MaterialInstance.h"
 #include "AssetManager/AssetManager.h"
 
+#include "Physics/Colliders/ColliderPrimitives.h"
+
 #include <string>
 #include <memory>
 
@@ -437,7 +439,10 @@ struct BoundingBoxComponent {
 };
 
 struct RigidBodyComponent {
-    //Collider collider;
+    std::unique_ptr<Entropy::ColliderBase> collider;
+
+    RigidBodyComponent(std::unique_ptr<Entropy::ColliderBase> collider) 
+        : collider(std::move(collider)) {}
 };
 
 // Light data structure for shader

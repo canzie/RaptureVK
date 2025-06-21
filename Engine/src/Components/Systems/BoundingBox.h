@@ -20,6 +20,8 @@ public:
     glm::vec3 getSize() const { return m_max - m_min; }
 
     bool isValid() const { return m_isValid; }
+    bool contains(const BoundingBox& other) const;
+    float getSurfaceArea() const;
 
     void logBounds() const;
 

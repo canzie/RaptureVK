@@ -64,8 +64,6 @@ namespace Rapture {
         return BoundingBox(newMin, newMax);
     }
 
-
-
     void BoundingBox::logBounds() const {
         if (m_isValid) {
             RP_CORE_INFO("BoundingBox: Min({:.2f}, {:.2f}, {:.2f}), Max({:.2f}, {:.2f}, {:.2f})", 
@@ -73,6 +71,20 @@ namespace Rapture {
         } else {
             RP_CORE_WARN("BoundingBox: Invalid");
         }
+    }
+
+    bool BoundingBox::contains(const BoundingBox& other) const {
+        return m_min.x <= other.m_min.x &&
+               m_min.y <= other.m_min.y &&
+               m_min.z <= other.m_min.z &&
+               m_max.x >= other.m_max.x &&
+               m_max.y >= other.m_max.y &&
+               m_max.z >= other.m_max.z;
+    }
+
+    float BoundingBox::getSurfaceArea() const {
+        glm::vec3 d = m_max - m_min;
+        return 2.0f * (d.x * d.y + d.y * d.z + d.z * d.x);
     }
 
 } // namespace Rapture 
