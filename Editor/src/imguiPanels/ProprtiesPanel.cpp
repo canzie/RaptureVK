@@ -107,6 +107,22 @@ void PropertiesPanel::renderMaterialComponent()
                         material.material->setParameter(Rapture::ParameterID::ALBEDO, albedo);
                     }
                 }
+
+                if (paramID == Rapture::ParameterID::ROUGHNESS) {
+                    ImGui::SameLine();
+                    float roughness = materialParameter.asFloat();
+                    if (ImGui::DragFloat("##roughness", &roughness, 0.01f, 0.0f, 1.0f)) {
+                        material.material->setParameter(Rapture::ParameterID::ROUGHNESS, roughness);
+                    }
+                }
+
+                if (paramID == Rapture::ParameterID::METALLIC) {
+                    ImGui::SameLine();
+                    float metallic = materialParameter.asFloat();
+                    if (ImGui::DragFloat("##metallic", &metallic, 0.01f, 0.0f, 1.0f)) {
+                        material.material->setParameter(Rapture::ParameterID::METALLIC, metallic);
+                    }
+                }
             }
 
         }

@@ -22,6 +22,7 @@ namespace Rapture {
         explicit EntityException(const std::string& message) : std::runtime_error(message) {}
     };
 
+    // more lightweight than an entire entity
     using EntityID = uint32_t;
 
 class Entity {

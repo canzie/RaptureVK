@@ -8,7 +8,6 @@ bool TracyProfiler::s_gpuInitialized = false;
 
 #if RAPTURE_TRACY_PROFILING_ENABLED
 TracyVkCtx TracyProfiler::s_gpuContext = nullptr;
-VkCommandBuffer TracyProfiler::s_gpuCommandBuffer = VK_NULL_HANDLE;
 #endif
 
 void TracyProfiler::init() {
@@ -41,7 +40,6 @@ void TracyProfiler::shutdown() {
         if (s_gpuInitialized && s_gpuContext) {
             TracyVkDestroy(s_gpuContext);
             s_gpuContext = nullptr;
-            s_gpuCommandBuffer = VK_NULL_HANDLE;
             s_gpuInitialized = false;
         }
         
@@ -63,5 +61,24 @@ void TracyProfiler::endFrame() {
     // Tracy automatically handles frame boundaries with FrameMark
     // No additional work needed here
 }
+
+#if RAPTURE_TRACY_PROFILING_ENABLED
+void TracyProfiler::initGPUContext(VkPhysicalDevice physicalDevice, VkDevice device, VkQueue queue, VkCommandBuffer cmdBuffer) {
+    if (!s_gpuInitialized) {
+        s_gpuContext = TracyVkContext(physicalDevice, device, queue, cmdBuffer);
+        s_gpuInitialized = true;
+    }
+}
+
+void TracyProfiler::collectGPUData(VkCommandBuffer cmdBuffer) {
+    if (s_gpuInitialized) {
+        TracyVkCollect(s_gpuContext, cmdBuffer);
+    }
+}
+
+TracyVkCtx TracyProfiler::getGPUContext() {
+    return s_gpuContext;
+}
+#endif
 
 } // namespace Rapture 

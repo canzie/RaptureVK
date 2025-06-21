@@ -401,12 +401,19 @@ void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImag
         throw std::runtime_error("failed to begin recording command buffer for imgui!");
     }
 
+    {
+    RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "ImGui Layer");
+
     beginDynamicRendering(commandBuffer, targetImageView);
 
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 
     endDynamicRendering(commandBuffer);
 
+    RAPTURE_PROFILE_GPU_COLLECT(commandBuffer);
+
+
+    }
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         throw std::runtime_error("failed to record command buffer for imgui!");
     }

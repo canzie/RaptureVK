@@ -202,12 +202,10 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
     float indentSize = depth * 20.0f; // Adjust indentation size as needed
     ImGui::Indent(indentSize);
     
-    // Alternating row background color
-    ImU32 rowBgColor = ImGui::ColorConvertFloat4ToU32(
-        (rowIndex % 2 == 0) ? ImGuiPanelStyle::BACKGROUND_SECONDARY : ImGuiPanelStyle::BACKGROUND_PRIMARY
-    );
-    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0 + (rowIndex % 2), rowBgColor);
+    // Apply custom styling for selected tree nodes
+    ImGui::PushStyleColor(ImGuiCol_Header, ImGuiPanelStyle::ACCENT_PRIMARY);
     
+
     bool nodeOpen = false;
     if (m_renamingEntity.lock() == node->entity) {
         nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)node->entity->getID(), flags, "%s", "");
@@ -216,6 +214,9 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
     // Render the tree node itself
         nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)node->entity->getID(), flags, "%s", node->entityName.c_str());
     }
+    
+    ImGui::PopStyleColor();
+    
 
     
     // Handle click for selection (only if not toggling open/close)

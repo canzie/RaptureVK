@@ -36,7 +36,31 @@ Application::Application(int width, int height, const char *title)
 
   m_vulkanContext->createRecourses(m_window.get());
 
+  CommandPoolManager::init();
+
   TracyProfiler::init();
+  if (TracyProfiler::isEnabled()) {
+    auto& vc = getVulkanContext();
+    auto graphicsQueue = vc.getGraphicsQueue();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getQueueFamilyIndices().graphicsFamily.value();
+    config.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    auto tempCommandPool = CommandPoolManager::createCommandPool(config);
+
+    auto tempCmdBuffer = tempCommandPool->getCommandBuffer(true);
+
+    TracyProfiler::initGPUContext(
+        vc.getPhysicalDevice(),
+        vc.getLogicalDevice(),
+        graphicsQueue->getQueueVk(),
+        tempCmdBuffer->getCommandBufferVk()
+    );
+
+    tempCmdBuffer->end();
+    graphicsQueue->submitQueue(tempCmdBuffer);
+    graphicsQueue->waitIdle();
+  }
 
   // Initialize project - this will setup default world and scene
   m_project = std::make_unique<Project>();
@@ -63,8 +87,6 @@ Application::Application(int width, int height, const char *title)
 
   m_project->setProjectRootDirectory(root_dir);
   m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/");
-
-  CommandPoolManager::init();
 
   AssetManager::init();
   MaterialManager::init();

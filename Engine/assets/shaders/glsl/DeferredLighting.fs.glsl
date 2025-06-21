@@ -237,6 +237,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
     float shadowFactor = 0.0;
     vec2 texelSize;
     float bias;
+    float samples;
 
     if (shadowInfo.cascadeCount > 1) {
 
@@ -259,12 +260,17 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
             distanceScale = 0.5;
         }
         
+        
         bias = max(0.05 * (1.0 - cosTheta) * distanceScale * cascadeBiasMultiplier, 0.005);
         float comparisonDepth = projCoords.z - bias;
 
+        const int kernelRadius = 3; // 7x7 kernel → radius = (7-1)/2 = 3
+        int kernelSize = (kernelRadius * 2 + 1);
+        samples = float(kernelSize * kernelSize);
+
         // Use a 3x3 kernel for PCF with the texture array
-        for(int x = -1; x <= 1; ++x) {
-            for(int y = -1; y <= 1; ++y) {        
+        for(int x = -kernelRadius; x <= kernelRadius; ++x) {
+            for(int y = -kernelRadius; y <= kernelRadius; ++y) {        
                 // Use vec4 for sampler2DArrayShadow: vec4(u, v, layer, comparisonValue)
                 shadowFactor += texture(gBindlessShadowArray[shadowInfo.textureHandle], vec4(
                     projCoords.xy + vec2(x, y) * texelSize,
@@ -295,9 +301,13 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         bias = max(0.005 * (1.0 - cosTheta) * distanceScale, 0.001);
         float comparisonDepth = projCoords.z - bias; 
 
+        const int kernelRadius = 1; // 3x3 kernel → radius = (3-1)/2 = 1
+        int kernelSize = (kernelRadius * 2 + 1);
+        samples = float(kernelSize * kernelSize);
+
         // Use a 3x3 kernel for PCF
-        for(int x = -1; x <= 1; ++x) {
-            for(int y = -1; y <= 1; ++y) {
+        for(int x = -kernelRadius; x <= kernelRadius; ++x) {
+            for(int y = -kernelRadius; y <= kernelRadius; ++y) {
                 shadowFactor += texture(gBindlessTextures[shadowInfo.textureHandle], vec3(
                     projCoords.xy + vec2(x, y) * texelSize,
                     comparisonDepth
@@ -306,7 +316,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         }
     }
     
-    shadowFactor /= 9.0; // Average the results
+    shadowFactor /= samples; // Average the results
     
     return clamp(shadowFactor, 0.0, 1.0);
 }

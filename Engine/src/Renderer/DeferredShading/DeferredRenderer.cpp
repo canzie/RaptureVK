@@ -275,52 +275,69 @@ void DeferredRenderer::recordCommandBuffer(
         RP_CORE_ERROR("failed to begin recording command buffer!");
         throw std::runtime_error("failed to begin recording command buffer!");
     }
+    {
+    RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DeferredRenderer Frame");
 
     auto &registry = activeScene->getRegistry();
     auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
     auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
 
-    for (auto entity : lightView) {
-        auto &lightComp = lightView.get<LightComponent>(entity);
-        auto &transformComp = lightView.get<TransformComponent>(entity);
-        auto &shadowComp = lightView.get<ShadowComponent>(entity);
+    {
+        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Shadow Maps");
+        for (auto entity : lightView) {
+            auto &lightComp = lightView.get<LightComponent>(entity);
+            auto &transformComp = lightView.get<TransformComponent>(entity);
+            auto &shadowComp = lightView.get<ShadowComponent>(entity);
 
-        // Always update directional light shadows for debugging, others only when changed
-        bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
-                                transformComp.hasChanged(m_currentFrame) ||
-                                lightComp.type == LightType::Directional); // Force update for directional lights
-        
-        if (shadowComp.shadowMap && shouldUpdateShadow) {
-            shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+            // Always update directional light shadows for debugging, others only when changed
+            bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
+                                    transformComp.hasChanged(m_currentFrame) ||
+                                    lightComp.type == LightType::Directional); // Force update for directional lights
+            
+            if (shadowComp.shadowMap && shouldUpdateShadow) {
+                shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+            }
+        }
+
+        for (auto entity : cascadedShadowView) {
+            auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
+            auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
+            auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
+
+            // Always update directional light shadows for debugging, others only when changed
+            bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
+                                    transformComp.hasChanged(m_currentFrame) ||
+                                    lightComp.type == LightType::Directional); // Force update for directional lights
+            
+            if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
+                shadowComp.cascadedShadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+            }
         }
     }
 
-    for (auto entity : cascadedShadowView) {
-        auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
-        auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
-        auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
-
-        // Always update directional light shadows for debugging, others only when changed
-        bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
-                                transformComp.hasChanged(m_currentFrame) ||
-                                lightComp.type == LightType::Directional); // Force update for directional lights
-        
-        if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
-            shadowComp.cascadedShadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
-        }
+    {
+        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
+        m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
     }
 
-    m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene,
-                                        m_currentFrame);
+    {
+        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
+        m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex, m_currentFrame);
+    }
+    
+    {
+        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Stencil Border Pass");
+        m_stencilBorderPass->recordCommandBuffer(commandBuffer, imageIndex, m_currentFrame, activeScene);
+    }
 
-    m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex,
-                                        m_currentFrame);
+    {
+        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
+        m_skyboxPass->recordCommandBuffer(commandBuffer, m_currentFrame);
+    }
 
-    m_stencilBorderPass->recordCommandBuffer(commandBuffer, imageIndex,
-                                            m_currentFrame, activeScene);
+    RAPTURE_PROFILE_GPU_COLLECT(commandBuffer->getCommandBufferVk());
 
-    m_skyboxPass->recordCommandBuffer(commandBuffer, m_currentFrame);
-
+    }
     if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to record command buffer!");
         throw std::runtime_error("failed to record command buffer!");

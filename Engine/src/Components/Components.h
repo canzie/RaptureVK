@@ -436,6 +436,10 @@ struct BoundingBoxComponent {
 
 };
 
+struct RigidBodyComponent {
+    //Collider collider;
+};
+
 // Light data structure for shader
 struct LightData {
     alignas(16) glm::vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)

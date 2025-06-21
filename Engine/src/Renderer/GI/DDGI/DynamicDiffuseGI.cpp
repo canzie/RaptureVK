@@ -14,6 +14,8 @@
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/Descriptors/DescriptorArrayManager.h"
 
+#include "Logging/TracyProfiler.h"
+
 
 namespace Rapture {
 
@@ -441,7 +443,8 @@ void DynamicDiffuseGI::clearTextures() {
 
 void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
 
-    
+    RAPTURE_PROFILE_FUNCTION();
+
     auto& tlas = scene->getTLAS();
     auto& tlasInstances = tlas.getInstances();
 
@@ -554,6 +557,9 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
 }
 
 void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
+
+    RAPTURE_PROFILE_FUNCTION();
+
     if (!m_isPopulated) {
         // First populate the probe data
         populateProbes(scene);
@@ -567,6 +573,13 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
     updateSunProperties(scene);
     updateSkybox(scene);
 
+    auto& tlas = scene->getTLAS();
+    if (!tlas.isBuilt() || tlas.getInstanceCount() == 0) {
+        //RP_CORE_WARN("DynamicDiffuseGI::populateProbesCompute - Scene TLAS is not built");
+        return;
+    }
+    
+
     // Begin command buffer
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -577,24 +590,35 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
         return;
     }
 
-    // Cast rays using compute shader
-    castRays(scene);
-    
+    {
+        RAPTURE_PROFILE_GPU_SCOPE(m_CommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::populateProbesCompute");
+        // Cast rays using compute shader
+        castRays(scene);
+    }   
     // Flatten ray data texture (within the same command buffer)
     if (m_RayDataTextureFlattened) {
+        RAPTURE_PROFILE_SCOPE("Flattening ray data texture");
         m_RayDataTextureFlattened->update(m_CommandBuffer);
     }
     
-    // Blend textures
-    blendTextures();
+    {
+        RAPTURE_PROFILE_GPU_SCOPE(m_CommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::blendTextures");
+        // Blend textures
+        blendTextures();
+    }
 
     // Flatten final textures (within the same command buffer)
     if (m_IrradianceTextureFlattened) {
+        RAPTURE_PROFILE_SCOPE("Flattening irradiance texture");
         m_IrradianceTextureFlattened->update(m_CommandBuffer);
     }
     if (m_DistanceTextureFlattened) {
+        RAPTURE_PROFILE_SCOPE("Flattening distance texture");
         m_DistanceTextureFlattened->update(m_CommandBuffer);
     }
+
+    RAPTURE_PROFILE_GPU_COLLECT(m_CommandBuffer->getCommandBufferVk());
+
 
     // End command buffer
     if (vkEndCommandBuffer(m_CommandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
@@ -618,6 +642,8 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene) {
     std::shared_ptr<Texture> newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling()) 
                                             ? skyboxComp->skyboxTexture 
                                             : s_defaultSkyboxTexture;
+
+    RAPTURE_PROFILE_FUNCTION();
 
     if (m_skyboxTexture != newTexture) {
         m_skyboxTexture = newTexture;
@@ -666,6 +692,8 @@ std::shared_ptr<Texture> DynamicDiffuseGI::getPrevVisibilityTexture() {
 
 
 void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
+
+    RAPTURE_PROFILE_FUNCTION();
 
 
     // Get TLAS from scene
@@ -785,7 +813,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
 
 void DynamicDiffuseGI::blendTextures() {
 
-
+    RAPTURE_PROFILE_FUNCTION();
 
     // === BARRIER PHASE 5: Prepare for blending shaders ===
     // Even though blending shaders are not implemented, prepare the barriers for when they are
@@ -950,6 +978,8 @@ void DynamicDiffuseGI::initTextures(){
 
 void DynamicDiffuseGI::updateProbeVolume() {
 
+    RAPTURE_PROFILE_FUNCTION();
+
     if (!m_ProbeInfoBuffer) {
         RP_CORE_ERROR("DynamicDiffuseGI::updateProbeVolume - Probe info buffer not initialized");
         return;
@@ -1008,6 +1038,8 @@ void DynamicDiffuseGI::initProbeInfoBuffer() {
 }
 
 void DynamicDiffuseGI::updateSunProperties(std::shared_ptr<Scene> scene) {
+
+    RAPTURE_PROFILE_FUNCTION();
 
     auto& reg = scene->getRegistry();
     auto MMview = reg.view<TransformComponent, LightComponent>();

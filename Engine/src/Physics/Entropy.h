@@ -21,8 +21,8 @@
 #include <vector>
 #include <memory>
 
-namespace Rapture {
-namespace Entropy {
+namespace Rapture::Entropy {
+
 
 
     struct ContactPoint {
@@ -83,5 +83,5 @@ namespace Entropy {
 
 
 
-} // namespace Entropy
+
 } // namespace Rapture

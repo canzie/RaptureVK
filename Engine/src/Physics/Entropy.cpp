@@ -1,8 +1,7 @@
 #include "Entropy.h"
 
 
-namespace Rapture {
-namespace Entropy {
+namespace Rapture::Entropy {
 
 
 
@@ -12,5 +11,4 @@ namespace Entropy {
 
 
 
-} // namespace Entropy
-} // namespace Rapture
+} // namespace Rapture::Entropy

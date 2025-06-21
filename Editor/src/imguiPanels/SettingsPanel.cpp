@@ -38,19 +38,19 @@ void SettingsPanel::renderDDGISettings() {
         ddgi->setProbeVolume(probeVolume);
     }
 
-    if (ImGui::SliderFloat("Probe Max Ray Distance", &probeVolume.probeMaxRayDistance, 0.0f, 100.0f)) {
+    if (ImGui::SliderFloat("Probe Max Ray Distance", &probeVolume.probeMaxRayDistance, 1000.0f, 100000000.0f)) {
         ddgi->setProbeVolume(probeVolume);
     }
 
-    if (ImGui::SliderFloat("Probe Normal Bias", &probeVolume.probeNormalBias, 0.0f, 1.0f)) {
+    if (ImGui::SliderFloat("Probe Normal Bias", &probeVolume.probeNormalBias, 0.0f, 5.0f)) {
         ddgi->setProbeVolume(probeVolume);
     }   
 
-    if (ImGui::SliderFloat("Probe View Bias", &probeVolume.probeViewBias, 0.0f, 1.0f)) {
+    if (ImGui::SliderFloat("Probe View Bias", &probeVolume.probeViewBias, 0.0f, 5.0f)) {
         ddgi->setProbeVolume(probeVolume);
     }
 
-    if (ImGui::SliderFloat("Probe Distance Exponent", &probeVolume.probeDistanceExponent, 0.0f, 10.0f)) {
+    if (ImGui::SliderFloat("Probe Distance Exponent", &probeVolume.probeDistanceExponent, 0.0f, 100.0f)) {
         ddgi->setProbeVolume(probeVolume);
     }
 

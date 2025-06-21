@@ -8,8 +8,7 @@
 
 
 
-namespace Rapture {
-namespace Entropy {
+namespace Rapture::Entropy {
 
 
 enum class ParticleType {
@@ -36,5 +35,5 @@ private:
 
     };
 
-}
-}
+
+} // namespace Rapture::Entropy

@@ -26,8 +26,7 @@ BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
   }
 
   m_descriptorSetLayout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
-  // get descriptor info
-  // assume only 1 descriptor in that set for now
+
   auto infos = m_shader->getMaterialSets();
 
   if (name.empty()) {
@@ -41,6 +40,10 @@ BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
     // get descriptor set layout
     for (auto &parameter : info.params) {
       auto param = MaterialParameter(parameter, info.binding);
+
+        if (param.m_info.parameterId == ParameterID::ALBEDO) {
+            param.setValue(glm::vec3(1.0f, 1.0f, 1.0f));
+        }
 
       if (param.m_info.parameterId != ParameterID::UNKNOWN) {
         m_parameterMap[param.m_info.parameterId] = param;

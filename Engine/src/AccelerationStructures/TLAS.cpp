@@ -344,7 +344,7 @@ void TLAS::build() {
 
 void TLAS::update() {
     if (!m_isBuilt) {
-        RP_CORE_WARN("TLAS: Cannot update unbuilt acceleration structure, building instead");
+        //RP_CORE_WARN("TLAS: Cannot update unbuilt acceleration structure, building instead");
         build();
         return;
     }
@@ -361,7 +361,7 @@ void TLAS::update() {
 
 void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>>& instanceUpdates) {
     if (!m_isBuilt) {
-        RP_CORE_WARN("TLAS: Cannot update unbuilt acceleration structure");
+        //RP_CORE_WARN("TLAS: Cannot update unbuilt acceleration structure");
         return;
     }
     

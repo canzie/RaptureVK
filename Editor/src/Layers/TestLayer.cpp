@@ -95,6 +95,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     auto cube = activeScene->createCube("Cube");
     auto sphere = activeScene->createSphere("Sphere");
 
+    activeScene->registerBLAS(cube);
+
     Rapture::Entity light1 = activeScene->createEntity("Spot Light 1");
     light1.addComponent<Rapture::TransformComponent>(
         glm::vec3(2.0f, 1.0f, -3.0f),  // Position to the right of the sphere, same Z coordinate

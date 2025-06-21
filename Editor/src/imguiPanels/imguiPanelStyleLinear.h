@@ -308,6 +308,8 @@ namespace ImGuiPanelStyle {
         colors[ImGuiCol_TableHeaderBg] = GRUVBOX_BG1;
         colors[ImGuiCol_TableBorderStrong] = GRUVBOX_BG3;    // Outer border
         colors[ImGuiCol_TableBorderLight] = GRUVBOX_BG2;     // Row/column lines
+        colors[ImGuiCol_TableRowBg] = BACKGROUND_PRIMARY;
+        colors[ImGuiCol_TableRowBgAlt] = BACKGROUND_SECONDARY;
 
         // Docking
         colors[ImGuiCol_DockingPreview] = ImVec4(ACCENT_PRIMARY.x, ACCENT_PRIMARY.y, ACCENT_PRIMARY.z, 0.7f);

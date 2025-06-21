@@ -26,12 +26,28 @@
     - fixing the imguizmo thing
     - ability to EASILY draw/add either a bbox debug to a mesh or switch to wireframe, this is needed to visualise the colliders
 
-- primitive meshes: for now we can add a primitive mesh, this will need to asign a material, mesh and transform. for the material we use some default material instance.
-    for instancing: create an instance component, when this is added AND there is a meshcomponent also, it will create a vector of instanceIDs and transforms
-    when drawing meshes, we will take entities that do not have this component, then do a seperate pass for the onesthat do, or use some if checks. the instance data should probably be on the gpu in some static buffer. then for the ui, in the mesh component part there will be a subsection with the instancing info showing the instance id and the instance specigic transform. user can select a different instance from this menu. for animation, we either dont allow those to be instanced or ignore behaviour as long as it does not crash. for materials ... maybe we just store a vector of components in the instance component.
-- terrain
-- optimisations
+    - we need a static tree and a dynamic tree
+    - each frame we check the dynamic object against both of these trees, the dynamic one will be one that is updated quickly while the static one will need fast traversal/accuracy
+    - the larger problem with open world means we need a seperate tlas for the tlasses per chunk, this can be one on the cpu.
+    - for the dynamic tree we can use:
+        - DBVH
+        - 
+    - for the static tree we can use:
+        - BVH
+        - this can be put on the gpu, then we can do the checks there???
 
+    - start with broad phase collision
+    - then we can go to narrow phase collision, by checking the actual collision -> then test by changing color when 2 objects intersect
+    - after this we can go back and implement a solver
+
+    - create these datastructures to be hotswappable
+
+
+broad phase
+    - check simple aabb collision against the bvh
+
+narrow phase
+    - check collisions with the actual colliders -> output is either colliding entities or a contact manifold
 
 ### J*B SYSTEM
 #### Requirements
@@ -45,19 +61,28 @@
 
 
 TODO
-- general descriptor manager
-- fix the gizmo rotation math
+- ray picking
+- materials in the asset manager -> Material Graph editor
+- fix the gizmo translation math
+
+
+- terrain
+- optimisations
+    - parallel commandbuffer recording
+    - lighting pass optimisations
+    - look into reusing command buffer recordings
+    - find a way to iterate over a view faster. -> even paralise that? -> we can, using secondary command buffers
 
 --------------------------------
 
 # features / stuff to add
 
-- ray picking
 - static meshes
 - ssao
 - (lod)
 - mipmaps
-- materials in the asset manager
+- general descriptor manager
+
 - emmisive materials
 - Photometry (use camera settings to calculate the correct exposure)
 

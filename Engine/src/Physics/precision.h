@@ -1,13 +1,9 @@
 #pragma once
 
-namespace Rapture {
-namespace Entropy {
-namespace Precision {
+namespace Rapture::Entropy::Precision {
 
 typedef float real;
 
 // Entropy::Precision::real
 
-}
-}
-}
+} // namespace Rapture::Entropy::Precision

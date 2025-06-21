@@ -5,6 +5,7 @@
 #include "Renderer/Shadows/ShadowCommon.h"
 #include "Components/Components.h"
 #include "RenderTargets/SwapChains/SwapChain.h"
+#include "Logging/TracyProfiler.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <limits>
@@ -55,6 +56,8 @@ CascadedShadowMap::~CascadedShadowMap() {
 }
 
 std::vector<float> CascadedShadowMap::calculateCascadeSplits(float nearPlane, float farPlane, float lambda) {
+
+    RAPTURE_PROFILE_FUNCTION();
 
     // Validate input parameters
     if (nearPlane <= 0.0f) {
@@ -180,6 +183,8 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(
 
 void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t currentFrame) {
 
+    RAPTURE_PROFILE_FUNCTION();
+
     setupDynamicRenderingMemoryBarriers(commandBuffer);
     beginDynamicRendering(commandBuffer);
 
@@ -297,6 +302,8 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
 std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp, const CameraComponent &cameraComp)
 {
 
+    RAPTURE_PROFILE_FUNCTION();
+
     if (lightComp.type != LightType::Directional) {
         RP_CORE_ERROR("CascadedShadowMap::updateViewMatrix: Light is not a directional light");
         return std::vector<CascadeData>();
@@ -345,6 +352,8 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(
     float cascadeNearPlane, 
     float cascadeFarPlane, 
     ProjectionType cameraProjectionType) {
+
+    RAPTURE_PROFILE_FUNCTION();
 
     // Validate input parameters
     if (glm::any(glm::isnan(cameraProjectionMatrix[0])) || 

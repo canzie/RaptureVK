@@ -46,10 +46,10 @@
     #define RAPTURE_PROFILE_FREE(ptr) TracyFree(ptr)
     
     // GPU profiling
-    #define RAPTURE_PROFILE_GPU_SCOPE(name) \
-        TracyVkZone(gpu_scope##__LINE__, name, true)
-    #define RAPTURE_PROFILE_GPU_COLLECT() \
-        TracyGpuCollect
+    #define RAPTURE_PROFILE_GPU_SCOPE(cmdbuf, name) \
+        TracyVkZone(Rapture::TracyProfiler::getGPUContext(), cmdbuf, name)
+    #define RAPTURE_PROFILE_GPU_COLLECT(cmdbuf) \
+        Rapture::TracyProfiler::collectGPUData(cmdbuf)
     
     // Lock tracking
     #define RAPTURE_PROFILE_LOCKABLE(type, varname) TracyLockable(type, varname)
@@ -75,8 +75,8 @@
     #define RAPTURE_PROFILE_FREE(ptr)
     
     // GPU profiling (empty macros)
-    #define RAPTURE_PROFILE_GPU_SCOPE(name)
-    #define RAPTURE_PROFILE_GPU_COLLECT()
+    #define RAPTURE_PROFILE_GPU_SCOPE(cmdbuf, name)
+    #define RAPTURE_PROFILE_GPU_COLLECT(cmdbuf)
     
     // Lock tracking (empty macros)
     #define RAPTURE_PROFILE_LOCKABLE(type, varname) type varname
@@ -105,25 +105,16 @@ public:
     static void beginFrame();
     static void endFrame();
     
-    // Initializes Tracy GPU context - should be called after OpenGL is fully initialized
-    static void initGPUContext(VkPhysicalDevice physicalDevice, VkDevice device, VkQueue queue, VkCommandBuffer cmdBuffer) {
-    #if RAPTURE_TRACY_PROFILING_ENABLED
-        if (!s_gpuInitialized) {
-            s_gpuContext = TracyVkContext(physicalDevice, device, queue, cmdBuffer);
-            s_gpuCommandBuffer = cmdBuffer;
-            s_gpuInitialized = true;
-        }
-    #endif
-    }
+    // Initializes Tracy GPU context - should be called after Vulkan is fully initialized
+    static void initGPUContext(VkPhysicalDevice physicalDevice, VkDevice device, VkQueue queue, VkCommandBuffer cmdBuffer);
     
     // Collects GPU profiling data - should be called at the end of each frame
-    static void collectGPUData() {
-    #if RAPTURE_TRACY_PROFILING_ENABLED
-        if (s_gpuInitialized) {
-            TracyVkCollect(s_gpuContext, s_gpuCommandBuffer);
-        }
-    #endif
-    }
+    static void collectGPUData(VkCommandBuffer cmdBuffer);
+
+    // Get the GPU context for profiling scopes
+#if RAPTURE_TRACY_PROFILING_ENABLED
+    static TracyVkCtx getGPUContext();
+#endif
     
     // Utility to check if Tracy is enabled
     static constexpr bool isEnabled() {
@@ -148,7 +139,6 @@ private:
     static bool s_gpuInitialized;
     #if RAPTURE_TRACY_PROFILING_ENABLED
     static TracyVkCtx s_gpuContext;
-    static VkCommandBuffer s_gpuCommandBuffer;
     #endif
 };
 
