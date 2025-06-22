@@ -206,6 +206,11 @@ namespace Rapture {
         std::shared_ptr<Mesh> mesh;
         bool isLoading = true;
 
+        //std::shared_ptr<UniformBuffer> m_objectDataBuffer; // per mesh data
+        //uint32_t m_bindlessMeshDataIndex;
+        //static std::unique_ptr<DescriptorSubAllocationBase<Buffer>> s_bindlessMeshDataAllocation;
+
+
         MeshComponent() {
             mesh = std::make_shared<Mesh>();
         };

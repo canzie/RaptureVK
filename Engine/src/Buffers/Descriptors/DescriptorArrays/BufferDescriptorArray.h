@@ -9,18 +9,18 @@
 
 namespace Rapture {
 
-class StorageDescriptorSubAllocation : public DescriptorSubAllocationBase<Buffer> {
+class BufferDescriptorSubAllocation : public DescriptorSubAllocationBase<Buffer> {
 public:
-    StorageDescriptorSubAllocation(DescriptorArrayBase<Buffer>* parent, uint32_t startIndex, uint32_t capacity, std::string name = "")
+    BufferDescriptorSubAllocation(DescriptorArrayBase<Buffer>* parent, uint32_t startIndex, uint32_t capacity, std::string name = "")
         : DescriptorSubAllocationBase<Buffer>(parent, startIndex, capacity, name) {}
     
-    ~StorageDescriptorSubAllocation();
+    ~BufferDescriptorSubAllocation();
 };
 
-class StorageDescriptorArray : public DescriptorArrayBase<Buffer> {
+class BufferDescriptorArray : public DescriptorArrayBase<Buffer> {
 public:
-    StorageDescriptorArray(const DescriptorArrayConfig& config, VkDescriptorSet set);
-    ~StorageDescriptorArray() = default;
+    BufferDescriptorArray(const DescriptorArrayConfig& config, VkDescriptorSet set);
+    ~BufferDescriptorArray() = default;
 
     std::unique_ptr<DescriptorSubAllocationBase<Buffer>> createSubAllocation(uint32_t capacity, std::string name = "") override;
     uint32_t allocate(std::shared_ptr<Buffer> resource) override;

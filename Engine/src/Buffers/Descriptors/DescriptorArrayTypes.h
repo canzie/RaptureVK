@@ -2,10 +2,13 @@
 
 #include <vulkan/vulkan.h>
 #include <string>
+#include "Buffers/Descriptors/DescriptorArrays/BufferDescriptorArray.h"
+
 
 namespace Rapture {
 
-// for the manager
+
+
 
 enum class DescriptorArrayType {
     TEXTURE,
@@ -34,6 +37,19 @@ struct DescriptorArrayConfig {
         }
     }
 };
+
+inline std::string getDescriptorArrayTypeName(DescriptorArrayType type) {
+    switch (type) {
+        case DescriptorArrayType::TEXTURE:
+            return "Texture";
+        case DescriptorArrayType::STORAGE_BUFFER:
+            return "Storage Buffer";
+        case DescriptorArrayType::UNIFORM_BUFFER:
+            return "Uniform Buffer";
+        default:
+            return "Unknown";
+    }
+}
 
 struct SubAllocationRequest {
     DescriptorArrayType type;

@@ -4,10 +4,12 @@
 #include <memory>
 #include <vector>
 
-class Scene;
-class BoundingBox;
+
 
 namespace Rapture {
+
+class Scene;
+class BoundingBox;
 
 class BVH_SAH {
 public:

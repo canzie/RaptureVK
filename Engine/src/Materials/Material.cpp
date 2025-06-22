@@ -13,56 +13,68 @@ namespace Rapture {
 
 bool MaterialManager::s_initialized = false;
 
+std::unique_ptr<DescriptorSubAllocationBase<Buffer>> BaseMaterial::s_bindlessUniformBuffers;
+//std::unique_ptr<DescriptorSubAllocationBase<Texture>> BaseMaterial::s_bindlessTextures;
+
 std::unordered_map<std::string, std::shared_ptr<BaseMaterial>>
     MaterialManager::s_materials;
 
 BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
-                           const std::string &name)
+                        const std::string &name)
     : m_shader(shader) {
 
-  if (shader->getDescriptorSetLayouts().size() < 1) {
-    throw std::runtime_error("Material::BaseMaterial - shader has no "
-                             "descriptor set layout for a material!");
-  }
-
-  m_descriptorSetLayout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
-
-  auto infos = m_shader->getMaterialSets();
-
-  if (name.empty()) {
-    m_name = infos[0].name;
-  } else {
-    m_name = name;
-  }
-
-  m_sizeBytes = 0;
-  for (auto &info : infos) {
-    // get descriptor set layout
-    for (auto &parameter : info.params) {
-      auto param = MaterialParameter(parameter, info.binding);
-
-        if (param.m_info.parameterId == ParameterID::ALBEDO) {
-            param.setValue(glm::vec3(1.0f, 1.0f, 1.0f));
-        }
-
-      if (param.m_info.parameterId != ParameterID::UNKNOWN) {
-        m_parameterMap[param.m_info.parameterId] = param;
-        m_sizeBytes += param.m_info.size;
-      } else {
-        RP_CORE_ERROR(
-            "Material::BaseMaterial - unknown parameter id: {0} and type: {1}",
-            parameter.name, parameter.type);
-      }
+    if (shader->getDescriptorSetLayouts().size() < 1) {
+        throw std::runtime_error("Material::BaseMaterial - shader has no "
+                                "descriptor set layout for a material!");
     }
-  }
 
-  if (m_sizeBytes == 0) {
-    RP_CORE_ERROR("Material::BaseMaterial - no valid parameters found in "
-                  "material set {0}",
-                  infos[0].name);
-    throw std::runtime_error("Material::BaseMaterial - no valid parameters "
-                             "found in material set {0}");
-  }
+    if (s_bindlessUniformBuffers == nullptr) {
+        s_bindlessUniformBuffers = DescriptorArrayManager::createStorageSubAllocation(DescriptorArrayType::UNIFORM_BUFFER, 1024, "Bindless Material UBOs");
+    }
+
+    //if (s_bindlessTextures == nullptr) {
+    //    s_bindlessTextures = DescriptorArrayManager::createTextureSubAllocation(1024, "Bindless Material Textures");
+    //}
+
+
+    m_descriptorSetLayout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
+
+    auto infos = m_shader->getMaterialSets();
+
+    if (name.empty()) {
+        m_name = infos[0].name;
+    } else {
+        m_name = name;
+    }
+
+    m_sizeBytes = 0;
+    for (auto &info : infos) {
+        // get descriptor set layout
+        for (auto &parameter : info.params) {
+        auto param = MaterialParameter(parameter, info.binding);
+
+            if (param.m_info.parameterId == ParameterID::ALBEDO) {
+                param.setValue(glm::vec3(1.0f, 1.0f, 1.0f));
+            }
+
+        if (param.m_info.parameterId != ParameterID::UNKNOWN) {
+            m_parameterMap[param.m_info.parameterId] = param;
+            m_sizeBytes += param.m_info.size;
+        } else {
+            RP_CORE_ERROR(
+                "Material::BaseMaterial - unknown parameter id: {0} and type: {1}",
+                parameter.name, parameter.type);
+        }
+        }
+    }
+
+    if (m_sizeBytes == 0) {
+        RP_CORE_ERROR("Material::BaseMaterial - no valid parameters found in "
+                    "material set {0}",
+                    infos[0].name);
+        throw std::runtime_error("Material::BaseMaterial - no valid parameters "
+                                "found in material set {0}");
+    }
 }
 
 void MaterialManager::init() {

@@ -1,0 +1,342 @@
+#include "BufferPool.h"
+#include "Logging/Log.h"
+#include "Utils/GLTypes.h"
+#include <cstring>
+#include <functional>
+
+namespace Rapture {
+
+// Static member initialization
+std::unique_ptr<BufferPoolManager> BufferPoolManager::s_instance = nullptr;
+
+BufferAllocation::~BufferAllocation()
+ {
+    // Automatically free from arena when destroyed
+    if (isValid()) {
+        parentArena->free(*this);
+    }
+}
+
+// BufferAllocation implementation
+VkBuffer BufferAllocation::getBuffer() const {
+    return parentArena ? parentArena->buffer : VK_NULL_HANDLE;
+}
+
+VkDeviceAddress BufferAllocation::getDeviceAddress() const {
+    if (!parentArena || !isValid()) {
+        return 0;
+    }
+    
+    VkBufferDeviceAddressInfo addressInfo{};
+    addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+    addressInfo.buffer = parentArena->buffer;
+    
+    // Note: This requires a VkDevice handle, which we don't have here
+    // In practice, this should be called from a context that has access to the device
+    // For now, return 0 and let the caller handle device address retrieval
+    return 0; // TODO: Implement proper device address retrieval
+}
+
+
+
+
+// BufferArena implementation
+BufferArena::BufferArena(uint32_t id, VmaAllocator allocator, VkDeviceSize arenaSize, 
+                        BufferUsage usage, VkBufferUsageFlags usageFlags, const BufferFlags& flags)
+    : id(id), vmaAllocator(allocator), size(arenaSize), usage(usage), usageFlags(usageFlags), flags(flags) {
+    
+    // Create the VMA virtual block for sub-allocations
+    VmaVirtualBlockCreateInfo blockCreateInfo{};
+    blockCreateInfo.size = arenaSize;
+    blockCreateInfo.flags = 0; // Could add VMA_VIRTUAL_BLOCK_CREATE_LINEAR_ALGORITHM_BIT for linear allocation
+    
+    VkResult result = vmaCreateVirtualBlock(&blockCreateInfo, &virtualBlock);
+    if (result != VK_SUCCESS) {
+        RP_CORE_ERROR("BufferArena: Failed to create virtual block with size {} MB", arenaSize / MEGA_BYTE);
+        return;
+    }
+    
+    // Create the actual VkBuffer
+    VkBufferCreateInfo bufferCreateInfo{};
+    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCreateInfo.size = arenaSize;
+    bufferCreateInfo.usage = usageFlags;
+    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    
+    VmaAllocationCreateInfo allocCreateInfo{};
+    switch (usage) {
+        case BufferUsage::STATIC:
+            allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+            break;
+        case BufferUsage::DYNAMIC:
+            allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+            break;
+        case BufferUsage::STREAM:
+            allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+            allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            break;
+        case BufferUsage::STAGING:
+            allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+            allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            break;
+    }
+    
+    result = vmaCreateBuffer(vmaAllocator, &bufferCreateInfo, &allocCreateInfo, &buffer, &vmaAllocation, nullptr);
+    if (result != VK_SUCCESS) {
+        RP_CORE_ERROR("BufferArena: Failed to create buffer with size {} MB", arenaSize / MEGA_BYTE);
+        vmaDestroyVirtualBlock(virtualBlock);
+        virtualBlock = VK_NULL_HANDLE;
+        return;
+    }
+    
+    RP_CORE_INFO("BufferArena: Created arena {} with size {} MB", id, arenaSize / MEGA_BYTE);
+}
+
+BufferArena::~BufferArena() {
+    if (buffer != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(vmaAllocator, buffer, vmaAllocation);
+    }
+    
+    if (virtualBlock != VK_NULL_HANDLE) {
+        vmaDestroyVirtualBlock(virtualBlock);
+    }
+    
+    RP_CORE_INFO("BufferArena: Destroyed arena {}", id);
+}
+
+bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllocation& outAllocation) {
+    std::lock_guard<std::mutex> lock(mutex);
+    
+    VmaVirtualAllocationCreateInfo allocCreateInfo{};
+    allocCreateInfo.size = size;
+    allocCreateInfo.alignment = alignment;
+    
+    VmaVirtualAllocation allocation;
+    VkDeviceSize offset;
+    
+    VkResult result = vmaVirtualAllocate(virtualBlock, &allocCreateInfo, &allocation, &offset);
+    if (result != VK_SUCCESS) {
+        return false;
+    }
+    
+    outAllocation.parentArena = shared_from_this();
+    outAllocation.allocation = allocation;
+    outAllocation.offsetBytes = offset;
+    outAllocation.sizeBytes = size;
+    
+    return true;
+}
+
+void BufferArena::free(BufferAllocation& allocation) {
+    if (!allocation.isValid() || allocation.parentArena.get() != this) {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(mutex);
+    vmaVirtualFree(virtualBlock, allocation.allocation);
+    
+    // Clear the allocation data (but don't reset parentArena to avoid infinite recursion)
+    allocation.allocation = VK_NULL_HANDLE;
+    allocation.offsetBytes = 0;
+    allocation.sizeBytes = 0;
+}
+
+bool BufferArena::isCompatible(const BufferAllocationRequest& request) const {
+    // Check usage compatibility
+    if (usage != request.usage) {
+        return false;
+    }
+    
+    // Check buffer type compatibility (both vertex and index buffers can use the same arena)
+    VkBufferUsageFlags requestFlags = 0;
+    if (request.type == BufferType::VERTEX) {
+        requestFlags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    } else if (request.type == BufferType::INDEX) {
+        requestFlags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    }
+    
+    // Check if this arena has the required buffer usage flags
+    if (!(usageFlags & requestFlags)) {
+        RP_CORE_ERROR("BufferArena::isCompatible - Arena {} does not have the required buffer usage flags", id);
+        return false;
+    }
+    
+    // Check additional flags compatibility
+    if (request.flags.useShaderDeviceAddress && !(usageFlags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)) {
+        return false;
+    }
+    
+    if (request.flags.useStorageBuffer && !(usageFlags & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)) {
+        return false;
+    }
+    
+    if (request.flags.useAccelerationStructure && !(usageFlags & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR)) {
+        return false;
+    }
+    
+    return true;
+}
+
+VkDeviceSize BufferArena::getAvailableSpace() const {
+    if (virtualBlock == VK_NULL_HANDLE) {
+        return 0;
+    }
+    
+    VmaStatistics stats;
+    vmaGetVirtualBlockStatistics(virtualBlock, &stats);
+    return stats.allocationBytes > size ? 0 : size - stats.allocationBytes;
+}
+
+// BufferPoolManager implementation
+BufferPoolManager& BufferPoolManager::getInstance() {
+    if (!s_instance) {
+        s_instance = std::unique_ptr<BufferPoolManager>(new BufferPoolManager());
+    }
+    return *s_instance;
+}
+
+void BufferPoolManager::init(VmaAllocator allocator) {
+    auto& instance = getInstance();
+    std::lock_guard<std::mutex> lock(instance.m_mutex);
+    instance.m_allocator = allocator;
+    RP_CORE_INFO("BufferPoolManager: Initialized with VMA allocator");
+}
+
+void BufferPoolManager::shutdown() {
+    if (s_instance) {
+        std::lock_guard<std::mutex> lock(s_instance->m_mutex);
+        s_instance->m_layoutToArenaMap.clear();
+        s_instance->m_allocator = VK_NULL_HANDLE;
+        RP_CORE_INFO("BufferPoolManager: Shutdown complete");
+    } else {
+        RP_CORE_ERROR("BufferPoolManager: Shutdown called but not initialized!");
+    }
+    s_instance.reset();
+}
+
+std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer(const BufferAllocationRequest& request) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    
+    if (m_allocator == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("BufferPoolManager: Not initialized!");
+        return nullptr;
+    }
+    
+    auto arena = findOrCreateArena(request);
+    if (!arena) {
+        RP_CORE_ERROR("BufferPoolManager: Failed to find or create arena for buffer allocation");
+        return nullptr;
+    }
+    
+    auto allocation = std::make_shared<BufferAllocation>();
+    if (!arena->allocate(request.size, request.alignment, *allocation)) {
+        RP_CORE_ERROR("BufferPoolManager: Failed to allocate {} bytes from arena {}", request.size, arena->id);
+        return nullptr;
+    }
+    
+    RP_CORE_TRACE("BufferPoolManager: Allocated {} bytes from arena {} at offset {} for type {}", 
+                  request.size, arena->id, allocation->offsetBytes, request.type == BufferType::VERTEX ? "VERTEX" : "INDEX");
+    
+    return allocation;
+}
+
+void BufferPoolManager::freeBuffer(std::shared_ptr<BufferAllocation> allocation) {
+    if (!allocation || !allocation->isValid()) {
+        return;
+    }
+    
+    allocation->parentArena->free(*allocation);
+    RP_CORE_TRACE("BufferPoolManager: Freed allocation of {} bytes", allocation->sizeBytes);
+}
+
+
+
+
+
+
+std::shared_ptr<BufferArena> BufferPoolManager::findOrCreateArena(const BufferAllocationRequest& request) {
+
+    // For vertex buffers, look in layout-specific arenas
+    size_t layoutHash = request.layout.hash();
+    auto it = m_layoutToArenaMap.find(layoutHash);
+    
+    if (it != m_layoutToArenaMap.end()) {
+        // Check existing arenas for this layout
+        for (auto& arena : it->second) {
+            if (arena->isCompatible(request) && arena->getAvailableSpace() >= request.size) {
+                return arena;
+            }
+        }
+    }
+
+    
+    // No suitable arena found, create a new one
+    return createArena(request);
+}
+
+std::shared_ptr<BufferArena> BufferPoolManager::createArena(const BufferAllocationRequest& request) {
+    VkDeviceSize arenaSize = calculateArenaSize(request);
+    VkBufferUsageFlags usageFlags = generateUsageFlags(request.type, request.flags);
+    
+    uint32_t arenaId = m_nextArenaID++;
+    
+    auto arena = std::make_shared<BufferArena>(arenaId, m_allocator, arenaSize, request.usage, usageFlags, request.flags);
+    
+    if (arena->buffer == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("BufferPoolManager: Failed to create arena {}", arenaId);
+        return nullptr;
+    }
+    
+    
+        // Add to layout-specific collection
+        size_t layoutHash = request.layout.hash();
+        m_layoutToArenaMap[layoutHash].push_back(arena);
+
+    
+    return arena;
+}
+
+VkDeviceSize BufferPoolManager::calculateArenaSize(const BufferAllocationRequest& request) const {
+    // Start with default arena size
+    VkDeviceSize arenaSize = DEFAULT_ARENA_SIZE;
+    
+    // If the request is larger than half the default size, increase arena size
+    if (request.size > DEFAULT_ARENA_SIZE / 2) {
+        arenaSize = std::max(request.size * 2, DEFAULT_ARENA_SIZE);
+    }
+    
+    // Cap at maximum arena size
+    arenaSize = std::min(arenaSize, MAX_ARENA_SIZE);
+    
+    // Ensure arena is at least large enough for the request
+    arenaSize = std::max(arenaSize, request.size);
+    
+    return arenaSize;
+}
+
+VkBufferUsageFlags BufferPoolManager::generateUsageFlags(BufferType type, const BufferFlags& flags) const {
+    VkBufferUsageFlags usageFlags = 0;
+    
+    // Always include both vertex and index buffer bits for maximum compatibility
+    usageFlags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    
+    // Add transfer flags for staging operations
+    usageFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    
+    // Add optional flags
+    if (flags.useShaderDeviceAddress) {
+        usageFlags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    }
+    
+    if (flags.useStorageBuffer) {
+        usageFlags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    }
+    
+    if (flags.useAccelerationStructure) {
+        usageFlags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    }
+    
+    return usageFlags;
+}
+
+} // namespace Rapture 

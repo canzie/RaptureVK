@@ -166,6 +166,7 @@ void TestLayer::notifyCameraChange()
 void TestLayer::onUpdate(float ts)
 {
 
+
     RAPTURE_PROFILE_SCOPE("TestLayer::onUpdate");
     // Get the active scene from SceneManager
     auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
@@ -196,6 +197,17 @@ void TestLayer::onUpdate(float ts)
     }
 
     auto& registry = activeScene->getRegistry();
+
+    auto view = registry.view<Rapture::MeshComponent, Rapture::TransformComponent, Rapture::MaterialComponent>();
+    int i = 0;
+    for (auto entity : view) {
+        RAPTURE_PROFILE_SCOPE("TestLayer::onUpdate - MeshComponent");
+        auto& meshComp = view.get<Rapture::MeshComponent>(entity);
+        auto& transform = view.get<Rapture::TransformComponent>(entity);
+        auto& material = view.get<Rapture::MaterialComponent>(entity);
+
+        i++;
+    }
 
     // Get time with decimal precision
     // Use time since launch instead of time since epoch

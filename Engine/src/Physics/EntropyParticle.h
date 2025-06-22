@@ -3,7 +3,7 @@
 #include "precision.h"
 
 #include <glm/glm.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 
 

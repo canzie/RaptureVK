@@ -1,15 +1,16 @@
-#include "StorageDescriptorArray.h"
+#include "BufferDescriptorArray.h"
 #include "WindowContext/Application.h"
 
 #include "Logging/Log.h"
 #include "Buffers/StorageBuffers/StorageBuffer.h"
+#include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include <stdexcept>
 
 namespace Rapture {
 
-// StorageDescriptorSubAllocation Implementation
-StorageDescriptorSubAllocation::~StorageDescriptorSubAllocation() {
+// BufferDescriptorSubAllocation Implementation
+BufferDescriptorSubAllocation::~BufferDescriptorSubAllocation() {
     for (uint32_t i = 0; i < m_capacity; ++i) {
         if (m_isIndexUsed[i]) {
             m_parent->free(m_startIndex + i);
@@ -18,8 +19,8 @@ StorageDescriptorSubAllocation::~StorageDescriptorSubAllocation() {
     RP_CORE_INFO("Destroyed and freed storage descriptor sub-allocation of size {} at index {}", m_capacity, m_startIndex);
 }
 
-// StorageDescriptorArray Implementation
-StorageDescriptorArray::StorageDescriptorArray(const DescriptorArrayConfig& config, VkDescriptorSet set)
+// BufferDescriptorArray Implementation
+BufferDescriptorArray::BufferDescriptorArray(const DescriptorArrayConfig& config, VkDescriptorSet set)
     : DescriptorArrayBase<Buffer>(config, set) {
     
     if (m_capacity == 0) {
@@ -35,10 +36,10 @@ StorageDescriptorArray::StorageDescriptorArray(const DescriptorArrayConfig& conf
 
     initializeSlotsWithDefault();
 
-    RP_CORE_INFO("Created StorageDescriptorArray with capacity {} for type {}", m_capacity, static_cast<int>(m_type));
+    RP_CORE_INFO("Created BufferDescriptorArray with capacity {} for type {}", m_capacity, getDescriptorArrayTypeName(config.arrayType));
 }
 
-std::unique_ptr<DescriptorSubAllocationBase<Buffer>> StorageDescriptorArray::createSubAllocation(uint32_t capacity, std::string name) {
+std::unique_ptr<DescriptorSubAllocationBase<Buffer>> BufferDescriptorArray::createSubAllocation(uint32_t capacity, std::string name) {
     uint32_t startIndex = UINT32_MAX;
     uint32_t consecutiveFreeCount = 0;
     
@@ -58,7 +59,7 @@ std::unique_ptr<DescriptorSubAllocationBase<Buffer>> StorageDescriptorArray::cre
                 m_isIndexUsed[startIndex + j] = true;
             }
             RP_CORE_INFO("Allocated a storage descriptor sub-block of size {} at index {}", capacity, startIndex);
-            return std::make_unique<StorageDescriptorSubAllocation>(this, startIndex, capacity, name);
+            return std::make_unique<BufferDescriptorSubAllocation>(this, startIndex, capacity, name);
         }
     }
 
@@ -66,7 +67,7 @@ std::unique_ptr<DescriptorSubAllocationBase<Buffer>> StorageDescriptorArray::cre
     return nullptr;
 }
 
-uint32_t StorageDescriptorArray::allocate(std::shared_ptr<Buffer> resource) {
+uint32_t BufferDescriptorArray::allocate(std::shared_ptr<Buffer> resource) {
     for (uint32_t i = 0; i < m_capacity; ++i) {
         uint32_t index = (m_nextFreeIndex + i) % m_capacity;
         if (!m_isIndexUsed[index]) {
@@ -77,11 +78,11 @@ uint32_t StorageDescriptorArray::allocate(std::shared_ptr<Buffer> resource) {
         }
     }
 
-    RP_CORE_ERROR("StorageDescriptorArray is full! Failed to allocate a new handle.");
+    RP_CORE_ERROR("BufferDescriptorArray is full! Failed to allocate a new handle.");
     return UINT32_MAX;
 }
 
-void StorageDescriptorArray::update(uint32_t index, std::shared_ptr<Buffer> resource) {
+void BufferDescriptorArray::update(uint32_t index, std::shared_ptr<Buffer> resource) {
     if (index >= m_capacity) {
         RP_CORE_WARN("Attempted to update a storage descriptor at an out-of-bounds index: {}", index);
         return;
@@ -126,7 +127,7 @@ void StorageDescriptorArray::update(uint32_t index, std::shared_ptr<Buffer> reso
     vkUpdateDescriptorSets(m_device, 1, &writeSet, 0, nullptr);
 }
 
-void StorageDescriptorArray::free(uint32_t index) {
+void BufferDescriptorArray::free(uint32_t index) {
     if (index >= m_capacity) {
         RP_CORE_WARN("Attempted to free an out-of-bounds storage descriptor handle: {}", index);
         return;
@@ -142,9 +143,9 @@ void StorageDescriptorArray::free(uint32_t index) {
 
 
 
-void StorageDescriptorArray::initializeSlotsWithDefault() {
+void BufferDescriptorArray::initializeSlotsWithDefault() {
     if (!m_defaultResource) {
-        RP_CORE_WARN("Cannot initialize StorageDescriptorArray slots: default buffer is null.");
+        RP_CORE_WARN("Cannot initialize BufferDescriptorArray slots: default buffer is null.");
         return;
     }
 
@@ -167,7 +168,7 @@ void StorageDescriptorArray::initializeSlotsWithDefault() {
     vkUpdateDescriptorSets(m_device, 1, &writeSet, 0, nullptr);
 }
 
-std::shared_ptr<Buffer> StorageDescriptorArray::createDefaultResource() {
+std::shared_ptr<Buffer> BufferDescriptorArray::createDefaultResource() {
     auto& app = Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     VmaAllocator allocator = vulkanContext.getVmaAllocator();
@@ -175,12 +176,12 @@ std::shared_ptr<Buffer> StorageDescriptorArray::createDefaultResource() {
     // Create a small default buffer (16 bytes) with the appropriate usage flags
     VkDeviceSize defaultSize = 16;
     
-    // Create a StorageBuffer which has VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-    // This will work for both storage and uniform buffer descriptor arrays
-    // since StorageBuffer typically includes both usage flags
-    auto defaultBuffer = std::make_shared<StorageBuffer>(defaultSize, BufferUsage::STATIC, allocator);
+    if (m_type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
+        return std::make_shared<UniformBuffer>(defaultSize, BufferUsage::STATIC, allocator);
+    } 
     
-    return defaultBuffer;
+    // Default to storage buffer for VK_DESCRIPTOR_TYPE_STORAGE_BUFFER or any other type
+    return std::make_shared<StorageBuffer>(defaultSize, BufferUsage::STATIC, allocator);
 }
 
 } // namespace Rapture 

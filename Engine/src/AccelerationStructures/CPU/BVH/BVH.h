@@ -18,10 +18,12 @@
 #include "Scenes/Entities/Entity.h"
 #include "BVHCommon.h"
 
-class Scene;
-class BoundingBox;
+
 
 namespace Rapture {
+
+class Scene;
+class BoundingBox;
 
 class BVH {
 

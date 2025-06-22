@@ -232,7 +232,7 @@ void SkyboxPass::createDescriptorSets() {
     }
 
     if (!m_skyboxTexture->isReadyForSampling()) {
-        RP_CORE_WARN("SkyboxPass - Skybox texture is not ready for sampling, descriptor sets will not be created.");
+        //RP_CORE_WARN("SkyboxPass - Skybox texture is not ready for sampling, descriptor sets will not be created.");
         return;
     }
 

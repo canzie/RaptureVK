@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <limits>
 #include <algorithm>
+#include <unordered_map>
 
 namespace Rapture {
 
@@ -219,8 +220,11 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
     auto& registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
     
+    // Group entities by vertex layout to minimize vkCmdSetVertexInputEXT calls
+    std::unordered_map<size_t, std::vector<entt::entity>> entitiesByVertexLayout;
+    
+    // Pre-pass: group entities by vertex layout hash and perform early culling
     for (auto entity : view) {
-        
         auto& transform = view.get<TransformComponent>(entity);
         auto& meshComp = view.get<MeshComponent>(entity);
         auto& boundingBoxComp = view.get<BoundingBoxComponent>(entity);
@@ -240,57 +244,75 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
             boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
         }
         
-        // Perform frustum culling
-        //if (m_frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside) {
-        //    continue;
-        //}
-        
-        // Get the vertex buffer layout
-        auto& app = Application::getInstance();
-        auto& vc = app.getVulkanContext();
-        auto& bufferLayout = meshComp.mesh->getVertexBuffer()->getBufferLayout();
-        
-        // Convert to EXT variants required by vkCmdSetVertexInputEXT
-        auto bindingDescription = bufferLayout.getBindingDescription2EXT();
-        auto attributeDescriptions = bufferLayout.getAttributeDescriptions2EXT();
-        
-        // Use the function pointer from VulkanContext
-        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(),
-            1, &bindingDescription,
-            static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
-        
-        // Push the model matrix as a push constant
-        PushConstantsCSM pushConstants{};
-        pushConstants.model = transform.transformMatrix();
-        
-        // Get push constant stage flags from shader
-        VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        // Group by vertex layout hash
+        size_t layoutHash = meshComp.mesh->getVertexBuffer()->getBufferLayout().hash();
+        entitiesByVertexLayout[layoutHash].push_back(entity);
+    }
+
+    auto& app = Application::getInstance();
+    auto& vc = app.getVulkanContext();
+    
+    // Track current vertex layout to avoid redundant calls
+    size_t currentVertexLayoutHash = SIZE_MAX;
+    
+    // Render entities grouped by vertex layout
+    for (const auto& [layoutHash, entities] : entitiesByVertexLayout) {
+        // Set vertex input state only when layout changes
+        if (currentVertexLayoutHash != layoutHash) {
+            // Get the vertex buffer layout from the first entity in this group
+            auto& firstMeshComp = view.get<MeshComponent>(entities[0]);
+            auto& bufferLayout = firstMeshComp.mesh->getVertexBuffer()->getBufferLayout();
+            
+            // Convert to EXT variants required by vkCmdSetVertexInputEXT
+            auto bindingDescription = bufferLayout.getBindingDescription2EXT();
+            auto attributeDescriptions = bufferLayout.getAttributeDescriptions2EXT();
+            
+            // Use the function pointer from VulkanContext
+            vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(),
+                1, &bindingDescription,
+                static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+            
+            currentVertexLayoutHash = layoutHash;
         }
-        
-        vkCmdPushConstants(commandBuffer->getCommandBufferVk(),
-                           m_pipeline->getPipelineLayoutVk(),
-                           stageFlags,
-                           0,
-                           sizeof(PushConstantsCSM),
-                           &pushConstants);
-        
-        // Bind vertex buffer
-        VkBuffer vertexBuffers[] = {meshComp.mesh->getVertexBuffer()->getBufferVk()};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
-        
-        // Bind index buffer
-        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
-                            meshComp.mesh->getIndexBuffer()->getBufferVk(), 
-                            0, 
-                            meshComp.mesh->getIndexBuffer()->getIndexType());
-        
-        // Draw the mesh once - multiview extension will handle rendering to all cascade layers
-        vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), 
-                        meshComp.mesh->getIndexCount(), 
-                        1, 0, 0, 0);
+
+        // Render all entities with this vertex layout
+        for (auto entity : entities) {
+            auto& transform = view.get<TransformComponent>(entity);
+            auto& meshComp = view.get<MeshComponent>(entity);
+            
+            // Push the model matrix as a push constant
+            PushConstantsCSM pushConstants{};
+            pushConstants.model = transform.transformMatrix();
+            
+            // Get push constant stage flags from shader
+            VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
+                stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+            }
+            
+            vkCmdPushConstants(commandBuffer->getCommandBufferVk(),
+                               m_pipeline->getPipelineLayoutVk(),
+                               stageFlags,
+                               0,
+                               sizeof(PushConstantsCSM),
+                               &pushConstants);
+            
+            // Bind vertex buffer
+            VkBuffer vertexBuffers[] = {meshComp.mesh->getVertexBuffer()->getBufferVk()};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
+            
+            // Bind index buffer
+            vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
+                                meshComp.mesh->getIndexBuffer()->getBufferVk(), 
+                                0, 
+                                meshComp.mesh->getIndexBuffer()->getIndexType());
+            
+            // Draw the mesh once - multiview extension will handle rendering to all cascade layers
+            vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), 
+                            meshComp.mesh->getIndexCount(), 
+                            1, 0, 0, 0);
+        }
     }
     
     // End rendering and transition image for shader reading

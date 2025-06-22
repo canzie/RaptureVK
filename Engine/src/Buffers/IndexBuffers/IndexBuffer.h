@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Buffers/Buffers.h"
+#include "Buffers/BufferPool.h"
 
 namespace Rapture {
 
@@ -29,7 +30,9 @@ class IndexBuffer : public Buffer {
     private:
         VkIndexType m_indexType;
         uint32_t m_bindlessIndex = UINT32_MAX;
-        
+
+        std::shared_ptr<BufferAllocation> m_bufferAllocation;
+
         static std::unique_ptr<DescriptorSubAllocationBase<Buffer>> s_bindlessBuffers;
 };
 

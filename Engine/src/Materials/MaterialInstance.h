@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Material.h"
-#include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Materials/MaterialParameters.h"
+#include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include <memory>
 #include <string>
@@ -17,6 +17,7 @@ namespace Rapture {
 class MaterialInstance {
     public:
         MaterialInstance(std::shared_ptr<BaseMaterial> material, const std::string& name = "");
+        ~MaterialInstance();
 
         std::shared_ptr<BaseMaterial> getBaseMaterial() const { return m_baseMaterial; }
 
@@ -63,6 +64,9 @@ class MaterialInstance {
         std::shared_ptr<DescriptorSet> m_descriptorSet;
         bool m_isDirty = false;
         bool m_isReady = false;
+
+        uint32_t m_bindlessUniformBufferIndex;
+        //uint32_t m_bindlessTextureIndex;
         
         std::shared_ptr<BaseMaterial> m_baseMaterial;
         std::shared_ptr<UniformBuffer> m_uniformBuffer;

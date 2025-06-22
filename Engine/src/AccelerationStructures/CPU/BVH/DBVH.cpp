@@ -1,6 +1,5 @@
 #include "DBVH.h"
 #include "Components/Systems/BoundingBox.h"
-#include "glm/gtx/norm.hpp"
 
 namespace Rapture {
 

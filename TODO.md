@@ -29,12 +29,7 @@
     - we need a static tree and a dynamic tree
     - each frame we check the dynamic object against both of these trees, the dynamic one will be one that is updated quickly while the static one will need fast traversal/accuracy
     - the larger problem with open world means we need a seperate tlas for the tlasses per chunk, this can be one on the cpu.
-    - for the dynamic tree we can use:
-        - DBVH
-        - 
-    - for the static tree we can use:
-        - BVH
-        - this can be put on the gpu, then we can do the checks there???
+
 
     - start with broad phase collision
     - then we can go to narrow phase collision, by checking the actual collision -> then test by changing color when 2 objects intersect
@@ -48,6 +43,15 @@ broad phase
 
 narrow phase
     - check collisions with the actual colliders -> output is either colliding entities or a contact manifold
+
+
+BVH, DBVH, BVH_SAH are implemented, now we should do some limit testing before we move forward. Could load like x cubes/spheres and disable rendering
+
+
+
+RENDERER/MATERIAL OVERHAUL 
+
+
 
 ### J*B SYSTEM
 #### Requirements

@@ -8,7 +8,7 @@
 
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorArrayManager.h"
-
+#include "Buffers/BufferPool.h"
 #include "Utils/Timestep.h"
 
 namespace Rapture {
@@ -38,14 +38,17 @@ Application::Application(int width, int height, const char *title)
 
   CommandPoolManager::init();
 
+  BufferPoolManager::init(m_vulkanContext->getVmaAllocator());
+
   TracyProfiler::init();
+  #if RAPTURE_TRACY_PROFILING_ENABLED
   if (TracyProfiler::isEnabled()) {
     auto& vc = getVulkanContext();
     auto graphicsQueue = vc.getGraphicsQueue();
 
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getQueueFamilyIndices().graphicsFamily.value();
-    config.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     auto tempCommandPool = CommandPoolManager::createCommandPool(config);
 
     auto tempCmdBuffer = tempCommandPool->getCommandBuffer(true);
@@ -61,7 +64,7 @@ Application::Application(int width, int height, const char *title)
     graphicsQueue->submitQueue(tempCmdBuffer);
     graphicsQueue->waitIdle();
   }
-
+  #endif
   // Initialize project - this will setup default world and scene
   m_project = std::make_unique<Project>();
   auto working_dir = std::filesystem::current_path();
@@ -89,7 +92,6 @@ Application::Application(int width, int height, const char *title)
   m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/");
 
   AssetManager::init();
-  MaterialManager::init();
 
   DescriptorArrayConfig textureConfig;
   textureConfig.arrayType = DescriptorArrayType::TEXTURE;
@@ -103,8 +105,16 @@ Application::Application(int width, int height, const char *title)
   storageConfig.name = "GlobalBindlessStorageBufferPool";
   storageConfig.bindingIndex = 1;    // binding=0
 
+  DescriptorArrayConfig uboConfig;
+  uboConfig.arrayType = DescriptorArrayType::UNIFORM_BUFFER;
+  uboConfig.capacity = 4096;
+  uboConfig.name = "GlobalBindlessUniformBufferPool";
+  uboConfig.bindingIndex = 2;    // binding=0
 
-  DescriptorArrayManager::init({textureConfig, storageConfig});
+  DescriptorArrayManager::init({textureConfig, storageConfig, uboConfig});
+
+  MaterialManager::init();
+
 
   ForwardRenderer::init();
   DeferredRenderer::init();
@@ -147,6 +157,7 @@ Application::~Application() {
   AssetManager::shutdown();
 
   CommandPoolManager::shutdown();
+  BufferPoolManager::shutdown();
 
   // Shutdown the event system and clear all listeners
   EventRegistry::getInstance().shutdown();

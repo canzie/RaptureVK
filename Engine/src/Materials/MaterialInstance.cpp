@@ -10,7 +10,8 @@ namespace Rapture {
 
 
 MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const std::string &name)
-    : m_baseMaterial(material)
+    : m_baseMaterial(material), 
+    m_bindlessUniformBufferIndex(UINT32_MAX)
 {
 
 
@@ -33,6 +34,11 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
     // Create uniform buffer
     m_uniformBuffer = std::make_shared<UniformBuffer>(material->getSizeBytes(), BufferUsage::DYNAMIC, allocator, nullptr);
 
+    if (m_bindlessUniformBufferIndex == UINT32_MAX && BaseMaterial::s_bindlessUniformBuffers != nullptr) {
+        m_bindlessUniformBufferIndex = BaseMaterial::s_bindlessUniformBuffers->allocate(m_uniformBuffer);
+    } else {
+        RP_CORE_WARN("MaterialInstance::MaterialInstance - bindless uniform buffer is not set!");
+    }
     
     m_parameterMap = material->getTemplateParameters();
 
@@ -72,6 +78,13 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
 
 
 
+}
+
+MaterialInstance::~MaterialInstance() {
+
+    if (m_bindlessUniformBufferIndex != UINT32_MAX) {
+        BaseMaterial::s_bindlessUniformBuffers->free(m_bindlessUniformBufferIndex);
+    }
 }
 
 MaterialParameter MaterialInstance::getParameter(ParameterID id) {

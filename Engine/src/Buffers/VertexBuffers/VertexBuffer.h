@@ -2,6 +2,7 @@
 
 #include "Buffers/Buffers.h"
 #include "Buffers/VertexBuffers/BufferLayout.h"
+#include "Buffers/BufferPool.h"
 
 namespace Rapture {
 
@@ -28,6 +29,7 @@ class VertexBuffer : public Buffer {
         static DescriptorSubAllocationBase<Buffer>* getBindlessBuffers() { return s_bindlessBuffers.get(); }
 
     private:
+        std::shared_ptr<BufferAllocation> m_bufferAllocation;
         BufferLayout m_bufferLayout;
         uint32_t m_bindlessIndex = UINT32_MAX;
         

@@ -61,9 +61,9 @@ namespace Rapture::Entropy {
 
         // shape specific collision detection functions
 
-        bool checkSphereSphere(SphereColliderComponent& sphereA, SphereColliderComponent& sphereB);
+        //bool checkSphereSphere(SphereCollider& sphereA, SphereCollider& sphereB);
         // checks collision between 2 AABBs
-        bool checkBoxBox(AABBColliderComponent& boxA, AABBColliderComponent& boxB);
+        //bool checkBoxBox(AABBCollider& boxA, AABBCollider& boxB);
 
 
     private:

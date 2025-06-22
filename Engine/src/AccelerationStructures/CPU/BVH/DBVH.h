@@ -3,9 +3,11 @@
 #include "AccelerationStructures/CPU/BVH/BVHCommon.h"
 #include <vector>
 
-class BoundingBox;
 
 namespace Rapture {
+
+class BoundingBox;
+
 
 class DBVH {
 public:

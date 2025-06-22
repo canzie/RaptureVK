@@ -11,14 +11,14 @@ VkDescriptorPool DescriptorArrayManager::m_descriptorPool = VK_NULL_HANDLE;
 
 // Individual arrays
 std::shared_ptr<TextureDescriptorArray> DescriptorArrayManager::m_textureArray;
-std::unordered_map<DescriptorArrayType, std::shared_ptr<StorageDescriptorArray>> DescriptorArrayManager::m_storageArrays;
+std::unordered_map<DescriptorArrayType, std::shared_ptr<BufferDescriptorArray>> DescriptorArrayManager::m_bufferArrays;
 
 void DescriptorArrayManager::init(std::vector<DescriptorArrayConfig> configs) {
     RP_CORE_INFO("Initializing descriptor array manager");
     
     // Clear existing arrays
     m_textureArray.reset();
-    m_storageArrays.clear();
+    m_bufferArrays.clear();
 
     createDescriptorPools();
     createUnifiedDescriptorSet(configs);
@@ -36,8 +36,8 @@ void DescriptorArrayManager::init(std::vector<DescriptorArrayConfig> configs) {
                 
             case DescriptorArrayType::STORAGE_BUFFER:
             case DescriptorArrayType::UNIFORM_BUFFER:
-                if (m_storageArrays.find(config.arrayType) == m_storageArrays.end()) {
-                    m_storageArrays[config.arrayType] = std::make_shared<StorageDescriptorArray>(config, m_unifiedSet);
+                if (m_bufferArrays.find(config.arrayType) == m_bufferArrays.end()) {
+                    m_bufferArrays[config.arrayType] = std::make_shared<BufferDescriptorArray>(config, m_unifiedSet);
                     RP_CORE_INFO("Created {} descriptor array with capacity {}", 
                                 config.arrayType == DescriptorArrayType::STORAGE_BUFFER ? "storage buffer" : "uniform buffer",
                                 config.capacity);
@@ -57,7 +57,7 @@ void DescriptorArrayManager::init(std::vector<DescriptorArrayConfig> configs) {
 void DescriptorArrayManager::shutdown() {
     RP_CORE_INFO("Shutting down descriptor array manager");
     m_textureArray.reset();
-    m_storageArrays.clear();
+    m_bufferArrays.clear();
 
     auto& app = Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
@@ -83,9 +83,9 @@ std::shared_ptr<TextureDescriptorArray> DescriptorArrayManager::getTextureArray(
     return m_textureArray;
 }
 
-std::shared_ptr<StorageDescriptorArray> DescriptorArrayManager::getStorageArray(DescriptorArrayType type) {
-    auto it = m_storageArrays.find(type);
-    if (it != m_storageArrays.end()) {
+std::shared_ptr<BufferDescriptorArray> DescriptorArrayManager::getBufferArray(DescriptorArrayType type) {
+    auto it = m_bufferArrays.find(type);
+    if (it != m_bufferArrays.end()) {
         return it->second;
     }
     
@@ -103,13 +103,14 @@ std::unique_ptr<DescriptorSubAllocationBase<Texture>> DescriptorArrayManager::cr
 }
 
 std::unique_ptr<DescriptorSubAllocationBase<Buffer>> DescriptorArrayManager::createStorageSubAllocation(DescriptorArrayType type, uint32_t capacity, std::string name) {
-    auto storageArray = getStorageArray(type);
-    if (!storageArray) {
+    auto bufferArray = getBufferArray(type);
+    if (!bufferArray) {
         RP_CORE_ERROR("Cannot create storage sub-allocation: descriptor array of type {} not initialized", static_cast<int>(type));
         return nullptr;
     }
     
-    return storageArray->createSubAllocation(capacity, name);
+    RP_CORE_INFO("Creating storage sub-allocation for {} with capacity {}", name, capacity);
+    return bufferArray->createSubAllocation(capacity, name);
 }
 
 void DescriptorArrayManager::createDescriptorPools() {
