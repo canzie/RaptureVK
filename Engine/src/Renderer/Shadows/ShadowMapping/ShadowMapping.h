@@ -7,7 +7,7 @@
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/Descriptors/DescriptorArrayManager.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include "Renderer/Frustum/Frustum.h"
@@ -46,7 +46,7 @@ public:
 
     glm::mat4 getLightViewProjection() const { return m_lightViewProjection; }
 
-    static DescriptorSubAllocationBase<Texture>* getBindlessShadowMaps() { return s_bindlessShadowMaps.get(); }
+    static std::shared_ptr<DescriptorBindingTexture> getBindlessShadowMaps() { return s_bindlessShadowMaps; }
 
 private:
     void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
@@ -64,7 +64,7 @@ private:
     std::shared_ptr<Texture> m_shadowTexture;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
     std::vector<std::shared_ptr<UniformBuffer>> m_shadowUBOs;
-    std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets;
+    std::vector<uint32_t> m_shadowMatrixsDescriptorIndices;
     
     Frustum m_frustum;
 
@@ -78,7 +78,7 @@ private:
 
     uint32_t m_shadowMapIndex = 0;
 
-    static std::unique_ptr<DescriptorSubAllocationBase<Texture>> s_bindlessShadowMaps;
+    static std::shared_ptr<DescriptorBindingTexture> s_bindlessShadowMaps;
     
     };
 

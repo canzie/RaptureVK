@@ -54,20 +54,20 @@ void BVH_SAH::build(std::shared_ptr<Scene> scene) {
     recursiveBuild(primitives, 0, primitives.size() - 1);
 }
 
-int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, int start, int end) {
+int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size_t end) {
     if (start > end) {
         return -1;
     }
 
-    int numPrimitives = end - start + 1;
-    int currentNodeIndex = m_nodes.size();
+    size_t numPrimitives = end - start + 1;
+    int currentNodeIndex = static_cast<int>(m_nodes.size());
     BVHNode node;
     m_nodes.push_back(node);
 
     BVHNode& currentNode = m_nodes[currentNodeIndex];
     currentNode.min = primitives[start].min;
     currentNode.max = primitives[start].max;
-    for (int i = start + 1; i <= end; ++i) {
+    for (size_t i = start + 1; i <= end; ++i) {
         currentNode.min = glm::min(currentNode.min, primitives[i].min);
         currentNode.max = glm::max(currentNode.max, primitives[i].max);
     }
@@ -75,7 +75,7 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, int start, int end
     float parentSurfaceArea = calculateSurfaceArea(currentNode);
     float bestCost = std::numeric_limits<float>::max();
     int bestAxis = -1;
-    int bestSplitIndex = -1;
+    size_t bestSplitIndex = -1;
 
     for (int axis = 0; axis < 3; ++axis) {
         std::sort(primitives.begin() + start, primitives.begin() + end + 1,
@@ -88,7 +88,7 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, int start, int end
         leftBox.min = primitives[start].min;
         leftBox.max = primitives[start].max;
         leftAreas[0] = calculateSurfaceArea(leftBox);
-        for (int i = 1; i < numPrimitives; ++i) {
+        for (size_t i = 1; i < numPrimitives; ++i) {
             leftBox.min = glm::min(leftBox.min, primitives[start + i].min);
             leftBox.max = glm::max(leftBox.max, primitives[start + i].max);
             leftAreas[i] = calculateSurfaceArea(leftBox);
@@ -99,8 +99,8 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, int start, int end
         rightBox.max = primitives[end].max;
         float rightArea = calculateSurfaceArea(rightBox);
 
-        for (int i = numPrimitives - 2; i >= 0; --i) {
-            float cost = 0.125f + (leftAreas[i] * (i + 1) + rightArea * (numPrimitives - 1 - i)) / parentSurfaceArea;
+        for (size_t i = numPrimitives - 2; i >= 0; --i) {
+            float cost = 0.125f + (leftAreas[i] * static_cast<float>(i + 1) + rightArea * static_cast<float>(numPrimitives - 1 - i)) / parentSurfaceArea;
 
             if (cost < bestCost) {
                 bestCost = cost;
@@ -114,7 +114,7 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, int start, int end
         }
     }
 
-    float leafCost = numPrimitives;
+    float leafCost = static_cast<float>(numPrimitives);
     if (bestCost >= leafCost || numPrimitives <= 1) {
         // Create leaf
         currentNode.entityID = primitives[start].entityID;

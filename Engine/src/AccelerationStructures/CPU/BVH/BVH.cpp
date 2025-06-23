@@ -107,12 +107,12 @@ void BVH::getIntersectingAABBsRecursive(const BoundingBox& worldAABB, int nodeIn
     getIntersectingAABBsRecursive(worldAABB, node.rightChildIndex, intersectingEntities);
 }
 
-int BVH::recursiveBuild(std::vector<BVHNode>& primitives, int start, int end) {
+int BVH::recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size_t end) {
     if (start > end) {
         return -1;
     }
 
-    int currentNodeIndex = m_nodes.size();
+    int currentNodeIndex = static_cast<int>(m_nodes.size());
     BVHNode node;
     m_nodes.push_back(node);
 
@@ -125,7 +125,7 @@ int BVH::recursiveBuild(std::vector<BVHNode>& primitives, int start, int end) {
 
     glm::vec3 min = primitives[start].min;
     glm::vec3 max = primitives[start].max;
-    for (int i = start + 1; i <= end; ++i) {
+    for (size_t i = start + 1; i <= end; ++i) {
         min = glm::min(min, primitives[i].min);
         max = glm::max(max, primitives[i].max);
     }
@@ -137,7 +137,7 @@ int BVH::recursiveBuild(std::vector<BVHNode>& primitives, int start, int end) {
     if (extent.y > extent.x) axis = 1;
     if (extent.z > extent[axis]) axis = 2;
 
-    int mid = start + (end - start) / 2;
+    size_t mid = start + (end - start) / 2;
     std::sort(primitives.begin() + start, primitives.begin() + end + 1,
         [axis](const BVHNode& a, const BVHNode& b) {
             float centerA = (a.min[axis] + a.max[axis]) * 0.5f;

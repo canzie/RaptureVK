@@ -4,7 +4,7 @@
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 
-#include "Buffers/Descriptors/DescriptorArrayManager.h"
+#include "Buffers/Descriptors/DescriptorSet.h"
 
 #include "stb_image.h"
 
@@ -12,7 +12,7 @@
 
 namespace Rapture { 
 
-std::unique_ptr<DescriptorSubAllocationBase<Texture>> Texture::s_bindlessTextures = nullptr;
+std::shared_ptr<DescriptorBindingTexture> Texture::s_bindlessTextures = nullptr;
 
 
 // Sampler implementation
@@ -514,12 +514,14 @@ uint32_t Texture::getBindlessIndex() {
     
     // Initialize the bindless buffer pool if not already done
     if (s_bindlessTextures == nullptr) {
-        s_bindlessTextures = DescriptorArrayManager::createTextureSubAllocation(1024, "Bindless Texture Descriptor Array Sub-Allocation");   
+        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+        if (set) {
+            s_bindlessTextures = set->getTextureBinding(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+        }
     }
     
     if (s_bindlessTextures) {
-        // For now, we'll use a placeholder index based on buffer address
-        m_bindlessIndex = s_bindlessTextures->allocate(shared_from_this());
+        m_bindlessIndex = s_bindlessTextures->add(shared_from_this());
     }
     
     return m_bindlessIndex;

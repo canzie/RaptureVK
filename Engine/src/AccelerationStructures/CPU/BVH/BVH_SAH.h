@@ -20,7 +20,7 @@ public:
     std::vector<EntityID> getIntersectingAABBs(const BoundingBox& worldAABB) const;
 
 private:
-    int recursiveBuild(std::vector<BVHNode>& primitives, int start, int end);
+    int recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size_t end);
     void getIntersectingAABBsRecursive(const BoundingBox& worldAABB, int nodeIndex, std::vector<EntityID>& intersectingEntities) const;
 
 private:

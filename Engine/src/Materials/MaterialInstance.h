@@ -59,6 +59,9 @@ class MaterialInstance {
         // Force recalculation of material flags (useful after bulk parameter changes)
         void recalculateMaterialFlags();
 
+        // Get the bindless index for this material's uniform buffer
+        uint32_t getBindlessIndex() const { return m_bindlessUniformBufferIndex; }
+
     private:
         std::string m_name;
         std::shared_ptr<DescriptorSet> m_descriptorSet;

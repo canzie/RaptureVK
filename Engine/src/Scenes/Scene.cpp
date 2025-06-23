@@ -93,7 +93,21 @@ namespace Rapture {
         }
     }
 
-    void Scene::onUpdate(uint32_t dt) {
+    void Scene::onUpdate(float dt) {
+        auto view = m_Registry.view<TransformComponent, MeshComponent, MaterialComponent>();
+
+        for (auto entity : view) {
+            
+            auto [transform, mesh, material] = view.get<TransformComponent, MeshComponent, MaterialComponent>(entity);
+            uint32_t vertexFlags = mesh.mesh->getVertexBuffer()->getBufferLayout().getFlags();
+            uint32_t materialFlags = material.material->getMaterialFlags();
+            uint32_t flags = vertexFlags | materialFlags;
+
+            mesh.meshDataBuffer->updateFromComponents(transform, flags);
+        }
+
+
+
         updateTLAS();
     }
 

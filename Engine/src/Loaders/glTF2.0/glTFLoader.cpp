@@ -225,7 +225,7 @@ namespace Rapture {
 
         // Extract the directory path from the filepath
         m_basePath = "";
-        uint32_t lastSlashPos = filepath.find_last_of("/\\");
+        size_t lastSlashPos = filepath.find_last_of("/\\");
         if (lastSlashPos != std::string::npos) {
             m_basePath = filepath.substr(0, lastSlashPos + 1);
         }
@@ -342,8 +342,8 @@ namespace Rapture {
         // Process each node in the scene
         yyjson_val* sceneNodes = getObjectValue(sceneVal, "nodes");
         if (sceneNodes && yyjson_is_arr(sceneNodes)) {
-            uint32_t nodeCount = getArraySize(sceneNodes);
-            for (uint32_t i = 0; i < nodeCount; i++) {
+            size_t nodeCount = getArraySize(sceneNodes);
+            for (size_t i = 0; i < nodeCount; i++) {
                 yyjson_val* nodeIndexVal = getArrayElement(sceneNodes, i);
                 unsigned int nodeIndex = getInt(nodeIndexVal, 0);
                 if (nodeIndex < getArraySize(m_nodes)) {
@@ -569,8 +569,8 @@ namespace Rapture {
         // Process children
         yyjson_val* childrenVal = getObjectValue(nodeVal, "children");
         if (childrenVal && yyjson_is_arr(childrenVal)) {
-            uint32_t childCount = getArraySize(childrenVal);
-            for (uint32_t i = 0; i < childCount; i++) {
+            size_t childCount = getArraySize(childrenVal);
+            for (size_t i = 0; i < childCount; i++) {
                 yyjson_val* childIndexVal = getArrayElement(childrenVal, i);
                 unsigned int childIndex = getInt(childIndexVal, 0);
                 if (childIndex < getArraySize(m_nodes)) {
@@ -648,8 +648,8 @@ namespace Rapture {
         // Process primitives
         yyjson_val* primitivesVal = getObjectValue(meshVal, "primitives");
         if (primitivesVal && yyjson_is_arr(primitivesVal)) {
-            uint32_t primitiveCount = getArraySize(primitivesVal);
-            for (uint32_t i = 0; i < primitiveCount; i++) {
+            size_t primitiveCount = getArraySize(primitivesVal);
+            for (size_t i = 0; i < primitiveCount; i++) {
                 // For each primitive, create a new entity
                 Entity primitiveEntity = m_scene->createEntity("_Primitive_" + std::to_string(i) + "_" + meshName);
                 //RP_CORE_INFO("glTF2Loader: Mesh loaded: {}", meshName);
@@ -745,7 +745,7 @@ namespace Rapture {
         std::vector<uint32_t> attrOffsets;
         
         for (const auto& [name, data] : attributeData) {
-            uint32_t attrSize = data.size() / vertexCount;
+            uint32_t attrSize = static_cast<uint32_t>(data.size() / vertexCount);
             attrSizes.push_back(attrSize);
             attrOffsets.push_back(vertexStride);
             vertexStride += attrSize;
@@ -843,7 +843,7 @@ namespace Rapture {
                 params.vertexData = (void*)interleavedData.data();
                 params.vertexDataSize = totalVertexDataSize;
                 params.indexData = (void*)indexData.data();
-                params.indexDataSize = indexData.size();
+                params.indexDataSize = static_cast<uint32_t>(indexData.size());
                 params.indexCount = indCount;
                 params.indexType = compType;
 

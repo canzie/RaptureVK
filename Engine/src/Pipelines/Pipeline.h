@@ -9,7 +9,14 @@ namespace Rapture {
 
 class PipelineBase {
 public:
+    virtual VkPipelineLayout getPipelineLayoutVk() const = 0;
+    virtual VkPipeline getPipelineVk() const = 0;
+    virtual VkPipelineBindPoint getPipelineBindPoint() const = 0;
 
+protected:
+    VkPipelineLayout m_pipelineLayout;
+    VkPipeline m_pipeline;
+    VkPipelineBindPoint m_pipelineBindPoint;
 
 };
 

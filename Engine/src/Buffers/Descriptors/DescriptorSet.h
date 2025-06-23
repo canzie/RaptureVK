@@ -9,6 +9,8 @@
 #include <mutex>
 
 #include "Textures/TextureCommon.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
+#include "Pipelines/Pipeline.h"
 
 namespace Rapture {
 
@@ -20,26 +22,54 @@ namespace Rapture {
     // we can go even further and log a warn when a layout can be optimised to be identical to a cached one.
 
 // Forward declarations
+class UniformBuffer;
 class Buffer;
 class Texture;
 class TLAS;
 
+// XYZ -> SET=X BIND=YZ
+// 000 -> SET=0 BIND=00
+// 101 -> SET=1 BIND=01
+// 199 -> SET=1 BIND=99
+
+enum class DescriptorSetBindingLocation {
+    NONE,
+    CAMERA_UBO = 0,
+    LIGHTS_UBO = 1,
+    SHADOW_MATRICES_UBO = 2,
+    CASCADE_MATRICES_UBO = 3,
+    SHADOW_DATA_UBO = 4,
+    MATERIAL_UBO = 100,
+    MESH_DATA_UBO = 200,
+    BINDLESS_TEXTURES = 300,
+    BINDLESS_SSBOS = 301,
+};
+
+inline uint32_t getBindingSetNumber(DescriptorSetBindingLocation location) {
+    return static_cast<uint32_t>(location) / 100;
+}
+
+inline uint32_t getBindingBindNumber(DescriptorSetBindingLocation location) {
+    return static_cast<uint32_t>(location) % 100;
+}
+
 struct DescriptorSetBinding {
-    uint32_t binding;
     VkDescriptorType type;
     uint32_t count = 1;
     TextureViewType viewType = TextureViewType::DEFAULT;
     // Use variant to hold different resource types
-    std::variant<std::shared_ptr<Buffer>, std::shared_ptr<Texture>, std::reference_wrapper<TLAS>> resource;
     bool useStorageImageInfo = false; // Flag to use storage image descriptor info
+    DescriptorSetBindingLocation location = DescriptorSetBindingLocation::NONE;
 
 };
 
 struct DescriptorSetBindings {
     std::vector<DescriptorSetBinding> bindings;
-    VkDescriptorSetLayout layout;
+    uint32_t setNumber;
 };
 
+
+// TODO Find a way to only use the DescriptorBinding instead of the seperate ones
 class DescriptorSet {
 public:
     DescriptorSet(const DescriptorSetBindings& bindings);
@@ -53,13 +83,36 @@ public:
     
     VkDescriptorSetLayout getLayout() const { return m_layout; }
 
-    // Update descriptor set with new data
-    void updateDescriptorSet(const DescriptorSetBindings& bindings);
+    // Typed getBinding methods for compile-time type safety
+    std::shared_ptr<DescriptorBindingUniformBuffer> getUniformBufferBinding(DescriptorSetBindingLocation location) {
+        auto it = m_uniformBufferBindings.find(location);
+        return it != m_uniformBufferBindings.end() ? it->second : nullptr;
+    }
+    
+    std::shared_ptr<DescriptorBindingTexture> getTextureBinding(DescriptorSetBindingLocation location) {
+        auto it = m_textureBindings.find(location);
+        return it != m_textureBindings.end() ? it->second : nullptr;
+    }
+    
+    std::shared_ptr<DescriptorBindingTLAS> getTLASBinding(DescriptorSetBindingLocation location) {
+        auto it = m_tlasBindings.find(location);
+        return it != m_tlasBindings.end() ? it->second : nullptr;
+    }
+
+    std::shared_ptr<DescriptorBindingSSBO> getSSBOBinding(DescriptorSetBindingLocation location) {
+        auto it = m_ssboBindings.find(location);
+        return it != m_ssboBindings.end() ? it->second : nullptr;
+    }
+
+    void bind(VkCommandBuffer commandBuffer, std::shared_ptr<PipelineBase> pipeline);
 
 private:
+    void createBinding(const DescriptorSetBinding& binding);
+    void createDescriptorSetLayout(const DescriptorSetBindings& bindings);
+    void createDescriptorSet();
+
+
     void createDescriptorPool();
-    void allocateDescriptorSet();
-    void writeDescriptorSet(const DescriptorSetBindings& bindings);
 
     void updateUsedCounts(const DescriptorSetBindings& bindings);
     
@@ -68,6 +121,13 @@ private:
     VkDevice m_device;
     VkDescriptorSetLayout m_layout;
     VkDescriptorSet m_set;
+
+    std::unordered_map<DescriptorSetBindingLocation, std::shared_ptr<DescriptorBindingUniformBuffer>> m_uniformBufferBindings;
+    std::unordered_map<DescriptorSetBindingLocation, std::shared_ptr<DescriptorBindingTexture>> m_textureBindings;
+    std::unordered_map<DescriptorSetBindingLocation, std::shared_ptr<DescriptorBindingTLAS>> m_tlasBindings;
+    std::unordered_map<DescriptorSetBindingLocation, std::shared_ptr<DescriptorBindingSSBO>> m_ssboBindings;
+
+    uint32_t m_setNumber;
     
     // Track what this descriptor set is using for cleanup
     uint32_t m_usedBuffers = 0;
@@ -94,6 +154,21 @@ private:
     static const uint32_t s_maxStorageImages = 2000;
     static const uint32_t s_maxInputAttachments = 1000;
     static const uint32_t s_maxAccelerationStructures = 64;
+};
+
+class DescriptorManager {
+public:
+    static void init();
+    static void shutdown();
+
+    static std::shared_ptr<DescriptorSet> getDescriptorSet(uint32_t setNumber);
+    static std::shared_ptr<DescriptorSet> getDescriptorSet(DescriptorSetBindingLocation location);
+
+
+private:
+    static std::array<std::shared_ptr<DescriptorSet>, 4> s_descriptorSets;
+    static std::array<std::mutex, 4> s_descriptorSetMutexes;
+
 };
 
 }

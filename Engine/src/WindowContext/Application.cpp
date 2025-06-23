@@ -6,8 +6,8 @@
 #include "Renderer/DeferredShading/DeferredRenderer.h"
 #include "Renderer/ForwardRenderer/ForwardRenderer.h"
 
+#include "Buffers/Descriptors/DescriptorManager.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
-#include "Buffers/Descriptors/DescriptorArrayManager.h"
 #include "Buffers/BufferPool.h"
 #include "Utils/Timestep.h"
 
@@ -93,25 +93,8 @@ Application::Application(int width, int height, const char *title)
 
   AssetManager::init();
 
-  DescriptorArrayConfig textureConfig;
-  textureConfig.arrayType = DescriptorArrayType::TEXTURE;
-  textureConfig.capacity = 2048;
-  textureConfig.name = "GlobalBindlessTexturePool";
-  textureConfig.bindingIndex = 0;    // binding=0
+    DescriptorManager::init();
 
-  DescriptorArrayConfig storageConfig;
-  storageConfig.arrayType = DescriptorArrayType::STORAGE_BUFFER;
-  storageConfig.capacity = 4096;
-  storageConfig.name = "GlobalBindlessStorageBufferPool";
-  storageConfig.bindingIndex = 1;    // binding=0
-
-  DescriptorArrayConfig uboConfig;
-  uboConfig.arrayType = DescriptorArrayType::UNIFORM_BUFFER;
-  uboConfig.capacity = 4096;
-  uboConfig.name = "GlobalBindlessUniformBufferPool";
-  uboConfig.bindingIndex = 2;    // binding=0
-
-  DescriptorArrayManager::init({textureConfig, storageConfig, uboConfig});
 
   MaterialManager::init();
 
@@ -149,7 +132,7 @@ Application::~Application() {
 
   ForwardRenderer::shutdown();
   DeferredRenderer::shutdown();
-  DescriptorArrayManager::shutdown();
+  DescriptorManager::shutdown();
 
   m_layerStack.clear();
 
@@ -172,14 +155,16 @@ void Application::run() {
 
     Timestep::onUpdate();
 
-    for (auto layer : m_layerStack) {
-      layer->onUpdate(Timestep::deltaTime());
-    }
-
     auto activeScene = m_project->getActiveScene();
     if (activeScene) {
       activeScene->onUpdate(Timestep::deltaTime());
     }
+
+    for (auto layer : m_layerStack) {
+      layer->onUpdate(Timestep::deltaTime());
+    }
+
+
 
     m_window->onUpdate();
 

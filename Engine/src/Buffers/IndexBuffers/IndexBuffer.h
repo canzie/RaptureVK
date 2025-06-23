@@ -2,11 +2,11 @@
 
 #include "Buffers/Buffers.h"
 #include "Buffers/BufferPool.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
+
 
 namespace Rapture {
 
-template<typename T>
-class DescriptorSubAllocationBase;
 
 
 class IndexBuffer : public Buffer {
@@ -25,7 +25,7 @@ class IndexBuffer : public Buffer {
         // Get the bindless descriptor index for this buffer
         uint32_t getBindlessIndex();
         
-        static DescriptorSubAllocationBase<Buffer>* getBindlessBuffers() { return s_bindlessBuffers.get(); }
+        static std::shared_ptr<DescriptorBindingSSBO> getBindlessBuffers() { return s_bindlessBuffers; }
         
     private:
         VkIndexType m_indexType;
@@ -33,7 +33,7 @@ class IndexBuffer : public Buffer {
 
         std::shared_ptr<BufferAllocation> m_bufferAllocation;
 
-        static std::unique_ptr<DescriptorSubAllocationBase<Buffer>> s_bindlessBuffers;
+        static std::shared_ptr<DescriptorBindingSSBO> s_bindlessBuffers;
 };
 
 }

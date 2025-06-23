@@ -12,16 +12,20 @@ namespace Rapture {
 
 struct PushConstants {
     glm::mat4 model;
+    uint32_t shadowMapIndex;
 };
 
-std::unique_ptr<DescriptorSubAllocationBase<Texture>> ShadowMap::s_bindlessShadowMaps = nullptr;
+std::shared_ptr<DescriptorBindingTexture> ShadowMap::s_bindlessShadowMaps = nullptr;
 
 
 ShadowMap::ShadowMap(float width, float height) 
     : m_width(width), m_height(height), m_shadowMapIndex(UINT32_MAX), m_lightViewProjection(glm::mat4(1.0f)) {
 
     if (s_bindlessShadowMaps == nullptr) {
-        s_bindlessShadowMaps = DescriptorArrayManager::createTextureSubAllocation(512, "Bindless Shadow Map Descriptor Array Sub-Allocation");
+        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+        if (set) {
+            s_bindlessShadowMaps = set->getTextureBinding(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+        }
     }
 
     createShadowTexture();
@@ -65,31 +69,16 @@ void ShadowMap::createUniformBuffers() {
 void ShadowMap::createDescriptorSets() {
     RAPTURE_PROFILE_FUNCTION();
     
-    // Get descriptor set layout from shader
-    VkDescriptorSetLayout layout;
-    if (auto shader = m_shader.lock()) {
-        if (shader->getDescriptorSetLayouts().size() > 0) {
-            layout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::COMMON_RESOURCES)];
+
+    auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO);
+    if (set) {
+        for (uint32_t i = 0; i < m_framesInFlight; i++) {
+            auto binding = set->getUniformBufferBinding(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO);
+            m_shadowMatrixsDescriptorIndices.push_back(binding->add(m_shadowUBOs[i]));
         }
     }
-    
-    m_descriptorSets.resize(m_framesInFlight);
-    
-    // For each frame in flight, create a descriptor set
-    for (uint32_t i = 0; i < m_framesInFlight; i++) {
-        DescriptorSetBindings bindings;
-        bindings.layout = layout;
-        
-        DescriptorSetBinding shadowBinding;
-        shadowBinding.binding = 0;
-        shadowBinding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        shadowBinding.count = 1;
-        shadowBinding.resource = m_shadowUBOs[i];
-        bindings.bindings.push_back(shadowBinding);
 
-        
-        m_descriptorSets[i] = std::make_shared<DescriptorSet>(bindings);
-    }
+
 }
 
 void ShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer) {
@@ -291,6 +280,9 @@ void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer
     scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
     
+    // Bind descriptor sets
+    DescriptorManager::bindSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO);
+
     // Get entities with TransformComponent and MeshComponent for rendering
     auto& registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
@@ -339,7 +331,8 @@ void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer
         // Push the model matrix as a push constant
         PushConstants pushConstants{};
         pushConstants.model = transform.transformMatrix();
-        
+        pushConstants.shadowMapIndex = m_shadowMatrixsDescriptorIndices[currentFrame];
+
         // Get push constant stage flags from shader
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
@@ -364,12 +357,6 @@ void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer
                             0, 
                             meshComp.mesh->getIndexBuffer()->getIndexType());
         
-        // Bind descriptor sets
-        VkDescriptorSet sets[] = {m_descriptorSets[currentFrame]->getDescriptorSet()};
-        vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(),
-                              VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              m_pipeline->getPipelineLayoutVk(),
-                              0, 1, sets, 0, nullptr);
         
         // Draw the mesh
         vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), 
@@ -513,7 +500,7 @@ void ShadowMap::createShadowTexture() {
     m_shadowTexture = std::make_shared<Texture>(spec);
 
     if (s_bindlessShadowMaps) {
-        m_shadowMapIndex = s_bindlessShadowMaps->allocate(m_shadowTexture);
+        m_shadowMapIndex = s_bindlessShadowMaps->add(m_shadowTexture);
     } else {
         RP_CORE_ERROR("ShadowMap::createShadowTexture - s_bindlessShadowMaps is nullptr");
     }

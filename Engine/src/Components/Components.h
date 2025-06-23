@@ -14,14 +14,16 @@
 #include "Components/Systems/CameraController.h"
 #include "Components/Systems/EntityNode.h"
 #include "Components/Systems/BoundingBox.h"
+#include "Components/Systems/ObjectDataBuffer.h"
+
 #include "Renderer/Frustum/Frustum.h"
 #include "Renderer/Shadows/ShadowMapping/ShadowMapping.h"
 #include "Renderer/Shadows/CascadedShadowMapping/CascadedShadowMapping.h"
+
 #include "Cameras/PerspectiveCamera/PerspectiveCamera.h"
 #include "AccelerationStructures/BLAS.h"
 #include "Meshes/Mesh.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
-
 #include "Materials/MaterialInstance.h"
 #include "AssetManager/AssetManager.h"
 
@@ -206,18 +208,18 @@ namespace Rapture {
         std::shared_ptr<Mesh> mesh;
         bool isLoading = true;
 
-        //std::shared_ptr<UniformBuffer> m_objectDataBuffer; // per mesh data
-        //uint32_t m_bindlessMeshDataIndex;
-        //static std::unique_ptr<DescriptorSubAllocationBase<Buffer>> s_bindlessMeshDataAllocation;
+        std::shared_ptr<MeshDataBuffer> meshDataBuffer;
 
 
         MeshComponent() {
             mesh = std::make_shared<Mesh>();
+            meshDataBuffer = std::make_shared<MeshDataBuffer>();
         };
 
         MeshComponent(std::shared_ptr<Mesh> mesh) {
             this->mesh = mesh;
             isLoading = false;
+            meshDataBuffer = std::make_shared<MeshDataBuffer>();
         };
     };
 

@@ -8,6 +8,8 @@
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
 #include "Cameras/CameraCommon.h"
 #include "Textures/Texture.h"
 #include "WindowContext/VulkanContext/VulkanContext.h"
@@ -61,12 +63,27 @@ public:
     std::vector<std::shared_ptr<Texture>> getMaterialTextures() const { return m_materialTextures; }
     std::vector<std::shared_ptr<Texture>> getDepthTextures() const { return m_depthStencilTextures; }
 
+    // Getters for bindless texture indices for current frame
+    uint32_t getPositionTextureIndex() const { return m_positionTextureIndices[m_currentFrame]; }
+    uint32_t getNormalTextureIndex() const { return m_normalTextureIndices[m_currentFrame]; }
+    uint32_t getAlbedoTextureIndex() const { return m_albedoTextureIndices[m_currentFrame]; }
+    uint32_t getMaterialTextureIndex() const { return m_materialTextureIndices[m_currentFrame]; }
+    uint32_t getDepthTextureIndex() const { return m_depthTextureIndices[m_currentFrame]; }
+
+    // Getters for all bindless texture indices
+    const std::vector<uint32_t>& getPositionTextureIndices() const { return m_positionTextureIndices; }
+    const std::vector<uint32_t>& getNormalTextureIndices() const { return m_normalTextureIndices; }
+    const std::vector<uint32_t>& getAlbedoTextureIndices() const { return m_albedoTextureIndices; }
+    const std::vector<uint32_t>& getMaterialTextureIndices() const { return m_materialTextureIndices; }
+    const std::vector<uint32_t>& getDepthTextureIndices() const { return m_depthTextureIndices; }
+
 
 
 private:
     void createTextures();
     void createPipeline();
-    void createDescriptorSets(uint32_t framesInFlight);
+    void bindCameraResourcesToGlobalSet();
+    void bindGBufferTexturesToBindlessSet();
 
     void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
 
@@ -74,7 +91,7 @@ private:
 
     void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
 
-
+    void bindDescriptorSets(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t currentFrame);
 
 private:
     std::weak_ptr<Shader> m_shader; 
@@ -94,15 +111,19 @@ private:
     std::vector<std::shared_ptr<Texture>> m_materialTextures;
     std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
 
+    // Bindless texture indices for each frame in flight
+    std::vector<uint32_t> m_positionTextureIndices;
+    std::vector<uint32_t> m_normalTextureIndices;
+    std::vector<uint32_t> m_albedoTextureIndices;
+    std::vector<uint32_t> m_materialTextureIndices;
+    std::vector<uint32_t> m_depthTextureIndices;
+
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     VkRenderingAttachmentInfo m_colorAttachmentInfo[4];
     VkRenderingAttachmentInfo m_depthAttachmentInfo;
 
     std::vector<std::shared_ptr<UniformBuffer>> m_cameraUBOs;
-    std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets;
-
-    bool m_isFirstFrame = true;
 
     std::shared_ptr<Entity> m_selectedEntity;
     size_t m_entitySelectedListenerId;

@@ -6,6 +6,8 @@
 #include "Textures/Texture.h"
 #include "AccelerationStructures/TLAS.h"
 
+#include "Buffers/Descriptors/DescriptorBinding.h"
+
 #include <stdexcept>
 #include <algorithm>
 #include <array>
@@ -31,8 +33,8 @@ const uint32_t DescriptorSet::s_maxStorageImages;
 const uint32_t DescriptorSet::s_maxInputAttachments;
 const uint32_t DescriptorSet::s_maxAccelerationStructures;
 
-DescriptorSet::DescriptorSet(const DescriptorSetBindings& bindings) 
-    : m_layout(bindings.layout), m_set(VK_NULL_HANDLE) {
+DescriptorSet::DescriptorSet(const DescriptorSetBindings& bindings)
+    : m_layout(VK_NULL_HANDLE), m_set(VK_NULL_HANDLE), m_setNumber(bindings.setNumber) {
     
     auto& app = Application::getInstance();
     m_device = app.getVulkanContext().getLogicalDevice();
@@ -48,17 +50,21 @@ DescriptorSet::DescriptorSet(const DescriptorSetBindings& bindings)
         throw std::runtime_error("DescriptorSet::DescriptorSet - too many descriptor sets!");
     }
 
+
+
     // simply checks if we still have space in the pool. should never really exceed the limits
     // but i dont want to 😞🔫
     updateUsedCounts(bindings);
 
 
+    createDescriptorSetLayout(bindings);
+    createDescriptorSet();
+    for (const auto& binding : bindings.bindings) {
+        createBinding(binding);
+    }
 
-    // Allocate descriptor set from pool
-    allocateDescriptorSet();
     
-    // Write descriptor set data
-    writeDescriptorSet(bindings);
+
 }
 
 DescriptorSet::~DescriptorSet() {
@@ -80,7 +86,83 @@ DescriptorSet::~DescriptorSet() {
     // Descriptor set is automatically freed when pool is destroyed/reset
 }
 
-void DescriptorSet::createDescriptorPool() {
+void DescriptorSet::bind(VkCommandBuffer commandBuffer, std::shared_ptr<PipelineBase> pipeline) {
+    vkCmdBindDescriptorSets(commandBuffer, pipeline->getPipelineBindPoint(), pipeline->getPipelineLayoutVk(), m_setNumber, 1, &m_set, 0, nullptr);
+}
+
+void DescriptorSet::createBinding(const DescriptorSetBinding &binding)
+{
+
+    uint32_t bindNumber = getBindingBindNumber(binding.location);
+
+    switch (binding.type) {
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+            m_uniformBufferBindings[binding.location] = std::make_shared<DescriptorBindingUniformBuffer>(this, bindNumber, binding.count);
+            break;
+        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+            m_textureBindings[binding.location] = std::make_shared<DescriptorBindingTexture>(this, bindNumber, binding.viewType, binding.useStorageImageInfo, binding.count);
+            break;
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+            m_tlasBindings[binding.location] = std::make_shared<DescriptorBindingTLAS>(this, bindNumber, binding.count);
+            break;
+        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+            m_ssboBindings[binding.location] = std::make_shared<DescriptorBindingSSBO>(this, bindNumber, binding.count);
+            break;
+        default:
+    }
+}
+
+void DescriptorSet::createDescriptorSetLayout(const DescriptorSetBindings &bindings) {
+    
+    Application& app = Application::getInstance();
+    VkDevice device = app.getVulkanContext().getLogicalDevice();
+
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+    layoutBindings.reserve(bindings.bindings.size());
+
+    // each binding in a set
+    for (const auto& bindingInfo : bindings.bindings) {
+        uint32_t bindNumber = getBindingBindNumber(bindingInfo.location);
+        VkDescriptorSetLayoutBinding layoutBinding{};
+        layoutBinding.binding = bindNumber;
+        layoutBinding.descriptorType = bindingInfo.type;
+        layoutBinding.descriptorCount = bindingInfo.count;
+        layoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
+        layoutBinding.pImmutableSamplers = nullptr;
+
+        layoutBindings.push_back(layoutBinding);
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
+    layoutInfo.pBindings = layoutBindings.data();
+
+    // layout for all bindings in a set
+
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &m_layout) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create descriptor set layout for set {0}!", m_setNumber);
+        throw std::runtime_error("Failed to create descriptor set layout!");
+    }
+}
+
+void DescriptorSet::createDescriptorSet() {
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = s_pool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &m_layout;
+
+    if (vkAllocateDescriptorSets(m_device, &allocInfo, &m_set) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to allocate descriptor set!");
+        throw std::runtime_error("Failed to allocate descriptor set");
+    }
+}
+
+
+
+void DescriptorSet::createDescriptorPool()
+{
     // Define pool sizes for different descriptor types
     std::array<VkDescriptorPoolSize, 6> poolSizes{};
     
@@ -124,101 +206,8 @@ void DescriptorSet::createDescriptorPool() {
     RP_CORE_INFO("Created descriptor pool with {} max sets", s_maxSets);
 }
 
-void DescriptorSet::allocateDescriptorSet() {
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = s_pool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &m_layout;
-
-    {
-        std::lock_guard<std::mutex> lock(m_descriptorUpdateMutex);
-
-        VkResult result = vkAllocateDescriptorSets(m_device, &allocInfo, &m_set);
-        if (result != VK_SUCCESS) {
-            RP_CORE_ERROR("Failed to allocate descriptor set! VkResult: {}", static_cast<int>(result));
-            throw std::runtime_error("Failed to allocate descriptor set");
-        }
-    }
-}
-
-void DescriptorSet::writeDescriptorSet(const DescriptorSetBindings& bindings) {
-    std::vector<VkWriteDescriptorSet> descriptorWrites;
-    std::vector<VkDescriptorBufferInfo> bufferInfos;
-    std::vector<VkDescriptorImageInfo> imageInfos;
-    std::vector<VkWriteDescriptorSetAccelerationStructureKHR> accelerationStructureWrites;
-    
-    std::lock_guard<std::mutex> lock(m_descriptorUpdateMutex);
 
 
-    // Reserve space to avoid reallocation
-    descriptorWrites.reserve(bindings.bindings.size());
-    bufferInfos.reserve(bindings.bindings.size());
-    imageInfos.reserve(bindings.bindings.size());
-    accelerationStructureWrites.reserve(bindings.bindings.size());
-
-    for (const auto& binding : bindings.bindings) {
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = m_set;
-        descriptorWrite.dstBinding = binding.binding;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = binding.type;
-        descriptorWrite.descriptorCount = binding.count;
-
-        // TODO:: add a check for the correct uniform or storage bit
-        if (std::holds_alternative<std::shared_ptr<Buffer>>(binding.resource)) {
-            auto resource = std::get<std::shared_ptr<Buffer>>(binding.resource);
-
-            if (resource) {
-                bufferInfos.push_back(resource->getDescriptorBufferInfo());
-                descriptorWrite.pBufferInfo = &bufferInfos.back();
-            } else {
-                RP_CORE_WARN("Buffer is null for binding {}", binding.binding);
-                return; // Skip this binding
-            }
-        } else if (std::holds_alternative<std::shared_ptr<Texture>>(binding.resource)) {
-            // Handle Texture
-            auto resource = std::get<std::shared_ptr<Texture>>(binding.resource);
-            if (resource) {
-                if (binding.useStorageImageInfo) {
-                    imageInfos.push_back(resource->getStorageImageDescriptorInfo());
-                } else {
-                    imageInfos.push_back(resource->getDescriptorImageInfo(binding.viewType));
-                }
-                descriptorWrite.pImageInfo = &imageInfos.back();
-            } else {
-                RP_CORE_WARN("Texture is null for binding {}", binding.binding);
-                return; // Skip this binding
-            }
-
-        } else if (std::holds_alternative<std::reference_wrapper<TLAS>>(binding.resource)) {
-            auto& resource = std::get<std::reference_wrapper<TLAS>>(binding.resource).get();
-            if (resource.getAccelerationStructure() != VK_NULL_HANDLE) {
-                // Create acceleration structure write descriptor
-                VkWriteDescriptorSetAccelerationStructureKHR accelerationStructureWrite{};
-                accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-                accelerationStructureWrite.accelerationStructureCount = 1;
-                VkAccelerationStructureKHR accelerationStructure = resource.getAccelerationStructure();
-                accelerationStructureWrite.pAccelerationStructures = &accelerationStructure;
-                
-                accelerationStructureWrites.push_back(accelerationStructureWrite);
-                
-                // Link the acceleration structure write to the main descriptor write
-                descriptorWrite.pNext = &accelerationStructureWrites.back();
-            } else {
-                RP_CORE_WARN("TLAS is null for binding {}", binding.binding);
-                return; // Skip this binding
-            }
-        }
-        descriptorWrites.push_back(descriptorWrite);
-    }
-
-    if (!descriptorWrites.empty()) {
-        vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(descriptorWrites.size()), 
-                              descriptorWrites.data(), 0, nullptr);
-    }
-}
 
 void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
 {
@@ -307,9 +296,7 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
     m_usedAccelerationStructures = newAccelerationStructures;
 }
 
-void DescriptorSet::updateDescriptorSet(const DescriptorSetBindings& bindings) {
-    writeDescriptorSet(bindings);
-}
+
 
 void DescriptorSet::destroyDescriptorPool() {
     if (s_pool != VK_NULL_HANDLE) {

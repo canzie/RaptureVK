@@ -2,7 +2,7 @@
 
 #include <vk_mem_alloc.h>
 #include "TextureCommon.h"
-#include "Buffers/Descriptors/DescriptorArraySubAllocationBase.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
 #include <string>
 #include <memory>
 #include <vector>
@@ -101,7 +101,7 @@ private:
 
     uint32_t m_bindlessIndex = UINT32_MAX;
 
-    static std::unique_ptr<DescriptorSubAllocationBase<Texture>> s_bindlessTextures;
+    static std::shared_ptr<DescriptorBindingTexture> s_bindlessTextures;
 };
 
 }

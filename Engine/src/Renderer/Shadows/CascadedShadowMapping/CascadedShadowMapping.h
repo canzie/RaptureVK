@@ -8,7 +8,8 @@
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/Descriptors/DescriptorArrayManager.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include "Renderer/Frustum/Frustum.h"
@@ -75,7 +76,7 @@ public:
     float getLambda() const { return m_lambda; }
     void setLambda(float lambda) { m_lambda = std::clamp(lambda, 0.0f, 1.0f); }
 
-    static DescriptorSubAllocationBase<Texture>* getBindlessShadowMaps() { return s_bindlessCSMs.get(); }
+    static std::shared_ptr<DescriptorBindingTexture> getBindlessShadowMaps() { return s_bindlessCSMs; }
 
     std::vector<float> getCascadeSplits() const { return m_cascadeSplits; }
 
@@ -128,7 +129,7 @@ private:
 
     uint32_t m_shadowMapIndex = 0;
 
-    static std::unique_ptr<DescriptorSubAllocationBase<Texture>> s_bindlessCSMs;
+    static std::shared_ptr<DescriptorBindingTexture> s_bindlessCSMs;
     
     };
 

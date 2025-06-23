@@ -51,18 +51,15 @@ public:
 
     void bind(VkCommandBuffer commandBuffer);
 
-    VkPipeline getPipelineVk() const { return m_pipeline; }
-    VkPipelineLayout getPipelineLayoutVk() const { return m_pipelineLayout; }
+    VkPipeline getPipelineVk() const override { return m_pipeline; }
+    VkPipelineLayout getPipelineLayoutVk() const override { return m_pipelineLayout; }
+    VkPipelineBindPoint getPipelineBindPoint() const override { return VK_PIPELINE_BIND_POINT_GRAPHICS; }
     
 private:
     void createPipelineLayout(const GraphicsPipelineConfiguration& config);
     void createPipeline(const GraphicsPipelineConfiguration& config);
 
 
-protected:
-
-    VkPipeline m_pipeline;
-    VkPipelineLayout m_pipelineLayout;
 };
 
 

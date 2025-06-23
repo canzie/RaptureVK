@@ -1,12 +1,12 @@
 #include "IndexBuffer.h"
 #include "Logging/Log.h"
-#include "Buffers/Descriptors/DescriptorArrayManager.h"
+#include "Buffers/Descriptors/DescriptorSet.h"
 
 #include "Utils/GLTypes.h"
 
 namespace Rapture {
 
-std::unique_ptr<DescriptorSubAllocationBase<Buffer>> IndexBuffer::s_bindlessBuffers = nullptr;
+std::shared_ptr<DescriptorBindingSSBO> IndexBuffer::s_bindlessBuffers = nullptr;
 
 VkIndexType getIndexTypeVk(uint32_t indexType) {
     switch (indexType) {
@@ -80,12 +80,15 @@ uint32_t IndexBuffer::getBindlessIndex()
     
     // Initialize the bindless buffer pool if not already done
     if (s_bindlessBuffers == nullptr) {
-        s_bindlessBuffers = DescriptorArrayManager::createStorageSubAllocation(DescriptorArrayType::STORAGE_BUFFER, 1024, "Bindless Index Buffer Descriptor Array Sub-Allocation");   
+        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+        if (set) {
+            s_bindlessBuffers = set->getSSBOBinding(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+        }
     }
     
     if (s_bindlessBuffers) {
         // For now, we'll use a placeholder index based on buffer address
-        m_bindlessIndex = s_bindlessBuffers->allocate(shared_from_this());
+        m_bindlessIndex = s_bindlessBuffers->add(shared_from_this());
     }
     
     return m_bindlessIndex;

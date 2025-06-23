@@ -47,6 +47,58 @@ narrow phase
 
 BVH, DBVH, BVH_SAH are implemented, now we should do some limit testing before we move forward. Could load like x cubes/spheres and disable rendering
 
+# Descriptor System refactor
+
+- global descriptor sets
+- need a way to update descriptor set sizes dynamically (notify the pipeline of this change)
+- create some static bindings
+- shader reflection stays the same for the materials but changes for the other sets
+  for those it will only provide the used set numbers and request the layouts from the descriptor manager
+- for the material system, we create a seperate set for each material -> unique pipeline for each material
+- we need a way to tell the system to add some binding to a set
+    - provide either a set and binding number or a some enum it will then map the request to the predefined bindings
+    - when setting some data to a binding, we request the binding, then assign whatever, if it is an array we find some free slot, set the data or 
+      update and return the index this index will need to be used in the shader for access
+    - a binding object will be a cpu object, updates to a specific index will go trough that object
+      it needs to know which set it belongs to 
+    - next is the syncing between cpu and glsl bindings ... for now we just do this manually? could probably import the same common file used in the shader...
+
+
+class DescriptorBinding;
+    - a reference/ptr to the set object it belongs to
+    - a type (array, single descriptor) -> image and ssbo arrays should go trough the descriptorsetarray system only ubos are allowed to be arrays here
+    - a method to add/update the data at its location (if it is an array also need the index)
+    - the add method will return an index into the array if it is an array, otherwise something like 0
+    - keep a vector of bools to track the current allocations, will be used when adding a new binding
+    - a size
+class DescriptorSet {
+    - has a map of all the static bindings for a given set, this will be described at the start of the manager/application
+    - containt the actual vkdescriptor set and layout
+    - it will also contain a bind method that automatically binds to the given set, takes a commandbuffer and pipeline object (create one for compute 
+      one for graphics)
+    - need a config struct to properly define a set and its binding types
+
+enum class with all of the binding types and their destined set (use some bit mask for this)
+}
+
+
+
+'''
+    layout(set = 1, binding = 0) uniform materialUBOs[] {
+        // unique to each material
+        vec3 albedo;
+        float roughness;
+        float metallic;
+        uint MetallicRougnesHandle;
+        uint AlbedoHandle;
+        uint NormalHandle;
+        ...
+
+        uint flags; // flags can be minimised by setting the handles to some reserved values
+        // use bindless handles for the textures
+    }
+
+'''
 
 
 RENDERER/MATERIAL OVERHAUL 

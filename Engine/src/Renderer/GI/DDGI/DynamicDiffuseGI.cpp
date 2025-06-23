@@ -12,7 +12,8 @@
 #include "AssetManager/AssetManager.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/Descriptors/DescriptorArrayManager.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
 
 #include "Logging/TracyProfiler.h"
 
@@ -111,22 +112,15 @@ void DynamicDiffuseGI::createPipelines() {
 
 void DynamicDiffuseGI::createDescriptorSets(std::shared_ptr<Scene> scene) {
 
-    RP_CORE_TRACE("Creating descriptor sets");
+    RP_CORE_TRACE("Getting descriptor sets");
 
-    DescriptorSetBindings uboBindings;
-    // just take any shader where the probe volume is the only one in a set
-    uboBindings.layout = m_DDGI_ProbeIrradianceBlendingShader->getDescriptorSetLayouts()[1]; 
-    
-    // Binding 0: ProbeInfo UBO  
-    DescriptorSetBinding probeInfoBinding;
-    probeInfoBinding.binding = 0;
-    probeInfoBinding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    probeInfoBinding.count = 1;
-    probeInfoBinding.resource = m_ProbeInfoBuffer;
-    uboBindings.bindings.push_back(probeInfoBinding);
 
-    m_probeVolumeDescriptorSet = std::make_shared<DescriptorSet>(uboBindings);
-        
+    auto probeInfoSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
+    if (probeInfoSet) {
+        auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
+        binding->add(m_ProbeInfoBuffer);
+    }
+
 
     createProbeTraceDescriptorSets(scene);
     createProbeBlendingDescriptorSets(scene, true);

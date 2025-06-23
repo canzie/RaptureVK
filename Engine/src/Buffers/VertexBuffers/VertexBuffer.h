@@ -3,11 +3,9 @@
 #include "Buffers/Buffers.h"
 #include "Buffers/VertexBuffers/BufferLayout.h"
 #include "Buffers/BufferPool.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
 
 namespace Rapture {
-
-template<typename T>
-class DescriptorSubAllocationBase;
 
 class VertexBuffer : public Buffer {
     public:
@@ -26,14 +24,14 @@ class VertexBuffer : public Buffer {
         // Get the bindless descriptor index for this buffer
         uint32_t getBindlessIndex();
         
-        static DescriptorSubAllocationBase<Buffer>* getBindlessBuffers() { return s_bindlessBuffers.get(); }
+        static std::shared_ptr<DescriptorBindingSSBO> getBindlessBuffers() { return s_bindlessBuffers; }
 
     private:
         std::shared_ptr<BufferAllocation> m_bufferAllocation;
         BufferLayout m_bufferLayout;
         uint32_t m_bindlessIndex = UINT32_MAX;
         
-        static std::unique_ptr<DescriptorSubAllocationBase<Buffer>> s_bindlessBuffers;
+        static std::shared_ptr<DescriptorBindingSSBO> s_bindlessBuffers;
 };
 
 }

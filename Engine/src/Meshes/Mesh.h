@@ -8,7 +8,6 @@
 #include "Buffers/VertexBuffers/VertexBuffer.h"
 #include "Buffers/VertexBuffers/BufferLayout.h"
 
-#include "Buffers/Descriptors/DescriptorArrayManager.h"
 
 
 namespace Rapture

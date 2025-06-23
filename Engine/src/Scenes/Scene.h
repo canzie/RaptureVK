@@ -30,7 +30,7 @@ namespace Rapture {
         
         void destroyEntity(Entity entity);
 
-        void onUpdate(uint32_t dt);
+        void onUpdate(float dt);
 
         entt::registry& getRegistry() { return m_Registry; }
         const entt::registry& getRegistry() const { return m_Registry; }

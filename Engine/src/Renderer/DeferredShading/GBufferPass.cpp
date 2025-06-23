@@ -11,6 +11,9 @@ namespace Rapture {
 struct PushConstants {
     glm::mat4 model;
     uint32_t flags;
+    uint32_t meshDataBindlessIndex;
+    uint32_t materialBindlessIndex;
+    uint32_t frameIndex;
 };
 
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight, std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs)
@@ -27,7 +30,12 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight, std
     
     createPipeline();
     createTextures();
-    createDescriptorSets(framesInFlight);
+    
+    // Bind camera UBOs to the global descriptor set
+    bindCameraResourcesToGlobalSet();
+    
+    // Bind GBuffer textures to bindless set
+    bindGBufferTexturesToBindlessSet();
     
     m_entitySelectedListenerId = GameEvents::onEntitySelected().addListener(
         [this](std::shared_ptr<Rapture::Entity> entity) {
@@ -42,8 +50,30 @@ GBufferPass::~GBufferPass() {
 
     GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId); 
 
-    // Clean up descriptor sets
-    m_descriptorSets.clear();
+    // Free bindless texture indices
+    auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+    if (bindlessSet) {
+        auto textureBinding = bindlessSet->getTextureBinding(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+        if (textureBinding) {
+            for (uint32_t i = 0; i < m_framesInFlight; i++) {
+                if (m_positionTextureIndices.size() > i && m_positionTextureIndices[i] != UINT32_MAX) {
+                    textureBinding->free(m_positionTextureIndices[i]);
+                }
+                if (m_normalTextureIndices.size() > i && m_normalTextureIndices[i] != UINT32_MAX) {
+                    textureBinding->free(m_normalTextureIndices[i]);
+                }
+                if (m_albedoTextureIndices.size() > i && m_albedoTextureIndices[i] != UINT32_MAX) {
+                    textureBinding->free(m_albedoTextureIndices[i]);
+                }
+                if (m_materialTextureIndices.size() > i && m_materialTextureIndices[i] != UINT32_MAX) {
+                    textureBinding->free(m_materialTextureIndices[i]);
+                }
+                if (m_depthTextureIndices.size() > i && m_depthTextureIndices[i] != UINT32_MAX) {
+                    textureBinding->free(m_depthTextureIndices[i]);
+                }
+            }
+        }
+    }
 
     // Clean up camera UBOs
     m_cameraUBOs.clear();
@@ -57,6 +87,60 @@ GBufferPass::~GBufferPass() {
 
     // Clean up pipeline
     m_pipeline.reset();
+}
+
+void GBufferPass::bindCameraResourcesToGlobalSet() {
+    // Get the global descriptor set for common resources (Set 0)
+    auto commonSet = DescriptorManager::getDescriptorSet(0);
+    if (!commonSet) {
+        RP_CORE_ERROR("GBufferPass: Failed to get common descriptor set from DescriptorManager");
+        return;
+    }
+    
+    // Bind camera UBOs to the global descriptor set array
+    auto cameraBinding = commonSet->getUniformBufferBinding(DescriptorSetBindingLocation::CAMERA_UBO);
+    if (cameraBinding) {
+        for (uint32_t i = 0; i < m_cameraUBOs.size() && i < 3; ++i) {
+            cameraBinding->update(m_cameraUBOs[i], i);
+        }
+        RP_CORE_INFO("GBufferPass: Bound {} camera UBOs to global descriptor set", m_cameraUBOs.size());
+    } else {
+        RP_CORE_ERROR("GBufferPass: Failed to get camera UBO binding from global descriptor set");
+    }
+}
+
+void GBufferPass::bindDescriptorSets(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t currentFrame) {
+    // Collect all descriptor sets we need to bind, avoiding duplicates
+    std::vector<std::pair<uint32_t, VkDescriptorSet>> setsToBindRaw;
+    
+    // Set 0: Common resources (camera, lights, etc.) from DescriptorManager
+    auto commonSet = DescriptorManager::getDescriptorSet(0);
+    if (commonSet) {
+        setsToBindRaw.push_back({0, commonSet->getDescriptorSet()});
+    }
+    
+    // Set 3: Bindless resources (textures, buffers) from DescriptorArrayManager
+    auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+    if (bindlessSet) {
+        setsToBindRaw.push_back({3, bindlessSet->getDescriptorSet()});
+    }
+    
+    // Sort by set number to ensure proper binding order
+    std::sort(setsToBindRaw.begin(), setsToBindRaw.end(), 
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    
+    // Remove duplicates (though unlikely in this case)
+    auto end = std::unique(setsToBindRaw.begin(), setsToBindRaw.end(),
+                          [](const auto& a, const auto& b) { return a.first == b.first; });
+    setsToBindRaw.erase(end, setsToBindRaw.end());
+    
+    // Bind each set at its proper index
+    for (const auto& [setIndex, descriptorSet] : setsToBindRaw) {
+        vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), 
+                               VK_PIPELINE_BIND_POINT_GRAPHICS, 
+                               m_pipeline->getPipelineLayoutVk(),
+                               setIndex, 1, &descriptorSet, 0, nullptr);
+    }
 }
 
 // order of the color attachments is important, it NEEDS to be the same order as the fragment shaders output attachments
@@ -112,6 +196,9 @@ void GBufferPass::recordCommandBuffer(
     if (mainCamera) {
         cameraComp = mainCamera->tryGetComponent<CameraComponent>();
     }
+
+    // Bind global descriptor sets (common resources + bindless arrays)
+    bindDescriptorSets(commandBuffer, currentFrame);
 
     for (auto entity : view) {
 
@@ -183,14 +270,18 @@ void GBufferPass::recordCommandBuffer(
             1, &bindingDescription,
             static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
         
-        // Push the model matrix as a push constant
-        PushConstants pushConstants{};
-        pushConstants.model = transform.transformMatrix();
-        
-        // Combine vertex attribute flags and material flags
+        // Update mesh data buffer with current transform and flags
         uint32_t vertexFlags = meshComp.mesh->getVertexBuffer()->getBufferLayout().getFlags();
         uint32_t materialFlags = materialComp.material->getMaterialFlags();
+        meshComp.meshDataBuffer->updateFromComponents(transform, vertexFlags | materialFlags);
+        
+        // Push the constants
+        PushConstants pushConstants{};
+        pushConstants.model = transform.transformMatrix();
         pushConstants.flags = vertexFlags | materialFlags;
+        pushConstants.meshDataBindlessIndex = meshComp.meshDataBuffer->getDescriptorIndex();
+        pushConstants.materialBindlessIndex = materialComp.material->getBindlessIndex();
+        pushConstants.frameIndex = currentFrame;
 
         // for now assume only 1 set of pushconstants in a full shader
         VkShaderStageFlags stageFlags;
@@ -212,11 +303,7 @@ void GBufferPass::recordCommandBuffer(
         vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
 
         
-        // Bind descriptor sets (only view/proj and material now)materialComp.material->getDescriptorSet()
-        VkDescriptorSet descriptorSets[] = {m_descriptorSets[currentFrame]->getDescriptorSet(), materialComp.material->getDescriptorSet()};
-        uint32_t descriptorSetCount = sizeof(descriptorSets) / sizeof(descriptorSets[0]);
-        vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
-            0, descriptorSetCount, descriptorSets, 0, nullptr);
+ 
         
         // Bind index buffer
         vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), mesh->getIndexBuffer()->getBufferVk(), 0, mesh->getIndexBuffer()->getIndexType());
@@ -403,6 +490,45 @@ void GBufferPass::createTextures()
     }
 }
 
+void GBufferPass::bindGBufferTexturesToBindlessSet() {
+    // Get the bindless texture descriptor set
+    auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+    if (!bindlessSet) {
+        RP_CORE_ERROR("GBufferPass::bindGBufferTexturesToBindlessSet: Failed to get bindless textures descriptor set");
+        return;
+    }
+    
+    auto textureBinding = bindlessSet->getTextureBinding(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+    if (!textureBinding) {
+        RP_CORE_ERROR("GBufferPass::bindGBufferTexturesToBindlessSet: Failed to get bindless texture binding");
+        return;
+    }
+    
+    // Resize the index vectors
+    m_positionTextureIndices.resize(m_framesInFlight);
+    m_normalTextureIndices.resize(m_framesInFlight);
+    m_albedoTextureIndices.resize(m_framesInFlight);
+    m_materialTextureIndices.resize(m_framesInFlight);
+    m_depthTextureIndices.resize(m_framesInFlight);
+    
+    // Add each texture to the bindless set and store the indices
+    for (uint32_t i = 0; i < m_framesInFlight; i++) {
+        m_positionTextureIndices[i] = textureBinding->add(m_positionDepthTextures[i]);
+        m_normalTextureIndices[i] = textureBinding->add(m_normalTextures[i]);
+        m_albedoTextureIndices[i] = textureBinding->add(m_albedoSpecTextures[i]);
+        m_materialTextureIndices[i] = textureBinding->add(m_materialTextures[i]);
+        m_depthTextureIndices[i] = textureBinding->add(m_depthStencilTextures[i]);
+        
+        if (m_positionTextureIndices[i] == UINT32_MAX || 
+            m_normalTextureIndices[i] == UINT32_MAX ||
+            m_albedoTextureIndices[i] == UINT32_MAX ||
+            m_materialTextureIndices[i] == UINT32_MAX ||
+            m_depthTextureIndices[i] == UINT32_MAX) {
+            RP_CORE_ERROR("GBufferPass::bindGBufferTexturesToBindlessSet: Failed to add GBuffer texture(s) to bindless array for frame {}", i);
+        }
+    }
+}
+
 void GBufferPass::createPipeline()
 {
     std::vector<VkDynamicState> dynamicStates = {
@@ -544,25 +670,7 @@ void GBufferPass::createPipeline()
 
 
 
-void GBufferPass::createDescriptorSets(uint32_t framesInFlight)
-{
-    VkDescriptorSetLayout layout;
-    uint32_t descriptorSetIndex = static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::COMMON_RESOURCES);
-    if (auto shader = m_shader.lock(); shader->getDescriptorSetLayouts().size() > descriptorSetIndex) {
-        layout = shader->getDescriptorSetLayouts()[descriptorSetIndex];
-    }
 
-    std::vector<DescriptorSetBindings> bindings(framesInFlight);
-    for (unsigned int i = 0; i < framesInFlight; i++) {
-        // TODO: binding index, currently set to 0, should change to use a constant DESCRIPTOR SET CAMERA INDEX 
-        bindings[i].bindings.push_back({0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, TextureViewType::DEFAULT, m_cameraUBOs[i], false});
-        bindings[i].layout = layout;
-    }
-
-    for (unsigned int i = 0; i < framesInFlight; i++) {
-        m_descriptorSets.push_back(std::make_shared<DescriptorSet>(bindings[i]));
-    }
-}
 
 
 } // namespace Rapture
