@@ -42,7 +42,7 @@ enum class GBufferFlags : uint32_t {
 
 class GBufferPass {
 public:
-    GBufferPass(float width, float height, uint32_t framesInFlight, std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs);
+    GBufferPass(float width, float height, uint32_t framesInFlight);
     ~GBufferPass();
 
     static FramebufferSpecification getFramebufferSpecification();
@@ -82,7 +82,6 @@ public:
 private:
     void createTextures();
     void createPipeline();
-    void bindCameraResourcesToGlobalSet();
     void bindGBufferTexturesToBindlessSet();
 
     void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
@@ -91,7 +90,6 @@ private:
 
     void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
 
-    void bindDescriptorSets(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t currentFrame);
 
 private:
     std::weak_ptr<Shader> m_shader; 
@@ -120,10 +118,9 @@ private:
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
+
     VkRenderingAttachmentInfo m_colorAttachmentInfo[4];
     VkRenderingAttachmentInfo m_depthAttachmentInfo;
-
-    std::vector<std::shared_ptr<UniformBuffer>> m_cameraUBOs;
 
     std::shared_ptr<Entity> m_selectedEntity;
     size_t m_entitySelectedListenerId;

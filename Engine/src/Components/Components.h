@@ -128,13 +128,15 @@ namespace Rapture {
         
         // Optional: Camera could be marked as main camera for rendering
         bool isMainCamera = false;
+        
+        std::shared_ptr<CameraDataBuffer> cameraDataBuffer;
 
         CameraComponent(float fovy = 45.0f, float ar = 16.0f/9.0f, float near_ = 0.1f, float far_ = 100.0f)
             : fov(fovy), aspectRatio(ar), nearPlane(near_), farPlane(far_)
         {
             camera = PerspectiveCamera(fovy, ar, near_, far_);
             frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
-
+            cameraDataBuffer = std::make_shared<CameraDataBuffer>();
         }
 
         void updateProjectionMatrix(float fovy, float ar, float near_, float far_)
@@ -317,6 +319,8 @@ struct LightComponent
     // Flag indicating if the light is active
     bool isActive = true;
     bool castsShadow = false;
+
+    std::shared_ptr<LightDataBuffer> lightDataBuffer;
     
     private:
         mutable uint32_t m_lastHash = 0;
@@ -411,19 +415,23 @@ struct BLASComponent {
 
 struct ShadowComponent {
     std::unique_ptr<ShadowMap> shadowMap;
+    std::shared_ptr<ShadowDataBuffer> shadowDataBuffer;
     bool isActive = true;
     
     ShadowComponent(float width, float height) {
         shadowMap = std::make_unique<ShadowMap>(width, height);
+        shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
     }
 };
 
 struct CascadedShadowComponent {
     std::unique_ptr<CascadedShadowMap> cascadedShadowMap;
+    std::shared_ptr<ShadowDataBuffer> shadowDataBuffer;
     bool isActive = true;
     
     CascadedShadowComponent(float width, float height, uint8_t numCascades, float lambda) {
         cascadedShadowMap = std::make_unique<CascadedShadowMap>(width, height, numCascades, lambda);
+        shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
     }
 };
 

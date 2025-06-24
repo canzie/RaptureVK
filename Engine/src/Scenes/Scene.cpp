@@ -5,6 +5,8 @@
 
 #include "AssetManager/AssetManager.h"
 #include "Meshes/MeshPrimitives.h"
+#include "WindowContext/Application.h"
+#include "RenderTargets/SwapChains/SwapChain.h"
 
 #include <memory>
 
@@ -94,19 +96,100 @@ namespace Rapture {
     }
 
     void Scene::onUpdate(float dt) {
-        auto view = m_Registry.view<TransformComponent, MeshComponent, MaterialComponent>();
+        static uint32_t frameCounter = 0;
+        frameCounter++;
 
-        for (auto entity : view) {
-            
-            auto [transform, mesh, material] = view.get<TransformComponent, MeshComponent, MaterialComponent>(entity);
+        // Get current frame dimensions for camera updates
+        auto& app = Application::getInstance();
+        auto swapChain = app.getVulkanContext().getSwapChain();
+        float width = static_cast<float>(swapChain->getExtent().width);
+        float height = static_cast<float>(swapChain->getExtent().height);
+
+        // Update mesh data buffers
+        auto meshView = m_Registry.view<TransformComponent, MeshComponent, MaterialComponent>();
+        for (auto entity : meshView) {
+            auto [transform, mesh, material] = meshView.get<TransformComponent, MeshComponent, MaterialComponent>(entity);
             uint32_t vertexFlags = mesh.mesh->getVertexBuffer()->getBufferLayout().getFlags();
             uint32_t materialFlags = material.material->getMaterialFlags();
             uint32_t flags = vertexFlags | materialFlags;
 
-            mesh.meshDataBuffer->updateFromComponents(transform, flags);
+            mesh.meshDataBuffer->update(transform, flags);
         }
 
 
+        // Update camera data buffer
+        auto cameraView = m_Registry.view<TransformComponent, CameraComponent>();
+        for (auto entity : cameraView) {
+            auto [transform, camera] = cameraView.get<TransformComponent, CameraComponent>(entity);
+
+            // Update camera aspect ratio based on current swapchain extent
+            float aspectRatio = width / height;
+            if (camera.aspectRatio != aspectRatio) {
+                camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane, camera.farPlane);
+            }
+            camera.cameraDataBuffer->update(camera);
+        }
+
+        // Update light data buffers
+        auto lightView = m_Registry.view<LightComponent, TransformComponent>();
+        for (auto entity : lightView) {
+            auto [light, transform] = lightView.get<LightComponent, TransformComponent>(entity);
+
+            if (light.hasChanged(frameCounter) || transform.hasChanged(frameCounter)) {
+                light.lightDataBuffer->update(transform, light, static_cast<uint32_t>(entity));
+            }
+        }
+
+        // Get camera position for shadow calculations
+        glm::vec3 cameraPosition = glm::vec3(0.0f);
+        if (m_config.mainCamera && m_config.mainCamera->isValid()) {
+            auto cameraTransform = m_config.mainCamera->tryGetComponent<TransformComponent>();
+            if (cameraTransform) {
+                cameraPosition = cameraTransform->translation();
+            }
+        }
+
+        // Update regular shadow maps
+        auto shadowView = m_Registry.view<LightComponent, TransformComponent, ShadowComponent>();
+        for (auto entity : shadowView) {
+            auto [light, transform, shadow] = shadowView.get<LightComponent, TransformComponent, ShadowComponent>(entity);
+
+            if (shadow.shadowMap && shadow.isActive && 
+                (light.hasChanged(frameCounter) || transform.hasChanged(frameCounter))) {                
+            
+                // Update the shadow map view matrix
+                shadow.shadowMap->updateViewMatrix(light, transform, cameraPosition);
+                
+                // Update the shadow data buffer if it exists
+                if (shadow.shadowDataBuffer) {
+                    shadow.shadowDataBuffer->update(light, shadow, static_cast<uint32_t>(entity));
+                }
+                
+            }
+        }
+
+        // Update cascaded shadow maps
+        auto cascadedShadowView = m_Registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
+        for (auto entity : cascadedShadowView) {
+            auto [light, transform, shadow] = cascadedShadowView.get<LightComponent, TransformComponent, CascadedShadowComponent>(entity);
+
+            if (shadow.cascadedShadowMap && shadow.isActive && 
+                (light.hasChanged(frameCounter) || transform.hasChanged(frameCounter))) {
+                // Update the cascaded shadow map view matrices
+                if (m_config.mainCamera && m_config.mainCamera->isValid()) {
+                    auto cameraComp = m_config.mainCamera->tryGetComponent<CameraComponent>();
+                    if (cameraComp) {
+                        auto cascades = shadow.cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
+                        
+                        // Update the shadow data buffer if it exists
+                        if (shadow.shadowDataBuffer) {
+                            shadow.shadowDataBuffer->update(light, shadow, static_cast<uint32_t>(entity));
+                        }
+                    }
+                }
+            }
+        }
+        
 
         updateTLAS();
     }

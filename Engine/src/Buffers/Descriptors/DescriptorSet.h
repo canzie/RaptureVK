@@ -39,10 +39,12 @@ enum class DescriptorSetBindingLocation {
     SHADOW_MATRICES_UBO = 2,
     CASCADE_MATRICES_UBO = 3,
     SHADOW_DATA_UBO = 4,
+    PROBE_VOLUME_DATA_UBO = 5,
     MATERIAL_UBO = 100,
     MESH_DATA_UBO = 200,
     BINDLESS_TEXTURES = 300,
     BINDLESS_SSBOS = 301,
+    BINDLESS_STORAGE_TEXTURES = 302
 };
 
 inline uint32_t getBindingSetNumber(DescriptorSetBindingLocation location) {

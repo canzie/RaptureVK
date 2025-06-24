@@ -27,8 +27,7 @@ public:
         float width, 
         float height, 
         uint32_t framesInFlight, 
-        std::shared_ptr<GBufferPass> gBufferPass, 
-        std::vector<std::shared_ptr<UniformBuffer>> shadowDataUBOs, 
+        std::shared_ptr<GBufferPass> gBufferPass,
         std::shared_ptr<DynamicDiffuseGI> ddgi);
 
     ~LightingPass();
@@ -46,9 +45,6 @@ public:
 
 private:
     void createPipeline();
-    void createDescriptorSets(uint32_t framesInFlight);
-    void updateLightUBOs(std::shared_ptr<Scene> activeScene);
-    void createLightUBOs(uint32_t framesInFlight);
 
     void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
     void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
@@ -72,7 +68,6 @@ private:
     std::vector<std::shared_ptr<UniformBuffer>> m_lightUBOs;
     std::vector<std::shared_ptr<UniformBuffer>> m_shadowDataUBOs;
     std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets; // all sets are in set 0
-    std::shared_ptr<DescriptorSet> m_probeAtlasDescriptorSets[2]; // set=2, we need 2, one for prev one for current set of textures
 
     std::shared_ptr<GBufferPass> m_gBufferPass;
 

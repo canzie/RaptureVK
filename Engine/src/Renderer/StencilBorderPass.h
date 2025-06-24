@@ -22,8 +22,7 @@ class StencilBorderPass {
 public:
     StencilBorderPass(float width, float height, 
         uint32_t framesInFlight, 
-        std::vector<std::shared_ptr<Texture>> depthStencilTextures,
-        std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs);
+        std::vector<std::shared_ptr<Texture>> depthStencilTextures);
 
     ~StencilBorderPass();
 
@@ -36,7 +35,6 @@ public:
 
 private:
     void createPipeline();
-    void createDescriptorSets(uint32_t framesInFlight);
 
     void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
 
@@ -60,8 +58,6 @@ private:
 
     std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
 
-    std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets;
-    std::vector<std::shared_ptr<UniformBuffer>> m_cameraUBOs;
 
 
 

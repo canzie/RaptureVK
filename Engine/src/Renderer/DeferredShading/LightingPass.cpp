@@ -12,6 +12,17 @@ namespace Rapture {
 struct PushConstants {
 
     glm::vec3 cameraPos;
+
+    uint32_t GBufferAlbedoHandle;
+    uint32_t GBufferNormalHandle;
+    uint32_t GBufferPositionHandle;
+    uint32_t GBufferMaterialHandle;
+    uint32_t GBufferDepthHandle;
+
+    uint32_t probeVolumeHandle;
+    uint32_t probeIrradianceHandle;
+    uint32_t probeVisibilityHandle;
+
 };
 
 LightingPass::LightingPass(
@@ -19,14 +30,12 @@ LightingPass::LightingPass(
     float height, 
     uint32_t framesInFlight, 
     std::shared_ptr<GBufferPass> gBufferPass, 
-    std::vector<std::shared_ptr<UniformBuffer>> shadowDataUBOs,
     std::shared_ptr<DynamicDiffuseGI> ddgi)
     : m_framesInFlight(framesInFlight), 
     m_currentFrame(0), 
     m_width(width), 
     m_height(height), 
     m_gBufferPass(gBufferPass), 
-    m_shadowDataUBOs(shadowDataUBOs),
     m_ddgi(ddgi) {
 
     auto& app = Application::getInstance();
@@ -55,8 +64,7 @@ LightingPass::LightingPass(
     m_handle = handle;
 
     createPipeline();
-    createLightUBOs(framesInFlight);
-    createDescriptorSets(framesInFlight);
+
 
 }
 
@@ -97,7 +105,6 @@ void LightingPass::recordCommandBuffer(
 
     m_currentFrame = swapchainImageIndex;  
 
-    updateLightUBOs(activeScene); 
 
     setupDynamicRenderingMemoryBarriers(commandBuffer); 
     beginDynamicRendering(commandBuffer);               
@@ -132,6 +139,15 @@ void LightingPass::recordCommandBuffer(
     PushConstants pushConstants;
     pushConstants.cameraPos = cameraPos;
 
+    pushConstants.GBufferAlbedoHandle = m_gBufferPass->getAlbedoTextureIndex();
+    pushConstants.GBufferNormalHandle = m_gBufferPass->getNormalTextureIndex();
+    pushConstants.GBufferPositionHandle = m_gBufferPass->getPositionTextureIndex();
+    pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
+    pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
+
+    // TODO Get the shadow and light indices -> ?
+    // TODO Get ddgi stuff -> push constants
+
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
         m_pipeline->getPipelineLayoutVk(),
         VK_SHADER_STAGE_FRAGMENT_BIT, 
@@ -139,23 +155,9 @@ void LightingPass::recordCommandBuffer(
         sizeof(PushConstants), 
         &pushConstants);
 
-    // Bind descriptor sets using frameInFlightIndex for GBuffer/UBO consistency
-    // First bind set 0 (common resources)
-    VkDescriptorSet commonResourcesSet = m_descriptorSets[frameInFlightIndex]->getDescriptorSet();
-    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
-        static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::COMMON_RESOURCES), 1, &commonResourcesSet, 0, nullptr);
-    
-    // Then bind set 2 (probe atlas)
-    bool isEvenFrame = m_ddgi->isFrameEven();
-    VkDescriptorSet probeAtlasSet = m_probeAtlasDescriptorSets[isEvenFrame ? 0 : 1]->getDescriptorSet();
-    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
-        2, 1, &probeAtlasSet, 0, nullptr);
+    DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // light and shadow and probe volume data
+    DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // bindless textures for gbuffer textures
 
-    // Then bind set 3 (bindless shadow textures)
-    VkDescriptorSet bindlessSet = ShadowMap::getBindlessShadowMaps()->getDescriptorSet();
-    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
-        static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::EXTRA_RESOURCES), 1, &bindlessSet, 0, nullptr);
-    
         
     // Draw 6 vertices for 2 triangles
     vkCmdDraw(commandBuffer->getCommandBufferVk(), 6, 1, 0, 0);
@@ -277,228 +279,6 @@ void LightingPass::createPipeline() {
 
 }
 
-// need gbuffer textures
-// camera position
-// light data
-// shadow data
-void LightingPass::createDescriptorSets(uint32_t framesInFlight) {
-
-    if (m_gBufferPass == nullptr) {
-        RP_CORE_ERROR("LightingPass - GBufferPass is not set!");
-        return;
-    }
-
-    if (m_shader.expired()) {
-        RP_CORE_ERROR("LightingPass - Shader is not set!");
-        return;
-    }
-
-    m_descriptorSets.resize(framesInFlight);
-
-    VkDescriptorSetLayout layout = m_shader.lock()->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::COMMON_RESOURCES)];
-
-    for (uint32_t i = 0; i < framesInFlight; i++) {
-
-        DescriptorSetBindings bindings;
-        bindings.layout = layout;
-
-        DescriptorSetBinding binding;
-        binding.binding = 0;
-        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.count = 1;
-        binding.resource = m_gBufferPass->getPositionDepthTextures()[i];
-        bindings.bindings.push_back(binding);
-
-        binding.binding = 1;
-        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.count = 1;
-        binding.resource = m_gBufferPass->getNormalTextures()[i];
-        bindings.bindings.push_back(binding);
-
-        binding.binding = 2;
-        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.count = 1;
-        binding.resource = m_gBufferPass->getAlbedoSpecTextures()[i];
-        bindings.bindings.push_back(binding);
-
-        binding.binding = 3;
-        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.count = 1;
-        binding.resource = m_gBufferPass->getMaterialTextures()[i];
-        bindings.bindings.push_back(binding);
-
-        // probe irradiance atlas
-        // probe distance atlas
-
-        binding.binding = 4;
-        binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        binding.count = 1;
-        binding.resource = m_lightUBOs[i];
-        bindings.bindings.push_back(binding);
-
-        binding.binding = 5;
-        binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        binding.count = 1;
-        binding.resource = m_shadowDataUBOs[i];
-        bindings.bindings.push_back(binding);
-
-        // probe volume
-        binding.binding = 6;
-        binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        binding.count = 1;
-        binding.resource = m_ddgi->getProbeVolumeUniformBuffer();
-        bindings.bindings.push_back(binding);
-
-        m_descriptorSets[i] = std::make_shared<DescriptorSet>(bindings);
-    }
-
-    VkDescriptorSetLayout probeAtlasLayout =  m_shader.lock()->getDescriptorSetLayouts()[2];
-
-
-        DescriptorSetBindings bindings;
-        bindings.layout = probeAtlasLayout;
-
-        // first texture set
-        DescriptorSetBinding binding;
-        binding.binding = 0;
-        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.count = 1;
-        binding.resource = m_ddgi->getRadianceTexture();
-        bindings.bindings.push_back(binding);
-
-        binding.binding = 1;
-        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.count = 1;
-        binding.resource = m_ddgi->getVisibilityTexture();
-        bindings.bindings.push_back(binding);
-
-        m_probeAtlasDescriptorSets[0] = std::make_shared<DescriptorSet>(bindings);
-
-        // second texture set
-        bindings.bindings.clear();
-        binding.binding = 0;
-        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.count = 1;
-        binding.resource = m_ddgi->getPrevRadianceTexture();
-        bindings.bindings.push_back(binding);
-        
-        binding.binding = 1;
-        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.count = 1;
-        binding.resource = m_ddgi->getPrevVisibilityTexture();
-        bindings.bindings.push_back(binding);
-
-        m_probeAtlasDescriptorSets[1] = std::make_shared<DescriptorSet>(bindings);
-
-    
-}
-
-void LightingPass::updateLightUBOs(std::shared_ptr<Scene> activeScene) {
-    if (!activeScene) {
-        return;
-    }
-
-    auto& registry = activeScene->getRegistry();
-    auto lightView = registry.view<TransformComponent, LightComponent>();
-    
-    // Check if any lights or transforms have changed
-    bool lightsChanged = m_lightsChanged;
-    
-    for (auto entity : lightView) {
-        auto& transform = lightView.get<TransformComponent>(entity);
-        auto& lightComp = lightView.get<LightComponent>(entity);
-        
-
-        if (true) { // to force true for testing
-            lightsChanged = true;
-            break;
-        }
-    }
-    
-    if (!lightsChanged) {
-        return;
-    }
-    
-    // Update light uniform buffer
-    LightUniformBufferObject lightUbo{};
-    lightUbo.numLights = 0;
-    
-    for (auto entity : lightView) {
-        if (lightUbo.numLights >= MAX_LIGHTS) {
-            RP_CORE_WARN("Maximum number of lights ({}) exceeded. Additional lights will be ignored.", MAX_LIGHTS);
-            break;
-        }
-        
-        auto& transform = lightView.get<TransformComponent>(entity);
-        auto& lightComp = lightView.get<LightComponent>(entity);
-        
-        if (!lightComp.isActive) {
-            continue;
-        }
-        
-        LightData& lightData = lightUbo.lights[lightUbo.numLights];
-
-
-        // Position and light type
-        glm::vec3 position = transform.translation();
-        float lightTypeFloat = static_cast<float>(lightComp.type);
-        
-        // For directional lights, position is irrelevant - use a default position
-        // This ensures the light behaves purely based on direction
-        if (lightComp.type == LightType::Directional) {
-            position = glm::vec3(0.0f, 0.0f, 0.0f); // Position doesn't matter for directional lights
-        }
-        
-        lightData.position = glm::vec4(position, lightTypeFloat);
-        
-        
-        // Direction and range
-        glm::vec3 direction = glm::vec3(0.0f, 0.0f, -1.0f); // Default forward direction
-        if (lightComp.type == LightType::Directional || lightComp.type == LightType::Spot) {
-            glm::quat rotationQuat = transform.transforms.getRotationQuat();
-            direction = glm::normalize(rotationQuat * glm::vec3(0, 0, -1)); // Forward vector
-        }
-        lightData.direction = glm::vec4(direction, lightComp.range);
-        
-        // Color and intensity
-        lightData.color = glm::vec4(lightComp.color, lightComp.intensity);
-        
-        // Spot light angles
-        if (lightComp.type == LightType::Spot) {
-            float innerCos = std::cos(lightComp.innerConeAngle);
-            float outerCos = std::cos(lightComp.outerConeAngle);
-            lightData.spotAngles = glm::vec4(innerCos, outerCos, 0.0f, 0.0f);
-        } else {
-            lightData.spotAngles = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-        }
-        
-        lightData.spotAngles.z = static_cast<float>(entity);
-        
-        lightUbo.numLights++;
-    }
-    
-    // Update light uniform buffers for ALL frames in flight
-    for (size_t i = 0; i < m_lightUBOs.size(); i++) {
-        m_lightUBOs[i]->addData((void*)&lightUbo, sizeof(lightUbo), 0);
-    }
-
-    m_lightsChanged = false;
-    
-}
-
-void LightingPass::createLightUBOs(uint32_t framesInFlight) {
-
-    m_lightUBOs.resize(framesInFlight);
-    LightUniformBufferObject initialLightUbo{}; // Zero-initialize
-    initialLightUbo.numLights = 0; // Explicitly set numLights to 0
-
-    for (uint32_t i = 0; i < framesInFlight; i++) {
-        m_lightUBOs[i] = std::make_shared<UniformBuffer>(sizeof(LightUniformBufferObject), BufferUsage::DYNAMIC, m_vmaAllocator);
-        // Initialize the UBO with the default data
-        m_lightUBOs[i]->addData(&initialLightUbo, sizeof(initialLightUbo), 0);
-    }
-
-}
 
 void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer) {
 

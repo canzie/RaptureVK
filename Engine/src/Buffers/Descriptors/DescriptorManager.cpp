@@ -88,7 +88,7 @@ void DescriptorManager::initializeSet2() {
     DescriptorSetBindings bindings;
     
     // Add bindings for mesh data (using SSBO for bindless access)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024, TextureViewType::DEFAULT, 
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::MESH_DATA_UBO});
     bindings.setNumber = 2;
     
@@ -101,6 +101,18 @@ void DescriptorManager::initializeSet3() {
     // Set 2: Object/Mesh resources  
     DescriptorSetBindings bindings;
     
+    // Add bindings for bindless textures
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 4096, TextureViewType::DEFAULT, 
+                                false, DescriptorSetBindingLocation::BINDLESS_TEXTURES});
+
+    // Add bindings for bindless SSBOs
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, TextureViewType::DEFAULT, 
+                                false, DescriptorSetBindingLocation::BINDLESS_SSBOS});
+
+    // Add bindings for bindless textures and storage images
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024, TextureViewType::DEFAULT, 
+                                true, DescriptorSetBindingLocation::BINDLESS_STORAGE_TEXTURES});
+
 
     bindings.setNumber = 3;
     

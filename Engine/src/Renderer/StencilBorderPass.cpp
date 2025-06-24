@@ -10,16 +10,17 @@ namespace Rapture {
 
 
 struct PushConstants {
-    glm::mat4 model;
+    uint32_t modelDataIndex;
     glm::vec4 color;
     float borderWidth;
+    uint32_t depthStencilTextureHandle;
+    uint32_t cameraUBOIndex;
 };
 
 StencilBorderPass::StencilBorderPass(
     float width, float height, 
     uint32_t framesInFlight, 
-    std::vector<std::shared_ptr<Texture>> depthStencilTextures,
-    std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs)
+    std::vector<std::shared_ptr<Texture>> depthStencilTextures)
     : m_width(width), 
       m_height(height), 
       m_framesInFlight(framesInFlight), 
@@ -27,8 +28,7 @@ StencilBorderPass::StencilBorderPass(
       m_currentImageIndex(0), 
       m_selectedEntity(nullptr),
       m_pipeline(nullptr),
-      m_swapChain(nullptr),
-      m_cameraUBOs(cameraUBOs) {
+      m_swapChain(nullptr) {
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -51,7 +51,6 @@ StencilBorderPass::StencilBorderPass(
     m_shaderHandle = handle;
 
     createPipeline();
-    createDescriptorSets(framesInFlight);
 
     m_entitySelectedListenerId = GameEvents::onEntitySelected().addListener(
         [this](std::shared_ptr<Rapture::Entity> entity) {
@@ -83,6 +82,15 @@ void StencilBorderPass::recordCommandBuffer(
         return;
     }
 
+    auto camera = activeScene->getSettings().mainCamera;
+    if (camera == nullptr) {
+        return;
+    }
+    auto cameraComp = camera->tryGetComponent<CameraComponent>();
+    if (cameraComp == nullptr) {
+        return;
+    }
+
     m_currentImageIndex = swapchainImageIndex;
     
     setupDynamicRenderingMemoryBarriers(commandBuffer);
@@ -107,16 +115,16 @@ void StencilBorderPass::recordCommandBuffer(
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
 
-
-    auto& model = transformComp->transforms.getTransform();
     auto mesh = meshComp->mesh;
 
 
 
     PushConstants pushConstants;
-    pushConstants.model = model;
+    pushConstants.modelDataIndex = meshComp->meshDataBuffer->getDescriptorIndex();
     pushConstants.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
     pushConstants.borderWidth = 0.01f;
+    pushConstants.depthStencilTextureHandle = m_depthStencilTextures[currentFrameInFlight]->getBindlessIndex();
+    pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex();
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
         m_pipeline->getPipelineLayoutVk(),
@@ -125,11 +133,11 @@ void StencilBorderPass::recordCommandBuffer(
         sizeof(PushConstants), 
         &pushConstants);
 
-    // Bind descriptor sets using frameInFlightIndex for GBuffer/UBO consistency
-    VkDescriptorSet descriptorSetsToBind[] = {m_descriptorSets[currentFrameInFlight]->getDescriptorSet()};
-    uint32_t descriptorSetCount = sizeof(descriptorSetsToBind) / sizeof(descriptorSetsToBind[0]);
-    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(), VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline->getPipelineLayoutVk(), 
-        0, descriptorSetCount, descriptorSetsToBind, 0, nullptr);
+    
+    DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // camera stuff
+    DescriptorManager::getDescriptorSet(2)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // model matrix
+    DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // depth texture
+
     
     // Get the vertex buffer layout
     auto& bufferLayout = mesh->getVertexBuffer()->getBufferLayout();
@@ -277,37 +285,6 @@ void StencilBorderPass::createPipeline() {
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
 
-void StencilBorderPass::createDescriptorSets(uint32_t framesInFlight) {
-
-    VkDescriptorSetLayout layout = m_shader.lock()->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::COMMON_RESOURCES)];
-    m_descriptorSets.resize(framesInFlight);
-
-    for (uint32_t i = 0; i < framesInFlight; i++) {
-
-        DescriptorSetBindings bindings;
-        bindings.layout = layout;
-
-        // First binding: Stencil texture sampler (binding 0)
-        DescriptorSetBinding stencilBinding;
-        stencilBinding.binding = 1;
-        stencilBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        stencilBinding.count = 1;
-        stencilBinding.viewType = TextureViewType::STENCIL;
-        stencilBinding.resource = m_depthStencilTextures[i];
-        bindings.bindings.push_back(stencilBinding);
-
-        // Second binding: Camera UBO (binding 1)
-        DescriptorSetBinding cameraBinding;
-        cameraBinding.binding = 0;
-        cameraBinding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        cameraBinding.count = 1;
-        cameraBinding.resource = m_cameraUBOs[i];
-        bindings.bindings.push_back(cameraBinding);
-
-        m_descriptorSets[i] = std::make_shared<DescriptorSet>(bindings);
-    }
-
-}
 
 void StencilBorderPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer) {
 

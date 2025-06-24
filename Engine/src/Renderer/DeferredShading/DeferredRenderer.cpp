@@ -36,9 +36,7 @@ std::shared_ptr<LightingPass> DeferredRenderer::m_lightingPass = nullptr;
 std::shared_ptr<StencilBorderPass> DeferredRenderer::m_stencilBorderPass = nullptr;
 std::shared_ptr<SkyboxPass> DeferredRenderer::m_skyboxPass = nullptr;
 
-std::vector<std::shared_ptr<UniformBuffer>> DeferredRenderer::m_cameraUBOs = {};
-std::vector<std::shared_ptr<UniformBuffer>> DeferredRenderer::m_shadowDataUBOs =
-    {};
+
 float DeferredRenderer::m_width = 0.0f;
 float DeferredRenderer::m_height = 0.0f;
 bool DeferredRenderer::m_framebufferNeedsResize = false;
@@ -61,7 +59,6 @@ void DeferredRenderer::init() {
 
 
   setupCommandResources();
-  createUniformBuffers(m_swapChain->getImageCount());
 
   m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>();
 
@@ -69,21 +66,20 @@ void DeferredRenderer::init() {
   m_gbufferPass = std::make_shared<GBufferPass>(
       static_cast<float>(m_swapChain->getExtent().width),
       static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_cameraUBOs);
+      m_swapChain->getImageCount());
 
   m_lightingPass = std::make_shared<LightingPass>(
       static_cast<float>(m_swapChain->getExtent().width),
       static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs, m_dynamicDiffuseGI);
+      m_swapChain->getImageCount(), m_gbufferPass, m_dynamicDiffuseGI);
 
   m_stencilBorderPass = std::make_shared<StencilBorderPass>(
       static_cast<float>(m_swapChain->getExtent().width),
       static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(),
-      m_cameraUBOs);
+      m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
 
 
-  m_skyboxPass = std::make_shared<SkyboxPass>(m_cameraUBOs, m_gbufferPass->getDepthTextures());
+  m_skyboxPass = std::make_shared<SkyboxPass>(m_gbufferPass->getDepthTextures());
 
   ApplicationEvents::onWindowResize().addListener(
       [](unsigned int width, unsigned int height) {
@@ -208,27 +204,22 @@ void DeferredRenderer::onSwapChainRecreated() {
     m_width = static_cast<float>(m_swapChain->getExtent().width);
     m_height = static_cast<float>(m_swapChain->getExtent().height);
 
-    m_cameraUBOs.clear();
-    m_shadowDataUBOs.clear();
-    createUniformBuffers(m_swapChain->getImageCount());
-
     m_commandBuffers.clear();
 
     m_gbufferPass = std::make_shared<GBufferPass>(
         static_cast<float>(m_swapChain->getExtent().width),
         static_cast<float>(m_swapChain->getExtent().height),
-        m_swapChain->getImageCount(), m_cameraUBOs);
+        m_swapChain->getImageCount());
     m_lightingPass = std::make_shared<LightingPass>(
         static_cast<float>(m_swapChain->getExtent().width),
         static_cast<float>(m_swapChain->getExtent().height),
-        m_swapChain->getImageCount(), m_gbufferPass, m_shadowDataUBOs, m_dynamicDiffuseGI);
+        m_swapChain->getImageCount(), m_gbufferPass, m_dynamicDiffuseGI);
     m_stencilBorderPass = std::make_shared<StencilBorderPass>(
         static_cast<float>(m_swapChain->getExtent().width),
         static_cast<float>(m_swapChain->getExtent().height),
-        m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(),
-        m_cameraUBOs);
+        m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
 
-    m_skyboxPass = std::make_shared<SkyboxPass>(m_cameraUBOs, m_gbufferPass->getDepthTextures());
+    m_skyboxPass = std::make_shared<SkyboxPass>(m_gbufferPass->getDepthTextures());
 
 
 
@@ -262,9 +253,6 @@ void DeferredRenderer::recordCommandBuffer(
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     beginInfo.pInheritanceInfo = nullptr; // Optional
-
-    updateCameraUBOs(activeScene, m_currentFrame);
-    updateShadowMaps(activeScene);
 
     if (!m_skyboxPass->hasActiveSkybox() && activeScene->getSkyboxComponent()) {
         m_skyboxPass->setSkyboxTexture(activeScene->getSkyboxComponent()->skyboxTexture);
@@ -343,149 +331,6 @@ void DeferredRenderer::recordCommandBuffer(
         throw std::runtime_error("failed to record command buffer!");
     }
 }
-void DeferredRenderer::updateCameraUBOs(std::shared_ptr<Scene> activeScene,
-                                        uint32_t currentFrame) {
 
-  RAPTURE_PROFILE_FUNCTION();
 
-  CameraUniformBufferObject ubo{};
-
-  // Try to find the main camera in the scene
-  auto &registry = activeScene->getRegistry();
-  auto cameraView = registry.view<TransformComponent, CameraComponent>();
-
-  bool foundMainCamera = false;
-  for (auto entity : cameraView) {
-    auto &camera = cameraView.get<CameraComponent>(entity);
-    if (camera.isMainCamera) {
-      // Update camera aspect ratio based on current swapchain extent
-      float aspectRatio = m_width / m_height;
-      if (camera.aspectRatio != aspectRatio) {
-        camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane,
-                                      camera.farPlane);
-      }
-
-      // Use the camera's view matrix
-      ubo.view = camera.camera.getViewMatrix();
-      ubo.proj = camera.camera.getProjectionMatrix();
-      foundMainCamera = true;
-      break;
-    }
-  }
-
-  // Fallback to default camera if no main camera found
-  if (!foundMainCamera) {
-    RP_CORE_WARN("No main camera found in scene, using default view matrix");
-    ubo.view =
-        glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
-                    glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.proj =
-        glm::perspective(glm::radians(45.0f), m_width / m_height, 0.1f, 10.0f);
-  }
-
-  // Fix projection matrix for Vulkan coordinate system
-  ubo.proj[1][1] *= -1;
-
-  m_cameraUBOs[currentFrame]->addData((void *)&ubo, sizeof(ubo), 0);
-}
-
-void DeferredRenderer::createUniformBuffers(uint32_t framesInFlight) {
-  for (unsigned int i = 0; i < framesInFlight; i++) {
-    m_cameraUBOs.push_back(
-        std::make_shared<UniformBuffer>(sizeof(CameraUniformBufferObject),
-                                        BufferUsage::STREAM, m_vmaAllocator));
-    m_shadowDataUBOs.push_back(std::make_shared<UniformBuffer>(
-        sizeof(ShadowStorageLayout), BufferUsage::DYNAMIC, m_vmaAllocator));
-
-    ShadowStorageLayout shadowDataLayout{};
-    shadowDataLayout.shadowCount = 0;
-    m_shadowDataUBOs[i]->addData((void *)&shadowDataLayout,
-                                 sizeof(shadowDataLayout), 0);
-  }
-}
-
-void DeferredRenderer::updateShadowMaps(std::shared_ptr<Scene> activeScene) {
-
-  auto &registry = activeScene->getRegistry();
-  auto lightView =
-      registry.view<LightComponent, TransformComponent, ShadowComponent>();
-
-  auto camera = activeScene->getSettings().mainCamera;
-  auto cameraTransform = camera->tryGetComponent<TransformComponent>();
-  auto cameraComp = camera->tryGetComponent<CameraComponent>();
-  glm::vec3 cameraPosition = glm::vec3(0.0f);
-  if (cameraTransform && cameraComp) {
-    cameraPosition = cameraTransform->translation();
-  } else {
-    RP_CORE_WARN("No camera found in scene, using default position");
-  }
-
-  ShadowStorageLayout shadowDataLayout{};
-  uint32_t shadowIndex = 0;
-
-  for (auto entity : lightView) {
-    auto& lightComp = lightView.get<LightComponent>(entity);
-    auto& transformComp = lightView.get<TransformComponent>(entity);
-    auto& shadowComp = lightView.get<ShadowComponent>(entity);
-
-    if (shadowComp.shadowMap && shadowComp.isActive) {
-      shadowComp.shadowMap->updateViewMatrix(lightComp, transformComp,
-                                             cameraPosition);
-
-      // Always populate shadow data for existing shadow maps
-      ShadowBufferData shadowBufferData{};
-      shadowBufferData.type = static_cast<int>(lightComp.type);
-      shadowBufferData.cascadeCount = 1;
-      shadowBufferData.lightIndex = (uint32_t)entity;
-      shadowBufferData.textureHandle = shadowComp.shadowMap->getTextureHandle();
-      shadowBufferData.cascadeMatrices[0] =
-          shadowComp.shadowMap->getLightViewProjection();
-      shadowBufferData.cascadeSplitsViewSpace[0] =
-          glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-
-      // Store in the array
-      shadowDataLayout.shadowData[shadowIndex] = shadowBufferData;
-      shadowIndex++;
-    }
-  }
-
-  auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
-  for (auto entity : cascadedShadowView) {
-    auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
-    auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
-    auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
-
-    if (shadowComp.cascadedShadowMap && shadowComp.isActive) {
-      auto cascades = shadowComp.cascadedShadowMap->updateViewMatrix(lightComp, transformComp, *cameraComp);
-          // Always populate shadow data for existing shadow maps
-      ShadowBufferData shadowBufferData{};
-      shadowBufferData.type = static_cast<int>(lightComp.type);
-      shadowBufferData.cascadeCount = static_cast<uint32_t>(cascades.size());
-      shadowBufferData.lightIndex = (uint32_t)entity;
-      shadowBufferData.textureHandle = shadowComp.cascadedShadowMap->getTextureHandle();
-
-      for (uint8_t i = 0; i < cascades.size(); i++) {
-        shadowBufferData.cascadeMatrices[i] = cascades[i].lightViewProj;
-        shadowBufferData.cascadeSplitsViewSpace[i].x = cascades[i].nearPlane;
-        shadowBufferData.cascadeSplitsViewSpace[i].y = cascades[i].farPlane;
-        // Mark this as a texture array by setting a special flag in the last component
-        // -1.0 in w component of first cascade split indicates texture array
-        shadowBufferData.cascadeSplitsViewSpace[i].w = -1.0f;
-      }
-
-      // Store in the array
-      shadowDataLayout.shadowData[shadowIndex] = shadowBufferData;
-      shadowIndex++;
-    
-    }
-    
-  }
-
-  shadowDataLayout.shadowCount = shadowIndex;
-
-  // Update all shadow data UBOs
-  for (unsigned int i = 0; i < m_swapChain->getImageCount(); i++) {
-    m_shadowDataUBOs[i]->addData((void *)&shadowDataLayout, sizeof(shadowDataLayout), 0);
-  }
-}
 } // namespace Rapture

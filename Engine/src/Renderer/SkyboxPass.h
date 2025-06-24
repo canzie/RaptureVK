@@ -18,8 +18,8 @@ namespace Rapture {
 
 class SkyboxPass {
 public:
-    SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs, std::vector<std::shared_ptr<Texture>> depthTextures);
-    SkyboxPass(std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs, std::vector<std::shared_ptr<Texture>> depthTextures);
+    SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::shared_ptr<Texture>> depthTextures);
+    SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures);
 
     ~SkyboxPass();
 

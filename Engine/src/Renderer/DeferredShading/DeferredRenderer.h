@@ -58,11 +58,6 @@ private:
                                   std::shared_ptr<Scene> activeScene,
                                   uint32_t imageIndex);
 
-  static void createUniformBuffers(uint32_t framesInFlight);
-
-  static void updateCameraUBOs(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
-
-  static void updateShadowMaps(std::shared_ptr<Scene> activeScene);
 
 private:
   static std::shared_ptr<GBufferPass> m_gbufferPass;
@@ -75,8 +70,6 @@ private:
 
   static std::shared_ptr<Shader> m_shader;
 
-  static std::vector<std::shared_ptr<UniformBuffer>> m_cameraUBOs;
-  static std::vector<std::shared_ptr<UniformBuffer>> m_shadowDataUBOs;
 
   static VmaAllocator m_vmaAllocator;
   static VkDevice m_device;
