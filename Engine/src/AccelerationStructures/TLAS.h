@@ -22,7 +22,7 @@ struct TLASInstance {
     uint32_t entityID = 0;
 };
 
-class TLAS {
+class TLAS : public std::enable_shared_from_this<TLAS> {
 public:
     TLAS();
     ~TLAS();
@@ -51,6 +51,9 @@ public:
     // Check if the acceleration structure has been built
     bool isBuilt() const { return m_isBuilt; }
     
+    // Get the bindless index of this TLAS in the descriptor manager
+    uint32_t getBindlessIndex() const { return m_bindlessIndex; }
+    
     // Clear all instances
     void clear();
     
@@ -64,6 +67,7 @@ private:
     void createInstanceBuffer();
     void buildAccelerationStructure();
     void updateInstanceBuffer(const std::vector<std::pair<uint32_t, glm::mat4>>& instanceUpdates);
+    void registerWithDescriptorManager();
 
 private:
     std::vector<TLASInstance> m_instances;
@@ -96,6 +100,8 @@ private:
     // Vulkan handles
     VkDevice m_device;
     VmaAllocator m_allocator;
+    
+    uint32_t m_bindlessIndex;
 };
 
 }

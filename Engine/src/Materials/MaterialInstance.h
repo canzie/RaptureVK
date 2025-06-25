@@ -9,10 +9,15 @@
 #include <string>
 #include <atomic>
 #include <mutex>
+#include <vector>
 
 
 namespace Rapture {
 
+struct PendingTexture {
+    ParameterID parameterId;
+    std::shared_ptr<Texture> texture;
+};
 
 class MaterialInstance {
     public:
@@ -23,11 +28,6 @@ class MaterialInstance {
 
         const std::string& getName() const { return m_name; }
 
-        VkDescriptorSet getDescriptorSet();
-
-        // call this when you added a new parameter value that was not set before
-        // e.g.: textures start as nullptr, so when you set them the descriptor set needs to know about this VkImageView
-        void updateDescriptorSet();
 
         template<typename T>
         void setParameter(ParameterID id, T value){
@@ -44,10 +44,13 @@ class MaterialInstance {
             }
         }
 
+        // Template specialization declaration for std::shared_ptr<Texture>
+        template<>
+        void setParameter<std::shared_ptr<Texture>>(ParameterID id, std::shared_ptr<Texture> texture);
+
        MaterialParameter getParameter(ParameterID id); 
         
-
-        bool isReady();
+        void updatePendingTextures();
 
         void updateUniformBuffer(ParameterID id);
 
@@ -68,6 +71,9 @@ class MaterialInstance {
         bool m_isDirty = false;
         bool m_isReady = false;
 
+        std::vector<PendingTexture> m_pendingTextures;
+        std::mutex m_pendingTexturesMutex;
+
         uint32_t m_bindlessUniformBufferIndex;
         //uint32_t m_bindlessTextureIndex;
         
@@ -86,6 +92,8 @@ class MaterialInstance {
         // Helper to check if a texture parameter is valid (not null)
         bool hasValidTexture(ParameterID id) const;
 
+        // Helper to check if a parameter ID represents a texture
+        bool isTextureParameter(ParameterID id) const;
 
 };
 

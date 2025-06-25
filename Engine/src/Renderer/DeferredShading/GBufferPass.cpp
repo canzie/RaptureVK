@@ -11,12 +11,7 @@ namespace Rapture {
 struct PushConstants {
     uint32_t meshDataBindlessIndex;
     uint32_t materialBindlessIndex;
-    uint32_t cameraBindlessIndex;
-
-
-    
-    uint32_t frameIndex;
-    
+    uint32_t cameraBindlessIndex;    
 };
 
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
@@ -49,30 +44,7 @@ GBufferPass::~GBufferPass() {
 
     GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId); 
 
-    // Free bindless texture indices
-    auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
-    if (bindlessSet) {
-        auto textureBinding = bindlessSet->getTextureBinding(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
-        if (textureBinding) {
-            for (uint32_t i = 0; i < m_framesInFlight; i++) {
-                if (m_positionTextureIndices.size() > i && m_positionTextureIndices[i] != UINT32_MAX) {
-                    textureBinding->free(m_positionTextureIndices[i]);
-                }
-                if (m_normalTextureIndices.size() > i && m_normalTextureIndices[i] != UINT32_MAX) {
-                    textureBinding->free(m_normalTextureIndices[i]);
-                }
-                if (m_albedoTextureIndices.size() > i && m_albedoTextureIndices[i] != UINT32_MAX) {
-                    textureBinding->free(m_albedoTextureIndices[i]);
-                }
-                if (m_materialTextureIndices.size() > i && m_materialTextureIndices[i] != UINT32_MAX) {
-                    textureBinding->free(m_materialTextureIndices[i]);
-                }
-                if (m_depthTextureIndices.size() > i && m_depthTextureIndices[i] != UINT32_MAX) {
-                    textureBinding->free(m_depthTextureIndices[i]);
-                }
-            }
-        }
-    }
+    
 
 
     // Clean up textures
@@ -164,10 +136,6 @@ void GBufferPass::recordCommandBuffer(
         if (!meshComp.mesh || meshComp.isLoading) {
             continue;
         }
-
-        if (!materialComp.material->isReady()) {
-            continue;
-        }
         
         auto mesh = meshComp.mesh;
         
@@ -223,11 +191,9 @@ void GBufferPass::recordCommandBuffer(
 
         // Push the constants
         PushConstants pushConstants{};
-        pushConstants.meshDataBindlessIndex = meshComp.meshDataBuffer->getDescriptorIndex();
+        pushConstants.meshDataBindlessIndex = meshComp.meshDataBuffer->getDescriptorIndex(m_currentFrame);
         pushConstants.materialBindlessIndex = materialComp.material->getBindlessIndex();
-        pushConstants.cameraBindlessIndex = cameraComp->cameraDataBuffer->getDescriptorIndex();
-
-        pushConstants.frameIndex = currentFrame;
+        pushConstants.cameraBindlessIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame);
 
         // for now assume only 1 set of pushconstants in a full shader
         VkShaderStageFlags stageFlags;

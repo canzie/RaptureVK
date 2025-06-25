@@ -61,7 +61,7 @@ namespace Rapture {
         entt::registry m_Registry;
         SceneSettings m_config;
 
-        std::unique_ptr<TLAS> m_tlas;
+        std::shared_ptr<TLAS> m_tlas;
     
         friend class Entity;
     };

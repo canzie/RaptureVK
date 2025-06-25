@@ -6,11 +6,11 @@
 
 namespace Rapture {
 
-LightDataBuffer::LightDataBuffer() 
-    : ObjectDataBuffer(DescriptorSetBindingLocation::LIGHTS_UBO, sizeof(LightObjectData)) {
+LightDataBuffer::LightDataBuffer(uint32_t frameCount) 
+    : ObjectDataBuffer(DescriptorSetBindingLocation::LIGHTS_UBO, sizeof(LightObjectData), frameCount) {
 }
 
-void LightDataBuffer::update(const TransformComponent& transform, const LightComponent& light, uint32_t entityID) {
+void LightDataBuffer::update(const TransformComponent& transform, const LightComponent& light, uint32_t entityID, uint32_t frameIndex) {
     if (!light.isActive) {
         return;
     }
@@ -50,7 +50,7 @@ void LightDataBuffer::update(const TransformComponent& transform, const LightCom
     
     data.spotAngles.z = static_cast<float>(entityID);
 
-    updateBuffer(&data, sizeof(LightObjectData));
+    updateBuffer(&data, sizeof(LightObjectData), frameIndex);
 }
 
 } 

@@ -4,16 +4,16 @@
 
 namespace Rapture {
 
-MeshDataBuffer::MeshDataBuffer() 
-    : ObjectDataBuffer(DescriptorSetBindingLocation::MESH_DATA_UBO, sizeof(MeshObjectData)) {
+MeshDataBuffer::MeshDataBuffer(uint32_t frameCount) 
+    : ObjectDataBuffer(DescriptorSetBindingLocation::MESH_DATA_UBO, sizeof(MeshObjectData), frameCount) {
 }
 
-void MeshDataBuffer::update(const TransformComponent& transform, uint32_t flags) {
+void MeshDataBuffer::update(const TransformComponent& transform, uint32_t flags, uint32_t frameIndex) {
     MeshObjectData data{};
     data.modelMatrix = transform.transformMatrix();
     data.flags = flags;
 
-    updateBuffer(&data, sizeof(MeshObjectData));
+    updateBuffer(&data, sizeof(MeshObjectData), frameIndex);
 }
 
 } 

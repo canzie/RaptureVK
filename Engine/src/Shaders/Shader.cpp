@@ -2,6 +2,7 @@
 
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
 
 #include "ShaderReflections.h"
 
@@ -245,9 +246,33 @@ void Shader::createDescriptorSetLayout()
     }
     m_descriptorSetLayouts.clear();
 
-    // Create a new layout for each descriptor set
+    
+    // First, determine the maximum set number we need
+    uint32_t maxSetNumber = 0;
     for (const auto& setInfo : m_descriptorSetInfos) {
-        createDescriptorSetLayoutFromInfo(setInfo);
+        maxSetNumber = std::max(maxSetNumber, setInfo.setNumber);
+    }
+    
+    // Ensure we have layouts for sets 0-3 at minimum
+    maxSetNumber = std::max(maxSetNumber, 3u);
+    
+    // Resize layout vector to accommodate all sets
+    m_descriptorSetLayouts.resize(maxSetNumber + 1, VK_NULL_HANDLE);
+
+    // Process each set
+    for (uint32_t setNumber = 0; setNumber <= maxSetNumber; ++setNumber) {
+        auto descriptorSet = DescriptorManager::getDescriptorSet(setNumber);
+        if (descriptorSet) {
+            m_descriptorSetLayouts[setNumber] = descriptorSet->getLayout();
+        } else {
+            RP_CORE_WARN("Shader: DescriptorManager set {} not available, falling back to shader layout", setNumber);
+            // Fall back to shader-defined layout
+            auto it = std::find_if(m_descriptorSetInfos.begin(), m_descriptorSetInfos.end(),
+                [setNumber](const DescriptorSetInfo& info) { return info.setNumber == setNumber; });
+            if (it != m_descriptorSetInfos.end()) {
+                createDescriptorSetLayoutFromInfo(*it);
+            }
+        }
     }
 
     // Check if shader actually uses set 3 for bindless descriptors

@@ -53,20 +53,24 @@ void DescriptorManager::initializeSet0() {
     // Add bindings for all common resources
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::CAMERA_UBO});
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 32, TextureViewType::DEFAULT, 
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 64, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::LIGHTS_UBO});
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16, TextureViewType::DEFAULT, 
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 48, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::SHADOW_MATRICES_UBO});
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::CASCADE_MATRICES_UBO});
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 32, TextureViewType::DEFAULT, 
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 64, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::SHADOW_DATA_UBO});
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, TextureViewType::DEFAULT, 
+                                false, DescriptorSetBindingLocation::PROBE_VOLUME_DATA_UBO});
     bindings.setNumber = 0;
 
     
     // Create the descriptor set
-    std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[0]);
-    s_descriptorSets[0] = std::make_shared<DescriptorSet>(bindings);
+    std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[bindings.setNumber]);
+    s_descriptorSets[bindings.setNumber] = std::make_shared<DescriptorSet>(bindings);
+
+    RP_CORE_INFO("DescriptorManager Initialized set {}", bindings.setNumber);
 }
 
 void DescriptorManager::initializeSet1() {
@@ -74,13 +78,15 @@ void DescriptorManager::initializeSet1() {
     DescriptorSetBindings bindings;
     
     // Add bindings for material resources
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 512, TextureViewType::DEFAULT, 
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::MATERIAL_UBO});
     bindings.setNumber = 1;
     
     // Create the descriptor set
-    std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[1]);
-    s_descriptorSets[1] = std::make_shared<DescriptorSet>(bindings);
+    std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[bindings.setNumber]);
+    s_descriptorSets[bindings.setNumber] = std::make_shared<DescriptorSet>(bindings);
+
+    RP_CORE_INFO("DescriptorManager Initialized set {}", bindings.setNumber);
 }
 
 void DescriptorManager::initializeSet2() {
@@ -88,38 +94,72 @@ void DescriptorManager::initializeSet2() {
     DescriptorSetBindings bindings;
     
     // Add bindings for mesh data (using SSBO for bindless access)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024, TextureViewType::DEFAULT, 
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2048, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::MESH_DATA_UBO});
     bindings.setNumber = 2;
     
     // Create the descriptor set
-    std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[2]);
-    s_descriptorSets[2] = std::make_shared<DescriptorSet>(bindings);
+    std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[bindings.setNumber]);
+    s_descriptorSets[bindings.setNumber] = std::make_shared<DescriptorSet>(bindings);
+
+    RP_CORE_INFO("DescriptorManager Initialized set {}", bindings.setNumber);
 }
 
 void DescriptorManager::initializeSet3() {
-    // Set 2: Object/Mesh resources  
+    // Set 3: Bindless resources  
     DescriptorSetBindings bindings;
     
-    // Add bindings for bindless textures
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 4096, TextureViewType::DEFAULT, 
+    //  Bindless textures
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4096, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::BINDLESS_TEXTURES});
 
-    // Add bindings for bindless SSBOs
+    //  Bindless SSBOs
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::BINDLESS_SSBOS});
 
-    // Add bindings for bindless textures and storage images
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024, TextureViewType::DEFAULT, 
-                                true, DescriptorSetBindingLocation::BINDLESS_STORAGE_TEXTURES});
+    // DDGI ray data storage
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
+                                true, DescriptorSetBindingLocation::DDGI_RAY_DATA_STORAGE});
+    
+    // DDGI irradiance storage (current frame)
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
+                                true, DescriptorSetBindingLocation::DDGI_IRRADIANCE_STORAGE});
+    
+    // DDGI irradiance storage (previous frame)
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
+                                true, DescriptorSetBindingLocation::DDGI_PREV_IRRADIANCE_STORAGE});
+    
+    // DDGI visibility storage (current frame)
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
+                                true, DescriptorSetBindingLocation::DDGI_VISIBILITY_STORAGE});
+    
+    // DDGI visibility storage (previous frame)
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
+                                true, DescriptorSetBindingLocation::DDGI_PREV_VISIBILITY_STORAGE});
+    
+    // Flatten output storage (color textures)
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
+                                true, DescriptorSetBindingLocation::FLATTEN_OUTPUT_STORAGE});
 
+    // DDGI scene info SSBO
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024, TextureViewType::DEFAULT, 
+                                false, DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS});
+
+    // Flatten depth output storage (depth textures)
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEPTH, 
+                                true, DescriptorSetBindingLocation::FLATTEN_DEPTH_OUTPUT_STORAGE});
+
+    // General purpose bindless storage textures
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 8, TextureViewType::DEFAULT, 
+                                false, DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES});
 
     bindings.setNumber = 3;
     
-    
     // Create the descriptor set
-    std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[2]);
-    s_descriptorSets[2] = std::make_shared<DescriptorSet>(bindings);
+    std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[bindings.setNumber]);
+    s_descriptorSets[bindings.setNumber] = std::make_shared<DescriptorSet>(bindings);
+
+    RP_CORE_INFO("DescriptorManager Initialized set {}", bindings.setNumber);
 }
 
 void DescriptorManager::bindSet(uint32_t setNumber, std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<PipelineBase> pipeline) {
@@ -136,6 +176,32 @@ void DescriptorManager::bindSet(uint32_t setNumber, std::shared_ptr<CommandBuffe
 void DescriptorManager::bindSet(DescriptorSetBindingLocation location, std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<PipelineBase> pipeline) {
     uint32_t setNumber = getBindingSetNumber(location);
     bindSet(setNumber, commandBuffer, pipeline);
+}
+
+std::vector<VkDescriptorSetLayout> DescriptorManager::getDescriptorSetLayouts() {
+    std::vector<VkDescriptorSetLayout> layouts;
+    
+    for (size_t i = 0; i < s_descriptorSets.size(); ++i) {
+        if (s_descriptorSets[i]) {
+            layouts.push_back(s_descriptorSets[i]->getLayout());
+        }
+    }
+    
+    return layouts;
+}
+
+std::vector<VkDescriptorSetLayout> DescriptorManager::getDescriptorSetLayouts(const std::vector<uint32_t>& setNumbers) {
+    std::vector<VkDescriptorSetLayout> layouts;
+    
+    for (uint32_t setNumber : setNumbers) {
+        if (setNumber < s_descriptorSets.size() && s_descriptorSets[setNumber]) {
+            layouts.push_back(s_descriptorSets[setNumber]->getLayout());
+        } else {
+            RP_CORE_WARN("DescriptorManager::getDescriptorSetLayouts - set number {} not available", setNumber);
+        }
+    }
+    
+    return layouts;
 }
 
 } // namespace Rapture 

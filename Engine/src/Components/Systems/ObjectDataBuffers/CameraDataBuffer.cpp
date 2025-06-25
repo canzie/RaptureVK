@@ -8,21 +8,19 @@
 
 namespace Rapture {
 
-CameraDataBuffer::CameraDataBuffer() 
-    : ObjectDataBuffer(DescriptorSetBindingLocation::CAMERA_UBO, sizeof(CameraUniformBufferObject)) {
+CameraDataBuffer::CameraDataBuffer(uint32_t frameCount) 
+    : ObjectDataBuffer(DescriptorSetBindingLocation::CAMERA_UBO, sizeof(CameraUniformBufferObject), frameCount) {
 }
 
-
-void CameraDataBuffer::update(const CameraComponent& camera) {
+void CameraDataBuffer::update(const CameraComponent& camera, uint32_t frameIndex) {
     CameraUniformBufferObject ubo{};
-
 
     // Use the camera's matrices
     ubo.view = camera.camera.getViewMatrix();
     ubo.proj = camera.camera.getProjectionMatrix();
     ubo.proj[1][1] *= -1;
 
-    updateBuffer(&ubo, sizeof(CameraUniformBufferObject));
+    updateBuffer(&ubo, sizeof(CameraUniformBufferObject), frameIndex);
 }
 
 } 

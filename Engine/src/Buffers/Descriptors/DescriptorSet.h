@@ -40,11 +40,24 @@ enum class DescriptorSetBindingLocation {
     CASCADE_MATRICES_UBO = 3,
     SHADOW_DATA_UBO = 4,
     PROBE_VOLUME_DATA_UBO = 5,
+    DDGI_PROBE_INFO = 5,  // Alias for PROBE_VOLUME_DATA_UBO
+
     MATERIAL_UBO = 100,
+
     MESH_DATA_UBO = 200,
+
     BINDLESS_TEXTURES = 300,
     BINDLESS_SSBOS = 301,
-    BINDLESS_STORAGE_TEXTURES = 302
+    BINDLESS_ACCELERATION_STRUCTURES = 302,
+    // Specific storage image bindings in set 3
+    DDGI_RAY_DATA_STORAGE = 303,        // Will be at binding 2 in set 3
+    DDGI_IRRADIANCE_STORAGE = 304,      // Will be at binding 3 in set 3
+    DDGI_PREV_IRRADIANCE_STORAGE = 305, // Will be at binding 4 in set 3
+    DDGI_VISIBILITY_STORAGE = 306,      // Will be at binding 5 in set 3
+    DDGI_PREV_VISIBILITY_STORAGE = 307, // Will be at binding 6 in set 3
+    FLATTEN_OUTPUT_STORAGE = 308,       // Will be at binding 8 in set 3 (color textures)
+    DDGI_SCENE_INFO_SSBOS = 309,        // Will be at binding 9 in set 3
+    FLATTEN_DEPTH_OUTPUT_STORAGE = 310  // Will be at binding 10 in set 3 (depth textures)
 };
 
 inline uint32_t getBindingSetNumber(DescriptorSetBindingLocation location) {
@@ -150,28 +163,14 @@ private:
     static uint32_t s_poolInputAttachmentCount;
     static uint32_t s_poolAccelerationStructureCount;
     static const uint32_t s_maxSets = 1000;  // Maximum descriptor sets in pool
-    static const uint32_t s_maxBuffers = 2000;
-    static const uint32_t s_maxTextures = 4000;
-    static const uint32_t s_maxStorageBuffers = 2000;
-    static const uint32_t s_maxStorageImages = 2000;
+    static const uint32_t s_maxBuffers = 16000;    // Increased from 8000
+    static const uint32_t s_maxTextures = 16000;   // Increased from 8000
+    static const uint32_t s_maxStorageBuffers = 8000;  // Increased from 4000
+    static const uint32_t s_maxStorageImages = 8000;   // Increased from 4000 (need 4103+ minimum)
     static const uint32_t s_maxInputAttachments = 1000;
-    static const uint32_t s_maxAccelerationStructures = 64;
+    static const uint32_t s_maxAccelerationStructures = 128;  // Increased from 64
 };
 
-class DescriptorManager {
-public:
-    static void init();
-    static void shutdown();
-
-    static std::shared_ptr<DescriptorSet> getDescriptorSet(uint32_t setNumber);
-    static std::shared_ptr<DescriptorSet> getDescriptorSet(DescriptorSetBindingLocation location);
-
-
-private:
-    static std::array<std::shared_ptr<DescriptorSet>, 4> s_descriptorSets;
-    static std::array<std::mutex, 4> s_descriptorSetMutexes;
-
-};
 
 }
 

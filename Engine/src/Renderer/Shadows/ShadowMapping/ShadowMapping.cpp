@@ -12,21 +12,14 @@ namespace Rapture {
 
 struct PushConstants {
     glm::mat4 model;
-    uint32_t shadowMapIndex;
+    glm::mat4 shadowMatrix;
 };
 
-std::shared_ptr<DescriptorBindingTexture> ShadowMap::s_bindlessShadowMaps = nullptr;
 
 
 ShadowMap::ShadowMap(float width, float height) 
-    : m_width(width), m_height(height), m_shadowMapIndex(UINT32_MAX), m_lightViewProjection(glm::mat4(1.0f)) {
+    : m_width(width), m_height(height), m_lightViewProjection(glm::mat4(1.0f)) {
 
-    if (s_bindlessShadowMaps == nullptr) {
-        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
-        if (set) {
-            s_bindlessShadowMaps = set->getTextureBinding(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
-        }
-    }
 
     createShadowTexture();
     createPipeline();
@@ -39,47 +32,21 @@ ShadowMap::ShadowMap(float width, float height)
     m_allocator = vulkanContext.getVmaAllocator();
     
 
-
-
     createUniformBuffers();
-    createDescriptorSets();
 }
 
 ShadowMap::~ShadowMap() {
-    if (m_shadowMapIndex != UINT32_MAX && s_bindlessShadowMaps) {
-        s_bindlessShadowMaps->free(m_shadowMapIndex);
-    }
+
 }
 
 void ShadowMap::createUniformBuffers() {
     RAPTURE_PROFILE_FUNCTION();
     
     // Create uniform buffers for each frame in flight
-    m_shadowUBOs.resize(m_framesInFlight);
-    
-    for (uint32_t i = 0; i < m_framesInFlight; i++) {
-        m_shadowUBOs[i] = std::make_shared<UniformBuffer>(
-            sizeof(ShadowMapData),
-            BufferUsage::STREAM,
-            m_allocator
-        );
-    }
+    m_shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
 }
 
-void ShadowMap::createDescriptorSets() {
-    RAPTURE_PROFILE_FUNCTION();
-    
 
-    auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO);
-    if (set) {
-        for (uint32_t i = 0; i < m_framesInFlight; i++) {
-            auto binding = set->getUniformBufferBinding(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO);
-            m_shadowMatrixsDescriptorIndices.push_back(binding->add(m_shadowUBOs[i]));
-        }
-    }
-
-
-}
 
 void ShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer) {
     RAPTURE_PROFILE_FUNCTION();
@@ -245,10 +212,6 @@ void ShadowMap::updateViewMatrix(const LightComponent& lightComp, const Transfor
     shadowMapData.lightViewProjection = lightProj * viewMatrix;
     m_lightViewProjection = shadowMapData.lightViewProjection;
 
-    // Update all UBOs with the new projection matrix
-    for (uint32_t i = 0; i < m_framesInFlight; i++) {
-        m_shadowUBOs[i]->addData(&shadowMapData, sizeof(ShadowMapData), 0);
-    }
 }
 
 void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, 
@@ -281,7 +244,8 @@ void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
     
     // Bind descriptor sets
-    DescriptorManager::bindSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO);
+    // via pushconstants for now, since it is only one matrix
+    //DescriptorManager::bindSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
     auto& registry = activeScene->getRegistry();
@@ -331,7 +295,7 @@ void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer
         // Push the model matrix as a push constant
         PushConstants pushConstants{};
         pushConstants.model = transform.transformMatrix();
-        pushConstants.shadowMapIndex = m_shadowMatrixsDescriptorIndices[currentFrame];
+        pushConstants.shadowMatrix = m_lightViewProjection;
 
         // Get push constant stage flags from shader
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -499,10 +463,6 @@ void ShadowMap::createShadowTexture() {
 
     m_shadowTexture = std::make_shared<Texture>(spec);
 
-    if (s_bindlessShadowMaps) {
-        m_shadowMapIndex = s_bindlessShadowMaps->add(m_shadowTexture);
-    } else {
-        RP_CORE_ERROR("ShadowMap::createShadowTexture - s_bindlessShadowMaps is nullptr");
-    }
+    
 }
 }

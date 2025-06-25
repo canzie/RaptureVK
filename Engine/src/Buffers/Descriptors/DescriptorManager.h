@@ -19,6 +19,10 @@ public:
     // Convenience method to bind resources to descriptor sets
     static void bindSet(uint32_t setNumber, std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<PipelineBase> pipeline);
     static void bindSet(DescriptorSetBindingLocation location, std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<PipelineBase> pipeline);
+
+    // Get descriptor set layouts for pipeline creation
+    static std::vector<VkDescriptorSetLayout> getDescriptorSetLayouts();
+    static std::vector<VkDescriptorSetLayout> getDescriptorSetLayouts(const std::vector<uint32_t>& setNumbers);
 private:
     static void initializeSet0(); // Common resources (camera, lights, shadows)
     static void initializeSet1(); // Material resources

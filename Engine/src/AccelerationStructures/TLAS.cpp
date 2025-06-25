@@ -1,6 +1,7 @@
 #include "TLAS.h"
 #include "WindowContext/Application.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
 #include "Logging/Log.h"
 
 #include <stdexcept>
@@ -22,6 +23,7 @@ TLAS::TLAS()
     , m_isBuilt(false)
     , m_needsRebuild(false)
     , m_supportsUpdate(true)  // Assume true for now, could check device features
+    , m_bindlessIndex(UINT32_MAX)
 {
     auto& app = Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
@@ -53,6 +55,14 @@ TLAS::~TLAS() {
     
     if (m_scratchBuffer != VK_NULL_HANDLE) {
         vmaDestroyBuffer(m_allocator, m_scratchBuffer, m_scratchAllocation);
+    }
+
+    if (m_bindlessIndex != UINT32_MAX) {
+        auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
+        if (bindlessSet) {
+            auto binding = bindlessSet->getTLASBinding(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
+            binding->free(m_bindlessIndex);
+        }
     }
 }
 
@@ -340,6 +350,24 @@ void TLAS::build() {
     m_isBuilt = true;
     m_needsRebuild = false;
     RP_CORE_INFO("TLAS: Acceleration structure built successfully with {} instances", m_instances.size());
+    
+    // Register with descriptor manager after successful build
+    registerWithDescriptorManager();
+}
+
+void TLAS::registerWithDescriptorManager() {
+    // Add this TLAS to the bindless acceleration structures descriptor set
+    auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
+    if (bindlessSet) {
+        auto binding = bindlessSet->getTLASBinding(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
+        if (binding) {
+            m_bindlessIndex = binding->add(shared_from_this());
+            RP_CORE_INFO("TLAS: Registered with descriptor manager at bindless index {}", m_bindlessIndex);
+        }
+        else {
+            RP_CORE_ERROR("TLAS: Failed to get TLAS binding from descriptor manager");
+        }
+    }
 }
 
 void TLAS::update() {

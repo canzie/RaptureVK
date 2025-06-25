@@ -10,7 +10,7 @@ namespace Rapture {
 
 
 struct PushConstants {
-    uint32_t modelDataIndex;
+    glm::mat4 modelMatrix;
     glm::vec4 color;
     float borderWidth;
     uint32_t depthStencilTextureHandle;
@@ -120,11 +120,11 @@ void StencilBorderPass::recordCommandBuffer(
 
 
     PushConstants pushConstants;
-    pushConstants.modelDataIndex = meshComp->meshDataBuffer->getDescriptorIndex();
+    pushConstants.modelMatrix = transformComp->transformMatrix();
     pushConstants.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
     pushConstants.borderWidth = 0.01f;
     pushConstants.depthStencilTextureHandle = m_depthStencilTextures[currentFrameInFlight]->getBindlessIndex();
-    pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex();
+    pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentImageIndex);
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
         m_pipeline->getPipelineLayoutVk(),

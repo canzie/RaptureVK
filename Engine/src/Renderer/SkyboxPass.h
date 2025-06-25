@@ -33,7 +33,6 @@ public:
 
 private:
     void createPipeline();
-    void createDescriptorSets();
     void createSkyboxGeometry();
 
     void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t frameInFlightIndex);
@@ -46,9 +45,6 @@ private:
 
     std::weak_ptr<Shader> m_shader;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
-
-    std::vector<std::shared_ptr<UniformBuffer>> m_cameraUBOs;
-    std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets;
 
     std::shared_ptr<Texture> m_skyboxTexture;
     std::vector<std::shared_ptr<Texture>> m_depthTextures;

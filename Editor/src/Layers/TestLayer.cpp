@@ -92,10 +92,9 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     //auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf", activeScene);
     //loader->loadModel((rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf").string());
 
-    auto cube = activeScene->createCube("Cube");
-    auto sphere = activeScene->createSphere("Sphere");
+    //auto cube = activeScene->createCube("Cube");
+    //auto sphere = activeScene->createSphere("Sphere");
 
-    activeScene->registerBLAS(cube);
 
     Rapture::Entity light1 = activeScene->createEntity("Spot Light 1");
     light1.addComponent<Rapture::TransformComponent>(
@@ -129,7 +128,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     );
     sunLight.addComponent<Rapture::CascadedShadowComponent>(2048, 2048, 4, 0.8f);
 
-    auto perlinNoiseTexture = Rapture::PerlinNoiseGenerator::generateNoise(1024, 1024, 4, 0.5f, 2.0f, 8.0f);
+    //auto perlinNoiseTexture = Rapture::PerlinNoiseGenerator::generateNoise(1024, 1024, 4, 0.5f, 2.0f, 8.0f);
 
 
     auto skybox = activeScene->createEntity("Skybox");

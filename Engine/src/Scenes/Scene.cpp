@@ -97,7 +97,6 @@ namespace Rapture {
 
     void Scene::onUpdate(float dt) {
         static uint32_t frameCounter = 0;
-        frameCounter++;
 
         // Get current frame dimensions for camera updates
         auto& app = Application::getInstance();
@@ -109,11 +108,16 @@ namespace Rapture {
         auto meshView = m_Registry.view<TransformComponent, MeshComponent, MaterialComponent>();
         for (auto entity : meshView) {
             auto [transform, mesh, material] = meshView.get<TransformComponent, MeshComponent, MaterialComponent>(entity);
+            
+            // should be shot for this but feels kindof dumb to do another loop just for the materials
+            // + when there are no more pending texutres, it should be 0 cost since we just check if the vector is empty then return.
+            material.material->updatePendingTextures();
+
             uint32_t vertexFlags = mesh.mesh->getVertexBuffer()->getBufferLayout().getFlags();
             uint32_t materialFlags = material.material->getMaterialFlags();
             uint32_t flags = vertexFlags | materialFlags;
 
-            mesh.meshDataBuffer->update(transform, flags);
+            mesh.meshDataBuffer->update(transform, flags, frameCounter);
         }
 
 
@@ -127,7 +131,7 @@ namespace Rapture {
             if (camera.aspectRatio != aspectRatio) {
                 camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane, camera.farPlane);
             }
-            camera.cameraDataBuffer->update(camera);
+            camera.cameraDataBuffer->update(camera, frameCounter);
         }
 
         // Update light data buffers
@@ -160,9 +164,10 @@ namespace Rapture {
                 // Update the shadow map view matrix
                 shadow.shadowMap->updateViewMatrix(light, transform, cameraPosition);
                 
+                auto shadowDataBuffer = shadow.shadowMap->getShadowDataBuffer();
                 // Update the shadow data buffer if it exists
-                if (shadow.shadowDataBuffer) {
-                    shadow.shadowDataBuffer->update(light, shadow, static_cast<uint32_t>(entity));
+                if (shadowDataBuffer) {
+                    shadowDataBuffer->update(light, shadow, static_cast<uint32_t>(entity));
                 }
                 
             }
@@ -173,23 +178,25 @@ namespace Rapture {
         for (auto entity : cascadedShadowView) {
             auto [light, transform, shadow] = cascadedShadowView.get<LightComponent, TransformComponent, CascadedShadowComponent>(entity);
 
-            if (shadow.cascadedShadowMap && shadow.isActive && 
-                (light.hasChanged(frameCounter) || transform.hasChanged(frameCounter))) {
+            if (shadow.cascadedShadowMap && shadow.isActive) {
                 // Update the cascaded shadow map view matrices
                 if (m_config.mainCamera && m_config.mainCamera->isValid()) {
                     auto cameraComp = m_config.mainCamera->tryGetComponent<CameraComponent>();
                     if (cameraComp) {
                         auto cascades = shadow.cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
-                        
+
+                        auto shadowDataBuffer = shadow.cascadedShadowMap->getShadowDataBuffer();
                         // Update the shadow data buffer if it exists
-                        if (shadow.shadowDataBuffer) {
-                            shadow.shadowDataBuffer->update(light, shadow, static_cast<uint32_t>(entity));
+                        if (shadowDataBuffer) {
+                            shadowDataBuffer->update(light, shadow, static_cast<uint32_t>(entity));
                         }
                     }
                 }
             }
         }
         
+        frameCounter = (frameCounter + 1) % 3;
+
 
         updateTLAS();
     }
@@ -261,7 +268,7 @@ namespace Rapture {
 
     void Scene::registerBLAS(std::shared_ptr<Entity> entity) {
         if (!m_tlas) {
-            m_tlas = std::make_unique<TLAS>();
+            m_tlas = std::make_shared<TLAS>();
         }
 
         auto [blas, mesh, transform] = entity->tryGetComponents<BLASComponent, MeshComponent, TransformComponent>();

@@ -1,7 +1,7 @@
 #include "VertexBuffer.h"
 #include "Logging/Log.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
-
+#include "Buffers/Descriptors/DescriptorManager.h"
 namespace Rapture {
 
 std::shared_ptr<DescriptorBindingSSBO> VertexBuffer::s_bindlessBuffers = nullptr;

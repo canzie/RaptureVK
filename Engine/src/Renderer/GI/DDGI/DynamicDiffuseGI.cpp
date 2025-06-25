@@ -20,6 +20,21 @@
 
 namespace Rapture {
 
+// Push constants for DDGI compute shaders
+struct DDGITracePushConstants {
+    uint32_t skyboxTextureIndex;
+    uint32_t sunLightDataIndex;
+    uint32_t prevRadianceIndex;
+    uint32_t prevVisibilityIndex;
+    uint32_t tlasIndex;
+};
+
+struct DDGIBlendPushConstants {
+    uint32_t prevTextureIndex;
+    uint32_t rayDataIndex;
+    uint32_t writeToAlternateTexture; // 0 = write to primary, 1 = write to alternate
+};
+
 std::shared_ptr<Texture> DynamicDiffuseGI::s_defaultSkyboxTexture = nullptr;
 
 DynamicDiffuseGI::DynamicDiffuseGI() 
@@ -36,8 +51,11 @@ DynamicDiffuseGI::DynamicDiffuseGI()
     m_DDGI_ProbeIrradianceBlendingPipeline(nullptr),
     m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
     m_MeshInfoBuffer(nullptr),
-    m_SunLightBuffer(nullptr),
-    m_skyboxTexture(nullptr) {
+    m_skyboxTexture(nullptr),
+    m_probeIrradianceBindlessIndex(UINT32_MAX),
+    m_prevProbeIrradianceBindlessIndex(UINT32_MAX),
+    m_probeVisibilityBindlessIndex(UINT32_MAX),
+    m_prevProbeVisibilityBindlessIndex(UINT32_MAX) {
 
     if (!s_defaultSkyboxTexture) {
         s_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
@@ -64,7 +82,6 @@ DynamicDiffuseGI::DynamicDiffuseGI()
 
     initProbeInfoBuffer();
     initTextures();
-    initializeSunProperties();
 
 
     
@@ -110,243 +127,67 @@ void DynamicDiffuseGI::createPipelines() {
 
 }
 
-void DynamicDiffuseGI::createDescriptorSets(std::shared_ptr<Scene> scene) {
+void DynamicDiffuseGI::setupProbeTextures() {
+    RP_CORE_TRACE("Setting up probe textures for bindless access");
 
-    RP_CORE_TRACE("Getting descriptor sets");
-
-
-    auto probeInfoSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
-    if (probeInfoSet) {
-        auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
-        binding->add(m_ProbeInfoBuffer);
+    // Get bindless indices for probe textures (these will be used in lighting pass)
+    if (m_RadianceTexture) {
+        m_probeIrradianceBindlessIndex = m_RadianceTexture->getBindlessIndex();
+        m_prevProbeIrradianceBindlessIndex = m_PrevRadianceTexture->getBindlessIndex();
+    }
+    if (m_VisibilityTexture) {
+        m_probeVisibilityBindlessIndex = m_VisibilityTexture->getBindlessIndex();
+        m_prevProbeVisibilityBindlessIndex = m_PrevVisibilityTexture->getBindlessIndex();
     }
 
-
-    createProbeTraceDescriptorSets(scene);
-    createProbeBlendingDescriptorSets(scene, true);
-    createProbeBlendingDescriptorSets(scene, false);
-
+    // Add probe textures to their specific storage image bindings in set 3
+    auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+    if (bindlessSet) {
+        // Add ray data texture to binding 2
+        auto rayDataBinding = bindlessSet->getTextureBinding(DescriptorSetBindingLocation::DDGI_RAY_DATA_STORAGE);
+        if (rayDataBinding) {
+            rayDataBinding->add(m_RayDataTexture);
+        }
+        
+        // Add irradiance textures to bindings 3 and 4
+        auto irradianceBinding = bindlessSet->getTextureBinding(DescriptorSetBindingLocation::DDGI_IRRADIANCE_STORAGE);
+        if (irradianceBinding) {
+            irradianceBinding->add(m_RadianceTexture);
+        }
+        
+        auto prevIrradianceBinding = bindlessSet->getTextureBinding(DescriptorSetBindingLocation::DDGI_PREV_IRRADIANCE_STORAGE);
+        if (prevIrradianceBinding) {
+            prevIrradianceBinding->add(m_PrevRadianceTexture);
+        }
+        
+        // Add visibility textures to bindings 5 and 6
+        auto visibilityBinding = bindlessSet->getTextureBinding(DescriptorSetBindingLocation::DDGI_VISIBILITY_STORAGE);
+        if (visibilityBinding) {
+            visibilityBinding->add(m_VisibilityTexture);
+        }
+        
+        auto prevVisibilityBinding = bindlessSet->getTextureBinding(DescriptorSetBindingLocation::DDGI_PREV_VISIBILITY_STORAGE);
+        if (prevVisibilityBinding) {
+            prevVisibilityBinding->add(m_PrevVisibilityTexture);
+        }
+        
+        RP_CORE_INFO("DDGI: Added storage textures to fixed bindings in set 3");
+    }
 }
 
-void DynamicDiffuseGI::createProbeTraceDescriptorSets(std::shared_ptr<Scene> scene) {
+uint32_t DynamicDiffuseGI::getSunLightDataIndex(std::shared_ptr<Scene> scene) {
 
-    m_rayTraceDescriptorSets.clear();
+    auto& reg = scene->getRegistry();
+    auto lightView = reg.view<LightComponent>();
 
-    // Set 0: Textures, TLAS, and SSBO descriptors (without previous textures)
-    if (m_DDGI_ProbeTraceShader && m_DDGI_ProbeTraceShader->getDescriptorSetLayouts().size() > 0) {
-        DescriptorSetBindings resourceBindings;
-        resourceBindings.layout = m_DDGI_ProbeTraceShader->getDescriptorSetLayouts()[0];
-        
-        // Binding 0: RayData output texture (storage image)
-        DescriptorSetBinding rayDataBinding;
-        rayDataBinding.binding = 0;
-        rayDataBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        rayDataBinding.count = 1;
-        rayDataBinding.viewType = TextureViewType::DEFAULT;
-        rayDataBinding.resource = m_RayDataTexture;
-        rayDataBinding.useStorageImageInfo = true;
-        resourceBindings.bindings.push_back(rayDataBinding);
-        
-        DescriptorSetBinding skyboxBinding;
-        skyboxBinding.binding = 3;
-        skyboxBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        skyboxBinding.count = 1;
-        skyboxBinding.viewType = TextureViewType::DEFAULT;
-        skyboxBinding.resource = m_skyboxTexture;
-        resourceBindings.bindings.push_back(skyboxBinding);
-        
-
-        DescriptorSetBinding tlasBinding;
-        tlasBinding.binding = 4;
-        tlasBinding.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-        tlasBinding.resource = std::ref(const_cast<TLAS&>(scene->getTLAS())); // yikes
-        resourceBindings.bindings.push_back(tlasBinding);
-
-        DescriptorSetBinding meshInfoBinding;
-        meshInfoBinding.binding = 5;
-        meshInfoBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        meshInfoBinding.resource = m_MeshInfoBuffer;
-        resourceBindings.bindings.push_back(meshInfoBinding);
-        
-        m_rayTraceDescriptorSets.push_back(std::make_shared<DescriptorSet>(resourceBindings));
-    }
-
-    // Set 2: Previous textures - create two versions for frame alternation
-    if (m_DDGI_ProbeTraceShader && m_DDGI_ProbeTraceShader->getDescriptorSetLayouts().size() > 2) {
-        // Set 2 for when m_isEvenFrame = true (previous = PrevRadianceTexture)
-        DescriptorSetBindings evenFrameBindings;
-        evenFrameBindings.layout = m_DDGI_ProbeTraceShader->getDescriptorSetLayouts()[2];
-        
-        // Binding 0: Previous probe irradiance texture
-        DescriptorSetBinding prevRadianceBinding;
-        prevRadianceBinding.binding = 0;
-        prevRadianceBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        prevRadianceBinding.count = 1;
-        prevRadianceBinding.viewType = TextureViewType::DEFAULT;
-        prevRadianceBinding.useStorageImageInfo = false;
-        prevRadianceBinding.resource = m_PrevRadianceTexture;
-        evenFrameBindings.bindings.push_back(prevRadianceBinding);
-        
-        // Binding 1: Previous probe distance texture
-        DescriptorSetBinding prevVisibilityBinding;
-        prevVisibilityBinding.binding = 1;
-        prevVisibilityBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        prevVisibilityBinding.count = 1;
-        prevVisibilityBinding.viewType = TextureViewType::DEFAULT;
-        prevVisibilityBinding.useStorageImageInfo = false;
-        prevVisibilityBinding.resource = m_PrevVisibilityTexture;
-        evenFrameBindings.bindings.push_back(prevVisibilityBinding);
-        
-        m_rayTracePrevTextureDescriptorSet[0] = std::make_shared<DescriptorSet>(evenFrameBindings);
-
-        // Set 2 for when m_isEvenFrame = false (previous = RadianceTexture)
-        DescriptorSetBindings oddFrameBindings;
-        oddFrameBindings.layout = m_DDGI_ProbeTraceShader->getDescriptorSetLayouts()[2];
-        
-        // Binding 0: Previous probe irradiance texture
-        prevRadianceBinding.resource = m_RadianceTexture;
-        oddFrameBindings.bindings.push_back(prevRadianceBinding);
-        
-        // Binding 1: Previous probe distance texture  
-        prevVisibilityBinding.resource = m_VisibilityTexture;
-        oddFrameBindings.bindings.push_back(prevVisibilityBinding);
-        
-        m_rayTracePrevTextureDescriptorSet[1] = std::make_shared<DescriptorSet>(oddFrameBindings);
-    }
-
-
-    // Set 1: UBO descriptors
-    if (m_DDGI_ProbeTraceShader && m_DDGI_ProbeTraceShader->getDescriptorSetLayouts().size() > 1) {
-        DescriptorSetBindings uboBindings;
-        uboBindings.layout = m_DDGI_ProbeTraceShader->getDescriptorSetLayouts()[1];
-        
-        // Binding 0: ProbeInfo UBO  
-        DescriptorSetBinding probeInfoBinding;
-        probeInfoBinding.binding = 0;
-        probeInfoBinding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        probeInfoBinding.count = 1;
-        probeInfoBinding.resource = m_ProbeInfoBuffer;
-        uboBindings.bindings.push_back(probeInfoBinding);
-        
-        // Binding 1: SunProperties UBO
-        DescriptorSetBinding sunPropsBinding;
-        sunPropsBinding.binding = 1;
-        sunPropsBinding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        sunPropsBinding.count = 1;
-        sunPropsBinding.resource = m_SunLightBuffer;
-        uboBindings.bindings.push_back(sunPropsBinding);
-        
-        m_rayTraceDescriptorSets.push_back(std::make_shared<DescriptorSet>(uboBindings));
-
-    }
-
-
-
-
-
-
-}
-
-void DynamicDiffuseGI::createProbeBlendingDescriptorSets(std::shared_ptr<Scene> scene, bool isEvenFrame) {
-
-    int descriptorSetIndex = isEvenFrame ? 0 : 1;
-
-    // Set 0: Textures, TLAS, and SSBO descriptors
-    if (m_DDGI_ProbeIrradianceBlendingShader && m_DDGI_ProbeIrradianceBlendingShader->getDescriptorSetLayouts().size() > 0) {
-        DescriptorSetBindings resourceBindings;
-        resourceBindings.layout = m_DDGI_ProbeIrradianceBlendingShader->getDescriptorSetLayouts()[0];
-        
-        // Binding 0: RayData output texture (storage image)
-        DescriptorSetBinding rayDataBinding;
-        rayDataBinding.binding = 0;
-        rayDataBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        rayDataBinding.count = 1;
-        rayDataBinding.viewType = TextureViewType::DEFAULT;
-        rayDataBinding.resource = m_RayDataTexture;
-        rayDataBinding.useStorageImageInfo = false;
-        resourceBindings.bindings.push_back(rayDataBinding);
-        
-        // Binding 1: Previous probe irradiance texture
-        DescriptorSetBinding irradianceBinding;
-        irradianceBinding.binding = 1;
-        irradianceBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        irradianceBinding.count = 1;
-        irradianceBinding.viewType = TextureViewType::DEFAULT;
-        irradianceBinding.useStorageImageInfo = true;
-        if (isEvenFrame) {
-            irradianceBinding.resource = m_RadianceTexture;
-        } else {
-            irradianceBinding.resource = m_PrevRadianceTexture;
+    for (auto ent : lightView) {
+        auto& lightComp = lightView.get<LightComponent>(ent);
+        if (lightComp.type == LightType::Directional) {
+            return lightComp.lightDataBuffer->getDescriptorIndex();
         }
-        
-        resourceBindings.bindings.push_back(irradianceBinding);
-        
-        // Binding 2: Previous probe irradiance texture (for hysteresis)
-        DescriptorSetBinding prevIrradianceBinding;
-        prevIrradianceBinding.binding = 2;
-        prevIrradianceBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        prevIrradianceBinding.count = 1;
-        prevIrradianceBinding.viewType = TextureViewType::DEFAULT;
-        prevIrradianceBinding.useStorageImageInfo = false;
-        if (isEvenFrame) {
-            prevIrradianceBinding.resource = m_PrevRadianceTexture; 
-        } else {
-            prevIrradianceBinding.resource = m_RadianceTexture;      
-        }
-        resourceBindings.bindings.push_back(prevIrradianceBinding);
-
-        m_IrradianceBlendingDescriptorSet[descriptorSetIndex] = std::make_shared<DescriptorSet>(resourceBindings);
-    
     }
 
-    // Set 0: Textures, TLAS, and SSBO descriptors
-    if (m_DDGI_ProbeDistanceBlendingShader && m_DDGI_ProbeDistanceBlendingShader->getDescriptorSetLayouts().size() > 0) {
-        DescriptorSetBindings resourceBindings;
-        resourceBindings.layout = m_DDGI_ProbeDistanceBlendingShader->getDescriptorSetLayouts()[0];
-        
-        // Binding 0: RayData output texture (storage image)
-        DescriptorSetBinding rayDataBinding;
-        rayDataBinding.binding = 0;
-        rayDataBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        rayDataBinding.count = 1;
-        rayDataBinding.viewType = TextureViewType::DEFAULT;
-        rayDataBinding.resource = m_RayDataTexture;
-        rayDataBinding.useStorageImageInfo = false;
-        resourceBindings.bindings.push_back(rayDataBinding);
-        
-        // Binding 1: Previous probe irradiance texture
-        DescriptorSetBinding distanceBinding;
-        distanceBinding.binding = 1;
-        distanceBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        distanceBinding.count = 1;
-        distanceBinding.viewType = TextureViewType::DEFAULT;
-        distanceBinding.useStorageImageInfo = true;
-        if (isEvenFrame) {
-            distanceBinding.resource = m_VisibilityTexture;
-        } else {
-            distanceBinding.resource = m_PrevVisibilityTexture;
-        }
-        
-        resourceBindings.bindings.push_back(distanceBinding);
-        
-        // Binding 2: Previous probe distance texture
-        DescriptorSetBinding prevDistanceBinding;
-        prevDistanceBinding.binding = 2;
-        prevDistanceBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        prevDistanceBinding.count = 1;
-        prevDistanceBinding.viewType = TextureViewType::DEFAULT;
-        prevDistanceBinding.useStorageImageInfo = false;
-        if (isEvenFrame) {
-            prevDistanceBinding.resource = m_PrevVisibilityTexture;
-        } else {
-            prevDistanceBinding.resource = m_VisibilityTexture;
-        }
-        resourceBindings.bindings.push_back(prevDistanceBinding);
-
-        m_DistanceBlendingDescriptorSet[descriptorSetIndex] = std::make_shared<DescriptorSet>(resourceBindings);
-    }
-
-
+    return 0;
 }
 
 void DynamicDiffuseGI::clearTextures() {
@@ -481,19 +322,10 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
 
             if (materialComp.material) {
                 auto& material = materialComp.material;
-                auto albedoTexture = material->getParameter(ParameterID::ALBEDO_MAP).asTexture();
-                auto normalTexture = material->getParameter(ParameterID::NORMAL_MAP).asTexture();
-                auto metallicRoughnessTexture = material->getParameter(ParameterID::METALLIC_ROUGHNESS_MAP).asTexture();
+                meshinfo.AlbedoTextureIndex = material->getParameter(ParameterID::ALBEDO_MAP).asUInt();
+                meshinfo.NormalTextureIndex = material->getParameter(ParameterID::NORMAL_MAP).asUInt();
+                meshinfo.MetallicRoughnessTextureIndex = material->getParameter(ParameterID::METALLIC_ROUGHNESS_MAP).asUInt();
 
-                if (albedoTexture) {
-                    meshinfo.AlbedoTextureIndex = albedoTexture->getBindlessIndex();
-                }
-                if (normalTexture) {
-                    meshinfo.NormalTextureIndex = normalTexture->getBindlessIndex();
-                }
-                if (metallicRoughnessTexture) {
-                    meshinfo.MetallicRoughnessTextureIndex = metallicRoughnessTexture->getBindlessIndex();
-                }
             }
 
             if (meshComp.mesh) {
@@ -542,8 +374,19 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
         m_MeshInfoBuffer->addDataGPU(meshInfos.data(), sizeof(MeshInfo) * meshInfos.size(), 0);
     }
 
-    if (m_rayTraceDescriptorSets.empty()) {
-        createDescriptorSets(scene);
+    // Add mesh info buffer to the mesh data descriptor set
+    auto meshDataSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS);
+    if (meshDataSet) {
+        auto binding = meshDataSet->getSSBOBinding(DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS);
+        if (binding) {
+            m_meshDataSSBOIndex = binding->add(m_MeshInfoBuffer);
+            RP_CORE_INFO("DDGI Mesh data SSBO index: {}", m_meshDataSSBOIndex);
+        }
+    }
+
+    // Setup probe textures for bindless access if not already done
+    if (m_probeIrradianceBindlessIndex == UINT32_MAX) {
+        setupProbeTextures();
     }
 
     m_isPopulated = true;
@@ -558,13 +401,10 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
         // First populate the probe data
         populateProbes(scene);
     }
-
     if (m_isVolumeDirty) {
         // Update the probe volume
         updateProbeVolume();
     }
-    
-    updateSunProperties(scene);
     updateSkybox(scene);
 
     auto& tlas = scene->getTLAS();
@@ -641,9 +481,8 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene) {
 
     if (m_skyboxTexture != newTexture) {
         m_skyboxTexture = newTexture;
-        if (!m_rayTraceDescriptorSets.empty()) {
-            createProbeTraceDescriptorSets(scene);
-        }
+        // Skybox texture doesn't need special handling in the new system
+        // since it's accessed via bindless
     }
 }
 
@@ -741,41 +580,29 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
     // Bind the compute pipeline
     m_DDGI_ProbeTracePipeline->bind(m_CommandBuffer->getCommandBufferVk());
 
-    // Create descriptor sets for the compute shader
-    // Based on shader analysis:
-    // Set 0: Textures, TLAS, and SSBO descriptors (RayData at 0, skybox at 3, TLAS at 4, MeshInfo at 5)
-    // Set 1: UBO bindings (ProbeInfo at binding 0, SunProperties at binding 1)
-    // Set 2: Previous textures (previous radiance at 0, previous visibility at 1)
-    // Set 3: Bindless arrays (textures at binding 0, buffers at binding 1)
-
+    // Use the new descriptor manager system
+    // Set 0: Common resources (camera, lights, shadows, probe volume)
+    DescriptorManager::bindSet(0, m_CommandBuffer, m_DDGI_ProbeTracePipeline);
     
+    // Set 1: Material resources (not used in DDGI)
+    // Set 2: Object/Mesh resources (mesh data SSBO)
+    DescriptorManager::bindSet(2, m_CommandBuffer, m_DDGI_ProbeTracePipeline);
+    
+    // Set 3: Bindless arrays
+    DescriptorManager::bindSet(3, m_CommandBuffer, m_DDGI_ProbeTracePipeline);
 
-    std::vector<VkDescriptorSet> resourceDescriptorSetVk(m_rayTraceDescriptorSets.size());
-    for (int i = 0; i < m_rayTraceDescriptorSets.size(); i++) {
-        resourceDescriptorSetVk[i] = m_rayTraceDescriptorSets[i]->getDescriptorSet();
-    }
-
-    vkCmdBindDescriptorSets(m_CommandBuffer->getCommandBufferVk(),
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
-                            0, static_cast<uint32_t>(m_rayTraceDescriptorSets.size()), resourceDescriptorSetVk.data(), 0, nullptr);
-
-    // Set 2: Previous textures - alternate between descriptor sets based on frame
-    int prevTextureSetIndex = m_isEvenFrame ? 0 : 1;
-    VkDescriptorSet prevTextureDescriptorSet = m_rayTracePrevTextureDescriptorSet[prevTextureSetIndex]->getDescriptorSet();
-    vkCmdBindDescriptorSets(m_CommandBuffer->getCommandBufferVk(),
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
-                            2, 1, &prevTextureDescriptorSet, 0, nullptr);
-
-    // Set 3: Bindless descriptor arrays
-    VkDescriptorSet bindlessDescriptorSet = DescriptorArrayManager::getUnifiedSet();
-    if (bindlessDescriptorSet != VK_NULL_HANDLE) {
-        vkCmdBindDescriptorSets(m_CommandBuffer->getCommandBufferVk(),
-                               VK_PIPELINE_BIND_POINT_COMPUTE,
-                               m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
-                               3, 1, &bindlessDescriptorSet, 0, nullptr);
-    }
+    // Set push constants with texture and buffer indices
+    DDGITracePushConstants pushConstants = {};
+    pushConstants.sunLightDataIndex = getSunLightDataIndex(scene);
+    pushConstants.skyboxTextureIndex = m_skyboxTexture ? m_skyboxTexture->getBindlessIndex() : 0;
+    pushConstants.tlasIndex = tlas.getBindlessIndex();
+    pushConstants.prevRadianceIndex = m_isEvenFrame ? m_prevProbeIrradianceBindlessIndex : m_probeIrradianceBindlessIndex;
+    pushConstants.prevVisibilityIndex = m_isEvenFrame ? m_prevProbeVisibilityBindlessIndex : m_probeVisibilityBindlessIndex;
+    
+    vkCmdPushConstants(m_CommandBuffer->getCommandBufferVk(),
+                       m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
+                       VK_SHADER_STAGE_COMPUTE_BIT,
+                       0, sizeof(DDGITracePushConstants), &pushConstants);
 
     // Dispatch the compute shader
     // Workgroup size is 16x16x1 based on shader, dispatch based on probe grid dimensions
@@ -842,21 +669,23 @@ void DynamicDiffuseGI::blendTextures() {
         static_cast<uint32_t>(preBlendingBarriers.size()), preBlendingBarriers.data()
     );
 
-    int descriptorSetIndex = m_isEvenFrame ? 0 : 1;
-
-
     // Irradiance blending shader
     m_DDGI_ProbeIrradianceBlendingPipeline->bind(m_CommandBuffer->getCommandBufferVk());
 
+    // Use the new descriptor manager system for blending shaders
+    DescriptorManager::bindSet(0, m_CommandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // probe volume
+    DescriptorManager::bindSet(3, m_CommandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // bindless
 
-    VkDescriptorSet irradianceBlendingDescriptorSet[2] = {
-        m_IrradianceBlendingDescriptorSet[descriptorSetIndex]->getDescriptorSet(), 
-        m_probeVolumeDescriptorSet->getDescriptorSet()};
-
-    vkCmdBindDescriptorSets(m_CommandBuffer->getCommandBufferVk(),
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            m_DDGI_ProbeIrradianceBlendingPipeline->getPipelineLayoutVk(),
-                            0, 2, irradianceBlendingDescriptorSet, 0, nullptr);
+    // Set push constants for radiance blending
+    DDGIBlendPushConstants radianceBlendConstants = {};
+    radianceBlendConstants.prevTextureIndex = m_isEvenFrame ? m_prevProbeIrradianceBindlessIndex : m_probeIrradianceBindlessIndex;
+    radianceBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
+    radianceBlendConstants.writeToAlternateTexture = m_isEvenFrame ? 0 : 1; // 0 = write to primary (RadianceTexture), 1 = write to alternate (PrevRadianceTexture)
+    
+    vkCmdPushConstants(m_CommandBuffer->getCommandBufferVk(),
+                       m_DDGI_ProbeIrradianceBlendingPipeline->getPipelineLayoutVk(),
+                       VK_SHADER_STAGE_COMPUTE_BIT,
+                       0, sizeof(DDGIBlendPushConstants), &radianceBlendConstants);
 
     vkCmdDispatch(m_CommandBuffer->getCommandBufferVk(), 
                  m_ProbeVolume.gridDimensions.x, 
@@ -864,17 +693,21 @@ void DynamicDiffuseGI::blendTextures() {
                  m_ProbeVolume.gridDimensions.y);
 
     // Distance blending shader
-
     m_DDGI_ProbeDistanceBlendingPipeline->bind(m_CommandBuffer->getCommandBufferVk());
 
-    VkDescriptorSet distanceBlendingDescriptorSet[2] = {
-        m_DistanceBlendingDescriptorSet[descriptorSetIndex]->getDescriptorSet(), 
-        m_probeVolumeDescriptorSet->getDescriptorSet()};
+    DescriptorManager::bindSet(0, m_CommandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // probe volume
+    DescriptorManager::bindSet(3, m_CommandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // bindless
 
-    vkCmdBindDescriptorSets(m_CommandBuffer->getCommandBufferVk(),
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            m_DDGI_ProbeDistanceBlendingPipeline->getPipelineLayoutVk(),
-                            0, 2, distanceBlendingDescriptorSet, 0, nullptr);
+    // Set push constants for visibility blending
+    DDGIBlendPushConstants visibilityBlendConstants = {};
+    visibilityBlendConstants.prevTextureIndex = m_isEvenFrame ? m_prevProbeVisibilityBindlessIndex : m_probeVisibilityBindlessIndex;
+    visibilityBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
+    visibilityBlendConstants.writeToAlternateTexture = m_isEvenFrame ? 0 : 1; // 0 = write to primary (VisibilityTexture), 1 = write to alternate (PrevVisibilityTexture)
+    
+    vkCmdPushConstants(m_CommandBuffer->getCommandBufferVk(),
+                       m_DDGI_ProbeDistanceBlendingPipeline->getPipelineLayoutVk(),
+                       VK_SHADER_STAGE_COMPUTE_BIT,
+                       0, sizeof(DDGIBlendPushConstants), &visibilityBlendConstants);
 
     vkCmdDispatch(m_CommandBuffer->getCommandBufferVk(), 
                  m_ProbeVolume.gridDimensions.x, 
@@ -1029,66 +862,20 @@ void DynamicDiffuseGI::initProbeInfoBuffer() {
         m_ProbeInfoBuffer = std::make_shared<UniformBuffer>(sizeof(ProbeVolume), BufferUsage::STATIC, m_allocator);
         m_ProbeInfoBuffer->addDataGPU(&probeVolume, sizeof(ProbeVolume), 0);
 
-}
-
-void DynamicDiffuseGI::updateSunProperties(std::shared_ptr<Scene> scene) {
-
-    RAPTURE_PROFILE_FUNCTION();
-
-    auto& reg = scene->getRegistry();
-    auto MMview = reg.view<TransformComponent, LightComponent>();
-
-    // Use default fake values for now as requested
-    m_SunShadowProps.sunDirectionWorld = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
-    m_SunShadowProps.sunColor = glm::vec3(1.0f, 1.0f, 1.0f);
-    m_SunShadowProps.sunIntensity = 0.0f;
-
-    for (auto ent : MMview) {
-        auto [transformComp, lightComp] = MMview.get<TransformComponent, LightComponent>(ent);
-
-        if (lightComp.type == LightType::Directional) {
-            glm::quat rotationQuat = transformComp.transforms.getRotationQuat();
-            m_SunShadowProps.sunDirectionWorld = glm::normalize(rotationQuat * glm::vec3(0, 0, -1));
-            m_SunShadowProps.sunColor = lightComp.color;
-            m_SunShadowProps.sunIntensity = lightComp.intensity;
-            break;
+        // Add probe volume UBO to the descriptor manager immediately
+        auto probeInfoSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
+        if (probeInfoSet) {
+            auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
+            if (binding) {
+                binding->add(m_ProbeInfoBuffer);
+                RP_CORE_INFO("DDGI: Added probe volume UBO to descriptor set 0, binding 5");
+            } else {
+                RP_CORE_ERROR("DDGI: Failed to get uniform buffer binding for probe info");
+            }
+        } else {
+            RP_CORE_ERROR("DDGI: Failed to get descriptor set for probe info");
         }
 
-    }
-
-
-    // Update the sun light buffer
-    if (!m_SunLightBuffer) {
-        m_SunLightBuffer = std::make_shared<UniformBuffer>(
-            sizeof(SunProperties),
-            BufferUsage::STREAM,
-            m_allocator,
-            &m_SunShadowProps
-        );
-    } else {
-        m_SunLightBuffer->addData(&m_SunShadowProps, sizeof(SunProperties), 0);
-    }
-}
-
-void DynamicDiffuseGI::initializeSunProperties() {
-    // Use default fake values for now as requested
-    m_SunShadowProps = {};
-    m_SunShadowProps.sunDirectionWorld = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));
-    m_SunShadowProps.sunColor = glm::vec3(1.0f, 1.0f, 1.0f);
-    m_SunShadowProps.sunIntensity = 0.0f;
-
-
-    // Update the sun light buffer
-    if (!m_SunLightBuffer) {
-        m_SunLightBuffer = std::make_shared<UniformBuffer>(
-            sizeof(SunProperties),
-            BufferUsage::STREAM,
-            m_allocator,
-            &m_SunShadowProps
-        );
-    } else {
-        m_SunLightBuffer->addData(&m_SunShadowProps, sizeof(SunProperties), 0);
-    }
 }
 
 }

@@ -30,13 +30,6 @@ struct MeshInfo {
 
 
 
-struct SunProperties {
-    alignas(16) glm::vec3 sunDirectionWorld;        // Normalized direction FROM fragment TO sun
-    alignas(16) glm::vec3 sunColor;
-
-    alignas(4) float sunIntensity;
-};
-
 struct ProbeVolume {
     alignas(16) glm::vec3 origin;
 

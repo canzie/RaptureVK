@@ -1,19 +1,22 @@
 #version 460
 
+#extension GL_EXT_nonuniform_qualifier : require
+
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-// Input depth texture array
-layout(set=0, binding = 0) uniform sampler2DArray inputDepthArray;
+// Bindless texture arrays (set 3)
+layout(set = 3, binding = 0) uniform sampler2DArray gTextures[];
 
-// Output flattened texture (color format for visualization)
-layout(set=0, binding = 1, rgba32f) uniform image2D outputTex;
+// Fixed output storage binding (set 3, binding 10) for depth textures
+layout(set = 3, binding = 10, rgba32f) uniform restrict image2D outputTex;
 
-// Push constants for dimensions
+// Push constants for dimensions and texture indices
 layout (push_constant) uniform PushConstants {
-    int layerCount;      // Number of layers in the texture array
-    int layerWidth;      // Width of each layer
-    int layerHeight;     // Height of each layer
-    int tilesPerRow;     // Number of tiles to arrange horizontally
+    uint inputTextureIndex;  // Index into bindless texture array
+    int layerCount;          // Number of layers in the texture array
+    int layerWidth;          // Width of each layer
+    int layerHeight;         // Height of each layer
+    int tilesPerRow;         // Number of tiles to arrange horizontally
 };
 
 void main() {
@@ -37,12 +40,10 @@ void main() {
     localCoord.x = pixelCoord.x % layerWidth;
     localCoord.y = pixelCoord.y % layerHeight;
     
-    // Sample depth value from the texture array using texelFetch
-    float depthValue = texelFetch(inputDepthArray, ivec3(localCoord, layerIndex), 0).r;
+
+    // Sample depth value from the bindless texture array
+    float depthValue = texture(gTextures[inputTextureIndex], vec3(localCoord, layerIndex)).r;
     
-    // Convert depth to visible grayscale
-    // Depth values are typically 0.0 (far) to 1.0 (near)
-    // We'll remap them for better visualization
     
     // Apply logarithmic mapping for better depth visualization
     float visualizedDepth = 1.0 - depthValue; // Invert so closer = brighter

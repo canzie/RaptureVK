@@ -521,9 +521,6 @@ void ForwardRenderer::recordCommandBuffer(
       continue;
     }
 
-    if (!materialComp.material->isReady()) {
-      continue;
-    }
 
     auto mesh = meshComp.mesh;
 
@@ -567,17 +564,8 @@ void ForwardRenderer::recordCommandBuffer(
     vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1,
                            vertexBuffers, offsets);
 
-    // Bind descriptor sets (only view/proj and material
-    // now)materialComp.material->getDescriptorSet()
-    VkDescriptorSet descriptorSets[] = {
-        m_descriptorSets[m_currentFrame],
-        materialComp.material->getDescriptorSet()};
-    uint32_t descriptorSetCount =
-        sizeof(descriptorSets) / sizeof(descriptorSets[0]);
-    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(),
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            m_graphicsPipeline->getPipelineLayoutVk(), 0,
-                            descriptorSetCount, descriptorSets, 0, nullptr);
+
+    // TODO: Bind descriptor sets
 
     // Bind index buffer
     vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(),

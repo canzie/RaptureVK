@@ -1,7 +1,7 @@
 #include "IndexBuffer.h"
 #include "Logging/Log.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
-
+#include "Buffers/Descriptors/DescriptorManager.h"
 #include "Utils/GLTypes.h"
 
 namespace Rapture {

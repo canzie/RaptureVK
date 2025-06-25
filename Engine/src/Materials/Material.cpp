@@ -13,8 +13,6 @@ namespace Rapture {
 
 bool MaterialManager::s_initialized = false;
 
-std::unique_ptr<DescriptorSubAllocationBase<Buffer>> BaseMaterial::s_bindlessUniformBuffers;
-//std::unique_ptr<DescriptorSubAllocationBase<Texture>> BaseMaterial::s_bindlessTextures;
 
 std::unordered_map<std::string, std::shared_ptr<BaseMaterial>>
     MaterialManager::s_materials;
@@ -28,13 +26,6 @@ BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
                                 "descriptor set layout for a material!");
     }
 
-    if (s_bindlessUniformBuffers == nullptr) {
-        s_bindlessUniformBuffers = DescriptorArrayManager::createStorageSubAllocation(DescriptorArrayType::UNIFORM_BUFFER, 1024, "Bindless Material UBOs");
-    }
-
-    //if (s_bindlessTextures == nullptr) {
-    //    s_bindlessTextures = DescriptorArrayManager::createTextureSubAllocation(1024, "Bindless Material Textures");
-    //}
 
 
     m_descriptorSetLayout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];

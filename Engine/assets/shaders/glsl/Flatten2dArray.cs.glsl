@@ -1,19 +1,22 @@
 #version 460
 
+#extension GL_EXT_nonuniform_qualifier : require
+
+
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-// Input texture array
-layout(set=0, binding = 0) uniform sampler2DArray inputTexArray;
+// Bindless texture arrays (set 3)
+layout(set = 3, binding = 0) uniform sampler2DArray gTextures[];
 
-// Output flattened texture
-layout(set=0, binding = 1, rgba32f) uniform image2D outputTex;
+layout(set = 3, binding = 8, rgba32f) uniform restrict image2D outputTex;
 
-// Push constants for dimensions
+// Push constants for dimensions and texture indices
 layout (push_constant) uniform PushConstants {
-    int layerCount;      // Number of layers in the texture array
-    int layerWidth;      // Width of each layer
-    int layerHeight;     // Height of each layer
-    int tilesPerRow;     // Number of tiles to arrange horizontally
+    uint inputTextureIndex;  // Index into bindless texture array
+    int layerCount;          // Number of layers in the texture array
+    int layerWidth;          // Width of each layer
+    int layerHeight;         // Height of each layer
+    int tilesPerRow;         // Number of tiles to arrange horizontally
 };
 
 void main() {
@@ -35,8 +38,11 @@ void main() {
     localCoord.x = pixelCoord.x % layerWidth;
     localCoord.y = pixelCoord.y % layerHeight;
     
-    // Sample from the texture array
-    vec3 sampledColor = texelFetch(inputTexArray, ivec3(localCoord, layerIndex), 0).xyz;
+
+    
+    // Note: We're treating the input as a 2D texture array but accessing via bindless
+    // The input texture index should point to the flattened representation
+    vec3 sampledColor = texture(gTextures[inputTextureIndex], vec3(localCoord, layerIndex)).xyz;
     
     // Write to the output texture
     imageStore(outputTex, pixelCoord, vec4(sampledColor, 1.0));

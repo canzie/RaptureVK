@@ -31,8 +31,6 @@ class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
         std::string getName() const { return m_name; }
         VkDescriptorSetLayout getDescriptorSetLayout() const { return m_descriptorSetLayout; }
 
-    protected:
-        static std::shared_ptr<DescriptorBindingUniformBuffer> s_bindlessUniformBuffers;
 
 
     private:

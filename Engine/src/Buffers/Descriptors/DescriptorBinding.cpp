@@ -4,6 +4,7 @@
 #include "Textures/Texture.h"
 #include "AccelerationStructures/TLAS.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
+#include "Buffers/Buffers.h"
 
 #include "WindowContext/Application.h"
 #include "Logging/Log.h"
@@ -25,7 +26,15 @@ DescriptorBinding<T>::DescriptorBinding(DescriptorSet *set, uint32_t binding, Vk
     fillEmpty();
 }
 
-
+template <typename T>
+DescriptorBinding<T>::~DescriptorBinding() {
+    for (uint32_t i = 0; i < m_size; ++i) {
+        if (m_isAllocated[i]) {
+            free(i);
+        }
+    }
+    m_isAllocated.clear();
+}
 
 template<typename T>
 void DescriptorBinding<T>::fillEmpty() {
@@ -63,6 +72,8 @@ uint32_t DescriptorBindingUniformBuffer::add(std::shared_ptr<UniformBuffer> reso
         m_isAllocated[index] = true;
     }
 
+    VkDescriptorBufferInfo bufferInfo = resource->getDescriptorBufferInfo();
+    
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -70,7 +81,7 @@ uint32_t DescriptorBindingUniformBuffer::add(std::shared_ptr<UniformBuffer> reso
     descriptorWrite.dstArrayElement = index;
     descriptorWrite.descriptorType = m_type;
     descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pBufferInfo = &(resource->getDescriptorBufferInfo());
+    descriptorWrite.pBufferInfo = &bufferInfo;
 
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
@@ -83,7 +94,7 @@ uint32_t DescriptorBindingUniformBuffer::add(std::shared_ptr<UniformBuffer> reso
 }
 
 DescriptorBindingTexture::DescriptorBindingTexture(DescriptorSet *set, uint32_t binding, TextureViewType viewType, bool isStorageImage, uint32_t size)
-    : DescriptorBinding<Texture>(set, binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, size), m_viewType(viewType), m_isStorageImage(isStorageImage) { }
+    : DescriptorBinding<Texture>(set, binding, isStorageImage ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, size), m_viewType(viewType), m_isStorageImage(isStorageImage) { }
 
 
 uint32_t DescriptorBindingTexture::add(std::shared_ptr<Texture> resource)
@@ -103,6 +114,13 @@ uint32_t DescriptorBindingTexture::add(std::shared_ptr<Texture> resource)
         m_isAllocated[index] = true;
     }
 
+    VkDescriptorImageInfo imageInfo;
+    if (m_isStorageImage) {
+        imageInfo = resource->getStorageImageDescriptorInfo();
+    } else {
+        imageInfo = resource->getDescriptorImageInfo(m_viewType);
+    }
+
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -110,12 +128,7 @@ uint32_t DescriptorBindingTexture::add(std::shared_ptr<Texture> resource)
     descriptorWrite.dstArrayElement = index;
     descriptorWrite.descriptorType = m_type;
     descriptorWrite.descriptorCount = 1;
-    
-    if (m_isStorageImage) {
-        descriptorWrite.pImageInfo = &(resource->getStorageImageDescriptorInfo());
-    } else {
-        descriptorWrite.pImageInfo = &(resource->getDescriptorImageInfo(m_viewType));
-    }
+    descriptorWrite.pImageInfo = &imageInfo;
 
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
@@ -168,7 +181,10 @@ uint32_t DescriptorBindingTLAS::add(std::shared_ptr<TLAS> resource)
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+
     return index;
+
+
 }
 
 // Template free method implementation
@@ -212,6 +228,8 @@ void DescriptorBindingUniformBuffer::update(std::shared_ptr<UniformBuffer> resou
         return;
     }
     
+    VkDescriptorBufferInfo bufferInfo = resource->getDescriptorBufferInfo();
+    
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -219,7 +237,7 @@ void DescriptorBindingUniformBuffer::update(std::shared_ptr<UniformBuffer> resou
     descriptorWrite.dstArrayElement = index;
     descriptorWrite.descriptorType = m_type;
     descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pBufferInfo = &(resource->getDescriptorBufferInfo());
+    descriptorWrite.pBufferInfo = &bufferInfo;
 
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
@@ -248,6 +266,13 @@ void DescriptorBindingTexture::update(std::shared_ptr<Texture> resource, uint32_
         return;
     }
     
+    VkDescriptorImageInfo imageInfo;
+    if (m_isStorageImage) {
+        imageInfo = resource->getStorageImageDescriptorInfo();
+    } else {
+        imageInfo = resource->getDescriptorImageInfo(m_viewType);
+    }
+    
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -255,12 +280,7 @@ void DescriptorBindingTexture::update(std::shared_ptr<Texture> resource, uint32_
     descriptorWrite.dstArrayElement = index;
     descriptorWrite.descriptorType = m_type;
     descriptorWrite.descriptorCount = 1;
-    
-    if (m_isStorageImage) {
-        descriptorWrite.pImageInfo = &(resource->getStorageImageDescriptorInfo());
-    } else {
-        descriptorWrite.pImageInfo = &(resource->getDescriptorImageInfo(m_viewType));
-    }
+    descriptorWrite.pImageInfo = &imageInfo;
 
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
@@ -333,6 +353,8 @@ uint32_t DescriptorBindingSSBO::add(std::shared_ptr<Buffer> resource)
         m_isAllocated[index] = true;
     }
 
+    VkDescriptorBufferInfo bufferInfo = resource->getDescriptorBufferInfo();
+    
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -340,7 +362,7 @@ uint32_t DescriptorBindingSSBO::add(std::shared_ptr<Buffer> resource)
     descriptorWrite.dstArrayElement = index;
     descriptorWrite.descriptorType = m_type;
     descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pBufferInfo = &(resource->getDescriptorBufferInfo());
+    descriptorWrite.pBufferInfo = &bufferInfo;
 
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
@@ -372,6 +394,8 @@ void DescriptorBindingSSBO::update(std::shared_ptr<Buffer> resource, uint32_t in
         return;
     }
     
+    VkDescriptorBufferInfo bufferInfo = resource->getDescriptorBufferInfo();
+    
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -379,12 +403,18 @@ void DescriptorBindingSSBO::update(std::shared_ptr<Buffer> resource, uint32_t in
     descriptorWrite.dstArrayElement = index;
     descriptorWrite.descriptorType = m_type;
     descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pBufferInfo = &(resource->getDescriptorBufferInfo());
+    descriptorWrite.pBufferInfo = &bufferInfo;
 
     auto& app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
 }
+
+// Explicit template instantiations for the template class DescriptorBinding
+template class DescriptorBinding<UniformBuffer>;
+template class DescriptorBinding<Texture>;
+template class DescriptorBinding<TLAS>;
+template class DescriptorBinding<Buffer>;
 
 }

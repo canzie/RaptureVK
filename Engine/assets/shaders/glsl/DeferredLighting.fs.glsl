@@ -26,18 +26,10 @@ layout(location = 0) in vec2 fragTexCoord;
 #define CASCADE_BLEND_WIDTH_PERCENT 0.15 // 10% blend width
 
 
-layout(set = 0, binding = 0) uniform sampler2D gPositionDepth;
-layout(set = 0, binding = 1) uniform sampler2D gNormal;
-layout(set = 0, binding = 2) uniform sampler2D gAlbedoSpec;
-layout(set = 0, binding = 3) uniform sampler2D gMetallicRoughnessAO;
-
-// DDGI textures
-layout(set = 2, binding = 0) uniform sampler2DArray probeIrradianceAtlas;  // Irradiance
-layout(set = 2, binding = 1) uniform sampler2DArray probeDistanceAtlas;    // Distance, Distance^2
-
-
-layout(set = 3, binding = 0) uniform sampler2DShadow gBindlessTextures[];
-layout(set = 3, binding = 0) uniform sampler2DArrayShadow gBindlessShadowArray[];
+layout(set = 3, binding = 0) uniform sampler2D gTextures[];
+layout(set = 3, binding = 0) uniform sampler2DShadow gShadowTextures[];
+layout(set = 3, binding = 0) uniform sampler2DArrayShadow gShadowArrays[];
+layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
 
 #include "ProbeCommon.glsl"
 #include "IrradianceCommon.glsl"
@@ -48,9 +40,8 @@ struct LightData {
     vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)
     vec4 direction;     // w = range
     vec4 color;         // w = intensity
-    vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = unused, w = unused
+    vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = entity id, w = unused
 };
-
 
 
 struct ShadowBufferData {
@@ -62,27 +53,37 @@ struct ShadowBufferData {
     vec4 cascadeSplitsViewSpace[MAX_CASCADES]; // Contains view-space Z split depths in .x component
 };
 
-layout(std140, set = 0, binding = 4) uniform LightUniformBufferObject {
-    uint numLights;
-    LightData lights[MAX_LIGHTS];
-} u_lights;
+layout(std140, set = 0, binding = 1) uniform LightDataBuffer {
+    LightData lightData;
+} u_lightData[];
 
 
-layout(std140, set = 0, binding = 5) uniform ShadowDataLayout {
-    uint shadowCount;
-    ShadowBufferData shadowData[MAX_LIGHTS];
-} u_shadowData;
+layout(std140, set = 0, binding = 4) uniform ShadowDataBuffer {
+    ShadowBufferData shadowData;
+} u_shadowData[];
 
 
-layout(std140, set = 0, binding = 6) uniform ProbeInfo {
+layout(std140, set = 0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_DDGI_Volume;
 };
 
 
-// Push constant for per-object data
 layout(push_constant) uniform PushConstants {
-    vec3 camPos;
-} pushConstants;
+    vec3 cameraPos;
+    uint lightCount;
+    uint shadowCount;
+    
+    uint GBufferAlbedoHandle;
+    uint GBufferNormalHandle;
+    uint GBufferPositionHandle;
+    uint GBufferMaterialHandle;
+    uint GBufferDepthHandle;
+
+    uint probeVolumeHandle;
+    uint probeIrradianceHandle;
+    uint probeVisibilityHandle;
+} pc;
+
 
 // Simple Fresnel approximation
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
@@ -242,7 +243,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
     if (shadowInfo.cascadeCount > 1) {
 
         // Use texture array for cascaded shadow mapping
-        texelSize = 1.0 / vec2(textureSize(gBindlessShadowArray[shadowInfo.textureHandle], 0));
+        texelSize = 1.0 / vec2(textureSize(gShadowArrays[shadowInfo.textureHandle], 0));
         
         // Apply bias to avoid shadow acne - adjust based on surface angle and cascade level
         float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
@@ -272,7 +273,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         for(int x = -kernelRadius; x <= kernelRadius; ++x) {
             for(int y = -kernelRadius; y <= kernelRadius; ++y) {        
                 // Use vec4 for sampler2DArrayShadow: vec4(u, v, layer, comparisonValue)
-                shadowFactor += texture(gBindlessShadowArray[shadowInfo.textureHandle], vec4(
+                shadowFactor += texture(gShadowArrays[shadowInfo.textureHandle], vec4(
                     projCoords.xy + vec2(x, y) * texelSize,
                     float(cascadeIndex),
                     comparisonDepth
@@ -282,7 +283,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
 
     } else {
         // Use bindless shadow map
-        texelSize = 1.0 / textureSize(gBindlessTextures[shadowInfo.textureHandle], 0);
+        texelSize = 1.0 / textureSize(gShadowTextures[shadowInfo.textureHandle], 0);
 
         // Apply bias to avoid shadow acne - adjust based on surface angle
         float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
@@ -308,7 +309,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         // Use a 3x3 kernel for PCF
         for(int x = -kernelRadius; x <= kernelRadius; ++x) {
             for(int y = -kernelRadius; y <= kernelRadius; ++y) {
-                shadowFactor += texture(gBindlessTextures[shadowInfo.textureHandle], vec3(
+                shadowFactor += texture(gShadowTextures[shadowInfo.textureHandle], vec3(
                     projCoords.xy + vec2(x, y) * texelSize,
                     comparisonDepth
                 ));
@@ -414,8 +415,8 @@ vec3 getIrradiance(vec3 worldPos, vec3 normal, ProbeVolume volume, vec3 cameraDi
         worldPos,
         normal,
         surfaceBias,
-        probeIrradianceAtlas,
-        probeDistanceAtlas,
+        gTextureArrays[pc.probeIrradianceHandle],
+        gTextureArrays[pc.probeVisibilityHandle],
         volume);
 
     return irradiance;
@@ -425,11 +426,11 @@ void main() {
 
 
     // Sample from GBuffer textures
-    vec4 positionDepth = texture(gPositionDepth, fragTexCoord);
+    vec4 positionDepth = texture(gTextures[pc.GBufferPositionHandle], fragTexCoord);
     vec3 fragPos = positionDepth.xyz;
-    vec3 N = texture(gNormal, fragTexCoord).rgb;
-    vec4 albedoSpec = texture(gAlbedoSpec, fragTexCoord);
-    vec4 metallicRoughnessAO = texture(gMetallicRoughnessAO, fragTexCoord);
+    vec3 N = texture(gTextures[pc.GBufferNormalHandle], fragTexCoord).rgb;
+    vec4 albedoSpec = texture(gTextures[pc.GBufferAlbedoHandle], fragTexCoord);
+    vec4 metallicRoughnessAO = texture(gTextures[pc.GBufferMaterialHandle], fragTexCoord);
     
     N = normalize(N);
     
@@ -439,14 +440,14 @@ void main() {
     float roughness = metallicRoughnessAO.g;
     float ao = metallicRoughnessAO.b;
     
-    vec3 V = normalize(pushConstants.camPos - fragPos);
+    vec3 V = normalize(pc.cameraPos - fragPos);
     
     vec3 Lo = vec3(0.0);
     int debugCascadeIndex = -1; // Store the cascade index for debugging
 
     // Process all active lights
-    for(uint i = 0; i < u_lights.numLights; i++) {
-        LightData light = u_lights.lights[i];
+    for(uint i = 0; i < pc.lightCount; i++) {
+        LightData light = u_lightData[i].lightData;
         vec3 lightPos = light.position.xyz;
         vec3 lightDirWorld;
         float attenuation = 1.0;
@@ -508,8 +509,8 @@ void main() {
 
         float shadowFactor = 1.0;
         int currentCascadeIndex = -1; 
-        for (uint j = 0u; j < u_shadowData.shadowCount; j++) {
-           ShadowBufferData shadowInfo = u_shadowData.shadowData[j];
+        for (uint j = 0u; j < pc.shadowCount; j++) {
+           ShadowBufferData shadowInfo = u_shadowData[j].shadowData;
             if (shadowInfo.lightIndex == light.spotAngles.z && shadowInfo.type >= 0) {
                
                shadowFactor = calculateShadow(fragPos, positionDepth.a, N, lightDirWorld, shadowInfo, currentCascadeIndex);

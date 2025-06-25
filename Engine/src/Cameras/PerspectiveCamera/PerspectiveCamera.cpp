@@ -8,7 +8,7 @@ namespace Rapture
 {
 	PerspectiveCamera::PerspectiveCamera(float fov, float aspect_ratio, float near_plane, float far_plane)
 	{
-		m_viewMatrix = glm::mat4(0.0f);
+		m_viewMatrix = glm::mat4(1.0f);
 		updateProjectionMatrix(fov, aspect_ratio, near_plane, far_plane);
 	}
 

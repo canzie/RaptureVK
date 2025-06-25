@@ -14,6 +14,8 @@
 
 #include "Scenes/Scene.h"
 
+#include "Components/Systems/ObjectDataBuffers/ShadowDataBuffer.h"
+
 #include <memory>
 #include <glm/glm.hpp>
 
@@ -26,13 +28,11 @@ struct TransformComponent;
 class ShadowMap {
 public:
     ShadowMap(float width, float height);
-
     ~ShadowMap();
 
     void createPipeline();
     void createShadowTexture();
     void createUniformBuffers();
-    void createDescriptorSets();
     
     void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, 
                             std::shared_ptr<Scene> activeScene, 
@@ -42,11 +42,12 @@ public:
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTexture; }
 
-    uint32_t getTextureHandle() const { return m_shadowMapIndex; }
+    uint32_t getTextureHandle() { return m_shadowTexture->getBindlessIndex(); }
 
     glm::mat4 getLightViewProjection() const { return m_lightViewProjection; }
 
-    static std::shared_ptr<DescriptorBindingTexture> getBindlessShadowMaps() { return s_bindlessShadowMaps; }
+    std::shared_ptr<ShadowDataBuffer> getShadowDataBuffer() { return m_shadowDataBuffer; }
+
 
 private:
     void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
@@ -62,24 +63,21 @@ private:
     glm::mat4 m_lightViewProjection;
 
     std::shared_ptr<Texture> m_shadowTexture;
-    std::shared_ptr<GraphicsPipeline> m_pipeline;
-    std::vector<std::shared_ptr<UniformBuffer>> m_shadowUBOs;
-    std::vector<uint32_t> m_shadowMatrixsDescriptorIndices;
+    std::shared_ptr<ShadowDataBuffer> m_shadowDataBuffer;
     
-    Frustum m_frustum;
-
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};
     
+    Frustum m_frustum;
+
+
     std::weak_ptr<Shader> m_shader;
     AssetHandle m_handle;
 
+    std::shared_ptr<GraphicsPipeline> m_pipeline;
     VmaAllocator m_allocator;
 
-    uint32_t m_shadowMapIndex = 0;
 
-    static std::shared_ptr<DescriptorBindingTexture> s_bindlessShadowMaps;
-    
     };
 
 }

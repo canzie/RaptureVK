@@ -17,21 +17,28 @@
 
 
 
-layout (set=0, binding = 0) uniform sampler2DArray RayData;
+// Bindless texture arrays (set 3, binding 0)
+layout (set=3, binding = 0) uniform sampler2DArray RayData[];
 
+// Storage image bindings for writing current probe data
 #ifdef DDGI_BLEND_RADIANCE
-    layout (set=0, binding = 1, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;
-    layout (set=0, binding = 2) uniform sampler2DArray prevProbeIrradianceAtlas;
+    layout (set=3, binding = 4, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;        // Primary irradiance storage
+    layout (set=3, binding = 5, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlasAlt;     // Alternate irradiance storage
 #else
-    layout (set=0, binding = 1, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
-    layout (set=0, binding = 2) uniform sampler2DArray prevProbeDistanceAtlas;
+    layout (set=3, binding = 6, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;        // Primary distance storage
+    layout (set=3, binding = 7, rg16f) uniform restrict image2DArray ProbeDistanceAtlasAlt;     // Alternate distance storage
 #endif
 
 // Skybox Cubemap
 
 precision highp float;
 
-
+// Push constant - matching C++ DynamicDiffuseGI::DDGIBlendPushConstants
+layout(push_constant) uniform PushConstants {
+    uint prevTextureIndex; // will be irradiance or distance based on the blend type
+    uint rayDataIndex;
+    uint writeToAlternateTexture; // 0 = write to primary, 1 = write to alternate
+} pc;
 
 #include "ProbeCommon.glsl"
 
@@ -40,7 +47,7 @@ precision highp float;
 
 // Input Uniforms / Buffers
 // Contains global information about the probe grid
-layout(std140, set=1, binding = 0) uniform ProbeInfo {
+layout(std140, set=0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
 
@@ -101,11 +108,21 @@ void UpdateBorderTexelsGLSL(
 
         vec4 valueToCopy;
         #if defined(DDGI_BLEND_RADIANCE)
-            valueToCopy = imageLoad(ProbeIrradianceAtlas, copyFromAtlasCoords);
-            imageStore(ProbeIrradianceAtlas, ivec3(globalInvocationID.xyz), valueToCopy);
+            if (pc.writeToAlternateTexture == 0) {
+                valueToCopy = imageLoad(ProbeIrradianceAtlas, copyFromAtlasCoords);
+                imageStore(ProbeIrradianceAtlas, ivec3(globalInvocationID.xyz), valueToCopy);
+            } else {
+                valueToCopy = imageLoad(ProbeIrradianceAtlasAlt, copyFromAtlasCoords);
+                imageStore(ProbeIrradianceAtlasAlt, ivec3(globalInvocationID.xyz), valueToCopy);
+            }
         #elif defined(DDGI_BLEND_DISTANCE)
-            valueToCopy = imageLoad(ProbeDistanceAtlas, copyFromAtlasCoords);
-            imageStore(ProbeDistanceAtlas, ivec3(globalInvocationID.xyz), valueToCopy);
+            if (pc.writeToAlternateTexture == 0) {
+                valueToCopy = imageLoad(ProbeDistanceAtlas, copyFromAtlasCoords);
+                imageStore(ProbeDistanceAtlas, ivec3(globalInvocationID.xyz), valueToCopy);
+            } else {
+                valueToCopy = imageLoad(ProbeDistanceAtlasAlt, copyFromAtlasCoords);
+                imageStore(ProbeDistanceAtlasAlt, ivec3(globalInvocationID.xyz), valueToCopy);
+            }
         #endif
     }
 }
@@ -166,7 +183,7 @@ void main() {
 
             // Load the ray traced radiance and hit distance
             // Use texelFetch for integer coordinates, not texture()
-            vec4 probeRayData = texelFetch(RayData, rayDataTexCoords, 0);
+            vec4 probeRayData = texelFetch(RayData[pc.rayDataIndex], rayDataTexCoords, 0);
 
             vec3 probeRayRadiance = probeRayData.rgb;
             float probeRayDistance = probeRayData.a;
@@ -181,7 +198,11 @@ void main() {
 
                 // Early out: only blend ray radiance into the probe if the backface threshold hasn't been exceeded
                 if (backfaces >= maxBackfaces) {
-                    imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(0.0, 0.0, 0.0, 0.0)); // Store BLACK
+                    if (pc.writeToAlternateTexture == 0) {
+                        imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(0.0, 0.0, 0.0, 0.0)); // Store BLACK
+                    } else {
+                        imageStore(ProbeIrradianceAtlasAlt, ivec3(gl_GlobalInvocationID.xyz), vec4(0.0, 0.0, 0.0, 0.0)); // Store BLACK
+                    }
                     return;
                 }
                 continue;
@@ -221,13 +242,12 @@ void main() {
         result.a = 1.0;
 
         #ifdef DDGI_BLEND_RADIANCE
-            // Use texelFetch for integer coordinates, not texture()
-            vec3 probeIrradianceMean = texelFetch(prevProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), 0).rgb;
+            // Use bindless texture array to access previous irradiance texture
+            vec3 probeIrradianceMean = texelFetch(RayData[pc.prevTextureIndex], ivec3(gl_GlobalInvocationID.xyz), 0).rgb;
         #endif
         #ifdef DDGI_BLEND_DISTANCE
-            // For distance blending, load history from the previous distance atlas
-            // Use texelFetch for integer coordinates, not texture()
-            vec2 prevDistanceData = texelFetch(prevProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz), 0).rg;
+            // Use bindless texture array to access previous distance texture
+            vec2 prevDistanceData = texelFetch(RayData[pc.prevTextureIndex], ivec3(gl_GlobalInvocationID.xyz), 0).rg;
             // Store it in probeIrradianceMean for now to minimize changes to subsequent logic that uses .rg
             // However, it's clearer to use a separate variable if more changes are made later.
             vec3 probeIrradianceMean = vec3(prevDistanceData.r, prevDistanceData.g, 0.0);
@@ -293,7 +313,11 @@ void main() {
     #endif
 
     #ifdef DDGI_BLEND_DISTANCE
-        imageStore(ProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
+        if (pc.writeToAlternateTexture == 0) {
+            imageStore(ProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
+        } else {
+            imageStore(ProbeDistanceAtlasAlt, ivec3(gl_GlobalInvocationID.xyz), result);
+        }
     #endif
     #ifdef DDGI_BLEND_RADIANCE
         // Clamp result to prevent NaN and extreme values
@@ -302,7 +326,11 @@ void main() {
         // Ensure alpha is valid
         result.a = clamp(result.a, 0.0, 1.0);
         
-        imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
+        if (pc.writeToAlternateTexture == 0) {
+            imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
+        } else {
+            imageStore(ProbeIrradianceAtlasAlt, ivec3(gl_GlobalInvocationID.xyz), result);
+        }
     #endif
 
 
@@ -324,7 +352,19 @@ void main() {
     UpdateBorderTexelsGLSL(ivec3(gl_LocalInvocationID), ivec3(gl_WorkGroupID), ivec3(gl_GlobalInvocationID));
 
 #else
-    imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0, 0.0, 1.0, 1.0));
+    #ifdef DDGI_BLEND_RADIANCE
+        if (pc.writeToAlternateTexture == 0) {
+            imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0, 0.0, 1.0, 1.0));
+        } else {
+            imageStore(ProbeIrradianceAtlasAlt, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0, 0.0, 1.0, 1.0));
+        }
+    #else
+        if (pc.writeToAlternateTexture == 0) {
+            imageStore(ProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0, 0.0, 1.0, 1.0));
+        } else {
+            imageStore(ProbeDistanceAtlasAlt, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0, 0.0, 1.0, 1.0));
+        }
+    #endif
 
 #endif
 

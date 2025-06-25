@@ -78,7 +78,7 @@ class DescriptorSet {
       one for graphics)
     - need a config struct to properly define a set and its binding types
 
-enum class with all of the binding types and their destined set (use some bit mask for this)
+enum class with all of the binding types and their destined[] set (use some bit mask for this)
 }
 
 
@@ -103,15 +103,9 @@ enum class with all of the binding types and their destined set (use some bit ma
 CURRENT PHASE IN REFACTOR
  - new descriptor system is done-ish
  - need to update the
-    1) ddgi
-    2) find a way to send light/shadow data to the lighting pass shader
-    3) shader needs to get the premade layouts from the descriptor manager
-    4) add option for multiple copies/frame in flight for the ObjectDataBuffers
-    5) update material system to use bindless textures in its ubo
-    6) fill in the remaining locations in the manager
     7) update all shaders 
     8) see if the current camera component(or any other one) is correctly updating when the screen resizes
-    9) implement a weakshader caching system in the bindings -> resize support (after the base works)
+  [ 9) implement a weakptr caching system in the bindings -> resize support (after the base works) ]
 
 
 RENDERER/MATERIAL OVERHAUL 

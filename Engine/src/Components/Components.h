@@ -136,7 +136,7 @@ namespace Rapture {
         {
             camera = PerspectiveCamera(fovy, ar, near_, far_);
             frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
-            cameraDataBuffer = std::make_shared<CameraDataBuffer>();
+            cameraDataBuffer = std::make_shared<CameraDataBuffer>(3);
         }
 
         void updateProjectionMatrix(float fovy, float ar, float near_, float far_)
@@ -215,13 +215,13 @@ namespace Rapture {
 
         MeshComponent() {
             mesh = std::make_shared<Mesh>();
-            meshDataBuffer = std::make_shared<MeshDataBuffer>();
+            meshDataBuffer = std::make_shared<MeshDataBuffer>(3);
         };
 
         MeshComponent(std::shared_ptr<Mesh> mesh) {
             this->mesh = mesh;
             isLoading = false;
-            meshDataBuffer = std::make_shared<MeshDataBuffer>();
+            meshDataBuffer = std::make_shared<MeshDataBuffer>(3);
         };
     };
 
@@ -329,22 +329,30 @@ struct LightComponent
 
     public:
     // Constructors
-    LightComponent() = default;
+    LightComponent() { 
+        lightDataBuffer = std::make_shared<LightDataBuffer>(); // 3 frames in flight
+    }
     
     // Constructor for point light
     LightComponent(const glm::vec3& color, float intensity, float range)
-        : type(LightType::Point), color(color), intensity(intensity), range(range) {}
+        : type(LightType::Point), color(color), intensity(intensity), range(range) {
+        lightDataBuffer = std::make_shared<LightDataBuffer>(); // 3 frames in flight
+    }
     
     // Constructor for directional light
     LightComponent(const glm::vec3& color, float intensity)
-        : type(LightType::Directional), color(color), intensity(intensity) {}
+        : type(LightType::Directional), color(color), intensity(intensity) {
+        lightDataBuffer = std::make_shared<LightDataBuffer>(); // 3 frames in flight
+    }
     
     // Constructor for spot light
     LightComponent(const glm::vec3& color, float intensity, float range, 
                     float innerAngleDegrees, float outerAngleDegrees)
         : type(LightType::Spot), color(color), intensity(intensity), range(range),
             innerConeAngle(glm::radians(innerAngleDegrees)), 
-            outerConeAngle(glm::radians(outerAngleDegrees)) {}
+            outerConeAngle(glm::radians(outerAngleDegrees)) {
+        lightDataBuffer = std::make_shared<LightDataBuffer>(); // 3 frames in flight
+    }
 
 
 
@@ -415,23 +423,19 @@ struct BLASComponent {
 
 struct ShadowComponent {
     std::unique_ptr<ShadowMap> shadowMap;
-    std::shared_ptr<ShadowDataBuffer> shadowDataBuffer;
     bool isActive = true;
     
     ShadowComponent(float width, float height) {
         shadowMap = std::make_unique<ShadowMap>(width, height);
-        shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
     }
 };
 
 struct CascadedShadowComponent {
     std::unique_ptr<CascadedShadowMap> cascadedShadowMap;
-    std::shared_ptr<ShadowDataBuffer> shadowDataBuffer;
     bool isActive = true;
     
     CascadedShadowComponent(float width, float height, uint8_t numCascades, float lambda) {
         cascadedShadowMap = std::make_unique<CascadedShadowMap>(width, height, numCascades, lambda);
-        shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
     }
 };
 

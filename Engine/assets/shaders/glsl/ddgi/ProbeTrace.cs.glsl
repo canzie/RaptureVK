@@ -10,23 +10,33 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-// Ray data output texture
-layout (set=0, binding = 0, rgba32f) uniform restrict writeonly image2DArray RayData;
+// Ray data output texture (fixed binding in set 3)
+layout(set = 3, binding = 3, rgba32f) uniform restrict writeonly image2DArray RayData;
 
-// Previous probe data
-layout (set=2, binding = 0) uniform sampler2DArray prevProbeIrradianceAtlas;
-layout (set=2, binding = 1) uniform sampler2DArray prevProbeDistanceAtlas;
+// Previous probe data (bindless textures in set 3)
+layout(set = 3, binding = 0) uniform sampler2D gTextures[];
+layout(set = 3, binding = 0) uniform samplerCube gCubemaps[];
+layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
 
-// Skybox Cubemap
-layout (set=0, binding = 3) uniform samplerCube u_skyboxCubemap;
-
-// TLAS binding
-layout (set=0, binding = 4) uniform accelerationStructureEXT topLevelAS;
+// TLAS binding (set 0)
+layout(set = 3, binding = 2) uniform accelerationStructureEXT topLevelAS[];
 
 // includes index and vertex buffers, the meshinfo contains the offsets into these buffers
 layout(set = 3, binding = 1) readonly buffer gBindlessBuffers {
     uint data[];
 } gBuffers[];
+
+// Push constants (updated structure)
+layout(push_constant) uniform PushConstants {
+    uint skyboxTextureIndex;     // Index into bindless texture array
+    uint sunLightDataIndex;
+
+    uint prevRadianceIndex;      // Previous radiance texture bindless index
+    uint prevVisibilityIndex;    // Previous visibility texture bindless index
+
+
+    uint tlasIndex;              // TLAS index (if using bindless TLAS)
+};
 
 precision highp float;
 
@@ -54,28 +64,27 @@ struct MeshInfo {
 };
 
 // Scene info buffer
-layout(std430, set=0, binding = 5) readonly buffer SceneInfo {
+layout(std430, set=3, binding = 9) readonly buffer SceneInfo {
     MeshInfo MeshInfos[];
 } u_sceneInfo;
 
 // Global descriptor arrays for bindless textures (set 3)
 #ifndef DESCRIPTOR_ARRAYS_DEFINED
 #define DESCRIPTOR_ARRAYS_DEFINED
-layout(set = 3, binding = 0) uniform sampler2D gTextures[];
 #endif
 
 #include "ProbeCommon.glsl"
 #include "IrradianceCommon.glsl"
 
 // Input Uniforms / Buffers
-layout(std140, set=1, binding = 0) uniform ProbeInfo {
+layout(std140, set=0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
 
 // Sun shadow uniforms
-layout(std140, set=1, binding = 1) uniform SunPropertiesUBO {
-    SunProperties u_SunProperties;
-};
+layout(std140, set=0, binding = 1) uniform SunPropertiesUBO { // use the light thing here instead
+    SunProperties sunProperties;
+}u_sunProperties[];
 
 
 
@@ -230,7 +239,7 @@ SurfaceData getSurfaceDataForHit(uint primitiveID, vec2 barycentrics, MeshInfo m
 
 vec3 sampleAlbedo(MeshInfo meshInfo, vec2 uv) {
     if (meshInfo.AlbedoTextureIndex == 0) {
-        return vec3(1.0, 0.0, 1.0); // Default color
+        return vec3(0.0, 1.0, 0.0); // Default color
     }
     return texture(gTextures[meshInfo.AlbedoTextureIndex], uv).rgb;
 }
@@ -286,7 +295,7 @@ void main() {
     uvec3 outputCoords = DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume);
 
 
-    rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, 
+    rayQueryInitializeEXT(rayQuery, topLevelAS[tlasIndex], gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, 
         probeWorldPosition, 0.0, probeRayDirection, u_volume.probeMaxRayDistance);
 
     rayQueryProceedEXT(rayQuery);
@@ -332,15 +341,15 @@ void main() {
             // Use the ray's own direction for surface bias, not the main camera direction
             vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, probeRayDirection, u_volume);
 
-            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_SunProperties);
+            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_sunProperties[sunLightDataIndex].sunProperties);
 
             // Get irradiance from the DDGIVolume
             irradiance = DDGIGetVolumeIrradiance(
                 hitPosition,
                 worldShadingNormal,
                 surfaceBias,
-                prevProbeIrradianceAtlas,
-                prevProbeDistanceAtlas,
+                gTextureArrays[prevRadianceIndex],
+                gTextureArrays[prevVisibilityIndex],
                 u_volume);
 
             // Perfectly diffuse reflectors don't exist in the real world.
@@ -357,7 +366,7 @@ void main() {
         }
     } else {
         // Miss - sample skybox and store blue color for visualization
-        vec3 skyboxColor = texture(u_skyboxCubemap, probeRayDirection).rgb;
+        vec3 skyboxColor = texture(gCubemaps[skyboxTextureIndex], probeRayDirection).rgb;
         //skyboxColor *= u_SunProperties.sunIntensity * u_SunProperties.sunColor;
         
         DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor);

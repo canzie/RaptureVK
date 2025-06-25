@@ -234,8 +234,8 @@ std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer(const Buffer
         return nullptr;
     }
     
-    RP_CORE_TRACE("BufferPoolManager: Allocated {} bytes from arena {} at offset {} for type {}", 
-                  request.size, arena->id, allocation->offsetBytes, request.type == BufferType::VERTEX ? "VERTEX" : "INDEX");
+    //RP_CORE_TRACE("BufferPoolManager: Allocated {} bytes from arena {} at offset {} for type {}", 
+    //              request.size, arena->id, allocation->offsetBytes, request.type == BufferType::VERTEX ? "VERTEX" : "INDEX");
     
     return allocation;
 }
@@ -246,7 +246,7 @@ void BufferPoolManager::freeBuffer(std::shared_ptr<BufferAllocation> allocation)
     }
     
     allocation->parentArena->free(*allocation);
-    RP_CORE_TRACE("BufferPoolManager: Freed allocation of {} bytes", allocation->sizeBytes);
+    //RP_CORE_TRACE("BufferPoolManager: Freed allocation of {} bytes", allocation->sizeBytes);
 }
 
 

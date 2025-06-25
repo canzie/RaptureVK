@@ -24,7 +24,6 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
         m_name = name;
     }
 
-    //RP_CORE_INFO("Creating MaterialInstance for {0} with size {1}", m_name, material->getSizeBytes());
 
     if (allocator == nullptr) {
         RP_CORE_ERROR("MaterialInstance::MaterialInstance - allocator is nullptr!");
@@ -33,48 +32,37 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
 
     // Create uniform buffer
     m_uniformBuffer = std::make_shared<UniformBuffer>(material->getSizeBytes(), BufferUsage::DYNAMIC, allocator, nullptr);
-
-    if (m_bindlessUniformBufferIndex == UINT32_MAX && BaseMaterial::s_bindlessUniformBuffers != nullptr) {
-        m_bindlessUniformBufferIndex = BaseMaterial::s_bindlessUniformBuffers->allocate(m_uniformBuffer);
-    } else {
-        RP_CORE_WARN("MaterialInstance::MaterialInstance - bindless uniform buffer is not set!");
-    }
-    
-    m_parameterMap = material->getTemplateParameters();
-
-
-    DescriptorSetBindings bindings;
-    bindings.layout = material->getDescriptorSetLayout();
-    
-
-
-
-    for (auto& [id, param] : m_parameterMap) {
-        if (param.m_info.type == MaterialParameterTypes::COMBINED_IMAGE_SAMPLER) {
-            // Add texture binding with default white texture initially
-            DescriptorSetBinding binding;
-            binding.binding = param.m_info.binding;
-            binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            binding.count = 1;
-            binding.resource = AssetManager::importDefaultAsset<Texture>(AssetType::Texture).first; // Use default white texture
-
-            bindings.bindings.push_back(binding);
-        } else {
-            // Add uniform buffer binding
-            DescriptorSetBinding binding;
-            binding.binding = param.m_info.binding;
-            binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            binding.count = 1;
-            binding.resource = m_uniformBuffer;
-
-            bindings.bindings.push_back(binding);
-
-            m_uniformBuffer->addData(param.asRaw(), param.m_info.size, param.m_info.offset);
+    auto materialSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::MATERIAL_UBO);
+    if (materialSet) {
+        auto binding = materialSet->getUniformBufferBinding(DescriptorSetBindingLocation::MATERIAL_UBO);
+        if (binding) {
+            m_bindlessUniformBufferIndex = binding->add(m_uniformBuffer);
         }
     }
 
-    m_descriptorSet = std::make_shared<DescriptorSet>(bindings);
+    m_parameterMap = material->getTemplateParameters();
+
+    // Get the default white texture for fallback
+    auto [defaultTextureAsset, defaultTextureHandle] = AssetManager::importDefaultAsset<Texture>(AssetType::Texture);
+    uint32_t defaultWhiteTextureIndex = 0; // fallback to index 0 if no default found
     
+    if (defaultTextureAsset) {
+        if (defaultTextureAsset->isReadyForSampling()) {
+            defaultWhiteTextureIndex = defaultTextureAsset->getBindlessIndex();
+        }
+    }
+
+    for (auto& [id, param] : m_parameterMap) {
+        // Initialize texture parameters with default white texture bindless index
+        if (param.m_info.type == MaterialParameterTypes::UINT) {
+            // Check if this parameter is a texture type
+            if (isTextureParameter(id)) {
+                param.setValue<uint32_t>(defaultWhiteTextureIndex);
+            }
+        }
+        
+        m_uniformBuffer->addData(param.asRaw(), param.m_info.size, param.m_info.offset);
+    }
 
 
 
@@ -83,7 +71,14 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
 MaterialInstance::~MaterialInstance() {
 
     if (m_bindlessUniformBufferIndex != UINT32_MAX) {
-        BaseMaterial::s_bindlessUniformBuffers->free(m_bindlessUniformBufferIndex);
+        auto materialSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::MATERIAL_UBO);
+        if (materialSet) {
+            auto binding = materialSet->getUniformBufferBinding(DescriptorSetBindingLocation::MATERIAL_UBO);
+            if (binding) {
+                binding->free(m_bindlessUniformBufferIndex);
+            }
+        }
+
     }
 }
 
@@ -94,100 +89,64 @@ MaterialParameter MaterialInstance::getParameter(ParameterID id) {
 
   return MaterialParameter();
 
-
-
 }
 
-VkDescriptorSet MaterialInstance::getDescriptorSet()
-{
+template<>
+void MaterialInstance::setParameter<std::shared_ptr<Texture>>(ParameterID id, std::shared_ptr<Texture> texture) {
 
-
-    return m_descriptorSet->getDescriptorSet(); 
-}
-
-void MaterialInstance::updateDescriptorSet()
-{
-
-    DescriptorSetBindings bindings;
-    bindings.layout = m_baseMaterial->getDescriptorSetLayout();
-    
-
-    for (auto& [id, param] : m_parameterMap) {
-        if (param.m_info.type == MaterialParameterTypes::COMBINED_IMAGE_SAMPLER) {
-            std::shared_ptr<Texture> texture = nullptr;
-            
-            if (std::holds_alternative<std::shared_ptr<Texture>>(param.m_value)) {
-                texture = std::get<std::shared_ptr<Texture>>(param.m_value);
-                
-            }
-            
-            // Use default white texture if no texture is set
-            if (texture == nullptr) {
-                texture = AssetManager::importDefaultAsset<Texture>(AssetType::Texture).first;
-            }
-            
-            DescriptorSetBinding binding;
-            binding.binding = param.m_info.binding;
-            binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            binding.count = 1;
-            binding.resource = texture;
-
-            bindings.bindings.push_back(binding);
+    if (m_parameterMap.find(id) != m_parameterMap.end()) {
+        if (texture && texture->isReadyForSampling()) {
+            m_parameterMap[id].setValue<uint32_t>(texture->getBindlessIndex());
+            updateUniformBuffer(id);
+            m_flagsDirty = true;
         } else {
-            DescriptorSetBinding binding;
-            binding.binding = param.m_info.binding;
-            binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            binding.count = 1;
-            binding.resource = m_uniformBuffer;
-
-            bindings.bindings.push_back(binding);
+            std::lock_guard<std::mutex> lock(m_pendingTexturesMutex);
+            m_pendingTextures.push_back({id, texture});
         }
-
-        
+    } else {
+        RP_CORE_WARN("MaterialInstance::setParameter: Parameter ID '{}' not found for this material", parameterIdToString(id));
     }
-
-    m_descriptorSet->updateDescriptorSet(bindings);
 }
 
+void MaterialInstance::updatePendingTextures() {
+    std::lock_guard<std::mutex> lock(m_pendingTexturesMutex);
 
-
-bool MaterialInstance::isReady()
-{
-
-    if (m_isReady) {
-        return true;
+    if (m_pendingTextures.empty()) {
+        return;
     }
 
-    for (auto& [id, param] : m_parameterMap) {
+    m_pendingTextures.erase(std::remove_if(m_pendingTextures.begin(), m_pendingTextures.end(),
+        [this](const PendingTexture& pending) {
+            bool isReadyForSampling = pending.texture && pending.texture->isReadyForSampling();
+            bool isNullTexture = !pending.texture;
 
-        if (param.m_info.type == MaterialParameterTypes::COMBINED_IMAGE_SAMPLER) {
-            std::shared_ptr<Texture> texture = nullptr;
-            
-            if (std::holds_alternative<std::shared_ptr<Texture>>(param.m_value)) {
-                texture = std::get<std::shared_ptr<Texture>>(param.m_value);
+            uint32_t defaultWhiteTextureIndex;
+            // Get the default white texture index instead of hardcoding 0
+            auto [defaultTextureAsset, defaultTextureHandle] = AssetManager::importDefaultAsset<Texture>(AssetType::Texture);
+            if (defaultTextureAsset) {
+                if (defaultTextureAsset->isReadyForSampling()) {
+                    defaultWhiteTextureIndex = defaultTextureAsset->getBindlessIndex();
+                } else {
+                    defaultWhiteTextureIndex = 0; // fallback
+                }
+            }
+
+            if (isReadyForSampling || isNullTexture) {
+                uint32_t bindlessIndex = isNullTexture ? defaultWhiteTextureIndex : pending.texture->getBindlessIndex();
+                
+                m_parameterMap[pending.parameterId].setValue<uint32_t>(bindlessIndex);
+                updateUniformBuffer(pending.parameterId);
+                m_flagsDirty = true;
+                
+                // Return true to remove it from the pending list.
+                return true; 
             }
             
-            // If no texture is assigned, we'll use default texture (which should always be ready)
-            if (texture == nullptr) {
-                texture = AssetManager::importDefaultAsset<Texture>(AssetType::Texture).first;
-            }
-            
-            // Check if the texture (either assigned or default) is ready
-            if (texture && !texture->isReadyForSampling()) {
-                return false;
-            }
-        }
-    }
-
-    updateDescriptorSet();
-
-
-    m_isReady = true;
-    return true;
+            return false; 
+        }), m_pendingTextures.end());
 }
 
-void MaterialInstance::updateUniformBuffer(ParameterID id)
-{
+void MaterialInstance::updateUniformBuffer(ParameterID id) {
     m_uniformBuffer->addData(m_parameterMap[id].asRaw(), m_parameterMap[id].m_info.size, m_parameterMap[id].m_info.offset);
 }
 
@@ -257,11 +216,12 @@ bool MaterialInstance::hasValidTexture(ParameterID id) const
         return false;
     }
 
-    const auto& param = it->second;
+    auto param = it->second;
     
     // Check if it's a texture parameter
-    if (param.m_info.type != MaterialParameterTypes::COMBINED_IMAGE_SAMPLER) {
-        return false;
+    if (param.m_info.type == MaterialParameterTypes::UINT) {
+        uint32_t value = param.asUInt();
+        return value != UINT32_MAX && value != 0;
     }
 
     // Check if it holds a valid (non-null) texture
@@ -271,6 +231,24 @@ bool MaterialInstance::hasValidTexture(ParameterID id) const
     }
 
     return false;
+}
+
+// Helper function to check if a parameter ID represents a texture
+bool MaterialInstance::isTextureParameter(ParameterID id) const {
+    switch (id) {
+        case ParameterID::ALBEDO_MAP:
+        case ParameterID::NORMAL_MAP:
+        case ParameterID::METALLIC_MAP:
+        case ParameterID::ROUGHNESS_MAP:
+        case ParameterID::METALLIC_ROUGHNESS_MAP:
+        case ParameterID::HEIGHT_MAP:
+        case ParameterID::AO_MAP:
+        case ParameterID::EMISSIVE_MAP:
+        case ParameterID::SPECULAR_MAP:
+            return true;
+        default:
+            return false;
+    }
 }
 
 }

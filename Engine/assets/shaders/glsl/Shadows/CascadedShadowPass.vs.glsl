@@ -1,14 +1,18 @@
 #version 450
+
 #extension GL_EXT_multiview : require
+#extension GL_EXT_nonuniform_qualifier : require
+
 
 // Uniform buffer containing light view-projection matrices for all cascades
-layout(set = 0, binding = 0) uniform CascadeMatrices {
+layout(set = 0, binding = 3) uniform CascadeMatrices {
     mat4 lightViewProjection[4];  // Support up to 4 cascades
-} cascades;
+} u_cascades[];
 
 // Push constants for the model matrix
 layout(push_constant) uniform PushConstants {
     mat4 model;
+    uint shadowMatrixIndices;
 } pc;
 
 // Vertex attributes
@@ -20,5 +24,5 @@ void main() {
     
     // Transform vertex position to world space, then to light space for the current cascade
     vec4 worldPosition = pc.model * vec4(inPosition, 1.0);
-    gl_Position = cascades.lightViewProjection[gl_ViewIndex] * worldPosition;
+    gl_Position = u_cascades[pc.shadowMatrixIndices].lightViewProjection[gl_ViewIndex] * worldPosition;
 } 

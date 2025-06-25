@@ -24,9 +24,10 @@ namespace Rapture {
 
 class DescriptorSet;
 class UniformBuffer;
+class Buffer;
 class Texture;
 class TLAS;
-enum class TextureViewType;
+enum class TextureViewType : uint8_t;
 
 
 // TODO Add some sort of checking/verification for making sure that when adding a ubo to an array it is the same type

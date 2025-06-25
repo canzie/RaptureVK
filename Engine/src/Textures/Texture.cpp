@@ -4,7 +4,9 @@
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 
+
 #include "Buffers/Descriptors/DescriptorSet.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
 
 #include "stb_image.h"
 

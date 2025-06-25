@@ -52,7 +52,7 @@ namespace Rapture {
         const std::vector<VkPipelineShaderStageCreateInfo>& getStages() { return m_stages; };
         const VkShaderModule& getSource(ShaderType type);
 
-        const std::vector<VkDescriptorSetLayout>& getDescriptorSetLayouts() { return m_descriptorSetLayouts; };                // Get SPIR-V bytecode for material parameter extraction        const std::vector<char>& getVertexSpirv() const { return m_vertexSpirv; }        const std::vector<char>& getFragmentSpirv() const { return m_fragmentSpirv; }                // Get shader name for debugging        std::string getName() const { return m_name; }
+        const std::vector<VkDescriptorSetLayout>& getDescriptorSetLayouts() { return m_descriptorSetLayouts; }; // Get SPIR-V bytecode for material parameter extraction        const std::vector<char>& getVertexSpirv() const { return m_vertexSpirv; }        const std::vector<char>& getFragmentSpirv() const { return m_fragmentSpirv; }                // Get shader name for debugging        std::string getName() const { return m_name; }
 
         const std::vector<DescriptorInfo>& getMaterialSets() const { return m_materialSets; }
 

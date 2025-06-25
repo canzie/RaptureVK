@@ -2,11 +2,17 @@
 #include "WindowContext/Application.h"
 #include "AssetManager/AssetManager.h"
 #include "Logging/Log.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
 
 namespace Rapture {
 
-SkyboxPass::SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs, std::vector<std::shared_ptr<Texture>> depthTextures)
-    : m_skyboxTexture(skyboxTexture), m_cameraUBOs(cameraUBOs), m_depthTextures(depthTextures) {
+struct PushConstants {
+    uint32_t frameIndex;
+    uint32_t skyboxTextureIndex;
+};
+
+SkyboxPass::SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::shared_ptr<Texture>> depthTextures)
+    : m_skyboxTexture(skyboxTexture), m_depthTextures(depthTextures) {
     
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -25,12 +31,11 @@ SkyboxPass::SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::
     m_shader = shader;
 
     createSkyboxGeometry();
-    createDescriptorSets();
     createPipeline();
 }
 
-SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs, std::vector<std::shared_ptr<Texture>> depthTextures)
-    : m_skyboxTexture(nullptr), m_cameraUBOs(cameraUBOs), m_depthTextures(depthTextures) {
+SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures)
+    : m_skyboxTexture(nullptr), m_depthTextures(depthTextures) {
     
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -53,7 +58,6 @@ SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<UniformBuffer>> cameraUBOs, s
 }
 
 SkyboxPass::~SkyboxPass() {
-    m_descriptorSets.clear();
     m_pipeline.reset();
     m_skyboxVertexBuffer.reset();
     m_skyboxIndexBuffer.reset();
@@ -63,9 +67,6 @@ void SkyboxPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffe
     
     if (!m_skyboxTexture && !m_skyboxTexture->isReadyForSampling()) { // TODO: create a log type to only log once
         //RP_CORE_WARN("SkyboxPass - Skybox texture is not ready for sampling, skipping command buffer.");
-        return;
-    } else if (m_descriptorSets.empty()) {
-        createDescriptorSets();
         return;
     }
 
@@ -93,14 +94,34 @@ void SkyboxPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffe
     vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), m_skyboxIndexBuffer->getBufferVk(), 0, VK_INDEX_TYPE_UINT32);
 
-    VkDescriptorSet descriptorSet = m_descriptorSets[frameInFlightIndex]->getDescriptorSet();
-    vkCmdBindDescriptorSets(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
+    PushConstants pushConstants{};
+    pushConstants.frameIndex = frameInFlightIndex;
+    pushConstants.skyboxTextureIndex = m_skyboxTexture->getBindlessIndex();
+
+    // Get push constant stage flags from shader reflection data
+    VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
+        stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+    }
+
+    vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
         m_pipeline->getPipelineLayoutVk(),
-        0, 1, &descriptorSet,
-        0, nullptr
-    );
+        stageFlags,
+        0,
+        sizeof(PushConstants),
+        &pushConstants);
+
+
+
+    auto cameraSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::CAMERA_UBO);
+    if (cameraSet) {
+        cameraSet->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
+    }
+
+    auto skyboxSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+    if (skyboxSet) {
+        skyboxSet->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
+    }
 
     vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), 36, 1, 0, 0, 0);
 
@@ -115,7 +136,6 @@ void SkyboxPass::setSkyboxTexture(std::shared_ptr<Texture> skyboxTexture) {
     }
     m_skyboxTexture = skyboxTexture;
     // Re-create descriptor sets with the new texture
-    createDescriptorSets();
 }
 
 
@@ -216,50 +236,6 @@ void SkyboxPass::createPipeline() {
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
 
-
-void SkyboxPass::createDescriptorSets() {
-    auto shader = m_shader.lock();
-    if (!shader) {
-        RP_CORE_ERROR("SkyboxPass - Shader is not set!");
-        return;
-    }
-    if (shader->getDescriptorSetLayouts().empty()) {
-        RP_CORE_ERROR("SkyboxPass - Shader has no descriptor set layouts.");
-        return;
-    }
-    if (!m_skyboxTexture) {
-        return;
-    }
-
-    if (!m_skyboxTexture->isReadyForSampling()) {
-        //RP_CORE_WARN("SkyboxPass - Skybox texture is not ready for sampling, descriptor sets will not be created.");
-        return;
-    }
-
-    m_descriptorSets.resize(m_cameraUBOs.size());
-    VkDescriptorSetLayout layout = shader->getDescriptorSetLayouts()[0];
-
-    for (size_t i = 0; i < m_cameraUBOs.size(); ++i) {
-        DescriptorSetBindings bindings;
-        bindings.layout = layout;
-
-        DescriptorSetBinding uboBinding;
-        uboBinding.binding = 0;
-        uboBinding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboBinding.count = 1;
-        uboBinding.resource = m_cameraUBOs[i];
-        bindings.bindings.push_back(uboBinding);
-
-        DescriptorSetBinding samplerBinding;
-        samplerBinding.binding = 1;
-        samplerBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        samplerBinding.count = 1;
-        samplerBinding.resource = m_skyboxTexture;
-        bindings.bindings.push_back(samplerBinding);
-        
-        m_descriptorSets[i] = std::make_shared<DescriptorSet>(bindings);
-    }
-}
 
 void SkyboxPass::createSkyboxGeometry() {
     std::vector<glm::vec3> vertices = {

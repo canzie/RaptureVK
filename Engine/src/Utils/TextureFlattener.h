@@ -43,7 +43,7 @@ public:
 private:
     std::shared_ptr<Texture> m_inputTexture;
     std::shared_ptr<Texture> m_flattenedTexture;
-    std::shared_ptr<DescriptorSet> m_descriptorSet;
+    uint32_t m_inputTextureBindlessIndex = 0;
     std::string m_name;
 };
 
@@ -63,6 +63,7 @@ public:
 
 private:
     struct FlattenPushConstants {
+        uint32_t inputTextureIndex;
         int layerCount;
         int layerWidth;
         int layerHeight;
@@ -71,7 +72,6 @@ private:
 
     static void initializeSharedResources();
     static std::shared_ptr<Texture> createFlattenedTextureSpec(std::shared_ptr<Texture> inputTexture);
-    static std::shared_ptr<DescriptorSet> createDescriptorSet(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> outputTexture);
 
     // Shared resources
     static std::shared_ptr<Shader> s_flattenShader;

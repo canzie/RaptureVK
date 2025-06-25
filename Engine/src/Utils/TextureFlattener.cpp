@@ -6,8 +6,11 @@
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
 
 namespace Rapture {
+
+#define FLATTENING_ENABLED 1
 
 // Static member definitions
 std::shared_ptr<Shader> TextureFlattener::s_flattenShader = nullptr;
@@ -22,13 +25,15 @@ bool TextureFlattener::s_initialized = false;
 FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> flattenedTexture, const std::string& name)
     : m_inputTexture(inputTexture), m_flattenedTexture(flattenedTexture), m_name(name) {
     
-    // Create descriptor set for this texture combination
-    m_descriptorSet = TextureFlattener::createDescriptorSet(inputTexture, flattenedTexture);
+    // Add input texture to bindless texture array and get its index
+    m_inputTextureBindlessIndex = inputTexture->getBindlessIndex();
+
 }
 
 void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer) {
-    if (!m_inputTexture || !m_flattenedTexture || !m_descriptorSet) {
-        RP_CORE_ERROR("FlattenTexture::update - Invalid textures or descriptor set");
+#if FLATTENING_ENABLED
+    if (!m_inputTexture || !m_flattenedTexture) {
+        RP_CORE_ERROR("FlattenTexture::update - Invalid textures");
         return;
     }
 
@@ -43,13 +48,25 @@ void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer) {
     // Determine if this is a depth texture
     bool isDepthTexture = (inputSpec.format == TextureFormat::D32F || 
                           inputSpec.format == TextureFormat::D24S8);
-    // Determine the correct aspect mask based on the input texture format
+    
+    // Update output texture to the appropriate flatten storage binding since we only have 1 slot
+    DescriptorSetBindingLocation outputBinding = isDepthTexture ? 
+        DescriptorSetBindingLocation::FLATTEN_DEPTH_OUTPUT_STORAGE : 
+        DescriptorSetBindingLocation::FLATTEN_OUTPUT_STORAGE;
+        
+    auto bindlessSet = DescriptorManager::getDescriptorSet(outputBinding);
+    if (bindlessSet) {
+        auto binding = bindlessSet->getTextureBinding(outputBinding);
+        if (binding) {
+            binding->update(m_flattenedTexture, 0);
+        }
+    }
+    
+    // Input layout transition
     VkImageAspectFlags inputAspectMask = isDepthTexture ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     
-    // For depth textures, they're typically already in shader read optimal layout when the flattener runs
-    // We'll skip the input barrier for depth textures since they're already in the correct layout
     VkImageMemoryBarrier inputBarrier{};
-    bool needInputBarrier = !isDepthTexture; // Only barrier for non-depth textures
+    bool needInputBarrier = !isDepthTexture;
     
     if (needInputBarrier) {
         inputBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -67,7 +84,7 @@ void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer) {
         inputBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     }
     
-    // Transition output texture to general layout for storage image access
+    // Output layout transition
     VkImageMemoryBarrier outputBarrier{};
     outputBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     outputBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -101,12 +118,17 @@ void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer) {
         static_cast<uint32_t>(preBarriers.size()), preBarriers.data()
     );
     
-    // Bind the appropriate compute pipeline based on texture type
+    // Bind the appropriate compute pipeline
     auto pipeline = isDepthTexture ? TextureFlattener::s_flattenDepthPipeline : TextureFlattener::s_flattenPipeline;
     pipeline->bind(commandBuffer->getCommandBufferVk());
     
-    // Set push constants
+    // Bind descriptor sets using DescriptorManager
+    DescriptorManager::bindSet(0, commandBuffer, pipeline); // Common resources (not used but shader expects it)
+    DescriptorManager::bindSet(3, commandBuffer, pipeline); // Bindless textures and flatten output storage
+    
+    // Set push constants with bindless indices and texture dimensions
     TextureFlattener::FlattenPushConstants pushConstants;
+    pushConstants.inputTextureIndex = m_inputTextureBindlessIndex;
     pushConstants.layerCount = inputSpec.depth;
     pushConstants.layerWidth = inputSpec.width;
     pushConstants.layerHeight = inputSpec.height;
@@ -116,13 +138,6 @@ void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer) {
                        pipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT,
                        0, sizeof(TextureFlattener::FlattenPushConstants), &pushConstants);
-    
-    // Bind descriptor set
-    VkDescriptorSet descriptorSetVk = m_descriptorSet->getDescriptorSet();
-    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(),
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            pipeline->getPipelineLayoutVk(),
-                            0, 1, &descriptorSetVk, 0, nullptr);
     
     // Dispatch compute shader
     uint32_t workGroupsX = (outputSpec.width + 15) / 16;
@@ -154,6 +169,7 @@ void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer) {
         0, nullptr,
         1, &finalBarrier
     );
+#endif
 }
 
 // TextureFlattener implementation
@@ -254,45 +270,6 @@ std::shared_ptr<Texture> TextureFlattener::createFlattenedTextureSpec(std::share
     flattenedSpec.wrap = inputSpec.wrap;
     
     return std::make_shared<Texture>(flattenedSpec);
-}
-
-std::shared_ptr<DescriptorSet> TextureFlattener::createDescriptorSet(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> outputTexture) {
-    // Determine if this is a depth texture
-    bool isDepthTexture = (inputTexture->getSpecification().format == TextureFormat::D32F || 
-                          inputTexture->getSpecification().format == TextureFormat::D24S8);
-    
-    // Choose the appropriate shader
-    auto shader = isDepthTexture ? s_flattenDepthShader : s_flattenShader;
-    
-    if (!shader || shader->getDescriptorSetLayouts().empty()) {
-        RP_CORE_ERROR("TextureFlattener::createDescriptorSet - Invalid shader or descriptor set layouts");
-        return nullptr;
-    }
-    
-    DescriptorSetBindings bindings;
-    bindings.layout = shader->getDescriptorSetLayouts()[0];
-    
-    // Binding 0: Input texture array (sampler2DArray)
-    DescriptorSetBinding inputBinding;
-    inputBinding.binding = 0;
-    inputBinding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    inputBinding.count = 1;
-    inputBinding.viewType = TextureViewType::DEFAULT;
-    inputBinding.resource = inputTexture;
-    inputBinding.useStorageImageInfo = false;
-    bindings.bindings.push_back(inputBinding);
-    
-    // Binding 1: Output flattened texture (storage image2D)
-    DescriptorSetBinding outputBinding;
-    outputBinding.binding = 1;
-    outputBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    outputBinding.count = 1;
-    outputBinding.viewType = TextureViewType::DEFAULT;
-    outputBinding.resource = outputTexture;
-    outputBinding.useStorageImageInfo = true;
-    bindings.bindings.push_back(outputBinding);
-    
-    return std::make_shared<DescriptorSet>(bindings);
 }
 
 } 

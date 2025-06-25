@@ -11,6 +11,28 @@ namespace Rapture
     {
         RAPTURE_PROFILE_SCOPE("Update Main Camera Frustum");
 
+        // Validate input matrices to prevent crashes
+        if (glm::any(glm::isnan(projection[0])) || glm::any(glm::isnan(view[0]))) {
+            RP_CORE_ERROR("Frustum::update - Received NaN in input matrices, skipping frustum update");
+            return;
+        }
+        
+        // Check for zero matrices which would cause division by zero
+        bool projectionIsZero = true;
+        bool viewIsZero = true;
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                if (abs(projection[i][j]) > 0.0001f) projectionIsZero = false;
+                if (abs(view[i][j]) > 0.0001f) viewIsZero = false;
+            }
+        }
+        
+        if (projectionIsZero || viewIsZero) {
+            RP_CORE_WARN("Frustum::update - Received zero matrix (projection: {}, view: {}), skipping frustum update", 
+                         projectionIsZero, viewIsZero);
+            return;
+        }
+
         // Compute the view-projection matrix
         glm::mat4 viewProj = projection * view;
 

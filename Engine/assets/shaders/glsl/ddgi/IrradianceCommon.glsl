@@ -8,9 +8,12 @@
 #endif
 
 struct SunProperties {
-    vec3 sunDirectionWorld;
-    vec3 sunColor;
-    float sunIntensity;
+
+    vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)
+    vec4 direction;     // w = range
+    vec4 color;         // w = intensity
+    vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = entity id, w = unused
+
 };
 
 #ifdef DDGI_ENABLE_DIFFUSE_LIGHTING
@@ -36,7 +39,7 @@ float LightVisibility(
     // Use ACCEPT_FIRST_HIT and SKIP_CLOSEST_HIT equivalent flags
     rayQueryInitializeEXT(
         visibilityQuery, 
-        topLevelAS, 
+        topLevelAS[0], 
         gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT, 
         0xFF,
         rayOrigin, 
@@ -68,7 +71,7 @@ vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProp
     float visibility = LightVisibility(
         hitPositionWorld,
         shadingNormal,
-        -sunProperties.sunDirectionWorld,  // Light vector (towards sun)
+        -sunProperties.direction.xyz,  // Light vector (towards sun)
         1e27,                              // Very large tmax for directional light
         normalBias,
         viewBias
@@ -80,10 +83,10 @@ vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProp
     }
     
     // Compute lighting
-    vec3 lightDirection = normalize(-sunProperties.sunDirectionWorld);
+    vec3 lightDirection = normalize(-sunProperties.direction.xyz);
     float NdotL = max(dot(shadingNormal, lightDirection), 0.0);
     
-    return sunProperties.sunIntensity * sunProperties.sunColor * NdotL * visibility;
+    return sunProperties.color.xyz * sunProperties.color.w * NdotL * visibility;
 }
 
 vec3 EvaluateSpotLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties)

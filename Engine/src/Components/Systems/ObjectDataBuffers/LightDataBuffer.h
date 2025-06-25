@@ -17,13 +17,13 @@ struct LightObjectData {
 
 class LightDataBuffer : public ObjectDataBuffer {
 public:
-    LightDataBuffer();
+
+    LightDataBuffer(uint32_t frameCount = 1);
     
-    // Update function that takes the specific data this buffer needs
-    void update(const TransformComponent& transform, const LightComponent& light, uint32_t entityID);
+
+    void update(const TransformComponent& transform, const LightComponent& light, uint32_t entityID, uint32_t frameIndex = 0);
     
-    // Override the pure virtual update (can be empty if we always use the parameterized version)
-    //void update() override {}
+
 };
 
 }

@@ -13,6 +13,9 @@ struct PushConstants {
 
     glm::vec3 cameraPos;
 
+    uint32_t lightCount;
+    uint32_t shadowCount;
+
     uint32_t GBufferAlbedoHandle;
     uint32_t GBufferNormalHandle;
     uint32_t GBufferPositionHandle;
@@ -145,8 +148,25 @@ void LightingPass::recordCommandBuffer(
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 
-    // TODO Get the shadow and light indices -> ?
-    // TODO Get ddgi stuff -> push constants
+
+    auto& reg = activeScene->getRegistry();
+    auto lightView = reg.view<LightComponent>();
+    auto shadowView = reg.view<ShadowComponent>();
+    auto cascadedShadowView = reg.view<CascadedShadowComponent>();
+
+    pushConstants.lightCount = static_cast<uint32_t>(lightView.size());
+    pushConstants.shadowCount = static_cast<uint32_t>(shadowView.size() + cascadedShadowView.size());
+
+    // Get probe texture indices from DDGI system
+    if (m_ddgi) {
+        pushConstants.probeVolumeHandle = 0; // Probe volume data is in set 0, binding 5
+        pushConstants.probeIrradianceHandle = m_ddgi->getCurrentRadianceBindlessIndex();
+        pushConstants.probeVisibilityHandle = m_ddgi->getCurrentVisibilityBindlessIndex();
+    } else {
+        pushConstants.probeVolumeHandle = 0;
+        pushConstants.probeIrradianceHandle = 0;
+        pushConstants.probeVisibilityHandle = 0;
+    }
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
         m_pipeline->getPipelineLayoutVk(),

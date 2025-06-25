@@ -12,13 +12,13 @@ struct TransformComponent;
 
 class CameraDataBuffer : public ObjectDataBuffer {
 public:
-    CameraDataBuffer();
+
+    CameraDataBuffer(uint32_t frameCount = 1);
     
-    // Update from specific camera component
-    void update(const CameraComponent& camera);
+
+    void update(const CameraComponent& camera, uint32_t frameIndex = 0);
     
-    // Override the pure virtual update (can be empty since we use parameterized versions)
-    //void update() override {}
+
 };
 
 } 

@@ -59,15 +59,43 @@ enum class ParameterID : uint16_t {
 };
 
 enum class MaterialParameterTypes {
-    FLOAT, INT, UINT, UINT64, BOOL,
-    VEC2, VEC3, VEC4, UVEC2, UVEC3, UVEC4, IVEC2, IVEC3, IVEC4,
-    MAT3, MAT4,
-    TEXTURE, COMBINED_IMAGE_SAMPLER, SAMPLER,
-    UNKNOWN
+    FLOAT = 1, 
+    INT = 2, 
+    UINT = 4, 
+    UINT64 = 8, 
+    BOOL = 16,
+    VEC2 = 32, 
+    VEC3 = 64, 
+    VEC4 = 128, 
+    UVEC2 = 256, 
+    UVEC3 = 512, 
+    UVEC4 = 1024, 
+    IVEC2 = 2048, 
+    IVEC3 = 4096, 
+    IVEC4 = 8192,
+    MAT3 = 16384, 
+    MAT4 = 32768,
+    TEXTURE = 65536, 
+    COMBINED_IMAGE_SAMPLER = 131072, 
+    SAMPLER = 262144,
+    
+    UNKNOWN = 0
 };
 
+// Helper functions for bitwise operations on MaterialParameterTypes
+inline MaterialParameterTypes operator|(MaterialParameterTypes a, MaterialParameterTypes b) {
+    return static_cast<MaterialParameterTypes>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
 
-// Parameter information for shader reflection
+inline MaterialParameterTypes operator&(MaterialParameterTypes a, MaterialParameterTypes b) {
+    return static_cast<MaterialParameterTypes>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+}
+
+inline bool hasType(MaterialParameterTypes combined, MaterialParameterTypes type) {
+    return (combined & type) == type;
+}
+
+// Extended parameter information
 struct MaterialParameterInfo {
     ParameterID parameterId;
     MaterialParameterTypes type;

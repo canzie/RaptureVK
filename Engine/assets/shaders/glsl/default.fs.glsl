@@ -9,8 +9,6 @@ layout(set = 1, binding = 0) uniform Material {
     float roughness;
 } material;
 
-
 void main() {
-
     outColor = vec4(material.albedo.x, material.roughness, material.albedo.z, 1.0);
 }

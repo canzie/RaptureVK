@@ -22,11 +22,17 @@ void MaterialParameterMapper::initializeMappings() {
     });
     
     addParameterVariants(ParameterID::ALBEDO_MAP, MaterialParameterTypes::COMBINED_IMAGE_SAMPLER, {
-        "albedoMap", "albedo_map", "albedoTexture", "albedo_texture", "baseColorMap", 
-        "base_color_map", "diffuseMap", "diffuse_map", "diffuseTexture", "diffuse_texture", 
-        "colorMap", "color_map", "mainTexture", "main_texture", "texture0", "tex0", "u_albedoMap"
+        "albedomap", "albedo_map", "albedoTexture", "albedo_texture", "basecolormap", 
+        "base_color_map", "diffusemap", "diffuse_map", "diffuseTexture", "diffuse_texture", 
+        "colormap", "color_map", "maintexture", "main_texture", "texture0", "tex0", "u_albedomap"
     });
     
+    addParameterVariants(ParameterID::ALBEDO_MAP, MaterialParameterTypes::UINT, {
+        "albedomaphandle", "albedo_map_handle", "albedomapindex", "albedo_map_index", 
+        "albedohandle", "albedoindex", "basecolormaphandle", "base_color_map_handle",
+        "diffusemaphandle", "diffuse_map_handle", "albedomapbindless", "basecolormapbindless"
+    });
+
     // Metallic mappings
     addParameterVariants(ParameterID::METALLIC, MaterialParameterTypes::FLOAT, {
         "metallic", "metallicFactor", "metallic_factor", "metalness", "metal", 
@@ -38,6 +44,13 @@ void MaterialParameterMapper::initializeMappings() {
         "metalnessMap", "metalness_map", "metalMap", "metal_map", "u_metallicMap"
     });
     
+    addParameterVariants(ParameterID::METALLIC_MAP, MaterialParameterTypes::UINT, {
+        "metallicmaphandle", "metallic_map_handle", "metallicmapindex", "metallic_map_index",
+        "metallichandle", "metallicindex", "metalnessmaphandle", "metalness_map_handle",
+        "metalmaphandle", "metal_map_handle", "metallicmapbindless", "metalnessmapbindless"
+    });
+    
+
     // Roughness mappings
     addParameterVariants(ParameterID::ROUGHNESS, MaterialParameterTypes::FLOAT, {
         "roughness", "roughnessFactor", "roughness_factor", "roughnessValue", 
@@ -48,11 +61,25 @@ void MaterialParameterMapper::initializeMappings() {
         "roughnessMap", "roughness_map", "roughnessTexture", "roughness_texture",
         "surface_roughness_map", "u_roughnessMap"
     });
+    
+    addParameterVariants(ParameterID::ROUGHNESS_MAP, MaterialParameterTypes::UINT, {
+        "roughnessmaphandle", "roughness_map_handle", "roughnessmapindex", "roughness_map_index",
+        "roughnesshandle", "roughnessindex", "roughnessmapbindless", "surface_roughness_map_handle"
+    });
+    
+
 
     addParameterVariants(ParameterID::METALLIC_ROUGHNESS_MAP, MaterialParameterTypes::COMBINED_IMAGE_SAMPLER, {
         "metallicRoughnessMap", "metallic_roughness_map", "metallic_roughness_texture", "metallic_roughness_texture",
         "u_metallicRoughnessMap", "u_metallic_roughness_map"
     });
+    
+    addParameterVariants(ParameterID::METALLIC_ROUGHNESS_MAP, MaterialParameterTypes::UINT, {
+        "metallicroughnessmaphandle", "metallic_roughness_map_handle", "metallicroughnessmapindex", "metallic_roughness_map_index",
+        "metallicroughnesshandle", "metallicroughnessindex", "metallicroughnessmapbindless", "metallic_roughness_bindless"
+    });
+    
+
     
     
     // Normal mappings
@@ -65,6 +92,12 @@ void MaterialParameterMapper::initializeMappings() {
         "bump_map", "bumpTexture", "bump_texture", "normalmap", "bump", "u_normalMap"
     });
     
+    addParameterVariants(ParameterID::NORMAL_MAP, MaterialParameterTypes::UINT, {
+        "normalmaphandle", "normal_map_handle", "normalmapindex", "normal_map_index",
+        "normalhandle", "normalindex", "bumpmaphandle", "bump_map_handle",
+        "normalmapbindless", "bumpmapbindless"
+    });
+    
     // Height/Displacement mappings
     addParameterVariants(ParameterID::HEIGHT_MAP, MaterialParameterTypes::COMBINED_IMAGE_SAMPLER, {
         "heightMap", "height_map", "heightTexture", "height_texture", "displacementMap", 
@@ -72,10 +105,22 @@ void MaterialParameterMapper::initializeMappings() {
         "parallax_map", "elevationMap", "elevation_map", "u_heightMap"
     });
     
+    addParameterVariants(ParameterID::HEIGHT_MAP, MaterialParameterTypes::UINT, {
+        "heightmaphandle", "height_map_handle", "heightmapindex", "height_map_index",
+        "heighthandle", "heightindex", "displacementmaphandle", "displacement_map_handle",
+        "parallaxmaphandle", "parallax_map_handle", "heightmapbindless", "displacementmapbindless"
+    });
+    
     // Ambient Occlusion mappings
     addParameterVariants(ParameterID::AO_MAP, MaterialParameterTypes::COMBINED_IMAGE_SAMPLER, {
         "aoMap", "ao_map", "aoTexture", "ao_texture", "ambientOcclusionMap", 
         "ambient_occlusion_map", "occlusionMap", "occlusion_map", "ambientMap", "ambient_map", "u_aoMap"
+    });
+    
+    addParameterVariants(ParameterID::AO_MAP, MaterialParameterTypes::UINT, {
+        "aomaphandle", "ao_map_handle", "aomapindex", "ao_map_index",
+        "aohandle", "aoindex", "ambientocclusionmaphandle", "ambient_occlusion_map_handle",
+        "occlusionmaphandle", "occlusion_map_handle", "aomapbindless", "ambientocclusionmapbindless"
     });
     
     // Ambient Occlusion mappings
@@ -95,6 +140,12 @@ void MaterialParameterMapper::initializeMappings() {
         "emissionMap", "emission_map", "glowMap", "glow_map", "u_emissiveMap"
     });
     
+    addParameterVariants(ParameterID::EMISSIVE_MAP, MaterialParameterTypes::UINT, {
+        "emissivemaphandle", "emissive_map_handle", "emissivemapindex", "emissive_map_index",
+        "emissivehandle", "emissiveindex", "emissionmaphandle", "emission_map_handle",
+        "glowmaphandle", "glow_map_handle", "emissivemapbindless", "emissionmapbindless"
+    });
+    
     // Specular mappings
     addParameterVariants(ParameterID::SPECULAR, MaterialParameterTypes::VEC3, {
         "specular", "specularColor", "specular_color", "specularFactor", "specular_factor"
@@ -102,6 +153,11 @@ void MaterialParameterMapper::initializeMappings() {
     
     addParameterVariants(ParameterID::SPECULAR_MAP, MaterialParameterTypes::COMBINED_IMAGE_SAMPLER, {
         "specularMap", "specular_map", "specularTexture", "specular_texture"
+    });
+    
+    addParameterVariants(ParameterID::SPECULAR_MAP, MaterialParameterTypes::UINT, {
+        "specularmaphandle", "specular_map_handle", "specularmapindex", "specular_map_index",
+        "specularhandle", "specularindex", "specularmapbindless", "specular_bindless"
     });
 
     m_isInitialized = true;

@@ -16,22 +16,18 @@ namespace Rapture {
 
 struct PushConstantsCSM {
     glm::mat4 model;
+    uint32_t shadowMatrixIndices;
 };
 
-std::unique_ptr<DescriptorSubAllocationBase<Texture>> CascadedShadowMap::s_bindlessCSMs = nullptr;
 
 CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda) :
     m_width(width),
     m_height(height),
     m_NumCascades(static_cast<uint8_t>(std::clamp(numCascades, 1u, MAX_CASCADES))),
     m_lambda(lambda),
-    m_shadowTextureArray(nullptr),
-    m_shadowMapIndex(UINT32_MAX)    {
+    m_shadowTextureArray(nullptr) {
 
-    // Initialize static bindless descriptor array if not already done
-    if (s_bindlessCSMs == nullptr) {
-        s_bindlessCSMs = DescriptorArrayManager::createTextureSubAllocation(512, "Bindless CSM Descriptor Array Sub-Allocation");
-    }
+
 
     // Get VMA allocator and frames in flight from application
     auto& app = Application::getInstance();
@@ -43,16 +39,13 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
     createShadowTexture();
     createPipeline();
     createUniformBuffers();
-    createDescriptorSets();
     
     // Create flattened texture for debugging/visualization
     m_flattenedShadowTexture = TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
 }
 
 CascadedShadowMap::~CascadedShadowMap() {
-    if (s_bindlessCSMs && m_shadowMapIndex != UINT32_MAX) {
-        s_bindlessCSMs->free(m_shadowMapIndex);
-    }
+
 
 }
 
@@ -209,13 +202,9 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
     scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
     
-    // Bind descriptor sets (contains all cascade matrices)
-    VkDescriptorSet sets[] = {m_descriptorSets[currentFrame]->getDescriptorSet()};
-    vkCmdBindDescriptorSets(commandBuffer->getCommandBufferVk(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          m_pipeline->getPipelineLayoutVk(),
-                          0, 1, sets, 0, nullptr);
-    
+
+    DescriptorManager::bindSet(0, commandBuffer, m_pipeline);
+
     // Get entities with TransformComponent and MeshComponent for rendering
     auto& registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
@@ -283,6 +272,7 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
             // Push the model matrix as a push constant
             PushConstantsCSM pushConstants{};
             pushConstants.model = transform.transformMatrix();
+            pushConstants.shadowMatrixIndices = m_cascadeMatricesIndex;
             
             // Get push constant stage flags from shader
             VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -360,9 +350,8 @@ std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponen
         }
     }
 
-    // Update all frame uniform buffers
-    for (size_t i = 0; i < m_framesInFlight; i++) {
-        m_shadowUBOs[i]->addData((void*)&csmData, sizeof(CSMData), 0);
+    if (m_cascadeMatricesBuffer) {
+        m_cascadeMatricesBuffer->addData(&csmData, sizeof(CSMData), 0);
     }
 
     return cascadeData;
@@ -675,68 +664,24 @@ void CascadedShadowMap::createShadowTexture() {
 
     m_shadowTextureArray = std::make_shared<Texture>(spec);
 
-    if (s_bindlessCSMs) {
-        m_shadowMapIndex = s_bindlessCSMs->allocate(m_shadowTextureArray);
-    } else {
-        RP_CORE_ERROR("CascadedShadowMaping::createShadowTexture - s_bindlessCSMs is nullptr");
-    }
 
 }
 void CascadedShadowMap::createUniformBuffers() {
-    m_shadowUBOs.resize(m_framesInFlight);
+    m_shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
 
-    CSMData csmData;
-    // Initialize with identity matrices
-    for (size_t i = 0; i < MAX_CASCADES; i++) {
-        if (i < m_NumCascades) {
-            csmData.lightViewProjection[i] = (i < m_lightViewProjections.size()) ? 
-                m_lightViewProjections[i] : glm::mat4(1.0f);
-        } else {
-            // Fill unused cascades with identity matrices
-            csmData.lightViewProjection[i] = glm::mat4(1.0f);
+    m_cascadeMatricesBuffer = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::DYNAMIC, m_allocator, nullptr);
+    
+    // Add to descriptor set
+    auto cascadeSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
+    if (cascadeSet) {
+        auto binding = cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
+        if (binding) {
+            m_cascadeMatricesIndex = binding->add(m_cascadeMatricesBuffer);
         }
     }
 
-    for (size_t i = 0; i < m_framesInFlight; i++) {
-        m_shadowUBOs[i] = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::STREAM, m_allocator);
-        m_shadowUBOs[i]->addData((void*)&csmData, sizeof(CSMData), 0);
-    }
 }
-void CascadedShadowMap::createDescriptorSets() {
-    // Get descriptor set layout from shader
-    VkDescriptorSetLayout layout;
-    if (auto shader = m_shader.lock()) {
-        if (shader->getDescriptorSetLayouts().size() > 0) {
-            layout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::COMMON_RESOURCES)];
-        } else {
-            RP_CORE_ERROR("CascadedShadowMap::createDescriptorSets: Shader has no descriptor set layouts");
-            return;
-        }
-    } else {
-        RP_CORE_ERROR("CascadedShadowMap::createDescriptorSets: Shader is nullptr");
-        return;
-    }
-    
-    m_descriptorSets.resize(m_framesInFlight);
-    
-    // For each frame in flight, create a descriptor set
-    for (uint32_t i = 0; i < m_framesInFlight; i++) {
-        DescriptorSetBindings bindings;
-        bindings.layout = layout;
-        
-        DescriptorSetBinding shadowBinding;
-        shadowBinding.binding = 0;
-        shadowBinding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        shadowBinding.count = 1;
-        shadowBinding.resource = m_shadowUBOs[i];
-        bindings.bindings.push_back(shadowBinding);
 
-        
-        m_descriptorSets[i] = std::make_shared<DescriptorSet>(bindings);
-    }
-
-
-}
 void CascadedShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer) {
 
     // Transition shadow map to depth attachment layout

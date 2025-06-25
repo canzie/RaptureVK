@@ -99,7 +99,7 @@ Application::Application(int width, int height, const char *title)
   MaterialManager::init();
 
 
-  ForwardRenderer::init();
+  //ForwardRenderer::init();
   DeferredRenderer::init();
 
   ModelLoadersCache::init();
@@ -130,7 +130,7 @@ Application::~Application() {
   ModelLoadersCache::clear();
   m_project.reset();
 
-  ForwardRenderer::shutdown();
+  //ForwardRenderer::shutdown();
   DeferredRenderer::shutdown();
   DescriptorManager::shutdown();
 

@@ -14,6 +14,8 @@
 
 #include "Renderer/Frustum/Frustum.h"
 
+#include "Components/Systems/ObjectDataBuffers/ShadowDataBuffer.h"
+
 #include "Scenes/Scene.h"
 
 #include <memory>
@@ -69,14 +71,13 @@ public:
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTextureArray; }
     std::shared_ptr<Texture> getFlattenedShadowTexture() const { return m_flattenedShadowTexture ? m_flattenedShadowTexture->getFlattenedTexture() : nullptr; }
 
-    uint32_t getTextureHandle() const { return m_shadowMapIndex; }
+    uint32_t getTextureHandle() { return m_shadowTextureArray->getBindlessIndex(); }
+    std::shared_ptr<ShadowDataBuffer> getShadowDataBuffer() { return m_shadowDataBuffer; }
 
     std::vector<glm::mat4> getLightViewProjections() const { return m_lightViewProjections; }
 
     float getLambda() const { return m_lambda; }
     void setLambda(float lambda) { m_lambda = std::clamp(lambda, 0.0f, 1.0f); }
-
-    static std::shared_ptr<DescriptorBindingTexture> getBindlessShadowMaps() { return s_bindlessCSMs; }
 
     std::vector<float> getCascadeSplits() const { return m_cascadeSplits; }
 
@@ -84,7 +85,6 @@ private:
     void createPipeline();
     void createShadowTexture();
     void createUniformBuffers();
-    void createDescriptorSets();
 
     void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
     void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
@@ -115,9 +115,10 @@ private:
     std::shared_ptr<Texture> m_shadowTextureArray;
     std::shared_ptr<FlattenTexture> m_flattenedShadowTexture;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
-    std::vector<std::shared_ptr<UniformBuffer>> m_shadowUBOs;
-    std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets;
-    
+
+    std::shared_ptr<ShadowDataBuffer> m_shadowDataBuffer;
+    std::shared_ptr<UniformBuffer> m_cascadeMatricesBuffer;
+    uint32_t m_cascadeMatricesIndex = UINT32_MAX;
 
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};
@@ -127,9 +128,6 @@ private:
 
     VmaAllocator m_allocator;
 
-    uint32_t m_shadowMapIndex = 0;
-
-    static std::shared_ptr<DescriptorBindingTexture> s_bindlessCSMs;
     
     };
 

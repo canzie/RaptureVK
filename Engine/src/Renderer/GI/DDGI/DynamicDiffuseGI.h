@@ -55,20 +55,32 @@ public:
     void setProbeVolume(const ProbeVolume& probeVolume) { m_ProbeVolume = probeVolume; m_isVolumeDirty = true; }
     void setVolumeDirty(bool dirty) { m_isVolumeDirty = dirty; }
 
+    // Get bindless indices for probe textures
+    uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
+    uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
+
+    // Get current texture indices based on frame parity (for lighting pass)
+    uint32_t getCurrentRadianceBindlessIndex() const { 
+        return m_isEvenFrame ? m_probeIrradianceBindlessIndex : m_prevProbeIrradianceBindlessIndex; 
+    }
+    uint32_t getCurrentVisibilityBindlessIndex() const { 
+        return m_isEvenFrame ? m_probeVisibilityBindlessIndex : m_prevProbeVisibilityBindlessIndex; 
+    }
+
+    // Mesh data SSBO index for compute shader access
+    uint32_t getMeshDataSSBOIndex() const { return m_meshDataSSBOIndex; }
+
 private:
     void castRays(std::shared_ptr<Scene> scene);
     void blendTextures();
 
     void initTextures();
-    void updateSunProperties(std::shared_ptr<Scene> scene);
     void initProbeInfoBuffer();
-    void initializeSunProperties();
 
     void createPipelines();
-    void createDescriptorSets(std::shared_ptr<Scene> scene);
-    void createProbeTraceDescriptorSets(std::shared_ptr<Scene> scene);
-    void createProbeBlendingDescriptorSets(std::shared_ptr<Scene> scene, bool isEvenFrame);
+    void setupProbeTextures();
 
+    uint32_t getSunLightDataIndex(std::shared_ptr<Scene> scene);
 
     void clearTextures();
 
@@ -82,13 +94,11 @@ private:
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeDistanceBlendingPipeline;
 
     ProbeVolume m_ProbeVolume;
-    SunProperties m_SunShadowProps;
 
     
     std::shared_ptr<StorageBuffer> m_MeshInfoBuffer;
 
 
-    std::shared_ptr<UniformBuffer> m_SunLightBuffer;
     std::shared_ptr<UniformBuffer> m_ProbeInfoBuffer;
 
 
@@ -129,12 +139,14 @@ private:
     uint32_t m_meshCount;
     uint32_t m_probesPerRow; // Number of probes along the X-axis of the atlas texture
 
-    std::vector<std::shared_ptr<DescriptorSet>> m_rayTraceDescriptorSets;
-    std::shared_ptr<DescriptorSet> m_rayTracePrevTextureDescriptorSet[2]; // Set 2: Previous textures for probe trace
-    std::shared_ptr<DescriptorSet> m_IrradianceBlendingDescriptorSet[2];
-    std::shared_ptr<DescriptorSet> m_DistanceBlendingDescriptorSet[2];
+    // Probe texture bindless indices for use in lighting pass
+    uint32_t m_probeIrradianceBindlessIndex = 0;
+    uint32_t m_probeVisibilityBindlessIndex = 0;
+    uint32_t m_prevProbeIrradianceBindlessIndex = 0;
+    uint32_t m_prevProbeVisibilityBindlessIndex = 0;
 
-    std::shared_ptr<DescriptorSet> m_probeVolumeDescriptorSet;
+    // Mesh data SSBO index for compute shader access
+    uint32_t m_meshDataSSBOIndex = 0;
 
     std::shared_ptr<Texture> m_skyboxTexture;
 

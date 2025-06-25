@@ -46,15 +46,20 @@ DescriptorSet::DescriptorSet(const DescriptorSetBindings& bindings)
     }
 
     if (s_poolRefCount > s_maxSets) {
-        RP_CORE_ERROR("DescriptorSet::DescriptorSet - too many descriptor sets!");
+        RP_CORE_ERROR("DescriptorSet::DescriptorSet - too many descriptor sets! Current: {}, Max: {}", 
+                      s_poolRefCount, s_maxSets);
         throw std::runtime_error("DescriptorSet::DescriptorSet - too many descriptor sets!");
     }
 
-
-
-    // simply checks if we still have space in the pool. should never really exceed the limits
-    // but i dont want to 😞🔫
-    updateUsedCounts(bindings);
+    // Check if we still have space in the pool before proceeding
+    try {
+        updateUsedCounts(bindings);
+    } catch (const std::exception& e) {
+        RP_CORE_ERROR("DescriptorSet::DescriptorSet - Failed to allocate descriptors: {}", e.what());
+        // Decrement ref count since we're failing to create
+        s_poolRefCount--;
+        throw;
+    }
 
 
     createDescriptorSetLayout(bindings);
@@ -100,6 +105,7 @@ void DescriptorSet::createBinding(const DescriptorSetBinding &binding)
             m_uniformBufferBindings[binding.location] = std::make_shared<DescriptorBindingUniformBuffer>(this, bindNumber, binding.count);
             break;
         case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+        case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
             m_textureBindings[binding.location] = std::make_shared<DescriptorBindingTexture>(this, bindNumber, binding.viewType, binding.useStorageImageInfo, binding.count);
             break;
         case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
@@ -109,6 +115,8 @@ void DescriptorSet::createBinding(const DescriptorSetBinding &binding)
             m_ssboBindings[binding.location] = std::make_shared<DescriptorBindingSSBO>(this, bindNumber, binding.count);
             break;
         default:
+            RP_CORE_ERROR("DescriptorSet::createBinding - unknown descriptor type: {}", static_cast<int>(binding.type));
+            return;
     }
 }
 
@@ -118,7 +126,9 @@ void DescriptorSet::createDescriptorSetLayout(const DescriptorSetBindings &bindi
     VkDevice device = app.getVulkanContext().getLogicalDevice();
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+    std::vector<VkDescriptorBindingFlags> bindingFlags;
     layoutBindings.reserve(bindings.bindings.size());
+    bindingFlags.reserve(bindings.bindings.size());
 
     // each binding in a set
     for (const auto& bindingInfo : bindings.bindings) {
@@ -131,10 +141,21 @@ void DescriptorSet::createDescriptorSetLayout(const DescriptorSetBindings &bindi
         layoutBinding.pImmutableSamplers = nullptr;
 
         layoutBindings.push_back(layoutBinding);
+        
+        // Add UPDATE_AFTER_BIND flag to allow updating descriptors while bound to pending command buffers
+        bindingFlags.push_back(VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
     }
+
+    // Set up binding flags info
+    VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
+    bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+    bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
+    bindingFlagsInfo.pBindingFlags = bindingFlags.data();
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;  // Required for UPDATE_AFTER_BIND
+    layoutInfo.pNext = &bindingFlagsInfo;  // Chain the binding flags
     layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
     layoutInfo.pBindings = layoutBindings.data();
 
@@ -153,8 +174,20 @@ void DescriptorSet::createDescriptorSet() {
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &m_layout;
 
-    if (vkAllocateDescriptorSets(m_device, &allocInfo, &m_set) != VK_SUCCESS) {
-        RP_CORE_ERROR("Failed to allocate descriptor set!");
+    VkResult result = vkAllocateDescriptorSets(m_device, &allocInfo, &m_set);
+    if (result != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to allocate descriptor set for set {}! VkResult: {} ({})", 
+                      m_setNumber, static_cast<int>(result), 
+                      result == VK_ERROR_OUT_OF_POOL_MEMORY ? "VK_ERROR_OUT_OF_POOL_MEMORY" :
+                      result == VK_ERROR_FRAGMENTED_POOL ? "VK_ERROR_FRAGMENTED_POOL" : "OTHER");
+        RP_CORE_ERROR("Pool status - Sets: {}/{}, Buffers: {}/{}, Textures: {}/{}, "
+                      "StorageBuffers: {}/{}, StorageImages: {}/{}, AccelStructs: {}/{}", 
+                      s_poolRefCount, s_maxSets,
+                      s_poolBufferCount, s_maxBuffers,
+                      s_poolTextureCount, s_maxTextures,
+                      s_poolStorageBufferCount, s_maxStorageBuffers,
+                      s_poolStorageImageCount, s_maxStorageImages,
+                      s_poolAccelerationStructureCount, s_maxAccelerationStructures);
         throw std::runtime_error("Failed to allocate descriptor set");
     }
 }
@@ -192,7 +225,7 @@ void DescriptorSet::createDescriptorPool()
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = s_maxSets;
@@ -211,7 +244,7 @@ void DescriptorSet::createDescriptorPool()
 
 void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
 {
-        // Check if adding this descriptor set would exceed any limits
+    // Check if adding this descriptor set would exceed any limits
     uint32_t newBuffers = 0, newTextures = 0, newStorageBuffers = 0, newStorageImages = 0, newInputAttachments = 0, newAccelerationStructures = 0;
     
     for (const auto& binding : bindings.bindings) {
@@ -242,38 +275,68 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
         }
     }
 
+    // Log current resource usage for debugging
+    RP_CORE_TRACE("DescriptorSet: Resource usage for set {} - Buffers: {}, Textures: {}, "
+                  "StorageBuffers: {}, StorageImages: {}, InputAttachments: {}, AccelStructs: {}",
+                  bindings.setNumber, newBuffers, newTextures, newStorageBuffers, 
+                  newStorageImages, newInputAttachments, newAccelerationStructures);
+
     // Check limits before allocating
     if (s_poolBufferCount + newBuffers > s_maxBuffers) {
+        RP_CORE_ERROR("DescriptorSet: Uniform buffer limit exceeded for set {}! "
+                      "Current: {}, Requested: {}, Total would be: {}, Max: {}", 
+                      bindings.setNumber, s_poolBufferCount, newBuffers, 
+                      s_poolBufferCount + newBuffers, s_maxBuffers);
         throw std::runtime_error("DescriptorSet: Uniform buffer limit exceeded! Current: " + 
                                 std::to_string(s_poolBufferCount) + ", Requested: " + 
                                 std::to_string(newBuffers) + ", Max: " + std::to_string(s_maxBuffers));
     }
     
     if (s_poolTextureCount + newTextures > s_maxTextures) {
+        RP_CORE_ERROR("DescriptorSet: Texture/Sampler limit exceeded for set {}! "
+                      "Current: {}, Requested: {}, Total would be: {}, Max: {}", 
+                      bindings.setNumber, s_poolTextureCount, newTextures, 
+                      s_poolTextureCount + newTextures, s_maxTextures);
         throw std::runtime_error("DescriptorSet: Texture/Sampler limit exceeded! Current: " + 
                                 std::to_string(s_poolTextureCount) + ", Requested: " + 
                                 std::to_string(newTextures) + ", Max: " + std::to_string(s_maxTextures));
     }
     
     if (s_poolStorageBufferCount + newStorageBuffers > s_maxStorageBuffers) {
+        RP_CORE_ERROR("DescriptorSet: Storage buffer limit exceeded for set {}! "
+                      "Current: {}, Requested: {}, Total would be: {}, Max: {}", 
+                      bindings.setNumber, s_poolStorageBufferCount, newStorageBuffers, 
+                      s_poolStorageBufferCount + newStorageBuffers, s_maxStorageBuffers);
         throw std::runtime_error("DescriptorSet: Storage buffer limit exceeded! Current: " + 
                                 std::to_string(s_poolStorageBufferCount) + ", Requested: " + 
                                 std::to_string(newStorageBuffers) + ", Max: " + std::to_string(s_maxStorageBuffers));
     }
     
     if (s_poolStorageImageCount + newStorageImages > s_maxStorageImages) {
+        RP_CORE_ERROR("DescriptorSet: Storage image limit exceeded for set {}! "
+                      "Current: {}, Requested: {}, Total would be: {}, Max: {}", 
+                      bindings.setNumber, s_poolStorageImageCount, newStorageImages, 
+                      s_poolStorageImageCount + newStorageImages, s_maxStorageImages);
         throw std::runtime_error("DescriptorSet: Storage image limit exceeded! Current: " + 
                                 std::to_string(s_poolStorageImageCount) + ", Requested: " + 
                                 std::to_string(newStorageImages) + ", Max: " + std::to_string(s_maxStorageImages));
     }
     
     if (s_poolInputAttachmentCount + newInputAttachments > s_maxInputAttachments) {
+        RP_CORE_ERROR("DescriptorSet: Input attachment limit exceeded for set {}! "
+                      "Current: {}, Requested: {}, Total would be: {}, Max: {}", 
+                      bindings.setNumber, s_poolInputAttachmentCount, newInputAttachments, 
+                      s_poolInputAttachmentCount + newInputAttachments, s_maxInputAttachments);
         throw std::runtime_error("DescriptorSet: Input attachment limit exceeded! Current: " + 
                                 std::to_string(s_poolInputAttachmentCount) + ", Requested: " + 
                                 std::to_string(newInputAttachments) + ", Max: " + std::to_string(s_maxInputAttachments));
     }
 
     if (s_poolAccelerationStructureCount + newAccelerationStructures > s_maxAccelerationStructures) {
+        RP_CORE_ERROR("DescriptorSet: Acceleration structure limit exceeded for set {}! "
+                      "Current: {}, Requested: {}, Total would be: {}, Max: {}", 
+                      bindings.setNumber, s_poolAccelerationStructureCount, newAccelerationStructures, 
+                      s_poolAccelerationStructureCount + newAccelerationStructures, s_maxAccelerationStructures);
         throw std::runtime_error("DescriptorSet: Acceleration structure limit exceeded! Current: " + 
                                 std::to_string(s_poolAccelerationStructureCount) + ", Requested: " + 
                                 std::to_string(newAccelerationStructures) + ", Max: " + std::to_string(s_maxAccelerationStructures));
@@ -294,6 +357,14 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
     m_usedStorageImages = newStorageImages;
     m_usedInputAttachments = newInputAttachments;
     m_usedAccelerationStructures = newAccelerationStructures;
+
+    RP_CORE_INFO("DescriptorSet: Successfully allocated resources for set {} - "
+                 "Pool usage: Sets {}/{}, Buffers {}/{}, Textures {}/{}, "
+                 "StorageBuffers {}/{}, StorageImages {}/{}, AccelStructs {}/{}",
+                 bindings.setNumber, s_poolRefCount, s_maxSets,
+                 s_poolBufferCount, s_maxBuffers, s_poolTextureCount, s_maxTextures,
+                 s_poolStorageBufferCount, s_maxStorageBuffers, s_poolStorageImageCount, s_maxStorageImages,
+                 s_poolAccelerationStructureCount, s_maxAccelerationStructures);
 }
 
 

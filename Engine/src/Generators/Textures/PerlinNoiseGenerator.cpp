@@ -18,7 +18,8 @@ struct PerlinNoisePushConstants {
     float scale;
     uint32_t seed;
 };
-
+}
+/*
 // Static member definitions
 std::unique_ptr<ComputePipeline> PerlinNoiseGenerator::m_computePipeline = nullptr;
 std::shared_ptr<Shader> PerlinNoiseGenerator::m_computeShader = nullptr;
@@ -264,3 +265,4 @@ void PerlinNoiseGenerator::dispatchComputeShader(VkCommandBuffer commandBuffer, 
 }
 
 }
+*/
