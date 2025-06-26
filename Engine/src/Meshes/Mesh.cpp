@@ -2,7 +2,6 @@
 #include "WindowContext/Application.h"
 
 #include "Logging/Log.h"
-#include "Buffers/BufferPool.h"
 
 namespace Rapture {
 
@@ -48,18 +47,31 @@ namespace Rapture {
         vertexRequest.type = BufferType::VERTEX;
         vertexRequest.usage = BufferUsage::STATIC;
         vertexRequest.layout = params.bufferLayout;
-        auto vertexAllocation = bufferPoolManager.allocateBuffer(vertexRequest);
+        vertexRequest.indexSize = params.indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2;
+        vertexRequest.alignment = params.bufferLayout.calculateVertexSize();
+        m_vertexAllocation = bufferPoolManager.allocateBuffer(vertexRequest);
+
 
         BufferAllocationRequest indexRequest;
         indexRequest.size = params.indexDataSize;
         indexRequest.type = BufferType::INDEX;
         indexRequest.usage = BufferUsage::STATIC;
         indexRequest.layout = params.bufferLayout;
+        indexRequest.indexSize = params.indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2;
+        indexRequest.alignment = params.bufferLayout.calculateVertexSize();
 
-        auto indexAllocation = bufferPoolManager.allocateBuffer(indexRequest);
+        m_indexAllocation = bufferPoolManager.allocateBuffer(indexRequest);
 
+        // Upload data to the BufferPool allocations
+        if (m_vertexAllocation && params.vertexData) {
+            m_vertexAllocation->uploadData(params.vertexData, params.vertexDataSize);
 
+        }
+        
+        if (m_indexAllocation && params.indexData) {
+            m_indexAllocation->uploadData(params.indexData, params.indexDataSize);
 
+        }
 
     }
 

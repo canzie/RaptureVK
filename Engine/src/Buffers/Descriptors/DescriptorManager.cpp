@@ -63,6 +63,10 @@ void DescriptorManager::initializeSet0() {
                                 false, DescriptorSetBindingLocation::SHADOW_DATA_UBO});
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::PROBE_VOLUME_DATA_UBO});
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, TextureViewType::DEFAULT, 
+                                false, DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS});
+
+            
     bindings.setNumber = 0;
 
     

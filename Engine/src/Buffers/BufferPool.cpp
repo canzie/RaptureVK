@@ -1,6 +1,9 @@
 #include "BufferPool.h"
 #include "Logging/Log.h"
 #include "Utils/GLTypes.h"
+#include "CommandBuffers/CommandPool.h"
+#include "CommandBuffers/CommandBuffer.h"
+#include "WindowContext/Application.h"
 #include <cstring>
 #include <functional>
 
@@ -35,6 +38,102 @@ VkDeviceAddress BufferAllocation::getDeviceAddress() const {
     // In practice, this should be called from a context that has access to the device
     // For now, return 0 and let the caller handle device address retrieval
     return 0; // TODO: Implement proper device address retrieval
+}
+
+void BufferAllocation::uploadData(const void* data, VkDeviceSize size, VkDeviceSize offset) {
+    if (!isValid() || !data) {
+        RP_CORE_ERROR("BufferAllocation::uploadData - Invalid allocation or null data");
+        return;
+    }
+    
+    if (offset + size > sizeBytes) {
+        RP_CORE_ERROR("BufferAllocation::uploadData - Upload size {} + offset {} exceeds allocation size {}", 
+                      size, offset, sizeBytes);
+        return;
+    }
+    
+    VmaAllocator allocator = parentArena->vmaAllocator;
+    VkBuffer targetBuffer = parentArena->buffer;
+    VkDeviceSize targetOffset = offsetBytes + offset;
+    
+    // Check if we can directly map the memory (for CPU-accessible buffers)
+    VmaAllocationInfo allocInfo;
+    vmaGetAllocationInfo(allocator, parentArena->vmaAllocation, &allocInfo);
+    
+
+    // Create staging buffer for GPU-only memory
+    VkBufferCreateInfo stagingBufferInfo{};
+    stagingBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    stagingBufferInfo.size = size;
+    stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    stagingBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    
+    VmaAllocationCreateInfo stagingAllocInfo{};
+    stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    stagingAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    
+    VkBuffer stagingBuffer;
+    VmaAllocation stagingAllocation;
+    VmaAllocationInfo stagingInfo;
+    
+    VkResult result = vmaCreateBuffer(allocator, &stagingBufferInfo, &stagingAllocInfo, 
+                                        &stagingBuffer, &stagingAllocation, &stagingInfo);
+    if (result != VK_SUCCESS) {
+        RP_CORE_ERROR("BufferAllocation::uploadData - Failed to create staging buffer");
+        return;
+    }
+    
+    // Copy data to staging buffer
+    std::memcpy(stagingInfo.pMappedData, data, size);
+    
+    // Get command buffer from CommandPool system
+    auto& app = Application::getInstance();
+    auto& vulkanContext = app.getVulkanContext();
+    
+    // Create command pool config for transfer operations
+    CommandPoolConfig poolConfig;
+    poolConfig.queueFamilyIndex = vulkanContext.getQueueFamilyIndices().graphicsFamily.value(); // Using graphics queue for transfer
+    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    
+    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
+    if (!commandPool) {
+        RP_CORE_ERROR("BufferAllocation::uploadData - Failed to create command pool");
+        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+        return;
+    }
+    
+    auto commandBuffer = commandPool->getCommandBuffer();
+    if (!commandBuffer) {
+        RP_CORE_ERROR("BufferAllocation::uploadData - Failed to get command buffer");
+        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+        return;
+    }
+    
+    // Begin command buffer
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    
+    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+    
+    // Record copy command
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = targetOffset;
+    copyRegion.size = size;
+    
+    vkCmdCopyBuffer(commandBuffer->getCommandBufferVk(), stagingBuffer, targetBuffer, 1, &copyRegion);
+    
+    // End command buffer
+    commandBuffer->end();
+    
+    auto graphicsQueue = vulkanContext.getGraphicsQueue();
+    graphicsQueue->submitQueue(commandBuffer);
+    graphicsQueue->waitIdle();
+    
+    // Clean up staging buffer
+    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+
 }
 
 
@@ -104,12 +203,20 @@ BufferArena::~BufferArena() {
     RP_CORE_INFO("BufferArena: Destroyed arena {}", id);
 }
 
-bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllocation& outAllocation) {
+bool BufferArena::allocate( BufferAllocationRequest& request, BufferAllocation& outAllocation) {
     std::lock_guard<std::mutex> lock(mutex);
     
+    // Calculate element-based alignment and metadata
+    VkDeviceSize elementAlignment = calculateElementAlignment(request);
+    uint32_t elementSize = calculateElementSize(request);
+    uint32_t elementCount = static_cast<uint32_t>(request.size / elementSize);
+    
+    // Ensure the allocation size is properly aligned to element boundaries
+    VkDeviceSize alignedSize = elementCount * elementSize;
+    
     VmaVirtualAllocationCreateInfo allocCreateInfo{};
-    allocCreateInfo.size = size;
-    allocCreateInfo.alignment = alignment;
+    allocCreateInfo.size = alignedSize;
+    allocCreateInfo.alignment = elementAlignment;
     
     VmaVirtualAllocation allocation;
     VkDeviceSize offset;
@@ -119,10 +226,29 @@ bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllo
         return false;
     }
     
+    // Calculate the first element index for this allocation
+    uint32_t firstElementIndex = static_cast<uint32_t>(offset / elementSize);
+    
+    // Create allocation metadata
+    AllocationElementInfo elementInfo;
+    elementInfo.type = request.type;
+    elementInfo.elementSize = elementSize;
+    elementInfo.elementCount = elementCount;
+    elementInfo.firstElementIndex = firstElementIndex;
+    
+    // Store allocation metadata
+    allocations.push_back(elementInfo);
+    
+    // Update next element index
+    nextElementIndex = firstElementIndex + elementCount;
+    
+    // Fill out the allocation
     outAllocation.parentArena = shared_from_this();
     outAllocation.allocation = allocation;
     outAllocation.offsetBytes = offset;
-    outAllocation.sizeBytes = size;
+    outAllocation.sizeBytes = alignedSize;
+    outAllocation.elementInfo = elementInfo;
+    
     
     return true;
 }
@@ -133,12 +259,57 @@ void BufferArena::free(BufferAllocation& allocation) {
     }
     
     std::lock_guard<std::mutex> lock(mutex);
+    
+    // Remove allocation metadata
+    auto& allocInfo = allocation.elementInfo;
+    auto it = std::find_if(allocations.begin(), allocations.end(),
+        [&](const AllocationElementInfo& info) {
+            return info.firstElementIndex == allocInfo.firstElementIndex &&
+                   info.elementCount == allocInfo.elementCount &&
+                   info.type == allocInfo.type;
+        });
+    if (it != allocations.end()) {
+        allocations.erase(it);
+    }
+    
     vmaVirtualFree(virtualBlock, allocation.allocation);
     
     // Clear the allocation data (but don't reset parentArena to avoid infinite recursion)
     allocation.allocation = VK_NULL_HANDLE;
     allocation.offsetBytes = 0;
     allocation.sizeBytes = 0;
+    allocation.elementInfo = AllocationElementInfo(); // Reset element info
+}
+
+VkDeviceSize BufferArena::calculateElementAlignment( BufferAllocationRequest& request) {
+    if (request.type == BufferType::VERTEX) {
+        // For vertex data, align to the vertex stride
+        uint32_t stride = request.layout.calculateVertexSize();
+        return std::max(static_cast<VkDeviceSize>(stride), request.alignment);
+    } else {
+        // For index data, align to the index size
+        return std::max(static_cast<VkDeviceSize>(request.indexSize), request.alignment);
+    }
+}
+
+uint32_t BufferArena::calculateElementSize( BufferAllocationRequest& request) {
+    if (request.type == BufferType::VERTEX) {
+        return request.layout.calculateVertexSize();
+    } else {
+        return request.indexSize;
+    }
+}
+
+AllocationElementInfo* BufferArena::findAllocationInfo(VmaVirtualAllocation allocation) {
+    // This is a simple linear search. For performance-critical scenarios,
+    // consider using a hash map with allocation handle as key
+    for (auto& info : allocations) {
+        // Note: VmaVirtualAllocation doesn't directly map to our info,
+        // so this is a placeholder implementation
+        // In practice, you might need to store the allocation handle in AllocationElementInfo
+        // or use a different mapping strategy
+    }
+    return nullptr;
 }
 
 bool BufferArena::isCompatible(const BufferAllocationRequest& request) const {
@@ -214,7 +385,7 @@ void BufferPoolManager::shutdown() {
     s_instance.reset();
 }
 
-std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer(const BufferAllocationRequest& request) {
+std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer( BufferAllocationRequest& request) {
     std::lock_guard<std::mutex> lock(m_mutex);
     
     if (m_allocator == VK_NULL_HANDLE) {
@@ -229,7 +400,7 @@ std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer(const Buffer
     }
     
     auto allocation = std::make_shared<BufferAllocation>();
-    if (!arena->allocate(request.size, request.alignment, *allocation)) {
+    if (!arena->allocate(request, *allocation)) {
         RP_CORE_ERROR("BufferPoolManager: Failed to allocate {} bytes from arena {}", request.size, arena->id);
         return nullptr;
     }

@@ -28,6 +28,7 @@ enum class TextureWrap {
 enum class TextureFormat : uint16_t {
     RGBA8,       // VK_FORMAT_R8G8B8A8_UNORM or VK_FORMAT_R8G8B8A8_SRGB
     RGB8,        // VK_FORMAT_R8G8B8_UNORM or VK_FORMAT_R8G8B8_SRGB (requires swizzle or different view format if HW doesn't support well)
+    BGRA8,       // VK_FORMAT_B8G8R8A8_UNORM or VK_FORMAT_B8G8R8A8_SRGB
     RGBA16F,     // VK_FORMAT_R16G16B16A16_SFLOAT
     RGB16F,      // VK_FORMAT_R16G16B16_SFLOAT
     RGBA32F,     // VK_FORMAT_R32G32B32A32_SFLOAT
@@ -99,6 +100,7 @@ inline VkFormat toVkFormat(TextureFormat format, bool srgb = true) {
     switch (format) {
         case TextureFormat::RGBA8:       return srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
         case TextureFormat::RGB8:        return srgb ? VK_FORMAT_R8G8B8_SRGB : VK_FORMAT_R8G8B8_UNORM; // Check hardware support or use VK_FORMAT_R8G8B8A8 and swizzle for RGB.
+        case TextureFormat::BGRA8:       return srgb ? VK_FORMAT_B8G8R8A8_SRGB : VK_FORMAT_B8G8R8A8_UNORM;
         case TextureFormat::RGBA16F:     return VK_FORMAT_R16G16B16A16_SFLOAT;
         case TextureFormat::RGB16F:      return VK_FORMAT_R16G16B16_SFLOAT; // Requires VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT for this format
         case TextureFormat::RGBA32F:     return VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -201,6 +203,7 @@ inline uint32_t getBytesPerPixel(TextureFormat format) {
     switch (format) {
         case TextureFormat::RGBA8:       return 4;  // 4 channels × 1 byte
         case TextureFormat::RGB8:        return 3;  // 3 channels × 1 byte  
+        case TextureFormat::BGRA8:       return 4;  // 4 channels × 1 byte
         case TextureFormat::RGBA16F:     return 8;  // 4 channels × 2 bytes
         case TextureFormat::RGB16F:      return 6;  // 3 channels × 2 bytes
         case TextureFormat::RGBA32F:     return 16; // 4 channels × 4 bytes

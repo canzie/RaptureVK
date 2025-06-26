@@ -15,6 +15,7 @@
 #include "Renderer/Frustum/Frustum.h"
 
 #include "Components/Systems/ObjectDataBuffers/ShadowDataBuffer.h"
+#include "Renderer/MDIBatch.h"
 
 #include "Scenes/Scene.h"
 
@@ -127,6 +128,9 @@ private:
     AssetHandle m_handle;
 
     VmaAllocator m_allocator;
+    
+    // MDI batching system
+    std::unique_ptr<MDIBatchMap> m_mdiBatchMap;
 
     
     };

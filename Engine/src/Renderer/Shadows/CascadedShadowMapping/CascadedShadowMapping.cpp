@@ -15,8 +15,8 @@
 namespace Rapture {
 
 struct PushConstantsCSM {
-    glm::mat4 model;
     uint32_t shadowMatrixIndices;
+    uint32_t batchInfoBufferIndex;
 };
 
 
@@ -39,6 +39,9 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
     createShadowTexture();
     createPipeline();
     createUniformBuffers();
+    
+    // Initialize MDI batching system
+    m_mdiBatchMap = std::make_unique<MDIBatchMap>();
     
     // Create flattened texture for debugging/visualization
     m_flattenedShadowTexture = TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
@@ -184,6 +187,9 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
 
     m_currentFrame = currentFrame;
 
+    // Begin frame for MDI batching
+    m_mdiBatchMap->beginFrame();
+
     // Bind pipeline
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
     
@@ -204,15 +210,13 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
     
 
     DescriptorManager::bindSet(0, commandBuffer, m_pipeline);
+    DescriptorManager::bindSet(2, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
     auto& registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
     
-    // Group entities by vertex layout to minimize vkCmdSetVertexInputEXT calls
-    std::unordered_map<size_t, std::vector<entt::entity>> entitiesByVertexLayout;
-    
-    // Pre-pass: group entities by vertex layout hash and perform early culling
+    // First pass: Populate MDI batches with mesh data
     for (auto entity : view) {
         auto& transform = view.get<TransformComponent>(entity);
         auto& meshComp = view.get<MeshComponent>(entity);
@@ -233,75 +237,83 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
             boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
         }
         
-        // Group by vertex layout hash
-        size_t layoutHash = meshComp.mesh->getVertexBuffer()->getBufferLayout().hash();
-        entitiesByVertexLayout[layoutHash].push_back(entity);
+        // Get buffer allocation info to determine batch
+        auto vboAlloc = meshComp.mesh->getVertexAllocation();
+        auto iboAlloc = meshComp.mesh->getIndexAllocation();
+        
+        if (!vboAlloc || !iboAlloc) {
+            continue;
+        }
+        
+        // Get or create batch for this VBO/IBO arena combination
+        MDIBatch* batch = m_mdiBatchMap->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(), meshComp.mesh->getIndexBuffer()->getIndexType());
+        
+        // Get mesh buffer index from the MeshComponent
+        uint32_t meshBufferIndex = meshComp.meshDataBuffer ? meshComp.meshDataBuffer->getDescriptorIndex(currentFrame) : 0;
+        
+        // Add mesh to batch (materialIndex = 0 for shadow pass)
+        batch->addObject(*meshComp.mesh, meshBufferIndex, 0);
     }
 
+    // Second pass: Upload batch data and render using MDI
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
     
-    // Track current vertex layout to avoid redundant calls
-    size_t currentVertexLayoutHash = SIZE_MAX;
     
-    // Render entities grouped by vertex layout
-    for (const auto& [layoutHash, entities] : entitiesByVertexLayout) {
-        // Set vertex input state only when layout changes
-        if (currentVertexLayoutHash != layoutHash) {
-            // Get the vertex buffer layout from the first entity in this group
-            auto& firstMeshComp = view.get<MeshComponent>(entities[0]);
-            auto& bufferLayout = firstMeshComp.mesh->getVertexBuffer()->getBufferLayout();
-            
-            // Convert to EXT variants required by vkCmdSetVertexInputEXT
-            auto bindingDescription = bufferLayout.getBindingDescription2EXT();
-            auto attributeDescriptions = bufferLayout.getAttributeDescriptions2EXT();
-            
-            // Use the function pointer from VulkanContext
-            vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(),
-                1, &bindingDescription,
-                static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
-            
-            currentVertexLayoutHash = layoutHash;
+    for (const auto& [batchKey, batch] : m_mdiBatchMap->getBatches()) {
+        if (batch->getDrawCount() == 0) {
+            continue;
         }
-
-        // Render all entities with this vertex layout
-        for (auto entity : entities) {
-            auto& transform = view.get<TransformComponent>(entity);
-            auto& meshComp = view.get<MeshComponent>(entity);
-            
-            // Push the model matrix as a push constant
-            PushConstantsCSM pushConstants{};
-            pushConstants.model = transform.transformMatrix();
-            pushConstants.shadowMatrixIndices = m_cascadeMatricesIndex;
-            
-            // Get push constant stage flags from shader
-            VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-            if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-                stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
-            }
-            
-            vkCmdPushConstants(commandBuffer->getCommandBufferVk(),
-                               m_pipeline->getPipelineLayoutVk(),
-                               stageFlags,
-                               0,
-                               sizeof(PushConstantsCSM),
-                               &pushConstants);
-            
-            // Bind vertex buffer
-            VkBuffer vertexBuffers[] = {meshComp.mesh->getVertexBuffer()->getBufferVk()};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
-            
-            // Bind index buffer
-            vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
-                                meshComp.mesh->getIndexBuffer()->getBufferVk(), 
-                                0, 
-                                meshComp.mesh->getIndexBuffer()->getIndexType());
-            
-            // Draw the mesh once - multiview extension will handle rendering to all cascade layers
-            vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), 
-                            meshComp.mesh->getIndexCount(), 
-                            1, 0, 0, 0);
+        
+        // Upload batch data to GPU
+        batch->uploadBuffers();
+        
+        // Get layout from batch (cached from first mesh added)        
+        auto bindingDescription = batch->getBufferLayout().getBindingDescription2EXT();
+        auto attributeDescriptions = batch->getBufferLayout().getAttributeDescriptions2EXT();
+        
+        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(),
+            1, &bindingDescription,
+            static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+                
+        
+        // Set push constants for this batch
+        PushConstantsCSM pushConstants{};
+        pushConstants.shadowMatrixIndices = m_cascadeMatricesIndex;
+        pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
+        
+        VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        }
+        
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(),
+                           m_pipeline->getPipelineLayoutVk(),
+                           stageFlags,
+                           0,
+                           sizeof(PushConstantsCSM),
+                           &pushConstants);
+        
+        // Bind vertex buffer from the arena
+        VkBuffer vertexBuffer = batch->getVertexBuffer();
+        VkDeviceSize vertexOffset = 0;
+        vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, &vertexBuffer, &vertexOffset);
+        
+        // Bind index buffer from the arena
+        VkBuffer indexBuffer = batch->getIndexBuffer();
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
+                            indexBuffer, 
+                            0, 
+                            batch->getIndexType());
+        
+        // Execute multi-draw indirect
+        auto indirectBuffer = batch->getIndirectBuffer();
+        if (indirectBuffer) {
+            vkCmdDrawIndexedIndirect(commandBuffer->getCommandBufferVk(),
+                                   indirectBuffer->getBufferVk(),
+                                   0,
+                                   batch->getDrawCount(),
+                                   sizeof(VkDrawIndexedIndirectCommand));
         }
     }
     

@@ -8,6 +8,7 @@
 #include "Buffers/VertexBuffers/VertexBuffer.h"
 #include "Buffers/VertexBuffers/BufferLayout.h"
 
+#include "Buffers/BufferPool.h"
 
 
 namespace Rapture
@@ -42,11 +43,19 @@ public:
     
     //static std::shared_ptr<UniformBuffer> createBindlessMeshDataBuffer();
 
+    std::shared_ptr<BufferAllocation> getIndexAllocation() { return m_indexAllocation; }
+    std::shared_ptr<BufferAllocation> getVertexAllocation() { return m_vertexAllocation; }
+
+    std::shared_ptr<BufferAllocation> getIndexAllocation() const { return m_indexAllocation; }
+    std::shared_ptr<BufferAllocation> getVertexAllocation() const { return m_vertexAllocation; }
 
 private:
     uint32_t m_indexCount;
     std::shared_ptr<VertexBuffer> m_vertexBuffer;
     std::shared_ptr<IndexBuffer> m_indexBuffer;
+
+    std::shared_ptr<BufferAllocation> m_indexAllocation;
+    std::shared_ptr<BufferAllocation> m_vertexAllocation;
 
     //std::shared_ptr<UniformBuffer> m_objectDataBuffer; // per mesh data
     //uint32_t m_bindlessMeshDataIndex;

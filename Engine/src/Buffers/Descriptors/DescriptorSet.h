@@ -41,6 +41,7 @@ enum class DescriptorSetBindingLocation {
     SHADOW_DATA_UBO = 4,
     PROBE_VOLUME_DATA_UBO = 5,
     DDGI_PROBE_INFO = 5,  // Alias for PROBE_VOLUME_DATA_UBO
+    MDI_INDEXED_INFO_SSBOS = 6,
 
     MATERIAL_UBO = 100,
 

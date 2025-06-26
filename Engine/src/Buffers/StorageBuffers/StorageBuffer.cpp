@@ -23,6 +23,22 @@ StorageBuffer::StorageBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator 
     }
 }
 
+StorageBuffer::StorageBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator, VkBufferUsageFlags additionalUsageFlags, void* data)
+    : Buffer(size, usage, allocator)
+{
+    
+    m_usageFlags = getBufferUsage() | additionalUsageFlags;
+    m_propertiesFlags = getMemoryPropertyFlags();
+        
+    createBuffer();
+
+    if (data && (usage == BufferUsage::DYNAMIC || usage == BufferUsage::STREAM)) {
+        addData(data, size, 0);
+    } else if (data && usage == BufferUsage::STATIC) {
+        addDataGPU(data, size, 0);
+    }
+}
+
 StorageBuffer::~StorageBuffer() {
 }
 

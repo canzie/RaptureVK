@@ -57,10 +57,12 @@ class VulkanContext {
             return m_accelerationStructureProperties;
         }
 
-        // Extension function pointers
-        PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
-        PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR = nullptr;
-        PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR = nullptr;
+            // Extension function pointers
+    PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
+    PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR = nullptr;
+    PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR = nullptr;
+    PFN_vkCmdDrawMultiEXT vkCmdDrawMultiEXT = nullptr;
+    PFN_vkCmdDrawMultiIndexedEXT vkCmdDrawMultiIndexedEXT = nullptr;
 
         // Ray tracing extension function pointers
         PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR = nullptr;

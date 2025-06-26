@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include "Events/ApplicationEvents.h"
+#include "Textures/TextureCommon.h"
 
 namespace Rapture {
 
@@ -404,5 +405,7 @@ SwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) {
     return actualExtent;
   }
 }
+
+
 
 } // namespace Rapture

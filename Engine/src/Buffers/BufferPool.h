@@ -51,6 +51,14 @@ struct BufferFlags {
     bool useAccelerationStructure = false; // VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
 };
 
+// Metadata for tracking element offsets within allocations
+struct AllocationElementInfo {
+    BufferType type = BufferType::VERTEX;
+    uint32_t elementSize = 0;       // Size of each element (vertex stride or index size)
+    uint32_t elementCount = 0;      // Number of elements in this allocation
+    uint32_t firstElementIndex = 0; // First element index within the arena (not byte offset)
+};
+
 // Parameters for requesting a buffer allocation
 struct BufferAllocationRequest {
     VkDeviceSize size = 0;
@@ -58,7 +66,8 @@ struct BufferAllocationRequest {
     BufferUsage usage = BufferUsage::STATIC;
     BufferFlags flags = BufferFlags();
     VkDeviceSize alignment = 1; // Default alignment
-    BufferLayout layout; // Required for vertex buffers
+    BufferLayout layout; // Required for vertex buffers, can be provided for index buffers for grouping
+    uint32_t indexSize = 4; // Size of index (4 for uint32_t, 2 for uint16_t) - only used for INDEX type
 
 };
 
@@ -73,6 +82,7 @@ struct BufferAllocation {
     VmaVirtualAllocation allocation = VK_NULL_HANDLE;
     VkDeviceSize offsetBytes = 0;
     VkDeviceSize sizeBytes = 0;
+    AllocationElementInfo elementInfo; // Metadata for element offset calculations
 
     BufferAllocation() = default;
     ~BufferAllocation();
@@ -85,6 +95,17 @@ struct BufferAllocation {
     // Get the device address of this allocation
     VkDeviceAddress getDeviceAddress() const;
     
+    // Get the first element index (vertex/index number, not byte offset)
+    uint32_t getFirstElementIndex() const { return elementInfo.firstElementIndex; }
+    
+    // Get the number of elements in this allocation
+    uint32_t getElementCount() const { return elementInfo.elementCount; }
+    
+    // Get the size of each element
+    uint32_t getElementSize() const { return elementInfo.elementSize; }
+    
+    // Upload data to this allocation
+    void uploadData(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
 };
 
 
@@ -102,13 +123,17 @@ struct BufferArena : public std::enable_shared_from_this<BufferArena> {
     VkBufferUsageFlags usageFlags;
     BufferFlags flags;
     std::mutex mutex;
+    
+    // Element tracking for mixed vertex/index buffer support
+    uint32_t nextElementIndex = 0; // Next available element index in the arena
+    std::vector<AllocationElementInfo> allocations; // Track all allocations for element calculations
 
     BufferArena(uint32_t id, VmaAllocator allocator, VkDeviceSize arenaSize, BufferUsage usage, 
                 VkBufferUsageFlags usageFlags, const BufferFlags& flags);
     ~BufferArena();
 
     // Tries to allocate a block of memory from the virtual block.
-    bool allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllocation& outAllocation);
+    bool allocate( BufferAllocationRequest& request, BufferAllocation& outAllocation);
     void free(BufferAllocation& allocation);
     
     // Check if this arena is compatible with the given request
@@ -116,6 +141,16 @@ struct BufferArena : public std::enable_shared_from_this<BufferArena> {
     
     // Get available space in this arena
     VkDeviceSize getAvailableSpace() const;
+    
+private:
+    // Calculate element alignment based on request type
+    VkDeviceSize calculateElementAlignment( BufferAllocationRequest& request);
+    
+    // Calculate element size for the request
+    uint32_t calculateElementSize( BufferAllocationRequest& request) ;
+    
+    // Find the allocation info by VmaVirtualAllocation handle
+    AllocationElementInfo* findAllocationInfo(VmaVirtualAllocation allocation);
 };
 
 // Manager class for all buffer arenas. This is a singleton.
@@ -127,21 +162,11 @@ public:
     static void shutdown();
 
     // Allocate a single buffer (vertex or index)
-    std::shared_ptr<BufferAllocation> allocateBuffer(const BufferAllocationRequest& request);
+    std::shared_ptr<BufferAllocation> allocateBuffer( BufferAllocationRequest& request);
     
     // Free a buffer allocation
     void freeBuffer(std::shared_ptr<BufferAllocation> allocation);
     
-    
-    // Get statistics
-    struct PoolStats {
-        size_t totalArenas = 0;
-        VkDeviceSize totalAllocatedBytes = 0;
-        VkDeviceSize totalUsedBytes = 0;
-        float fragmentationRatio = 0.0f;
-    };
-    
-    PoolStats getStats() const;
 
 private:
     BufferPoolManager() = default;

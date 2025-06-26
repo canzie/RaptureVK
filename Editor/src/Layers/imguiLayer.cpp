@@ -234,46 +234,57 @@ void ImGuiLayer::renderImGui()
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
     }
 
-    if (m_defaultTextureDescriptorSets[m_currentFrame] != VK_NULL_HANDLE) {
-        ImGui_ImplVulkan_RemoveTexture(m_defaultTextureDescriptorSets[m_currentFrame]);
+    {
+        RAPTURE_PROFILE_SCOPE("Texture Descriptor Update");
+        if (m_defaultTextureDescriptorSets[m_currentFrame] != VK_NULL_HANDLE) {
+            ImGui_ImplVulkan_RemoveTexture(m_defaultTextureDescriptorSets[m_currentFrame]);
+        }
+        m_defaultTextureDescriptorSets[m_currentFrame] = ImGui_ImplVulkan_AddTexture(m_swapChainTextures[m_currentFrame]->getSampler().getSamplerVk(), m_swapChainTextures[m_currentFrame]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
-    m_defaultTextureDescriptorSets[m_currentFrame] = ImGui_ImplVulkan_AddTexture(m_swapChainTextures[m_currentFrame]->getSampler().getSamplerVk(), m_swapChainTextures[m_currentFrame]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    m_viewportPanel.renderSceneViewport((ImTextureID)m_defaultTextureDescriptorSets[m_currentFrame]);
-
-    m_propertiesPanel.render();
-    m_browserPanel.render();
-    m_gbufferPanel.render();
-    m_contentBrowserPanel.render();
-    m_imageViewerPanel.render();
-    m_settingsPanel.render();
+    {
+        RAPTURE_PROFILE_SCOPE("UI Panels Rendering");
+        m_viewportPanel.renderSceneViewport((ImTextureID)m_defaultTextureDescriptorSets[m_currentFrame]);
+        m_propertiesPanel.render();
+        m_browserPanel.render();
+        m_gbufferPanel.render();
+        m_contentBrowserPanel.render();
+        m_imageViewerPanel.render();
+        m_settingsPanel.render();
+    }
     
     //ImGui::ShowDemoWindow();
 
-    if (ImGui::BeginMenuBar()) {
-        if (ImGui::BeginMenu("File"))
-        {
-            if (ImGui::MenuItem("Exit")) { /* Handle exit */ }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("View"))
-        {
-            if (ImGui::MenuItem("Viewport")) { /* Handle exit */ }
-            if (ImGui::MenuItem("Browser")) { /* Handle exit */ }
-            if (ImGui::MenuItem("Properties")) { /* Handle exit */ }
-            if (ImGui::MenuItem("GBuffer Viewer")) { /* Handle exit */ }
-            if (ImGui::MenuItem("Content Browser")) { /* Handle exit */ }
-            if (ImGui::MenuItem("Image Viewer")) { /* Handle exit */ }
-            if (ImGui::MenuItem("Settings")) { /* Handle exit */ }
+    {
+        RAPTURE_PROFILE_SCOPE("Menu Bar Rendering");
+        if (ImGui::BeginMenuBar()) {
+            if (ImGui::BeginMenu("File"))
+            {
+                if (ImGui::MenuItem("Exit")) { /* Handle exit */ }
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("View"))
+            {
+                if (ImGui::MenuItem("Viewport")) { /* Handle exit */ }
+                if (ImGui::MenuItem("Browser")) { /* Handle exit */ }
+                if (ImGui::MenuItem("Properties")) { /* Handle exit */ }
+                if (ImGui::MenuItem("GBuffer Viewer")) { /* Handle exit */ }
+                if (ImGui::MenuItem("Content Browser")) { /* Handle exit */ }
+                if (ImGui::MenuItem("Image Viewer")) { /* Handle exit */ }
+                if (ImGui::MenuItem("Settings")) { /* Handle exit */ }
 
-            ImGui::EndMenu();
+                ImGui::EndMenu();
+            }
+            ImGui::EndMenuBar();
         }
-        ImGui::EndMenuBar();
     }
 
-    ImGui::End(); // End dockspace
-    ImGui::Render();
-    ImGui::EndFrame();
+    {
+        RAPTURE_PROFILE_SCOPE("ImGui Frame Finalization");
+        ImGui::End(); // End dockspace
+        ImGui::Render();
+        ImGui::EndFrame();
+    }
 }
 
 void ImGuiLayer::onUpdate(float ts)
@@ -285,15 +296,24 @@ void ImGuiLayer::onUpdate(float ts)
     auto swapChain = vulkanContext.getSwapChain();
     auto graphicsQueue = vulkanContext.getGraphicsQueue();
 
-    // Start ImGui frame
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-    ImGuizmo::BeginFrame();
+    {
+        RAPTURE_PROFILE_SCOPE("ImGui Frame Setup");
+        // Start ImGui frame
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGuizmo::BeginFrame();
+    }
 
     // Acquire next swapchain image
-    int imageIndexi = swapChain->acquireImage(m_currentFrame);
+    int imageIndexi;
+    {
+        RAPTURE_PROFILE_SCOPE("SwapChain Image Acquisition");
+        imageIndexi = swapChain->acquireImage(m_currentFrame);
+    }
+    
     if (imageIndexi == -1) {
+        RAPTURE_PROFILE_SCOPE("SwapChain Recreation");
         //Rapture::ForwardRenderer::recreateSwapChain();
         m_currentFrame = 0;
         graphicsQueue->clear();
@@ -309,68 +329,85 @@ void ImGuiLayer::onUpdate(float ts)
     VkSemaphore waitSemaphores[] = {swapChain->getImageAvailableSemaphore(m_currentFrame)};
     VkSemaphore signalSemaphores[] = {swapChain->getRenderFinishedSemaphore(m_currentFrame)};
 
-
     // First submit - render the scene
-    VkSubmitInfo firstSubmitInfo{};
-    firstSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    firstSubmitInfo.waitSemaphoreCount = 1;
-    firstSubmitInfo.pWaitSemaphores = waitSemaphores;
-    firstSubmitInfo.pWaitDstStageMask = waitStages;
-    firstSubmitInfo.signalSemaphoreCount = 1;
-    firstSubmitInfo.pSignalSemaphores = signalSemaphores;
-    graphicsQueue->submitCommandBuffers(firstSubmitInfo);
+    {
+        RAPTURE_PROFILE_SCOPE("Scene Render Submit");
+        VkSubmitInfo firstSubmitInfo{};
+        firstSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        firstSubmitInfo.waitSemaphoreCount = 1;
+        firstSubmitInfo.pWaitSemaphores = waitSemaphores;
+        firstSubmitInfo.pWaitDstStageMask = waitStages;
+        firstSubmitInfo.signalSemaphoreCount = 1;
+        firstSubmitInfo.pSignalSemaphores = signalSemaphores;
+        graphicsQueue->submitCommandBuffers(firstSubmitInfo);
+    }
 
     // Copy the swapchain image to the texture
     // Wait on the first render to complete, signal a new semaphore for ImGui
-    m_swapChainTextures[m_currentFrame]->copyFromImage(
-        swapChain->getImages()[m_currentImageIndex], 
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        swapChain->getRenderFinishedSemaphore(m_currentFrame), 
-        swapChain->getImageAvailableSemaphore(m_currentFrame));
+    {
+        RAPTURE_PROFILE_SCOPE("SwapChain to Texture Copy");
+        m_swapChainTextures[m_currentFrame]->copyFromImage(
+            swapChain->getImages()[m_currentImageIndex], 
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+            swapChain->getRenderFinishedSemaphore(m_currentFrame), 
+            swapChain->getImageAvailableSemaphore(m_currentFrame));
+    }
 
     // ImGui commands
-    renderImGui();
+    {
+        RAPTURE_PROFILE_SCOPE("ImGui Render Commands");
+        renderImGui();
+    }
 
-    m_imguiCommandBuffers[m_currentFrame]->reset();
-    auto targetImageView = swapChain->getImageViews()[m_currentImageIndex];
-    drawImGui(m_imguiCommandBuffers[m_currentFrame]->getCommandBufferVk(), targetImageView);
-    graphicsQueue->addCommandBuffer(m_imguiCommandBuffers[m_currentFrame]);
+    {
+        RAPTURE_PROFILE_SCOPE("ImGui Command Buffer Setup");
+        m_imguiCommandBuffers[m_currentFrame]->reset();
+        auto targetImageView = swapChain->getImageViews()[m_currentImageIndex];
+        drawImGui(m_imguiCommandBuffers[m_currentFrame]->getCommandBufferVk(), targetImageView);
+        graphicsQueue->addCommandBuffer(m_imguiCommandBuffers[m_currentFrame]);
+    }
 
     // Final submit - render ImGui
-    VkSubmitInfo finalSubmitInfo{};
-    finalSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    finalSubmitInfo.waitSemaphoreCount = 1;
-    finalSubmitInfo.pWaitSemaphores = waitSemaphores;
-    finalSubmitInfo.pWaitDstStageMask = waitStages;
-    finalSubmitInfo.signalSemaphoreCount = 1;
-    finalSubmitInfo.pSignalSemaphores = signalSemaphores;
+    {
+        RAPTURE_PROFILE_SCOPE("ImGui Render Submit");
+        VkSubmitInfo finalSubmitInfo{};
+        finalSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        finalSubmitInfo.waitSemaphoreCount = 1;
+        finalSubmitInfo.pWaitSemaphores = waitSemaphores;
+        finalSubmitInfo.pWaitDstStageMask = waitStages;
+        finalSubmitInfo.signalSemaphoreCount = 1;
+        finalSubmitInfo.pSignalSemaphores = signalSemaphores;
 
-    graphicsQueue->submitCommandBuffers(finalSubmitInfo, swapChain->getInFlightFence(m_currentFrame));
+        graphicsQueue->submitCommandBuffers(finalSubmitInfo, swapChain->getInFlightFence(m_currentFrame));
+    }
 
     // Present
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
+    VkResult result;
+    {
+        RAPTURE_PROFILE_SCOPE("SwapChain Present");
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = {swapChain->getSwapChainVk()};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &m_currentImageIndex; // imageIndex from vkAcquireNextImageKHR
-    presentInfo.pResults = nullptr; // Optional
+        VkSwapchainKHR swapChains[] = {swapChain->getSwapChainVk()};
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+        presentInfo.pImageIndices = &m_currentImageIndex; // imageIndex from vkAcquireNextImageKHR
+        presentInfo.pResults = nullptr; // Optional
 
-    VkResult result = vulkanContext.getPresentQueue()->presentQueue(presentInfo); 
-    swapChain->signalImageAvailability(m_currentImageIndex);
+        result = vulkanContext.getPresentQueue()->presentQueue(presentInfo); 
+        swapChain->signalImageAvailability(m_currentImageIndex);
+    }
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
-
+        RAPTURE_PROFILE_SCOPE("SwapChain Recreation (Present)");
         //Rapture::ForwardRenderer::recreateSwapChain();
         Rapture::ApplicationEvents::onRequestSwapChainRecreation().publish();
         m_framebufferNeedsResize = false;
         m_currentFrame = 0;
         this->onResize();
-
 
         return; // Must return after recreating swap chain, as current frame's resources are invalid.
     } else if (result != VK_SUCCESS) {
@@ -378,9 +415,7 @@ void ImGuiLayer::onUpdate(float ts)
         throw std::runtime_error("failed to present swap chain image in ImGuiLayer!");
     }
 
-
     m_currentFrame = (m_currentFrame + 1) % m_imageCount;
-
 }
 
 void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImageView)
@@ -390,7 +425,6 @@ void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImag
     auto& app = Rapture::Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();
-
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -402,18 +436,26 @@ void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImag
     }
 
     {
-    RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "ImGui Layer");
+        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "ImGui Layer");
 
-    beginDynamicRendering(commandBuffer, targetImageView);
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "Dynamic Rendering Setup");
+            beginDynamicRendering(commandBuffer, targetImageView);
+        }
 
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "ImGui Draw Data Rendering");
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+        }
 
-    endDynamicRendering(commandBuffer);
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "Dynamic Rendering End");
+            endDynamicRendering(commandBuffer);
+        }
 
-    RAPTURE_PROFILE_GPU_COLLECT(commandBuffer);
-
-
+        RAPTURE_PROFILE_GPU_COLLECT(commandBuffer);
     }
+
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         throw std::runtime_error("failed to record command buffer for imgui!");
     }
@@ -465,35 +507,40 @@ void ImGuiLayer::endDynamicRendering(VkCommandBuffer commandBuffer) {
 
     vkCmdEndRendering(commandBuffer);
 
-    // Add pipeline barrier to transition to present layout
-    VkImageMemoryBarrier presentBarrier{};
-    presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    presentBarrier.image = swapChain->getImages()[m_currentImageIndex];  
-    presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    presentBarrier.subresourceRange.baseMipLevel = 0;
-    presentBarrier.subresourceRange.levelCount = 1;
-    presentBarrier.subresourceRange.baseArrayLayer = 0;
-    presentBarrier.subresourceRange.layerCount = 1;
-    presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    presentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    {
+        RAPTURE_PROFILE_SCOPE("Image Layout Transition");
+        // Add pipeline barrier to transition to present layout
+        VkImageMemoryBarrier presentBarrier{};
+        presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        presentBarrier.image = swapChain->getImages()[m_currentImageIndex];  
+        presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        presentBarrier.subresourceRange.baseMipLevel = 0;
+        presentBarrier.subresourceRange.levelCount = 1;
+        presentBarrier.subresourceRange.baseArrayLayer = 0;
+        presentBarrier.subresourceRange.layerCount = 1;
+        presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        presentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 
-    vkCmdPipelineBarrier(
-        commandBuffer,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &presentBarrier
-    );
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &presentBarrier
+        );
+    }
 }
 
 void ImGuiLayer::onResize()
 {
+    RAPTURE_PROFILE_FUNCTION();
+
     auto& app = Rapture::Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();

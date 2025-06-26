@@ -110,6 +110,7 @@ namespace Rapture {
     m_deviceExtensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
     
     // Ray tracing extensions
     m_deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
@@ -912,6 +913,16 @@ void VulkanContext::createLogicalDevice()
         }
     } else {
         m_isDynamicRenderingEnabled = false;
+    }
+
+    // Load multi-draw function pointers
+    vkCmdDrawMultiEXT = (PFN_vkCmdDrawMultiEXT)vkGetDeviceProcAddr(m_device, "vkCmdDrawMultiEXT");
+    vkCmdDrawMultiIndexedEXT = (PFN_vkCmdDrawMultiIndexedEXT)vkGetDeviceProcAddr(m_device, "vkCmdDrawMultiIndexedEXT");
+    
+    if (!vkCmdDrawMultiEXT || !vkCmdDrawMultiIndexedEXT) {
+        RP_CORE_WARN("Failed to load multi-draw function pointers! Multi-draw indirect will fall back to regular indirect.");
+    } else {
+        RP_CORE_INFO("Successfully loaded multi-draw function pointers.");
     }
 
     // Load ray tracing function pointers and query properties

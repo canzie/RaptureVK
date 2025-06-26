@@ -55,6 +55,7 @@ public:
 
   void invalidate();
 
+
   static RenderMode renderMode;
 
 private:
@@ -82,6 +83,9 @@ private:
   bool m_framebufferNeedsResize;
 
   std::shared_ptr<Texture> m_depthTexture;
+
+  // only used for offscreen rendering when RenderMode is OFFSCREEN
+  // std::vector<std::shared_ptr<Texture>> m_offscreenTextures;
 
   VkDevice m_device = VK_NULL_HANDLE;
   VkSurfaceKHR m_surface = VK_NULL_HANDLE;
