@@ -22,9 +22,11 @@ struct PushConstants {
     uint32_t GBufferMaterialHandle;
     uint32_t GBufferDepthHandle;
 
+    bool useDDGI;
     uint32_t probeVolumeHandle;
     uint32_t probeIrradianceHandle;
     uint32_t probeVisibilityHandle;
+
 
 };
 
@@ -147,6 +149,8 @@ void LightingPass::recordCommandBuffer(
     pushConstants.GBufferPositionHandle = m_gBufferPass->getPositionTextureIndex();
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
+
+    pushConstants.useDDGI = false;
 
 
     auto& reg = activeScene->getRegistry();

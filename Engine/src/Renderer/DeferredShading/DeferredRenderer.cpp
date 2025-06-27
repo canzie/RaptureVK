@@ -126,7 +126,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
 
   uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
 
-  m_dynamicDiffuseGI->populateProbesCompute(activeScene);
+  //m_dynamicDiffuseGI->populateProbesCompute(activeScene);
 
   m_commandBuffers[m_currentFrame]->reset();
   recordCommandBuffer(m_commandBuffers[m_currentFrame], activeScene,

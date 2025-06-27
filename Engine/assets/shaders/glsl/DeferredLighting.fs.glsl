@@ -79,6 +79,7 @@ layout(push_constant) uniform PushConstants {
     uint GBufferMaterialHandle;
     uint GBufferDepthHandle;
 
+    bool useDDGI;
     uint probeVolumeHandle;
     uint probeIrradianceHandle;
     uint probeVisibilityHandle;
@@ -527,11 +528,13 @@ void main() {
         Lo += contribution * attenuation * shadowFactor;
     }
 
-    vec3 ambient = vec3(0.03) * albedo * ao * (1.0 - metallic);
+    vec3 indirectDiffuse = vec3(0.03) * albedo * ao * (1.0 - metallic);
 
-    vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
-    vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, u_DDGI_Volume, V);
-    vec3 indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
+    if (pc.useDDGI) {
+        vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
+        vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, u_DDGI_Volume, V);
+        indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
+    }
 
     vec3 color = indirectDiffuse + Lo;
 

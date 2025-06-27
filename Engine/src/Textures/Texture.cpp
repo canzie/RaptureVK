@@ -332,7 +332,8 @@ void Texture::copyFromImage(
     VkImageLayout newLayout,
     VkSemaphore waitSemaphore,
     VkSemaphore signalSemaphore,
-    VkCommandBuffer extCommandBuffer) {
+    VkCommandBuffer extCommandBuffer,
+    bool useInternalFence) {
 
         
     if (m_image == VK_NULL_HANDLE || image == VK_NULL_HANDLE) {
@@ -496,15 +497,21 @@ void Texture::copyFromImage(
             submitInfo.pSignalSemaphores = &signalSemaphore;
         }
 
-        VkFence fence;
-        VkFenceCreateInfo fenceInfo{};
-        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        vkCreateFence(app.getVulkanContext().getLogicalDevice(), &fenceInfo, nullptr, &fence);
+        if (useInternalFence) {
+            // Traditional blocking approach
+            VkFence fence;
+            VkFenceCreateInfo fenceInfo{};
+            fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            vkCreateFence(app.getVulkanContext().getLogicalDevice(), &fenceInfo, nullptr, &fence);
 
-        graphicsQueue->submitQueue(internalCommandBuffer, submitInfo, fence);
+            graphicsQueue->submitQueue(internalCommandBuffer, submitInfo, fence);
 
-        vkWaitForFences(app.getVulkanContext().getLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
-        vkDestroyFence(app.getVulkanContext().getLogicalDevice(), fence, nullptr);
+            vkWaitForFences(app.getVulkanContext().getLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
+            vkDestroyFence(app.getVulkanContext().getLogicalDevice(), fence, nullptr);
+        } else {
+            // Non-blocking approach - caller handles synchronization
+            graphicsQueue->submitQueue(internalCommandBuffer, submitInfo, VK_NULL_HANDLE);
+        }
     }
 }
 

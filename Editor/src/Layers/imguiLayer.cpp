@@ -343,16 +343,38 @@ void ImGuiLayer::onUpdate(float ts)
     }
 
     // Copy the swapchain image to the texture
-    // Wait on the first render to complete, signal a new semaphore for ImGui
+    // Use the same command buffer that will be synchronized with the frame fence
     {
         RAPTURE_PROFILE_SCOPE("SwapChain to Texture Copy");
+        
+        // Create the copy command in the same command buffer as ImGui rendering
+        // This ensures it's synchronized with the frame fence
+        VkCommandBuffer imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame]->getCommandBufferVk();
+        
+        // Begin command buffer for both copy and ImGui operations
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        beginInfo.pInheritanceInfo = nullptr;
+
+        m_imguiCommandBuffers[m_currentFrame]->reset();
+        
+        if (vkBeginCommandBuffer(imguiCommandBuffer, &beginInfo) != VK_SUCCESS) {
+            Rapture::RP_ERROR("failed to begin recording command buffer for texture copy!");
+            throw std::runtime_error("failed to begin recording command buffer for texture copy!");
+        }
+        
+        // Record the copy operation directly into the ImGui command buffer
         m_swapChainTextures[m_currentFrame]->copyFromImage(
             swapChain->getImages()[m_currentImageIndex], 
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-            signalSemaphores[0], 
-            waitSemaphores[0]);
+            VK_NULL_HANDLE, // no semaphores needed - using external command buffer
+            VK_NULL_HANDLE,
+            imguiCommandBuffer, // use the ImGui command buffer
+            false); // no internal fence - will be handled by frame fence
     }
+
 
     // ImGui commands
     {
@@ -360,20 +382,9 @@ void ImGuiLayer::onUpdate(float ts)
         renderImGui();
     }
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    beginInfo.pInheritanceInfo = nullptr; // Optional
-
+    // Command buffer was already begun in the copy section above
     VkCommandBuffer imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame]->getCommandBufferVk();
-
-    m_imguiCommandBuffers[m_currentFrame]->reset();
     auto targetImageView = swapChain->getImageViews()[m_currentImageIndex];
-
-    if (vkBeginCommandBuffer(imguiCommandBuffer, &beginInfo) != VK_SUCCESS) {
-        Rapture::RP_ERROR("failed to begin recording command buffer for imgui!");
-        throw std::runtime_error("failed to begin recording command buffer for imgui!");
-    }
 
     {
         RAPTURE_PROFILE_SCOPE("ImGui Command Buffer Setup");
@@ -386,16 +397,20 @@ void ImGuiLayer::onUpdate(float ts)
         throw std::runtime_error("failed to record command buffer for imgui!");
     }
 
-    // Final submit - render ImGui
+    // Final submit - render ImGui (waits for scene render, signals completion for present)
     {
         RAPTURE_PROFILE_SCOPE("ImGui Render Submit");
+        
+        // Create a dedicated semaphore for ImGui completion
+        VkSemaphore imguiCompleteSemaphore = swapChain->getRenderFinishedSemaphore(m_currentFrame);
+        
         VkSubmitInfo finalSubmitInfo{};
         finalSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         finalSubmitInfo.waitSemaphoreCount = 1;
-        finalSubmitInfo.pWaitSemaphores = waitSemaphores;
+        finalSubmitInfo.pWaitSemaphores = signalSemaphores; // Wait for scene rendering to complete
         finalSubmitInfo.pWaitDstStageMask = waitStages;
-        finalSubmitInfo.signalSemaphoreCount = 1;
-        finalSubmitInfo.pSignalSemaphores = signalSemaphores;
+        finalSubmitInfo.signalSemaphoreCount = 1; // Signal ImGui completion
+        finalSubmitInfo.pSignalSemaphores = &imguiCompleteSemaphore;
 
         graphicsQueue->submitCommandBuffers(finalSubmitInfo, swapChain->getInFlightFence(m_currentFrame));
     }
@@ -404,10 +419,12 @@ void ImGuiLayer::onUpdate(float ts)
     VkResult result;
     {
         RAPTURE_PROFILE_SCOPE("SwapChain Present");
+        VkSemaphore imguiCompleteSemaphore = swapChain->getRenderFinishedSemaphore(m_currentFrame);
+        
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = signalSemaphores;
+        presentInfo.waitSemaphoreCount = 1; // Wait for ImGui to complete before presenting
+        presentInfo.pWaitSemaphores = &imguiCompleteSemaphore;
 
         VkSwapchainKHR swapChains[] = {swapChain->getSwapChainVk()};
         presentInfo.swapchainCount = 1;
