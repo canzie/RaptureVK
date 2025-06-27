@@ -331,7 +331,10 @@ void Texture::copyFromImage(
     VkImageLayout otherLayout, 
     VkImageLayout newLayout,
     VkSemaphore waitSemaphore,
-    VkSemaphore signalSemaphore) {
+    VkSemaphore signalSemaphore,
+    VkCommandBuffer extCommandBuffer) {
+
+        
     if (m_image == VK_NULL_HANDLE || image == VK_NULL_HANDLE) {
         RP_CORE_ERROR("Cannot copy image: One or both VkImages are VK_NULL_HANDLE");
         throw std::runtime_error("Cannot copy image: One or both VkImages are VK_NULL_HANDLE");
@@ -340,19 +343,29 @@ void Texture::copyFromImage(
     auto& app = Application::getInstance();
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
     
-    // Get or create a command pool for graphics operations
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getQueueFamilyIndices().graphicsFamily.value();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    
-    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer();
+    std::shared_ptr<CommandBuffer> internalCommandBuffer = nullptr;
+    VkCommandBuffer commandBufferVk;
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    bool useExternalCommandBuffer = (extCommandBuffer != VK_NULL_HANDLE);
 
-    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+    if (!useExternalCommandBuffer) {
+        // Get or create a command pool for graphics operations
+        CommandPoolConfig poolConfig{};
+        poolConfig.queueFamilyIndex = app.getVulkanContext().getQueueFamilyIndices().graphicsFamily.value();
+        poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        
+        auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
+        internalCommandBuffer = commandPool->getCommandBuffer();
+        commandBufferVk = internalCommandBuffer->getCommandBufferVk();
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(commandBufferVk, &beginInfo);
+    } else {
+        commandBufferVk = extCommandBuffer;
+    }
 
     // Transition source image to transfer source optimal
     VkImageMemoryBarrier sourceBarrier{};
@@ -390,7 +403,7 @@ void Texture::copyFromImage(
 
     // Execute the layout transitions
     vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
+        commandBufferVk,
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         0,
@@ -430,7 +443,7 @@ void Texture::copyFromImage(
 
     // Use blit instead of copy to handle color channel ordering
     vkCmdBlitImage(
-        commandBuffer->getCommandBufferVk(),
+        commandBufferVk,
         image,
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         m_image,
@@ -456,7 +469,7 @@ void Texture::copyFromImage(
 
     // Execute the final layout transitions
     vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
+        commandBufferVk,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
         0,
@@ -465,25 +478,34 @@ void Texture::copyFromImage(
         2, finalBarriers
     );
 
-    commandBuffer->end();
+    if (!useExternalCommandBuffer) {
+        internalCommandBuffer->end();
 
-    // Submit the command buffer
-    VkSubmitInfo submitInfo{};
-    if (waitSemaphore != VK_NULL_HANDLE) {
+        // Submit the command buffer
+        VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = &waitSemaphore;
-        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_TRANSFER_BIT};
-        submitInfo.pWaitDstStageMask = waitStages;
-    }
-    if (signalSemaphore != VK_NULL_HANDLE) {
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &signalSemaphore;
-    }
-    //graphicsQueue->addCommandBuffer(commandBuffer);
 
-    graphicsQueue->submitQueue(commandBuffer, submitInfo, VK_NULL_HANDLE);
-    graphicsQueue->waitIdle();
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_TRANSFER_BIT};
+        if (waitSemaphore != VK_NULL_HANDLE) {
+            submitInfo.waitSemaphoreCount = 1;
+            submitInfo.pWaitSemaphores = &waitSemaphore;
+            submitInfo.pWaitDstStageMask = waitStages;
+        }
+        if (signalSemaphore != VK_NULL_HANDLE) {
+            submitInfo.signalSemaphoreCount = 1;
+            submitInfo.pSignalSemaphores = &signalSemaphore;
+        }
+
+        VkFence fence;
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        vkCreateFence(app.getVulkanContext().getLogicalDevice(), &fenceInfo, nullptr, &fence);
+
+        graphicsQueue->submitQueue(internalCommandBuffer, submitInfo, fence);
+
+        vkWaitForFences(app.getVulkanContext().getLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
+        vkDestroyFence(app.getVulkanContext().getLogicalDevice(), fence, nullptr);
+    }
 }
 
 VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask)

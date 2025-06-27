@@ -2,7 +2,6 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
-
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
@@ -14,26 +13,35 @@ layout(location = 2) out vec2 outTexCoord;
 layout(location = 3) out vec3 outTangent;
 layout(location = 4) out vec3 outBitangent;
 layout(location = 5) out flat uint outFlags;
+layout(location = 6) out flat uint outMaterialIndex;
 
-
-
+// Camera data
 layout(set = 0, binding = 0) uniform CameraDataBuffer {
     mat4 view;
     mat4 proj;
 } u_camera[]; // each index is for a different frame, all the same camera
 
+// Object info structure
+struct ObjectInfo {
+    uint meshIndex;
+    uint materialIndex;
+};
+
+// Batch info buffer containing per-object data
+layout(set = 0, binding = 6) readonly buffer BatchInfoBuffer {
+    ObjectInfo objects[];
+} u_batchInfo[];
+
+// Mesh data buffer
 layout(set = 2, binding = 0) uniform MeshDataBuffer {
     mat4 model;
     uint flags; // Bit flags for vertex attribute availability
 } u_meshes[];
 
-// Push constant for per-object data
+// Push constant for per-batch data
 layout(push_constant) uniform PushConstants {
-    uint meshDataBindlessIndex;
-    uint materialBindlessIndex;
+    uint batchInfoBufferIndex;
     uint cameraBindlessIndex; 
-    
-    //uint frameIndex;
 } pc;
 
 // Bit flag definitions
@@ -45,9 +53,13 @@ const uint FLAG_HAS_NORMAL_MAP = 16u;
 
 void main() {
 
-    mat4 model = u_meshes[pc.meshDataBindlessIndex].model;
-    uint flags = u_meshes[pc.meshDataBindlessIndex].flags;
+    // Get batch info for this draw call using gl_InstanceIndex
+    uint meshBufferIndex = u_batchInfo[pc.batchInfoBufferIndex].objects[gl_InstanceIndex].meshIndex;
+    
+    outMaterialIndex = u_batchInfo[pc.batchInfoBufferIndex].objects[gl_InstanceIndex].materialIndex;
 
+    mat4 model = u_meshes[meshBufferIndex].model;
+    uint flags = u_meshes[meshBufferIndex].flags;
 
     // Use flags to determine attribute availability (branchless)
     float hasNormals = float((flags & FLAG_HAS_NORMALS) != 0u);

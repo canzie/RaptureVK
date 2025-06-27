@@ -38,7 +38,7 @@ public:
 
     void loadImageFromFile(size_t threadId=0);
 
-    void copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLayout newLayout, VkSemaphore waitSemaphore=VK_NULL_HANDLE, VkSemaphore signalSemaphore=VK_NULL_HANDLE);
+    void copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLayout newLayout, VkSemaphore waitSemaphore=VK_NULL_HANDLE, VkSemaphore signalSemaphore=VK_NULL_HANDLE, VkCommandBuffer extCommandBuffer=VK_NULL_HANDLE);
 
     // Getters
     VkImage getImage() const { return m_image; }

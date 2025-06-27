@@ -203,52 +203,72 @@ BufferArena::~BufferArena() {
     RP_CORE_INFO("BufferArena: Destroyed arena {}", id);
 }
 
-bool BufferArena::allocate( BufferAllocationRequest& request, BufferAllocation& outAllocation) {
+bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllocation& outAllocation) {
     std::lock_guard<std::mutex> lock(mutex);
     
-    // Calculate element-based alignment and metadata
-    VkDeviceSize elementAlignment = calculateElementAlignment(request);
-    uint32_t elementSize = calculateElementSize(request);
-    uint32_t elementCount = static_cast<uint32_t>(request.size / elementSize);
-    
-    // Ensure the allocation size is properly aligned to element boundaries
-    VkDeviceSize alignedSize = elementCount * elementSize;
-    
     VmaVirtualAllocationCreateInfo allocCreateInfo{};
-    allocCreateInfo.size = alignedSize;
-    allocCreateInfo.alignment = elementAlignment;
+    allocCreateInfo.size = size;
+    allocCreateInfo.alignment = alignment;
     
     VmaVirtualAllocation allocation;
     VkDeviceSize offset;
     
     VkResult result = vmaVirtualAllocate(virtualBlock, &allocCreateInfo, &allocation, &offset);
+    
+    if (result == VK_SUCCESS && (alignment <= 1 || (offset % alignment) == 0)) {
+        // Perfect! The allocation worked and is properly aligned
+        outAllocation.parentArena = shared_from_this();
+        outAllocation.allocation = allocation;
+        outAllocation.offsetBytes = offset;
+        outAllocation.sizeBytes = size;
+        return true;
+    }
+    
+    // If that failed or gave us a misaligned result, free it and try manual alignment
+    if (result == VK_SUCCESS) {
+        vmaVirtualFree(virtualBlock, allocation);
+    }
+    
+    // Calculate how much extra space we might need for alignment
+    VkDeviceSize maxPadding = (alignment > 1) ? (alignment - 1) : 0;
+    VkDeviceSize allocSize = size + maxPadding;
+    
+    // Try allocating with extra space for manual alignment
+    allocCreateInfo.size = allocSize;
+    allocCreateInfo.alignment = 1; // Use minimal alignment to avoid VMA conflicts
+    
+    result = vmaVirtualAllocate(virtualBlock, &allocCreateInfo, &allocation, &offset);
     if (result != VK_SUCCESS) {
+        RP_CORE_TRACE("BufferArena {}: Failed to allocate {} bytes (including {} padding)", id, allocSize, maxPadding);
         return false;
     }
     
-    // Calculate the first element index for this allocation
-    uint32_t firstElementIndex = static_cast<uint32_t>(offset / elementSize);
+    // Manually calculate the aligned offset
+    VkDeviceSize alignedOffset = offset;
+    if (alignment > 1) {
+        VkDeviceSize remainder = offset % alignment;
+        if (remainder != 0) {
+            alignedOffset = offset + (alignment - remainder);
+        }
+    }
     
-    // Create allocation metadata
-    AllocationElementInfo elementInfo;
-    elementInfo.type = request.type;
-    elementInfo.elementSize = elementSize;
-    elementInfo.elementCount = elementCount;
-    elementInfo.firstElementIndex = firstElementIndex;
+    // Verify we have enough space for the aligned allocation
+    if (alignedOffset + size > offset + allocSize) {
+        RP_CORE_ERROR("BufferArena {}: Alignment calculation error - not enough space allocated", id);
+        vmaVirtualFree(virtualBlock, allocation);
+        return false;
+    }
     
-    // Store allocation metadata
-    allocations.push_back(elementInfo);
-    
-    // Update next element index
-    nextElementIndex = firstElementIndex + elementCount;
-    
-    // Fill out the allocation
     outAllocation.parentArena = shared_from_this();
     outAllocation.allocation = allocation;
-    outAllocation.offsetBytes = offset;
-    outAllocation.sizeBytes = alignedSize;
-    outAllocation.elementInfo = elementInfo;
+    outAllocation.offsetBytes = alignedOffset;
+    outAllocation.sizeBytes = size;
     
+    // Log successful manual alignment if it was needed
+    if (alignedOffset != offset) {
+        RP_CORE_TRACE("BufferArena {}: Manual alignment: raw_offset={}, aligned_offset={}, padding={}", 
+                     id, offset, alignedOffset, alignedOffset - offset);
+    }
     
     return true;
 }
@@ -259,58 +279,16 @@ void BufferArena::free(BufferAllocation& allocation) {
     }
     
     std::lock_guard<std::mutex> lock(mutex);
-    
-    // Remove allocation metadata
-    auto& allocInfo = allocation.elementInfo;
-    auto it = std::find_if(allocations.begin(), allocations.end(),
-        [&](const AllocationElementInfo& info) {
-            return info.firstElementIndex == allocInfo.firstElementIndex &&
-                   info.elementCount == allocInfo.elementCount &&
-                   info.type == allocInfo.type;
-        });
-    if (it != allocations.end()) {
-        allocations.erase(it);
-    }
-    
     vmaVirtualFree(virtualBlock, allocation.allocation);
     
     // Clear the allocation data (but don't reset parentArena to avoid infinite recursion)
     allocation.allocation = VK_NULL_HANDLE;
     allocation.offsetBytes = 0;
     allocation.sizeBytes = 0;
-    allocation.elementInfo = AllocationElementInfo(); // Reset element info
 }
 
-VkDeviceSize BufferArena::calculateElementAlignment( BufferAllocationRequest& request) {
-    if (request.type == BufferType::VERTEX) {
-        // For vertex data, align to the vertex stride
-        uint32_t stride = request.layout.calculateVertexSize();
-        return std::max(static_cast<VkDeviceSize>(stride), request.alignment);
-    } else {
-        // For index data, align to the index size
-        return std::max(static_cast<VkDeviceSize>(request.indexSize), request.alignment);
-    }
-}
 
-uint32_t BufferArena::calculateElementSize( BufferAllocationRequest& request) {
-    if (request.type == BufferType::VERTEX) {
-        return request.layout.calculateVertexSize();
-    } else {
-        return request.indexSize;
-    }
-}
 
-AllocationElementInfo* BufferArena::findAllocationInfo(VmaVirtualAllocation allocation) {
-    // This is a simple linear search. For performance-critical scenarios,
-    // consider using a hash map with allocation handle as key
-    for (auto& info : allocations) {
-        // Note: VmaVirtualAllocation doesn't directly map to our info,
-        // so this is a placeholder implementation
-        // In practice, you might need to store the allocation handle in AllocationElementInfo
-        // or use a different mapping strategy
-    }
-    return nullptr;
-}
 
 bool BufferArena::isCompatible(const BufferAllocationRequest& request) const {
     // Check usage compatibility
@@ -385,7 +363,7 @@ void BufferPoolManager::shutdown() {
     s_instance.reset();
 }
 
-std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer( BufferAllocationRequest& request) {
+std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer(const BufferAllocationRequest& request) {
     std::lock_guard<std::mutex> lock(m_mutex);
     
     if (m_allocator == VK_NULL_HANDLE) {
@@ -400,14 +378,12 @@ std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer( BufferAlloc
     }
     
     auto allocation = std::make_shared<BufferAllocation>();
-    if (!arena->allocate(request, *allocation)) {
+    if (!arena->allocate(request.size, request.alignment, *allocation)) {
         RP_CORE_ERROR("BufferPoolManager: Failed to allocate {} bytes from arena {}", request.size, arena->id);
         return nullptr;
     }
     
-    //RP_CORE_TRACE("BufferPoolManager: Allocated {} bytes from arena {} at offset {} for type {}", 
-    //              request.size, arena->id, allocation->offsetBytes, request.type == BufferType::VERTEX ? "VERTEX" : "INDEX");
-    
+
     return allocation;
 }
 

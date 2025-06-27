@@ -2,7 +2,6 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
-
 layout(location = 0) out vec4 gPositionDepth; // Renamed and changed to vec4
 layout(location = 1) out vec4 gNormal; // Changed from vec3 to vec4
 layout(location = 2) out vec4 gAlbedoSpec;
@@ -14,6 +13,7 @@ layout(location = 2) in vec2 inTexCoord;
 layout(location = 3) in vec3 inTangent;
 layout(location = 4) in vec3 inBitangent;
 layout(location = 5) in flat uint inFlags; // Receive flags from vertex shader
+layout(location = 6) in flat uint inMaterialIndex;
 
 precision highp float;
 
@@ -29,7 +29,7 @@ const uint FLAG_HAS_AO_MAP = 256u;
 
 
 
-
+// Material data
 layout(set = 1, binding = 0) uniform MaterialDataBuffer {
     vec3 albedo;
     float roughness;
@@ -40,18 +40,19 @@ layout(set = 1, binding = 0) uniform MaterialDataBuffer {
     uint aoMapIndex;
 } u_materials[];
 
-
+// Bindless textures
 layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 
+// Push constants
 layout(push_constant) uniform PushConstants {
-    uint meshDataBindlessIndex;
-    uint materialBindlessIndex;
+    uint batchInfoBufferIndex;
     uint cameraBindlessIndex; 
-    
-    //uint frameIndex;
 } pc;
 
 void main() {
+
+    // Get material index from batch info using gl_InstanceIndex
+    uint materialIndex = inMaterialIndex;
 
     // Use flags to determine attribute availability (branchless)
     float hasNormals = float((inFlags & FLAG_HAS_NORMALS) != 0u);
@@ -67,24 +68,24 @@ void main() {
     vec2 texCoord = mix(vec2(0.0, 0.0), inTexCoord, hasTexcoords);
 
     // Get material properties from textures or fallback to uniforms
-    float roughness = u_materials[pc.materialBindlessIndex].roughness;
-    float metallic = u_materials[pc.materialBindlessIndex].metallic;
+    float roughness = u_materials[materialIndex].roughness;
+    float metallic = u_materials[materialIndex].metallic;
     float ao = 1.0;
 
     // Albedo with conditional texture sampling
-    vec3 albedoTexture = texture(u_textures[u_materials[pc.materialBindlessIndex].albedoMapIndex], texCoord).rgb;
-    vec3 albedo = mix(u_materials[pc.materialBindlessIndex].albedo, albedoTexture * u_materials[pc.materialBindlessIndex].albedo, hasAlbedoMap);
+    vec3 albedoTexture = texture(u_textures[u_materials[materialIndex].albedoMapIndex], texCoord).rgb;
+    vec3 albedo = mix(u_materials[materialIndex].albedo, albedoTexture * u_materials[materialIndex].albedo, hasAlbedoMap);
 
     // Roughness with conditional texture sampling
-    float roughnessTexture = texture(u_textures[u_materials[pc.materialBindlessIndex].metallicRoughnessMapIndex], texCoord).g;
+    float roughnessTexture = texture(u_textures[u_materials[materialIndex].metallicRoughnessMapIndex], texCoord).g;
     roughness = mix(roughness, roughness * roughnessTexture, hasMetallicRoughnessMap);
     
     // Metallic with conditional texture sampling
-    float metallicTexture = texture(u_textures[u_materials[pc.materialBindlessIndex].metallicRoughnessMapIndex], texCoord).b;
+    float metallicTexture = texture(u_textures[u_materials[materialIndex].metallicRoughnessMapIndex], texCoord).b;
     metallic = mix(metallic, metallic * metallicTexture, hasMetallicRoughnessMap);
 
     // AO with conditional texture sampling
-    float aoTexture = texture(u_textures[u_materials[pc.materialBindlessIndex].aoMapIndex], texCoord).r;
+    float aoTexture = texture(u_textures[u_materials[materialIndex].aoMapIndex], texCoord).r;
     ao = mix(ao, ao * aoTexture, hasAoMap);
 
     // Position (world space) and Depth (view space Z)
@@ -95,7 +96,7 @@ void main() {
     
     if ((inFlags & FLAG_HAS_NORMAL_MAP) != 0u && (inFlags & FLAG_HAS_TEXCOORDS) != 0u) {
         // We have a normal map and texture coordinates
-        vec3 tangentNormal = texture(u_textures[u_materials[pc.materialBindlessIndex].normalMapIndex], texCoord).xyz * 2.0 - 1.0;
+        vec3 tangentNormal = texture(u_textures[u_materials[materialIndex].normalMapIndex], texCoord).xyz * 2.0 - 1.0;
         
         if ((inFlags & FLAG_HAS_TANGENTS) != 0u && (inFlags & FLAG_HAS_BITANGENTS) != 0u) {
             // Use pre-computed TBN matrix (optimal path)
@@ -131,5 +132,4 @@ void main() {
     
     // Material properties
     gMaterial = vec4(metallic, roughness, ao, 1.0); // Output vec4 with alpha = 1.0
-
 }

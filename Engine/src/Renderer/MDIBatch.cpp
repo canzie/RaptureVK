@@ -39,9 +39,16 @@ namespace Rapture
         VkDrawIndexedIndirectCommand cmd{};
         cmd.indexCount = mesh.getIndexCount();
         cmd.instanceCount = 1;
-        cmd.firstIndex = iboAlloc->getFirstElementIndex();  // Direct element index from BufferPool
-        cmd.vertexOffset = static_cast<int32_t>(vboAlloc->getFirstElementIndex());  // Direct element index from BufferPool
+        cmd.firstIndex = static_cast<int32_t>(iboAlloc->offsetBytes/(m_indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2));  // Direct element index from BufferPool
+        cmd.vertexOffset = static_cast<int32_t>(vboAlloc->offsetBytes/(m_bufferLayout.calculateVertexSize()));  // Direct element index from BufferPool
         cmd.firstInstance = m_cpuIndirectCommands.size(); // This will be the index into the batch info buffer
+
+        if (iboAlloc->offsetBytes%(m_indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2) != 0) {
+            RP_CORE_ERROR("MDIBatch::addObject() - Index buffer offset is not aligned to index size");
+        }
+        if (vboAlloc->offsetBytes%(m_bufferLayout.calculateVertexSize()) != 0) {
+            RP_CORE_ERROR("MDIBatch::addObject() - Vertex buffer offset is not aligned to vertex size | {}", vboAlloc->offsetBytes%(m_bufferLayout.calculateVertexSize()));
+        }
 
         m_cpuIndirectCommands.push_back(cmd);
         m_cpuObjectInfo.push_back({meshIndex, materialIndex});
@@ -50,24 +57,47 @@ namespace Rapture
     void MDIBatch::uploadBuffers() {
         if (m_cpuIndirectCommands.empty()) return;
 
-        // Create buffers if they don't exist yet
-        if (!m_buffersCreated) {
-            uint32_t requiredSize = m_cpuIndirectCommands.size();
+        uint32_t requiredSize = m_cpuIndirectCommands.size();
+        
+        // Create buffers if they don't exist yet or resize if needed
+        if (!m_buffersCreated || requiredSize > m_allocatedSize) {
             auto& app = Application::getInstance();
             VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
             
-            // Create indirect buffer with additional indirect buffer usage flag
-            m_indirectBuffer = std::make_shared<StorageBuffer>(requiredSize * sizeof(VkDrawIndexedIndirectCommand), 
+            // Calculate new size with growth strategy (start with INITIAL_BATCH_SIZE, then double each time)
+            uint32_t newSize = m_buffersCreated ? m_allocatedSize * 2 : std::max(requiredSize, INITIAL_BATCH_SIZE);
+            while (newSize < requiredSize) {
+                newSize *= 2;
+                // Safety check to prevent excessive memory allocation
+                if (newSize > 1024 * 1024) { // Cap at 1M objects
+                    RP_CORE_WARN("MDIBatch: Very large buffer allocation requested ({} objects). This may indicate a performance issue.", newSize);
+                    break;
+                }
+            }
+            
+            // If resizing, we need to free the old descriptor binding first
+            if (m_buffersCreated && m_batchInfoBufferIndex != UINT32_MAX) {
+                auto descriptorSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
+                if (descriptorSet) {
+                    auto ssboBinding = descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
+                    if (ssboBinding) {
+                        ssboBinding->free(m_batchInfoBufferIndex);
+                    }
+                }
+                m_batchInfoBufferIndex = UINT32_MAX;
+            }
+            
+            // Create new larger buffers
+            m_indirectBuffer = std::make_shared<StorageBuffer>(newSize * sizeof(VkDrawIndexedIndirectCommand), 
                                                               BufferUsage::DYNAMIC, 
                                                               allocator, 
                                                               VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 
-            // Create batch info buffer
-            m_batchInfoBuffer = std::make_shared<StorageBuffer>(requiredSize * sizeof(ObjectInfo), 
+            m_batchInfoBuffer = std::make_shared<StorageBuffer>(newSize * sizeof(ObjectInfo), 
                                                                BufferUsage::DYNAMIC, 
                                                                allocator);
             
-            // Add batch info buffer to descriptor set and get index
+            // Add new batch info buffer to descriptor set and get index
             auto descriptorSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
             if (descriptorSet) {
                 auto ssboBinding = descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
@@ -79,7 +109,9 @@ namespace Rapture
                 }
             }
             
+            m_allocatedSize = newSize;
             m_buffersCreated = true;
+
         }
 
         m_indirectBuffer->addData(m_cpuIndirectCommands.data(), m_cpuIndirectCommands.size() * sizeof(VkDrawIndexedIndirectCommand), 0);

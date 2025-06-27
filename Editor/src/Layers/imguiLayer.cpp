@@ -350,8 +350,8 @@ void ImGuiLayer::onUpdate(float ts)
             swapChain->getImages()[m_currentImageIndex], 
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-            swapChain->getRenderFinishedSemaphore(m_currentFrame), 
-            swapChain->getImageAvailableSemaphore(m_currentFrame));
+            signalSemaphores[0], 
+            waitSemaphores[0]);
     }
 
     // ImGui commands
@@ -360,12 +360,30 @@ void ImGuiLayer::onUpdate(float ts)
         renderImGui();
     }
 
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    beginInfo.pInheritanceInfo = nullptr; // Optional
+
+    VkCommandBuffer imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame]->getCommandBufferVk();
+
+    m_imguiCommandBuffers[m_currentFrame]->reset();
+    auto targetImageView = swapChain->getImageViews()[m_currentImageIndex];
+
+    if (vkBeginCommandBuffer(imguiCommandBuffer, &beginInfo) != VK_SUCCESS) {
+        Rapture::RP_ERROR("failed to begin recording command buffer for imgui!");
+        throw std::runtime_error("failed to begin recording command buffer for imgui!");
+    }
+
     {
         RAPTURE_PROFILE_SCOPE("ImGui Command Buffer Setup");
-        m_imguiCommandBuffers[m_currentFrame]->reset();
-        auto targetImageView = swapChain->getImageViews()[m_currentImageIndex];
-        drawImGui(m_imguiCommandBuffers[m_currentFrame]->getCommandBufferVk(), targetImageView);
+        drawImGui(imguiCommandBuffer, targetImageView);
         graphicsQueue->addCommandBuffer(m_imguiCommandBuffers[m_currentFrame]);
+    }
+
+    
+    if (vkEndCommandBuffer(imguiCommandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to record command buffer for imgui!");
     }
 
     // Final submit - render ImGui
@@ -426,14 +444,7 @@ void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImag
     auto& vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    beginInfo.pInheritanceInfo = nullptr; // Optional
 
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer for imgui!");
-    }
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "ImGui Layer");
@@ -456,9 +467,6 @@ void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImag
         RAPTURE_PROFILE_GPU_COLLECT(commandBuffer);
     }
 
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer for imgui!");
-    }
 }
 
 

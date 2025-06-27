@@ -9,8 +9,7 @@
 namespace Rapture {
 
 struct PushConstants {
-    uint32_t meshDataBindlessIndex;
-    uint32_t materialBindlessIndex;
+    uint32_t batchInfoBufferIndex;
     uint32_t cameraBindlessIndex;    
 };
 
@@ -27,6 +26,10 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     
     createPipeline();
     createTextures();
+    
+    // Initialize MDI batching system
+    m_mdiBatchMap = std::make_unique<MDIBatchMap>();
+    m_selectedEntityBatchMap = std::make_unique<MDIBatchMap>();
     
     // Bind GBuffer textures to bindless set
     bindGBufferTexturesToBindlessSet();
@@ -114,18 +117,19 @@ void GBufferPass::recordCommandBuffer(
         cameraComp = mainCamera->tryGetComponent<CameraComponent>();
     }
 
-    // bind set 0, 1 and 2
-    DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // camera stuff
-    DescriptorManager::getDescriptorSet(1)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // materials
-    DescriptorManager::getDescriptorSet(2)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // model data
-    DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // bindless textures for the material stuff
+    // Begin frame for MDI batching
+    m_mdiBatchMap->beginFrame();
+    m_selectedEntityBatchMap->beginFrame();
 
-    
+    // bind descriptor sets
+    DescriptorManager::bindSet(0, commandBuffer, m_pipeline); // camera stuff
+    DescriptorManager::bindSet(1, commandBuffer, m_pipeline); // materials
+    DescriptorManager::bindSet(2, commandBuffer, m_pipeline); // model data
+    DescriptorManager::bindSet(3, commandBuffer, m_pipeline); // bindless textures for the material stuff
 
+    // First pass: Populate MDI batches with mesh data
     for (auto entity : view) {
-
-        RAPTURE_PROFILE_SCOPE("Draw Mesh");
-
+        RAPTURE_PROFILE_SCOPE("Populate Batch");
 
         auto& transform = view.get<TransformComponent>(entity);
         auto& meshComp = view.get<MeshComponent>(entity);
@@ -143,6 +147,7 @@ void GBufferPass::recordCommandBuffer(
         if (!mesh->getVertexBuffer() || !mesh->getIndexBuffer()) {
             continue;
         }
+        
         if (transform.hasChanged(m_currentFrame)){
             boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
         }
@@ -156,80 +161,166 @@ void GBufferPass::recordCommandBuffer(
         // Check if current entity is the selected one
         bool isSelected = false;
         if (m_selectedEntity) {
-            // Assuming m_selectedEntity->getHandle() returns entt::entity
-            // and 'entity' is of type entt::entity
             if (m_selectedEntity->getHandle() == entity) {
                 isSelected = true;
             }
         }
 
-        if (isSelected) {
-            // Set stencil reference to 1 for the selected entity
-            vkCmdSetStencilReference(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 1);
-            // Enable stencil writing for selected entity
-            vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0xFF);
-        } else {
-            // Set stencil reference to 0 for non-selected entities
-            vkCmdSetStencilReference(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0);
-            // Disable stencil writing for non-selected entities
-            vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0x00);
-        }
-
-        // Get the vertex buffer layout
-        auto& bufferLayout = mesh->getVertexBuffer()->getBufferLayout();
+        // Get buffer allocation info to determine batch
+        auto vboAlloc = meshComp.mesh->getVertexAllocation();
+        auto iboAlloc = meshComp.mesh->getIndexAllocation();
         
-        // Convert to EXT variants required by vkCmdSetVertexInputEXT
-        auto bindingDescription = bufferLayout.getBindingDescription2EXT();
-            
-        auto attributeDescriptions = bufferLayout.getAttributeDescriptions2EXT();
-            
-        // Use the function pointer from VulkanContext
-        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 
+        if (!vboAlloc || !iboAlloc) {
+            continue;
+        }
+        
+        // Choose the appropriate batch map based on selection state
+        MDIBatchMap* batchMap = isSelected ? m_selectedEntityBatchMap.get() : m_mdiBatchMap.get();
+        
+        // Get or create batch for this VBO/IBO arena combination
+        MDIBatch* batch = batchMap->obtainBatch(vboAlloc, iboAlloc, 
+                                               meshComp.mesh->getVertexBuffer()->getBufferLayout(), 
+                                               meshComp.mesh->getIndexBuffer()->getIndexType());
+        
+        // Get mesh buffer index from the MeshComponent
+        uint32_t meshBufferIndex = meshComp.meshDataBuffer ? meshComp.meshDataBuffer->getDescriptorIndex(currentFrame) : 0;
+        uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
+        
+        // Add mesh to batch
+        batch->addObject(*meshComp.mesh, meshBufferIndex, materialIndex);
+    }
+
+    // Second pass: Render non-selected entities using MDI
+    // Set stencil reference to 0 for non-selected entities
+    vkCmdSetStencilReference(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0);
+    // Disable stencil writing for non-selected entities
+    vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0x00);
+    
+    for (const auto& [batchKey, batch] : m_mdiBatchMap->getBatches()) {
+        if (batch->getDrawCount() == 0) {
+            continue;
+        }
+        
+        RAPTURE_PROFILE_SCOPE("Draw Non-Selected Batch");
+        
+        // Upload batch data to GPU
+        batch->uploadBuffers();
+        
+        // Get layout from batch
+        auto bindingDescription = batch->getBufferLayout().getBindingDescription2EXT();
+        auto attributeDescriptions = batch->getBufferLayout().getAttributeDescriptions2EXT();
+        
+        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(),
             1, &bindingDescription,
             static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
         
-
-        // Push the constants
+        // Set push constants for this batch
         PushConstants pushConstants{};
-        pushConstants.meshDataBindlessIndex = meshComp.meshDataBuffer->getDescriptorIndex(m_currentFrame);
-        pushConstants.materialBindlessIndex = materialComp.material->getBindlessIndex();
-        pushConstants.cameraBindlessIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame);
-
-        // for now assume only 1 set of pushconstants in a full shader
-        VkShaderStageFlags stageFlags;
-        if (auto shader = m_shader.lock(); shader->getPushConstantLayouts().size() > 0) {
+        pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
+        pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
+        
+        VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
             stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
         }
-
-
-        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
-            m_pipeline->getPipelineLayoutVk(),
-            stageFlags, 
-            0, 
-            sizeof(PushConstants), 
-            &pushConstants);
         
-        // Bind vertex buffers
-        VkBuffer vertexBuffers[] = {mesh->getVertexBuffer()->getBufferVk()};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
-
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(),
+                           m_pipeline->getPipelineLayoutVk(),
+                           stageFlags,
+                           0,
+                           sizeof(PushConstants),
+                           &pushConstants);
         
- 
+        // Bind vertex buffer from the arena
+        VkBuffer vertexBuffer = batch->getVertexBuffer();
+        VkDeviceSize vertexOffset = 0;
+        vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, &vertexBuffer, &vertexOffset);
         
-        // Bind index buffer
-        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), mesh->getIndexBuffer()->getBufferVk(), 0, mesh->getIndexBuffer()->getIndexType());
+        // Bind index buffer from the arena
+        VkBuffer indexBuffer = batch->getIndexBuffer();
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
+                            indexBuffer, 
+                            0, 
+                            batch->getIndexType());
         
-        // Draw the mesh
-        vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), mesh->getIndexCount(), 1, 0, 0, 0);
-    
+        // Execute multi-draw indirect
+        auto indirectBuffer = batch->getIndirectBuffer();
+        if (indirectBuffer) {
+            vkCmdDrawIndexedIndirect(commandBuffer->getCommandBufferVk(),
+                                   indirectBuffer->getBufferVk(),
+                                   0,
+                                   batch->getDrawCount(),
+                                   sizeof(VkDrawIndexedIndirectCommand));
+        }
     }
+
+    // Third pass: Render selected entities using MDI with different stencil settings
+    // Set stencil reference to 1 for the selected entity
+    vkCmdSetStencilReference(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 1);
+    // Enable stencil writing for selected entity
+    vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0xFF);
     
+    for (const auto& [batchKey, batch] : m_selectedEntityBatchMap->getBatches()) {
+        if (batch->getDrawCount() == 0) {
+            continue;
+        }
+        
+        RAPTURE_PROFILE_SCOPE("Draw Selected Batch");
+        
+        // Upload batch data to GPU
+        batch->uploadBuffers();
+        
+        // Get layout from batch
+        auto bindingDescription = batch->getBufferLayout().getBindingDescription2EXT();
+        auto attributeDescriptions = batch->getBufferLayout().getAttributeDescriptions2EXT();
+        
+        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(),
+            1, &bindingDescription,
+            static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+        
+        // Set push constants for this batch
+        PushConstants pushConstants{};
+        pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
+        pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
+        
+        VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        }
+        
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(),
+                           m_pipeline->getPipelineLayoutVk(),
+                           stageFlags,
+                           0,
+                           sizeof(PushConstants),
+                           &pushConstants);
+        
+        // Bind vertex buffer from the arena
+        VkBuffer vertexBuffer = batch->getVertexBuffer();
+        VkDeviceSize vertexOffset = 0;
+        vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, &vertexBuffer, &vertexOffset);
+        
+        // Bind index buffer from the arena
+        VkBuffer indexBuffer = batch->getIndexBuffer();
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
+                            indexBuffer, 
+                            0, 
+                            batch->getIndexType());
+        
+        // Execute multi-draw indirect
+        auto indirectBuffer = batch->getIndirectBuffer();
+        if (indirectBuffer) {
+            vkCmdDrawIndexedIndirect(commandBuffer->getCommandBufferVk(),
+                                   indirectBuffer->getBufferVk(),
+                                   0,
+                                   batch->getDrawCount(),
+                                   sizeof(VkDrawIndexedIndirectCommand));
+        }
+    }
 
     vkCmdEndRendering(commandBuffer->getCommandBufferVk());
 
     transitionToShaderReadableLayout(commandBuffer);
-
 }
 
 void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer) {

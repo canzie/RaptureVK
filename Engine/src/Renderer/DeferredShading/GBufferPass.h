@@ -2,6 +2,7 @@
 
 #include "Shaders/Shader.h"
 #include "Pipelines/GraphicsPipeline.h"
+#include "Renderer/MDIBatch.h"
 
 #include "AssetManager/AssetManager.h"
 #include "Scenes/Scene.h"
@@ -118,6 +119,9 @@ private:
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
+    // MDI batching system
+    std::unique_ptr<MDIBatchMap> m_mdiBatchMap;
+    std::unique_ptr<MDIBatchMap> m_selectedEntityBatchMap; // Separate batches for selected entities
 
     VkRenderingAttachmentInfo m_colorAttachmentInfo[4];
     VkRenderingAttachmentInfo m_depthAttachmentInfo;

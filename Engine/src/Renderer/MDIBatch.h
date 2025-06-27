@@ -34,6 +34,7 @@ public:
     uint32_t getVboArenaId() const { return m_vboArenaId; }
     uint32_t getIboArenaId() const { return m_iboArenaId; }
     uint32_t getDrawCount() const { return m_cpuIndirectCommands.size(); }
+    uint32_t getAllocatedSize() const { return m_allocatedSize; }
 
     BufferLayout& getBufferLayout() const { return m_bufferLayout; }
     VkBuffer getVertexBuffer() const { return m_vertexBuffer; }
