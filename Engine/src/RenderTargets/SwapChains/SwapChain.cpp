@@ -1,6 +1,7 @@
 #include "SwapChain.h"
 
 #include "Logging/Log.h"
+#include "Logging/TracyProfiler.h"
 #include "WindowContext/Application.h"
 
 #include <algorithm>
@@ -292,6 +293,7 @@ int SwapChain::acquireImage(uint32_t semaphoreIndex) {
     return availability.frameIndex;
   } else {
 
+    RAPTURE_PROFILE_SCOPE("SwapChain::acquireImage - Wait for fence");
     vkWaitForFences(m_device, 1, &m_inFlightFences[semaphoreIndex], VK_TRUE,
                     UINT64_MAX);
 

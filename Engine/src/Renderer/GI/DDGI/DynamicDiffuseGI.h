@@ -26,11 +26,11 @@ namespace Rapture {
 
 class DynamicDiffuseGI {
 public:
-    DynamicDiffuseGI();
+    DynamicDiffuseGI(uint32_t framesInFlight);
     ~DynamicDiffuseGI();
 
     void populateProbes(std::shared_ptr<Scene> scene);
-    void populateProbesCompute(std::shared_ptr<Scene> scene);
+    void populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex);
 
     std::shared_ptr<Texture> getRadianceTexture();
     std::shared_ptr<Texture> getVisibilityTexture();
@@ -71,8 +71,8 @@ public:
     uint32_t getMeshDataSSBOIndex() const { return m_meshDataSSBOIndex; }
 
 private:
-    void castRays(std::shared_ptr<Scene> scene);
-    void blendTextures();
+    void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
+    void blendTextures(uint32_t frameIndex);
 
     void initTextures();
     void initProbeInfoBuffer();
@@ -121,8 +121,8 @@ private:
     VmaAllocator m_allocator;
     std::shared_ptr<VulkanQueue> m_computeQueue;
 
-    std::shared_ptr<CommandBuffer> m_CommandBuffer;
-
+    std::vector<std::shared_ptr<CommandBuffer>> m_CommandBuffers;
+    uint32_t m_framesInFlight;
 
     // used to alternate between the textures each frame
     bool m_isEvenFrame;

@@ -60,7 +60,7 @@ void DeferredRenderer::init() {
 
   setupCommandResources();
 
-  m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>();
+  m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
 
 
   m_gbufferPass = std::make_shared<GBufferPass>(
@@ -126,7 +126,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
 
   uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
 
-  //m_dynamicDiffuseGI->populateProbesCompute(activeScene);
+  m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
 
   m_commandBuffers[m_currentFrame]->reset();
   recordCommandBuffer(m_commandBuffers[m_currentFrame], activeScene,
@@ -205,6 +205,9 @@ void DeferredRenderer::onSwapChainRecreated() {
     m_height = static_cast<float>(m_swapChain->getExtent().height);
 
     m_commandBuffers.clear();
+
+    // Recreate DDGI system with new frame count to ensure correct number of command buffers
+    m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
 
     m_gbufferPass = std::make_shared<GBufferPass>(
         static_cast<float>(m_swapChain->getExtent().width),

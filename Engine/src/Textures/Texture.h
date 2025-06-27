@@ -77,6 +77,9 @@ private:
     void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, size_t threadId=0);
     void copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height, size_t threadId=0);
     
+    // Generate mipmaps for the texture using vkCmdBlitImage
+    void generateMipmaps(size_t threadId=0);
+    
     // Helper function to validate spec against loaded image data
     bool validateSpecificationAgainstImageData(int width, int height, int channels);
     

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <vulkan/vulkan.h>
+#include <cmath>
 
 #include "Logging/Log.h"
 
@@ -68,7 +69,7 @@ struct TextureSpecification {
     uint32_t height = 0;
     uint32_t depth = 1; // For 3D textures
 
-    uint32_t mipLevels = 1; // Added for mipmapping
+    uint32_t mipLevels = 1; // 1 = no mipmaps, 0 = auto-calculate maximum possible mip levels
 };
 
 
@@ -216,6 +217,10 @@ inline uint32_t getBytesPerPixel(TextureFormat format) {
             RP_CORE_ERROR("getBytesPerPixel() - Unsupported format!");
             return 4; // Default fallback
     }
+}
+
+inline uint32_t calculateMaxMipLevels(uint32_t width, uint32_t height) {
+    return static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
 }
 
 }

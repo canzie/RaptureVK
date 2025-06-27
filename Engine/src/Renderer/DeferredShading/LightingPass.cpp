@@ -150,7 +150,7 @@ void LightingPass::recordCommandBuffer(
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 
-    pushConstants.useDDGI = false;
+    pushConstants.useDDGI = true;
 
 
     auto& reg = activeScene->getRegistry();

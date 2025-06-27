@@ -37,7 +37,7 @@ struct DDGIBlendPushConstants {
 
 std::shared_ptr<Texture> DynamicDiffuseGI::s_defaultSkyboxTexture = nullptr;
 
-DynamicDiffuseGI::DynamicDiffuseGI() 
+DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight) 
   : m_ProbeInfoBuffer(nullptr),
     m_Hysteresis(0.96f),
     m_isPopulated(false),
@@ -52,6 +52,7 @@ DynamicDiffuseGI::DynamicDiffuseGI()
     m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
     m_MeshInfoBuffer(nullptr),
     m_skyboxTexture(nullptr),
+    m_framesInFlight(framesInFlight),
     m_probeIrradianceBindlessIndex(UINT32_MAX),
     m_prevProbeIrradianceBindlessIndex(UINT32_MAX),
     m_probeVisibilityBindlessIndex(UINT32_MAX),
@@ -61,8 +62,6 @@ DynamicDiffuseGI::DynamicDiffuseGI()
         s_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
     }
     m_skyboxTexture = s_defaultSkyboxTexture;
-
-
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -78,13 +77,10 @@ DynamicDiffuseGI::DynamicDiffuseGI()
 
     auto pool = CommandPoolManager::createCommandPool(poolConfig);
 
-    m_CommandBuffer = pool->getCommandBuffer();
+    m_CommandBuffers = pool->getCommandBuffers(m_framesInFlight);
 
     initProbeInfoBuffer();
     initTextures();
-
-
-    
 }
 
 DynamicDiffuseGI::~DynamicDiffuseGI() {
@@ -196,7 +192,7 @@ void DynamicDiffuseGI::clearTextures() {
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    if (vkBeginCommandBuffer(m_CommandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
+    if (vkBeginCommandBuffer(m_CommandBuffers[0]->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::clearTextures - Failed to begin command buffer");
         return;
     }
@@ -225,7 +221,7 @@ void DynamicDiffuseGI::clearTextures() {
     layoutTransitions.push_back(prevVisibilityTransition);
 
     vkCmdPipelineBarrier(
-        m_CommandBuffer->getCommandBufferVk(),
+        m_CommandBuffers[0]->getCommandBufferVk(),
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         0,
@@ -236,7 +232,7 @@ void DynamicDiffuseGI::clearTextures() {
 
     VkClearColorValue clearColor = { {0.0f, 0.0f, 0.0f, 0.0f} };
     vkCmdClearColorImage(
-        m_CommandBuffer->getCommandBufferVk(),
+        m_CommandBuffers[0]->getCommandBufferVk(),
         m_RadianceTexture->getImage(),
         VK_IMAGE_LAYOUT_GENERAL,
         &clearColor,
@@ -244,7 +240,7 @@ void DynamicDiffuseGI::clearTextures() {
     );
 
     vkCmdClearColorImage(
-        m_CommandBuffer->getCommandBufferVk(),
+        m_CommandBuffers[0]->getCommandBufferVk(),
         m_PrevRadianceTexture->getImage(),
         VK_IMAGE_LAYOUT_GENERAL,
         &clearColor,
@@ -252,7 +248,7 @@ void DynamicDiffuseGI::clearTextures() {
     );
 
     vkCmdClearColorImage(
-        m_CommandBuffer->getCommandBufferVk(),
+        m_CommandBuffers[0]->getCommandBufferVk(),
         m_VisibilityTexture->getImage(),
         VK_IMAGE_LAYOUT_GENERAL,
         &clearColor,
@@ -260,19 +256,19 @@ void DynamicDiffuseGI::clearTextures() {
     );
 
     vkCmdClearColorImage(
-        m_CommandBuffer->getCommandBufferVk(),
+        m_CommandBuffers[0]->getCommandBufferVk(),
         m_PrevVisibilityTexture->getImage(),
         VK_IMAGE_LAYOUT_GENERAL,
         &clearColor,
         1, &subresourceRange
     );
 
-    if (vkEndCommandBuffer(m_CommandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
+    if (vkEndCommandBuffer(m_CommandBuffers[0]->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::clearTextures - Failed to end command buffer");
         return;
     }
 
-    m_computeQueue->submitQueue(m_CommandBuffer);
+    m_computeQueue->submitQueue(m_CommandBuffers[0]);
 
 }
 
@@ -393,7 +389,7 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
     RP_CORE_INFO("Populated {} mesh infos for DDGI", meshInfos.size());
 }
 
-void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
+void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex) {
 
     RAPTURE_PROFILE_FUNCTION();
 
@@ -412,56 +408,57 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene) {
         //RP_CORE_WARN("DynamicDiffuseGI::populateProbesCompute - Scene TLAS is not built");
         return;
     }
-    
+
+    auto currentCommandBuffer = m_CommandBuffers[frameIndex];
 
     // Begin command buffer
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     
-    if (vkBeginCommandBuffer(m_CommandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
+    if (vkBeginCommandBuffer(currentCommandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::castRays - Failed to begin command buffer");
         return;
     }
 
     {
-        RAPTURE_PROFILE_GPU_SCOPE(m_CommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::populateProbesCompute");
+        RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::populateProbesCompute");
         // Cast rays using compute shader
-        castRays(scene);
+        castRays(scene, frameIndex);
     }   
     // Flatten ray data texture (within the same command buffer)
     if (m_RayDataTextureFlattened) {
         RAPTURE_PROFILE_SCOPE("Flattening ray data texture");
-        m_RayDataTextureFlattened->update(m_CommandBuffer);
+        m_RayDataTextureFlattened->update(currentCommandBuffer);
     }
     
     {
-        RAPTURE_PROFILE_GPU_SCOPE(m_CommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::blendTextures");
+        RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::blendTextures");
         // Blend textures
-        blendTextures();
+        blendTextures(frameIndex);
     }
 
     // Flatten final textures (within the same command buffer)
     if (m_IrradianceTextureFlattened) {
         RAPTURE_PROFILE_SCOPE("Flattening irradiance texture");
-        m_IrradianceTextureFlattened->update(m_CommandBuffer);
+        m_IrradianceTextureFlattened->update(currentCommandBuffer);
     }
     if (m_DistanceTextureFlattened) {
         RAPTURE_PROFILE_SCOPE("Flattening distance texture");
-        m_DistanceTextureFlattened->update(m_CommandBuffer);
+        m_DistanceTextureFlattened->update(currentCommandBuffer);
     }
 
-    RAPTURE_PROFILE_GPU_COLLECT(m_CommandBuffer->getCommandBufferVk());
+    RAPTURE_PROFILE_GPU_COLLECT(currentCommandBuffer->getCommandBufferVk());
 
 
     // End command buffer
-    if (vkEndCommandBuffer(m_CommandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
+    if (vkEndCommandBuffer(currentCommandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::populateProbesCompute - Failed to end command buffer");
         return;
     }
     
     // Submit command buffer (single submit for all operations)
-    m_computeQueue->submitQueue(m_CommandBuffer);
+    m_computeQueue->submitQueue(currentCommandBuffer);
 
     // Toggle frame flag for double buffering
     m_isEvenFrame = !m_isEvenFrame;
@@ -524,10 +521,11 @@ std::shared_ptr<Texture> DynamicDiffuseGI::getPrevVisibilityTexture() {
 
 
 
-void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
+void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex) {
 
     RAPTURE_PROFILE_FUNCTION();
 
+    auto currentCommandBuffer = m_CommandBuffers[frameIndex];
 
     // Get TLAS from scene
     const auto& tlas = scene->getTLAS();
@@ -568,7 +566,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
     preTraceBarriers.push_back(prevVisibilityReadBarrier);
     
     vkCmdPipelineBarrier(
-        m_CommandBuffer->getCommandBufferVk(),
+        currentCommandBuffer->getCommandBufferVk(),
         m_isFirstFrame ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         0,
@@ -578,18 +576,18 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
     );
 
     // Bind the compute pipeline
-    m_DDGI_ProbeTracePipeline->bind(m_CommandBuffer->getCommandBufferVk());
+    m_DDGI_ProbeTracePipeline->bind(currentCommandBuffer->getCommandBufferVk());
 
     // Use the new descriptor manager system
     // Set 0: Common resources (camera, lights, shadows, probe volume)
-    DescriptorManager::bindSet(0, m_CommandBuffer, m_DDGI_ProbeTracePipeline);
+    DescriptorManager::bindSet(0, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
     
     // Set 1: Material resources (not used in DDGI)
     // Set 2: Object/Mesh resources (mesh data SSBO)
-    DescriptorManager::bindSet(2, m_CommandBuffer, m_DDGI_ProbeTracePipeline);
+    DescriptorManager::bindSet(2, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
     
     // Set 3: Bindless arrays
-    DescriptorManager::bindSet(3, m_CommandBuffer, m_DDGI_ProbeTracePipeline);
+    DescriptorManager::bindSet(3, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
 
     // Set push constants with texture and buffer indices
     DDGITracePushConstants pushConstants = {};
@@ -599,7 +597,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
     pushConstants.prevRadianceIndex = m_isEvenFrame ? m_prevProbeIrradianceBindlessIndex : m_probeIrradianceBindlessIndex;
     pushConstants.prevVisibilityIndex = m_isEvenFrame ? m_prevProbeVisibilityBindlessIndex : m_probeVisibilityBindlessIndex;
     
-    vkCmdPushConstants(m_CommandBuffer->getCommandBufferVk(),
+    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(),
                        m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT,
                        0, sizeof(DDGITracePushConstants), &pushConstants);
@@ -610,7 +608,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
     uint32_t workGroupsY = m_ProbeVolume.gridDimensions.z; 
     uint32_t workGroupsZ = m_ProbeVolume.gridDimensions.y;
     
-    vkCmdDispatch(m_CommandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, workGroupsZ);
+    vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, workGroupsZ);
 
     // === BARRIER PHASE 2: After trace shader - transition ray data for reading ===
     VkImageMemoryBarrier rayDataReadBarrier = m_RayDataTexture->getImageMemoryBarrier(
@@ -621,7 +619,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
 
     
     vkCmdPipelineBarrier(
-        m_CommandBuffer->getCommandBufferVk(),
+        currentCommandBuffer->getCommandBufferVk(),
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         0,
@@ -632,9 +630,11 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene) {
 
 }
 
-void DynamicDiffuseGI::blendTextures() {
+void DynamicDiffuseGI::blendTextures(uint32_t frameIndex) {
 
     RAPTURE_PROFILE_FUNCTION();
+
+    auto currentCommandBuffer = m_CommandBuffers[frameIndex];
 
     // === BARRIER PHASE 5: Prepare for blending shaders ===
     // Even though blending shaders are not implemented, prepare the barriers for when they are
@@ -660,7 +660,7 @@ void DynamicDiffuseGI::blendTextures() {
     preBlendingBarriers.push_back(currentVisibilityWriteBarrier);
     
     vkCmdPipelineBarrier(
-        m_CommandBuffer->getCommandBufferVk(),
+        currentCommandBuffer->getCommandBufferVk(),
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Wait for flatten to finish
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Prepare for blending operations
         0,
@@ -670,11 +670,11 @@ void DynamicDiffuseGI::blendTextures() {
     );
 
     // Irradiance blending shader
-    m_DDGI_ProbeIrradianceBlendingPipeline->bind(m_CommandBuffer->getCommandBufferVk());
+    m_DDGI_ProbeIrradianceBlendingPipeline->bind(currentCommandBuffer->getCommandBufferVk());
 
     // Use the new descriptor manager system for blending shaders
-    DescriptorManager::bindSet(0, m_CommandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // probe volume
-    DescriptorManager::bindSet(3, m_CommandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // bindless
+    DescriptorManager::bindSet(0, currentCommandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // probe volume
+    DescriptorManager::bindSet(3, currentCommandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // bindless
 
     // Set push constants for radiance blending
     DDGIBlendPushConstants radianceBlendConstants = {};
@@ -682,21 +682,21 @@ void DynamicDiffuseGI::blendTextures() {
     radianceBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
     radianceBlendConstants.writeToAlternateTexture = m_isEvenFrame ? 0 : 1; // 0 = write to primary (RadianceTexture), 1 = write to alternate (PrevRadianceTexture)
     
-    vkCmdPushConstants(m_CommandBuffer->getCommandBufferVk(),
+    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(),
                        m_DDGI_ProbeIrradianceBlendingPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT,
                        0, sizeof(DDGIBlendPushConstants), &radianceBlendConstants);
 
-    vkCmdDispatch(m_CommandBuffer->getCommandBufferVk(), 
+    vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), 
                  m_ProbeVolume.gridDimensions.x, 
                  m_ProbeVolume.gridDimensions.z, 
                  m_ProbeVolume.gridDimensions.y);
 
     // Distance blending shader
-    m_DDGI_ProbeDistanceBlendingPipeline->bind(m_CommandBuffer->getCommandBufferVk());
+    m_DDGI_ProbeDistanceBlendingPipeline->bind(currentCommandBuffer->getCommandBufferVk());
 
-    DescriptorManager::bindSet(0, m_CommandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // probe volume
-    DescriptorManager::bindSet(3, m_CommandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // bindless
+    DescriptorManager::bindSet(0, currentCommandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // probe volume
+    DescriptorManager::bindSet(3, currentCommandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // bindless
 
     // Set push constants for visibility blending
     DDGIBlendPushConstants visibilityBlendConstants = {};
@@ -704,12 +704,12 @@ void DynamicDiffuseGI::blendTextures() {
     visibilityBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
     visibilityBlendConstants.writeToAlternateTexture = m_isEvenFrame ? 0 : 1; // 0 = write to primary (VisibilityTexture), 1 = write to alternate (PrevVisibilityTexture)
     
-    vkCmdPushConstants(m_CommandBuffer->getCommandBufferVk(),
+    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(),
                        m_DDGI_ProbeDistanceBlendingPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT,
                        0, sizeof(DDGIBlendPushConstants), &visibilityBlendConstants);
 
-    vkCmdDispatch(m_CommandBuffer->getCommandBufferVk(), 
+    vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), 
                  m_ProbeVolume.gridDimensions.x, 
                  m_ProbeVolume.gridDimensions.z, 
                  m_ProbeVolume.gridDimensions.y);
@@ -736,7 +736,7 @@ void DynamicDiffuseGI::blendTextures() {
     postBlendingBarriers.push_back(currentVisibilityReadBarrier);
     
     vkCmdPipelineBarrier(
-        m_CommandBuffer->getCommandBufferVk(),
+        currentCommandBuffer->getCommandBufferVk(),
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // After blending operations
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // For next frame and final lighting
         0,

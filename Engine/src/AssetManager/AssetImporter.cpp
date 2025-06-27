@@ -149,7 +149,10 @@ std::shared_ptr<Asset> AssetImporter::loadTexture(const AssetHandle &handle, con
     return nullptr;
   }
 
+  
   TextureSpecification texSpec = TextureSpecification();
+  texSpec.mipLevels = 0; // Auto-calculate mip levels
+
   if (std::holds_alternative<TextureImportConfig>(metadata.m_importConfig)) {
     auto importConfig = std::get<TextureImportConfig>(metadata.m_importConfig);
     texSpec.srgb = importConfig.srgb;
