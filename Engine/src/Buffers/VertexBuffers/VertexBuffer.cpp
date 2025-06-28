@@ -2,6 +2,9 @@
 #include "Logging/Log.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
+#include "Buffers/BufferPool.h"
+#include "WindowContext/Application.h"
+
 namespace Rapture {
 
 std::shared_ptr<DescriptorBindingSSBO> VertexBuffer::s_bindlessBuffers = nullptr;
@@ -16,10 +19,37 @@ VertexBuffer::VertexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator al
         createBuffer();
 }
 
+VertexBuffer::VertexBuffer(BufferAllocationRequest& request, VmaAllocator allocator, void* data)
+    : Buffer(request.size, request.usage, allocator), m_bufferLayout(request.layout)
+{
+    auto& app = Application::getInstance();
+    auto& vulkanContext = app.getVulkanContext();
+    auto& bufferPoolManager = BufferPoolManager::getInstance();
+
+    request.type = BufferType::VERTEX;
+    m_bufferAllocation = bufferPoolManager.allocateBuffer(request);
+
+    if (!m_bufferAllocation)
+    {
+        RP_CORE_ERROR("VertexBuffer::VertexBuffer - Failed to allocate buffer!");
+        throw std::runtime_error("VertexBuffer::VertexBuffer - Failed to allocate buffer!");
+    }
+
+    if (m_bufferAllocation && data)
+    {
+        m_bufferAllocation->uploadData(data, request.size);
+    }
+
+
+}
+
 VertexBuffer::~VertexBuffer(){
     // Free the bindless descriptor if allocated
     if (m_bindlessIndex != UINT32_MAX && s_bindlessBuffers) {
         s_bindlessBuffers->free(m_bindlessIndex);
+    }
+    if (m_bufferAllocation) {
+        BufferPoolManager::getInstance().freeBuffer(m_bufferAllocation);
     }
 }
 
@@ -86,9 +116,15 @@ uint32_t VertexBuffer::getBindlessIndex()
 void VertexBuffer::addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset)
 {
     // Check for buffer overflow
-    if (offset + size > m_Size) {
-        RP_CORE_ERROR("VertexBuffer::addDataGPU - Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}", size, offset, m_Size);
+    if (offset + size > getSize()) {
+        RP_CORE_ERROR("VertexBuffer::addDataGPU - Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}", size, offset, getSize());
         return;
+    }
+
+    if (m_bufferAllocation)
+    {
+		m_bufferAllocation->uploadData(data, size, offset);
+		return;
     }
 
     // Create a staging buffer

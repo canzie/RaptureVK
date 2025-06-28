@@ -342,6 +342,9 @@ void ImGuiLayer::onUpdate(float ts)
         graphicsQueue->submitCommandBuffers(firstSubmitInfo);
     }
 
+        graphicsQueue->waitIdle();
+
+
     // Copy the swapchain image to the texture
     // Use the same command buffer that will be synchronized with the frame fence
     {

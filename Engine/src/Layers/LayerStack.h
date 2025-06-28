@@ -25,6 +25,18 @@ namespace Rapture {
 
         void clear();
 
+        // Iterators over regular layers (those pushed before the first overlay)
+        std::vector<Layer*>::iterator layerBegin() { return m_Layers.begin(); }
+        std::vector<Layer*>::iterator layerEnd() { return m_Layers.begin() + m_LayerInsertIndex; }
+        std::vector<Layer*>::const_iterator layerBegin() const { return m_Layers.begin(); }
+        std::vector<Layer*>::const_iterator layerEnd() const { return m_Layers.begin() + m_LayerInsertIndex; }
+
+        // Iterators over overlay layers (those pushed after regular layers)
+        std::vector<Layer*>::iterator overlayBegin() { return m_Layers.begin() + m_LayerInsertIndex; }
+        std::vector<Layer*>::iterator overlayEnd() { return m_Layers.end(); }
+        std::vector<Layer*>::const_iterator overlayBegin() const { return m_Layers.begin() + m_LayerInsertIndex; }
+        std::vector<Layer*>::const_iterator overlayEnd() const { return m_Layers.end(); }
+
 	private:
 		std::vector<Layer*> m_Layers;
 		unsigned int m_LayerInsertIndex = 0;

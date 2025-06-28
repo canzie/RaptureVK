@@ -128,19 +128,21 @@ Application::~Application() {
   TracyProfiler::shutdown();
 
   ModelLoadersCache::clear();
+
+  m_layerStack.clear();
   m_project.reset();
 
   //ForwardRenderer::shutdown();
   DeferredRenderer::shutdown();
   DescriptorManager::shutdown();
 
-  m_layerStack.clear();
 
   MaterialManager::shutdown();
   AssetManager::shutdown();
+  
+  BufferPoolManager::shutdown();
 
   CommandPoolManager::shutdown();
-  BufferPoolManager::shutdown();
 
   // Shutdown the event system and clear all listeners
   EventRegistry::getInstance().shutdown();
@@ -155,16 +157,23 @@ void Application::run() {
 
     Timestep::onUpdate();
 
+    for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
+      (*it)->onUpdate(Timestep::deltaTime());
+    }
+
+
     auto activeScene = m_project->getActiveScene();
     if (activeScene) {
       activeScene->onUpdate(Timestep::deltaTime());
+
+
+      DeferredRenderer::drawFrame(activeScene);
     }
 
-    for (auto layer : m_layerStack) {
-      layer->onUpdate(Timestep::deltaTime());
+
+    for (auto it = m_layerStack.overlayBegin(); it != m_layerStack.overlayEnd(); ++it) {
+      (*it)->onUpdate(Timestep::deltaTime());
     }
-
-
 
     m_window->onUpdate();
 

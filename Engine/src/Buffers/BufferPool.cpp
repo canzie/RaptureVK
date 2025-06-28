@@ -12,8 +12,7 @@ namespace Rapture {
 // Static member initialization
 std::unique_ptr<BufferPoolManager> BufferPoolManager::s_instance = nullptr;
 
-BufferAllocation::~BufferAllocation()
- {
+BufferAllocation::~BufferAllocation() {
     // Automatically free from arena when destroyed
     if (isValid()) {
         parentArena->free(*this);

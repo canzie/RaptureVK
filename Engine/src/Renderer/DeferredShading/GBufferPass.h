@@ -119,9 +119,9 @@ private:
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
-    // MDI batching system
-    std::unique_ptr<MDIBatchMap> m_mdiBatchMap;
-    std::unique_ptr<MDIBatchMap> m_selectedEntityBatchMap; // Separate batches for selected entities
+    // MDI batching system - one set per frame in flight
+    std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
+    std::vector<std::unique_ptr<MDIBatchMap>> m_selectedEntityBatchMaps; // Separate batches for selected entities
 
     VkRenderingAttachmentInfo m_colorAttachmentInfo[4];
     VkRenderingAttachmentInfo m_depthAttachmentInfo;

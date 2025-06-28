@@ -63,6 +63,13 @@ void BLAS::createGeometry() {
 
     RAPTURE_PROFILE_FUNCTION();
 
+    auto vertexAllocation = m_mesh->getVertexAllocation();
+    auto indexAllocation = m_mesh->getIndexAllocation();
+    
+    if (!vertexAllocation || !vertexAllocation->isValid() || !indexAllocation || !indexAllocation->isValid()) {
+        RP_CORE_ERROR("BLAS: Mesh vertex or index buffer allocation is invalid!");
+        throw std::runtime_error("BLAS: Mesh vertex or index buffer allocation is invalid!");
+    }
 
     auto vertexBuffer = m_mesh->getVertexBuffer();
     auto indexBuffer = m_mesh->getIndexBuffer();
@@ -72,18 +79,20 @@ void BLAS::createGeometry() {
         throw std::runtime_error("BLAS: Mesh vertex or index buffer is null!");
     }
     
-    // Get vertex buffer device address
-    VkBufferDeviceAddressInfo vertexAddressInfo{};
-    vertexAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-    vertexAddressInfo.buffer = vertexBuffer->getBufferVk();
-    VkDeviceAddress vertexAddress = vkGetBufferDeviceAddress(m_device, &vertexAddressInfo);
-    
-    // Get index buffer device address
-    VkBufferDeviceAddressInfo indexAddressInfo{};
-    indexAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-    indexAddressInfo.buffer = indexBuffer->getBufferVk();
-    VkDeviceAddress indexAddress = vkGetBufferDeviceAddress(m_device, &indexAddressInfo);
-    
+    // Get vertex buffer device address from allocation
+    VkBufferDeviceAddressInfo vertexBufferAddressInfo{};
+    vertexBufferAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+    vertexBufferAddressInfo.buffer = vertexAllocation->getBuffer();
+    VkDeviceAddress vertexBufferBaseAddress = vkGetBufferDeviceAddress(m_device, &vertexBufferAddressInfo);
+    VkDeviceAddress vertexAddress = vertexBufferBaseAddress + vertexAllocation->offsetBytes;
+
+    // Get index buffer device address from allocation
+    VkBufferDeviceAddressInfo indexBufferAddressInfo{};
+    indexBufferAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+    indexBufferAddressInfo.buffer = indexAllocation->getBuffer();
+    VkDeviceAddress indexBufferBaseAddress = vkGetBufferDeviceAddress(m_device, &indexBufferAddressInfo);
+    VkDeviceAddress indexAddress = indexBufferBaseAddress + indexAllocation->offsetBytes;
+
     // Set up geometry
     m_geometry = {};
     m_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -102,7 +111,7 @@ void BLAS::createGeometry() {
     
     m_geometry.geometry.triangles.vertexStride = vertexStride;
     m_geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT; // Position format
-    m_geometry.geometry.triangles.maxVertex = static_cast<uint32_t>(vertexBuffer->getSize() / vertexStride) - 1;
+    m_geometry.geometry.triangles.maxVertex = static_cast<uint32_t>(vertexAllocation->sizeBytes / vertexStride) - 1;
     
     // Index data
     m_geometry.geometry.triangles.indexData.deviceAddress = indexAddress;

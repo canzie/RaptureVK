@@ -108,11 +108,11 @@ void LightingPass::recordCommandBuffer(
 
     RAPTURE_PROFILE_FUNCTION();
 
-    m_currentFrame = swapchainImageIndex;  
+    m_currentFrame = frameInFlightIndex;  
 
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer); 
-    beginDynamicRendering(commandBuffer);               
+    setupDynamicRenderingMemoryBarriers(commandBuffer, swapchainImageIndex); 
+    beginDynamicRendering(commandBuffer, swapchainImageIndex);               
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
     auto& app = Application::getInstance();
@@ -304,12 +304,12 @@ void LightingPass::createPipeline() {
 }
 
 
-void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer) {
+void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t swapchainImageIndex) {
 
 if (m_swapChain != nullptr) {
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachmentInfo.imageView = m_swapChain->getImageViews()[m_currentFrame];
+    colorAttachmentInfo.imageView = m_swapChain->getImageViews()[swapchainImageIndex];
     colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -333,7 +333,7 @@ if (m_swapChain != nullptr) {
 
 }
 
-void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer) {
+void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t swapchainImageIndex) {
 
     auto& app = Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
@@ -345,7 +345,7 @@ void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBu
     colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    colorBarrier.image = m_swapChain->getImages()[m_currentFrame];
+    colorBarrier.image = m_swapChain->getImages()[swapchainImageIndex];
     colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     colorBarrier.subresourceRange.baseMipLevel = 0;
     colorBarrier.subresourceRange.levelCount = 1;

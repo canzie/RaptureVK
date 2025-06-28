@@ -156,12 +156,12 @@ void StencilBorderPass::recordCommandBuffer(
     
     // Bind vertex buffers
     VkBuffer vertexBuffers[] = {mesh->getVertexBuffer()->getBufferVk()};
-    VkDeviceSize offsets[] = {0};
+    VkDeviceSize offsets[] = {mesh->getVertexBuffer()->getOffset()};
     vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
 
 
     // Bind index buffer
-    vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), mesh->getIndexBuffer()->getBufferVk(), 0, mesh->getIndexBuffer()->getIndexType());
+    vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), mesh->getIndexBuffer()->getBufferVk(), mesh->getIndexBuffer()->getOffset(), mesh->getIndexBuffer()->getIndexType());
     
     // Draw the mesh
     vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), mesh->getIndexCount(), 1, 0, 0, 0);

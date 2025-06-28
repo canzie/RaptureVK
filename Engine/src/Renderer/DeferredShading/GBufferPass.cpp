@@ -27,9 +27,13 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     createPipeline();
     createTextures();
     
-    // Initialize MDI batching system
-    m_mdiBatchMap = std::make_unique<MDIBatchMap>();
-    m_selectedEntityBatchMap = std::make_unique<MDIBatchMap>();
+    // Initialize MDI batching system - one set per frame in flight
+    m_mdiBatchMaps.resize(framesInFlight);
+    m_selectedEntityBatchMaps.resize(framesInFlight);
+    for (uint32_t i = 0; i < framesInFlight; i++) {
+        m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>();
+        m_selectedEntityBatchMaps[i] = std::make_unique<MDIBatchMap>();
+    }
     
     // Bind GBuffer textures to bindless set
     bindGBufferTexturesToBindlessSet();
@@ -117,9 +121,9 @@ void GBufferPass::recordCommandBuffer(
         cameraComp = mainCamera->tryGetComponent<CameraComponent>();
     }
 
-    // Begin frame for MDI batching
-    m_mdiBatchMap->beginFrame();
-    m_selectedEntityBatchMap->beginFrame();
+    // Begin frame for MDI batching - use current frame's batch maps
+    m_mdiBatchMaps[m_currentFrame]->beginFrame();
+    m_selectedEntityBatchMaps[m_currentFrame]->beginFrame();
 
     // bind descriptor sets
     DescriptorManager::bindSet(0, commandBuffer, m_pipeline); // camera stuff
@@ -175,7 +179,7 @@ void GBufferPass::recordCommandBuffer(
         }
         
         // Choose the appropriate batch map based on selection state
-        MDIBatchMap* batchMap = isSelected ? m_selectedEntityBatchMap.get() : m_mdiBatchMap.get();
+        MDIBatchMap* batchMap = isSelected ? m_selectedEntityBatchMaps[m_currentFrame].get() : m_mdiBatchMaps[m_currentFrame].get();
         
         // Get or create batch for this VBO/IBO arena combination
         MDIBatch* batch = batchMap->obtainBatch(vboAlloc, iboAlloc, 
@@ -196,7 +200,7 @@ void GBufferPass::recordCommandBuffer(
     // Disable stencil writing for non-selected entities
     vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0x00);
     
-    for (const auto& [batchKey, batch] : m_mdiBatchMap->getBatches()) {
+    for (const auto& [batchKey, batch] : m_mdiBatchMaps[m_currentFrame]->getBatches()) {
         if (batch->getDrawCount() == 0) {
             continue;
         }
@@ -218,6 +222,7 @@ void GBufferPass::recordCommandBuffer(
         PushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
         pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
+
         
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
@@ -260,7 +265,7 @@ void GBufferPass::recordCommandBuffer(
     // Enable stencil writing for selected entity
     vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0xFF);
     
-    for (const auto& [batchKey, batch] : m_selectedEntityBatchMap->getBatches()) {
+    for (const auto& [batchKey, batch] : m_selectedEntityBatchMaps[m_currentFrame]->getBatches()) {
         if (batch->getDrawCount() == 0) {
             continue;
         }

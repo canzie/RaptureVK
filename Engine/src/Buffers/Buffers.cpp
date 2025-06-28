@@ -6,22 +6,26 @@
 
 #include "Logging/Log.h"
 #include "stdexcept"
+#include "Buffers/BufferPool.h"
 
 namespace Rapture {
 
     Buffer::Buffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator)
-    : m_Allocator(allocator), m_usage(usage), m_Size(size)
+    : m_Allocator(allocator), m_usage(usage), m_Size(size), m_bufferAllocation(nullptr), m_Buffer(VK_NULL_HANDLE), m_Allocation(VK_NULL_HANDLE)
     {
 
     }
 
+
     Buffer::~Buffer() {
-        destoryObjects();
+        if (!m_bufferAllocation)
+            destoryObjects();
     }
 
     void Buffer::destoryObjects()
     {
-        vmaDestroyBuffer(m_Allocator, m_Buffer, m_Allocation);
+        if (m_Buffer != VK_NULL_HANDLE && m_Allocation != VK_NULL_HANDLE)
+            vmaDestroyBuffer(m_Allocator, m_Buffer, m_Allocation);
     }
 
     void Buffer::addData(void *newData, VkDeviceSize size, VkDeviceSize offset)
@@ -56,7 +60,7 @@ namespace Rapture {
     }
 
 
-    void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+    void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize dstOffset)
     {
         auto& app = Application::getInstance();
         auto queueFamilyIndices = app.getVulkanContext().getQueueFamilyIndices();
@@ -80,7 +84,7 @@ namespace Rapture {
         vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
         VkBufferCopy copyRegion{};
         copyRegion.srcOffset = 0;
-        copyRegion.dstOffset = 0;
+        copyRegion.dstOffset = dstOffset;
         copyRegion.size = size;
         vkCmdCopyBuffer(commandBuffer->getCommandBufferVk(), srcBuffer, dstBuffer, 1, &copyRegion);
 
@@ -98,14 +102,54 @@ namespace Rapture {
 
     VkDescriptorBufferInfo Buffer::getDescriptorBufferInfo() const {
         VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = m_Buffer;
-        bufferInfo.offset = 0;
-        bufferInfo.range = m_Size;
+        bufferInfo.buffer = getBufferVk();
+        bufferInfo.offset = getOffset();
+        bufferInfo.range = getSize();
         return bufferInfo;
+    }
+
+    VkBuffer Buffer::getBufferVk() const
+    {
+        if (m_bufferAllocation)
+            return m_bufferAllocation->getBuffer();
+        return m_Buffer;
+    }
+
+    VkDeviceSize Buffer::getSize() const
+    {
+        if (m_bufferAllocation)
+            return m_bufferAllocation->sizeBytes;
+        return m_Size;
+    }
+
+    VkDeviceSize Buffer::getOffset() const
+    {
+        if (m_bufferAllocation)
+            return m_bufferAllocation->offsetBytes;
+        return 0;
+    }
+
+    std::shared_ptr<BufferAllocation> Buffer::getBufferAllocation()
+    {
+        if (m_bufferAllocation)
+            return m_bufferAllocation;
+        
+        RP_CORE_ERROR("Buffer::getBufferAllocation() called on a non-pooled buffer!");
+        return nullptr;
+    }
+
+    void Buffer::setBufferAllocation(std::shared_ptr<BufferAllocation> allocation) {
+        m_bufferAllocation = allocation;
     }
 
     void Buffer::createBuffer()
     { 
+        if (m_bufferAllocation)
+        {
+			RP_CORE_ERROR("createBuffer() called on a pooled buffer!");
+			return;
+        }
+        
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = m_Size;

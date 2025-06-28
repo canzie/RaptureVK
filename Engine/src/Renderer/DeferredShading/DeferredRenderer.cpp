@@ -275,6 +275,7 @@ void DeferredRenderer::recordCommandBuffer(
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Shadow Maps");
+        
         for (auto entity : lightView) {
             auto &lightComp = lightView.get<LightComponent>(entity);
             auto &transformComp = lightView.get<TransformComponent>(entity);
@@ -290,20 +291,21 @@ void DeferredRenderer::recordCommandBuffer(
             }
         }
 
-        for (auto entity : cascadedShadowView) {
-            auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
-            auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
-            auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
+            for (auto entity : cascadedShadowView) {
+                auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
+                auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
+                auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
 
-            // Always update directional light shadows for debugging, others only when changed
-            bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
-                                    transformComp.hasChanged(m_currentFrame) ||
-                                    lightComp.type == LightType::Directional); // Force update for directional lights
-            
-            if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
-                shadowComp.cascadedShadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+                // Always update directional light shadows for debugging, others only when changed
+                bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
+                                        transformComp.hasChanged(m_currentFrame) ||
+                                        lightComp.type == LightType::Directional); // Force update for directional lights
+                
+                if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
+                    shadowComp.cascadedShadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+                }
             }
-        }
+        
     }
 
     {

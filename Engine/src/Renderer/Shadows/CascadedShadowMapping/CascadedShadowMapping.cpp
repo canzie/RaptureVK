@@ -40,15 +40,17 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
     createPipeline();
     createUniformBuffers();
     
-    // Initialize MDI batching system
-    m_mdiBatchMap = std::make_unique<MDIBatchMap>();
+    // Initialize MDI batching system - one per frame in flight
+    m_mdiBatchMaps.resize(m_framesInFlight);
+    for (uint32_t i = 0; i < m_framesInFlight; i++) {
+        m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>();
+    }
     
     // Create flattened texture for debugging/visualization
     m_flattenedShadowTexture = TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
 }
 
 CascadedShadowMap::~CascadedShadowMap() {
-
 
 }
 
@@ -159,12 +161,31 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(
             maxZ = std::max(maxZ, trf.z);
         }
         
+        // --- Stabilize the cascade to the shadow-map texel grid to avoid shimmering ---
+        float orthoWidth  = maxX - minX;
+        float orthoHeight = maxY - minY;
+
+        // Calculate world-space size of a texel for this cascade
+        float texelSizeX = orthoWidth  / m_width;   // m_width == shadow map resolution in X
+        float texelSizeY = orthoHeight / m_height;  // m_height == shadow map resolution in Y
+
+        // Snap the light-space frustum center to the texel grid
+        glm::vec3 frustumCenterLS = glm::vec3(lightViewMatrix * glm::vec4(frustumCenter, 1.0f));
+        frustumCenterLS.x = std::floor(frustumCenterLS.x / texelSizeX) * texelSizeX;
+        frustumCenterLS.y = std::floor(frustumCenterLS.y / texelSizeY) * texelSizeY;
+
+        // Re-derive min/max in light-space using snapped center
+        minX = frustumCenterLS.x - orthoWidth  * 0.5f;
+        maxX = frustumCenterLS.x + orthoWidth  * 0.5f;
+        minY = frustumCenterLS.y - orthoHeight * 0.5f;
+        maxY = frustumCenterLS.y + orthoHeight * 0.5f;
+        
         // Add padding to avoid clipping issues
         constexpr float zMult = 10.0f;
         if (minZ < 0) minZ *= zMult; else minZ /= zMult;
         if (maxZ < 0) maxZ /= zMult; else maxZ *= zMult;
 
-        // 5. Create the orthographic projection for this cascade
+        // 5. Create the orthographic projection for this cascade (now stabilized)
         glm::mat4 lightProjectionMatrix = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
         
         lightProjectionMatrix[1][1] *= -1;
@@ -182,13 +203,16 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
 
     RAPTURE_PROFILE_FUNCTION();
 
+    m_writeIndex = (m_writeIndex + 1) % 2;
+    m_readIndex = (m_readIndex + 1) % 2;
+
     setupDynamicRenderingMemoryBarriers(commandBuffer);
     beginDynamicRendering(commandBuffer);
 
     m_currentFrame = currentFrame;
 
-    // Begin frame for MDI batching
-    m_mdiBatchMap->beginFrame();
+    // Begin frame for MDI batching - use current frame's batch map
+    m_mdiBatchMaps[m_currentFrame]->beginFrame();
 
     // Bind pipeline
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
@@ -246,7 +270,7 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
         }
         
         // Get or create batch for this VBO/IBO arena combination
-        MDIBatch* batch = m_mdiBatchMap->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(), meshComp.mesh->getIndexBuffer()->getIndexType());
+        MDIBatch* batch = m_mdiBatchMaps[m_currentFrame]->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(), meshComp.mesh->getIndexBuffer()->getIndexType());
         
         // Get mesh buffer index from the MeshComponent
         uint32_t meshBufferIndex = meshComp.meshDataBuffer ? meshComp.meshDataBuffer->getDescriptorIndex(currentFrame) : 0;
@@ -260,7 +284,7 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
     auto& vc = app.getVulkanContext();
     
     
-    for (const auto& [batchKey, batch] : m_mdiBatchMap->getBatches()) {
+    for (const auto& [batchKey, batch] : m_mdiBatchMaps[m_currentFrame]->getBatches()) {
         if (batch->getDrawCount() == 0) {
             continue;
         }
@@ -321,12 +345,17 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
     vkCmdEndRendering(commandBuffer->getCommandBufferVk());
 
     transitionToShaderReadableLayout(commandBuffer);
+
+
+
 }
 
 std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp, const CameraComponent &cameraComp)
 {
 
+
     RAPTURE_PROFILE_FUNCTION();
+
 
     if (lightComp.type != LightType::Directional) {
         RP_CORE_ERROR("CascadedShadowMap::updateViewMatrix: Light is not a directional light");
@@ -365,6 +394,7 @@ std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponen
     if (m_cascadeMatricesBuffer) {
         m_cascadeMatricesBuffer->addData(&csmData, sizeof(CSMData), 0);
     }
+
 
     return cascadeData;
 }
@@ -679,16 +709,17 @@ void CascadedShadowMap::createShadowTexture() {
 
 }
 void CascadedShadowMap::createUniformBuffers() {
-    m_shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
+    m_shadowDataBuffer = std::make_shared<ShadowDataBuffer>(m_framesInFlight);
 
-    m_cascadeMatricesBuffer = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::DYNAMIC, m_allocator, nullptr);
-    
+    m_cascadeMatricesBuffer = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::STREAM, m_allocator, nullptr);
+
     // Add to descriptor set
     auto cascadeSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
     if (cascadeSet) {
         auto binding = cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
         if (binding) {
             m_cascadeMatricesIndex = binding->add(m_cascadeMatricesBuffer);
+            
         }
     }
 
@@ -696,17 +727,20 @@ void CascadedShadowMap::createUniformBuffers() {
 
 void CascadedShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer) {
 
+
     // Transition shadow map to depth attachment layout
     VkImageMemoryBarrier barrier = m_shadowTextureArray->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED,
+        m_firstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        0,
+        m_firstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT,
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
     );
+
+    m_firstFrame = false;
     
     vkCmdPipelineBarrier(
         commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
         0,
         0, nullptr,

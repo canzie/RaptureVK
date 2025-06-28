@@ -19,6 +19,7 @@
 
 #include "Scenes/Scene.h"
 
+#include <array>
 #include <memory>
 #include <glm/glm.hpp>
 
@@ -107,19 +108,26 @@ private:
     float m_lambda;
     uint8_t m_NumCascades;
     
+    bool m_firstFrame = true;
+
     uint32_t m_currentFrame = 0;
     uint32_t m_framesInFlight = 3; // Default, will be updated
 
     std::vector<glm::mat4> m_lightViewProjections;
     std::vector<float> m_cascadeSplits;
 
+    // ping pong textures
     std::shared_ptr<Texture> m_shadowTextureArray;
+
+    uint32_t m_writeIndex = 0;
+    uint32_t m_readIndex = 1;
+
     std::shared_ptr<FlattenTexture> m_flattenedShadowTexture;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     std::shared_ptr<ShadowDataBuffer> m_shadowDataBuffer;
     std::shared_ptr<UniformBuffer> m_cascadeMatricesBuffer;
-    uint32_t m_cascadeMatricesIndex = UINT32_MAX;
+    uint32_t m_cascadeMatricesIndex;
 
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};
@@ -129,8 +137,8 @@ private:
 
     VmaAllocator m_allocator;
     
-    // MDI batching system
-    std::unique_ptr<MDIBatchMap> m_mdiBatchMap;
+    // MDI batching system - one per frame in flight
+    std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
 
     
     };

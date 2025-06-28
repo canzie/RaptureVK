@@ -3,6 +3,8 @@
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Utils/GLTypes.h"
+#include "Buffers/BufferPool.h"
+#include "WindowContext/Application.h"
 
 namespace Rapture {
 
@@ -34,11 +36,35 @@ IndexBuffer::IndexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allo
 IndexBuffer::IndexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator, uint32_t indexType)
     : IndexBuffer(size, usage, allocator, getIndexTypeVk(indexType)) {}   
 
+IndexBuffer::IndexBuffer(BufferAllocationRequest& request, VmaAllocator allocator, void* data)
+    : Buffer(request.size, request.usage, allocator), m_indexType(request.indexSize == 4 ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16)
+{
+    auto& app = Application::getInstance();
+    auto& bufferPoolManager = BufferPoolManager::getInstance();
+
+    request.type = BufferType::INDEX;
+    m_bufferAllocation = bufferPoolManager.allocateBuffer(request);
+
+    if (!m_bufferAllocation)
+    {
+        RP_CORE_ERROR("IndexBuffer::IndexBuffer - Failed to allocate buffer!");
+        throw std::runtime_error("IndexBuffer::IndexBuffer - Failed to allocate buffer!");
+    }
+
+    if (m_bufferAllocation && data)
+    {
+        m_bufferAllocation->uploadData(data, request.size);
+    }
+}
+
 IndexBuffer::~IndexBuffer()
 {
     // Free the bindless descriptor if allocated
     if (m_bindlessIndex != UINT32_MAX && s_bindlessBuffers) {
         s_bindlessBuffers->free(m_bindlessIndex);
+    }
+    if (m_bufferAllocation) {
+        BufferPoolManager::getInstance().freeBuffer(m_bufferAllocation);
     }
 }   
 
@@ -95,11 +121,20 @@ uint32_t IndexBuffer::getBindlessIndex()
 }
 
 void IndexBuffer::addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset) {
+
     // Check for buffer overflow
-    if (offset + size > m_Size) {
-        RP_CORE_ERROR("IndexBuffer::addDataGPU - Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}", size, offset, m_Size);
+    if (offset + size > getSize()) {
+        RP_CORE_ERROR("IndexBuffer::addDataGPU - Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}", size, offset, getSize());
         return;
     }
+
+    if (m_bufferAllocation)
+    {
+		m_bufferAllocation->uploadData(data, size, offset);
+		return;
+    }
+
+
 
     // Create a staging buffer
     IndexBuffer stagingBuffer(size, BufferUsage::STAGING, m_Allocator, m_indexType);

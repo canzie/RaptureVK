@@ -98,11 +98,13 @@ namespace Rapture {
     void Scene::onUpdate(float dt) {
         static uint32_t frameCounter = 0;
 
+
         // Get current frame dimensions for camera updates
         auto& app = Application::getInstance();
         auto swapChain = app.getVulkanContext().getSwapChain();
         float width = static_cast<float>(swapChain->getExtent().width);
         float height = static_cast<float>(swapChain->getExtent().height);
+        uint32_t frameCount = swapChain->getImageCount();
 
         // Update mesh data buffers
         auto meshView = m_Registry.view<TransformComponent, MeshComponent, MaterialComponent>();
@@ -183,8 +185,8 @@ namespace Rapture {
                 if (m_config.mainCamera && m_config.mainCamera->isValid()) {
                     auto cameraComp = m_config.mainCamera->tryGetComponent<CameraComponent>();
                     if (cameraComp) {
-                        auto cascades = shadow.cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
-
+                        shadow.cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
+                        
                         auto shadowDataBuffer = shadow.cascadedShadowMap->getShadowDataBuffer();
                         // Update the shadow data buffer if it exists
                         if (shadowDataBuffer) {
@@ -195,7 +197,7 @@ namespace Rapture {
             }
         }
         
-        frameCounter = (frameCounter + 1) % 3;
+        frameCounter = (frameCounter + 1) % frameCount;
 
 
         updateTLAS();

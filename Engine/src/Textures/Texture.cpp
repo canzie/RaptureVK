@@ -631,7 +631,15 @@ void Texture::createImageView() {
     viewInfo.image = m_image;
     viewInfo.viewType = toVkImageViewType(m_spec.type);
     viewInfo.format = toVkFormat(m_spec.format, m_spec.srgb);
-    viewInfo.subresourceRange.aspectMask = getImageAspectFlags(m_spec.format);
+    
+    // For depth-stencil formats, only use depth aspect for the main view to comply with Vulkan spec
+    // The spec requires that descriptor set image views have either depth OR stencil aspect, not both
+    if (isDepthFormat(m_spec.format)) {
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    } else {
+        viewInfo.subresourceRange.aspectMask = getImageAspectFlags(m_spec.format);
+    }
+    
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = m_spec.mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -934,6 +942,7 @@ void Texture::generateMipmaps(size_t threadId) {
     if (m_spec.mipLevels <= 1) {
         return; // No mipmaps to generate
     }
+    
 
     if (m_image == VK_NULL_HANDLE) {
         RP_CORE_ERROR("Cannot generate mipmaps: VkImage is VK_NULL_HANDLE");

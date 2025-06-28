@@ -10,6 +10,7 @@ namespace Rapture {
 class VertexBuffer : public Buffer {
     public:
         VertexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator);
+        VertexBuffer(BufferAllocationRequest& request, VmaAllocator allocator, void* data);
         ~VertexBuffer();
 
         virtual VkBufferUsageFlags getBufferUsage() override;
@@ -27,7 +28,6 @@ class VertexBuffer : public Buffer {
         static std::shared_ptr<DescriptorBindingSSBO> getBindlessBuffers() { return s_bindlessBuffers; }
 
     private:
-        std::shared_ptr<BufferAllocation> m_bufferAllocation;
         BufferLayout m_bufferLayout;
         uint32_t m_bindlessIndex = UINT32_MAX;
         

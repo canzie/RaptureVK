@@ -312,13 +312,13 @@ void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer
         
         // Bind vertex buffer
         VkBuffer vertexBuffers[] = {meshComp.mesh->getVertexBuffer()->getBufferVk()};
-        VkDeviceSize offsets[] = {0};
+        VkDeviceSize offsets[] = {meshComp.mesh->getVertexBuffer()->getOffset()};
         vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
         
         // Bind index buffer
         vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
                             meshComp.mesh->getIndexBuffer()->getBufferVk(), 
-                            0, 
+                            meshComp.mesh->getIndexBuffer()->getOffset(), 
                             meshComp.mesh->getIndexBuffer()->getIndexType());
         
         

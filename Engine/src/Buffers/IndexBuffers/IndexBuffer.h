@@ -13,6 +13,7 @@ class IndexBuffer : public Buffer {
     public:
         IndexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator, uint32_t indexType);
         IndexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator, VkIndexType indexType);
+        IndexBuffer(BufferAllocationRequest& request, VmaAllocator allocator, void* data);
         ~IndexBuffer();
 
         virtual VkBufferUsageFlags getBufferUsage() override;
@@ -31,7 +32,6 @@ class IndexBuffer : public Buffer {
         VkIndexType m_indexType;
         uint32_t m_bindlessIndex = UINT32_MAX;
 
-        std::shared_ptr<BufferAllocation> m_bufferAllocation;
 
         static std::shared_ptr<DescriptorBindingSSBO> s_bindlessBuffers;
 };

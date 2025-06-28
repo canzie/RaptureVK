@@ -48,7 +48,7 @@ enum class BufferType {
 struct BufferFlags {
     bool useShaderDeviceAddress = true;  // VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
     bool useStorageBuffer = true;        // VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-    bool useAccelerationStructure = false; // VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
+    bool useAccelerationStructure = true; // VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
 };
 
 // Parameters for requesting a buffer allocation
@@ -116,6 +116,7 @@ struct BufferArena : public std::enable_shared_from_this<BufferArena> {
     
     // Check if this arena is compatible with the given request
     bool isCompatible(const BufferAllocationRequest& request) const;
+
     
     // Get available space in this arena
     VkDeviceSize getAvailableSpace() const;
@@ -136,15 +137,7 @@ public:
     void freeBuffer(std::shared_ptr<BufferAllocation> allocation);
     
     
-    // Get statistics
-    struct PoolStats {
-        size_t totalArenas = 0;
-        VkDeviceSize totalAllocatedBytes = 0;
-        VkDeviceSize totalUsedBytes = 0;
-        float fragmentationRatio = 0.0f;
-    };
-    
-    PoolStats getStats() const;
+
 
 private:
     BufferPoolManager() = default;

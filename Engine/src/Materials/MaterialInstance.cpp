@@ -24,7 +24,6 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
         m_name = name;
     }
 
-
     if (allocator == nullptr) {
         RP_CORE_ERROR("MaterialInstance::MaterialInstance - allocator is nullptr!");
         throw std::runtime_error("MaterialInstance::MaterialInstance - allocator is nullptr!");

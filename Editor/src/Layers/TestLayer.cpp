@@ -209,8 +209,6 @@ void TestLayer::onUpdate(float ts)
     notifyCameraChange();
 
 
-    //Rapture::ForwardRenderer::drawFrame(activeScene);
-    Rapture::DeferredRenderer::drawFrame(activeScene);
 
 }
 

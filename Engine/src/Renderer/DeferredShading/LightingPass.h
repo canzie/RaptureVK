@@ -46,8 +46,8 @@ public:
 private:
     void createPipeline();
 
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
+    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t swapchainImageIndex);
+    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t swapchainImageIndex);
 
 
 private:

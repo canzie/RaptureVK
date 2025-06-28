@@ -89,12 +89,12 @@ namespace Rapture
             
             // Create new larger buffers
             m_indirectBuffer = std::make_shared<StorageBuffer>(newSize * sizeof(VkDrawIndexedIndirectCommand), 
-                                                              BufferUsage::DYNAMIC, 
+                                                              BufferUsage::STREAM, 
                                                               allocator, 
                                                               VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 
             m_batchInfoBuffer = std::make_shared<StorageBuffer>(newSize * sizeof(ObjectInfo), 
-                                                               BufferUsage::DYNAMIC, 
+                                                               BufferUsage::STREAM, 
                                                                allocator);
             
             // Add new batch info buffer to descriptor set and get index
@@ -116,6 +116,7 @@ namespace Rapture
 
         m_indirectBuffer->addData(m_cpuIndirectCommands.data(), m_cpuIndirectCommands.size() * sizeof(VkDrawIndexedIndirectCommand), 0);
         m_batchInfoBuffer->addData(m_cpuObjectInfo.data(), m_cpuObjectInfo.size() * sizeof(ObjectInfo), 0);
+
     }
 
     void MDIBatch::clear() {
