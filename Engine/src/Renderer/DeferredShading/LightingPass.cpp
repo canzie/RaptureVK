@@ -11,7 +11,7 @@ namespace Rapture {
 
 struct PushConstants {
 
-    glm::vec3 cameraPos;
+    glm::vec4 cameraPos;
 
     uint32_t lightCount;
     uint32_t shadowCount;
@@ -22,11 +22,17 @@ struct PushConstants {
     uint32_t GBufferMaterialHandle;
     uint32_t GBufferDepthHandle;
 
-    bool useDDGI;
+    uint32_t useDDGI;
     uint32_t probeVolumeHandle;
     uint32_t probeIrradianceHandle;
     uint32_t probeVisibilityHandle;
 
+
+    uint32_t padding[1];
+
+    // Fog
+    glm::vec4 fogColor;     // .rgb = color, .a = enabled
+    glm::vec2 fogDistances; // .x = near, .y = far
 
 };
 
@@ -70,7 +76,8 @@ LightingPass::LightingPass(
 
     createPipeline();
 
-
+    // Default fog settings
+    m_fogSettings = FogSettings();
 }
 
 LightingPass::~LightingPass() {
@@ -142,7 +149,7 @@ void LightingPass::recordCommandBuffer(
     }
 
     PushConstants pushConstants;
-    pushConstants.cameraPos = cameraPos;
+    pushConstants.cameraPos = glm::vec4(cameraPos, 1.0f);
 
     pushConstants.GBufferAlbedoHandle = m_gBufferPass->getAlbedoTextureIndex();
     pushConstants.GBufferNormalHandle = m_gBufferPass->getNormalTextureIndex();
@@ -150,8 +157,11 @@ void LightingPass::recordCommandBuffer(
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 
-    pushConstants.useDDGI = true;
+    pushConstants.useDDGI = 1;
 
+    // Fog
+    pushConstants.fogColor = glm::vec4(m_fogSettings.color, m_fogSettings.enabled ? 1.0f : 0.0f);
+    pushConstants.fogDistances = glm::vec2(m_fogSettings.nearDistance, m_fogSettings.farDistance);
 
     auto& reg = activeScene->getRegistry();
     auto lightView = reg.view<LightComponent>();

@@ -1,6 +1,7 @@
 #include "SettingsPanel.h"
 
 #include "Renderer/DeferredShading/DeferredRenderer.h"
+#include "Renderer/DeferredShading/LightingPass.h"
 
 SettingsPanel::SettingsPanel() {
 
@@ -24,7 +25,8 @@ void SettingsPanel::render() {
 void SettingsPanel::renderRendererSettings() {
     ImGui::Separator();
     renderDDGISettings();
-
+    ImGui::Separator();
+    renderFogSettings();
 }
 
 void SettingsPanel::renderDDGISettings() {
@@ -69,4 +71,18 @@ void SettingsPanel::renderDDGISettings() {
 
 
 
+}
+
+void SettingsPanel::renderFogSettings() {
+    ImGui::Text("Fog Settings");
+
+    auto lightingPass = Rapture::DeferredRenderer::getLightingPass();
+    if (lightingPass) {
+        auto& fogSettings = lightingPass->getFogSettings();
+
+        ImGui::Checkbox("Enabled", &fogSettings.enabled);
+        ImGui::ColorEdit3("Fog Color", &fogSettings.color.x);
+        ImGui::DragFloat("Near Distance", &fogSettings.nearDistance, 0.1f, 0.0f, fogSettings.farDistance, "%.2f");
+        ImGui::DragFloat("Far Distance", &fogSettings.farDistance, 0.1f, fogSettings.nearDistance, 1000.0, "%.2f");
+    }
 }

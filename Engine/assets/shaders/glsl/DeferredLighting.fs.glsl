@@ -69,7 +69,7 @@ layout(std140, set = 0, binding = 5) uniform ProbeInfo {
 
 
 layout(push_constant) uniform PushConstants {
-    vec3 cameraPos;
+    vec4 cameraPos;
     uint lightCount;
     uint shadowCount;
     
@@ -79,10 +79,14 @@ layout(push_constant) uniform PushConstants {
     uint GBufferMaterialHandle;
     uint GBufferDepthHandle;
 
-    bool useDDGI;
+    uint useDDGI;
     uint probeVolumeHandle;
     uint probeIrradianceHandle;
     uint probeVisibilityHandle;
+
+    // Fog
+    vec4 fogColor;     // .rgb = color, .a = enabled
+    vec2 fogDistances; // .x = near, .y = far
 } pc;
 
 
@@ -441,7 +445,7 @@ void main() {
     float roughness = metallicRoughnessAO.g;
     float ao = metallicRoughnessAO.b;
     
-    vec3 V = normalize(pc.cameraPos - fragPos);
+    vec3 V = normalize(pc.cameraPos.xyz - fragPos);
     
     vec3 Lo = vec3(0.0);
     int debugCascadeIndex = -1; // Store the cascade index for debugging
@@ -530,13 +534,20 @@ void main() {
 
     vec3 indirectDiffuse = vec3(0.03) * albedo ;
 
-    if (pc.useDDGI) {
+    if (pc.useDDGI > 0u) {
         vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
         vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, u_DDGI_Volume, V);
         indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
     }
 
     vec3 color = indirectDiffuse + Lo;
+
+    // Apply Fog
+    if (pc.fogColor.a > 0.5) {
+        float fragDepthView = abs(positionDepth.a); // Using view-space depth from G-Buffer
+        float fogFactor = smoothstep(pc.fogDistances.x, pc.fogDistances.y, fragDepthView);
+        color = mix(color, pc.fogColor.rgb, fogFactor);
+    }
 
 #if DEBUG_CASCADES
     // Apply cascade visualization tint if enabled and a cascade was determined

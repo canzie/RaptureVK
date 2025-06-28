@@ -21,6 +21,13 @@
 
 namespace Rapture {
 
+struct FogSettings {
+    bool enabled = true;
+    glm::vec3 color = glm::vec3(0.5f, 0.6f, 0.7f);
+    float nearDistance = 1.0f;
+    float farDistance = 180.0f;
+};
+
 class LightingPass {
 public:
     LightingPass(
@@ -42,6 +49,7 @@ public:
         uint32_t frameInFlightIndex
     );
 
+    FogSettings& getFogSettings() { return m_fogSettings; }
 
 private:
     void createPipeline();
@@ -77,6 +85,8 @@ private:
     float m_height;
 
     bool m_lightsChanged = true;
+
+    FogSettings m_fogSettings;
 
 };
 
