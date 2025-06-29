@@ -18,6 +18,11 @@ class StorageBuffer : public Buffer {
 
         virtual void addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset) override;
 
+        uint32_t getBindlessIndex();
+
+    private:
+        // index in the bindless ssbo binding
+        uint32_t m_bindlessIndex = UINT32_MAX;
         
 };
 

@@ -54,14 +54,14 @@ namespace Rapture
 	// Initialize cached time since launch
 	std::chrono::milliseconds Timestep::m_timeSinceLaunch = std::chrono::milliseconds(0);
 
+    void Stopwatch::start() {
+        m_startTime = std::chrono::system_clock::now();
+        m_isRunning = true;
+    }
+
+    void Stopwatch::stop() {
+        m_endTime = std::chrono::system_clock::now();
+        m_elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(m_endTime - m_startTime);
+        m_isRunning = false;
+    }
 }
-
-/**
-
-
-
-
-			{
-
-		};
-	*/

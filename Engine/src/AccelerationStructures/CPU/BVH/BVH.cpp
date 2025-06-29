@@ -33,13 +33,16 @@ void BVH::build(std::shared_ptr<Scene> scene) {
     // --> so we will do the large aabb including the collider witouth changing the original bounding box component
     // this means we can use the original bounding box component as the argument for the intersection tests.
     std::vector<BVHNode> primitives;
-    auto bbView = reg.view<BoundingBoxComponent>();
+    auto bbView = reg.view<BoundingBoxComponent, TransformComponent>();
 
     for (auto entity : bbView) {
-        auto& bb = bbView.get<BoundingBoxComponent>(entity);
+        auto [bb, transform] = bbView.get<BoundingBoxComponent, TransformComponent>(entity);
         
         BVHNode node;
         node.entityID = (EntityID)entity;
+
+        bb.updateWorldBoundingBox(transform.transforms.getTransform());
+
         node.min = bb.worldBoundingBox.getMin();
         node.max = bb.worldBoundingBox.getMax();
         

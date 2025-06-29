@@ -266,10 +266,14 @@ void TLAS::build() {
     auto& app = Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
     
+    // Get alignment for scratch buffer
+    const auto& asProps = vulkanContext.getAccelerationStructureProperties();
+    const VkDeviceSize scratchAlignment = asProps.minAccelerationStructureScratchOffsetAlignment;
+    
     // Create scratch buffer
     VkBufferCreateInfo scratchBufferCreateInfo{};
     scratchBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    scratchBufferCreateInfo.size = m_scratchSize;
+    scratchBufferCreateInfo.size = m_scratchSize + scratchAlignment;
     scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     
     VmaAllocationCreateInfo scratchAllocCreateInfo{};
@@ -292,9 +296,12 @@ void TLAS::build() {
     scratchAddressInfo.buffer = m_scratchBuffer;
     VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(m_device, &scratchAddressInfo);
     
+    // Align the scratch address
+    VkDeviceAddress alignedScratchAddress = (scratchAddress + scratchAlignment - 1) & ~(scratchAlignment - 1);
+    
     // Update build info with addresses
     m_buildInfo.dstAccelerationStructure = m_accelerationStructure;
-    m_buildInfo.scratchData.deviceAddress = scratchAddress;
+    m_buildInfo.scratchData.deviceAddress = alignedScratchAddress;
     
     // Create command buffer and build acceleration structure
     CommandPoolConfig poolConfig{};
@@ -412,10 +419,14 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>>& in
         auto& app = Application::getInstance();
         auto& vulkanContext = app.getVulkanContext();
         
+        // Get alignment for scratch buffer
+        const auto& asProps = vulkanContext.getAccelerationStructureProperties();
+        const VkDeviceSize scratchAlignment = asProps.minAccelerationStructureScratchOffsetAlignment;
+        
         // Create scratch buffer for update
         VkBufferCreateInfo scratchBufferCreateInfo{};
         scratchBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        scratchBufferCreateInfo.size = m_scratchSize;
+        scratchBufferCreateInfo.size = m_scratchSize + scratchAlignment;
         scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         
         VmaAllocationCreateInfo scratchAllocCreateInfo{};
@@ -438,11 +449,14 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>>& in
         scratchAddressInfo.buffer = updateScratchBuffer;
         VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(m_device, &scratchAddressInfo);
         
+        // Align the scratch address (tilde means bitwise not)
+        VkDeviceAddress alignedScratchAddress = (scratchAddress + scratchAlignment - 1) & ~(scratchAlignment - 1);
+        
         // Update build info for update mode
         m_buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
         m_buildInfo.srcAccelerationStructure = m_accelerationStructure;
         m_buildInfo.dstAccelerationStructure = m_accelerationStructure;
-        m_buildInfo.scratchData.deviceAddress = scratchAddress;
+        m_buildInfo.scratchData.deviceAddress = alignedScratchAddress;
         
         // Create command buffer for update
         CommandPoolConfig poolConfig{};

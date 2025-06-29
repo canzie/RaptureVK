@@ -18,6 +18,12 @@
 
 #include "Logging/TracyProfiler.h"
 
+#include "AccelerationStructures/CPU/BVH/BVH.h"
+#include "AccelerationStructures/CPU/BVH/BVH_SAH.h"
+#include "AccelerationStructures/CPU/BVH/DBVH.h"
+#include "Utils/Timestep.h"
+#include "Meshes/MeshPrimitives.h"
+
 TestLayer::~TestLayer()
 {
     onDetach();
@@ -92,8 +98,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     //auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf", activeScene);
     //loader->loadModel((rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf").string());
 
-    //auto cube = activeScene->createCube("Cube");
-    //auto sphere = activeScene->createSphere("Sphere");
+    auto cube = activeScene->createCube("Cube");
+    auto sphere = activeScene->createSphere("Sphere");
 
 
     Rapture::Entity light1 = activeScene->createEntity("Spot Light 1");
@@ -143,6 +149,50 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     }
 
     Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
+
+    {
+        Rapture::Stopwatch stopwatch;
+        stopwatch.start();
+        // Create BVH
+        auto bvh = std::make_shared<Rapture::BVH>(Rapture::LeafType::AABB);
+        bvh->build(activeScene);
+        stopwatch.stop();
+        Rapture::RP_INFO("BVH build time: {0}ms", stopwatch.getElapsedTimeMs());
+
+        auto& bvhNodes = bvh->getNodes();
+        std::vector<Rapture::InstanceData> instanceData;
+        for (const auto& node : bvhNodes) {
+            if (node.isLeaf()) {
+                glm::vec3 center = (node.min + node.max) * 0.5f;
+                glm::vec3 size = node.max - node.min;
+
+                glm::mat4 transform = glm::translate(glm::mat4(1.0f), center);
+                transform = glm::scale(transform, size);
+                instanceData.push_back({transform});
+            }
+        }
+
+        auto bvhViz = activeScene->createEntity("BVH Visualization");
+        bvhViz.addComponent<Rapture::TransformComponent>();
+        bvhViz.addComponent<Rapture::MeshComponent>(std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateCube()));
+        bvhViz.addComponent<Rapture::InstanceShapeComponent>(instanceData, Rapture::Application::getInstance().getVulkanContext().getVmaAllocator());
+        auto& instanceComp = bvhViz.getComponent<Rapture::InstanceShapeComponent>();
+        instanceComp.useWireMode = true;
+        instanceComp.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    
+    }
+
+    {
+        Rapture::Stopwatch stopwatch;
+        stopwatch.start();
+        // Create DBVH
+        auto bvhSAH = std::make_shared<Rapture::BVH_SAH>(Rapture::LeafType::AABB);
+        bvhSAH->build(activeScene);
+        stopwatch.stop();
+        Rapture::RP_INFO("BVH_SAH build time: {0}ms", stopwatch.getElapsedTimeMs());
+
+
+    }
 }
 
 

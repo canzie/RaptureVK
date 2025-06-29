@@ -54,11 +54,15 @@ protected:
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize dstOffset = 0);
 
 protected:
+    // only valid when not using a bufferpool, prefer using the getBufferVk() to always get the correct buffer
     VkBuffer m_Buffer;
+    
     VkBufferUsageFlags m_usageFlags;
     VkMemoryPropertyFlags m_propertiesFlags;
     VmaAllocation m_Allocation;
     VkDeviceSize m_Size;
+
+    // only used for index and vertex buffers
     std::shared_ptr<BufferAllocation> m_bufferAllocation;
 
 

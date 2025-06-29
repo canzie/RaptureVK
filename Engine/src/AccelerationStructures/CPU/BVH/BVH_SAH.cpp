@@ -25,14 +25,18 @@ BVH_SAH::~BVH_SAH() {
 void BVH_SAH::build(std::shared_ptr<Scene> scene) {
     auto& reg = scene->getRegistry();
     std::vector<BVHNode> primitives;
-    auto bbView = reg.view<BoundingBoxComponent>();
+    auto bbView = reg.view<BoundingBoxComponent, TransformComponent>();
 
     for (auto entity : bbView) {
-        auto& bb = bbView.get<BoundingBoxComponent>(entity);
+        auto [bb, transform] = bbView.get<BoundingBoxComponent, TransformComponent>(entity);
         BVHNode node;
         node.entityID = (EntityID)entity;
+
+        bb.updateWorldBoundingBox(transform.transforms.getTransform());
+
         node.min = bb.worldBoundingBox.getMin();
         node.max = bb.worldBoundingBox.getMax();
+
         if (reg.any_of<RigidBodyComponent>(entity)) {
             auto& collider = reg.get<RigidBodyComponent>(entity);
             glm::vec3 min, max;
@@ -40,6 +44,7 @@ void BVH_SAH::build(std::shared_ptr<Scene> scene) {
             node.min = glm::min(node.min, min);
             node.max = glm::max(node.max, max);
         }
+
         primitives.push_back(node);
     }
 
@@ -99,7 +104,9 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size
         rightBox.max = primitives[end].max;
         float rightArea = calculateSurfaceArea(rightBox);
 
-        for (size_t i = numPrimitives - 2; i >= 0; --i) {
+        size_t i = numPrimitives - 1;
+        while (i > 0) {
+            i--;
             float cost = 0.125f + (leftAreas[i] * static_cast<float>(i + 1) + rightArea * static_cast<float>(numPrimitives - 1 - i)) / parentSurfaceArea;
 
             if (cost < bestCost) {

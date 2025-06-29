@@ -18,6 +18,7 @@
 #include "Renderer/StencilBorderPass.h"
 #include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
 #include "Renderer/SkyboxPass.h"
+#include "Renderer/InstancedShapesPass.h"
 
 #include <memory>
 #include <vector>
@@ -65,6 +66,7 @@ private:
   static std::shared_ptr<LightingPass> m_lightingPass;
   static std::shared_ptr<StencilBorderPass> m_stencilBorderPass;
   static std::shared_ptr<SkyboxPass> m_skyboxPass;
+  static std::shared_ptr<InstancedShapesPass> m_instancedShapesPass;
 
   static std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
   static std::shared_ptr<CommandPool> m_commandPool;

@@ -342,6 +342,8 @@ void ImGuiLayer::onUpdate(float ts)
         graphicsQueue->submitCommandBuffers(firstSubmitInfo);
     }
 
+        // currently here to prevent csm flickering
+        // but everything is correctly set up to just remove it whenever csm is 100% stable
         graphicsQueue->waitIdle();
 
 

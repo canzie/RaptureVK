@@ -37,7 +37,6 @@ std::vector<CameraUniformBufferObject> ForwardRenderer::m_cameraUbos = {};
 // Light uniform buffers (binding 1)
 std::vector<std::shared_ptr<UniformBuffer>>
     ForwardRenderer::m_lightUniformBuffers = {};
-std::vector<LightUniformBufferObject> ForwardRenderer::m_lightUbos = {};
 
 // Light management
 bool ForwardRenderer::m_lightsNeedUpdate = true;
@@ -621,26 +620,7 @@ void ForwardRenderer::recreateSwapChain() {
 }
 
 void ForwardRenderer::createUniformBuffers() {
-  VkDeviceSize cameraBufferSize = sizeof(CameraUniformBufferObject);
-  VkDeviceSize lightBufferSize = sizeof(LightUniformBufferObject);
 
-  for (size_t i = 0; i < m_swapChain->getImageCount(); i++) {
-    // Create camera uniform buffer
-    auto cameraBuffer = std::make_shared<UniformBuffer>(
-        cameraBufferSize, BufferUsage::STREAM, m_vmaAllocator);
-    m_cameraUniformBuffers.push_back(cameraBuffer);
-    m_cameraUbos.push_back({});
-    m_cameraUniformBuffers[i]->addData((void *)&m_cameraUbos[i],
-                                       sizeof(m_cameraUbos[i]), 0);
-
-    // Create light uniform buffer
-    auto lightBuffer = std::make_shared<UniformBuffer>(
-        lightBufferSize, BufferUsage::STREAM, m_vmaAllocator);
-    m_lightUniformBuffers.push_back(lightBuffer);
-    m_lightUbos.push_back({});
-    m_lightUniformBuffers[i]->addData((void *)&m_lightUbos[i],
-                                      sizeof(m_lightUbos[i]), 0);
-  }
 }
 
 void ForwardRenderer::updateUniformBuffers() {
@@ -736,56 +716,7 @@ void ForwardRenderer::createDescriptorPool() {
 }
 
 void ForwardRenderer::createDescriptorSets() {
-  std::vector<VkDescriptorSetLayout> layouts(
-      m_swapChain->getImageCount(), m_shader->getDescriptorSetLayouts()[0]);
-  VkDescriptorSetAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocInfo.descriptorPool = m_descriptorPool;
-  allocInfo.descriptorSetCount =
-      static_cast<uint32_t>(m_swapChain->getImageCount());
-  allocInfo.pSetLayouts = layouts.data();
 
-  m_descriptorSets.resize(m_swapChain->getImageCount());
-  if (vkAllocateDescriptorSets(m_device, &allocInfo, m_descriptorSets.data()) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate descriptor sets!");
-  }
-
-  for (size_t i = 0; i < m_swapChain->getImageCount(); i++) {
-    std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
-
-    // Camera uniform buffer (binding 0)
-    VkDescriptorBufferInfo cameraBufferInfo{};
-    cameraBufferInfo.buffer = m_cameraUniformBuffers[i]->getBufferVk();
-    cameraBufferInfo.offset = 0;
-    cameraBufferInfo.range = sizeof(CameraUniformBufferObject);
-
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = m_descriptorSets[i];
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &cameraBufferInfo;
-
-    // Light uniform buffer (binding 1)
-    VkDescriptorBufferInfo lightBufferInfo{};
-    lightBufferInfo.buffer = m_lightUniformBuffers[i]->getBufferVk();
-    lightBufferInfo.offset = 0;
-    lightBufferInfo.range = sizeof(LightUniformBufferObject);
-
-    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = m_descriptorSets[i];
-    descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;
-    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pBufferInfo = &lightBufferInfo;
-
-    vkUpdateDescriptorSets(m_device,
-                           static_cast<uint32_t>(descriptorWrites.size()),
-                           descriptorWrites.data(), 0, nullptr);
-  }
 }
 
 void ForwardRenderer::setupLights(std::shared_ptr<Scene> activeScene) {
@@ -827,71 +758,7 @@ void ForwardRenderer::updateLights(std::shared_ptr<Scene> activeScene) {
   }
 
   // Update light uniform buffer
-  LightUniformBufferObject lightUbo{};
-  lightUbo.numLights = 0;
 
-  for (auto entity : lightView) {
-    if (lightUbo.numLights >= MAX_LIGHTS) {
-      RP_CORE_WARN("Maximum number of lights ({}) exceeded. Additional lights "
-                   "will be ignored.",
-                   MAX_LIGHTS);
-      break;
-    }
-
-    auto &transform = lightView.get<TransformComponent>(entity);
-    auto &lightComp = lightView.get<LightComponent>(entity);
-
-    if (!lightComp.isActive) {
-      continue;
-    }
-
-    LightData &lightData = lightUbo.lights[lightUbo.numLights];
-
-    // Position and light type
-    glm::vec3 position = transform.translation();
-    float lightTypeFloat = static_cast<float>(lightComp.type);
-    lightData.position = glm::vec4(position, lightTypeFloat);
-
-    // Direction and range
-    glm::vec3 direction =
-        glm::vec3(0.0f, 0.0f, -1.0f); // Default forward direction
-    if (lightComp.type == LightType::Directional ||
-        lightComp.type == LightType::Spot) {
-      // Calculate direction from rotation
-      glm::vec3 eulerAngles = transform.rotation();
-      glm::mat4 rotationMatrix =
-          glm::rotate(glm::mat4(1.0f), glm::radians(eulerAngles.x),
-                      glm::vec3(1.0f, 0.0f, 0.0f));
-      rotationMatrix = glm::rotate(rotationMatrix, glm::radians(eulerAngles.y),
-                                   glm::vec3(0.0f, 1.0f, 0.0f));
-      rotationMatrix = glm::rotate(rotationMatrix, glm::radians(eulerAngles.z),
-                                   glm::vec3(0.0f, 0.0f, 1.0f));
-      direction = glm::normalize(
-          glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
-    }
-    lightData.direction = glm::vec4(direction, lightComp.range);
-
-    // Color and intensity
-    lightData.color = glm::vec4(lightComp.color, lightComp.intensity);
-
-    // Spot light angles
-    if (lightComp.type == LightType::Spot) {
-      float innerCos = std::cos(lightComp.innerConeAngle);
-      float outerCos = std::cos(lightComp.outerConeAngle);
-      lightData.spotAngles = glm::vec4(innerCos, outerCos, 0.0f, 0.0f);
-    } else {
-      lightData.spotAngles = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-    }
-
-    lightUbo.numLights++;
-  }
-
-  // Update light uniform buffers for ALL frames in flight
-  for (size_t i = 0; i < m_lightUniformBuffers.size(); i++) {
-    m_lightUniformBuffers[i]->addData((void *)&lightUbo, sizeof(lightUbo), 0);
-  }
-
-  m_lightsNeedUpdate = false;
 }
 
 } // namespace Rapture

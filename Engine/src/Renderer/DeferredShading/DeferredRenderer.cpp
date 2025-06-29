@@ -35,6 +35,7 @@ std::shared_ptr<GBufferPass> DeferredRenderer::m_gbufferPass = nullptr;
 std::shared_ptr<LightingPass> DeferredRenderer::m_lightingPass = nullptr;
 std::shared_ptr<StencilBorderPass> DeferredRenderer::m_stencilBorderPass = nullptr;
 std::shared_ptr<SkyboxPass> DeferredRenderer::m_skyboxPass = nullptr;
+std::shared_ptr<InstancedShapesPass> DeferredRenderer::m_instancedShapesPass = nullptr;
 
 
 float DeferredRenderer::m_width = 0.0f;
@@ -78,6 +79,10 @@ void DeferredRenderer::init() {
       static_cast<float>(m_swapChain->getExtent().height),
       m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
 
+  m_instancedShapesPass = std::make_shared<InstancedShapesPass>(
+    static_cast<float>(m_swapChain->getExtent().width),
+    static_cast<float>(m_swapChain->getExtent().height),
+    m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
 
   m_skyboxPass = std::make_shared<SkyboxPass>(m_gbufferPass->getDepthTextures());
 
@@ -100,6 +105,7 @@ void DeferredRenderer::shutdown() {
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
     m_gbufferPass.reset();
+    m_instancedShapesPass.reset();
 
 
     // Clean up command buffers and pool
@@ -200,6 +206,7 @@ void DeferredRenderer::onSwapChainRecreated() {
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
     m_gbufferPass.reset();
+    m_instancedShapesPass.reset();
 
     m_width = static_cast<float>(m_swapChain->getExtent().width);
     m_height = static_cast<float>(m_swapChain->getExtent().height);
@@ -218,6 +225,11 @@ void DeferredRenderer::onSwapChainRecreated() {
         static_cast<float>(m_swapChain->getExtent().height),
         m_swapChain->getImageCount(), m_gbufferPass, m_dynamicDiffuseGI);
     m_stencilBorderPass = std::make_shared<StencilBorderPass>(
+        static_cast<float>(m_swapChain->getExtent().width),
+        static_cast<float>(m_swapChain->getExtent().height),
+        m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
+
+    m_instancedShapesPass = std::make_shared<InstancedShapesPass>(
         static_cast<float>(m_swapChain->getExtent().width),
         static_cast<float>(m_swapChain->getExtent().height),
         m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
@@ -318,6 +330,11 @@ void DeferredRenderer::recordCommandBuffer(
         m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex, m_currentFrame);
     }
     
+    {
+        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
+        m_instancedShapesPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex, m_currentFrame);
+    }
+
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Stencil Border Pass");
         m_stencilBorderPass->recordCommandBuffer(commandBuffer, imageIndex, m_currentFrame, activeScene);

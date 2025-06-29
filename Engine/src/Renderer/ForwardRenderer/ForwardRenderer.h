@@ -98,7 +98,6 @@ private:
 
   // Light uniform buffers (binding 1)
   static std::vector<std::shared_ptr<UniformBuffer>> m_lightUniformBuffers;
-  static std::vector<LightUniformBufferObject> m_lightUbos;
 
   // Light management
   static bool m_lightsNeedUpdate;

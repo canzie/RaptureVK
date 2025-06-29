@@ -208,11 +208,15 @@ void BLAS::build() {
     
     auto& app = Application::getInstance();
     auto& vulkanContext = app.getVulkanContext();
+
+    // Get alignment for scratch buffer
+    const auto& asProps = vulkanContext.getAccelerationStructureProperties();
+    const VkDeviceSize scratchAlignment = asProps.minAccelerationStructureScratchOffsetAlignment;
     
     // Create scratch buffer
     VkBufferCreateInfo scratchBufferCreateInfo{};
     scratchBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    scratchBufferCreateInfo.size = m_scratchSize;
+    scratchBufferCreateInfo.size = m_scratchSize + scratchAlignment;
     scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     
     VmaAllocationCreateInfo scratchAllocCreateInfo{};
@@ -230,9 +234,12 @@ void BLAS::build() {
     scratchAddressInfo.buffer = m_scratchBuffer;
     VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(m_device, &scratchAddressInfo);
     
+    // Align the scratch address
+    VkDeviceAddress alignedScratchAddress = (scratchAddress + scratchAlignment - 1) & ~(scratchAlignment - 1);
+
     // Update build info with addresses
     m_buildInfo.dstAccelerationStructure = m_accelerationStructure;
-    m_buildInfo.scratchData.deviceAddress = scratchAddress;
+    m_buildInfo.scratchData.deviceAddress = alignedScratchAddress;
     
     // Create command buffer and build acceleration structure
     CommandPoolConfig poolConfig{};

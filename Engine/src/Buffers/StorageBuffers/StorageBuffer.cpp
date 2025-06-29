@@ -3,6 +3,8 @@
 #include "WindowContext/Application.h"
 #include "Logging/Log.h"
 
+#include "Buffers/Descriptors/DescriptorManager.h"
+
 namespace Rapture {
 
 
@@ -40,6 +42,17 @@ StorageBuffer::StorageBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator 
 }
 
 StorageBuffer::~StorageBuffer() {
+
+    if (m_bindlessIndex != UINT32_MAX) {
+        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+        if (set) {
+            auto binding = set->getSSBOBinding(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+            if (binding) {
+                binding->free(m_bindlessIndex);
+            }
+        }
+    }
+
 }
 
 
@@ -91,5 +104,22 @@ void StorageBuffer::addDataGPU(void *data, VkDeviceSize size, VkDeviceSize offse
 
     // Copy from staging buffer to device local buffer
     copyBuffer(stagingBuffer.getBufferVk(), m_Buffer, size);
+}
+uint32_t StorageBuffer::getBindlessIndex() {
+    if (m_bindlessIndex != UINT32_MAX) {
+        return m_bindlessIndex;
+    }
+
+    auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+    if (set) {
+        auto binding = set->getSSBOBinding(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+
+        if (binding){
+            m_bindlessIndex = binding->add(shared_from_this());
+        }
+
+    }
+
+    return m_bindlessIndex;
 }
 }

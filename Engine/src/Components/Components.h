@@ -5,6 +5,7 @@
     Stores the state part of the ecs, mainly the data/instance of a system
 */
 
+#include "ComponentsCommon.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -24,6 +25,7 @@
 #include "AccelerationStructures/BLAS.h"
 #include "Meshes/Mesh.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
+#include "Buffers/StorageBuffers/StorageBuffer.h"
 #include "Materials/MaterialInstance.h"
 #include "AssetManager/AssetManager.h"
 
@@ -33,8 +35,6 @@
 #include <memory>
 
 
-    // Maximum number of lights supported
-    static constexpr uint32_t MAX_LIGHTS = 16;
 
 namespace Rapture {
 
@@ -252,6 +252,29 @@ namespace Rapture {
 
     };
 
+
+
+
+    // enables efficient instancing of 1000s of instances
+    // a more limited version of instancing as materials and other data is static
+    // if you want more complex objects, boohoo
+    struct InstanceShapeComponent {
+        // ssbo containing instance data and other instancing details like wiremode, ...
+        std::shared_ptr<StorageBuffer> instanceSSBO;
+        glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+        bool useWireMode = false;
+        uint32_t instanceCount = 0;
+
+        InstanceShapeComponent(std::vector<InstanceData> instanceData, VmaAllocator allocator) {
+
+            instanceSSBO = std::make_shared<StorageBuffer>(sizeof(InstanceData) * instanceData.size(), BufferUsage::STATIC, allocator);
+
+            instanceSSBO->addDataGPU(instanceData.data(), instanceData.size() * sizeof(InstanceData), 0);
+
+            instanceCount = static_cast<uint32_t>(instanceData.size());
+        }
+    };
+
     struct EntityNodeComponent
     {
         std::shared_ptr<EntityNode> entity_node;
@@ -294,13 +317,7 @@ struct SkyboxComponent {
 };
 
 
-// Light types for the LightComponent
-enum class LightType
-{
-    Point = 0,
-    Directional = 1,
-    Spot = 2
-};
+
 
 struct LightComponent
 {
@@ -464,19 +481,7 @@ struct RigidBodyComponent {
         : collider(std::move(collider)) {}
 };
 
-// Light data structure for shader
-struct LightData {
-    alignas(16) glm::vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)
-    alignas(16) glm::vec4 direction;     // w = range
-    alignas(16) glm::vec4 color;         // w = intensity
-    alignas(16) glm::vec4 spotAngles;    // x = inner cone cos, y = outer cone cos, z = entity id, w = unused
-};
 
-// Light uniform buffer object (binding 1)
-struct LightUniformBufferObject {
-    alignas(4) uint32_t numLights = 0;
-    LightData lights[MAX_LIGHTS];
-};
 
 }
 
