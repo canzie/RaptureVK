@@ -4,7 +4,7 @@
 #include "Components/Components.h"
 #include "Physics/Colliders/ColliderPrimitives.h"
 #include "Components/Systems/BoundingBox.h"
-
+#include "Physics/EntropyComponents.h"
 #include <algorithm>
 #include <iostream>
 
@@ -37,8 +37,8 @@ void BVH_SAH::build(std::shared_ptr<Scene> scene) {
         node.min = bb.worldBoundingBox.getMin();
         node.max = bb.worldBoundingBox.getMax();
 
-        if (reg.any_of<RigidBodyComponent>(entity)) {
-            auto& collider = reg.get<RigidBodyComponent>(entity);
+        if (reg.any_of<Entropy::RigidBodyComponent>(entity)) {
+            auto& collider = reg.get<Entropy::RigidBodyComponent>(entity);
             glm::vec3 min, max;
             collider.collider->getAABB(min, max);
             node.min = glm::min(node.min, min);

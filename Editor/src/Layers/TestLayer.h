@@ -9,9 +9,12 @@
 #include <vector>
 #include <glm/glm.hpp>
 
+#include "Physics/Entropy.h"
+
 // Forward declarations
 class ViewportPanel;
 
+namespace Rapture { class DBVH; }
 
 class TestLayer : public Rapture::Layer
 {
@@ -48,5 +51,7 @@ private:
     // FPS counter variables
     int m_fpsCounter = 0;
     float m_fpsTimer = 0.0f;
+
+    std::shared_ptr<Rapture::Entropy::EntropyPhysics> m_entropyPhysics;
 
 };

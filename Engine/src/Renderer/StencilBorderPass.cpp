@@ -128,7 +128,7 @@ void StencilBorderPass::recordCommandBuffer(
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
         m_pipeline->getPipelineLayoutVk(),
-        VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 
+         VK_SHADER_STAGE_VERTEX_BIT, 
         0,
         sizeof(PushConstants), 
         &pushConstants);

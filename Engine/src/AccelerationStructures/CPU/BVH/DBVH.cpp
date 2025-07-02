@@ -1,5 +1,9 @@
 #include "DBVH.h"
 #include "Components/Systems/BoundingBox.h"
+#include "Components/Components.h"
+#include "Physics/EntropyComponents.h"
+#include "Scenes/Scene.h"
+#include <unordered_set>
 
 namespace Rapture {
 
@@ -22,6 +26,29 @@ DBVH::DBVH() {
     m_nodes[m_nodeCapacity - 1].rightChildIndex = -1;
     m_nodes[m_nodeCapacity - 1].height = -1;
     m_freeList = 0;
+}
+
+DBVH::DBVH(std::shared_ptr<Scene> scene) : DBVH() {
+    auto& reg = scene->getRegistry();
+    auto view = reg.view<Entropy::RigidBodyComponent, MeshComponent, TransformComponent, BoundingBoxComponent>();
+    for (auto entityHandle : view) {
+        auto [rigidBody, mesh, transform, boundingBox] = view.get(entityHandle);
+
+        if (mesh.isStatic) {
+            continue;
+        }
+
+        glm::vec3 min;
+        glm::vec3 max;
+        rigidBody.collider->getAABB(min, max);
+        BoundingBox aabb = BoundingBox(min, max);
+        BoundingBox localAABB = aabb + boundingBox.localBoundingBox;
+
+        BoundingBox worldAABB = localAABB.transform(transform.transformMatrix());
+
+        
+        insert((uint32_t)entityHandle, worldAABB);
+    }
 }
 
 DBVH::~DBVH() {}
@@ -85,7 +112,7 @@ void DBVH::remove(int nodeId) {
     freeNode(nodeId);
 }
 
-bool DBVH::update(int nodeId, const BoundingBox& aabb, const glm::vec3& displacement) {
+bool DBVH::update(int nodeId, const BoundingBox& aabb) {
     BoundingBox node_aabb(m_nodes[nodeId].min, m_nodes[nodeId].max);
     if (node_aabb.contains(aabb))
         return false;
@@ -113,25 +140,36 @@ void DBVH::insertLeaf(int leafNodeId) {
 
         float area = BoundingBox(m_nodes[index].min, m_nodes[index].max).getSurfaceArea();
 
-        BoundingBox combined(m_nodes[index].min, m_nodes[index].max);
-        combined = combine(combined, leafAABB);
-        float combinedArea = combined.getSurfaceArea();
+        BoundingBox combinedAABB = combine(BoundingBox(m_nodes[index].min, m_nodes[index].max), leafAABB);
+        float combinedArea = combinedAABB.getSurfaceArea();
 
+        // Cost of creating a new parent for this node and the new leaf
         float cost = 2.0f * combinedArea;
+
+        // Minimum cost of pushing the leaf down the tree
         float inheritanceCost = 2.0f * (combinedArea - area);
 
-        auto cost_function = [&](int child_idx) {
-            BoundingBox childAABB(m_nodes[child_idx].min, m_nodes[child_idx].max);
-            if (m_nodes[child_idx].isLeaf()) {
-                 return combine(leafAABB, childAABB).getSurfaceArea() + inheritanceCost;
-            } else {
-                 BoundingBox combined_child = combine(leafAABB, childAABB);
-                 return (combined_child.getSurfaceArea() - childAABB.getSurfaceArea()) + inheritanceCost;
-            }
-        };
+        // Cost of descending into left child
+        BoundingBox leftChildAABB(m_nodes[leftChild].min, m_nodes[leftChild].max);
+        float costLeft;
+        if (m_nodes[leftChild].isLeaf()) {
+            costLeft = combine(leafAABB, leftChildAABB).getSurfaceArea() + inheritanceCost;
+        } else {
+            float oldArea = leftChildAABB.getSurfaceArea();
+            float newArea = combine(leafAABB, leftChildAABB).getSurfaceArea();
+            costLeft = (newArea - oldArea) + inheritanceCost;
+        }
 
-        float costLeft = cost_function(leftChild);
-        float costRight = cost_function(rightChild);
+        // Cost of descending into right child
+        BoundingBox rightChildAABB(m_nodes[rightChild].min, m_nodes[rightChild].max);
+        float costRight;
+        if (m_nodes[rightChild].isLeaf()) {
+            costRight = combine(leafAABB, rightChildAABB).getSurfaceArea() + inheritanceCost;
+        } else {
+            float oldArea = rightChildAABB.getSurfaceArea();
+            float newArea = combine(leafAABB, rightChildAABB).getSurfaceArea();
+            costRight = (newArea - oldArea) + inheritanceCost;
+        }
         
         if (cost < costLeft && cost < costRight) 
             break;
@@ -231,16 +269,19 @@ void DBVH::balance(int iA) {
 
     int balance = C->height - B->height;
 
+    // Rotate C up
     if (balance > 1) {
         int iF = C->leftChildIndex;
         int iG = C->rightChildIndex;
         BVHNode* F = &m_nodes[iF];
         BVHNode* G = &m_nodes[iG];
 
+        // Swap A and C
         C->leftChildIndex = iA;
         C->parentIndex = A->parentIndex;
         A->parentIndex = iC;
 
+        // A's old parent should now point to C
         if (C->parentIndex != -1) {
             if (m_nodes[C->parentIndex].leftChildIndex == iA) {
                 m_nodes[C->parentIndex].leftChildIndex = iC;
@@ -251,7 +292,8 @@ void DBVH::balance(int iA) {
             m_rootNodeId = iC;
         }
 
-        if (F->height > G->height) {
+        // Rotate
+        if (F->height > G->height) { // Double rotation (Right-Left)
             C->rightChildIndex = iF;
             A->rightChildIndex = iG;
             G->parentIndex = iA;
@@ -264,7 +306,7 @@ void DBVH::balance(int iA) {
             
             A->height = 1 + std::max(B->height, G->height);
             C->height = 1 + std::max(A->height, F->height);
-        } else {
+        } else { // Single rotation (Right-Right)
             C->rightChildIndex = iG;
             A->rightChildIndex = iF;
             F->parentIndex = iA;
@@ -277,16 +319,22 @@ void DBVH::balance(int iA) {
             A->height = 1 + std::max(B->height, F->height);
             C->height = 1 + std::max(A->height, G->height);
         }
-    } else if (balance < -1) {
+        return;
+    } 
+    
+    // Rotate B up
+    if (balance < -1) {
         int iD = B->leftChildIndex;
         int iE = B->rightChildIndex;
         BVHNode* D = &m_nodes[iD];
         BVHNode* E = &m_nodes[iE];
 
-        B->leftChildIndex = iA;
+        // Swap A and B
+        B->rightChildIndex = iA;
         B->parentIndex = A->parentIndex;
         A->parentIndex = iB;
 
+        // A's old parent should now point to B
         if (B->parentIndex != -1) {
             if (m_nodes[B->parentIndex].leftChildIndex == iA) {
                 m_nodes[B->parentIndex].leftChildIndex = iB;
@@ -297,8 +345,9 @@ void DBVH::balance(int iA) {
             m_rootNodeId = iB;
         }
 
-        if (D->height > E->height) {
-            B->rightChildIndex = iD;
+        // Rotate
+        if (D->height > E->height) { // Single rotation (Left-Left)
+            B->leftChildIndex = iD;
             A->leftChildIndex = iE;
             E->parentIndex = iA;
             
@@ -309,8 +358,8 @@ void DBVH::balance(int iA) {
 
             A->height = 1 + std::max(C->height, E->height);
             B->height = 1 + std::max(A->height, D->height);
-        } else {
-            B->rightChildIndex = iE;
+        } else { // Double rotation (Left-Right)
+            B->leftChildIndex = iE;
             A->leftChildIndex = iD;
             D->parentIndex = iA;
 
@@ -326,12 +375,22 @@ void DBVH::balance(int iA) {
 }
 
 std::vector<EntityID> DBVH::getIntersectingAABBs(const BoundingBox& worldAABB) const {
-    std::vector<EntityID> intersectingEntities;
     if (m_rootNodeId == -1) {
-        return intersectingEntities;
+        return {};
     }
-    getIntersectingAABBsRecursive(worldAABB, m_rootNodeId, intersectingEntities);
-    return intersectingEntities;
+
+    std::vector<EntityID> collected;
+    collected.reserve(8);
+    getIntersectingAABBsRecursive(worldAABB, m_rootNodeId, collected);
+
+    std::unordered_set<EntityID> uniqueIds;
+    uniqueIds.reserve(collected.size());
+    for (EntityID id : collected) {
+        if (id != static_cast<EntityID>(Entity::null())) {
+            uniqueIds.insert(id);
+        }
+    }
+    return std::vector<EntityID>(uniqueIds.begin(), uniqueIds.end());
 }
 
 void DBVH::getIntersectingAABBsRecursive(const BoundingBox& worldAABB, int nodeIndex, std::vector<EntityID>& intersectingEntities) const {
@@ -345,12 +404,12 @@ void DBVH::getIntersectingAABBsRecursive(const BoundingBox& worldAABB, int nodeI
     const auto& node_min = node.min;
     const auto& node_max = node.max;
 
-    bool intersects = (world_max.x > node_min.x &&
-        world_min.x < node_max.x &&
-        world_max.y > node_min.y &&
-        world_min.y < node_max.y &&
-        world_max.z > node_min.z &&
-        world_min.z < node_max.z);
+    bool intersects = (world_max.x >= node_min.x &&
+        world_min.x <= node_max.x &&
+        world_max.y >= node_min.y &&
+        world_min.y <= node_max.y &&
+        world_max.z >= node_min.z &&
+        world_min.z <= node_max.z);
 
     if (!intersects) {
         return;

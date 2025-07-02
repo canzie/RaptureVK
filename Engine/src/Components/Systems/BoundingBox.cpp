@@ -64,6 +64,12 @@ namespace Rapture {
         return BoundingBox(newMin, newMax);
     }
 
+    BoundingBox BoundingBox::operator+(const BoundingBox &other) const {
+        glm::vec3 min = glm::min(m_min, other.m_min);
+        glm::vec3 max = glm::max(m_max, other.m_max);
+        return BoundingBox(min, max);
+    }
+
     void BoundingBox::logBounds() const {
         if (m_isValid) {
             RP_CORE_INFO("BoundingBox: Min({:.2f}, {:.2f}, {:.2f}), Max({:.2f}, {:.2f}, {:.2f})", 

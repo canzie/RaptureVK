@@ -4,6 +4,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
 
+#include "Physics/EntropyCommon.h"
+
 // Forward declarations of all collider types
 // This is necessary for the base class to have pointers to them.
 namespace Rapture::Entropy {
@@ -35,31 +37,33 @@ namespace Rapture::Entropy {
     // base collider
     struct ColliderBase {
         glm::mat4 transform = glm::mat4(1.0f);
+        glm::mat4 localTransform = glm::mat4(1.0f);
         bool isVisible = true;
         
         virtual ~ColliderBase() = default;
 
         // The first dispatch in the double-dispatch pattern.
-        bool intersects(ColliderBase& other) {
+        bool intersects(ColliderBase& other, ContactManifold* manifold=nullptr) {
             // We use the collider type enum to decide which collider is responsible for the check.
             // This ensures we only have to implement each pair-wise check once.
             if (getColliderType() < other.getColliderType())
-                return this->dispatch(other);
-            return other.dispatch(*this);
+                return this->dispatch(other, manifold);
+            return other.dispatch(*this, manifold);
         }
+
 
         // Pure virtual functions to be implemented by derived colliders.
         virtual ColliderType getColliderType() const = 0;
         virtual void getAABB(glm::vec3& min, glm::vec3& max) const = 0;
 
         // The second dispatch, which calls the correct overload.
-        virtual bool dispatch(ColliderBase& other) = 0;
-        virtual bool intersect(SphereCollider & other) = 0;
-        virtual bool intersect(AABBCollider & other) = 0;
-        virtual bool intersect(OBBCollider & other) = 0;
-        virtual bool intersect(CapsuleCollider & other) = 0;
-        virtual bool intersect(CylinderCollider & other) = 0;
-        virtual bool intersect(ConvexHullCollider & other) = 0;
+        virtual bool dispatch(ColliderBase& other, ContactManifold* manifold) = 0;
+        virtual bool intersect(SphereCollider & other, ContactManifold* manifold) = 0;
+        virtual bool intersect(AABBCollider & other, ContactManifold* manifold) = 0;
+        virtual bool intersect(OBBCollider & other, ContactManifold* manifold) = 0;
+        virtual bool intersect(CapsuleCollider & other, ContactManifold* manifold) = 0;
+        virtual bool intersect(CylinderCollider & other, ContactManifold* manifold) = 0;
+        virtual bool intersect(ConvexHullCollider & other, ContactManifold* manifold) = 0;
     };
 
     struct SphereCollider : public ColliderBase {
@@ -69,13 +73,13 @@ namespace Rapture::Entropy {
         ColliderType getColliderType() const override { return ColliderType::Sphere; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
-        bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
-        bool intersect(SphereCollider & other) override;
-        bool intersect(AABBCollider & other) override;
-        bool intersect(OBBCollider & other) override;
-        bool intersect(CapsuleCollider & other) override;
-        bool intersect(CylinderCollider & other) override;
-        bool intersect(ConvexHullCollider & other) override;
+        bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
+        bool intersect(SphereCollider & other, ContactManifold* manifold) override;
+        bool intersect(AABBCollider & other, ContactManifold* manifold) override;
+        bool intersect(OBBCollider & other, ContactManifold* manifold) override;
+        bool intersect(CapsuleCollider & other, ContactManifold* manifold) override;
+        bool intersect(CylinderCollider & other, ContactManifold* manifold) override;
+        bool intersect(ConvexHullCollider & other, ContactManifold* manifold) override;
     };
     
     struct CylinderCollider : public ColliderBase {
@@ -86,29 +90,32 @@ namespace Rapture::Entropy {
         ColliderType getColliderType() const override { return ColliderType::Cylinder; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
-        bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
-        bool intersect(SphereCollider & other) override;
-        bool intersect(AABBCollider & other) override;
-        bool intersect(OBBCollider & other) override;
-        bool intersect(CapsuleCollider & other) override;
-        bool intersect(CylinderCollider & other) override;
-        bool intersect(ConvexHullCollider & other) override;
+        bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
+        bool intersect(SphereCollider & other, ContactManifold* manifold) override;
+        bool intersect(AABBCollider & other, ContactManifold* manifold) override;
+        bool intersect(OBBCollider & other, ContactManifold* manifold) override;
+        bool intersect(CapsuleCollider & other, ContactManifold* manifold) override;
+        bool intersect(CylinderCollider & other, ContactManifold* manifold) override;
+        bool intersect(ConvexHullCollider & other, ContactManifold* manifold) override;
     };
 
     struct AABBCollider : public ColliderBase {
         glm::vec3 min;
         glm::vec3 max;
 
+        AABBCollider(const glm::vec3& min, const glm::vec3& max) : min(min), max(max) {}
+        AABBCollider() : min(glm::vec3(0.0f)), max(glm::vec3(0.0f)) {}
+
         ColliderType getColliderType() const override { return ColliderType::AABB; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
-        bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
-        bool intersect(SphereCollider & other) override;
-        bool intersect(AABBCollider & other) override;
-        bool intersect(OBBCollider & other) override;
-        bool intersect(CapsuleCollider & other) override;
-        bool intersect(CylinderCollider & other) override;
-        bool intersect(ConvexHullCollider & other) override;
+        bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
+        bool intersect(SphereCollider & other, ContactManifold* manifold) override;
+        bool intersect(AABBCollider & other, ContactManifold* manifold) override;
+        bool intersect(OBBCollider & other, ContactManifold* manifold) override;
+        bool intersect(CapsuleCollider & other, ContactManifold* manifold) override;
+        bool intersect(CylinderCollider & other, ContactManifold* manifold) override;
+        bool intersect(ConvexHullCollider & other, ContactManifold* manifold) override;
     };
 
     struct CapsuleCollider : public ColliderBase {
@@ -119,13 +126,13 @@ namespace Rapture::Entropy {
         ColliderType getColliderType() const override { return ColliderType::Capsule; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
         
-        bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
-        bool intersect(SphereCollider & other) override;
-        bool intersect(AABBCollider & other) override;
-        bool intersect(OBBCollider & other) override;
-        bool intersect(CapsuleCollider & other) override;
-        bool intersect(CylinderCollider & other) override;
-        bool intersect(ConvexHullCollider & other) override;
+        bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
+        bool intersect(SphereCollider & other, ContactManifold* manifold) override;
+        bool intersect(AABBCollider & other, ContactManifold* manifold) override;
+        bool intersect(OBBCollider & other, ContactManifold* manifold) override;
+        bool intersect(CapsuleCollider & other, ContactManifold* manifold) override;
+        bool intersect(CylinderCollider & other, ContactManifold* manifold) override;
+        bool intersect(ConvexHullCollider & other, ContactManifold* manifold) override;
     };
 
     struct OBBCollider : public ColliderBase {
@@ -136,13 +143,13 @@ namespace Rapture::Entropy {
         ColliderType getColliderType() const override { return ColliderType::OBB; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
-        bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
-        bool intersect(SphereCollider & other) override;
-        bool intersect(AABBCollider & other) override;
-        bool intersect(OBBCollider & other) override;
-        bool intersect(CapsuleCollider & other) override;
-        bool intersect(CylinderCollider & other) override;
-        bool intersect(ConvexHullCollider & other) override;
+        bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
+        bool intersect(SphereCollider & other, ContactManifold* manifold) override;
+        bool intersect(AABBCollider & other, ContactManifold* manifold) override;
+        bool intersect(OBBCollider & other, ContactManifold* manifold) override;
+        bool intersect(CapsuleCollider & other, ContactManifold* manifold) override;
+        bool intersect(CylinderCollider & other, ContactManifold* manifold) override;
+        bool intersect(ConvexHullCollider & other, ContactManifold* manifold) override;
     };
 
     struct ConvexHullCollider : public ColliderBase {
@@ -151,13 +158,13 @@ namespace Rapture::Entropy {
         ColliderType getColliderType() const override { return ColliderType::ConvexHull; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
 
-        bool dispatch(ColliderBase& other) override { return other.intersect(*this); }
-        bool intersect(SphereCollider & other) override;
-        bool intersect(AABBCollider & other) override;
-        bool intersect(OBBCollider & other) override;
-        bool intersect(CapsuleCollider & other) override;
-        bool intersect(CylinderCollider & other) override;
-        bool intersect(ConvexHullCollider & other) override;
+        bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
+        bool intersect(SphereCollider & other, ContactManifold* manifold) override;
+        bool intersect(AABBCollider & other, ContactManifold* manifold) override;
+        bool intersect(OBBCollider & other, ContactManifold* manifold) override;
+        bool intersect(CapsuleCollider & other, ContactManifold* manifold) override;
+        bool intersect(CylinderCollider & other, ContactManifold* manifold) override;
+        bool intersect(ConvexHullCollider & other, ContactManifold* manifold) override;
     };
     
     

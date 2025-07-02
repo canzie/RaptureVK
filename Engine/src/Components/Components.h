@@ -28,7 +28,7 @@
 #include "Buffers/StorageBuffers/StorageBuffer.h"
 #include "Materials/MaterialInstance.h"
 #include "AssetManager/AssetManager.h"
-
+#include "Physics/EntropyComponents.h"
 #include "Physics/Colliders/ColliderPrimitives.h"
 
 #include <string>
@@ -209,6 +209,7 @@ namespace Rapture {
     struct MeshComponent {
         std::shared_ptr<Mesh> mesh;
         bool isLoading = true;
+        bool isStatic = true;
 
         std::shared_ptr<MeshDataBuffer> meshDataBuffer;
 
@@ -262,16 +263,17 @@ namespace Rapture {
         // ssbo containing instance data and other instancing details like wiremode, ...
         std::shared_ptr<StorageBuffer> instanceSSBO;
         glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-        bool useWireMode = false;
+        bool useWireMode = true;
         uint32_t instanceCount = 0;
 
         InstanceShapeComponent(std::vector<InstanceData> instanceData, VmaAllocator allocator) {
 
-            instanceSSBO = std::make_shared<StorageBuffer>(sizeof(InstanceData) * instanceData.size(), BufferUsage::STATIC, allocator);
+            if (!instanceData.empty()) {
+                instanceSSBO = std::make_shared<StorageBuffer>(sizeof(InstanceData) * instanceData.size(), BufferUsage::DYNAMIC, allocator);
+                instanceSSBO->addDataGPU(instanceData.data(), instanceData.size() * sizeof(InstanceData), 0);
+                instanceCount = static_cast<uint32_t>(instanceData.size());
 
-            instanceSSBO->addDataGPU(instanceData.data(), instanceData.size() * sizeof(InstanceData), 0);
-
-            instanceCount = static_cast<uint32_t>(instanceData.size());
+            }
         }
     };
 
@@ -474,12 +476,6 @@ struct BoundingBoxComponent {
 
 };
 
-struct RigidBodyComponent {
-    std::unique_ptr<Entropy::ColliderBase> collider;
-
-    RigidBodyComponent(std::unique_ptr<Entropy::ColliderBase> collider) 
-        : collider(std::move(collider)) {}
-};
 
 
 

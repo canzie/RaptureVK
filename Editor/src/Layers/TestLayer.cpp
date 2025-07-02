@@ -23,6 +23,8 @@
 #include "AccelerationStructures/CPU/BVH/DBVH.h"
 #include "Utils/Timestep.h"
 #include "Meshes/MeshPrimitives.h"
+#include "Physics/EntropyComponents.h"
+
 
 TestLayer::~TestLayer()
 {
@@ -98,12 +100,33 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     //auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf", activeScene);
     //loader->loadModel((rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf").string());
 
-    auto cube = activeScene->createCube("Cube");
-    auto sphere = activeScene->createSphere("Sphere");
+    auto cubeA = activeScene->createCube("Cube A");
+    auto& rbA = cubeA.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
+    rbA.invMass = 1.0f;
+
+    cubeA.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 5.0f, 0.0f));
+    cubeA.getComponent<Rapture::MeshComponent>().isStatic = false;
+
+    auto cubeB = activeScene->createCube("Cube B");
+    auto& rbB = cubeB.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
+    rbB.invMass = 1.0f;
+    cubeB.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 10.0f, 0.0f));
+    cubeB.getComponent<Rapture::MeshComponent>().isStatic = false;
 
 
-    Rapture::Entity light1 = activeScene->createEntity("Spot Light 1");
-    light1.addComponent<Rapture::TransformComponent>(
+    auto platform = activeScene->createCube("Platform");
+    auto& rbPlatform = platform.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
+    rbPlatform.invMass = 0.0f;
+    platform.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
+    platform.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 1.0f, 10.0f));
+    platform.getComponent<Rapture::MeshComponent>().isStatic = true;
+
+
+
+
+
+    Rapture::Entity light1 = activeScene->createSphere("Spot Light 1");
+    light1.setComponent<Rapture::TransformComponent>(
         glm::vec3(2.0f, 1.0f, -3.0f),  // Position to the right of the sphere, same Z coordinate
         glm::vec3(-2.243f, 0.0f, 0.0f),              // No rotation needed for point light
         glm::vec3(0.2f)               // Small scale to make the cube compact
@@ -121,8 +144,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     light1.addComponent<Rapture::ShadowComponent>(2048, 2048);
 
     // Light 2: A blue-tinted light to the left side
-    Rapture::Entity sunLight = activeScene->createEntity("Sun");
-    sunLight.addComponent<Rapture::TransformComponent>(
+    Rapture::Entity sunLight = activeScene->createSphere("Sun");
+    sunLight.setComponent<Rapture::TransformComponent>(
         glm::vec3(-2.0f, 0.5f, -3.0f), // Position to the left of the sphere, same Z coordinate
         glm::vec3(-1.504f, 0.0f, 0.0f),               // No rotation needed for point light
         glm::vec3(0.2f)                // Small scale to make the cube compact
@@ -150,49 +173,10 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
 
-    {
-        Rapture::Stopwatch stopwatch;
-        stopwatch.start();
-        // Create BVH
-        auto bvh = std::make_shared<Rapture::BVH>(Rapture::LeafType::AABB);
-        bvh->build(activeScene);
-        stopwatch.stop();
-        Rapture::RP_INFO("BVH build time: {0}ms", stopwatch.getElapsedTimeMs());
+    m_entropyPhysics = std::make_shared<Rapture::Entropy::EntropyPhysics>();
+    m_entropyPhysics->addGlobalForceGenerator(std::make_shared<Rapture::Entropy::GravityForce>());
+    m_entropyPhysics->addGlobalForceGenerator(std::make_shared<Rapture::Entropy::DampingForce>(0.4f, 0.4f));
 
-        auto& bvhNodes = bvh->getNodes();
-        std::vector<Rapture::InstanceData> instanceData;
-        for (const auto& node : bvhNodes) {
-            if (node.isLeaf()) {
-                glm::vec3 center = (node.min + node.max) * 0.5f;
-                glm::vec3 size = node.max - node.min;
-
-                glm::mat4 transform = glm::translate(glm::mat4(1.0f), center);
-                transform = glm::scale(transform, size);
-                instanceData.push_back({transform});
-            }
-        }
-
-        auto bvhViz = activeScene->createEntity("BVH Visualization");
-        bvhViz.addComponent<Rapture::TransformComponent>();
-        bvhViz.addComponent<Rapture::MeshComponent>(std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateCube()));
-        bvhViz.addComponent<Rapture::InstanceShapeComponent>(instanceData, Rapture::Application::getInstance().getVulkanContext().getVmaAllocator());
-        auto& instanceComp = bvhViz.getComponent<Rapture::InstanceShapeComponent>();
-        instanceComp.useWireMode = true;
-        instanceComp.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    
-    }
-
-    {
-        Rapture::Stopwatch stopwatch;
-        stopwatch.start();
-        // Create DBVH
-        auto bvhSAH = std::make_shared<Rapture::BVH_SAH>(Rapture::LeafType::AABB);
-        bvhSAH->build(activeScene);
-        stopwatch.stop();
-        Rapture::RP_INFO("BVH_SAH build time: {0}ms", stopwatch.getElapsedTimeMs());
-
-
-    }
 }
 
 
@@ -258,6 +242,13 @@ void TestLayer::onUpdate(float ts)
     // Notify about camera changes (for ImGuizmo)
     notifyCameraChange();
 
+    // Step simple physics (gravity) before collision detection for demo.
+    if (m_entropyPhysics) {
+        auto manifolds = m_entropyPhysics->step(activeScene, ts/10.0f); // need to slow it down, otherwise it is too fast
+
+    }
+
+    m_entropyPhysics->getCollisions()->debugVisualize(activeScene);
 
 
 }

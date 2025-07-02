@@ -2,24 +2,29 @@
 
 #include "AccelerationStructures/CPU/BVH/BVHCommon.h"
 #include <vector>
+#include <memory>
 
 
 namespace Rapture {
 
 class BoundingBox;
+class Scene;
 
 
 class DBVH {
 public:
     DBVH();
+    DBVH(std::shared_ptr<Scene> scene);
     ~DBVH();
 
     int insert(EntityID entity, const BoundingBox& aabb);
     void remove(int nodeId);
-    bool update(int nodeId, const BoundingBox& aabb, const glm::vec3& displacement);
+    bool update(int nodeId, const BoundingBox& aabb);
     void clear();
 
     std::vector<EntityID> getIntersectingAABBs(const BoundingBox& worldAABB) const;
+
+    std::vector<BVHNode>& getNodes() { return m_nodes; }
 
 private:
     int allocateNode();

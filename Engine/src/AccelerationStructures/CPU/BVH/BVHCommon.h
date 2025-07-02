@@ -21,7 +21,10 @@ struct BVHNode {
     int rightChildIndex = -1;
     int height = -1;                                     // used for dbvh
 
-    bool isLeaf() const { return leftChildIndex == -1; } // used for dbvh
+    // A node is a valid leaf if it has no children **and** it is part of the active tree
+    // (height >= 0). Free-list / unallocated nodes keep height == -1, so we must
+    // exclude them here to avoid treating them as real leaves.
+    bool isLeaf() const { return height >= 0 && leftChildIndex == -1; } // used for dbvh
 };
 
 }

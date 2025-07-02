@@ -783,6 +783,7 @@ namespace Rapture {
                     entity.getComponent<BoundingBoxComponent>().localBoundingBox = BoundingBox(minBounds, maxBounds);
                 } else if (calculatedBounds) {
                     entity.addComponent<BoundingBoxComponent>(minBounds, maxBounds);
+                    //entity.addComponent<Entropy::RigidBodyComponent>(std::make_unique<Entropy::AABBCollider>(minBounds, maxBounds));
                 }
             }
         }

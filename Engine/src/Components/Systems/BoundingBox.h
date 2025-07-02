@@ -29,6 +29,7 @@ public:
 
     BoundingBox transform(const glm::mat4& matrix) const;
 
+    BoundingBox operator+(const BoundingBox& other) const;
 
 private:
     glm::vec3 m_min;
