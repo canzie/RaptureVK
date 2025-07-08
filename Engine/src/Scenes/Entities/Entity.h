@@ -9,6 +9,8 @@
 #include <entt/entt.hpp>
 #include "Scenes/Scene.h"
 
+#include "Scenes/Entities/EntityCommon.h"
+
 
 /*
     This is just a entt wrapper using magic (...)
@@ -23,7 +25,7 @@ namespace Rapture {
     };
 
     // more lightweight than an entire entity
-    using EntityID = uint32_t;
+    
 
 class Entity {
 

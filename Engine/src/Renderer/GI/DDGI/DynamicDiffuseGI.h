@@ -3,6 +3,8 @@
 #include <memory>
 #include <vector>
 #include <cmath>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <glm/glm.hpp>
 
@@ -21,8 +23,11 @@
 
 #include "DDGICommon.h"
 
+#include "Scenes/Entities/EntityCommon.h"
+
 namespace Rapture {
 
+class MaterialInstance;
 
 class DynamicDiffuseGI {
 public:
@@ -55,6 +60,8 @@ public:
     void setProbeVolume(const ProbeVolume& probeVolume) { m_ProbeVolume = probeVolume; m_isVolumeDirty = true; }
     void setVolumeDirty(bool dirty) { m_isVolumeDirty = dirty; }
 
+    void onResize(uint32_t framesInFlight);
+
     // Get bindless indices for probe textures
     uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
     uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
@@ -79,6 +86,7 @@ private:
 
     void createPipelines();
     void setupProbeTextures();
+    void updateMeshInfoBuffer(std::shared_ptr<Scene> scene);
 
     uint32_t getSunLightDataIndex(std::shared_ptr<Scene> scene);
 
@@ -95,7 +103,16 @@ private:
 
     ProbeVolume m_ProbeVolume;
 
-    
+    // material to offsets
+    // key: raw pointer to MaterialInstance
+    // value: list of byte offsets in the MeshInfo SSBO where this material's parameters live
+    std::unordered_map<MaterialInstance*, std::vector<uint32_t>> m_MaterialToOffsets;
+    std::unordered_map<EntityID, uint32_t> m_MeshToOffsets;
+
+    // Queue of materials that have changed this frame and need patching
+    std::unordered_set<MaterialInstance*> m_dirtyMaterials;
+    std::unordered_set<EntityID> m_dirtyMeshes;
+
     std::shared_ptr<StorageBuffer> m_MeshInfoBuffer;
 
 

@@ -44,6 +44,7 @@ private:
     std::shared_ptr<Texture> m_inputTexture;
     std::shared_ptr<Texture> m_flattenedTexture;
     uint32_t m_inputTextureBindlessIndex = 0;
+    std::shared_ptr<DescriptorSet> m_descriptorSet;
     std::string m_name;
 };
 

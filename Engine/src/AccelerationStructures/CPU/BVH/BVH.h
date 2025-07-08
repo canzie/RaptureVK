@@ -14,6 +14,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <limits>
+#include <unordered_map>
 
 #include "Scenes/Entities/Entity.h"
 #include "BVHCommon.h"

@@ -55,6 +55,7 @@ namespace Rapture::Entropy {
         // Pure virtual functions to be implemented by derived colliders.
         virtual ColliderType getColliderType() const = 0;
         virtual void getAABB(glm::vec3& min, glm::vec3& max) const = 0;
+        virtual glm::mat3 calculateInertiaTensor(float mass) const = 0;
 
         // The second dispatch, which calls the correct overload.
         virtual bool dispatch(ColliderBase& other, ContactManifold* manifold) = 0;
@@ -72,6 +73,7 @@ namespace Rapture::Entropy {
 
         ColliderType getColliderType() const override { return ColliderType::Sphere; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
+        glm::mat3 calculateInertiaTensor(float mass) const override;
 
         bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
         bool intersect(SphereCollider & other, ContactManifold* manifold) override;
@@ -108,6 +110,7 @@ namespace Rapture::Entropy {
 
         ColliderType getColliderType() const override { return ColliderType::AABB; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
+        glm::mat3 calculateInertiaTensor(float mass) const override;
 
         bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
         bool intersect(SphereCollider & other, ContactManifold* manifold) override;
@@ -142,6 +145,7 @@ namespace Rapture::Entropy {
 
         ColliderType getColliderType() const override { return ColliderType::OBB; }
         void getAABB(glm::vec3& min, glm::vec3& max) const override;
+        glm::mat3 calculateInertiaTensor(float mass) const override;
 
         bool dispatch(ColliderBase& other, ContactManifold* manifold) override { return other.intersect(*this, manifold); }
         bool intersect(SphereCollider & other, ContactManifold* manifold) override;

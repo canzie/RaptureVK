@@ -252,23 +252,31 @@ void Shader::createDescriptorSetLayout()
     for (const auto& setInfo : m_descriptorSetInfos) {
         maxSetNumber = std::max(maxSetNumber, setInfo.setNumber);
     }
-    
-    // Ensure we have layouts for sets 0-3 at minimum
-    maxSetNumber = std::max(maxSetNumber, 3u);
+
     
     // Resize layout vector to accommodate all sets
     m_descriptorSetLayouts.resize(maxSetNumber + 1, VK_NULL_HANDLE);
 
     // Process each set
     for (uint32_t setNumber = 0; setNumber <= maxSetNumber; ++setNumber) {
-        auto descriptorSet = DescriptorManager::getDescriptorSet(setNumber);
+        std::shared_ptr<DescriptorSet> descriptorSet = nullptr;
+
+        // Sets 0-3 are considered "managed" and can be retrieved from the DescriptorManager.
+        if (setNumber <= 3) {
+            descriptorSet = DescriptorManager::getDescriptorSet(setNumber);
+        }
+
         if (descriptorSet) {
             m_descriptorSetLayouts[setNumber] = descriptorSet->getLayout();
         } else {
-            RP_CORE_WARN("Shader: DescriptorManager set {} not available, falling back to shader layout", setNumber);
-            // Fall back to shader-defined layout
+            // For sets > 3, or if a managed set is not available, we fall back to creating the layout from reflection data.
+            if (setNumber <= 3) {
+                RP_CORE_WARN("Shader: DescriptorManager set {} not available, falling back to shader layout", setNumber);
+            }
+            
             auto it = std::find_if(m_descriptorSetInfos.begin(), m_descriptorSetInfos.end(),
                 [setNumber](const DescriptorSetInfo& info) { return info.setNumber == setNumber; });
+            
             if (it != m_descriptorSetInfos.end()) {
                 createDescriptorSetLayoutFromInfo(*it);
             }
@@ -297,21 +305,31 @@ void Shader::createDescriptorSetLayoutFromInfo(const DescriptorSetInfo& setInfo)
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
     layoutBindings.reserve(setInfo.bindings.size());
-
+    std::vector<VkDescriptorBindingFlags> bindingFlags(setInfo.bindings.size(), VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+    
     // each binding in a set
     for (const auto& bindingInfo : setInfo.bindings) {
         VkDescriptorSetLayoutBinding layoutBinding{};
         layoutBinding.binding = bindingInfo.binding;
         layoutBinding.descriptorType = bindingInfo.descriptorType;
         layoutBinding.descriptorCount = bindingInfo.descriptorCount;
-        layoutBinding.stageFlags = bindingInfo.stageFlags;
+        layoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
         layoutBinding.pImmutableSamplers = nullptr;
 
         layoutBindings.push_back(layoutBinding);
     }
 
+    // Set up binding flags info
+    VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
+    bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+    bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
+    bindingFlagsInfo.pBindingFlags = bindingFlags.data();
+
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;  // Required for UPDATE_AFTER_BIND
+    layoutInfo.pNext = &bindingFlagsInfo;  
     layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
     layoutInfo.pBindings = layoutBindings.data();
 

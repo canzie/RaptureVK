@@ -24,6 +24,7 @@ private:
     void renderShadowComponent();
     void renderCascadedShadowComponent();
     void renderMeshComponent();
+    void renderRigidBodyComponent();
 
 private:
 

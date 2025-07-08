@@ -45,20 +45,11 @@ namespace Rapture::Entropy {
         // Visualise current BVHs (static + dynamic) using InstanceShapeComponents
         void debugVisualize(std::shared_ptr<Scene> scene);
 
-        std::vector<std::pair<Entity, Entity>>& broadPhase(std::shared_ptr<Scene> scene);
 
     private:
-
+        std::vector<std::pair<Entity, Entity>>& broadPhase(std::shared_ptr<Scene> scene);
         void narrowPhase(std::shared_ptr<Scene> scene, std::vector<ContactManifold> &manifolds);
 
-        // general collision detection function
-        bool checkCollision(const Entity& entityA, const Entity& entityB);
-
-        // shape specific collision detection functions
-
-        //bool checkSphereSphere(SphereCollider& sphereA, SphereCollider& sphereB);
-        // checks collision between 2 AABBs
-        //bool checkBoxBox(AABBCollider& boxA, AABBCollider& boxB);
 
         void updateVisualization(const std::vector<Rapture::BVHNode>& nodes,
                                  std::shared_ptr<Entity> vizEntity,
@@ -74,6 +65,7 @@ namespace Rapture::Entropy {
         // Acceleration structures
         std::shared_ptr<BVH>  m_staticBVH;
         std::shared_ptr<DBVH> m_dynamicBVH;
+        bool m_isSBVHDirty = true; // check for rebuilding the static bvh
 
         // Debug visualisation entities
         std::shared_ptr<Entity> m_staticVizEntity;
@@ -193,12 +185,45 @@ namespace Rapture::Entropy {
         glm::vec3 ra; // contact vector from A's COM to contact point
         glm::vec3 rb; // contact vector from B's COM to contact point
         glm::vec3 contactPoint; // world-space contact location (average of points)
+        glm::mat3 contactToWorld; // world-space basis
 
         // Cached pointers for quick access during iterations
         RigidBodyComponent* bodyA  = nullptr;
         RigidBodyComponent* bodyB  = nullptr;
         TransformComponent* transA = nullptr;
         TransformComponent* transB = nullptr;
+
+        void calculateContactBasis() {
+            glm::vec3 contactTangent[2];
+            glm::vec3 contactNormal = normal;
+            // Check whether the Z axis is nearer to the X or Y axis.
+            if(glm::abs(contactNormal.x) > glm::abs(contactNormal.y)) {
+                // Scaling factor to ensure the results are normalized.
+                const Precision::real s = (Precision::real)1.0f / glm::sqrt(contactNormal.z*contactNormal.z + contactNormal.x*contactNormal.x);
+                // The new X axis is at right angles to the world Y axis.
+                contactTangent[0].x = contactNormal.z*s;
+                contactTangent[0].y = 0;
+                contactTangent[0].z = -contactNormal.x*s;
+                // The new Y axis is at right angles to the new X and Z axes.
+                contactTangent[1].x = contactNormal.y*contactTangent[0].x;
+                contactTangent[1].y = contactNormal.z*contactTangent[0].x - contactNormal.x*contactTangent[0].z;
+                contactTangent[1].z = -contactNormal.y*contactTangent[0].x;
+            } else{
+                // Scaling factor to ensure the results are normalized.
+                const Precision::real s = (Precision::real)1.0f / glm::sqrt(contactNormal.z*contactNormal.z + contactNormal.y*contactNormal.y);
+                // The new X axis is at right angles to the world X axis.
+                contactTangent[0].x = 0;
+                contactTangent[0].y = -contactNormal.z*s;
+                contactTangent[0].z = contactNormal.y*s;
+                // The new Y axis is at right angles to the new X and Z axes.
+                contactTangent[1].x = contactNormal.y*contactTangent[0].z - contactNormal.z*contactTangent[0].y;
+                contactTangent[1].y = -contactNormal.x*contactTangent[0].z;
+                contactTangent[1].z = contactNormal.x*contactTangent[0].y;
+            }
+
+            contactToWorld = glm::mat3(contactNormal, contactTangent[0], contactTangent[1]);
+        }
+
     };
 
     private:

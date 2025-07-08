@@ -56,7 +56,7 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
         if (param.m_info.type == MaterialParameterTypes::UINT) {
             // Check if this parameter is a texture type
             if (isTextureParameter(id)) {
-                param.setValue<uint32_t>(defaultWhiteTextureIndex);
+                param.setValue<uint32_t>(UINT32_MAX);
             }
         }
         
@@ -98,6 +98,9 @@ void MaterialInstance::setParameter<std::shared_ptr<Texture>>(ParameterID id, st
             m_parameterMap[id].setValue<uint32_t>(texture->getBindlessIndex());
             updateUniformBuffer(id);
             m_flagsDirty = true;
+
+            
+            Rapture::AssetEvents::onMaterialInstanceChanged().publish(this);
         } else {
             std::lock_guard<std::mutex> lock(m_pendingTexturesMutex);
             m_pendingTextures.push_back({id, texture});

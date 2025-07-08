@@ -15,6 +15,8 @@ struct ProbeVolume {
     uvec3 gridDimensions;
 
     int      probeNumRays;                       // number of rays traced per probe
+    int      probeNumIrradianceTexels;   // number of texels in one dimension of a probe's irradiance texture
+    int      probeNumDistanceTexels;     // number of texels in one dimension of a probe's distance texture 
     int      probeNumIrradianceInteriorTexels;   // number of texels in one dimension of a probe's irradiance texture (does not include 1-texel border)
     int      probeNumDistanceInteriorTexels;     // number of texels in one dimension of a probe's distance texture (does not include 1-texel border)
 
@@ -71,6 +73,10 @@ vec3 octDecode(vec2 coords) {
     return normalize(direction);
 }
 
+// -- Quaternion helper prototypes --
+vec4 RTXGIQuaternionConjugate(vec4 q);
+vec3 RTXGIQuaternionRotate(vec3 v, vec4 q);
+
 /**
  * Computes a low discrepancy spherically distributed direction on the unit sphere,
  * for the given index in a set of samples. Each direction is unique in
@@ -101,9 +107,10 @@ vec3 DDGIGetProbeWorldPosition(ivec3 probeCoords, ProbeVolume volume)
     // Center the probe grid about the origin
     vec3 probeWorldPosition = (probeGridWorldPosition - probeGridShift);
 
+    probeWorldPosition = RTXGIQuaternionRotate(probeWorldPosition, volume.rotation);
 
-    // Translate the grid to the volume's center
-    probeWorldPosition += volume.origin; // + (u_volume. * u_volume.spacing);
+    //probeWorldPosition += volume.origin + (volume.probeScrollOffsets * volume.probeSpacing);
+    probeWorldPosition += volume.origin;
 
     return probeWorldPosition;
 }
@@ -132,11 +139,12 @@ vec3 DDGIGetProbeRayDirection(int rayIndex, ProbeVolume volume)
     int sampleIndex = rayIndex;
     int numRays = volume.probeNumRays;
 
-
-    // Get a ray direction on the sphere
+    // Get a deterministic direction on the sphere using the spherical Fibonacci sequence
     vec3 direction = SphericalFibonacci(uint(sampleIndex), uint(numRays));
 
-    // Don't rotate fixed rays so relocation/classification are temporally stable
+    // Rotate the ray direction by the per-frame random quaternion stored in the volume
+    direction = RTXGIQuaternionRotate(direction, RTXGIQuaternionConjugate(volume.probeRayRotation));
+
     return normalize(direction);
 }
 
@@ -153,6 +161,12 @@ int DDGIGetPlaneIndex(ivec3 probeCoords)
 int DDGIGetProbeIndexInPlane(ivec3 probeCoords, ivec3 gridDimensions)
 {
     return probeCoords.x + int(gridDimensions.x * probeCoords.z);
+}
+
+
+int DDGIGetProbeIndexInPlane(ivec3 texCoords, ivec3 gridDimensions, int probeNumTexels)
+{
+    return int(texCoords.x / probeNumTexels) + int(gridDimensions.x * int(texCoords.y / probeNumTexels));
 }
 
 /**
@@ -209,9 +223,10 @@ int DDGIGetProbeIndex(ivec3 probeCoords, ProbeVolume volume) {
 int DDGIGetProbeIndex(ivec3 texCoords, int probeNumTexels, ProbeVolume volume)
 {
     int probesPerPlane = DDGIGetProbesPerPlane(ivec3(volume.gridDimensions));
-    int probeIndexInPlane = DDGIGetProbeIndexInPlane(texCoords, ivec3(volume.gridDimensions));
+    int probeIndexInPlane = DDGIGetProbeIndexInPlane(texCoords, ivec3(volume.gridDimensions), probeNumTexels);
 
     return (texCoords.z * probesPerPlane) + probeIndexInPlane;
+    
 }
 
 /**
@@ -236,9 +251,20 @@ uvec3 DDGIGetRayDataTexelCoords(int rayIndex, int probeIndex, ProbeVolume volume
  * Computes the surfaceBias parameter used by DDGIGetVolumeIrradiance().
  * The surfaceNormal and cameraDirection arguments are expected to be normalized.
  */
-vec3 DDGIGetSurfaceBias(vec3 surfaceNormal, vec3 cameraDirection, ProbeVolume volume)
+vec3 DDGIGetSurfaceBias(vec3 surfaceNormal, vec3 samplePointToCamera, ProbeVolume volume)
 {
-    return (surfaceNormal * volume.probeNormalBias) + (-cameraDirection * volume.probeViewBias);
+    // Improved self-shadow bias based on "Qualitative Image Improvements" (2023)
+    // BiasVector = (n * 0.2 + ωo * 0.8) * (0.75 * D) * B
+    //   n  = surface normal (unit)
+    //   ωo = direction from surface towards camera (unit)
+    //   D  = minimum axial distance between probes
+    //   B  = user-tunable scalar (we reuse volume.probeNormalBias as B)
+
+    float D = min(min(volume.spacing.x, volume.spacing.y), volume.spacing.z);
+
+    vec3 biasVector = (surfaceNormal * 0.2 + samplePointToCamera * 0.8) * (0.75 * D) * volume.probeNormalBias;
+
+    return biasVector;
 }
 
 /**
@@ -254,7 +280,7 @@ ivec3 DDGIGetBaseProbeGridCoords(vec3 worldPosition, ProbeVolume volume)
     vec3 position = worldPosition - (volume.origin);
 
     // Rotate the world position into the volume's space
-    //if(!IsVolumeMovementScrolling(volume)) position = RTXGIQuaternionRotate(position, RTXGIQuaternionConjugate(volume.rotation));
+    position = RTXGIQuaternionRotate(position, RTXGIQuaternionConjugate(volume.rotation));
 
     // Shift from [-n/2, n/2] to [0, n] (grid space)
     position += (volume.spacing * vec3(volume.gridDimensions - uvec3(1, 1, 1))) * 0.5;
@@ -328,6 +354,27 @@ vec2 DDGIGetOctahedralCoordinates(vec3 direction)
     return uv;
 }
 
+float DDGIGetVolumeBlendWeight(vec3 worldPosition, ProbeVolume volume) {
+    // Get the volume's origin and extent
+    vec3 origin = volume.origin /*+ (volume.probeScrollOffsets * volume.probeSpacing)*/;
+    vec3 extent = (volume.spacing * (volume.gridDimensions - uvec3(1, 1, 1))) * 0.5;
+
+    // Get the delta between the (rotated volume) and the world-space position
+    vec3 position = (worldPosition - origin);
+    position = abs(RTXGIQuaternionRotate(position, RTXGIQuaternionConjugate(volume.rotation)));
+
+    vec3 delta = position - extent;
+    if(delta.x < 0.0 && delta.y < 0.0 && delta.z < 0.0) return 1.0;
+
+    // Adjust the blend weight for each axis
+    float volumeBlendWeight = 1.0;
+    volumeBlendWeight *= (1.0 - clamp(delta.x / volume.spacing.x, 0.0, 1.0));
+    volumeBlendWeight *= (1.0 - clamp(delta.y / volume.spacing.y, 0.0, 1.0));
+    volumeBlendWeight *= (1.0 - clamp(delta.z / volume.spacing.z, 0.0, 1.0));
+
+    return volumeBlendWeight;
+}
+
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
@@ -356,3 +403,18 @@ vec2 DDGIGetOctahedralCoordinates(vec3 direction)
 
     }
 #endif
+
+
+
+// -- Quaternion helper implementations --
+vec4 RTXGIQuaternionConjugate(vec4 q)
+{
+    return vec4(-q.xyz, q.w);
+}
+
+vec3 RTXGIQuaternionRotate(vec3 v, vec4 q)
+{
+    vec3 b = q.xyz;
+    float b2 = dot(b, b);
+    return (v * (q.w * q.w - b2)) + b * (2.0 * dot(v, b)) + cross(b, v) * (2.0 * q.w);
+}

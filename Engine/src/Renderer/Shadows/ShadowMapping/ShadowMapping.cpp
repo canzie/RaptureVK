@@ -269,7 +269,7 @@ void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer
         }
         
         // Update world bounding box if transform changed
-        if (transform.hasChanged(m_currentFrame)) {
+        if (transform.hasChanged()) {
             boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
         }
         

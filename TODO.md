@@ -8,12 +8,15 @@
 
 
 ### DDGI - shit is hard
+
+- use random rays
+- check what to do with backface hits/ general results from the ray trace
+
 - add probe relocation to the ddgi system
 - add support for different probe volumes
 - fix the weird artifacts, probably related to normals or something
 - test system in one of the test scenes
 - generate HDR cubemap for the skybox
-- use random rays
 
 - perhaps giga optimisation
     - get a new shader pass for identifying which probes should be active
@@ -23,46 +26,38 @@
 
 
 
-# current focus
 
-- physics
+### PHYSICS
     - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)
-    - nice way to add some primitive meshes
-    - fixing the imguizmo thing
-    - ability to EASILY draw/add either a bbox debug to a mesh or switch to wireframe, this is needed to visualise the colliders
-
-    - we need a static tree and a dynamic tree
-    - each frame we check the dynamic object against both of these trees, the dynamic one will be one that is updated quickly while the static one will need fast traversal/accuracy
+    - fixing the imguizmo thing    
     - the larger problem with open world means we need a seperate tlas for the tlasses per chunk, this can be one on the cpu.
+    - fix issue with adding/removing/resizing entities in the static tree
+    - fix issue where the dynamic tree does not remove entities when they are removed
+    - redo all of the maths, including addition of balancing when something falls, it should rotate to go flat
+    - add option to view the meshes collider seperatly instead of only the aabb, and move this collider -> add it to the entity browser directly
+    - move physics object and updates to the scenes onupdate, instead of the testlayer
 
 
-    - start with broad phase collision
-    - then we can go to narrow phase collision, by checking the actual collision -> then test by changing color when 2 objects intersect
-    - after this we can go back and implement a solver
 
-    - create these datastructures to be hotswappable
-
-
-broad phase
-    - check simple aabb collision against the bvh
-
-narrow phase
-    - check collisions with the actual colliders -> output is either colliding entities or a contact manifold
+### MATERIAL OVERHAUL 
+- add user generated materials
+- tldr: use a template gbuffer shader (currently just fragment), create some node with the pbr outputs as the final node
+        let the user do intermediate operations like generating or importing textures (everything is bindless anyway), also provide them with some default inputs
+        if a connection in the final node is empty, we use defaults meaning everything empty is the default material, could add an option to disable this
+        or they just override the default values
+    -> need a seperate descriptor set for each different material -> sort by material for the mdi batch
+- add material editor
 
 
-BVH, DBVH, BVH_SAH are implemented, now we should do some limit testing before we move forward. Could load like x cubes/spheres and disable rendering
+### Terrain Generation
 
-
-NEED a way to visualise probes, aabbs, etc. using instancing...
-    - we have the primitives
-    - seperate pass vs combined pass -> ???
-
-
-  [ 9) implement a weakptr caching system in the bindings -> resize support (after the base works) ]
-
-
-RENDERER/MATERIAL OVERHAUL 
-
+- allow for easy noise generation, should only need inputs, outputs and algo -> provide an image
+- make basic terrain
+- blend multiple noise layers
+- use tesselation shaders
+- generate normals, use textures, deal with collision??? 
+- add lod and spatial partitioning
+- look into clipmaps
 
 
 ### J*B SYSTEM
@@ -76,16 +71,17 @@ RENDERER/MATERIAL OVERHAUL
 - job queues can be static (dependency chain needs to be defined when the job queue is created)
 
 
-TODO
-- ray picking
+### ASSET MANAGER
 - materials in the asset manager -> Material Graph editor
+- meshes in the asset manager
+
+### ISSUES
 - fix the gizmo translation math
 - fix CSM on triple buffering
-
-
-- terrain
 - optimisations
     - lighting pass optimisations
+- [ 9 implement a weakptr caching system in the bindings -> resize support (after the base works) ]
+- fix the issue where not rendering the sponza scene -> not tlas -> crash, should be able to render empty scene or a full scene no matter what (except vertex only meshes)
 
 --------------------------------
 
@@ -93,18 +89,14 @@ TODO
 
 - static meshes
 - ssao
-- (lod)
-
-
-- emmisive materials
+- path tracer ...
 - Photometry (use camera settings to calculate the correct exposure)
-
 - animations
 - giga serializaiton
-
 - post processing
-- procedural stuff
 - some limit testing
+- volumetric fog/clouds
+- atmospheric scattering
 - audio
 - ui
 - game?

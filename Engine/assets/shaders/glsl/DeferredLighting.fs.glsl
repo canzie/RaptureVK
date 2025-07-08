@@ -410,19 +410,27 @@ float calculateShadow(vec3 fragPosWorld, float fragDepthView, vec3 normal, vec3 
     }
 }
 
-vec3 getIrradiance(vec3 worldPos, vec3 normal, ProbeVolume volume, vec3 cameraDirection) {
+vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume volume) {
     
 
-    vec3 surfaceBias = DDGIGetSurfaceBias(normal, cameraDirection, volume);
+    vec3 surfaceBias = DDGIGetSurfaceBias(normal, cameraDirection,  volume);
+    
+    float blendWeight = DDGIGetVolumeBlendWeight(worldPos, volume);
 
-    // Get irradiance for the world-space position in the volume
-    vec3 irradiance = DDGIGetVolumeIrradiance(
-        worldPos,
-        normal,
-        surfaceBias,
-        gTextureArrays[pc.probeIrradianceHandle],
-        gTextureArrays[pc.probeVisibilityHandle],
-        volume);
+    vec3 irradiance = vec3(0.0);
+
+    if (blendWeight > 0.0) {
+        // Get irradiance for the world-space position in the volume
+        irradiance = DDGIGetVolumeIrradiance(
+            worldPos,
+            normal,
+            surfaceBias,
+            gTextureArrays[pc.probeIrradianceHandle],
+            gTextureArrays[pc.probeVisibilityHandle],
+            volume);
+            
+        irradiance *= blendWeight;
+    }
 
     return irradiance;
 }
@@ -536,7 +544,8 @@ void main() {
 
     if (pc.useDDGI > 0u) {
         vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
-        vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, u_DDGI_Volume, V);
+        
+        vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, V, u_DDGI_Volume);
         indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
     }
 

@@ -111,6 +111,26 @@ namespace Rapture {
         for (auto entity : meshView) {
             auto [transform, mesh, material] = meshView.get<TransformComponent, MeshComponent, MaterialComponent>(entity);
             
+            // nothing changed
+            if (!transform.hasChanged()) {
+                continue;
+            }
+
+            // TODO: This will break the last frame if the transform is not continuesly changed
+            // for example frame 1 and 2 will have isdirty to true, then frame 3 will have isdirty to false
+            // this works here but the other updates like for the lights will break
+            // after this we should be clean
+            if (transform.dirtyFrames == frameCount) {
+                *transform.isDirty = false;
+                transform.dirtyFrames = 0;
+            } else {
+                transform.dirtyFrames++;
+            }
+            
+            Entity ent = Entity(entity, this);
+            // publish the event
+            AssetEvents::onMeshTransformChanged().publish(ent.getID());
+
             // should be shot for this but feels kindof dumb to do another loop just for the materials
             // + when there are no more pending texutres, it should be 0 cost since we just check if the vector is empty then return.
             material.material->updatePendingTextures();
@@ -120,6 +140,7 @@ namespace Rapture {
             uint32_t flags = vertexFlags | materialFlags;
 
             mesh.meshDataBuffer->update(transform, flags, frameCounter);
+
         }
 
 
@@ -141,7 +162,7 @@ namespace Rapture {
         for (auto entity : lightView) {
             auto [light, transform] = lightView.get<LightComponent, TransformComponent>(entity);
 
-            if (light.hasChanged(frameCounter) || transform.hasChanged(frameCounter)) {
+            if (light.hasChanged(frameCounter) || transform.hasChanged()) {
                 light.lightDataBuffer->update(transform, light, static_cast<uint32_t>(entity));
             }
         }
@@ -161,7 +182,7 @@ namespace Rapture {
             auto [light, transform, shadow] = shadowView.get<LightComponent, TransformComponent, ShadowComponent>(entity);
 
             if (shadow.shadowMap && shadow.isActive && 
-                (light.hasChanged(frameCounter) || transform.hasChanged(frameCounter))) {                
+                (light.hasChanged(frameCounter) || transform.hasChanged())) {                
             
                 // Update the shadow map view matrix
                 shadow.shadowMap->updateViewMatrix(light, transform, cameraPosition);
@@ -298,6 +319,11 @@ namespace Rapture {
 
     // TODO: update this so we update the transform directly instead of sotring the change and letting the tlas go over it again
     void Scene::updateTLAS() {
+
+        if (!m_tlas) {
+            return;
+        }
+
         auto view = m_Registry.view<TransformComponent, BLASComponent>();
 
         std::vector<std::pair<uint32_t, glm::mat4>> instanceUpdates;
@@ -309,13 +335,15 @@ namespace Rapture {
             
             if (entity.isValid()) {
                 auto [transform] = entity.tryGetComponents<TransformComponent>();
-                if (transform && transform->hasChanged(0))  { // we just lie about the haschanged index, this SHOULD just force a recalc which is fine, i SHOULD not break logic.
+                if (transform && transform->hasChanged())  { // we just lie about the haschanged index, this SHOULD just force a recalc which is fine, i SHOULD not break logic.
                     instanceUpdates.push_back({instanceIndex, transform->transformMatrix()});
                 }
             }
         instanceIndex++;
 
         }
+
+
         m_tlas->updateInstances(instanceUpdates);
     }
 }

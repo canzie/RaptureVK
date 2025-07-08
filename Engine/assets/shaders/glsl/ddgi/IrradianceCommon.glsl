@@ -99,9 +99,7 @@ vec3 EvaluateSpotLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties 
 /**
  * Computes the diffuse reflection of light off the given surface (direct lighting).
  */
-vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties)
-{
-    
+vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties) {
 
     vec3 brdf = (albedo / PI);
 
@@ -137,7 +135,7 @@ vec3 DDGIGetVolumeIrradiance(
 
     // Clamp the distance (in grid space) between the given point and the base probe's world position (on each axis) to [0, 1]
     vec3 gridSpaceDistance = (biasedWorldPosition - baseProbeWorldPosition);
-    //if(!IsVolumeMovementScrolling(volume)) gridSpaceDistance = RTXGIQuaternionRotate(gridSpaceDistance, RTXGIQuaternionConjugate(volume.rotation));
+    gridSpaceDistance = RTXGIQuaternionRotate(gridSpaceDistance, RTXGIQuaternionConjugate(volume.rotation));
     vec3 alpha = clamp((gridSpaceDistance / volume.spacing), vec3(0.0), vec3(1.0));
 
 
@@ -149,7 +147,7 @@ vec3 DDGIGetVolumeIrradiance(
 
         // Get the 3D grid coordinates of the adjacent probe by adding the offset to 
         // the base probe and clamping to the grid boundaries
-        ivec3 adjacentProbeCoords = clamp(baseProbeCoords + adjacentProbeOffset, ivec3(0, 0, 0), ivec3(volume.gridDimensions - uvec3(1, 1, 1)));
+        ivec3 adjacentProbeCoords = clamp(baseProbeCoords + adjacentProbeOffset, ivec3(0, 0, 0), ivec3(volume.gridDimensions - ivec3(1, 1, 1)));
 
         // Get the adjacent probe's index, adjusting the adjacent probe index for scrolling offsets (if present)
         int adjacentProbeIndex = DDGIGetProbeIndex(adjacentProbeCoords, volume);
@@ -232,11 +230,7 @@ vec3 DDGIGetVolumeIrradiance(
         // Sample the probe's irradiance
         vec3 probeIrradiance = texture(probeIrradianceAtlas, probeTextureUV).rgb;
 
-        // scuffed way to recognize probes inside of geometry, a better implementation would move/relocate these probes
-        
-        //if (probeIrradiance.x <= 0.0 || probeIrradiance.y <= 0.0 || probeIrradiance.z <= 0.0) {
-        //    continue;
-        //}
+
 
         // Check for invalid probe data (black probes indicate probes inside geometry)
         // Use length check instead of individual component checks to handle small but valid values

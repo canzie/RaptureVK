@@ -50,13 +50,22 @@ BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
 
         if (param.m_info.parameterId != ParameterID::UNKNOWN) {
             m_parameterMap[param.m_info.parameterId] = param;
-            m_sizeBytes += param.m_info.size;
+            // Ensure the overall buffer size encompasses this parameter (offset + its size)
+            uint32_t endOffset = static_cast<uint32_t>(param.m_info.offset + param.m_info.size);
+            if (endOffset > m_sizeBytes) {
+                m_sizeBytes = endOffset;
+            }
         } else {
             RP_CORE_ERROR(
                 "Material::BaseMaterial - unknown parameter id: {0} and type: {1}",
                 parameter.name, parameter.type);
         }
         }
+    }
+
+    // Align size to 16 bytes for std140 compliance
+    if (m_sizeBytes % 16 != 0) {
+        m_sizeBytes = (m_sizeBytes + 15) & ~15u; // round up to next multiple of 16
     }
 
     if (m_sizeBytes == 0) {

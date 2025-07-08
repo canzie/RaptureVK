@@ -8,7 +8,8 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 // Bindless texture arrays (set 3)
 layout(set = 3, binding = 0) uniform sampler2DArray gTextures[];
 
-layout(set = 3, binding = 8, rgba32f) uniform restrict image2D outputTex;
+// custom set 
+layout(set = 4, binding = 0, rgba32f) uniform restrict image2D outputTex;
 
 // Push constants for dimensions and texture indices
 layout (push_constant) uniform PushConstants {
@@ -40,9 +41,12 @@ void main() {
     
 
     
+    // Convert local integer coordinates to normalized UVs for sampling
+    vec2 uv = (vec2(localCoord) + 0.5) / vec2(layerWidth, layerHeight);
+    
     // Note: We're treating the input as a 2D texture array but accessing via bindless
     // The input texture index should point to the flattened representation
-    vec3 sampledColor = texture(gTextures[inputTextureIndex], vec3(localCoord, layerIndex)).xyz;
+    vec3 sampledColor = texture(gTextures[inputTextureIndex], vec3(uv, layerIndex)).xyz;
     
     // Write to the output texture
     imageStore(outputTex, pixelCoord, vec4(sampledColor, 1.0));

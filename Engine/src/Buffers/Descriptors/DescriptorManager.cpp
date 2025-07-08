@@ -141,17 +141,11 @@ void DescriptorManager::initializeSet3() {
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
                                 true, DescriptorSetBindingLocation::DDGI_PREV_VISIBILITY_STORAGE});
     
-    // Flatten output storage (color textures)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
-                                true, DescriptorSetBindingLocation::FLATTEN_OUTPUT_STORAGE});
 
     // DDGI scene info SSBO
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS});
 
-    // Flatten depth output storage (depth textures)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEPTH, 
-                                true, DescriptorSetBindingLocation::FLATTEN_DEPTH_OUTPUT_STORAGE});
 
     // General purpose bindless storage textures
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 8, TextureViewType::DEFAULT, 

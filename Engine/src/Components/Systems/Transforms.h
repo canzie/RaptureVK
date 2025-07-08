@@ -27,6 +27,8 @@ class Transforms {
         glm::quat& getRotationQuat() { return m_rotationQ; }
         glm::vec3& getScale() { return m_scale; }
 
+        bool* getDirtyFlag() { return &m_isDirty; }
+
         void setTransform(const glm::mat4& transform);
         void setTranslation(const glm::vec3& translation);
         void setRotation(const glm::vec3& rotation);
@@ -47,6 +49,8 @@ class Transforms {
         glm::quat m_rotationQ;
         glm::vec3 m_scale;
         glm::mat4 m_transform;
+
+        bool m_isDirty = false;
 
 
 };

@@ -747,7 +747,7 @@ void ForwardRenderer::updateLights(std::shared_ptr<Scene> activeScene) {
     auto &tagComp = lightView.get<TagComponent>(entity);
 
     if (lightComp.hasChanged(m_currentFrame) ||
-        transform.hasChanged(m_currentFrame)) {
+        transform.hasChanged()) {
       lightsChanged = true;
       break;
     }

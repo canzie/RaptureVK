@@ -214,7 +214,7 @@ void DeferredRenderer::onSwapChainRecreated() {
     m_commandBuffers.clear();
 
     // Recreate DDGI system with new frame count to ensure correct number of command buffers
-    m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
+    m_dynamicDiffuseGI->onResize(m_swapChain->getImageCount());
 
     m_gbufferPass = std::make_shared<GBufferPass>(
         static_cast<float>(m_swapChain->getExtent().width),
@@ -295,7 +295,7 @@ void DeferredRenderer::recordCommandBuffer(
 
             // Always update directional light shadows for debugging, others only when changed
             bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
-                                    transformComp.hasChanged(m_currentFrame) ||
+                                    transformComp.hasChanged() ||
                                     lightComp.type == LightType::Directional); // Force update for directional lights
             
             if (shadowComp.shadowMap && shouldUpdateShadow) {
@@ -310,7 +310,7 @@ void DeferredRenderer::recordCommandBuffer(
 
                 // Always update directional light shadows for debugging, others only when changed
                 bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
-                                        transformComp.hasChanged(m_currentFrame) ||
+                                        transformComp.hasChanged() ||
                                         lightComp.type == LightType::Directional); // Force update for directional lights
                 
                 if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {

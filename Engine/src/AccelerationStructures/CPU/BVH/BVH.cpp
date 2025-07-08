@@ -23,8 +23,9 @@ BVH::~BVH() {
 
 void BVH::build(std::shared_ptr<Scene> scene) {
 
-    auto& reg = scene->getRegistry();
+    m_nodes.clear();
 
+    auto& reg = scene->getRegistry();
 
     std::vector<BVHNode> primitives;
     auto bbView = reg.view<BoundingBoxComponent, Entropy::RigidBodyComponent, TransformComponent, MeshComponent>();

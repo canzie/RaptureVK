@@ -56,9 +56,11 @@ enum class DescriptorSetBindingLocation {
     DDGI_PREV_IRRADIANCE_STORAGE = 305, // Will be at binding 4 in set 3
     DDGI_VISIBILITY_STORAGE = 306,      // Will be at binding 5 in set 3
     DDGI_PREV_VISIBILITY_STORAGE = 307, // Will be at binding 6 in set 3
-    FLATTEN_OUTPUT_STORAGE = 308,       // Will be at binding 8 in set 3 (color textures)
     DDGI_SCENE_INFO_SSBOS = 309,        // Will be at binding 9 in set 3
-    FLATTEN_DEPTH_OUTPUT_STORAGE = 310  // Will be at binding 10 in set 3 (depth textures)
+
+    // CUSTOM BINDINGS, intended for debugging and uses sets after set4(set=3)
+    CUSTOM_FLATTEN_OUTPUT = 400,
+    CUSTOM_FLATTEN_DEPTH_OUTPUT = 400,
 };
 
 inline uint32_t getBindingSetNumber(DescriptorSetBindingLocation location) {

@@ -34,18 +34,24 @@ layout(push_constant) uniform PushConstants {
     uint prevRadianceIndex;      // Previous radiance texture bindless index
     uint prevVisibilityIndex;    // Previous visibility texture bindless index
 
+    vec3 cameraPosition;
 
     uint tlasIndex;              // TLAS index (if using bindless TLAS)
 };
 
 precision highp float;
 
+// Added constant to represent an invalid index/offset (all bits set)
+const uint UINT32_MAX = 0xFFFFFFFFu;
 
 // Simplified MeshInfo structure matching our C++ version
 struct MeshInfo {
     uint AlbedoTextureIndex;
     uint NormalTextureIndex;
-    uint MetallicRoughnessTextureIndex;
+    vec3 albedo;
+    vec3 emissiveColor;
+    uint EmissiveFactorTextureIndex;
+    
     uint iboIndex; // index of the buffer in the bindless buffers array
     uint vboIndex; // index of the buffer in the bindless buffers array
     uint meshIndex; // index of the mesh in the mesh array, this is the same index as the tlasinstance instanceCustomIndex
@@ -143,53 +149,68 @@ uvec3 fetchTriangleIndices(uint primitiveID, MeshInfo meshInfo) {
 VertexAttributes fetchVertexAttributes(uint vertexIndex, MeshInfo meshInfo) {
     VertexAttributes attrs;
     uint vertexOffset = vertexIndex * meshInfo.vertexStrideBytes;
-    
-    // Position (assuming vec3)
-    uint posOffset = vertexOffset + meshInfo.positionAttributeOffsetBytes;
-    attrs.position = vec3(
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[posOffset / 4]),
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(posOffset + 4) / 4]),
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(posOffset + 8) / 4])
-    );
-    
-    // Texture coordinates (assuming vec2)
-    uint texOffset = vertexOffset + meshInfo.texCoordAttributeOffsetBytes;
-    attrs.texCoord = vec2(
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[texOffset / 4]),
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(texOffset + 4) / 4])
-    );
-    
-    // Normal (assuming vec3)
-    uint normalOffset = vertexOffset + meshInfo.normalAttributeOffsetBytes;
-    attrs.normal = vec3(
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[normalOffset / 4]),
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(normalOffset + 4) / 4]),
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(normalOffset + 8) / 4])
-    );
-    
-    // Tangent (assuming vec4)
-    uint tangentOffset = vertexOffset + meshInfo.tangentAttributeOffsetBytes;
-    attrs.tangent = vec4(
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[tangentOffset / 4]),
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 4) / 4]),
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 8) / 4]),
-        uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 12) / 4])
-    );
 
-    attrs.position = (meshInfo.modelMatrix * vec4(attrs.position, 1.0)).xyz;
-    attrs.normal = normalize((meshInfo.modelMatrix * vec4(attrs.normal, 0.0)).xyz);
-    
-    // Transform only the tangent vector (xyz), preserve handedness (w)
-    vec3 worldTangent = normalize((meshInfo.modelMatrix * vec4(attrs.tangent.xyz, 0.0)).xyz);
-    attrs.tangent = vec4(worldTangent, attrs.tangent.w);
-    
-    // Re-orthogonalize tangent with respect to normal (in world space)
-    vec3 T = normalize(attrs.tangent.xyz - dot(attrs.tangent.xyz, attrs.normal) * attrs.normal);
-    attrs.tangent = vec4(T, attrs.tangent.w);
-    
-    // Calculate bitangent with proper handedness
-    attrs.bitangent = normalize(cross(attrs.normal, T) * attrs.tangent.w);
-    
+    // === Position (required) ===
+    vec3 position = vec3(0.0);
+    if(meshInfo.positionAttributeOffsetBytes != UINT32_MAX) {
+        uint posOffset = vertexOffset + meshInfo.positionAttributeOffsetBytes;
+        position = vec3(
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[posOffset / 4]),
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(posOffset + 4) / 4]),
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(posOffset + 8) / 4])
+        );
+    }
+    attrs.position = (meshInfo.modelMatrix * vec4(position, 1.0)).xyz;
+
+    // === Texture coordinates (optional) ===
+    if(meshInfo.texCoordAttributeOffsetBytes != UINT32_MAX) {
+        uint texOffset = vertexOffset + meshInfo.texCoordAttributeOffsetBytes;
+        attrs.texCoord = vec2(
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[texOffset / 4]),
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(texOffset + 4) / 4])
+        );
+    } else {
+        attrs.texCoord = vec2(0.0);
+    }
+
+    // === Normal (optional but preferred) ===
+    vec3 normal = vec3(0.0, 0.0, 1.0);
+    if(meshInfo.normalAttributeOffsetBytes != UINT32_MAX) {
+        uint normalOffset = vertexOffset + meshInfo.normalAttributeOffsetBytes;
+        normal = vec3(
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[normalOffset / 4]),
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(normalOffset + 4) / 4]),
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(normalOffset + 8) / 4])
+        );
+    }
+    attrs.normal = normalize((meshInfo.modelMatrix * vec4(normal, 0.0)).xyz);
+
+    // === Tangent (optional) - only compute if normal mapping might be used ===
+    vec4 tangent = vec4(0.0);
+    if(meshInfo.tangentAttributeOffsetBytes != UINT32_MAX) {
+        uint tangentOffset = vertexOffset + meshInfo.tangentAttributeOffsetBytes;
+        vec4 localTangent = vec4(
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[tangentOffset / 4]),
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 4) / 4]),
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 8) / 4]),
+            uintBitsToFloat(gBuffers[meshInfo.vboIndex].data[(tangentOffset + 12) / 4])
+        );
+        vec3 worldTangent = normalize((meshInfo.modelMatrix * vec4(localTangent.xyz, 0.0)).xyz);
+        tangent = vec4(worldTangent, localTangent.w);
+        
+        // Re-orthogonalize tangent with respect to normal (in world space)
+        vec3 T = normalize(tangent.xyz - dot(tangent.xyz, attrs.normal) * attrs.normal);
+        attrs.tangent = vec4(T, tangent.w);
+
+        // Calculate bitangent with proper handedness
+        attrs.bitangent = normalize(cross(attrs.normal, T) * attrs.tangent.w);
+    } else {
+        // When no tangent data is provided, just set dummy values
+        // These will be ignored if no normal mapping is used
+        attrs.tangent = vec4(1.0, 0.0, 0.0, 1.0);
+        attrs.bitangent = vec3(0.0, 1.0, 0.0);
+    }
+
     return attrs;
 }
 
@@ -238,15 +259,27 @@ SurfaceData getSurfaceDataForHit(uint primitiveID, vec2 barycentrics, MeshInfo m
 }
 
 vec3 sampleAlbedo(MeshInfo meshInfo, vec2 uv) {
-    if (meshInfo.AlbedoTextureIndex == 0) {
-        return vec3(0.0, 1.0, 0.0); // Default color
+    uint texIndex = meshInfo.AlbedoTextureIndex;
+    vec3 baseColor = meshInfo.albedo;
+
+    if(texIndex == UINT32_MAX) {
+        return baseColor; 
     }
-    return texture(gTextures[meshInfo.AlbedoTextureIndex], uv).rgb;
+
+    return baseColor * texture(gTextures[texIndex], uv).rgb;
+}
+
+vec3 sampleEmissiveColor(MeshInfo meshInfo, vec2 uv) {
+    uint texIndex = meshInfo.EmissiveFactorTextureIndex;
+    if(texIndex == UINT32_MAX) {
+        return meshInfo.emissiveColor;
+    }
+    return texture(gTextures[texIndex], uv).rgb * meshInfo.emissiveColor;
 }
 
 vec3 sampleNormal(MeshInfo meshInfo, vec2 uv) {
-    if (meshInfo.NormalTextureIndex == 0) {
-        return vec3(0.0, 0.0, 0.0);
+    if(meshInfo.NormalTextureIndex == UINT32_MAX) {
+        return vec3(0.0);
     }
     return texture(gTextures[meshInfo.NormalTextureIndex], uv).rgb;
 }
@@ -258,24 +291,23 @@ vec3 calculateShadingNormal(
     vec4 T_geom,   // Interpolated tangent (world space, w component contains handedness)
     vec3 B_geom    // Pre-computed bitangent (world space)
 ) {
-    vec3 finalNormal = N_geom;
-
-    if (meshInfo.NormalTextureIndex != 0) {
-        vec3 tangentNormal = texture(gTextures[meshInfo.NormalTextureIndex], uv).xyz;
-        tangentNormal = tangentNormal * 2.0 - 1.0;
-
-        // Use the pre-computed tangent, bitangent, and normal directly
-        vec3 N = normalize(N_geom);
-        vec3 T = normalize(T_geom.xyz);
-        vec3 B = normalize(B_geom);
-        
-        // Form TBN matrix from pre-computed vectors
-        mat3 TBN = mat3(T, B, N);
-
-        finalNormal = normalize(TBN * tangentNormal);
+    // If no normal map is provided, just return the geometric normal
+    // This avoids issues with inconsistent tangent generation
+    if (meshInfo.NormalTextureIndex == UINT32_MAX) {
+        return normalize(N_geom);
     }
 
-    return finalNormal;
+    // Apply normal map only if a valid texture index is provided
+    vec3 tangentNormal = texture(gTextures[meshInfo.NormalTextureIndex], uv).xyz;
+    tangentNormal = tangentNormal * 2.0 - 1.0;
+
+    // Use the pre-computed tangent, bitangent, and normal directly
+    vec3 N = normalize(N_geom);
+    vec3 T = normalize(T_geom.xyz);
+    vec3 B = normalize(B_geom);
+
+    mat3 TBN = mat3(T, B, N);
+    return normalize(TBN * tangentNormal);
 }
 
 void main() {
@@ -290,42 +322,56 @@ void main() {
     // Get the probe's grid coordinates
     ivec3 probeCoords = DDGIGetProbeCoords(probeIndex, u_volume);
 
+    // TODO:get probe state 
+
     vec3 probeWorldPosition = DDGIGetProbeWorldPosition(probeCoords, u_volume);
     vec3 probeRayDirection = DDGIGetProbeRayDirection(rayIndex, u_volume);
     uvec3 outputCoords = DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume);
 
 
-    rayQueryInitializeEXT(rayQuery, topLevelAS[tlasIndex], gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, 
+    rayQueryInitializeEXT(rayQuery, topLevelAS[tlasIndex], gl_RayFlagsOpaqueEXT, 0xFF, 
         probeWorldPosition, 0.0, probeRayDirection, u_volume.probeMaxRayDistance);
-
-    rayQueryProceedEXT(rayQuery);
 
     // Trace the ray
     bool hit = false;
     vec3 hitPosition;
-    vec3 hitNormal;
-    vec2 hitUV;
     uint hitInstanceID;
-    float hitT;
+    float hitT = 1e30;
+    uint primitiveID;
+    vec2 barycentrics;
+    uint instanceCustomIndex;
     bool isFrontFacing = true;
 
+    while (rayQueryProceedEXT(rayQuery)) {
+        if (rayQueryGetIntersectionTypeEXT(rayQuery, false) == gl_RayQueryCandidateIntersectionTriangleEXT) {
+            float t = rayQueryGetIntersectionTEXT(rayQuery, false);
 
-    
+            if (t < hitT) {
+                hitT = t;
+                hit = true;
+                // Confirm this intersection as the committed one
+                rayQueryConfirmIntersectionEXT(rayQuery);
+            }
+        }
+    }
 
-
-
+    // After the loop, get data from the committed intersection
     if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-        hit = true;
         hitT = rayQueryGetIntersectionTEXT(rayQuery, true);
         hitPosition = probeWorldPosition + probeRayDirection * hitT;
         hitInstanceID = rayQueryGetIntersectionInstanceIdEXT(rayQuery, true);
+        isFrontFacing = rayQueryGetIntersectionFrontFaceEXT(rayQuery, true);
         
         // Get additional ray intersection data
-        uint primitiveID = rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, true);
-        vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
-        uint instanceCustomIndex = rayQueryGetIntersectionInstanceCustomIndexEXT(rayQuery, true);
-        isFrontFacing = rayQueryGetIntersectionFrontFaceEXT(rayQuery, true);
+        primitiveID = rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, true);
+        barycentrics = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
+        instanceCustomIndex = rayQueryGetIntersectionInstanceCustomIndexEXT(rayQuery, true);
+        hit = true;
+    } else {
+        hit = false;
+    }
 
+    if (hit) {
         if (isFrontFacing) {
             // Get mesh info using the instance custom index
             MeshInfo meshInfo = u_sceneInfo.MeshInfos[instanceCustomIndex];
@@ -335,31 +381,41 @@ void main() {
             
             vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent, surface.bitangent);
             vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
+            vec3 emissiveColor = sampleEmissiveColor(meshInfo, surface.texCoord);
     
             // Indirect Lighting (recursive)
             vec3 irradiance = vec3(0.0);
-            // Use the ray's own direction for surface bias, not the main camera direction
-            vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, probeRayDirection, u_volume);
+
+            // Direction from the hit point towards the camera 
+            vec3 samplePointToCamera = normalize(cameraPosition - hitPosition);
+
+            vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, samplePointToCamera, u_volume);
 
             vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_sunProperties[sunLightDataIndex].sunProperties);
 
-            // Get irradiance from the DDGIVolume
-            irradiance = DDGIGetVolumeIrradiance(
-                hitPosition,
-                worldShadingNormal,
-                surfaceBias,
-                gTextureArrays[prevRadianceIndex],
-                gTextureArrays[prevVisibilityIndex],
-                u_volume);
+            float volumeBlendWeight = DDGIGetVolumeBlendWeight(hitPosition, u_volume);
+
+            if (volumeBlendWeight > 0.0) {
+                // Get irradiance from the DDGIVolume
+                irradiance = DDGIGetVolumeIrradiance(
+                    hitPosition,
+                    worldShadingNormal,
+                    surfaceBias,
+                    gTextureArrays[prevRadianceIndex],
+                    gTextureArrays[prevVisibilityIndex],
+                    u_volume);
+                    
+                irradiance *= volumeBlendWeight;
+            }
 
             // Perfectly diffuse reflectors don't exist in the real world.
             // Limit the BRDF albedo to a maximum value to account for the energy loss at each bounce.
             float maxAlbedo = 0.9;
 
             // Store the final ray radiance and hit distance
-            vec3 radiance = diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
+            vec3 radiance = emissiveColor + diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
 
-            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), clamp(radiance, vec3(0.0), vec3(1.0)), hitT);
+            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), radiance, hitT);
         } else {
             // Back face hit - store negative distance
             DDGIStoreProbeRayBackfaceHit(ivec3(outputCoords), hitT);

@@ -48,7 +48,7 @@ void Transforms::setTransform(const glm::mat4& transform)
 {
     m_transform = transform;
     decomposeTransform();
-
+    m_isDirty = true;
 }   
 
 
@@ -56,6 +56,7 @@ void Transforms::setTranslation(const glm::vec3& translation)
 {
     m_translation = translation;
     recalculateTransform();
+    m_isDirty = true;
 }   
 
 
@@ -64,6 +65,7 @@ void Transforms::setRotation(const glm::vec3& rotation)
     m_rotationQ = glm::quat(rotation);
     m_rotationV = rotation;
     recalculateTransform();
+    m_isDirty = true;
 }   
 
 
@@ -72,6 +74,7 @@ void Transforms::setRotation(const glm::quat& rotation)
     m_rotationQ = rotation;
     m_rotationV = glm::eulerAngles(m_rotationQ);
     recalculateTransform();
+    m_isDirty = true;
 }      
 
 
@@ -79,6 +82,7 @@ void Transforms::setScale(const glm::vec3& scale)
 {
     m_scale = scale;
     recalculateTransform();
+    m_isDirty = true;
 }
 
 glm::mat4 Transforms::recalculateTransform(const glm::vec3 &translation, const glm::vec3 &rotation, const glm::vec3 &scale)

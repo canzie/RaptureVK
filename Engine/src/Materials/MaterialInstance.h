@@ -4,6 +4,7 @@
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Materials/MaterialParameters.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
+#include "Events/AssetEvents.h"  // Publish material change events
 
 #include <memory>
 #include <string>
@@ -34,6 +35,9 @@ class MaterialInstance {
             if (m_parameterMap.find(id) != m_parameterMap.end()) {
                 m_parameterMap[id].setValue<T>(value);
                 updateUniformBuffer(id);
+                
+                // Notify listeners that this material instance has changed
+                Rapture::AssetEvents::onMaterialInstanceChanged().publish(this);
                 
                 // Update material flags when setting texture parameters
                 if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>) {

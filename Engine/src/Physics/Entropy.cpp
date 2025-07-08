@@ -7,6 +7,7 @@
 #include "WindowContext/Application.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/glm.hpp>
 #include <set>
 #include <algorithm>
 #include <cmath>
@@ -24,7 +25,14 @@ std::vector<std::pair<Entity, Entity>>& EntropyCollisions::broadPhase(std::share
     if (!m_staticBVH) {
         m_staticBVH = std::make_shared<BVH>(Rapture::LeafType::AABB);
         m_staticBVH->build(scene);
+        m_isSBVHDirty = false;
     }
+
+    if (m_isSBVHDirty) {
+        m_staticBVH->build(scene);
+        m_isSBVHDirty = false;
+    }
+
     updateDynamicBVH(scene);
 
     auto nodes = m_dynamicBVH->getNodes();
@@ -49,9 +57,16 @@ std::vector<std::pair<Entity, Entity>>& EntropyCollisions::broadPhase(std::share
 
         for (auto otherEntityHandle : result) {
             if (otherEntityHandle == entityHandle) continue;
+            Entity otherEntity(otherEntityHandle, scene.get());
+
+            if (!otherEntity.isValid()){
+                m_isSBVHDirty = true;
+                continue;
+            }
+            
             uint64_t key = makeKey(entityHandle, otherEntityHandle);
             if (pairSet.insert(key).second) {
-                Entity otherEntity(otherEntityHandle, scene.get());
+                
                 m_potentialPairs.push_back({entity, otherEntity});
             }
         }
@@ -61,9 +76,16 @@ std::vector<std::pair<Entity, Entity>>& EntropyCollisions::broadPhase(std::share
 
         for (auto otherEntityHandle : dynamicResult) {
             if (otherEntityHandle == entityHandle) continue;
+            Entity otherEntity(otherEntityHandle, scene.get());
+
+            if (!otherEntity.isValid()){
+                m_dynamicBVH->remove(otherEntityHandle);
+                continue;
+            }
+
+
             uint64_t key = makeKey(entityHandle, otherEntityHandle);
             if (pairSet.insert(key).second) {
-                Entity otherEntity(otherEntityHandle, scene.get());
                 m_potentialPairs.push_back({entity, otherEntity});
             }
         }
@@ -105,14 +127,11 @@ void EntropyCollisions::narrowPhase(std::shared_ptr<Scene> scene, std::vector<Co
 
 
 
-    //RP_CORE_INFO("Found {0} manifolds, {1} contact points", manifolds.size(), contactPoints);
+    //RP_PHYSICS_INFO("Found {0} manifolds, {1} contact points", manifolds.size(), contactPoints);
 
 }
 
-bool EntropyCollisions::checkCollision(const Entity &entityA, const Entity &entityB)
-{
-    return false;
-}
+
 
 void EntropyCollisions::updateVisualization(const std::vector<Rapture::BVHNode> &nodes, std::shared_ptr<Entity> vizEntity, const glm::vec4 &color) {
 
@@ -300,39 +319,49 @@ void EntropyDynamics::integrate(std::shared_ptr<Scene> scene, float dt) {
 
     auto& reg = scene->getRegistry();
     auto view = reg.view<RigidBodyComponent, TransformComponent>();
-
+    
     for (auto entityHandle : view) {
         auto [rb, transform] = view.get<RigidBodyComponent, TransformComponent>(entityHandle);
-        if (rb.invMass == 0.0f) {
-            rb.velocity = glm::vec3(0.0f);
-            rb.angularVelocity = glm::vec3(0.0f);
-            continue; // Static body – no integration
+        
+        if (rb.invMass == 0.0f) { // infinite mass / static body
+            rb.previousTransform = transform.transforms;
+            rb.isFirstUpdate = false;
+            continue;
         }
 
-        // Linear: v += (F / m) * dt   (F already accumulated)
-        glm::vec3 acceleration = rb.accumulatedForce * rb.invMass;
-        rb.velocity += acceleration * dt;
+        if (rb.isFirstUpdate) {
+			rb.previousTransform = transform.transforms;
+			rb.isFirstUpdate = false;
+		}
+        
+        // linear motion
+        glm::vec3 linearAcceleration = rb.accumulatedForce * rb.invMass;
+        rb.velocity += linearAcceleration * dt;
+        transform.transforms.setTranslation(transform.translation() + rb.velocity * dt);
+    
+        
+        // angular motion
+		glm::quat rotationDelta = transform.transforms.getRotationQuat() * glm::inverse(rb.previousTransform.getRotationQuat());
 
-        // Angular: ω += I^-1 * τ * dt
-        glm::vec3 angularAcc = rb.invInertiaTensor * rb.accumulatedTorque;
-        rb.angularVelocity += angularAcc * dt;
+        glm::mat3 R = glm::mat3_cast(transform.transforms.getRotationQuat());
+        glm::mat3 invInertiaTensorWorld = R * rb.invInertiaTensor * glm::transpose(R);
 
-        // Integrate position (Euler)
-        glm::vec3 newPos = transform.transforms.getTranslation() + rb.velocity * dt;
-        transform.transforms.setTranslation(newPos);
-
-        // Integrate orientation using angular velocity (Euler, small-angle)
-        glm::quat currentQ = transform.transforms.getRotationQuat();
-        glm::quat omegaQuat(0.0f, rb.angularVelocity.x, rb.angularVelocity.y, rb.angularVelocity.z);
-        glm::quat deltaQ = 0.5f * omegaQuat * currentQ;
-        glm::quat newQ = glm::normalize(currentQ + deltaQ * dt);
-        transform.transforms.setRotation(newQ);
-
-        rb.accumulatedForce  = glm::vec3(0.0f);
+        glm::vec3 angularAcceleration = invInertiaTensorWorld * rb.accumulatedTorque;
+        rb.angularVelocity += angularAcceleration * dt;
+        
+        // apply orientation
+        glm::quat angularVelQuat = glm::quat(0.f, rb.angularVelocity.x, rb.angularVelocity.y, rb.angularVelocity.z);
+        glm::quat deltaOrientation = 0.5f * angularVelQuat * transform.transforms.getRotationQuat();
+        transform.transforms.setRotation(glm::normalize(transform.transforms.getRotationQuat() + (deltaOrientation * dt)));
+    
+        
+        // Update previous transform for next frame
+        rb.previousTransform = transform.transforms;
+        
+        // clear accumulators
+        rb.accumulatedForce = glm::vec3(0.0f);
         rb.accumulatedTorque = glm::vec3(0.0f);
     }
-
-
 }
 
 // -------------------------------------------------------------
@@ -402,6 +431,10 @@ void ConstraintSolver::buildConstraints(std::shared_ptr<Scene> scene,
             c.ra = c.contactPoint - trA.transforms.getTranslation();
             c.rb = c.contactPoint - trB.transforms.getTranslation();
 
+            // We will use this later to transform between world and contact coordinates when
+            // calculating impulses.
+            c.calculateContactBasis();
+
             m_constraints.push_back(c);
         }
     }
@@ -451,41 +484,105 @@ void ConstraintSolver::resolveInterpenetration(uint32_t iterations) {
 }
 
 void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations) {
+    if (dt <= 0.0f || m_constraints.empty()) return;
+
     const float velocityEpsilon = 0.0001f;
-    if (dt <= 0.0f) return;
 
     for (uint32_t it = 0; it < iterations; ++it) {
         bool allResolved = true;
 
         for (auto &c : m_constraints) {
-            // Relative velocity at contact along the normal
-            glm::vec3 relVel = c.bodyA->velocity - c.bodyB->velocity;
-            float separatingVel = glm::dot(relVel, c.normal);
+            // Build the relative velocity at the contact point (includes angular components)
+            glm::vec3 velA = c.bodyA->velocity + glm::cross(c.bodyA->angularVelocity, c.ra);
+            glm::vec3 velB = c.bodyB->velocity + glm::cross(c.bodyB->angularVelocity, c.rb);
+            glm::vec3 relVelWorld = velA - velB;
 
-            // Calculate desired separating velocity after collision
-            float desiredSepVel = -separatingVel * c.restitution;
 
-            // Check if need to resolve
-            float deltaVel = desiredSepVel - separatingVel;
-            if (deltaVel < velocityEpsilon) {
-                continue; // either moving apart already or small
+            glm::mat3 worldToContact = glm::transpose(c.contactToWorld);
+            glm::vec3 relVelContact  = worldToContact * relVelWorld;
+
+            // Positive x means the bodies are separating along the contact normal. If so, no
+            // normal impulse is required for a friction-less resolution.
+            if (relVelContact.x > 0.0f) {
+                continue;
+            }
+
+
+            float desiredDeltaVel = -(1.0f + c.restitution) * relVelContact.x;
+
+
+            float invMassSum   = c.bodyA->invMass + c.bodyB->invMass;
+            float deltaVelocity = invMassSum; // start with linear parts
+
+            // Angular part for body A.
+            {
+                glm::vec3 deltaVelWorld = glm::cross(c.ra, c.normal);
+                deltaVelWorld = c.bodyA->invInertiaTensor * deltaVelWorld;
+                deltaVelWorld = glm::cross(deltaVelWorld, c.ra);
+                deltaVelocity += glm::dot(deltaVelWorld, c.normal);
+            }
+
+            // Angular part for body B.
+            {
+                glm::vec3 deltaVelWorld = glm::cross(c.rb, c.normal);
+                deltaVelWorld = c.bodyB->invInertiaTensor * deltaVelWorld;
+                deltaVelWorld = glm::cross(deltaVelWorld, c.rb);
+                deltaVelocity += glm::dot(deltaVelWorld, c.normal);
+            }
+
+            // Guard against extremely small denominators to avoid numerical blow-ups.
+            if (deltaVelocity < velocityEpsilon) {
+                continue;
+            }
+
+    
+            float j = desiredDeltaVel / deltaVelocity;
+
+   
+            glm::vec3 impulse = j * c.normal;
+
+
+            c.bodyA->velocity        += impulse * c.bodyA->invMass;
+            c.bodyB->velocity        -= impulse * c.bodyB->invMass;
+            c.bodyA->angularVelocity += c.bodyA->invInertiaTensor * glm::cross(c.ra, impulse);
+            c.bodyB->angularVelocity -= c.bodyB->invInertiaTensor * glm::cross(c.rb, impulse);
+
+            velA = c.bodyA->velocity + glm::cross(c.bodyA->angularVelocity, c.ra);
+            velB = c.bodyB->velocity + glm::cross(c.bodyB->angularVelocity, c.rb);
+            relVelWorld = velA - velB;
+
+            glm::vec3 tangent = relVelWorld - glm::dot(relVelWorld, c.normal) * c.normal;
+            float tangentLen = glm::length(tangent);
+            if (tangentLen > velocityEpsilon) {
+                tangent /= tangentLen; // normalise
+
+                glm::vec3 raCrossT = glm::cross(c.ra, tangent);
+                glm::vec3 rbCrossT = glm::cross(c.rb, tangent);
+                float angularTermT = glm::dot(tangent,
+                                              glm::cross(c.bodyA->invInertiaTensor * raCrossT, c.ra) +
+                                              glm::cross(c.bodyB->invInertiaTensor * rbCrossT, c.rb));
+
+                float denomT = invMassSum + angularTermT;
+                if (denomT > 0.0f) {
+                    float jt = -glm::dot(relVelWorld, tangent) / denomT;
+
+                    // Coulomb friction – clamp magnitude.
+                    float maxFriction = c.friction * j;
+                    jt = glm::clamp(jt, -maxFriction, maxFriction);
+
+                    glm::vec3 frictionImpulse = jt * tangent;
+
+                    c.bodyA->velocity       += frictionImpulse * c.bodyA->invMass;
+                    c.bodyB->velocity       -= frictionImpulse * c.bodyB->invMass;
+                    c.bodyA->angularVelocity += c.bodyA->invInertiaTensor * glm::cross(c.ra, frictionImpulse);
+                    c.bodyB->angularVelocity -= c.bodyB->invInertiaTensor * glm::cross(c.rb, frictionImpulse);
+                }
             }
 
             allResolved = false;
-
-            float totalInvMass = c.bodyA->invMass + c.bodyB->invMass;
-            if (totalInvMass <= 0.0f) continue;
-
-            float impulseMag = deltaVel / totalInvMass;
-            glm::vec3 impulse = impulseMag * c.normal;
-
-            // will result in 0 for static bodies since invMass is 0
-            c.bodyA->velocity += impulse * c.bodyA->invMass;
-            c.bodyB->velocity -= impulse * c.bodyB->invMass;
-            
         }
 
-        if (allResolved) break; // early out when all constraints satisfied
+        if (allResolved) break; // early out if no impulses were applied in this iteration
     }
 }
 
@@ -498,11 +595,17 @@ void ConstraintSolver::solve(std::shared_ptr<Scene> scene,
     // 1. Build constraints from the current contacts
     buildConstraints(scene, manifolds);
 
-    // 2. Positional correction (interpenetration)
-    resolveInterpenetration(iterations);
+    // Choose iteration count if caller did not specify a custom value (<=0) or is too low.
+    uint32_t recommendedIters = static_cast<uint32_t>(m_constraints.size() * 2);
+    if (iterations < recommendedIters) {
+        iterations = recommendedIters;
+    }
 
-    // 3. Velocity resolution (impulses)
+    // 2. Velocity resolution (sequential impulses)
     resolveVelocities(dt, iterations);
+
+    // 3. Positional correction (interpenetration)
+    resolveInterpenetration(iterations);
 }
 
 } // namespace Rapture::Entropy

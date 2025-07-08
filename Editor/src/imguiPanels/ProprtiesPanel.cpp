@@ -8,6 +8,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include "Logging/TracyProfiler.h"
 
@@ -81,6 +82,10 @@ void PropertiesPanel::render()
 
         if (entity->hasComponent<Rapture::MeshComponent>()) {
             renderMeshComponent();
+
+            if (entity->hasComponent<Rapture::Entropy::RigidBodyComponent>()) {
+                renderRigidBodyComponent();
+            }
         }
     }
 
@@ -121,6 +126,14 @@ void PropertiesPanel::renderMaterialComponent()
                     float metallic = materialParameter.asFloat();
                     if (ImGui::DragFloat("##metallic", &metallic, 0.01f, 0.0f, 1.0f)) {
                         material.material->setParameter(Rapture::ParameterID::METALLIC, metallic);
+                    }
+                }
+            
+                if (paramID == Rapture::ParameterID::EMISSIVE) {
+                    ImGui::SameLine();
+                    glm::vec3 emissive = materialParameter.asVec3();
+                    if (ImGui::ColorEdit3("##emissive", glm::value_ptr(emissive))) {
+                        material.material->setParameter(Rapture::ParameterID::EMISSIVE, emissive);
                     }
                 }
             }
@@ -526,4 +539,121 @@ void PropertiesPanel::renderMeshComponent() {
     }
 
 
+}
+
+void PropertiesPanel::renderRigidBodyComponent() {
+    if (auto entity = m_selectedEntity.lock()) {
+        if (ImGui::CollapsingHeader("Rigid Body Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto& rigidbody = entity->getComponent<Rapture::Entropy::RigidBodyComponent>();
+            auto* collider = rigidbody.collider.get();
+
+            if (!collider) {
+                ImGui::Text("No collider attached.");
+                return;
+            }
+
+            // Mass
+            auto colliderType = collider->getColliderType();
+            if (colliderType == Rapture::Entropy::ColliderType::Sphere ||
+                colliderType == Rapture::Entropy::ColliderType::AABB ||
+                colliderType == Rapture::Entropy::ColliderType::OBB)
+            {
+                float mass = (rigidbody.invMass > 0.0f) ? 1.0f / rigidbody.invMass : 0.0f;
+                if (ImGui::DragFloat("Mass", &mass, 0.1f, 0.0f, 1000.0f)) {
+                    if (mass > 0.0001f) {
+                        rigidbody.setMass(mass);
+                    } else {
+                        rigidbody.invMass = 0.0f;
+                        rigidbody.invInertiaTensor = glm::mat3(0.0f);
+                    }
+                }
+            } else {
+                ImGui::Text("Mass editing not yet supported for this collider type.");
+            }
+
+            ImGui::Separator();
+            ImGui::Text("State Vectors");
+            ImGui::InputFloat3("Velocity", &rigidbody.velocity[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat3("Angular Velocity", &rigidbody.angularVelocity[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+            glm::vec4 orientation(rigidbody.orientation.x, rigidbody.orientation.y, rigidbody.orientation.z, rigidbody.orientation.w);
+            ImGui::InputFloat4("Orientation (xyzw)", &orientation[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+            ImGui::Separator();
+            ImGui::Text("Accumulators");
+            ImGui::InputFloat3("Accumulated Force", &rigidbody.accumulatedForce[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat3("Accumulated Torque", &rigidbody.accumulatedTorque[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+
+            ImGui::Separator();
+            ImGui::Text("Inverse Inertia Tensor");
+            // GLM stores matrices in column-major order, so we need to transpose for row-major display
+            glm::mat3 invTensor = glm::transpose(rigidbody.invInertiaTensor);
+            ImGui::InputFloat3("##row1", &invTensor[0][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat3("##row2", &invTensor[1][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+            ImGui::InputFloat3("##row3", &invTensor[2][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
+
+
+
+            ImGui::Separator();
+            ImGui::Text("Collider Properties");
+
+            // Collider specific properties
+            switch (collider->getColliderType()) {
+                case Rapture::Entropy::ColliderType::Sphere:
+                {
+                    ImGui::Text("Type: Sphere");
+                    auto* sphere = static_cast<Rapture::Entropy::SphereCollider*>(collider);
+                    ImGui::DragFloat3("Center", &sphere->center.x, 0.1f);
+                    ImGui::DragFloat("Radius", &sphere->radius, 0.1f, 0.0f);
+                    break;
+                }
+                case Rapture::Entropy::ColliderType::AABB:
+                {
+                    ImGui::Text("Type: AABB");
+                    auto* aabb = static_cast<Rapture::Entropy::AABBCollider*>(collider);
+                    ImGui::DragFloat3("Min", &aabb->min.x, 0.1f);
+                    ImGui::DragFloat3("Max", &aabb->max.x, 0.1f);
+                    break;
+                }
+                case Rapture::Entropy::ColliderType::OBB:
+                {
+                    ImGui::Text("Type: OBB");
+                    auto* obb = static_cast<Rapture::Entropy::OBBCollider*>(collider);
+                    ImGui::DragFloat3("Center", &obb->center.x, 0.1f);
+                    ImGui::DragFloat3("Extents", &obb->extents.x, 0.1f);
+                    glm::vec3 euler = glm::degrees(glm::eulerAngles(obb->orientation));
+                    if(ImGui::DragFloat3("Orientation", &euler.x, 1.0f)) {
+                        obb->orientation = glm::quat(glm::radians(euler));
+                    }
+                    break;
+                }
+                case Rapture::Entropy::ColliderType::Capsule:
+                {
+                    ImGui::Text("Type: Capsule");
+                    auto* capsule = static_cast<Rapture::Entropy::CapsuleCollider*>(collider);
+                    ImGui::DragFloat3("Start", &capsule->start.x, 0.1f);
+                    ImGui::DragFloat3("End", &capsule->end.x, 0.1f);
+                    ImGui::DragFloat("Radius", &capsule->radius, 0.1f, 0.0f);
+                    break;
+                }
+                case Rapture::Entropy::ColliderType::Cylinder:
+                {
+                    ImGui::Text("Type: Cylinder");
+                    auto* cylinder = static_cast<Rapture::Entropy::CylinderCollider*>(collider);
+                    ImGui::DragFloat3("Start", &cylinder->start.x, 0.1f);
+                    ImGui::DragFloat3("End", &cylinder->end.x, 0.1f);
+                    ImGui::DragFloat("Radius", &cylinder->radius, 0.1f, 0.0f);
+                    break;
+                }
+                case Rapture::Entropy::ColliderType::ConvexHull:
+                {
+                    ImGui::Text("Type: Convex Hull");
+                    auto* convexHull = static_cast<Rapture::Entropy::ConvexHullCollider*>(collider);
+                    ImGui::Text("Vertices: %zu", convexHull->vertices.size());
+                    break;
+                }
+            }
+        }
+    }
 }

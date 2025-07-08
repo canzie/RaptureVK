@@ -152,7 +152,7 @@ void GBufferPass::recordCommandBuffer(
             continue;
         }
         
-        if (transform.hasChanged(m_currentFrame)){
+        if (transform.hasChanged()){
             boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
         }
 

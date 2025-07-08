@@ -66,90 +66,73 @@ vec3 powVec3(vec3 value, float power)
 
 // Function to update border texels by copying from the nearest interior texel
 void UpdateBorderTexelsGLSL(
+    ivec3 globalInvocationID,
     ivec3 localInvocationID,
-    ivec3 workGroupID,
-    ivec3 globalInvocationID
+    ivec3 workGroupID
 ) {
-    bool isCurrentThreadBorderTexel = 
-        (localInvocationID.x == 0 || localInvocationID.x == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1)) ||
-        (localInvocationID.y == 0 || localInvocationID.y == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1));
 
-    if (isCurrentThreadBorderTexel) {
-        // Base coordinates for the start of this probe's block in the atlas (top-left of the 8x8 or 16x16 block)
-        ivec3 probeBlockBaseAtlasCoords = ivec3(
-            workGroupID.x * RTXGI_DDGI_PROBE_NUM_TEXELS,
-            workGroupID.y * RTXGI_DDGI_PROBE_NUM_TEXELS,
-            int(globalInvocationID.z) // Slice index
-        );
+    bool isCornerTexel = (localInvocationID.x == 0 || localInvocationID.x == (RTXGI_DDGI_PROBE_NUM_TEXELS - 1)) && (localInvocationID.y == 0 || localInvocationID.y == (RTXGI_DDGI_PROBE_NUM_TEXELS - 1));
+    bool isRowTexel = (localInvocationID.x > 0 && localInvocationID.x < (RTXGI_DDGI_PROBE_NUM_TEXELS - 1));
 
-        ivec3 copyFromAtlasCoords; // The absolute atlas coordinates to copy FROM (points to an interior texel)
+    uvec3 copyCoordinates = uvec3(workGroupID.x * RTXGI_DDGI_PROBE_NUM_TEXELS, workGroupID.y * RTXGI_DDGI_PROBE_NUM_TEXELS, globalInvocationID.z);
 
-        // Determine the local offset of the interior texel to copy from
-        int interiorCopyLocalOffsetX;
-        int interiorCopyLocalOffsetY;
-
-        if (localInvocationID.x == 0) { // Left border
-            interiorCopyLocalOffsetX = 1;
-        } else if (localInvocationID.x == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1)) { // Right border
-            interiorCopyLocalOffsetX = RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS;
-        } else { // Interior X-coord (for row edges, or if this logic path is mistakenly hit)
-            interiorCopyLocalOffsetX = int(localInvocationID.x);
-        }
-
-        if (localInvocationID.y == 0) { // Top border
-            interiorCopyLocalOffsetY = 1;
-        } else if (localInvocationID.y == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1)) { // Bottom border
-            interiorCopyLocalOffsetY = RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS;
-        } else { // Interior Y-coord (for column edges, or if this logic path is mistakenly hit)
-            interiorCopyLocalOffsetY = int(localInvocationID.y);
-        }
-        
-        copyFromAtlasCoords = probeBlockBaseAtlasCoords + ivec3(interiorCopyLocalOffsetX, interiorCopyLocalOffsetY, 0);
-
-        vec4 valueToCopy;
-        #if defined(DDGI_BLEND_RADIANCE)
-            if (pc.writeToAlternateTexture == 0) {
-                valueToCopy = imageLoad(ProbeIrradianceAtlas, copyFromAtlasCoords);
-                imageStore(ProbeIrradianceAtlas, ivec3(globalInvocationID.xyz), valueToCopy);
-            } else {
-                valueToCopy = imageLoad(ProbeIrradianceAtlasAlt, copyFromAtlasCoords);
-                imageStore(ProbeIrradianceAtlasAlt, ivec3(globalInvocationID.xyz), valueToCopy);
-            }
-        #elif defined(DDGI_BLEND_DISTANCE)
-            if (pc.writeToAlternateTexture == 0) {
-                valueToCopy = imageLoad(ProbeDistanceAtlas, copyFromAtlasCoords);
-                imageStore(ProbeDistanceAtlas, ivec3(globalInvocationID.xyz), valueToCopy);
-            } else {
-                valueToCopy = imageLoad(ProbeDistanceAtlasAlt, copyFromAtlasCoords);
-                imageStore(ProbeDistanceAtlasAlt, ivec3(globalInvocationID.xyz), valueToCopy);
-            }
-        #endif
+    if (isCornerTexel) {
+        copyCoordinates.x += localInvocationID.x > 0 ? 1 : RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS;
+        copyCoordinates.y += localInvocationID.y > 0 ? 1 : RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS;
+    } else if (isRowTexel) {
+        copyCoordinates.x += (RTXGI_DDGI_PROBE_NUM_TEXELS - 1) - localInvocationID.x;
+        copyCoordinates.y += localInvocationID.y + (localInvocationID.y > 0 ? -1 : 1);
+    } else {
+        copyCoordinates.x += localInvocationID.x + (localInvocationID.x > 0 ? -1 : 1);
+        copyCoordinates.y += (RTXGI_DDGI_PROBE_NUM_TEXELS - 1) - localInvocationID.y;
     }
+
+    #ifdef DDGI_BLEND_RADIANCE
+        vec4 valueToCopy;
+        if (pc.writeToAlternateTexture == 0) {
+            valueToCopy = imageLoad(ProbeIrradianceAtlas, ivec3(copyCoordinates));
+            imageStore(ProbeIrradianceAtlas, ivec3(globalInvocationID.xyz), valueToCopy);
+        } else {
+            valueToCopy = imageLoad(ProbeIrradianceAtlasAlt, ivec3(copyCoordinates));
+            imageStore(ProbeIrradianceAtlasAlt, ivec3(globalInvocationID.xyz), valueToCopy);
+        }
+    #else
+        vec2 valueToCopy;
+        if (pc.writeToAlternateTexture == 0) {
+            valueToCopy = imageLoad(ProbeDistanceAtlas, ivec3(copyCoordinates)).rg;
+            imageStore(ProbeDistanceAtlas, ivec3(globalInvocationID.xyz), vec4(valueToCopy, 0.0, 1.0));
+        } else {
+            valueToCopy = imageLoad(ProbeDistanceAtlasAlt, ivec3(copyCoordinates)).rg;
+            imageStore(ProbeDistanceAtlasAlt, ivec3(globalInvocationID.xyz), vec4(valueToCopy, 0.0, 1.0));
+        }
+    #endif
+
 }
 
 void main() {
 #if defined(DDGI_BLEND_RADIANCE) || defined(DDGI_BLEND_DISTANCE)
     // Determine if the current thread is processing an INTERIOR texel
     // Border texels are at local invocation 0 or (NUM_INTERIOR_TEXELS + 1) which is (NUM_TEXELS - 1)
-    bool isProcessingInteriorTexel = 
-        !( (gl_LocalInvocationID.x == 0 || gl_LocalInvocationID.x == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1)) ||
+    bool isBorderTexel = 
+        ( (gl_LocalInvocationID.x == 0 || gl_LocalInvocationID.x == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1)) ||
            (gl_LocalInvocationID.y == 0 || gl_LocalInvocationID.y == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1)) );
 
-    if (isProcessingInteriorTexel) {
+    if (!isBorderTexel) {
         ivec3 probeGridCoords;
         probeGridCoords.x = int(gl_WorkGroupID.x);
         probeGridCoords.z = int(gl_WorkGroupID.y);
         probeGridCoords.y = int(gl_WorkGroupID.z);
 
 
-        int probeIndex = DDGIGetProbeIndex(probeGridCoords, u_volume);
+        //int probeIndex = DDGIGetProbeIndex(probeGridCoords, u_volume);
+        int probeIndex = DDGIGetProbeIndex(ivec3(gl_GlobalInvocationID.xyz), RTXGI_DDGI_PROBE_NUM_TEXELS, u_volume);
 
         uint numProbes = (u_volume.gridDimensions.x * u_volume.gridDimensions.y * u_volume.gridDimensions.z);
 
         if (probeIndex < 0 || probeIndex >= numProbes) return;
 
 
-        //ivec3 threadCoords = ivec3(gl_WorkGroupID.x * RTXGI_DDGI_PROBE_NUM_TEXELS, gl_WorkGroupID.y * RTXGI_DDGI_PROBE_NUM_TEXELS, int(gl_GlobalInvocationID.z)) + ivec3(gl_LocalInvocationID.xyz) - ivec3(1, 1, 0);
+        ivec3 threadCoords = ivec3(gl_WorkGroupID.x * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, gl_WorkGroupID.y * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, int(gl_GlobalInvocationID.z)) + ivec3(gl_LocalInvocationID.xyz) - ivec3(1, 1, 0);
 
 
 
@@ -160,13 +143,13 @@ void main() {
         uint backfaces = 0;
         uint maxBackfaces = uint((u_volume.probeNumRays - rayIndex) * u_volume.probeFixedRayBackfaceThreshold);
         
-        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(ivec2(gl_LocalInvocationID.xy), u_volume.probeNumIrradianceInteriorTexels);
+        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(threadCoords.xy, RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
         
     #endif
     #ifdef DDGI_BLEND_DISTANCE 
 
-        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(ivec2(gl_LocalInvocationID.xy), u_volume.probeNumDistanceInteriorTexels);
+        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(threadCoords.xy, RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
 
     #endif
@@ -197,14 +180,8 @@ void main() {
                 backfaces++;
 
                 // Early out: only blend ray radiance into the probe if the backface threshold hasn't been exceeded
-                if (backfaces >= maxBackfaces) {
-                    if (pc.writeToAlternateTexture == 0) {
-                        imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(0.0, 0.0, 0.0, 0.0)); // Store BLACK
-                    } else {
-                        imageStore(ProbeIrradianceAtlasAlt, ivec3(gl_GlobalInvocationID.xyz), vec4(0.0, 0.0, 0.0, 0.0)); // Store BLACK
-                    }
-                    return;
-                }
+                if (backfaces >= maxBackfaces) return;
+                
                 continue;
             }
 
@@ -264,11 +241,12 @@ void main() {
 
         // Get the difference between the current irradiance and the irradiance mean stored in the probe
         vec3 delta = (result.rgb - probeIrradianceMean.rgb);
+        vec3 delta2 = (probeIrradianceMean.rgb - result.rgb);
 
         // Store the current irradiance (before interpolation) for use in probe variability
         vec3 irradianceSample = result.rgb;
 
-        float maxComponent = max(max(abs(delta.r), abs(delta.g)), abs(delta.b));
+        float maxComponent = max(max(abs(delta2.r), abs(delta2.g)), abs(delta2.b));
 
         float probeIrradianceThreshold = 0.25;
         if (maxComponent > probeIrradianceThreshold)
@@ -305,12 +283,11 @@ void main() {
 
         result = vec4(probeIrradianceMean.rgb + lerpDelta, 1.0);
 
-
-    #endif
-
-    #ifdef DDGI_BLEND_DISTANCE
+    #else
         result = vec4(mix(result.rg, probeIrradianceMean.rg, hysteresis), 0.0, 1.0);
+
     #endif
+
 
     #ifdef DDGI_BLEND_DISTANCE
         if (pc.writeToAlternateTexture == 0) {
@@ -320,11 +297,6 @@ void main() {
         }
     #endif
     #ifdef DDGI_BLEND_RADIANCE
-        // Clamp result to prevent NaN and extreme values
-        result.rgb = clamp(result.rgb, vec3(0.0), vec3(64.0));
-        
-        // Ensure alpha is valid
-        result.a = clamp(result.a, 0.0, 1.0);
         
         if (pc.writeToAlternateTexture == 0) {
             imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
@@ -333,25 +305,19 @@ void main() {
         }
     #endif
 
-
     return;
     } // End of interior texel processing
 
     // Synchronization: Ensure all interior texel calculations and stores are complete
     // before any thread attempts to read them for border updates.
-    barrier();
-    
-    // Add memory barrier to ensure image writes are visible
-    memoryBarrierImage();
-    
-    // Additional barrier to ensure all workgroups have completed interior processing
-    // before any workgroup starts border processing
+    memoryBarrierShared();
     memoryBarrier();
+    barrier();
 
     // Border Texel Update Logic:
-    UpdateBorderTexelsGLSL(ivec3(gl_LocalInvocationID), ivec3(gl_WorkGroupID), ivec3(gl_GlobalInvocationID));
+    UpdateBorderTexelsGLSL(ivec3(gl_GlobalInvocationID), ivec3(gl_LocalInvocationID), ivec3(gl_WorkGroupID));
 
-#else
+#else // issue with compilation, use either DDGI_BLEND_RADIANCE or DDGI_BLEND_DISTANCE
     #ifdef DDGI_BLEND_RADIANCE
         if (pc.writeToAlternateTexture == 0) {
             imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), vec4(1.0, 0.0, 1.0, 1.0));

@@ -53,7 +53,13 @@ namespace Rapture {
         void registerBLAS(std::shared_ptr<Entity> entity);
 
         void buildTLAS();
-        const TLAS& getTLAS() {return *m_tlas;}
+        std::shared_ptr<TLAS> getTLAS() {
+            if (!m_tlas) {
+                //RP_CORE_ERROR("Scene::getTLAS - TLAS is not built");
+                return nullptr;
+            }
+            return m_tlas;
+        }
 
         void updateTLAS();
 

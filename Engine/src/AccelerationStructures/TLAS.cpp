@@ -511,7 +511,7 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>>& in
         m_buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
         m_buildInfo.srcAccelerationStructure = VK_NULL_HANDLE;
         
-        RP_CORE_INFO("TLAS: Updated {} instances efficiently", instanceUpdates.size());
+        //RP_CORE_INFO("TLAS: Updated {} instances efficiently", instanceUpdates.size());
     } else {
         // Fall back to full rebuild if update is not supported
         RP_CORE_WARN("TLAS: Device doesn't support AS updates, falling back to rebuild");

@@ -10,20 +10,9 @@ namespace Rapture::Entropy {
 // SphereCollider
 // =====================================================================================================================
 
-void SphereCollider::getAABB(glm::vec3& min, glm::vec3& max) const {
-    // Calculate world-space center.
-    glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(center, 1.0f));
-
-    // Estimate uniform scale by averaging the length of the basis vectors.
-    glm::vec3 axisX = glm::vec3(transform[0]);
-    glm::vec3 axisY = glm::vec3(transform[1]);
-    glm::vec3 axisZ = glm::vec3(transform[2]);
-
-    float scale = (glm::length(axisX) + glm::length(axisY) + glm::length(axisZ)) / 3.0f;
-    float worldRadius = radius * scale;
-
-    min = worldCenter - glm::vec3(worldRadius);
-    max = worldCenter + glm::vec3(worldRadius);
+void SphereCollider::getAABB(glm::vec3& outMin, glm::vec3& outMax) const {
+    outMin = center - glm::vec3(radius);
+    outMax = center + glm::vec3(radius);
 }
 
 bool SphereCollider::intersect(SphereCollider& other, ContactManifold* manifold) {
@@ -100,13 +89,22 @@ bool SphereCollider::intersect(ConvexHullCollider& other, ContactManifold* manif
     return other.intersect(*this, manifold);
 }
 
+glm::mat3 SphereCollider::calculateInertiaTensor(float mass) const {
+    glm::mat3 inertiaTensor(0.0f);
+    float i = 2.0f / 5.0f * mass * radius * radius;
+    inertiaTensor[0][0] = i;
+    inertiaTensor[1][1] = i;
+    inertiaTensor[2][2] = i;
+    return inertiaTensor;
+}
+
 // =====================================================================================================================
 // AABBCollider
 // =====================================================================================================================
 
-void AABBCollider::getAABB(glm::vec3& min, glm::vec3& max) const {
-    min = this->min;
-    max = this->max;
+void AABBCollider::getAABB(glm::vec3& outMin, glm::vec3& outMax) const {
+    outMin = min;
+    outMax = max;
 }
 
 bool AABBCollider::intersect(SphereCollider& other, ContactManifold* manifold) {
@@ -279,6 +277,20 @@ bool AABBCollider::intersect(ConvexHullCollider& other, ContactManifold* manifol
     return other.intersect(*this, manifold);
 }
 
+glm::mat3 AABBCollider::calculateInertiaTensor(float mass) const {
+    glm::mat3 inertiaTensor(0.0f);
+    glm::vec3 size = max - min;
+    float width = size.x;
+    float height = size.y;
+    float depth = size.z;
+
+    inertiaTensor[0][0] = (1.0f / 12.0f) * mass * (height * height + depth * depth);
+    inertiaTensor[1][1] = (1.0f / 12.0f) * mass * (width * width + depth * depth);
+    inertiaTensor[2][2] = (1.0f / 12.0f) * mass * (width * width + height * height);
+    
+    return inertiaTensor;
+}
+
 // =====================================================================================================================
 // OBBCollider
 // =====================================================================================================================
@@ -301,25 +313,125 @@ bool OBBCollider::intersect(AABBCollider& other, ContactManifold* manifold) {
     return false;
 }
 
+glm::mat3 OBBCollider::calculateInertiaTensor(float mass) const {
+    glm::vec3 size = extents * 2.0f;
+    float one_twelfth_mass = (1.0f/12.0f) * mass;
+    
+    float ix = one_twelfth_mass * (size.y * size.y + size.z * size.z);
+    float iy = one_twelfth_mass * (size.x * size.x + size.z * size.z);
+    float iz = one_twelfth_mass * (size.x * size.x + size.y * size.y);
+
+    glm::mat3 inertiaTensor(0.0f);
+    inertiaTensor[0][0] = ix;
+    inertiaTensor[1][1] = iy;
+    inertiaTensor[2][2] = iz;
+    return inertiaTensor;
+}
+
 bool OBBCollider::intersect(OBBCollider& other, ContactManifold* manifold) {
-    // TODO: Implement OBB vs OBB intersection (e.g., using SAT).
-    return false;
+    
+    struct OBBIntersectionInfo {
+        bool intersecting = true;
+        float penetration = std::numeric_limits<float>::max();
+        glm::vec3 axis;
+    };
+
+    auto project = [](const OBBCollider& obb, const glm::vec3& axis, float& min, float& max) {
+        glm::vec3 worldCenter = glm::vec3(obb.transform * glm::vec4(obb.center, 1.0f));
+        glm::mat3 rotMatrix = glm::mat3_cast(obb.orientation) * glm::mat3(obb.transform);
+
+        float r = obb.extents.x * glm::abs(glm::dot(axis, rotMatrix[0])) +
+                  obb.extents.y * glm::abs(glm::dot(axis, rotMatrix[1])) +
+                  obb.extents.z * glm::abs(glm::dot(axis, rotMatrix[2]));
+
+        float c = glm::dot(worldCenter, axis);
+        min = c - r;
+        max = c + r;
+    };
+
+    auto testAxis = [&](const OBBCollider& a, const OBBCollider& b, const glm::vec3& axis, OBBIntersectionInfo& info) {
+        if (glm::dot(axis, axis) < 1e-6f) return;
+
+        float minA, maxA, minB, maxB;
+        project(a, axis, minA, maxA);
+        project(b, axis, minB, maxB);
+
+        float overlap = std::min(maxA, maxB) - std::max(minA, minB);
+        if (overlap < 0) {
+            info.intersecting = false;
+            return;
+        }
+        
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.axis = axis;
+        }
+    };
+    
+    OBBIntersectionInfo info;
+
+    glm::mat3 rotA = glm::mat3_cast(this->orientation) * glm::mat3(this->transform);
+    glm::mat3 rotB = glm::mat3_cast(other.orientation) * glm::mat3(other.transform);
+
+    std::vector<glm::vec3> axes;
+    axes.reserve(15);
+    axes.push_back(rotA[0]);
+    axes.push_back(rotA[1]);
+    axes.push_back(rotA[2]);
+    axes.push_back(rotB[0]);
+    axes.push_back(rotB[1]);
+    axes.push_back(rotB[2]);
+
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            axes.push_back(glm::cross(rotA[i], rotB[j]));
+        }
+    }
+
+    for (const auto& axis : axes) {
+        testAxis(*this, other, axis, info);
+        if (!info.intersecting) return false;
+    }
+
+    if (manifold) {
+        glm::vec3 worldCenterA = glm::vec3(this->transform * glm::vec4(this->center, 1.0f));
+        glm::vec3 worldCenterB = glm::vec3(other.transform * glm::vec4(other.center, 1.0f));
+
+        glm::vec3 dir = worldCenterB - worldCenterA;
+        if (glm::dot(dir, info.axis) < 0) {
+            info.axis = -info.axis;
+        }
+
+        // NOTE: This is a simplified contact point generation.
+        // A full implementation would require finding the features (vertex, edge, face)
+        // that are in contact.
+        ContactPoint cp;
+        cp.penetrationDepth = info.penetration;
+        cp.normalOnB = glm::normalize(info.axis);
+        
+        // Approximate contact point.
+        glm::vec3 contactPointOnB = worldCenterB; // Start with center
+        // You would find the support point on B in the direction of -normal
+        
+        cp.worldPointB = contactPointOnB; // Simplified
+        cp.worldPointA = cp.worldPointB - cp.normalOnB * cp.penetrationDepth;
+        manifold->contactPoints.push_back(cp);
+    }
+    
+    return true;
 }
 
 bool OBBCollider::intersect(CapsuleCollider& other, ContactManifold* manifold) {
-    // Delegated to CapsuleCollider as its type enum is greater.
     assert(getColliderType() < other.getColliderType());
     return other.intersect(*this, manifold);
 }
 
 bool OBBCollider::intersect(CylinderCollider& other, ContactManifold* manifold) {
-    // Delegated to CylinderCollider as its type enum is greater.
     assert(getColliderType() < other.getColliderType());
     return other.intersect(*this, manifold);
 }
 
 bool OBBCollider::intersect(ConvexHullCollider& other, ContactManifold* manifold) {
-    // Delegated to ConvexHullCollider as its type enum is greater.
     assert(getColliderType() < other.getColliderType());
     return other.intersect(*this, manifold);
 }

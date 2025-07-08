@@ -31,8 +31,7 @@ TestLayer::~TestLayer()
     onDetach();
 }
 
-void TestLayer::onAttach()
-{
+void TestLayer::onAttach() {
 
     Rapture::RP_INFO("TestLayer attached");
 
@@ -100,27 +99,16 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     //auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf", activeScene);
     //loader->loadModel((rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf").string());
 
-    auto cubeA = activeScene->createCube("Cube A");
-    auto& rbA = cubeA.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
-    rbA.invMass = 1.0f;
-
-    cubeA.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 5.0f, 0.0f));
-    cubeA.getComponent<Rapture::MeshComponent>().isStatic = false;
-
-    auto cubeB = activeScene->createCube("Cube B");
-    auto& rbB = cubeB.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
-    rbB.invMass = 1.0f;
-    cubeB.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 10.0f, 0.0f));
-    cubeB.getComponent<Rapture::MeshComponent>().isStatic = false;
+    
+    auto cubeD = activeScene->createCube("Cube D");
+    auto& rbD = cubeD.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
+    rbD.invMass = 0.0f;
+    cubeD.addComponent<Rapture::BLASComponent>(cubeD.getComponent<Rapture::MeshComponent>().mesh);
+    cubeD.getComponent<Rapture::MeshComponent>().isStatic = true;
+    cubeD.getComponent<Rapture::MaterialComponent>().material->setParameter<glm::vec3>(Rapture::ParameterID::ALBEDO, glm::vec3(1.0f, 0.0f, 0.0f));
 
 
-    auto platform = activeScene->createCube("Platform");
-    auto& rbPlatform = platform.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
-    rbPlatform.invMass = 0.0f;
-    platform.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
-    platform.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 1.0f, 10.0f));
-    platform.getComponent<Rapture::MeshComponent>().isStatic = true;
-
+    activeScene->registerBLAS(cubeD);
 
 
 
@@ -168,14 +156,48 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     try {
         activeScene->buildTLAS();
     } catch (const std::runtime_error& e) {
-        Rapture::RP_ERROR("glTF2Loader: Failed to build TLAS: {}", e.what());
+        Rapture::RP_ERROR("Testlayer: Failed to build TLAS: {}", e.what());
     }
 
-    Rapture::RP_INFO("Created camera entity in scene: {0}", activeScene->getSceneName());
 
     m_entropyPhysics = std::make_shared<Rapture::Entropy::EntropyPhysics>();
     m_entropyPhysics->addGlobalForceGenerator(std::make_shared<Rapture::Entropy::GravityForce>());
     m_entropyPhysics->addGlobalForceGenerator(std::make_shared<Rapture::Entropy::DampingForce>(0.4f, 0.4f));
+
+    auto& volume =Rapture::DeferredRenderer::getDynamicDiffuseGI()->getProbeVolume();
+
+    std::vector<Rapture::InstanceData> instanceData(volume.gridDimensions.x * volume.gridDimensions.y * volume.gridDimensions.z);
+
+    glm::vec3 gridDimensionsF = glm::vec3(volume.gridDimensions);
+    glm::vec3 gridHalfSize = (gridDimensionsF - glm::vec3(1.0f)) * volume.spacing * 0.5f;
+    glm::vec3 gridStart = volume.origin - gridHalfSize;
+
+    for (uint32_t i = 0; i < volume.gridDimensions.x; i++) {
+        for (uint32_t j = 0; j < volume.gridDimensions.y; j++) {
+            for (uint32_t k = 0; k < volume.gridDimensions.z; k++) {
+                glm::vec3 probePosition = gridStart + glm::vec3(i, j, k) * volume.spacing;
+
+                glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), probePosition);
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(0.1f)); // Scale down the probes to be visible
+
+                size_t index = k + j * volume.gridDimensions.z + i * volume.gridDimensions.y * volume.gridDimensions.z;
+
+                Rapture::InstanceData data;
+                data.transform = modelMatrix;
+                instanceData[index] = data;
+            }
+        }
+    }
+
+    auto sphere = std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateSphere(1, 8));
+    auto ddgiVizEntity = std::make_shared<Rapture::Entity>(scene->createEntity("DDGI Probe Volume"));
+    ddgiVizEntity->addComponent<Rapture::TransformComponent>();
+    //ddgiVizEntity->addComponent<Rapture::InstanceShapeComponent>(instanceData, app.getVulkanContext().getVmaAllocator());
+    ddgiVizEntity->addComponent<Rapture::MeshComponent>(sphere);
+        
+
+    
+
 
 }
 

@@ -52,67 +52,45 @@ namespace Rapture {
     // need to store the data in the Transforms class because i want to support
     // getting/setting each individual varaible while keeping the rest consistent
     // e.g. chaning the transformmatrix will update the individual translation, rotation, scale and vice versa
-	struct TransformComponent
-	{
+	struct TransformComponent {
         Transforms transforms;
+        
+        bool* isDirty = nullptr;
+        // used to help with a case where a transform is updated in 1 frame but we also need to update the other frames in flight
+        // this will say how many frames have been updated
+        // at 0 we ignore
+        // at else we continue updating untill dirtyFrames is equal to # frames in flight
+        uint8_t dirtyFrames = 0;
         
         glm::vec3 translation() const { return transforms.getTranslation(); }
         glm::vec3 rotation() const { return transforms.getRotation(); }
         glm::vec3 scale() const { return transforms.getScale(); }
         glm::mat4 transformMatrix() const { return transforms.getTransform(); }
 
-        private:
-            mutable std::size_t m_lastHash = 0;
-            mutable uint32_t m_lastFrame = 10; // random number larger than framesinglight
-            mutable bool changedThisFrame = false;
 
         public:
         TransformComponent()=default;
 
         TransformComponent(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale) {
             transforms = Transforms(translation, rotation, scale);
+            isDirty = transforms.getDirtyFlag();
         }
 
         // Add constructor for quaternion rotation
         TransformComponent(glm::vec3 translation, glm::quat rotation, glm::vec3 scale) {
             transforms = Transforms(translation, rotation, scale);
+            isDirty = transforms.getDirtyFlag();
         }
 
         TransformComponent(glm::mat4 transformMatrix) {
             transforms.setTransform(transformMatrix);
+            isDirty = transforms.getDirtyFlag();
         }
 
-        std::size_t calculateCurrentHash() const
-        {
-            const glm::mat4& matrix = transforms.getTransform();
-            std::size_t hash = 0;
-            
-            // Hash the 16 float values in the transform matrix
-            const float* values = glm::value_ptr(matrix);
-            for (int i = 0; i < 16; ++i) {
-                // Simple hash combination using bit operations
-                // Multiply by prime number and XOR with current hash
-                hash ^= std::hash<float>{}(values[i]) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            }
-            
-            return hash;
+        bool hasChanged() {
+            return *isDirty;
         }
-
-        bool hasChanged(uint32_t currentFrame) const
-        {
-            if (m_lastFrame != currentFrame) {
-                m_lastFrame = currentFrame;
-                changedThisFrame = false;
-
-                size_t currentHash = calculateCurrentHash();
-                if (m_lastHash != currentHash) {
-                    m_lastHash = currentHash;
-                    changedThisFrame = true;
-                    return true;
-                }
-            }
-            return changedThisFrame;
-        }
+ 
 	};
 
     // Pure camera component - only contains camera-specific data

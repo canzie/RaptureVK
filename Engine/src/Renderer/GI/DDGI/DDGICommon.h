@@ -9,7 +9,11 @@ namespace Rapture {
 struct MeshInfo {
     alignas(4) uint32_t AlbedoTextureIndex;
     alignas(4) uint32_t NormalTextureIndex;
-    alignas(4) uint32_t MetallicRoughnessTextureIndex;
+
+    alignas(16) glm::vec3 albedo;
+    
+    alignas(16) glm::vec3 emissiveColor;
+    alignas(4) uint32_t EmissiveFactorTextureIndex;
 
     alignas(4) uint32_t iboIndex; // index of the buffer in the bindless buffers array
     alignas(4) uint32_t vboIndex; // index of the buffer in the bindless buffers array
@@ -41,8 +45,11 @@ struct ProbeVolume {
     alignas(16) glm::uvec3 gridDimensions;
 
     alignas(4) int      probeNumRays;                       // number of rays traced per probe
+    alignas(4) int      probeNumIrradianceTexels;   // number of texels in one dimension of a probe's irradiance texture
+    alignas(4) int      probeNumDistanceTexels;     // number of texels in one dimension of a probe's distance texture 
+
     alignas(4) int      probeNumIrradianceInteriorTexels;   // number of texels in one dimension of a probe's irradiance texture (does not include 1-texel border)
-    alignas(4) int      probeNumDistanceInteriorTexels;     // number of texels in one dimension of a probe's distance texture (does not include 1-texel border)
+    alignas(4) int      probeNumDistanceInteriorTexels;     // number of texels in one dimension of a probe's distance texture (does not include 1-texel border) 
 
     alignas(4) float    probeHysteresis;                    // weight of the previous irradiance and distance data store in probes
     alignas(4) float    probeMaxRayDistance;                // maximum world-space distance a probe ray can travel

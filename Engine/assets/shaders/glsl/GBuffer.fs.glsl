@@ -38,6 +38,8 @@ layout(set = 1, binding = 0) uniform MaterialDataBuffer {
     uint normalMapIndex;
     uint metallicRoughnessMapIndex;
     uint aoMapIndex;
+    vec3 emissiveColor;
+
 } u_materials[];
 
 // Bindless textures

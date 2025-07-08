@@ -120,7 +120,7 @@ void BrowserPanel::buildHierarchyCache() {
         Rapture::Entity entity(entityHandle, scene.get());
         if (!entity.isValid()) continue;
         
-        std::string entityName = entity.getComponent<Rapture::TagComponent>().tag;
+        std::string entityName = entity.getComponent<Rapture::TagComponent>().tag + " " + std::to_string(entity.getID());
         
         std::shared_ptr<Rapture::Entity> entityPtr = std::make_shared<Rapture::Entity>(entity);
         if (entityPtr->hasComponent<Rapture::LightComponent>()) {
