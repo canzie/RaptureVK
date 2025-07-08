@@ -507,6 +507,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
         float u2 = dist(rng);
         float u3 = dist(rng);
 
+
         // Convert to a uniform random unit quaternion (James Arvo, Graphics Gems III)
         float sqrt1_u1 = std::sqrt(1.0f - u1);
         float sqrt_u1  = std::sqrt(u1);
@@ -977,6 +978,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer() {
         probeVolume.gridDimensions = glm::uvec3(24, 12, 24);
         
         probeVolume.probeNumRays = 256;
+        probeVolume.probeStaticRayCount = 192;
         probeVolume.probeNumIrradianceTexels = 8;
         probeVolume.probeNumDistanceTexels = 16;
         probeVolume.probeNumIrradianceInteriorTexels = probeVolume.probeNumIrradianceTexels - 2;

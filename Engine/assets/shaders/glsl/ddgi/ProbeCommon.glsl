@@ -15,6 +15,8 @@ struct ProbeVolume {
     uvec3 gridDimensions;
 
     int      probeNumRays;                       // number of rays traced per probe
+    uint     probeStaticRayCount;               // number of rays traced per probe for static objects, cant be larger than probeNumRays
+
     int      probeNumIrradianceTexels;   // number of texels in one dimension of a probe's irradiance texture
     int      probeNumDistanceTexels;     // number of texels in one dimension of a probe's distance texture 
     int      probeNumIrradianceInteriorTexels;   // number of texels in one dimension of a probe's irradiance texture (does not include 1-texel border)
@@ -40,6 +42,7 @@ struct ProbeVolume {
     float    probeClassificationEnabled;         // enable/disable probe classification (0.0 = disabled, 1.0 = enabled)
     float    probeChangeThreshold;               // threshold for considering a probe's position has changed significantly
     float    probeMinValidSamples;               // minimum number of valid ray samples required for a probe to be considered valid
+
 };
 
 
@@ -76,6 +79,33 @@ vec3 octDecode(vec2 coords) {
 // -- Quaternion helper prototypes --
 vec4 RTXGIQuaternionConjugate(vec4 q);
 vec3 RTXGIQuaternionRotate(vec3 v, vec4 q);
+
+/**
+ * Determines if a ray at the given index should be dynamic (rotated) or static (fixed).
+ * This function centralizes the logic for ray classification, making it easy to modify
+ * the distribution pattern between static and dynamic rays.
+ */
+bool DDGIIsRayDynamic(int rayIndex, ProbeVolume volume)
+{
+    int dynamicRayCount = volume.probeNumRays - int(volume.probeStaticRayCount);
+    
+    // Method 1: Evenly distributed dynamic rays (current implementation)
+    // Every Nth ray is dynamic where N = totalRays / dynamicRayCount
+    int rayStep = volume.probeNumRays / dynamicRayCount;
+    return (rayIndex % rayStep) == 0;
+    
+    // Alternative Method 2: First N rays are static, rest are dynamic
+    // return rayIndex >= int(volume.probeStaticRayCount);
+    
+    // Alternative Method 3: Interleaved pattern (every other ray alternates in groups)
+    // int groupSize = 8;
+    // int groupIndex = rayIndex / groupSize;
+    // int indexInGroup = rayIndex % groupSize;
+    // return (groupIndex % 2 == 0) ? (indexInGroup < groupSize/2) : (indexInGroup >= groupSize/2);
+    
+    // Alternative Method 4: Prime-based distribution for better coverage
+    // return (rayIndex * 7) % volume.probeNumRays < dynamicRayCount;
+}
 
 /**
  * Computes a low discrepancy spherically distributed direction on the unit sphere,
@@ -138,7 +168,7 @@ vec3 DDGIGetProbeRayDirection(int rayIndex, ProbeVolume volume)
 {
     int sampleIndex = rayIndex;
     int numRays = volume.probeNumRays;
-
+    
     // Get a deterministic direction on the sphere using the spherical Fibonacci sequence
     vec3 direction = SphericalFibonacci(uint(sampleIndex), uint(numRays));
 

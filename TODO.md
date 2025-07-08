@@ -31,7 +31,6 @@
     - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)
     - fixing the imguizmo thing    
     - the larger problem with open world means we need a seperate tlas for the tlasses per chunk, this can be one on the cpu.
-    - fix issue with adding/removing/resizing entities in the static tree
     - fix issue where the dynamic tree does not remove entities when they are removed
     - redo all of the maths, including addition of balancing when something falls, it should rotate to go flat
     - add option to view the meshes collider seperatly instead of only the aabb, and move this collider -> add it to the entity browser directly

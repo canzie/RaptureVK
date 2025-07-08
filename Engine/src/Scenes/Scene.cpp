@@ -112,24 +112,22 @@ namespace Rapture {
             auto [transform, mesh, material] = meshView.get<TransformComponent, MeshComponent, MaterialComponent>(entity);
             
             // nothing changed
-            if (!transform.hasChanged()) {
-                continue;
+            if (transform.hasChanged()) {
+                // TODO: This will break the last frame if the transform is not continuesly changed
+                // for example frame 1 and 2 will have isdirty to true, then frame 3 will have isdirty to false
+                // this works here but the other updates like for the lights will break
+                // after this we should be clean
+                if (transform.dirtyFrames == frameCount) {
+                    *transform.isDirty = false;
+                    transform.dirtyFrames = 0;
+                } else {
+                    transform.dirtyFrames++;
+                }
+                
+                Entity ent = Entity(entity, this);
+                // publish the event
+                AssetEvents::onMeshTransformChanged().publish(ent.getID());
             }
-
-            // TODO: This will break the last frame if the transform is not continuesly changed
-            // for example frame 1 and 2 will have isdirty to true, then frame 3 will have isdirty to false
-            // this works here but the other updates like for the lights will break
-            // after this we should be clean
-            if (transform.dirtyFrames == frameCount) {
-                *transform.isDirty = false;
-                transform.dirtyFrames = 0;
-            } else {
-                transform.dirtyFrames++;
-            }
-            
-            Entity ent = Entity(entity, this);
-            // publish the event
-            AssetEvents::onMeshTransformChanged().publish(ent.getID());
 
             // should be shot for this but feels kindof dumb to do another loop just for the materials
             // + when there are no more pending texutres, it should be 0 cost since we just check if the vector is empty then return.

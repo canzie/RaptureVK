@@ -24,7 +24,7 @@ namespace Rapture {
 struct FogSettings {
     bool enabled = true;
     glm::vec3 color = glm::vec3(0.5f, 0.6f, 0.7f);
-    float nearDistance = 1.0f;
+    float nearDistance = 10.0f;
     float farDistance = 180.0f;
 };
 

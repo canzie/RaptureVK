@@ -48,13 +48,13 @@ public:
     const Sampler& getSampler() const { return *m_sampler; }
     const TextureSpecification& getSpecification() const { return m_spec; }
     VkFormat getFormat() const { return toVkFormat(m_spec.format); }
-
     // Get descriptor image info for use in descriptor sets
     VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType=TextureViewType::DEFAULT) const;
     // Get descriptor image info for storage images (used in compute shaders)
     VkDescriptorImageInfo getStorageImageDescriptorInfo() const;
     VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask);
     uint32_t getBindlessIndex();
+
 
     void setReadyForSampling(bool ready) {
         m_readyForSampling = ready;

@@ -40,11 +40,12 @@ struct ProbeVolume {
     alignas(16) glm::vec4 rotation;                 // rotation quaternion for the volume
     alignas(16) glm::vec4 probeRayRotation;         // rotation quaternion for probe rays
 
-
     alignas(16) glm::vec3 spacing;
     alignas(16) glm::uvec3 gridDimensions;
 
     alignas(4) int      probeNumRays;                       // number of rays traced per probe
+    alignas(4) uint32_t probeStaticRayCount;
+
     alignas(4) int      probeNumIrradianceTexels;   // number of texels in one dimension of a probe's irradiance texture
     alignas(4) int      probeNumDistanceTexels;     // number of texels in one dimension of a probe's distance texture 
 
@@ -71,6 +72,8 @@ struct ProbeVolume {
     alignas(4) float    probeClassificationEnabled;         // enable/disable probe classification (0.0 = disabled, 1.0 = enabled)
     alignas(4) float    probeChangeThreshold;               // threshold for considering a probe's position has changed significantly
     alignas(4) float    probeMinValidSamples;               // minimum number of valid ray samples required for a probe to be considered valid
+
+
 };
 
 

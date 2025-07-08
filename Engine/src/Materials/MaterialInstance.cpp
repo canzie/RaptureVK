@@ -117,29 +117,22 @@ void MaterialInstance::updatePendingTextures() {
         return;
     }
 
+
+
     m_pendingTextures.erase(std::remove_if(m_pendingTextures.begin(), m_pendingTextures.end(),
         [this](const PendingTexture& pending) {
             bool isReadyForSampling = pending.texture && pending.texture->isReadyForSampling();
             bool isNullTexture = !pending.texture;
 
-            uint32_t defaultWhiteTextureIndex;
-            // Get the default white texture index instead of hardcoding 0
-            auto [defaultTextureAsset, defaultTextureHandle] = AssetManager::importDefaultAsset<Texture>(AssetType::Texture);
-            if (defaultTextureAsset) {
-                if (defaultTextureAsset->isReadyForSampling()) {
-                    defaultWhiteTextureIndex = defaultTextureAsset->getBindlessIndex();
-                } else {
-                    defaultWhiteTextureIndex = 0; // fallback
-                }
-            }
 
             if (isReadyForSampling || isNullTexture) {
-                uint32_t bindlessIndex = isNullTexture ? defaultWhiteTextureIndex : pending.texture->getBindlessIndex();
+                uint32_t bindlessIndex = isNullTexture ? UINT32_MAX : pending.texture->getBindlessIndex();
                 
                 m_parameterMap[pending.parameterId].setValue<uint32_t>(bindlessIndex);
                 updateUniformBuffer(pending.parameterId);
                 m_flagsDirty = true;
                 
+                Rapture::AssetEvents::onMaterialInstanceChanged().publish(this);
                 // Return true to remove it from the pending list.
                 return true; 
             }
