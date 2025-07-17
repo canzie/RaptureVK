@@ -42,6 +42,35 @@ An integrated editor built with Dear ImGui provides tools for interacting with t
 *   **Entity Inspector:** View and modify the components and properties of objects in the scene.
 *   **Content Browser:** Manage and import assets.
 
+## 📸 Showcase
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="./screenshots/cornell box v2.PNG" alt="Cornell Box with DDGI" width="400">
+      <br>
+      A simple showcase of the DDGI system in the Cornell Box. This is an early implementation, so features like probe relocation and classification are not yet available.
+    </td>
+    <td width="50%">
+      <img src="./screenshots/ddgi_sponza_v1.PNG" alt="Sponza with DDGI" width="400">
+      <br>
+      DDGI illuminating the Sponza scene.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="./screenshots/csm_debug_cascades.PNG" alt="CSM Debug View" width="400">
+      <br>
+      A debug view of the Cascaded Shadow Maps, where you can see the different cascades in the different colors.
+    </td>
+    <td width="50%">
+      <img src="./screenshots/emissive-cube.png" alt="Emissive Cube" width="400">
+      <br>
+      The engine has built-in support for emissive materials.
+    </td>
+  </tr>
+</table>
+
 ## 🚀 Future Development
 
 RaptureVK is under active development. Here are some of the major features and systems that are planned:
