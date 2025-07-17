@@ -11,7 +11,7 @@
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 // Ray data output texture (fixed binding in set 3)
-layout(set = 3, binding = 3, rgba32f) uniform restrict writeonly image2DArray RayData;
+layout(set = 4, binding = 0, rgba32f) uniform restrict writeonly image2DArray RayData;
 
 // Previous probe data (bindless textures in set 3)
 layout(set = 3, binding = 0) uniform sampler2D gTextures[];
@@ -373,6 +373,12 @@ void main() {
 
     if (hit) {
         if (isFrontFacing) {
+
+            if (rayIndex < int(u_volume.probeStaticRayCount)) {
+                DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), vec3(0.0), hitT);
+                return;
+            }
+
             // Get mesh info using the instance custom index
             MeshInfo meshInfo = u_sceneInfo.MeshInfos[instanceCustomIndex];
             

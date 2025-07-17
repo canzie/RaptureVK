@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <map>
 
 #include "Textures/Texture.h"
 #include "Shaders/Shader.h"
@@ -11,12 +12,18 @@
 
 namespace Rapture {
 
+enum class FlattenerDataType {
+    FLOAT,
+    INT,
+    UINT
+};
+
 /**
  * @brief Represents a flattened texture with its associated data
  */
 class FlattenTexture {
 public:
-    FlattenTexture(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> flattenedTexture, const std::string& name);
+    FlattenTexture(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> flattenedTexture, const std::string& name, FlattenerDataType dataType);
     ~FlattenTexture() = default;
 
     /**
@@ -45,6 +52,7 @@ private:
     std::shared_ptr<Texture> m_flattenedTexture;
     uint32_t m_inputTextureBindlessIndex = 0;
     std::shared_ptr<DescriptorSet> m_descriptorSet;
+    FlattenerDataType m_dataType;
     std::string m_name;
 };
 
@@ -58,9 +66,10 @@ public:
      * 
      * @param inputTexture The input texture array to flatten
      * @param name Name for the flattened texture (used for asset registration)
+     * @param dataType The data type of the texture's components
      * @return std::shared_ptr<FlattenTexture> The FlattenTexture instance
      */
-    static std::shared_ptr<FlattenTexture> createFlattenTexture(std::shared_ptr<Texture> inputTexture, const std::string& name);
+    static std::shared_ptr<FlattenTexture> createFlattenTexture(std::shared_ptr<Texture> inputTexture, const std::string& name, FlattenerDataType dataType = FlattenerDataType::FLOAT);
 
 private:
     struct FlattenPushConstants {
@@ -72,12 +81,13 @@ private:
     };
 
     static void initializeSharedResources();
+    static void getOrCreateShaderAndPipeline(FlattenerDataType dataType);
     static std::shared_ptr<Texture> createFlattenedTextureSpec(std::shared_ptr<Texture> inputTexture);
 
     // Shared resources
-    static std::shared_ptr<Shader> s_flattenShader;
+    static std::map<FlattenerDataType, std::shared_ptr<Shader>> s_flattenShaders;
     static std::shared_ptr<Shader> s_flattenDepthShader;
-    static std::shared_ptr<ComputePipeline> s_flattenPipeline;
+    static std::map<FlattenerDataType, std::shared_ptr<ComputePipeline>> s_flattenPipelines;
     static std::shared_ptr<ComputePipeline> s_flattenDepthPipeline;
     static bool s_initialized;
 

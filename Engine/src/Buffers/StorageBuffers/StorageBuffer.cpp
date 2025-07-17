@@ -63,7 +63,7 @@ VkBufferUsageFlags StorageBuffer::getBufferUsage()
         case BufferUsage::STATIC:
             return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         case BufferUsage::DYNAMIC:
-            return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         case BufferUsage::STREAM:
             return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         case BufferUsage::STAGING:

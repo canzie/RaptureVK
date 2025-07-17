@@ -62,25 +62,32 @@ void ImageViewerPanel::render() {
         if (m_textureDescriptorSet != VK_NULL_HANDLE) {
             // Get texture dimensions
             const auto& spec = m_texture->getSpecification();
-            float aspectRatio = static_cast<float>(spec.width) / static_cast<float>(spec.height);
             
-            // Calculate display size while maintaining aspect ratio
-            ImVec2 currentAvailableRegion = ImGui::GetContentRegionAvail();
-            float displayWidth = std::min(currentAvailableRegion.x - 20.0f, static_cast<float>(spec.width));
-            float displayHeight = displayWidth / aspectRatio;
-            
-            // Ensure the image fits within the available height as well
-            if (displayHeight > currentAvailableRegion.y - 60.0f) {
-                displayHeight = currentAvailableRegion.y - 60.0f;
-                displayWidth = displayHeight * aspectRatio;
-            }
-            
-            // Display texture info
+            // Display texture info and zoom controls
             ImGui::Text("Dimensions: %dx%d", spec.width, spec.height);
             ImGui::Text("Format: %d", static_cast<int>(spec.format));
             ImGui::Separator();
-            
-            // Center the image
+            ImGui::SliderFloat("Zoom", &m_zoomFactor, 0.1f, 10.0f, "%.2fx");
+            ImGui::Separator();
+
+            // Calculate display size based on zoom factor
+            float displayWidth = static_cast<float>(spec.width) * m_zoomFactor;
+            float displayHeight = static_cast<float>(spec.height) * m_zoomFactor;
+
+            // Clamp display size to available region while maintaining aspect ratio
+            ImVec2 currentAvailableRegion = ImGui::GetContentRegionAvail();
+            float aspectRatio = static_cast<float>(spec.width) / static_cast<float>(spec.height);
+
+            if (displayWidth > currentAvailableRegion.x) {
+                displayWidth = currentAvailableRegion.x;
+                displayHeight = displayWidth / aspectRatio;
+            }
+            if (displayHeight > currentAvailableRegion.y) {
+                displayHeight = currentAvailableRegion.y;
+                displayWidth = displayHeight * aspectRatio;
+            }
+
+            // Center the image horizontally
             float centerX = (currentAvailableRegion.x - displayWidth) * 0.5f;
             if (centerX > 0) {
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + centerX);
@@ -88,6 +95,15 @@ void ImageViewerPanel::render() {
             
             // Display the image
             ImGui::Image((ImTextureID)m_textureDescriptorSet, ImVec2(displayWidth, displayHeight));
+            
+            // Handle mouse wheel zoom
+            if (ImGui::IsItemHovered()) {
+                float mouseWheel = ImGui::GetIO().MouseWheel;
+                if (mouseWheel != 0) {
+                    m_zoomFactor += mouseWheel * 0.2f;
+                    m_zoomFactor = std::max(0.1f, std::min(m_zoomFactor, 10.0f));
+                }
+            }
         }
     } else if (m_texture && !m_texture->isReadyForSampling()) {
         ImGui::Text("Loading texture...");

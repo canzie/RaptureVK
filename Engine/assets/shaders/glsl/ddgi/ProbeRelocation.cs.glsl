@@ -16,13 +16,13 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 //  Resource bindings (match your engine's descriptor table)                    
 // -----------------------------------------------------------------------------
 // 0,0  –  Ray-data texture (RGBA32F) produced by ProbeTrace pass
-layout(set = 0, binding = 0) uniform sampler2DArray RayData;
+layout(set = 3, binding = 0) uniform sampler2DArray RayData[];
 
 // 0,1  –  Probe state image (optional, not used in this shader)
 //layout(set = 0, binding = 1, r32ui) uniform restrict uimage2DArray ProbeStates;
 
 // 0,2  –  Probe offset image (read-modify-write)
-layout(set = 0, binding = 2, rgba32f) uniform restrict image2DArray ProbeOffsets;
+layout(set = 4, binding = 6, rgba32f) uniform restrict image2DArray ProbeOffsets;
 
 // -----------------------------------------------------------------------------
 //  DDGI volume parameters                                                      
@@ -30,29 +30,15 @@ layout(set = 0, binding = 2, rgba32f) uniform restrict image2DArray ProbeOffsets
 #include "ProbeCommon.glsl"
 
 // Global DDGI info (same uniform block used everywhere else)
-layout(std140, set = 1, binding = 0) uniform ProbeInfo {
+layout(std140, set = 0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
 
-// Tweakables – you can fetch these from a UBO if you expose them in C++
-const float PROBE_OFFSET_LIMIT   = 0.35;   // Fraction of spacing a probe is allowed to move
-const float BACKFACE_FRACTION    = 0.25;   // 25 % backfaces → assume we are inside
-const float MIN_FRONTFACE_FACTOR = 0.2;    // (m) max step towards open space when not inside
-const float EPSILON              = 1e-3;   // Small bias to stay within bounds (world units)
+layout(push_constant) uniform PushConstants {
+    uint rayDataIndex;
+} pc;
 
-// Convenient alias
-#define RAYS_PER_PROBE  (u_volume.probeNumRays)
 
-// ----------------------------------------------------------------------------
-// Helper – safe component-wise division (returns large value when |d| < 1e-5)
-// ----------------------------------------------------------------------------
-vec3 safeDivide(vec3 a, vec3 b) {
-    vec3 r;
-    r.x = (abs(b.x) < 1e-5) ? 1e10 : a.x / b.x;
-    r.y = (abs(b.y) < 1e-5) ? 1e10 : a.y / b.y;
-    r.z = (abs(b.z) < 1e-5) ? 1e10 : a.z / b.z;
-    return r;
-}
 
 void main() {
     // ---------------------------------------------------------------------
@@ -60,84 +46,89 @@ void main() {
     // ---------------------------------------------------------------------
     uint probeIndex      = gl_GlobalInvocationID.x; // 1D dispatch ‑ one probe per thread
     uint totalProbes     = u_volume.gridDimensions.x * u_volume.gridDimensions.y * u_volume.gridDimensions.z;
-    if (probeIndex >= totalProbes) { return; }
+    if (probeIndex >= totalProbes) return;
 
-    ivec3 probeCoords    = DDGIGetProbeCoords(int(probeIndex), u_volume);
-    uvec3 probeTexelCoord= DDGIGetProbeTexelCoords(int(probeIndex), u_volume);
-    ivec3 texelCoord     = ivec3(probeTexelCoord);
+    uvec3 probeTexelCoord = DDGIGetProbeTexelCoords(int(probeIndex), u_volume);
+    ivec3 texelCoord      = ivec3(probeTexelCoord);
+    vec4 probeData        = imageLoad(ProbeOffsets, texelCoord);
+
+    vec3 offset =  DDGILoadProbeDataOffset(probeData.xyz, u_volume);
+
 
     // ---------------------------------------------------------------------
     // Gather per-probe ray statistics                                       
     // ---------------------------------------------------------------------
     int   backfaceCount               = 0;
     float closestBackfaceDistance     = 1e30;
-    vec3  closestBackfaceDirection    = vec3(0.0);
+    int   closestBackfaceIndex        = -1;
 
     float closestFrontfaceDistance    = 1e30;
-    vec3  closestFrontfaceDirection   = vec3(0.0);
+    int   closestFrontfaceIndex       = -1;
 
     float farthestFrontfaceDistance   = -1.0;
-    vec3  farthestFrontfaceDirection  = vec3(0.0);
+    int   farthestFrontfaceIndex      = -1;
 
-    for (int rayIdx = 0; rayIdx < RAYS_PER_PROBE; ++rayIdx) {
-        uvec3 rayCoords = DDGIGetRayDataTexelCoords(rayIdx, int(probeIndex), u_volume);
-        vec4  rayData   = texelFetch(RayData, ivec3(rayCoords), 0);
-        float hitT      = rayData.a;
-        vec3  rayDir    = DDGIGetProbeRayDirection(rayIdx, u_volume);
+    int numRays = min(u_volume.probeNumRays, int(u_volume.probeStaticRayCount));
+
+    for (int rayIdx = 0; rayIdx < numRays; rayIdx++) {
+        ivec3 rayDataTexCoords = ivec3(DDGIGetRayDataTexelCoords(rayIdx, int(probeIndex), u_volume));
+        vec4  rayData  = texelFetch(RayData[pc.rayDataIndex], rayDataTexCoords, 0);
+
+        float hitT = rayData.a;
 
         if (hitT < 0.0) {
-            // Back-face hit (stored as negative distance * 0.2 in the trace pass)
             backfaceCount++;
-            float dist = abs(hitT);
-            if (dist < closestBackfaceDistance) { closestBackfaceDistance = dist; closestBackfaceDirection = rayDir; }
-        } else if (hitT > 0.0 && hitT < u_volume.probeMaxRayDistance) {
-            if (hitT < closestFrontfaceDistance) { closestFrontfaceDistance = hitT; closestFrontfaceDirection = rayDir; }
-            if (hitT > farthestFrontfaceDistance) { farthestFrontfaceDistance = hitT; farthestFrontfaceDirection = rayDir; }
+
+            hitT = hitT * -0.5;
+            if (hitT > closestBackfaceDistance) {
+                closestBackfaceDistance = hitT;
+                closestBackfaceIndex = rayIdx;
+            }
+        } else {
+            if (hitT < closestFrontfaceDistance) {
+                closestFrontfaceDistance = hitT;
+                closestFrontfaceIndex = rayIdx;
+            } else if (hitT > farthestFrontfaceDistance) {
+                farthestFrontfaceDistance = hitT;
+                farthestFrontfaceIndex = rayIdx;
+            }
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Load current offset from atlas                                         
-    // ---------------------------------------------------------------------
-    vec4  offsetTexel   = imageLoad(ProbeOffsets, texelCoord);
-    vec3  currentOffset = offsetTexel.xyz;
+    vec3 fullOffset = vec3(1e27);
 
-    // ---------------------------------------------------------------------
-    // Compute the per-axis movement limit                                   
-    // ---------------------------------------------------------------------
-    vec3 offsetLimit = PROBE_OFFSET_LIMIT * u_volume.spacing;
+    if (closestBackfaceIndex != -1 && (float(backfaceCount) / float(numRays)) > u_volume.probeFixedRayBackfaceThreshold) {
+        vec3 closestBackfaceDirection = DDGIGetProbeRayDirection(closestBackfaceIndex, u_volume);
+        fullOffset = offset + (closestBackfaceDirection * (closestBackfaceDistance + u_volume.probeMinFrontfaceDistance * 0.5));
+    } else if (closestFrontfaceDistance < u_volume.probeMinFrontfaceDistance) {
+        // Don't move the probe if moving towards the farthest frontface will also bring us closer to the nearest frontface
+        vec3 closestFrontfaceDirection = DDGIGetProbeRayDirection(closestFrontfaceIndex, u_volume);
+        vec3 farthestFrontfaceDirection = DDGIGetProbeRayDirection(farthestFrontfaceIndex, u_volume);
 
-    // Final offset we will write
-    vec3 fullOffset = currentOffset; // default – don't move
-
-    // ---------------------------------------------------------------------
-    //  PRIMARY BRANCH – probe is probably inside geometry                   
-    // ---------------------------------------------------------------------
-    if (float(backfaceCount) / float(RAYS_PER_PROBE) > BACKFACE_FRACTION && (closestBackfaceDistance < 1e20)) {
-        // Solve for the max scaling possible on each axis so we remain inside the cell bounds
-        vec3 positiveOffset   = safeDivide((-currentOffset + offsetLimit),  closestBackfaceDirection);
-        vec3 negativeOffset   = safeDivide((-currentOffset - offsetLimit),  closestBackfaceDirection);
-        vec3 combinedOffset   = vec3(max(positiveOffset.x, negativeOffset.x),
-                                     max(positiveOffset.y, negativeOffset.y),
-                                     max(positiveOffset.z, negativeOffset.z));
-
-        float scaleFactor = min(min(combinedOffset.x, combinedOffset.y), combinedOffset.z) - EPSILON;
-
-        // If scaleFactor <= 1.0 we can't move meaningfully – stay put.
-        if (scaleFactor > 1.0) {
-            fullOffset = currentOffset + closestBackfaceDirection * scaleFactor;
+        if (dot(closestFrontfaceDirection, farthestFrontfaceDirection) <= 0.0)
+        {
+            // Ensures the probe never moves through the farthest frontface
+            farthestFrontfaceDirection *= min(farthestFrontfaceDistance, 1.0);
+            fullOffset = offset + farthestFrontfaceDirection;
         }
+    } else if (closestFrontfaceDistance > u_volume.probeMinFrontfaceDistance) {
+        // Probe isn't near anything, try to move it back towards zero offset
+        float moveBackMargin = min(closestFrontfaceDistance - u_volume.probeMinFrontfaceDistance, length(offset));
+        vec3 moveBackDirection = normalize(-offset);
+        fullOffset = offset + (moveBackMargin * moveBackDirection);
     }
-    // ---------------------------------------------------------------------
-    //  SECONDARY BRANCH – move slightly towards open space                  
-    // ---------------------------------------------------------------------
-    else if (farthestFrontfaceDistance > 0.0) {
-        float moveDist = min(MIN_FRONTFACE_FACTOR, farthestFrontfaceDistance);
-        fullOffset     = currentOffset + normalize(farthestFrontfaceDirection) * moveDist;
+
+    // Absolute maximum distance that probe could be moved should satisfy ellipsoid equation:
+    // x^2 / probeGridSpacing.x^2 + y^2 / probeGridSpacing.y^2 + z^2 / probeGridSpacing.y^2 < (0.5)^2
+    // Clamp to less than maximum distance to avoid degenerate cases
+    vec3 normalizedOffset = fullOffset / u_volume.spacing;
+    if (dot(normalizedOffset, normalizedOffset) < 0.2025) // 0.45 * 0.45 == 0.2025
+    {
+        offset = fullOffset;
     }
 
     // ---------------------------------------------------------------------
     // Store back                                                             
     // ---------------------------------------------------------------------
-    imageStore(ProbeOffsets, texelCoord, vec4(fullOffset, 1.0));
+    imageStore(ProbeOffsets, texelCoord, vec4(offset, 1.0));
 } 

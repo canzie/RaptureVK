@@ -161,21 +161,38 @@ ivec3 DDGIGetProbeCoords(int probeIndex, ProbeVolume volume)
 }
 
 /**
+ * Reads the probe's position offset (from a RWTexture2DArray) and converts it to a world-space offset.
+ */
+vec3 DDGILoadProbeDataOffset(vec3 probeOffset, ProbeVolume volume)
+{
+    return probeOffset * volume.spacing;
+}
+
+/**
  * Computes a spherically distributed, normalized ray direction for the given ray index in a set of ray samples.
  * Applies the volume's random probe ray rotation transformation to "non-fixed" ray direction samples.
  */
 vec3 DDGIGetProbeRayDirection(int rayIndex, ProbeVolume volume)
 {
+    bool isFixedRay = false;
     int sampleIndex = rayIndex;
     int numRays = volume.probeNumRays;
+
+    if (true) {
+        isFixedRay = (rayIndex < int(volume.probeStaticRayCount));
+        sampleIndex = isFixedRay ? rayIndex : rayIndex - int(volume.probeStaticRayCount);
+        numRays = isFixedRay ? int(volume.probeStaticRayCount) : numRays - int(volume.probeStaticRayCount);
+    }
     
     // Get a deterministic direction on the sphere using the spherical Fibonacci sequence
     vec3 direction = SphericalFibonacci(uint(sampleIndex), uint(numRays));
 
-    // Rotate the ray direction by the per-frame random quaternion stored in the volume
-    direction = RTXGIQuaternionRotate(direction, RTXGIQuaternionConjugate(volume.probeRayRotation));
+    if (isFixedRay) {
+        return normalize(direction);
+    }
 
-    return normalize(direction);
+    // Rotate the ray direction by the per-frame random quaternion stored in the volume
+    return normalize(RTXGIQuaternionRotate(direction, RTXGIQuaternionConjugate(volume.probeRayRotation)));
 }
 
 int DDGIGetProbesPerPlane(ivec3 gridDimensions)

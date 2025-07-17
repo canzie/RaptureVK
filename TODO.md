@@ -9,12 +9,9 @@
 
 ### DDGI - shit is hard
 
-- use random rays
-- check what to do with backface hits/ general results from the ray trace
-
-- add probe relocation to the ddgi system
+- stabilize the ray rotation
+- add probe relocation and classification to the ddgi system
 - add support for different probe volumes
-- fix the weird artifacts, probably related to normals or something
 - test system in one of the test scenes
 - generate HDR cubemap for the skybox
 

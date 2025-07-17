@@ -192,7 +192,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     auto sphere = std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateSphere(1, 8));
     auto ddgiVizEntity = std::make_shared<Rapture::Entity>(scene->createEntity("DDGI Probe Volume"));
     ddgiVizEntity->addComponent<Rapture::TransformComponent>();
-    //ddgiVizEntity->addComponent<Rapture::InstanceShapeComponent>(instanceData, app.getVulkanContext().getVmaAllocator());
+    ddgiVizEntity->addComponent<Rapture::InstanceShapeComponent>(instanceData, app.getVulkanContext().getVmaAllocator());
     ddgiVizEntity->addComponent<Rapture::MeshComponent>(sphere);
         
 

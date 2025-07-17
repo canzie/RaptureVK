@@ -51,16 +51,27 @@ enum class DescriptorSetBindingLocation {
     BINDLESS_SSBOS = 301,
     BINDLESS_ACCELERATION_STRUCTURES = 302,
     // Specific storage image bindings in set 3
-    DDGI_RAY_DATA_STORAGE = 303,        // Will be at binding 2 in set 3
-    DDGI_IRRADIANCE_STORAGE = 304,      // Will be at binding 3 in set 3
-    DDGI_PREV_IRRADIANCE_STORAGE = 305, // Will be at binding 4 in set 3
-    DDGI_VISIBILITY_STORAGE = 306,      // Will be at binding 5 in set 3
-    DDGI_PREV_VISIBILITY_STORAGE = 307, // Will be at binding 6 in set 3
     DDGI_SCENE_INFO_SSBOS = 309,        // Will be at binding 9 in set 3
 
-    // CUSTOM BINDINGS, intended for debugging and uses sets after set4(set=3)
+    // CUSTOM BINDINGS, unique per system where no recourses are shared
+    // is super usefull for storageimages
     CUSTOM_FLATTEN_OUTPUT = 400,
     CUSTOM_FLATTEN_DEPTH_OUTPUT = 400,
+    CUSTOM_0 = 400,
+    CUSTOM_1 = 401,
+    CUSTOM_2 = 402,
+    CUSTOM_3 = 403,
+    CUSTOM_4 = 404,
+    CUSTOM_5 = 405,
+    CUSTOM_6 = 406,
+    CUSTOM_7 = 407,
+    CUSTOM_8 = 408,
+    CUSTOM_9 = 409,
+    CUSTOM_10 = 410,
+    CUSTOM_11 = 411,
+    CUSTOM_12 = 412,
+    CUSTOM_13 = 413,
+    CUSTOM_14 = 414,
 };
 
 inline uint32_t getBindingSetNumber(DescriptorSetBindingLocation location) {

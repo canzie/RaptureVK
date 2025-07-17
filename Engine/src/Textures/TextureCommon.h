@@ -36,6 +36,8 @@ enum class TextureFormat : uint16_t {
     RGB32F,      // VK_FORMAT_R32G32B32_SFLOAT
     R11G11B10F,  // VK_FORMAT_B10G11R11_UFLOAT_PACK32 (Note: BGR order in Vulkan common format)
     RG16F,       // VK_FORMAT_R16G16_SFLOAT
+    R8UI,        // VK_FORMAT_R8_UINT
+    R8U,         // VK_FORMAT_R8_SINT
     // Depth/Stencil Formats (consider adding these if needed)
     D32F,        // VK_FORMAT_D32_SFLOAT
     D24S8        // VK_FORMAT_D24_UNORM_S8_UINT
@@ -108,6 +110,9 @@ inline VkFormat toVkFormat(TextureFormat format, bool srgb = true) {
         case TextureFormat::RGB32F:      return VK_FORMAT_R32G32B32_SFLOAT; // Requires VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT for this format
         case TextureFormat::R11G11B10F:  return VK_FORMAT_B10G11R11_UFLOAT_PACK32; // Note BGR order and ufloat
         case TextureFormat::RG16F:       return VK_FORMAT_R16G16_SFLOAT;
+        case TextureFormat::R8UI:        return VK_FORMAT_R8_UINT;
+        case TextureFormat::R8U:         return VK_FORMAT_R8_SINT;
+
         case TextureFormat::D32F:        return VK_FORMAT_D32_SFLOAT;
         case TextureFormat::D24S8:       return VK_FORMAT_D24_UNORM_S8_UINT;
         default: 
@@ -211,6 +216,8 @@ inline uint32_t getBytesPerPixel(TextureFormat format) {
         case TextureFormat::RGB32F:      return 12; // 3 channels × 4 bytes
         case TextureFormat::R11G11B10F:  return 4;  // Packed format
         case TextureFormat::RG16F:       return 4;  // 2 channels × 2 bytes
+        case TextureFormat::R8UI:        return 1;  // 1 channel × 1 byte
+        case TextureFormat::R8U:         return 1;  // 1 channel × 1 byte
         case TextureFormat::D32F:        return 4;  // 1 channel × 4 bytes
         case TextureFormat::D24S8:       return 4;  // Packed format
         default: 

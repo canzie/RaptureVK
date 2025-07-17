@@ -22,4 +22,6 @@ class ImageViewerPanel {
         std::shared_ptr<Rapture::Texture> m_texture;
         VkDescriptorSet m_textureDescriptorSet = VK_NULL_HANDLE;
         Rapture::AssetHandle m_currentTextureHandle;
+
+        float m_zoomFactor = 1.0f;
 };

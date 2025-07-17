@@ -132,7 +132,7 @@ Texture::Texture(const std::vector<std::string>& paths, TextureSpecification spe
     }
 }
 
-Texture::Texture(const TextureSpecification& spec) 
+Texture::Texture(TextureSpecification spec) 
     : m_spec(spec), 
     m_image(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE), m_sampler(nullptr) {
     

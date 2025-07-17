@@ -15,19 +15,23 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 //  Resource bindings                                                            
 // -----------------------------------------------------------------------------
 // 0,0  – Ray data written by the ProbeTrace pass                                
-layout(set = 0, binding = 0) uniform sampler2DArray RayData;
+layout(set = 3, binding = 0) uniform sampler2DArray RayData[];
 
 // 0,1  – Probe state image (R32_UINT)  (read-modify-write)
-layout(set = 0, binding = 1, r32ui) uniform restrict uimage2DArray ProbeStates;
+layout(set = 4, binding = 5, r8ui) uniform restrict uimage2DArray ProbeStates;
 
 // -----------------------------------------------------------------------------
 //  Shared DDGI helpers / structs                                                
 // -----------------------------------------------------------------------------
 #include "ProbeCommon.glsl"
 
-layout(std140, set = 1, binding = 0) uniform ProbeInfo {
+layout(std140, set = 0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
+
+layout(push_constant) uniform PushConstants {
+    uint rayDataIndex;
+} pc;
 
 // -----------------------------------------------------------------------------
 //  Enumerated probe states (uint encodings)                                     
@@ -56,7 +60,7 @@ void accumulateRayStatistics(
 
     for (int r = 0; r < RAYS_PER_PROBE; ++r) {
         uvec3 rayCoord = DDGIGetRayDataTexelCoords(r, int(probeIndex), u_volume);
-        float hitT     = texelFetch(RayData, ivec3(rayCoord), 0).a;
+        float hitT     = texelFetch(RayData[pc.rayDataIndex], ivec3(rayCoord), 0).a;
 
         if (hitT < 0.0) {
             backfaceCount++;
@@ -80,6 +84,8 @@ void main() {
 
     uvec3 texelCoordU  = DDGIGetProbeTexelCoords(int(probeIndex), u_volume);
     ivec3 texelCoord   = ivec3(texelCoordU);
+
+
 
     // ---------------------------------------------------------------------
     // Load previous state                                                   

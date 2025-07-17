@@ -2,11 +2,25 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
+#if defined(DATA_TYPE_UINT)
+    #define SAMPLER_TYPE usampler2DArray
+    #define VEC_TYPE uvec4
+    #define VEC_CONV(v) vec4(v)
+#elif defined(DATA_TYPE_INT)
+    #define SAMPLER_TYPE isampler2DArray
+    #define VEC_TYPE ivec4
+    #define VEC_CONV(v) vec4(v)
+#else // Default to FLOAT
+    #define SAMPLER_TYPE sampler2DArray
+    #define VEC_TYPE vec4
+    #define VEC_CONV(v) v
+#endif
+
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 // Bindless texture arrays (set 3)
-layout(set = 3, binding = 0) uniform sampler2DArray gTextures[];
+layout(set = 3, binding = 0) uniform SAMPLER_TYPE gTextures[];
 
 // custom set 
 layout(set = 4, binding = 0, rgba32f) uniform restrict image2D outputTex;
@@ -44,10 +58,9 @@ void main() {
     // Convert local integer coordinates to normalized UVs for sampling
     vec2 uv = (vec2(localCoord) + 0.5) / vec2(layerWidth, layerHeight);
     
-    // Note: We're treating the input as a 2D texture array but accessing via bindless
-    // The input texture index should point to the flattened representation
-    vec3 sampledColor = texture(gTextures[inputTextureIndex], vec3(uv, layerIndex)).xyz;
+    VEC_TYPE sampledValue = texture(gTextures[inputTextureIndex], vec3(uv, layerIndex));
+    vec4 finalColor = VEC_CONV(sampledValue);
     
     // Write to the output texture
-    imageStore(outputTex, pixelCoord, vec4(sampledColor, 1.0));
+    imageStore(outputTex, pixelCoord, finalColor);
 }

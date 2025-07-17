@@ -121,27 +121,6 @@ void DescriptorManager::initializeSet3() {
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::BINDLESS_SSBOS});
 
-    // DDGI ray data storage
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
-                                true, DescriptorSetBindingLocation::DDGI_RAY_DATA_STORAGE});
-    
-    // DDGI irradiance storage (current frame)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
-                                true, DescriptorSetBindingLocation::DDGI_IRRADIANCE_STORAGE});
-    
-    // DDGI irradiance storage (previous frame)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
-                                true, DescriptorSetBindingLocation::DDGI_PREV_IRRADIANCE_STORAGE});
-    
-    // DDGI visibility storage (current frame)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
-                                true, DescriptorSetBindingLocation::DDGI_VISIBILITY_STORAGE});
-    
-    // DDGI visibility storage (previous frame)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, 
-                                true, DescriptorSetBindingLocation::DDGI_PREV_VISIBILITY_STORAGE});
-    
-
     // DDGI scene info SSBO
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS});

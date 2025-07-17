@@ -543,10 +543,19 @@ void main() {
     vec3 indirectDiffuse = vec3(0.03) * albedo ;
 
     if (pc.useDDGI > 0u) {
-        vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
+        // Calculate F0 (surface reflection at zero incidence)
+        vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+        // Specular BRDF terms
+        float NdotV = max(dot(N, V), 0.0001);
+
+        //vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
+        vec3 kD_indirect = (vec3(1.0) - fresnelSchlick(NdotV, F0)) * (1.0 - metallic);
         
         vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, V, u_DDGI_Volume);
         indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
+
+        
     }
 
     vec3 color = indirectDiffuse + Lo;

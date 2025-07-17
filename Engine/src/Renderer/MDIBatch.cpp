@@ -63,17 +63,13 @@ namespace Rapture
         if (!m_buffersCreated || requiredSize > m_allocatedSize) {
             auto& app = Application::getInstance();
             VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
-            
-            // Calculate new size with growth strategy (start with INITIAL_BATCH_SIZE, then double each time)
-            uint32_t newSize = m_buffersCreated ? m_allocatedSize * 2 : std::max(requiredSize, INITIAL_BATCH_SIZE);
-            while (newSize < requiredSize) {
-                newSize *= 2;
-                // Safety check to prevent excessive memory allocation
-                if (newSize > 1024 * 1024) { // Cap at 1M objects
-                    RP_CORE_WARN("MDIBatch: Very large buffer allocation requested ({} objects). This may indicate a performance issue.", newSize);
-                    break;
-                }
-            }
+                        
+            double log2Size = std::log2(requiredSize);
+
+            // Calculate new size with growth heuristic (closest power of 2 above the required size)
+            // this is to reduce any further buffer reallocations
+            uint32_t newSize = m_buffersCreated ? std::pow(2, ceil(log2Size)) : std::max(requiredSize, INITIAL_BATCH_SIZE);
+
             
             // If resizing, we need to free the old descriptor binding first
             if (m_buffersCreated && m_batchInfoBufferIndex != UINT32_MAX) {
@@ -111,7 +107,6 @@ namespace Rapture
             
             m_allocatedSize = newSize;
             m_buffersCreated = true;
-
         }
 
         m_indirectBuffer->addData(m_cpuIndirectCommands.data(), m_cpuIndirectCommands.size() * sizeof(VkDrawIndexedIndirectCommand), 0);
@@ -119,6 +114,7 @@ namespace Rapture
 
     }
 
+    
     void MDIBatch::clear() {
         m_cpuIndirectCommands.clear();
         m_cpuObjectInfo.clear();
@@ -148,7 +144,6 @@ namespace Rapture
         return m_batchInfoBufferIndex;
     }
 
-    MDIBatchMap::MDIBatchMap() {}
 
     void MDIBatchMap::beginFrame() {
         for (auto& [key, batch] : m_batches) {

@@ -12,6 +12,8 @@ namespace Rapture {
 
 class Mesh;
 
+// Holds the data that will be indexed using the draw index in the shaders
+// currently bindless indices
 struct ObjectInfo {
     uint32_t meshIndex;
     uint32_t materialIndex;
@@ -24,8 +26,11 @@ public:
 
     void addObject(const Mesh& mesh, uint32_t meshIndex, uint32_t materialIndex);
 
+    // commit the data to the gpu buffers
+    // should be called at the end, when all of the objects have been added
     void uploadBuffers();
 
+    // clear the cpu data
     void clear();
 
     std::shared_ptr<StorageBuffer> getIndirectBuffer();
@@ -52,9 +57,12 @@ private:
     uint32_t m_iboArenaId;
 
     uint32_t m_allocatedSize = 0;
-    uint32_t m_batchInfoBufferIndex = UINT32_MAX;
+    uint32_t m_batchInfoBufferIndex = UINT32_MAX; // init at max to avoid confusion with the first element
     bool m_buffersCreated = false;
 
+    // needs to be used for the final draw commands
+    // easier to store a copy here than to always take the ones from the first element
+    // this is just cleaner
     BufferLayout& m_bufferLayout;
     VkBuffer m_vertexBuffer;
     VkBuffer m_indexBuffer;
@@ -63,17 +71,23 @@ private:
 
 };
 
+// when a render pass uses multiple batches we need a way to neatly organise this
 class MDIBatchMap {
 public:
-    MDIBatchMap();
+    MDIBatchMap() = default;
 
+    // called at the start of the frame
+    // this is used to clear the batch map
     void beginFrame();
     
+    // obtain = create or get
     MDIBatch* obtainBatch(std::shared_ptr<BufferAllocation> vboArena, std::shared_ptr<BufferAllocation> iboArena, BufferLayout& bufferLayout, VkIndexType indexType);
 
     const std::unordered_map<uint64_t, std::unique_ptr<MDIBatch>>& getBatches() const { return m_batches; }
 
 private:
+    // we take the buffer ids from both buffers, then add these numbers to generate a unique key
+    // e.g. 123 + 456 = 123456
     std::unordered_map<uint64_t, std::unique_ptr<MDIBatch>> m_batches;
 };
 

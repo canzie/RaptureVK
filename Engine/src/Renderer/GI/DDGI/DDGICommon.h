@@ -63,7 +63,7 @@ struct ProbeVolume {
 
     // Probe Relocation, Probe Classification
     alignas(4) float    probeMinFrontfaceDistance;          // minimum world-space distance to a front facing triangle allowed before a probe is relocated
-
+    
     alignas(4) float    probeRandomRayBackfaceThreshold;
     alignas(4) float    probeFixedRayBackfaceThreshold;
     

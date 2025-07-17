@@ -22,11 +22,11 @@ layout (set=3, binding = 0) uniform sampler2DArray RayData[];
 
 // Storage image bindings for writing current probe data
 #ifdef DDGI_BLEND_RADIANCE
-    layout (set=3, binding = 4, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;        // Primary irradiance storage
-    layout (set=3, binding = 5, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlasAlt;     // Alternate irradiance storage
+    layout (set=4, binding = 1, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;        // Primary irradiance storage
+    layout (set=4, binding = 2, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlasAlt;     // Alternate irradiance storage
 #else
-    layout (set=3, binding = 6, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;        // Primary distance storage
-    layout (set=3, binding = 7, rg16f) uniform restrict image2DArray ProbeDistanceAtlasAlt;     // Alternate distance storage
+    layout (set=4, binding = 3, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;        // Primary distance storage
+    layout (set=4, binding = 4, rg16f) uniform restrict image2DArray ProbeDistanceAtlasAlt;     // Alternate distance storage
 #endif
 
 // Skybox Cubemap
@@ -137,7 +137,7 @@ void main() {
 
 
 
-        int rayIndex = 0;
+        int rayIndex = int(u_volume.probeStaticRayCount);
         
     #ifdef DDGI_BLEND_RADIANCE
         uint backfaces = 0;

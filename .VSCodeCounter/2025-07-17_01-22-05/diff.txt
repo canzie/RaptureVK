@@ -1,0 +1,93 @@
+Date : 2025-07-17 01:22:05
+Directory : e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl
+Total : 53 files,  -5734 codes, -58 comments, -614 blanks, all -6406 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| GLSL     |         27 |      2,111 |        615 |        800 |      3,526 |
+| C++      |         26 |     -7,845 |       -673 |     -1,414 |     -9,932 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++--------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                 | files      | code       | comment    | blank      | total      |
++--------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                    |         53 |     -5,734 |        -58 |       -614 |     -6,406 |
+| . (Files)                                                                            |         17 |        974 |        221 |        356 |      1,551 |
+| ..                                                                                   |         26 |     -7,845 |       -673 |     -1,414 |     -9,932 |
+| ..\..                                                                                |         26 |     -7,845 |       -673 |     -1,414 |     -9,932 |
+| ..\..\..                                                                             |         26 |     -7,845 |       -673 |     -1,414 |     -9,932 |
+| ..\..\..\..                                                                          |         26 |     -7,845 |       -673 |     -1,414 |     -9,932 |
+| ..\..\..\..\Editor                                                                   |         26 |     -7,845 |       -673 |     -1,414 |     -9,932 |
+| ..\..\..\..\Editor\src                                                               |         26 |     -7,845 |       -673 |     -1,414 |     -9,932 |
+| ..\..\..\..\Editor\src (Files)                                                       |          3 |        -61 |        -17 |        -23 |       -101 |
+| ..\..\..\..\Editor\src\Layers                                                        |          4 |       -701 |        -66 |       -252 |     -1,019 |
+| ..\..\..\..\Editor\src\imguiPanels                                                   |         17 |     -4,389 |       -308 |       -665 |     -5,362 |
+| ..\..\..\..\Editor\src\vendor                                                        |          2 |     -2,694 |       -282 |       -474 |     -3,450 |
+| ..\..\..\..\Editor\src\vendor\ImGuizmo                                               |          2 |     -2,694 |       -282 |       -474 |     -3,450 |
+| Generators                                                                           |          1 |         77 |          6 |         19 |        102 |
+| Shadows                                                                              |          2 |         37 |         13 |         21 |         71 |
+| ddgi                                                                                 |          7 |      1,023 |        375 |        404 |      1,802 |
++--------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++--------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                             | language | code       | comment    | blank      | total      |
++--------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| e:\Dev\Games\RaptureVK\Editor\src\EntryPoint.h                                       | C++      |         -5 |         -2 |         -2 |         -9 |
+| e:\Dev\Games\RaptureVK\Editor\src\Layers\TestLayer.cpp                               | C++      |       -166 |        -27 |        -88 |       -281 |
+| e:\Dev\Games\RaptureVK\Editor\src\Layers\TestLayer.h                                 | C++      |        -34 |         -5 |        -19 |        -58 |
+| e:\Dev\Games\RaptureVK\Editor\src\Layers\imguiLayer.cpp                              | C++      |       -441 |        -31 |       -126 |       -598 |
+| e:\Dev\Games\RaptureVK\Editor\src\Layers\imguiLayer.h                                | C++      |        -60 |         -3 |        -19 |        -82 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\BrowserPanel.cpp                       | C++      |       -211 |        -37 |        -75 |       -323 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\BrowserPanel.h                         | C++      |        -36 |        -10 |        -23 |        -69 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ContentBrowserPanel.cpp                | C++      |       -247 |        -23 |        -94 |       -364 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ContentBrowserPanel.h                  | C++      |        -39 |         -7 |        -15 |        -61 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\GBufferPanel.cpp                       | C++      |       -171 |        -21 |        -31 |       -223 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\GBufferPanel.h                         | C++      |        -19 |          0 |         -6 |        -25 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\IconsMaterialDesign.h                  | C++      |     -2,239 |         -4 |         -4 |     -2,247 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ImageViewerPanel.cpp                   | C++      |       -107 |        -17 |        -25 |       -149 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ImageViewerPanel.h                     | C++      |        -20 |          0 |         -7 |        -27 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ProprtiesPanel.cpp                     | C++      |       -470 |        -47 |       -143 |       -660 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ProprtiesPanel.h                       | C++      |        -26 |         -1 |        -11 |        -38 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\SettingsPanel.cpp                      | C++      |        -58 |          0 |        -31 |        -89 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\SettingsPanel.h                        | C++      |        -11 |          0 |         -7 |        -18 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ViewportPanel.cpp                      | C++      |       -246 |        -38 |        -77 |       -361 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ViewportPanel.h                        | C++      |        -28 |         -4 |        -17 |        -49 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\imguiPanelStyle.h                      | C++      |       -201 |        -45 |        -43 |       -289 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\imguiPanelStyleLinear.h                | C++      |       -260 |        -54 |        -56 |       -370 |
+| e:\Dev\Games\RaptureVK\Editor\src\main.cpp                                           | C++      |        -15 |         -4 |         -8 |        -27 |
+| e:\Dev\Games\RaptureVK\Editor\src\source.cpp                                         | C++      |        -41 |        -11 |        -13 |        -65 |
+| e:\Dev\Games\RaptureVK\Editor\src\vendor\ImGuizmo\ImGuizmo.cpp                       | C++      |     -2,521 |       -181 |       -442 |     -3,144 |
+| e:\Dev\Games\RaptureVK\Editor\src\vendor\ImGuizmo\ImGuizmo.h                         | C++      |       -173 |       -101 |        -32 |       -306 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\BindingsCommon.glsl                | GLSL     |          9 |          4 |          9 |         22 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\DeferredLighting.fs.glsl           | GLSL     |        363 |         91 |        133 |        587 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\DeferredLighting.vs.glsl           | GLSL     |         30 |          5 |         10 |         45 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\Flatten2dArray.cs.glsl             | GLSL     |         41 |          9 |         17 |         67 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\FlattenDepthArray.cs.glsl          | GLSL     |         31 |         14 |         17 |         62 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\GBuffer.fs.glsl                    | GLSL     |         89 |         21 |         27 |        137 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\GBuffer.vs.glsl                    | GLSL     |         68 |         21 |         25 |        114 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\Generators\PerlinNoise.cs.glsl     | GLSL     |         77 |          6 |         19 |        102 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\InstancedShapes.fs.glsl            | GLSL     |         12 |          0 |          3 |         15 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\InstancedShapes.vs.glsl            | GLSL     |         49 |          2 |         14 |         65 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\PBR.fs.glsl                        | GLSL     |        146 |         23 |         46 |        215 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\PBR.vs.glsl                        | GLSL     |         29 |          7 |         11 |         47 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\Shadows\CascadedShadowPass.vs.glsl | GLSL     |         28 |         11 |         13 |         52 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\Shadows\ShadowPass.vs.glsl         | GLSL     |          9 |          2 |          8 |         19 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\Skybox.fs.glsl                     | GLSL     |         13 |          6 |          7 |         26 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\Skybox.vs.glsl                     | GLSL     |         18 |          9 |          9 |         36 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\StencilBorder.fs.glsl              | GLSL     |         22 |          4 |          9 |         35 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\StencilBorder.vs.glsl              | GLSL     |         27 |          4 |         10 |         41 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\ddgi\IrradianceCommon.glsl         | GLSL     |        131 |         62 |         68 |        261 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\ddgi\MeshCommon.glsl               | GLSL     |          0 |          0 |          1 |          1 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\ddgi\ProbeBlending.cs.glsl         | GLSL     |        203 |         50 |         87 |        340 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\ddgi\ProbeClassification.cs.glsl   | GLSL     |         92 |         39 |         29 |        160 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\ddgi\ProbeCommon.glsl              | GLSL     |        242 |        128 |         98 |        468 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\ddgi\ProbeRelocation.cs.glsl       | GLSL     |         74 |         32 |         28 |        134 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\ddgi\ProbeTrace.cs.glsl            | GLSL     |        281 |         64 |         93 |        438 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\default.fs.glsl                    | GLSL     |         10 |          0 |          4 |         14 |
+| e:\Dev\Games\RaptureVK\Engine\assets\shaders\glsl\default.vs.glsl                    | GLSL     |         17 |          1 |          5 |         23 |
+| Total                                                                                |          |     -5,734 |        -58 |       -614 |     -6,406 |
++--------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+

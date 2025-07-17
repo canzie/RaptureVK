@@ -1,9 +1,8 @@
-// allocate pools for ibo/vbo to use, we will place them in the same buffer for localityAdd commentMore actions
-// when drawing a list of meshes we will now just need a prepass to sort them based on the buffers used.
-// we will copy the design of the opengl version i made exepct reuse the same buffer for index and vertex data
-// 
-
-
+/*
+* allocate pools for ibo/vbo to use, we will place them in the same buffer for locality and mdi.
+* when drawing a list of meshes we will now just need a prepass to sort them based on the buffers used.
+*/
+ 
 
 
 #pragma once
@@ -23,17 +22,11 @@
 #include <algorithm>
 
 
-// overview of the design and flow
-
 
 namespace Rapture {
 
-// Forward declarations
-class Buffer;
-class VertexBuffer;
-class IndexBuffer;
 
-// Constants for buffer pool configuration
+// buffer pool configuration
 constexpr VkDeviceSize MEGA_BYTE = 1024 * 1024;
 constexpr VkDeviceSize DEFAULT_ARENA_SIZE = 64 * MEGA_BYTE; // 64 MB default arena size
 constexpr VkDeviceSize MAX_ARENA_SIZE = 256 * MEGA_BYTE;    // 256 MB maximum arena size
@@ -44,27 +37,25 @@ enum class BufferType {
     INDEX
 };
 
-// Extended buffer usage flags
+
 struct BufferFlags {
     bool useShaderDeviceAddress = true;  // VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
     bool useStorageBuffer = true;        // VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
     bool useAccelerationStructure = true; // VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
 };
 
-// Parameters for requesting a buffer allocation
 struct BufferAllocationRequest {
     VkDeviceSize size = 0;
     BufferType type = BufferType::VERTEX;
     BufferUsage usage = BufferUsage::STATIC;
     BufferFlags flags = BufferFlags();
-    VkDeviceSize alignment = 1; // Default alignment
+    VkDeviceSize alignment = 1; // Default alignment (usually bufferlayout size)
     BufferLayout layout; // Required for vertex buffers
-    uint32_t indexSize = 2;
+    uint32_t indexSize = 2; // 2 bytes for 16 bit indices, 4 bytes for 32 bit indices
 
 };
 
-// Represents a single large buffer arena from which sub-allocations are made.
-// This is managed by the BufferPoolManager.
+
 struct BufferArena;
 
 // Represents a sub-allocation within a BufferArena.
@@ -80,20 +71,19 @@ struct BufferAllocation {
 
     bool isValid() const { return parentArena && allocation != VK_NULL_HANDLE; }
     
-    // Get the actual VkBuffer handle
     VkBuffer getBuffer() const;
     
-    // Get the device address of this allocation
     VkDeviceAddress getDeviceAddress() const;
     
     void uploadData(const void* data, VkDeviceSize size, VkDeviceSize offset=0);
+    void free();
     
 };
 
 
 
 
-// Definition of the BufferArena
+
 struct BufferArena : public std::enable_shared_from_this<BufferArena> {
     uint32_t id;
     VkBuffer buffer = VK_NULL_HANDLE;
@@ -110,19 +100,18 @@ struct BufferArena : public std::enable_shared_from_this<BufferArena> {
                 VkBufferUsageFlags usageFlags, const BufferFlags& flags);
     ~BufferArena();
 
-    // Tries to allocate a block of memory from the virtual block.
-    bool allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllocation& outAllocation);
-    void free(BufferAllocation& allocation);
+    bool allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllocation* outAllocation);
+    void free(BufferAllocation* allocation);
+    void clear();
+
+    bool isValid() const;
     
-    // Check if this arena is compatible with the given request
     bool isCompatible(const BufferAllocationRequest& request) const;
 
-    
-    // Get available space in this arena
     VkDeviceSize getAvailableSpace() const;
 };
 
-// Manager class for all buffer arenas. This is a singleton.
+
 class BufferPoolManager {
 public:
     static BufferPoolManager& getInstance();
@@ -130,11 +119,11 @@ public:
     static void init(VmaAllocator allocator);
     static void shutdown();
 
-    // Allocate a single buffer (vertex or index)
     std::shared_ptr<BufferAllocation> allocateBuffer(const BufferAllocationRequest& request);
     
-    // Free a buffer allocation
-    void freeBuffer(std::shared_ptr<BufferAllocation> allocation);
+    // removes the arena from the pools map, there will still be a reference to the arena outside of the pool
+    // but the arena will be invalidated and the memory will be freed, same for its allocations
+    void freeBuffer(std::shared_ptr<BufferArena> arena);
     
     
 
@@ -159,13 +148,9 @@ private:
     VmaAllocator m_allocator = VK_NULL_HANDLE;
     std::mutex m_mutex;
 
-
-    
-    // Layout-specific arena organization for vertex buffers
     // Key is the hash of the BufferLayout, value is list of arenas for that layout
     std::unordered_map<size_t, std::vector<std::shared_ptr<BufferArena>>> m_layoutToArenaMap;
 
-    
     uint32_t m_nextArenaID = 0;
     
     static std::unique_ptr<BufferPoolManager> s_instance;

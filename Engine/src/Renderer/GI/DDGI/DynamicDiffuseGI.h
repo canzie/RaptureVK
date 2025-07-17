@@ -29,6 +29,21 @@ namespace Rapture {
 
 class MaterialInstance;
 
+enum class DDGIDescriptorSetBindingLocation {
+    RAY_DATA = 400,
+    IRRADIANCE = 401,
+    PREV_IRRADIANCE = 402,
+    VISIBILITY = 403,
+    PREV_VISIBILITY = 404,
+    PROBE_IRRADIANCE_ATLAS = 401,      // Alias for irradiance
+    PROBE_IRRADIANCE_ATLAS_ALT = 402,  // Alias for prev_irradiance
+    PROBE_DISTANCE_ATLAS = 403,        // Alias for visibility
+    PROBE_DISTANCE_ATLAS_ALT = 404,     // Alias for prev_visibility
+    PROBE_CLASSIFICATION = 405,
+    PROBE_OFFSET = 406,
+    PROBE_RELOCATION = 406 // same as probe offset
+};
+
 class DynamicDiffuseGI {
 public:
     DynamicDiffuseGI(uint32_t framesInFlight);
@@ -80,6 +95,8 @@ public:
 private:
     void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
     void blendTextures(uint32_t frameIndex);
+    void classifyProbes(uint32_t frameIndex);
+    void relocateProbes(uint32_t frameIndex);
 
     void initTextures();
     void initProbeInfoBuffer();
@@ -96,10 +113,14 @@ private:
     std::shared_ptr<Shader> m_DDGI_ProbeTraceShader;
     std::shared_ptr<Shader> m_DDGI_ProbeIrradianceBlendingShader;
     std::shared_ptr<Shader> m_DDGI_ProbeDistanceBlendingShader;
+    std::shared_ptr<Shader> m_DDGI_ProbeRelocationShader;
+    std::shared_ptr<Shader> m_DDGI_ProbeClassificationShader;
 
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeTracePipeline;
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeIrradianceBlendingPipeline;
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeDistanceBlendingPipeline;
+    std::shared_ptr<ComputePipeline> m_DDGI_ProbeRelocationPipeline;
+    std::shared_ptr<ComputePipeline> m_DDGI_ProbeClassificationPipeline;
 
     ProbeVolume m_ProbeVolume;
 
@@ -128,9 +149,14 @@ private:
 
     std::shared_ptr<Texture> m_RayDataTexture;
 
+    std::shared_ptr<Texture> m_ProbeClassificationTexture;
+    std::shared_ptr<Texture> m_ProbeOffsetTexture; // stores an offset for each probe, enables the use of the relocation shader
+
     std::shared_ptr<FlattenTexture> m_IrradianceTextureFlattened;
     std::shared_ptr<FlattenTexture> m_DistanceTextureFlattened;
     std::shared_ptr<FlattenTexture> m_RayDataTextureFlattened;
+    std::shared_ptr<FlattenTexture> m_ProbeClassificationTextureFlattened;
+    std::shared_ptr<FlattenTexture> m_ProbeOffsetTextureFlattened;
 
 
     std::vector<glm::vec3> m_DebugProbePositions;
@@ -148,8 +174,6 @@ private:
     bool m_isFirstFrame;
 
     bool m_isVolumeDirty;
-
-    float m_Hysteresis;
 
 
 
@@ -169,6 +193,12 @@ private:
 
 
     static std::shared_ptr<Texture> s_defaultSkyboxTexture;
+
+    std::shared_ptr<DescriptorSet> m_probeTraceDescriptorSet;
+    std::shared_ptr<DescriptorSet> m_probeIrradianceBlendingDescriptorSet;
+    std::shared_ptr<DescriptorSet> m_probeDistanceBlendingDescriptorSet;
+    std::shared_ptr<DescriptorSet> m_probeClassificationDescriptorSet;
+    std::shared_ptr<DescriptorSet> m_probeRelocationDescriptorSet;
 };
 
 }

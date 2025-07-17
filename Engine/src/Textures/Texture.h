@@ -31,7 +31,7 @@ public:
     Texture(const std::vector<std::string>& paths, TextureSpecification spec = TextureSpecification(), bool isLoadingAsync=false);
 
     // Constructor for creating texture from specification (no file loading)
-    Texture(const TextureSpecification& spec);
+    Texture(TextureSpecification spec);
     
     ~Texture();
 

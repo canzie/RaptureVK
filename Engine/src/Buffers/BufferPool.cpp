@@ -1,43 +1,35 @@
 #include "BufferPool.h"
+
 #include "Logging/Log.h"
 #include "Utils/GLTypes.h"
 #include "CommandBuffers/CommandPool.h"
 #include "CommandBuffers/CommandBuffer.h"
 #include "WindowContext/Application.h"
+
 #include <cstring>
 #include <functional>
+#include <algorithm>
 
 namespace Rapture {
 
-// Static member initialization
+
 std::unique_ptr<BufferPoolManager> BufferPoolManager::s_instance = nullptr;
 
+//---------------------------------//
+// BufferAllocation implementation //
+//---------------------------------//
+
 BufferAllocation::~BufferAllocation() {
-    // Automatically free from arena when destroyed
     if (isValid()) {
-        parentArena->free(*this);
+        parentArena->free(this);
     }
 }
 
-// BufferAllocation implementation
+
 VkBuffer BufferAllocation::getBuffer() const {
     return parentArena ? parentArena->buffer : VK_NULL_HANDLE;
 }
 
-VkDeviceAddress BufferAllocation::getDeviceAddress() const {
-    if (!parentArena || !isValid()) {
-        return 0;
-    }
-    
-    VkBufferDeviceAddressInfo addressInfo{};
-    addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-    addressInfo.buffer = parentArena->buffer;
-    
-    // Note: This requires a VkDevice handle, which we don't have here
-    // In practice, this should be called from a context that has access to the device
-    // For now, return 0 and let the caller handle device address retrieval
-    return 0; // TODO: Implement proper device address retrieval
-}
 
 void BufferAllocation::uploadData(const void* data, VkDeviceSize size, VkDeviceSize offset) {
     if (!isValid() || !data) {
@@ -135,10 +127,19 @@ void BufferAllocation::uploadData(const void* data, VkDeviceSize size, VkDeviceS
 
 }
 
+void BufferAllocation::free() {
+    if (isValid()) {
+        parentArena->free(this);
+    }
+}
 
 
 
-// BufferArena implementation
+//----------------------------//
+// BufferArena implementation //
+//----------------------------//
+
+
 BufferArena::BufferArena(uint32_t id, VmaAllocator allocator, VkDeviceSize arenaSize, 
                         BufferUsage usage, VkBufferUsageFlags usageFlags, const BufferFlags& flags)
     : id(id), vmaAllocator(allocator), size(arenaSize), usage(usage), usageFlags(usageFlags), flags(flags) {
@@ -191,18 +192,10 @@ BufferArena::BufferArena(uint32_t id, VmaAllocator allocator, VkDeviceSize arena
 }
 
 BufferArena::~BufferArena() {
-    if (buffer != VK_NULL_HANDLE) {
-        vmaDestroyBuffer(vmaAllocator, buffer, vmaAllocation);
-    }
-    
-    if (virtualBlock != VK_NULL_HANDLE) {
-        vmaDestroyVirtualBlock(virtualBlock);
-    }
-    
-    RP_CORE_INFO("BufferArena: Destroyed arena {}", id);
+    clear();
 }
 
-bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllocation& outAllocation) {
+bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllocation* outAllocation) {
     std::lock_guard<std::mutex> lock(mutex);
     
     VmaVirtualAllocationCreateInfo allocCreateInfo{};
@@ -215,11 +208,11 @@ bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllo
     VkResult result = vmaVirtualAllocate(virtualBlock, &allocCreateInfo, &allocation, &offset);
     
     if (result == VK_SUCCESS && (alignment <= 1 || (offset % alignment) == 0)) {
-        // Perfect! The allocation worked and is properly aligned
-        outAllocation.parentArena = shared_from_this();
-        outAllocation.allocation = allocation;
-        outAllocation.offsetBytes = offset;
-        outAllocation.sizeBytes = size;
+        // The allocation worked and is properly aligned
+        outAllocation->parentArena = shared_from_this();
+        outAllocation->allocation = allocation;
+        outAllocation->offsetBytes = offset;
+        outAllocation->sizeBytes = size;
         return true;
     }
     
@@ -258,12 +251,11 @@ bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllo
         return false;
     }
     
-    outAllocation.parentArena = shared_from_this();
-    outAllocation.allocation = allocation;
-    outAllocation.offsetBytes = alignedOffset;
-    outAllocation.sizeBytes = size;
+    outAllocation->parentArena = shared_from_this();
+    outAllocation->allocation = allocation;
+    outAllocation->offsetBytes = alignedOffset;
+    outAllocation->sizeBytes = size;
     
-    // Log successful manual alignment if it was needed
     if (alignedOffset != offset) {
         RP_CORE_TRACE("BufferArena {}: Manual alignment: raw_offset={}, aligned_offset={}, padding={}", 
                      id, offset, alignedOffset, alignedOffset - offset);
@@ -272,25 +264,42 @@ bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllo
     return true;
 }
 
-void BufferArena::free(BufferAllocation& allocation) {
-    if (!allocation.isValid() || allocation.parentArena.get() != this) {
+void BufferArena::free(BufferAllocation* allocation) {
+    if (!allocation->isValid() || allocation->parentArena.get() != this) {
         return;
     }
     
     std::lock_guard<std::mutex> lock(mutex);
-    vmaVirtualFree(virtualBlock, allocation.allocation);
+    vmaVirtualFree(virtualBlock, allocation->allocation);
     
     // Clear the allocation data (but don't reset parentArena to avoid infinite recursion)
-    allocation.allocation = VK_NULL_HANDLE;
-    allocation.offsetBytes = 0;
-    allocation.sizeBytes = 0;
+    allocation->allocation = VK_NULL_HANDLE;
+    allocation->offsetBytes = 0;
+    allocation->sizeBytes = 0;
 }
 
+void BufferArena::clear() {
 
+    std::lock_guard<std::mutex> lock(mutex);
 
+    if (!isValid()) {
+        return;
+    }
 
-bool BufferArena::isCompatible(const BufferAllocationRequest& request) const {
-    // Check usage compatibility
+    vmaDestroyBuffer(vmaAllocator, buffer, vmaAllocation);
+    vmaDestroyVirtualBlock(virtualBlock);
+    
+    RP_CORE_INFO("BufferArena: Destroyed arena {}", id);
+
+}
+
+bool BufferArena::isValid() const {
+    return buffer != VK_NULL_HANDLE && virtualBlock != VK_NULL_HANDLE;
+}
+
+bool BufferArena::isCompatible(const BufferAllocationRequest &request) const
+{
+
     if (usage != request.usage) {
         return false;
     }
@@ -335,7 +344,10 @@ VkDeviceSize BufferArena::getAvailableSpace() const {
     return stats.allocationBytes > size ? 0 : size - stats.allocationBytes;
 }
 
-// BufferPoolManager implementation
+//----------------------------------//
+// BufferPoolManager implementation //
+//----------------------------------//
+
 BufferPoolManager& BufferPoolManager::getInstance() {
     if (!s_instance) {
         s_instance = std::unique_ptr<BufferPoolManager>(new BufferPoolManager());
@@ -377,7 +389,7 @@ std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer(const Buffer
     }
     
     auto allocation = std::make_shared<BufferAllocation>();
-    if (!arena->allocate(request.size, request.alignment, *allocation)) {
+    if (!arena->allocate(request.size, request.alignment, allocation.get())) {
         RP_CORE_ERROR("BufferPoolManager: Failed to allocate {} bytes from arena {}", request.size, arena->id);
         return nullptr;
     }
@@ -386,18 +398,28 @@ std::shared_ptr<BufferAllocation> BufferPoolManager::allocateBuffer(const Buffer
     return allocation;
 }
 
-void BufferPoolManager::freeBuffer(std::shared_ptr<BufferAllocation> allocation) {
-    if (!allocation || !allocation->isValid()) {
+void BufferPoolManager::freeBuffer(std::shared_ptr<BufferArena> arena) {
+    if (!arena) {
         return;
     }
-    
-    allocation->parentArena->free(*allocation);
-    //RP_CORE_TRACE("BufferPoolManager: Freed allocation of {} bytes", allocation->sizeBytes);
+
+
+    for (auto map_it = m_layoutToArenaMap.begin(); map_it != m_layoutToArenaMap.end(); ++map_it) {
+        auto& arenas = map_it->second;
+        
+        auto it = std::find(arenas.begin(), arenas.end(), arena);
+
+        if (it != arenas.end()) {
+            arenas.erase(it);
+
+            if (arenas.empty()) {
+                arena->clear(); // this will make the arena invalid
+                m_layoutToArenaMap.erase(map_it);
+            }
+            return;
+        }
+    }
 }
-
-
-
-
 
 
 std::shared_ptr<BufferArena> BufferPoolManager::findOrCreateArena(const BufferAllocationRequest& request) {
@@ -415,9 +437,10 @@ std::shared_ptr<BufferArena> BufferPoolManager::findOrCreateArena(const BufferAl
         }
     }
 
-    
-    // No suitable arena found, create a new one
+
     return createArena(request);
+    
+
 }
 
 std::shared_ptr<BufferArena> BufferPoolManager::createArena(const BufferAllocationRequest& request) {
@@ -442,19 +465,19 @@ std::shared_ptr<BufferArena> BufferPoolManager::createArena(const BufferAllocati
     return arena;
 }
 
+
+// uses a (too) simple heuristic to calculate the arena size
+// most cases will use a 64mb arena because of this, this is fine an close to the
+// bufferpool sizes of other engines
 VkDeviceSize BufferPoolManager::calculateArenaSize(const BufferAllocationRequest& request) const {
-    // Start with default arena size
     VkDeviceSize arenaSize = DEFAULT_ARENA_SIZE;
     
-    // If the request is larger than half the default size, increase arena size
     if (request.size > DEFAULT_ARENA_SIZE / 2) {
         arenaSize = std::max(request.size * 2, DEFAULT_ARENA_SIZE);
     }
     
-    // Cap at maximum arena size
     arenaSize = std::min(arenaSize, MAX_ARENA_SIZE);
     
-    // Ensure arena is at least large enough for the request
     arenaSize = std::max(arenaSize, request.size);
     
     return arenaSize;

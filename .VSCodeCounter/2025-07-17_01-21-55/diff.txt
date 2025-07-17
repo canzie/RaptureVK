@@ -1,0 +1,302 @@
+Date : 2025-07-17 01:21:55
+Directory : e:\Dev\Games\RaptureVK\Editor\src
+Total : 209 files,  -12787 codes, -1820 comments, -5327 blanks, all -19934 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| C++      |        209 |    -12,787 |     -1,820 |     -5,327 |    -19,934 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                               | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                  |        209 |    -12,787 |     -1,820 |     -5,327 |    -19,934 |
+| . (Files)                                                                                          |          3 |         61 |         17 |         23 |        101 |
+| ..                                                                                                 |        183 |    -20,632 |     -2,493 |     -6,741 |    -29,866 |
+| ..\..                                                                                              |        183 |    -20,632 |     -2,493 |     -6,741 |    -29,866 |
+| ..\..\Engine                                                                                       |        183 |    -20,632 |     -2,493 |     -6,741 |    -29,866 |
+| ..\..\Engine\src                                                                                   |        183 |    -20,632 |     -2,493 |     -6,741 |    -29,866 |
+| ..\..\Engine\src (Files)                                                                           |          2 |        -26 |        -27 |        -18 |        -71 |
+| ..\..\Engine\src\AccelerationStructures                                                            |         11 |     -1,437 |       -134 |       -436 |     -2,007 |
+| ..\..\Engine\src\AccelerationStructures (Files)                                                    |          4 |       -718 |       -102 |       -219 |     -1,039 |
+| ..\..\Engine\src\AccelerationStructures\CPU                                                        |          7 |       -719 |        -32 |       -217 |       -968 |
+| ..\..\Engine\src\AccelerationStructures\CPU\BVH                                                    |          7 |       -719 |        -32 |       -217 |       -968 |
+| ..\..\Engine\src\AssetManager                                                                      |         11 |       -889 |       -100 |       -337 |     -1,326 |
+| ..\..\Engine\src\Buffers                                                                           |         24 |     -2,433 |       -262 |       -807 |     -3,502 |
+| ..\..\Engine\src\Buffers (Files)                                                                   |          4 |       -597 |        -87 |       -237 |       -921 |
+| ..\..\Engine\src\Buffers\CommandBuffers                                                            |          4 |       -190 |        -38 |        -75 |       -303 |
+| ..\..\Engine\src\Buffers\Descriptors                                                               |          6 |       -952 |        -94 |       -279 |     -1,325 |
+| ..\..\Engine\src\Buffers\IndexBuffers                                                              |          2 |       -138 |         -8 |        -46 |       -192 |
+| ..\..\Engine\src\Buffers\StorageBuffers                                                            |          2 |       -108 |         -5 |        -44 |       -157 |
+| ..\..\Engine\src\Buffers\UniformBuffers                                                            |          2 |        -70 |        -10 |        -40 |       -120 |
+| ..\..\Engine\src\Buffers\VertexBuffers                                                             |          4 |       -378 |        -20 |        -86 |       -484 |
+| ..\..\Engine\src\Cameras                                                                           |          3 |        -51 |         -1 |        -30 |        -82 |
+| ..\..\Engine\src\Cameras (Files)                                                                   |          1 |         -8 |         -1 |         -8 |        -17 |
+| ..\..\Engine\src\Cameras\PerspectiveCamera                                                         |          2 |        -43 |          0 |        -22 |        -65 |
+| ..\..\Engine\src\Components                                                                        |         21 |     -1,167 |       -138 |       -453 |     -1,758 |
+| ..\..\Engine\src\Components (Files)                                                                |          2 |       -330 |        -40 |       -125 |       -495 |
+| ..\..\Engine\src\Components\Systems                                                                |         19 |       -837 |        -98 |       -328 |     -1,263 |
+| ..\..\Engine\src\Components\Systems (Files)                                                        |          9 |       -515 |        -61 |       -205 |       -781 |
+| ..\..\Engine\src\Components\Systems\ObjectDataBuffers                                              |         10 |       -322 |        -37 |       -123 |       -482 |
+| ..\..\Engine\src\Events                                                                            |          7 |       -221 |        -41 |        -76 |       -338 |
+| ..\..\Engine\src\Generators                                                                        |          5 |        -39 |       -249 |        -15 |       -303 |
+| ..\..\Engine\src\Generators\Meshes                                                                 |          1 |          0 |          0 |         -1 |         -1 |
+| ..\..\Engine\src\Generators\Textures                                                               |          4 |        -39 |       -249 |        -14 |       -302 |
+| ..\..\Engine\src\Input                                                                             |          2 |        -19 |         -1 |        -10 |        -30 |
+| ..\..\Engine\src\Layers                                                                            |          3 |        -93 |        -10 |        -29 |       -132 |
+| ..\..\Engine\src\Loaders                                                                           |          2 |       -858 |       -221 |       -254 |     -1,333 |
+| ..\..\Engine\src\Loaders\glTF2.0                                                                   |          2 |       -858 |       -221 |       -254 |     -1,333 |
+| ..\..\Engine\src\Logging                                                                           |          4 |       -423 |        -69 |       -110 |       -602 |
+| ..\..\Engine\src\Materials                                                                         |          6 |       -778 |        -60 |       -265 |     -1,103 |
+| ..\..\Engine\src\Meshes                                                                            |          4 |       -321 |        -41 |       -117 |       -479 |
+| ..\..\Engine\src\Physics                                                                           |          8 |     -1,142 |       -177 |       -425 |     -1,744 |
+| ..\..\Engine\src\Physics (Files)                                                                   |          6 |       -619 |        -94 |       -278 |       -991 |
+| ..\..\Engine\src\Physics\Colliders                                                                 |          2 |       -523 |        -83 |       -147 |       -753 |
+| ..\..\Engine\src\Pipelines                                                                         |          5 |       -246 |         -9 |       -125 |       -380 |
+| ..\..\Engine\src\RenderTargets                                                                     |          3 |       -406 |         -7 |       -107 |       -520 |
+| ..\..\Engine\src\RenderTargets\SwapChains                                                          |          3 |       -406 |         -7 |       -107 |       -520 |
+| ..\..\Engine\src\Renderer                                                                          |         26 |     -5,211 |       -423 |     -1,680 |     -7,314 |
+| ..\..\Engine\src\Renderer (Files)                                                                  |          8 |     -1,091 |        -29 |       -326 |     -1,446 |
+| ..\..\Engine\src\Renderer\DeferredShading                                                          |          6 |     -1,242 |        -84 |       -408 |     -1,734 |
+| ..\..\Engine\src\Renderer\ForwardRenderer                                                          |          2 |       -639 |        -47 |       -189 |       -875 |
+| ..\..\Engine\src\Renderer\Frustum                                                                  |          2 |       -115 |        -27 |        -32 |       -174 |
+| ..\..\Engine\src\Renderer\GI                                                                       |          3 |     -1,078 |        -98 |       -367 |     -1,543 |
+| ..\..\Engine\src\Renderer\GI\DDGI                                                                  |          3 |     -1,078 |        -98 |       -367 |     -1,543 |
+| ..\..\Engine\src\Renderer\Shadows                                                                  |          5 |     -1,046 |       -138 |       -358 |     -1,542 |
+| ..\..\Engine\src\Renderer\Shadows (Files)                                                          |          1 |        -25 |         -3 |        -15 |        -43 |
+| ..\..\Engine\src\Renderer\Shadows\CascadedShadowMapping                                            |          2 |       -647 |        -87 |       -213 |       -947 |
+| ..\..\Engine\src\Renderer\Shadows\ShadowMapping                                                    |          2 |       -374 |        -48 |       -130 |       -552 |
+| ..\..\Engine\src\Scenes                                                                            |          8 |       -931 |       -125 |       -292 |     -1,348 |
+| ..\..\Engine\src\Scenes (Files)                                                                    |          5 |       -551 |        -68 |       -187 |       -806 |
+| ..\..\Engine\src\Scenes\Entities                                                                   |          3 |       -380 |        -57 |       -105 |       -542 |
+| ..\..\Engine\src\Shaders                                                                           |          7 |       -946 |       -106 |       -270 |     -1,322 |
+| ..\..\Engine\src\Textures                                                                          |          3 |     -1,112 |        -93 |       -271 |     -1,476 |
+| ..\..\Engine\src\Utils                                                                             |          7 |       -406 |        -67 |       -131 |       -604 |
+| ..\..\Engine\src\WindowContext                                                                     |         11 |     -1,477 |       -132 |       -483 |     -2,092 |
+| ..\..\Engine\src\WindowContext (Files)                                                             |          3 |       -194 |        -13 |       -103 |       -310 |
+| ..\..\Engine\src\WindowContext\GlfwWindowContext                                                   |          2 |       -171 |        -23 |        -50 |       -244 |
+| ..\..\Engine\src\WindowContext\VulkanContext                                                       |          6 |     -1,112 |        -96 |       -330 |     -1,538 |
+| Layers                                                                                             |          4 |        701 |         66 |        252 |      1,019 |
+| imguiPanels                                                                                        |         17 |      4,389 |        308 |        665 |      5,362 |
+| vendor                                                                                             |          2 |      2,694 |        282 |        474 |      3,450 |
+| vendor\ImGuizmo                                                                                    |          2 |      2,694 |        282 |        474 |      3,450 |
++----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                                           | language | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| e:\Dev\Games\RaptureVK\Editor\src\EntryPoint.h                                                     | C++      |          5 |          2 |          2 |          9 |
+| e:\Dev\Games\RaptureVK\Editor\src\Layers\TestLayer.cpp                                             | C++      |        166 |         27 |         88 |        281 |
+| e:\Dev\Games\RaptureVK\Editor\src\Layers\TestLayer.h                                               | C++      |         34 |          5 |         19 |         58 |
+| e:\Dev\Games\RaptureVK\Editor\src\Layers\imguiLayer.cpp                                            | C++      |        441 |         31 |        126 |        598 |
+| e:\Dev\Games\RaptureVK\Editor\src\Layers\imguiLayer.h                                              | C++      |         60 |          3 |         19 |         82 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\BrowserPanel.cpp                                     | C++      |        211 |         37 |         75 |        323 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\BrowserPanel.h                                       | C++      |         36 |         10 |         23 |         69 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ContentBrowserPanel.cpp                              | C++      |        247 |         23 |         94 |        364 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ContentBrowserPanel.h                                | C++      |         39 |          7 |         15 |         61 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\GBufferPanel.cpp                                     | C++      |        171 |         21 |         31 |        223 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\GBufferPanel.h                                       | C++      |         19 |          0 |          6 |         25 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\IconsMaterialDesign.h                                | C++      |      2,239 |          4 |          4 |      2,247 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ImageViewerPanel.cpp                                 | C++      |        107 |         17 |         25 |        149 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ImageViewerPanel.h                                   | C++      |         20 |          0 |          7 |         27 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ProprtiesPanel.cpp                                   | C++      |        470 |         47 |        143 |        660 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ProprtiesPanel.h                                     | C++      |         26 |          1 |         11 |         38 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\SettingsPanel.cpp                                    | C++      |         58 |          0 |         31 |         89 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\SettingsPanel.h                                      | C++      |         11 |          0 |          7 |         18 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ViewportPanel.cpp                                    | C++      |        246 |         38 |         77 |        361 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\ViewportPanel.h                                      | C++      |         28 |          4 |         17 |         49 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\imguiPanelStyle.h                                    | C++      |        201 |         45 |         43 |        289 |
+| e:\Dev\Games\RaptureVK\Editor\src\imguiPanels\imguiPanelStyleLinear.h                              | C++      |        260 |         54 |         56 |        370 |
+| e:\Dev\Games\RaptureVK\Editor\src\main.cpp                                                         | C++      |         15 |          4 |          8 |         27 |
+| e:\Dev\Games\RaptureVK\Editor\src\source.cpp                                                       | C++      |         41 |         11 |         13 |         65 |
+| e:\Dev\Games\RaptureVK\Editor\src\vendor\ImGuizmo\ImGuizmo.cpp                                     | C++      |      2,521 |        181 |        442 |      3,144 |
+| e:\Dev\Games\RaptureVK\Editor\src\vendor\ImGuizmo\ImGuizmo.h                                       | C++      |        173 |        101 |         32 |        306 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\BLAS.cpp                                  | C++      |       -209 |        -26 |        -64 |       -299 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\BLAS.h                                    | C++      |        -36 |         -7 |        -17 |        -60 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\CPU\BVH\BVH.cpp                           | C++      |       -130 |         -7 |        -48 |       -185 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\CPU\BVH\BVH.h                             | C++      |        -26 |         -9 |        -21 |        -56 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\CPU\BVH\BVHCommon.h                       | C++      |        -19 |         -3 |         -9 |        -31 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\CPU\BVH\BVH_SAH.cpp                       | C++      |       -147 |         -1 |        -36 |       -184 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\CPU\BVH\BVH_SAH.h                         | C++      |        -23 |          0 |        -12 |        -35 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\CPU\BVH\DBVH.cpp                          | C++      |       -341 |        -12 |        -75 |       -428 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\CPU\BVH\DBVH.h                            | C++      |        -33 |          0 |        -16 |        -49 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\TLAS.cpp                                  | C++      |       -409 |        -54 |       -109 |       -572 |
+| e:\Dev\Games\RaptureVK\Engine\src\AccelerationStructures\TLAS.h                                    | C++      |        -64 |        -15 |        -29 |       -108 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\Asset.h                                             | C++      |        -76 |         -8 |        -29 |       -113 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetHelpers.h                                      | C++      |        -90 |        -10 |        -31 |       -131 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetImportConfig.h                                 | C++      |        -20 |          0 |        -15 |        -35 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetImporter.cpp                                   | C++      |       -220 |        -17 |        -60 |       -297 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetImporter.h                                     | C++      |        -72 |         -7 |        -38 |       -117 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetLoadRequests.h                                 | C++      |        -14 |         -1 |        -11 |        -26 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetManager.h                                      | C++      |       -103 |         -4 |        -36 |       -143 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetManagerBase.h                                  | C++      |        -22 |          0 |        -10 |        -32 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetManagerEditor.cpp                              | C++      |       -232 |        -28 |        -64 |       -324 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetManagerEditor.h                                | C++      |        -35 |        -25 |        -38 |        -98 |
+| e:\Dev\Games\RaptureVK\Engine\src\AssetManager\AssetManagerStaticInitializers.cpp                  | C++      |         -5 |          0 |         -5 |        -10 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\BufferPool.cpp                                           | C++      |       -332 |        -43 |       -113 |       -488 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\BufferPool.h                                             | C++      |        -90 |        -29 |        -55 |       -174 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\Buffers.cpp                                              | C++      |       -130 |        -11 |        -40 |       -181 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\Buffers.h                                                | C++      |        -45 |         -4 |        -29 |        -78 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\CommandBuffers\CommandBuffer.cpp                         | C++      |        -59 |          0 |        -17 |        -76 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\CommandBuffers\CommandBuffer.h                           | C++      |        -21 |         -4 |         -9 |        -34 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\CommandBuffers\CommandPool.cpp                           | C++      |        -67 |        -20 |        -26 |       -113 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\CommandBuffers\CommandPool.h                             | C++      |        -43 |        -14 |        -23 |        -80 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\Descriptors\DescriptorBinding.cpp                        | C++      |       -323 |        -12 |        -85 |       -420 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\Descriptors\DescriptorBinding.h                          | C++      |        -61 |        -18 |        -31 |       -110 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\Descriptors\DescriptorManager.cpp                        | C++      |       -122 |        -17 |        -45 |       -184 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\Descriptors\DescriptorManager.h                          | C++      |        -24 |         -2 |        -10 |        -36 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\Descriptors\DescriptorSet.cpp                            | C++      |       -290 |        -25 |        -68 |       -383 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\Descriptors\DescriptorSet.h                              | C++      |       -132 |        -20 |        -40 |       -192 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\IndexBuffers\IndexBuffer.cpp                             | C++      |       -115 |         -7 |        -30 |       -152 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\IndexBuffers\IndexBuffer.h                               | C++      |        -23 |         -1 |        -16 |        -40 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\StorageBuffers\StorageBuffer.cpp                         | C++      |        -92 |         -4 |        -30 |       -126 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\StorageBuffers\StorageBuffer.h                           | C++      |        -16 |         -1 |        -14 |        -31 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\UniformBuffers\UniformBuffer.cpp                         | C++      |        -57 |         -4 |        -18 |        -79 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\UniformBuffers\UniformBuffer.h                           | C++      |        -13 |         -6 |        -22 |        -41 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\VertexBuffers\BufferLayout.cpp                           | C++      |        -36 |          0 |         -7 |        -43 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\VertexBuffers\BufferLayout.h                             | C++      |       -213 |        -12 |        -36 |       -261 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\VertexBuffers\VertexBuffer.cpp                           | C++      |       -105 |         -7 |        -30 |       -142 |
+| e:\Dev\Games\RaptureVK\Engine\src\Buffers\VertexBuffers\VertexBuffer.h                             | C++      |        -24 |         -1 |        -13 |        -38 |
+| e:\Dev\Games\RaptureVK\Engine\src\Cameras\CameraCommon.h                                           | C++      |         -8 |         -1 |         -8 |        -17 |
+| e:\Dev\Games\RaptureVK\Engine\src\Cameras\PerspectiveCamera\PerspectiveCamera.cpp                  | C++      |        -23 |          0 |        -12 |        -35 |
+| e:\Dev\Games\RaptureVK\Engine\src\Cameras\PerspectiveCamera\PerspectiveCamera.h                    | C++      |        -20 |          0 |        -10 |        -30 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Components.h                                          | C++      |       -311 |        -38 |       -114 |       -463 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\ComponentsCommon.h                                    | C++      |        -19 |         -2 |        -11 |        -32 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\BoundingBox.cpp                               | C++      |        -74 |         -3 |        -19 |        -96 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\BoundingBox.h                                 | C++      |        -27 |          0 |        -19 |        -46 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\CameraController.cpp                          | C++      |        -95 |         -9 |        -34 |       -138 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\CameraController.h                            | C++      |        -31 |         -5 |        -20 |        -56 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\EntityNode.cpp                                | C++      |       -101 |        -11 |        -35 |       -147 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\EntityNode.h                                  | C++      |        -28 |        -12 |        -16 |        -56 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffer.h                            | C++      |         -6 |         -8 |         -5 |        -19 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\CameraDataBuffer.cpp        | C++      |        -19 |         -1 |         -6 |        -26 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\CameraDataBuffer.h          | C++      |        -12 |         -1 |        -11 |        -24 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\LightDataBuffer.cpp         | C++      |        -38 |         -5 |        -13 |        -56 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\LightDataBuffer.h           | C++      |        -17 |         -1 |        -12 |        -30 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\MeshDataBuffer.cpp          | C++      |        -14 |          0 |         -5 |        -19 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\MeshDataBuffer.h            | C++      |        -14 |         -2 |        -10 |        -26 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\ObjectDataBase.cpp          | C++      |       -105 |         -7 |        -24 |       -136 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\ObjectDataBase.h            | C++      |        -33 |        -11 |        -16 |        -60 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\ShadowDataBuffer.cpp        | C++      |        -52 |         -4 |        -15 |        -71 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\ObjectDataBuffers\ShadowDataBuffer.h          | C++      |        -18 |         -5 |        -11 |        -34 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\Transforms.cpp                                | C++      |       -113 |        -12 |        -40 |       -165 |
+| e:\Dev\Games\RaptureVK\Engine\src\Components\Systems\Transforms.h                                  | C++      |        -40 |         -1 |        -17 |        -58 |
+| e:\Dev\Games\RaptureVK\Engine\src\Events\ApplicationEvents.h                                       | C++      |        -34 |         -5 |         -6 |        -45 |
+| e:\Dev\Games\RaptureVK\Engine\src\Events\AssetEvents.h                                             | C++      |        -25 |         -6 |        -13 |        -44 |
+| e:\Dev\Games\RaptureVK\Engine\src\Events\Events.h                                                  | C++      |        -82 |        -21 |        -29 |       -132 |
+| e:\Dev\Games\RaptureVK\Engine\src\Events\GameEvents.h                                              | C++      |        -42 |         -5 |        -15 |        -62 |
+| e:\Dev\Games\RaptureVK\Engine\src\Events\InputEvents.h                                             | C++      |        -34 |         -4 |         -7 |        -45 |
+| e:\Dev\Games\RaptureVK\Engine\src\Events\MiscEvents.h                                              | C++      |          0 |          0 |         -1 |         -1 |
+| e:\Dev\Games\RaptureVK\Engine\src\Events\ProjectEvents.h                                           | C++      |         -4 |          0 |         -5 |         -9 |
+| e:\Dev\Games\RaptureVK\Engine\src\Generators\Meshes\TerrainGenerator.h                             | C++      |          0 |          0 |         -1 |         -1 |
+| e:\Dev\Games\RaptureVK\Engine\src\Generators\Textures\CubemapIrradianceGenerator.h                 | C++      |          0 |         -1 |         -1 |         -2 |
+| e:\Dev\Games\RaptureVK\Engine\src\Generators\Textures\HDRIConverter.h                              | C++      |          0 |          0 |         -1 |         -1 |
+| e:\Dev\Games\RaptureVK\Engine\src\Generators\Textures\PerlinNoiseGenerator.cpp                     | C++      |        -18 |       -247 |         -3 |       -268 |
+| e:\Dev\Games\RaptureVK\Engine\src\Generators\Textures\PerlinNoiseGenerator.h                       | C++      |        -21 |         -1 |         -9 |        -31 |
+| e:\Dev\Games\RaptureVK\Engine\src\Input\Input.h                                                    | C++      |         -6 |         -1 |         -5 |        -12 |
+| e:\Dev\Games\RaptureVK\Engine\src\Input\Keybinds.h                                                 | C++      |        -13 |          0 |         -5 |        -18 |
+| e:\Dev\Games\RaptureVK\Engine\src\Layers\Layer.h                                                   | C++      |        -23 |         -5 |        -11 |        -39 |
+| e:\Dev\Games\RaptureVK\Engine\src\Layers\LayerStack.cpp                                            | C++      |        -39 |         -3 |         -6 |        -48 |
+| e:\Dev\Games\RaptureVK\Engine\src\Layers\LayerStack.h                                              | C++      |        -31 |         -2 |        -12 |        -45 |
+| e:\Dev\Games\RaptureVK\Engine\src\Loaders\glTF2.0\glTFLoader.cpp                                   | C++      |       -716 |       -105 |       -206 |     -1,027 |
+| e:\Dev\Games\RaptureVK\Engine\src\Loaders\glTF2.0\glTFLoader.h                                     | C++      |       -142 |       -116 |        -48 |       -306 |
+| e:\Dev\Games\RaptureVK\Engine\src\Logging\Log.cpp                                                  | C++      |       -197 |        -28 |        -46 |       -271 |
+| e:\Dev\Games\RaptureVK\Engine\src\Logging\Log.h                                                    | C++      |        -73 |        -10 |        -19 |       -102 |
+| e:\Dev\Games\RaptureVK\Engine\src\Logging\TracyProfiler.cpp                                        | C++      |        -58 |         -8 |        -18 |        -84 |
+| e:\Dev\Games\RaptureVK\Engine\src\Logging\TracyProfiler.h                                          | C++      |        -95 |        -23 |        -27 |       -145 |
+| e:\Dev\Games\RaptureVK\Engine\src\Materials\Material.cpp                                           | C++      |       -114 |         -8 |        -35 |       -157 |
+| e:\Dev\Games\RaptureVK\Engine\src\Materials\Material.h                                             | C++      |        -37 |         -5 |        -22 |        -64 |
+| e:\Dev\Games\RaptureVK\Engine\src\Materials\MaterialInstance.cpp                                   | C++      |       -181 |         -9 |        -60 |       -250 |
+| e:\Dev\Games\RaptureVK\Engine\src\Materials\MaterialInstance.h                                     | C++      |        -62 |        -11 |        -35 |       -108 |
+| e:\Dev\Games\RaptureVK\Engine\src\Materials\MaterialParameters.cpp                                 | C++      |       -251 |        -12 |        -66 |       -329 |
+| e:\Dev\Games\RaptureVK\Engine\src\Materials\MaterialParameters.h                                   | C++      |       -133 |        -15 |        -47 |       -195 |
+| e:\Dev\Games\RaptureVK\Engine\src\Meshes\Mesh.cpp                                                  | C++      |        -43 |         -1 |        -17 |        -61 |
+| e:\Dev\Games\RaptureVK\Engine\src\Meshes\Mesh.h                                                    | C++      |        -40 |         -4 |        -24 |        -68 |
+| e:\Dev\Games\RaptureVK\Engine\src\Meshes\MeshPrimitives.cpp                                        | C++      |       -223 |        -32 |        -56 |       -311 |
+| e:\Dev\Games\RaptureVK\Engine\src\Meshes\MeshPrimitives.h                                          | C++      |        -15 |         -4 |        -20 |        -39 |
+| e:\Dev\Games\RaptureVK\Engine\src\Physics\Colliders\ColliderPrimitives.cpp                         | C++      |       -396 |        -70 |       -110 |       -576 |
+| e:\Dev\Games\RaptureVK\Engine\src\Physics\Colliders\ColliderPrimitives.h                           | C++      |       -127 |        -13 |        -37 |       -177 |
+| e:\Dev\Games\RaptureVK\Engine\src\Physics\Entropy.cpp                                              | C++      |       -387 |        -55 |       -170 |       -612 |
+| e:\Dev\Games\RaptureVK\Engine\src\Physics\Entropy.h                                                | C++      |       -146 |        -36 |        -61 |       -243 |
+| e:\Dev\Games\RaptureVK\Engine\src\Physics\EntropyCommon.h                                          | C++      |        -25 |          0 |        -10 |        -35 |
+| e:\Dev\Games\RaptureVK\Engine\src\Physics\EntropyComponents.h                                      | C++      |        -34 |         -2 |        -17 |        -53 |
+| e:\Dev\Games\RaptureVK\Engine\src\Physics\EntropyParticle.h                                        | C++      |        -23 |          0 |        -16 |        -39 |
+| e:\Dev\Games\RaptureVK\Engine\src\Physics\precision.h                                              | C++      |         -4 |         -1 |         -4 |         -9 |
+| e:\Dev\Games\RaptureVK\Engine\src\Pipelines\ComputePipeline.cpp                                    | C++      |        -76 |         -3 |        -29 |       -108 |
+| e:\Dev\Games\RaptureVK\Engine\src\Pipelines\ComputePipeline.h                                      | C++      |        -25 |          0 |        -15 |        -40 |
+| e:\Dev\Games\RaptureVK\Engine\src\Pipelines\GraphicsPipeline.cpp                                   | C++      |        -83 |         -2 |        -34 |       -119 |
+| e:\Dev\Games\RaptureVK\Engine\src\Pipelines\GraphicsPipeline.h                                     | C++      |        -34 |         -3 |        -32 |        -69 |
+| e:\Dev\Games\RaptureVK\Engine\src\Pipelines\Pipeline.h                                             | C++      |        -28 |         -1 |        -15 |        -44 |
+| e:\Dev\Games\RaptureVK\Engine\src\RenderTargets\SwapChains\SwapChain.cpp                           | C++      |       -329 |         -5 |        -80 |       -414 |
+| e:\Dev\Games\RaptureVK\Engine\src\RenderTargets\SwapChains\SwapChain.h                             | C++      |        -77 |         -2 |        -26 |       -105 |
+| e:\Dev\Games\RaptureVK\Engine\src\RenderTargets\SwapChains\SwapChainImageViews.h                   | C++      |          0 |          0 |         -1 |         -1 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\DeferredShading\DeferredRenderer.cpp                    | C++      |       -250 |        -16 |        -93 |       -359 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\DeferredShading\DeferredRenderer.h                      | C++      |        -63 |         -3 |        -29 |        -95 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\DeferredShading\GBufferPass.cpp                         | C++      |       -492 |        -46 |       -135 |       -673 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\DeferredShading\GBufferPass.h                           | C++      |        -94 |         -9 |        -30 |       -133 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\DeferredShading\LightingPass.cpp                        | C++      |       -279 |         -9 |        -93 |       -381 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\DeferredShading\LightingPass.h                          | C++      |        -64 |         -1 |        -28 |        -93 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\ForwardRenderer\ForwardRenderer.cpp                     | C++      |       -567 |        -41 |       -157 |       -765 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\ForwardRenderer\ForwardRenderer.h                       | C++      |        -72 |         -6 |        -32 |       -110 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\Frustum\Frustum.cpp                                     | C++      |        -92 |        -23 |        -22 |       -137 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\Frustum\Frustum.h                                       | C++      |        -23 |         -4 |        -10 |        -37 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\GI\DDGI\DDGICommon.h                                    | C++      |        -49 |         -2 |        -32 |        -83 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\GI\DDGI\DynamicDiffuseGI.cpp                            | C++      |       -896 |        -85 |       -273 |     -1,254 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\GI\DDGI\DynamicDiffuseGI.h                              | C++      |       -133 |        -11 |        -62 |       -206 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\InstancedShapesPass.cpp                                 | C++      |       -236 |         -2 |        -56 |       -294 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\InstancedShapesPass.h                                   | C++      |        -44 |          0 |        -12 |        -56 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\MDIBatch.cpp                                            | C++      |       -134 |         -8 |        -29 |       -171 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\MDIBatch.h                                              | C++      |        -56 |          0 |        -27 |        -83 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\Shadows\CascadedShadowMapping\CascadedShadowMapping.cpp | C++      |       -552 |        -78 |       -171 |       -801 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\Shadows\CascadedShadowMapping\CascadedShadowMapping.h   | C++      |        -95 |         -9 |        -42 |       -146 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\Shadows\ShadowCommon.h                                  | C++      |        -25 |         -3 |        -15 |        -43 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\Shadows\ShadowMapping\ShadowMapping.cpp                 | C++      |       -322 |        -46 |       -101 |       -469 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\Shadows\ShadowMapping\ShadowMapping.h                   | C++      |        -52 |         -2 |        -29 |        -83 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\SkyboxPass.cpp                                          | C++      |       -273 |        -10 |        -74 |       -357 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\SkyboxPass.h                                            | C++      |        -41 |         -2 |        -17 |        -60 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\StencilBorderPass.cpp                                   | C++      |       -259 |         -7 |        -90 |       -356 |
+| e:\Dev\Games\RaptureVK\Engine\src\Renderer\StencilBorderPass.h                                     | C++      |        -48 |          0 |        -21 |        -69 |
+| e:\Dev\Games\RaptureVK\Engine\src\Scenes\Entities\Entity.h                                         | C++      |       -182 |        -34 |        -48 |       -264 |
+| e:\Dev\Games\RaptureVK\Engine\src\Scenes\Entities\EntityCommon.h                                   | C++      |         -5 |          0 |         -5 |        -10 |
+| e:\Dev\Games\RaptureVK\Engine\src\Scenes\Entities\EntityView.h                                     | C++      |       -193 |        -23 |        -52 |       -268 |
+| e:\Dev\Games\RaptureVK\Engine\src\Scenes\Project.h                                                 | C++      |        -95 |        -13 |        -31 |       -139 |
+| e:\Dev\Games\RaptureVK\Engine\src\Scenes\Scene.cpp                                                 | C++      |       -227 |        -35 |        -85 |       -347 |
+| e:\Dev\Games\RaptureVK\Engine\src\Scenes\Scene.h                                                   | C++      |        -51 |         -2 |        -23 |        -76 |
+| e:\Dev\Games\RaptureVK\Engine\src\Scenes\SceneManager.h                                            | C++      |       -107 |        -10 |        -32 |       -149 |
+| e:\Dev\Games\RaptureVK\Engine\src\Scenes\World.h                                                   | C++      |        -71 |         -8 |        -16 |        -95 |
+| e:\Dev\Games\RaptureVK\Engine\src\Shaders\Shader.cpp                                               | C++      |       -392 |        -37 |       -122 |       -551 |
+| e:\Dev\Games\RaptureVK\Engine\src\Shaders\Shader.h                                                 | C++      |        -46 |         -5 |        -33 |        -84 |
+| e:\Dev\Games\RaptureVK\Engine\src\Shaders\ShaderCommon.h                                           | C++      |        -34 |         -4 |        -10 |        -48 |
+| e:\Dev\Games\RaptureVK\Engine\src\Shaders\ShaderCompilation.cpp                                    | C++      |       -117 |         -5 |        -28 |       -150 |
+| e:\Dev\Games\RaptureVK\Engine\src\Shaders\ShaderCompilation.h                                      | C++      |        -35 |         -3 |        -12 |        -50 |
+| e:\Dev\Games\RaptureVK\Engine\src\Shaders\ShaderReflections.cpp                                    | C++      |       -275 |        -39 |        -50 |       -364 |
+| e:\Dev\Games\RaptureVK\Engine\src\Shaders\ShaderReflections.h                                      | C++      |        -47 |        -13 |        -15 |        -75 |
+| e:\Dev\Games\RaptureVK\Engine\src\Textures\Texture.cpp                                             | C++      |       -844 |        -77 |       -209 |     -1,130 |
+| e:\Dev\Games\RaptureVK\Engine\src\Textures\Texture.h                                               | C++      |        -66 |        -13 |        -33 |       -112 |
+| e:\Dev\Games\RaptureVK\Engine\src\Textures\TextureCommon.h                                         | C++      |       -202 |         -3 |        -29 |       -234 |
+| e:\Dev\Games\RaptureVK\Engine\src\Utils\GLTypes.h                                                  | C++      |         -9 |          0 |         -3 |        -12 |
+| e:\Dev\Games\RaptureVK\Engine\src\Utils\TextureFlattener.cpp                                       | C++      |       -231 |        -26 |        -60 |       -317 |
+| e:\Dev\Games\RaptureVK\Engine\src\Utils\TextureFlattener.h                                         | C++      |        -53 |        -28 |        -16 |        -97 |
+| e:\Dev\Games\RaptureVK\Engine\src\Utils\Timestep.cpp                                               | C++      |        -46 |         -5 |        -16 |        -67 |
+| e:\Dev\Games\RaptureVK\Engine\src\Utils\Timestep.h                                                 | C++      |        -34 |          0 |        -16 |        -50 |
+| e:\Dev\Games\RaptureVK\Engine\src\Utils\UUID.cpp                                                   | C++      |         -4 |          0 |         -5 |         -9 |
+| e:\Dev\Games\RaptureVK\Engine\src\Utils\UUID.h                                                     | C++      |        -29 |         -8 |        -15 |        -52 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\Application.cpp                                    | C++      |       -130 |         -9 |        -60 |       -199 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\Application.h                                      | C++      |        -32 |          0 |        -22 |        -54 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\GlfwWindowContext\GlfwWindowContext.cpp            | C++      |       -131 |        -21 |        -35 |       -187 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\GlfwWindowContext\GlfwWindowContext.h              | C++      |        -40 |         -2 |        -15 |        -57 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\VulkanContext\VulkanContext.cpp                    | C++      |       -810 |        -80 |       -223 |     -1,113 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\VulkanContext\VulkanContext.h                      | C++      |        -99 |        -12 |        -43 |       -154 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\VulkanContext\VulkanContextHelpers.h               | C++      |        -39 |          0 |        -14 |        -53 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\VulkanContext\VulkanQueue.cpp                      | C++      |       -115 |          0 |        -32 |       -147 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\VulkanContext\VulkanQueue.h                        | C++      |        -29 |         -4 |        -11 |        -44 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\VulkanContext\VulkanTypes.h                        | C++      |        -20 |          0 |         -7 |        -27 |
+| e:\Dev\Games\RaptureVK\Engine\src\WindowContext\WindowContext.h                                    | C++      |        -32 |         -4 |        -21 |        -57 |
+| e:\Dev\Games\RaptureVK\Engine\src\main.cpp                                                         | C++      |         -6 |        -17 |         -2 |        -25 |
+| e:\Dev\Games\RaptureVK\Engine\src\source.cpp                                                       | C++      |        -20 |        -10 |        -16 |        -46 |
+| Total                                                                                              |          |    -12,787 |     -1,820 |     -5,327 |    -19,934 |
++----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+

@@ -64,7 +64,7 @@ IndexBuffer::~IndexBuffer()
         s_bindlessBuffers->free(m_bindlessIndex);
     }
     if (m_bufferAllocation) {
-        BufferPoolManager::getInstance().freeBuffer(m_bufferAllocation);
+        BufferPoolManager::getInstance().freeAllocation(m_bufferAllocation);
     }
 }   
 

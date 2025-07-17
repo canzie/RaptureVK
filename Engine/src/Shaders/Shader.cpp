@@ -254,7 +254,6 @@ void Shader::createDescriptorSetLayout()
     }
 
     
-    // Resize layout vector to accommodate all sets
     m_descriptorSetLayouts.resize(maxSetNumber + 1, VK_NULL_HANDLE);
 
     // Process each set

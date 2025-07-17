@@ -160,7 +160,7 @@ namespace Rapture {
         for (auto entity : lightView) {
             auto [light, transform] = lightView.get<LightComponent, TransformComponent>(entity);
 
-            if (light.hasChanged(frameCounter) || transform.hasChanged()) {
+            if (light.hasChanged(frameCounter) || transform.hasChanged() || light.type == LightType::Directional) {
                 light.lightDataBuffer->update(transform, light, static_cast<uint32_t>(entity));
             }
         }
