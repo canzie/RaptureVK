@@ -49,7 +49,7 @@ An integrated editor built with Dear ImGui provides tools for interacting with t
     <td width="50%">
       <img src="./screenshots/cornell box v2.PNG" alt="Cornell Box with DDGI" width="400">
       <br>
-      A simple showcase of the DDGI system in the Cornell Box. This is an early implementation, so features like probe relocation and classification are not yet available.
+      A simple showcase of the DDGI system in a version of the Cornell Box. This is an early implementation, so features like probe relocation and classification are not yet available.
     </td>
     <td width="50%">
       <img src="./screenshots/ddgi_sponza_v1.PNG" alt="Sponza with DDGI" width="400">
