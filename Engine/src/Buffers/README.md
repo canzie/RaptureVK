@@ -18,7 +18,7 @@ When reading the code you might come across different usage types (STATIC, DYNAM
 - **Purpose**: Represents a sub-allocation within a larger buffer arena.
 - **Role**: Holds the allocated memory slice (offset, size) and provides methods for data upload and device address retrieval. Automatically frees itself on destruction via RAII.
 
-### BufferArena (Struct, std::enable_shared_from_this)
+### BufferArena (Struct)
 - **Purpose**: Manages a single large Vulkan buffer (arena) and handles sub-allocations using VMA's virtual blocks.
 - **Role**: Creates a VkBuffer with specified size and usage flags. Provides thread-safe allocate/free operations with manual alignment handling if needed. Tracks compatibility with requests.
 
