@@ -1,3 +1,5 @@
+Related files: [`MDIBatch.h`](./MDIBatch.h), [`MDIBatch.cpp`](./MDIBatch.cpp)
+
 # Multi-Draw Indirect (MDI) Batching System
 
 This document provides an overview of the Multi-Draw Indirect (MDI) batching system, designed to efficiently render large numbers of objects by minimizing CPU overhead and API calls. The system is tightly integrated with the `BufferPool` to leverage memory locality for optimal performance.

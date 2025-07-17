@@ -49,6 +49,8 @@ release/
 # git
 .git
 
+.VSCodeCounter/
+
 # cache
 .cache/
 

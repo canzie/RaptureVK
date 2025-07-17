@@ -1,3 +1,5 @@
+Related files: [`BufferPool.h`](./BufferPool.h), [`BufferPool.cpp`](./BufferPool.cpp)
+
 # Buffer Pool System Overview
 
 This system manages Vulkan buffer allocations for vertex and index buffers using a pooling mechanism to improve performance through better memory locality, especially for Multi-Draw Indirect (MDI) rendering. It uses VMA (Vulkan Memory Allocator) for efficient sub-allocations within larger buffer arenas.
