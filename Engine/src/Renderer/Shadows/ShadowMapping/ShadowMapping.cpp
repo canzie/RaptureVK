@@ -385,9 +385,9 @@ void ShadowMap::createPipeline() {
     rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;  // Use front face culling for shadow mapping
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_TRUE;  // Enable depth bias
-    rasterizer.depthBiasConstantFactor = 2.0f;  // Adjust these values based on your needs
+    rasterizer.depthBiasConstantFactor = 1.25f;  // Adjust these values based on your needs
     rasterizer.depthBiasClamp = 0.0f;
-    rasterizer.depthBiasSlopeFactor = 2.0f;
+    rasterizer.depthBiasSlopeFactor = 1.75f;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;

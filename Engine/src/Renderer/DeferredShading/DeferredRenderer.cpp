@@ -296,7 +296,7 @@ void DeferredRenderer::recordCommandBuffer(
             // Always update directional light shadows for debugging, others only when changed
             bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
                                     transformComp.hasChanged() ||
-                                    lightComp.type == LightType::Directional); // Force update for directional lights
+                                    lightComp.type == LightType::Directional || lightComp.type == LightType::Spot); // Force update for directional lights
             
             if (shadowComp.shadowMap && shouldUpdateShadow) {
                 shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);

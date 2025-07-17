@@ -28,6 +28,7 @@ namespace Rapture {
 struct DDGITracePushConstants {
     uint32_t skyboxTextureIndex;
     uint32_t sunLightDataIndex;
+    uint32_t lightCount;
     uint32_t prevRadianceIndex;
     uint32_t prevVisibilityIndex;
     alignas(16) glm::vec3 cameraPosition;
@@ -828,8 +829,12 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     // Set 4: DDGI specific storage images
     m_probeTraceDescriptorSet->bind(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline);
 
+    auto& reg = scene->getRegistry();
+    auto lightView = reg.view<LightComponent>();
+
     // Set push constants with texture and buffer indices
     DDGITracePushConstants pushConstants = {};
+    pushConstants.lightCount = static_cast<uint32_t>(lightView.size());
     pushConstants.sunLightDataIndex = getSunLightDataIndex(scene);
     pushConstants.skyboxTextureIndex = m_skyboxTexture ? m_skyboxTexture->getBindlessIndex() : 0;
     pushConstants.tlasIndex = tlas->getBindlessIndex();

@@ -160,7 +160,7 @@ namespace Rapture {
         for (auto entity : lightView) {
             auto [light, transform] = lightView.get<LightComponent, TransformComponent>(entity);
 
-            if (light.hasChanged(frameCounter) || transform.hasChanged() || light.type == LightType::Directional) {
+            if (light.hasChanged(frameCounter) || transform.hasChanged() || light.type == LightType::Directional || light.type == LightType::Spot) {
                 light.lightDataBuffer->update(transform, light, static_cast<uint32_t>(entity));
             }
         }
@@ -180,7 +180,7 @@ namespace Rapture {
             auto [light, transform, shadow] = shadowView.get<LightComponent, TransformComponent, ShadowComponent>(entity);
 
             if (shadow.shadowMap && shadow.isActive && 
-                (light.hasChanged(frameCounter) || transform.hasChanged())) {                
+                (light.hasChanged(frameCounter) || transform.hasChanged() || light.type == LightType::Spot)) {                
             
                 // Update the shadow map view matrix
                 shadow.shadowMap->updateViewMatrix(light, transform, cameraPosition);

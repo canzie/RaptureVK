@@ -98,7 +98,7 @@ void DescriptorManager::initializeSet2() {
     DescriptorSetBindings bindings;
     
     // Add bindings for mesh data (using SSBO for bindless access)
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2048, TextureViewType::DEFAULT, 
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16384, TextureViewType::DEFAULT, 
                                 false, DescriptorSetBindingLocation::MESH_DATA_UBO});
     bindings.setNumber = 2;
     

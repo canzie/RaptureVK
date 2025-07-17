@@ -30,6 +30,7 @@ layout(set = 3, binding = 1) readonly buffer gBindlessBuffers {
 layout(push_constant) uniform PushConstants {
     uint skyboxTextureIndex;     // Index into bindless texture array
     uint sunLightDataIndex;
+    uint lightCount;
 
     uint prevRadianceIndex;      // Previous radiance texture bindless index
     uint prevVisibilityIndex;    // Previous visibility texture bindless index
@@ -87,10 +88,7 @@ layout(std140, set=0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
 
-// Sun shadow uniforms
-layout(std140, set=0, binding = 1) uniform SunPropertiesUBO { // use the light thing here instead
-    SunProperties sunProperties;
-}u_sunProperties[];
+
 
 
 
@@ -397,7 +395,7 @@ void main() {
 
             vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, samplePointToCamera, u_volume);
 
-            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_sunProperties[sunLightDataIndex].sunProperties);
+            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, lightCount);
 
             float volumeBlendWeight = DDGIGetVolumeBlendWeight(hitPosition, u_volume);
 

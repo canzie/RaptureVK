@@ -177,7 +177,7 @@ private:
     static uint32_t s_poolInputAttachmentCount;
     static uint32_t s_poolAccelerationStructureCount;
     static const uint32_t s_maxSets = 1000;  // Maximum descriptor sets in pool
-    static const uint32_t s_maxBuffers = 16000;    // Increased from 8000
+    static const uint32_t s_maxBuffers = 20000;    // Increased from 8000
     static const uint32_t s_maxTextures = 16000;   // Increased from 8000
     static const uint32_t s_maxStorageBuffers = 8000;  // Increased from 4000
     static const uint32_t s_maxStorageImages = 8000;   // Increased from 4000 (need 4103+ minimum)

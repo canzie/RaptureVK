@@ -18,6 +18,11 @@ struct SunProperties {
 
 #ifdef DDGI_ENABLE_DIFFUSE_LIGHTING
 
+// Sun shadow uniforms
+layout(std140, set=0, binding = 1) uniform SunPropertiesUBO { // use the light thing here instead
+    SunProperties sunProperties;
+}u_sunProperties[];
+
 /**
  * Computes the visibility factor for a given vector to a light using ray tracing.
  */
@@ -59,6 +64,14 @@ float LightVisibility(
     return 1.0; // Visible
 }
 
+float LightFalloff(float distanceToLight) {
+    return 1.0 / pow(max(distanceToLight, 1.0), 2);
+}
+
+float LightWindowing(float distanceToLight, float maxDistance) {
+    return pow(clamp(1.0 - pow((distanceToLight / maxDistance), 4), 0.0, 1.0), 2);
+}
+
 /**
  * Evaluate direct lighting for the current surface and the directional light using ray-traced visibility.
  */
@@ -95,18 +108,60 @@ vec3 EvaluateSpotLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties 
     return vec3(0.0);
 }
 
+vec3 EvaluatePointLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties PointLight)
+{   
+    float normalBias = 0.01; // Small bias to avoid self-intersection
+    float viewBias = 0.0;    // Not used yet, but kept for future
+
+    vec3 lightVector = (PointLight.position.xyz - hitPositionWorld);
+    float  lightDistance = length(lightVector);
+
+    // Early out, light energy doesn't reach the surface
+    if (lightDistance > PointLight.position.w) return vec3(0.0);
+
+    float tmax = (lightDistance - viewBias);
+    float visibility = LightVisibility(hitPositionWorld, shadingNormal, lightVector, tmax, normalBias, viewBias);
+
+    // Early out, this light isn't visible from the surface
+    if (visibility <= 0.0) return vec3(0.0);
+
+    // Compute lighting
+    vec3 lightDirection = normalize(lightVector);
+    float  nol = max(dot(shadingNormal, lightDirection), 0.0);
+    float  falloff = LightFalloff(lightDistance);
+    float  window = LightWindowing(lightDistance, PointLight.position.w);
+
+    vec3 color = PointLight.color.xyz * PointLight.color.w * nol * falloff * window * visibility;
+
+    return color;
+}
 
 /**
  * Computes the diffuse reflection of light off the given surface (direct lighting).
  */
-vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties) {
+vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorld, uint lightCount) {
 
     vec3 brdf = (albedo / PI);
 
-    vec3 lighting = EvaluateDirectionalLight(shadingNormal, hitPositionWorld, sunProperties);
+    vec3 totalLighting = vec3(0.0);
 
+    for (uint i = 0; i < lightCount; ++i) {
+        SunProperties light = u_sunProperties[i].sunProperties;
+        
+        // light type is in light.position.w
+        if (light.position.w == 1) { // Directional
+             totalLighting += EvaluateDirectionalLight(shadingNormal, hitPositionWorld, light);
+        } else if (light.position.w == 0) { // Point
+             totalLighting += EvaluatePointLight(shadingNormal, hitPositionWorld, light);
+        } else if (light.position.w == 2) { // Spot
+             totalLighting += EvaluateSpotLight(shadingNormal, hitPositionWorld, light);
+        }
+    }
 
-    return (brdf * lighting);
+    //vec3 lighting = EvaluateDirectionalLight(shadingNormal, hitPositionWorld, sunProperties);
+    //vec3 lighting = EvaluatePointLight(shadingNormal, hitPositionWorld, sunProperties);
+
+    return (brdf * totalLighting);
 }
 
 #endif

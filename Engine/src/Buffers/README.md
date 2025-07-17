@@ -4,9 +4,9 @@ Related files: [`BufferPool.h`](./BufferPool.h), [`BufferPool.cpp`](./BufferPool
 
 This system manages Vulkan buffer allocations for vertex and index buffers using a pooling mechanism to improve performance through better memory locality, especially for Multi-Draw Indirect (MDI) rendering. It uses VMA (Vulkan Memory Allocator) for efficient sub-allocations within larger buffer arenas.
 
-The main limitation of VMA that led to the need for this system was the lack of inherit support for direct larger shared buffers. It is recommended to combine the vertex, index and even uniform buffers into a single larger buffer for better locality and performance. Even tough vma might use the same buffer under the hood, we need more control here.
+The main limitation of VMA that led to the need for this system was the lack of inherit support for larger shared buffers. It is recommended to combine the vertex, index and even uniform buffers into a single larger buffer for better locality and performance. Even tough vma might use the same buffer under the hood, we needed more control here.
 
-When reading the code you might come across different usage types (STATIC, DYNAMIC, STREAM), these are inspired from opengl to minimise vulkan verbosity.
+When reading the code you might come across different usage types (STATIC, DYNAMIC, STREAM), these are inspired from opengl to reduce vulkan verbosity.
 
 ## Key Components
 

@@ -99,17 +99,54 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     //auto loader = Rapture::ModelLoadersCache::getLoader(rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf", activeScene);
     //loader->loadModel((rootPath / "assets/models/glTF2.0/MetalRoughSpheres/MetalRoughSpheres.gltf").string());
 
-    
-    auto cubeD = activeScene->createCube("Cube D");
-    auto& rbD = cubeD.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
-    rbD.invMass = 0.0f;
+    /*
+    auto cubeA = activeScene->createCube("Ceiling A");
+    cubeA.addComponent<Rapture::BLASComponent>(cubeA.getComponent<Rapture::MeshComponent>().mesh);
+    cubeA.getComponent<Rapture::MeshComponent>().isStatic = true;
+
+    auto cubeB = activeScene->createCube("Floor B");
+    cubeB.addComponent<Rapture::BLASComponent>(cubeB.getComponent<Rapture::MeshComponent>().mesh);
+    cubeB.getComponent<Rapture::MeshComponent>().isStatic = true;
+    cubeB.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(20.0f, 2.0f, 20.0f));
+
+    auto cubeC = activeScene->createCube("Wall C");
+    cubeC.addComponent<Rapture::BLASComponent>(cubeC.getComponent<Rapture::MeshComponent>().mesh);
+    cubeC.getComponent<Rapture::MeshComponent>().isStatic = true;
+
+    auto cubeD = activeScene->createCube("Wall D");
     cubeD.addComponent<Rapture::BLASComponent>(cubeD.getComponent<Rapture::MeshComponent>().mesh);
     cubeD.getComponent<Rapture::MeshComponent>().isStatic = true;
-    cubeD.getComponent<Rapture::MaterialComponent>().material->setParameter<glm::vec3>(Rapture::ParameterID::ALBEDO, glm::vec3(1.0f, 0.0f, 0.0f));
+    
+    auto cubeE = activeScene->createCube("Red Wall");
+    //auto& rbD = cubeD.addComponent<Rapture::Entropy::RigidBodyComponent>(std::make_unique<Rapture::Entropy::AABBCollider>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f)));
+    //rbD.invMass = 0.0f;
+    cubeE.addComponent<Rapture::BLASComponent>(cubeE.getComponent<Rapture::MeshComponent>().mesh);
+    cubeE.getComponent<Rapture::MeshComponent>().isStatic = true;
+    cubeE.getComponent<Rapture::MaterialComponent>().material->setParameter<glm::vec3>(Rapture::ParameterID::ALBEDO, glm::vec3(1.0f, 0.0f, 0.0f));
 
+    auto cubeF = activeScene->createCube("Green Wall");
+    cubeF.addComponent<Rapture::BLASComponent>(cubeF.getComponent<Rapture::MeshComponent>().mesh);
+    cubeF.getComponent<Rapture::MeshComponent>().isStatic = true;
+    cubeF.getComponent<Rapture::MaterialComponent>().material->setParameter<glm::vec3>(Rapture::ParameterID::ALBEDO, glm::vec3(0.0f, 1.0f, 0.0f));
 
+    auto cubeG = activeScene->createCube("Cube B");
+    cubeG.addComponent<Rapture::BLASComponent>(cubeG.getComponent<Rapture::MeshComponent>().mesh);
+    cubeG.getComponent<Rapture::MeshComponent>().isStatic = true;
+    cubeG.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 10.0f, 1.5f));
+
+    auto cubeH = activeScene->createCube("Cube A");
+    cubeH.addComponent<Rapture::BLASComponent>(cubeH.getComponent<Rapture::MeshComponent>().mesh);
+    cubeH.getComponent<Rapture::MeshComponent>().isStatic = true;
+
+    activeScene->registerBLAS(cubeA);
+    activeScene->registerBLAS(cubeB);
+    activeScene->registerBLAS(cubeC);
     activeScene->registerBLAS(cubeD);
-
+    activeScene->registerBLAS(cubeE);
+    activeScene->registerBLAS(cubeF);
+    activeScene->registerBLAS(cubeG);
+    activeScene->registerBLAS(cubeH);
+*/
 
 
 
@@ -192,7 +229,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     auto sphere = std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateSphere(1, 8));
     auto ddgiVizEntity = std::make_shared<Rapture::Entity>(scene->createEntity("DDGI Probe Volume"));
     ddgiVizEntity->addComponent<Rapture::TransformComponent>();
-    ddgiVizEntity->addComponent<Rapture::InstanceShapeComponent>(instanceData, app.getVulkanContext().getVmaAllocator());
+    //ddgiVizEntity->addComponent<Rapture::InstanceShapeComponent>(instanceData, app.getVulkanContext().getVmaAllocator());
     ddgiVizEntity->addComponent<Rapture::MeshComponent>(sphere);
         
 

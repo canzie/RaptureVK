@@ -18,7 +18,7 @@ layout(location = 0) in vec2 fragTexCoord;
 #define DEBUG_SPOTLIGHTS 0
 #define MAX_CASCADES 4
 #define MAX_SHADOW_CASTERS 4
-#define DEBUG_CASCADES 0
+#define DEBUG_CASCADES 1
 #define DEBUG_DIRECTIONAL_SHADOWS 0  // Set to 1 to enable debugging
 #define DEBUG_SHADOW_COORDS 0
 
@@ -267,7 +267,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         }
         
         
-        bias = max(0.05 * (1.0 - cosTheta) * distanceScale * cascadeBiasMultiplier, 0.005);
+        bias = max(0.005 * (1.0 - cosTheta) * distanceScale * cascadeBiasMultiplier, 0.0005);
         float comparisonDepth = projCoords.z - bias;
 
         const int kernelRadius = 3; // 7x7 kernel → radius = (7-1)/2 = 3
