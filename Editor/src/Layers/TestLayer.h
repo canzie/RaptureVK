@@ -42,6 +42,7 @@ public:
     void notifyCameraChange();
 
 private:
+    void createRadianceCascadeProbeVisualization(std::shared_ptr<Rapture::Scene> scene);
 
     
     // Camera references
@@ -53,5 +54,7 @@ private:
     float m_fpsTimer = 0.0f;
 
     std::shared_ptr<Rapture::Entropy::EntropyPhysics> m_entropyPhysics;
+    
+    std::vector<std::shared_ptr<Rapture::Entity>> m_cascadeProbeEntities;
 
 };

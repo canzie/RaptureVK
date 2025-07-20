@@ -8,6 +8,8 @@
 #include "Components/Components.h"
 #include "Renderer/ForwardRenderer/ForwardRenderer.h"
 #include "Renderer/DeferredShading/DeferredRenderer.h"
+#include "Renderer/GI/RadianceCascades/RadianceCascades.h"
+#include "Materials/MaterialInstance.h"
 
 #include "Loaders/glTF2.0/glTFLoader.h"
 
@@ -233,12 +235,84 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     ddgiVizEntity->addComponent<Rapture::MeshComponent>(sphere);
         
 
-    
-
+    // Create radiance cascade probe visualization
+    createRadianceCascadeProbeVisualization(activeScene);
 
 }
 
+void TestLayer::createRadianceCascadeProbeVisualization(std::shared_ptr<Rapture::Scene> scene) {
+    auto& app = Rapture::Application::getInstance();
+    auto radianceCascades = Rapture::DeferredRenderer::getRadianceCascades();
+    
+    if (!radianceCascades) {
+        Rapture::RP_WARN("TestLayer: RadianceCascades not available for visualization");
+        return;
+    }
 
+    const auto& cascades = radianceCascades->getCascades();
+    
+    // Create different colored spheres for each cascade level
+    auto sphere = std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateSphere(1, 16));
+    
+    // Define colors for each cascade (rainbow-like progression)
+    std::vector<glm::vec3> cascadeColors = {
+        glm::vec3(1.0f, 0.0f, 0.0f),  // Red - Cascade 0 (finest detail)
+        glm::vec3(1.0f, 0.5f, 0.0f),  // Orange - Cascade 1
+        glm::vec3(1.0f, 1.0f, 0.0f),  // Yellow - Cascade 2
+        glm::vec3(0.0f, 1.0f, 0.0f),  // Green - Cascade 3
+        glm::vec3(0.0f, 0.0f, 1.0f),  // Blue - Cascade 4
+        glm::vec3(0.5f, 0.0f, 1.0f)   // Purple - Cascade 5
+    };
+    
+    for (uint32_t cascadeIdx = 0; cascadeIdx < MAX_CASCADES; cascadeIdx++) {
+        const auto& cascade = cascades[cascadeIdx];
+        
+        // Skip invalid cascades
+        if (cascade.cascadeLevel == UINT32_MAX) {
+            continue;
+        }
+        
+        // Get probe positions for this cascade
+        auto probePositions = radianceCascades->getCascadeProbePositions(cascadeIdx);
+        
+        if (probePositions.empty()) {
+            continue;
+        }
+        
+        // Create instance data for this cascade
+        std::vector<Rapture::InstanceData> instanceData(probePositions.size());
+        
+        // Calculate scale based on cascade level (larger cascades = larger probes)
+        float baseScale = 0.05f;  // Base scale for finest cascade
+        float scaleMultiplier = std::pow(1.5f, static_cast<float>(cascadeIdx));  // Scale increases with cascade level
+        float probeScale = baseScale * scaleMultiplier;
+        
+        for (size_t i = 0; i < probePositions.size(); i++) {
+            glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), probePositions[i]);
+            modelMatrix = glm::scale(modelMatrix, glm::vec3(probeScale));
+            
+            instanceData[i].transform = modelMatrix;
+        }
+        
+        // Create entity for this cascade
+        std::string entityName = "RC Cascade " + std::to_string(cascadeIdx) + " Probes";
+        auto cascadeEntity = std::make_shared<Rapture::Entity>(scene->createSphere(entityName));
+        
+        auto& isc = cascadeEntity->addComponent<Rapture::InstanceShapeComponent>(instanceData, app.getVulkanContext().getVmaAllocator());
+        
+        
+        // Create material with cascade-specific color
+        auto& materialC = cascadeEntity->getComponent<Rapture::MaterialComponent>();
+
+        glm::vec3 cascadeColor = cascadeColors[cascadeIdx % cascadeColors.size()];
+        materialC.material->setParameter<glm::vec3>(Rapture::ParameterID::ALBEDO, cascadeColor);
+        isc.color = glm::vec4(cascadeColor, 1.0);
+        
+        // Store for potential cleanup
+        m_cascadeProbeEntities.push_back(cascadeEntity);
+
+    }
+}
 
 
 void TestLayer::onDetach()

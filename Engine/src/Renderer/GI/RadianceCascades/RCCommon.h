@@ -31,6 +31,7 @@ struct BuildParams {
      * @brief The spatial grid resolution of the first cascade (P_0)
      */
     glm::ivec3 baseGridDimensions = glm::ivec3(32, 32, 32); // Example dimensions
+    glm::vec3 baseGridSpacing = glm::vec3(1.0, 1.0, 1.0); // Example dimensions
 
     /**
      * @brief The angular resolution 'dimension' of the first cascade (Q_0).
@@ -49,22 +50,29 @@ struct BuildParams {
 };
 
 struct RadianceCascadeLevel {
-    uint32_t cascadeLevel = UINT32_MAX;
+    alignas(4) uint32_t cascadeLevel = UINT32_MAX;
 
-    glm::ivec3 probeGridDimensions = glm::ivec3(0);
+    alignas(16) glm::ivec3 probeGridDimensions = glm::ivec3(0);
 
-    glm::vec3 probeSpacing = glm::vec3(0.0f); // 
-    glm::vec3 probeOrigin = glm::vec3(0.0f);
+    alignas(16) glm::vec3 probeSpacing = glm::vec3(0.0f); // 
+    alignas(16) glm::vec3 probeOrigin = glm::vec3(0.0f);
 
-    float minProbeDistance = 0.0f;
-    float maxProbeDistance = 0.0f;
+    alignas(4) float minProbeDistance = 0.0f;
+    alignas(4) float maxProbeDistance = 0.0f;
     
-    uint32_t angularResolution = 0; // NxN = number of rays  
+    alignas(4) uint32_t angularResolution = 0; // NxN = number of rays  
 
-    uint32_t cascadeTextureIndex = UINT32_MAX; // bindless index of the cascade
+    alignas(4) uint32_t cascadeTextureIndex = UINT32_MAX; // bindless index of the cascade
 
 
+};
 
+struct RCProbeTracePushConstants {
+    uint32_t cascadeIndex;
+    uint32_t cascadeLevels;
+    uint32_t tlasIndex;
+    uint32_t lightCount;
+    uint32_t skyboxTextureIndex;
 };
 
 }

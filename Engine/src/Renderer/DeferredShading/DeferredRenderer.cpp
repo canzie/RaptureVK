@@ -42,6 +42,7 @@ float DeferredRenderer::m_width = 0.0f;
 float DeferredRenderer::m_height = 0.0f;
 bool DeferredRenderer::m_framebufferNeedsResize = false;
 std::shared_ptr<DynamicDiffuseGI> DeferredRenderer::m_dynamicDiffuseGI = nullptr;
+std::shared_ptr<RadianceCascades> DeferredRenderer::m_radianceCascades = nullptr;
 
 void DeferredRenderer::init() {
 
@@ -62,7 +63,8 @@ void DeferredRenderer::init() {
   setupCommandResources();
 
   m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
-
+  m_radianceCascades = std::make_shared<RadianceCascades>(m_swapChain->getImageCount());
+  m_radianceCascades->build(BuildParams());
 
   m_gbufferPass = std::make_shared<GBufferPass>(
       static_cast<float>(m_swapChain->getExtent().width),
@@ -133,6 +135,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
   uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
 
   m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
+  m_radianceCascades->castRays(activeScene, m_currentFrame);
 
   m_commandBuffers[m_currentFrame]->reset();
   recordCommandBuffer(m_commandBuffers[m_currentFrame], activeScene,
