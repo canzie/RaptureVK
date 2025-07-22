@@ -58,11 +58,15 @@ void RadianceCascades::build(const BuildParams &buildParams) {
         );
 
         // this is the center of the grid, the shader should shift the grid by half of the extent
-        cascade.probeOrigin = glm::vec3(-0.4f, 5.4f, -0.25f);
+        cascade.probeOrigin = glm::vec3(-0.4f, 4.7f, -0.25f);
 
         cascade.cascadeTextureIndex = 0xFFFFFFFF;
 
-        RP_CORE_INFO("Cascade {}: Probe Origin: {}, Probe Spacing: {}, Probe Grid Dimensions: {}, Angular Resolution: {}", i, glm::to_string(cascade.probeOrigin), glm::to_string(cascade.probeSpacing), glm::to_string(cascade.probeGridDimensions), cascade.angularResolution);
+        RP_CORE_INFO("Cascade {}: \n\t Probe Origin: {}, Probe Spacing: {}, \
+            Probe Grid Dimensions: {}, \
+            Angular Resolution: {}, interval: {} - {}", 
+            
+            i, glm::to_string(cascade.probeOrigin), glm::to_string(cascade.probeSpacing), glm::to_string(cascade.probeGridDimensions), cascade.angularResolution, cascade.minProbeDistance, cascade.maxProbeDistance);
 
         m_radianceCascades[i] = cascade;
         
@@ -192,25 +196,7 @@ void RadianceCascades::buildUniformBuffers() {
 void RadianceCascades::mergeCascades(std::shared_ptr<CommandBuffer> commandBuffer) {
     
     // Transition all cascade textures to general layout for read/write access
-    std::vector<VkImageMemoryBarrier> preMergeBarriers;
-    for (uint32_t i = 0; i < MAX_CASCADES; i++) {
-        VkImageMemoryBarrier cascadeBarrier = m_cascadeTextures[i]->getImageMemoryBarrier(
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-            VK_IMAGE_LAYOUT_GENERAL, 
-            VK_ACCESS_SHADER_READ_BIT, 
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-        preMergeBarriers.push_back(cascadeBarrier);
-    }
-    
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        static_cast<uint32_t>(preMergeBarriers.size()), preMergeBarriers.data()
-    );
+
 
     // Bind the merge cascade pipeline
     m_mergeCascadePipeline->bind(commandBuffer->getCommandBufferVk());
@@ -230,6 +216,21 @@ void RadianceCascades::mergeCascades(std::shared_ptr<CommandBuffer> commandBuffe
             continue;
         }
 
+        VkImageMemoryBarrier cascadeBarrier = m_cascadeTextures[currentCascade]->getImageMemoryBarrier(
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+            VK_IMAGE_LAYOUT_GENERAL, 
+            VK_ACCESS_SHADER_READ_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+
+        vkCmdPipelineBarrier(
+                commandBuffer->getCommandBufferVk(),
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                0,
+                0, nullptr,
+                0, nullptr,
+                1, &cascadeBarrier
+            );
         // Bind the output descriptor set (current cascade texture)
         m_probeTraceDescriptorSets[currentCascade]->bind(commandBuffer->getCommandBufferVk(), m_mergeCascadePipeline);
 
@@ -258,46 +259,26 @@ void RadianceCascades::mergeCascades(std::shared_ptr<CommandBuffer> commandBuffe
         // Dispatch the merge compute shader
         vkCmdDispatch(commandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, workGroupsZ);
 
-        // Add memory barrier between merge operations
-        if (currentCascade > 0) {
-            VkImageMemoryBarrier intermediateMergeBarrier = m_cascadeTextures[currentCascade]->getImageMemoryBarrier(
-                VK_IMAGE_LAYOUT_GENERAL, 
-                VK_IMAGE_LAYOUT_GENERAL, 
-                VK_ACCESS_SHADER_WRITE_BIT, 
-                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-
-            vkCmdPipelineBarrier(
-                commandBuffer->getCommandBufferVk(),
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                0,
-                0, nullptr,
-                0, nullptr,
-                1, &intermediateMergeBarrier
-            );
-        }
-    }
-
-    // Final transition to shader read-only optimal for merged cascades
-    std::vector<VkImageMemoryBarrier> postMergeBarriers;
-    for (uint32_t i = 0; i < MAX_CASCADES; i++) {
-        VkImageMemoryBarrier cascadeBarrier = m_cascadeTextures[i]->getImageMemoryBarrier(
+        // Add a memory barrier after each dispatch to prevent race conditions.
+        // This ensures that the writes to the current cascade's texture are complete
+        // before it is read in the next iteration of the loop.
+        VkImageMemoryBarrier intermediateMergeBarrier = m_cascadeTextures[currentCascade]->getImageMemoryBarrier(
             VK_IMAGE_LAYOUT_GENERAL, 
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
             VK_ACCESS_SHADER_WRITE_BIT, 
             VK_ACCESS_SHADER_READ_BIT);
-        postMergeBarriers.push_back(cascadeBarrier);
+
+        vkCmdPipelineBarrier(
+            commandBuffer->getCommandBufferVk(),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &intermediateMergeBarrier
+        );
     }
-    
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        static_cast<uint32_t>(postMergeBarriers.size()), postMergeBarriers.data()
-    );
+
 
 
 }

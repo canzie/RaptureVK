@@ -25,9 +25,10 @@ namespace Rapture {
         ~Scene();
 
         Entity createEntity(const std::string& name = "Untitled Entity");
-        Entity createCube(const std::string& name = "Untitled Entity");
-        Entity createSphere(const std::string& name = "Untitled Entity");
-        
+        Entity createCube(const std::string& name = "Untitled Cube Entity");
+        Entity createSphere(const std::string& name = "Untitled Sphere Entity");
+        Entity createLine(const std::string& name = "Untitled Line Entity");
+
         void destroyEntity(Entity entity);
 
         void onUpdate(float dt);

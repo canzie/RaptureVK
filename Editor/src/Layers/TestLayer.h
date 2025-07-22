@@ -55,6 +55,4 @@ private:
 
     std::shared_ptr<Rapture::Entropy::EntropyPhysics> m_entropyPhysics;
     
-    std::vector<std::shared_ptr<Rapture::Entity>> m_cascadeProbeEntities;
-
 };

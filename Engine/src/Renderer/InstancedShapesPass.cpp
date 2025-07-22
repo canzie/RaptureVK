@@ -91,7 +91,7 @@ void InstancedShapesPass::recordCommandBuffer(
     for (auto entity : view) {
         auto [transformComp, meshComp, instanceShapeComp] = view.get<TransformComponent, MeshComponent, InstanceShapeComponent>(entity);
 
-        if (meshComp.mesh == nullptr || instanceShapeComp.instanceSSBO == nullptr) {
+        if (meshComp.mesh == nullptr || instanceShapeComp.instanceSSBO == nullptr || !meshComp.isVisible) {
             continue;
         }
 

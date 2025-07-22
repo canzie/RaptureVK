@@ -141,7 +141,7 @@ void GBufferPass::recordCommandBuffer(
         auto& boundingBoxComp = view.get<BoundingBoxComponent>(entity);
 
         // Check if mesh is valid and not loading
-        if (!meshComp.mesh || meshComp.isLoading) {
+        if (!meshComp.mesh || meshComp.isLoading || !meshComp.isVisible) {
             continue;
         }
         

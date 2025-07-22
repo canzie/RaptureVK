@@ -188,6 +188,7 @@ namespace Rapture {
         std::shared_ptr<Mesh> mesh;
         bool isLoading = true;
         bool isStatic = true;
+        bool isVisible = true;
 
         std::shared_ptr<MeshDataBuffer> meshDataBuffer;
 

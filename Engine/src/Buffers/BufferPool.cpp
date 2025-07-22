@@ -231,7 +231,7 @@ bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllo
     
     result = vmaVirtualAllocate(virtualBlock, &allocCreateInfo, &allocation, &offset);
     if (result != VK_SUCCESS) {
-        RP_CORE_TRACE("BufferArena {}: Failed to allocate {} bytes (including {} padding)", id, allocSize, maxPadding);
+        RP_CORE_ERROR("BufferArena {}: Failed to allocate {} bytes (including {} padding)", id, allocSize, maxPadding);
         return false;
     }
     
@@ -257,8 +257,8 @@ bool BufferArena::allocate(VkDeviceSize size, VkDeviceSize alignment, BufferAllo
     outAllocation->sizeBytes = size;
     
     if (alignedOffset != offset) {
-        RP_CORE_TRACE("BufferArena {}: Manual alignment: raw_offset={}, aligned_offset={}, padding={}", 
-                     id, offset, alignedOffset, alignedOffset - offset);
+        //RP_CORE_TRACE("BufferArena {}: Manual alignment: raw_offset={}, aligned_offset={}, padding={}", 
+        //             id, offset, alignedOffset, alignedOffset - offset);
     }
     
     return true;

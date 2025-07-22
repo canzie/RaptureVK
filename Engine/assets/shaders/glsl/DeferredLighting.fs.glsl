@@ -437,32 +437,7 @@ vec3 GetProbeRayDirection(uint rayIndex, uint angularResolution)
     return normalize(direction);
 }
 
-uint RemapRayIndexMathematical(vec3 currentRayDirection, uint prevAngularResolution)
-{
-    uint numPrevRays = prevAngularResolution * prevAngularResolution;
-    
-    // Convert direction to spherical coordinates
-    float phi = atan(currentRayDirection.y, currentRayDirection.x);
-    float cosTheta = currentRayDirection.z;
-    
-    // Normalize phi to [0, 2π]
-    if (phi < 0.0) phi += 6.28318530718;
-    
-    // Convert to spherical Fibonacci parameters
-    const float b = (sqrt(5.0) * 0.5 + 0.5) - 1.0;
-    
-    // Solve for sampleIndex using the inverse of SphericalFibonacci
-    // phi = 2π * fract(sampleIndex * b)
-    // cosTheta = 1 - (2 * sampleIndex + 1) / numSamples
-    
-    // From cosTheta equation: sampleIndex = (1 - cosTheta) * numSamples / 2 - 0.5
-    float sampleIndex = (1.0 - cosTheta) * float(numPrevRays) * 0.5 - 0.5;
-    
-    // Clamp to valid range
-    sampleIndex = clamp(sampleIndex, 0.0, float(numPrevRays - 1));
-    
-    return uint(sampleIndex);
-}
+
 
 vec3 GetProbeWorldPosition(ivec3 probeCoords, CascadeLevelInfo cascadeLevelInfo)
 {
@@ -481,71 +456,79 @@ vec3 GetProbeWorldPosition(ivec3 probeCoords, CascadeLevelInfo cascadeLevelInfo)
 }
 
 vec3 sampleRadianceCascadeDiffuse(vec3 fragmentWorldPosition, vec3 normal, CascadeLevelInfo cascade0) {
-    vec3 localPos = (fragmentWorldPosition - cascade0.probeOrigin) / cascade0.probeSpacing;
+    // This function calculates the inverse of GetProbeWorldPosition to find the fragment's
+    // position within the probe grid's local coordinate space.
+    vec3 gridShift = (cascade0.probeSpacing * vec3(cascade0.probeGridDimensions - 1)) * 0.5;
+    vec3 localPos = (fragmentWorldPosition - cascade0.probeOrigin + gridShift) / cascade0.probeSpacing;
 
-    // Get integer probe coords and interpolation weights
-    ivec3 base = ivec3(floor(localPos));
-    vec3 frac = fract(localPos);
+    // Get integer probe coords and fractional part for interpolation
+    ivec3 baseProbeCoord = ivec3(floor(localPos));
+    vec3 interpWeights = fract(localPos);
 
-    vec3 diffuseIrradiance = vec3(0.0);
+    vec3 totalIntegratedRadiance = vec3(0.0);
 
-    // Accumulate from 8 neighboring probes (trilinear)
-    for (int dx = 0; dx <= 1; ++dx) {
-        for (int dy = 0; dy <= 1; ++dy) {
-            for (int dz = 0; dz <= 1; ++dz) {
-
-                ivec3 probeCoord = base + ivec3(dx, dy, dz);
-
-                // Clamp to valid grid range
+    // Trilinear interpolation over the 8 neighboring probes
+    for (int z = 0; z <= 1; ++z) {
+        for (int y = 0; y <= 1; ++y) {
+            for (int x = 0; x <= 1; ++x) {
+                // Calculate current probe's coordinate and world position
+                ivec3 probeCoord = baseProbeCoord + ivec3(x, y, z);
                 probeCoord = clamp(probeCoord, ivec3(0), cascade0.probeGridDimensions - 1);
-
-                // Trilinear weight
-                float weight = mix(1.0 - frac.x, frac.x, dx) *
-                               mix(1.0 - frac.y, frac.y, dy) *
-                               mix(1.0 - frac.z, frac.z, dz);
-
-                // Calculate the ray direction closest to the surface normal
-                // Use the same spherical Fibonacci mapping as in the cascade generation
-                uint numRays = cascade0.angularResolution * cascade0.angularResolution;
-                
-
                 vec3 probeWorldPosition = GetProbeWorldPosition(probeCoord, cascade0);
-                vec3 raydirection = normalize(fragmentWorldPosition - probeWorldPosition);
 
-                // Find the ray index closest to the normal direction
-                uint closestRayIndex = 0;
-                float maxDot = -1.0;
-                
-                for (uint rayIdx = 0; rayIdx < numRays; ++rayIdx) {
-                    vec3 rayDir = GetProbeRayDirection(rayIdx, cascade0.angularResolution);
-                    float dotProduct = abs(dot(rayDir, raydirection));
-                    if (dotProduct > maxDot) {
-                        maxDot = dotProduct;
-                        closestRayIndex = rayIdx;
+                // --- Irradiance Integration for this probe ---
+                vec3 probeIrradiance = vec3(0.0);
+                uint numRaysToSample = 32; // Sample a subset of rays for performance
+                uint totalRaysInProbe = cascade0.angularResolution * cascade0.angularResolution;
+                uint step_ = max(1u, totalRaysInProbe / numRaysToSample);
+
+                float totalWeight = 0.0;
+                float totalSamples = 0.0;
+                for (uint i = 0; i < numRaysToSample; ++i) {
+                    uint rayIndex = i * step_;
+
+                    // Get ray direction for this sample
+                    vec3 rayDir = GetProbeRayDirection(rayIndex, cascade0.angularResolution);
+
+                    // Consider rays in the hemisphere of the normal
+                    float NdotL = dot(normal, rayDir);
+                    if (NdotL > 0.0) {
+                        // Calculate texture coordinates for this ray
+                        uint rayX = rayIndex % cascade0.angularResolution;
+                        uint rayY = rayIndex / cascade0.angularResolution;
+                        ivec3 texCoords;
+                        texCoords.x = probeCoord.x * int(cascade0.angularResolution) + int(rayX);
+                        texCoords.y = probeCoord.z * int(cascade0.angularResolution) + int(rayY);
+                        texCoords.z = probeCoord.y;
+
+                        // Fetch radiance 
+                        vec4 probeData = texelFetch(gTextureArrays[cascade0.cascadeTextureIndex], texCoords, 0);
+                        vec3 probeRadiance = probeData.rgb;
+
+                        // Accumulate cosine-weighted radiance
+                        probeIrradiance += probeRadiance * NdotL;
+                        totalWeight += NdotL;
+                        totalSamples += 1.0;
                     }
                 }
                 
-                // Calculate texture coordinates for this probe and ray
-                uint rayX = closestRayIndex % cascade0.angularResolution;
-                uint rayY = closestRayIndex / cascade0.angularResolution;
-                
-                ivec3 texCoords;
-                texCoords.x = probeCoord.x * int(cascade0.angularResolution) + int(rayX);
-                texCoords.y = probeCoord.z * int(cascade0.angularResolution) + int(rayY);
-                texCoords.z = probeCoord.y;
+                if (totalWeight > 0.0) {
+                    probeIrradiance /= totalWeight;
+                    probeIrradiance /= totalSamples;
+                }
 
-                // Fetch radiance from probe's texture
-                vec3 probeRadiance = texelFetch(gTextureArrays[cascade0.cascadeTextureIndex], texCoords, 0).rgb;
+                // Calculate trilinear interpolation weight
+                float weight = mix(1.0 - interpWeights.x, interpWeights.x, x) *
+                               mix(1.0 - interpWeights.y, interpWeights.y, y) *
+                               mix(1.0 - interpWeights.z, interpWeights.z, z);
 
-                diffuseIrradiance += probeRadiance * weight;
+                // Accumulate weighted irradiance
+                totalIntegratedRadiance += probeIrradiance * weight;
             }
         }
     }
 
-    // Apply Lambert's cosine integration (1/pi)
-    diffuseIrradiance *= (1.0 / PI);
-
-    return diffuseIrradiance;
+    return totalIntegratedRadiance;
 }
 
 
@@ -694,11 +677,12 @@ void main() {
         //vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, V, u_DDGI_Volume);
         //indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
 
-        indirectDiffuse = sampleRadianceCascadeDiffuse(fragPos, N, cs[0].cascadeLevelInfo);
+        vec3 indirectRadiance = sampleRadianceCascadeDiffuse(fragPos, N, cs[0].cascadeLevelInfo);
+        indirectDiffuse = indirectRadiance;
         
     }
 
-    vec3 color = indirectDiffuse ;
+    vec3 color = indirectDiffuse + Lo;
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {

@@ -28,6 +28,7 @@
 #include "Physics/EntropyComponents.h"
 
 
+
 TestLayer::~TestLayer()
 {
     onDetach();
@@ -59,6 +60,7 @@ void TestLayer::onAttach() {
 
 void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 {
+
     auto activeScene = scene;
 
     if (!activeScene) {
@@ -237,8 +239,11 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Create radiance cascade probe visualization
     createRadianceCascadeProbeVisualization(activeScene);
+    
 
 }
+
+
 
 void TestLayer::createRadianceCascadeProbeVisualization(std::shared_ptr<Rapture::Scene> scene) {
     auto& app = Rapture::Application::getInstance();
@@ -252,8 +257,6 @@ void TestLayer::createRadianceCascadeProbeVisualization(std::shared_ptr<Rapture:
     const auto& cascades = radianceCascades->getCascades();
     
     // Create different colored spheres for each cascade level
-    auto sphere = std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateSphere(1, 16));
-    
     // Define colors for each cascade (rainbow-like progression)
     std::vector<glm::vec3> cascadeColors = {
         glm::vec3(1.0f, 0.0f, 0.0f),  // Red - Cascade 0 (finest detail)
@@ -264,9 +267,13 @@ void TestLayer::createRadianceCascadeProbeVisualization(std::shared_ptr<Rapture:
         glm::vec3(0.5f, 0.0f, 1.0f)   // Purple - Cascade 5
     };
     
+
+
     for (uint32_t cascadeIdx = 0; cascadeIdx < MAX_CASCADES; cascadeIdx++) {
         const auto& cascade = cascades[cascadeIdx];
-        
+        bool enableRayVisualization = false;
+
+    
         // Skip invalid cascades
         if (cascade.cascadeLevel == UINT32_MAX) {
             continue;
@@ -287,11 +294,54 @@ void TestLayer::createRadianceCascadeProbeVisualization(std::shared_ptr<Rapture:
         float scaleMultiplier = std::pow(1.5f, static_cast<float>(cascadeIdx));  // Scale increases with cascade level
         float probeScale = baseScale * scaleMultiplier;
         
-        for (size_t i = 0; i < probePositions.size(); i++) {
-            glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), probePositions[i]);
+        uint32_t angularResolution = cascade.angularResolution;
+        uint32_t numRays = angularResolution * angularResolution / 8;
+        float minProbeDistance = cascade.minProbeDistance;
+        float maxProbeDistance = cascade.maxProbeDistance;
+        float rayLength = 4.0f;
+        std::vector<Rapture::InstanceData> rayInstanceData;
+
+        for (size_t i = 0; i < probePositions.size(); ++i) {
+            const glm::vec3& probePos = probePositions[i];
+            // Sphere instanceData as before
+            glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), probePos);
             modelMatrix = glm::scale(modelMatrix, glm::vec3(probeScale));
-            
             instanceData[i].transform = modelMatrix;
+
+            // Ray visualization
+            if (enableRayVisualization) {
+            for (uint32_t rayIdx = 0; rayIdx < numRays; ++rayIdx) {
+                // SphericalFibonacci direction (matches GLSL)
+                const float b = (std::sqrt(5.0f) * 0.5f + 0.5f) - 1.0f;
+                float phi = 2.0f * glm::pi<float>() * std::fmod(rayIdx * b, 1.0f);
+                float cosTheta = 1.0f - (2.0f * float(rayIdx) + 1.0f) * (1.0f / float(numRays));
+                float sinTheta = std::sqrt(std::clamp(1.0f - (cosTheta * cosTheta), 0.0f, 1.0f));
+                glm::vec3 direction = glm::vec3(std::cos(phi) * sinTheta, std::sin(phi) * sinTheta, cosTheta);
+                direction = glm::normalize(direction);
+
+                
+                // Compute the center of the cube so that it starts at minProbeDistance and extends rayLength in the direction
+                glm::vec3 center = probePos + direction * (minProbeDistance + rayLength * 0.5f);
+                glm::vec3 xAxis(1.0f, 0.0f, 0.0f);
+                float dot = glm::clamp(glm::dot(xAxis, direction), -1.0f, 1.0f);
+                glm::quat rotation;
+                if (dot > 0.9999f) {
+                    rotation = glm::quat(1, 0, 0, 0); // No rotation
+                } else if (dot < -0.9999f) {
+                    rotation = glm::angleAxis(glm::pi<float>(), glm::vec3(0, 1, 0)); // 180 deg around Y
+                } else {
+                    glm::vec3 axis = glm::normalize(glm::cross(xAxis, direction));
+                    float angle = std::acos(dot);
+                    rotation = glm::angleAxis(angle, axis);
+                }
+                glm::mat4 transform = glm::translate(glm::mat4(1.0f), center)
+                                    * glm::mat4_cast(rotation)
+                                    * glm::scale(glm::mat4(1.0f), glm::vec3(rayLength, 0.001f, 0.001f));
+                rayInstanceData.push_back({transform});
+                }
+            }
+            // Create entity for all rays in this cascade
+
         }
         
         // Create entity for this cascade
@@ -308,9 +358,13 @@ void TestLayer::createRadianceCascadeProbeVisualization(std::shared_ptr<Rapture:
         materialC.material->setParameter<glm::vec3>(Rapture::ParameterID::ALBEDO, cascadeColor);
         isc.color = glm::vec4(cascadeColor, 1.0);
         
-        // Store for potential cleanup
-        m_cascadeProbeEntities.push_back(cascadeEntity);
 
+        if (enableRayVisualization) {
+            auto rayEntity = std::make_shared<Rapture::Entity>(scene->createCube("RC Cascade " + std::to_string(cascadeIdx) + " Rays"));
+            auto& irm = rayEntity->addComponent<Rapture::InstanceShapeComponent>(rayInstanceData, app.getVulkanContext().getVmaAllocator());
+            irm.color = glm::vec4(cascadeColor, 1.0f);
+            irm.useWireMode = true;
+        }
     }
 }
 

@@ -89,6 +89,33 @@ namespace Rapture {
         return entity;
     }
 
+    Entity Scene::createLine(const std::string &name) {
+        // Create entity in the registry
+        entt::entity handle = m_Registry.create();
+        
+        // Create Entity wrapper
+        Entity entity(handle, this);
+        
+        // Add basic name component if you have one
+        entity.addComponent<TagComponent>(name);
+
+        entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+
+        // Add a cube mesh
+        auto lineMesh = std::make_shared<Mesh>(Primitives::CreateLine(0.0f, 1.0f));
+        entity.addComponent<MeshComponent>(lineMesh);
+
+        entity.addComponent<BoundingBoxComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+
+        // Add a material
+        auto material = AssetManager::importDefaultAsset<MaterialInstance>(AssetType::Material).first;
+        if (material) {
+            entity.addComponent<MaterialComponent>(material);
+        }
+
+        return entity;
+    }
+
     void Scene::destroyEntity(Entity entity) {
         if (entity.isValid() && entity.getScene() == this) {
             m_Registry.destroy(entity.getHandle());

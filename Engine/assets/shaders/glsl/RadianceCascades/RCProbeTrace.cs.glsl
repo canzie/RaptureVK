@@ -259,21 +259,7 @@ vec3 sampleEmissiveColor(MeshInfo meshInfo, vec2 uv) {
     return texture(gTextures[texIndex], uv).rgb * meshInfo.emissiveColor;
 }
 
-vec3 GetProbeWorldPosition(ivec3 probeCoords, CascadeLevelInfo cascadeLevelInfo)
-{
-    // Multiply the grid coordinates by the probe spacing
-    vec3 probeGridWorldPosition = vec3(probeCoords) * cascadeLevelInfo.probeSpacing;
 
-    // Shift the grid of probes by half of each axis extent to center the volume about its origin
-    vec3 probeGridShift = (cascadeLevelInfo.probeSpacing * vec3((cascadeLevelInfo.probeGridDimensions - 1))) * 0.5;
-
-    // Center the probe grid about the origin
-    vec3 probeWorldPosition = (probeGridWorldPosition - probeGridShift);
-
-    probeWorldPosition += cascadeLevelInfo.probeOrigin;
-
-    return probeWorldPosition;
-}
 
 vec3 SphericalFibonacci(uint sampleIndex, uint numSamples)
 {
@@ -372,7 +358,7 @@ vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, LightIn
     }
     
     // Compute lighting
-    vec3 lightDirection = normalize(-light.direction.xyz);
+    //vec3 lightDirection = normalize(-light.direction.xyz);
     
     return light.color.xyz * light.color.w * visibility;
 }
@@ -494,24 +480,40 @@ void main() {
     // Proceed with the ray query. The loop continues until the query is complete.
     // With gl_RayFlagsOpaqueEXT, the hardware automatically finds the closest hit,
     // so we just need to let the query run to completion.
-    while (rayQueryProceedEXT(query)) {}
 
-    vec4 outColor = vec4(0.0, 0.0, 0.0, 0.0); // Black for miss
+    bool hit = false;
+    float hitT = 1e30;
 
-    if (u_cascadeIndex == u_cascadeLevels - 1) {
-        if (u_skyboxTextureIndex != UINT32_MAX) {
-            vec3 skyboxColor = texture(gCubemaps[u_skyboxTextureIndex], probeRayDirection).rgb;
-            outColor = vec4(skyboxColor, cascadeLevelInfo.maxProbeDistance);
+    while (rayQueryProceedEXT(query)) {
+        if (rayQueryGetIntersectionTypeEXT(query, false) == gl_RayQueryCandidateIntersectionTriangleEXT) {
+            float t = rayQueryGetIntersectionTEXT(query, false);
+
+            if (t < hitT) {
+                hitT = t;
+                hit = true;
+                // Confirm this intersection as the committed one
+                rayQueryConfirmIntersectionEXT(query);
+            }
         }
     }
 
+    bool isFrontFacing = false;
 
-    // After the loop, check the type of the committed intersection.
     if (rayQueryGetIntersectionTypeEXT(query, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-        // We have a hit. Check if it's a front or back face.
-        bool isFrontFacing = rayQueryGetIntersectionFrontFaceEXT(query, true);
-        float hitT = rayQueryGetIntersectionTEXT(query, true);
+        hitT = rayQueryGetIntersectionTEXT(query, true);
+        isFrontFacing = rayQueryGetIntersectionFrontFaceEXT(query, true);
+        hit = true;
+    } else {
+        hit = false;
+    }
 
+    // Default to a miss. The hit distance is set to the max distance for the cascade.
+    // The color is black, but it will be overwritten by the skybox for the last cascade,
+    // or by the previous cascade's data during the merge step.
+    vec4 outColor = vec4(0.0, 0.0, 0.0, 0.0);
+
+
+    if (hit) {
         if (isFrontFacing) {
             // Get additional ray intersection data
             uint primitiveID = rayQueryGetIntersectionPrimitiveIndexEXT(query, true);
@@ -533,12 +535,25 @@ void main() {
 
             vec3 radiance = diffuse + emissiveColor;
 
-            outColor = vec4(radiance, hitT);
+            outColor = vec4(radiance, 1.0);
         } else {
             
-            outColor = vec4(1.0, 0.0, 0.0, -hitT); // Red for back-face hit
+            //outColor = vec4(0.0, 0.0, 0.0, 0.0); // Red for back-face hit
         }
+    } else {
+
+        if (u_cascadeIndex == u_cascadeLevels - 1) {
+            if (u_skyboxTextureIndex != UINT32_MAX) {
+                vec3 skyboxColor = texture(gCubemaps[u_skyboxTextureIndex], probeRayDirection).rgb;
+                outColor.rgb = skyboxColor;
+                outColor.a = 1.0; // A miss is a miss. Alpha must be 0 for the merge to work.
+            }
+        }
+
+        
+
     }
+
 
     // Store the resulting color.
     imageStore(CascadeTextures, ivec3(outputCoords), outColor);
