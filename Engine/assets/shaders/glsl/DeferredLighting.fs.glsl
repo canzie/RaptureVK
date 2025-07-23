@@ -456,8 +456,7 @@ vec3 GetProbeWorldPosition(ivec3 probeCoords, CascadeLevelInfo cascadeLevelInfo)
 }
 
 vec3 sampleRadianceCascadeDiffuse(vec3 fragmentWorldPosition, vec3 normal, CascadeLevelInfo cascade0) {
-    // This function calculates the inverse of GetProbeWorldPosition to find the fragment's
-    // position within the probe grid's local coordinate space.
+
     vec3 gridShift = (cascade0.probeSpacing * vec3(cascade0.probeGridDimensions - 1)) * 0.5;
     vec3 localPos = (fragmentWorldPosition - cascade0.probeOrigin + gridShift) / cascade0.probeSpacing;
 
@@ -514,7 +513,7 @@ vec3 sampleRadianceCascadeDiffuse(vec3 fragmentWorldPosition, vec3 normal, Casca
                 
                 if (totalWeight > 0.0) {
                     probeIrradiance /= totalWeight;
-                    probeIrradiance /= totalSamples;
+                    //probeIrradiance /= totalSamples;
                 }
 
                 // Calculate trilinear interpolation weight
@@ -678,7 +677,7 @@ void main() {
         //indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
 
         vec3 indirectRadiance = sampleRadianceCascadeDiffuse(fragPos, N, cs[0].cascadeLevelInfo);
-        indirectDiffuse = indirectRadiance;
+        indirectDiffuse = indirectRadiance ;
         
     }
 

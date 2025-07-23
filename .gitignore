@@ -54,6 +54,7 @@ release/
 # cache
 .cache/
 
+pdf/
 
 # vendor
 Engine/vendor/*

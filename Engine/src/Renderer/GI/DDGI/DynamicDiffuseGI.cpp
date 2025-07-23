@@ -523,7 +523,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::populateProbesCompute");
         // Cast rays using compute shader
-        castRays(scene, frameIndex);
+        //castRays(scene, frameIndex);
     }   
     // Flatten ray data texture (within the same command buffer)
     if (m_RayDataTextureFlattened) {
@@ -533,7 +533,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::relocateProbes");
-        relocateProbes(frameIndex);
+        //relocateProbes(frameIndex);
     }
 
     if (m_ProbeOffsetTextureFlattened) {
@@ -543,7 +543,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::classifyProbes");
-        classifyProbes(frameIndex);
+        //classifyProbes(frameIndex);
     }
 
     if (m_ProbeClassificationTextureFlattened) {
@@ -555,7 +555,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::blendTextures");
         // Blend textures
-        blendTextures(frameIndex);
+        //blendTextures(frameIndex);
     }
 
     // Flatten final textures (within the same command buffer)

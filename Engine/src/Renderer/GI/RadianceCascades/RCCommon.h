@@ -7,46 +7,18 @@ namespace Rapture {
 
 struct BuildParams {
 
-    int numCascades = 8;
 
-    /**
-     * @brief The range extent of the first cascade (t_1, since t_0 is 0)
-     */
-    float baseRange = 2.0f;
+    // First cascade covers [0, baseRange]
+    float baseRange = 4.0f;  // t_0 (tune based on scene)
 
-    /**
-     * @brief The exponential factor used to determine subsequent cascade ranges (t_i ~ pow(rangeScaleFactor, i)).
-     * Must be > 1. Typically 2.0.
-     */
-    float rangeScaleFactor = 2.0f;
+     // Base grid dimensions (P_0)
+    glm::ivec3 baseGridDimensions = glm::ivec3(32, 32, 32); // Must be power-of-2 friendly
 
-    /**
-     * @brief The factor by which spatial resolution changes per cascade (e.g., 0.5 means dimensions halve each step).
-     * This affects probe spacing (Δp ~ 1 / gridScaleFactor^i). Should be < 1.
-     * Based on paper scaling Δp ~ 2^i, if t_i ~ 2^i, this implies probe spacing doubles, so grid dimensions should halve.
-     */
-    float gridScaleFactor = 0.5f;
-
-    /**
-     * @brief The spatial grid resolution of the first cascade (P_0)
-     */
-    glm::ivec3 baseGridDimensions = glm::ivec3(32, 32, 32); // Example dimensions
-    glm::vec3 baseGridSpacing = glm::vec3(1.0, 1.0, 1.0); // Example dimensions
-
-    /**
-     * @brief The angular resolution 'dimension' of the first cascade (Q_0).
-     * E.g., for an NxN octahedral map, this would be N.
-     */
-    int baseAngularResolution = 8; // Example angular resolution
-
-   /**
-    * @brief The factor by which angular resolution changes per cascade.
-    * Based on paper scaling Δω ~ 1/2^i, angular resolution should double.
-    * Must be > 1. Typically 2.0.
-    */
-   float angularScaleFactor = 2.0f;
-
-
+    // Base angular resolution (Q_0 dimension)
+    int baseAngularResolution = 8;  // For N for NxN map
+    
+    // Base probe spacing (∆p_0)
+    float baseSpacing = 1.0f;  // Must satisfy ∆p_0 < t_0
 };
 
 struct RadianceCascadeLevel {

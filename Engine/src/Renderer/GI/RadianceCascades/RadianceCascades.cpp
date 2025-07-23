@@ -18,6 +18,30 @@
 
 namespace Rapture {
 
+bool CheckPenumbraCondition(const RadianceCascadeLevel& cascade, float penumbraConstant = 1.0f) {
+    const float minDistance = cascade.minProbeDistance;
+    const float maxDistance = cascade.maxProbeDistance;
+
+    // Get maximum component of spacing (worst-case axis)
+    const float maxSpacing = std::max({cascade.probeSpacing.x, 
+                    cascade.probeSpacing.y, 
+                    cascade.probeSpacing.z});
+
+    // Calculate angular step (radians)
+    const float angularStep = (3.14159265f / 2.0f) / cascade.angularResolution;
+
+    // Penumbra Condition checks
+    bool spatialCondition = (maxSpacing <= penumbraConstant * minDistance);
+    bool angularCondition = (angularStep <= penumbraConstant / maxDistance);
+
+    // For first cascade where minDistance=0, only check angular
+    if (minDistance < 1e-5f) {
+        return angularCondition;
+    }
+
+    return spatialCondition && angularCondition;
+}
+
 struct RCMergeCascadePushConstants {
     uint32_t prevCascadeIndex;
     uint32_t currentCascadeIndex;
@@ -39,23 +63,25 @@ void RadianceCascades::build(const BuildParams &buildParams) {
 
         cascade.cascadeLevel = i;
 
-        float maxRange = buildParams.baseRange * std::pow(buildParams.rangeScaleFactor, static_cast<float>(i));
+        float maxRange = buildParams.baseRange * std::pow(2.0f, static_cast<float>(i));
 
         cascade.minProbeDistance = prevMinRange;
         cascade.maxProbeDistance = maxRange;
 
         prevMinRange = maxRange;
 
+        // Grid dimensions: baseGridDimensions / 2^i
+        glm::vec3 scaledDimsF = glm::vec3(buildParams.baseGridDimensions) / std::pow(2.0f, static_cast<float>(i));
+        cascade.probeGridDimensions = glm::max(glm::ivec3(glm::round(scaledDimsF)), glm::ivec3(1));
 
-        glm::vec3 scaledDimsF = glm::vec3(buildParams.baseGridDimensions) * std::pow(buildParams.gridScaleFactor, static_cast<float>(i));
-        cascade.probeGridDimensions = glm::max(glm::ivec3(glm::floor(scaledDimsF)), glm::ivec3(1)); // prevent zero dimensions
-
-        //glm::vec3 extent = glm::vec3(maxRange); // cubic region size
-        cascade.probeSpacing = buildParams.baseGridSpacing * std::pow(2.0f, static_cast<float>(i));
-
+        // Calculate angular resolution: Q_i = baseAngularResolution * 2^i
         cascade.angularResolution = static_cast<uint32_t>(
-            buildParams.baseAngularResolution * std::pow(buildParams.angularScaleFactor, static_cast<float>(i))
+            buildParams.baseAngularResolution * std::pow(2.0f, static_cast<float>(i))
         );
+        cascade.angularResolution = glm::max(cascade.angularResolution, 2u);
+
+        // Calculate probe spacing: ∆p_i = baseSpacing * 2^i
+        cascade.probeSpacing = glm::vec3(buildParams.baseSpacing) * std::pow(2.0f, static_cast<float>(i));
 
         // this is the center of the grid, the shader should shift the grid by half of the extent
         cascade.probeOrigin = glm::vec3(-0.4f, 4.7f, -0.25f);
@@ -69,6 +95,10 @@ void RadianceCascades::build(const BuildParams &buildParams) {
             i, glm::to_string(cascade.probeOrigin), glm::to_string(cascade.probeSpacing), glm::to_string(cascade.probeGridDimensions), cascade.angularResolution, cascade.minProbeDistance, cascade.maxProbeDistance);
 
         m_radianceCascades[i] = cascade;
+
+        if (!CheckPenumbraCondition(cascade)) {
+            RP_CORE_ERROR("Penumbra condition not met for cascade {}", i);
+        }
         
     }
 

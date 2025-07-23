@@ -5,6 +5,12 @@
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_ray_query : require
 
+#define DEBUG_COORDS 0
+#define DEBUG_RAY_INDEX 0
+#define DEBUG_PROBE_COORDS 0
+#define DEBUG_PROBE_WORLD_POSITION 0
+#define DEBUG_RAY_DIRECTION 0
+
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -457,14 +463,50 @@ void main() {
         return;
     }
 
+
+        
+
+
+#if DEBUG_COORDS == 1
+        imageStore(CascadeTextures, ivec3(outputCoords), vec4(vec3(outputCoords)/vec3(imageSize), 1.0));
+        return;
+#endif
+
+    
+
     // From the output texel coordinates, we can derive the probe and ray indices.
     ivec3 probeCoords = getProbeCoords(outputCoords, angularResolution);
     uint rayIndex = getRayIndex(outputCoords, angularResolution);
 
+#if DEBUG_RAY_INDEX == 1
+        imageStore(CascadeTextures, ivec3(outputCoords), vec4(vec3(rayIndex)/vec3(angularResolution*angularResolution), 1.0));
+        return;
+#endif
+
+#if DEBUG_PROBE_COORDS == 1
+        imageStore(CascadeTextures, ivec3(outputCoords), vec4(vec3(probeCoords)/vec3(cascadeLevelInfo.probeGridDimensions), 0.5));
+        return;
+#endif
+
+
+
+    
+
 
     vec3 probeWorldPosition = GetProbeWorldPosition(probeCoords, cascadeLevelInfo);
     vec3 probeRayDirection = GetProbeRayDirection(rayIndex, cascadeLevelInfo);
-    
+
+#if DEBUG_PROBE_WORLD_POSITION == 1
+        vec3 totalWorldExtent = vec3(cascadeLevelInfo.probeGridDimensions) * cascadeLevelInfo.probeSpacing * 0.5;
+        imageStore(CascadeTextures, ivec3(outputCoords), vec4((probeWorldPosition/totalWorldExtent) * 0.5 + 0.5, 1.0));
+        return;
+#endif
+
+#if DEBUG_RAY_DIRECTION == 1
+        imageStore(CascadeTextures, ivec3(outputCoords), vec4(probeRayDirection * 0.5 + 0.5, 1.0));
+        return;
+#endif
+
     rayQueryEXT query;
     rayQueryInitializeEXT(
         query,
@@ -507,11 +549,10 @@ void main() {
         hit = false;
     }
 
-    // Default to a miss. The hit distance is set to the max distance for the cascade.
+    // Default to a miss. The hit distance is set to a negative value.
     // The color is black, but it will be overwritten by the skybox for the last cascade,
     // or by the previous cascade's data during the merge step.
     vec4 outColor = vec4(0.0, 0.0, 0.0, 0.0);
-
 
     if (hit) {
         if (isFrontFacing) {
@@ -535,23 +576,21 @@ void main() {
 
             vec3 radiance = diffuse + emissiveColor;
 
+            // Store radiance and the positive hit distance
             outColor = vec4(radiance, 1.0);
         } else {
-            
-            //outColor = vec4(0.0, 0.0, 0.0, 0.0); // Red for back-face hit
+            outColor = vec4(0.0, 0.0, 0.0, 0.0);
         }
-    } else {
-
+    } else { // This covers misses and back-face hits
+        // For the final cascade, sample the skybox on a miss
         if (u_cascadeIndex == u_cascadeLevels - 1) {
             if (u_skyboxTextureIndex != UINT32_MAX) {
                 vec3 skyboxColor = texture(gCubemaps[u_skyboxTextureIndex], probeRayDirection).rgb;
                 outColor.rgb = skyboxColor;
-                outColor.a = 1.0; // A miss is a miss. Alpha must be 0 for the merge to work.
+                outColor.a = 1.0;
             }
         }
-
-        
-
+        // For all misses/back-faces, hitT remains -1.0
     }
 
 

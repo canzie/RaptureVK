@@ -52,63 +52,47 @@ float rcp(float x) {
 
 // https://dl.acm.org/doi/10.1145/2816795.2818131
 // this is out of my league, just copied it from the paper
-float inverseSphericalFibonacci(vec3 direction, uint numSamples) {
+uvec4 GetCandidateRayIndices(vec3 direction, uint numSamples) {
     const float PHI = (1.0 + sqrt(5.0)) / 2.0;
     const float PI = 3.14159265359;
     
-    // Normalize direction vector
     direction = normalize(direction);
 
-    float phi = atan(direction.y, direction.x); // Correct range [-PI, PI]
+    float phi = atan(direction.y, direction.x);
     float cosTheta = direction.z;
 
-    // Handle potential floating point inaccuracies at the poles
     if (abs(cosTheta) > 1.0) cosTheta = sign(cosTheta);
 
-    // Estimate k
     float k = max(2.0, floor(log(float(numSamples) * PI * sqrt(5.0) * (1.0 - cosTheta * cosTheta)) / (2.0 * log(PHI))));
 
-    // Calculate Fibonacci numbers F_k and F_{k+1}
     float Fk = round(pow(PHI, k) / sqrt(5.0));
     float Fk1 = round(pow(PHI, k + 1.0) / sqrt(5.0));
 
-    // Define the basis vectors for the local coordinate system
     vec2 b1 = vec2(2.0 * PI * (fract((Fk + 1.0) * (PHI - 1.0)) - (PHI - 1.0)), -2.0 * Fk / float(numSamples));
     vec2 b2 = vec2(2.0 * PI * (fract((Fk1 + 1.0) * (PHI - 1.0)) - (PHI - 1.0)), -2.0 * Fk1 / float(numSamples));
     mat2 B = mat2(b1, b2);
     mat2 invB = inverse(B);
 
-    // Calculate the integer coordinates in the local system
     vec2 c = floor(invB * vec2(phi, cosTheta - (1.0 - 1.0 / float(numSamples))));
 
-    float min_dist = 1.0/0.0; // Positive infinity
-    float j = 0.0;
+    uvec4 candidateIndices = uvec4(0);
+    int count = 0;
 
-    // Check the four candidate points
     for (int s = 0; s < 4; ++s) {
         vec2 uv = vec2(s % 2, s / 2);
         vec2 p = c + uv;
 
-        // Reconstruct index i from local coordinates
         float i = floor(Fk * p.x + Fk1 * p.y);
         
-        // Skip invalid indices
-        if (i < 0.0 || i >= float(numSamples)) continue;
-
-        // Reconstruct the point q on the sphere
-        float newPhi = 2.0 * PI * fract(i * (PHI - 1.0));
-        float newCosTheta = 1.0 - (2.0 * i + 1.0) / float(numSamples);
-        float newSinTheta = sqrt(1.0 - newCosTheta * newCosTheta);
-        vec3 q = vec3(cos(newPhi) * newSinTheta, sin(newPhi) * newSinTheta, newCosTheta);
-
-        // Find the point with the minimum distance
-        float dist = distance(q, direction);
-        if (dist < min_dist) {
-            min_dist = dist;
-            j = i;
+        if (i >= 0.0 && i < float(numSamples)) {
+            candidateIndices[count++] = uint(i);
         }
     }
-    return j;
+    // Fill remaining with a dummy value if less than 4 valid candidates
+    for (int s = count; s < 4; ++s) {
+        candidateIndices[s] = 0; // Or some other invalid/dummy index
+    }
+    return candidateIndices;
 }
 
 
@@ -142,6 +126,10 @@ uint getRayIndex(uvec3 outputCoords, uint angularResolution) {
     return rayIndex;
 }
 
+// normalizedProbeCoords : [0, 1] probe coordinates from the grid in the current cascade
+// probeRayDirection : direction of the ray from the current cascade, this is the ray we want to match in the previous cascade
+// currentProbeWorldPosition : world space position of the probe in the current cascade
+// prevCascadeInfo : cascade info of the previous cascade
 vec4 getPrevCascadeData(vec3 normalizedProbeCoords, vec3 probeRayDirection, vec3 currentProbeWorldPosition, CascadeLevelInfo prevCascadeInfo) {
 
     // Calculate the floating-point coordinates of the current probe within the previous cascade's grid
@@ -151,45 +139,74 @@ vec4 getPrevCascadeData(vec3 normalizedProbeCoords, vec3 probeRayDirection, vec3
     ivec3 baseProbeCoords = ivec3(floor(prevCascadeFloatCoords));
     vec3 fractionalOffset = fract(prevCascadeFloatCoords);
 
-    // Find the index and 2D coordinates of the ray direction closest to the probe's ray
-    float prevRayIndex = inverseSphericalFibonacci(probeRayDirection, prevCascadeInfo.angularResolution * prevCascadeInfo.angularResolution);
-    prevRayIndex = clamp(prevRayIndex, 0.0, float(prevCascadeInfo.angularResolution * prevCascadeInfo.angularResolution - 1));
-    int centralRayX = int(uint(prevRayIndex) % prevCascadeInfo.angularResolution);
-    int centralRayY = int(uint(prevRayIndex) / prevCascadeInfo.angularResolution);
+    uint numPrevSamples = prevCascadeInfo.angularResolution * prevCascadeInfo.angularResolution;
+    uvec4 candidateRayIndices = GetCandidateRayIndices(probeRayDirection, numPrevSamples);
 
-    vec4 weightedData = vec4(0.0);
+    vec4 totalWeightedData = vec4(0.0);
+    float totalAngularWeight = 0.0;
 
-    // Trilinearly interpolate between the 8 nearest probes
-    for (int x = 0; x <= 1; x++) {
-        for (int y = 0; y <= 1; y++) {
-            for (int z = 0; z <= 1; z++) {
-                ivec3 offset = ivec3(x, y, z);
-                ivec3 probeCoords = baseProbeCoords + offset;
+    // Loop through the 4 candidate ray indices
+    for (int s = 0; s < 4; ++s) {
+        uint candidateRayIndex = candidateRayIndices[s];
 
-                if (probeCoords.x < 0 || probeCoords.x >= prevCascadeInfo.probeGridDimensions.x ||
-                    probeCoords.y < 0 || probeCoords.y >= prevCascadeInfo.probeGridDimensions.y ||
-                    probeCoords.z < 0 || probeCoords.z >= prevCascadeInfo.probeGridDimensions.z) {
-                    continue;
-                 }  
+        // Skip if it's a dummy index (less than 4 valid candidates)
+        if (candidateRayIndex >= numPrevSamples) continue;
 
+        vec3 candidateDirection = SphericalFibonacci(candidateRayIndex, numPrevSamples);
+        float angularWeight = max(0.0, 1.0 - distance(candidateDirection, normalize(probeRayDirection)));
 
-                ivec3 texCoords;
-                texCoords.x = probeCoords.x * int(prevCascadeInfo.angularResolution) + centralRayX;
-                texCoords.y = probeCoords.z * int(prevCascadeInfo.angularResolution) + centralRayY;
-                texCoords.z = probeCoords.y;
-                
-                vec4 prevProbeData = texelFetch(gTextureArrays[prevCascadeInfo.cascadeTextureIndex], texCoords, 0);
+        if (angularWeight == 0.0) continue;
 
-                // Calculate trilinear interpolation weights
-                vec3 weight3d = mix(vec3(1.0) - fractionalOffset, fractionalOffset, vec3(offset));
-                float weight = weight3d.x * weight3d.y * weight3d.z;
+        int candidateRayX = int(candidateRayIndex % prevCascadeInfo.angularResolution);
+        int candidateRayY = int(candidateRayIndex / prevCascadeInfo.angularResolution);
 
-                weightedData += prevProbeData * weight;
+        vec4 spatiallyWeightedData = vec4(0.0);
+        float spatialTotalWeight = 0.0;
+
+        // Trilinearly interpolate between the 8 nearest probes for this candidate ray
+        for (int x = 0; x <= 1; x++) {
+            for (int y = 0; y <= 1; y++) {
+                for (int z = 0; z <= 1; z++) {
+                    ivec3 offset = ivec3(x, y, z);
+                    ivec3 probeCoords = baseProbeCoords + offset;
+
+                    if (any(lessThan(probeCoords, ivec3(0)))) continue;
+                    if (any(greaterThanEqual(probeCoords, prevCascadeInfo.probeGridDimensions))) continue;
+
+                    ivec3 texCoords;
+                    texCoords.x = probeCoords.x * int(prevCascadeInfo.angularResolution) + candidateRayX;
+                    texCoords.y = probeCoords.z * int(prevCascadeInfo.angularResolution) + candidateRayY;
+                    texCoords.z = probeCoords.y;
+                    
+                    vec4 prevProbeData = texelFetch(gTextureArrays[prevCascadeInfo.cascadeTextureIndex], texCoords, 0);
+
+                    // Calculate trilinear interpolation weights
+                    vec3 weight3d = mix(vec3(1.0) - fractionalOffset, fractionalOffset, vec3(offset));
+                    float weight = weight3d.x * weight3d.y * weight3d.z;
+
+                    spatiallyWeightedData += prevProbeData * weight;
+                    spatialTotalWeight += weight;
+                }
             }
         }
+
+        if (spatialTotalWeight > 0.0) {
+            spatiallyWeightedData /= spatialTotalWeight;
+        } else {
+            continue;
+        }
+
+        totalWeightedData += spatiallyWeightedData * angularWeight;
+        totalAngularWeight += angularWeight;
     }
 
-    return weightedData;
+    if (totalAngularWeight > 0.0) {
+        totalWeightedData /= totalAngularWeight;
+    } else {
+        return vec4(1.0, 0.0, 1.0, 1.0); // Red = error
+    }
+
+    return totalWeightedData;
 }
 
 void main() {
@@ -215,21 +232,28 @@ void main() {
     vec3 probeRayDirection = GetProbeRayDirection(rayIndex, currentCascadeInfo.angularResolution);
     vec3 currentProbeWorldPosition = GetProbeWorldPosition(probeCoords, currentCascadeInfo);
 
-    vec4 currentProbeData = imageLoad(cascadeN, ivec3(outputCoords));
-
-    currentProbeData.a = 1.0 - currentProbeData.a;
+    vec4 currentData = imageLoad(cascadeN, ivec3(outputCoords));
 
 
-    if (currentProbeData.a != 0.0) {
+    vec4 prevData = getPrevCascadeData(normalizedProbeCoords, probeRayDirection, currentProbeWorldPosition, prevCascadeInfo);
+    
+    // we do the 1 minus to transition from hit to transparancy
+    // so for hits, the transparancy is 0, and for misses, the transparancy is 1
+    float currentTransparency = 1.0 - currentData.a;
+    float prevTransparency = 1.0 - prevData.a;
 
-        vec4 prevProbeData = getPrevCascadeData(normalizedProbeCoords, probeRayDirection, currentProbeWorldPosition, prevCascadeInfo);
-        prevProbeData.a = 1.0 - prevProbeData.a;
 
-        currentProbeData += currentProbeData.a * prevProbeData;
-
+    // Apply merging equation: L_{a,c} = L_{a,b} + β_{a,b} * L_{b,c}
+    vec3 mergedRadiance = currentData.rgb;
+    if (currentTransparency > 0.0) {  // Only add if not fully opaque
+        mergedRadiance += currentTransparency * prevData.rgb;
     }
 
+    // Compute new transparency: β_{a,c} = β_{a,b} * β_{b,c}
+    float mergedTransparency = 1.0 - (currentTransparency * prevTransparency);
 
-    imageStore(cascadeN, ivec3(outputCoords), vec4(currentProbeData.rgb, 1.0));
+    // Store merged result (RGB + β)
+    imageStore(cascadeN, ivec3(outputCoords), vec4(mergedRadiance, mergedTransparency));
+
     
 }
