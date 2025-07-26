@@ -1,4 +1,4 @@
-#include "RadianceCascades.h"
+#include "RadianceCascades2D.h"
 
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
@@ -14,46 +14,23 @@
 
 #include <format>
 
-// TODO : Add safety for when the grid dimensions go below 1
 
 namespace Rapture {
 
-bool CheckPenumbraCondition(const RadianceCascadeLevel& cascade, float penumbraConstant = 1.0f) {
-    const float minDistance = cascade.minProbeDistance;
-    const float maxDistance = cascade.maxProbeDistance;
 
-    // Get maximum component of spacing (worst-case axis)
-    const float maxSpacing = std::max({cascade.probeSpacing.x, 
-                    cascade.probeSpacing.y, 
-                    cascade.probeSpacing.z});
-
-    // Calculate angular step (radians)
-    const float angularStep = (3.14159265f / 2.0f) / cascade.angularResolution;
-
-    // Penumbra Condition checks
-    bool spatialCondition = (maxSpacing <= penumbraConstant * minDistance);
-    bool angularCondition = (angularStep <= penumbraConstant / maxDistance);
-
-    // For first cascade where minDistance=0, only check angular
-    if (minDistance < 1e-5f) {
-        return angularCondition;
-    }
-
-    return spatialCondition && angularCondition;
-}
 
 struct RCMergeCascadePushConstants {
     uint32_t prevCascadeIndex;
     uint32_t currentCascadeIndex;
 };
 
-RadianceCascades::RadianceCascades(uint32_t framesInFlight) {
+RadianceCascades2D::RadianceCascades2D(uint32_t framesInFlight) {
     // load shaders and compute pipelines
     buildPipelines();
     buildCommandBuffers(framesInFlight);
 }
 
-RadianceCascades::~RadianceCascades() {
+RadianceCascades2D::~RadianceCascades2D() {
 
     auto cascadeLevelInfoSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::RC_CASCADE_LEVEL_INFO);
     if (!cascadeLevelInfoSet) {
@@ -74,7 +51,7 @@ RadianceCascades::~RadianceCascades() {
     
 }
 
-void RadianceCascades::build(const BuildParams &buildParams) {
+void RadianceCascades2D::build(const BuildParams2D &buildParams) {
 
 
     m_buildParams = buildParams;
@@ -82,20 +59,21 @@ void RadianceCascades::build(const BuildParams &buildParams) {
     float prevMinRange = 0.0f;
 
     for (uint32_t i = 0; i < MAX_CASCADES; i++) {
-        RadianceCascadeLevel cascade = {};
+        RadianceCascadeLevel2D cascade = {};
 
         cascade.cascadeLevel = i;
 
-        float maxRange = buildParams.baseRange * std::pow(2.0f, static_cast<float>(i));
+        float maxRange = buildParams.baseRange * std::pow(buildParams.rangeExp, static_cast<float>(i));
 
         cascade.minProbeDistance = prevMinRange;
         cascade.maxProbeDistance = maxRange;
 
+
         prevMinRange = maxRange;
 
         // Grid dimensions: baseGridDimensions / 2^i
-        glm::vec3 scaledDimsF = glm::vec3(buildParams.baseGridDimensions) / std::pow(2.0f, static_cast<float>(i));
-        cascade.probeGridDimensions = glm::max(glm::ivec3(glm::round(scaledDimsF)), glm::ivec3(1));
+        glm::vec2 scaledDimsF = glm::vec2(buildParams.baseGridDimensions) / std::pow(2.0f, static_cast<float>(i));
+        cascade.probeGridDimensions = glm::max(glm::ivec2(glm::round(scaledDimsF)), glm::ivec2(1));
 
         // Calculate angular resolution: Q_i = baseAngularResolution * 2^i
         cascade.angularResolution = static_cast<uint32_t>(
@@ -104,24 +82,19 @@ void RadianceCascades::build(const BuildParams &buildParams) {
         cascade.angularResolution = glm::max(cascade.angularResolution, 2u);
 
         // Calculate probe spacing: ∆p_i = baseSpacing * 2^i
-        cascade.probeSpacing = glm::vec3(buildParams.baseSpacing) * std::pow(2.0f, static_cast<float>(i));
+        cascade.probeSpacing = glm::vec2(buildParams.baseSpacing) * std::pow(2.0f, static_cast<float>(i));
 
         // this is the center of the grid, the shader should shift the grid by half of the extent
-        cascade.probeOrigin = glm::vec3(-0.4f, 4.7f, -0.25f);
+        cascade.probeOrigin = glm::vec2(0.0f);
 
         cascade.cascadeTextureIndex = 0xFFFFFFFF;
 
-        RP_CORE_INFO("Cascade {}: \n\t Probe Origin: {}, Probe Spacing: {}, \
-            Probe Grid Dimensions: {}, \
-            Angular Resolution: {}, interval: {} - {}", 
-            
-            i, glm::to_string(cascade.probeOrigin), glm::to_string(cascade.probeSpacing), glm::to_string(cascade.probeGridDimensions), cascade.angularResolution, cascade.minProbeDistance, cascade.maxProbeDistance);
+
+        float overlap = glm::length(glm::vec2(buildParams.baseSpacing) * std::pow(2.0f, static_cast<float>(i+1)));
+        cascade.maxProbeDistance = cascade.maxProbeDistance + overlap;
 
         m_radianceCascades[i] = cascade;
 
-        if (!CheckPenumbraCondition(cascade)) {
-            RP_CORE_ERROR("Penumbra condition not met for cascade {}", i);
-        }
         
     }
 
@@ -139,26 +112,25 @@ void RadianceCascades::build(const BuildParams &buildParams) {
 
 }
 
-void RadianceCascades::buildTextures() {
+void RadianceCascades2D::buildTextures() {
 
     TextureSpecification defaultSpec = {};
-    defaultSpec.filter = TextureFilter::Nearest;
+    defaultSpec.filter = TextureFilter::Linear;
     defaultSpec.srgb = false;
     defaultSpec.storageImage = true;
     defaultSpec.format = TextureFormat::RGBA32F;
-    defaultSpec.type = TextureType::TEXTURE2D_ARRAY;
+    defaultSpec.type = TextureType::TEXTURE2D;
 
     for (uint32_t i = 0; i < MAX_CASCADES; i++) {
 
-        RadianceCascadeLevel& cascade = m_radianceCascades[i];
+        RadianceCascadeLevel2D& cascade = m_radianceCascades[i];
 
         if (cascade.cascadeLevel == UINT32_MAX) {
             RP_CORE_ERROR("Cascade not initializes, call build() first");
             throw std::runtime_error("Cascade not initialized, call build() first");
         }
         defaultSpec.width = cascade.probeGridDimensions.x * cascade.angularResolution;
-        defaultSpec.height = cascade.probeGridDimensions.z * cascade.angularResolution;
-        defaultSpec.depth = cascade.probeGridDimensions.y;
+        defaultSpec.height = cascade.probeGridDimensions.y * cascade.angularResolution;
 
         m_cascadeTextures[i] = std::make_shared<Texture>(defaultSpec);
 
@@ -169,42 +141,46 @@ void RadianceCascades::buildTextures() {
             throw std::runtime_error(std::format("Failed to get bindless index for cascade({}) texture", cascade.cascadeLevel).c_str());
         }
 
-        m_flatCascadeTextures[i] = TextureFlattener::createFlattenTexture(m_cascadeTextures[i], "[RC] Flattened Cascade Texture: " + std::to_string(cascade.cascadeLevel));
-        m_flatMergedCascadeTextures[i] = TextureFlattener::createFlattenTexture(m_cascadeTextures[i], "[RC] Flattened Merged Cascade Texture: " + std::to_string(cascade.cascadeLevel));
+        AssetVariant textureVariant = m_cascadeTextures[i];
+        std::shared_ptr<AssetVariant> textureVariantPtr = std::make_shared<AssetVariant>(textureVariant);
+        AssetManager::registerVirtualAsset(textureVariantPtr, "[RC] Cascade Texture: " + std::to_string(cascade.cascadeLevel), AssetType::Texture);
 
+        m_cascadeTextures[i]->setReadyForSampling(true);
+
+        // make a copy of cascade 0 for the irradiance step
+        if (i == 0) {
+            m_irradianceCascadeTexture = std::make_shared<Texture>(defaultSpec);
+            AssetVariant irradianceVariant = m_irradianceCascadeTexture;
+            std::shared_ptr<AssetVariant> irradianceVariantPtr = std::make_shared<AssetVariant>(irradianceVariant);
+            AssetManager::registerVirtualAsset(irradianceVariantPtr, "[RC] Irradiance Cascade Texture: " + std::to_string(cascade.cascadeLevel), AssetType::Texture);
+    
+            m_irradianceCascadeTexture->setReadyForSampling(true);
+            cascade.irradianceTextureIndex = m_irradianceCascadeTexture->getBindlessIndex();
+        }
+        
 
         cascade.cascadeTextureIndex = bindlessIndex;
 
     }
 
-    // Create the final 3D irradiance volume
-    TextureSpecification irradianceSpec = {};
-    irradianceSpec.filter = TextureFilter::Linear; // Use linear for trilinear interpolation
-    irradianceSpec.srgb = false;
-    irradianceSpec.storageImage = true;
-    irradianceSpec.format = TextureFormat::RGBA16F;
-    irradianceSpec.type = TextureType::TEXTURE3D;
-    irradianceSpec.width = m_radianceCascades[0].probeGridDimensions.x;
-    irradianceSpec.height = m_radianceCascades[0].probeGridDimensions.y;
-    irradianceSpec.depth = m_radianceCascades[0].probeGridDimensions.z;
-    m_irradianceVolume = std::make_shared<Texture>(irradianceSpec);
+
 
 }
 
-void RadianceCascades::buildPipelines() {
+void RadianceCascades2D::buildPipelines() {
 
     auto& app = Application::getInstance();
     auto& proj = app.getProject();
     auto shaderDir = proj.getProjectShaderDirectory();
 
     ShaderImportConfig shaderBaseProbeConfig; 
-    shaderBaseProbeConfig.compileInfo.includePath = shaderDir / "glsl/RadianceCascades/";
+    shaderBaseProbeConfig.compileInfo.includePath = shaderDir / "glsl/RadianceCascades2D/";
 
 
 
-    auto [probeTraceShader, probeTraceShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/RadianceCascades/RCProbeTrace.cs.glsl", shaderBaseProbeConfig);
-    auto [mergeCascadeShader, mergeCascadeShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/RadianceCascades/RCPCascadeMerge.cs.glsl", shaderBaseProbeConfig);
-    auto [irradianceShader, irradianceShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/RadianceCascades/RCProbeIrradiance.cs.glsl", shaderBaseProbeConfig);
+    auto [probeTraceShader, probeTraceShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/RadianceCascades2D/RCProbeTrace.cs.glsl", shaderBaseProbeConfig);
+    auto [mergeCascadeShader, mergeCascadeShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/RadianceCascades2D/RCPCascadeMerge.cs.glsl", shaderBaseProbeConfig);
+    auto [integrateIrradianceShader, integrateIrradianceShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/RadianceCascades2D/RCIntegrateIrradiance.cs.glsl", shaderBaseProbeConfig);
 
     ComputePipelineConfiguration probeTraceConfig;
     probeTraceConfig.shader = probeTraceShader;
@@ -212,16 +188,18 @@ void RadianceCascades::buildPipelines() {
     ComputePipelineConfiguration mergeCascadeConfig;
     mergeCascadeConfig.shader = mergeCascadeShader;
 
-    ComputePipelineConfiguration irradianceConfig;
-    irradianceConfig.shader = irradianceShader;
+    ComputePipelineConfiguration integrateIrradianceConfig;
+    integrateIrradianceConfig.shader = integrateIrradianceShader;
+
 
     m_probeTracePipeline = std::make_shared<ComputePipeline>(probeTraceConfig);
     m_mergeCascadePipeline = std::make_shared<ComputePipeline>(mergeCascadeConfig);
-    m_irradiancePipeline = std::make_shared<ComputePipeline>(irradianceConfig);
+
+    m_integrateIrradiancePipeline = std::make_shared<ComputePipeline>(integrateIrradianceConfig);
 
 }
 
-void RadianceCascades::buildCommandBuffers(uint32_t framesInFlight) {
+void RadianceCascades2D::buildCommandBuffers(uint32_t framesInFlight) {
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
 
@@ -234,11 +212,9 @@ void RadianceCascades::buildCommandBuffers(uint32_t framesInFlight) {
     m_commandBuffers = pool->getCommandBuffers(framesInFlight);
 
 
-
-
 }
 
-void RadianceCascades::buildUniformBuffers() {
+void RadianceCascades2D::buildUniformBuffers() {
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
@@ -256,14 +232,14 @@ void RadianceCascades::buildUniformBuffers() {
     }
 
     for (uint32_t i = 0; i < MAX_CASCADES; i++) {
-        m_cascadeUniformBuffers.push_back(std::make_shared<UniformBuffer>(sizeof(RadianceCascadeLevel), BufferUsage::STATIC, vc.getVmaAllocator(), &m_radianceCascades[i]));
-        m_cascadeUniformBuffers[i]->addDataGPU(&m_radianceCascades[i], sizeof(RadianceCascadeLevel), 0);
+        m_cascadeUniformBuffers.push_back(std::make_shared<UniformBuffer>(sizeof(RadianceCascadeLevel2D), BufferUsage::STATIC, vc.getVmaAllocator(), &m_radianceCascades[i]));
+        m_cascadeUniformBuffers[i]->addDataGPU(&m_radianceCascades[i], sizeof(RadianceCascadeLevel2D), 0);
 
         m_cascadeUniformBufferIndices.push_back(cascadeLevelInfoBinding->add(m_cascadeUniformBuffers[i]));
     }
 }
 
-void RadianceCascades::mergeCascades(std::shared_ptr<CommandBuffer> commandBuffer) {
+void RadianceCascades2D::mergeCascades(std::shared_ptr<CommandBuffer> commandBuffer) {
     
     // Transition all cascade textures to general layout for read/write access
 
@@ -319,15 +295,13 @@ void RadianceCascades::mergeCascades(std::shared_ptr<CommandBuffer> commandBuffe
         // Calculate dispatch size based on current cascade dimensions
         const auto& currentCascadeInfo = m_radianceCascades[currentCascade];
         uint32_t imageWidth = currentCascadeInfo.probeGridDimensions.x * currentCascadeInfo.angularResolution;
-        uint32_t imageHeight = currentCascadeInfo.probeGridDimensions.z * currentCascadeInfo.angularResolution;
-        uint32_t imageDepth = currentCascadeInfo.probeGridDimensions.y;
+        uint32_t imageHeight = currentCascadeInfo.probeGridDimensions.y * currentCascadeInfo.angularResolution;
 
         uint32_t workGroupsX = (imageWidth + 7) / 8;
         uint32_t workGroupsY = (imageHeight + 7) / 8;
-        uint32_t workGroupsZ = imageDepth;
 
         // Dispatch the merge compute shader
-        vkCmdDispatch(commandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, workGroupsZ);
+        vkCmdDispatch(commandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, 1);
 
         // Add a memory barrier after each dispatch to prevent race conditions.
         // This ensures that the writes to the current cascade's texture are complete
@@ -353,7 +327,81 @@ void RadianceCascades::mergeCascades(std::shared_ptr<CommandBuffer> commandBuffe
 
 }
 
-void RadianceCascades::updateBaseRange(float baseRange) {
+void RadianceCascades2D::integrateCascade(std::shared_ptr<CommandBuffer> commandBuffer) {
+
+
+    VkImageMemoryBarrier integrationBarrier = m_irradianceCascadeTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED, 
+        VK_IMAGE_LAYOUT_GENERAL, 
+        0,
+        VK_ACCESS_SHADER_WRITE_BIT);
+
+    VkImageMemoryBarrier cascadeBarrier = m_cascadeTextures[0]->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_ACCESS_SHADER_READ_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+
+    vkCmdPipelineBarrier(
+            commandBuffer->getCommandBufferVk(),
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &integrationBarrier
+        );
+
+    vkCmdPipelineBarrier(
+        commandBuffer->getCommandBufferVk(),
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &cascadeBarrier
+    );
+
+    m_integrateIrradiancePipeline->bind(commandBuffer->getCommandBufferVk());
+
+
+    DescriptorManager::bindSet(0, commandBuffer, m_integrateIrradiancePipeline);
+    DescriptorManager::bindSet(3, commandBuffer, m_integrateIrradiancePipeline);
+    m_integrateIrradianceDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_integrateIrradiancePipeline);
+
+    // Calculate dispatch size based on current cascade dimensions
+    const auto& cascade0Info = m_radianceCascades[0];
+    uint32_t imageWidth = cascade0Info.probeGridDimensions.x * cascade0Info.angularResolution;
+    uint32_t imageHeight = cascade0Info.probeGridDimensions.y * cascade0Info.angularResolution;
+
+    uint32_t workGroupsX = (imageWidth + 7) / 8;
+    uint32_t workGroupsY = (imageHeight + 7) / 8;
+
+    // Dispatch the merge compute shader
+    vkCmdDispatch(commandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, 1);
+
+
+
+    VkImageMemoryBarrier postIntegrationBarrier = m_irradianceCascadeTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_GENERAL, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+
+    vkCmdPipelineBarrier(
+            commandBuffer->getCommandBufferVk(),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &postIntegrationBarrier
+        );
+
+
+}
+
+void RadianceCascades2D::updateBaseRange(float baseRange) {
     float prevMinRange = 0.0f;
 
     if (baseRange < m_buildParams.baseSpacing) {
@@ -363,22 +411,25 @@ void RadianceCascades::updateBaseRange(float baseRange) {
     m_buildParams.baseRange = baseRange;
 
     for (uint32_t i = 0; i < MAX_CASCADES; i++) {
-        RadianceCascadeLevel& cascade = m_radianceCascades[i];
+        RadianceCascadeLevel2D& cascade = m_radianceCascades[i];
 
-        float maxRange = baseRange * std::pow(2.0f, static_cast<float>(i));
+        float maxRange = baseRange * std::pow(m_buildParams.rangeExp, static_cast<float>(i));
 
         cascade.minProbeDistance = prevMinRange;
         cascade.maxProbeDistance = maxRange;
 
         prevMinRange = maxRange;
 
-        m_cascadeUniformBuffers[i]->addDataGPU(&cascade, sizeof(RadianceCascadeLevel), 0);
+        float overlap = glm::length(glm::length(glm::vec2(m_buildParams.baseSpacing) * std::pow(2.0f, static_cast<float>(i+1))));
+        cascade.maxProbeDistance = cascade.maxProbeDistance + overlap;
+
+        m_cascadeUniformBuffers[i]->addDataGPU(&cascade, sizeof(RadianceCascadeLevel2D), 0);
     }
 
     
 }
 
-void RadianceCascades::updateBaseSpacing(float baseSpacing) {
+void RadianceCascades2D::updateBaseSpacing(float baseSpacing) {
     if (baseSpacing > m_buildParams.baseRange) {
         return;
     }
@@ -386,13 +437,13 @@ void RadianceCascades::updateBaseSpacing(float baseSpacing) {
     m_buildParams.baseSpacing = baseSpacing;
 
     for (uint32_t i = 0; i < MAX_CASCADES; i++) {
-        RadianceCascadeLevel& cascade = m_radianceCascades[i];
-        cascade.probeSpacing = glm::vec3(baseSpacing) * std::pow(2.0f, static_cast<float>(i));
-        m_cascadeUniformBuffers[i]->addDataGPU(&cascade, sizeof(RadianceCascadeLevel), 0);
+        RadianceCascadeLevel2D& cascade = m_radianceCascades[i];
+        cascade.probeSpacing = glm::vec2(baseSpacing) * std::pow(2.0f, static_cast<float>(i));
+        m_cascadeUniformBuffers[i]->addDataGPU(&cascade, sizeof(RadianceCascadeLevel2D), 0);
     }
 }
 
-void RadianceCascades::castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex) {
+void RadianceCascades2D::castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex) {
 
     auto tlas = scene->getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
@@ -451,7 +502,7 @@ void RadianceCascades::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
         m_probeTraceDescriptorSets[i]->bind(currentCommandBuffer->getCommandBufferVk(), m_probeTracePipeline);
 
 
-        RCProbeTracePushConstants pushConstants = {};
+        RCProbeTracePushConstants2D pushConstants = {};
         pushConstants.cascadeIndex = i;
         pushConstants.cascadeLevels = MAX_CASCADES;
         pushConstants.tlasIndex = tlas->getBindlessIndex();
@@ -468,21 +519,19 @@ void RadianceCascades::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
             currentCommandBuffer->getCommandBufferVk(),
             m_probeTracePipeline->getPipelineLayoutVk(),
             VK_SHADER_STAGE_COMPUTE_BIT,
-            0, sizeof(RCProbeTracePushConstants), &pushConstants
+            0, sizeof(RCProbeTracePushConstants2D), &pushConstants
         );
 
         const auto& cascade = m_radianceCascades[i];
         
         uint32_t imageWidth = m_cascadeTextures[i]->getSpecification().width;
         uint32_t imageHeight = m_cascadeTextures[i]->getSpecification().height;
-        uint32_t imageDepth = m_cascadeTextures[i]->getSpecification().depth;
 
 
         uint32_t workGroupsX = (imageWidth + 7) / 8;
         uint32_t workGroupsY = (imageHeight + 7) / 8;
-        uint32_t workGroupsZ = imageDepth;
     
-        vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, workGroupsZ);
+        vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, 1);
     }
 
 
@@ -508,17 +557,12 @@ void RadianceCascades::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     );
 
 
-    for (uint32_t i = 0; i < MAX_CASCADES; i++) {
-        m_flatCascadeTextures[i]->update(currentCommandBuffer);
-    }
+
 
     mergeCascades(currentCommandBuffer);
 
-    for (uint32_t i = 0; i < MAX_CASCADES; i++) {
-        m_flatMergedCascadeTextures[i]->update(currentCommandBuffer);
-    }
+    integrateCascade(currentCommandBuffer);
 
-    //prefilterProbes(currentCommandBuffer);
 
 
     //-------------------------------------------------------------------------------------------------
@@ -538,7 +582,7 @@ void RadianceCascades::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
 
 }
 
-void RadianceCascades::buildDescriptorSet() {
+void RadianceCascades2D::buildDescriptorSet() {
     
     DescriptorSetBindings bindings;
     bindings.setNumber = 4;
@@ -558,25 +602,17 @@ void RadianceCascades::buildDescriptorSet() {
         textureBinding->add(m_cascadeTextures[i]);
     }
 
-    // Create descriptor set for the irradiance pre-filtering pass
+    // #irradiancedescriptor
     DescriptorSetBindings irradianceBindings;
-    irradianceBindings.setNumber = 4; // Output binding
-    
-    DescriptorSetBinding irradianceBindingLocation;
-    irradianceBindingLocation.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    irradianceBindingLocation.count = 1;
-    irradianceBindingLocation.viewType = TextureViewType::DEFAULT;
-    irradianceBindingLocation.useStorageImageInfo = true;
-    irradianceBindingLocation.location = DescriptorSetBindingLocation::CUSTOM_0;
-
-    irradianceBindings.bindings.push_back(irradianceBindingLocation);
-    m_irradianceDescriptorSet = std::make_shared<DescriptorSet>(irradianceBindings);
-    auto irradianceTextureBinding = m_irradianceDescriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_0);
-    irradianceTextureBinding->add(m_irradianceVolume);
+    irradianceBindings.setNumber = 4;
+    irradianceBindings.bindings.push_back(bindingLocation);
+    m_integrateIrradianceDescriptorSet = std::make_shared<DescriptorSet>(irradianceBindings);
+    auto irradianceTextureBinding = m_integrateIrradianceDescriptorSet->getTextureBinding((DescriptorSetBindingLocation::CUSTOM_0));
+    irradianceTextureBinding->add(m_irradianceCascadeTexture);
 
 }
 
-std::vector<glm::vec3> RadianceCascades::getCascadeProbePositions(uint32_t cascadeIndex) const {
+std::vector<glm::vec3> RadianceCascades2D::getCascadeProbePositions(uint32_t cascadeIndex) const {
     if (cascadeIndex >= MAX_CASCADES) {
         RP_CORE_ERROR("Invalid cascade index: {}", cascadeIndex);
         return {};
@@ -590,90 +626,30 @@ std::vector<glm::vec3> RadianceCascades::getCascadeProbePositions(uint32_t casca
     }
 
     std::vector<glm::vec3> positions;
-    positions.reserve(cascade.probeGridDimensions.x * cascade.probeGridDimensions.y * cascade.probeGridDimensions.z);
+    positions.reserve(cascade.probeGridDimensions.x * cascade.probeGridDimensions.y);
 
     // Calculate probe positions using the same logic as the shader GetProbeWorldPosition
     for (int x = 0; x < cascade.probeGridDimensions.x; x++) {
         for (int y = 0; y < cascade.probeGridDimensions.y; y++) {
-            for (int z = 0; z < cascade.probeGridDimensions.z; z++) {
-                glm::ivec3 probeCoords(x, y, z);
-                
-                // Multiply the grid coordinates by the probe spacing
-                glm::vec3 probeGridWorldPosition = glm::vec3(probeCoords) * cascade.probeSpacing;
+            glm::ivec2 probeCoords(x, y);
+            
+            // Multiply the grid coordinates by the probe spacing
+            glm::vec2 probeGridWorldPosition = glm::vec2(probeCoords) * cascade.probeSpacing;
 
-                // Shift the grid of probes by half of each axis extent to center the volume about its origin
-                glm::vec3 probeGridShift = (cascade.probeSpacing * glm::vec3(cascade.probeGridDimensions - 1)) * 0.5f;
+            // Shift the grid of probes by half of each axis extent to center the volume about its origin
+            glm::vec2 probeGridShift = (cascade.probeSpacing * glm::vec2(cascade.probeGridDimensions - 1)) * 0.5f;
 
-                // Center the probe grid about the origin
-                glm::vec3 probeWorldPosition = probeGridWorldPosition - probeGridShift + cascade.probeOrigin;
+            // Center the probe grid about the origin
+            glm::vec2 probeWorldPosition = probeGridWorldPosition;// - probeGridShift;
 
-                positions.push_back(probeWorldPosition);
-            }
+            positions.push_back(glm::vec3(probeWorldPosition.x, 0.0f, probeWorldPosition.y));
+        
         }
     }
 
     return positions;
 }
 
-void RadianceCascades::prefilterProbes(std::shared_ptr<CommandBuffer> commandBuffer) {
-    
-    // Barrier to ensure merged cascade 0 is ready to be read
-    VkImageMemoryBarrier preFilterBarrier = m_cascadeTextures[0]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_SHADER_READ_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
-
-    // Barrier to transition irradiance volume to general for writing
-    VkImageMemoryBarrier irradianceWriteBarrier = m_irradianceVolume->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, 
-        VK_IMAGE_LAYOUT_GENERAL, 
-        0, 
-        VK_ACCESS_SHADER_WRITE_BIT);
-
-    std::vector<VkImageMemoryBarrier> barriers = { preFilterBarrier, irradianceWriteBarrier };
-
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        static_cast<uint32_t>(barriers.size()), barriers.data()
-    );
-
-    // Bind pipeline and descriptor sets
-    m_irradiancePipeline->bind(commandBuffer->getCommandBufferVk());
-    DescriptorManager::bindSet(0, commandBuffer, m_irradiancePipeline);
-    DescriptorManager::bindSet(3, commandBuffer, m_irradiancePipeline); // Binds the merged cascade[0] texture
-    m_irradianceDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_irradiancePipeline);
-
-    // Dispatch compute shader
-    const auto& cascade0 = m_radianceCascades[0];
-    uint32_t workGroupsX = (cascade0.probeGridDimensions.x + 3) / 4;
-    uint32_t workGroupsY = (cascade0.probeGridDimensions.y + 3) / 4;
-    uint32_t workGroupsZ = (cascade0.probeGridDimensions.z + 3) / 4;
-
-    vkCmdDispatch(commandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, workGroupsZ);
-
-    // Barrier to ensure irradiance volume is ready for sampling
-    VkImageMemoryBarrier postFilterBarrier = m_irradianceVolume->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_GENERAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_SHADER_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
-    
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Transition for fragment shader access
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &postFilterBarrier
-    );
-}
 
 
 }

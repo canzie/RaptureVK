@@ -37,9 +37,9 @@ layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
 struct CascadeLevelInfo {
     uint cascadeLevel;
     
-    ivec3 probeGridDimensions;
-    vec3 probeSpacing;
-    vec3 probeOrigin;
+    ivec2 probeGridDimensions;
+    vec2 probeSpacing;
+    vec2 probeOrigin;
 
     float minProbeDistance;
     float maxProbeDistance;
@@ -47,6 +47,7 @@ struct CascadeLevelInfo {
     uint angularResolution;
 
     uint cascadeTextureIndex;
+    uint irradianceTextureIndex;
 };
 
 // Light data structure for shader
@@ -430,105 +431,73 @@ float calculateShadow(vec3 fragPosWorld, float fragDepthView, vec3 normal, vec3 
 
 
 
-vec3 GetProbeRayDirection(uint rayIndex, uint angularResolution)
-{
-    uint numRays = angularResolution * angularResolution;
-    vec3 direction = SphericalFibonacci(rayIndex, numRays);
-    return normalize(direction);
-}
 
+vec3 sampleRadianceCascade2D(vec3 fragPos, vec3 normal, CascadeLevelInfo cascade0) {
 
+    // Map world position to the 2D probe grid on the XZ plane
+    vec2 probeGridCoords = (fragPos.xz - cascade0.probeOrigin) / cascade0.probeSpacing;
+    probeGridCoords = clamp(probeGridCoords, vec2(0.0), vec2(cascade0.probeGridDimensions) - 1.0);
 
-vec3 GetProbeWorldPosition(ivec3 probeCoords, CascadeLevelInfo cascadeLevelInfo)
-{
-    // Multiply the grid coordinates by the probe spacing
-    vec3 probeGridWorldPosition = vec3(probeCoords) * cascadeLevelInfo.probeSpacing;
-
-    // Shift the grid of probes by half of each axis extent to center the volume about its origin
-    vec3 probeGridShift = (cascadeLevelInfo.probeSpacing * vec3((cascadeLevelInfo.probeGridDimensions - 1))) * 0.5;
-
-    // Center the probe grid about the origin
-    vec3 probeWorldPosition = (probeGridWorldPosition - probeGridShift);
-
-    probeWorldPosition += cascadeLevelInfo.probeOrigin;
-
-    return probeWorldPosition;
-}
-
-vec3 sampleRadianceCascadeDiffuse(vec3 fragmentWorldPosition, vec3 normal, CascadeLevelInfo cascade0) {
-
-    vec3 gridShift = (cascade0.probeSpacing * vec3(cascade0.probeGridDimensions - 1)) * 0.5;
-    vec3 localPos = (fragmentWorldPosition - cascade0.probeOrigin + gridShift) / cascade0.probeSpacing;
-
-    // Get integer probe coords and fractional part for interpolation
-    ivec3 baseProbeCoord = ivec3(floor(localPos));
-    vec3 interpWeights = fract(localPos);
+    ivec2 localPos = ivec2(floor(probeGridCoords));
+    vec2 alpha = fract(probeGridCoords); // Weights for bilinear interpolation
 
     vec3 totalIntegratedRadiance = vec3(0.0);
 
-    // Trilinear interpolation over the 8 neighboring probes
-    for (int z = 0; z <= 1; ++z) {
-        for (int y = 0; y <= 1; ++y) {
-            for (int x = 0; x <= 1; ++x) {
-                // Calculate current probe's coordinate and world position
-                ivec3 probeCoord = baseProbeCoord + ivec3(x, y, z);
-                probeCoord = clamp(probeCoord, ivec3(0), cascade0.probeGridDimensions - 1);
-                vec3 probeWorldPosition = GetProbeWorldPosition(probeCoord, cascade0);
+    normal.y = 1.0;
 
-                // --- Irradiance Integration for this probe ---
-                vec3 probeIrradiance = vec3(0.0);
-                uint numRaysToSample = 32; // Sample a subset of rays for performance
-                uint totalRaysInProbe = cascade0.angularResolution * cascade0.angularResolution;
-                uint step_ = max(1u, totalRaysInProbe / numRaysToSample);
+    // Bilinear interpolation over the 4 nearest probes
+    for (int probeIndex = 0; probeIndex < 4; probeIndex++) {
+        ivec2 adjacentProbeOffset = ivec2(probeIndex % 2, probeIndex / 2);
+        ivec2 adjacentProbeCoords2D = clamp(localPos + adjacentProbeOffset, ivec2(0), cascade0.probeGridDimensions - 1);
 
-                float totalWeight = 0.0;
-                float totalSamples = 0.0;
-                for (uint i = 0; i < numRaysToSample; ++i) {
-                    uint rayIndex = i * step_;
+        
+        // Calculate bilinear weight for this probe
+        vec2 bilinearVec = mix(vec2(1.0) - alpha, alpha, vec2(adjacentProbeOffset));
+        float bilinearWeight = bilinearVec.x * bilinearVec.y;
 
-                    // Get ray direction for this sample
-                    vec3 rayDir = GetProbeRayDirection(rayIndex, cascade0.angularResolution);
+        // --- Integrate radiance for this single probe ---
+        uint numRays = cascade0.angularResolution * cascade0.angularResolution;
+        float totalWeight = 0.0;
+        vec3 probeIrradiance = vec3(0.0);
 
-                    // Consider rays in the hemisphere of the normal
-                    float NdotL = dot(normal, rayDir);
-                    if (NdotL > 0.0) {
-                        // Calculate texture coordinates for this ray
-                        uint rayX = rayIndex % cascade0.angularResolution;
-                        uint rayY = rayIndex / cascade0.angularResolution;
-                        ivec3 texCoords;
-                        texCoords.x = probeCoord.x * int(cascade0.angularResolution) + int(rayX);
-                        texCoords.y = probeCoord.z * int(cascade0.angularResolution) + int(rayY);
-                        texCoords.z = probeCoord.y;
+        for (uint rayIndex = 0; rayIndex < numRays; rayIndex++) {
+            // Generate a 2D ray direction on a circle
+            float angle = (float(rayIndex) / float(numRays)) * 2.0 * PI;
+            vec2 rayDir2D = vec2(cos(angle), sin(angle));
+            
+            // Promote the 2D ray to 3D, assuming it's on the XZ plane, and perform the 3D dot product
+            vec3 rayDir3D = vec3(rayDir2D.x, 1.0, rayDir2D.y);
+            float weight = dot(normal, rayDir3D);
 
-                        // Fetch radiance 
-                        vec4 probeData = texelFetch(gTextureArrays[cascade0.cascadeTextureIndex], texCoords, 0);
-                        vec3 probeRadiance = probeData.rgb;
+            if (weight <= 0.0) continue;
 
-                        // Accumulate cosine-weighted radiance
-                        probeIrradiance += probeRadiance * NdotL;
-                        totalWeight += NdotL;
-                        totalSamples += 1.0;
-                    }
-                }
-                
-                if (totalWeight > 0.0) {
-                    probeIrradiance /= totalWeight;
-                    //probeIrradiance /= totalSamples;
-                }
+            int candidateRayX = int(rayIndex % cascade0.angularResolution);
+            int candidateRayY = int(rayIndex / cascade0.angularResolution);
 
-                // Calculate trilinear interpolation weight
-                float weight = mix(1.0 - interpWeights.x, interpWeights.x, x) *
-                               mix(1.0 - interpWeights.y, interpWeights.y, y) *
-                               mix(1.0 - interpWeights.z, interpWeights.z, z);
+            // Calculate the 2D texel coordinate for lookup in the 2D radiance texture
+            ivec2 texCoords;
+            texCoords.x = adjacentProbeCoords2D.x * int(cascade0.angularResolution) + candidateRayX;
+            texCoords.y = adjacentProbeCoords2D.y * int(cascade0.angularResolution) + candidateRayY;
+            
+            // Sample from the 2D texture using gTextures
+            vec4 ProbeData = texelFetch(gTextures[cascade0.cascadeTextureIndex], texCoords, 0);
+            vec3 probeRayRadiance = ProbeData.rgb;
 
-                // Accumulate weighted irradiance
-                totalIntegratedRadiance += probeIrradiance * weight;
-            }
+            probeIrradiance += probeRayRadiance * weight;
+            totalWeight += weight;
         }
-    }
 
+        if (totalWeight > 0.0) {
+            probeIrradiance /= totalWeight;
+        }
+        // --- End of single probe integration ---
+
+        totalIntegratedRadiance += probeIrradiance * bilinearWeight;
+    }
+    
     return totalIntegratedRadiance;
 }
+
 
 
 vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume volume) {
@@ -676,12 +645,12 @@ void main() {
         //vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, V, u_DDGI_Volume);
         //indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
 
-        vec3 indirectRadiance = sampleRadianceCascadeDiffuse(fragPos, N, cs[0].cascadeLevelInfo);
-        indirectDiffuse = indirectRadiance ;
+        vec3 indirectRadiance = sampleRadianceCascade2D(fragPos, N, cs[0].cascadeLevelInfo);
+        indirectDiffuse = indirectRadiance * albedo;
         
     }
 
-    vec3 color = indirectDiffuse + Lo;
+    vec3 color = indirectDiffuse * Lo;
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {

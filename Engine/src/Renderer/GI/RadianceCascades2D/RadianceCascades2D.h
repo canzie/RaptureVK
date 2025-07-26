@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RCCommon.h"
+#include "RC2DCommon.h"
 #include "Textures/Texture.h"
 #include "Utils/TextureFlattener.h"
 
@@ -16,7 +16,7 @@
 
 namespace Rapture {
 
-#define MAX_CASCADES 6
+#define MAX_CASCADES 5
 
 /*
 
@@ -29,19 +29,19 @@ then merge based on ??? | b + wa * (a - b)
 */
 
 
-class RadianceCascades {
+class RadianceCascades2D {
 
 public:
 
-    RadianceCascades(uint32_t framesInFlight);
-    ~RadianceCascades();
+    RadianceCascades2D(uint32_t framesInFlight);
+    ~RadianceCascades2D();
 
-    void build(const BuildParams& buildParams);
+    void build(const BuildParams2D& buildParams);
     void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
 
     // Getters for visualization
-    const std::array<RadianceCascadeLevel, MAX_CASCADES>& getCascades() const { return m_radianceCascades; }
-    const RadianceCascadeLevel& getCascade(uint32_t index) const { return m_radianceCascades[index]; }
+    const std::array<RadianceCascadeLevel2D, MAX_CASCADES>& getCascades() const { return m_radianceCascades; }
+    const RadianceCascadeLevel2D& getCascade(uint32_t index) const { return m_radianceCascades[index]; }
     
     // Get probe positions for a specific cascade
     std::vector<glm::vec3> getCascadeProbePositions(uint32_t cascadeIndex) const;
@@ -49,8 +49,7 @@ public:
     void updateBaseRange(float baseRange);
     void updateBaseSpacing(float baseSpacing);
 
-    const BuildParams& getBuildParams() const { return m_buildParams; }
-    std::shared_ptr<Texture> getIrradianceVolume() const { return m_irradianceVolume; }
+    const BuildParams2D& getBuildParams() const { return m_buildParams; }
 
 
 
@@ -62,19 +61,19 @@ private:
     void buildUniformBuffers();
 
     void mergeCascades(std::shared_ptr<CommandBuffer> commandBuffer);
-    void prefilterProbes(std::shared_ptr<CommandBuffer> commandBuffer);
+    void integrateCascade(std::shared_ptr<CommandBuffer> commandBuffer);
 
 
 
 private:
-    std::array<RadianceCascadeLevel, MAX_CASCADES> m_radianceCascades;
+    std::array<RadianceCascadeLevel2D, MAX_CASCADES> m_radianceCascades;
     std::array<std::shared_ptr<Texture>, MAX_CASCADES> m_cascadeTextures;
-    std::shared_ptr<Texture> m_irradianceVolume;
-    // used for debugging to view the 2d texture arrays in 2d
-    std::array<std::shared_ptr<FlattenTexture>, MAX_CASCADES> m_flatCascadeTextures;
-    std::array<std::shared_ptr<FlattenTexture>, MAX_CASCADES> m_flatMergedCascadeTextures;
 
-    BuildParams m_buildParams;
+    // stores the integrated irradiance from cascade 0
+    std::shared_ptr<Texture> m_irradianceCascadeTexture;
+
+
+    BuildParams2D m_buildParams;
 
     std::vector<std::shared_ptr<UniformBuffer>> m_cascadeUniformBuffers;
     std::vector<uint32_t> m_cascadeUniformBufferIndices; // keep these for cleaning
@@ -84,9 +83,9 @@ private:
 
     std::shared_ptr<ComputePipeline> m_probeTracePipeline;
     std::shared_ptr<ComputePipeline> m_mergeCascadePipeline;
-    std::shared_ptr<ComputePipeline> m_irradiancePipeline;
+    std::shared_ptr<ComputePipeline> m_integrateIrradiancePipeline;
     std::vector<std::shared_ptr<DescriptorSet>> m_probeTraceDescriptorSets;
-    std::shared_ptr<DescriptorSet> m_irradianceDescriptorSet;
+    std::shared_ptr<DescriptorSet> m_integrateIrradianceDescriptorSet;
 
 
     };

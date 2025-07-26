@@ -18,6 +18,7 @@
 #include <memory>
 
 #include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
+#include "Renderer/GI/RadianceCascades/RadianceCascades.h"
 
 namespace Rapture {
 
@@ -80,7 +81,7 @@ private:
     std::shared_ptr<GBufferPass> m_gBufferPass;
 
     std::shared_ptr<DynamicDiffuseGI> m_ddgi;
-
+    
     float m_width;
     float m_height;
 

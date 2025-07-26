@@ -12,6 +12,7 @@ class SettingsPanel {
 
         void renderRendererSettings();
         void renderDDGISettings();
+        void renderRadianceCascadeSettings();
         void renderFogSettings();
 };
 

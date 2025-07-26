@@ -18,6 +18,8 @@
 #include "Renderer/StencilBorderPass.h"
 #include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
 #include "Renderer/GI/RadianceCascades/RadianceCascades.h"
+#include "Renderer/GI/RadianceCascades2D/RadianceCascades2D.h"
+
 #include "Renderer/SkyboxPass.h"
 #include "Renderer/InstancedShapesPass.h"
 
@@ -53,7 +55,7 @@ public:
 
   static std::shared_ptr<DynamicDiffuseGI> getDynamicDiffuseGI() { return m_dynamicDiffuseGI; }
 
-  static std::shared_ptr<RadianceCascades> getRadianceCascades() { return m_radianceCascades; }
+  static std::shared_ptr<RadianceCascades2D> getRadianceCascades() { return m_radianceCascades; }
 
 private:
   // sets up command pools and buffers
@@ -91,7 +93,7 @@ private:
   static float m_height;
 
   static std::shared_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
-  static std::shared_ptr<RadianceCascades> m_radianceCascades;
+  static std::shared_ptr<RadianceCascades2D> m_radianceCascades;
 };
 
 } // namespace Rapture

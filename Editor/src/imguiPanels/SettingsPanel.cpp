@@ -27,6 +27,8 @@ void SettingsPanel::renderRendererSettings() {
     renderDDGISettings();
     ImGui::Separator();
     renderFogSettings();
+    ImGui::Separator();
+    renderRadianceCascadeSettings();
 }
 
 void SettingsPanel::renderDDGISettings() {
@@ -69,6 +71,27 @@ void SettingsPanel::renderDDGISettings() {
     }
 
 
+
+
+}
+
+void SettingsPanel::renderRadianceCascadeSettings() {
+    ImGui::Text("Radiance Cascade Settings");
+
+    auto rc = Rapture::DeferredRenderer::getRadianceCascades();
+    auto& buildParams = rc->getBuildParams();
+
+    float baseRange = buildParams.baseRange;
+    float baseSpacing = buildParams.baseSpacing;
+
+
+    if (ImGui::SliderFloat("Base Range", &baseRange, 1.0f, 64.0f)) {
+        rc->updateBaseRange(baseRange);
+    }
+
+    if (ImGui::SliderFloat("Base Spacing", &baseSpacing, 0.5f, 4.0f)) {
+        rc->updateBaseSpacing(baseSpacing);
+    }
 
 
 }

@@ -137,7 +137,7 @@ vec4 getPrevCascadeData(vec3 normalizedProbeCoords, vec3 probeRayDirection, vec3
 
     // Get the base integer coordinates and the fractional part for interpolation
     ivec3 baseProbeCoords = ivec3(floor(prevCascadeFloatCoords));
-    vec3 fractionalOffset = fract(prevCascadeFloatCoords);
+    vec3 alpha = fract(prevCascadeFloatCoords);
 
     uint numPrevSamples = prevCascadeInfo.angularResolution * prevCascadeInfo.angularResolution;
     uvec4 candidateRayIndices = GetCandidateRayIndices(probeRayDirection, numPrevSamples);
@@ -164,36 +164,33 @@ vec4 getPrevCascadeData(vec3 normalizedProbeCoords, vec3 probeRayDirection, vec3
         float spatialTotalWeight = 0.0;
 
         // Trilinearly interpolate between the 8 nearest probes for this candidate ray
-        for (int x = 0; x <= 1; x++) {
-            for (int y = 0; y <= 1; y++) {
-                for (int z = 0; z <= 1; z++) {
-                    ivec3 offset = ivec3(x, y, z);
-                    ivec3 probeCoords = baseProbeCoords + offset;
+        for (int probeIndex = 0; probeIndex < 8; probeIndex++) {
+            ivec3 adjacentProbeOffset = ivec3(probeIndex, probeIndex >> 1, probeIndex >> 2) & ivec3(1, 1, 1);
+            ivec3 adjacentProbeCoords = clamp(baseProbeCoords + adjacentProbeOffset, ivec3(0, 0, 0), prevCascadeInfo.probeGridDimensions - 1);
 
-                    if (any(lessThan(probeCoords, ivec3(0)))) continue;
-                    if (any(greaterThanEqual(probeCoords, prevCascadeInfo.probeGridDimensions))) continue;
 
-                    ivec3 texCoords;
-                    texCoords.x = probeCoords.x * int(prevCascadeInfo.angularResolution) + candidateRayX;
-                    texCoords.y = probeCoords.z * int(prevCascadeInfo.angularResolution) + candidateRayY;
-                    texCoords.z = probeCoords.y;
+            //if (any(lessThan(probeCoords, ivec3(0)))) continue;
+            //if (any(greaterThanEqual(probeCoords, prevCascadeInfo.probeGridDimensions))) continue;
+
+            ivec3 texCoords;
+            texCoords.x = adjacentProbeCoords.x * int(prevCascadeInfo.angularResolution) + candidateRayX;
+            texCoords.y = adjacentProbeCoords.z * int(prevCascadeInfo.angularResolution) + candidateRayY;
+            texCoords.z = adjacentProbeCoords.y;
+            
+            vec4 prevProbeData = texelFetch(gTextureArrays[prevCascadeInfo.cascadeTextureIndex], texCoords, 0);
+
+            // Calculate trilinear interpolation weights
+            vec3 trilinear = mix(vec3(1.0) - alpha, alpha, vec3(adjacentProbeOffset));  
+            float trilinearWeight = (trilinear.x * trilinear.y * trilinear.z);
+
+
+            spatiallyWeightedData += prevProbeData * trilinearWeight;
+            spatialTotalWeight += trilinearWeight;
                     
-                    vec4 prevProbeData = texelFetch(gTextureArrays[prevCascadeInfo.cascadeTextureIndex], texCoords, 0);
-
-                    // Calculate trilinear interpolation weights
-                    vec3 weight3d = mix(vec3(1.0) - fractionalOffset, fractionalOffset, vec3(offset));
-                    float weight = weight3d.x * weight3d.y * weight3d.z;
-
-                    spatiallyWeightedData += prevProbeData * weight;
-                    spatialTotalWeight += weight;
-                }
-            }
         }
 
         if (spatialTotalWeight > 0.0) {
             spatiallyWeightedData /= spatialTotalWeight;
-        } else {
-            continue;
         }
 
         totalWeightedData += spatiallyWeightedData * angularWeight;

@@ -15,11 +15,15 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 // Ray data output texture (fixed binding in set 3)
-layout(set = 4, binding = 0, rgba32f) uniform restrict writeonly image2DArray CascadeTextures;
+layout(set = 4, binding = 0, rgba32f) uniform restrict writeonly image2D CascadeTextures;
 
 precision highp float;
 
 #include "RCCommon.glsl"
+
+#ifndef PI
+#define PI 3.14159265358979323846
+#endif
 
 
 // Previous probe data (bindless textures in set 3)
@@ -267,27 +271,11 @@ vec3 sampleEmissiveColor(MeshInfo meshInfo, vec2 uv) {
 
 
 
-vec3 SphericalFibonacci(uint sampleIndex, uint numSamples)
-{
-    const float b = (sqrt(5.0) * 0.5 + 0.5) - 1.0;
-    float phi = 6.28318530718 * fract(float(sampleIndex) * b);
-    float cosTheta = 1.0 - (2.0 * float(sampleIndex) + 1.0) * (1.0 / float(numSamples));
-    float sinTheta = sqrt(clamp(1.0 - (cosTheta * cosTheta), 0.0, 1.0));
-
-    return vec3((cos(phi) * sinTheta), (sin(phi) * sinTheta), cosTheta);
+vec2 getUniformDirection(uint sampleIndex, uint numSamples) {
+    float angle = (2.0 * PI * (sampleIndex + 0.5)) / numSamples;
+    return normalize(vec2(cos(angle), sin(angle)));
 }
 
-vec3 GetProbeRayDirection(uint rayIndex, CascadeLevelInfo cascadeLevelInfo)
-{
-    uint sampleIndex = rayIndex;
-    uint numRays = cascadeLevelInfo.angularResolution * cascadeLevelInfo.angularResolution;
-    
-    // Get a deterministic direction on the sphere using the spherical Fibonacci sequence
-    vec3 direction = SphericalFibonacci(sampleIndex, numRays);
-
-    return normalize(direction);
-
-}
 
 struct LightInfo {
 
@@ -302,210 +290,49 @@ layout(std140, set=0, binding = 1) uniform LightInfoUBO {
     LightInfo light;
 }u_lights[];
 
-/**
- * Computes the visibility factor for a given vector to a light using ray tracing.
- */
-float LightVisibility(
-    vec3 worldPosition,
-    vec3 normal,
-    vec3 lightVector,
-    float tmax,
-    float normalBias,
-    float viewBias)
-{
-    // Create a visibility ray query
-    rayQueryEXT visibilityQuery;
-    
-    vec3 rayOrigin = worldPosition + (normal * normalBias); 
-    vec3 rayDirection = normalize(lightVector);
-    
-    // Initialize ray query for visibility test
-    // Use ACCEPT_FIRST_HIT and SKIP_CLOSEST_HIT equivalent flags
-    rayQueryInitializeEXT(
-        visibilityQuery, 
-        topLevelAS[0], 
-        gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT, 
-        0xFF,
-        rayOrigin, 
-        0.0, 
-        rayDirection, 
-        tmax
-    );
-    
-    // Process the ray query
-    rayQueryProceedEXT(visibilityQuery);
-    
-    // Check if we hit anything (if we did, the light is occluded)
-    if (rayQueryGetIntersectionTypeEXT(visibilityQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-        return 0.0; // Occluded
-    }
-    
-    return 1.0; // Visible
-}
-
-vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, LightInfo light) {   
-    
-    // Use ray-traced visibility instead of shadow maps
-    float normalBias = 0.01; // Small bias to avoid self-intersection
-    float viewBias = 0.0;    // Not used yet, but kept for future
-    
-    float visibility = LightVisibility(
-        hitPositionWorld,
-        shadingNormal,
-        -light.direction.xyz,  // Light vector (towards sun)
-        1e27,                              // Very large tmax for directional light
-        normalBias,
-        viewBias
-    );
-    
-    // Early out if the light isn't visible from the surface
-    if (visibility <= 0.0) {
-        return vec3(0.0);
-    }
-    
-    // Compute lighting
-    //vec3 lightDirection = normalize(-light.direction.xyz);
-    
-    return light.color.xyz * light.color.w * visibility;
-}
-
-vec3 EvaluateSpotLight(vec3 shadingNormal, vec3 hitPositionWorld, LightInfo spotLight)
-{   
-    return vec3(0.0);
-}
-
-vec3 EvaluatePointLight(vec3 shadingNormal, vec3 hitPositionWorld, LightInfo pointLight)
-{   
-    return vec3(0.0);
-}
-
-// calculate the radiance
-vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorld, uint lightCount) {
 
 
-    vec3 totalLighting = vec3(0.0);
 
-    for (uint i = 0; i < lightCount; ++i) {
-        LightInfo light = u_lights[i].light;
-        
-        // light type is in light.position.w
-        if (light.position.w == 1) { // Directional
-             totalLighting += EvaluateDirectionalLight(shadingNormal, hitPositionWorld, light);
-        } else if (light.position.w == 0) { // Point
-             totalLighting += EvaluatePointLight(shadingNormal, hitPositionWorld, light);
-        } else if (light.position.w == 2) { // Spot
-             totalLighting += EvaluateSpotLight(shadingNormal, hitPositionWorld, light);
-        }
-    }
-
-
-    return (albedo * totalLighting);
-}
-
-vec3 calculateShadingNormal(
-    MeshInfo meshInfo,
-    vec2 uv,
-    vec3 N_geom,   // Interpolated geometric normal (world space)
-    vec4 T_geom,   // Interpolated tangent (world space, w component contains handedness)
-    vec3 B_geom    // Pre-computed bitangent (world space)
-) {
-    // If no normal map is provided, just return the geometric normal
-    // This avoids issues with inconsistent tangent generation
-    if (meshInfo.NormalTextureIndex == UINT32_MAX) {
-        return normalize(N_geom);
-    }
-
-    // Apply normal map only if a valid texture index is provided
-    vec3 tangentNormal = texture(gTextures[meshInfo.NormalTextureIndex], uv).xyz;
-    tangentNormal = tangentNormal * 2.0 - 1.0;
-
-    // Use the pre-computed tangent, bitangent, and normal directly
-    vec3 N = normalize(N_geom);
-    vec3 T = normalize(T_geom.xyz);
-    vec3 B = normalize(B_geom);
-
-    mat3 TBN = mat3(T, B, N);
-    return normalize(TBN * tangentNormal);
-}
-
-ivec3 getProbeCoords(uvec3 outputCoords, uint angularResolution) {
-    ivec3 probeCoords;
+ivec2 getProbeCoords(uvec2 outputCoords, uint angularResolution) {
+    ivec2 probeCoords;
     probeCoords.x = int(outputCoords.x / angularResolution);
-    probeCoords.z = int(outputCoords.y / angularResolution);
-    probeCoords.y = int(outputCoords.z);
+    probeCoords.y = int(outputCoords.y / angularResolution);
 
     return probeCoords;
 }
 
-uint getRayIndex(uvec3 outputCoords, uint angularResolution) {
-    uint rayIndexX = outputCoords.x % angularResolution;
-    uint rayIndexY = outputCoords.y % angularResolution;
-    uint rayIndex = rayIndexY * angularResolution + rayIndexX;
-
-    return rayIndex;
-}
 
 
 void main() {
     CascadeLevelInfo cascadeLevelInfo = cs[u_cascadeIndex].cascadeLevelInfo;
     uint angularResolution = cascadeLevelInfo.angularResolution;
     
-    uvec3 outputCoords = uvec3(gl_GlobalInvocationID.xyz);
+    uvec2 outputCoords = uvec2(gl_GlobalInvocationID.xy);
+    uvec2 localCoords = uvec2(gl_LocalInvocationID.xy);
     
+
     // The size of the output texture array
-    uvec3 imageSize = uvec3(imageSize(CascadeTextures));
+    uvec2 imageSize = uvec2(imageSize(CascadeTextures));
 
     // Discard threads that are outside of the image dimensions.
     // This can happen due to workgroup rounding.
     if (outputCoords.x >= imageSize.x || 
-        outputCoords.y >= imageSize.y || 
-        outputCoords.z >= imageSize.z) {
+        outputCoords.y >= imageSize.y) {
         return;
     }
 
 
-        
+    ivec2 dir_coord = ivec2(outputCoords) % ivec2(angularResolution);
+    int dir_index = dir_coord.x + dir_coord.y * int(angularResolution);
+
+    vec2 dir = getUniformDirection(dir_index, angularResolution*angularResolution);
+    vec2 probeCoords = floor(outputCoords / angularResolution);
+    vec2 probeWorldPosition = probeCoords * cascadeLevelInfo.probeSpacing;
+    //vec2 gridShift = (cascadeLevelInfo.probeSpacing * vec2((cascadeLevelInfo.probeGridDimensions - 1))) * 0.5;
+    //probeWorldPosition -= gridShift;
+    //probeWorldPosition += cascadeLevelInfo.probeOrigin;
 
 
-#if DEBUG_COORDS == 1
-        imageStore(CascadeTextures, ivec3(outputCoords), vec4(vec3(outputCoords)/vec3(imageSize), 1.0));
-        return;
-#endif
-
-    
-
-    // From the output texel coordinates, we can derive the probe and ray indices.
-    ivec3 probeCoords = getProbeCoords(outputCoords, angularResolution);
-    uint rayIndex = getRayIndex(outputCoords, angularResolution);
-
-#if DEBUG_RAY_INDEX == 1
-        imageStore(CascadeTextures, ivec3(outputCoords), vec4(vec3(rayIndex)/vec3(angularResolution*angularResolution), 1.0));
-        return;
-#endif
-
-#if DEBUG_PROBE_COORDS == 1
-        imageStore(CascadeTextures, ivec3(outputCoords), vec4(vec3(probeCoords)/vec3(cascadeLevelInfo.probeGridDimensions), 0.5));
-        return;
-#endif
-
-
-
-    
-
-
-    vec3 probeWorldPosition = GetProbeWorldPosition(probeCoords, cascadeLevelInfo);
-    vec3 probeRayDirection = GetProbeRayDirection(rayIndex, cascadeLevelInfo);
-
-#if DEBUG_PROBE_WORLD_POSITION == 1
-        vec3 totalWorldExtent = vec3(cascadeLevelInfo.probeGridDimensions) * cascadeLevelInfo.probeSpacing * 0.5;
-        imageStore(CascadeTextures, ivec3(outputCoords), vec4((probeWorldPosition/totalWorldExtent) * 0.5 + 0.5, 1.0));
-        return;
-#endif
-
-#if DEBUG_RAY_DIRECTION == 1
-        imageStore(CascadeTextures, ivec3(outputCoords), vec4(probeRayDirection * 0.5 + 0.5, 1.0));
-        return;
-#endif
 
     rayQueryEXT query;
     rayQueryInitializeEXT(
@@ -513,15 +340,12 @@ void main() {
         topLevelAS[u_tlasIndex],
         gl_RayFlagsOpaqueEXT,
         0xFF,
-        probeWorldPosition,
+        vec3(probeWorldPosition.x, 0.0, probeWorldPosition.y),
         cascadeLevelInfo.minProbeDistance,
-        probeRayDirection,
+        vec3(dir.x, 0.0, dir.y),
         cascadeLevelInfo.maxProbeDistance
     );
 
-    // Proceed with the ray query. The loop continues until the query is complete.
-    // With gl_RayFlagsOpaqueEXT, the hardware automatically finds the closest hit,
-    // so we just need to let the query run to completion.
 
     bool hit = false;
     float hitT = 1e30;
@@ -560,40 +384,40 @@ void main() {
             uint primitiveID = rayQueryGetIntersectionPrimitiveIndexEXT(query, true);
             vec2 barycentrics = rayQueryGetIntersectionBarycentricsEXT(query, true);
             uint instanceCustomIndex = rayQueryGetIntersectionInstanceCustomIndexEXT(query, true);
-            vec3 hitPosition = probeWorldPosition + probeRayDirection * hitT;
 
-            // Get mesh info using the instance custom index
             MeshInfo meshInfo = u_sceneInfo.MeshInfos[instanceCustomIndex];
             
             // Get surface data for the hit point
             SurfaceData surface = getSurfaceDataForHit(primitiveID, barycentrics, meshInfo);
             
-            vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent, surface.bitangent);
-            vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
             vec3 emissiveColor = sampleEmissiveColor(meshInfo, surface.texCoord);
+            vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
+            float dstSquared = hitT * hitT;
+            float intensity = 1.0 / (dstSquared + 0.01);
 
-            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, u_lightCount);
+            emissiveColor = emissiveColor * intensity;
 
-            vec3 radiance = emissiveColor;
 
-            // Store radiance and the positive hit distance
+            vec3 radiance = albedo + emissiveColor;
+
             outColor = vec4(radiance, 1.0);
         } else {
-            outColor = vec4(0.0, 0.0, 0.0, 0.0);
+            outColor = vec4(0.0, 0.0, 0.0, 1.0);
         }
-    } else { // This covers misses and back-face hits
+    } else { 
         // For the final cascade, sample the skybox on a miss
         if (u_cascadeIndex == u_cascadeLevels - 1) {
             if (u_skyboxTextureIndex != UINT32_MAX) {
-                vec3 skyboxColor = texture(gCubemaps[u_skyboxTextureIndex], probeRayDirection).rgb;
+                //vec3 skyboxColor = texture(gCubemaps[u_skyboxTextureIndex], probeRayDirection).rgb;
                 //outColor.rgb = skyboxColor;
                 //outColor.a = 1.0;
+                outColor = vec4(0.0, 0.0, 0.0, 1.0);
+                
             }
         }
-        // For all misses/back-faces, hitT remains -1.0
     }
 
 
     // Store the resulting color.
-    imageStore(CascadeTextures, ivec3(outputCoords), outColor);
+    imageStore(CascadeTextures, ivec2(outputCoords), outColor);
 }
