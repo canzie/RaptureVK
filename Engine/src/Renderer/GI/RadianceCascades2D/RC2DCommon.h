@@ -9,13 +9,15 @@ struct BuildParams2D {
 
 
     // First cascade covers [0, baseRange]
-    float baseRange = 2.0f;  // t_0 (tune based on scene)
-    float rangeExp = 2.0f;
+    float baseRange = 1.0f;  // t_0 (tune based on scene)
+    float rangeExp = 4.0f;
      // Base grid dimensions (P_0)
-    glm::ivec2 baseGridDimensions = glm::ivec2(256, 256); // Must be power-of-2 friendly
+    glm::ivec2 baseGridDimensions = glm::ivec2(256, 256); 
+    float gridDimensionsExp = 2.0f;
 
     // Base angular resolution (Q_0 dimension)
-    int baseAngularResolution = 4;  // For N for NxN map
+    int baseAngularResolution = 8;  // For N for NxN map
+    float angularResolutionExp = 2.0f;
     
     // Base probe spacing (∆p_0)
     float baseSpacing = 0.1f;  // Must satisfy ∆p_0 < t_0

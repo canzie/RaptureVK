@@ -344,7 +344,7 @@ void ImGuiLayer::onUpdate(float ts)
 
         // currently here to prevent csm flickering
         // but everything is correctly set up to just remove it whenever csm is 100% stable
-        graphicsQueue->waitIdle();
+        //graphicsQueue->waitIdle();
 
 
     // Copy the swapchain image to the texture

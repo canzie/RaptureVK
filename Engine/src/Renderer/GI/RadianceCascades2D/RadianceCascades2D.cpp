@@ -72,17 +72,17 @@ void RadianceCascades2D::build(const BuildParams2D &buildParams) {
         prevMinRange = maxRange;
 
         // Grid dimensions: baseGridDimensions / 2^i
-        glm::vec2 scaledDimsF = glm::vec2(buildParams.baseGridDimensions) / std::pow(2.0f, static_cast<float>(i));
+        glm::vec2 scaledDimsF = glm::vec2(buildParams.baseGridDimensions) / std::pow(buildParams.gridDimensionsExp, static_cast<float>(i));
         cascade.probeGridDimensions = glm::max(glm::ivec2(glm::round(scaledDimsF)), glm::ivec2(1));
 
         // Calculate angular resolution: Q_i = baseAngularResolution * 2^i
         cascade.angularResolution = static_cast<uint32_t>(
-            buildParams.baseAngularResolution * std::pow(2.0f, static_cast<float>(i))
+            buildParams.baseAngularResolution * std::pow(buildParams.angularResolutionExp, static_cast<float>(i))
         );
         cascade.angularResolution = glm::max(cascade.angularResolution, 2u);
 
         // Calculate probe spacing: ∆p_i = baseSpacing * 2^i
-        cascade.probeSpacing = glm::vec2(buildParams.baseSpacing) * std::pow(2.0f, static_cast<float>(i));
+        cascade.probeSpacing = glm::vec2(buildParams.baseSpacing) * std::pow(buildParams.gridDimensionsExp, static_cast<float>(i));
 
         // this is the center of the grid, the shader should shift the grid by half of the extent
         cascade.probeOrigin = glm::vec2(0.0f);
@@ -90,7 +90,7 @@ void RadianceCascades2D::build(const BuildParams2D &buildParams) {
         cascade.cascadeTextureIndex = 0xFFFFFFFF;
 
 
-        float overlap = glm::length(glm::vec2(buildParams.baseSpacing) * std::pow(2.0f, static_cast<float>(i+1)));
+        float overlap = glm::length(glm::vec2(buildParams.baseSpacing) * std::pow(buildParams.gridDimensionsExp, static_cast<float>(i+1)));
         cascade.maxProbeDistance = cascade.maxProbeDistance + overlap;
 
         m_radianceCascades[i] = cascade;
@@ -240,7 +240,8 @@ void RadianceCascades2D::buildUniformBuffers() {
 }
 
 void RadianceCascades2D::mergeCascades(std::shared_ptr<CommandBuffer> commandBuffer) {
-    
+    RAPTURE_PROFILE_FUNCTION();
+
     // Transition all cascade textures to general layout for read/write access
 
 
@@ -328,6 +329,7 @@ void RadianceCascades2D::mergeCascades(std::shared_ptr<CommandBuffer> commandBuf
 }
 
 void RadianceCascades2D::integrateCascade(std::shared_ptr<CommandBuffer> commandBuffer) {
+    RAPTURE_PROFILE_FUNCTION();
 
 
     VkImageMemoryBarrier integrationBarrier = m_irradianceCascadeTexture->getImageMemoryBarrier(
@@ -420,7 +422,7 @@ void RadianceCascades2D::updateBaseRange(float baseRange) {
 
         prevMinRange = maxRange;
 
-        float overlap = glm::length(glm::length(glm::vec2(m_buildParams.baseSpacing) * std::pow(2.0f, static_cast<float>(i+1))));
+        float overlap = glm::length(glm::length(glm::vec2(m_buildParams.baseSpacing) * std::pow(m_buildParams.gridDimensionsExp, static_cast<float>(i+1))));
         cascade.maxProbeDistance = cascade.maxProbeDistance + overlap;
 
         m_cascadeUniformBuffers[i]->addDataGPU(&cascade, sizeof(RadianceCascadeLevel2D), 0);
@@ -438,12 +440,13 @@ void RadianceCascades2D::updateBaseSpacing(float baseSpacing) {
 
     for (uint32_t i = 0; i < MAX_CASCADES; i++) {
         RadianceCascadeLevel2D& cascade = m_radianceCascades[i];
-        cascade.probeSpacing = glm::vec2(baseSpacing) * std::pow(2.0f, static_cast<float>(i));
+        cascade.probeSpacing = glm::vec2(baseSpacing) * std::pow(m_buildParams.gridDimensionsExp, static_cast<float>(i));
         m_cascadeUniformBuffers[i]->addDataGPU(&cascade, sizeof(RadianceCascadeLevel2D), 0);
     }
 }
 
 void RadianceCascades2D::castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex) {
+    RAPTURE_PROFILE_FUNCTION();
 
     auto tlas = scene->getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
@@ -452,7 +455,11 @@ void RadianceCascades2D::castRays(std::shared_ptr<Scene> scene, uint32_t frameIn
 
 
 
+
     auto currentCommandBuffer = m_commandBuffers[frameIndex];
+
+
+
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -464,7 +471,9 @@ void RadianceCascades2D::castRays(std::shared_ptr<Scene> scene, uint32_t frameIn
         return;
     }
     //-------------------------------------------------------------------------------------------------
-
+    {    
+        RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "RadianceCascades2D::castRays");
+    
     std::vector<VkImageMemoryBarrier> preTraceBarriers;
 
 
@@ -556,16 +565,24 @@ void RadianceCascades2D::castRays(std::shared_ptr<Scene> scene, uint32_t frameIn
         static_cast<uint32_t>(postTraceBarriers.size()), postTraceBarriers.data()
     );
 
+    }   
 
+    {    
+        RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "RadianceCascades2D::mergeCascades");
 
+        mergeCascades(currentCommandBuffer);
+    }
 
-    mergeCascades(currentCommandBuffer);
+    {    
+        RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "RadianceCascades2D::integrateCascade");
 
-    integrateCascade(currentCommandBuffer);
+        integrateCascade(currentCommandBuffer);
+    }
 
 
 
     //-------------------------------------------------------------------------------------------------
+    RAPTURE_PROFILE_GPU_COLLECT(currentCommandBuffer->getCommandBufferVk());
 
 
     if (vkEndCommandBuffer(currentCommandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
