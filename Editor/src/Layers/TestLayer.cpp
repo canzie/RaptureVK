@@ -105,26 +105,58 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     
 
-    auto cubeB = activeScene->createCube("Floor");
-    cubeB.addComponent<Rapture::BLASComponent>(cubeB.getComponent<Rapture::MeshComponent>().mesh);
-    cubeB.getComponent<Rapture::MeshComponent>().isStatic = true;
-    cubeB.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(20.0f, 2.0f, 20.0f));
-    cubeB.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(15.0f, 0.0f, 15.0f));
+    auto floor = activeScene->createCube("Floor");
+    floor.addComponent<Rapture::BLASComponent>(floor.getComponent<Rapture::MeshComponent>().mesh);
+    floor.getComponent<Rapture::MeshComponent>().isStatic = true;
+    floor.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(20.0f, 2.0f, 20.0f));
+    floor.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(15.0f, 0.0f, 15.0f));
 
 
-    auto cubeG = activeScene->createCube("Wall");
-    cubeG.addComponent<Rapture::BLASComponent>(cubeG.getComponent<Rapture::MeshComponent>().mesh);
-    cubeG.getComponent<Rapture::MeshComponent>().isStatic = true;
-    cubeG.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(14.0f, 12.0f, 1.5f));
+    auto wallA = activeScene->createCube("Wall A");
+    wallA.addComponent<Rapture::BLASComponent>(wallA.getComponent<Rapture::MeshComponent>().mesh);
+    wallA.getComponent<Rapture::MeshComponent>().isStatic = true;
+    wallA.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(14.0f, 12.0f, 1.5f));
 
-    auto cubeH = activeScene->createSphere("Cube A");
-    cubeH.addComponent<Rapture::BLASComponent>(cubeH.getComponent<Rapture::MeshComponent>().mesh);
-    cubeH.getComponent<Rapture::MeshComponent>().isStatic = true;
+    auto wallB = activeScene->createCube("Wall B");
+    wallB.addComponent<Rapture::BLASComponent>(wallB.getComponent<Rapture::MeshComponent>().mesh);
+    wallB.getComponent<Rapture::MeshComponent>().isStatic = true;
+    wallB.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(14.0f, 12.0f, 1.5f));
 
-    activeScene->registerBLAS(cubeB);
+    auto wallC = activeScene->createCube("Wall C");
+    wallC.addComponent<Rapture::BLASComponent>(wallC.getComponent<Rapture::MeshComponent>().mesh);
+    wallC.getComponent<Rapture::MeshComponent>().isStatic = true;
+    wallC.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(14.0f, 12.0f, 1.5f));
 
-    activeScene->registerBLAS(cubeG);
-    activeScene->registerBLAS(cubeH);
+
+
+    auto sphereA = activeScene->createSphere("Sphere A");
+    sphereA.addComponent<Rapture::BLASComponent>(sphereA.getComponent<Rapture::MeshComponent>().mesh);
+    sphereA.getComponent<Rapture::MeshComponent>().isStatic = true;
+
+    auto sphereB = activeScene->createSphere("Sphere B");
+    sphereB.addComponent<Rapture::BLASComponent>(sphereB.getComponent<Rapture::MeshComponent>().mesh);
+    sphereB.getComponent<Rapture::MeshComponent>().isStatic = true;
+
+    auto sphereC = activeScene->createSphere("Sphere C");
+    sphereC.addComponent<Rapture::BLASComponent>(sphereC.getComponent<Rapture::MeshComponent>().mesh);
+    sphereC.getComponent<Rapture::MeshComponent>().isStatic = true;
+
+    auto sphereD = activeScene->createSphere("Sphere D");
+    sphereD.addComponent<Rapture::BLASComponent>(sphereD.getComponent<Rapture::MeshComponent>().mesh);
+    sphereD.getComponent<Rapture::MeshComponent>().isStatic = true;
+
+    
+
+    activeScene->registerBLAS(floor);
+    
+    activeScene->registerBLAS(wallA);
+    activeScene->registerBLAS(wallB);
+    activeScene->registerBLAS(wallC);
+
+    activeScene->registerBLAS(sphereA);
+    activeScene->registerBLAS(sphereB);
+    activeScene->registerBLAS(sphereC);
+    activeScene->registerBLAS(sphereD);
 
 
 

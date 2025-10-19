@@ -63,7 +63,7 @@ vec4 getClosestHit(vec2 origin, vec2 direction, vec2 interval) {
         float dstSquared = hitT * hitT;
         float intensity = 1.0 / (hitT + 0.01);
 
-        emissiveColor = emissiveColor * intensity;
+        //emissiveColor = emissiveColor * intensity;
 
 
         vec3 radiance = emissiveColor;
@@ -151,7 +151,7 @@ void main() {
         // in the direction of sampleRayCoord
         // then use the result from this hit to merge_intervals, instead of currentData
         vec2 direction = getUniformDirection(sampleRayIndex1D, prevCascadeInfo.angularResolution*prevCascadeInfo.angularResolution);
-        vec4 hit = getClosestHit(currentProbeWorldPosition, direction, vec2(prevCascadeInfo.probeSpacing.x, currentCascadeInfo.maxProbeDistance));
+        vec4 hit = getClosestHit(currentProbeWorldPosition, direction, vec2(currentCascadeInfo.minProbeDistance, prevCascadeInfo.minProbeDistance));
 
         if (hit.a == 0.0) {
             merged += hit;
