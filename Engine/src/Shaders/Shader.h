@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__SHADER_H
+#define RAPTURE__SHADER_H
 
 #include <vector>
 #include <string>
@@ -39,12 +40,9 @@ namespace Rapture {
         // constructors for different shaders types
         void createGraphicsShader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
         void createGraphicsShader(const std::filesystem::path& vertexPath);
-
         void createComputeShader(const std::filesystem::path& computePath);
 
-        // helper functions
         void createShaderModule(const std::vector<char>& code, ShaderType type);
-        std::vector<char> readFile(const std::filesystem::path& path);
         void createDescriptorSetLayout();
         
         
@@ -81,3 +79,4 @@ namespace Rapture {
 
 }
 
+#endif // RAPTURE__SHADER_H

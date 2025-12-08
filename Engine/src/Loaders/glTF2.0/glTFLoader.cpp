@@ -148,7 +148,8 @@ namespace Rapture {
         //});
 
         // change this to use a callback?
-        material->setParameter<std::shared_ptr<Texture>>(id, tex);
+        // Use the non-template overload which correctly converts Texture to uint32_t bindless index
+        material->setParameter(id, tex);
 
         
 

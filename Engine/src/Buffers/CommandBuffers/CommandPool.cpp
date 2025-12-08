@@ -2,15 +2,14 @@
 
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
-
 #include "CommandBuffer.h"
 
 namespace Rapture {
 
-    std::unordered_map<uint32_t, std::shared_ptr<CommandPool>> CommandPoolManager::m_commandPools;
+    std::unordered_map<CommandPoolHash, std::shared_ptr<CommandPool>> CommandPoolManager::s_commandPools;
 
     CommandPool::CommandPool(const CommandPoolConfig &config)
-    : m_hash(config.hash()), m_createInfo{}
+    : m_hash(config.hash()), m_createInfo{}, m_commandPool(VK_NULL_HANDLE), m_device(VK_NULL_HANDLE)
     {
 
         auto& app = Application::getInstance();
@@ -25,7 +24,7 @@ namespace Rapture {
 
         if (vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS) {
             RP_CORE_ERROR("failed to create command pool!");
-            throw std::runtime_error("failed to create command pool!");
+            m_commandPool = VK_NULL_HANDLE;
         }
     }
 
@@ -33,6 +32,7 @@ namespace Rapture {
     {
         m_savedCommandBuffers.clear();
         vkDestroyCommandPool(m_device, m_commandPool, nullptr);
+        m_commandPool = VK_NULL_HANDLE;
     } 
 
 
@@ -53,7 +53,7 @@ namespace Rapture {
 
     void CommandPoolManager::init()
     {
-        //m_commandPools.clear();
+        //s_commandPools.clear();
     }
 
     
@@ -64,12 +64,17 @@ namespace Rapture {
 
     std::shared_ptr<CommandPool> CommandPoolManager::createCommandPool(const CommandPoolConfig &config)
     {
-        if (m_commandPools.find(config.hash()) != m_commandPools.end()) {
-            return m_commandPools[config.hash()];
+        if (s_commandPools.find(config.hash()) != s_commandPools.end()) {
+            return s_commandPools[config.hash()];
         }
 
         auto commandPool = std::make_shared<CommandPool>(config);
-        m_commandPools.insert(std::make_pair(config.hash(), commandPool));
+        if (commandPool->getCommandPoolVk() == VK_NULL_HANDLE) {
+            RP_CORE_ERROR("Failed to create command pool!");
+            return nullptr;
+        }
+
+        s_commandPools.insert(std::make_pair(config.hash(), commandPool));
 
         return commandPool;
     }
@@ -83,31 +88,31 @@ namespace Rapture {
     }
     */
 
-    std::shared_ptr<CommandPool> CommandPoolManager::getCommandPool(uint32_t CPHash)
+    std::shared_ptr<CommandPool> CommandPoolManager::getCommandPool(CommandPoolHash cpHash)
     {
-        if (m_commandPools.find(CPHash) == m_commandPools.end()) {
-            RP_CORE_ERROR("CommandPoolManager::getCommandPool - command pool not found!");
+        if (s_commandPools.find(cpHash) == s_commandPools.end()) {
+            RP_CORE_ERROR("Command pool not found!");
             return nullptr;
         }
 
-        return m_commandPools[CPHash];
+        return s_commandPools[cpHash];
     }
 
     /*
     void CommandPoolManager::closePool(uint32_t CPHash)
     {
-        if (m_commandPools.find(CPHash) == m_commandPools.end()) {
+        if (s_commandPools.find(CPHash) == s_commandPools.end()) {
             RP_CORE_ERROR("CommandPoolManager::closePool - command pool not found!");
             return;
         }
 
-        m_commandPools.erase(CPHash);
+        s_commandPools.erase(CPHash);
     }
     */
 
     void CommandPoolManager::closeAllPools()
     {
-        m_commandPools.clear();
+        s_commandPools.clear();
     }
     
 }

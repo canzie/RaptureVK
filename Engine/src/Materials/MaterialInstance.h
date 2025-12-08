@@ -48,11 +48,9 @@ class MaterialInstance {
             }
         }
 
-        // Template specialization declaration for std::shared_ptr<Texture>
-        template<>
-        void setParameter<std::shared_ptr<Texture>>(ParameterID id, std::shared_ptr<Texture> texture);
+        void setParameter(ParameterID id, std::shared_ptr<Texture> texture);
 
-       MaterialParameter getParameter(ParameterID id); 
+        MaterialParameter getParameter(ParameterID id); 
         
         void updatePendingTextures();
 

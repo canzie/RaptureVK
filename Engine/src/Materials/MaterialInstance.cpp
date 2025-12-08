@@ -90,8 +90,7 @@ MaterialParameter MaterialInstance::getParameter(ParameterID id) {
 
 }
 
-template<>
-void MaterialInstance::setParameter<std::shared_ptr<Texture>>(ParameterID id, std::shared_ptr<Texture> texture) {
+void MaterialInstance::setParameter(ParameterID id, std::shared_ptr<Texture> texture) {
 
     if (m_parameterMap.find(id) != m_parameterMap.end()) {
         if (texture && texture->isReadyForSampling()) {

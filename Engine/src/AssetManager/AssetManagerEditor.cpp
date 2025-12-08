@@ -156,12 +156,14 @@ namespace Rapture {
                 metadata.m_storageType = AssetStorageType::Disk; // Default assets are treated as disk assets
                 metadata.m_filePath = "<default_white_texture>"; // Special path to indicate default asset
                 metadata.m_indices = {0};
+                metadata.m_importConfig = std::monostate(); // Initialize import config
 
                 // Wrap the texture in an Asset object
                 AssetVariant assetVariant = defaultTexture;
-                std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
+                std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(std::move(assetVariant));
                 std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
                 asset->m_handle = handle;
+                asset->m_status = AssetStatus::LOADED;
 
                 // Register the asset
                 m_assetRegistry.insert_or_assign(handle, metadata);
@@ -190,10 +192,26 @@ namespace Rapture {
                 // Generate a handle for the default material
                 AssetHandle handle = UUIDGenerator::Generate();
 
+                // Create metadata for the default material
+                AssetMetadata metadata;
+                metadata.m_assetType = AssetType::Material;
+                metadata.m_storageType = AssetStorageType::Disk;
+                metadata.m_filePath = "<default_material>";
+                metadata.m_indices = {};
+                metadata.m_importConfig = std::monostate();
+
                 AssetVariant assetVariant = defaultMaterial;
-                std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
+                std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(std::move(assetVariant));
                 std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
                 asset->m_handle = handle;
+                asset->m_status = AssetStatus::LOADED;
+
+                // Register the asset
+                m_assetRegistry.insert_or_assign(handle, metadata);
+                m_loadedAssets.insert_or_assign(handle, asset);
+                
+                // Track this as a default asset
+                m_defaultAssetHandles[assetType] = handle;
 
                 return std::make_pair(asset, handle);
                 }

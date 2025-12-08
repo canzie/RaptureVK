@@ -80,7 +80,12 @@ namespace Rapture {
 
 		// Set custom colors for each logger
 		spdlog::set_pattern("%^[%T] %n: %v%$");
-		spdlog::set_level(spdlog::level::trace);
+		
+		#ifdef NDEBUG
+			SetLogLevel(spdlog::level::info);
+		#else
+			SetLogLevel(spdlog::level::trace);
+		#endif
 
 		// Set up default file sink categories
 		std::set<LogCategory> allCategories = {

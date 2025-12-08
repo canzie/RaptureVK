@@ -5,7 +5,8 @@
  
 
 
-#pragma once
+#ifndef RAPTURE__BUFFER_POOL_H
+#define RAPTURE__BUFFER_POOL_H
 
 #include "VertexBuffers/BufferLayout.h"
 #include "Buffers.h"
@@ -157,3 +158,5 @@ private:
 };
 
 }
+
+#endif // RAPTURE__BUFFER_POOL_H

@@ -1,6 +1,8 @@
-#pragma once
+#ifndef RAPTURE__COMMAND_POOL_H
+#define RAPTURE__COMMAND_POOL_H
 
 #include <vulkan/vulkan.h>
+
 #include <vector>
 #include <unordered_map>
 #include <memory>
@@ -9,8 +11,9 @@
 
 namespace Rapture {
 
-    // Forward declaration
     class CommandBuffer;
+
+    using CommandPoolHash = uint32_t;
 
     struct CommandPoolConfig {
         std::string name = "CommandPool";
@@ -18,8 +21,8 @@ namespace Rapture {
         uint32_t queueFamilyIndex;
         VkCommandPoolCreateFlags flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        uint32_t hash() const {
-            return static_cast<uint32_t>(std::hash<size_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^ std::hash<VkCommandPoolCreateFlags>()(flags));
+        CommandPoolHash hash() const {
+            return static_cast<CommandPoolHash>(std::hash<size_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^ std::hash<VkCommandPoolCreateFlags>()(flags));
         }
 
     };
@@ -41,7 +44,7 @@ namespace Rapture {
             //std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
             VkCommandPoolCreateInfo m_createInfo;
             VkCommandPool m_commandPool;
-            uint32_t m_hash;
+            CommandPoolHash m_hash;
 
             VkDevice m_device;
 
@@ -58,7 +61,7 @@ namespace Rapture {
 
         static std::shared_ptr<CommandPool> createCommandPool(const CommandPoolConfig& config);
         // access a pool by its hash
-        static std::shared_ptr<CommandPool> getCommandPool(uint32_t CPHash);
+        static std::shared_ptr<CommandPool> getCommandPool(CommandPoolHash hash);
         // the strict flag will return the command pool closest to the config provided (most same values)
         // assuming atleast 1 pool exists, this function will return a pool, given the strict flag=false
         //static std::shared_ptr<CommandPool> getCommandPool(const CommandPoolConfig& config, bool isStrict = true);
@@ -71,9 +74,11 @@ namespace Rapture {
         static void closeAllPools();
 
     private:
-        static std::unordered_map<uint32_t, std::shared_ptr<CommandPool>> m_commandPools;
+        static std::unordered_map<CommandPoolHash, std::shared_ptr<CommandPool>> s_commandPools;
 
 
     };
 
 }
+
+#endif // RAPTURE__COMMAND_POOL_H

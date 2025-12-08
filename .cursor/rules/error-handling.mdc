@@ -1,0 +1,18 @@
+---
+description: Error handling standards including exception policy and logging guidelines
+globs: **/*.h, **/*.cpp, **/*.hpp
+alwaysApply: true
+---
+
+# Error Handling Standards
+
+## Error Handling Policy
+- **DO NOT throw exceptions** - return empty/default values instead (e.g., return empty vector, nullptr, or default-constructed object).
+- Use RAII for resource management to avoid memory leaks.
+- Validate inputs at function boundaries.
+
+## Logging
+- Log errors using the provided logging library wrapper, which can be found at 'Engine/src/logger/log.h'.
+- The logging library wraps spdlog. 
+- Use the correct category and type depending on the location and purpose of the logs.
+- **DO NOT include function names in log messages** - the logging macro will handle this automatically.

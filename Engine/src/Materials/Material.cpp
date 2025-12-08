@@ -17,49 +17,50 @@ bool MaterialManager::s_initialized = false;
 std::unordered_map<std::string, std::shared_ptr<BaseMaterial>>
     MaterialManager::s_materials;
 
-BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
-                        const std::string &name)
-    : m_shader(shader) {
+BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader, const std::string &name)
+    : m_shader(shader), m_name(name) {
 
-    if (shader->getDescriptorSetLayouts().size() < 1) {
-        throw std::runtime_error("Material::BaseMaterial - shader has no "
-                                "descriptor set layout for a material!");
+    auto lockedShader = m_shader.lock();
+    if (!lockedShader) {
+        RP_CORE_ERROR("shader is no longer valid");
+        m_name.clear();
+        return;
     }
 
+    if (lockedShader->getDescriptorSetLayouts().size() < 1) {
+      return;
+    }
+
+    m_descriptorSetLayout = lockedShader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
 
 
-    m_descriptorSetLayout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
-
-    auto infos = m_shader->getMaterialSets();
+    auto descriptorSetInfos = lockedShader->getMaterialSets();
 
     if (name.empty()) {
-        m_name = infos[0].name;
-    } else {
-        m_name = name;
+        m_name = std::string(descriptorSetInfos[0].name);
     }
 
     m_sizeBytes = 0;
-    for (auto &info : infos) {
-        // get descriptor set layout
-        for (auto &parameter : info.params) {
-        auto param = MaterialParameter(parameter, info.binding);
+    for (auto &info : descriptorSetInfos) {
+        for (auto &parameterInfo : info.params) {
+            auto param = MaterialParameter(parameterInfo, info.binding);
+
+            if (param.m_info.parameterId == ParameterID::UNKNOWN) {
+                RP_CORE_ERROR("unknown parameter id: {0} and type: {1}", parameterInfo.name, parameterInfo.type);
+                continue;
+            }
 
             if (param.m_info.parameterId == ParameterID::ALBEDO) {
                 param.setValue(glm::vec3(1.0f, 1.0f, 1.0f));
             }
 
-        if (param.m_info.parameterId != ParameterID::UNKNOWN) {
             m_parameterMap[param.m_info.parameterId] = param;
             // Ensure the overall buffer size encompasses this parameter (offset + its size)
             uint32_t endOffset = static_cast<uint32_t>(param.m_info.offset + param.m_info.size);
             if (endOffset > m_sizeBytes) {
                 m_sizeBytes = endOffset;
             }
-        } else {
-            RP_CORE_ERROR(
-                "Material::BaseMaterial - unknown parameter id: {0} and type: {1}",
-                parameter.name, parameter.type);
-        }
+            
         }
     }
 
@@ -69,11 +70,9 @@ BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
     }
 
     if (m_sizeBytes == 0) {
-        RP_CORE_ERROR("Material::BaseMaterial - no valid parameters found in "
-                    "material set {0}",
-                    infos[0].name);
-        throw std::runtime_error("Material::BaseMaterial - no valid parameters "
-                                "found in material set {0}");
+        RP_CORE_ERROR("no valid parameters found in material set");
+        m_name.clear();
+        return;
     }
 }
 

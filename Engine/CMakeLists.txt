@@ -1,7 +1,7 @@
 set(ENGINE_NAME RaptureVK)
 
 # Include vendor libraries
-include(${CMAKE_CURRENT_SOURCE_DIR}/vendor/vendor_libraries_self.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/vendor/vendor_libraries.cmake)
 
 # Collect source files
 file(GLOB_RECURSE ENGINE_SOURCES

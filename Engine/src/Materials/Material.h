@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__MATERIAL_H
+#define RAPTURE__MATERIAL_H
 
 #include "MaterialParameters.h"
 
@@ -20,7 +21,7 @@ namespace Rapture {
 
 class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
     public:
-        BaseMaterial(std::shared_ptr<Shader> shader, const std::string& name = "");
+        BaseMaterial(std::shared_ptr<Shader> shader, const std::string& name);
         ~BaseMaterial() = default;
 
 
@@ -37,7 +38,7 @@ class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
         std::string m_name;
         uint32_t m_sizeBytes;
         VkDescriptorSetLayout m_descriptorSetLayout;
-        std::shared_ptr<Shader> m_shader;
+        std::weak_ptr<Shader> m_shader;
 
 
         std::unordered_map<ParameterID, MaterialParameter> m_parameterMap;
@@ -61,3 +62,4 @@ class MaterialManager {
 
 }
 
+#endif // RAPTURE__MATERIAL_H

@@ -1,0 +1,14 @@
+---
+description: Security coding practices and guidelines
+globs: **/*.h, **/*.cpp, **/*.hpp
+alwaysApply: true
+---
+
+# Security Guidelines
+
+## Security Practices
+- Use secure coding practices to avoid vulnerabilities (e.g., buffer overflows, dangling pointers).
+- Prefer `std::array` or `std::vector` over raw arrays.
+- use RAII
+- Avoid C-style casts; use `static_cast`, `dynamic_cast`, or `reinterpret_cast` when necessary.
+- Enforce const-correctness in functions and member variables.

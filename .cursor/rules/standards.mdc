@@ -1,0 +1,28 @@
+---
+description: Coding standards including naming conventions, C++ features usage, and key conventions
+globs: **/*.h, **/*.cpp, **/*.hpp
+alwaysApply: true
+---
+
+# Coding Standards
+
+## Naming Conventions
+- Use PascalCase for class names.
+- Use camelCase for variable names and methods.
+- Use SCREAMING_SNAKE_CASE for constants and macros.
+- Prefix member variables with an underscore or m_ (e.g., `_userId`, `m_userId`).
+- **Prefix static functions with `s_`** (e.g., `s_calculateTotal`, `s_initializeSystem`).
+- Use namespaces to organize code logically.
+
+## C++ Features Usage
+- Prefer modern C++ features (e.g., auto, range-based loops, smart pointers).
+- Use `std::unique_ptr` and `std::shared_ptr` for memory management.
+- Prefer `std::optional`, `std::variant`, and `std::any` for type-safe alternatives.
+- Use `constexpr` and `const` to optimize compile-time computations.
+- Use `std::string_view` for read-only string operations to avoid unnecessary copies.
+
+## Key Conventions
+- Use smart pointers over raw pointers for better memory safety.
+- Avoid global variables; use singletons sparingly.
+- Use `enum class` for strongly typed enumerations.
+- Separate interface from implementation in classes.

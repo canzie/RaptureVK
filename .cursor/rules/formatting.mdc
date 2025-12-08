@@ -1,0 +1,12 @@
+---
+description: Code formatting standards including header guards, syntax, and file structure
+globs: **/*.h, **/*.cpp, **/*.hpp
+alwaysApply: true
+---
+
+# Code Formatting Standards
+
+## Header Guards
+- **DO NOT use `#pragma once`** - use traditional header guards instead.
+- Use the pattern: `#ifndef RAPTURE__FILENAME_H` / `#define RAPTURE__FILENAME_H` / `#endif // RAPTURE__FILENAME_H`
+- Example: For `io.h`, use `#ifndef RAPTURE__IO_H` / `#define RAPTURE__IO_H` / `#endif // RAPTURE__IO_H`

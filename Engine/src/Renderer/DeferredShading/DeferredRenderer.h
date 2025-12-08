@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__DEFERRED_RENDERER_H
+#define RAPTURE__DEFERRED_RENDERER_H
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/IndexBuffers/IndexBuffer.h"
@@ -71,8 +72,6 @@ private:
   static std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
   static std::shared_ptr<CommandPool> m_commandPool;
 
-  static std::shared_ptr<Shader> m_shader;
-
 
   static VmaAllocator m_vmaAllocator;
   static VkDevice m_device;
@@ -92,3 +91,5 @@ private:
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__DEFERRED_RENDERER_H

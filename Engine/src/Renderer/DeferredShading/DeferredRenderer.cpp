@@ -23,7 +23,6 @@ struct PushConstants {
 // Static member definitions
 std::vector<std::shared_ptr<CommandBuffer>> DeferredRenderer::m_commandBuffers;
 std::shared_ptr<CommandPool> DeferredRenderer::m_commandPool = nullptr;
-std::shared_ptr<Shader> DeferredRenderer::m_shader = nullptr;
 VmaAllocator DeferredRenderer::m_vmaAllocator = VK_NULL_HANDLE;
 VkDevice DeferredRenderer::m_device = VK_NULL_HANDLE;
 std::shared_ptr<SwapChain> DeferredRenderer::m_swapChain = nullptr;

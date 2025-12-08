@@ -1,11 +1,10 @@
-#pragma once
+#ifndef RAPTURE__APPLICATION_H
+#define RAPTURE__APPLICATION_H
 
 #include "WindowContext.h"
 #include "VulkanContext/VulkanContext.h"
-
-#include "Scenes/Scene.h"
-
 #include "Layers/LayerStack.h"
+#include "Scenes/Scene.h"
 #include "Scenes/Project.h"
 
 #include <memory>
@@ -34,8 +33,8 @@ namespace Rapture {
 
 
     private:
-		bool m_running = true;
-		bool m_isMinimized = false;
+		bool m_running;
+		bool m_isMinimized;
 
 		LayerStack m_layerStack;
 
@@ -52,3 +51,5 @@ namespace Rapture {
 Application* CreateApplicationWindow(int width, int height, const char* title);
 
 }
+
+#endif // RAPTURE__APPLICATION_H

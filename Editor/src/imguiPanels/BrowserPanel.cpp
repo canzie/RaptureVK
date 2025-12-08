@@ -183,7 +183,7 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
     if (m_renamingEntity.lock() != node->entity) {
         flags |= ImGuiTreeNodeFlags_SpanAllColumns; // Make the node span all columns
     } else {
-        flags |= ImGuiTreeNodeFlags_AllowItemOverlap; // Allow input field to receive clicks
+        flags |= ImGuiTreeNodeFlags_AllowOverlap; // Allow input field to receive clicks
     }
     
     if (node->children.empty()) {

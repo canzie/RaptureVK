@@ -3,17 +3,15 @@
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
+#include "Utils/io.h"
 
 #include "ShaderReflections.h"
 
-
-#include <fstream>
-
 namespace Rapture {
 
-Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath, ShaderCompileInfo compileInfo) {
-
-    m_compileInfo = compileInfo;
+Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath, ShaderCompileInfo compileInfo)
+    : m_compileInfo(compileInfo) 
+{
 
     if (fragmentPath.empty()) {
         createGraphicsShader(vertexPath);
@@ -29,9 +27,9 @@ Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::p
 }
 
 Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compileInfo)
+    : m_compileInfo(compileInfo)
 {
 
-    m_compileInfo = compileInfo;
 
     if (computePath.empty()) {
         return;
@@ -213,26 +211,6 @@ void Shader::createShaderModule(const std::vector<char>& code, ShaderType type) 
     }
 
     m_sources[type] = shaderModule;
-}
-
-std::vector<char> Shader::readFile(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-        RP_CORE_ERROR("Shader::readFile - failed to open file! {0}", path.string());
-        throw std::runtime_error("Shader::readFile - failed to open file!");
-    }
-
-    size_t fileSize = (size_t) file.tellg();
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-
-    file.close();
-
-    return buffer;
-
 }
 
 void Shader::createDescriptorSetLayout()

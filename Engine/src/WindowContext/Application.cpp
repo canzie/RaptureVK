@@ -21,26 +21,22 @@ Application::Application(int width, int height, const char *title)
 {
   if (s_instance) {
     RP_CORE_ERROR("Application already exists!");
-    // Or throw an exception
     return;
   }
-  s_instance = this; // Set s_instance HERE
+  s_instance = this;
 
   RP_CORE_INFO("Creating window...");
-  m_window = std::unique_ptr<WindowContext>(
-      WindowContext::createWindow(width, height, title));
+  m_window = std::unique_ptr<WindowContext>(WindowContext::createWindow(width, height, title));
 
   RP_CORE_INFO("Creating Vulkan context...");
-  m_vulkanContext =
-      std::unique_ptr<VulkanContext>(new VulkanContext(m_window.get()));
+  m_vulkanContext = std::unique_ptr<VulkanContext>(new VulkanContext(m_window.get()));
 
   m_vulkanContext->createRecourses(m_window.get());
 
   CommandPoolManager::init();
-
   BufferPoolManager::init(m_vulkanContext->getVmaAllocator());
-
   TracyProfiler::init();
+
   #if RAPTURE_TRACY_PROFILING_ENABLED
   if (TracyProfiler::isEnabled()) {
     auto& vc = getVulkanContext();
@@ -64,8 +60,8 @@ Application::Application(int width, int height, const char *title)
     graphicsQueue->submitQueue(tempCmdBuffer);
     graphicsQueue->waitIdle();
   }
-  #endif
-  // Initialize project - this will setup default world and scene
+  #endif // RAPTURE_TRACY_PROFILING_ENABLED
+
   m_project = std::make_unique<Project>();
   auto working_dir = std::filesystem::current_path();
   auto root_dir = working_dir;
@@ -92,10 +88,7 @@ Application::Application(int width, int height, const char *title)
   m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/");
 
   AssetManager::init();
-
-    DescriptorManager::init();
-
-
+  DescriptorManager::init();
   MaterialManager::init();
 
 
@@ -104,19 +97,21 @@ Application::Application(int width, int height, const char *title)
 
   ModelLoadersCache::init();
 
-  ApplicationEvents::onWindowClose().addListener(
-      [this]() { m_running = false; });
+  ApplicationEvents::onWindowClose().addListener( [this]() { 
+    m_running = false; 
+  });
 
-  ApplicationEvents::onWindowFocus().addListener(
-      [this]() { RP_CORE_INFO("Window focused"); });
+  ApplicationEvents::onWindowFocus().addListener( [this]() { 
+    RP_CORE_INFO("Window focused"); 
+  });
 
-  ApplicationEvents::onWindowLostFocus().addListener(
-      [this]() { RP_CORE_INFO("Window lost focus"); });
+  ApplicationEvents::onWindowLostFocus().addListener( [this]() { 
+    RP_CORE_INFO("Window lost focus"); 
+  });
 
-  ApplicationEvents::onWindowResize().addListener(
-      [this](unsigned int width, unsigned int height) {
-        RP_CORE_INFO("Window resized to {}x{}", width, height);
-      });
+  ApplicationEvents::onWindowResize().addListener( [this](unsigned int width, unsigned int height) {
+    RP_CORE_INFO("Window resized to {0}x{1}", width, height);
+  });
 
   RP_CORE_INFO("========== Application created ==========");
 }

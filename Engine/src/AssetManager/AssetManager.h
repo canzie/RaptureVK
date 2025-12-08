@@ -61,6 +61,9 @@ namespace Rapture {
         template<typename T>
         static std::pair<std::shared_ptr<T>, AssetHandle> importDefaultAsset(AssetType assetType) {
             auto [asset, handle] = s_activeAssetManager->importDefaultAsset(assetType);
+            if (!asset) {
+                return std::make_pair(nullptr, handle);
+            }
             return std::make_pair(asset->getUnderlyingAsset<T>(), handle);
         }
         
