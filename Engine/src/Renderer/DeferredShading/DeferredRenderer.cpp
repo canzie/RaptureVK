@@ -414,6 +414,12 @@ void DeferredRenderer::recordCommandBuffer(
                                                 *m_sceneRenderTarget, imageIndex,
                                                 m_currentFrame);
         }
+
+        // TODO: SkyboxPass needs to be updated to use SceneRenderTarget
+        // {
+        //     RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
+        //     m_skyboxPass->recordCommandBuffer(commandBuffer, m_currentFrame);
+        // }
         
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");

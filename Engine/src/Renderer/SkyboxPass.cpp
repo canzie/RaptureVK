@@ -65,8 +65,7 @@ SkyboxPass::~SkyboxPass() {
 
 void SkyboxPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t frameInFlightIndex) {
     
-    if (!m_skyboxTexture && !m_skyboxTexture->isReadyForSampling()) { // TODO: create a log type to only log once
-        //RP_CORE_WARN("SkyboxPass - Skybox texture is not ready for sampling, skipping command buffer.");
+    if (!m_skyboxTexture || !m_skyboxTexture->isReadyForSampling()) {
         return;
     }
 
