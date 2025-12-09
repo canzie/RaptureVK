@@ -1,6 +1,6 @@
-#pragma once
-// Entire content related to old Event system removed.
-// This file can be deleted if no new application-specific EventBus definitions are added here later.
+#ifndef RAPTURE__APPLICATION_EVENTS_H
+#define RAPTURE__APPLICATION_EVENTS_H
+
 #include "Events.h" // For EventBus and EventRegistry
 
 namespace Rapture {
@@ -14,7 +14,10 @@ namespace ApplicationEvents {
     using WindowMovedEvent = EventBus<unsigned int /*xPos*/, unsigned int /*yPos*/>;
     using SwapChainRecreatedEvent = EventBus<std::shared_ptr<SwapChain>>;
     using RequestSwapChainRecreationEvent = EventBus<>;
-    // Application Lifecycle Events
+    
+    // Viewport Events (for Editor)
+    // Triggered when the viewport panel size changes (independent of window size)
+    using ViewportResizeEvent = EventBus<unsigned int /*width*/, unsigned int /*height*/>;
 
 
     // Accessors for Application Window Events
@@ -41,5 +44,12 @@ namespace ApplicationEvents {
         return EventRegistry::getInstance().getEventBus<>("RequestSwapChainRecreation");
     }
 
+    // Accessor for Viewport Resize Event
+    inline ViewportResizeEvent& onViewportResize() {
+        return EventRegistry::getInstance().getEventBus<unsigned int, unsigned int>("ViewportResize");
+    }
+
 } // namespace ApplicationEvents
 } // namespace Rapture
+
+#endif // RAPTURE__APPLICATION_EVENTS_H

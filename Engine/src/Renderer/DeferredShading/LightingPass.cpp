@@ -41,27 +41,25 @@ LightingPass::LightingPass(
     float height, 
     uint32_t framesInFlight, 
     std::shared_ptr<GBufferPass> gBufferPass, 
-    std::shared_ptr<DynamicDiffuseGI> ddgi)
+    std::shared_ptr<DynamicDiffuseGI> ddgi,
+    VkFormat colorFormat)
     : m_framesInFlight(framesInFlight), 
     m_currentFrame(0), 
     m_width(width), 
     m_height(height), 
     m_gBufferPass(gBufferPass), 
-    m_ddgi(ddgi) {
+    m_ddgi(ddgi),
+    m_colorFormat(colorFormat) {
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
     
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
-    m_swapChain = vc.getSwapChain();
 
     auto& project = app.getProject();
 
     auto shaderPath = project.getProjectShaderDirectory();
-
-    m_width = static_cast<float>(m_swapChain->getExtent().width);
-    m_height = static_cast<float>(m_swapChain->getExtent().height);
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/ddgi/";
@@ -87,22 +85,18 @@ LightingPass::~LightingPass() {
     m_lightUBOs.clear();
 
     m_pipeline.reset();
-
-    m_swapChain.reset();
 }
 
-// TODO: Remove swapchain dependency
 FramebufferSpecification LightingPass::getFramebufferSpecification()
 {
-    if (m_swapChain->getImageFormat() == VK_FORMAT_UNDEFINED) {
-        RP_CORE_ERROR("LightingPass - Attempted to create render pass before swap chain was initialized!");
-        throw std::runtime_error("LightingPass - Attempted to create render pass before swap chain was initialized!");
+    if (m_colorFormat == VK_FORMAT_UNDEFINED) {
+        RP_CORE_ERROR("LightingPass - Invalid color format!");
+        return FramebufferSpecification{};
     }
 
     FramebufferSpecification spec;
-    spec.depthAttachment = m_swapChain->getDepthImageFormat();
-    //spec.stencilAttachment = m_swapChain->getDepthImageFormat();
-    spec.colorAttachments.push_back(m_swapChain->getImageFormat());
+    spec.depthAttachment = VK_FORMAT_D32_SFLOAT; // Standard depth format
+    spec.colorAttachments.push_back(m_colorFormat);
 
     return spec;
 }
@@ -110,20 +104,26 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
 void LightingPass::recordCommandBuffer(
     std::shared_ptr<CommandBuffer> commandBuffer, 
     std::shared_ptr<Scene> activeScene,
-    uint32_t swapchainImageIndex,
+    SceneRenderTarget& renderTarget,
+    uint32_t imageIndex,
     uint32_t frameInFlightIndex) {
 
     RAPTURE_PROFILE_FUNCTION();
 
     m_currentFrame = frameInFlightIndex;  
 
+    // Get render target properties
+    VkImage targetImage = renderTarget.getImage(imageIndex);
+    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    VkExtent2D targetExtent = renderTarget.getExtent();
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer, swapchainImageIndex); 
-    beginDynamicRendering(commandBuffer, swapchainImageIndex);               
+    // Update dimensions from target extent
+    m_width = static_cast<float>(targetExtent.width);
+    m_height = static_cast<float>(targetExtent.height);
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage); 
+    beginDynamicRendering(commandBuffer, targetImageView, targetExtent);               
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
-
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -136,7 +136,7 @@ void LightingPass::recordCommandBuffer(
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+    scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
     auto camera = activeScene->getSettings().mainCamera;
@@ -157,7 +157,7 @@ void LightingPass::recordCommandBuffer(
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 
-    pushConstants.useDDGI = 1;
+    pushConstants.useDDGI = 0;
 
     // Fog
     pushConstants.fogColor = glm::vec4(m_fogSettings.color, m_fogSettings.enabled ? 1.0f : 0.0f);
@@ -314,23 +314,22 @@ void LightingPass::createPipeline() {
 }
 
 
-void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t swapchainImageIndex) {
+void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, 
+                                         VkImageView targetImageView,
+                                         VkExtent2D targetExtent) {
 
-if (m_swapChain != nullptr) {
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachmentInfo.imageView = m_swapChain->getImageViews()[swapchainImageIndex];
+    colorAttachmentInfo.imageView = targetImageView;
     colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
     
-
-
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent = m_swapChain->getExtent();
+    renderingInfo.renderArea.extent = targetExtent;
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
@@ -338,15 +337,10 @@ if (m_swapChain != nullptr) {
     renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
-
 }
 
-}
-
-void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t swapchainImageIndex) {
-
-    auto& app = Application::getInstance();
-    auto& vulkanContext = app.getVulkanContext();
+void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, 
+                                                        VkImage targetImage) {
 
     VkImageMemoryBarrier colorBarrier{};
     // Image layout transitions for dynamic rendering
@@ -355,7 +349,7 @@ void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBu
     colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    colorBarrier.image = m_swapChain->getImages()[swapchainImageIndex];
+    colorBarrier.image = targetImage;
     colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     colorBarrier.subresourceRange.baseMipLevel = 0;
     colorBarrier.subresourceRange.levelCount = 1;
@@ -374,8 +368,5 @@ void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBu
         0, nullptr,
         1, &colorBarrier
     );
-    
-
-
 }
 }

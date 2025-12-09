@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMGUI__LAYER_H
+#define IMGUI__LAYER_H
 
 #include "Layers/Layer.h"
 
@@ -48,6 +49,7 @@ private:
     void beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageView targetImageView);
     void endDynamicRendering(VkCommandBuffer commandBuffer);
     void onResize();
+    void updateViewportDescriptorSet();
 
     void handleSwapChainRecreation(std::shared_ptr<Rapture::SwapChain> newSwapChain);
 
@@ -55,17 +57,17 @@ private:
     float m_Time = 0.0f;
     float m_FontScale = 1.5f; // Default font scale
     bool m_framebufferNeedsResize = false;
-    size_t  m_windowResizeEventListenerID = 0; 
+    size_t m_windowResizeEventListenerID = 0; 
 
-    VkDescriptorPool m_imguiPool;
-    VkDevice m_device;
+    VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
+    VkDevice m_device = VK_NULL_HANDLE;
     std::vector<std::shared_ptr<Rapture::CommandBuffer>> m_imguiCommandBuffers;
     uint32_t m_currentFrame = 0;
     uint32_t m_currentImageIndex = 0;
     uint32_t m_imageCount = 0;
 
-    std::vector<std::shared_ptr<Rapture::Texture>> m_swapChainTextures;
-    std::vector<VkDescriptorSet> m_defaultTextureDescriptorSets;
+    // Descriptor sets for the scene render target textures (used in viewport panel)
+    std::vector<VkDescriptorSet> m_viewportTextureDescriptorSets;
 
     std::vector<VkSemaphore> m_imageAvailableSemaphores;
     std::vector<VkSemaphore> m_renderFinishedSemaphores;
@@ -79,3 +81,5 @@ private:
     ImageViewerPanel m_imageViewerPanel;
     SettingsPanel m_settingsPanel;
 };
+
+#endif // IMGUI__LAYER_H

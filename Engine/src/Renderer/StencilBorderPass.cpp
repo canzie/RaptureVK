@@ -20,7 +20,8 @@ struct PushConstants {
 StencilBorderPass::StencilBorderPass(
     float width, float height, 
     uint32_t framesInFlight, 
-    std::vector<std::shared_ptr<Texture>> depthStencilTextures)
+    std::vector<std::shared_ptr<Texture>> depthStencilTextures,
+    VkFormat colorFormat)
     : m_width(width), 
       m_height(height), 
       m_framesInFlight(framesInFlight), 
@@ -28,21 +29,17 @@ StencilBorderPass::StencilBorderPass(
       m_currentImageIndex(0), 
       m_selectedEntity(nullptr),
       m_pipeline(nullptr),
-      m_swapChain(nullptr) {
+      m_colorFormat(colorFormat) {
 
     auto& app = Application::getInstance();
     auto& vc = app.getVulkanContext();
     
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
-    m_swapChain = vc.getSwapChain();
 
     auto& project = app.getProject();
 
     auto shaderPath = project.getProjectShaderDirectory();
-
-    m_width = static_cast<float>(m_swapChain->getExtent().width);
-    m_height = static_cast<float>(m_swapChain->getExtent().height);
 
     auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/StencilBorder.vs.spv");
 
@@ -65,7 +62,8 @@ StencilBorderPass::~StencilBorderPass() {
 
 void StencilBorderPass::recordCommandBuffer(
     std::shared_ptr<CommandBuffer> commandBuffer, 
-    uint32_t swapchainImageIndex,
+    SceneRenderTarget& renderTarget,
+    uint32_t imageIndex,
     uint32_t currentFrameInFlight, 
     std::shared_ptr<Scene> activeScene) {
 
@@ -91,10 +89,17 @@ void StencilBorderPass::recordCommandBuffer(
         return;
     }
 
-    m_currentImageIndex = swapchainImageIndex;
+    // Get render target properties
+    VkImage targetImage = renderTarget.getImage(imageIndex);
+    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    VkExtent2D targetExtent = renderTarget.getExtent();
+
+    m_currentImageIndex = currentFrameInFlight;
+    m_width = static_cast<float>(targetExtent.width);
+    m_height = static_cast<float>(targetExtent.height);
     
-    setupDynamicRenderingMemoryBarriers(commandBuffer);
-    beginDynamicRendering(commandBuffer);
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
+    beginDynamicRendering(commandBuffer, targetImageView, targetExtent);
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
     auto& app = Application::getInstance();
@@ -111,7 +116,7 @@ void StencilBorderPass::recordCommandBuffer(
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+    scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
 
@@ -276,7 +281,7 @@ void StencilBorderPass::createPipeline() {
     config.depthStencilState = depthStencil;
 
     FramebufferSpecification spec;
-    spec.colorAttachments.push_back(m_swapChain->getImageFormat());
+    spec.colorAttachments.push_back(m_colorFormat);
 
     config.framebufferSpec = spec;
 
@@ -286,23 +291,23 @@ void StencilBorderPass::createPipeline() {
 }
 
 
-void StencilBorderPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer) {
+void StencilBorderPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer,
+                                               VkImageView targetImageView,
+                                               VkExtent2D targetExtent) {
 
-if (m_swapChain != nullptr) {
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachmentInfo.imageView = m_swapChain->getImageViews()[m_currentImageIndex];
+    colorAttachmentInfo.imageView = targetImageView;
     colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // Preserve previous pass output
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
     
 
-
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent = m_swapChain->getExtent();
+    renderingInfo.renderArea.extent = targetExtent;
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
@@ -310,24 +315,19 @@ if (m_swapChain != nullptr) {
     renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
-
 }
 
-}
-
-void StencilBorderPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer) {
-
-    auto& app = Application::getInstance();
-    auto& vulkanContext = app.getVulkanContext();
-
+void StencilBorderPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer,
+                                                            VkImage targetImage) {
+    // Execution barrier to ensure previous pass color writes are complete
+    // before this pass starts writing (write-after-write synchronization)
     VkImageMemoryBarrier colorBarrier{};
-    // Image layout transitions for dynamic rendering
     colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; 
     colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    colorBarrier.image = m_swapChain->getImages()[m_currentImageIndex];
+    colorBarrier.image = targetImage;
     colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     colorBarrier.subresourceRange.baseMipLevel = 0;
     colorBarrier.subresourceRange.levelCount = 1;
@@ -335,7 +335,6 @@ void StencilBorderPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<Comm
     colorBarrier.subresourceRange.layerCount = 1;
     colorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    
 
     vkCmdPipelineBarrier(
         commandBuffer->getCommandBufferVk(),
@@ -346,10 +345,6 @@ void StencilBorderPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<Comm
         0, nullptr,
         1, &colorBarrier
     );
-
 }
 
-
-
 } // namespace Rapture
-

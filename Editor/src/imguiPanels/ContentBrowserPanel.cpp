@@ -41,7 +41,7 @@ void ContentBrowserPanel::render() {
     
     // Main content area
     float leftPaneWidth = ImGui::GetContentRegionAvail().x * 0.25f;
-    ImGui::BeginChild("LeftPane", ImVec2(leftPaneWidth, 0), ImGuiChildFlags_ResizeX | ImGuiChildFlags_Borders);
+    ImGui::BeginChild("LeftPane", ImVec2(leftPaneWidth, 0), ImGuiChildFlags_ResizeX | ImGuiChildFlags_Border);
     
     if (m_currentMode == ContentBrowserMode::FILE) {
         renderFileHierarchy();
@@ -53,7 +53,7 @@ void ContentBrowserPanel::render() {
     
     ImGui::SameLine();
 
-    ImGui::BeginChild("RightPane", ImVec2(0, 0), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("RightPane", ImVec2(0, 0), ImGuiChildFlags_Border);
     
     // Search bar at the top of the right pane
     ImGui::Text("Search:");
@@ -74,7 +74,7 @@ void ContentBrowserPanel::render() {
 
 void ContentBrowserPanel::renderTopPane() {
     RAPTURE_PROFILE_FUNCTION();
-    ImGui::BeginChild("TopPane", ImVec2(0, 20), ImGuiChildFlags_ResizeY | ImGuiChildFlags_Borders);
+    ImGui::BeginChild("TopPane", ImVec2(0, 20), ImGuiChildFlags_ResizeY | ImGuiChildFlags_Border);
     
     // Mode selection
     ImGui::Text("Mode:");

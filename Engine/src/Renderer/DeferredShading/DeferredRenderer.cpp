@@ -26,6 +26,7 @@ std::shared_ptr<CommandPool> DeferredRenderer::m_commandPool = nullptr;
 VmaAllocator DeferredRenderer::m_vmaAllocator = VK_NULL_HANDLE;
 VkDevice DeferredRenderer::m_device = VK_NULL_HANDLE;
 std::shared_ptr<SwapChain> DeferredRenderer::m_swapChain = nullptr;
+std::shared_ptr<SceneRenderTarget> DeferredRenderer::m_sceneRenderTarget = nullptr;
 uint32_t DeferredRenderer::m_currentFrame = 0;
 std::shared_ptr<VulkanQueue> DeferredRenderer::m_graphicsQueue = nullptr;
 std::shared_ptr<VulkanQueue> DeferredRenderer::m_presentQueue = nullptr;
@@ -40,6 +41,9 @@ std::shared_ptr<InstancedShapesPass> DeferredRenderer::m_instancedShapesPass = n
 float DeferredRenderer::m_width = 0.0f;
 float DeferredRenderer::m_height = 0.0f;
 bool DeferredRenderer::m_framebufferNeedsResize = false;
+uint32_t DeferredRenderer::m_pendingViewportWidth = 0;
+uint32_t DeferredRenderer::m_pendingViewportHeight = 0;
+bool DeferredRenderer::m_viewportResizePending = false;
 std::shared_ptr<DynamicDiffuseGI> DeferredRenderer::m_dynamicDiffuseGI = nullptr;
 
 void DeferredRenderer::init() {
@@ -57,31 +61,33 @@ void DeferredRenderer::init() {
   m_width = static_cast<float>(m_swapChain->getExtent().width);
   m_height = static_cast<float>(m_swapChain->getExtent().height);
 
-
   setupCommandResources();
+  createRenderTarget();
 
   m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
 
+  // Get the render target format for pipeline creation
+  VkFormat colorFormat = m_sceneRenderTarget->getFormat();
 
   m_gbufferPass = std::make_shared<GBufferPass>(
-      static_cast<float>(m_swapChain->getExtent().width),
-      static_cast<float>(m_swapChain->getExtent().height),
+      m_width,
+      m_height,
       m_swapChain->getImageCount());
 
   m_lightingPass = std::make_shared<LightingPass>(
-      static_cast<float>(m_swapChain->getExtent().width),
-      static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_gbufferPass, m_dynamicDiffuseGI);
+      m_width,
+      m_height,
+      m_swapChain->getImageCount(), m_gbufferPass, m_dynamicDiffuseGI, colorFormat);
 
   m_stencilBorderPass = std::make_shared<StencilBorderPass>(
-      static_cast<float>(m_swapChain->getExtent().width),
-      static_cast<float>(m_swapChain->getExtent().height),
-      m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
+      m_width,
+      m_height,
+      m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(), colorFormat);
 
   m_instancedShapesPass = std::make_shared<InstancedShapesPass>(
-    static_cast<float>(m_swapChain->getExtent().width),
-    static_cast<float>(m_swapChain->getExtent().height),
-    m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
+      m_width,
+      m_height,
+      m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(), colorFormat);
 
   m_skyboxPass = std::make_shared<SkyboxPass>(m_gbufferPass->getDepthTextures());
 
@@ -93,7 +99,17 @@ void DeferredRenderer::init() {
   ApplicationEvents::onSwapChainRecreated().addListener(
       [](std::shared_ptr<SwapChain> swapChain) { onSwapChainRecreated(); });
 
-
+  // Listen for viewport resize events (Editor mode only)
+  // We defer the actual resize to the start of the next frame to avoid
+  // mid-frame resource destruction issues
+  if (SwapChain::renderMode == RenderMode::OFFSCREEN) {
+    ApplicationEvents::onViewportResize().addListener(
+        [](unsigned int width, unsigned int height) {
+          m_pendingViewportWidth = width;
+          m_pendingViewportHeight = height;
+          m_viewportResizePending = true;
+        });
+  }
 }
 
 void DeferredRenderer::shutdown() {
@@ -106,6 +122,8 @@ void DeferredRenderer::shutdown() {
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
 
+    // Clean up scene render target
+    m_sceneRenderTarget.reset();
 
     // Clean up command buffers and pool
     m_commandBuffers.clear();
@@ -123,40 +141,44 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
 
   RAPTURE_PROFILE_FUNCTION();
 
-  int imageIndexi = m_swapChain->acquireImage(m_currentFrame);
-
-  if (imageIndexi == -1) {
-    return;
+  if (m_viewportResizePending) {
+    processPendingViewportResize();
   }
 
-  uint32_t imageIndex = static_cast<uint32_t>(imageIndexi);
+  // For PRESENTATION mode, we need to acquire a swapchain image
+  // For OFFSCREEN mode, we just use m_currentFrame as the target index
+  uint32_t imageIndex = m_currentFrame;
 
-  m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
+  if (SwapChain::renderMode == RenderMode::PRESENTATION) {
+    int imageIndexi = m_swapChain->acquireImage(m_currentFrame);
+    if (imageIndexi == -1) {
+      return;
+    }
+    imageIndex = static_cast<uint32_t>(imageIndexi);
+  }
+
+  //m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
 
   m_commandBuffers[m_currentFrame]->reset();
-  recordCommandBuffer(m_commandBuffers[m_currentFrame], activeScene,
-                      imageIndex);
+  recordCommandBuffer(m_commandBuffers[m_currentFrame], activeScene, imageIndex);
 
   m_graphicsQueue->addCommandBuffer(m_commandBuffers[m_currentFrame]);
 
- // --- BEGIN SUBMISSION LOGIC FOR FORWARD RENDERER (COMMON TO BOTH MODES) ---
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-  VkSemaphore frWaitSemaphores[1]; // Semaphores FR's submission waits on
-  VkPipelineStageFlags frWaitStages[] = {
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-  VkSemaphore frSignalSemaphores[1]; // Semaphores FR's submission signals
+  VkSemaphore frWaitSemaphores[1];
+  VkPipelineStageFlags frWaitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  VkSemaphore frSignalSemaphores[1];
 
   if (SwapChain::renderMode == RenderMode::PRESENTATION) {
-    frWaitSemaphores[0] =
-        m_swapChain->getImageAvailableSemaphore(m_currentFrame);
+    // PRESENTATION mode: Wait for swapchain image, signal when done, then present
+    frWaitSemaphores[0] = m_swapChain->getImageAvailableSemaphore(m_currentFrame);
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = frWaitSemaphores;
     submitInfo.pWaitDstStageMask = frWaitStages;
 
-    frSignalSemaphores[0] =
-        m_swapChain->getRenderFinishedSemaphore(m_currentFrame);
+    frSignalSemaphores[0] = m_swapChain->getRenderFinishedSemaphore(m_currentFrame);
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = frSignalSemaphores;
 
@@ -175,23 +197,23 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene) {
     VkSwapchainKHR swapChains[] = {m_swapChain->getSwapChainVk()};
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices =
-        &imageIndex;                // imageIndex from vkAcquireNextImageKHR
-    presentInfo.pResults = nullptr; // Optional
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = nullptr;
 
-    VkResult result = m_presentQueue->presentQueue(
-        presentInfo); // Re-uses 'result' variable from vkAcquireNextImageKHR
+    VkResult result = m_presentQueue->presentQueue(presentInfo);
     m_swapChain->signalImageAvailability(imageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
       ApplicationEvents::onRequestSwapChainRecreation().publish();
-      return; // Must return after recreating swap chain, as current frame's
-              // resources are invalid.
+      return;
     } else if (result != VK_SUCCESS) {
-      RP_CORE_ERROR("failed to present swap chain image in ForwardRenderer!");
-      throw std::runtime_error(
-          "failed to present swap chain image in ForwardRenderer!");
+      RP_CORE_ERROR("failed to present swap chain image!");
+      return;
     }
+  } else {
+    // OFFSCREEN mode: Do NOT submit here - ImguiLayer handles submission
+    // The command buffer has been recorded and added to the queue.
+    // ImguiLayer will submit it with proper semaphore synchronization.
   }
 
   m_currentFrame = (m_currentFrame + 1) % m_swapChain->getImageCount();
@@ -201,46 +223,110 @@ void DeferredRenderer::onSwapChainRecreated() {
     // Wait for all operations to complete
     vkDeviceWaitIdle(m_device);
 
+    // In PRESENTATION mode, the render target is backed by swapchain, so we need to recreate everything
+    // In OFFSCREEN mode, only update the swapchain reference (image count may have changed)
+    if (SwapChain::renderMode == RenderMode::PRESENTATION) {
+        m_width = static_cast<float>(m_swapChain->getExtent().width);
+        m_height = static_cast<float>(m_swapChain->getExtent().height);
+        
+        // Recreate the swapchain-backed render target
+        m_sceneRenderTarget = std::make_shared<SceneRenderTarget>(m_swapChain);
+        
+        // Recreate all render passes with new dimensions
+        recreateRenderPasses();
+    } else {
+        // OFFSCREEN mode: swapchain recreation doesn't affect our render target size
+        // Just update the reference
+        if (m_sceneRenderTarget) {
+            m_sceneRenderTarget->onSwapChainRecreated();
+        }
+        
+        m_dynamicDiffuseGI->onResize(m_swapChain->getImageCount());
+    }
+
+    m_commandBuffers.clear();
+    setupCommandResources();
+
+    m_currentFrame = 0;
+    m_framebufferNeedsResize = false;
+}
+
+void DeferredRenderer::createRenderTarget() {
+    if (SwapChain::renderMode == RenderMode::OFFSCREEN) {
+        // Create offscreen render target for Editor mode
+        // Use BGRA8 SRGB format (matches typical swapchain format)
+        m_sceneRenderTarget = std::make_shared<SceneRenderTarget>(
+            static_cast<uint32_t>(m_width),
+            static_cast<uint32_t>(m_height),
+            m_swapChain->getImageCount(),
+            TextureFormat::BGRA8
+        );
+        RP_CORE_INFO("Created OFFSCREEN render target for Editor mode");
+    } else {
+        // Create swapchain-backed render target for Standalone mode
+        m_sceneRenderTarget = std::make_shared<SceneRenderTarget>(m_swapChain);
+        RP_CORE_INFO("Created SWAPCHAIN-backed render target for Standalone mode");
+    }
+}
+
+void DeferredRenderer::recreateRenderPasses() {
     m_skyboxPass.reset();
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
 
-    m_width = static_cast<float>(m_swapChain->getExtent().width);
-    m_height = static_cast<float>(m_swapChain->getExtent().height);
-
-    m_commandBuffers.clear();
-
-    // Recreate DDGI system with new frame count to ensure correct number of command buffers
+    // Recreate DDGI system
     m_dynamicDiffuseGI->onResize(m_swapChain->getImageCount());
 
+    VkFormat colorFormat = m_sceneRenderTarget->getFormat();
+
     m_gbufferPass = std::make_shared<GBufferPass>(
-        static_cast<float>(m_swapChain->getExtent().width),
-        static_cast<float>(m_swapChain->getExtent().height),
+        m_width,
+        m_height,
         m_swapChain->getImageCount());
+
     m_lightingPass = std::make_shared<LightingPass>(
-        static_cast<float>(m_swapChain->getExtent().width),
-        static_cast<float>(m_swapChain->getExtent().height),
-        m_swapChain->getImageCount(), m_gbufferPass, m_dynamicDiffuseGI);
+        m_width,
+        m_height,
+        m_swapChain->getImageCount(), m_gbufferPass, m_dynamicDiffuseGI, colorFormat);
+
     m_stencilBorderPass = std::make_shared<StencilBorderPass>(
-        static_cast<float>(m_swapChain->getExtent().width),
-        static_cast<float>(m_swapChain->getExtent().height),
-        m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
+        m_width,
+        m_height,
+        m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(), colorFormat);
 
     m_instancedShapesPass = std::make_shared<InstancedShapesPass>(
-        static_cast<float>(m_swapChain->getExtent().width),
-        static_cast<float>(m_swapChain->getExtent().height),
-        m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures());
+        m_width,
+        m_height,
+        m_swapChain->getImageCount(), m_gbufferPass->getDepthTextures(), colorFormat);
 
     m_skyboxPass = std::make_shared<SkyboxPass>(m_gbufferPass->getDepthTextures());
+}
 
+void DeferredRenderer::processPendingViewportResize() {
+    uint32_t width = m_pendingViewportWidth;
+    uint32_t height = m_pendingViewportHeight;
+    m_viewportResizePending = false;
 
+    if (static_cast<uint32_t>(m_width) == width &&
+        static_cast<uint32_t>(m_height) == height) {
+        return; // No change
+    }
 
-    setupCommandResources();
+    vkDeviceWaitIdle(m_device);
+    
+    m_currentFrame = 0;
+    m_width = static_cast<float>(width);
+    m_height = static_cast<float>(height);
 
-    m_currentFrame = 0; // Reset current frame
-    m_framebufferNeedsResize = false;
+    // Resize the offscreen render target
+    m_sceneRenderTarget->resize(width, height);
+
+    // Recreate render passes with new dimensions
+    recreateRenderPasses();
+
+    RP_CORE_INFO("Resized render target to {}x{}", width, height);
 }
 
 void DeferredRenderer::setupCommandResources() {
@@ -266,92 +352,95 @@ void DeferredRenderer::recordCommandBuffer(
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    beginInfo.pInheritanceInfo = nullptr; // Optional
+    beginInfo.pInheritanceInfo = nullptr;
 
     if (!m_skyboxPass->hasActiveSkybox() && activeScene->getSkyboxComponent()) {
         m_skyboxPass->setSkyboxTexture(activeScene->getSkyboxComponent()->skyboxTexture);
     }
 
-    if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) !=
-        VK_SUCCESS) {
+    if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to begin recording command buffer!");
-        throw std::runtime_error("failed to begin recording command buffer!");
+        return;
     }
-    {
-    RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DeferredRenderer Frame");
-
-    auto &registry = activeScene->getRegistry();
-    auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
-    auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
 
     {
-        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Shadow Maps");
-        
-        for (auto entity : lightView) {
-            auto &lightComp = lightView.get<LightComponent>(entity);
-            auto &transformComp = lightView.get<TransformComponent>(entity);
-            auto &shadowComp = lightView.get<ShadowComponent>(entity);
+        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DeferredRenderer Frame");
 
-            // Always update directional light shadows for debugging, others only when changed
-            bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
-                                    transformComp.hasChanged() ||
-                                    lightComp.type == LightType::Directional || lightComp.type == LightType::Spot); // Force update for directional lights
+        auto &registry = activeScene->getRegistry();
+        auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
+        auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
+
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Shadow Maps");
             
-            if (shadowComp.shadowMap && shouldUpdateShadow) {
-                shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+            for (auto entity : lightView) {
+                auto &lightComp = lightView.get<LightComponent>(entity);
+                auto &transformComp = lightView.get<TransformComponent>(entity);
+                auto &shadowComp = lightView.get<ShadowComponent>(entity);
+
+                bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
+                                        transformComp.hasChanged() ||
+                                        lightComp.type == LightType::Directional || 
+                                        lightComp.type == LightType::Spot);
+                
+                if (shadowComp.shadowMap && shouldUpdateShadow) {
+                    shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+                }
             }
-        }
 
             for (auto entity : cascadedShadowView) {
                 auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
                 auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
                 auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
 
-                // Always update directional light shadows for debugging, others only when changed
                 bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) ||
                                         transformComp.hasChanged() ||
-                                        lightComp.type == LightType::Directional); // Force update for directional lights
+                                        lightComp.type == LightType::Directional);
                 
                 if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
                     shadowComp.cascadedShadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
                 }
             }
+        }
+
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
+            m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+        }
+
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
+            m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, 
+                                                *m_sceneRenderTarget, imageIndex,
+                                                m_currentFrame);
+        }
         
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
+            m_instancedShapesPass->recordCommandBuffer(commandBuffer, activeScene, 
+                                                       *m_sceneRenderTarget, imageIndex,
+                                                       m_currentFrame);
+        }
+
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Stencil Border Pass");
+            m_stencilBorderPass->recordCommandBuffer(commandBuffer, 
+                                                     *m_sceneRenderTarget, imageIndex,
+                                                     m_currentFrame, activeScene);
+        }
+
+        // Transition to shader read layout for OFFSCREEN mode so ImGui can sample it
+        if (m_sceneRenderTarget->requiresSamplingTransition()) {
+            m_sceneRenderTarget->transitionToShaderReadLayout(commandBuffer, imageIndex);
+        }
+
+        RAPTURE_PROFILE_GPU_COLLECT(commandBuffer->getCommandBufferVk());
     }
 
-    {
-        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
-        m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
-    }
-
-    {
-        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
-        m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex, m_currentFrame);
-    }
-    
-    {
-        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
-        m_instancedShapesPass->recordCommandBuffer(commandBuffer, activeScene, imageIndex, m_currentFrame);
-    }
-
-    {
-        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Stencil Border Pass");
-        m_stencilBorderPass->recordCommandBuffer(commandBuffer, imageIndex, m_currentFrame, activeScene);
-    }
-
-    {
-        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
-        m_skyboxPass->recordCommandBuffer(commandBuffer, m_currentFrame);
-    }
-
-    RAPTURE_PROFILE_GPU_COLLECT(commandBuffer->getCommandBufferVk());
-
-    }
     if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to record command buffer!");
-        throw std::runtime_error("failed to record command buffer!");
+        return;
     }
 }
-
 
 } // namespace Rapture

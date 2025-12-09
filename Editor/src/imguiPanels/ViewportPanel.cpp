@@ -8,10 +8,13 @@
 #include "imguiPanelStyleLinear.h"
 
 #include "Events/GameEvents.h"
+#include "Events/ApplicationEvents.h"
 
 #include <string>
 
-ViewportPanel::ViewportPanel() {
+ViewportPanel::ViewportPanel() 
+    : m_viewportSize(0, 0)
+    , m_lastViewportSize(0, 0) {
 
     m_entitySelectedListenerId = Rapture::GameEvents::onEntitySelected().addListener(
         [this](std::shared_ptr<Rapture::Entity> entity) {
@@ -40,6 +43,8 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
     m_viewportPosition = ImGui::GetCursorScreenPos();
     m_viewportSize = ImGui::GetContentRegionAvail();
 
+    // Check for size changes and publish resize event if needed
+    checkForSizeChange();
 
     ImVec2 windowSize = ImGui::GetContentRegionAvail();
     ImGui::Image((ImTextureID)textureID, windowSize);
@@ -355,6 +360,25 @@ void ViewportPanel::renderEntityGizmo() {
             //    bb->needsUpdate = true;
             //}
             
+        }
+    }
+}
+
+void ViewportPanel::checkForSizeChange() {
+    // Only publish event if size actually changed and is valid
+    if (m_viewportSize.x > 0 && m_viewportSize.y > 0) {
+        // Check if size changed significantly (more than 1 pixel to avoid float precision issues)
+        bool sizeChanged = std::abs(m_viewportSize.x - m_lastViewportSize.x) > 1.0f ||
+                          std::abs(m_viewportSize.y - m_lastViewportSize.y) > 1.0f;
+        
+        if (sizeChanged) {
+            m_lastViewportSize = m_viewportSize;
+            
+            // Publish the viewport resize event
+            Rapture::ApplicationEvents::onViewportResize().publish(
+                static_cast<unsigned int>(m_viewportSize.x),
+                static_cast<unsigned int>(m_viewportSize.y)
+            );
         }
     }
 }

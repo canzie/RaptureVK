@@ -10,6 +10,7 @@
 #include "Materials/MaterialInstance.h"
 #include "Pipelines/GraphicsPipeline.h"
 #include "RenderTargets/SwapChains/SwapChain.h"
+#include "RenderTargets/SceneRenderTarget.h"
 #include "Scenes/Scene.h"
 #include "Shaders/Shader.h"
 #include "WindowContext/VulkanContext/VulkanQueue.h"
@@ -46,6 +47,13 @@ public:
 
   static void onSwapChainRecreated();
 
+  /**
+   * @brief Resize the render target (for Editor viewport resize, independent of window size)
+   * Only effective when using offscreen render target.
+   * @param width New width
+   * @param height New height
+   */
+
   // Getter for GBuffer pass
   static std::shared_ptr<GBufferPass> getGBufferPass() { return m_gbufferPass; }
 
@@ -53,9 +61,23 @@ public:
 
   static std::shared_ptr<DynamicDiffuseGI> getDynamicDiffuseGI() { return m_dynamicDiffuseGI; }
 
+  /**
+   * @brief Get the scene render target (for ImGui to sample in Editor mode)
+   * @return The scene render target
+   */
+  static std::shared_ptr<SceneRenderTarget> getSceneRenderTarget() { return m_sceneRenderTarget; }
+
+  /**
+   * @brief Get the current frame index for synchronization
+   */
+  static uint32_t getCurrentFrame() { return m_currentFrame; }
+
 private:
   // sets up command pools and buffers
   static void setupCommandResources();
+  static void createRenderTarget();
+  static void recreateRenderPasses();
+  static void processPendingViewportResize();
 
   static void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer,
                                   std::shared_ptr<Scene> activeScene,
@@ -76,6 +98,7 @@ private:
   static VmaAllocator m_vmaAllocator;
   static VkDevice m_device;
   static std::shared_ptr<SwapChain> m_swapChain;
+  static std::shared_ptr<SceneRenderTarget> m_sceneRenderTarget;
 
   static uint32_t m_currentFrame;
 
@@ -85,9 +108,13 @@ private:
   static bool m_framebufferNeedsResize;
   static float m_width;
   static float m_height;
+  
+  // Pending viewport resize (deferred to start of next frame)
+  static uint32_t m_pendingViewportWidth;
+  static uint32_t m_pendingViewportHeight;
+  static bool m_viewportResizePending;
 
   static std::shared_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
-
 };
 
 } // namespace Rapture

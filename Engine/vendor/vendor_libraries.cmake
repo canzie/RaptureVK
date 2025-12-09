@@ -42,10 +42,11 @@ FetchContent_Declare(
 )
 
 # --- ImGui ---
+# Using v1.90.4 - stable release with docking support (March 2024)
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG docking
+    GIT_TAG v1.90.4-docking
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
 )

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__LIGHTING_PASS_H
+#define RAPTURE__LIGHTING_PASS_H
 
 #include "Shaders/Shader.h"
 #include "Pipelines/GraphicsPipeline.h"
@@ -13,7 +14,7 @@
 #include "WindowContext/VulkanContext/VulkanContext.h"
 #include "Components/Components.h"
 
-#include "RenderTargets/SwapChains/SwapChain.h"
+#include "RenderTargets/SceneRenderTarget.h"
 #include "Renderer/DeferredShading/GBufferPass.h"
 #include <memory>
 
@@ -35,17 +36,26 @@ public:
         float height, 
         uint32_t framesInFlight, 
         std::shared_ptr<GBufferPass> gBufferPass,
-        std::shared_ptr<DynamicDiffuseGI> ddgi);
+        std::shared_ptr<DynamicDiffuseGI> ddgi,
+        VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
 
     ~LightingPass();
 
     FramebufferSpecification getFramebufferSpecification();
 
-    // NOTE: assumes that the command buffer is already started, and will be ended by the caller
+    /**
+     * @brief Record commands to render the lighting pass
+     * @param commandBuffer The command buffer to record to
+     * @param activeScene The scene to render
+     * @param renderTarget The render target to render to
+     * @param imageIndex The image index within the render target
+     * @param frameInFlightIndex The current frame in flight index
+     */
     void recordCommandBuffer(
         std::shared_ptr<CommandBuffer> commandBuffer, 
         std::shared_ptr<Scene> activeScene,
-        uint32_t swapchainImageIndex,
+        SceneRenderTarget& renderTarget,
+        uint32_t imageIndex,
         uint32_t frameInFlightIndex
     );
 
@@ -54,8 +64,11 @@ public:
 private:
     void createPipeline();
 
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t swapchainImageIndex);
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, uint32_t swapchainImageIndex);
+    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, 
+                               VkImageView targetImageView, 
+                               VkExtent2D targetExtent);
+    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, 
+                                              VkImage targetImage);
 
 
 private:
@@ -65,7 +78,7 @@ private:
     uint32_t m_framesInFlight;
     uint32_t m_currentFrame;
 
-    std::shared_ptr<SwapChain> m_swapChain;
+    VkFormat m_colorFormat;
     VmaAllocator m_vmaAllocator;
     VkDevice m_device;
 
@@ -91,3 +104,5 @@ private:
 };
 
 }
+
+#endif // RAPTURE__LIGHTING_PASS_H
