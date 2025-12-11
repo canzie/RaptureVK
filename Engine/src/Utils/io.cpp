@@ -5,7 +5,8 @@
 
 namespace Rapture {
 
-std::vector<char> readFile(const std::filesystem::path& path) {
+std::vector<char> readFile(const std::filesystem::path &path)
+{
     std::ifstream file(path, std::ios::ate | std::ios::binary);
 
     if (!file.is_open()) {
@@ -13,7 +14,7 @@ std::vector<char> readFile(const std::filesystem::path& path) {
         return {};
     }
 
-    size_t fileSize = (size_t) file.tellg();
+    size_t fileSize = (size_t)file.tellg();
     std::vector<char> buffer(fileSize);
 
     file.seekg(0);
@@ -24,4 +25,4 @@ std::vector<char> readFile(const std::filesystem::path& path) {
     return buffer;
 }
 
-}
+} // namespace Rapture

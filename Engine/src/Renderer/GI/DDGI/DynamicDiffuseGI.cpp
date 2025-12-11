@@ -1,7 +1,13 @@
 #include "DynamicDiffuseGI.h"
 
 #include "AssetManager/Asset.h"
+#include "AssetManager/AssetManager.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
+#include "Buffers/Descriptors/DescriptorBinding.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
+#include "Buffers/Descriptors/DescriptorSet.h"
 #include "Components/Components.h"
+#include "Events/AssetEvents.h"
 #include "Materials/MaterialParameters.h"
 #include "Renderer/GI/DDGI/DDGICommon.h"
 #include "Scenes/Entities/Entity.h"
@@ -9,18 +15,12 @@
 #include "Textures/Texture.h"
 #include "Textures/TextureCommon.h"
 #include "WindowContext/Application.h"
-#include "AssetManager/AssetManager.h"
-#include "Buffers/CommandBuffers/CommandPool.h"
-#include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/Descriptors/DescriptorManager.h"
-#include "Buffers/Descriptors/DescriptorBinding.h"
-#include "Events/AssetEvents.h"
 
 #include "Logging/TracyProfiler.h"
 
-#include <random>
 #include <cmath>
 #include <glm/gtc/constants.hpp>
+#include <random>
 
 namespace Rapture {
 
@@ -51,45 +51,29 @@ struct DDGIRelocatePushConstants {
 
 std::shared_ptr<Texture> DynamicDiffuseGI::s_defaultSkyboxTexture = nullptr;
 
-DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight) 
-  : m_ProbeInfoBuffer(nullptr),
-    m_isPopulated(false),
-    m_meshCount(0),
-    m_isEvenFrame(true),
-    m_isFirstFrame(true),
-    m_DDGI_ProbeTraceShader(nullptr),
-    m_DDGI_ProbeIrradianceBlendingShader(nullptr),
-    m_DDGI_ProbeDistanceBlendingShader(nullptr),
-    m_DDGI_ProbeRelocationShader(nullptr),
-    m_DDGI_ProbeClassificationShader(nullptr),
-    m_DDGI_ProbeTracePipeline(nullptr),
-    m_DDGI_ProbeIrradianceBlendingPipeline(nullptr),
-    m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
-    m_DDGI_ProbeRelocationPipeline(nullptr),
-    m_DDGI_ProbeClassificationPipeline(nullptr),
-    m_MeshInfoBuffer(nullptr),
-    m_probeTraceDescriptorSet(nullptr),
-    m_probeIrradianceBlendingDescriptorSet(nullptr),
-    m_probeDistanceBlendingDescriptorSet(nullptr),
-    m_probeClassificationDescriptorSet(nullptr),
-    m_probeRelocationDescriptorSet(nullptr),
-    m_skyboxTexture(nullptr),
-    m_framesInFlight(framesInFlight),
-    m_probeIrradianceBindlessIndex(UINT32_MAX),
-    m_prevProbeIrradianceBindlessIndex(UINT32_MAX),
-    m_probeVisibilityBindlessIndex(UINT32_MAX),
-    m_prevProbeVisibilityBindlessIndex(UINT32_MAX) {
+DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
+    : m_DDGI_ProbeTraceShader(nullptr), m_DDGI_ProbeIrradianceBlendingShader(nullptr), m_DDGI_ProbeDistanceBlendingShader(nullptr),
+      m_DDGI_ProbeRelocationShader(nullptr), m_DDGI_ProbeClassificationShader(nullptr), m_DDGI_ProbeTracePipeline(nullptr),
+      m_DDGI_ProbeIrradianceBlendingPipeline(nullptr), m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
+      m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_MeshInfoBuffer(nullptr),
+      m_ProbeInfoBuffer(nullptr), m_framesInFlight(framesInFlight), m_isEvenFrame(true), m_isPopulated(false), m_isFirstFrame(true),
+      m_meshCount(0), m_probeIrradianceBindlessIndex(UINT32_MAX), m_probeVisibilityBindlessIndex(UINT32_MAX),
+      m_prevProbeIrradianceBindlessIndex(UINT32_MAX), m_prevProbeVisibilityBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr),
+      m_probeTraceDescriptorSet(nullptr), m_probeIrradianceBlendingDescriptorSet(nullptr),
+      m_probeDistanceBlendingDescriptorSet(nullptr), m_probeClassificationDescriptorSet(nullptr),
+      m_probeRelocationDescriptorSet(nullptr)
+{
 
     // Listen for material instance changes so we can patch the MeshInfo SSBO on-demand.
-    AssetEvents::onMaterialInstanceChanged().addListener([this](MaterialInstance* mat){
-        if(mat) {
+    AssetEvents::onMaterialInstanceChanged().addListener([this](MaterialInstance *mat) {
+        if (mat) {
             m_dirtyMaterials.insert(mat);
         }
     });
 
     // Listen for mesh transform changes so we can patch the MeshInfo SSBO on-demand.
-    AssetEvents::onMeshTransformChanged().addListener([this](EntityID ent){
-        if(ent) {
+    AssetEvents::onMeshTransformChanged().addListener([this](EntityID ent) {
+        if (ent) {
             m_dirtyMeshes.insert(ent);
         }
     });
@@ -99,8 +83,8 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     }
     m_skyboxTexture = s_defaultSkyboxTexture;
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
     m_allocator = vc.getVmaAllocator();
     m_computeQueue = vc.getComputeQueue();
 
@@ -120,14 +104,13 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     setupProbeTextures();
 }
 
-DynamicDiffuseGI::~DynamicDiffuseGI() {
+DynamicDiffuseGI::~DynamicDiffuseGI() {}
 
-}
+void DynamicDiffuseGI::createPipelines()
+{
 
-void DynamicDiffuseGI::createPipelines() {
-
-    auto& app = Application::getInstance();
-    auto& proj = app.getProject();
+    auto &app = Application::getInstance();
+    auto &proj = app.getProject();
     auto shaderDir = proj.getProjectShaderDirectory();
 
     ShaderImportConfig shaderIrradianceBlendConfig;
@@ -137,14 +120,19 @@ void DynamicDiffuseGI::createPipelines() {
     shaderDistanceBlendConfig.compileInfo.macros.push_back("DDGI_BLEND_DISTANCE");
     shaderDistanceBlendConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
 
-    ShaderImportConfig shaderBaseProbeConfig; 
+    ShaderImportConfig shaderBaseProbeConfig;
     shaderBaseProbeConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
 
-    auto [probeTraceShader, probeTraceShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", shaderBaseProbeConfig);
-    auto [probeIrradianceBlendShader, probeIrradianceBlendShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderIrradianceBlendConfig);
-    auto [probeDistanceBlendShader, probeDistanceBlendShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderDistanceBlendConfig);
-    auto [probeRelocationShader, probeRelocationShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeRelocation.cs.glsl", shaderBaseProbeConfig);
-    auto [probeClassificationShader, probeClassificationShaderHandle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeClassification.cs.glsl", shaderBaseProbeConfig);
+    auto [probeTraceShader, probeTraceShaderHandle] =
+        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", shaderBaseProbeConfig);
+    auto [probeIrradianceBlendShader, probeIrradianceBlendShaderHandle] =
+        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderIrradianceBlendConfig);
+    auto [probeDistanceBlendShader, probeDistanceBlendShaderHandle] =
+        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderDistanceBlendConfig);
+    auto [probeRelocationShader, probeRelocationShaderHandle] =
+        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeRelocation.cs.glsl", shaderBaseProbeConfig);
+    auto [probeClassificationShader, probeClassificationShaderHandle] =
+        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeClassification.cs.glsl", shaderBaseProbeConfig);
 
     m_DDGI_ProbeTraceShader = probeTraceShader;
     m_DDGI_ProbeIrradianceBlendingShader = probeIrradianceBlendShader;
@@ -170,7 +158,8 @@ void DynamicDiffuseGI::createPipelines() {
     m_DDGI_ProbeClassificationPipeline = std::make_shared<ComputePipeline>(probeClassificationConfig);
 }
 
-void DynamicDiffuseGI::setupProbeTextures() {
+void DynamicDiffuseGI::setupProbeTextures()
+{
     RP_CORE_TRACE("Setting up probe textures for bindless access");
 
     // Get bindless indices for probe textures (these will be used in lighting pass)
@@ -182,19 +171,19 @@ void DynamicDiffuseGI::setupProbeTextures() {
         m_probeVisibilityBindlessIndex = m_VisibilityTexture->getBindlessIndex();
         m_prevProbeVisibilityBindlessIndex = m_PrevVisibilityTexture->getBindlessIndex();
     }
-
 }
 
-void DynamicDiffuseGI::updateMeshInfoBuffer(std::shared_ptr<Scene> scene) {
+void DynamicDiffuseGI::updateMeshInfoBuffer(std::shared_ptr<Scene> scene)
+{
     if ((m_dirtyMaterials.empty() && m_dirtyMeshes.empty()) || !m_MeshInfoBuffer) {
         return;
     }
 
     // Offsets inside MeshInfo struct that correspond to material parameters
     constexpr size_t MATERIAL_START_OFFSET = offsetof(MeshInfo, AlbedoTextureIndex);
-    constexpr size_t MATERIAL_END_OFFSET   = offsetof(MeshInfo, iboIndex); // first field after material params
-    constexpr size_t MATERIAL_PARAM_SIZE   = MATERIAL_END_OFFSET - MATERIAL_START_OFFSET;
-    constexpr size_t TRANSFORM_OFFSET      = offsetof(MeshInfo, modelMatrix);
+    constexpr size_t MATERIAL_END_OFFSET = offsetof(MeshInfo, iboIndex); // first field after material params
+    constexpr size_t MATERIAL_PARAM_SIZE = MATERIAL_END_OFFSET - MATERIAL_START_OFFSET;
+    constexpr size_t TRANSFORM_OFFSET = offsetof(MeshInfo, modelMatrix);
 
     struct PackedParams {
         uint32_t AlbedoTextureIndex;
@@ -204,16 +193,16 @@ void DynamicDiffuseGI::updateMeshInfoBuffer(std::shared_ptr<Scene> scene) {
         uint32_t EmissiveFactorTextureIndex;
     };
 
-    for (auto* mat : m_dirtyMaterials) {
+    for (auto *mat : m_dirtyMaterials) {
         if (!mat) continue;
 
         // Build a small struct containing just the material-related parameters in the same layout as MeshInfo
         PackedParams params = {};
 
-        params.AlbedoTextureIndex         = mat->getParameter(ParameterID::ALBEDO_MAP).asUInt();
-        params.NormalTextureIndex         = mat->getParameter(ParameterID::NORMAL_MAP).asUInt();
-        params.albedo                     = mat->getParameter(ParameterID::ALBEDO).asVec3();
-        params.emissiveColor              = mat->getParameter(ParameterID::EMISSIVE).asVec3();
+        params.AlbedoTextureIndex = mat->getParameter(ParameterID::ALBEDO_MAP).asUInt();
+        params.NormalTextureIndex = mat->getParameter(ParameterID::NORMAL_MAP).asUInt();
+        params.albedo = mat->getParameter(ParameterID::ALBEDO).asVec3();
+        params.emissiveColor = mat->getParameter(ParameterID::EMISSIVE).asVec3();
         params.EmissiveFactorTextureIndex = UINT32_MAX;
 
         auto offsetsIt = m_MaterialToOffsets.find(mat);
@@ -228,27 +217,28 @@ void DynamicDiffuseGI::updateMeshInfoBuffer(std::shared_ptr<Scene> scene) {
     for (auto entityID : m_dirtyMeshes) {
         Entity ent = Entity(entityID, scene.get());
         if (!ent) continue;
-        
+
         auto offsetIt = m_MeshToOffsets.find(entityID);
         if (offsetIt == m_MeshToOffsets.end()) continue;
 
         uint32_t dstOffset = offsetIt->second + static_cast<uint32_t>(TRANSFORM_OFFSET);
         glm::mat4 modelMatrix = ent.getComponent<TransformComponent>().transformMatrix();
         RP_CORE_INFO("Updating mesh info buffer for entity: {}", ent.getID());
-        m_MeshInfoBuffer->addData((void*)&modelMatrix, sizeof(glm::mat4), dstOffset);
+        m_MeshInfoBuffer->addData((void *)&modelMatrix, sizeof(glm::mat4), dstOffset);
     }
 
     m_dirtyMeshes.clear();
     m_dirtyMaterials.clear();
 }
 
-uint32_t DynamicDiffuseGI::getSunLightDataIndex(std::shared_ptr<Scene> scene) {
+uint32_t DynamicDiffuseGI::getSunLightDataIndex(std::shared_ptr<Scene> scene)
+{
 
-    auto& reg = scene->getRegistry();
+    auto &reg = scene->getRegistry();
     auto lightView = reg.view<LightComponent>();
 
     for (auto ent : lightView) {
-        auto& lightComp = lightView.get<LightComponent>(ent);
+        auto &lightComp = lightView.get<LightComponent>(ent);
         if (lightComp.type == LightType::Directional) {
             return lightComp.lightDataBuffer->getDescriptorIndex();
         }
@@ -257,7 +247,8 @@ uint32_t DynamicDiffuseGI::getSunLightDataIndex(std::shared_ptr<Scene> scene) {
     return 0;
 }
 
-void DynamicDiffuseGI::clearTextures() {
+void DynamicDiffuseGI::clearTextures()
+{
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -277,62 +268,39 @@ void DynamicDiffuseGI::clearTextures() {
 
     // Transition images from UNDEFINED to GENERAL layout before clearing
     std::vector<VkImageMemoryBarrier> layoutTransitions;
-    
 
-    VkImageMemoryBarrier radianceTransition = m_RadianceTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
+    VkImageMemoryBarrier radianceTransition = m_RadianceTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(radianceTransition);
-    
-    VkImageMemoryBarrier prevRadianceTransition = m_PrevRadianceTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
+
+    VkImageMemoryBarrier prevRadianceTransition = m_PrevRadianceTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(prevRadianceTransition);
-    
-    VkImageMemoryBarrier visibilityTransition = m_VisibilityTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
+
+    VkImageMemoryBarrier visibilityTransition = m_VisibilityTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(visibilityTransition);
-    
-    VkImageMemoryBarrier prevVisibilityTransition = m_PrevVisibilityTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
+
+    VkImageMemoryBarrier prevVisibilityTransition = m_PrevVisibilityTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(prevVisibilityTransition);
 
-    vkCmdPipelineBarrier(
-        m_CommandBuffers[0]->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        static_cast<uint32_t>(layoutTransitions.size()), layoutTransitions.data()
-    );
+    vkCmdPipelineBarrier(m_CommandBuffers[0]->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(layoutTransitions.size()),
+                         layoutTransitions.data());
 
-    VkClearColorValue clearColor = { {0.0f, 0.0f, 0.0f, 0.0f} };
-    vkCmdClearColorImage(
-        m_CommandBuffers[0]->getCommandBufferVk(),
-        m_RadianceTexture->getImage(),
-        VK_IMAGE_LAYOUT_GENERAL,
-        &clearColor,
-        1, &subresourceRange
-    );
+    VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 0.0f}};
+    vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_RadianceTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColor, 1, &subresourceRange);
 
-    vkCmdClearColorImage(
-        m_CommandBuffers[0]->getCommandBufferVk(),
-        m_PrevRadianceTexture->getImage(),
-        VK_IMAGE_LAYOUT_GENERAL,
-        &clearColor,
-        1, &subresourceRange
-    );
+    vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_PrevRadianceTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColor, 1, &subresourceRange);
 
-    vkCmdClearColorImage(
-        m_CommandBuffers[0]->getCommandBufferVk(),
-        m_VisibilityTexture->getImage(),
-        VK_IMAGE_LAYOUT_GENERAL,
-        &clearColor,
-        1, &subresourceRange
-    );
+    vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_VisibilityTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColor, 1, &subresourceRange);
 
-    vkCmdClearColorImage(
-        m_CommandBuffers[0]->getCommandBufferVk(),
-        m_PrevVisibilityTexture->getImage(),
-        VK_IMAGE_LAYOUT_GENERAL,
-        &clearColor,
-        1, &subresourceRange
-    );
+    vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_PrevVisibilityTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColor, 1, &subresourceRange);
 
     if (vkEndCommandBuffer(m_CommandBuffers[0]->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::clearTextures - Failed to end command buffer");
@@ -340,30 +308,27 @@ void DynamicDiffuseGI::clearTextures() {
     }
 
     m_computeQueue->submitQueue(m_CommandBuffers[0]);
-
 }
 
-void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
+void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene)
+{
 
     RAPTURE_PROFILE_FUNCTION();
 
-
     auto tlas = scene->getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
-        //RP_CORE_WARN("DynamicDiffuseGI::populateProbes - Scene TLAS is not built");
+        // RP_CORE_WARN("DynamicDiffuseGI::populateProbes - Scene TLAS is not built");
         return;
     }
 
-    auto& tlasInstances = tlas->getInstances();
-
+    auto &tlasInstances = tlas->getInstances();
 
     if (m_meshCount == tlas->getInstanceCount()) {
         return;
     }
 
-    auto& reg = scene->getRegistry();
+    auto &reg = scene->getRegistry();
     auto MMview = reg.view<MaterialComponent, MeshComponent, TransformComponent>(entt::exclude<LightComponent>);
-
 
     std::vector<MeshInfo> meshInfos(tlas->getInstanceCount());
 
@@ -373,10 +338,10 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
 
         Entity ent = Entity(inst.entityID, scene.get());
 
-        MeshInfo& meshinfo = meshInfos[i];
+        MeshInfo &meshinfo = meshInfos[i];
         meshinfo = {};
         meshinfo.AlbedoTextureIndex = 0;
-        meshinfo.NormalTextureIndex = 0; 
+        meshinfo.NormalTextureIndex = 0;
         meshinfo.vboIndex = 0;
         meshinfo.iboIndex = 0;
         meshinfo.positionAttributeOffsetBytes = 0;
@@ -396,13 +361,12 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
             meshinfo.modelMatrix = transformComp.transformMatrix();
 
             if (materialComp.material) {
-                auto& material = materialComp.material;
+                auto &material = materialComp.material;
                 meshinfo.AlbedoTextureIndex = material->getParameter(ParameterID::ALBEDO_MAP).asUInt();
                 meshinfo.NormalTextureIndex = material->getParameter(ParameterID::NORMAL_MAP).asUInt();
 
                 meshinfo.albedo = material->getParameter(ParameterID::ALBEDO).asVec3();
                 meshinfo.emissiveColor = material->getParameter(ParameterID::EMISSIVE).asVec3();
-
             }
 
             if (meshComp.mesh) {
@@ -413,16 +377,15 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
 
                     meshinfo.vboIndex = vertexBuffer->getBindlessIndex();
 
-                    auto& bfl = vertexBuffer->getBufferLayout();
+                    auto &bfl = vertexBuffer->getBufferLayout();
 
                     meshinfo.positionAttributeOffsetBytes = bfl.getAttributeOffset(BufferAttributeID::POSITION);
                     meshinfo.texCoordAttributeOffsetBytes = bfl.getAttributeOffset(BufferAttributeID::TEXCOORD_0);
                     meshinfo.normalAttributeOffsetBytes = bfl.getAttributeOffset(BufferAttributeID::NORMAL);
                     meshinfo.tangentAttributeOffsetBytes = bfl.getAttributeOffset(BufferAttributeID::TANGENT);
                     meshinfo.vertexStrideBytes = bfl.calculateVertexSize();
-
                 }
-                
+
                 if (indexBuffer) {
                     meshinfo.iboIndex = indexBuffer->getBindlessIndex();
                     meshinfo.indexType = indexBuffer->getIndexType();
@@ -441,12 +404,8 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
 
     // Create or update the mesh info buffer
     if (!m_MeshInfoBuffer || m_MeshInfoBuffer->getSize() < sizeof(MeshInfo) * meshInfos.size()) {
-        m_MeshInfoBuffer = std::make_shared<StorageBuffer>(
-        sizeof(MeshInfo) * meshInfos.size(),
-        BufferUsage::DYNAMIC,
-        m_allocator,
-        meshInfos.data()
-        );
+        m_MeshInfoBuffer = std::make_shared<StorageBuffer>(sizeof(MeshInfo) * meshInfos.size(), BufferUsage::DYNAMIC, m_allocator,
+                                                           meshInfos.data());
     } else {
         m_MeshInfoBuffer->addData(meshInfos.data(), sizeof(MeshInfo) * meshInfos.size(), 0);
     }
@@ -455,17 +414,16 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
     m_MaterialToOffsets.clear();
     m_MeshToOffsets.clear();
 
-    for(uint32_t idx = 0; idx < meshInfos.size(); ++idx) {
+    for (uint32_t idx = 0; idx < meshInfos.size(); ++idx) {
         Entity ent = Entity(tlasInstances[idx].entityID, scene.get());
         if (MMview.contains(ent)) {
             auto [meshComp, materialComp, transformComp] = MMview.get<MeshComponent, MaterialComponent, TransformComponent>(ent);
-            if(materialComp.material) {
+            if (materialComp.material) {
                 m_MeshToOffsets[ent.getID()] = idx * static_cast<uint32_t>(sizeof(MeshInfo));
                 m_MaterialToOffsets[materialComp.material.get()].push_back(idx * static_cast<uint32_t>(sizeof(MeshInfo)));
             }
         }
     }
-
 
     // Add mesh info buffer to the mesh data descriptor set
     auto meshDataSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS);
@@ -477,17 +435,14 @@ void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene){
         }
     }
 
-
-
     m_isPopulated = true;
     RP_CORE_INFO("Populated {} mesh infos for DDGI", meshInfos.size());
 }
 
-void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex) {
+void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex)
+{
 
     RAPTURE_PROFILE_FUNCTION();
-
-
 
     // Apply any material changes collected since last frame
     updateMeshInfoBuffer(scene);
@@ -504,7 +459,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     auto tlas = scene->getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
-        //RP_CORE_WARN("DynamicDiffuseGI::populateProbesCompute - Scene TLAS is not built");
+        // RP_CORE_WARN("DynamicDiffuseGI::populateProbesCompute - Scene TLAS is not built");
         return;
     }
 
@@ -514,7 +469,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    
+
     if (vkBeginCommandBuffer(currentCommandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::castRays - Failed to begin command buffer");
         return;
@@ -524,13 +479,13 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::populateProbesCompute");
         // Cast rays using compute shader
         castRays(scene, frameIndex);
-    }   
+    }
     // Flatten ray data texture (within the same command buffer)
     if (m_RayDataTextureFlattened) {
         RAPTURE_PROFILE_SCOPE("Flattening ray data texture");
         m_RayDataTextureFlattened->update(currentCommandBuffer);
     }
-    
+
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::relocateProbes");
         relocateProbes(frameIndex);
@@ -551,7 +506,6 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
         m_ProbeClassificationTextureFlattened->update(currentCommandBuffer);
     }
 
-
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::blendTextures");
         // Blend textures
@@ -570,25 +524,24 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     RAPTURE_PROFILE_GPU_COLLECT(currentCommandBuffer->getCommandBufferVk());
 
-
     // End command buffer
     if (vkEndCommandBuffer(currentCommandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::populateProbesCompute - Failed to end command buffer");
         return;
     }
-    
+
     // Submit command buffer (single submit for all operations)
     m_computeQueue->submitQueue(currentCommandBuffer);
 
     // Toggle frame flag for double buffering
     m_isEvenFrame = !m_isEvenFrame;
-    
+
     // Mark that first frame is complete
     m_isFirstFrame = false;
-
 }
 
-void DynamicDiffuseGI::classifyProbes(uint32_t frameIndex) {
+void DynamicDiffuseGI::classifyProbes(uint32_t frameIndex)
+{
     RAPTURE_PROFILE_FUNCTION();
 
     auto currentCommandBuffer = m_CommandBuffers[frameIndex];
@@ -597,20 +550,12 @@ void DynamicDiffuseGI::classifyProbes(uint32_t frameIndex) {
     std::vector<VkImageMemoryBarrier> preClassifyBarriers;
 
     VkImageMemoryBarrier classificationWriteBarrier = m_ProbeClassificationTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, 
-        VK_IMAGE_LAYOUT_GENERAL, 
-        0, 
-        VK_ACCESS_SHADER_WRITE_BIT
-    );
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_SHADER_WRITE_BIT);
     preClassifyBarriers.push_back(classificationWriteBarrier);
 
-    vkCmdPipelineBarrier(
-        currentCommandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr,
-        static_cast<uint32_t>(preClassifyBarriers.size()), preClassifyBarriers.data()
-    );
+    vkCmdPipelineBarrier(currentCommandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                         static_cast<uint32_t>(preClassifyBarriers.size()), preClassifyBarriers.data());
 
     // Bind pipeline and descriptor sets
     m_DDGI_ProbeClassificationPipeline->bind(currentCommandBuffer->getCommandBufferVk());
@@ -621,10 +566,8 @@ void DynamicDiffuseGI::classifyProbes(uint32_t frameIndex) {
     // Push constants
     DDGIClassifyPushConstants pushConstants = {};
     pushConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
-    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(),
-                       m_DDGI_ProbeClassificationPipeline->getPipelineLayoutVk(),
-                       VK_SHADER_STAGE_COMPUTE_BIT,
-                       0, sizeof(DDGIClassifyPushConstants), &pushConstants);
+    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeClassificationPipeline->getPipelineLayoutVk(),
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIClassifyPushConstants), &pushConstants);
 
     // Dispatch
     uint32_t totalProbes = m_ProbeVolume.gridDimensions.x * m_ProbeVolume.gridDimensions.y * m_ProbeVolume.gridDimensions.z;
@@ -633,42 +576,26 @@ void DynamicDiffuseGI::classifyProbes(uint32_t frameIndex) {
 
     // Barrier to ensure classification texture is ready for reading by next stages
     VkImageMemoryBarrier classificationReadBarrier = m_ProbeClassificationTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_GENERAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_SHADER_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT
-    );
-    vkCmdPipelineBarrier(
-        currentCommandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr,
-        1, &classificationReadBarrier
-    );
+        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+    vkCmdPipelineBarrier(currentCommandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &classificationReadBarrier);
 }
 
-void DynamicDiffuseGI::relocateProbes(uint32_t frameIndex) {
+void DynamicDiffuseGI::relocateProbes(uint32_t frameIndex)
+{
     RAPTURE_PROFILE_FUNCTION();
     auto currentCommandBuffer = m_CommandBuffers[frameIndex];
 
     // Barrier to ensure offset texture is ready for writing
     std::vector<VkImageMemoryBarrier> preRelocateBarriers;
     VkImageMemoryBarrier offsetWriteBarrier = m_ProbeOffsetTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, 
-        VK_IMAGE_LAYOUT_GENERAL, 
-        0, 
-        VK_ACCESS_SHADER_WRITE_BIT
-    );
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_SHADER_WRITE_BIT);
     preRelocateBarriers.push_back(offsetWriteBarrier);
 
-    vkCmdPipelineBarrier(
-        currentCommandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr,
-        static_cast<uint32_t>(preRelocateBarriers.size()), preRelocateBarriers.data()
-    );
-    
+    vkCmdPipelineBarrier(currentCommandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                         static_cast<uint32_t>(preRelocateBarriers.size()), preRelocateBarriers.data());
+
     // Bind pipeline and descriptor sets
     m_DDGI_ProbeRelocationPipeline->bind(currentCommandBuffer->getCommandBufferVk());
     DescriptorManager::bindSet(0, currentCommandBuffer, m_DDGI_ProbeRelocationPipeline);
@@ -678,10 +605,8 @@ void DynamicDiffuseGI::relocateProbes(uint32_t frameIndex) {
     // Push constants
     DDGIRelocatePushConstants pushConstants = {};
     pushConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
-    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(),
-                       m_DDGI_ProbeRelocationPipeline->getPipelineLayoutVk(),
-                       VK_SHADER_STAGE_COMPUTE_BIT,
-                       0, sizeof(DDGIRelocatePushConstants), &pushConstants);
+    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeRelocationPipeline->getPipelineLayoutVk(),
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIRelocatePushConstants), &pushConstants);
 
     // Dispatch
     uint32_t totalProbes = m_ProbeVolume.gridDimensions.x * m_ProbeVolume.gridDimensions.y * m_ProbeVolume.gridDimensions.z;
@@ -690,26 +615,17 @@ void DynamicDiffuseGI::relocateProbes(uint32_t frameIndex) {
 
     // Barrier to ensure offset texture is ready for reading
     VkImageMemoryBarrier offsetReadBarrier = m_ProbeOffsetTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_GENERAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_SHADER_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT
-    );
-    vkCmdPipelineBarrier(
-        currentCommandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr,
-        1, &offsetReadBarrier
-    );
+        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+    vkCmdPipelineBarrier(currentCommandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &offsetReadBarrier);
 }
 
-
-void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene) {
-    SkyboxComponent* skyboxComp = scene->getSkyboxComponent();
-    std::shared_ptr<Texture> newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling()) 
-                                            ? skyboxComp->skyboxTexture 
-                                            : s_defaultSkyboxTexture;
+void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
+{
+    SkyboxComponent *skyboxComp = scene->getSkyboxComponent();
+    std::shared_ptr<Texture> newTexture =
+        (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling()) ? skyboxComp->skyboxTexture
+                                                                                                     : s_defaultSkyboxTexture;
 
     RAPTURE_PROFILE_FUNCTION();
 
@@ -720,18 +636,17 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene) {
     }
 }
 
-
-
-std::shared_ptr<Texture> DynamicDiffuseGI::getRadianceTexture() {
+std::shared_ptr<Texture> DynamicDiffuseGI::getRadianceTexture()
+{
 
     if (m_isEvenFrame) {
         return m_RadianceTexture;
     } else {
         return m_PrevRadianceTexture;
     }
-
 }
-std::shared_ptr<Texture> DynamicDiffuseGI::getPrevRadianceTexture() {
+std::shared_ptr<Texture> DynamicDiffuseGI::getPrevRadianceTexture()
+{
 
     if (m_isEvenFrame) {
         return m_PrevRadianceTexture;
@@ -740,7 +655,8 @@ std::shared_ptr<Texture> DynamicDiffuseGI::getPrevRadianceTexture() {
     }
 }
 
-std::shared_ptr<Texture> DynamicDiffuseGI::getVisibilityTexture() {
+std::shared_ptr<Texture> DynamicDiffuseGI::getVisibilityTexture()
+{
     if (m_isEvenFrame) {
         return m_VisibilityTexture;
     } else {
@@ -748,7 +664,8 @@ std::shared_ptr<Texture> DynamicDiffuseGI::getVisibilityTexture() {
     }
 }
 
-std::shared_ptr<Texture> DynamicDiffuseGI::getPrevVisibilityTexture() {
+std::shared_ptr<Texture> DynamicDiffuseGI::getPrevVisibilityTexture()
+{
     if (m_isEvenFrame) {
         return m_PrevVisibilityTexture;
     } else {
@@ -756,9 +673,8 @@ std::shared_ptr<Texture> DynamicDiffuseGI::getPrevVisibilityTexture() {
     }
 }
 
-
-
-void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex) {
+void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex)
+{
 
     RAPTURE_PROFILE_FUNCTION();
 
@@ -767,50 +683,42 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     // Get TLAS from scene
     auto tlas = scene->getTLAS();
     if (!tlas || !tlas->isBuilt()) {
-        //RP_CORE_WARN("DynamicDiffuseGI::castRays - Scene TLAS is not built");
+        // RP_CORE_WARN("DynamicDiffuseGI::castRays - Scene TLAS is not built");
         return;
     }
 
-
     // === BARRIER PHASE 1: Prepare for trace shader (3 dependencies) ===
     std::vector<VkImageMemoryBarrier> preTraceBarriers;
-    
+
     // 1. Transition ray data texture to general layout for storage image access
     VkImageMemoryBarrier rayDataWriteBarrier = m_RayDataTexture->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_IMAGE_LAYOUT_GENERAL, 
-        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
-        VK_ACCESS_SHADER_WRITE_BIT);
+        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT);
 
     preTraceBarriers.push_back(rayDataWriteBarrier);
 
     // 2. Ensure previous radiance texture is ready for reading
-    VkImageMemoryBarrier prevRadianceReadBarrier = (m_isEvenFrame ? m_PrevRadianceTexture : m_RadianceTexture)->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
+    VkImageMemoryBarrier prevRadianceReadBarrier =
+        (m_isEvenFrame ? m_PrevRadianceTexture : m_RadianceTexture)
+            ->getImageMemoryBarrier(m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT,
+                                    VK_ACCESS_SHADER_READ_BIT);
 
     preTraceBarriers.push_back(prevRadianceReadBarrier);
 
     // 3. Ensure previous visibility texture is ready for reading
-    VkImageMemoryBarrier prevVisibilityReadBarrier = (m_isEvenFrame ? m_PrevVisibilityTexture : m_VisibilityTexture)->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
+    VkImageMemoryBarrier prevVisibilityReadBarrier =
+        (m_isEvenFrame ? m_PrevVisibilityTexture : m_VisibilityTexture)
+            ->getImageMemoryBarrier(m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT,
+                                    VK_ACCESS_SHADER_READ_BIT);
 
     preTraceBarriers.push_back(prevVisibilityReadBarrier);
-    
-    vkCmdPipelineBarrier(
-        currentCommandBuffer->getCommandBufferVk(),
-        m_isFirstFrame ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        static_cast<uint32_t>(preTraceBarriers.size()), preTraceBarriers.data()
-    );
+
+    vkCmdPipelineBarrier(currentCommandBuffer->getCommandBufferVk(),
+                         m_isFirstFrame ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                         static_cast<uint32_t>(preTraceBarriers.size()), preTraceBarriers.data());
 
     // Bind the compute pipeline
     m_DDGI_ProbeTracePipeline->bind(currentCommandBuffer->getCommandBufferVk());
@@ -818,18 +726,18 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     // Use the new descriptor manager system
     // Set 0: Common resources (camera, lights, shadows, probe volume)
     DescriptorManager::bindSet(0, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
-    
+
     // Set 1: Material resources (not used in DDGI)
     // Set 2: Object/Mesh resources (mesh data SSBO)
-    //DescriptorManager::bindSet(2, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
-    
+    // DescriptorManager::bindSet(2, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
+
     // Set 3: Bindless arrays
     DescriptorManager::bindSet(3, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
 
     // Set 4: DDGI specific storage images
     m_probeTraceDescriptorSet->bind(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline);
 
-    auto& reg = scene->getRegistry();
+    auto &reg = scene->getRegistry();
     auto lightView = reg.view<LightComponent>();
 
     // Set push constants with texture and buffer indices
@@ -842,47 +750,34 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     pushConstants.prevVisibilityIndex = m_isEvenFrame ? m_prevProbeVisibilityBindlessIndex : m_probeVisibilityBindlessIndex;
 
     auto camEnt = scene->getMainCamera();
-    if(auto camTransform = camEnt.lock()) {
-        auto& transform = camTransform->getComponent<TransformComponent>();
+    if (auto camTransform = camEnt.lock()) {
+        auto &transform = camTransform->getComponent<TransformComponent>();
         pushConstants.cameraPosition = transform.translation();
     } else {
         pushConstants.cameraPosition = glm::vec3(0.0f);
     }
-    
-    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(),
-                       m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
-                       VK_SHADER_STAGE_COMPUTE_BIT,
-                       0, sizeof(DDGITracePushConstants), &pushConstants);
+
+    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGITracePushConstants), &pushConstants);
 
     // Dispatch the compute shader
     // Workgroup size is 16x16x1 based on shader, dispatch based on probe grid dimensions
     uint32_t workGroupsX = m_ProbeVolume.gridDimensions.x;
-    uint32_t workGroupsY = m_ProbeVolume.gridDimensions.z; 
+    uint32_t workGroupsY = m_ProbeVolume.gridDimensions.z;
     uint32_t workGroupsZ = m_ProbeVolume.gridDimensions.y;
-    
+
     vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), workGroupsX, workGroupsY, workGroupsZ);
 
     // === BARRIER PHASE 2: After trace shader - transition ray data for reading ===
     VkImageMemoryBarrier rayDataReadBarrier = m_RayDataTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_GENERAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_SHADER_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
+        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
-    
-    vkCmdPipelineBarrier(
-        currentCommandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &rayDataReadBarrier
-    );
-
+    vkCmdPipelineBarrier(currentCommandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &rayDataReadBarrier);
 }
 
-void DynamicDiffuseGI::blendTextures(uint32_t frameIndex) {
+void DynamicDiffuseGI::blendTextures(uint32_t frameIndex)
+{
 
     RAPTURE_PROFILE_FUNCTION();
 
@@ -891,35 +786,30 @@ void DynamicDiffuseGI::blendTextures(uint32_t frameIndex) {
     // === BARRIER PHASE 5: Prepare for blending shaders ===
     // Even though blending shaders are not implemented, prepare the barriers for when they are
     std::vector<VkImageMemoryBarrier> preBlendingBarriers;
-    
+
     // Ensure ray data is in shader read mode (should already be done)
     // Ensure previous textures are in shader read mode (should already be done)
     // Transition current textures to storage image mode for blending output
-    VkImageMemoryBarrier currentRadianceWriteBarrier = (m_isEvenFrame ? m_RadianceTexture : m_PrevRadianceTexture)->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_IMAGE_LAYOUT_GENERAL, 
-        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
-        VK_ACCESS_SHADER_WRITE_BIT);
+    VkImageMemoryBarrier currentRadianceWriteBarrier =
+        (m_isEvenFrame ? m_RadianceTexture : m_PrevRadianceTexture)
+            ->getImageMemoryBarrier(m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                    VK_IMAGE_LAYOUT_GENERAL, m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT,
+                                    VK_ACCESS_SHADER_WRITE_BIT);
 
     preBlendingBarriers.push_back(currentRadianceWriteBarrier);
-    
-    VkImageMemoryBarrier currentVisibilityWriteBarrier = (m_isEvenFrame ? m_VisibilityTexture : m_PrevVisibilityTexture)->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_IMAGE_LAYOUT_GENERAL, 
-        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, 
-        VK_ACCESS_SHADER_WRITE_BIT);
+
+    VkImageMemoryBarrier currentVisibilityWriteBarrier =
+        (m_isEvenFrame ? m_VisibilityTexture : m_PrevVisibilityTexture)
+            ->getImageMemoryBarrier(m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                    VK_IMAGE_LAYOUT_GENERAL, m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT,
+                                    VK_ACCESS_SHADER_WRITE_BIT);
 
     preBlendingBarriers.push_back(currentVisibilityWriteBarrier);
-    
-    vkCmdPipelineBarrier(
-        currentCommandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Wait for flatten to finish
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Prepare for blending operations
-        0,
-        0, nullptr,
-        0, nullptr,
-        static_cast<uint32_t>(preBlendingBarriers.size()), preBlendingBarriers.data()
-    );
+
+    vkCmdPipelineBarrier(currentCommandBuffer->getCommandBufferVk(),
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Wait for flatten to finish
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Prepare for blending operations
+                         0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(preBlendingBarriers.size()), preBlendingBarriers.data());
 
     // Irradiance blending shader
     m_DDGI_ProbeIrradianceBlendingPipeline->bind(currentCommandBuffer->getCommandBufferVk());
@@ -927,23 +817,21 @@ void DynamicDiffuseGI::blendTextures(uint32_t frameIndex) {
     // Use the new descriptor manager system for blending shaders
     DescriptorManager::bindSet(0, currentCommandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // probe volume
     DescriptorManager::bindSet(3, currentCommandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // bindless
-    m_probeIrradianceBlendingDescriptorSet->bind(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeIrradianceBlendingPipeline);
+    m_probeIrradianceBlendingDescriptorSet->bind(currentCommandBuffer->getCommandBufferVk(),
+                                                 m_DDGI_ProbeIrradianceBlendingPipeline);
 
     // Set push constants for radiance blending
     DDGIBlendPushConstants radianceBlendConstants = {};
     radianceBlendConstants.prevTextureIndex = m_isEvenFrame ? m_prevProbeIrradianceBindlessIndex : m_probeIrradianceBindlessIndex;
     radianceBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
-    radianceBlendConstants.writeToAlternateTexture = m_isEvenFrame ? 0 : 1; // 0 = write to primary (RadianceTexture), 1 = write to alternate (PrevRadianceTexture)
-    
-    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(),
-                       m_DDGI_ProbeIrradianceBlendingPipeline->getPipelineLayoutVk(),
-                       VK_SHADER_STAGE_COMPUTE_BIT,
-                       0, sizeof(DDGIBlendPushConstants), &radianceBlendConstants);
+    radianceBlendConstants.writeToAlternateTexture =
+        m_isEvenFrame ? 0 : 1; // 0 = write to primary (RadianceTexture), 1 = write to alternate (PrevRadianceTexture)
 
-    vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), 
-                 m_ProbeVolume.gridDimensions.x, 
-                 m_ProbeVolume.gridDimensions.z, 
-                 m_ProbeVolume.gridDimensions.y);
+    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeIrradianceBlendingPipeline->getPipelineLayoutVk(),
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIBlendPushConstants), &radianceBlendConstants);
+
+    vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), m_ProbeVolume.gridDimensions.x, m_ProbeVolume.gridDimensions.z,
+                  m_ProbeVolume.gridDimensions.y);
 
     // Distance blending shader
     m_DDGI_ProbeDistanceBlendingPipeline->bind(currentCommandBuffer->getCommandBufferVk());
@@ -956,119 +844,108 @@ void DynamicDiffuseGI::blendTextures(uint32_t frameIndex) {
     DDGIBlendPushConstants visibilityBlendConstants = {};
     visibilityBlendConstants.prevTextureIndex = m_isEvenFrame ? m_prevProbeVisibilityBindlessIndex : m_probeVisibilityBindlessIndex;
     visibilityBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
-    visibilityBlendConstants.writeToAlternateTexture = m_isEvenFrame ? 0 : 1; // 0 = write to primary (VisibilityTexture), 1 = write to alternate (PrevVisibilityTexture)
-    
-    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(),
-                       m_DDGI_ProbeDistanceBlendingPipeline->getPipelineLayoutVk(),
-                       VK_SHADER_STAGE_COMPUTE_BIT,
-                       0, sizeof(DDGIBlendPushConstants), &visibilityBlendConstants);
+    visibilityBlendConstants.writeToAlternateTexture =
+        m_isEvenFrame ? 0 : 1; // 0 = write to primary (VisibilityTexture), 1 = write to alternate (PrevVisibilityTexture)
 
-    vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), 
-                 m_ProbeVolume.gridDimensions.x, 
-                 m_ProbeVolume.gridDimensions.z, 
-                 m_ProbeVolume.gridDimensions.y);
+    vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeDistanceBlendingPipeline->getPipelineLayoutVk(),
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIBlendPushConstants), &visibilityBlendConstants);
+
+    vkCmdDispatch(currentCommandBuffer->getCommandBufferVk(), m_ProbeVolume.gridDimensions.x, m_ProbeVolume.gridDimensions.z,
+                  m_ProbeVolume.gridDimensions.y);
 
     // === BARRIER PHASE 6: After blending shaders - transition to shader read ===
     // Transition current textures to shader read mode for next frame and final lighting
     std::vector<VkImageMemoryBarrier> postBlendingBarriers;
-    
-    VkImageMemoryBarrier currentRadianceReadBarrier = (m_isEvenFrame ? m_RadianceTexture : m_PrevRadianceTexture)->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_GENERAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_SHADER_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
 
+    VkImageMemoryBarrier currentRadianceReadBarrier =
+        (m_isEvenFrame ? m_RadianceTexture : m_PrevRadianceTexture)
+            ->getImageMemoryBarrier(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT,
+                                    VK_ACCESS_SHADER_READ_BIT);
 
     postBlendingBarriers.push_back(currentRadianceReadBarrier);
-    
-    VkImageMemoryBarrier currentVisibilityReadBarrier = (m_isEvenFrame ? m_VisibilityTexture : m_PrevVisibilityTexture)->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_GENERAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_SHADER_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
+
+    VkImageMemoryBarrier currentVisibilityReadBarrier =
+        (m_isEvenFrame ? m_VisibilityTexture : m_PrevVisibilityTexture)
+            ->getImageMemoryBarrier(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT,
+                                    VK_ACCESS_SHADER_READ_BIT);
 
     postBlendingBarriers.push_back(currentVisibilityReadBarrier);
-    
+
     vkCmdPipelineBarrier(
         currentCommandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // After blending operations
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,                                         // After blending operations
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // For next frame and final lighting
-        0,
-        0, nullptr,
-        0, nullptr,
-        static_cast<uint32_t>(postBlendingBarriers.size()), postBlendingBarriers.data()
-    );
-
+        0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(postBlendingBarriers.size()), postBlendingBarriers.data());
 }
 
+void DynamicDiffuseGI::initTextures()
+{
 
+    TextureSpecification irradianceSpec;
+    irradianceSpec.width = m_ProbeVolume.gridDimensions.x * m_ProbeVolume.probeNumIrradianceTexels;
+    irradianceSpec.height = m_ProbeVolume.gridDimensions.z * m_ProbeVolume.probeNumIrradianceTexels;
+    irradianceSpec.depth = m_ProbeVolume.gridDimensions.y;
+    irradianceSpec.type = TextureType::TEXTURE2D_ARRAY;
+    irradianceSpec.format = TextureFormat::R11G11B10F;
+    irradianceSpec.filter = TextureFilter::Linear;
+    irradianceSpec.storageImage = true;
+    irradianceSpec.wrap = TextureWrap::ClampToEdge;
+    irradianceSpec.srgb = false;
 
-void DynamicDiffuseGI::initTextures(){
+    TextureSpecification distanceSpec;
+    distanceSpec.width = m_ProbeVolume.gridDimensions.x * m_ProbeVolume.probeNumDistanceTexels;
+    distanceSpec.height = m_ProbeVolume.gridDimensions.z * m_ProbeVolume.probeNumDistanceTexels;
+    distanceSpec.depth = m_ProbeVolume.gridDimensions.y;
+    distanceSpec.type = TextureType::TEXTURE2D_ARRAY;
+    distanceSpec.format = TextureFormat::RG16F;
+    distanceSpec.filter = TextureFilter::Linear;
+    distanceSpec.storageImage = true;
+    distanceSpec.srgb = false;
+    distanceSpec.wrap = TextureWrap::ClampToEdge;
 
-  TextureSpecification irradianceSpec;
-  irradianceSpec.width = m_ProbeVolume.gridDimensions.x * m_ProbeVolume.probeNumIrradianceTexels;
-  irradianceSpec.height = m_ProbeVolume.gridDimensions.z * m_ProbeVolume.probeNumIrradianceTexels;
-  irradianceSpec.depth = m_ProbeVolume.gridDimensions.y;
-  irradianceSpec.type = TextureType::TEXTURE2D_ARRAY;
-  irradianceSpec.format = TextureFormat::R11G11B10F;
-  irradianceSpec.filter = TextureFilter::Linear;
-  irradianceSpec.storageImage = true;
-  irradianceSpec.wrap = TextureWrap::ClampToEdge;
-  irradianceSpec.srgb = false;
+    TextureSpecification rayDataSpec;
+    rayDataSpec.width = m_ProbeVolume.probeNumRays;
+    rayDataSpec.height = m_ProbeVolume.gridDimensions.x * m_ProbeVolume.gridDimensions.z;
+    rayDataSpec.depth = m_ProbeVolume.gridDimensions.y;
+    rayDataSpec.type = TextureType::TEXTURE2D_ARRAY;
+    rayDataSpec.format = TextureFormat::RGBA32F;
+    rayDataSpec.filter = TextureFilter::Nearest;
+    rayDataSpec.storageImage = true;
+    rayDataSpec.srgb = false;
+    rayDataSpec.wrap = TextureWrap::ClampToEdge;
 
-  TextureSpecification distanceSpec;
-  distanceSpec.width = m_ProbeVolume.gridDimensions.x * m_ProbeVolume.probeNumDistanceTexels;
-  distanceSpec.height = m_ProbeVolume.gridDimensions.z * m_ProbeVolume.probeNumDistanceTexels;
-  distanceSpec.depth = m_ProbeVolume.gridDimensions.y;
-  distanceSpec.type = TextureType::TEXTURE2D_ARRAY;
-  distanceSpec.format = TextureFormat::RG16F;
-  distanceSpec.filter = TextureFilter::Linear;
-  distanceSpec.storageImage = true;
-  distanceSpec.srgb = false;
-  distanceSpec.wrap = TextureWrap::ClampToEdge;
+    TextureSpecification probeClassificationSpec = rayDataSpec;
+    probeClassificationSpec.width = m_ProbeVolume.gridDimensions.x;
+    probeClassificationSpec.height = m_ProbeVolume.gridDimensions.z;
+    probeClassificationSpec.depth = m_ProbeVolume.gridDimensions.y;
+    probeClassificationSpec.format = TextureFormat::R8UI;
 
-  TextureSpecification rayDataSpec;
-  rayDataSpec.width = m_ProbeVolume.probeNumRays;
-  rayDataSpec.height = m_ProbeVolume.gridDimensions.x * m_ProbeVolume.gridDimensions.z;
-  rayDataSpec.depth = m_ProbeVolume.gridDimensions.y;
-  rayDataSpec.type = TextureType::TEXTURE2D_ARRAY;
-  rayDataSpec.format = TextureFormat::RGBA32F;
-  rayDataSpec.filter = TextureFilter::Nearest;
-  rayDataSpec.storageImage = true;
-  rayDataSpec.srgb = false;
-  rayDataSpec.wrap = TextureWrap::ClampToEdge;
+    TextureSpecification probeOffsetSpec = probeClassificationSpec;
+    probeOffsetSpec.format = TextureFormat::RGBA32F;
 
-  TextureSpecification probeClassificationSpec = rayDataSpec;
-  probeClassificationSpec.width = m_ProbeVolume.gridDimensions.x;
-  probeClassificationSpec.height = m_ProbeVolume.gridDimensions.z;
-  probeClassificationSpec.depth = m_ProbeVolume.gridDimensions.y;
-  probeClassificationSpec.format = TextureFormat::R8UI;
+    // Create the textures
+    m_RayDataTexture = std::make_shared<Texture>(rayDataSpec);
 
-  TextureSpecification probeOffsetSpec = probeClassificationSpec;
-  probeOffsetSpec.format = TextureFormat::RGBA32F;
+    m_RadianceTexture = std::make_shared<Texture>(irradianceSpec);
+    m_VisibilityTexture = std::make_shared<Texture>(distanceSpec);
 
+    // Previous frame textures for temporal blending
+    m_PrevRadianceTexture = std::make_shared<Texture>(irradianceSpec);
+    m_PrevVisibilityTexture = std::make_shared<Texture>(distanceSpec);
 
-  // Create the textures
-  m_RayDataTexture = std::make_shared<Texture>(rayDataSpec);
+    m_ProbeClassificationTexture = std::make_shared<Texture>(probeClassificationSpec);
+    m_ProbeOffsetTexture = std::make_shared<Texture>(probeOffsetSpec);
 
-  m_RadianceTexture = std::make_shared<Texture>(irradianceSpec);
-  m_VisibilityTexture = std::make_shared<Texture>(distanceSpec);
-  
-  // Previous frame textures for temporal blending
-  m_PrevRadianceTexture = std::make_shared<Texture>(irradianceSpec);
-  m_PrevVisibilityTexture = std::make_shared<Texture>(distanceSpec);
+    // Create flattened textures using TextureFlattener
+    m_RayDataTextureFlattened = TextureFlattener::createFlattenTexture(m_RayDataTexture, "[DDGI] Flattened Ray Data Texture");
+    m_IrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_RadianceTexture, "[DDGI] Irradiance Flattened Texture");
+    m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened Texture");
+    m_ProbeClassificationTextureFlattened = TextureFlattener::createFlattenTexture(
+        m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened Texture", FlattenerDataType::UINT);
+    m_ProbeOffsetTextureFlattened =
+        TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened Texture");
 
-  m_ProbeClassificationTexture = std::make_shared<Texture>(probeClassificationSpec);
-  m_ProbeOffsetTexture = std::make_shared<Texture>(probeOffsetSpec);
-  
-  // Create flattened textures using TextureFlattener
-  m_RayDataTextureFlattened = TextureFlattener::createFlattenTexture(m_RayDataTexture, "[DDGI] Flattened Ray Data Texture");
-  m_IrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_RadianceTexture, "[DDGI] Irradiance Flattened Texture");
-  m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened Texture");
-  m_ProbeClassificationTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened Texture", FlattenerDataType::UINT);
-  m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened Texture");
-
-  clearTextures();
+    clearTextures();
 
     // --- Create custom descriptor sets for each compute shader ---
 
@@ -1076,55 +953,76 @@ void DynamicDiffuseGI::initTextures(){
     {
         DescriptorSetBindings bindings;
         bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS});
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS_ALT});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS_ALT});
         m_probeIrradianceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeIrradianceBlendingDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS)->add(m_RadianceTexture);
-        m_probeIrradianceBlendingDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS_ALT)->add(m_PrevRadianceTexture);
+        m_probeIrradianceBlendingDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS)
+            ->add(m_RadianceTexture);
+        m_probeIrradianceBlendingDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS_ALT)
+            ->add(m_PrevRadianceTexture);
     }
 
     // For Probe Distance Blending
     {
         DescriptorSetBindings bindings;
         bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS});
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS_ALT});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS_ALT});
         m_probeDistanceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeDistanceBlendingDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS)->add(m_VisibilityTexture);
-        m_probeDistanceBlendingDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS_ALT)->add(m_PrevVisibilityTexture);
+        m_probeDistanceBlendingDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS)
+            ->add(m_VisibilityTexture);
+        m_probeDistanceBlendingDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS_ALT)
+            ->add(m_PrevVisibilityTexture);
     }
 
     // For Probe Tracing (assuming it writes to RayDataTexture)
     {
         DescriptorSetBindings bindings;
         bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA});
         m_probeTraceDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeTraceDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA)->add(m_RayDataTexture);
+        m_probeTraceDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA)
+            ->add(m_RayDataTexture);
     }
 
     // For Probe Classification
     {
         DescriptorSetBindings bindings;
         bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
         m_probeClassificationDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeClassificationDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)->add(m_ProbeClassificationTexture);
+        m_probeClassificationDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
+            ->add(m_ProbeClassificationTexture);
     }
 
     // For Probe Relocation
     {
         DescriptorSetBindings bindings;
         bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_RELOCATION});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_RELOCATION});
         m_probeRelocationDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeRelocationDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_RELOCATION)->add(m_ProbeOffsetTexture);
+        m_probeRelocationDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_RELOCATION)
+            ->add(m_ProbeOffsetTexture);
     }
 
     RP_CORE_INFO("DDGI: Created custom descriptor sets for compute pipelines.");
 }
 
-void DynamicDiffuseGI::updateProbeVolume() {
+void DynamicDiffuseGI::updateProbeVolume()
+{
 
     RAPTURE_PROFILE_FUNCTION();
 
@@ -1139,108 +1037,105 @@ void DynamicDiffuseGI::updateProbeVolume() {
 
     m_ProbeInfoBuffer->addDataGPU(&m_ProbeVolume, sizeof(ProbeVolume), 0);
     m_isVolumeDirty = false;
-
 }
 
-void DynamicDiffuseGI::initProbeInfoBuffer() {
+void DynamicDiffuseGI::initProbeInfoBuffer()
+{
 
-        ProbeVolume probeVolume;
+    ProbeVolume probeVolume;
 
-        probeVolume.probeRayRotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-        // Randomize ray directions
-        {
-            static std::mt19937 rng(std::random_device{}());
-            std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-    
-            // Generate three independent uniform random variables
-            float u1 = dist(rng);
-            float u2 = dist(rng);
-            float u3 = dist(rng);
-    
-    
-            // Convert to a uniform random unit quaternion (James Arvo, Graphics Gems III)
-            float sqrt1_u1 = std::sqrt(1.0f - u1);
-            float sqrt_u1  = std::sqrt(u1);
-    
-            float theta1 = 2.0f * glm::pi<float>() * u2;
-            float theta2 = 2.0f * glm::pi<float>() * u3;
-    
-            glm::vec4 quat;
-            quat.x = sqrt1_u1 * std::sin(theta1);
-            quat.y = sqrt1_u1 * std::cos(theta1);
-            quat.z = sqrt_u1  * std::sin(theta2);
-            quat.w = sqrt_u1  * std::cos(theta2);
-    
-            // Store the new rotation and flag the buffer for GPU update
-            probeVolume.probeRayRotation = quat;
-        }
+    probeVolume.probeRayRotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+    // Randomize ray directions
+    {
+        static std::mt19937 rng(std::random_device{}());
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
+        // Generate three independent uniform random variables
+        float u1 = dist(rng);
+        float u2 = dist(rng);
+        float u3 = dist(rng);
 
-        probeVolume.origin = glm::vec3(-0.4f, 5.4f, -0.25f);
-        
-        probeVolume.rotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-        
-        probeVolume.spacing = glm::vec3(1.02f, 1.5f, 1.02f);
-        probeVolume.gridDimensions = glm::uvec3(24, 12, 24);
-        
-        probeVolume.probeNumRays = 256;
-        probeVolume.probeStaticRayCount = 32;
-        probeVolume.probeNumIrradianceTexels = 8;
-        probeVolume.probeNumDistanceTexels = 16;
-        probeVolume.probeNumIrradianceInteriorTexels = probeVolume.probeNumIrradianceTexels - 2;
-        probeVolume.probeNumDistanceInteriorTexels = probeVolume.probeNumDistanceTexels - 2;
+        // Convert to a uniform random unit quaternion (James Arvo, Graphics Gems III)
+        float sqrt1_u1 = std::sqrt(1.0f - u1);
+        float sqrt_u1 = std::sqrt(u1);
 
-        probeVolume.probeHysteresis = 0.93f;
-        probeVolume.probeMaxRayDistance = 100000.0f;
-        // Self-shadow bias scale (B). The view-bias term is no longer used with the new unified formula.
-        probeVolume.probeNormalBias = 0.3f; // B parameter from the paper (works well for most scenes)
-        probeVolume.probeViewBias = 0.0f;   // Unused 
-        probeVolume.probeDistanceExponent = 10.0f;
-        probeVolume.probeIrradianceEncodingGamma = 2.2f;
+        float theta1 = 2.0f * glm::pi<float>() * u2;
+        float theta2 = 2.0f * glm::pi<float>() * u3;
 
-        probeVolume.probeBrightnessThreshold = 0.1f;
+        glm::vec4 quat;
+        quat.x = sqrt1_u1 * std::sin(theta1);
+        quat.y = sqrt1_u1 * std::cos(theta1);
+        quat.z = sqrt_u1 * std::sin(theta2);
+        quat.w = sqrt_u1 * std::cos(theta2);
 
-        probeVolume.probeMinFrontfaceDistance = 0.1f;
-    
-        probeVolume.probeRandomRayBackfaceThreshold = 0.1f;
-        probeVolume.probeFixedRayBackfaceThreshold = 0.25f;
+        // Store the new rotation and flag the buffer for GPU update
+        probeVolume.probeRayRotation = quat;
+    }
 
-        probeVolume.probeRelocationEnabled = 1.0f;
-        probeVolume.probeClassificationEnabled = 1.0f;
-        probeVolume.probeChangeThreshold = 0.1f;
-        probeVolume.probeMinValidSamples = 16.0f;
+    probeVolume.origin = glm::vec3(-0.4f, 5.4f, -0.25f);
 
-        m_ProbeVolume = probeVolume;
-        
+    probeVolume.rotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
 
-        m_ProbeInfoBuffer = std::make_shared<UniformBuffer>(sizeof(ProbeVolume), BufferUsage::STATIC, m_allocator);
-        m_ProbeInfoBuffer->addDataGPU(&probeVolume, sizeof(ProbeVolume), 0);
+    probeVolume.spacing = glm::vec3(1.02f, 1.5f, 1.02f);
+    probeVolume.gridDimensions = glm::uvec3(24, 12, 24);
 
-        // Add probe volume UBO to the descriptor manager immediately
-        auto probeInfoSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
-        if (probeInfoSet) {
-            auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
-            if (binding) {
-                binding->add(m_ProbeInfoBuffer);
-                RP_CORE_INFO("DDGI: Added probe volume UBO to descriptor set 0, binding 5");
-            } else {
-                RP_CORE_ERROR("DDGI: Failed to get uniform buffer binding for probe info");
-            }
+    probeVolume.probeNumRays = 256;
+    probeVolume.probeStaticRayCount = 32;
+    probeVolume.probeNumIrradianceTexels = 8;
+    probeVolume.probeNumDistanceTexels = 16;
+    probeVolume.probeNumIrradianceInteriorTexels = probeVolume.probeNumIrradianceTexels - 2;
+    probeVolume.probeNumDistanceInteriorTexels = probeVolume.probeNumDistanceTexels - 2;
+
+    probeVolume.probeHysteresis = 0.93f;
+    probeVolume.probeMaxRayDistance = 100000.0f;
+    // Self-shadow bias scale (B). The view-bias term is no longer used with the new unified formula.
+    probeVolume.probeNormalBias = 0.3f; // B parameter from the paper (works well for most scenes)
+    probeVolume.probeViewBias = 0.0f;   // Unused
+    probeVolume.probeDistanceExponent = 10.0f;
+    probeVolume.probeIrradianceEncodingGamma = 2.2f;
+
+    probeVolume.probeBrightnessThreshold = 0.1f;
+
+    probeVolume.probeMinFrontfaceDistance = 0.1f;
+
+    probeVolume.probeRandomRayBackfaceThreshold = 0.1f;
+    probeVolume.probeFixedRayBackfaceThreshold = 0.25f;
+
+    probeVolume.probeRelocationEnabled = 1.0f;
+    probeVolume.probeClassificationEnabled = 1.0f;
+    probeVolume.probeChangeThreshold = 0.1f;
+    probeVolume.probeMinValidSamples = 16.0f;
+
+    m_ProbeVolume = probeVolume;
+
+    m_ProbeInfoBuffer = std::make_shared<UniformBuffer>(sizeof(ProbeVolume), BufferUsage::STATIC, m_allocator);
+    m_ProbeInfoBuffer->addDataGPU(&probeVolume, sizeof(ProbeVolume), 0);
+
+    // Add probe volume UBO to the descriptor manager immediately
+    auto probeInfoSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
+    if (probeInfoSet) {
+        auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
+        if (binding) {
+            binding->add(m_ProbeInfoBuffer);
+            RP_CORE_INFO("DDGI: Added probe volume UBO to descriptor set 0, binding 5");
         } else {
-            RP_CORE_ERROR("DDGI: Failed to get descriptor set for probe info");
+            RP_CORE_ERROR("DDGI: Failed to get uniform buffer binding for probe info");
         }
-
+    } else {
+        RP_CORE_ERROR("DDGI: Failed to get descriptor set for probe info");
+    }
 }
 
-void DynamicDiffuseGI::onResize(uint32_t framesInFlight) {
+void DynamicDiffuseGI::onResize(uint32_t framesInFlight)
+{
     if (m_framesInFlight == framesInFlight) {
         return; // No change needed if frame count is the same
     }
 
     m_framesInFlight = framesInFlight;
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
 
     // Recreate command buffers with the new number of frames in flight
     CommandPoolConfig poolConfig;
@@ -1254,5 +1149,4 @@ void DynamicDiffuseGI::onResize(uint32_t framesInFlight) {
     RP_CORE_INFO("DDGI system resized for {} frames in flight.", m_framesInFlight);
 }
 
-}
-
+} // namespace Rapture

@@ -1,18 +1,18 @@
 #ifndef RAPTURE__IO_H
 #define RAPTURE__IO_H
 
-#include <vector>
 #include <filesystem>
+#include <vector>
 
 namespace Rapture {
 
-    /**
-     * Reads a file and returns its contents as a vector of characters.
-     * @param path The path to the file to read
-     * @return A vector containing the file's binary contents, or an empty vector if the file cannot be opened
-     */
-    std::vector<char> readFile(const std::filesystem::path& path);
+/**
+ * Reads a file and returns its contents as a vector of characters.
+ * @param path The path to the file to read
+ * @return A vector containing the file's binary contents, or an empty vector if the file cannot be opened
+ */
+std::vector<char> readFile(const std::filesystem::path &path);
 
-}
+} // namespace Rapture
 
 #endif // RAPTURE__IO_H

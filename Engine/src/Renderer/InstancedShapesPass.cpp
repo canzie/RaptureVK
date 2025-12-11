@@ -1,12 +1,12 @@
 #include "Renderer/InstancedShapesPass.h"
 
-#include "WindowContext/Application.h"
+#include "AssetManager/AssetManager.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
+#include "Components/Components.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
-#include "Components/Components.h"
-#include "AssetManager/AssetManager.h"
 #include "Shaders/Shader.h"
-#include "Buffers/Descriptors/DescriptorManager.h"
+#include "WindowContext/Application.h"
 
 namespace Rapture {
 
@@ -17,24 +17,19 @@ struct InstancedShapesPushConstants {
     uint32_t instanceDataSSBOIndex;
 };
 
-InstancedShapesPass::InstancedShapesPass(
-    float width, float height, 
-    uint32_t framesInFlight, 
-    std::vector<std::shared_ptr<Texture>> depthStencilTextures,
-    VkFormat colorFormat)
-    : m_width(width), 
-      m_height(height), 
-      m_framesInFlight(framesInFlight), 
-      m_depthStencilTextures(depthStencilTextures),
-      m_colorFormat(colorFormat) {
+InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t framesInFlight,
+                                         std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat)
+    : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_depthStencilTextures(depthStencilTextures),
+      m_colorFormat(colorFormat)
+{
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
-    
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
-    auto& project = app.getProject();
+    auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
     auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/InstancedShapes.vs.glsl");
@@ -45,25 +40,22 @@ InstancedShapesPass::InstancedShapesPass(
     createPipeline();
 }
 
-InstancedShapesPass::~InstancedShapesPass() {
-}
+InstancedShapesPass::~InstancedShapesPass() {}
 
-void InstancedShapesPass::recordCommandBuffer(
-    const std::shared_ptr<CommandBuffer>& commandBuffer, 
-    const std::shared_ptr<Scene>& scene,
-    SceneRenderTarget& renderTarget,
-    uint32_t imageIndex,
-    uint32_t frameInFlight) {
+void InstancedShapesPass::recordCommandBuffer(const std::shared_ptr<CommandBuffer> &commandBuffer,
+                                              const std::shared_ptr<Scene> &scene, SceneRenderTarget &renderTarget,
+                                              uint32_t imageIndex, uint32_t frameInFlight)
+{
 
     RAPTURE_PROFILE_FUNCTION();
-    
+
     m_currentImageIndex = frameInFlight;
-    
+
     // Get render target properties
     VkImage targetImage = renderTarget.getImage(imageIndex);
     VkImageView targetImageView = renderTarget.getImageView(imageIndex);
     VkExtent2D targetExtent = renderTarget.getExtent();
-    
+
     m_width = static_cast<float>(targetExtent.width);
     m_height = static_cast<float>(targetExtent.height);
 
@@ -95,14 +87,15 @@ void InstancedShapesPass::recordCommandBuffer(
         return;
     }
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
 
-    auto& registry = scene->getRegistry();
+    auto &registry = scene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, InstanceShapeComponent>();
 
     for (auto entity : view) {
-        auto [transformComp, meshComp, instanceShapeComp] = view.get<TransformComponent, MeshComponent, InstanceShapeComponent>(entity);
+        auto [transformComp, meshComp, instanceShapeComp] =
+            view.get<TransformComponent, MeshComponent, InstanceShapeComponent>(entity);
 
         if (meshComp.mesh == nullptr || instanceShapeComp.instanceSSBO == nullptr) {
             continue;
@@ -120,37 +113,38 @@ void InstancedShapesPass::recordCommandBuffer(
         pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(frameInFlight);
         pushConstants.instanceDataSSBOIndex = instanceShapeComp.instanceSSBO->getBindlessIndex();
 
-        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
+        vkCmdPushConstants(
+            commandBuffer->getCommandBufferVk(),
             instanceShapeComp.useWireMode ? m_pipelineWireframe->getPipelineLayoutVk() : m_pipelineFilled->getPipelineLayoutVk(),
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
-            0,
-            sizeof(InstancedShapesPushConstants), 
-            &pushConstants);
-        
-        DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
-        DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(InstancedShapesPushConstants), &pushConstants);
 
-        auto& bufferLayout = meshComp.mesh->getVertexBuffer()->getBufferLayout();
+        DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(),
+                                                     instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
+        DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(),
+                                                     instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
+
+        auto &bufferLayout = meshComp.mesh->getVertexBuffer()->getBufferLayout();
         auto bindingDescription = bufferLayout.getBindingDescription2EXT();
         auto attributeDescriptions = bufferLayout.getAttributeDescriptions2EXT();
-        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 
-            1, &bindingDescription,
-            static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 1, &bindingDescription,
+                                  static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
 
         VkBuffer vertexBuffers[] = {meshComp.mesh->getVertexBuffer()->getBufferVk()};
         VkDeviceSize offsets[] = {meshComp.mesh->getVertexBuffer()->getOffset()};
         vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
-        
-        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexBuffer()->getBufferVk(), meshComp.mesh->getIndexBuffer()->getOffset(), meshComp.mesh->getIndexBuffer()->getIndexType());
-    
+
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexBuffer()->getBufferVk(),
+                             meshComp.mesh->getIndexBuffer()->getOffset(), meshComp.mesh->getIndexBuffer()->getIndexType());
+
         uint32_t instanceCount = instanceShapeComp.instanceCount;
         vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexCount(), instanceCount, 0, 0, 0);
     }
-    
+
     vkCmdEndRendering(commandBuffer->getCommandBufferVk());
 }
 
-void InstancedShapesPass::createPipeline() {
+void InstancedShapesPass::createPipeline()
+{
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_shader.expired()) {
@@ -163,11 +157,8 @@ void InstancedShapesPass::createPipeline() {
         return;
     }
 
-    std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR,
-        VK_DYNAMIC_STATE_VERTEX_INPUT_EXT
-    };
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                                 VK_DYNAMIC_STATE_VERTEX_INPUT_EXT};
 
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -207,12 +198,13 @@ void InstancedShapesPass::createPipeline() {
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_TRUE;
     colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; 
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
@@ -232,7 +224,7 @@ void InstancedShapesPass::createPipeline() {
     FramebufferSpecification spec;
     spec.colorAttachments.push_back(m_colorFormat);
     spec.depthAttachment = m_depthStencilTextures[0]->getFormat();
-    
+
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
     config.inputAssemblyState = inputAssembly;
@@ -253,10 +245,9 @@ void InstancedShapesPass::createPipeline() {
     m_pipelineWireframe = std::make_shared<GraphicsPipeline>(config);
 }
 
-
-void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuffer>& commandBuffer, 
-                                                 VkImageView targetImageView,
-                                                 VkExtent2D targetExtent) {
+void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuffer> &commandBuffer, VkImageView targetImageView,
+                                                VkExtent2D targetExtent)
+{
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachmentInfo.imageView = targetImageView;
@@ -284,13 +275,14 @@ void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuf
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(const std::shared_ptr<CommandBuffer>& commandBuffer,
-                                                              VkImage targetImage) {
+void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(const std::shared_ptr<CommandBuffer> &commandBuffer,
+                                                              VkImage targetImage)
+{
     // Execution barrier to ensure previous pass color writes are complete
     // before this pass starts writing (write-after-write synchronization)
     VkImageMemoryBarrier colorBarrier{};
     colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; 
+    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -303,15 +295,8 @@ void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(const std::shared_
     colorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &colorBarrier
-    );
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &colorBarrier);
 }
 
-} // namespace Rapture 
+} // namespace Rapture

@@ -145,13 +145,14 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     sunLightComp.castsShadow = true;
     sunLight.addComponent<Rapture::CascadedShadowComponent>(2048.0f, 2048.0f, 4, 0.8f);
 
-    // TODO: Skybox disabled until SkyboxPass is refactored for SceneRenderTarget
-    // auto skyboxPath = rootPath / "assets/textures/cubemaps/default.cubemap";
-    // if (std::filesystem::exists(skyboxPath)) {
-    //     auto skybox = activeScene->createEntity("Skybox");
-    //     skybox.addComponent<Rapture::SkyboxComponent>(skyboxPath);
-    //     activeScene->setSkybox(skybox);
-    // }
+    /*
+    auto skyboxPath = rootPath / "assets/textures/cubemaps/default.cubemap";
+    if (std::filesystem::exists(skyboxPath)) {
+        auto skybox = activeScene->createEntity("Skybox");
+        skybox.addComponent<Rapture::SkyboxComponent>(skyboxPath);
+        activeScene->setSkybox(skybox);
+    }
+    */
 
     // Build TLAS for ray tracing
     try {

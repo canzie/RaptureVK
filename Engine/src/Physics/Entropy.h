@@ -1,179 +1,168 @@
 #pragma once
 
-
 /*
-*   Entropy will be the physics engine built and used for the Rapture engine
-*   The first version will be a impulse based approach
-*   I will attempt to create the engine in such a way that there is room for force based solvers for specific cases
-*
-*/
+ *   Entropy will be the physics engine built and used for the Rapture engine
+ *   The first version will be a impulse based approach
+ *   I will attempt to create the engine in such a way that there is room for force based solvers for specific cases
+ *
+ */
 
 #include "Scenes/Scene.h"
 
-#include "Colliders/ColliderPrimitives.h"
 #include "AccelerationStructures/CPU/BVH/BVH.h"
 #include "AccelerationStructures/CPU/BVH/DBVH.h"
+#include "Colliders/ColliderPrimitives.h"
 
 #include "EntropyCommon.h"
 #include "EntropyComponents.h"
 
-#include <cstdint>
 #include <array>
-#include <vector>
+#include <cstdint>
+#include <glm/glm.hpp>
 #include <memory>
 #include <unordered_map>
-#include <glm/glm.hpp>
+#include <vector>
 
-namespace Rapture { struct TransformComponent; }
+namespace Rapture {
+struct TransformComponent;
+}
 
 namespace Rapture::Entropy {
 
+class ConstraintSolver;
+class ForceGenerator;
+class EntropyDynamics;
+class EntropyCollisions;
 
-    class ConstraintSolver;
-    class ForceGenerator;
-    class EntropyDynamics;
-    class EntropyCollisions;
+// Should deal with collisions between colliders
+class EntropyCollisions {
+  public:
+    std::vector<ContactManifold> detectCollisions(std::shared_ptr<Scene> scene, float dt);
 
+    // Visualise current BVHs (static + dynamic) using InstanceShapeComponents
+    void debugVisualize(std::shared_ptr<Scene> scene);
 
+  private:
+    std::vector<std::pair<Entity, Entity>> &broadPhase(std::shared_ptr<Scene> scene);
+    void narrowPhase(std::shared_ptr<Scene> scene, std::vector<ContactManifold> &manifolds);
 
-    // Should deal with collisions between colliders
-    class EntropyCollisions {
-    public:
-        std::vector<ContactManifold> detectCollisions(std::shared_ptr<Scene> scene, float dt);
+    void updateVisualization(const std::vector<Rapture::BVHNode> &nodes, std::shared_ptr<Entity> vizEntity, const glm::vec4 &color);
 
+    void updateDynamicBVH(std::shared_ptr<Scene> scene);
 
-        // Visualise current BVHs (static + dynamic) using InstanceShapeComponents
-        void debugVisualize(std::shared_ptr<Scene> scene);
+  private:
+    std::vector<std::pair<Entity, Entity>> m_potentialPairs;
 
+    // Acceleration structures
+    std::shared_ptr<BVH> m_staticBVH;
+    std::shared_ptr<DBVH> m_dynamicBVH;
+    bool m_isSBVHDirty = true; // check for rebuilding the static bvh
 
-    private:
-        std::vector<std::pair<Entity, Entity>>& broadPhase(std::shared_ptr<Scene> scene);
-        void narrowPhase(std::shared_ptr<Scene> scene, std::vector<ContactManifold> &manifolds);
+    // Debug visualisation entities
+    std::shared_ptr<Entity> m_staticVizEntity;
+    std::shared_ptr<Entity> m_dynamicVizEntity;
 
+    std::unordered_map<uint32_t, int> m_entityNodeMap;
+};
 
-        void updateVisualization(const std::vector<Rapture::BVHNode>& nodes,
-                                 std::shared_ptr<Entity> vizEntity,
-                                 const glm::vec4& color);
+// -------------------------------------------------------------
+//  Force generation interface and common generators
+// -------------------------------------------------------------
 
-        void updateDynamicBVH(std::shared_ptr<Scene> scene);
+class ForceGenerator {
+  public:
+    virtual ~ForceGenerator() = default;
+    // Apply a force (and possibly torque) to the given rigid body.
+    virtual void apply(RigidBodyComponent &rb, float dt) = 0;
+};
 
+// Simple uniform gravity force (F = m * g)
+class GravityForce final : public ForceGenerator {
+  public:
+    explicit GravityForce(const glm::vec3 &g = glm::vec3(0.0f, -9.81f, 0.0f)) : m_gravity(g) {}
+    void setGravity(const glm::vec3 &g) { m_gravity = g; }
+    const glm::vec3 &getGravity() const { return m_gravity; }
+    void apply(RigidBodyComponent &rb, float dt) override
+    {
+        (void)dt;
+        // Skip static/infinite-mass bodies.
+        if (rb.invMass == 0.0f) return;
+        rb.accumulatedForce += m_gravity * (1.0f / rb.invMass); // mass = 1 / invMass
+    }
 
-    private:
+  private:
+    glm::vec3 m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
+};
 
-        std::vector<std::pair<Entity, Entity>> m_potentialPairs;
+// Damping force
+class DampingForce final : public ForceGenerator {
+  public:
+    DampingForce(float lin = 0.2f, float ang = 0.2f) : m_linear(lin), m_angular(ang) {}
+    void setCoefficients(float lin, float ang)
+    {
+        m_linear = lin;
+        m_angular = ang;
+    }
+    void apply(RigidBodyComponent &rb, float /*dt*/) override
+    {
+        if (rb.invMass == 0.0f) return;
+        rb.accumulatedForce += -m_linear * rb.velocity;
+        rb.accumulatedTorque += -m_angular * rb.angularVelocity;
+    }
 
-        // Acceleration structures
-        std::shared_ptr<BVH>  m_staticBVH;
-        std::shared_ptr<DBVH> m_dynamicBVH;
-        bool m_isSBVHDirty = true; // check for rebuilding the static bvh
+  private:
+    float m_linear;
+    float m_angular;
+};
 
-        // Debug visualisation entities
-        std::shared_ptr<Entity> m_staticVizEntity;
-        std::shared_ptr<Entity> m_dynamicVizEntity;
+// Should deal with dynamics like gravity
+// contains the physics solver
+class EntropyDynamics {
+  public:
+    // Register global generator (applied to every dynamic body each step).
+    void addGlobalForceGenerator(const std::shared_ptr<ForceGenerator> &gen);
+    // Attach a generator to a specific entity (e.g., custom thruster).
+    void addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen);
 
-        std::unordered_map<uint32_t,int> m_entityNodeMap;
+    // Executes force application and velocity integration for all rigid bodies in the scene.
+    void step(std::shared_ptr<Scene> scene, float dt);
 
-    };
-    
+  private:
+    void integrate(std::shared_ptr<Scene> scene, float dt);
 
+  private:
+    std::vector<std::shared_ptr<ForceGenerator>> m_globalGenerators;
+    std::unordered_map<uint32_t, std::vector<std::shared_ptr<ForceGenerator>>> m_bodyGenerators; // key: Entity id
+};
 
-    // -------------------------------------------------------------
-    //  Force generation interface and common generators
-    // -------------------------------------------------------------
-    
-    class ForceGenerator {
-    public:
-        virtual ~ForceGenerator() = default;
-        // Apply a force (and possibly torque) to the given rigid body.
-        virtual void apply(RigidBodyComponent &rb, float dt) = 0;
-    };
+// main class for the physics engine
+class EntropyPhysics {
+  public:
+    EntropyPhysics() = default;
 
-    // Simple uniform gravity force (F = m * g)
-    class GravityForce final : public ForceGenerator {
-    public:
-        explicit GravityForce(const glm::vec3 &g = glm::vec3(0.0f, -9.81f, 0.0f)) : m_gravity(g) {}
-        void setGravity(const glm::vec3 &g) { m_gravity = g; }
-        const glm::vec3 &getGravity() const { return m_gravity; }
-        void apply(RigidBodyComponent &rb, float dt) override {
-            // Skip static/infinite-mass bodies.
-            if (rb.invMass == 0.0f) return;
-            rb.accumulatedForce += m_gravity * (1.0f / rb.invMass); // mass = 1 / invMass
-        }
-    private:
-        glm::vec3 m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
-    };
+    // Forward force-generator management to dynamics subsystem
+    void addGlobalForceGenerator(const std::shared_ptr<ForceGenerator> &gen);
 
-    // Damping force
-    class DampingForce final : public ForceGenerator {
-    public:
-        DampingForce(float lin = 0.2f, float ang = 0.2f) : m_linear(lin), m_angular(ang) {}
-        void setCoefficients(float lin, float ang) { m_linear = lin; m_angular = ang; }
-        void apply(RigidBodyComponent &rb, float /*dt*/) override {
-            if (rb.invMass == 0.0f) return;
-            rb.accumulatedForce  += -m_linear  * rb.velocity;
-            rb.accumulatedTorque += -m_angular * rb.angularVelocity;
-        }
-    private:
-        float m_linear;
-        float m_angular;
-    };
+    void addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen);
 
+    // Run full physics pipeline
+    std::vector<ContactManifold> step(std::shared_ptr<Scene> scene, float dt);
 
+    EntropyCollisions *getCollisions() { return &m_collisions; }
+    EntropyDynamics *getDynamics() { return &m_dynamics; }
 
-    // Should deal with dynamics like gravity
-    // contains the physics solver
-    class EntropyDynamics {
-    public:
-        // Register global generator (applied to every dynamic body each step).
-        void addGlobalForceGenerator(const std::shared_ptr<ForceGenerator> &gen);
-        // Attach a generator to a specific entity (e.g., custom thruster).
-        void addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen);
+  private:
+    EntropyDynamics m_dynamics;
+    EntropyCollisions m_collisions;
 
-        // Executes force application and velocity integration for all rigid bodies in the scene.
-        void step(std::shared_ptr<Scene> scene, float dt);
+    std::unique_ptr<ConstraintSolver> m_solver;
+};
 
-    private:
-        void integrate(std::shared_ptr<Scene> scene, float dt);
+class ConstraintSolver {
+  public:
+    ConstraintSolver() = default;
 
-    private:
-        std::vector<std::shared_ptr<ForceGenerator>> m_globalGenerators;
-        std::unordered_map<uint32_t, std::vector<std::shared_ptr<ForceGenerator>>> m_bodyGenerators; // key: Entity id
-    };
-
-
-
-    // main class for the physics engine
-    class EntropyPhysics {
-    public:
-        EntropyPhysics() = default;
-
-        // Forward force-generator management to dynamics subsystem
-        void addGlobalForceGenerator(const std::shared_ptr<ForceGenerator> &gen);
-
-        void addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen);
-
-        // Run full physics pipeline
-        std::vector<ContactManifold> step(std::shared_ptr<Scene> scene, float dt);
-
-        EntropyCollisions* getCollisions() { return &m_collisions; }
-        EntropyDynamics* getDynamics() { return &m_dynamics; }
-
-    private:
-        EntropyDynamics   m_dynamics;
-        EntropyCollisions m_collisions;
-        
-        std::unique_ptr<ConstraintSolver> m_solver;
-    };
-
-
-    class ConstraintSolver {
-    public:
-        ConstraintSolver() = default;
-
-        void solve(std::shared_ptr<Scene> scene,
-                    const std::vector<ContactManifold>& manifolds,
-                    float dt,
-                    uint32_t iterations = 8);
+    void solve(std::shared_ptr<Scene> scene, const std::vector<ContactManifold> &manifolds, float dt, uint32_t iterations = 8);
 
     struct ContactConstraint {
         Entity a;
@@ -182,62 +171,63 @@ namespace Rapture::Entropy {
         float restitution;
         float friction;
         float penetration;
-        glm::vec3 ra; // contact vector from A's COM to contact point
-        glm::vec3 rb; // contact vector from B's COM to contact point
-        glm::vec3 contactPoint; // world-space contact location (average of points)
+        glm::vec3 ra;             // contact vector from A's COM to contact point
+        glm::vec3 rb;             // contact vector from B's COM to contact point
+        glm::vec3 contactPoint;   // world-space contact location (average of points)
         glm::mat3 contactToWorld; // world-space basis
 
         // Cached pointers for quick access during iterations
-        RigidBodyComponent* bodyA  = nullptr;
-        RigidBodyComponent* bodyB  = nullptr;
-        TransformComponent* transA = nullptr;
-        TransformComponent* transB = nullptr;
+        RigidBodyComponent *bodyA = nullptr;
+        RigidBodyComponent *bodyB = nullptr;
+        TransformComponent *transA = nullptr;
+        TransformComponent *transB = nullptr;
 
-        void calculateContactBasis() {
+        void calculateContactBasis()
+        {
             glm::vec3 contactTangent[2];
             glm::vec3 contactNormal = normal;
             // Check whether the Z axis is nearer to the X or Y axis.
-            if(glm::abs(contactNormal.x) > glm::abs(contactNormal.y)) {
+            if (glm::abs(contactNormal.x) > glm::abs(contactNormal.y)) {
                 // Scaling factor to ensure the results are normalized.
-                const Precision::real s = (Precision::real)1.0f / glm::sqrt(contactNormal.z*contactNormal.z + contactNormal.x*contactNormal.x);
+                const Precision::real s =
+                    (Precision::real)1.0f / glm::sqrt(contactNormal.z * contactNormal.z + contactNormal.x * contactNormal.x);
                 // The new X axis is at right angles to the world Y axis.
-                contactTangent[0].x = contactNormal.z*s;
+                contactTangent[0].x = contactNormal.z * s;
                 contactTangent[0].y = 0;
-                contactTangent[0].z = -contactNormal.x*s;
+                contactTangent[0].z = -contactNormal.x * s;
                 // The new Y axis is at right angles to the new X and Z axes.
-                contactTangent[1].x = contactNormal.y*contactTangent[0].x;
-                contactTangent[1].y = contactNormal.z*contactTangent[0].x - contactNormal.x*contactTangent[0].z;
-                contactTangent[1].z = -contactNormal.y*contactTangent[0].x;
-            } else{
+                contactTangent[1].x = contactNormal.y * contactTangent[0].x;
+                contactTangent[1].y = contactNormal.z * contactTangent[0].x - contactNormal.x * contactTangent[0].z;
+                contactTangent[1].z = -contactNormal.y * contactTangent[0].x;
+            } else {
                 // Scaling factor to ensure the results are normalized.
-                const Precision::real s = (Precision::real)1.0f / glm::sqrt(contactNormal.z*contactNormal.z + contactNormal.y*contactNormal.y);
+                const Precision::real s =
+                    (Precision::real)1.0f / glm::sqrt(contactNormal.z * contactNormal.z + contactNormal.y * contactNormal.y);
                 // The new X axis is at right angles to the world X axis.
                 contactTangent[0].x = 0;
-                contactTangent[0].y = -contactNormal.z*s;
-                contactTangent[0].z = contactNormal.y*s;
+                contactTangent[0].y = -contactNormal.z * s;
+                contactTangent[0].z = contactNormal.y * s;
                 // The new Y axis is at right angles to the new X and Z axes.
-                contactTangent[1].x = contactNormal.y*contactTangent[0].z - contactNormal.z*contactTangent[0].y;
-                contactTangent[1].y = -contactNormal.x*contactTangent[0].z;
-                contactTangent[1].z = contactNormal.x*contactTangent[0].y;
+                contactTangent[1].x = contactNormal.y * contactTangent[0].z - contactNormal.z * contactTangent[0].y;
+                contactTangent[1].y = -contactNormal.x * contactTangent[0].z;
+                contactTangent[1].z = contactNormal.x * contactTangent[0].y;
             }
 
             contactToWorld = glm::mat3(contactNormal, contactTangent[0], contactTangent[1]);
         }
-
     };
 
-    private:
-        // Build internal constraints from manifolds for the current frame
-        void buildConstraints(std::shared_ptr<Scene> scene,
-                              const std::vector<ContactManifold>& manifolds);
+  private:
+    // Build internal constraints from manifolds for the current frame
+    void buildConstraints(std::shared_ptr<Scene> scene, const std::vector<ContactManifold> &manifolds);
 
-        // Positional correction (interpenetration) phase
-        void resolveInterpenetration(uint32_t iterations);
+    // Positional correction (interpenetration) phase
+    void resolveInterpenetration(uint32_t iterations);
 
-        // Velocity resolution phase
-        void resolveVelocities(float dt, uint32_t iterations);
+    // Velocity resolution phase
+    void resolveVelocities(float dt, uint32_t iterations);
 
-        std::vector<ContactConstraint> m_constraints;
-    };
+    std::vector<ContactConstraint> m_constraints;
+};
 
 } // namespace Rapture::Entropy

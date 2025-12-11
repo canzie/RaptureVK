@@ -1,24 +1,19 @@
 #include "DescriptorBinding.h"
 
+#include "AccelerationStructures/TLAS.h"
+#include "Buffers/Buffers.h"
+#include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Textures/Texture.h"
-#include "AccelerationStructures/TLAS.h"
-#include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/Buffers.h"
 
-#include "WindowContext/Application.h"
 #include "Logging/Log.h"
-
+#include "WindowContext/Application.h"
 
 namespace Rapture {
 
-
-
-
-
-template<typename T>
+template <typename T>
 DescriptorBinding<T>::DescriptorBinding(DescriptorSet *set, uint32_t binding, VkDescriptorType type, uint32_t size)
-    : m_set(set), m_binding(binding), m_type(type), m_size(size)
+    : m_set(set), m_binding(binding), m_size(size), m_type(type)
 {
     m_isAllocated.resize(size, false);
     m_isArray = size > 1;
@@ -26,8 +21,8 @@ DescriptorBinding<T>::DescriptorBinding(DescriptorSet *set, uint32_t binding, Vk
     fillEmpty();
 }
 
-template <typename T>
-DescriptorBinding<T>::~DescriptorBinding() {
+template <typename T> DescriptorBinding<T>::~DescriptorBinding()
+{
     for (uint32_t i = 0; i < m_size; ++i) {
         if (m_isAllocated[i]) {
             free(i);
@@ -36,14 +31,10 @@ DescriptorBinding<T>::~DescriptorBinding() {
     m_isAllocated.clear();
 }
 
-template<typename T>
-void DescriptorBinding<T>::fillEmpty() {
+template <typename T> void DescriptorBinding<T>::fillEmpty() {}
 
-
-}
-
-template<typename T>
-uint32_t DescriptorBinding<T>::findFreeIndex() {
+template <typename T> uint32_t DescriptorBinding<T>::findFreeIndex()
+{
     for (uint32_t i = 0; i < m_size; ++i) {
         if (!m_isAllocated[i]) {
             return i;
@@ -53,7 +44,9 @@ uint32_t DescriptorBinding<T>::findFreeIndex() {
 }
 
 DescriptorBindingUniformBuffer::DescriptorBindingUniformBuffer(DescriptorSet *set, uint32_t binding, uint32_t size)
-    : DescriptorBinding<UniformBuffer>(set, binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, size) { }
+    : DescriptorBinding<UniformBuffer>(set, binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, size)
+{
+}
 
 uint32_t DescriptorBindingUniformBuffer::add(std::shared_ptr<UniformBuffer> resource)
 {
@@ -73,7 +66,7 @@ uint32_t DescriptorBindingUniformBuffer::add(std::shared_ptr<UniformBuffer> reso
     }
 
     VkDescriptorBufferInfo bufferInfo = resource->getDescriptorBufferInfo();
-    
+
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -83,19 +76,20 @@ uint32_t DescriptorBindingUniformBuffer::add(std::shared_ptr<UniformBuffer> reso
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = &bufferInfo;
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
     return index;
-    
-
-
 }
 
-DescriptorBindingTexture::DescriptorBindingTexture(DescriptorSet *set, uint32_t binding, TextureViewType viewType, bool isStorageImage, uint32_t size)
-    : DescriptorBinding<Texture>(set, binding, isStorageImage ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, size), m_viewType(viewType), m_isStorageImage(isStorageImage) { }
-
+DescriptorBindingTexture::DescriptorBindingTexture(DescriptorSet *set, uint32_t binding, TextureViewType viewType,
+                                                   bool isStorageImage, uint32_t size)
+    : DescriptorBinding<Texture>(
+          set, binding, isStorageImage ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, size),
+      m_viewType(viewType), m_isStorageImage(isStorageImage)
+{
+}
 
 uint32_t DescriptorBindingTexture::add(std::shared_ptr<Texture> resource)
 {
@@ -130,17 +124,17 @@ uint32_t DescriptorBindingTexture::add(std::shared_ptr<Texture> resource)
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pImageInfo = &imageInfo;
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
     return index;
-
 }
 
 DescriptorBindingTLAS::DescriptorBindingTLAS(DescriptorSet *set, uint32_t binding, uint32_t size)
-    : DescriptorBinding<TLAS>(set, binding, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, size) { }
-
+    : DescriptorBinding<TLAS>(set, binding, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, size)
+{
+}
 
 uint32_t DescriptorBindingTLAS::add(std::shared_ptr<TLAS> resource)
 {
@@ -166,35 +160,33 @@ uint32_t DescriptorBindingTLAS::add(std::shared_ptr<TLAS> resource)
     descriptorWrite.dstArrayElement = index;
     descriptorWrite.descriptorType = m_type;
     descriptorWrite.descriptorCount = 1;
-    
+
     // Create acceleration structure write descriptor
     VkWriteDescriptorSetAccelerationStructureKHR accelerationStructureWrite{};
     accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
     accelerationStructureWrite.accelerationStructureCount = 1;
     VkAccelerationStructureKHR accelerationStructure = resource->getAccelerationStructure();
     accelerationStructureWrite.pAccelerationStructures = &accelerationStructure;
-    
+
     // Link the acceleration structure write to the main descriptor write
     descriptorWrite.pNext = &accelerationStructureWrite;
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
 
     return index;
-
-
 }
 
 // Template free method implementation
-template<typename T>
-void DescriptorBinding<T>::free(uint32_t index) {
+template <typename T> void DescriptorBinding<T>::free(uint32_t index)
+{
     if (m_isArray && index >= m_size) {
         RP_CORE_WARN("Index {} out of bounds for binding {} with size {}", index, m_binding, m_size);
         return;
     }
-    
+
     if (m_isArray) {
         if (!m_isAllocated[index]) {
             RP_CORE_WARN("Trying to free already free slot {} in binding {}", index, m_binding);
@@ -202,18 +194,19 @@ void DescriptorBinding<T>::free(uint32_t index) {
         }
         m_isAllocated[index] = false;
     }
-    
+
     // TODO: Write null/empty descriptor to the slot to prevent invalid reads
     // This would require type-specific null descriptor creation
 }
 
 // UniformBuffer update method
-void DescriptorBindingUniformBuffer::update(std::shared_ptr<UniformBuffer> resource, uint32_t index) {
+void DescriptorBindingUniformBuffer::update(std::shared_ptr<UniformBuffer> resource, uint32_t index)
+{
     if (!resource) {
         RP_CORE_WARN("Buffer is null for binding {} at index {}", m_binding, index);
         return;
     }
-    
+
     if (m_isArray) {
         if (index >= m_size) {
             RP_CORE_WARN("Index {} out of bounds for binding {} with size {}", index, m_binding, m_size);
@@ -227,9 +220,9 @@ void DescriptorBindingUniformBuffer::update(std::shared_ptr<UniformBuffer> resou
         RP_CORE_WARN("Non-zero index {} specified for non-array binding {}", index, m_binding);
         return;
     }
-    
+
     VkDescriptorBufferInfo bufferInfo = resource->getDescriptorBufferInfo();
-    
+
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -239,19 +232,20 @@ void DescriptorBindingUniformBuffer::update(std::shared_ptr<UniformBuffer> resou
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = &bufferInfo;
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
 }
 
 // Texture update method
-void DescriptorBindingTexture::update(std::shared_ptr<Texture> resource, uint32_t index) {
+void DescriptorBindingTexture::update(std::shared_ptr<Texture> resource, uint32_t index)
+{
     if (!resource) {
         RP_CORE_WARN("Texture is null for binding {} at index {}", m_binding, index);
         return;
     }
-    
+
     if (m_isArray) {
         if (index >= m_size) {
             RP_CORE_WARN("Index {} out of bounds for binding {} with size {}", index, m_binding, m_size);
@@ -265,14 +259,14 @@ void DescriptorBindingTexture::update(std::shared_ptr<Texture> resource, uint32_
         RP_CORE_WARN("Non-zero index {} specified for non-array binding {}", index, m_binding);
         return;
     }
-    
+
     VkDescriptorImageInfo imageInfo;
     if (m_isStorageImage) {
         imageInfo = resource->getStorageImageDescriptorInfo();
     } else {
         imageInfo = resource->getDescriptorImageInfo(m_viewType);
     }
-    
+
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -282,19 +276,20 @@ void DescriptorBindingTexture::update(std::shared_ptr<Texture> resource, uint32_
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pImageInfo = &imageInfo;
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
 }
 
 // TLAS update method
-void DescriptorBindingTLAS::update(std::shared_ptr<TLAS> resource, uint32_t index) {
+void DescriptorBindingTLAS::update(std::shared_ptr<TLAS> resource, uint32_t index)
+{
     if (!resource || resource->getAccelerationStructure() == VK_NULL_HANDLE) {
         RP_CORE_WARN("TLAS is null for binding {} at index {}", m_binding, index);
         return;
     }
-    
+
     if (m_isArray) {
         if (index >= m_size) {
             RP_CORE_WARN("Index {} out of bounds for binding {} with size {}", index, m_binding, m_size);
@@ -308,7 +303,7 @@ void DescriptorBindingTLAS::update(std::shared_ptr<TLAS> resource, uint32_t inde
         RP_CORE_WARN("Non-zero index {} specified for non-array binding {}", index, m_binding);
         return;
     }
-    
+
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -316,25 +311,27 @@ void DescriptorBindingTLAS::update(std::shared_ptr<TLAS> resource, uint32_t inde
     descriptorWrite.dstArrayElement = index;
     descriptorWrite.descriptorType = m_type;
     descriptorWrite.descriptorCount = 1;
-    
+
     // Create acceleration structure write descriptor
     VkWriteDescriptorSetAccelerationStructureKHR accelerationStructureWrite{};
     accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
     accelerationStructureWrite.accelerationStructureCount = 1;
     VkAccelerationStructureKHR accelerationStructure = resource->getAccelerationStructure();
     accelerationStructureWrite.pAccelerationStructures = &accelerationStructure;
-    
+
     // Link the acceleration structure write to the main descriptor write
     descriptorWrite.pNext = &accelerationStructureWrite;
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
 }
 
 DescriptorBindingSSBO::DescriptorBindingSSBO(DescriptorSet *set, uint32_t binding, uint32_t size)
-    : DescriptorBinding<Buffer>(set, binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, size) { }
+    : DescriptorBinding<Buffer>(set, binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, size)
+{
+}
 
 uint32_t DescriptorBindingSSBO::add(std::shared_ptr<Buffer> resource)
 {
@@ -354,7 +351,7 @@ uint32_t DescriptorBindingSSBO::add(std::shared_ptr<Buffer> resource)
     }
 
     VkDescriptorBufferInfo bufferInfo = resource->getDescriptorBufferInfo();
-    
+
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -364,22 +361,21 @@ uint32_t DescriptorBindingSSBO::add(std::shared_ptr<Buffer> resource)
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = &bufferInfo;
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
     return index;
-    
 }
 
-
 // UniformBuffer update method
-void DescriptorBindingSSBO::update(std::shared_ptr<Buffer> resource, uint32_t index) {
+void DescriptorBindingSSBO::update(std::shared_ptr<Buffer> resource, uint32_t index)
+{
     if (!resource) {
         RP_CORE_WARN("Buffer is null for binding {} at index {}", m_binding, index);
         return;
     }
-    
+
     if (m_isArray) {
         if (index >= m_size) {
             RP_CORE_WARN("Index {} out of bounds for binding {} with size {}", index, m_binding, m_size);
@@ -393,9 +389,9 @@ void DescriptorBindingSSBO::update(std::shared_ptr<Buffer> resource, uint32_t in
         RP_CORE_WARN("Non-zero index {} specified for non-array binding {}", index, m_binding);
         return;
     }
-    
+
     VkDescriptorBufferInfo bufferInfo = resource->getDescriptorBufferInfo();
-    
+
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = m_set->getDescriptorSet();
@@ -405,7 +401,7 @@ void DescriptorBindingSSBO::update(std::shared_ptr<Buffer> resource, uint32_t in
     descriptorWrite.descriptorCount = 1;
     descriptorWrite.pBufferInfo = &bufferInfo;
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
@@ -417,4 +413,4 @@ template class DescriptorBinding<Texture>;
 template class DescriptorBinding<TLAS>;
 template class DescriptorBinding<Buffer>;
 
-}
+} // namespace Rapture

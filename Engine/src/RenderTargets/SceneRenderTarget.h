@@ -1,9 +1,9 @@
 #ifndef RAPTURE__SCENE_RENDER_TARGET_H
 #define RAPTURE__SCENE_RENDER_TARGET_H
 
-#include "Textures/Texture.h"
-#include "RenderTargets/SwapChains/SwapChain.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "RenderTargets/SwapChains/SwapChain.h"
+#include "Textures/Texture.h"
 #include <memory>
 #include <vector>
 
@@ -11,20 +11,20 @@ namespace Rapture {
 
 /**
  * @brief Abstraction for scene render targets.
- * 
+ *
  * In Editor mode (OFFSCREEN), this manages a set of offscreen textures that the
  * renderer draws to. These can then be sampled by ImGui for display in the viewport.
- * 
+ *
  * In Standalone mode (SWAPCHAIN), this wraps the swapchain and provides access
  * to swapchain images directly.
- * 
+ *
  * This allows the renderer to be agnostic about where it's rendering to.
  */
 class SceneRenderTarget {
-public:
-    enum class TargetType { 
-        OFFSCREEN,  // Renders to separate textures (Editor mode)
-        SWAPCHAIN   // Renders directly to swapchain (Standalone mode)
+  public:
+    enum class TargetType {
+        OFFSCREEN, // Renders to separate textures (Editor mode)
+        SWAPCHAIN  // Renders directly to swapchain (Standalone mode)
     };
 
     /**
@@ -34,8 +34,7 @@ public:
      * @param imageCount Number of images (typically matches frames in flight)
      * @param format The texture format for the render target
      */
-    SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, 
-                      TextureFormat format = TextureFormat::BGRA8);
+    SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format = TextureFormat::BGRA8);
 
     /**
      * @brief Construct a swapchain-backed render target (Standalone mode)
@@ -46,8 +45,8 @@ public:
     ~SceneRenderTarget();
 
     // Prevent copying
-    SceneRenderTarget(const SceneRenderTarget&) = delete;
-    SceneRenderTarget& operator=(const SceneRenderTarget&) = delete;
+    SceneRenderTarget(const SceneRenderTarget &) = delete;
+    SceneRenderTarget &operator=(const SceneRenderTarget &) = delete;
 
     /**
      * @brief Resize the render target (only valid for OFFSCREEN type)
@@ -92,20 +91,20 @@ public:
      * @param commandBuffer The command buffer to record the transition to
      * @param imageIndex The image index to transition
      */
-    void transitionToShaderReadLayout(const std::shared_ptr<CommandBuffer>& commandBuffer, uint32_t imageIndex);
+    void transitionToShaderReadLayout(const std::shared_ptr<CommandBuffer> &commandBuffer, uint32_t imageIndex);
 
-private:
+  private:
     void createOffscreenTextures(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format);
 
-private:
+  private:
     TargetType m_type;
-    
+
     // For OFFSCREEN mode
     std::vector<std::shared_ptr<Texture>> m_offscreenTextures;
     uint32_t m_width = 0;
     uint32_t m_height = 0;
     TextureFormat m_format = TextureFormat::BGRA8;
-    
+
     // For SWAPCHAIN mode
     std::shared_ptr<SwapChain> m_swapChain;
 };

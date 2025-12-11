@@ -136,11 +136,15 @@ std::shared_ptr<Asset> AssetImporter::loadShader(const AssetHandle &handle, cons
 }
 
 std::shared_ptr<Asset> AssetImporter::loadMaterial(const AssetHandle &handle, const AssetMetadata &metadata) {
+  (void)handle;
+  (void)metadata;
+
   RP_CORE_ERROR("AssetImporter::loadMaterial - Not implemented");
   return nullptr;
 }
 
 std::shared_ptr<Asset> AssetImporter::loadTexture(const AssetHandle &handle, const AssetMetadata &metadata) {
+  
   // Start worker thread if not already running
   if (!s_threadRunning) {
     RP_CORE_ERROR(

@@ -4,43 +4,39 @@
 
 namespace Rapture {
 
-SceneRenderTarget::SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, 
-                                     TextureFormat format)
-    : m_type(TargetType::OFFSCREEN)
-    , m_width(width)
-    , m_height(height)
-    , m_format(format)
-    , m_swapChain(nullptr) {
-    
+SceneRenderTarget::SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format)
+    : m_type(TargetType::OFFSCREEN), m_width(width), m_height(height), m_format(format), m_swapChain(nullptr)
+{
+
     createOffscreenTextures(width, height, imageCount, format);
     RP_CORE_INFO("Created offscreen SceneRenderTarget: {}x{} with {} images", width, height, imageCount);
 }
 
-SceneRenderTarget::SceneRenderTarget(std::shared_ptr<SwapChain> swapChain)
-    : m_type(TargetType::SWAPCHAIN)
-    , m_swapChain(swapChain) {
-    
+SceneRenderTarget::SceneRenderTarget(std::shared_ptr<SwapChain> swapChain) : m_type(TargetType::SWAPCHAIN), m_swapChain(swapChain)
+{
+
     if (!m_swapChain) {
         RP_CORE_ERROR("SceneRenderTarget - Cannot create swapchain target with null swapchain");
         return;
     }
-    
+
     m_width = swapChain->getExtent().width;
     m_height = swapChain->getExtent().height;
-    
+
     RP_CORE_INFO("Created swapchain-backed SceneRenderTarget: {}x{}", m_width, m_height);
 }
 
-SceneRenderTarget::~SceneRenderTarget() {
+SceneRenderTarget::~SceneRenderTarget()
+{
     m_offscreenTextures.clear();
     m_swapChain.reset();
 }
 
-void SceneRenderTarget::createOffscreenTextures(uint32_t width, uint32_t height, 
-                                                 uint32_t imageCount, TextureFormat format) {
+void SceneRenderTarget::createOffscreenTextures(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format)
+{
     m_offscreenTextures.clear();
     m_offscreenTextures.reserve(imageCount);
-    
+
     TextureSpecification spec;
     spec.width = width;
     spec.height = height;
@@ -51,44 +47,46 @@ void SceneRenderTarget::createOffscreenTextures(uint32_t width, uint32_t height,
     spec.mipLevels = 1;
     spec.wrap = TextureWrap::ClampToEdge;
     spec.filter = TextureFilter::Linear;
-    
+
     for (uint32_t i = 0; i < imageCount; i++) {
         auto texture = std::make_shared<Texture>(spec);
         m_offscreenTextures.push_back(texture);
     }
 }
 
-void SceneRenderTarget::resize(uint32_t width, uint32_t height) {
+void SceneRenderTarget::resize(uint32_t width, uint32_t height)
+{
     if (m_type == TargetType::SWAPCHAIN) {
         RP_CORE_WARN("SceneRenderTarget::resize - Cannot manually resize swapchain target. "
                      "Swapchain resize is handled separately.");
         return;
     }
-    
+
     if (width == 0 || height == 0) {
         RP_CORE_WARN("SceneRenderTarget::resize - Invalid dimensions: {}x{}", width, height);
         return;
     }
-    
+
     if (width == m_width && height == m_height) {
         return; // No change needed
     }
-    
+
     RP_CORE_INFO("Resizing SceneRenderTarget: {}x{} -> {}x{}", m_width, m_height, width, height);
-    
+
     // Wait for GPU to finish using the old textures
-    auto& app = Application::getInstance();
-    auto& vulkanContext = app.getVulkanContext();
+    auto &app = Application::getInstance();
+    auto &vulkanContext = app.getVulkanContext();
     vulkanContext.waitIdle();
-    
+
     m_width = width;
     m_height = height;
-    
+
     uint32_t imageCount = static_cast<uint32_t>(m_offscreenTextures.size());
     createOffscreenTextures(width, height, imageCount, m_format);
 }
 
-void SceneRenderTarget::onSwapChainRecreated() {
+void SceneRenderTarget::onSwapChainRecreated()
+{
     if (m_type == TargetType::SWAPCHAIN && m_swapChain) {
         m_width = m_swapChain->getExtent().width;
         m_height = m_swapChain->getExtent().height;
@@ -97,7 +95,8 @@ void SceneRenderTarget::onSwapChainRecreated() {
     // For OFFSCREEN type, this is a no-op - viewport size is independent
 }
 
-VkImage SceneRenderTarget::getImage(uint32_t index) const {
+VkImage SceneRenderTarget::getImage(uint32_t index) const
+{
     if (m_type == TargetType::SWAPCHAIN) {
         if (m_swapChain && index < m_swapChain->getImageCount()) {
             return m_swapChain->getImages()[index];
@@ -105,7 +104,7 @@ VkImage SceneRenderTarget::getImage(uint32_t index) const {
         RP_CORE_ERROR("SceneRenderTarget::getImage - Invalid index {} for swapchain", index);
         return VK_NULL_HANDLE;
     }
-    
+
     if (index < m_offscreenTextures.size()) {
         return m_offscreenTextures[index]->getImage();
     }
@@ -113,7 +112,8 @@ VkImage SceneRenderTarget::getImage(uint32_t index) const {
     return VK_NULL_HANDLE;
 }
 
-VkImageView SceneRenderTarget::getImageView(uint32_t index) const {
+VkImageView SceneRenderTarget::getImageView(uint32_t index) const
+{
     if (m_type == TargetType::SWAPCHAIN) {
         if (m_swapChain && index < m_swapChain->getImageCount()) {
             return m_swapChain->getImageViews()[index];
@@ -121,7 +121,7 @@ VkImageView SceneRenderTarget::getImageView(uint32_t index) const {
         RP_CORE_ERROR("SceneRenderTarget::getImageView - Invalid index {} for swapchain", index);
         return VK_NULL_HANDLE;
     }
-    
+
     if (index < m_offscreenTextures.size()) {
         return m_offscreenTextures[index]->getImageView();
     }
@@ -129,30 +129,34 @@ VkImageView SceneRenderTarget::getImageView(uint32_t index) const {
     return VK_NULL_HANDLE;
 }
 
-VkFormat SceneRenderTarget::getFormat() const {
+VkFormat SceneRenderTarget::getFormat() const
+{
     if (m_type == TargetType::SWAPCHAIN) {
         return m_swapChain ? m_swapChain->getImageFormat() : VK_FORMAT_UNDEFINED;
     }
     return toVkFormat(m_format, true); // SRGB format
 }
 
-VkExtent2D SceneRenderTarget::getExtent() const {
+VkExtent2D SceneRenderTarget::getExtent() const
+{
     return {m_width, m_height};
 }
 
-uint32_t SceneRenderTarget::getImageCount() const {
+uint32_t SceneRenderTarget::getImageCount() const
+{
     if (m_type == TargetType::SWAPCHAIN) {
         return m_swapChain ? m_swapChain->getImageCount() : 0;
     }
     return static_cast<uint32_t>(m_offscreenTextures.size());
 }
 
-std::shared_ptr<Texture> SceneRenderTarget::getTexture(uint32_t index) const {
+std::shared_ptr<Texture> SceneRenderTarget::getTexture(uint32_t index) const
+{
     if (m_type == TargetType::SWAPCHAIN) {
         RP_CORE_WARN("SceneRenderTarget::getTexture - Swapchain targets don't have Texture objects");
         return nullptr;
     }
-    
+
     if (index < m_offscreenTextures.size()) {
         return m_offscreenTextures[index];
     }
@@ -160,8 +164,8 @@ std::shared_ptr<Texture> SceneRenderTarget::getTexture(uint32_t index) const {
     return nullptr;
 }
 
-void SceneRenderTarget::transitionToShaderReadLayout(const std::shared_ptr<CommandBuffer>& commandBuffer, 
-                                                      uint32_t imageIndex) {
+void SceneRenderTarget::transitionToShaderReadLayout(const std::shared_ptr<CommandBuffer> &commandBuffer, uint32_t imageIndex)
+{
     if (m_type != TargetType::OFFSCREEN) {
         return; // Only offscreen targets need this transition
     }
@@ -181,15 +185,8 @@ void SceneRenderTarget::transitionToShaderReadLayout(const std::shared_ptr<Comma
     barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 } // namespace Rapture

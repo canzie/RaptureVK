@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.11)
 project(Rapture VERSION 1.0.0 LANGUAGES C CXX)
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "No build type specified, defaulting to Debug")
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
+    # Set the possible values of build type for cmake-gui
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 # Include FetchContent module for downloading dependencies
 include(FetchContent)
 

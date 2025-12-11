@@ -8,7 +8,7 @@
 
 namespace Rapture {
 
-struct PushConstants {
+struct GBufferPushConstants {
     uint32_t batchInfoBufferIndex;
     uint32_t cameraBindlessIndex;    
 };
@@ -219,7 +219,7 @@ void GBufferPass::recordCommandBuffer(
             static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
         
         // Set push constants for this batch
-        PushConstants pushConstants{};
+        GBufferPushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
         pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
 
@@ -233,7 +233,7 @@ void GBufferPass::recordCommandBuffer(
                            m_pipeline->getPipelineLayoutVk(),
                            stageFlags,
                            0,
-                           sizeof(PushConstants),
+                           sizeof(GBufferPushConstants),
                            &pushConstants);
         
         // Bind vertex buffer from the arena
@@ -284,7 +284,7 @@ void GBufferPass::recordCommandBuffer(
             static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
         
         // Set push constants for this batch
-        PushConstants pushConstants{};
+        GBufferPushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
         pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
         
@@ -297,7 +297,7 @@ void GBufferPass::recordCommandBuffer(
                            m_pipeline->getPipelineLayoutVk(),
                            stageFlags,
                            0,
-                           sizeof(PushConstants),
+                           sizeof(GBufferPushConstants),
                            &pushConstants);
         
         // Bind vertex buffer from the arena

@@ -486,6 +486,8 @@ VkDeviceSize BufferPoolManager::calculateArenaSize(const BufferAllocationRequest
 VkBufferUsageFlags BufferPoolManager::generateUsageFlags(BufferType type, const BufferFlags& flags) const {
     VkBufferUsageFlags usageFlags = 0;
     
+    (void)type;
+
     // Always include both vertex and index buffer bits for maximum compatibility
     usageFlags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     

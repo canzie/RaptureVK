@@ -1,14 +1,14 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
-#include <map>
 
-#include "Textures/Texture.h"
-#include "Shaders/Shader.h"
-#include "Pipelines/ComputePipeline.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
+#include "Pipelines/ComputePipeline.h"
+#include "Shaders/Shader.h"
+#include "Textures/Texture.h"
 
 namespace Rapture {
 
@@ -22,8 +22,9 @@ enum class FlattenerDataType {
  * @brief Represents a flattened texture with its associated data
  */
 class FlattenTexture {
-public:
-    FlattenTexture(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> flattenedTexture, const std::string& name, FlattenerDataType dataType);
+  public:
+    FlattenTexture(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> flattenedTexture, const std::string &name,
+                   FlattenerDataType dataType);
     ~FlattenTexture() = default;
 
     /**
@@ -45,9 +46,9 @@ public:
     /**
      * @brief Get the name
      */
-    const std::string& getName() const { return m_name; }
+    const std::string &getName() const { return m_name; }
 
-private:
+  private:
     std::shared_ptr<Texture> m_inputTexture;
     std::shared_ptr<Texture> m_flattenedTexture;
     uint32_t m_inputTextureBindlessIndex = 0;
@@ -60,18 +61,19 @@ private:
  * @brief Utility class for creating FlattenTexture instances
  */
 class TextureFlattener {
-public:
+  public:
     /**
      * @brief Create a FlattenTexture instance
-     * 
+     *
      * @param inputTexture The input texture array to flatten
      * @param name Name for the flattened texture (used for asset registration)
      * @param dataType The data type of the texture's components
      * @return std::shared_ptr<FlattenTexture> The FlattenTexture instance
      */
-    static std::shared_ptr<FlattenTexture> createFlattenTexture(std::shared_ptr<Texture> inputTexture, const std::string& name, FlattenerDataType dataType = FlattenerDataType::FLOAT);
+    static std::shared_ptr<FlattenTexture> createFlattenTexture(std::shared_ptr<Texture> inputTexture, const std::string &name,
+                                                                FlattenerDataType dataType = FlattenerDataType::FLOAT);
 
-private:
+  private:
     struct FlattenPushConstants {
         uint32_t inputTextureIndex;
         int layerCount;
@@ -94,4 +96,4 @@ private:
     friend class FlattenTexture;
 };
 
-} 
+} // namespace Rapture

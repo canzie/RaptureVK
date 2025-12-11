@@ -4,11 +4,19 @@ include(FetchContent)
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "Disable updates for already downloaded content" FORCE)
 set(FETCHCONTENT_QUIET FALSE CACHE BOOL "Enable verbose output for FetchContent" FORCE)
 
-# Set cache directory to be inside the vendor directory.
-# NOTE: It's recommended to add the subdirectories created by FetchContent to .gitignore
+# Set cache directory to be inside the vendor directory
 set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/Engine/vendor/_deps" CACHE PATH "Base directory for downloaded content" FORCE)
 
-# Vendor Libraries Configuration
+# Prevent vendor libraries from being rebuilt due to policy changes
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
+# Suppress warnings from vendor code
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ON CACHE INTERNAL "")
+set(CMAKE_WARN_DEPRECATED OFF CACHE INTERNAL "")
+
+# ==================== Vendor Libraries Configuration ====================
 
 # Create a vendor interface target
 add_library(vendor_libraries INTERFACE)
@@ -136,6 +144,13 @@ set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE)
 set(ENABLE_OPT ON CACHE BOOL "" FORCE)
 set(ALLOW_EXTERNAL_SPIRV_TOOLS ON CACHE BOOL "" FORCE)
 
+# Critical: Force glslang to use external SPIRV-Headers to avoid ODR violations
+set(USE_EXTERNAL_SPIRV_HEADERS ON CACHE BOOL "" FORCE)
+
+# Disable warnings and treat vendor code as system headers
+set(SPIRV_SKIP_EXECUTABLES ON CACHE BOOL "" FORCE)
+set(SPIRV_TOOLS_BUILD_STATIC ON CACHE BOOL "" FORCE)
+
 FetchContent_Declare(
   spirv_headers
   GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
@@ -143,6 +158,8 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
 )
+FetchContent_MakeAvailable(spirv_headers)
+
 FetchContent_Declare(
   spirv_tools
   GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
@@ -166,7 +183,6 @@ FetchContent_Declare(
 )
 
 # --- tomlplusplus ---
-
 FetchContent_Declare(
     tomlplusplus
     GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
@@ -178,7 +194,9 @@ FetchContent_Declare(
 
 # ==================== Make Dependencies Available ====================
 
-message(STATUS "Fetching and configuring dependencies...")
+message(STATUS "=== Fetching Vendor Dependencies ===")
+message(STATUS "This will only happen once. Subsequent builds will use cached versions.")
+
 FetchContent_MakeAvailable(glfw)
 FetchContent_MakeAvailable(glm)
 FetchContent_MakeAvailable(imgui)
@@ -189,12 +207,75 @@ FetchContent_MakeAvailable(VulkanMemoryAllocator)
 FetchContent_MakeAvailable(spirv_reflect)
 FetchContent_MakeAvailable(yyjson)
 FetchContent_MakeAvailable(tracy)
-FetchContent_MakeAvailable(spirv_headers)
+
+# Heavy shader compilation dependencies - built once and cached
+message(STATUS "Fetching shader compilation dependencies (this may take a while on first build)...")
+# Note: spirv_headers already made available earlier to avoid ODR violations
 FetchContent_MakeAvailable(spirv_tools)
 FetchContent_MakeAvailable(glslang)
 FetchContent_MakeAvailable(shaderc)
+
 FetchContent_MakeAvailable(tomlplusplus)
-message(STATUS "All dependencies are available.")
+message(STATUS "=== All vendor dependencies available ===")
+
+# ==================== Suppress Warnings from Vendor Libraries ====================
+
+# Function to mark all targets in a directory as SYSTEM
+function(mark_as_system_includes target)
+    if(NOT TARGET ${target})
+        return()
+    endif()
+    
+    # Check if it's an ALIAS target by trying to get ALIASED_TARGET property
+    get_target_property(aliased_target ${target} ALIASED_TARGET)
+    if(aliased_target)
+        # It's an alias, skip it
+        return()
+    endif()
+    
+    get_target_property(target_type ${target} TYPE)
+    
+    # Skip INTERFACE_LIBRARY targets
+    if(target_type STREQUAL "INTERFACE_LIBRARY")
+        return()
+    endif()
+    
+    # Suppress warnings from this target and disable LTO for vendor code
+    target_compile_options(${target} PRIVATE
+        $<$<CXX_COMPILER_ID:GNU>:-w -Wno-odr -Wno-lto-type-mismatch -fno-lto>
+        $<$<CXX_COMPILER_ID:Clang,AppleClang>:-w>
+        $<$<CXX_COMPILER_ID:MSVC>:/w>
+    )
+    
+    # Suppress LTO warnings at link time (only for linkable targets)
+    if(NOT target_type STREQUAL "OBJECT_LIBRARY")
+        target_link_options(${target} PRIVATE
+            $<$<CXX_COMPILER_ID:GNU>:-Wno-odr -Wno-lto-type-mismatch -fno-lto>
+        )
+    endif()
+    
+    # Mark includes as SYSTEM to suppress warnings from headers
+    get_target_property(include_dirs ${target} INTERFACE_INCLUDE_DIRECTORIES)
+    if(include_dirs AND NOT include_dirs STREQUAL "include_dirs-NOTFOUND")
+        set_target_properties(${target} PROPERTIES
+            INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${include_dirs}"
+        )
+    endif()
+endfunction()
+
+# Suppress warnings from shader compilation libraries
+mark_as_system_includes(SPIRV-Tools)
+mark_as_system_includes(SPIRV-Tools-opt)
+mark_as_system_includes(glslang)
+mark_as_system_includes(SPIRV)
+mark_as_system_includes(shaderc)
+mark_as_system_includes(shaderc_combined)
+mark_as_system_includes(glslang-default-resource-limits)
+
+# Suppress warnings from other vendor libraries
+mark_as_system_includes(glfw)
+mark_as_system_includes(spdlog)
+mark_as_system_includes(EnTT)
 
 # ==================== Manual Target Configuration ====================
 
@@ -221,11 +302,23 @@ target_include_directories(imgui_static SYSTEM PUBLIC
 )
 target_link_libraries(imgui_static PUBLIC glfw Vulkan::Vulkan)
 
+# Suppress ImGui warnings and disable LTO
+target_compile_options(imgui_static PRIVATE
+    $<$<CXX_COMPILER_ID:GNU>:-w -Wno-odr -Wno-lto-type-mismatch -fno-lto>
+    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-w>
+    $<$<CXX_COMPILER_ID:MSVC>:/w>
+)
+
 # --- stb_image Target ---
 set(STB_IMAGE_IMPL_FILE "${stb_BINARY_DIR}/stb_image_impl.cpp")
 file(WRITE ${STB_IMAGE_IMPL_FILE} "#define STB_IMAGE_IMPLEMENTATION\n#include \"${stb_SOURCE_DIR}/stb_image.h\"\n")
 add_library(stb_image STATIC ${STB_IMAGE_IMPL_FILE})
 target_include_directories(stb_image SYSTEM PUBLIC ${stb_SOURCE_DIR})
+target_compile_options(stb_image PRIVATE
+    $<$<CXX_COMPILER_ID:GNU>:-w -Wno-odr -Wno-lto-type-mismatch -fno-lto>
+    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-w>
+    $<$<CXX_COMPILER_ID:MSVC>:/w>
+)
 
 # --- VMA Target ---
 add_library(vma STATIC ${vulkanmemoryallocator_SOURCE_DIR}/src/VmaUsage.cpp)
@@ -233,6 +326,11 @@ target_include_directories(vma SYSTEM PUBLIC ${vulkanmemoryallocator_SOURCE_DIR}
 target_link_libraries(vma PUBLIC Vulkan::Vulkan)
 target_compile_definitions(vma PUBLIC VMA_STATIC_VULKAN_FUNCTIONS=1)
 set_target_properties(vma PROPERTIES CXX_STANDARD ${CMAKE_CXX_STANDARD} CXX_STANDARD_REQUIRED ON)
+target_compile_options(vma PRIVATE
+    $<$<CXX_COMPILER_ID:GNU>:-w -Wno-odr -Wno-lto-type-mismatch -fno-lto>
+    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-w>
+    $<$<CXX_COMPILER_ID:MSVC>:/w>
+)
 
 # --- SPIRV-Reflect Target ---
 add_library(spirv_reflect_static STATIC ${spirv_reflect_SOURCE_DIR}/spirv_reflect.c)
@@ -242,11 +340,21 @@ set_target_properties(spirv_reflect_static PROPERTIES C_STANDARD 99 C_STANDARD_R
 if(SPIRV_REFLECT_USE_SYSTEM_SPIRV_H)
     target_compile_definitions(spirv_reflect_static PUBLIC SPIRV_REFLECT_USE_SYSTEM_SPIRV_H)
 endif()
+target_compile_options(spirv_reflect_static PRIVATE
+    $<$<C_COMPILER_ID:GNU>:-w -Wno-odr -Wno-lto-type-mismatch -fno-lto>
+    $<$<C_COMPILER_ID:Clang,AppleClang>:-w>
+    $<$<C_COMPILER_ID:MSVC>:/w>
+)
 
 # --- yyjson Target ---
 add_library(yyjson_static STATIC ${yyjson_SOURCE_DIR}/src/yyjson.c)
 target_include_directories(yyjson_static SYSTEM PUBLIC ${yyjson_SOURCE_DIR}/src)
 set_target_properties(yyjson_static PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON)
+target_compile_options(yyjson_static PRIVATE
+    $<$<C_COMPILER_ID:GNU>:-w -Wno-odr -Wno-lto-type-mismatch -fno-lto>
+    $<$<C_COMPILER_ID:Clang,AppleClang>:-w>
+    $<$<C_COMPILER_ID:MSVC>:/w>
+)
 
 
 # ==================== Link all libraries to vendor_libraries ====================
@@ -264,6 +372,14 @@ target_link_libraries(vendor_libraries INTERFACE
     tracy::client
     shaderc_combined
     tomlplusplus::tomlplusplus
+)
+
+# Mark vendor_libraries includes as SYSTEM to suppress warnings
+target_include_directories(vendor_libraries SYSTEM INTERFACE
+    ${glfw_SOURCE_DIR}/include
+    ${glm_SOURCE_DIR}
+    ${entt_SOURCE_DIR}/single_include
+    ${spdlog_SOURCE_DIR}/include
 )
 
 # Add platform-specific libraries for GLFW
@@ -290,3 +406,6 @@ elseif(UNIX AND NOT APPLE)
         target_link_libraries(vendor_libraries INTERFACE ${X11_LIBRARIES})
     endif()
 endif()
+
+message(STATUS "=== Vendor libraries configuration complete ===")
+message(STATUS "Vendor libraries will NOT rebuild unless you manually delete: ${FETCHCONTENT_BASE_DIR}")

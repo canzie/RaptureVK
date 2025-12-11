@@ -2,9 +2,8 @@
 
 #include <cstdint>
 
-
 namespace Rapture {
 
-    using EntityID = uint32_t;
+using EntityID = uint32_t;
 
 }

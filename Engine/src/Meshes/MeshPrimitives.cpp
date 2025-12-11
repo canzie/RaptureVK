@@ -41,56 +41,54 @@ Mesh Primitives::CreateCube()
     // Format: position (3 floats), normal (3 floats), UV (2 floats)
     std::vector<float> vertices = {
         // Front face
-        -0.5f, -0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   0.0f, 0.0f, // Bottom-left
-         0.5f, -0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   1.0f, 0.0f, // Bottom-right
-         0.5f,  0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   1.0f, 1.0f, // Top-right
-        -0.5f,  0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   0.0f, 1.0f, // Top-left
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // Bottom-left
+        0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,  // Bottom-right
+        0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,   // Top-right
+        -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,  // Top-left
 
         // Back face
-         0.5f, -0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   0.0f, 0.0f, // Bottom-left
-        -0.5f, -0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   1.0f, 0.0f, // Bottom-right
-        -0.5f,  0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   1.0f, 1.0f, // Top-right
-         0.5f,  0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   0.0f, 1.0f, // Top-left
+        0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,  // Bottom-left
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
+        -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,  // Top-right
+        0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,   // Top-left
 
         // Left face
-        -0.5f, -0.5f, -0.5f,  -1.0f,  0.0f,  0.0f,   0.0f, 0.0f, // Bottom-left
-        -0.5f, -0.5f,  0.5f,  -1.0f,  0.0f,  0.0f,   1.0f, 0.0f, // Bottom-right
-        -0.5f,  0.5f,  0.5f,  -1.0f,  0.0f,  0.0f,   1.0f, 1.0f, // Top-right
-        -0.5f,  0.5f, -0.5f,  -1.0f,  0.0f,  0.0f,   0.0f, 1.0f, // Top-left
+        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, // Bottom-left
+        -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,  // Bottom-right
+        -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,   // Top-right
+        -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // Top-left
 
         // Right face
-         0.5f, -0.5f,  0.5f,   1.0f,  0.0f,  0.0f,   0.0f, 0.0f, // Bottom-left
-         0.5f, -0.5f, -0.5f,   1.0f,  0.0f,  0.0f,   1.0f, 0.0f, // Bottom-right
-         0.5f,  0.5f, -0.5f,   1.0f,  0.0f,  0.0f,   1.0f, 1.0f, // Top-right
-         0.5f,  0.5f,  0.5f,   1.0f,  0.0f,  0.0f,   0.0f, 1.0f, // Top-left
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,  // Bottom-left
+        0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, // Bottom-right
+        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,  // Top-right
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,   // Top-left
 
         // Top face
-        -0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   0.0f, 0.0f, // Bottom-left
-         0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 0.0f, // Bottom-right
-         0.5f,  0.5f, -0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 1.0f, // Top-right
-        -0.5f,  0.5f, -0.5f,   0.0f,  1.0f,  0.0f,   0.0f, 1.0f, // Top-left
+        -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,  // Bottom-left
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,   // Bottom-right
+        0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,  // Top-right
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, // Top-left
 
         // Bottom face
-        -0.5f, -0.5f, -0.5f,   0.0f, -1.0f,  0.0f,   0.0f, 0.0f, // Bottom-left
-         0.5f, -0.5f, -0.5f,   0.0f, -1.0f,  0.0f,   1.0f, 0.0f, // Bottom-right
-         0.5f, -0.5f,  0.5f,   0.0f, -1.0f,  0.0f,   1.0f, 1.0f, // Top-right
-        -0.5f, -0.5f,  0.5f,   0.0f, -1.0f,  0.0f,   0.0f, 1.0f  // Top-left
+        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, // Bottom-left
+        0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,  // Bottom-right
+        0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,   // Top-right
+        -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f   // Top-left
     };
 
-    std::vector<uint16_t> indices = {
-        // Front face
-        0, 1, 2,   2, 3, 0,
-        // Back face
-        4, 5, 6,   6, 7, 4,
-        // Left face
-        8, 9, 10,  10, 11, 8,
-        // Right face
-        12, 13, 14, 14, 15, 12,
-        // Top face
-        16, 17, 18, 18, 19, 16,
-        // Bottom face
-        20, 21, 22, 22, 23, 20
-    };
+    std::vector<uint16_t> indices = {// Front face
+                                     0, 1, 2, 2, 3, 0,
+                                     // Back face
+                                     4, 5, 6, 6, 7, 4,
+                                     // Left face
+                                     8, 9, 10, 10, 11, 8,
+                                     // Right face
+                                     12, 13, 14, 14, 15, 12,
+                                     // Top face
+                                     16, 17, 18, 18, 19, 16,
+                                     // Bottom face
+                                     20, 21, 22, 22, 23, 20};
 
     params.vertexData = vertices.data();
     params.vertexDataSize = vertices.size() * sizeof(float);
@@ -290,12 +288,12 @@ Mesh Primitives::CreateLine(float start, float end)
 
     // Simple line along X-axis from start to end
     std::vector<float> vertices = {
-        start, 0.0f, 0.0f,  // Start point
-        end,   0.0f, 0.0f   // End point
+        start, 0.0f, 0.0f, // Start point
+        end,   0.0f, 0.0f  // End point
     };
 
     std::vector<uint16_t> indices = {
-        0, 1  // Line indices
+        0, 1 // Line indices
     };
 
     params.vertexData = vertices.data();
@@ -308,4 +306,4 @@ Mesh Primitives::CreateLine(float start, float end)
     return Mesh(params);
 }
 
-}
+} // namespace Rapture

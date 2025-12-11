@@ -36,20 +36,20 @@ namespace Rapture {
         virtual uint32_t getExtensionCount() = 0;
 		
 		// Buffer swap control functions (implemented by derived classes)
-		virtual void setSwapMode(SwapMode mode) {}
-		virtual SwapMode getSwapMode() const { return static_cast<SwapMode>(0); } // Default implementation
+		virtual void setSwapMode(SwapMode mode) { m_swapMode = mode; }
+		virtual SwapMode getSwapMode() const { return m_swapMode; } 
 		virtual bool isTripleBufferingSupported() const { return false; }
 
 		static WindowContext* createWindow(int width, int height, const char* title);
 
 
 	protected:
-
 		struct ContextData {
 			int height;
 			int width;
 		} m_context_data;
-
+	private:
+		SwapMode m_swapMode = SwapMode::Immediate;
 
 	};
 

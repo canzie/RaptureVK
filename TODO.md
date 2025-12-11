@@ -1,3 +1,20 @@
+### The Return
+
+- look at csm flickering again
+- fix skybox
+- try to enable ddgi again -> try to improve perhaps
+- drag and drop textures for materials
+- ability to show texutres in properties panel
+- fix stencil buffer
+- jolt???
+- RC in 3d????, should be attemptable with opus ~ 50 bucks
+
+
+
+
+
+
+
 
 ### Components
 

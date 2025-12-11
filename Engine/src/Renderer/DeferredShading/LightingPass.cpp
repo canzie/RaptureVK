@@ -9,7 +9,7 @@
 
 namespace Rapture {
 
-struct PushConstants {
+struct LightingPushConstants {
 
     glm::vec4 cameraPos;
 
@@ -27,47 +27,33 @@ struct PushConstants {
     uint32_t probeIrradianceHandle;
     uint32_t probeVisibilityHandle;
 
-
     uint32_t padding[1];
 
     // Fog
     glm::vec4 fogColor;     // .rgb = color, .a = enabled
     glm::vec2 fogDistances; // .x = near, .y = far
-
 };
 
-LightingPass::LightingPass(
-    float width, 
-    float height, 
-    uint32_t framesInFlight, 
-    std::shared_ptr<GBufferPass> gBufferPass, 
-    std::shared_ptr<DynamicDiffuseGI> ddgi,
-    VkFormat colorFormat)
-    : m_framesInFlight(framesInFlight), 
-    m_currentFrame(0), 
-    m_width(width), 
-    m_height(height), 
-    m_gBufferPass(gBufferPass), 
-    m_ddgi(ddgi),
-    m_colorFormat(colorFormat) {
+LightingPass::LightingPass(float width, float height, uint32_t framesInFlight, std::shared_ptr<GBufferPass> gBufferPass,
+                           std::shared_ptr<DynamicDiffuseGI> ddgi, VkFormat colorFormat)
+    : m_framesInFlight(framesInFlight), m_currentFrame(0), m_colorFormat(colorFormat), m_gBufferPass(gBufferPass), m_ddgi(ddgi),
+      m_width(width), m_height(height)
+{
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
-    
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
-    auto& project = app.getProject();
+    auto &project = app.getProject();
 
     auto shaderPath = project.getProjectShaderDirectory();
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/ddgi/";
 
-
     auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/DeferredLighting.fs.glsl", shaderConfig);
-
-
 
     m_shader = shader;
     m_handle = handle;
@@ -78,7 +64,8 @@ LightingPass::LightingPass(
     m_fogSettings = FogSettings();
 }
 
-LightingPass::~LightingPass() {
+LightingPass::~LightingPass()
+{
     // Clean up descriptor sets
     m_descriptorSets.clear();
 
@@ -101,16 +88,13 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
     return spec;
 }
 
-void LightingPass::recordCommandBuffer(
-    std::shared_ptr<CommandBuffer> commandBuffer, 
-    std::shared_ptr<Scene> activeScene,
-    SceneRenderTarget& renderTarget,
-    uint32_t imageIndex,
-    uint32_t frameInFlightIndex) {
+void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                                       SceneRenderTarget &renderTarget, uint32_t imageIndex, uint32_t frameInFlightIndex)
+{
 
     RAPTURE_PROFILE_FUNCTION();
 
-    m_currentFrame = frameInFlightIndex;  
+    m_currentFrame = frameInFlightIndex;
 
     // Get render target properties
     VkImage targetImage = renderTarget.getImage(imageIndex);
@@ -121,8 +105,8 @@ void LightingPass::recordCommandBuffer(
     m_width = static_cast<float>(targetExtent.width);
     m_height = static_cast<float>(targetExtent.height);
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage); 
-    beginDynamicRendering(commandBuffer, targetImageView, targetExtent);               
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
+    beginDynamicRendering(commandBuffer, targetImageView, targetExtent);
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
     VkViewport viewport{};
@@ -148,7 +132,7 @@ void LightingPass::recordCommandBuffer(
         RP_CORE_WARN("LightingPass - No main camera found!");
     }
 
-    PushConstants pushConstants;
+    LightingPushConstants pushConstants;
     pushConstants.cameraPos = glm::vec4(cameraPos, 1.0f);
 
     pushConstants.GBufferAlbedoHandle = m_gBufferPass->getAlbedoTextureIndex();
@@ -163,7 +147,7 @@ void LightingPass::recordCommandBuffer(
     pushConstants.fogColor = glm::vec4(m_fogSettings.color, m_fogSettings.enabled ? 1.0f : 0.0f);
     pushConstants.fogDistances = glm::vec2(m_fogSettings.nearDistance, m_fogSettings.farDistance);
 
-    auto& reg = activeScene->getRegistry();
+    auto &reg = activeScene->getRegistry();
     auto lightView = reg.view<LightComponent>();
     auto shadowView = reg.view<ShadowComponent>();
     auto cascadedShadowView = reg.view<CascadedShadowComponent>();
@@ -182,31 +166,24 @@ void LightingPass::recordCommandBuffer(
         pushConstants.probeVisibilityHandle = 0;
     }
 
-    vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
-        m_pipeline->getPipelineLayoutVk(),
-        VK_SHADER_STAGE_FRAGMENT_BIT, 
-        0,
-        sizeof(PushConstants), 
-        &pushConstants);
+    vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                       sizeof(LightingPushConstants), &pushConstants);
 
-    DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // light and shadow and probe volume data
-    DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // bindless textures for gbuffer textures
+    // light and shadow and probe volume data
+    DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
+    // bindless textures for gbuffer textures
+    DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
 
-        
     // Draw 6 vertices for 2 triangles
     vkCmdDraw(commandBuffer->getCommandBufferVk(), 6, 1, 0, 0);
 
     vkCmdEndRendering(commandBuffer->getCommandBufferVk());
-
 }
 
-void LightingPass::createPipeline() {
+void LightingPass::createPipeline()
+{
 
-
-    std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -254,20 +231,21 @@ void LightingPass::createPipeline() {
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f; // Optional
-    rasterizer.depthBiasClamp = 0.0f; // Optional
-    rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+    rasterizer.depthBiasClamp = 0.0f;          // Optional
+    rasterizer.depthBiasSlopeFactor = 0.0f;    // Optional
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampling.minSampleShading = 1.0f; // Optional
-    multisampling.pSampleMask = nullptr; // Optional
+    multisampling.minSampleShading = 1.0f;          // Optional
+    multisampling.pSampleMask = nullptr;            // Optional
     multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
-    multisampling.alphaToOneEnable = VK_FALSE; // Optional
+    multisampling.alphaToOneEnable = VK_FALSE;      // Optional
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_TRUE;
     colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -282,7 +260,6 @@ void LightingPass::createPipeline() {
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &colorBlendAttachment;
 
-
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_FALSE;
@@ -294,8 +271,6 @@ void LightingPass::createPipeline() {
     depthStencil.back = {};
     depthStencil.minDepthBounds = 0.0f;
     depthStencil.maxDepthBounds = 1.0f;
-    
-    
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -310,13 +285,11 @@ void LightingPass::createPipeline() {
     config.shader = m_shader.lock();
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
-
 }
 
-
-void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, 
-                                         VkImageView targetImageView,
-                                         VkExtent2D targetExtent) {
+void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView,
+                                         VkExtent2D targetExtent)
+{
 
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -325,7 +298,7 @@ void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandB
     colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-    
+
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
@@ -339,13 +312,13 @@ void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandB
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, 
-                                                        VkImage targetImage) {
+void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage)
+{
 
     VkImageMemoryBarrier colorBarrier{};
     // Image layout transitions for dynamic rendering
     colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Always start from undefined for the first transition
+    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Always start from undefined for the first transition
     colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -355,18 +328,10 @@ void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBu
     colorBarrier.subresourceRange.levelCount = 1;
     colorBarrier.subresourceRange.baseArrayLayer = 0;
     colorBarrier.subresourceRange.layerCount = 1;
-    colorBarrier.srcAccessMask = 0;  // No access before
+    colorBarrier.srcAccessMask = 0; // No access before
     colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    
 
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &colorBarrier
-    );
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &colorBarrier);
 }
-}
+} // namespace Rapture

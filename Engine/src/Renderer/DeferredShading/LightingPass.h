@@ -1,18 +1,18 @@
 #ifndef RAPTURE__LIGHTING_PASS_H
 #define RAPTURE__LIGHTING_PASS_H
 
-#include "Shaders/Shader.h"
 #include "Pipelines/GraphicsPipeline.h"
+#include "Shaders/Shader.h"
 
 #include "AssetManager/AssetManager.h"
-#include "Scenes/Scene.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
-#include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
+#include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Cameras/CameraCommon.h"
+#include "Components/Components.h"
+#include "Scenes/Scene.h"
 #include "Textures/Texture.h"
 #include "WindowContext/VulkanContext/VulkanContext.h"
-#include "Components/Components.h"
 
 #include "RenderTargets/SceneRenderTarget.h"
 #include "Renderer/DeferredShading/GBufferPass.h"
@@ -30,14 +30,9 @@ struct FogSettings {
 };
 
 class LightingPass {
-public:
-    LightingPass(
-        float width, 
-        float height, 
-        uint32_t framesInFlight, 
-        std::shared_ptr<GBufferPass> gBufferPass,
-        std::shared_ptr<DynamicDiffuseGI> ddgi,
-        VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
+  public:
+    LightingPass(float width, float height, uint32_t framesInFlight, std::shared_ptr<GBufferPass> gBufferPass,
+                 std::shared_ptr<DynamicDiffuseGI> ddgi, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
 
     ~LightingPass();
 
@@ -51,28 +46,19 @@ public:
      * @param imageIndex The image index within the render target
      * @param frameInFlightIndex The current frame in flight index
      */
-    void recordCommandBuffer(
-        std::shared_ptr<CommandBuffer> commandBuffer, 
-        std::shared_ptr<Scene> activeScene,
-        SceneRenderTarget& renderTarget,
-        uint32_t imageIndex,
-        uint32_t frameInFlightIndex
-    );
+    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                             SceneRenderTarget &renderTarget, uint32_t imageIndex, uint32_t frameInFlightIndex);
 
-    FogSettings& getFogSettings() { return m_fogSettings; }
+    FogSettings &getFogSettings() { return m_fogSettings; }
 
-private:
+  private:
     void createPipeline();
 
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, 
-                               VkImageView targetImageView, 
-                               VkExtent2D targetExtent);
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, 
-                                              VkImage targetImage);
+    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView, VkExtent2D targetExtent);
+    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage);
 
-
-private:
-    std::weak_ptr<Shader> m_shader; 
+  private:
+    std::weak_ptr<Shader> m_shader;
     AssetHandle m_handle;
 
     uint32_t m_framesInFlight;
@@ -82,9 +68,7 @@ private:
     VmaAllocator m_vmaAllocator;
     VkDevice m_device;
 
-
     std::shared_ptr<GraphicsPipeline> m_pipeline;
-
 
     std::vector<std::shared_ptr<UniformBuffer>> m_lightUBOs;
     std::vector<std::shared_ptr<UniformBuffer>> m_shadowDataUBOs;
@@ -100,9 +84,8 @@ private:
     bool m_lightsChanged = true;
 
     FogSettings m_fogSettings;
-
 };
 
-}
+} // namespace Rapture
 
 #endif // RAPTURE__LIGHTING_PASS_H

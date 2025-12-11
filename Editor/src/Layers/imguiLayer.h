@@ -3,10 +3,10 @@
 
 #include "Layers/Layer.h"
 
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include <array>
 #include <cstddef>
 #include <iterator>
 #define GLFW_INCLUDE_NONE
@@ -19,27 +19,26 @@
 
 #include "Textures/Texture.h"
 
-#include "imguiPanels/ViewportPanel.h"
-#include "imguiPanels/ProprtiesPanel.h"
 #include "imguiPanels/BrowserPanel.h"
-#include "imguiPanels/GBufferPanel.h"
 #include "imguiPanels/ContentBrowserPanel.h"
+#include "imguiPanels/GBufferPanel.h"
 #include "imguiPanels/ImageViewerPanel.h"
+#include "imguiPanels/ProprtiesPanel.h"
 #include "imguiPanels/SettingsPanel.h"
+#include "imguiPanels/ViewportPanel.h"
 
 #include "RenderTargets/SwapChains/SwapChain.h"
 
-class ImGuiLayer : public Rapture::Layer
-{
-public:
+class ImGuiLayer : public Rapture::Layer {
+  public:
     ImGuiLayer();
     ~ImGuiLayer();
-    
+
     virtual void onAttach() override;
     virtual void onDetach() override;
     virtual void onUpdate(float ts) override;
 
-private:
+  private:
     // ImGui Vulkan logic, sets up the dynamic rendering and ImGui draw commands
     void drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImageView);
 
@@ -53,11 +52,11 @@ private:
 
     void handleSwapChainRecreation(std::shared_ptr<Rapture::SwapChain> newSwapChain);
 
-private:
+  private:
     float m_Time = 0.0f;
     float m_FontScale = 1.5f; // Default font scale
     bool m_framebufferNeedsResize = false;
-    size_t m_windowResizeEventListenerID = 0; 
+    size_t m_windowResizeEventListenerID = 0;
 
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
@@ -72,7 +71,10 @@ private:
     std::vector<VkSemaphore> m_imageAvailableSemaphores;
     std::vector<VkSemaphore> m_renderFinishedSemaphores;
 
-    //panels
+    // Cached formats used for ImGui dynamic rendering pipeline creation
+    std::array<VkFormat, 1> m_imguiColorAttachmentFormats{};
+
+    // panels
     ViewportPanel m_viewportPanel;
     PropertiesPanel m_propertiesPanel;
     BrowserPanel m_browserPanel;

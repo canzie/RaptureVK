@@ -32,7 +32,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR RAPTURE_DEBUG)
     endif()
 else()
     message(STATUS "Release build - Debug flags disabled")
-    #add_definitions(-DNDEBUG)
+    add_definitions(-DNDEBUG)
 endif()
 
 # Create engine executable (changed from library)
