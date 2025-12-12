@@ -301,11 +301,7 @@ void TLAS::build()
     auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
     auto commandBuffer = commandPool->getCommandBuffer();
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     // Build acceleration structure
     const VkAccelerationStructureBuildRangeInfoKHR *pBuildRangeInfo = &m_buildRangeInfo;
@@ -446,11 +442,7 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>> &in
         auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
         auto commandBuffer = commandPool->getCommandBuffer();
 
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+        commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
         // Update acceleration structure
         const VkAccelerationStructureBuildRangeInfoKHR *pBuildRangeInfo = &m_buildRangeInfo;

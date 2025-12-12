@@ -69,14 +69,9 @@ void GBufferPanel::renderTexture(const char* label, std::shared_ptr<Rapture::Tex
 void GBufferPanel::render() {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_initialized) {
-        updateDescriptorSets(); // Initial setup
-    }
-
-    ImGui::Begin("G-Buffer Inspector");
-
     std::shared_ptr<Rapture::GBufferPass> gbufferPass = Rapture::DeferredRenderer::getGBufferPass();
     if (!gbufferPass) {
+        ImGui::Begin("G-Buffer Inspector");
         ImGui::TextWrapped("G-Buffer pass not available. Ensure DeferredRenderer is initialized and a scene is rendering.");
         ImGui::End();
         return;
@@ -91,15 +86,56 @@ void GBufferPanel::render() {
         expectedTextures += 1; // Single depth view
     }
 
+    if (!m_initialized) {
+        updateDescriptorSets();
+    }
+
     // Ensure we have enough descriptor sets
     if (m_gbufferDescriptorSets.size() != expectedTextures) {
-        updateDescriptorSets(); // Attempt to re-initialize if size mismatch
+        updateDescriptorSets();
         if (m_gbufferDescriptorSets.size() != expectedTextures) {
+            ImGui::Begin("G-Buffer Inspector");
             ImGui::TextWrapped("Error: Could not initialize descriptor sets for all G-Buffer textures. Check logs.");
             ImGui::End();
             return;
         }
     }
+
+    // Detect texture changes (e.g., after resize) and invalidate all descriptor sets
+    std::vector<std::shared_ptr<Rapture::Texture>> currentTextures = {
+        gbufferPass->getPositionTexture(),
+        gbufferPass->getNormalTexture(),
+        gbufferPass->getAlbedoTexture(),
+        gbufferPass->getMaterialTexture()
+    };
+    if (depthTexture) {
+        currentTextures.push_back(depthTexture);
+        if (Rapture::hasStencilComponent(depthTexture->getSpecification().format)) {
+            currentTextures.push_back(depthTexture);
+        }
+    }
+
+    bool texturesChanged = m_cachedTextures.size() != currentTextures.size();
+    if (!texturesChanged) {
+        for (size_t i = 0; i < currentTextures.size(); i++) {
+            if (m_cachedTextures[i] != currentTextures[i]) {
+                texturesChanged = true;
+                break;
+            }
+        }
+    }
+
+    if (texturesChanged) {
+        for (auto& descSet : m_gbufferDescriptorSets) {
+            if (descSet != VK_NULL_HANDLE) {
+                ImGui_ImplVulkan_RemoveTexture(descSet);
+                descSet = VK_NULL_HANDLE;
+            }
+        }
+        m_cachedTextures = currentTextures;
+    }
+
+    ImGui::Begin("G-Buffer Inspector");
     
     int currentTextureIndex = 0;
 

@@ -272,14 +272,28 @@ void ImGuiLayer::updateViewportDescriptorSet()
         return;
     }
 
-    // Remove old descriptor set if it exists
-    if (m_viewportTextureDescriptorSets[m_currentFrame] != VK_NULL_HANDLE) {
-        ImGui_ImplVulkan_RemoveTexture(m_viewportTextureDescriptorSets[m_currentFrame]);
+    // Initialize cached textures vector if needed
+    if (m_cachedViewportTextures.size() != m_viewportTextureDescriptorSets.size()) {
+        m_cachedViewportTextures.resize(m_viewportTextureDescriptorSets.size());
     }
 
-    // Create new descriptor set for the scene render target texture
-    m_viewportTextureDescriptorSets[m_currentFrame] = ImGui_ImplVulkan_AddTexture(
-        texture->getSampler().getSamplerVk(), texture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    // Check if texture changed (e.g., after resize) - if so, invalidate ALL frame descriptor sets
+    if (m_cachedViewportTextures[m_currentFrame] != texture) {
+        for (size_t i = 0; i < m_viewportTextureDescriptorSets.size(); i++) {
+            if (m_viewportTextureDescriptorSets[i] != VK_NULL_HANDLE) {
+                ImGui_ImplVulkan_RemoveTexture(m_viewportTextureDescriptorSets[i]);
+                m_viewportTextureDescriptorSets[i] = VK_NULL_HANDLE;
+            }
+            m_cachedViewportTextures[i] = nullptr;
+        }
+    }
+
+    // Create new descriptor set if needed
+    if (m_viewportTextureDescriptorSets[m_currentFrame] == VK_NULL_HANDLE) {
+        m_viewportTextureDescriptorSets[m_currentFrame] = ImGui_ImplVulkan_AddTexture(
+            texture->getSampler().getSamplerVk(), texture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        m_cachedViewportTextures[m_currentFrame] = texture;
+    }
 }
 
 void ImGuiLayer::onUpdate(float ts)
@@ -330,16 +344,11 @@ void ImGuiLayer::onUpdate(float ts)
     }
 
     // Record ImGui command buffer
-    VkCommandBuffer imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame]->getCommandBufferVk();
+    auto& imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame];
 
-    m_imguiCommandBuffers[m_currentFrame]->reset();
+    imguiCommandBuffer->reset();
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = 0;
-    beginInfo.pInheritanceInfo = nullptr;
-
-    if (vkBeginCommandBuffer(imguiCommandBuffer, &beginInfo) != VK_SUCCESS) {
+    if (imguiCommandBuffer->begin(0) != VK_SUCCESS) {
         Rapture::RP_ERROR("failed to begin recording command buffer for ImGui!");
         return;
     }
@@ -349,10 +358,10 @@ void ImGuiLayer::onUpdate(float ts)
 
     {
         RAPTURE_PROFILE_SCOPE("ImGui Command Buffer Setup");
-        drawImGui(imguiCommandBuffer, targetImageView);
+        drawImGui(imguiCommandBuffer->getCommandBufferVk(), targetImageView);
     }
 
-    if (vkEndCommandBuffer(imguiCommandBuffer) != VK_SUCCESS) {
+    if (imguiCommandBuffer->end() != VK_SUCCESS) {
         Rapture::RP_ERROR("failed to record command buffer for ImGui!");
         return;
     }
@@ -547,6 +556,8 @@ void ImGuiLayer::onResize()
     // Resize descriptor set array to match new swapchain image count
     m_viewportTextureDescriptorSets.clear();
     m_viewportTextureDescriptorSets.resize(newImageCount, VK_NULL_HANDLE);
+    m_cachedViewportTextures.clear();
+    m_cachedViewportTextures.resize(newImageCount);
 
     // Recreate command buffers if image count changed
     if (newImageCount != m_imageCount) {

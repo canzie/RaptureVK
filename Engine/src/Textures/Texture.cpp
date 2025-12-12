@@ -368,11 +368,7 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
         internalCommandBuffer = commandPool->getCommandBuffer();
         commandBufferVk = internalCommandBuffer->getCommandBufferVk();
 
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        vkBeginCommandBuffer(commandBufferVk, &beginInfo);
+        internalCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     } else {
         commandBufferVk = extCommandBuffer;
     }
@@ -847,11 +843,7 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
     auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
     auto commandBuffer = commandPool->getCommandBuffer();
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -943,11 +935,7 @@ void Texture::generateMipmaps(size_t threadId)
     auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
     auto commandBuffer = commandPool->getCommandBuffer();
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1048,11 +1036,7 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
     auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
     auto commandBuffer = commandPool->getCommandBuffer();
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     std::vector<VkBufferImageCopy> bufferCopyRegions;
     uint32_t layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);

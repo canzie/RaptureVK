@@ -327,16 +327,11 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
 
     RAPTURE_PROFILE_FUNCTION();
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    beginInfo.pInheritanceInfo = nullptr;
-
     if (!m_skyboxPass->hasActiveSkybox() && activeScene->getSkyboxComponent()) {
         m_skyboxPass->setSkyboxTexture(activeScene->getSkyboxComponent()->skyboxTexture);
     }
 
-    if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
+    if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to begin recording command buffer!");
         return;
     }
@@ -413,7 +408,7 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
         RAPTURE_PROFILE_GPU_COLLECT(commandBuffer->getCommandBufferVk());
     }
 
-    if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
+    if (commandBuffer->end() != VK_SUCCESS) {
         RP_CORE_ERROR("failed to record command buffer!");
         return;
     }

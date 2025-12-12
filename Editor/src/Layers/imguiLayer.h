@@ -67,6 +67,7 @@ class ImGuiLayer : public Rapture::Layer {
 
     // Descriptor sets for the scene render target textures (used in viewport panel)
     std::vector<VkDescriptorSet> m_viewportTextureDescriptorSets;
+    std::vector<std::shared_ptr<Rapture::Texture>> m_cachedViewportTextures;
 
     std::vector<VkSemaphore> m_imageAvailableSemaphores;
     std::vector<VkSemaphore> m_renderFinishedSemaphores;

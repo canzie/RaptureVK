@@ -50,10 +50,6 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
         TracyProfiler::initGPUContext(vc.getPhysicalDevice(), vc.getLogicalDevice(), graphicsQueue->getQueueVk(),
                                       tempCmdBuffer->getCommandBufferVk());
-
-        tempCmdBuffer->end();
-        graphicsQueue->submitQueue(tempCmdBuffer);
-        graphicsQueue->waitIdle();
     }
 #endif // RAPTURE_TRACY_PROFILING_ENABLED
 

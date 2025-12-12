@@ -250,11 +250,7 @@ uint32_t DynamicDiffuseGI::getSunLightDataIndex(std::shared_ptr<Scene> scene)
 void DynamicDiffuseGI::clearTextures()
 {
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    if (vkBeginCommandBuffer(m_CommandBuffers[0]->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
+    if (m_CommandBuffers[0]->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::clearTextures - Failed to begin command buffer");
         return;
     }
@@ -302,7 +298,7 @@ void DynamicDiffuseGI::clearTextures()
     vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_PrevVisibilityTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
                          &clearColor, 1, &subresourceRange);
 
-    if (vkEndCommandBuffer(m_CommandBuffers[0]->getCommandBufferVk()) != VK_SUCCESS) {
+    if (m_CommandBuffers[0]->end() != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::clearTextures - Failed to end command buffer");
         return;
     }
@@ -466,11 +462,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     auto currentCommandBuffer = m_CommandBuffers[frameIndex];
 
     // Begin command buffer
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    if (vkBeginCommandBuffer(currentCommandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
+    if (currentCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::castRays - Failed to begin command buffer");
         return;
     }
@@ -525,7 +517,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     RAPTURE_PROFILE_GPU_COLLECT(currentCommandBuffer->getCommandBufferVk());
 
     // End command buffer
-    if (vkEndCommandBuffer(currentCommandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
+    if (currentCommandBuffer->end() != VK_SUCCESS) {
         RP_CORE_ERROR("DynamicDiffuseGI::populateProbesCompute - Failed to end command buffer");
         return;
     }

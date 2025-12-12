@@ -205,15 +205,11 @@ std::shared_ptr<VulkanQueue> VulkanContext::getComputeQueue() const
 
 std::shared_ptr<VulkanQueue> VulkanContext::getTransferQueue() const
 {
-    if (m_transferQueueIndex == -1) {
-        RP_CORE_ERROR("Transfer queue index is -1!");
-        throw std::runtime_error("Transfer queue index is -1!");
+    if (m_transferQueueIndex == -1 || !m_transferQueue) {
+        RP_CORE_WARN("Transfer queue not available, falling back to graphics queue");
+        return getGraphicsQueue();
     }
-    if (m_queues.find(m_transferQueueIndex) == m_queues.end()) {
-        RP_CORE_ERROR("Transfer queue index is not found!");
-        throw std::runtime_error("Transfer queue index is not found!");
-    }
-    return m_queues.find(m_transferQueueIndex)->second;
+    return m_transferQueue;
 }
 
 std::shared_ptr<VulkanQueue> VulkanContext::getPresentQueue() const
@@ -584,6 +580,7 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
 
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             indices.graphicsFamily = i;
+            indices.graphicsFamilyQueueCount = queueFamily.queueCount;
         }
 
         // Prefer a compute queue that also supports graphics for easier synchronization
@@ -618,13 +615,18 @@ void VulkanContext::createLogicalDevice()
         uniqueQueueFamilies.insert(indices.computeFamily.value());
     }
 
-    float queuePriority = 1.0f;
+    std::vector<float> queuePriorities = {1.0f, 1.0f};
     for (uint32_t queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo{};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        if (queueFamily == indices.graphicsFamily.value() && indices.graphicsFamilyQueueCount >= 2) {
+            queueCreateInfo.queueCount = 2;
+            queueCreateInfo.pQueuePriorities = queuePriorities.data();
+        } else {
+            queueCreateInfo.queueCount = 1;
+            queueCreateInfo.pQueuePriorities = &queuePriorities[0];
+        }
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
@@ -968,14 +970,14 @@ void VulkanContext::createLogicalDevice()
     // retrieve queues
     if (indices.graphicsFamily.value() == indices.presentFamily.value()) {
         // If graphics and present queues are from the same family, use the same instance
-        auto queue = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());
+        auto queue = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value(), 0, "graphics/present");
         m_queues[indices.graphicsFamily.value()] = queue;
         m_graphicsQueueIndex = indices.graphicsFamily.value();
         m_presentQueueIndex = indices.graphicsFamily.value();
     } else {
         // If they're from different families, create separate instances
-        m_queues[indices.graphicsFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());
-        m_queues[indices.presentFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.presentFamily.value());
+        m_queues[indices.graphicsFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value(), 0, "graphics");
+        m_queues[indices.presentFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.presentFamily.value(), 0, "present");
         m_graphicsQueueIndex = indices.graphicsFamily.value();
         m_presentQueueIndex = indices.presentFamily.value();
     }
@@ -984,7 +986,7 @@ void VulkanContext::createLogicalDevice()
     if (indices.computeFamily.has_value()) {
         // Check if compute queue family is different from already created queues
         if (m_queues.find(indices.computeFamily.value()) == m_queues.end()) {
-            m_queues[indices.computeFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.computeFamily.value());
+            m_queues[indices.computeFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.computeFamily.value(), 0, "compute");
         }
         m_computeQueueIndex = indices.computeFamily.value();
         RP_CORE_INFO("Compute queue created using family index: {}", indices.computeFamily.value());
@@ -993,7 +995,15 @@ void VulkanContext::createLogicalDevice()
         RP_CORE_WARN("No compute queue family found!");
     }
 
-    m_transferQueueIndex = -1;
+    // Create dedicated transfer queue from the graphics family if possible
+    if (indices.graphicsFamilyQueueCount >= 2) {
+        m_transferQueue = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value(), 1, "transfer");
+        m_transferQueueIndex = static_cast<int>(indices.graphicsFamily.value());
+        RP_CORE_INFO("Dedicated transfer queue created using graphics family index: {}, queue index: 1", indices.graphicsFamily.value());
+    } else {
+        m_transferQueueIndex = -1;
+        RP_CORE_WARN("Graphics family only supports 1 queue, no dedicated transfer queue available");
+    }
 
     RP_CORE_INFO("Logical device created successfully!");
 }

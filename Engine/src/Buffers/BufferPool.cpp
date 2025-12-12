@@ -101,11 +101,7 @@ void BufferAllocation::uploadData(const void* data, VkDeviceSize size, VkDeviceS
     }
     
     // Begin command buffer
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    
-    vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo);
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     
     // Record copy command
     VkBufferCopy copyRegion{};

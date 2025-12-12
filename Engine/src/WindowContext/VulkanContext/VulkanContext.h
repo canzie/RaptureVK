@@ -120,6 +120,7 @@ class VulkanContext {
     int m_presentQueueIndex;
 
     std::map<uint32_t, std::shared_ptr<VulkanQueue>> m_queues;
+    std::shared_ptr<VulkanQueue> m_transferQueue;
 
     VkSurfaceKHR m_surface;
 

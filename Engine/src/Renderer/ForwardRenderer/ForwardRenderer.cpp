@@ -449,12 +449,7 @@ void ForwardRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> command
 
     RAPTURE_PROFILE_FUNCTION();
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    beginInfo.pInheritanceInfo = nullptr; // Optional
-
-    if (vkBeginCommandBuffer(commandBuffer->getCommandBufferVk(), &beginInfo) != VK_SUCCESS) {
+    if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to begin recording command buffer!");
         throw std::runtime_error("failed to begin recording command buffer!");
     }
@@ -568,7 +563,7 @@ void ForwardRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> command
                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &presentBarrier);
     }
 
-    if (vkEndCommandBuffer(commandBuffer->getCommandBufferVk()) != VK_SUCCESS) {
+    if (commandBuffer->end() != VK_SUCCESS) {
         RP_CORE_ERROR("failed to record command buffer!");
         throw std::runtime_error("failed to record command buffer!");
     }
