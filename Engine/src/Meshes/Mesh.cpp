@@ -49,7 +49,7 @@ void Mesh::setMeshData(AllocatorParams &params)
     m_vertexAllocation = m_vertexBuffer->getBufferAllocation();
 
     if (!m_indexAllocation || !m_vertexAllocation) {
-        RP_CORE_ERROR("Mesh::setMeshData - Failed to create vertex or index buffer!");
+        RP_CORE_ERROR("Failed to create vertex or index buffer!");
         return;
     }
 }

@@ -50,12 +50,12 @@ void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer)
 {
 #if FLATTENING_ENABLED
     if (!m_inputTexture || !m_flattenedTexture) {
-        RP_CORE_ERROR("FlattenTexture::update - Invalid textures");
+        RP_CORE_ERROR("Invalid textures");
         return;
     }
 
     if (!TextureFlattener::s_initialized) {
-        RP_CORE_ERROR("FlattenTexture::update - TextureFlattener not initialized");
+        RP_CORE_ERROR("TextureFlattener not initialized");
         return;
     }
 
@@ -170,12 +170,12 @@ std::shared_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shar
                                                                        const std::string &name, FlattenerDataType dataType)
 {
     if (!inputTexture) {
-        RP_CORE_ERROR("TextureFlattener::createFlattenTexture - Input texture is null");
+        RP_CORE_ERROR("Input texture is null");
         return nullptr;
     }
 
     if (inputTexture->getSpecification().type != TextureType::TEXTURE2D_ARRAY) {
-        RP_CORE_ERROR("TextureFlattener::createFlattenTexture - Input texture must be a 2D array");
+        RP_CORE_ERROR("Input texture must be a 2D array");
         return nullptr;
     }
 
@@ -190,7 +190,7 @@ std::shared_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shar
     // Create the flattened output texture
     auto flattenedTexture = createFlattenedTextureSpec(inputTexture);
     if (!flattenedTexture) {
-        RP_CORE_ERROR("TextureFlattener::createFlattenTexture - Failed to create output texture");
+        RP_CORE_ERROR("Failed to create output texture");
         return nullptr;
     }
 
@@ -230,7 +230,7 @@ void TextureFlattener::initializeSharedResources()
     s_flattenDepthPipeline = std::make_shared<ComputePipeline>(flattenDepthConfig);
 
     s_initialized = true;
-    RP_CORE_INFO("TextureFlattener: Initialized shared resources (depth shader)");
+    RP_CORE_INFO("Initialized shared resources (depth shader)");
 }
 
 void TextureFlattener::getOrCreateShaderAndPipeline(FlattenerDataType dataType)
@@ -266,7 +266,7 @@ void TextureFlattener::getOrCreateShaderAndPipeline(FlattenerDataType dataType)
     pipelineConfig.shader = shader;
     s_flattenPipelines[dataType] = std::make_shared<ComputePipeline>(pipelineConfig);
 
-    RP_CORE_INFO("TextureFlattener: Created shader and pipeline for data type {}", (int)dataType);
+    RP_CORE_INFO("Created shader and pipeline for data type {}", (int)dataType);
 }
 
 std::shared_ptr<Texture> TextureFlattener::createFlattenedTextureSpec(std::shared_ptr<Texture> inputTexture)

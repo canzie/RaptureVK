@@ -235,7 +235,7 @@ class ModelLoadersCache {
     static std::shared_ptr<glTF2Loader> getLoader(const std::filesystem::path &filepath, std::shared_ptr<Scene> scene = nullptr)
     {
         if (!s_initialized) {
-            RP_CORE_ERROR("ModelLoadersCache - Not initialized");
+            RP_CORE_ERROR("Not initialized");
             return nullptr;
         }
 
@@ -243,7 +243,7 @@ class ModelLoadersCache {
             if (auto loader = s_loaders[filepath].lock()) {
                 return loader;
             } else {
-                RP_CORE_WARN("ModelLoadersCache - Loader for '{}' expired, removing from cache", filepath.string());
+                RP_CORE_WARN("Loader for '{}' expired, removing from cache", filepath.string());
                 s_loaders.erase(filepath);
             }
         }
@@ -255,7 +255,7 @@ class ModelLoadersCache {
             std::lock_guard<std::mutex> lock(s_mutex);
 
             if (!loader->initialize(filepath.string())) {
-                RP_CORE_ERROR("ModelLoadersCache::getLoader - Failed to initialize loader for '{}'", filepath.string());
+                RP_CORE_ERROR("Failed to initialize loader for '{}'", filepath.string());
                 return nullptr;
             }
             s_loaders[filepath] = loader;

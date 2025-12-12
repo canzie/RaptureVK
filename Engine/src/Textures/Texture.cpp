@@ -143,12 +143,16 @@ Texture::Texture(TextureSpecification spec)
     createImage();
     createImageView();
 
-    // For depth textures, transition to the correct layout
     if (isDepthFormat(m_spec.format)) {
         transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
         RP_CORE_INFO("Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout");
+    } else if (m_spec.storageImage) {
+        transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        RP_CORE_INFO("Transitioned storage image to GENERAL layout");
+    } else {
+        transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        m_readyForSampling = true;
     }
-    // m_readyForSampling = true;
 }
 
 Texture::~Texture()
@@ -549,10 +553,10 @@ void Texture::createImage()
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
 
     if (m_spec.width == 0 || m_spec.height == 0 || m_spec.depth == 0) {
-        RP_CORE_ERROR("Texture::createImage() - Invalid texture specification --- dimesnions should be greater than 0! width: {}, "
+        RP_CORE_ERROR("Invalid texture specification --- dimesnions should be greater than 0! width: {}, "
                       "height: {}, depth: {}",
                       m_spec.width, m_spec.height, m_spec.depth);
-        throw std::runtime_error("Texture::createImage() - Invalid texture specification!");
+        throw std::runtime_error("Invalid texture specification!");
     }
 
     VkImageCreateInfo imageInfo{};
@@ -590,8 +594,8 @@ void Texture::createImage()
     allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
     if (vmaCreateImage(allocator, &imageInfo, &allocInfo, &m_image, &m_allocation, nullptr) != VK_SUCCESS) {
-        RP_CORE_ERROR("Texture::createImage() - Failed to create image!");
-        throw std::runtime_error("Texture::createImage() - Failed to create image!");
+        RP_CORE_ERROR("Failed to create image!");
+        throw std::runtime_error("Failed to create image!");
     }
 }
 
@@ -669,12 +673,12 @@ VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) 
         imageInfo.imageView = m_imageViewDepthOnly;
         break;
     default:
-        RP_CORE_WARN("Texture::getDescriptorImageInfo - Invalid texture view type! Using default view.");
+        RP_CORE_WARN("Invalid texture view type! Using default view.");
         imageInfo.imageView = m_imageView;
         break;
     }
     if (imageInfo.imageView == VK_NULL_HANDLE) {
-        RP_CORE_WARN("Texture::getDescriptorImageInfo - Invalid texture view type! Using default view.");
+        RP_CORE_WARN("Invalid texture view type! Using default view.");
         imageInfo.imageView = m_imageView;
     }
 
@@ -883,6 +887,12 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
     } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL) {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;

@@ -19,7 +19,7 @@ shaderc_include_result *ShaderIncluder::GetInclude(const char *requested_source,
 
     std::ifstream file(fullPath);
     if (!file.is_open()) {
-        RP_CORE_ERROR("ShaderIncluder: Could not open include file: {0}", fullPath.string());
+        RP_CORE_ERROR("Could not open include file: {0}", fullPath.string());
         // Return an error to shaderc
         auto *error_data = new shaderc_include_result;
         error_data->source_name = "";
@@ -61,7 +61,7 @@ void ShaderIncluder::ReleaseInclude(shaderc_include_result *data)
 ShaderCompiler::ShaderCompiler()
 {
     if (!m_compiler.IsValid()) {
-        RP_CORE_ERROR("ShaderCompiler: Shaderc compiler is not valid.");
+        RP_CORE_ERROR("Shaderc compiler is not valid.");
         throw std::runtime_error("Failed to initialize shader compiler");
     }
 }
@@ -80,13 +80,13 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
 
     shaderc_shader_kind kind = getShaderKind(path);
     if (kind == (shaderc_shader_kind)-1) {
-        RP_CORE_ERROR("ShaderCompiler: Unknown shader file extension in path: {0}", path.string());
+        RP_CORE_ERROR("Unknown shader file extension in path: {0}", path.string());
         return {};
     }
 
     std::string source = readFile(path);
     if (source.empty()) {
-        RP_CORE_ERROR("ShaderCompiler: Failed to read shader file: {0}", path.string());
+        RP_CORE_ERROR("Failed to read shader file: {0}", path.string());
         return {};
     }
 

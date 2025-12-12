@@ -153,12 +153,12 @@ void StencilBorderPass::createPipeline()
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_shader.expired()) {
-        RP_CORE_ERROR("StencilBorderPass: Shader not loaded, cannot create pipeline.");
+        RP_CORE_ERROR("Shader not loaded, cannot create pipeline.");
         return;
     }
     auto shaderShared = m_shader.lock();
     if (!shaderShared) {
-        RP_CORE_ERROR("StencilBorderPass: Shader is null after lock, cannot create pipeline.");
+        RP_CORE_ERROR("Shader is null after lock, cannot create pipeline.");
         return;
     }
 

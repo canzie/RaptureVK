@@ -22,8 +22,8 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
     }
 
     if (allocator == nullptr) {
-        RP_CORE_ERROR("MaterialInstance::MaterialInstance - allocator is nullptr!");
-        throw std::runtime_error("MaterialInstance::MaterialInstance - allocator is nullptr!");
+        RP_CORE_ERROR("allocator is nullptr!");
+        throw std::runtime_error("allocator is nullptr!");
     }
 
     // Create uniform buffer
@@ -99,7 +99,7 @@ void MaterialInstance::setParameter(ParameterID id, std::shared_ptr<Texture> tex
             m_pendingTextures.push_back({id, texture});
         }
     } else {
-        RP_CORE_WARN("MaterialInstance::setParameter: Parameter ID '{}' not found for this material", parameterIdToString(id));
+        RP_CORE_WARN("Parameter ID '{}' not found for this material", parameterIdToString(id));
     }
 }
 

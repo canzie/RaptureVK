@@ -76,8 +76,8 @@ void SwapChain::invalidate()
 {
 
     if (m_device == VK_NULL_HANDLE) {
-        RP_CORE_ERROR("SwapChain::invalidate - logical device is nullptr!");
-        throw std::runtime_error("SwapChain::invalidate - logical device is nullptr!");
+        RP_CORE_ERROR("logical device is nullptr!");
+        throw std::runtime_error("logical device is nullptr!");
     }
 
     // destroy if old swapchain exists to prevent memory leaks
@@ -169,7 +169,7 @@ void SwapChain::createImageViews()
         createInfo.subresourceRange.layerCount = 1;
 
         if (vkCreateImageView(m_device, &createInfo, nullptr, &m_swapChainImageViews[i]) != VK_SUCCESS) {
-            RP_CORE_ERROR("SwapChain::createImageViews - failed to create image views!");
+            RP_CORE_ERROR("failed to create image views!");
             throw std::runtime_error("SwapChain::createImageViews - failed to create image views!");
         }
     }
@@ -194,7 +194,7 @@ void SwapChain::createDepthTexture()
 void SwapChain::createSyncObjects()
 {
     if (m_imageCount == 0) {
-        RP_CORE_WARN("SwapChain::createSyncObjects - Attempted to create sync "
+        RP_CORE_WARN("Attempted to create sync "
                      "objects with imageCount 0.");
         return;
     }
@@ -249,7 +249,7 @@ VkSemaphore SwapChain::getImageAvailableSemaphore(uint32_t frameIndex) const
     if (frameIndex < m_imageAvailableSemaphores.size()) {
         return m_imageAvailableSemaphores[frameIndex];
     }
-    RP_CORE_ERROR("SwapChain::getImageAvailableSemaphore - Invalid frame index "
+    RP_CORE_ERROR("Invalid frame index "
                   "{} requested.",
                   frameIndex);
     return VK_NULL_HANDLE; // Or throw
@@ -260,7 +260,7 @@ VkSemaphore SwapChain::getRenderFinishedSemaphore(uint32_t frameIndex) const
     if (frameIndex < m_renderFinishedSemaphores.size()) {
         return m_renderFinishedSemaphores[frameIndex];
     }
-    RP_CORE_ERROR("SwapChain::getRenderFinishedSemaphore - Invalid frame index "
+    RP_CORE_ERROR("Invalid frame index "
                   "{} requested.",
                   frameIndex);
     return VK_NULL_HANDLE; // Or throw
@@ -271,7 +271,7 @@ VkFence SwapChain::getInFlightFence(uint32_t frameIndex) const
     if (frameIndex < m_inFlightFences.size()) {
         return m_inFlightFences[frameIndex];
     }
-    RP_CORE_ERROR("SwapChain::getInFlightFence - Invalid frame index {} requested.", frameIndex);
+    RP_CORE_ERROR("Invalid frame index {} requested.", frameIndex);
     return VK_NULL_HANDLE; // Or throw
 }
 
@@ -282,7 +282,7 @@ int SwapChain::acquireImage(uint32_t semaphoreIndex)
         return availability.frameIndex;
     } else {
 
-        RAPTURE_PROFILE_SCOPE("SwapChain::acquireImage - Wait for fence");
+        RAPTURE_PROFILE_SCOPE("Wait for fence");
         vkWaitForFences(m_device, 1, &m_inFlightFences[semaphoreIndex], VK_TRUE, UINT64_MAX);
 
         VkSemaphore currentImageAvailableSemaphore = m_imageAvailableSemaphores[semaphoreIndex];
@@ -295,7 +295,7 @@ int SwapChain::acquireImage(uint32_t semaphoreIndex)
 
             return -1;
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-            RP_CORE_ERROR("SwapChain::acquireImage - failed to acquire swap chain image!");
+            RP_CORE_ERROR("failed to acquire swap chain image!");
             throw std::runtime_error("SwapChain::acquireImage - failed to acquire swap chain image!");
         }
 

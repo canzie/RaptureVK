@@ -12,7 +12,7 @@ void Frustum::update(const glm::mat4 &projection, const glm::mat4 &view)
 
     // Validate input matrices to prevent crashes
     if (glm::any(glm::isnan(projection[0])) || glm::any(glm::isnan(view[0]))) {
-        RP_CORE_ERROR("Frustum::update - Received NaN in input matrices, skipping frustum update");
+        RP_CORE_ERROR("Received NaN in input matrices, skipping frustum update");
         return;
     }
 
@@ -27,8 +27,7 @@ void Frustum::update(const glm::mat4 &projection, const glm::mat4 &view)
     }
 
     if (projectionIsZero || viewIsZero) {
-        RP_CORE_WARN("Frustum::update - Received zero matrix (projection: {}, view: {}), skipping frustum update", projectionIsZero,
-                     viewIsZero);
+        RP_CORE_WARN("Received zero matrix (projection: {}, view: {}), skipping frustum update", projectionIsZero, viewIsZero);
         return;
     }
 
@@ -79,7 +78,7 @@ void Frustum::update(const glm::mat4 &projection, const glm::mat4 &view)
         {
             plane /= length;
         } else {
-            RP_CORE_WARN("Frustum plane normalization failed: near-zero length");
+            RP_CORE_WARN("Plane normalization failed: near-zero length");
         }
     }
 }

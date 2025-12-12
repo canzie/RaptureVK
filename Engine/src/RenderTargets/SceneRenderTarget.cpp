@@ -16,7 +16,7 @@ SceneRenderTarget::SceneRenderTarget(std::shared_ptr<SwapChain> swapChain) : m_t
 {
 
     if (!m_swapChain) {
-        RP_CORE_ERROR("SceneRenderTarget - Cannot create swapchain target with null swapchain");
+        RP_CORE_ERROR("Cannot create swapchain target with null swapchain");
         return;
     }
 
@@ -57,13 +57,13 @@ void SceneRenderTarget::createOffscreenTextures(uint32_t width, uint32_t height,
 void SceneRenderTarget::resize(uint32_t width, uint32_t height)
 {
     if (m_type == TargetType::SWAPCHAIN) {
-        RP_CORE_WARN("SceneRenderTarget::resize - Cannot manually resize swapchain target. "
+        RP_CORE_WARN("Cannot manually resize swapchain target. "
                      "Swapchain resize is handled separately.");
         return;
     }
 
     if (width == 0 || height == 0) {
-        RP_CORE_WARN("SceneRenderTarget::resize - Invalid dimensions: {}x{}", width, height);
+        RP_CORE_WARN("Invalid dimensions: {}x{}", width, height);
         return;
     }
 
@@ -101,14 +101,14 @@ VkImage SceneRenderTarget::getImage(uint32_t index) const
         if (m_swapChain && index < m_swapChain->getImageCount()) {
             return m_swapChain->getImages()[index];
         }
-        RP_CORE_ERROR("SceneRenderTarget::getImage - Invalid index {} for swapchain", index);
+        RP_CORE_ERROR("Invalid index {} for swapchain", index);
         return VK_NULL_HANDLE;
     }
 
     if (index < m_offscreenTextures.size()) {
         return m_offscreenTextures[index]->getImage();
     }
-    RP_CORE_ERROR("SceneRenderTarget::getImage - Invalid index {} for offscreen target", index);
+    RP_CORE_ERROR("Invalid index {} for offscreen target", index);
     return VK_NULL_HANDLE;
 }
 
@@ -118,14 +118,14 @@ VkImageView SceneRenderTarget::getImageView(uint32_t index) const
         if (m_swapChain && index < m_swapChain->getImageCount()) {
             return m_swapChain->getImageViews()[index];
         }
-        RP_CORE_ERROR("SceneRenderTarget::getImageView - Invalid index {} for swapchain", index);
+        RP_CORE_ERROR("Invalid index {} for swapchain", index);
         return VK_NULL_HANDLE;
     }
 
     if (index < m_offscreenTextures.size()) {
         return m_offscreenTextures[index]->getImageView();
     }
-    RP_CORE_ERROR("SceneRenderTarget::getImageView - Invalid index {} for offscreen target", index);
+    RP_CORE_ERROR("Invalid index {} for offscreen target", index);
     return VK_NULL_HANDLE;
 }
 
@@ -153,14 +153,14 @@ uint32_t SceneRenderTarget::getImageCount() const
 std::shared_ptr<Texture> SceneRenderTarget::getTexture(uint32_t index) const
 {
     if (m_type == TargetType::SWAPCHAIN) {
-        RP_CORE_WARN("SceneRenderTarget::getTexture - Swapchain targets don't have Texture objects");
+        RP_CORE_WARN("Swapchain targets don't have Texture objects");
         return nullptr;
     }
 
     if (index < m_offscreenTextures.size()) {
         return m_offscreenTextures[index];
     }
-    RP_CORE_ERROR("SceneRenderTarget::getTexture - Invalid index {}", index);
+    RP_CORE_ERROR("Invalid index {}", index);
     return nullptr;
 }
 

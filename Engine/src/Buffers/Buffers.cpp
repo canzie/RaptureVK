@@ -17,33 +17,31 @@ Buffer::Buffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator)
 
 Buffer::~Buffer()
 {
-    if (!m_bufferAllocation)
-        destoryObjects();
+    if (!m_bufferAllocation) destoryObjects();
 }
 
 void Buffer::destoryObjects()
 {
-    if (m_Buffer != VK_NULL_HANDLE && m_Allocation != VK_NULL_HANDLE)
-        vmaDestroyBuffer(m_Allocator, m_Buffer, m_Allocation);
+    if (m_Buffer != VK_NULL_HANDLE && m_Allocation != VK_NULL_HANDLE) vmaDestroyBuffer(m_Allocator, m_Buffer, m_Allocation);
 }
 
 void Buffer::addData(void *newData, VkDeviceSize size, VkDeviceSize offset)
 {
     // Check for buffer overflow
     if (offset + size > m_Size) {
-        RP_CORE_ERROR("Buffer::addData - Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}",
-                      size, offset, m_Size);
+        RP_CORE_ERROR("Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}", size, offset,
+                      m_Size);
         return;
     }
 
     if (!(m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
-        RP_CORE_ERROR("Buffer::addData - Buffer is not host visible! Use addDataGPU for device local buffers.");
+        RP_CORE_ERROR("Buffer is not host visible! Use addDataGPU for device local buffers.");
         return;
     }
 
     void *mappedData;
     if (vmaMapMemory(m_Allocator, m_Allocation, &mappedData) != VK_SUCCESS) {
-        RP_CORE_ERROR("Buffer::addData - Failed to map memory!");
+        RP_CORE_ERROR("Failed to map memory!");
         return;
     }
 
@@ -104,31 +102,27 @@ VkDescriptorBufferInfo Buffer::getDescriptorBufferInfo() const
 
 VkBuffer Buffer::getBufferVk() const
 {
-    if (m_bufferAllocation)
-        return m_bufferAllocation->getBuffer();
+    if (m_bufferAllocation) return m_bufferAllocation->getBuffer();
     return m_Buffer;
 }
 
 VkDeviceSize Buffer::getSize() const
 {
-    if (m_bufferAllocation)
-        return m_bufferAllocation->sizeBytes;
+    if (m_bufferAllocation) return m_bufferAllocation->sizeBytes;
     return m_Size;
 }
 
 VkDeviceSize Buffer::getOffset() const
 {
-    if (m_bufferAllocation)
-        return m_bufferAllocation->offsetBytes;
+    if (m_bufferAllocation) return m_bufferAllocation->offsetBytes;
     return 0;
 }
 
 std::shared_ptr<BufferAllocation> Buffer::getBufferAllocation()
 {
-    if (m_bufferAllocation)
-        return m_bufferAllocation;
+    if (m_bufferAllocation) return m_bufferAllocation;
 
-    RP_CORE_ERROR("Buffer::getBufferAllocation() called on a non-pooled buffer!");
+    RP_CORE_ERROR("Called on a non-pooled buffer!");
     return nullptr;
 }
 
@@ -140,7 +134,7 @@ void Buffer::setBufferAllocation(std::shared_ptr<BufferAllocation> allocation)
 void Buffer::createBuffer()
 {
     if (m_bufferAllocation) {
-        RP_CORE_ERROR("createBuffer() called on a pooled buffer!");
+        RP_CORE_ERROR("Called on a pooled buffer!");
         return;
     }
 

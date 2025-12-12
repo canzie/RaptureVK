@@ -54,7 +54,7 @@ void ComputePipeline::createPipelineLayout(const ComputePipelineConfiguration &c
     pipelineLayoutInfo.pPushConstantRanges = config.shader->getPushConstantLayouts().data();
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
-        RP_CORE_ERROR("ComputePipeline::createPipelineLayout - failed to create pipeline layout!");
+        RP_CORE_ERROR("failed to create pipeline layout!");
         throw std::runtime_error("ComputePipeline::createPipelineLayout - failed to create pipeline layout!");
     }
 }
@@ -79,7 +79,7 @@ void ComputePipeline::createPipeline(const ComputePipelineConfiguration &config)
     }
 
     if (!foundComputeStage) {
-        RP_CORE_ERROR("ComputePipeline::createPipeline - no compute shader stage found!");
+        RP_CORE_ERROR("no compute shader stage found!");
         throw std::runtime_error("ComputePipeline::createPipeline - no compute shader stage found!");
     }
 
@@ -93,7 +93,7 @@ void ComputePipeline::createPipeline(const ComputePipelineConfiguration &config)
     pipelineInfo.basePipelineIndex = -1;              // Optional
 
     if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS) {
-        RP_CORE_ERROR("ComputePipeline::createPipeline - failed to create compute pipeline!");
+        RP_CORE_ERROR("failed to create compute pipeline!");
         throw std::runtime_error("ComputePipeline::createPipeline - failed to create compute pipeline!");
     }
 }

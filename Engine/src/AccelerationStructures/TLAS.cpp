@@ -21,8 +21,8 @@ TLAS::TLAS()
     auto &vulkanContext = app.getVulkanContext();
 
     if (!vulkanContext.isRayTracingEnabled()) {
-        RP_CORE_ERROR("TLAS: Ray tracing is not enabled on this device!");
-        throw std::runtime_error("TLAS: Ray tracing is not enabled on this device!");
+        RP_CORE_ERROR("Ray tracing is not enabled on this device!");
+        throw std::runtime_error("Ray tracing is not enabled on this device!");
     }
 
     m_device = vulkanContext.getLogicalDevice();
@@ -62,12 +62,12 @@ TLAS::~TLAS()
 void TLAS::addInstance(const TLASInstance &instance)
 {
     if (!instance.blas) {
-        RP_CORE_ERROR("TLAS: Cannot add instance with null BLAS!");
+        RP_CORE_ERROR("Cannot add instance with null BLAS!");
         return;
     }
 
     if (!instance.blas->isBuilt()) {
-        RP_CORE_ERROR("TLAS: Cannot add instance with unbuilt BLAS!");
+        RP_CORE_ERROR("Cannot add instance with unbuilt BLAS!");
         return;
     }
 
@@ -75,7 +75,7 @@ void TLAS::addInstance(const TLASInstance &instance)
     m_needsRebuild = true;
 
     if (m_isBuilt) {
-        RP_CORE_INFO("TLAS: Instance added, rebuild required");
+        RP_CORE_INFO("Instance added, rebuild required");
     }
 }
 
@@ -89,7 +89,7 @@ void TLAS::clear()
 void TLAS::createInstanceBuffer()
 {
     if (m_instances.empty()) {
-        RP_CORE_ERROR("TLAS: Cannot create instance buffer with no instances!");
+        RP_CORE_ERROR("Cannot create instance buffer with no instances!");
         return;
     }
 
@@ -116,7 +116,7 @@ void TLAS::createInstanceBuffer()
     VmaAllocationInfo allocInfo{};
     if (vmaCreateBuffer(m_allocator, &bufferCreateInfo, &allocCreateInfo, &m_instanceBuffer, &m_instanceAllocation, &allocInfo) !=
         VK_SUCCESS) {
-        RP_CORE_ERROR("TLAS: Failed to create instance buffer!");
+        RP_CORE_ERROR("Failed to create instance buffer!");
         throw std::runtime_error("TLAS: Failed to create instance buffer!");
     }
 
@@ -144,7 +144,7 @@ void TLAS::createInstanceBuffer()
 void TLAS::createAccelerationStructure()
 {
     if (m_instances.empty()) {
-        RP_CORE_ERROR("TLAS: Cannot create acceleration structure with no instances!");
+        RP_CORE_ERROR("Cannot create acceleration structure with no instances!");
         return;
     }
 
@@ -217,7 +217,7 @@ void TLAS::createAccelerationStructure()
     allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
     if (vmaCreateBuffer(m_allocator, &bufferCreateInfo, &allocCreateInfo, &m_buffer, &m_allocation, nullptr) != VK_SUCCESS) {
-        RP_CORE_ERROR("TLAS: Failed to create acceleration structure buffer!");
+        RP_CORE_ERROR("Failed to create acceleration structure buffer!");
         throw std::runtime_error("TLAS: Failed to create acceleration structure buffer!");
     }
 
@@ -229,7 +229,7 @@ void TLAS::createAccelerationStructure()
     createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 
     if (vulkanContext.vkCreateAccelerationStructureKHR(m_device, &createInfo, nullptr, &m_accelerationStructure) != VK_SUCCESS) {
-        RP_CORE_ERROR("TLAS: Failed to create acceleration structure!");
+        RP_CORE_ERROR("Failed to create acceleration structure!");
         throw std::runtime_error("TLAS: Failed to create acceleration structure!");
     }
 
@@ -240,13 +240,13 @@ void TLAS::createAccelerationStructure()
 
     m_deviceAddress = vulkanContext.vkGetAccelerationStructureDeviceAddressKHR(m_device, &addressInfo);
 
-    RP_CORE_INFO("TLAS: Acceleration structure created successfully");
+    RP_CORE_INFO("Acceleration structure created successfully");
 }
 
 void TLAS::build()
 {
     if (m_instances.empty()) {
-        RP_CORE_ERROR("TLAS: Cannot build acceleration structure with no instances!");
+        RP_CORE_ERROR("Cannot build acceleration structure with no instances!");
         return;
     }
 
@@ -276,7 +276,7 @@ void TLAS::build()
 
     if (vmaCreateBuffer(m_allocator, &scratchBufferCreateInfo, &scratchAllocCreateInfo, &m_scratchBuffer, &m_scratchAllocation,
                         nullptr) != VK_SUCCESS) {
-        RP_CORE_ERROR("TLAS: Failed to create scratch buffer!");
+        RP_CORE_ERROR("Failed to create scratch buffer!");
         throw std::runtime_error("TLAS: Failed to create scratch buffer!");
     }
 

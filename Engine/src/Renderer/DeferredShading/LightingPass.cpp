@@ -77,7 +77,7 @@ LightingPass::~LightingPass()
 FramebufferSpecification LightingPass::getFramebufferSpecification()
 {
     if (m_colorFormat == VK_FORMAT_UNDEFINED) {
-        RP_CORE_ERROR("LightingPass - Invalid color format!");
+        RP_CORE_ERROR("Invalid color format!");
         return FramebufferSpecification{};
     }
 
@@ -129,7 +129,7 @@ void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuf
     if (camera != nullptr) {
         cameraPos = camera->getComponent<TransformComponent>().translation();
     } else {
-        RP_CORE_WARN("LightingPass - No main camera found!");
+        RP_CORE_WARN("No main camera found!");
     }
 
     LightingPushConstants pushConstants;

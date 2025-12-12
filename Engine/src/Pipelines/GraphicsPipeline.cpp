@@ -54,8 +54,8 @@ void GraphicsPipeline::createPipelineLayout(const GraphicsPipelineConfiguration 
     pipelineLayoutInfo.pPushConstantRanges = config.shader->getPushConstantLayouts().data();
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
-        RP_CORE_ERROR("GraphicsPipeline::createPipelineLayout - failed to create pipeline layout!");
-        throw std::runtime_error("GraphicsPipeline::createPipelineLayout - failed to create pipeline layout!");
+        RP_CORE_ERROR("failed to create pipeline layout!");
+        throw std::runtime_error("failed to create pipeline layout!");
     }
 }
 
@@ -102,8 +102,8 @@ void GraphicsPipeline::createPipeline(const GraphicsPipelineConfiguration &confi
     pipelineInfo.pNext = &pipelineDynamicRenderingInfo;
 
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS) {
-        RP_CORE_ERROR("GraphicsPipeline::createPipeline - failed to create graphics pipeline!");
-        throw std::runtime_error("GraphicsPipeline::createPipeline - failed to create graphics pipeline!");
+        RP_CORE_ERROR("failed to create graphics pipeline!");
+        throw std::runtime_error("failed to create graphics pipeline!");
     }
 }
 

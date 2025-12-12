@@ -19,7 +19,7 @@ BoundingBox BoundingBox::calculateFromVertices(const std::vector<float> &vertice
     (void)vertices;
     (void)stride;
     (void)offset;
-    RP_CORE_ERROR("BoundingBox::calculateFromVertices - Not implemented");
+    RP_CORE_ERROR("Not implemented");
     return BoundingBox();
 }
 
@@ -70,10 +70,10 @@ BoundingBox BoundingBox::operator+(const BoundingBox &other) const
 void BoundingBox::logBounds() const
 {
     if (m_isValid) {
-        RP_CORE_INFO("BoundingBox: Min({:.2f}, {:.2f}, {:.2f}), Max({:.2f}, {:.2f}, {:.2f})", m_min.x, m_min.y, m_min.z, m_max.x,
-                     m_max.y, m_max.z);
+        RP_CORE_INFO("Min({:.2f}, {:.2f}, {:.2f}), Max({:.2f}, {:.2f}, {:.2f})", m_min.x, m_min.y, m_min.z, m_max.x, m_max.y,
+                     m_max.z);
     } else {
-        RP_CORE_WARN("BoundingBox: Invalid");
+        RP_CORE_WARN("Invalid");
     }
 }
 

@@ -244,30 +244,18 @@ std::string parameterIdToString(ParameterID id)
 
 MaterialParameterTypes stringToMaterialParameterType(const std::string &str)
 {
-    if (str == "float")
-        return MaterialParameterTypes::FLOAT;
-    if (str == "int")
-        return MaterialParameterTypes::INT;
-    if (str == "uint")
-        return MaterialParameterTypes::UINT;
-    if (str == "bool")
-        return MaterialParameterTypes::BOOL;
-    if (str == "vec2")
-        return MaterialParameterTypes::VEC2;
-    if (str == "vec3")
-        return MaterialParameterTypes::VEC3;
-    if (str == "vec4")
-        return MaterialParameterTypes::VEC4;
-    if (str == "mat3")
-        return MaterialParameterTypes::MAT3;
-    if (str == "mat4")
-        return MaterialParameterTypes::MAT4;
-    if (str == "texture")
-        return MaterialParameterTypes::TEXTURE;
-    if (str == "COMBINED_IMAGE_SAMPLER")
-        return MaterialParameterTypes::COMBINED_IMAGE_SAMPLER;
-    if (str == "sampler")
-        return MaterialParameterTypes::SAMPLER;
+    if (str == "float") return MaterialParameterTypes::FLOAT;
+    if (str == "int") return MaterialParameterTypes::INT;
+    if (str == "uint") return MaterialParameterTypes::UINT;
+    if (str == "bool") return MaterialParameterTypes::BOOL;
+    if (str == "vec2") return MaterialParameterTypes::VEC2;
+    if (str == "vec3") return MaterialParameterTypes::VEC3;
+    if (str == "vec4") return MaterialParameterTypes::VEC4;
+    if (str == "mat3") return MaterialParameterTypes::MAT3;
+    if (str == "mat4") return MaterialParameterTypes::MAT4;
+    if (str == "texture") return MaterialParameterTypes::TEXTURE;
+    if (str == "COMBINED_IMAGE_SAMPLER") return MaterialParameterTypes::COMBINED_IMAGE_SAMPLER;
+    if (str == "sampler") return MaterialParameterTypes::SAMPLER;
     return MaterialParameterTypes::UNKNOWN;
 }
 
@@ -281,10 +269,10 @@ MaterialParameter::MaterialParameter(const DescriptorParamInfo &info, uint32_t b
     m_info.offset = info.offset;
 
     if (m_info.parameterId == ParameterID::UNKNOWN) {
-        RP_CORE_ERROR("MaterialParameter::MaterialParameter - unknown parameter id: {0}", info.name);
+        RP_CORE_ERROR("unknown parameter id: {0}", info.name);
     }
     if (m_info.type == MaterialParameterTypes::UNKNOWN) {
-        RP_CORE_ERROR("MaterialParameter::MaterialParameter - unknown parameter type: {0}", info.name);
+        RP_CORE_ERROR("unknown parameter type: {0}", info.name);
     }
 
     // Initialize the variant with the appropriate type

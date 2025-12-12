@@ -69,7 +69,7 @@ void SkyboxPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffe
     }
 
     if (!m_pipeline) {
-        RP_CORE_ERROR("SkyboxPass - Pipeline is not initialized!");
+        RP_CORE_ERROR("Pipeline is not initialized!");
         return;
     }
 
@@ -140,7 +140,7 @@ void SkyboxPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffe
 void SkyboxPass::setSkyboxTexture(std::shared_ptr<Texture> skyboxTexture)
 {
     if (!skyboxTexture) {
-        RP_CORE_ERROR("SkyboxPass - Skybox texture is not set!");
+        RP_CORE_ERROR("Skybox texture is not set!");
         return;
     }
     m_skyboxTexture = skyboxTexture;
@@ -151,7 +151,7 @@ void SkyboxPass::createPipeline()
 {
     auto shader = m_shader.lock();
     if (!shader) {
-        RP_CORE_ERROR("SkyboxPass - Shader is not available for pipeline creation.");
+        RP_CORE_ERROR("Shader is not available for pipeline creation.");
         return;
     }
 

@@ -42,7 +42,7 @@ class MaterialInstance {
                 m_flagsDirty = true;
             }
         } else {
-            RP_CORE_WARN("MaterialInstance::setParameter: Parameter ID '{}' not found for this material", parameterIdToString(id));
+            RP_CORE_WARN("Parameter ID '{}' not found for this material", parameterIdToString(id));
         }
     }
 

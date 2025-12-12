@@ -1,12 +1,49 @@
-#pragma once
+#ifndef RAPTURE__LOG_H
+#define RAPTURE__LOG_H
 
 #include <memory>
+#include <spdlog/fmt/fmt.h>
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
 
 namespace Rapture {
+
+// Helper function to extract Class::Method from __PRETTY_FUNCTION__
+// Assumes format: ReturnType Namespace::Class::Method(Args)
+inline std::string s_extractFunctionInfo(const char *prettyFunction)
+{
+    std::string func(prettyFunction);
+
+    // For GCC/Clang: Format is typically "ReturnType Namespace::Class::Method(Args) [with ...]"
+    // Extract the part before the opening parenthesis
+    size_t parenPos = func.find('(');
+    if (parenPos != std::string::npos) {
+        func = func.substr(0, parenPos);
+    }
+
+    // Remove template parameters if present
+    size_t bracketPos = func.find('[');
+    if (bracketPos != std::string::npos) {
+        func = func.substr(0, bracketPos);
+    }
+
+    // Find the first :: (assumed to be after namespace)
+    size_t firstScope = func.find("::");
+    if (firstScope != std::string::npos && firstScope + 2 < func.length()) {
+        // Skip namespace (first component), return Class::Method (everything after first ::)
+        return func.substr(firstScope + 2);
+    }
+
+    // Fallback: return the function name after the last space
+    size_t lastSpace = func.find_last_of(" ");
+    if (lastSpace != std::string::npos && lastSpace + 1 < func.length()) {
+        return func.substr(lastSpace + 1);
+    }
+
+    return func;
+}
 
 enum class LogCategory {
     Core,
@@ -64,37 +101,51 @@ class Log {
 
 } // namespace Rapture
 
+// Helper macros to format log message with class/method and severity
+#define RP_LOG_TRACE(logger, ...) \
+    logger->trace("[TRACE] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+#define RP_LOG_INFO(logger, ...) \
+    logger->info("[INFO] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+#define RP_LOG_WARN(logger, ...) \
+    logger->warn("[WARN] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+#define RP_LOG_ERROR(logger, ...) \
+    logger->error("[ERROR] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+#define RP_LOG_CRITICAL(logger, ...) \
+    logger->critical("[CRITICAL] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+
 // Core log macros
-#define RP_CORE_TRACE(...)    Log::GetCoreLogger()->trace(__VA_ARGS__)
-#define RP_CORE_INFO(...)     Log::GetCoreLogger()->info(__VA_ARGS__)
-#define RP_CORE_WARN(...)     Log::GetCoreLogger()->warn(__VA_ARGS__)
-#define RP_CORE_ERROR(...)    Log::GetCoreLogger()->error(__VA_ARGS__)
-#define RP_CORE_CRITICAL(...) Log::GetCoreLogger()->critical(__VA_ARGS__)
+#define RP_CORE_TRACE(...)    RP_LOG_TRACE(Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_INFO(...)     RP_LOG_INFO(Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_WARN(...)     RP_LOG_WARN(Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_ERROR(...)    RP_LOG_ERROR(Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_CRITICAL(...) RP_LOG_CRITICAL(Log::GetCoreLogger(), __VA_ARGS__)
 
 // Client log macros
-#define RP_TRACE(...)    Log::GetClientLogger()->trace(__VA_ARGS__)
-#define RP_INFO(...)     Log::GetClientLogger()->info(__VA_ARGS__)
-#define RP_WARN(...)     Log::GetClientLogger()->warn(__VA_ARGS__)
-#define RP_ERROR(...)    Log::GetClientLogger()->error(__VA_ARGS__)
-#define RP_CRITICAL(...) Log::GetClientLogger()->critical(__VA_ARGS__)
+#define RP_TRACE(...)    RP_LOG_TRACE(Log::GetClientLogger(), __VA_ARGS__)
+#define RP_INFO(...)     RP_LOG_INFO(Log::GetClientLogger(), __VA_ARGS__)
+#define RP_WARN(...)     RP_LOG_WARN(Log::GetClientLogger(), __VA_ARGS__)
+#define RP_ERROR(...)    RP_LOG_ERROR(Log::GetClientLogger(), __VA_ARGS__)
+#define RP_CRITICAL(...) RP_LOG_CRITICAL(Log::GetClientLogger(), __VA_ARGS__)
 
 // Render log macros
-#define RP_RENDER_TRACE(...) Log::GetRenderLogger()->trace(__VA_ARGS__)
-#define RP_RENDER_INFO(...)  Log::GetRenderLogger()->info(__VA_ARGS__)
-#define RP_RENDER_WARN(...)  Log::GetRenderLogger()->warn(__VA_ARGS__)
-#define RP_RENDER_ERROR(...) Log::GetRenderLogger()->error(__VA_ARGS__)
-#define RP_RENDER_FATAL(...) Log::GetRenderLogger()->critical(__VA_ARGS__)
+#define RP_RENDER_TRACE(...) RP_LOG_TRACE(Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_INFO(...)  RP_LOG_INFO(Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_WARN(...)  RP_LOG_WARN(Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_ERROR(...) RP_LOG_ERROR(Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_FATAL(...) RP_LOG_CRITICAL(Log::GetRenderLogger(), __VA_ARGS__)
 
 // Physics log macros
-#define RP_PHYSICS_TRACE(...) Log::GetPhysicsLogger()->trace(__VA_ARGS__)
-#define RP_PHYSICS_INFO(...)  Log::GetPhysicsLogger()->info(__VA_ARGS__)
-#define RP_PHYSICS_WARN(...)  Log::GetPhysicsLogger()->warn(__VA_ARGS__)
-#define RP_PHYSICS_ERROR(...) Log::GetPhysicsLogger()->error(__VA_ARGS__)
-#define RP_PHYSICS_FATAL(...) Log::GetPhysicsLogger()->critical(__VA_ARGS__)
+#define RP_PHYSICS_TRACE(...) RP_LOG_TRACE(Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_INFO(...)  RP_LOG_INFO(Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_WARN(...)  RP_LOG_WARN(Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_ERROR(...) RP_LOG_ERROR(Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_FATAL(...) RP_LOG_CRITICAL(Log::GetPhysicsLogger(), __VA_ARGS__)
 
 // Audio log macros
-#define RP_AUDIO_TRACE(...) Log::GetAudioLogger()->trace(__VA_ARGS__)
-#define RP_AUDIO_INFO(...)  Log::GetAudioLogger()->info(__VA_ARGS__)
-#define RP_AUDIO_WARN(...)  Log::GetAudioLogger()->warn(__VA_ARGS__)
-#define RP_AUDIO_ERROR(...) Log::GetAudioLogger()->error(__VA_ARGS__)
-#define RP_AUDIO_FATAL(...) Log::GetAudioLogger()->critical(__VA_ARGS__)
+#define RP_AUDIO_TRACE(...) RP_LOG_TRACE(Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_INFO(...)  RP_LOG_INFO(Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_WARN(...)  RP_LOG_WARN(Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_ERROR(...) RP_LOG_ERROR(Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_FATAL(...) RP_LOG_CRITICAL(Log::GetAudioLogger(), __VA_ARGS__)
+
+#endif // RAPTURE__LOG_H

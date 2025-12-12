@@ -181,8 +181,7 @@ void Shader::createShaderModule(const std::vector<char> &code, ShaderType type)
 {
 
     if (m_sources.find(type) != m_sources.end()) {
-        RP_CORE_WARN("Shader::createShaderModule - shader module of type {0} already exists! overwriting...",
-                     shaderTypeToString(type));
+        RP_CORE_WARN("shader module of type {0} already exists! overwriting...", shaderTypeToString(type));
     }
 
     Application &app = Application::getInstance();
@@ -195,7 +194,7 @@ void Shader::createShaderModule(const std::vector<char> &code, ShaderType type)
 
     VkShaderModule shaderModule;
     if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        RP_CORE_ERROR("Shader::createShaderModule - failed to create shader module!");
+        RP_CORE_ERROR("failed to create shader module!");
         throw std::runtime_error("Shader::createShaderModule - failed to create shader module!");
     }
 
@@ -235,7 +234,7 @@ void Shader::createDescriptorSetLayout()
         } else {
             // For sets > 3, or if a managed set is not available, we fall back to creating the layout from reflection data.
             if (setNumber <= 3) {
-                RP_CORE_WARN("Shader: DescriptorManager set {} not available, falling back to shader layout", setNumber);
+                RP_CORE_WARN("DescriptorManager set {} not available, falling back to shader layout", setNumber);
             }
 
             auto it = std::find_if(m_descriptorSetInfos.begin(), m_descriptorSetInfos.end(),

@@ -42,7 +42,7 @@ std::shared_ptr<Asset> AssetManagerEditor::getAsset(AssetHandle handle)
 {
 
     if (!isAssetHandleValid(handle)) {
-        RP_CORE_ERROR("AssetManagerEditor::getAsset - Invalid asset handle");
+        RP_CORE_ERROR("Invalid asset handle");
         return nullptr;
     }
 
@@ -58,7 +58,7 @@ std::shared_ptr<Asset> AssetManagerEditor::getAsset(AssetHandle handle)
         if (asset) {
             m_loadedAssets.insert_or_assign(handle, asset);
         } else {
-            RP_CORE_ERROR("AssetManagerEditor::getAsset - Failed to load asset: {}", metadata.m_filePath.string());
+            RP_CORE_ERROR("Failed to load asset: {}", metadata.m_filePath.string());
         }
 
         return asset;
@@ -81,7 +81,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(s
 {
 
     if (path.empty()) {
-        RP_CORE_ERROR("AssetManagerEditor::importAsset - Path is empty");
+        RP_CORE_ERROR("Path is empty");
         return std::make_pair(nullptr, AssetHandle());
     }
 
@@ -102,7 +102,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(s
     metadata.m_importConfig = importConfig;
 
     if (metadata.m_assetType == AssetType::None) {
-        RP_CORE_ERROR("AssetManagerEditor::importAsset - Unknown asset type for extension: {}", path.extension().string());
+        RP_CORE_ERROR("Unknown asset type for extension: {}", path.extension().string());
         return std::make_pair(nullptr, AssetHandle());
     }
 
@@ -117,7 +117,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(s
         return std::make_pair(asset, handle);
     }
 
-    RP_CORE_ERROR("AssetManagerEditor::importAsset - Failed to import asset: {}", path.string());
+    RP_CORE_ERROR("Failed to import asset: {}", path.string());
     return std::make_pair(nullptr, AssetHandle());
 }
 
@@ -132,8 +132,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefault
             return std::make_pair(getAsset(existingHandle), existingHandle);
         } else {
             // Asset was unloaded somehow, remove the handle and recreate
-            RP_CORE_WARN("AssetManagerEditor::importDefaultAsset - Default {} asset was unloaded, recreating",
-                         AssetTypeToString(assetType));
+            RP_CORE_WARN("Default {} asset was unloaded, recreating", AssetTypeToString(assetType));
             m_defaultAssetHandles.erase(it);
         }
     }
@@ -143,7 +142,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefault
         // Create default white texture
         auto defaultTexture = Texture::createDefaultWhiteTexture();
         if (!defaultTexture) {
-            RP_CORE_ERROR("AssetManagerEditor::importDefaultAsset - Failed to create default white texture");
+            RP_CORE_ERROR("Failed to create default white texture");
             return std::make_pair(nullptr, AssetHandle());
         }
         defaultTexture->setReadyForSampling(true);
@@ -173,20 +172,20 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefault
         // Track this as a default asset
         m_defaultAssetHandles[assetType] = handle;
 
-        RP_CORE_INFO("AssetManagerEditor::importDefaultAsset - Created default white texture with handle");
+        RP_CORE_INFO("Created default white texture with handle");
         return std::make_pair(asset, handle);
     }
     case AssetType::Material: {
         // Create default material
         auto baseMaterial = MaterialManager::getMaterial("PBR");
         if (!baseMaterial) {
-            RP_CORE_ERROR("AssetManagerEditor::importDefaultAsset - Failed to get default material");
+            RP_CORE_ERROR("Failed to get default material");
             return std::make_pair(nullptr, AssetHandle());
         }
 
         auto defaultMaterial = std::make_shared<MaterialInstance>(baseMaterial, "Default");
         if (!defaultMaterial) {
-            RP_CORE_ERROR("AssetManagerEditor::importDefaultAsset - Failed to create default material");
+            RP_CORE_ERROR("Failed to create default material");
             return std::make_pair(nullptr, AssetHandle());
         }
 
@@ -217,8 +216,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefault
         return std::make_pair(asset, handle);
     }
     default:
-        RP_CORE_WARN("AssetManagerEditor::importDefaultAsset - Default asset type {} not implemented",
-                     AssetTypeToString(assetType));
+        RP_CORE_WARN("Default asset type {} not implemented", AssetTypeToString(assetType));
         return std::make_pair(nullptr, AssetHandle());
     }
 }
@@ -248,7 +246,7 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
     }
     // Add more asset types as needed
 
-    RP_CORE_WARN("AssetManagerEditor::determineAssetType - Unknown asset type for extension: {}", extension);
+    RP_CORE_WARN("Unknown asset type for extension: {}", extension);
     return AssetType::None;
 }
 
@@ -256,21 +254,19 @@ AssetHandle AssetManagerEditor::registerVirtualAsset(std::shared_ptr<AssetVarian
                                                      AssetType assetType)
 {
     if (!asset) {
-        RP_CORE_ERROR("AssetManagerEditor::registerVirtualAsset - Asset variant is null");
+        RP_CORE_ERROR("Asset variant is null");
         return AssetHandle{};
     }
 
     if (virtualName.empty()) {
-        RP_CORE_ERROR("AssetManagerEditor::registerVirtualAsset - Virtual name cannot be empty");
+        RP_CORE_ERROR("Virtual name cannot be empty");
         return AssetHandle{};
     }
 
     // Check if virtual asset with this name already exists
     for (const auto &[handle, metadata] : m_assetRegistry) {
         if (metadata.isVirtualAsset() && metadata.m_virtualName == virtualName && metadata.m_assetType != assetType) {
-            RP_CORE_WARN(
-                "AssetManagerEditor::registerVirtualAsset - Virtual asset with name '{}' already exists, returning existing handle",
-                virtualName);
+            RP_CORE_WARN("Virtual asset with name '{}' already exists, returning existing handle", virtualName);
             return handle;
         }
     }
@@ -293,8 +289,7 @@ AssetHandle AssetManagerEditor::registerVirtualAsset(std::shared_ptr<AssetVarian
     m_loadedAssets[handle] = assetWrapper;
     m_assetRegistry[handle] = metadata;
 
-    RP_CORE_INFO("AssetManagerEditor::registerVirtualAsset - Registered virtual {} asset: '{}'", AssetTypeToString(assetType),
-                 virtualName);
+    RP_CORE_INFO("Registered virtual {} asset: '{}'", AssetTypeToString(assetType), virtualName);
     return handle;
 }
 
@@ -302,14 +297,13 @@ bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
 {
     auto registryIt = m_assetRegistry.find(handle);
     if (registryIt == m_assetRegistry.end()) {
-        RP_CORE_WARN("AssetManagerEditor::unregisterVirtualAsset - Asset handle not found in registry");
+        RP_CORE_WARN("Asset handle not found in registry");
         return false;
     }
 
     const AssetMetadata &metadata = registryIt->second;
     if (!metadata.isVirtualAsset()) {
-        RP_CORE_ERROR("AssetManagerEditor::unregisterVirtualAsset - Cannot unregister non-virtual asset: {}",
-                      metadata.m_filePath.string());
+        RP_CORE_ERROR("Cannot unregister non-virtual asset: {}", metadata.m_filePath.string());
         return false;
     }
 
@@ -317,7 +311,7 @@ bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
     m_loadedAssets.erase(handle);
     m_assetRegistry.erase(handle);
 
-    RP_CORE_INFO("AssetManagerEditor::unregisterVirtualAsset - Unregistered virtual asset: '{}'", metadata.m_virtualName);
+    RP_CORE_INFO("Unregistered virtual asset: '{}'", metadata.m_virtualName);
     return true;
 }
 

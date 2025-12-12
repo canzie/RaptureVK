@@ -251,7 +251,7 @@ void DynamicDiffuseGI::clearTextures()
 {
 
     if (m_CommandBuffers[0]->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
-        RP_CORE_ERROR("DynamicDiffuseGI::clearTextures - Failed to begin command buffer");
+        RP_CORE_ERROR("Failed to begin command buffer");
         return;
     }
 
@@ -299,7 +299,7 @@ void DynamicDiffuseGI::clearTextures()
                          &clearColor, 1, &subresourceRange);
 
     if (m_CommandBuffers[0]->end() != VK_SUCCESS) {
-        RP_CORE_ERROR("DynamicDiffuseGI::clearTextures - Failed to end command buffer");
+        RP_CORE_ERROR("Failed to end command buffer");
         return;
     }
 
@@ -463,7 +463,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     // Begin command buffer
     if (currentCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
-        RP_CORE_ERROR("DynamicDiffuseGI::castRays - Failed to begin command buffer");
+        RP_CORE_ERROR("Failed to begin command buffer");
         return;
     }
 
@@ -518,7 +518,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     // End command buffer
     if (currentCommandBuffer->end() != VK_SUCCESS) {
-        RP_CORE_ERROR("DynamicDiffuseGI::populateProbesCompute - Failed to end command buffer");
+        RP_CORE_ERROR("Failed to end command buffer");
         return;
     }
 
@@ -1019,7 +1019,7 @@ void DynamicDiffuseGI::updateProbeVolume()
     RAPTURE_PROFILE_FUNCTION();
 
     if (!m_ProbeInfoBuffer) {
-        RP_CORE_ERROR("DynamicDiffuseGI::updateProbeVolume - Probe info buffer not initialized");
+        RP_CORE_ERROR("Probe info buffer not initialized");
         return;
     }
 
@@ -1109,12 +1109,12 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
         auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
         if (binding) {
             binding->add(m_ProbeInfoBuffer);
-            RP_CORE_INFO("DDGI: Added probe volume UBO to descriptor set 0, binding 5");
+            RP_CORE_INFO("Added probe volume UBO to descriptor set 0, binding 5");
         } else {
-            RP_CORE_ERROR("DDGI: Failed to get uniform buffer binding for probe info");
+            RP_CORE_ERROR("Failed to get uniform buffer binding for probe info");
         }
     } else {
-        RP_CORE_ERROR("DDGI: Failed to get descriptor set for probe info");
+        RP_CORE_ERROR("Failed to get descriptor set for probe info");
     }
 }
 

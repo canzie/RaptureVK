@@ -1,32 +1,29 @@
 #include "GBufferPass.h"
 
-#include "WindowContext/Application.h"
 #include "Components/Components.h"
 #include "Logging/TracyProfiler.h"
-
-
+#include "WindowContext/Application.h"
 
 namespace Rapture {
 
 struct GBufferPushConstants {
     uint32_t batchInfoBufferIndex;
-    uint32_t cameraBindlessIndex;    
+    uint32_t cameraBindlessIndex;
 };
 
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
-    : m_width(width), m_height(height), 
-    m_framesInFlight(framesInFlight), m_currentFrame(0), 
-    m_selectedEntity(nullptr) {
+    : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_currentFrame(0), m_selectedEntity(nullptr)
+{
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
-    
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
-    
+
     createPipeline();
     createTextures();
-    
+
     // Initialize MDI batching system - one set per frame in flight
     m_mdiBatchMaps.resize(framesInFlight);
     m_selectedEntityBatchMaps.resize(framesInFlight);
@@ -34,25 +31,20 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
         m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>();
         m_selectedEntityBatchMaps[i] = std::make_unique<MDIBatchMap>();
     }
-    
+
     // Bind GBuffer textures to bindless set
     bindGBufferTexturesToBindlessSet();
-    
-    m_entitySelectedListenerId = GameEvents::onEntitySelected().addListener(
-        [this](std::shared_ptr<Rapture::Entity> entity) {
-            m_selectedEntity = entity;
-        }
-    );
+
+    m_entitySelectedListenerId =
+        GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
 }
 
-GBufferPass::~GBufferPass() {
+GBufferPass::~GBufferPass()
+{
     // Wait for device to finish operations
     vkDeviceWaitIdle(m_device);
 
-    GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId); 
-
-    
-
+    GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
 
     // Clean up textures
     m_positionDepthTextures.clear();
@@ -65,36 +57,34 @@ GBufferPass::~GBufferPass() {
     m_pipeline.reset();
 }
 
-
-
 // order of the color attachments is important, it NEEDS to be the same order as the fragment shaders output attachments
-FramebufferSpecification GBufferPass::getFramebufferSpecification() {
+FramebufferSpecification GBufferPass::getFramebufferSpecification()
+{
     FramebufferSpecification spec;
     spec.depthAttachment = VK_FORMAT_D24_UNORM_S8_UINT;
     spec.stencilAttachment = VK_FORMAT_D24_UNORM_S8_UINT;
     spec.colorAttachments.push_back(VK_FORMAT_R32G32B32A32_SFLOAT); // position
-    spec.colorAttachments.push_back(VK_FORMAT_R16G16B16A16_SFLOAT ); // normal a=???
-    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_SRGB); // albedo + specular
-    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM ); // r=metallic g=roughness b=AO a=???
+    spec.colorAttachments.push_back(VK_FORMAT_R16G16B16A16_SFLOAT); // normal a=???
+    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_SRGB);       // albedo + specular
+    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM);      // r=metallic g=roughness b=AO a=???
 
     return spec;
 }
 
-void GBufferPass::recordCommandBuffer(
-    std::shared_ptr<CommandBuffer> commandBuffer, 
-    std::shared_ptr<Scene> activeScene, 
-    uint32_t currentFrame) {
+void GBufferPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                                      uint32_t currentFrame)
+{
 
     RAPTURE_PROFILE_FUNCTION();
 
-    m_currentFrame = currentFrame;  // Update current frame index
+    m_currentFrame = currentFrame; // Update current frame index
 
     setupDynamicRenderingMemoryBarriers(commandBuffer);
     beginDynamicRendering(commandBuffer);
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -111,11 +101,11 @@ void GBufferPass::recordCommandBuffer(
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
     // Get entities with TransformComponent and MeshComponent
-    auto& registry = activeScene->getRegistry();
+    auto &registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, MaterialComponent, BoundingBoxComponent>();
     auto mainCamera = activeScene->getSettings().mainCamera;
 
-    CameraComponent* cameraComp = nullptr;
+    CameraComponent *cameraComp = nullptr;
 
     if (mainCamera) {
         cameraComp = mainCamera->tryGetComponent<CameraComponent>();
@@ -135,33 +125,33 @@ void GBufferPass::recordCommandBuffer(
     for (auto entity : view) {
         RAPTURE_PROFILE_SCOPE("Populate Batch");
 
-        auto& transform = view.get<TransformComponent>(entity);
-        auto& meshComp = view.get<MeshComponent>(entity);
-        auto& materialComp = view.get<MaterialComponent>(entity);
-        auto& boundingBoxComp = view.get<BoundingBoxComponent>(entity);
+        auto &transform = view.get<TransformComponent>(entity);
+        auto &meshComp = view.get<MeshComponent>(entity);
+        auto &materialComp = view.get<MaterialComponent>(entity);
+        auto &boundingBoxComp = view.get<BoundingBoxComponent>(entity);
 
         // Check if mesh is valid and not loading
         if (!meshComp.mesh || meshComp.isLoading) {
             continue;
         }
-        
+
         auto mesh = meshComp.mesh;
-        
+
         // Check if mesh has valid buffers
         if (!mesh->getVertexBuffer() || !mesh->getIndexBuffer()) {
             continue;
         }
-        
-        if (transform.hasChanged()){
+
+        if (transform.hasChanged()) {
             boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
         }
 
-        if (cameraComp && activeScene->getSettings().frustumCullingEnabled){
-            if (cameraComp->frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside){
+        if (cameraComp && activeScene->getSettings().frustumCullingEnabled) {
+            if (cameraComp->frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside) {
                 continue;
             }
         }
-        
+
         // Check if current entity is the selected one
         bool isSelected = false;
         if (m_selectedEntity) {
@@ -173,23 +163,22 @@ void GBufferPass::recordCommandBuffer(
         // Get buffer allocation info to determine batch
         auto vboAlloc = meshComp.mesh->getVertexAllocation();
         auto iboAlloc = meshComp.mesh->getIndexAllocation();
-        
+
         if (!vboAlloc || !iboAlloc) {
             continue;
         }
-        
+
         // Choose the appropriate batch map based on selection state
-        MDIBatchMap* batchMap = isSelected ? m_selectedEntityBatchMaps[m_currentFrame].get() : m_mdiBatchMaps[m_currentFrame].get();
-        
+        MDIBatchMap *batchMap = isSelected ? m_selectedEntityBatchMaps[m_currentFrame].get() : m_mdiBatchMaps[m_currentFrame].get();
+
         // Get or create batch for this VBO/IBO arena combination
-        MDIBatch* batch = batchMap->obtainBatch(vboAlloc, iboAlloc, 
-                                               meshComp.mesh->getVertexBuffer()->getBufferLayout(), 
-                                               meshComp.mesh->getIndexBuffer()->getIndexType());
-        
+        MDIBatch *batch = batchMap->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(),
+                                                meshComp.mesh->getIndexBuffer()->getIndexType());
+
         // Get mesh buffer index from the MeshComponent
         uint32_t meshBufferIndex = meshComp.meshDataBuffer ? meshComp.meshDataBuffer->getDescriptorIndex(currentFrame) : 0;
         uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
-        
+
         // Add mesh to batch
         batch->addObject(*meshComp.mesh, meshBufferIndex, materialIndex);
     }
@@ -199,63 +188,51 @@ void GBufferPass::recordCommandBuffer(
     vkCmdSetStencilReference(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0);
     // Disable stencil writing for non-selected entities
     vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0x00);
-    
-    for (const auto& [batchKey, batch] : m_mdiBatchMaps[m_currentFrame]->getBatches()) {
+
+    for (const auto &[batchKey, batch] : m_mdiBatchMaps[m_currentFrame]->getBatches()) {
         if (batch->getDrawCount() == 0) {
             continue;
         }
-        
+
         RAPTURE_PROFILE_SCOPE("Draw Non-Selected Batch");
-        
+
         // Upload batch data to GPU
         batch->uploadBuffers();
-        
+
         // Get layout from batch
         auto bindingDescription = batch->getBufferLayout().getBindingDescription2EXT();
         auto attributeDescriptions = batch->getBufferLayout().getAttributeDescriptions2EXT();
-        
-        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(),
-            1, &bindingDescription,
-            static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
-        
+
+        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 1, &bindingDescription,
+                                  static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+
         // Set push constants for this batch
         GBufferPushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
         pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
 
-        
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
             stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
         }
-        
-        vkCmdPushConstants(commandBuffer->getCommandBufferVk(),
-                           m_pipeline->getPipelineLayoutVk(),
-                           stageFlags,
-                           0,
-                           sizeof(GBufferPushConstants),
-                           &pushConstants);
-        
+
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
+                           sizeof(GBufferPushConstants), &pushConstants);
+
         // Bind vertex buffer from the arena
         VkBuffer vertexBuffer = batch->getVertexBuffer();
         VkDeviceSize vertexOffset = 0;
         vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, &vertexBuffer, &vertexOffset);
-        
+
         // Bind index buffer from the arena
         VkBuffer indexBuffer = batch->getIndexBuffer();
-        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
-                            indexBuffer, 
-                            0, 
-                            batch->getIndexType());
-        
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), indexBuffer, 0, batch->getIndexType());
+
         // Execute multi-draw indirect
         auto indirectBuffer = batch->getIndirectBuffer();
         if (indirectBuffer) {
-            vkCmdDrawIndexedIndirect(commandBuffer->getCommandBufferVk(),
-                                   indirectBuffer->getBufferVk(),
-                                   0,
-                                   batch->getDrawCount(),
-                                   sizeof(VkDrawIndexedIndirectCommand));
+            vkCmdDrawIndexedIndirect(commandBuffer->getCommandBufferVk(), indirectBuffer->getBufferVk(), 0, batch->getDrawCount(),
+                                     sizeof(VkDrawIndexedIndirectCommand));
         }
     }
 
@@ -264,62 +241,51 @@ void GBufferPass::recordCommandBuffer(
     vkCmdSetStencilReference(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 1);
     // Enable stencil writing for selected entity
     vkCmdSetStencilWriteMask(commandBuffer->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0xFF);
-    
-    for (const auto& [batchKey, batch] : m_selectedEntityBatchMaps[m_currentFrame]->getBatches()) {
+
+    for (const auto &[batchKey, batch] : m_selectedEntityBatchMaps[m_currentFrame]->getBatches()) {
         if (batch->getDrawCount() == 0) {
             continue;
         }
-        
+
         RAPTURE_PROFILE_SCOPE("Draw Selected Batch");
-        
+
         // Upload batch data to GPU
         batch->uploadBuffers();
-        
+
         // Get layout from batch
         auto bindingDescription = batch->getBufferLayout().getBindingDescription2EXT();
         auto attributeDescriptions = batch->getBufferLayout().getAttributeDescriptions2EXT();
-        
-        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(),
-            1, &bindingDescription,
-            static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
-        
+
+        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 1, &bindingDescription,
+                                  static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+
         // Set push constants for this batch
         GBufferPushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
         pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
-        
+
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
             stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
         }
-        
-        vkCmdPushConstants(commandBuffer->getCommandBufferVk(),
-                           m_pipeline->getPipelineLayoutVk(),
-                           stageFlags,
-                           0,
-                           sizeof(GBufferPushConstants),
-                           &pushConstants);
-        
+
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
+                           sizeof(GBufferPushConstants), &pushConstants);
+
         // Bind vertex buffer from the arena
         VkBuffer vertexBuffer = batch->getVertexBuffer();
         VkDeviceSize vertexOffset = 0;
         vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, &vertexBuffer, &vertexOffset);
-        
+
         // Bind index buffer from the arena
         VkBuffer indexBuffer = batch->getIndexBuffer();
-        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), 
-                            indexBuffer, 
-                            0, 
-                            batch->getIndexType());
-        
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), indexBuffer, 0, batch->getIndexType());
+
         // Execute multi-draw indirect
         auto indirectBuffer = batch->getIndirectBuffer();
         if (indirectBuffer) {
-            vkCmdDrawIndexedIndirect(commandBuffer->getCommandBufferVk(),
-                                   indirectBuffer->getBufferVk(),
-                                   0,
-                                   batch->getDrawCount(),
-                                   sizeof(VkDrawIndexedIndirectCommand));
+            vkCmdDrawIndexedIndirect(commandBuffer->getCommandBufferVk(), indirectBuffer->getBufferVk(), 0, batch->getDrawCount(),
+                                     sizeof(VkDrawIndexedIndirectCommand));
         }
     }
 
@@ -328,7 +294,8 @@ void GBufferPass::recordCommandBuffer(
     transitionToShaderReadableLayout(commandBuffer);
 }
 
-void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer) {
+void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer)
+{
     RAPTURE_PROFILE_FUNCTION();
 
     // Update color attachment infos for current frame
@@ -388,68 +355,53 @@ void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBu
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void GBufferPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer) {
-    RAPTURE_PROFILE_FUNCTION();
-
-    VkImageMemoryBarrier barriers[5];
-    barriers[0] = m_positionDepthTextures[m_currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[1] = m_normalTextures[m_currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[2] = m_albedoSpecTextures[m_currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[3] = m_materialTextures[m_currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[4] = m_depthStencilTextures[m_currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(), 
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 
-        0, 
-        0, nullptr, 
-        0, nullptr, 
-        5, barriers);
-}
-
-void GBufferPass::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer) {
+void GBufferPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer)
+{
     RAPTURE_PROFILE_FUNCTION();
 
     VkImageMemoryBarrier barriers[5];
     barriers[0] = m_positionDepthTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
     barriers[1] = m_normalTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
     barriers[2] = m_albedoSpecTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
     barriers[3] = m_materialTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
-    barriers[4] = m_depthStencilTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 
-        VK_ACCESS_SHADER_READ_BIT);
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+    barriers[4] = m_depthStencilTextures[m_currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED,
+                                                                                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0,
+                                                                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(), 
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 
-        0, 
-        0, nullptr, 
-        0, nullptr, 
-        5, barriers);  
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, nullptr,
+                         0, nullptr, 5, barriers);
 }
 
+void GBufferPass::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer)
+{
+    RAPTURE_PROFILE_FUNCTION();
 
+    VkImageMemoryBarrier barriers[5];
+    barriers[0] = m_positionDepthTextures[m_currentFrame]->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+    barriers[1] = m_normalTextures[m_currentFrame]->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+    barriers[2] = m_albedoSpecTextures[m_currentFrame]->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+    barriers[3] = m_materialTextures[m_currentFrame]->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+    barriers[4] = m_depthStencilTextures[m_currentFrame]->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(),
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 5, barriers);
+}
 
 void GBufferPass::createTextures()
 {
@@ -498,15 +450,16 @@ void GBufferPass::createTextures()
     }
 }
 
-void GBufferPass::bindGBufferTexturesToBindlessSet() {
-    
+void GBufferPass::bindGBufferTexturesToBindlessSet()
+{
+
     // Resize the index vectors
     m_positionTextureIndices.resize(m_framesInFlight);
     m_normalTextureIndices.resize(m_framesInFlight);
     m_albedoTextureIndices.resize(m_framesInFlight);
     m_materialTextureIndices.resize(m_framesInFlight);
     m_depthTextureIndices.resize(m_framesInFlight);
-    
+
     // Add each texture to the bindless set and store the indices
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
         m_positionTextureIndices[i] = m_positionDepthTextures[i]->getBindlessIndex();
@@ -514,13 +467,11 @@ void GBufferPass::bindGBufferTexturesToBindlessSet() {
         m_albedoTextureIndices[i] = m_albedoSpecTextures[i]->getBindlessIndex();
         m_materialTextureIndices[i] = m_materialTextures[i]->getBindlessIndex();
         m_depthTextureIndices[i] = m_depthStencilTextures[i]->getBindlessIndex();
-        
-        if (m_positionTextureIndices[i] == UINT32_MAX || 
-            m_normalTextureIndices[i] == UINT32_MAX ||
-            m_albedoTextureIndices[i] == UINT32_MAX ||
-            m_materialTextureIndices[i] == UINT32_MAX ||
+
+        if (m_positionTextureIndices[i] == UINT32_MAX || m_normalTextureIndices[i] == UINT32_MAX ||
+            m_albedoTextureIndices[i] == UINT32_MAX || m_materialTextureIndices[i] == UINT32_MAX ||
             m_depthTextureIndices[i] == UINT32_MAX) {
-            RP_CORE_ERROR("GBufferPass::bindGBufferTexturesToBindlessSet: Failed to add GBuffer texture(s) to bindless array for frame {}", i);
+            RP_CORE_ERROR("Failed to add GBuffer texture(s) to bindless array for frame {}", i);
         }
     }
 }
@@ -528,9 +479,7 @@ void GBufferPass::bindGBufferTexturesToBindlessSet() {
 void GBufferPass::createPipeline()
 {
     std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR,
-        VK_DYNAMIC_STATE_VERTEX_INPUT_EXT,
+        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_VERTEX_INPUT_EXT,
         VK_DYNAMIC_STATE_STENCIL_REFERENCE, // Added for dynamic stencil reference
         VK_DYNAMIC_STATE_STENCIL_WRITE_MASK // Added for dynamic stencil write mask
     };
@@ -581,34 +530,33 @@ void GBufferPass::createPipeline()
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f; // Optional
-    rasterizer.depthBiasClamp = 0.0f; // Optional
-    rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+    rasterizer.depthBiasClamp = 0.0f;          // Optional
+    rasterizer.depthBiasSlopeFactor = 0.0f;    // Optional
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-
     VkPipelineColorBlendAttachmentState colorBlendAttachments[4];
     for (int i = 0; i < 4; ++i) {
         colorBlendAttachments[i] = {};
-        colorBlendAttachments[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachments[i].colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         colorBlendAttachments[i].blendEnable = VK_FALSE;
         // Other blend factors can be left as default if blendEnable is VK_FALSE
     }
 
-
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
-    colorBlending.attachmentCount = 4; // Changed from 1
+    colorBlending.logicOp = VK_LOGIC_OP_COPY;           // Optional
+    colorBlending.attachmentCount = 4;                  // Changed from 1
     colorBlending.pAttachments = colorBlendAttachments; // Changed from &colorBlendAttachment
-    colorBlending.blendConstants[0] = 0.0f; // Optional
-    colorBlending.blendConstants[1] = 0.0f; // Optional
-    colorBlending.blendConstants[2] = 0.0f; // Optional
-    colorBlending.blendConstants[3] = 0.0f; // Optional
+    colorBlending.blendConstants[0] = 0.0f;             // Optional
+    colorBlending.blendConstants[1] = 0.0f;             // Optional
+    colorBlending.blendConstants[2] = 0.0f;             // Optional
+    colorBlending.blendConstants[3] = 0.0f;             // Optional
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -617,25 +565,24 @@ void GBufferPass::createPipeline()
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_TRUE;
-    
+
     // Front face stencil operations
-    depthStencil.front.failOp = VK_STENCIL_OP_KEEP;      // Keep current value if stencil test fails
-    depthStencil.front.passOp = VK_STENCIL_OP_REPLACE;   // Replace with reference value when stencil test passes
+    depthStencil.front.failOp = VK_STENCIL_OP_KEEP;         // Keep current value if stencil test fails
+    depthStencil.front.passOp = VK_STENCIL_OP_REPLACE;      // Replace with reference value when stencil test passes
     depthStencil.front.depthFailOp = VK_STENCIL_OP_REPLACE; // Replace with reference value even if depth test fails
-    depthStencil.front.compareOp = VK_COMPARE_OP_ALWAYS; // Always pass the stencil test
-    depthStencil.front.compareMask = 0xFF;               // Compare all bits
-    depthStencil.front.writeMask = 0xFF;                 // Write all bits in stencil buffer
-    depthStencil.front.reference = 0;                    // Default reference value (will be overridden by vkCmdSetStencilReference)
-    
+    depthStencil.front.compareOp = VK_COMPARE_OP_ALWAYS;    // Always pass the stencil test
+    depthStencil.front.compareMask = 0xFF;                  // Compare all bits
+    depthStencil.front.writeMask = 0xFF;                    // Write all bits in stencil buffer
+    depthStencil.front.reference = 0; // Default reference value (will be overridden by vkCmdSetStencilReference)
+
     // Back face stencil operations (same as front face)
     depthStencil.back = depthStencil.front;
-    
+
     depthStencil.minDepthBounds = 0.0f;
     depthStencil.maxDepthBounds = 1.0f;
-    
-    
-    auto& app = Application::getInstance();
-    auto& project = app.getProject();
+
+    auto &app = Application::getInstance();
+    auto &project = app.getProject();
 
     auto shaderPath = project.getProjectShaderDirectory();
 
@@ -663,10 +610,5 @@ void GBufferPass::createPipeline()
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
-
-
-
-
-
 
 } // namespace Rapture

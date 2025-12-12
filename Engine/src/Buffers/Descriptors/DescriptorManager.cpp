@@ -36,7 +36,7 @@ void DescriptorManager::shutdown()
 std::shared_ptr<DescriptorSet> DescriptorManager::getDescriptorSet(uint32_t setNumber)
 {
     if (setNumber >= s_descriptorSets.size()) {
-        RP_CORE_ERROR("DescriptorManager::getDescriptorSet - set number {} out of bounds", setNumber);
+        RP_CORE_ERROR("set number {} out of bounds", setNumber);
         return nullptr;
     }
 
@@ -141,7 +141,7 @@ void DescriptorManager::initializeSet3()
     std::lock_guard<std::mutex> lock(s_descriptorSetMutexes[bindings.setNumber]);
     s_descriptorSets[bindings.setNumber] = std::make_shared<DescriptorSet>(bindings);
 
-    RP_CORE_INFO("DescriptorManager Initialized set {}", bindings.setNumber);
+    RP_CORE_INFO("Initialized set {}", bindings.setNumber);
 }
 
 void DescriptorManager::bindSet(uint32_t setNumber, std::shared_ptr<CommandBuffer> commandBuffer,
@@ -149,7 +149,7 @@ void DescriptorManager::bindSet(uint32_t setNumber, std::shared_ptr<CommandBuffe
 {
 
     if (setNumber >= s_descriptorSets.size()) {
-        RP_CORE_ERROR("DescriptorManager::bindSet - set number {} out of bounds", setNumber);
+        RP_CORE_ERROR("set number {} out of bounds", setNumber);
         return;
     }
 
@@ -184,7 +184,7 @@ std::vector<VkDescriptorSetLayout> DescriptorManager::getDescriptorSetLayouts(co
         if (setNumber < s_descriptorSets.size() && s_descriptorSets[setNumber]) {
             layouts.push_back(s_descriptorSets[setNumber]->getLayout());
         } else {
-            RP_CORE_WARN("DescriptorManager::getDescriptorSetLayouts - set number {} not available", setNumber);
+            RP_CORE_WARN("set number {} not available", setNumber);
         }
     }
 

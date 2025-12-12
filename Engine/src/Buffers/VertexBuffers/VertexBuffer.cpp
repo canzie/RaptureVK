@@ -27,8 +27,8 @@ VertexBuffer::VertexBuffer(BufferAllocationRequest &request, VmaAllocator alloca
     m_bufferAllocation = bufferPoolManager.allocateBuffer(request);
 
     if (!m_bufferAllocation) {
-        RP_CORE_ERROR("VertexBuffer::VertexBuffer - Failed to allocate buffer!");
-        throw std::runtime_error("VertexBuffer::VertexBuffer - Failed to allocate buffer!");
+        RP_CORE_ERROR("Failed to allocate buffer!");
+        throw std::runtime_error("Failed to allocate buffer!");
     }
 
     if (m_bufferAllocation && data) {
@@ -111,9 +111,8 @@ void VertexBuffer::addDataGPU(void *data, VkDeviceSize size, VkDeviceSize offset
 {
     // Check for buffer overflow
     if (offset + size > getSize()) {
-        RP_CORE_ERROR(
-            "VertexBuffer::addDataGPU - Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}",
-            size, offset, getSize());
+        RP_CORE_ERROR("Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}", size, offset,
+                      getSize());
         return;
     }
 

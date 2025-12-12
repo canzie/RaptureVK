@@ -148,12 +148,12 @@ void InstancedShapesPass::createPipeline()
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_shader.expired()) {
-        RP_CORE_ERROR("InstancedShapesPass: Shader not loaded, cannot create pipeline.");
+        RP_CORE_ERROR("Shader not loaded, cannot create pipeline.");
         return;
     }
     auto shaderShared = m_shader.lock();
     if (!shaderShared) {
-        RP_CORE_ERROR("InstancedShapesPass: Shader is null after lock, cannot create pipeline.");
+        RP_CORE_ERROR("Shader is null after lock, cannot create pipeline.");
         return;
     }
 

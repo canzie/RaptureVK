@@ -29,7 +29,7 @@ glTF2Loader::glTF2Loader(std::shared_ptr<Scene> scene)
       m_images(nullptr), m_samplers(nullptr)
 {
     if (!m_scene) {
-        RP_CORE_WARN("glTF2Loader: Scene pointer is null");
+        RP_CORE_WARN("Scene pointer is null");
     }
 }
 
@@ -98,13 +98,13 @@ void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, 
     // Get the image index
     yyjson_val *sourceVal = getObjectValue(texture, "source");
     if (!sourceVal) {
-        RP_CORE_ERROR("glTF2Loader: Texture missing source property");
+        RP_CORE_ERROR("Texture missing source property");
         return;
     }
 
     int imageIndex = getInt(sourceVal, -1);
     if (imageIndex < 0 || static_cast<size_t>(imageIndex) >= getArraySize(m_images)) {
-        RP_CORE_ERROR("glTF2Loader: Invalid image index {}", imageIndex);
+        RP_CORE_ERROR("Invalid image index {}", imageIndex);
         return;
     }
 
@@ -113,7 +113,7 @@ void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, 
     // Get the image URI
     yyjson_val *uriVal = getObjectValue(image, "uri");
     if (!uriVal) {
-        RP_CORE_ERROR("glTF2Loader: Image missing URI");
+        RP_CORE_ERROR("Image missing URI");
         return;
     }
 
@@ -139,7 +139,7 @@ void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, 
     auto [tex, handle] = AssetManager::importAsset<Texture>(texturePathFS, texImportConfig);
 
     if (!tex) {
-        RP_CORE_ERROR("glTF2Loader::loadAndSetTexture - Failed to import or get texture {}", texturePath);
+        RP_CORE_ERROR("Failed to import or get texture {}", texturePath);
         return;
     }
 
@@ -157,7 +157,7 @@ void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, 
 
 bool glTF2Loader::initialize(const std::string &filepath)
 {
-    RP_CORE_INFO("glTF2Loader: Initializing loader for '{}'", filepath);
+    RP_CORE_INFO("Initializing loader for '{}'", filepath);
 
     m_isLoaded = false;
     if (m_isInitialized) return true;
@@ -167,7 +167,7 @@ bool glTF2Loader::initialize(const std::string &filepath)
     // Read the gltf file content into string
     std::ifstream gltf_file(filepath);
     if (!gltf_file) {
-        RP_CORE_ERROR("glTF2Loader: Couldn't load glTF file '{}'", filepath);
+        RP_CORE_ERROR("Couldn't load glTF file '{}'", filepath);
         return false;
     }
 
@@ -178,7 +178,7 @@ bool glTF2Loader::initialize(const std::string &filepath)
     gltf_file.close();
 
     if (gltf_content.empty()) {
-        RP_CORE_ERROR("glTF2Loader: Empty glTF file '{}'", filepath);
+        RP_CORE_ERROR("Empty glTF file '{}'", filepath);
         return false;
     }
 
@@ -187,13 +187,13 @@ bool glTF2Loader::initialize(const std::string &filepath)
     m_glTFdoc = yyjson_read(gltf_content.c_str(), gltf_content.length(), 0);
 
     if (!m_glTFdoc) {
-        RP_CORE_ERROR("glTF2Loader: Failed to parse glTF JSON: {} at position {}", err.msg, err.pos);
+        RP_CORE_ERROR("Failed to parse glTF JSON: {} at position {}", err.msg, err.pos);
         return false;
     }
 
     m_glTFroot = yyjson_doc_get_root(m_glTFdoc);
     if (!m_glTFroot) {
-        RP_CORE_ERROR("glTF2Loader: Failed to get root from glTF JSON");
+        RP_CORE_ERROR("Failed to get root from glTF JSON");
         yyjson_doc_free(m_glTFdoc);
         m_glTFdoc = nullptr;
         return false;
@@ -214,7 +214,7 @@ bool glTF2Loader::initialize(const std::string &filepath)
 
     // Validate required sections
     if (!m_accessors || !m_meshes || !m_bufferViews || !m_buffers) {
-        RP_CORE_ERROR("glTF2Loader: Missing required glTF sections");
+        RP_CORE_ERROR("Missing required glTF sections");
         return false;
     }
 
@@ -228,13 +228,13 @@ bool glTF2Loader::initialize(const std::string &filepath)
     // Load the bin file with all the buffer data
     yyjson_val *firstBuffer = getArrayElement(m_buffers, 0);
     if (!firstBuffer) {
-        RP_CORE_ERROR("glTF2Loader: No buffers found");
+        RP_CORE_ERROR("No buffers found");
         return false;
     }
 
     const char *bufferURI = getString(getObjectValue(firstBuffer, "uri"), "");
     if (strlen(bufferURI) == 0) {
-        RP_CORE_ERROR("glTF2Loader: Buffer URI is missing");
+        RP_CORE_ERROR("Buffer URI is missing");
         return false;
     }
 
@@ -249,7 +249,7 @@ bool glTF2Loader::initialize(const std::string &filepath)
 
     std::ifstream binary_file(fullBufferPath, std::ios::binary);
     if (!binary_file) {
-        RP_CORE_ERROR("glTF2Loader: Couldn't load binary file '{}'", fullBufferPath);
+        RP_CORE_ERROR("Couldn't load binary file '{}'", fullBufferPath);
         return false;
     }
 
@@ -262,7 +262,7 @@ bool glTF2Loader::initialize(const std::string &filepath)
 
     // Read the entire file at once for efficiency
     if (!binary_file.read(reinterpret_cast<char *>(m_binVec.data()), fileSize)) {
-        RP_CORE_ERROR("glTF2Loader: Failed to read binary data");
+        RP_CORE_ERROR("Failed to read binary data");
         return false;
     }
 
@@ -276,12 +276,12 @@ bool glTF2Loader::loadModel(const std::string &filepath, bool calculateBoundingB
 {
     (void)calculateBoundingBoxes;
     if (m_scene == nullptr) {
-        RP_CORE_ERROR("glTF2Loader: Scene pointer is null");
+        RP_CORE_ERROR("Scene pointer is null");
         return false;
     }
 
     if (!m_isInitialized || !initialize(filepath)) {
-        RP_CORE_ERROR("glTF2Loader: Failed to initialize loader for '{}'", filepath);
+        RP_CORE_ERROR("Failed to initialize loader for '{}'", filepath);
         return false;
     }
 
@@ -290,7 +290,7 @@ bool glTF2Loader::loadModel(const std::string &filepath, bool calculateBoundingB
 
     // Check if the model has animations
     if (m_animations && getArraySize(m_animations) > 0) {
-        RP_CORE_INFO("glTF2Loader: Model has {} animations", getArraySize(m_animations));
+        RP_CORE_INFO("Model has {} animations", getArraySize(m_animations));
     }
 
     // Process the default scene or the first scene if default not specified

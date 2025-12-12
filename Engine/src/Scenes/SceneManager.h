@@ -50,7 +50,7 @@ class SceneManager {
     // Activation
     void setActiveScene(const std::string &name)
     {
-        RP_CORE_INFO("SceneManager::setActiveScene - Setting active scene to: {0}", name);
+        RP_CORE_INFO("Setting active scene to: {0}", name);
 
         auto it = m_scenes.find(name);
         if (it != m_scenes.end()) {

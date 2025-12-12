@@ -95,7 +95,7 @@ void MaterialManager::init()
         }
         s_materials[name] = material;
     } catch (const std::exception &e) {
-        RP_CORE_ERROR("MaterialManager::init - {}", e.what());
+        RP_CORE_ERROR("{}", e.what());
     }
 
     const std::string pbrShaderPath = "SPIRV/GBuffer.vs.spv";
@@ -110,7 +110,7 @@ void MaterialManager::init()
         }
         s_materials[name] = material;
     } catch (const std::exception &e) {
-        RP_CORE_ERROR("MaterialManager::init - {}", e.what());
+        RP_CORE_ERROR("{}", e.what());
     }
 
     s_initialized = true;
@@ -128,12 +128,12 @@ void MaterialManager::shutdown()
 std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &name)
 {
     if (!s_initialized) {
-        RP_CORE_ERROR("MaterialManager::getMaterial - material manager not initialized!");
+        RP_CORE_ERROR("material manager not initialized!");
         return nullptr;
     }
 
     if (s_materials.find(name) == s_materials.end()) {
-        RP_CORE_ERROR("MaterialManager::getMaterial - material '{0}' not found!", name);
+        RP_CORE_ERROR("material '{0}' not found!", name);
         return nullptr;
     }
     return s_materials[name];
@@ -142,7 +142,7 @@ std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &na
 void MaterialManager::printMaterialNames()
 {
     for (auto &[name, material] : s_materials) {
-        RP_CORE_INFO("\t MaterialManager::printMaterialNames - {0}", name);
+        RP_CORE_INFO("\t {0}", name);
     }
 }
 } // namespace Rapture

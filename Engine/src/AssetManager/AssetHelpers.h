@@ -19,7 +19,7 @@ inline std::optional<std::filesystem::path> getRelatedShaderPath(const std::file
                                                                  const std::string &targetStage)
 {
     if (!std::filesystem::exists(basePath)) {
-        RP_CORE_WARN("AssetImporter::getRelatedShaderPath - Base path does not exist: {}", basePath.string());
+        RP_CORE_WARN("Base path does not exist: {}", basePath.string());
         return std::nullopt;
     }
 
@@ -31,7 +31,7 @@ inline std::optional<std::filesystem::path> getRelatedShaderPath(const std::file
     std::smatch match;
 
     if (!std::regex_match(basePathStr, match, pathRegex) || match.size() != 4) {
-        RP_CORE_WARN("AssetImporter::getRelatedShaderPath - Could not parse base shader "
+        RP_CORE_WARN("Could not parse base shader "
                      "path structure: {}. Expected format like 'name.stage.ext'.",
                      basePathStr);
         return std::nullopt;
@@ -46,7 +46,7 @@ inline std::optional<std::filesystem::path> getRelatedShaderPath(const std::file
                                                                                {"compute", {".comp", ".cs"}}};
 
     if (stageExtensions.find(targetStage) == stageExtensions.end()) {
-        RP_CORE_ERROR("AssetImporter::getRelatedShaderPath - Invalid target shader "
+        RP_CORE_ERROR("Invalid target shader "
                       "stage requested: {}",
                       targetStage);
         return std::nullopt;
@@ -59,8 +59,7 @@ inline std::optional<std::filesystem::path> getRelatedShaderPath(const std::file
         }
     }
 
-    RP_CORE_WARN("AssetImporter::getRelatedShaderPath - Could not find related {} shader for base path: {}", targetStage,
-                 basePath.string());
+    RP_CORE_WARN("Could not find related {} shader for base path: {}", targetStage, basePath.string());
     return std::nullopt;
 }
 

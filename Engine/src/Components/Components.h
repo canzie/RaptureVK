@@ -268,7 +268,7 @@ struct SkyboxComponent {
     {
         auto [skyboxTexture, handle] = AssetManager::importAsset<Texture>(skyboxTexturePath);
         if (!skyboxTexture) {
-            RP_CORE_ERROR("SkyboxComponent - Failed to load skybox texture: {}", skyboxTexturePath.string());
+            RP_CORE_ERROR("Failed to load skybox texture: {}", skyboxTexturePath.string());
             this->skyboxTextureHandle = AssetHandle();
         } else {
             this->skyboxTexture = skyboxTexture;
@@ -391,7 +391,7 @@ struct BLASComponent {
             blas = std::make_shared<BLAS>(mesh);
             blas->build();
         } catch (const std::runtime_error &e) {
-            RP_CORE_ERROR("BLASComponent: Failed to create BLAS: {}", e.what());
+            RP_CORE_ERROR("Failed to create BLAS: {}", e.what());
         }
     }
 };

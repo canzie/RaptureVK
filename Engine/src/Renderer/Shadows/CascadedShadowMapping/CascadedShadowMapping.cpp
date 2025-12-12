@@ -54,13 +54,12 @@ std::vector<float> CascadedShadowMap::calculateCascadeSplits(float nearPlane, fl
 
     // Validate input parameters
     if (nearPlane <= 0.0f) {
-        RP_CORE_ERROR("CascadedShadowMaping::calculateCascadeSplits: Near plane must be positive, got {0}", nearPlane);
+        RP_CORE_ERROR("Near plane must be positive, got {0}", nearPlane);
         nearPlane = 0.1f; // Default fallback
     }
 
     if (farPlane <= nearPlane) {
-        RP_CORE_ERROR("CascadedShadowMaping::calculateCascadeSplits: Far plane ({0}) must be greater than near plane ({1})",
-                      farPlane, nearPlane);
+        RP_CORE_ERROR("Far plane ({0}) must be greater than near plane ({1})", farPlane, nearPlane);
         farPlane = nearPlane * 100.0f; // Default fallback
     }
 
@@ -329,7 +328,7 @@ std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponen
     RAPTURE_PROFILE_FUNCTION();
 
     if (lightComp.type != LightType::Directional) {
-        RP_CORE_ERROR("CascadedShadowMap::updateViewMatrix: Light is not a directional light");
+        RP_CORE_ERROR("Light is not a directional light");
         return std::vector<CascadeData>();
     }
 
@@ -373,17 +372,16 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
 
     // Validate input parameters
     if (glm::any(glm::isnan(cameraProjectionMatrix[0])) || glm::any(glm::isnan(cameraViewMatrix[0]))) {
-        RP_CORE_ERROR("CascadedShadowMaping::extractFrustumCorners: Received NaN in input matrices");
+        RP_CORE_ERROR("Received NaN in input matrices");
     }
 
     if (cascadeNearPlane <= 0.0f) {
-        RP_CORE_ERROR("CascadedShadowMaping::extractFrustumCorners: Near plane must be positive, got {0}", cascadeNearPlane);
+        RP_CORE_ERROR("Near plane must be positive, got {0}", cascadeNearPlane);
         cascadeNearPlane = 0.1f; // Fallback
     }
 
     if (cascadeFarPlane <= cascadeNearPlane) {
-        RP_CORE_ERROR("CascadedShadowMaping::extractFrustumCorners: Far plane ({0}) must be greater than near plane ({1})",
-                      cascadeFarPlane, cascadeNearPlane);
+        RP_CORE_ERROR("Far plane ({0}) must be greater than near plane ({1})", cascadeFarPlane, cascadeNearPlane);
         cascadeFarPlane = cascadeNearPlane * 10.0f; // Fallback
     }
 
@@ -418,16 +416,16 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
             aspectRatio = cameraProjectionMatrix[1][1] / cameraProjectionMatrix[0][0];
 
             if (fovY <= 0.0f || fovY > glm::radians(180.0f)) {
-                RP_CORE_ERROR("CascadedShadowMaping: Invalid FOV extracted: {0} radians", fovY);
+                RP_CORE_ERROR("Invalid FOV extracted: {0} radians", fovY);
                 fovY = glm::radians(45.0f); // Default fallback
             }
 
             if (aspectRatio <= 0.0f) {
-                RP_CORE_ERROR("CascadedShadowMaping: Invalid aspect ratio extracted: {0}", aspectRatio);
+                RP_CORE_ERROR("Invalid aspect ratio extracted: {0}", aspectRatio);
                 aspectRatio = 1.0f; // Default fallback
             }
         } catch (const std::exception &e) {
-            RP_CORE_ERROR("CascadedShadowMaping: Exception extracting perspective parameters: {0}", e.what());
+            RP_CORE_ERROR("Exception extracting perspective parameters: {0}", e.what());
             // Use fallback values
             fovY = glm::radians(45.0f);
             aspectRatio = 1.0f;
@@ -449,16 +447,16 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
             top = 1.0f / cameraProjectionMatrix[1][1];
 
             if (right <= 0.0f) {
-                RP_CORE_ERROR("CascadedShadowMaping: Invalid right value extracted: {0}", right);
+                RP_CORE_ERROR("Invalid right value extracted: {0}", right);
                 right = 10.0f; // Default fallback
             }
 
             if (top <= 0.0f) {
-                RP_CORE_ERROR("CascadedShadowMaping: Invalid top value extracted: {0}", top);
+                RP_CORE_ERROR("Invalid top value extracted: {0}", top);
                 top = 10.0f; // Default fallback
             }
         } catch (const std::exception &e) {
-            RP_CORE_ERROR("CascadedShadowMaping: Exception extracting orthographic parameters: {0}", e.what());
+            RP_CORE_ERROR("Exception extracting orthographic parameters: {0}", e.what());
             // Use fallback values
             right = 10.0f;
             top = 10.0f;
@@ -473,7 +471,7 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
 
     // Check for invalid transform matrix
     if (glm::any(glm::isnan(cascadeProjectionMatrix[0]))) {
-        RP_CORE_ERROR("CascadedShadowMaping: Generated cascade projection matrix contains NaN");
+        RP_CORE_ERROR("Generated cascade projection matrix contains NaN");
         return std::array<glm::vec3, 8>{}; // Return empty corners
     }
 
@@ -486,11 +484,11 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
 
         // Check for invalid inverse matrix
         if (glm::any(glm::isnan(inverseViewProj[0]))) {
-            RP_CORE_ERROR("CascadedShadowMaping: Inverse view-projection matrix contains NaN");
+            RP_CORE_ERROR("Inverse view-projection matrix contains NaN");
             return std::array<glm::vec3, 8>{}; // Return empty corners
         }
     } catch (const std::exception &e) {
-        RP_CORE_ERROR("CascadedShadowMaping: Exception calculating inverse matrix: {0}", e.what());
+        RP_CORE_ERROR("Exception calculating inverse matrix: {0}", e.what());
         return std::array<glm::vec3, 8>{}; // Return empty corners
     }
 
@@ -502,7 +500,7 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
 
         // Check for invalid transformed corner
         if (glm::any(glm::isnan(worldSpaceCorner)) || worldSpaceCorner.w == 0.0f) {
-            RP_CORE_ERROR("CascadedShadowMaping: Invalid frustum corner calculated (NaN or w=0)");
+            RP_CORE_ERROR("Invalid frustum corner calculated (NaN or w=0)");
             worldSpaceCorners[i] = glm::vec3(0.0f); // Fallback
         } else {
             // Apply perspective divide to get the actual world position

@@ -44,7 +44,7 @@ class SwapChain {
     VkFormat getDepthImageFormat() const { return VK_FORMAT_D32_SFLOAT; }
 
     VkSemaphore getImageAvailableSemaphore(uint32_t frameIndex) const;
-    VkSemaphore getRenderFinishedSemaphore(uint32_t frameIndex) const;
+    VkSemaphore getRenderFinishedSemaphore(uint32_t imageIndex) const;
     VkFence getInFlightFence(uint32_t frameIndex) const;
 
     int acquireImage(uint32_t semaphoreIndex);

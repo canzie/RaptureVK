@@ -282,7 +282,7 @@ void Scene::registerBLAS(Entity &entity)
 
     auto [blas, mesh, transform] = entity.tryGetComponents<BLASComponent, MeshComponent, TransformComponent>();
     if (!blas || !mesh || !transform) {
-        RP_CORE_ERROR("Scene::registerBLAS: Entity does not have a valid BLAS component");
+        RP_CORE_ERROR("Entity does not have a valid BLAS component");
         return;
     }
 
@@ -301,7 +301,7 @@ void Scene::registerBLAS(std::shared_ptr<Entity> entity)
 
     auto [blas, mesh, transform] = entity->tryGetComponents<BLASComponent, MeshComponent, TransformComponent>();
     if (!blas || !mesh || !transform) {
-        RP_CORE_ERROR("Scene::registerBLAS: Entity does not have a valid BLAS component");
+        RP_CORE_ERROR("Entity does not have a valid BLAS component");
         return;
     }
 
@@ -314,7 +314,7 @@ void Scene::registerBLAS(std::shared_ptr<Entity> entity)
 void Scene::buildTLAS()
 {
     if (!m_tlas) {
-        RP_CORE_ERROR("Scene::buildTLAS: TLAS is not initialized");
+        RP_CORE_ERROR("TLAS is not initialized");
         return;
     }
 

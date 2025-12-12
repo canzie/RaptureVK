@@ -266,30 +266,21 @@ void ImGuiLayer::updateViewportDescriptorSet()
         return;
     }
 
-    // Get the texture from the scene render target
     auto texture = sceneRenderTarget->getTexture(m_currentFrame);
     if (!texture) {
         return;
     }
 
-    // Initialize cached textures vector if needed
     if (m_cachedViewportTextures.size() != m_viewportTextureDescriptorSets.size()) {
         m_cachedViewportTextures.resize(m_viewportTextureDescriptorSets.size());
     }
 
-    // Check if texture changed (e.g., after resize) - if so, invalidate ALL frame descriptor sets
     if (m_cachedViewportTextures[m_currentFrame] != texture) {
-        for (size_t i = 0; i < m_viewportTextureDescriptorSets.size(); i++) {
-            if (m_viewportTextureDescriptorSets[i] != VK_NULL_HANDLE) {
-                ImGui_ImplVulkan_RemoveTexture(m_viewportTextureDescriptorSets[i]);
-                m_viewportTextureDescriptorSets[i] = VK_NULL_HANDLE;
-            }
-            m_cachedViewportTextures[i] = nullptr;
+        if (m_viewportTextureDescriptorSets[m_currentFrame] != VK_NULL_HANDLE) {
+            ImGui_ImplVulkan_RemoveTexture(m_viewportTextureDescriptorSets[m_currentFrame]);
+            m_viewportTextureDescriptorSets[m_currentFrame] = VK_NULL_HANDLE;
         }
-    }
 
-    // Create new descriptor set if needed
-    if (m_viewportTextureDescriptorSets[m_currentFrame] == VK_NULL_HANDLE) {
         m_viewportTextureDescriptorSets[m_currentFrame] = ImGui_ImplVulkan_AddTexture(
             texture->getSampler().getSamplerVk(), texture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         m_cachedViewportTextures[m_currentFrame] = texture;
@@ -332,10 +323,9 @@ void ImGuiLayer::onUpdate(float ts)
 
     m_currentImageIndex = static_cast<uint32_t>(imageIndexi);
 
-    // Synchronization primitives
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     VkSemaphore imageAvailableSemaphore = swapChain->getImageAvailableSemaphore(m_currentFrame);
-    VkSemaphore renderFinishedSemaphore = swapChain->getRenderFinishedSemaphore(m_currentFrame);
+    VkSemaphore renderFinishedSemaphore = swapChain->getRenderFinishedSemaphore(m_currentImageIndex);
 
     // Build ImGui render data first
     {
@@ -344,7 +334,7 @@ void ImGuiLayer::onUpdate(float ts)
     }
 
     // Record ImGui command buffer
-    auto& imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame];
+    auto &imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame];
 
     imguiCommandBuffer->reset();
 

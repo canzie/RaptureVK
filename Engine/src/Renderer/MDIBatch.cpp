@@ -50,10 +50,10 @@ void MDIBatch::addObject(const Mesh &mesh, uint32_t meshIndex, uint32_t material
     cmd.firstInstance = m_cpuIndirectCommands.size(); // This will be the index into the batch info buffer
 
     if (iboAlloc->offsetBytes % (m_indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2) != 0) {
-        RP_CORE_ERROR("MDIBatch::addObject() - Index buffer offset is not aligned to index size");
+        RP_CORE_ERROR("Index buffer offset is not aligned to index size");
     }
     if (vboAlloc->offsetBytes % (m_bufferLayout.calculateVertexSize()) != 0) {
-        RP_CORE_ERROR("MDIBatch::addObject() - Vertex buffer offset is not aligned to vertex size | {}",
+        RP_CORE_ERROR("Vertex buffer offset is not aligned to vertex size | {}",
                       vboAlloc->offsetBytes % (m_bufferLayout.calculateVertexSize()));
     }
 
@@ -125,7 +125,7 @@ void MDIBatch::clear()
 std::shared_ptr<StorageBuffer> MDIBatch::getIndirectBuffer()
 {
     if (!m_buffersCreated) {
-        RP_CORE_ERROR("MDIBatch::getIndirectBuffer() called before uploadBuffers()");
+        RP_CORE_ERROR("called before uploadBuffers()");
         return nullptr;
     }
     return m_indirectBuffer;
@@ -134,7 +134,7 @@ std::shared_ptr<StorageBuffer> MDIBatch::getIndirectBuffer()
 std::shared_ptr<StorageBuffer> MDIBatch::getBatchInfoBuffer()
 {
     if (!m_buffersCreated) {
-        RP_CORE_ERROR("MDIBatch::getBatchInfoBuffer() called before uploadBuffers()");
+        RP_CORE_ERROR("called before uploadBuffers()");
         return nullptr;
     }
     return m_batchInfoBuffer;
@@ -143,7 +143,7 @@ std::shared_ptr<StorageBuffer> MDIBatch::getBatchInfoBuffer()
 uint32_t MDIBatch::getBatchInfoBufferIndex() const
 {
     if (!m_buffersCreated) {
-        RP_CORE_ERROR("MDIBatch::getBatchInfoBufferIndex() called before uploadBuffers()");
+        RP_CORE_ERROR("called before uploadBuffers()");
         return UINT32_MAX;
     }
     return m_batchInfoBufferIndex;
