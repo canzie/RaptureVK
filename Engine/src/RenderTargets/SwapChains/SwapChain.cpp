@@ -93,7 +93,7 @@ void SwapChain::invalidate()
     uint32_t desiredImageCount = swapChainSupport.capabilities.minImageCount + 1;
     m_imageCount = std::min<uint32_t>(desiredImageCount, swapChainSupport.capabilities.maxImageCount);
 
-    uint32_t queueFamilyIndices[] = {m_queueFamilyIndices.graphicsFamily.value(), m_queueFamilyIndices.presentFamily.value()};
+    uint32_t queueFamilyIndices[] = {m_queueFamilyIndices.familyIndices[GRAPHICS], m_queueFamilyIndices.familyIndices[PRESENT]};
 
     VkSwapchainCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -110,7 +110,7 @@ void SwapChain::invalidate()
         createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 
-    if (m_queueFamilyIndices.graphicsFamily != m_queueFamilyIndices.presentFamily) {
+    if (m_queueFamilyIndices.familyIndices[GRAPHICS] != m_queueFamilyIndices.familyIndices[PRESENT]) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;

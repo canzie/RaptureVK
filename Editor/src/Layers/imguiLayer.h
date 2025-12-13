@@ -40,13 +40,13 @@ class ImGuiLayer : public Rapture::Layer {
 
   private:
     // ImGui Vulkan logic, sets up the dynamic rendering and ImGui draw commands
-    void drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImageView);
+    void drawImGui(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView);
 
     // imgui logic loop
     void renderImGui();
 
-    void beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageView targetImageView);
-    void endDynamicRendering(VkCommandBuffer commandBuffer);
+    void beginDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView);
+    void endDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer);
     void onResize();
     void updateViewportDescriptorSet();
 
@@ -54,7 +54,7 @@ class ImGuiLayer : public Rapture::Layer {
 
   private:
     float m_Time = 0.0f;
-    float m_FontScale = 1.5f; // Default font scale
+    float m_FontScale = 1.0f; // Default font scale
     bool m_framebufferNeedsResize = false;
     size_t m_windowResizeEventListenerID = 0;
 

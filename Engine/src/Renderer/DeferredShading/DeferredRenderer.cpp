@@ -148,7 +148,12 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
 
     m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
 
-    m_commandBuffers[m_currentFrame]->reset();
+    bool success = m_commandBuffers[m_currentFrame]->reset();
+    if (!success) {
+        m_currentFrame = (m_currentFrame + 1) % m_swapChain->getImageCount();
+        return;
+    }
+
     recordCommandBuffer(m_commandBuffers[m_currentFrame], activeScene, imageIndex);
 
     m_graphicsQueue->addCommandBuffer(m_commandBuffers[m_currentFrame]);
@@ -314,11 +319,11 @@ void DeferredRenderer::setupCommandResources()
     auto &vc = app.getVulkanContext();
 
     CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getQueueFamilyIndices().graphicsFamily.value();
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
     config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     m_commandPool = CommandPoolManager::createCommandPool(config);
 
-    m_commandBuffers = m_commandPool->getCommandBuffers(m_swapChain->getImageCount());
+    m_commandBuffers = m_commandPool->getCommandBuffers(m_swapChain->getImageCount(), "DeferredRenderer");
 }
 
 void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,

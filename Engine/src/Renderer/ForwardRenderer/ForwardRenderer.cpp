@@ -328,10 +328,10 @@ void ForwardRenderer::setupGraphicsPipeline()
 void ForwardRenderer::setupCommandPool()
 {
     auto &app = Application::getInstance();
-    auto queueFamilyIndices = app.getVulkanContext().getQueueFamilyIndices();
+    auto graphicsQueueIndex = app.getVulkanContext().getGraphicsQueueIndex();
 
     CommandPoolConfig config;
-    config.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+    config.queueFamilyIndex = graphicsQueueIndex;
     config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     config.threadId = 0;
 
@@ -340,7 +340,7 @@ void ForwardRenderer::setupCommandPool()
 
 void ForwardRenderer::setupCommandBuffers()
 {
-    m_commandBuffers = m_commandPool->getCommandBuffers(m_swapChain->getImageCount());
+    m_commandBuffers = m_commandPool->getCommandBuffers(m_swapChain->getImageCount(), "ForwardRenderer");
 }
 
 void ForwardRenderer::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer)

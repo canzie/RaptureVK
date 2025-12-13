@@ -390,10 +390,12 @@ void main() {
             // Indirect Lighting (recursive)
             vec3 irradiance = vec3(0.0);
 
-            // Direction from the hit point towards the camera 
-            vec3 samplePointToCamera = normalize(cameraPosition - hitPosition);
+            // Direction from the hit point back towards the probe (for surface bias calculation)
+            // Using -probeRayDirection gives us the direction from hit point to probe origin
+            // This is the correct "view" direction for probe tracing (not camera position)
+            vec3 hitToProbe = -probeRayDirection;
 
-            vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, samplePointToCamera, u_volume);
+            vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, hitToProbe, u_volume);
 
             vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, lightCount);
 

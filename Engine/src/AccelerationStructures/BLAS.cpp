@@ -235,11 +235,11 @@ void BLAS::build()
 
     // Create command buffer and build acceleration structure
     CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = vulkanContext.getQueueFamilyIndices().graphicsFamily.value();
+    poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
     auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer();
+    auto commandBuffer = commandPool->getCommandBuffer("BLAS");
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 

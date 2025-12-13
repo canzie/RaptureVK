@@ -60,17 +60,17 @@ void Buffer::addData(void *newData, VkDeviceSize size, VkDeviceSize offset)
 void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize dstOffset)
 {
     auto &app = Application::getInstance();
-    auto queueFamilyIndices = app.getVulkanContext().getQueueFamilyIndices();
+    auto graphicsQueueIndex = app.getVulkanContext().getGraphicsQueueIndex();
 
     CommandPoolConfig config;
-    config.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+    config.queueFamilyIndex = graphicsQueueIndex;
     config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     config.threadId = 0;
 
     auto commandPool = CommandPoolManager::createCommandPool(config);
 
     // Create command buffer for transfer
-    auto commandBuffer = commandPool->getCommandBuffer();
+    auto commandBuffer = commandPool->getCommandBuffer("Buffer Copy");
 
     // Begin command buffer
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);

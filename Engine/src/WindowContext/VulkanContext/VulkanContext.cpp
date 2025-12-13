@@ -83,6 +83,12 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     m_vmaAllocator = VK_NULL_HANDLE;
     m_debugMessenger = VK_NULL_HANDLE;
     m_swapChain = nullptr;
+    m_vendorQueue = nullptr;
+    m_isVertexInputDynamicStateEnabled = false;
+    m_isVertexAttributeRobustnessEnabled = false;
+    m_isDynamicRenderingEnabled = false;
+    m_isNullDescriptorEnabled = false;
+    m_isRayTracingEnabled = false;
 
 #ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
     // Detect and log the windowing system being used
@@ -139,8 +145,6 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
         m_swapChain->recreate();
         ApplicationEvents::onSwapChainRecreated().publish(m_swapChain);
     });
-
-    m_queueFamilyIndices = findQueueFamilies(m_physicalDevice);
 }
 
 VulkanContext::~VulkanContext()
@@ -182,50 +186,63 @@ void VulkanContext::waitIdle()
 
 std::shared_ptr<VulkanQueue> VulkanContext::getGraphicsQueue() const
 {
-    if (m_graphicsQueueIndex == -1) {
-        RP_CORE_ERROR("Graphics queue index is -1!");
-        throw std::runtime_error("Graphics queue index is -1!");
+    uint32_t graphicsQueueIndex = m_queueFamilyIndices.familyIndices[GRAPHICS];
+    if (graphicsQueueIndex == UINT32_MAX) {
+        RP_CORE_ERROR("Graphics queue index is UINT32_MAX!");
+        throw std::runtime_error("Graphics queue index is UINT32_MAX!");
     }
-    if (m_queues.find(m_graphicsQueueIndex) == m_queues.end()) {
+    if (m_queues.find(graphicsQueueIndex) == m_queues.end()) {
         RP_CORE_ERROR("Graphics queue index is not found!");
         throw std::runtime_error("Graphics queue index is not found!");
     }
-    return m_queues.find(m_graphicsQueueIndex)->second;
+    return m_queues.find(graphicsQueueIndex)->second;
 }
 
 std::shared_ptr<VulkanQueue> VulkanContext::getComputeQueue() const
 {
-    if (m_computeQueueIndex == -1) {
-        RP_CORE_ERROR("Compute queue index is -1!");
-        throw std::runtime_error("Compute queue index is -1!");
+    uint32_t computeQueueIndex = m_queueFamilyIndices.familyIndices[COMPUTE];
+    if (computeQueueIndex == UINT32_MAX) {
+        RP_CORE_ERROR("Compute queue index is UINT32_MAX!");
+        throw std::runtime_error("Compute queue index is UINT32_MAX!");
     }
-    if (m_queues.find(m_computeQueueIndex) == m_queues.end()) {
+    if (m_queues.find(computeQueueIndex) == m_queues.end()) {
         RP_CORE_ERROR("Compute queue index is not found!");
         throw std::runtime_error("Compute queue index is not found!");
     }
-    return m_queues.find(m_computeQueueIndex)->second;
+    return m_queues.find(computeQueueIndex)->second;
 }
 
 std::shared_ptr<VulkanQueue> VulkanContext::getTransferQueue() const
 {
-    if (m_transferQueueIndex == -1 || !m_transferQueue) {
-        RP_CORE_WARN("Transfer queue not available, falling back to graphics queue");
-        return getGraphicsQueue();
+    uint32_t transferQueueIndex = m_queueFamilyIndices.familyIndices[TRANSFER];
+    if (transferQueueIndex == UINT32_MAX) {
+        RP_CORE_ERROR("Transfer queue index is UINT32_MAX!");
+        throw std::runtime_error("Transfer queue index is UINT32_MAX!");
     }
-    return m_transferQueue;
+    if (m_queues.find(transferQueueIndex) == m_queues.end()) {
+        RP_CORE_ERROR("Transfer queue index is not found!");
+        throw std::runtime_error("Transfer queue index is not found!");
+    }
+    return m_queues.find(transferQueueIndex)->second;
 }
 
 std::shared_ptr<VulkanQueue> VulkanContext::getPresentQueue() const
 {
-    if (m_presentQueueIndex == -1) {
-        RP_CORE_ERROR("Present queue index is -1!");
-        throw std::runtime_error("Present queue index is -1!");
+    uint32_t presentQueueIndex = m_queueFamilyIndices.familyIndices[PRESENT];
+    if (presentQueueIndex == UINT32_MAX) {
+        RP_CORE_ERROR("Present queue index is UINT32_MAX!");
+        throw std::runtime_error("Present queue index is UINT32_MAX!");
     }
-    if (m_queues.find(m_presentQueueIndex) == m_queues.end()) {
+    if (m_queues.find(presentQueueIndex) == m_queues.end()) {
         RP_CORE_ERROR("Present queue index is not found!");
         throw std::runtime_error("Present queue index is not found!");
     }
-    return m_queues.find(m_presentQueueIndex)->second;
+    return m_queues.find(presentQueueIndex)->second;
+}
+
+std::shared_ptr<VulkanQueue> VulkanContext::getVendorQueue() const
+{
+    return m_vendorQueue != nullptr ? m_vendorQueue : getGraphicsQueue();
 }
 
 void VulkanContext::createRecourses(WindowContext *windowContext)
@@ -488,14 +505,14 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device)
     QueueFamilyIndices indices = findQueueFamilies(device);
     if (!indices.isComplete()) {
         RP_CORE_WARN("GPU {0}: Queue families incomplete:", deviceProperties.deviceName);
-        if (!indices.graphicsFamily.has_value()) {
-            RP_CORE_WARN("  - Graphics queue family not found");
+        if (indices.familyIndices[GRAPHICS] == UINT32_MAX) {
+            RP_CORE_WARN("\t- Graphics queue family not found");
         }
-        if (!indices.presentFamily.has_value()) {
-            RP_CORE_WARN("  - Present queue family not found");
+        if (indices.familyIndices[PRESENT] == UINT32_MAX) {
+            RP_CORE_WARN("\t- Present queue family not found");
         }
-        if (!indices.computeFamily.has_value()) {
-            RP_CORE_WARN("  - Compute queue family not found");
+        if (indices.familyIndices[COMPUTE] == UINT32_MAX) {
+            RP_CORE_WARN("\t- Compute queue family not found");
         }
         isDeviceSuitable = false;
     } else {
@@ -565,6 +582,10 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device)
     return isDeviceSuitable;
 }
 
+#define PREFER_QUEUE_INDEX(type)                                               \
+    (queueIndicesUses[indices.familyIndices[type]] < queueFamily.queueCount || \
+     queueIndicesUses[i] < queueIndicesUses[indices.familyIndices[type]])
+
 QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) const
 {
     QueueFamilyIndices indices;
@@ -573,6 +594,7 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    std::vector<uint32_t> queueIndicesUses(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
     int i = 0;
@@ -582,14 +604,40 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
         }
 
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            indices.graphicsFamily = i;
-            indices.graphicsFamilyQueueCount = queueFamily.queueCount;
+            if (indices.familyIndices[GRAPHICS] == UINT32_MAX) {
+                indices.familyIndices[GRAPHICS] = i;
+                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            } else if (PREFER_QUEUE_INDEX(GRAPHICS)) {
+                queueIndicesUses[indices.familyIndices[GRAPHICS]]--;
+                indices.familyIndices[GRAPHICS] = i;
+                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            }
+        }
+        if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
+            if (indices.familyIndices[COMPUTE] == UINT32_MAX) {
+                indices.familyIndices[COMPUTE] = i;
+                indices.familyQueueCounts[COMPUTE] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            } else if (PREFER_QUEUE_INDEX(COMPUTE)) {
+                queueIndicesUses[indices.familyIndices[COMPUTE]]--;
+                indices.familyIndices[COMPUTE] = i;
+                indices.familyQueueCounts[COMPUTE] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            }
         }
 
-        // Prefer a compute queue that also supports graphics for easier synchronization
-        if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-            if (!indices.computeFamily.has_value() || (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-                indices.computeFamily = i;
+        if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+            if (indices.familyIndices[TRANSFER] == UINT32_MAX) {
+                indices.familyIndices[TRANSFER] = i;
+                indices.familyQueueCounts[TRANSFER] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            } else if (PREFER_QUEUE_INDEX(TRANSFER)) {
+                queueIndicesUses[indices.familyIndices[TRANSFER]]--;
+                indices.familyIndices[TRANSFER] = i;
+                indices.familyQueueCounts[TRANSFER] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
             }
         }
 
@@ -597,11 +645,23 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &presentSupport);
 
         if (presentSupport) {
-            indices.presentFamily = i;
+            if (indices.familyIndices[PRESENT] == UINT32_MAX) {
+                indices.familyIndices[GRAPHICS] = i;
+                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            } else if (PREFER_QUEUE_INDEX(PRESENT)) {
+                queueIndicesUses[indices.familyIndices[PRESENT]]--;
+
+                indices.familyIndices[PRESENT] = i;
+                indices.familyQueueCounts[PRESENT] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            }
         }
 
         i++;
     }
+
+    indices.print();
 
     return indices;
 }
@@ -994,59 +1054,96 @@ s_loadRayTracing(VkPhysicalDevice physicalDevice, VkDevice device, PFN_vkCreateA
 }
 
 static void s_createQueues(VkDevice device, const QueueFamilyIndices &indices,
-                           std::map<uint32_t, std::shared_ptr<VulkanQueue>> &queues, int &graphicsIdx, int &presentIdx,
-                           int &computeIdx, std::shared_ptr<VulkanQueue> &transferQueue, int &transferIdx)
+                           std::map<uint32_t, std::shared_ptr<VulkanQueue>> &queues, std::shared_ptr<VulkanQueue> &vendorQueue)
 {
-    auto create = [&](uint32_t family, const char *name, uint32_t index) {
-        return std::make_shared<VulkanQueue>(device, family, index, name);
-    };
 
-    graphicsIdx = indices.graphicsFamily.value();
-    presentIdx = indices.presentFamily.value();
+    std::set<uint32_t> uniqueQueueFamilies = {indices.familyIndices[GRAPHICS], indices.familyIndices[PRESENT],
+                                              indices.familyIndices[COMPUTE], indices.familyIndices[TRANSFER]};
 
-    queues[graphicsIdx] = create(graphicsIdx, "graphics", 0);
+    for (uint32_t queueFamily : uniqueQueueFamilies) {
+        if (queueFamily == UINT32_MAX) continue;
 
-    if (presentIdx != graphicsIdx) queues[presentIdx] = create(presentIdx, "present", 0);
+        std::vector<std::string> queueTypeNames;
 
-    if (indices.computeFamily) {
-        computeIdx = indices.computeFamily.value();
-        if (!queues.count(computeIdx)) queues[computeIdx] = create(computeIdx, "compute", 0);
-    } else {
-        computeIdx = -1;
-    }
+        bool hasGraphics = (indices.familyIndices[GRAPHICS] == queueFamily);
+        bool hasPresent = (indices.familyIndices[PRESENT] == queueFamily);
+        bool hasCompute = (indices.familyIndices[COMPUTE] == queueFamily);
+        bool hasTransfer = (indices.familyIndices[TRANSFER] == queueFamily);
 
-    if (indices.graphicsFamilyQueueCount >= 2) {
-        transferQueue = create(graphicsIdx, "transfer", 1);
-        transferIdx = graphicsIdx;
-    } else {
-        transferIdx = -1;
+        if (hasGraphics) queueTypeNames.push_back("graphics");
+        if (hasPresent) queueTypeNames.push_back("present");
+        if (hasCompute) queueTypeNames.push_back("compute");
+        if (hasTransfer) queueTypeNames.push_back("transfer");
+
+        std::string queueName;
+        for (size_t i = 0; i < queueTypeNames.size(); ++i) {
+            if (i > 0) queueName += "|";
+            queueName += queueTypeNames[i];
+        }
+
+        uint32_t queueCount = 0;
+        for (int i = 0; i < COUNT; ++i) {
+            if (indices.familyIndices[i] == queueFamily) {
+                queueCount = indices.familyQueueCounts[i];
+                break;
+            }
+        }
+
+        if (queueCount == 0) continue;
+
+        auto primaryQueue = std::make_shared<VulkanQueue>(device, queueFamily, 0, queueName);
+        queues[queueFamily] = primaryQueue;
+
+        if (hasGraphics && queueCount > 1 && vendorQueue == nullptr) {
+            vendorQueue = std::make_shared<VulkanQueue>(device, queueFamily, 1, "vendor");
+        }
     }
 }
 
 void VulkanContext::createLogicalDevice()
 {
 
-    QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
+    m_queueFamilyIndices = findQueueFamilies(m_physicalDevice);
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+    std::set<uint32_t> uniqueQueueFamilies = {
+        m_queueFamilyIndices.familyIndices[GRAPHICS], m_queueFamilyIndices.familyIndices[PRESENT],
+        m_queueFamilyIndices.familyIndices[COMPUTE], m_queueFamilyIndices.familyIndices[TRANSFER]};
 
-    // Add compute queue family if it's different from graphics/present
-    if (indices.computeFamily.has_value()) {
-        uniqueQueueFamilies.insert(indices.computeFamily.value());
-    }
-
-    std::vector<float> queuePriorities = {1.0f, 1.0f};
+    std::vector<std::vector<float>> queuePriorityVectors;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
+        if (queueFamily == UINT32_MAX) continue;
+
+        uint32_t queueCount = 0;
+        for (int i = 0; i < COUNT; ++i) {
+            if (m_queueFamilyIndices.familyIndices[i] == queueFamily) {
+                queueCount = m_queueFamilyIndices.familyQueueCounts[i];
+                break;
+            }
+        }
+
+        std::vector<float> priorities;
+        if (queueCount > 0) {
+            priorities.resize(queueCount);
+            if (queueCount == 1) {
+                priorities[0] = 1.0f;
+            } else {
+                for (uint32_t i = 0; i < queueCount; ++i) {
+                    priorities[i] = 1.0f - (static_cast<float>(i) / static_cast<float>(queueCount - 1));
+                }
+            }
+        }
+
         VkDeviceQueueCreateInfo queueCreateInfo{};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamily;
-        if (queueFamily == indices.graphicsFamily.value() && indices.graphicsFamilyQueueCount >= 2) {
-            queueCreateInfo.queueCount = 2;
-            queueCreateInfo.pQueuePriorities = queuePriorities.data();
+        queueCreateInfo.queueCount = queueCount;
+        if (!priorities.empty()) {
+            queuePriorityVectors.push_back(std::move(priorities));
+            queueCreateInfo.pQueuePriorities = queuePriorityVectors.back().data();
         } else {
-            queueCreateInfo.queueCount = 1;
-            queueCreateInfo.pQueuePriorities = &queuePriorities[0];
+            queueCreateInfo.pQueuePriorities = nullptr;
         }
+
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
@@ -1115,8 +1212,7 @@ void VulkanContext::createLogicalDevice()
                      vkGetRayTracingShaderGroupHandlesKHR, vkCmdTraceRaysKHR, m_rayTracingPipelineProperties,
                      m_accelerationStructureProperties);
 
-    s_createQueues(m_device, indices, m_queues, m_graphicsQueueIndex, m_presentQueueIndex, m_computeQueueIndex, m_transferQueue,
-                   m_transferQueueIndex);
+    s_createQueues(m_device, m_queueFamilyIndices, m_queues, m_vendorQueue);
 
     RP_CORE_INFO("Logical device created successfully!");
 }

@@ -100,7 +100,7 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
     shaderc::SpvCompilationResult module = m_compiler.CompileGlslToSpv(source, kind, path.string().c_str(), options);
 
     if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
-        RP_CORE_ERROR("ShaderCompiler: Failed to compile {0}:\n{1}", path.string(), module.GetErrorMessage());
+        RP_CORE_ERROR("Failed to compile {0}:\n{1}", path.string(), module.GetErrorMessage());
         return {};
     }
 
@@ -110,8 +110,7 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
     std::vector<char> spirv(spirv_size);
     memcpy(spirv.data(), spirv_data, spirv_size);
 
-    RP_CORE_INFO("ShaderCompiler: Compiled shader: {0} \n\t using macros: [{1}]", path.string(),
-                 fmt::join(compileInfo.macros, ", "));
+    RP_CORE_INFO("Compiled shader: {0} \n\t using macros: [{1}]", path.string(), fmt::join(compileInfo.macros, ", "));
 
     return spirv;
 }

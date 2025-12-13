@@ -169,30 +169,25 @@ vec3 DDGILoadProbeDataOffset(vec3 probeOffset, ProbeVolume volume)
 }
 
 /**
- * Computes a spherically distributed, normalized ray direction for the given ray index in a set of ray samples.
- * Applies the volume's random probe ray rotation transformation to "non-fixed" ray direction samples.
+ * Computes a spherically distributed, normalized ray direction for the given ray index.
+ * Currently using fixed Spherical Fibonacci distribution (no rotation/jitter).
+ *
+ * NOTE: Ray rotation has been disabled because ANY per-frame variation causes
+ * severe flickering. This needs further investigation - the issue might be:
+ * 1. Buffer update race conditions
+ * 2. Hysteresis not actually being applied
+ * 3. Something else entirely
  */
 vec3 DDGIGetProbeRayDirection(int rayIndex, ProbeVolume volume)
 {
-    bool isFixedRay = false;
-    int sampleIndex = rayIndex;
-    int numRays = volume.probeNumRays;
+    bool isFixedRay = (rayIndex < int(volume.probeStaticRayCount));
+    int sampleIndex = isFixedRay ? rayIndex : rayIndex - int(volume.probeStaticRayCount);
+    int numRays = isFixedRay ? int(volume.probeStaticRayCount) : volume.probeNumRays - int(volume.probeStaticRayCount);
 
-    if (true) {
-        isFixedRay = (rayIndex < int(volume.probeStaticRayCount));
-        sampleIndex = isFixedRay ? rayIndex : rayIndex - int(volume.probeStaticRayCount);
-        numRays = isFixedRay ? int(volume.probeStaticRayCount) : numRays - int(volume.probeStaticRayCount);
-    }
-    
     // Get a deterministic direction on the sphere using the spherical Fibonacci sequence
     vec3 direction = SphericalFibonacci(uint(sampleIndex), uint(numRays));
 
-    if (isFixedRay) {
-        return normalize(direction);
-    }
-
-    // Rotate the ray direction by the per-frame random quaternion stored in the volume
-    return normalize(RTXGIQuaternionRotate(direction, RTXGIQuaternionConjugate(volume.probeRayRotation)));
+    return normalize(direction);
 }
 
 int DDGIGetProbesPerPlane(ivec3 gridDimensions)

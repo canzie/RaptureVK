@@ -13,6 +13,7 @@
 namespace Rapture {
 
 class CommandBuffer;
+struct CmdBufferDefferedDestruction;
 
 using CommandPoolHash = uint32_t;
 
@@ -37,9 +38,12 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     CommandPool(const CommandPoolConfig &config);
     ~CommandPool();
 
+    void deferCmdBufferDestruction(CmdBufferDefferedDestruction cmdBufferDefferedDestruction);
+    void onUpdate(float dt);
+
     VkCommandPool getCommandPoolVk() const { return m_commandPool; }
-    std::shared_ptr<CommandBuffer> getCommandBuffer(bool stayAlive = false);
-    std::vector<std::shared_ptr<CommandBuffer>> getCommandBuffers(uint32_t count);
+    std::shared_ptr<CommandBuffer> getCommandBuffer(const std::string &name, bool stayAlive = false);
+    std::vector<std::shared_ptr<CommandBuffer>> getCommandBuffers(uint32_t count, const std::string &namePrefix = "cmd");
 
   private:
     // std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
@@ -49,6 +53,7 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
 
     VkDevice m_device;
 
+    std::vector<CmdBufferDefferedDestruction> m_deferredCmdBufferDestructions;
     // only added when stayAlive=true, can be usefull for liefetime commandbuffers which rapture does not manage directly
     std::vector<std::shared_ptr<CommandBuffer>> m_savedCommandBuffers;
 };
@@ -57,6 +62,8 @@ class CommandPoolManager {
   public:
     static void init();
     static void shutdown();
+
+    static void onUpdate(float dt);
 
     static std::shared_ptr<CommandPool> createCommandPool(const CommandPoolConfig &config);
     // access a pool by its hash

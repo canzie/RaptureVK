@@ -54,14 +54,25 @@ CommandBuffer::~CommandBuffer()
     std::lock_guard<std::mutex> lock(m_stateMutex);
 
     // Check if still pending - this is an error
-    if (m_state == CmdBufferState::PENDING) {
+    if (m_state != CmdBufferState::PENDING) {
+        vkFreeCommandBuffers(m_device, m_commandPool->getCommandPoolVk(), 1, &m_commandBuffer);
+    } else {
         updatePendingState();
         if (m_state == CmdBufferState::PENDING) {
-            RP_CORE_ERROR("CommandBuffer[{}]: destroying command buffer while still PENDING!", m_name);
+            RP_CORE_ERROR("CommandBuffer[{}]: trying to destroy command buffer while still PENDING!, deferring destruction",
+                          m_name);
+            CmdBufferDefferedDestruction cmdBufferDefferedDestruction{};
+            cmdBufferDefferedDestruction.commandBuffer = m_commandBuffer;
+            cmdBufferDefferedDestruction.state = m_state;
+            cmdBufferDefferedDestruction.name = m_name;
+            cmdBufferDefferedDestruction.destroyAttempts = 0;
+            cmdBufferDefferedDestruction.pendingSignalValue = m_pendingSignalValue;
+            cmdBufferDefferedDestruction.pendingSemaphore = m_pendingSemaphore;
+            m_commandPool->deferCmdBufferDestruction(cmdBufferDefferedDestruction);
+        } else {
+            vkFreeCommandBuffers(m_device, m_commandPool->getCommandPoolVk(), 1, &m_commandBuffer);
         }
     }
-
-    vkFreeCommandBuffers(m_device, m_commandPool->getCommandPoolVk(), 1, &m_commandBuffer);
 }
 
 CmdBufferState CommandBuffer::getState()
@@ -95,14 +106,14 @@ void CommandBuffer::updatePendingState()
     }
 }
 
-void CommandBuffer::reset(VkCommandBufferResetFlags flags)
+bool CommandBuffer::reset(VkCommandBufferResetFlags flags)
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     updatePendingState();
 
     if (m_state == CmdBufferState::PENDING) {
         RP_CORE_ERROR("CommandBuffer[{}]: cannot reset while in PENDING state", m_name);
-        return;
+        return false;
     }
 
     if (m_state == CmdBufferState::RECORDING) {
@@ -113,13 +124,14 @@ void CommandBuffer::reset(VkCommandBufferResetFlags flags)
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("CommandBuffer[{}]: failed to reset (VkResult: {})", m_name, static_cast<int>(result));
         m_state = CmdBufferState::INVALID;
-        return;
+        return false;
     }
 
     m_state = CmdBufferState::INITIAL;
     m_oneTimeSubmit = false;
     m_pendingSemaphore = VK_NULL_HANDLE;
     m_pendingSignalValue = 0;
+    return true;
 }
 
 VkResult CommandBuffer::begin(VkCommandBufferUsageFlags flags)
@@ -175,7 +187,7 @@ VkResult CommandBuffer::end()
     return VK_SUCCESS;
 }
 
-bool CommandBuffer::onSubmit(VkSemaphore timelineSemaphore, uint64_t signalValue)
+VkCommandBuffer CommandBuffer::prepareSubmit()
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     updatePendingState();
@@ -183,24 +195,25 @@ bool CommandBuffer::onSubmit(VkSemaphore timelineSemaphore, uint64_t signalValue
     if (m_state != CmdBufferState::EXECUTABLE) {
         RP_CORE_ERROR("CommandBuffer[{}]: cannot submit, not in EXECUTABLE state (current: {})", m_name,
                       cmdBufferStateToString(m_state));
-        return false;
+        return VK_NULL_HANDLE;
     }
 
     m_state = CmdBufferState::PENDING;
-    m_pendingSemaphore = timelineSemaphore;
-    m_pendingSignalValue = signalValue;
-    return true;
+    return m_commandBuffer;
 }
 
-void CommandBuffer::onSubmitFailed()
+void CommandBuffer::completeSubmit(VkSemaphore timelineSemaphore, uint64_t signalValue)
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
-    // On submit failure, the command buffer remains in EXECUTABLE state
-    // (the GPU never started processing it)
-    if (m_state == CmdBufferState::PENDING) {
+    m_pendingSemaphore = timelineSemaphore;
+    m_pendingSignalValue = signalValue;
+}
+
+void CommandBuffer::abortSubmit()
+{
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    if (m_state == CmdBufferState::PENDING && m_pendingSemaphore == VK_NULL_HANDLE) {
         m_state = CmdBufferState::EXECUTABLE;
-        m_pendingSemaphore = VK_NULL_HANDLE;
-        m_pendingSignalValue = 0;
     }
 }
 

@@ -31,6 +31,8 @@ class VulkanQueue {
     VkSemaphore getTimelineSemaphore() const { return m_timelineSemaphore; }
     uint64_t getCurrentTimelineValue() const { return m_timelineValue; }
 
+    [[nodiscard]] std::unique_lock<std::mutex> acquireQueueLock() { return std::unique_lock<std::mutex>(m_queueMutex); }
+
     void clear();
 
   private:

@@ -17,7 +17,10 @@
 static void s_checkVkResult(VkResult err)
 {
     if (err == VK_SUCCESS) return;
-    if (err < 0) abort();
+    if (err < 0) {
+        Rapture::RP_ERROR("ImGuiLayer: VkResult error: {0}", static_cast<int>(err));
+        abort();
+    }
 }
 
 ImGuiLayer::ImGuiLayer()
@@ -122,8 +125,8 @@ void ImGuiLayer::onAttach()
     init_info.Instance = vulkanContext.getInstance();
     init_info.PhysicalDevice = vulkanContext.getPhysicalDevice();
     init_info.Device = vulkanContext.getLogicalDevice();
-    init_info.QueueFamily = vulkanContext.getQueueFamilyIndices().graphicsFamily.value();
-    init_info.Queue = vulkanContext.getGraphicsQueue()->getQueueVk();
+    init_info.QueueFamily = vulkanContext.getGraphicsQueueIndex();
+    init_info.Queue = vulkanContext.getVendorQueue()->getQueueVk();
     init_info.DescriptorPool = m_imguiPool;
 
     auto swapChain = vulkanContext.getSwapChain();
@@ -143,17 +146,21 @@ void ImGuiLayer::onAttach()
 
     init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.CheckVkResultFn = s_checkVkResult;
-    ImGui_ImplVulkan_Init(&init_info);
+
+    {
+        auto queueLock = vulkanContext.getVendorQueue()->acquireQueueLock();
+        ImGui_ImplVulkan_Init(&init_info);
+    }
 
     uint32_t imageCount = swapChain->getImageCount();
 
     Rapture::CommandPoolConfig config;
-    config.queueFamilyIndex = vulkanContext.getQueueFamilyIndices().graphicsFamily.value();
+    config.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
     config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     config.threadId = 0;
 
     auto commandPool = Rapture::CommandPoolManager::createCommandPool(config);
-    m_imguiCommandBuffers = commandPool->getCommandBuffers(imageCount);
+    m_imguiCommandBuffers = commandPool->getCommandBuffers(imageCount, "ImGui");
     m_imageCount = imageCount;
     m_currentFrame = 0;
 }
@@ -211,7 +218,7 @@ void ImGuiLayer::renderImGui()
         m_viewportPanel.renderSceneViewport((ImTextureID)m_viewportTextureDescriptorSets[m_currentFrame]);
         m_propertiesPanel.render();
         m_browserPanel.render();
-        m_gbufferPanel.render();
+        // m_gbufferPanel.render();
         m_contentBrowserPanel.render();
         m_imageViewerPanel.render();
         m_settingsPanel.render();
@@ -298,8 +305,11 @@ void ImGuiLayer::onUpdate(float ts)
 
     {
         RAPTURE_PROFILE_SCOPE("ImGui Frame Setup");
-        // Start ImGui frame
-        ImGui_ImplVulkan_NewFrame();
+        // Start ImGui frame - lock queue in case of lazy font upload
+        {
+            auto queueLock = vulkanContext.getVendorQueue()->acquireQueueLock();
+            ImGui_ImplVulkan_NewFrame();
+        }
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
@@ -334,7 +344,7 @@ void ImGuiLayer::onUpdate(float ts)
     }
 
     // Record ImGui command buffer
-    auto &imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame];
+    auto imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame];
 
     imguiCommandBuffer->reset();
 
@@ -348,7 +358,7 @@ void ImGuiLayer::onUpdate(float ts)
 
     {
         RAPTURE_PROFILE_SCOPE("ImGui Command Buffer Setup");
-        drawImGui(imguiCommandBuffer->getCommandBufferVk(), targetImageView);
+        drawImGui(imguiCommandBuffer, targetImageView);
     }
 
     if (imguiCommandBuffer->end() != VK_SUCCESS) {
@@ -356,7 +366,7 @@ void ImGuiLayer::onUpdate(float ts)
         return;
     }
 
-    graphicsQueue->addCommandBuffer(m_imguiCommandBuffers[m_currentFrame]);
+    graphicsQueue->addCommandBuffer(imguiCommandBuffer);
 
     {
         RAPTURE_PROFILE_SCOPE("Combined Render Submit");
@@ -406,7 +416,7 @@ void ImGuiLayer::onUpdate(float ts)
     m_currentFrame = (m_currentFrame + 1) % m_imageCount;
 }
 
-void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImageView)
+void ImGuiLayer::drawImGui(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -414,34 +424,38 @@ void ImGuiLayer::drawImGui(VkCommandBuffer commandBuffer, VkImageView targetImag
     auto &vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();
 
+    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
+
     {
-        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "ImGui Layer");
+        RAPTURE_PROFILE_GPU_SCOPE(commandBufferVk, "ImGui Layer");
 
         {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "Dynamic Rendering Setup");
+            RAPTURE_PROFILE_GPU_SCOPE(commandBufferVk, "Dynamic Rendering Setup");
             beginDynamicRendering(commandBuffer, targetImageView);
         }
 
         {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "ImGui Draw Data Rendering");
+            RAPTURE_PROFILE_GPU_SCOPE(commandBufferVk, "ImGui Draw Data Rendering");
             ImDrawData *drawData = ImGui::GetDrawData();
             if (drawData && drawData->CmdListsCount > 0) {
-                ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
+                ImGui_ImplVulkan_RenderDrawData(drawData, commandBufferVk);
             }
         }
 
         {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer, "Dynamic Rendering End");
+            RAPTURE_PROFILE_GPU_SCOPE(commandBufferVk, "Dynamic Rendering End");
             endDynamicRendering(commandBuffer);
         }
 
-        RAPTURE_PROFILE_GPU_COLLECT(commandBuffer);
+        RAPTURE_PROFILE_GPU_COLLECT(commandBufferVk);
     }
 }
 
-void ImGuiLayer::beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageView targetImageView)
+void ImGuiLayer::beginDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView)
 {
     RAPTURE_PROFILE_FUNCTION();
+
+    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
@@ -474,7 +488,7 @@ void ImGuiLayer::beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageVie
     toColorAttachment.srcAccessMask = 0;
     toColorAttachment.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
+    vkCmdPipelineBarrier(commandBufferVk, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
                          nullptr, 0, nullptr, 1, &toColorAttachment);
 
     VkRenderingInfo renderingInfo{};
@@ -489,10 +503,10 @@ void ImGuiLayer::beginDynamicRendering(VkCommandBuffer commandBuffer, VkImageVie
     renderingInfo.pDepthAttachment = nullptr;
     renderingInfo.pStencilAttachment = nullptr;
 
-    vkCmdBeginRendering(commandBuffer, &renderingInfo);
+    vkCmdBeginRendering(commandBufferVk, &renderingInfo);
 }
 
-void ImGuiLayer::endDynamicRendering(VkCommandBuffer commandBuffer)
+void ImGuiLayer::endDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -500,7 +514,9 @@ void ImGuiLayer::endDynamicRendering(VkCommandBuffer commandBuffer)
     auto &vulkanContext = app.getVulkanContext();
     auto swapChain = vulkanContext.getSwapChain();
 
-    vkCmdEndRendering(commandBuffer);
+    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
+
+    vkCmdEndRendering(commandBufferVk);
 
     {
         RAPTURE_PROFILE_SCOPE("Image Layout Transition");
@@ -520,8 +536,8 @@ void ImGuiLayer::endDynamicRendering(VkCommandBuffer commandBuffer)
         presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         presentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 
-        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-                             0, nullptr, 0, nullptr, 1, &presentBarrier);
+        vkCmdPipelineBarrier(commandBufferVk, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &presentBarrier);
     }
 }
 
@@ -554,12 +570,12 @@ void ImGuiLayer::onResize()
         m_imguiCommandBuffers.clear();
 
         Rapture::CommandPoolConfig config;
-        config.queueFamilyIndex = vulkanContext.getQueueFamilyIndices().graphicsFamily.value();
+        config.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
         config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         config.threadId = 0;
 
         auto commandPool = Rapture::CommandPoolManager::createCommandPool(config);
-        m_imguiCommandBuffers = commandPool->getCommandBuffers(newImageCount);
+        m_imguiCommandBuffers = commandPool->getCommandBuffers(newImageCount, "ImGui");
     }
 
     m_imageCount = newImageCount;

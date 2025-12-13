@@ -365,11 +365,11 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
     if (!useExternalCommandBuffer) {
         // Get or create a command pool for graphics operations
         CommandPoolConfig poolConfig{};
-        poolConfig.queueFamilyIndex = app.getVulkanContext().getQueueFamilyIndices().graphicsFamily.value();
+        poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
         poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
         auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-        internalCommandBuffer = commandPool->getCommandBuffer();
+        internalCommandBuffer = commandPool->getCommandBuffer("CopyFromImage");
         commandBufferVk = internalCommandBuffer->getCommandBufferVk();
 
         internalCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -840,12 +840,12 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
     // Get or create a command pool for graphics operations
     CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getQueueFamilyIndices().graphicsFamily.value();
+    poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     poolConfig.threadId = threadId;
 
     auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer();
+    auto commandBuffer = commandPool->getCommandBuffer("TransitionImageLayout");
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -907,15 +907,13 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
     commandBuffer->end();
 
     graphicsQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
-    graphicsQueue->waitIdle();
-
-    // CommandBuffer and CommandPool will be automatically cleaned up via RAII
+    graphicsQueue->waitIdle(); // TODO: fix this, could listen to the semaphore, nvm, a fence maybe?
 }
 
 void Texture::generateMipmaps(size_t threadId)
 {
     if (m_spec.mipLevels <= 1) {
-        return; // No mipmaps to generate
+        return;
     }
 
     if (m_image == VK_NULL_HANDLE) {
@@ -936,14 +934,13 @@ void Texture::generateMipmaps(size_t threadId)
 
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
 
-    // Get or create a command pool for graphics operations
     CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getQueueFamilyIndices().graphicsFamily.value();
+    poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     poolConfig.threadId = threadId;
 
     auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer();
+    auto commandBuffer = commandPool->getCommandBuffer(std::string("GenerateMipmaps_") + std::to_string(threadId));
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -961,7 +958,6 @@ void Texture::generateMipmaps(size_t threadId)
     int32_t mipHeight = static_cast<int32_t>(m_spec.height);
 
     for (uint32_t i = 1; i < m_spec.mipLevels; i++) {
-        // Transition previous mip level to TRANSFER_SRC_OPTIMAL
         barrier.subresourceRange.baseMipLevel = i - 1;
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -971,7 +967,6 @@ void Texture::generateMipmaps(size_t threadId)
         vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                              0, nullptr, 0, nullptr, 1, &barrier);
 
-        // Set up the blit operation
         VkImageBlit blit{};
         blit.srcOffsets[0] = {0, 0, 0};
         blit.srcOffsets[1] = {mipWidth, mipHeight, 1};
@@ -980,7 +975,6 @@ void Texture::generateMipmaps(size_t threadId)
         blit.srcSubresource.baseArrayLayer = 0;
         blit.srcSubresource.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
 
-        // Calculate next mip level dimensions
         int32_t nextMipWidth = mipWidth > 1 ? mipWidth / 2 : 1;
         int32_t nextMipHeight = mipHeight > 1 ? mipHeight / 2 : 1;
 
@@ -991,11 +985,9 @@ void Texture::generateMipmaps(size_t threadId)
         blit.dstSubresource.baseArrayLayer = 0;
         blit.dstSubresource.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
 
-        // Perform the blit operation
         vkCmdBlitImage(commandBuffer->getCommandBufferVk(), m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_image,
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
-        // Transition the previous mip level to SHADER_READ_ONLY_OPTIMAL
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -1004,12 +996,10 @@ void Texture::generateMipmaps(size_t threadId)
         vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-        // Update dimensions for next iteration
         mipWidth = nextMipWidth;
         mipHeight = nextMipHeight;
     }
 
-    // Transition the last mip level to SHADER_READ_ONLY_OPTIMAL
     barrier.subresourceRange.baseMipLevel = m_spec.mipLevels - 1;
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1024,7 +1014,7 @@ void Texture::generateMipmaps(size_t threadId)
     graphicsQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
 
-    RP_CORE_INFO("Generated {} mip levels for texture", m_spec.mipLevels);
+    RP_CORE_TRACE("Generated {} mip levels for texture", m_spec.mipLevels);
 }
 
 void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height, size_t threadId)
@@ -1039,12 +1029,12 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
 
     // Get or create a command pool for graphics operations
     CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getQueueFamilyIndices().graphicsFamily.value();
+    poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     poolConfig.threadId = threadId;
 
     auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer();
+    auto commandBuffer = commandPool->getCommandBuffer("CopyBufferToImage");
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 

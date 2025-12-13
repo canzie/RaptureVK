@@ -92,12 +92,12 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
 
     CommandPoolConfig poolConfig;
     poolConfig.name = "DDGI Command Pool";
-    poolConfig.queueFamilyIndex = vc.getQueueFamilyIndices().computeFamily.value();
+    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     auto pool = CommandPoolManager::createCommandPool(poolConfig);
 
-    m_CommandBuffers = pool->getCommandBuffers(m_framesInFlight);
+    m_CommandBuffers = pool->getCommandBuffers(m_framesInFlight, "DDGI");
 
     initProbeInfoBuffer();
     initTextures();
@@ -223,7 +223,7 @@ void DynamicDiffuseGI::updateMeshInfoBuffer(std::shared_ptr<Scene> scene)
 
         uint32_t dstOffset = offsetIt->second + static_cast<uint32_t>(TRANSFORM_OFFSET);
         glm::mat4 modelMatrix = ent.getComponent<TransformComponent>().transformMatrix();
-        RP_CORE_INFO("Updating mesh info buffer for entity: {}", ent.getID());
+        // RP_CORE_TRACE("Updating mesh info buffer for entity: {}", ent.getID());
         m_MeshInfoBuffer->addData((void *)&modelMatrix, sizeof(glm::mat4), dstOffset);
     }
 
@@ -679,6 +679,11 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
         return;
     }
 
+    // NOTE: Ray rotation/jitter has been disabled in the shader because any per-frame
+    // variation causes severe flickering. The probeRayRotation quaternion is no longer
+    // updated here. Investigation needed to understand why hysteresis isn't stabilizing
+    // the results when rotation is enabled.
+
     // === BARRIER PHASE 1: Prepare for trace shader (3 dependencies) ===
     std::vector<VkImageMemoryBarrier> preTraceBarriers;
 
@@ -1132,11 +1137,11 @@ void DynamicDiffuseGI::onResize(uint32_t framesInFlight)
     // Recreate command buffers with the new number of frames in flight
     CommandPoolConfig poolConfig;
     poolConfig.name = "DDGI Command Pool";
-    poolConfig.queueFamilyIndex = vc.getQueueFamilyIndices().computeFamily.value();
+    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     auto pool = CommandPoolManager::createCommandPool(poolConfig);
-    m_CommandBuffers = pool->getCommandBuffers(m_framesInFlight);
+    m_CommandBuffers = pool->getCommandBuffers(m_framesInFlight, "DDGI");
 
     RP_CORE_INFO("DDGI system resized for {} frames in flight.", m_framesInFlight);
 }

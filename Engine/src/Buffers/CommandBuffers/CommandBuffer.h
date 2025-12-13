@@ -16,6 +16,15 @@ enum class CmdBufferState {
     INVALID
 };
 
+struct CmdBufferDefferedDestruction {
+    VkCommandBuffer commandBuffer;
+    CmdBufferState state;
+    std::string name;
+    uint32_t destroyAttempts = 0;
+    uint64_t pendingSignalValue;
+    VkSemaphore pendingSemaphore;
+};
+
 const char *cmdBufferStateToString(CmdBufferState state);
 
 class CommandPool;
@@ -33,13 +42,15 @@ class CommandBuffer {
     const std::string &getName() const { return m_name; }
     void setName(const std::string &name) { m_name = name; }
 
-    void reset(VkCommandBufferResetFlags = 0);
+    bool reset(VkCommandBufferResetFlags = 0);
     VkResult begin(VkCommandBufferUsageFlags flags = 0);
     VkResult end();
 
-    bool onSubmit(VkSemaphore timelineSemaphore, uint64_t signalValue);
+    VkCommandBuffer prepareSubmit();
 
-    void onSubmitFailed();
+    void completeSubmit(VkSemaphore timelineSemaphore, uint64_t signalValue);
+
+    void abortSubmit();
 
     bool canSubmit();
     bool canReset();

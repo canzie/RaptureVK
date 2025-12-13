@@ -32,10 +32,16 @@ class VulkanContext {
 
     VmaAllocator getVmaAllocator() const { return m_vmaAllocator; }
 
+    uint32_t getGraphicsQueueIndex() const { return m_queueFamilyIndices.familyIndices[GRAPHICS]; }
+    uint32_t getComputeQueueIndex() const { return m_queueFamilyIndices.familyIndices[COMPUTE]; }
+    uint32_t getTransferQueueIndex() const { return m_queueFamilyIndices.familyIndices[TRANSFER]; }
+    uint32_t getPresentQueueIndex() const { return m_queueFamilyIndices.familyIndices[PRESENT]; }
+
     std::shared_ptr<VulkanQueue> getGraphicsQueue() const;
     std::shared_ptr<VulkanQueue> getComputeQueue() const;
     std::shared_ptr<VulkanQueue> getTransferQueue() const;
     std::shared_ptr<VulkanQueue> getPresentQueue() const;
+    std::shared_ptr<VulkanQueue> getVendorQueue() const;
 
     bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
     bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
@@ -103,15 +109,9 @@ class VulkanContext {
     VkDevice m_device;
 
     std::shared_ptr<SwapChain> m_swapChain;
-    std::shared_ptr<Renderpass> m_renderpass;
-
-    int m_graphicsQueueIndex;
-    int m_computeQueueIndex;
-    int m_transferQueueIndex;
-    int m_presentQueueIndex;
 
     std::map<uint32_t, std::shared_ptr<VulkanQueue>> m_queues;
-    std::shared_ptr<VulkanQueue> m_transferQueue;
+    std::shared_ptr<VulkanQueue> m_vendorQueue;
 
     VkSurfaceKHR m_surface;
 

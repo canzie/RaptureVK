@@ -42,14 +42,17 @@ Application::Application(int width, int height, const char *title) : m_running(t
         auto graphicsQueue = vc.getGraphicsQueue();
 
         CommandPoolConfig config = {};
-        config.queueFamilyIndex = vc.getQueueFamilyIndices().graphicsFamily.value();
+        config.queueFamilyIndex = vc.getGraphicsQueueIndex();
         config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         auto tempCommandPool = CommandPoolManager::createCommandPool(config);
 
-        auto tempCmdBuffer = tempCommandPool->getCommandBuffer(true);
+        auto tempCmdBuffer = tempCommandPool->getCommandBuffer("Tmp TracyBuffer", true);
 
-        TracyProfiler::initGPUContext(vc.getPhysicalDevice(), vc.getLogicalDevice(), graphicsQueue->getQueueVk(),
-                                      tempCmdBuffer->getCommandBufferVk());
+        {
+            auto queueLock = graphicsQueue->acquireQueueLock();
+            TracyProfiler::initGPUContext(vc.getPhysicalDevice(), vc.getLogicalDevice(), graphicsQueue->getQueueVk(),
+                                          tempCmdBuffer->getCommandBufferVk());
+        }
     }
 #endif // RAPTURE_TRACY_PROFILING_ENABLED
 
@@ -134,6 +137,8 @@ void Application::run()
         TracyProfiler::beginFrame();
 
         Timestep::onUpdate();
+
+        CommandPoolManager::onUpdate(Timestep::deltaTime());
 
         for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
             (*it)->onUpdate(Timestep::deltaTime());

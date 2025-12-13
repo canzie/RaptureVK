@@ -50,18 +50,25 @@ bool VulkanQueue::submitCommandBuffers(VkFence fence)
         return true;
     }
 
-    // Check all command buffers can be submitted
+    // Atomically prepare all command buffers (check state and transition to PENDING)
+    std::vector<VkCommandBuffer> commandBuffers;
+    std::vector<std::shared_ptr<CommandBuffer>> preparedBuffers;
+    commandBuffers.reserve(m_commandBuffers.size());
+    preparedBuffers.reserve(m_commandBuffers.size());
+
     for (auto &cmdBuffer : m_commandBuffers) {
-        if (!cmdBuffer->canSubmit()) {
-            RP_CORE_ERROR("VulkanQueue[{}]: Command buffer '{}' cannot be submitted (state: {})", m_name, cmdBuffer->getName(),
-                          cmdBufferStateToString(cmdBuffer->getState()));
+        VkCommandBuffer vkCmdBuffer = cmdBuffer->prepareSubmit();
+        if (vkCmdBuffer == VK_NULL_HANDLE) {
+            RP_CORE_ERROR("VulkanQueue[{}]: Command buffer '{}' cannot be submitted", m_name, cmdBuffer->getName());
+            // Abort all previously prepared buffers
+            for (auto &prepared : preparedBuffers) {
+                prepared->abortSubmit();
+            }
+            m_commandBuffers.clear();
             return false;
         }
-    }
-
-    std::vector<VkCommandBuffer> commandBuffers;
-    for (auto &commandBuffer : m_commandBuffers) {
-        commandBuffers.push_back(commandBuffer->getCommandBufferVk());
+        commandBuffers.push_back(vkCmdBuffer);
+        preparedBuffers.push_back(cmdBuffer);
     }
 
     // Increment timeline value for this submission
@@ -83,16 +90,17 @@ bool VulkanQueue::submitCommandBuffers(VkFence fence)
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}]: submitCommandBuffers(1) failed (VkResult: {})", m_name, static_cast<int>(result));
-        for (auto &cmdBuffer : m_commandBuffers) {
-            cmdBuffer->onSubmitFailed();
+        for (auto &cmdBuffer : preparedBuffers) {
+            cmdBuffer->abortSubmit();
         }
         m_commandBuffers.clear();
+        assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
 
-    // Mark all command buffers as pending
-    for (auto &cmdBuffer : m_commandBuffers) {
-        cmdBuffer->onSubmit(m_timelineSemaphore, signalValue);
+    // Complete all command buffers with timeline semaphore info
+    for (auto &cmdBuffer : preparedBuffers) {
+        cmdBuffer->completeSubmit(m_timelineSemaphore, signalValue);
     }
 
     m_commandBuffers.clear();
@@ -109,18 +117,25 @@ bool VulkanQueue::submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence)
         return true;
     }
 
-    // Check all command buffers can be submitted
+    // Atomically prepare all command buffers (check state and transition to PENDING)
+    std::vector<VkCommandBuffer> commandBuffers;
+    std::vector<std::shared_ptr<CommandBuffer>> preparedBuffers;
+    commandBuffers.reserve(m_commandBuffers.size());
+    preparedBuffers.reserve(m_commandBuffers.size());
+
     for (auto &cmdBuffer : m_commandBuffers) {
-        if (!cmdBuffer->canSubmit()) {
-            RP_CORE_ERROR("VulkanQueue[{}]: Command buffer '{}' cannot be submitted (state: {})", m_name, cmdBuffer->getName(),
-                          cmdBufferStateToString(cmdBuffer->getState()));
+        VkCommandBuffer vkCmdBuffer = cmdBuffer->prepareSubmit();
+        if (vkCmdBuffer == VK_NULL_HANDLE) {
+            RP_CORE_ERROR("VulkanQueue[{}]: Command buffer '{}' cannot be submitted", m_name, cmdBuffer->getName());
+            // Abort all previously prepared buffers
+            for (auto &prepared : preparedBuffers) {
+                prepared->abortSubmit();
+            }
+            m_commandBuffers.clear();
             return false;
         }
-    }
-
-    std::vector<VkCommandBuffer> commandBuffers;
-    for (auto &commandBuffer : m_commandBuffers) {
-        commandBuffers.push_back(commandBuffer->getCommandBufferVk());
+        commandBuffers.push_back(vkCmdBuffer);
+        preparedBuffers.push_back(cmdBuffer);
     }
 
     // Increment timeline value for this submission
@@ -151,15 +166,18 @@ bool VulkanQueue::submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence)
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}]: submitCommandBuffers(2) failed (VkResult: {})", m_name, static_cast<int>(result));
-        for (auto &cmdBuffer : m_commandBuffers) {
-            cmdBuffer->onSubmitFailed();
+        for (auto &cmdBuffer : preparedBuffers) {
+            cmdBuffer->abortSubmit();
         }
         m_commandBuffers.clear();
+
+        assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
 
-    for (auto &cmdBuffer : m_commandBuffers) {
-        cmdBuffer->onSubmit(m_timelineSemaphore, signalValue);
+    // Complete all command buffers with timeline semaphore info
+    for (auto &cmdBuffer : preparedBuffers) {
+        cmdBuffer->completeSubmit(m_timelineSemaphore, signalValue);
     }
 
     m_commandBuffers.clear();
@@ -171,17 +189,16 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSu
     std::lock_guard<std::mutex> lock(m_queueMutex);
 
     if (commandBuffer == nullptr) {
-        RP_CORE_CRITICAL("VulkanQueue[{}]: submitQueue - command buffer is nullptr!", m_name);
+        RP_CORE_CRITICAL("VulkanQueue[{}](1) command buffer is nullptr!", m_name);
         return false;
     }
 
-    if (!commandBuffer->canSubmit()) {
-        RP_CORE_ERROR("VulkanQueue[{}]: Command buffer '{}' cannot be submitted (state: {})", m_name, commandBuffer->getName(),
-                      cmdBufferStateToString(commandBuffer->getState()));
+    // Atomically check state and transition to PENDING before vkQueueSubmit
+    VkCommandBuffer commandBufferVk = commandBuffer->prepareSubmit();
+    if (commandBufferVk == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("VulkanQueue[{}](1) Command buffer '{}' cannot be submitted", m_name, commandBuffer->getName());
         return false;
     }
-
-    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
     // Increment timeline value for this submission
     uint64_t signalValue = ++m_timelineValue;
@@ -210,12 +227,13 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSu
 
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
-        RP_CORE_ERROR("VulkanQueue[{}]: submitQueue failed (VkResult: {})", m_name, static_cast<int>(result));
-        commandBuffer->onSubmitFailed();
+        RP_CORE_ERROR("VulkanQueue[{}](1) failed (VkResult: {})", m_name, static_cast<int>(result));
+        commandBuffer->abortSubmit();
+        assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
 
-    commandBuffer->onSubmit(m_timelineSemaphore, signalValue);
+    commandBuffer->completeSubmit(m_timelineSemaphore, signalValue);
     return true;
 }
 
@@ -224,17 +242,16 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFe
     std::lock_guard<std::mutex> lock(m_queueMutex);
 
     if (commandBuffer == nullptr) {
-        RP_CORE_CRITICAL("VulkanQueue[{}]: submitQueue - command buffer is nullptr!", m_name);
+        RP_CORE_CRITICAL("VulkanQueue[{}](2) command buffer is nullptr!", m_name);
         return false;
     }
 
-    if (!commandBuffer->canSubmit()) {
-        RP_CORE_ERROR("VulkanQueue[{}]: Command buffer '{}' cannot be submitted (state: {})", m_name, commandBuffer->getName(),
-                      cmdBufferStateToString(commandBuffer->getState()));
+    // Atomically check state and transition to PENDING before vkQueueSubmit
+    VkCommandBuffer commandBufferVk = commandBuffer->prepareSubmit();
+    if (commandBufferVk == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("VulkanQueue[{}](2) Command buffer '{}' cannot be submitted", m_name, commandBuffer->getName());
         return false;
     }
-
-    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
     // Increment timeline value for this submission
     uint64_t signalValue = ++m_timelineValue;
@@ -254,12 +271,13 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFe
 
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
-        RP_CORE_ERROR("VulkanQueue[{}]: submitQueue failed (VkResult: {})", m_name, static_cast<int>(result));
-        commandBuffer->onSubmitFailed();
+        RP_CORE_ERROR("VulkanQueue[{}](2) submitQueue failed (VkResult: {})", m_name, static_cast<int>(result));
+        commandBuffer->abortSubmit();
+        assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
 
-    commandBuffer->onSubmit(m_timelineSemaphore, signalValue);
+    commandBuffer->completeSubmit(m_timelineSemaphore, signalValue);
     return true;
 }
 
