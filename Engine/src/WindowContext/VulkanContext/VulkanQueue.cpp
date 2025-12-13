@@ -86,7 +86,7 @@ bool VulkanQueue::submitCommandBuffers(VkFence fence)
         for (auto &cmdBuffer : m_commandBuffers) {
             cmdBuffer->onSubmitFailed();
         }
-        m_timelineValue--;
+        m_commandBuffers.clear();
         return false;
     }
 
@@ -154,7 +154,7 @@ bool VulkanQueue::submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence)
         for (auto &cmdBuffer : m_commandBuffers) {
             cmdBuffer->onSubmitFailed();
         }
-        m_timelineValue--;
+        m_commandBuffers.clear();
         return false;
     }
 
@@ -212,7 +212,6 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSu
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}]: submitQueue failed (VkResult: {})", m_name, static_cast<int>(result));
         commandBuffer->onSubmitFailed();
-        m_timelineValue--;
         return false;
     }
 
@@ -257,7 +256,6 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFe
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}]: submitQueue failed (VkResult: {})", m_name, static_cast<int>(result));
         commandBuffer->onSubmitFailed();
-        m_timelineValue--;
         return false;
     }
 

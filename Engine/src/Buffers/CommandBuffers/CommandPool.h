@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -72,6 +73,7 @@ class CommandPoolManager {
 
   private:
     static std::unordered_map<CommandPoolHash, std::shared_ptr<CommandPool>> s_commandPools;
+    static std::mutex s_mutex;
 };
 
 } // namespace Rapture

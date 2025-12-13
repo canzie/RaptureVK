@@ -7,6 +7,7 @@
 namespace Rapture {
 
 std::unordered_map<CommandPoolHash, std::shared_ptr<CommandPool>> CommandPoolManager::s_commandPools;
+std::mutex CommandPoolManager::s_mutex;
 
 CommandPool::CommandPool(const CommandPoolConfig &config)
     : m_createInfo{}, m_commandPool(VK_NULL_HANDLE), m_hash(config.hash()), m_device(VK_NULL_HANDLE)
@@ -61,6 +62,8 @@ void CommandPoolManager::shutdown()
 
 std::shared_ptr<CommandPool> CommandPoolManager::createCommandPool(const CommandPoolConfig &config)
 {
+    std::lock_guard<std::mutex> lock(s_mutex);
+
     if (s_commandPools.find(config.hash()) != s_commandPools.end()) {
         return s_commandPools[config.hash()];
     }
@@ -87,6 +90,8 @@ std::shared_ptr<CommandPool> CommandPoolManager::getCommandPool(const CommandPoo
 
 std::shared_ptr<CommandPool> CommandPoolManager::getCommandPool(CommandPoolHash cpHash)
 {
+    std::lock_guard<std::mutex> lock(s_mutex);
+
     if (s_commandPools.find(cpHash) == s_commandPools.end()) {
         RP_CORE_ERROR("Command pool not found!");
         return nullptr;
@@ -109,6 +114,7 @@ void CommandPoolManager::closePool(uint32_t CPHash)
 
 void CommandPoolManager::closeAllPools()
 {
+    std::lock_guard<std::mutex> lock(s_mutex);
     s_commandPools.clear();
 }
 

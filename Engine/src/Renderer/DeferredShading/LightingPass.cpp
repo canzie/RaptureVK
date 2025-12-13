@@ -141,7 +141,7 @@ void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuf
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 
-    pushConstants.useDDGI = 0;
+    pushConstants.useDDGI = 1;
 
     // Fog
     pushConstants.fogColor = glm::vec4(m_fogSettings.color, m_fogSettings.enabled ? 1.0f : 0.0f);

@@ -43,15 +43,6 @@ class VulkanContext {
     bool isNullDescriptorEnabled() const { return m_isNullDescriptorEnabled; }
     bool isRayTracingEnabled() const { return m_isRayTracingEnabled; }
 
-    // Get descriptor indexing features
-    const VkPhysicalDeviceDescriptorIndexingFeatures &getDescriptorIndexingFeatures() const { return m_descriptorIndexingFeatures; }
-
-    // Get ray tracing properties
-    const VkPhysicalDeviceRayTracingPipelinePropertiesKHR &getRayTracingPipelineProperties() const
-    {
-        return m_rayTracingPipelineProperties;
-    }
-
     const VkPhysicalDeviceAccelerationStructurePropertiesKHR &getAccelerationStructureProperties() const
     {
         return m_accelerationStructureProperties;
