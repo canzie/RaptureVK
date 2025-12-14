@@ -31,7 +31,7 @@ Entity Scene::createEntity(const std::string &name)
     Entity entity(handle, this);
 
     // Add basic name component if you have one
-    entity.addComponent<TagComponent>(name);
+    entity.addComponent<PropertiesComponent>(name);
 
     return entity;
 }
@@ -45,7 +45,7 @@ Entity Scene::createCube(const std::string &name)
     Entity entity(handle, this);
 
     // Add basic name component if you have one
-    entity.addComponent<TagComponent>(name);
+    entity.addComponent<PropertiesComponent>(name);
 
     entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
@@ -73,7 +73,7 @@ Entity Scene::createSphere(const std::string &name)
     Entity entity(handle, this);
 
     // Add basic name component if you have one
-    entity.addComponent<TagComponent>(name);
+    entity.addComponent<PropertiesComponent>(name);
 
     entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 

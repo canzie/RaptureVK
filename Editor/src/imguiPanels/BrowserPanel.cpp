@@ -40,7 +40,7 @@ void BrowserPanel::render()
     if (auto scene = m_scene.lock()) {
         auto &registry = scene->getRegistry();
 
-        auto view = registry.view<Rapture::TagComponent>();
+        auto view = registry.view<Rapture::PropertiesComponent>();
         uint32_t entityCount = static_cast<uint32_t>(view.size());
 
         // Display total entities
@@ -103,7 +103,7 @@ void BrowserPanel::buildHierarchyCache()
     auto scene = m_scene.lock();
 
     auto &registry = scene->getRegistry();
-    auto view = registry.view<Rapture::TagComponent>();
+    auto view = registry.view<Rapture::PropertiesComponent>();
 
     // Map to store all nodes temporarily
     std::unordered_map<uint32_t, std::shared_ptr<HierarchyNode>> entityNodeMap;
@@ -115,7 +115,7 @@ void BrowserPanel::buildHierarchyCache()
         Rapture::Entity entity(entityHandle, scene.get());
         if (!entity.isValid()) continue;
 
-        std::string entityName = entity.getComponent<Rapture::TagComponent>().tag + " " + std::to_string(entity.getID());
+        std::string entityName = entity.getComponent<Rapture::PropertiesComponent>().tag + " " + std::to_string(entity.getID());
 
         std::shared_ptr<Rapture::Entity> entityPtr = std::make_shared<Rapture::Entity>(entity);
         if (entityPtr->hasComponent<Rapture::LightComponent>()) {
@@ -224,7 +224,7 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
         if (ImGui::InputText("##xx", m_entityRenameBuffer, sizeof(m_entityRenameBuffer),
                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CharsNoBlank |
                                  ImGuiInputTextFlags_AutoSelectAll)) {
-            node->entity->getComponent<Rapture::TagComponent>().tag = std::string(m_entityRenameBuffer);
+            node->entity->getComponent<Rapture::PropertiesComponent>().tag = std::string(m_entityRenameBuffer);
             m_needsHierarchyRebuild = true;
             m_renamingEntity.reset();
         }

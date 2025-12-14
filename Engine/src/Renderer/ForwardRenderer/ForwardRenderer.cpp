@@ -677,7 +677,7 @@ void ForwardRenderer::updateLights(std::shared_ptr<Scene> activeScene)
     }
 
     auto &registry = activeScene->getRegistry();
-    auto lightView = registry.view<TransformComponent, LightComponent, TagComponent>();
+    auto lightView = registry.view<TransformComponent, LightComponent, PropertiesComponent>();
 
     // Check if any lights or transforms have changed
     bool lightsChanged = m_lightsNeedUpdate;
@@ -685,7 +685,7 @@ void ForwardRenderer::updateLights(std::shared_ptr<Scene> activeScene)
     for (auto entity : lightView) {
         auto &transform = lightView.get<TransformComponent>(entity);
         auto &lightComp = lightView.get<LightComponent>(entity);
-        (void)lightView.get<TagComponent>(entity);
+        (void)lightView.get<PropertiesComponent>(entity);
 
         if (lightComp.hasChanged(m_currentFrame) || transform.hasChanged()) {
             lightsChanged = true;

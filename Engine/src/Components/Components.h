@@ -35,8 +35,9 @@
 
 namespace Rapture {
 
-struct TagComponent {
+struct PropertiesComponent {
     std::string tag;
+    bool isLocked = false; // cannot delete if locked
 };
 
 // dummy component to identify the root entity

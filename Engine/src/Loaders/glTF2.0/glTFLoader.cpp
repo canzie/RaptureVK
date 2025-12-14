@@ -515,7 +515,7 @@ NodeType glTF2Loader::processNode(Entity nodeEntity, yyjson_val *nodeVal)
 
     // Update the tag
     if (nodeName && strlen(nodeName) > 0) {
-        nodeEntity.getComponent<TagComponent>().tag = std::string(nodeName);
+        nodeEntity.getComponent<PropertiesComponent>().tag = std::string(nodeName);
     }
     auto &nodeEntityComp = nodeEntity.getComponent<EntityNodeComponent>();
 
