@@ -553,12 +553,12 @@ void main() {
         vec3 kD_indirect = (vec3(1.0) - fresnelSchlick(NdotV, F0)) * (1.0 - metallic);
         
         vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, V, u_DDGI_Volume);
-        indirectDiffuse = indirectDiffuesIntensity; //* (albedo/3.14159265359) * kD_indirect;
+        indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
 
         
     }
 
-    vec3 color = indirectDiffuse; //+ Lo;
+    vec3 color = indirectDiffuse + Lo;
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {

@@ -207,6 +207,13 @@ vec3 DDGIGetVolumeIrradiance(
         // Get the adjacent probe's index, adjusting the adjacent probe index for scrolling offsets (if present)
         int adjacentProbeIndex = DDGIGetProbeIndex(adjacentProbeCoords, volume);
 
+#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
+        uvec3 adjacentProbeTexelCoords = DDGIGetProbeTexelCoords(adjacentProbeIndex, volume);
+        uint adjacentProbeState = texelFetch(ProbeStates, ivec3(adjacentProbeTexelCoords), 0).r;
+        const uint PROBE_STATE_INACTIVE = 1u;
+        if (adjacentProbeState == PROBE_STATE_INACTIVE) continue;
+#endif
+
         vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume);
 
         // Compute the distance and direction from the (biased and non-biased) shading point and the adjacent probe

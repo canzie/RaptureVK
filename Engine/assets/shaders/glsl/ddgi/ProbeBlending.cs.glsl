@@ -20,6 +20,9 @@
 // Bindless texture arrays (set 3, binding 0)
 layout (set=3, binding = 0) uniform sampler2DArray RayData[];
 
+// Probe classification texture (read-only)
+layout(set = 4, binding = 5) uniform usampler2DArray ProbeStates;
+
 // Storage image bindings for writing current probe data
 #ifdef DDGI_BLEND_RADIANCE
     layout (set=4, binding = 1, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;        // Primary irradiance storage
@@ -131,17 +134,20 @@ void main() {
 
         if (probeIndex < 0 || probeIndex >= numProbes) return;
 
+#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
+        uvec3 probeTexelCoords = DDGIGetProbeTexelCoords(probeIndex, u_volume);
+        uint probeState = texelFetch(ProbeStates, ivec3(probeTexelCoords), 0).r;
+        const uint PROBE_STATE_INACTIVE = 1;
+        if (probeState == PROBE_STATE_INACTIVE) return;
+#endif
 
         ivec3 threadCoords = ivec3(gl_WorkGroupID.x * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, gl_WorkGroupID.y * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, int(gl_GlobalInvocationID.z)) + ivec3(gl_LocalInvocationID.xyz) - ivec3(1, 1, 0);
-
-
-
 
         int rayIndex = int(u_volume.probeStaticRayCount);
         
     #ifdef DDGI_BLEND_RADIANCE
         uint backfaces = 0;
-        uint maxBackfaces = uint((u_volume.probeNumRays - rayIndex) * u_volume.probeFixedRayBackfaceThreshold);
+        uint maxBackfaces = uint((u_volume.probeNumRays - rayIndex) * u_volume.probeRandomRayBackfaceThreshold);
         
         vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(threadCoords.xy, RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS);
         vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
@@ -164,16 +170,14 @@ void main() {
             float weight = max(0.0, dot(probeRayDirection, rayDirection));
             ivec3 rayDataTexCoords = ivec3(DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume));
 
-            // Load the ray traced radiance and hit distance
+    #ifdef DDGI_BLEND_RADIANCE
+                // Load the ray traced radiance and hit distance
             // Use texelFetch for integer coordinates, not texture()
             vec4 probeRayData = texelFetch(RayData[pc.rayDataIndex], rayDataTexCoords, 0);
 
             vec3 probeRayRadiance = probeRayData.rgb;
             float probeRayDistance = probeRayData.a;
 
-
-
-    #ifdef DDGI_BLEND_RADIANCE
             // Backface hit, don't blend this sample
             if (probeRayDistance < 0.0)
             {
@@ -197,6 +201,10 @@ void main() {
             // Increase or decrease the filtered distance value's "sharpness"
             weight = pow(weight, u_volume.probeDistanceExponent);
 
+            vec4 probeRayData = texelFetch(RayData[pc.rayDataIndex], rayDataTexCoords, 0);
+            float probeRayDistance = probeRayData.a;
+
+
             probeRayDistance = min(abs(probeRayDistance), probeMaxRayDistance);
 
             result += vec4(probeRayDistance * weight, (probeRayDistance * probeRayDistance) * weight, 0.0, weight);
@@ -204,6 +212,7 @@ void main() {
         }
 
         float epsilon = float(u_volume.probeNumRays);
+        epsilon -= u_volume.probeStaticRayCount;
 
         epsilon *= 1e-9;
 
@@ -218,16 +227,21 @@ void main() {
         result.rgb *= 1.0 / (2.0 * max(result.a, epsilon));
         result.a = 1.0;
 
+
+        vec3 probeIrradianceMean = vec3(0.0, 0.0, 0.0);
         #ifdef DDGI_BLEND_RADIANCE
-            // Use bindless texture array to access previous irradiance texture
-            vec3 probeIrradianceMean = texelFetch(RayData[pc.prevTextureIndex], ivec3(gl_GlobalInvocationID.xyz), 0).rgb;
+        if (pc.writeToAlternateTexture == 0) {
+            probeIrradianceMean = imageLoad(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz)).rgb;
+        } else {
+            probeIrradianceMean = imageLoad(ProbeIrradianceAtlasAlt, ivec3(gl_GlobalInvocationID.xyz)).rgb;
+        }
         #endif
         #ifdef DDGI_BLEND_DISTANCE
-            // Use bindless texture array to access previous distance texture
-            vec2 prevDistanceData = texelFetch(RayData[pc.prevTextureIndex], ivec3(gl_GlobalInvocationID.xyz), 0).rg;
-            // Store it in probeIrradianceMean for now to minimize changes to subsequent logic that uses .rg
-            // However, it's clearer to use a separate variable if more changes are made later.
-            vec3 probeIrradianceMean = vec3(prevDistanceData.r, prevDistanceData.g, 0.0);
+            if (pc.writeToAlternateTexture == 0) {
+                probeIrradianceMean = imageLoad(ProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz)).rgb;
+            } else {
+                probeIrradianceMean = imageLoad(ProbeDistanceAtlasAlt, ivec3(gl_GlobalInvocationID.xyz)).rgb;
+            }
         #endif
 
         // Get the history weight (hysteresis) to use for the probe texel's previous value
@@ -241,13 +255,13 @@ void main() {
 
         // Get the difference between the current irradiance and the irradiance mean stored in the probe
         vec3 delta = (result.rgb - probeIrradianceMean.rgb);
-        vec3 delta2 = (probeIrradianceMean.rgb - result.rgb);
 
         // Store the current irradiance (before interpolation) for use in probe variability
         vec3 irradianceSample = result.rgb;
 
-        float maxComponent = max(max(abs(delta2.r), abs(delta2.g)), abs(delta2.b));
-
+        vec3 diff = probeIrradianceMean.rgb - result.rgb;
+        float maxComponent = max(max(abs(diff.r), abs(diff.g)), abs(diff.b));
+        
         float probeIrradianceThreshold = 0.25;
         if (maxComponent > probeIrradianceThreshold)
         {
@@ -273,10 +287,10 @@ void main() {
         const float c_threshold = 1.0 / 1024.0;
         vec3 lerpDelta = (1.0 - hysteresis) * delta;
         
-        maxComponent = max(result.r, max(result.g, result.b));
-        float maxComponent2 = max(probeIrradianceMean.r, max(probeIrradianceMean.g, probeIrradianceMean.b));
+        float maxResultComponent = max(result.r, max(result.g, result.b));
+        float maxMeanComponent = max(probeIrradianceMean.r, max(probeIrradianceMean.g, probeIrradianceMean.b));
         
-        if (maxComponent < maxComponent2)
+        if (maxResultComponent < maxMeanComponent)
         {
             lerpDelta = min(max(vec3(c_threshold), abs(lerpDelta)), abs(delta)) * sign(lerpDelta);
         }

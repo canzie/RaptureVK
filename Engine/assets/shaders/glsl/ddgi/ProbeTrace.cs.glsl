@@ -7,11 +7,14 @@
 
 #define RAY_DATA_TEXTURE
 #define DDGI_ENABLE_DIFFUSE_LIGHTING
+#define DDGI_ENABLE_PROBE_CLASSIFICATION
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 // Ray data output texture (fixed binding in set 3)
 layout(set = 4, binding = 0, rgba32f) uniform restrict writeonly image2DArray RayData;
+
+layout(set = 4, binding = 5) uniform usampler2DArray ProbeStates;
 
 // Previous probe data (bindless textures in set 3)
 layout(set = 3, binding = 0) uniform sampler2D gTextures[];
@@ -316,11 +319,17 @@ void main() {
     int probesPerPlane = DDGIGetProbesPerPlane(ivec3(u_volume.gridDimensions));
 
     int probeIndex = (planeIndex * probesPerPlane) + probePlaneIndex;
+    
+    uvec3 probeTexelCoords = DDGIGetProbeTexelCoords(probeIndex, u_volume);
+    uint probeState = texelFetch(ProbeStates, ivec3(probeTexelCoords), 0).r;
+    
+    const uint PROBE_STATE_INACTIVE = 1u;
+    if (probeState == PROBE_STATE_INACTIVE && rayIndex >= int(u_volume.probeStaticRayCount)) return;
+
 
     // Get the probe's grid coordinates
     ivec3 probeCoords = DDGIGetProbeCoords(probeIndex, u_volume);
 
-    // TODO:get probe state 
 
     vec3 probeWorldPosition = DDGIGetProbeWorldPosition(probeCoords, u_volume);
     vec3 probeRayDirection = DDGIGetProbeRayDirection(rayIndex, u_volume);
@@ -421,17 +430,17 @@ void main() {
             // Store the final ray radiance and hit distance
             vec3 radiance = emissiveColor + diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
 
-            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), radiance, hitT);
+            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), clamp(radiance, vec3(0.0), vec3(1.0)), hitT);
         } else {
             // Back face hit - store negative distance
             DDGIStoreProbeRayBackfaceHit(ivec3(outputCoords), hitT);
         }
     } else {
         // Miss - sample skybox and store blue color for visualization
-        vec3 skyboxColor = texture(gCubemaps[skyboxTextureIndex], probeRayDirection).rgb;
+        //vec3 skyboxColor = texture(gCubemaps[skyboxTextureIndex], probeRayDirection).rgb;
         //skyboxColor *= u_SunProperties.sunIntensity * u_SunProperties.sunColor;
         
-        DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor);
+        DDGIStoreProbeRayMiss(ivec3(outputCoords), vec3(207.0/255.0, 236.0/255.0, 247.0/255.0));
     }
     
 }

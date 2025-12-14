@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <glm/gtc/constants.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <random>
 
 namespace Rapture {
@@ -449,29 +450,46 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     }
 
     {
+        // Compute a completely new random rotation each frame using James Arvo's method
+        // from Graphics Gems 3 (pg 117-120). This prevents flickering by generating
+        // a fresh uniform random rotation rather than accumulating incremental rotations.
         static std::mt19937 rng(std::random_device{}());
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
-        // Generate three independent uniform random variables
-        float u1 = dist(rng);
-        float u2 = dist(rng);
+        const float RTXGI_2PI = 2.0f * glm::pi<float>();
+
+        // Setup a random rotation matrix using 3 uniform random variables
+        float u1 = RTXGI_2PI * dist(rng);
+        float cos1 = std::cos(u1);
+        float sin1 = std::sin(u1);
+
+        float u2 = RTXGI_2PI * dist(rng);
+        float cos2 = std::cos(u2);
+        float sin2 = std::sin(u2);
+
         float u3 = dist(rng);
+        float sq3 = 2.0f * std::sqrt(u3 * (1.0f - u3));
 
-        // Convert to a uniform random unit quaternion (James Arvo, Graphics Gems III)
-        float sqrt1_u1 = std::sqrt(1.0f - u1);
-        float sqrt_u1 = std::sqrt(u1);
+        float s2 = 2.0f * u3 * sin2 * sin2 - 1.0f;
+        float c2 = 2.0f * u3 * cos2 * cos2 - 1.0f;
+        float sc = 2.0f * u3 * sin2 * cos2;
 
-        float theta1 = 2.0f * glm::pi<float>() * u2;
-        float theta2 = 2.0f * glm::pi<float>() * u3;
+        // Create the random rotation matrix (GLM is column-major)
+        glm::mat3 transform;
+        transform[0][0] = cos1 * c2 - sin1 * sc;
+        transform[1][0] = sin1 * c2 + cos1 * sc;
+        transform[2][0] = sq3 * cos2;
 
-        glm::vec4 quat;
-        quat.x = sqrt1_u1 * std::sin(theta1);
-        quat.y = sqrt1_u1 * std::cos(theta1);
-        quat.z = sqrt_u1 * std::sin(theta2);
-        quat.w = sqrt_u1 * std::cos(theta2);
+        transform[0][1] = cos1 * sc - sin1 * s2;
+        transform[1][1] = sin1 * sc + cos1 * s2;
+        transform[2][1] = sq3 * sin2;
 
-        // Store the new rotation and flag the buffer for GPU update
-        m_ProbeVolume.probeRayRotation = quat;
+        transform[0][2] = cos1 * (sq3 * cos2) - sin1 * (sq3 * sin2);
+        transform[1][2] = sin1 * (sq3 * cos2) + cos1 * (sq3 * sin2);
+        transform[2][2] = 1.0f - 2.0f * u3;
+
+        glm::quat rotationQuat = glm::quat_cast(transform);
+        m_ProbeVolume.probeRayRotation = glm::vec4(rotationQuat.x, rotationQuat.y, rotationQuat.z, rotationQuat.w);
         m_isVolumeDirty = true;
     }
 
@@ -736,6 +754,12 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
 
     preTraceBarriers.push_back(prevVisibilityReadBarrier);
 
+    VkImageMemoryBarrier probeClassificationReadBarrier = m_ProbeClassificationTexture->getImageMemoryBarrier(
+        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT);
+
+    preTraceBarriers.push_back(probeClassificationReadBarrier);
+
     vkCmdPipelineBarrier(currentCommandBuffer->getCommandBufferVk(),
                          m_isFirstFrame ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
@@ -980,6 +1004,8 @@ void DynamicDiffuseGI::initTextures()
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS});
         bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS_ALT});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, TextureViewType::DEFAULT, false,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
         m_probeIrradianceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeIrradianceBlendingDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS)
@@ -987,6 +1013,9 @@ void DynamicDiffuseGI::initTextures()
         m_probeIrradianceBlendingDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS_ALT)
             ->add(m_PrevRadianceTexture);
+        m_probeIrradianceBlendingDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
+            ->add(m_ProbeClassificationTexture);
     }
 
     // For Probe Distance Blending
@@ -997,6 +1026,8 @@ void DynamicDiffuseGI::initTextures()
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS});
         bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS_ALT});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, TextureViewType::DEFAULT, false,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
         m_probeDistanceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeDistanceBlendingDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS)
@@ -1004,6 +1035,9 @@ void DynamicDiffuseGI::initTextures()
         m_probeDistanceBlendingDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS_ALT)
             ->add(m_PrevVisibilityTexture);
+        m_probeDistanceBlendingDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
+            ->add(m_ProbeClassificationTexture);
     }
 
     // For Probe Tracing (assuming it writes to RayDataTexture)
@@ -1012,9 +1046,14 @@ void DynamicDiffuseGI::initTextures()
         bindings.setNumber = 4;
         bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA});
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, TextureViewType::DEFAULT, false,
+                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
         m_probeTraceDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeTraceDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA)
             ->add(m_RayDataTexture);
+        m_probeTraceDescriptorSet
+            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
+            ->add(m_ProbeClassificationTexture);
     }
 
     // For Probe Classification
@@ -1067,33 +1106,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
 
     ProbeVolume probeVolume;
 
-    probeVolume.probeRayRotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-    // Randomize ray directions
-    {
-        static std::mt19937 rng(std::random_device{}());
-        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-
-        // Generate three independent uniform random variables
-        float u1 = dist(rng);
-        float u2 = dist(rng);
-        float u3 = dist(rng);
-
-        // Convert to a uniform random unit quaternion (James Arvo, Graphics Gems III)
-        float sqrt1_u1 = std::sqrt(1.0f - u1);
-        float sqrt_u1 = std::sqrt(u1);
-
-        float theta1 = 2.0f * glm::pi<float>() * u2;
-        float theta2 = 2.0f * glm::pi<float>() * u3;
-
-        glm::vec4 quat;
-        quat.x = sqrt1_u1 * std::sin(theta1);
-        quat.y = sqrt1_u1 * std::cos(theta1);
-        quat.z = sqrt_u1 * std::sin(theta2);
-        quat.w = sqrt_u1 * std::cos(theta2);
-
-        // Store the new rotation and flag the buffer for GPU update
-        probeVolume.probeRayRotation = quat;
-    }
+    probeVolume.probeRayRotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     probeVolume.origin = glm::vec3(-0.4f, 5.4f, -0.25f);
 
@@ -1124,7 +1137,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
     probeVolume.probeRandomRayBackfaceThreshold = 0.1f;
     probeVolume.probeFixedRayBackfaceThreshold = 0.25f;
 
-    probeVolume.probeRelocationEnabled = 1.0f;
+    probeVolume.probeRelocationEnabled = 0.0f;
     probeVolume.probeClassificationEnabled = 1.0f;
     probeVolume.probeChangeThreshold = 0.1f;
     probeVolume.probeMinValidSamples = 16.0f;
