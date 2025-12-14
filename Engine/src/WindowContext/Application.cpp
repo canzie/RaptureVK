@@ -39,7 +39,7 @@ Application::Application(int width, int height, const char *title) : m_running(t
 #if RAPTURE_TRACY_PROFILING_ENABLED
     if (TracyProfiler::isEnabled()) {
         auto &vc = getVulkanContext();
-        auto graphicsQueue = vc.getGraphicsQueue();
+        auto vendorQueue = vc.getVendorQueue();
 
         CommandPoolConfig config = {};
         config.queueFamilyIndex = vc.getGraphicsQueueIndex();
@@ -49,8 +49,8 @@ Application::Application(int width, int height, const char *title) : m_running(t
         auto tempCmdBuffer = tempCommandPool->getCommandBuffer("Tmp TracyBuffer", true);
 
         {
-            auto queueLock = graphicsQueue->acquireQueueLock();
-            TracyProfiler::initGPUContext(vc.getPhysicalDevice(), vc.getLogicalDevice(), graphicsQueue->getQueueVk(),
+            auto queueLock = vendorQueue->acquireQueueLock();
+            TracyProfiler::initGPUContext(vc.getPhysicalDevice(), vc.getLogicalDevice(), vendorQueue->getQueueVk(),
                                           tempCmdBuffer->getCommandBufferVk());
         }
     }

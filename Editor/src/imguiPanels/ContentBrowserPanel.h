@@ -40,6 +40,7 @@ class ContentBrowserPanel {
         // Asset selection and interaction
         std::set<Rapture::AssetHandle> m_selectedAssets;
         Rapture::AssetHandle m_hoveredAsset;
+        float m_itemSize = 80.0f;
         
         
         // File browsing
@@ -51,6 +52,7 @@ class ContentBrowserPanel {
         // Asset browsing
         void renderAssetTypeHierarchy();
         void renderAssetContent();
+        void renderAssetItem(Rapture::AssetHandle handle, const Rapture::AssetMetadata& metadata, float itemWidth);
         
 
         // UI helpers

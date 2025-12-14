@@ -162,7 +162,7 @@ void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer)
     vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                          &finalBarrier);
-#endif
+#endif // FLATTENING_ENABLED
 }
 
 // TextureFlattener implementation

@@ -8,6 +8,8 @@
 #include "Logging/TracyProfiler.h"
 #include "Scenes/SceneManager.h"
 
+#define CHILD_INDENT_SIZE 10.0f
+
 BrowserPanel::BrowserPanel()
 {
     m_sceneActivatedListenerId =
@@ -189,7 +191,7 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
     }
 
     // Indentation
-    float indentSize = depth * 20.0f; // Adjust indentation size as needed
+    float indentSize = depth * CHILD_INDENT_SIZE;
     ImGui::Indent(indentSize);
 
     // Apply custom styling for selected tree nodes
@@ -231,7 +233,7 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
         ImGui::PopStyleColor();
     }
 
-    // Context Menu (Example)
+    // Context Menu
     if (ImGui::BeginPopupContextItem()) {
 
         if (ImGui::MenuItem("Rename Entity")) {

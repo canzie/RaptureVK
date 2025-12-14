@@ -175,6 +175,7 @@ struct MeshComponent {
     std::shared_ptr<Mesh> mesh;
     bool isLoading = true;
     bool isStatic = true;
+    bool isEnabled = true;
 
     std::shared_ptr<MeshDataBuffer> meshDataBuffer;
 

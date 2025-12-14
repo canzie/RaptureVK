@@ -163,6 +163,9 @@ class DynamicDiffuseGI {
 
     std::shared_ptr<FlattenTexture> m_IrradianceTextureFlattened;
     std::shared_ptr<FlattenTexture> m_DistanceTextureFlattened;
+    std::shared_ptr<FlattenTexture> m_PrevIrradianceTextureFlattened;
+    std::shared_ptr<FlattenTexture> m_PrevDistanceTextureFlattened;
+
     std::shared_ptr<FlattenTexture> m_RayDataTextureFlattened;
     std::shared_ptr<FlattenTexture> m_ProbeClassificationTextureFlattened;
     std::shared_ptr<FlattenTexture> m_ProbeOffsetTextureFlattened;

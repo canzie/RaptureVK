@@ -558,7 +558,7 @@ void main() {
         
     }
 
-    vec3 color = indirectDiffuse + Lo;
+    vec3 color = indirectDiffuse; //+ Lo;
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {

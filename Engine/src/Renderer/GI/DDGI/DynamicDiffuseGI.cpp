@@ -447,6 +447,34 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
         // First populate the probe data
         populateProbes(scene);
     }
+
+    {
+        static std::mt19937 rng(std::random_device{}());
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+
+        // Generate three independent uniform random variables
+        float u1 = dist(rng);
+        float u2 = dist(rng);
+        float u3 = dist(rng);
+
+        // Convert to a uniform random unit quaternion (James Arvo, Graphics Gems III)
+        float sqrt1_u1 = std::sqrt(1.0f - u1);
+        float sqrt_u1 = std::sqrt(u1);
+
+        float theta1 = 2.0f * glm::pi<float>() * u2;
+        float theta2 = 2.0f * glm::pi<float>() * u3;
+
+        glm::vec4 quat;
+        quat.x = sqrt1_u1 * std::sin(theta1);
+        quat.y = sqrt1_u1 * std::cos(theta1);
+        quat.z = sqrt_u1 * std::sin(theta2);
+        quat.w = sqrt_u1 * std::cos(theta2);
+
+        // Store the new rotation and flag the buffer for GPU update
+        m_ProbeVolume.probeRayRotation = quat;
+        m_isVolumeDirty = true;
+    }
+
     if (m_isVolumeDirty) {
         // Update the probe volume
         updateProbeVolume();
@@ -461,7 +489,6 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     auto currentCommandBuffer = m_CommandBuffers[frameIndex];
 
-    // Begin command buffer
     if (currentCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to begin command buffer");
         return;
@@ -474,7 +501,6 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     }
     // Flatten ray data texture (within the same command buffer)
     if (m_RayDataTextureFlattened) {
-        RAPTURE_PROFILE_SCOPE("Flattening ray data texture");
         m_RayDataTextureFlattened->update(currentCommandBuffer);
     }
 
@@ -484,7 +510,6 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     }
 
     if (m_ProbeOffsetTextureFlattened) {
-        RAPTURE_PROFILE_SCOPE("Flattening probe offset texture");
         m_ProbeOffsetTextureFlattened->update(currentCommandBuffer);
     }
 
@@ -494,7 +519,6 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     }
 
     if (m_ProbeClassificationTextureFlattened) {
-        RAPTURE_PROFILE_SCOPE("Flattening probe classification texture");
         m_ProbeClassificationTextureFlattened->update(currentCommandBuffer);
     }
 
@@ -506,17 +530,21 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     // Flatten final textures (within the same command buffer)
     if (m_IrradianceTextureFlattened) {
-        RAPTURE_PROFILE_SCOPE("Flattening irradiance texture");
         m_IrradianceTextureFlattened->update(currentCommandBuffer);
     }
     if (m_DistanceTextureFlattened) {
-        RAPTURE_PROFILE_SCOPE("Flattening distance texture");
         m_DistanceTextureFlattened->update(currentCommandBuffer);
+    }
+
+    if (m_PrevIrradianceTextureFlattened) {
+        m_PrevIrradianceTextureFlattened->update(currentCommandBuffer);
+    }
+    if (m_PrevDistanceTextureFlattened) {
+        m_PrevDistanceTextureFlattened->update(currentCommandBuffer);
     }
 
     RAPTURE_PROFILE_GPU_COLLECT(currentCommandBuffer->getCommandBufferVk());
 
-    // End command buffer
     if (currentCommandBuffer->end() != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to end command buffer");
         return;
@@ -528,7 +556,6 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     // Toggle frame flag for double buffering
     m_isEvenFrame = !m_isEvenFrame;
 
-    // Mark that first frame is complete
     m_isFirstFrame = false;
 }
 
@@ -687,14 +714,12 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     // === BARRIER PHASE 1: Prepare for trace shader (3 dependencies) ===
     std::vector<VkImageMemoryBarrier> preTraceBarriers;
 
-    // 1. Transition ray data texture to general layout for storage image access
     VkImageMemoryBarrier rayDataWriteBarrier = m_RayDataTexture->getImageMemoryBarrier(
         m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
         m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT);
 
     preTraceBarriers.push_back(rayDataWriteBarrier);
 
-    // 2. Ensure previous radiance texture is ready for reading
     VkImageMemoryBarrier prevRadianceReadBarrier =
         (m_isEvenFrame ? m_PrevRadianceTexture : m_RadianceTexture)
             ->getImageMemoryBarrier(m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -703,7 +728,6 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
 
     preTraceBarriers.push_back(prevRadianceReadBarrier);
 
-    // 3. Ensure previous visibility texture is ready for reading
     VkImageMemoryBarrier prevVisibilityReadBarrier =
         (m_isEvenFrame ? m_PrevVisibilityTexture : m_VisibilityTexture)
             ->getImageMemoryBarrier(m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -934,13 +958,15 @@ void DynamicDiffuseGI::initTextures()
     m_ProbeOffsetTexture = std::make_shared<Texture>(probeOffsetSpec);
 
     // Create flattened textures using TextureFlattener
-    m_RayDataTextureFlattened = TextureFlattener::createFlattenTexture(m_RayDataTexture, "[DDGI] Flattened Ray Data Texture");
-    m_IrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_RadianceTexture, "[DDGI] Irradiance Flattened Texture");
-    m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened Texture");
+    m_RayDataTextureFlattened = TextureFlattener::createFlattenTexture(m_RayDataTexture, "[DDGI] Flattened Ray Data");
+    m_IrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_RadianceTexture, "[DDGI] Irradiance Flattened");
+    m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened");
     m_ProbeClassificationTextureFlattened = TextureFlattener::createFlattenTexture(
-        m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened Texture", FlattenerDataType::UINT);
-    m_ProbeOffsetTextureFlattened =
-        TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened Texture");
+        m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened", FlattenerDataType::UINT);
+    m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened");
+
+    m_PrevIrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_PrevRadianceTexture, "[DDGI] Prev Irradiance");
+    m_PrevDistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_PrevVisibilityTexture, "[DDGI] Prev Distance");
 
     clearTextures();
 
@@ -1134,7 +1160,6 @@ void DynamicDiffuseGI::onResize(uint32_t framesInFlight)
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
-    // Recreate command buffers with the new number of frames in flight
     CommandPoolConfig poolConfig;
     poolConfig.name = "DDGI Command Pool";
     poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();

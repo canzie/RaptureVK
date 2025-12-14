@@ -207,7 +207,6 @@ void main() {
 
         epsilon *= 1e-9;
 
-
         // Normalize the blended irradiance (or filtered distance), if the combined weight is not close to zero.
         // To match the Monte Carlo Estimator of Irradiance, we should divide by N (the number of radiance samples).
         // Instead, we are dividing by sum(cos(theta)) (i.e. the sum of cosine weights) to reduce variance. To account
@@ -215,6 +214,7 @@ void main() {
         // For distance, note that we are *not* dividing by the sum of the cosine weights, but to avoid branching here
          // we are still dividing by 2. This means distance values sampled from texture need to be multiplied by 2 (see
         // Irradiance.hlsl line 138).
+
         result.rgb *= 1.0 / (2.0 * max(result.a, epsilon));
         result.a = 1.0;
 

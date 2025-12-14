@@ -187,7 +187,11 @@ vec3 DDGIGetProbeRayDirection(int rayIndex, ProbeVolume volume)
     // Get a deterministic direction on the sphere using the spherical Fibonacci sequence
     vec3 direction = SphericalFibonacci(uint(sampleIndex), uint(numRays));
 
-    return normalize(direction);
+    if (isFixedRay) {
+        return normalize(direction);    
+    }
+
+    return normalize(RTXGIQuaternionRotate(direction, RTXGIQuaternionConjugate(volume.probeRayRotation)));
 }
 
 int DDGIGetProbesPerPlane(ivec3 gridDimensions)
