@@ -25,7 +25,7 @@ layout(set = 4, binding = 5) uniform usampler2DArray ProbeStates;
 
 // Storage image bindings for writing current probe data
 #ifdef DDGI_BLEND_RADIANCE
-    layout (set=4, binding = 1, r11f_g11f_b10f) uniform restrict image2DArray ProbeIrradianceAtlas;
+    layout (set=4, binding = 1, rgba16f) uniform restrict image2DArray ProbeIrradianceAtlas;
 #else
     layout (set=4, binding = 3, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
 #endif
@@ -208,6 +208,7 @@ void main() {
         // For distance, note that we are *not* dividing by the sum of the cosine weights, but to avoid branching here
          // we are still dividing by 2. This means distance values sampled from texture need to be multiplied by 2 (see
         // Irradiance.hlsl line 138).
+
 
         result.rgb *= 1.0 / (2.0 * max(result.a, epsilon));
         result.a = 1.0;

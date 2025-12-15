@@ -241,12 +241,16 @@ vec3 DDGIGetVolumeIrradiance(
         // Compute the octahedral coordinates of the adjacent probe
         vec2 octantCoords = DDGIGetOctahedralCoordinates(-biasedPosToAdjProbe);
 
+        // Clamp octahedral coordinates inward by half a texel to prevent bilinear filtering from sampling border texels
+        float distanceOctInset = 1.0 / float(volume.probeNumDistanceInteriorTexels);
+        octantCoords = clamp(octantCoords, vec2(-1.0 + distanceOctInset), vec2(1.0 - distanceOctInset));
+
         // Get the texture array coordinates for the octant of the probe
         vec3 probeTextureUV = DDGIGetProbeUV(adjacentProbeIndex, octantCoords, volume.probeNumDistanceInteriorTexels, volume);
 
         // Sample the probe's distance texture to get the mean distance to nearby surfaces
         // Note: Multiplied by 2.0 to compensate for the division by 2 in the blending shader
-        vec2 filteredDistance = 2.0 * texture(probeDistanceAtlas, probeTextureUV).rg;
+        vec2 filteredDistance = 2.0 * textureLod(probeDistanceAtlas, probeTextureUV, 0.0).rg;
 
 
 
@@ -286,11 +290,15 @@ vec3 DDGIGetVolumeIrradiance(
         // Get the octahedral coordinates for the sample direction
         octantCoords = DDGIGetOctahedralCoordinates(direction);
 
+        // Clamp octahedral coordinates inward by half a texel to prevent bilinear filtering from sampling border texels
+        float irradianceOctInset = 1.0 / float(volume.probeNumIrradianceInteriorTexels);
+        octantCoords = clamp(octantCoords, vec2(-1.0 + irradianceOctInset), vec2(1.0 - irradianceOctInset));
+
         // Get the probe's texture coordinates
         probeTextureUV = DDGIGetProbeUV(adjacentProbeIndex, octantCoords, volume.probeNumIrradianceInteriorTexels, volume);
 
         // Sample the probe's irradiance
-        vec3 probeIrradiance = texture(probeIrradianceAtlas, probeTextureUV).rgb;
+        vec3 probeIrradiance = textureLod(probeIrradianceAtlas, probeTextureUV, 0.0).rgb;
 
 
 
@@ -316,7 +324,11 @@ vec3 DDGIGetVolumeIrradiance(
 
     irradiance *= (1.0 / accumulatedWeights);   // Normalize by the accumulated weights
     irradiance *= irradiance;                   // Go back to linear irradiance
-    irradiance *= 6.28318530718;                    // Multiply by the area of the integration domain (hemisphere) to complete the Monte Carlo Estimator equation
-    //irradiance *= 1.0989;
+    irradiance *= 6.28318530718;                // Multiply by the area of the integration domain (hemisphere) to complete the Monte Carlo Estimator equation
+
+    // Adjust for energy loss due to reduced precision in the R11G11B10F irradiance texture format
+    // RTXGI uses 1.0989 for R10G10B10A2. R11G11B10F has similar precision issues (especially blue channel with 10 bits)
+    // irradiance *= 1.0989;
+
     return irradiance;
 }

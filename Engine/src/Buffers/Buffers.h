@@ -46,6 +46,9 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
 
     std::shared_ptr<BufferAllocation> getBufferAllocation();
 
+    // Get VMA allocation for mapping/unmapping
+    VmaAllocation getAllocation() const { return m_Allocation; }
+
   protected:
     void setBufferAllocation(std::shared_ptr<BufferAllocation> allocation);
     void createBuffer();

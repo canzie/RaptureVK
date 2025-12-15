@@ -542,7 +542,7 @@ void main() {
 
     vec3 indirectDiffuse = vec3(0.03) * albedo ;
 
-    if (pc.useDDGI > 0u) {
+    if (pc.useDDGI > 0) {
         // Calculate F0 (surface reflection at zero incidence)
         vec3 F0 = mix(vec3(0.04), albedo, metallic);
 

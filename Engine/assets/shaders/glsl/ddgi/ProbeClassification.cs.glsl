@@ -43,33 +43,6 @@ const uint PROBE_STATE_INACTIVE = 1;
 // Convenient alias
 #define RAYS_PER_PROBE  (u_volume.probeNumRays)
 
-// Helper – count front / back hits and distances --------------------------------
-void accumulateRayStatistics(
-    in  uint  probeIndex,
-    out int   backfaceCount,
-    out float closestFrontDist,
-    out float farthestFrontDist)
-{
-    backfaceCount      = 0;
-    closestFrontDist   = 1e30;
-    farthestFrontDist  = -1.0;
-
-    for (int r = 0; r < RAYS_PER_PROBE; ++r) {
-        uvec3 rayCoord = DDGIGetRayDataTexelCoords(r, int(probeIndex), u_volume);
-        float hitT     = texelFetch(RayData[pc.rayDataIndex], ivec3(rayCoord), 0).a;
-
-        if (hitT < 0.0) {
-            backfaceCount++;
-        } else if (hitT > 0.0 && hitT < u_volume.probeMaxRayDistance) {
-            closestFrontDist  = min(closestFrontDist, hitT);
-            farthestFrontDist = max(farthestFrontDist, hitT);
-        }
-    }
-
-    if (closestFrontDist == 1e30)  closestFrontDist  = -1.0; // no hit
-    if (farthestFrontDist < 0.0)   farthestFrontDist = -1.0;
-}
-
 void main() {
 
     uint probeIndex  = gl_GlobalInvocationID.x;

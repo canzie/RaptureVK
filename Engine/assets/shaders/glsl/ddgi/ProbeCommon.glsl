@@ -378,8 +378,9 @@ vec3 DDGIGetProbeUV(int probeIndex, vec2 octantCoordinates, int numProbeInterior
     float textureWidth = numProbeTexels * float(volume.gridDimensions.x);
     float textureHeight = numProbeTexels * float(volume.gridDimensions.z);
 
-    // Move to the center of the probe and move to the octant texel before normalizing
-    vec2 uv = vec2(float(coords.x) * numProbeTexels, float(coords.y) * numProbeTexels) + (numProbeTexels * 0.5);
+    // Move to the center of the INTERIOR region (skip 1 border texel, then center within interior)
+    // This ensures UVs target interior texel centers only, not the center of the entire probe tile
+    vec2 uv = vec2(float(coords.x) * numProbeTexels, float(coords.y) * numProbeTexels) + vec2(1.0 + float(numProbeInteriorTexels) * 0.5);
     uv += octantCoordinates.xy * (float(numProbeInteriorTexels) * 0.5);
     uv /= vec2(textureWidth, textureHeight);
     return vec3(uv, float(coords.z));

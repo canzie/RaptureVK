@@ -88,6 +88,9 @@ class DynamicDiffuseGI {
     // Mesh data SSBO index for compute shader access
     uint32_t getMeshDataSSBOIndex() const { return m_meshDataSSBOIndex; }
 
+    // ========== GPU Unit Testing ==========
+    void runDDGIUnitTests();  // Run automated GPU tests and print results
+
   private:
     void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
     void blendTextures(uint32_t frameIndex);
@@ -182,6 +185,12 @@ class DynamicDiffuseGI {
     std::shared_ptr<DescriptorSet> m_probeDistanceBlendingDescriptorSet;
     std::shared_ptr<DescriptorSet> m_probeClassificationDescriptorSet;
     std::shared_ptr<DescriptorSet> m_probeRelocationDescriptorSet;
+
+    // GPU Unit Testing Infrastructure
+    std::shared_ptr<Shader> m_testShader;
+    std::shared_ptr<ComputePipeline> m_testPipeline;
+    std::shared_ptr<StorageBuffer> m_testResultsBuffer;
+    std::shared_ptr<DescriptorSet> m_testDescriptorSet;
 };
 
 } // namespace Rapture
