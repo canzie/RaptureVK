@@ -158,8 +158,8 @@ void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuf
     // Get probe texture indices from DDGI system
     if (m_ddgi) {
         pushConstants.probeVolumeHandle = 0; // Probe volume data is in set 0, binding 5
-        pushConstants.probeIrradianceHandle = m_ddgi->getCurrentRadianceBindlessIndex();
-        pushConstants.probeVisibilityHandle = m_ddgi->getCurrentVisibilityBindlessIndex();
+        pushConstants.probeIrradianceHandle = m_ddgi->getProbeIrradianceBindlessIndex();
+        pushConstants.probeVisibilityHandle = m_ddgi->getProbeVisibilityBindlessIndex();
     } else {
         pushConstants.probeVolumeHandle = 0;
         pushConstants.probeIrradianceHandle = 0;

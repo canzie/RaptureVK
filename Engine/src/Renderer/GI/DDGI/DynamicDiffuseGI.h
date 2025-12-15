@@ -52,11 +52,8 @@ class DynamicDiffuseGI {
     void populateProbes(std::shared_ptr<Scene> scene);
     void populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex);
 
-    std::shared_ptr<Texture> getRadianceTexture();
-    std::shared_ptr<Texture> getVisibilityTexture();
-
-    std::shared_ptr<Texture> getPrevRadianceTexture();
-    std::shared_ptr<Texture> getPrevVisibilityTexture();
+    std::shared_ptr<Texture> getRadianceTexture() { return m_RadianceTexture; }
+    std::shared_ptr<Texture> getVisibilityTexture() { return m_VisibilityTexture; }
 
     std::shared_ptr<Texture> getRadianceTextureFlattened()
     {
@@ -70,8 +67,6 @@ class DynamicDiffuseGI {
     std::vector<glm::vec3> &getDebugProbePositions() { return m_DebugProbePositions; }
 
     std::shared_ptr<UniformBuffer> getProbeVolumeUniformBuffer() { return m_ProbeInfoBuffer; }
-
-    bool isFrameEven() { return m_isEvenFrame; }
 
     void updateSkybox(std::shared_ptr<Scene> scene);
     void updateProbeVolume();
@@ -89,16 +84,6 @@ class DynamicDiffuseGI {
     // Get bindless indices for probe textures
     uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
     uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
-
-    // Get current texture indices based on frame parity (for lighting pass)
-    uint32_t getCurrentRadianceBindlessIndex() const
-    {
-        return m_isEvenFrame ? m_probeIrradianceBindlessIndex : m_prevProbeIrradianceBindlessIndex;
-    }
-    uint32_t getCurrentVisibilityBindlessIndex() const
-    {
-        return m_isEvenFrame ? m_probeVisibilityBindlessIndex : m_prevProbeVisibilityBindlessIndex;
-    }
 
     // Mesh data SSBO index for compute shader access
     uint32_t getMeshDataSSBOIndex() const { return m_meshDataSSBOIndex; }
@@ -153,9 +138,6 @@ class DynamicDiffuseGI {
     std::shared_ptr<Texture> m_RadianceTexture;
     std::shared_ptr<Texture> m_VisibilityTexture;
 
-    std::shared_ptr<Texture> m_PrevRadianceTexture;
-    std::shared_ptr<Texture> m_PrevVisibilityTexture;
-
     std::shared_ptr<Texture> m_RayDataTexture;
 
     std::shared_ptr<Texture> m_ProbeClassificationTexture;
@@ -163,8 +145,6 @@ class DynamicDiffuseGI {
 
     std::shared_ptr<FlattenTexture> m_IrradianceTextureFlattened;
     std::shared_ptr<FlattenTexture> m_DistanceTextureFlattened;
-    std::shared_ptr<FlattenTexture> m_PrevIrradianceTextureFlattened;
-    std::shared_ptr<FlattenTexture> m_PrevDistanceTextureFlattened;
 
     std::shared_ptr<FlattenTexture> m_RayDataTextureFlattened;
     std::shared_ptr<FlattenTexture> m_ProbeClassificationTextureFlattened;
@@ -178,9 +158,6 @@ class DynamicDiffuseGI {
     std::vector<std::shared_ptr<CommandBuffer>> m_CommandBuffers;
     uint32_t m_framesInFlight;
 
-    // used to alternate between the textures each frame
-    bool m_isEvenFrame;
-
     bool m_isPopulated;
     bool m_isFirstFrame;
 
@@ -192,8 +169,6 @@ class DynamicDiffuseGI {
     // Probe texture bindless indices for use in lighting pass
     uint32_t m_probeIrradianceBindlessIndex = 0;
     uint32_t m_probeVisibilityBindlessIndex = 0;
-    uint32_t m_prevProbeIrradianceBindlessIndex = 0;
-    uint32_t m_prevProbeVisibilityBindlessIndex = 0;
 
     // Mesh data SSBO index for compute shader access
     uint32_t m_meshDataSSBOIndex = 0;
