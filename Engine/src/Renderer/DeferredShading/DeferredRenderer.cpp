@@ -389,9 +389,8 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
         }
 
         {
-            // RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
-            // m_skyboxPass->recordCommandBuffer(commandBuffer, *m_sceneRenderTarget,
-            //                                  imageIndex, m_currentFrame);
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
+            m_skyboxPass->recordCommandBuffer(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame);
         }
 
         {

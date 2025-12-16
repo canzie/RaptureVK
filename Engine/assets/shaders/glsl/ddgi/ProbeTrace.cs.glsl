@@ -445,10 +445,10 @@ void main() {
         }
     } else {
         // Miss - sample skybox and store blue color for visualization
-        //vec3 skyboxColor = texture(gCubemaps[skyboxTextureIndex], probeRayDirection).rgb;
-        //skyboxColor *= u_SunProperties.sunIntensity * u_SunProperties.sunColor;
+        vec3 skyboxColor = texture(gCubemaps[pc.skyboxTextureIndex], probeRayDirection).rgb;
+        //skyboxColor = vec3(207.0/255.0, 236.0/255.0, 247.0/255.0);
         
-        DDGIStoreProbeRayMiss(ivec3(outputCoords), vec3(207.0/255.0, 236.0/255.0, 247.0/255.0));
+        DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor);
     }
     
 }
