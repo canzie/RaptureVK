@@ -175,6 +175,7 @@ vec3 DDGIGetVolumeIrradiance(
     vec3 surfaceBias, 
     sampler2DArray probeIrradianceAtlas,
     sampler2DArray probeDistanceAtlas,
+    sampler2DArray probeOffsetAtlas,
     ProbeVolume volume) {
 
     vec3 irradiance = vec3(0.0);
@@ -186,7 +187,7 @@ vec3 DDGIGetVolumeIrradiance(
     ivec3 baseProbeCoords = DDGIGetBaseProbeGridCoords(biasedWorldPosition, volume);
 
     // Get the world-space position of the base probe (ignore relocation)
-    vec3 baseProbeWorldPosition = DDGIGetProbeWorldPosition(baseProbeCoords, volume);
+    vec3 baseProbeWorldPosition = DDGIGetProbeWorldPosition(baseProbeCoords, volume, probeOffsetAtlas);
 
     // Clamp the distance (in grid space) between the given point and the base probe's world position (on each axis) to [0, 1]
     vec3 gridSpaceDistance = (biasedWorldPosition - baseProbeWorldPosition);
@@ -214,7 +215,7 @@ vec3 DDGIGetVolumeIrradiance(
         if (adjacentProbeState == PROBE_STATE_INACTIVE) continue;
 #endif
 
-        vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume);
+        vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume, probeOffsetAtlas);
 
         // Compute the distance and direction from the (biased and non-biased) shading point and the adjacent probe
         vec3  worldPosToAdjProbe = normalize(adjacentProbeWorldPosition - worldPosition);

@@ -118,8 +118,7 @@ std::string getSpirvTypeDescriptionString(const SpvReflectTypeDescription *typeD
         break; // Fallthrough to more generic type construction
     case SpvOpTypeVector: {
         std::string componentType = "unknown_vector_component";
-        if (typeDescription->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT)
-            componentType = "float";
+        if (typeDescription->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT) componentType = "float";
         else if (typeDescription->type_flags & SPV_REFLECT_TYPE_FLAG_INT) {
             // Further check for signedness if possible, though SpvReflectTypeDescription
             // doesn't directly expose signedness for vector components in a simple way.
@@ -132,20 +131,14 @@ std::string getSpirvTypeDescriptionString(const SpvReflectTypeDescription *typeD
                 componentType = "int";
             }
 
-        } else if (typeDescription->type_flags & SPV_REFLECT_TYPE_FLAG_BOOL)
-            componentType = "bool";
+        } else if (typeDescription->type_flags & SPV_REFLECT_TYPE_FLAG_BOOL) componentType = "bool";
 
         std::string prefix;
-        if (componentType == "float")
-            prefix = "vec";
-        else if (componentType == "int")
-            prefix = "ivec";
-        else if (componentType == "uint")
-            prefix = "uvec";
-        else if (componentType == "bool")
-            prefix = "bvec";
-        else
-            prefix = "vec"; // Default prefix
+        if (componentType == "float") prefix = "vec";
+        else if (componentType == "int") prefix = "ivec";
+        else if (componentType == "uint") prefix = "uvec";
+        else if (componentType == "bool") prefix = "bvec";
+        else prefix = "vec"; // Default prefix
 
         return prefix + std::to_string(typeDescription->traits.numeric.vector.component_count);
     }
@@ -321,8 +314,7 @@ getCombinedPushConstantRanges(const std::vector<std::pair<const std::vector<char
 
             if (result == SPV_REFLECT_RESULT_SUCCESS) {
                 for (const auto *spvPcBlock : spvPushConstants) {
-                    if (!spvPcBlock)
-                        continue;
+                    if (!spvPcBlock) continue;
 
                     // SPIR-V Reflect gives the shader stage for the *module* itself.
                     // If a push constant is truly used by multiple stages, it will appear in multiple modules.

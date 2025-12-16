@@ -18,16 +18,16 @@
 
 
 // Bindless texture arrays (set 3, binding 0)
-layout (set=3, binding = 0) uniform sampler2DArray RayData[];
+layout (set=3, binding = 0) uniform sampler2DArray gTextureArrays[];
 
 // Probe classification texture (read-only)
-layout(set = 4, binding = 5) uniform usampler2DArray ProbeStates;
+layout(set=4, binding = 3) uniform usampler2DArray ProbeStates;
 
 // Storage image bindings for writing current probe data
 #ifdef DDGI_BLEND_RADIANCE
     layout (set=4, binding = 1, rgba16f) uniform restrict image2DArray ProbeIrradianceAtlas;
 #else
-    layout (set=4, binding = 3, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
+    layout (set=4, binding = 2, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
 #endif
 
 // Skybox Cubemap
@@ -158,7 +158,7 @@ void main() {
     #ifdef DDGI_BLEND_RADIANCE
                 // Load the ray traced radiance and hit distance
             // Use texelFetch for integer coordinates, not texture()
-            vec4 probeRayData = texelFetch(RayData[pc.rayDataIndex], rayDataTexCoords, 0);
+            vec4 probeRayData = texelFetch(gTextureArrays[pc.rayDataIndex], rayDataTexCoords, 0);
 
             vec3 probeRayRadiance = probeRayData.rgb;
             float probeRayDistance = probeRayData.a;
@@ -186,7 +186,7 @@ void main() {
             // Increase or decrease the filtered distance value's "sharpness"
             weight = pow(weight, u_volume.probeDistanceExponent);
 
-            vec4 probeRayData = texelFetch(RayData[pc.rayDataIndex], rayDataTexCoords, 0);
+            vec4 probeRayData = texelFetch(gTextureArrays[pc.rayDataIndex], rayDataTexCoords, 0);
             float probeRayDistance = probeRayData.a;
 
 

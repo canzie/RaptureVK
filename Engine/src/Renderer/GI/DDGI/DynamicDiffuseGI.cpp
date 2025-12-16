@@ -27,13 +27,15 @@ namespace Rapture {
 
 // Push constants for DDGI compute shaders
 struct DDGITracePushConstants {
+
     uint32_t skyboxTextureIndex;
     uint32_t sunLightDataIndex;
     uint32_t lightCount;
     uint32_t prevRadianceIndex;
     uint32_t prevVisibilityIndex;
-    alignas(16) glm::vec3 cameraPosition;
     uint32_t tlasIndex;
+    uint32_t probeOffsetHandle;
+    // alignas(16) glm::vec3 cameraPosition;
 };
 
 struct DDGIBlendPushConstants {
@@ -43,6 +45,7 @@ struct DDGIBlendPushConstants {
 
 struct DDGIClassifyPushConstants {
     uint32_t rayDataIndex;
+    uint32_t probeOffsetHandle;
 };
 
 struct DDGIRelocatePushConstants {
@@ -57,10 +60,10 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
       m_DDGI_ProbeIrradianceBlendingPipeline(nullptr), m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
       m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_MeshInfoBuffer(nullptr),
       m_ProbeInfoBuffer(nullptr), m_framesInFlight(framesInFlight), m_isPopulated(false), m_isFirstFrame(true), m_meshCount(0),
-      m_probeIrradianceBindlessIndex(UINT32_MAX), m_probeVisibilityBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr),
-      m_probeTraceDescriptorSet(nullptr), m_probeIrradianceBlendingDescriptorSet(nullptr),
-      m_probeDistanceBlendingDescriptorSet(nullptr), m_probeClassificationDescriptorSet(nullptr),
-      m_probeRelocationDescriptorSet(nullptr)
+      m_probeIrradianceBindlessIndex(UINT32_MAX), m_probeVisibilityBindlessIndex(UINT32_MAX),
+      m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr), m_probeTraceDescriptorSet(nullptr),
+      m_probeIrradianceBlendingDescriptorSet(nullptr), m_probeDistanceBlendingDescriptorSet(nullptr),
+      m_probeClassificationDescriptorSet(nullptr), m_probeRelocationDescriptorSet(nullptr)
 {
 
     // Listen for material instance changes so we can patch the MeshInfo SSBO on-demand.
@@ -101,8 +104,6 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     initProbeInfoBuffer();
     initTextures();
     setupProbeTextures();
-
-    runDDGIUnitTests();
 }
 
 DynamicDiffuseGI::~DynamicDiffuseGI() {}
@@ -169,6 +170,9 @@ void DynamicDiffuseGI::setupProbeTextures()
     }
     if (m_VisibilityTexture) {
         m_probeVisibilityBindlessIndex = m_VisibilityTexture->getBindlessIndex();
+    }
+    if (m_ProbeOffsetTexture) {
+        m_probeOffsetBindlessIndex = m_ProbeOffsetTexture->getBindlessIndex();
     }
 }
 
@@ -508,7 +512,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::relocateProbes");
-        // relocateProbes(frameIndex);
+        relocateProbes(frameIndex);
     }
 
     if (m_ProbeOffsetTextureFlattened) {
@@ -577,6 +581,7 @@ void DynamicDiffuseGI::classifyProbes(uint32_t frameIndex)
     // Push constants
     DDGIClassifyPushConstants pushConstants = {};
     pushConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
+    pushConstants.probeOffsetHandle = m_probeOffsetBindlessIndex;
     vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeClassificationPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIClassifyPushConstants), &pushConstants);
 
@@ -727,14 +732,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     pushConstants.tlasIndex = tlas->getBindlessIndex();
     pushConstants.prevRadianceIndex = m_probeIrradianceBindlessIndex;
     pushConstants.prevVisibilityIndex = m_probeVisibilityBindlessIndex;
-
-    auto camEnt = scene->getMainCamera();
-    if (auto camTransform = camEnt.lock()) {
-        auto &transform = camTransform->getComponent<TransformComponent>();
-        pushConstants.cameraPosition = transform.translation();
-    } else {
-        pushConstants.cameraPosition = glm::vec3(0.0f);
-    }
+    pushConstants.probeOffsetHandle = m_probeOffsetBindlessIndex;
 
     vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGITracePushConstants), &pushConstants);
@@ -851,7 +849,7 @@ void DynamicDiffuseGI::initTextures()
     irradianceSpec.height = m_ProbeVolume.gridDimensions.z * m_ProbeVolume.probeNumIrradianceTexels;
     irradianceSpec.depth = m_ProbeVolume.gridDimensions.y;
     irradianceSpec.type = TextureType::TEXTURE2D_ARRAY;
-    irradianceSpec.format = TextureFormat::RGBA16F;  // Changed from R11G11B10F to eliminate blue channel precision loss
+    irradianceSpec.format = TextureFormat::RGBA16F; // Changed from R11G11B10F to eliminate blue channel precision loss
     irradianceSpec.filter = TextureFilter::Linear;
     irradianceSpec.storageImage = true;
     irradianceSpec.wrap = TextureWrap::ClampToEdge;
@@ -1040,7 +1038,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
     probeVolume.probeRandomRayBackfaceThreshold = 0.1f;
     probeVolume.probeFixedRayBackfaceThreshold = 0.25f;
 
-    probeVolume.probeRelocationEnabled = 0.0f;
+    probeVolume.probeRelocationEnabled = 1.0f;
     probeVolume.probeClassificationEnabled = 1.0f;
     probeVolume.probeChangeThreshold = 0.2f;
     probeVolume.probeMinValidSamples = 16.0f;
@@ -1085,116 +1083,6 @@ void DynamicDiffuseGI::onResize(uint32_t framesInFlight)
     m_CommandBuffers = pool->getCommandBuffers(m_framesInFlight, "DDGI");
 
     RP_CORE_INFO("DDGI system resized for {} frames in flight.", m_framesInFlight);
-}
-
-void DynamicDiffuseGI::runDDGIUnitTests()
-{
-    RP_CORE_INFO("========== Running DDGI GPU Unit Tests ==========");
-
-    auto &app = Application::getInstance();
-    auto &proj = app.getProject();
-    auto shaderDir = proj.getProjectShaderDirectory();
-
-    // Compile test shader if needed
-    if (!m_testShader) {
-        ShaderImportConfig testConfig;
-        testConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
-        auto [testShader, testHandle] =
-            AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/DDGIUnitTests.cs.glsl", testConfig);
-        m_testShader = testShader;
-
-        ComputePipelineConfiguration testPipelineConfig;
-        testPipelineConfig.shader = m_testShader;
-        m_testPipeline = std::make_shared<ComputePipeline>(testPipelineConfig);
-    }
-
-    // Create test results buffer (6 tests, each with TestResult struct)
-    // IMPORTANT: Must match GLSL std430 layout with proper alignment
-    struct TestResult {
-        uint32_t testID;
-        uint32_t passed;
-        uint32_t padding1;
-        uint32_t padding2;
-        alignas(16) glm::vec4 expected;
-        alignas(16) glm::vec4 actual;
-    };
-
-    const uint32_t numTests = 6;
-    if (!m_testResultsBuffer) {
-        m_testResultsBuffer = std::make_shared<StorageBuffer>(sizeof(TestResult) * numTests, BufferUsage::DYNAMIC, m_allocator);
-    }
-
-    // Create descriptor set for test
-    if (!m_testDescriptorSet) {
-        DescriptorSetBindings bindings;
-        bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
-                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS});
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false,
-                                     (DescriptorSetBindingLocation)10}); // binding 10 for test results
-
-        m_testDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_testDescriptorSet
-            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS)
-            ->add(m_RadianceTexture);
-        m_testDescriptorSet->getSSBOBinding((DescriptorSetBindingLocation)10)->add(m_testResultsBuffer);
-    }
-
-    // Run tests on GPU
-    auto cmdBuffer = m_CommandBuffers[0];
-    if (cmdBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
-        RP_CORE_ERROR("Failed to begin command buffer for unit tests");
-        return;
-    }
-
-    m_testPipeline->bind(cmdBuffer->getCommandBufferVk());
-    m_testDescriptorSet->bind(cmdBuffer->getCommandBufferVk(), m_testPipeline);
-    vkCmdDispatch(cmdBuffer->getCommandBufferVk(), 1, 1, 1); // Single invocation runs all tests
-
-    if (cmdBuffer->end() != VK_SUCCESS) {
-        RP_CORE_ERROR("Failed to end command buffer for unit tests");
-        return;
-    }
-
-    m_computeQueue->submitQueue(cmdBuffer);
-    m_computeQueue->waitIdle(); // Wait for GPU to finish
-
-    // Read back results by mapping the buffer
-    TestResult results[numTests];
-    void *mappedData = nullptr;
-    VkResult mapResult = vmaMapMemory(m_allocator, m_testResultsBuffer->getAllocation(), &mappedData);
-    if (mapResult == VK_SUCCESS && mappedData) {
-        memcpy(results, mappedData, sizeof(results));
-        vmaUnmapMemory(m_allocator, m_testResultsBuffer->getAllocation());
-    } else {
-        RP_CORE_ERROR("Failed to map test results buffer!");
-        return;
-    }
-
-    // Print results
-    const char *testNames[] = {"Write/Read Red",
-                               "Write/Read Green",
-                               "Write/Read Blue (Critical!)",
-                               "Write/Read Light Blue (Skybox)",
-                               "Gamma Encode/Decode Round-trip",
-                               "Small Values Precision (Blue channel)"};
-
-    uint32_t passCount = 0;
-    for (uint32_t i = 0; i < numTests; ++i) {
-        bool passed = results[i].passed == 1;
-        passCount += passed ? 1 : 0;
-
-        RP_CORE_INFO("Test {}: {} - {}", i, testNames[i], passed ? "PASS" : "FAIL");
-
-        if (!passed) {
-            RP_CORE_ERROR("  Expected: ({:.4f}, {:.4f}, {:.4f}, {:.4f})", results[i].expected.r, results[i].expected.g,
-                          results[i].expected.b, results[i].expected.a);
-            RP_CORE_ERROR("  Actual:   ({:.4f}, {:.4f}, {:.4f}, {:.4f})", results[i].actual.r, results[i].actual.g,
-                          results[i].actual.b, results[i].actual.a);
-        }
-    }
-
-    RP_CORE_INFO("========== Test Summary: {}/{} Passed ==========", passCount, numTests);
 }
 
 } // namespace Rapture

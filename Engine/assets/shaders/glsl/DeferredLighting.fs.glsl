@@ -1,6 +1,10 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 
+#ifndef PROBE_OFFSETS_TEXTURE
+#define PROBE_OFFSETS_TEXTURE
+#endif
+
 layout(location = 0) out vec4 outColor;
 
 layout(location = 0) in vec2 fragTexCoord;
@@ -83,6 +87,7 @@ layout(push_constant) uniform PushConstants {
     uint probeVolumeHandle;
     uint probeIrradianceHandle;
     uint probeVisibilityHandle;
+    uint probeOffsetHandle;
 
     // Fog
     vec4 fogColor;     // .rgb = color, .a = enabled
@@ -427,6 +432,7 @@ vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume
             surfaceBias,
             gTextureArrays[pc.probeIrradianceHandle],
             gTextureArrays[pc.probeVisibilityHandle],
+            gTextureArrays[pc.probeOffsetHandle],
             volume);
             
         irradiance *= blendWeight;

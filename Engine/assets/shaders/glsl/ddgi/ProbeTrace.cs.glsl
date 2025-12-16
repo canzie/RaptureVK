@@ -9,12 +9,16 @@
 #define DDGI_ENABLE_DIFFUSE_LIGHTING
 #define DDGI_ENABLE_PROBE_CLASSIFICATION
 
+#ifndef PROBE_OFFSETS_TEXTURE
+#define PROBE_OFFSETS_TEXTURE
+#endif
+
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-// Ray data output texture (fixed binding in set 3)
+// Ray data output texture (set 4, binding 0)
 layout(set = 4, binding = 0, rgba32f) uniform restrict writeonly image2DArray RayData;
 
-layout(set = 4, binding = 5) uniform usampler2DArray ProbeStates;
+layout(set = 4, binding = 3) uniform usampler2DArray ProbeStates;
 
 // Previous probe data (bindless textures in set 3)
 layout(set = 3, binding = 0) uniform sampler2D gTextures[];
@@ -31,6 +35,7 @@ layout(set = 3, binding = 1) readonly buffer gBindlessBuffers {
 
 // Push constants (updated structure)
 layout(push_constant) uniform PushConstants {
+
     uint skyboxTextureIndex;     // Index into bindless texture array
     uint sunLightDataIndex;
     uint lightCount;
@@ -38,10 +43,12 @@ layout(push_constant) uniform PushConstants {
     uint prevRadianceIndex;      // Previous radiance texture bindless index
     uint prevVisibilityIndex;    // Previous visibility texture bindless index
 
-    vec3 cameraPosition;
 
     uint tlasIndex;              // TLAS index (if using bindless TLAS)
-};
+    uint probeOffsetHandle;       // Probe offset texture bindless index
+    // vec3 cameraPosition;
+
+} pc;
 
 precision highp float;
 
@@ -331,12 +338,12 @@ void main() {
     ivec3 probeCoords = DDGIGetProbeCoords(probeIndex, u_volume);
 
 
-    vec3 probeWorldPosition = DDGIGetProbeWorldPosition(probeCoords, u_volume);
+    vec3 probeWorldPosition = DDGIGetProbeWorldPosition(probeCoords, u_volume, gTextureArrays[pc.probeOffsetHandle]);
     vec3 probeRayDirection = DDGIGetProbeRayDirection(rayIndex, u_volume);
     uvec3 outputCoords = DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume);
 
 
-    rayQueryInitializeEXT(rayQuery, topLevelAS[tlasIndex], gl_RayFlagsOpaqueEXT, 0xFF, 
+    rayQueryInitializeEXT(rayQuery, topLevelAS[pc.tlasIndex], gl_RayFlagsOpaqueEXT, 0xFF, 
         probeWorldPosition, 0.0, probeRayDirection, u_volume.probeMaxRayDistance);
 
     // Trace the ray
@@ -406,7 +413,7 @@ void main() {
 
             vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, hitToProbe, u_volume);
 
-            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, lightCount);
+            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, pc.lightCount);
 
             float volumeBlendWeight = DDGIGetVolumeBlendWeight(hitPosition, u_volume);
 
@@ -416,8 +423,9 @@ void main() {
                     hitPosition,
                     worldShadingNormal,
                     surfaceBias,
-                    gTextureArrays[prevRadianceIndex],
-                    gTextureArrays[prevVisibilityIndex],
+                    gTextureArrays[pc.prevRadianceIndex],
+                    gTextureArrays[pc.prevVisibilityIndex],
+                    gTextureArrays[pc.probeOffsetHandle],
                     u_volume);
                     
                 irradiance *= volumeBlendWeight;

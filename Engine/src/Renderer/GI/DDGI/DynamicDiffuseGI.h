@@ -32,16 +32,12 @@ class MaterialInstance;
 enum class DDGIDescriptorSetBindingLocation {
     RAY_DATA = 400,
     IRRADIANCE = 401,
-    PREV_IRRADIANCE = 402,
-    VISIBILITY = 403,
-    PREV_VISIBILITY = 404,
-    PROBE_IRRADIANCE_ATLAS = 401,     // Alias for irradiance
-    PROBE_IRRADIANCE_ATLAS_ALT = 402, // Alias for prev_irradiance
-    PROBE_DISTANCE_ATLAS = 403,       // Alias for visibility
-    PROBE_DISTANCE_ATLAS_ALT = 404,   // Alias for prev_visibility
-    PROBE_CLASSIFICATION = 405,
-    PROBE_OFFSET = 406,
-    PROBE_RELOCATION = 406 // same as probe offset
+    VISIBILITY = 402,
+    PROBE_IRRADIANCE_ATLAS = 401,
+    PROBE_DISTANCE_ATLAS = 402,
+    PROBE_CLASSIFICATION = 403,
+    PROBE_OFFSET = 404,
+    PROBE_RELOCATION = 404
 };
 
 class DynamicDiffuseGI {
@@ -84,12 +80,10 @@ class DynamicDiffuseGI {
     // Get bindless indices for probe textures
     uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
     uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
+    uint32_t getProbeOffsetBindlessIndex() const { return m_probeOffsetBindlessIndex; }
 
     // Mesh data SSBO index for compute shader access
     uint32_t getMeshDataSSBOIndex() const { return m_meshDataSSBOIndex; }
-
-    // ========== GPU Unit Testing ==========
-    void runDDGIUnitTests();  // Run automated GPU tests and print results
 
   private:
     void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
@@ -172,6 +166,7 @@ class DynamicDiffuseGI {
     // Probe texture bindless indices for use in lighting pass
     uint32_t m_probeIrradianceBindlessIndex = 0;
     uint32_t m_probeVisibilityBindlessIndex = 0;
+    uint32_t m_probeOffsetBindlessIndex = 0;
 
     // Mesh data SSBO index for compute shader access
     uint32_t m_meshDataSSBOIndex = 0;
@@ -185,12 +180,6 @@ class DynamicDiffuseGI {
     std::shared_ptr<DescriptorSet> m_probeDistanceBlendingDescriptorSet;
     std::shared_ptr<DescriptorSet> m_probeClassificationDescriptorSet;
     std::shared_ptr<DescriptorSet> m_probeRelocationDescriptorSet;
-
-    // GPU Unit Testing Infrastructure
-    std::shared_ptr<Shader> m_testShader;
-    std::shared_ptr<ComputePipeline> m_testPipeline;
-    std::shared_ptr<StorageBuffer> m_testResultsBuffer;
-    std::shared_ptr<DescriptorSet> m_testDescriptorSet;
 };
 
 } // namespace Rapture

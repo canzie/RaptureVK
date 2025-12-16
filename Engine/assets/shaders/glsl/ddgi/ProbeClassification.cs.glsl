@@ -3,6 +3,10 @@
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_nonuniform_qualifier : require
 
+#ifndef PROBE_OFFSETS_TEXTURE
+#define PROBE_OFFSETS_TEXTURE
+#endif
+
 // -----------------------------------------------------------------------------
 //  DDGI Probe-classification Compute Shader                                     
 //  Transitions probes between the seven logical states required by the paper:  
@@ -15,10 +19,10 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 //  Resource bindings                                                            
 // -----------------------------------------------------------------------------
 // 0,0  – Ray data written by the ProbeTrace pass                                
-layout(set = 3, binding = 0) uniform sampler2DArray RayData[];
+layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
 
-// 0,1  – Probe state image (R32_UINT)  (read-modify-write)
-layout(set = 4, binding = 5, r8ui) uniform restrict uimage2DArray ProbeStates;
+// 0,1  – Probe state image (R8_UINT)  (read-modify-write)
+layout(set = 4, binding = 3, r8ui) uniform restrict uimage2DArray ProbeStates;
 
 // -----------------------------------------------------------------------------
 //  Shared DDGI helpers / structs                                                
@@ -31,6 +35,7 @@ layout(std140, set = 0, binding = 5) uniform ProbeInfo {
 
 layout(push_constant) uniform PushConstants {
     uint rayDataIndex;
+    uint probeOffsetHandle;
 } pc;
 
 // -----------------------------------------------------------------------------
@@ -58,7 +63,7 @@ void main() {
     for (rayIndex = 0; rayIndex < u_volume.probeStaticRayCount; rayIndex++) {
         ivec3 rayDataTexCoords = ivec3(DDGIGetRayDataTexelCoords(rayIndex, int(probeIndex), u_volume));
 
-        hitDistances[rayIndex] = texelFetch(RayData[pc.rayDataIndex], rayDataTexCoords, 0).a;
+        hitDistances[rayIndex] = texelFetch(gTextureArrays[pc.rayDataIndex], rayDataTexCoords, 0).a;
 
         backfaceCount += (hitDistances[rayIndex] < 0.0) ? 1 : 0;
     }
@@ -72,7 +77,7 @@ void main() {
     }
 
     ivec3 probeCoords = DDGIGetProbeCoords(int(probeIndex), u_volume);
-    vec3 probeWorldPosition = DDGIGetProbeWorldPosition(probeCoords, u_volume);
+    vec3 probeWorldPosition = DDGIGetProbeWorldPosition(probeCoords, u_volume, gTextureArrays[pc.probeOffsetHandle]);
 
 
     for (rayIndex = 0; rayIndex < u_volume.probeStaticRayCount; rayIndex++)
