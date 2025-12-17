@@ -1,6 +1,7 @@
 #include "LightingPass.h"
 #include "WindowContext/Application.h"
 
+#include "Components/FogComponent.h"
 #include "Renderer/Shadows/ShadowCommon.h"
 #include "Renderer/Shadows/ShadowMapping/ShadowMapping.h"
 
@@ -58,9 +59,6 @@ LightingPass::LightingPass(float width, float height, uint32_t framesInFlight, s
     m_handle = handle;
 
     createPipeline();
-
-    // Default fog settings
-    m_fogSettings = FogSettings();
 }
 
 LightingPass::~LightingPass()
@@ -122,11 +120,11 @@ void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuf
     scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    auto camera = activeScene->getSettings().mainCamera;
+    auto camera = activeScene->getMainCamera();
     glm::vec3 cameraPos = glm::vec3(0.0f);
 
     if (camera != nullptr) {
-        cameraPos = camera->getComponent<TransformComponent>().translation();
+        cameraPos = camera.tryGetComponent<TransformComponent>()->translation();
     } else {
         RP_CORE_WARN("No main camera found!");
     }
@@ -142,9 +140,17 @@ void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuf
 
     pushConstants.useDDGI = 1;
 
-    // Fog
-    pushConstants.fogColor = glm::vec4(m_fogSettings.color, m_fogSettings.enabled ? 1.0f : 0.0f);
-    pushConstants.fogDistances = glm::vec2(m_fogSettings.nearDistance, m_fogSettings.farDistance);
+    // Query FogComponent from scene
+    auto fogView = activeScene->getRegistry().view<FogComponent>();
+    if (!fogView.empty()) {
+        auto &fogComp = fogView.get<FogComponent>(*fogView.begin());
+        pushConstants.fogColor = glm::vec4(fogComp.color, fogComp.enabled ? 1.0f : 0.0f);
+        pushConstants.fogDistances = glm::vec2(fogComp.start, fogComp.end);
+    } else {
+        // No fog component - disable fog
+        pushConstants.fogColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        pushConstants.fogDistances = glm::vec2(0.0f, 0.0f);
+    }
 
     auto &reg = activeScene->getRegistry();
     auto lightView = reg.view<LightComponent>();

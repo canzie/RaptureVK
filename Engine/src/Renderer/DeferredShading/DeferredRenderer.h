@@ -57,10 +57,6 @@ class DeferredRenderer {
     // Getter for GBuffer pass
     static std::shared_ptr<GBufferPass> getGBufferPass() { return m_gbufferPass; }
 
-    static std::shared_ptr<LightingPass> getLightingPass() { return m_lightingPass; }
-
-    static std::shared_ptr<DynamicDiffuseGI> getDynamicDiffuseGI() { return m_dynamicDiffuseGI; }
-
     /**
      * @brief Get the scene render target (for ImGui to sample in Editor mode)
      * @return The scene render target

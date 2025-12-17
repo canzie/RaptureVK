@@ -103,12 +103,12 @@ void GBufferPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuff
     // Get entities with TransformComponent and MeshComponent
     auto &registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, MaterialComponent, BoundingBoxComponent>();
-    auto mainCamera = activeScene->getSettings().mainCamera;
+    auto mainCamera = activeScene->getMainCamera();
 
     CameraComponent *cameraComp = nullptr;
 
     if (mainCamera) {
-        cameraComp = mainCamera->tryGetComponent<CameraComponent>();
+        cameraComp = mainCamera.tryGetComponent<CameraComponent>();
     }
 
     // Begin frame for MDI batching - use current frame's batch maps

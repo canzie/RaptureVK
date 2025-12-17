@@ -76,12 +76,12 @@ void InstancedShapesPass::recordCommandBuffer(const std::shared_ptr<CommandBuffe
     scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    auto camera = scene->getSettings().mainCamera;
+    auto camera = scene->getMainCamera();
     if (camera == nullptr) {
         vkCmdEndRendering(commandBuffer->getCommandBufferVk());
         return;
     }
-    auto cameraComp = camera->tryGetComponent<CameraComponent>();
+    auto cameraComp = camera.tryGetComponent<CameraComponent>();
     if (cameraComp == nullptr) {
         vkCmdEndRendering(commandBuffer->getCommandBufferVk());
         return;

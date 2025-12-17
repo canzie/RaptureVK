@@ -66,11 +66,11 @@ void StencilBorderPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
         return;
     }
 
-    auto camera = activeScene->getSettings().mainCamera;
+    auto camera = activeScene->getMainCamera();
     if (camera == nullptr) {
         return;
     }
-    auto cameraComp = camera->tryGetComponent<CameraComponent>();
+    auto cameraComp = camera.tryGetComponent<CameraComponent>();
     if (cameraComp == nullptr) {
         return;
     }

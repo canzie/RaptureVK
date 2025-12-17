@@ -332,8 +332,13 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
 
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_skyboxPass->hasActiveSkybox() && activeScene->getSkyboxComponent()) {
-        m_skyboxPass->setSkyboxTexture(activeScene->getSkyboxComponent()->skyboxTexture);
+    // Query for SkyboxComponent - could be on any entity (typically environment entity)
+    if (!m_skyboxPass->hasActiveSkybox()) {
+        auto view = activeScene->getRegistry().view<SkyboxComponent>();
+        if (!view.empty()) {
+            auto& skyboxComp = view.get<SkyboxComponent>(*view.begin());
+            m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture);
+        }
     }
 
     if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {

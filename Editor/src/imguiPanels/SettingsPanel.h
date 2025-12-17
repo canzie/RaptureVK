@@ -11,7 +11,5 @@ class SettingsPanel {
         void render();
 
         void renderRendererSettings();
-        void renderDDGISettings();
-        void renderFogSettings();
 };
 

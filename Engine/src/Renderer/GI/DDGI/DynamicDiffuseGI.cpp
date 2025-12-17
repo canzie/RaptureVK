@@ -7,6 +7,7 @@
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Components/Components.h"
+#include "Components/IndirectLightingComponent.h"
 #include "Events/AssetEvents.h"
 #include "Materials/MaterialParameters.h"
 #include "Renderer/GI/DDGI/DDGICommon.h"
@@ -636,9 +637,58 @@ void DynamicDiffuseGI::relocateProbes(uint32_t frameIndex)
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &offsetReadBarrier);
 }
 
+void DynamicDiffuseGI::updateFromIndirectLightingComponent(std::shared_ptr<Scene> scene)
+{
+    // Query for IndirectLightingComponent
+    auto view = scene->getRegistry().view<IndirectLightingComponent>();
+    if (view.empty()) {
+        return; // No indirect lighting component - use current settings
+    }
+
+    auto &ilComp = view.get<IndirectLightingComponent>(*view.begin());
+
+    // Only update if DDGI technique is selected and enabled
+    if (!ilComp.isDDGI() || ilComp.isDisabled()) {
+        return;
+    }
+
+    auto *ddgiSettings = ilComp.getDDGISettings();
+    if (!ddgiSettings) {
+        return;
+    }
+
+    if (m_ProbeVolume.gridDimensions != ddgiSettings->probeCount) {
+        m_ProbeVolume.gridDimensions = ddgiSettings->probeCount;
+        m_isVolumeDirty = true;
+    }
+
+    if (m_ProbeVolume.spacing != ddgiSettings->probeSpacing) {
+        m_ProbeVolume.spacing = ddgiSettings->probeSpacing;
+        m_isVolumeDirty = true;
+    }
+
+    if (m_ProbeVolume.origin != ddgiSettings->gridOrigin) {
+        m_ProbeVolume.origin = ddgiSettings->gridOrigin;
+        m_isVolumeDirty = true;
+    }
+
+    if (m_ProbeVolume.probeNumRays != static_cast<int>(ddgiSettings->raysPerProbe)) {
+        m_ProbeVolume.probeNumRays = static_cast<int>(ddgiSettings->raysPerProbe);
+        m_isVolumeDirty = true;
+    }
+
+    // Note: intensity and visualizeProbes can be used by renderer, not stored in ProbeVolume
+}
+
 void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
 {
-    SkyboxComponent *skyboxComp = scene->getSkyboxComponent();
+    // Query for SkyboxComponent from registry
+    SkyboxComponent *skyboxComp = nullptr;
+    auto view = scene->getRegistry().view<SkyboxComponent>();
+    if (!view.empty()) {
+        skyboxComp = &view.get<SkyboxComponent>(*view.begin());
+    }
+
     std::shared_ptr<Texture> newTexture =
         (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling()) ? skyboxComp->skyboxTexture
                                                                                                      : s_defaultSkyboxTexture;

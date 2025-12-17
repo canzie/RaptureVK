@@ -2,22 +2,25 @@
 
 #include "Events/GameEvents.h"
 
+#include "AssetManager/AssetManager.h"
 #include "Components/Components.h"
+#include "Components/FogComponent.h"
+#include "Components/IndirectLightingComponent.h"
+#include "Scenes/Entities/Entity.h"
 #include "Textures/Texture.h"
 
-
 #include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
+#include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 
 // Implementation of HelpMarker function
-void PropertiesPanel::HelpMarker(const char* desc)
+void PropertiesPanel::HelpMarker(const char *desc)
 {
     ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered())
-    {
+    if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
         ImGui::TextUnformatted(desc);
@@ -26,14 +29,11 @@ void PropertiesPanel::HelpMarker(const char* desc)
     }
 }
 
-
 PropertiesPanel::PropertiesPanel()
 {
     m_entitySelectedListenerId = Rapture::GameEvents::onEntitySelected().addListener(
-        [this](std::shared_ptr<Rapture::Entity> entity) {
-            m_selectedEntity = entity;
-    });
-    
+        [this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
+
     m_currentShadowMapDescriptorSet = VK_NULL_HANDLE;
     m_currentCSMDescriptorSet = VK_NULL_HANDLE;
 }
@@ -55,8 +55,6 @@ void PropertiesPanel::render()
     RAPTURE_PROFILE_FUNCTION();
 
     ImGui::Begin("Properties");
-
-    
 
     if (auto entity = m_selectedEntity.lock()) {
         if (entity->hasComponent<Rapture::TransformComponent>()) {
@@ -87,6 +85,23 @@ void PropertiesPanel::render()
                 renderRigidBodyComponent();
             }
         }
+
+        if (entity->hasComponent<Rapture::FogComponent>()) {
+            renderFogComponent();
+        }
+
+        if (entity->hasComponent<Rapture::IndirectLightingComponent>()) {
+            renderIndirectLightingComponent();
+        }
+
+        if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
+            ImGui::OpenPopup("AddComponentMenu");
+        }
+
+        if (ImGui::BeginPopup("AddComponentMenu")) {
+            renderAddComponentMenu(*entity);
+            ImGui::EndPopup();
+        }
     }
 
     ImGui::End();
@@ -96,14 +111,14 @@ void PropertiesPanel::renderMaterialComponent()
 {
     if (auto entity = m_selectedEntity.lock()) {
         if (ImGui::CollapsingHeader("Material Component", ImGuiTreeNodeFlags_DefaultOpen)) {
-            auto& material = entity->getComponent<Rapture::MaterialComponent>();
+            auto &material = entity->getComponent<Rapture::MaterialComponent>();
 
             ImGui::Text("Base Material: %s", material.material->getBaseMaterial()->getName().c_str());
             ImGui::Text("Material Instance: %s", material.material->getName().c_str());
 
-            auto& parameterMap = material.material->getParameterMap();
+            auto &parameterMap = material.material->getParameterMap();
 
-            for (auto& [paramID, materialParameter] : parameterMap) {
+            for (auto &[paramID, materialParameter] : parameterMap) {
                 ImGui::Text("%s", Rapture::parameterIdToString(paramID).c_str());
                 if (paramID == Rapture::ParameterID::ALBEDO) {
                     ImGui::SameLine();
@@ -128,7 +143,7 @@ void PropertiesPanel::renderMaterialComponent()
                         material.material->setParameter(Rapture::ParameterID::METALLIC, metallic);
                     }
                 }
-            
+
                 if (paramID == Rapture::ParameterID::EMISSIVE) {
                     ImGui::SameLine();
                     glm::vec3 emissive = materialParameter.asVec3();
@@ -137,7 +152,6 @@ void PropertiesPanel::renderMaterialComponent()
                     }
                 }
             }
-
         }
     }
 }
@@ -146,10 +160,10 @@ void PropertiesPanel::renderLightComponent()
 {
     if (auto entity = m_selectedEntity.lock()) {
         if (ImGui::CollapsingHeader("Light Component", ImGuiTreeNodeFlags_DefaultOpen)) {
-            auto& light = entity->getComponent<Rapture::LightComponent>();
+            auto &light = entity->getComponent<Rapture::LightComponent>();
 
             // Light Type
-            const char* lightTypeNames[] = { "Point", "Directional", "Spot" };
+            const char *lightTypeNames[] = {"Point", "Directional", "Spot"};
             int currentType = static_cast<int>(light.type);
             if (ImGui::Combo("Type", &currentType, lightTypeNames, IM_ARRAYSIZE(lightTypeNames))) {
                 light.type = static_cast<Rapture::LightType>(currentType);
@@ -189,166 +203,156 @@ void PropertiesPanel::renderLightComponent()
     }
 }
 
-void transformComponentSlider(glm::vec3& value, float sliderWidth, bool& changed, const std::string label[3]) {
+void transformComponentSlider(glm::vec3 &value, float sliderWidth, bool &changed, const std::string label[3])
+{
 
-          // X axis (Red)
-            //ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "X:");
-            //ImGui::SameLine();
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.1f, 0.1f, 0.5f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
-            ImGui::PushItemWidth(sliderWidth);
-            if (ImGui::DragFloat(label[0].c_str(), &value.x, 0.1f)) changed = true;
-            ImGui::PopItemWidth();
-            ImGui::PopStyleColor(2);
+    // X axis (Red)
+    // ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "X:");
+    // ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.6f, 0.1f, 0.1f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.2f, 0.2f, 1.0f));
+    ImGui::PushItemWidth(sliderWidth);
+    if (ImGui::DragFloat(label[0].c_str(), &value.x, 0.1f)) changed = true;
+    ImGui::PopItemWidth();
+    ImGui::PopStyleColor(2);
 
-            ImGui::SameLine();
+    ImGui::SameLine();
 
-            // Y axis (Green)
-            //ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Y:");
+    // Y axis (Green)
+    // ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "Y:");
 
-            //ImGui::SameLine();
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.6f, 0.1f, 0.5f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 1.0f, 0.2f, 1.0f));
-            ImGui::PushItemWidth(sliderWidth);
-            if (ImGui::DragFloat(label[1].c_str(), &value.y, 0.1f)) changed = true;
-            ImGui::PopItemWidth();
-            ImGui::PopStyleColor(2);
+    // ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.6f, 0.1f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 1.0f, 0.2f, 1.0f));
+    ImGui::PushItemWidth(sliderWidth);
+    if (ImGui::DragFloat(label[1].c_str(), &value.y, 0.1f)) changed = true;
+    ImGui::PopItemWidth();
+    ImGui::PopStyleColor(2);
 
-            ImGui::SameLine();
-            // Z axis (Blue)
-            //ImGui::TextColored(ImVec4(0.2f, 0.2f, 1.0f, 1.0f), "Z:");
-            //ImGui::SameLine();
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.6f, 0.5f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 0.2f, 1.0f, 1.0f));
-            ImGui::PushItemWidth(sliderWidth);
-            if (ImGui::DragFloat(label[2].c_str(), &value.z, 0.1f)) changed = true;
-            ImGui::PopItemWidth();
-            ImGui::PopStyleColor(2);
-
+    ImGui::SameLine();
+    // Z axis (Blue)
+    // ImGui::TextColored(ImVec4(0.2f, 0.2f, 1.0f, 1.0f), "Z:");
+    // ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.6f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.2f, 0.2f, 1.0f, 1.0f));
+    ImGui::PushItemWidth(sliderWidth);
+    if (ImGui::DragFloat(label[2].c_str(), &value.z, 0.1f)) changed = true;
+    ImGui::PopItemWidth();
+    ImGui::PopStyleColor(2);
 }
 
 void PropertiesPanel::renderTransformComponent()
 {
     if (auto entity = m_selectedEntity.lock()) {
 
+        if (ImGui::CollapsingHeader("Transform Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto &transform = entity->getComponent<Rapture::TransformComponent>();
+            ImGui::Dummy(ImVec2(0.0f, 10.0f));
 
-    if (ImGui::CollapsingHeader("Transform Component", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto& transform = entity->getComponent<Rapture::TransformComponent>();
-        ImGui::Dummy(ImVec2(0.0f, 10.0f));
+            // Position with lock option
+            ImGui::BeginTable("transformTable", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp);
 
+            // ========== Position Slider ==========
+            ImGui::TableNextRow();
 
-        // Position with lock option
-        ImGui::BeginTable("transformTable", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp);
+            glm::vec3 position = transform.transforms.getTranslation();
+            bool positionChanged = false;
 
-        // ========== Position Slider ==========
-        ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
 
-        glm::vec3 position = transform.transforms.getTranslation();
-        bool positionChanged = false;
+            ImGui::Text("Position");
 
-        ImGui::TableSetColumnIndex(0);
+            ImGui::TableSetColumnIndex(1);
 
-        ImGui::Text("Position");
+            float availableWidth = ImGui::GetContentRegionAvail().x;
+            float availableHeight = ImGui::GetContentRegionAvail().y;
 
-        ImGui::TableSetColumnIndex(1);
+            float sliderWidth = availableWidth / 3.0f;
 
+            std::string positionLabel[3] = {"##posX", "##posY", "##posZ"};
+            transformComponentSlider(position, sliderWidth, positionChanged, positionLabel);
 
-        float availableWidth = ImGui::GetContentRegionAvail().x;
-        float availableHeight = ImGui::GetContentRegionAvail().y;
+            // If position changed, update the transform
+            if (positionChanged) {
 
-        float sliderWidth = availableWidth / 3.0f;
+                transform.transforms.setTranslation(position);
+                transform.transforms.recalculateTransform();
+            }
 
-        std::string positionLabel[3] = {"##posX", "##posY", "##posZ"};
-        transformComponentSlider(position, sliderWidth, positionChanged, positionLabel);
-        
-        // If position changed, update the transform
-        if (positionChanged) {
+            ImGui::TableSetColumnIndex(2);
 
-            transform.transforms.setTranslation(position);
-            transform.transforms.recalculateTransform();
+            // ========== Rotation Slider ==========
+
+            ImGui::TableNextRow();
+
+            glm::vec3 rotation = transform.transforms.getRotation();
+            bool rotationChanged = false;
+
+            ImGui::TableSetColumnIndex(0);
+
+            ImGui::Text("Rotation");
+
+            ImGui::TableSetColumnIndex(1);
+
+            availableWidth = ImGui::GetContentRegionAvail().x;
+            availableHeight = ImGui::GetContentRegionAvail().y;
+
+            sliderWidth = availableWidth / 3.0f;
+
+            std::string rotationLabel[3] = {"##rotX", "##rotY", "##rotZ"};
+            transformComponentSlider(rotation, sliderWidth, rotationChanged, rotationLabel);
+
+            // If position changed, update the transform
+            if (rotationChanged) {
+
+                transform.transforms.setRotation(rotation);
+                transform.transforms.recalculateTransform();
+            }
+
+            ImGui::TableSetColumnIndex(2);
+
+            // ========== Scale Slider ==========
+
+            ImGui::TableNextRow();
+
+            glm::vec3 scale = transform.transforms.getScale();
+            bool scaleChanged = false;
+
+            ImGui::TableSetColumnIndex(0);
+
+            ImGui::Text("Scale");
+
+            ImGui::TableSetColumnIndex(1);
+
+            availableWidth = ImGui::GetContentRegionAvail().x;
+            availableHeight = ImGui::GetContentRegionAvail().y;
+
+            sliderWidth = availableWidth / 3.0f;
+
+            std::string scaleLabel[3] = {"##scaleX", "##scaleY", "##scaleZ"};
+            transformComponentSlider(scale, sliderWidth, scaleChanged, scaleLabel);
+
+            // If position changed, update the transform
+            if (scaleChanged) {
+
+                transform.transforms.setScale(scale);
+                transform.transforms.recalculateTransform();
+            }
+
+            ImGui::TableSetColumnIndex(2);
+
+            ImGui::EndTable();
+
+            ImGui::Dummy(ImVec2(0.0f, 20.0f));
         }
-
-        ImGui::TableSetColumnIndex(2); 
-
-        // ========== Rotation Slider ==========
-
-        ImGui::TableNextRow();
-
-        glm::vec3 rotation = transform.transforms.getRotation();
-        bool rotationChanged = false;
-
-        ImGui::TableSetColumnIndex(0);
-
-        ImGui::Text("Rotation");
-
-        ImGui::TableSetColumnIndex(1);
-
-
-        availableWidth = ImGui::GetContentRegionAvail().x;
-        availableHeight = ImGui::GetContentRegionAvail().y;
-
-        sliderWidth = availableWidth / 3.0f;
-
-        std::string rotationLabel[3] = {"##rotX", "##rotY", "##rotZ"};
-        transformComponentSlider(rotation, sliderWidth, rotationChanged, rotationLabel);
-        
-        // If position changed, update the transform
-        if (rotationChanged) {
-
-            transform.transforms.setRotation(rotation);
-            transform.transforms.recalculateTransform();
-        }
-
-        ImGui::TableSetColumnIndex(2); 
-
-
-        // ========== Scale Slider ==========
-
-        ImGui::TableNextRow();
-
-        glm::vec3 scale = transform.transforms.getScale();
-        bool scaleChanged = false;
-
-        ImGui::TableSetColumnIndex(0);
-
-        ImGui::Text("Scale");
-
-        ImGui::TableSetColumnIndex(1);
-
-
-        availableWidth = ImGui::GetContentRegionAvail().x;
-        availableHeight = ImGui::GetContentRegionAvail().y;
-
-        sliderWidth = availableWidth / 3.0f;
-
-        std::string scaleLabel[3] = {"##scaleX", "##scaleY", "##scaleZ"};
-        transformComponentSlider(scale, sliderWidth, scaleChanged, scaleLabel);
-        
-        // If position changed, update the transform
-        if (scaleChanged) {
-
-            transform.transforms.setScale(scale);
-            transform.transforms.recalculateTransform();
-        }
-
-        ImGui::TableSetColumnIndex(2); 
-
-        
-        ImGui::EndTable();
-
-        ImGui::Dummy(ImVec2(0.0f, 20.0f));
-
     }
-    
-    }
-
 }
 
 void PropertiesPanel::renderCameraComponent()
 {
     if (auto entity = m_selectedEntity.lock()) {
         if (ImGui::CollapsingHeader("Camera Component", ImGuiTreeNodeFlags_DefaultOpen)) {
-            auto& cameraComponent = entity->getComponent<Rapture::CameraComponent>();
+            auto &cameraComponent = entity->getComponent<Rapture::CameraComponent>();
 
             bool cameraChanged = false;
 
@@ -372,52 +376,45 @@ void PropertiesPanel::renderCameraComponent()
                 cameraChanged = true;
             }
 
-
             if (cameraChanged) {
-                cameraComponent.updateProjectionMatrix(cameraComponent.fov, cameraComponent.aspectRatio, cameraComponent.nearPlane, cameraComponent.farPlane);
+                cameraComponent.updateProjectionMatrix(cameraComponent.fov, cameraComponent.aspectRatio, cameraComponent.nearPlane,
+                                                       cameraComponent.farPlane);
             }
         }
     }
 }
 
-void PropertiesPanel::renderShadowComponent() {
+void PropertiesPanel::renderShadowComponent()
+{
 
     if (auto entity = m_selectedEntity.lock()) {
         if (ImGui::CollapsingHeader("Shadow Component", ImGuiTreeNodeFlags_DefaultOpen)) {
-            auto& shadow = entity->getComponent<Rapture::ShadowComponent>();
-            auto& light = entity->getComponent<Rapture::LightComponent>();
+            auto &shadow = entity->getComponent<Rapture::ShadowComponent>();
+            auto &light = entity->getComponent<Rapture::LightComponent>();
 
             // Only show shadow map if the light casts shadows
             if (shadow.shadowMap) {
                 auto shadowTexture = shadow.shadowMap->getShadowTexture();
                 if (shadowTexture) {
                     // Get the texture dimensions
-                    const auto& spec = shadowTexture->getSpecification();
+                    const auto &spec = shadowTexture->getSpecification();
                     float aspectRatio = static_cast<float>(spec.width) / static_cast<float>(spec.height);
-                    
+
                     // Calculate display size while maintaining aspect ratio
                     float displayWidth = ImGui::GetContentRegionAvail().x;
                     float displayHeight = displayWidth / aspectRatio;
-                    
+
                     // Create ImGui descriptor for the shadow map texture
                     VkDescriptorImageInfo imageInfo = shadowTexture->getDescriptorImageInfo(Rapture::TextureViewType::DEPTH);
                     if (m_currentShadowMapDescriptorSet != VK_NULL_HANDLE) {
                         ImGui_ImplVulkan_RemoveTexture(m_currentShadowMapDescriptorSet);
                     }
-                    m_currentShadowMapDescriptorSet = ImGui_ImplVulkan_AddTexture(
-                        imageInfo.sampler,
-                        imageInfo.imageView,
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                    );
-                    
+                    m_currentShadowMapDescriptorSet = ImGui_ImplVulkan_AddTexture(imageInfo.sampler, imageInfo.imageView,
+                                                                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
                     // Display the shadow map texture
                     ImGui::Text("Shadow Map (%dx%d)", spec.width, spec.height);
-                    ImGui::Image(
-                        (ImTextureID)m_currentShadowMapDescriptorSet,
-                        ImVec2(displayWidth, displayHeight)
-                    );
-
-
+                    ImGui::Image((ImTextureID)m_currentShadowMapDescriptorSet, ImVec2(displayWidth, displayHeight));
                 }
             } else {
                 ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Shadow map not available");
@@ -425,14 +422,14 @@ void PropertiesPanel::renderShadowComponent() {
             }
         }
     }
-
 }
 
-void PropertiesPanel::renderCascadedShadowComponent() {
+void PropertiesPanel::renderCascadedShadowComponent()
+{
     if (auto entity = m_selectedEntity.lock()) {
         if (ImGui::CollapsingHeader("Cascaded Shadow Component", ImGuiTreeNodeFlags_DefaultOpen)) {
-            auto& csmShadow = entity->getComponent<Rapture::CascadedShadowComponent>();
-            auto& light = entity->getComponent<Rapture::LightComponent>();
+            auto &csmShadow = entity->getComponent<Rapture::CascadedShadowComponent>();
+            auto &light = entity->getComponent<Rapture::LightComponent>();
 
             if (csmShadow.cascadedShadowMap) {
                 // Lambda parameter for cascade distribution
@@ -442,21 +439,21 @@ void PropertiesPanel::renderCascadedShadowComponent() {
                 }
                 ImGui::SameLine();
                 HelpMarker("Controls cascade split distribution: 0.0 = linear splits, 1.0 = logarithmic splits");
-                
+
                 // Display cascade information
                 ImGui::Separator();
                 ImGui::Text("Cascade Information:");
-                
+
                 uint8_t numCascades = csmShadow.cascadedShadowMap->getNumCascades();
                 ImGui::Text("Number of Cascades: %d", numCascades);
-                
+
                 // Display shadow map texture information
                 ImGui::Separator();
                 auto shadowTexture = csmShadow.cascadedShadowMap->getShadowTexture();
                 auto flattenedShadowTexture = csmShadow.cascadedShadowMap->getFlattenedShadowTexture();
-                
+
                 if (shadowTexture) {
-                    const auto& spec = shadowTexture->getSpecification();
+                    const auto &spec = shadowTexture->getSpecification();
                     ImGui::Text("Shadow Map Array:");
                     ImGui::Text("  Resolution: %dx%d", spec.width, spec.height);
                     ImGui::Text("  Layers: %d", spec.depth);
@@ -467,44 +464,39 @@ void PropertiesPanel::renderCascadedShadowComponent() {
                         ImGui::Text("    Near: %.3f", csmShadow.cascadedShadowMap->getCascadeSplits()[i]);
                         ImGui::Text("    Far: %.3f", csmShadow.cascadedShadowMap->getCascadeSplits()[i + 1]);
                     }
-                    
+
                     // Display flattened shadow map texture if available
                     if (flattenedShadowTexture && flattenedShadowTexture->isReadyForSampling()) {
                         ImGui::Separator();
                         ImGui::Text("Flattened Shadow Map Visualization:");
-                        
-                        const auto& flatSpec = flattenedShadowTexture->getSpecification();
+
+                        const auto &flatSpec = flattenedShadowTexture->getSpecification();
                         float aspectRatio = static_cast<float>(flatSpec.width) / static_cast<float>(flatSpec.height);
-                        
+
                         // Calculate display size while maintaining aspect ratio
                         float displayWidth = ImGui::GetContentRegionAvail().x;
                         float displayHeight = displayWidth / aspectRatio;
-                        
+
                         // Limit the height to prevent overly tall images
                         const float maxHeight = 400.0f;
                         if (displayHeight > maxHeight) {
                             displayHeight = maxHeight;
                             displayWidth = displayHeight * aspectRatio;
                         }
-                        
+
                         // Create ImGui descriptor for the flattened shadow map texture
-                        VkDescriptorImageInfo imageInfo = flattenedShadowTexture->getDescriptorImageInfo(Rapture::TextureViewType::DEFAULT);
+                        VkDescriptorImageInfo imageInfo =
+                            flattenedShadowTexture->getDescriptorImageInfo(Rapture::TextureViewType::DEFAULT);
                         if (m_currentCSMDescriptorSet != VK_NULL_HANDLE) {
                             ImGui_ImplVulkan_RemoveTexture(m_currentCSMDescriptorSet);
                         }
-                        m_currentCSMDescriptorSet = ImGui_ImplVulkan_AddTexture(
-                            imageInfo.sampler,
-                            imageInfo.imageView,
-                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                        );
-                        
+                        m_currentCSMDescriptorSet = ImGui_ImplVulkan_AddTexture(imageInfo.sampler, imageInfo.imageView,
+                                                                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
                         // Display the flattened shadow map texture
                         ImGui::Text("Flattened Resolution: %dx%d", flatSpec.width, flatSpec.height);
-                        ImGui::Image(
-                            (ImTextureID)m_currentCSMDescriptorSet,
-                            ImVec2(displayWidth, displayHeight)
-                        );
-                        
+                        ImGui::Image((ImTextureID)m_currentCSMDescriptorSet, ImVec2(displayWidth, displayHeight));
+
                         ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Each square represents one cascade layer");
                     } else {
                         ImGui::Separator();
@@ -513,7 +505,7 @@ void PropertiesPanel::renderCascadedShadowComponent() {
                 } else {
                     ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Shadow map array not available");
                 }
-                
+
             } else {
                 ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Cascaded shadow map not available");
                 ImGui::Text("Enable 'Casts Shadow' in the Light Component to generate shadow maps");
@@ -522,30 +514,29 @@ void PropertiesPanel::renderCascadedShadowComponent() {
     }
 }
 
-void PropertiesPanel::renderMeshComponent() {
+void PropertiesPanel::renderMeshComponent()
+{
 
     bool isInstanced = false;
 
     if (auto entity = m_selectedEntity.lock()) {
         if (ImGui::CollapsingHeader("Mesh Component", ImGuiTreeNodeFlags_DefaultOpen)) {
-            auto& meshComponent = entity->getComponent<Rapture::MeshComponent>();
+            auto &meshComponent = entity->getComponent<Rapture::MeshComponent>();
 
             if (entity->hasComponent<Rapture::InstanceComponent>()) {
                 isInstanced = true;
             }
             ImGui::Checkbox("Instanced", &isInstanced);
-
         }
     }
-
-
 }
 
-void PropertiesPanel::renderRigidBodyComponent() {
+void PropertiesPanel::renderRigidBodyComponent()
+{
     if (auto entity = m_selectedEntity.lock()) {
         if (ImGui::CollapsingHeader("Rigid Body Component", ImGuiTreeNodeFlags_DefaultOpen)) {
-            auto& rigidbody = entity->getComponent<Rapture::Entropy::RigidBodyComponent>();
-            auto* collider = rigidbody.collider.get();
+            auto &rigidbody = entity->getComponent<Rapture::Entropy::RigidBodyComponent>();
+            auto *collider = rigidbody.collider.get();
 
             if (!collider) {
                 ImGui::Text("No collider attached.");
@@ -554,10 +545,8 @@ void PropertiesPanel::renderRigidBodyComponent() {
 
             // Mass
             auto colliderType = collider->getColliderType();
-            if (colliderType == Rapture::Entropy::ColliderType::Sphere ||
-                colliderType == Rapture::Entropy::ColliderType::AABB ||
-                colliderType == Rapture::Entropy::ColliderType::OBB)
-            {
+            if (colliderType == Rapture::Entropy::ColliderType::Sphere || colliderType == Rapture::Entropy::ColliderType::AABB ||
+                colliderType == Rapture::Entropy::ColliderType::OBB) {
                 float mass = (rigidbody.invMass > 0.0f) ? 1.0f / rigidbody.invMass : 0.0f;
                 if (ImGui::DragFloat("Mass", &mass, 0.1f, 0.0f, 1000.0f)) {
                     if (mass > 0.0001f) {
@@ -576,14 +565,14 @@ void PropertiesPanel::renderRigidBodyComponent() {
             ImGui::InputFloat3("Velocity", &rigidbody.velocity[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::InputFloat3("Angular Velocity", &rigidbody.angularVelocity[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
 
-            glm::vec4 orientation(rigidbody.orientation.x, rigidbody.orientation.y, rigidbody.orientation.z, rigidbody.orientation.w);
+            glm::vec4 orientation(rigidbody.orientation.x, rigidbody.orientation.y, rigidbody.orientation.z,
+                                  rigidbody.orientation.w);
             ImGui::InputFloat4("Orientation (xyzw)", &orientation[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
 
             ImGui::Separator();
             ImGui::Text("Accumulators");
             ImGui::InputFloat3("Accumulated Force", &rigidbody.accumulatedForce[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::InputFloat3("Accumulated Torque", &rigidbody.accumulatedTorque[0], "%.3f", ImGuiInputTextFlags_ReadOnly);
-
 
             ImGui::Separator();
             ImGui::Text("Inverse Inertia Tensor");
@@ -593,67 +582,214 @@ void PropertiesPanel::renderRigidBodyComponent() {
             ImGui::InputFloat3("##row2", &invTensor[1][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::InputFloat3("##row3", &invTensor[2][0], "%.3f", ImGuiInputTextFlags_ReadOnly);
 
-
-
             ImGui::Separator();
             ImGui::Text("Collider Properties");
 
             // Collider specific properties
             switch (collider->getColliderType()) {
-                case Rapture::Entropy::ColliderType::Sphere:
-                {
-                    ImGui::Text("Type: Sphere");
-                    auto* sphere = static_cast<Rapture::Entropy::SphereCollider*>(collider);
-                    ImGui::DragFloat3("Center", &sphere->center.x, 0.1f);
-                    ImGui::DragFloat("Radius", &sphere->radius, 0.1f, 0.0f);
-                    break;
-                }
-                case Rapture::Entropy::ColliderType::AABB:
-                {
-                    ImGui::Text("Type: AABB");
-                    auto* aabb = static_cast<Rapture::Entropy::AABBCollider*>(collider);
-                    ImGui::DragFloat3("Min", &aabb->min.x, 0.1f);
-                    ImGui::DragFloat3("Max", &aabb->max.x, 0.1f);
-                    break;
-                }
-                case Rapture::Entropy::ColliderType::OBB:
-                {
-                    ImGui::Text("Type: OBB");
-                    auto* obb = static_cast<Rapture::Entropy::OBBCollider*>(collider);
-                    ImGui::DragFloat3("Center", &obb->center.x, 0.1f);
-                    ImGui::DragFloat3("Extents", &obb->extents.x, 0.1f);
-                    glm::vec3 euler = glm::degrees(glm::eulerAngles(obb->orientation));
-                    if(ImGui::DragFloat3("Orientation", &euler.x, 1.0f)) {
-                        obb->orientation = glm::quat(glm::radians(euler));
-                    }
-                    break;
-                }
-                case Rapture::Entropy::ColliderType::Capsule:
-                {
-                    ImGui::Text("Type: Capsule");
-                    auto* capsule = static_cast<Rapture::Entropy::CapsuleCollider*>(collider);
-                    ImGui::DragFloat3("Start", &capsule->start.x, 0.1f);
-                    ImGui::DragFloat3("End", &capsule->end.x, 0.1f);
-                    ImGui::DragFloat("Radius", &capsule->radius, 0.1f, 0.0f);
-                    break;
-                }
-                case Rapture::Entropy::ColliderType::Cylinder:
-                {
-                    ImGui::Text("Type: Cylinder");
-                    auto* cylinder = static_cast<Rapture::Entropy::CylinderCollider*>(collider);
-                    ImGui::DragFloat3("Start", &cylinder->start.x, 0.1f);
-                    ImGui::DragFloat3("End", &cylinder->end.x, 0.1f);
-                    ImGui::DragFloat("Radius", &cylinder->radius, 0.1f, 0.0f);
-                    break;
-                }
-                case Rapture::Entropy::ColliderType::ConvexHull:
-                {
-                    ImGui::Text("Type: Convex Hull");
-                    auto* convexHull = static_cast<Rapture::Entropy::ConvexHullCollider*>(collider);
-                    ImGui::Text("Vertices: %zu", convexHull->vertices.size());
-                    break;
-                }
+            case Rapture::Entropy::ColliderType::Sphere: {
+                ImGui::Text("Type: Sphere");
+                auto *sphere = static_cast<Rapture::Entropy::SphereCollider *>(collider);
+                ImGui::DragFloat3("Center", &sphere->center.x, 0.1f);
+                ImGui::DragFloat("Radius", &sphere->radius, 0.1f, 0.0f);
+                break;
             }
+            case Rapture::Entropy::ColliderType::AABB: {
+                ImGui::Text("Type: AABB");
+                auto *aabb = static_cast<Rapture::Entropy::AABBCollider *>(collider);
+                ImGui::DragFloat3("Min", &aabb->min.x, 0.1f);
+                ImGui::DragFloat3("Max", &aabb->max.x, 0.1f);
+                break;
+            }
+            case Rapture::Entropy::ColliderType::OBB: {
+                ImGui::Text("Type: OBB");
+                auto *obb = static_cast<Rapture::Entropy::OBBCollider *>(collider);
+                ImGui::DragFloat3("Center", &obb->center.x, 0.1f);
+                ImGui::DragFloat3("Extents", &obb->extents.x, 0.1f);
+                glm::vec3 euler = glm::degrees(glm::eulerAngles(obb->orientation));
+                if (ImGui::DragFloat3("Orientation", &euler.x, 1.0f)) {
+                    obb->orientation = glm::quat(glm::radians(euler));
+                }
+                break;
+            }
+            case Rapture::Entropy::ColliderType::Capsule: {
+                ImGui::Text("Type: Capsule");
+                auto *capsule = static_cast<Rapture::Entropy::CapsuleCollider *>(collider);
+                ImGui::DragFloat3("Start", &capsule->start.x, 0.1f);
+                ImGui::DragFloat3("End", &capsule->end.x, 0.1f);
+                ImGui::DragFloat("Radius", &capsule->radius, 0.1f, 0.0f);
+                break;
+            }
+            case Rapture::Entropy::ColliderType::Cylinder: {
+                ImGui::Text("Type: Cylinder");
+                auto *cylinder = static_cast<Rapture::Entropy::CylinderCollider *>(collider);
+                ImGui::DragFloat3("Start", &cylinder->start.x, 0.1f);
+                ImGui::DragFloat3("End", &cylinder->end.x, 0.1f);
+                ImGui::DragFloat("Radius", &cylinder->radius, 0.1f, 0.0f);
+                break;
+            }
+            case Rapture::Entropy::ColliderType::ConvexHull: {
+                ImGui::Text("Type: Convex Hull");
+                auto *convexHull = static_cast<Rapture::Entropy::ConvexHullCollider *>(collider);
+                ImGui::Text("Vertices: %zu", convexHull->vertices.size());
+                break;
+            }
+            }
+        }
+    }
+}
+
+void PropertiesPanel::renderFogComponent()
+{
+    if (auto entity = m_selectedEntity.lock()) {
+        ImGui::Separator();
+        ImGui::Text("Fog Component");
+
+        auto &fogComp = entity->getComponent<Rapture::FogComponent>();
+
+        ImGui::Checkbox("Enabled", &fogComp.enabled);
+        ImGui::ColorEdit3("Fog Color", &fogComp.color.x);
+        ImGui::DragFloat("Start Distance", &fogComp.start, 0.1f, 0.0f, fogComp.end, "%.2f");
+        ImGui::DragFloat("End Distance", &fogComp.end, 0.1f, fogComp.start, 1000.0f, "%.2f");
+        ImGui::DragFloat("Density", &fogComp.density, 0.001f, 0.0f, 1.0f, "%.3f");
+
+        const char *fogTypes[] = {"Linear", "Exponential", "ExponentialSquared"};
+        int currentType = static_cast<int>(fogComp.type);
+        if (ImGui::Combo("Fog Type", &currentType, fogTypes, 3)) {
+            fogComp.type = static_cast<Rapture::FogType>(currentType);
+        }
+    }
+}
+
+void PropertiesPanel::renderIndirectLightingComponent()
+{
+    if (auto entity = m_selectedEntity.lock()) {
+        ImGui::Separator();
+        ImGui::Text("Indirect Lighting Component");
+
+        auto &ilComp = entity->getComponent<Rapture::IndirectLightingComponent>();
+
+        ImGui::Checkbox("Enabled", &ilComp.enabled);
+        ImGui::DragFloat("GI Intensity", &ilComp.giIntensity, 0.01f, 0.0f, 10.0f, "%.2f");
+
+        ImGui::Text("Technique:");
+        if (ilComp.isAmbient()) {
+            ImGui::Text("  Current: Ambient");
+            auto *ambient = ilComp.getAmbientSettings();
+            if (ambient) {
+                ImGui::ColorEdit3("Ambient Color", &ambient->ambientColor.x);
+            }
+        } else if (ilComp.isDDGI()) {
+            ImGui::Text("  Current: DDGI");
+            auto *ddgi = ilComp.getDDGISettings();
+            if (ddgi) {
+                ImGui::DragInt3("Probe Count", reinterpret_cast<int *>(&ddgi->probeCount.x), 1.0f, 1, 32);
+                ImGui::DragFloat3("Probe Spacing", &ddgi->probeSpacing.x, 0.1f, 0.1f, 10.0f);
+                ImGui::DragFloat3("Grid Origin", &ddgi->gridOrigin.x, 0.1f);
+                ImGui::DragInt("Rays Per Probe", reinterpret_cast<int *>(&ddgi->raysPerProbe), 1.0f, 32, 1024);
+                ImGui::DragFloat("Intensity", &ddgi->intensity, 0.01f, 0.0f, 10.0f);
+                ImGui::Checkbox("Visualize Probes", &ddgi->visualizeProbes);
+            }
+        } else {
+            ImGui::Text("  Current: Disabled");
+        }
+    }
+}
+
+void PropertiesPanel::renderAddComponentMenu(Rapture::Entity entity)
+{
+    if (!entity.isValid()) {
+        return;
+    }
+
+    ImGui::Text("Add Component");
+    ImGui::Separator();
+
+    // Helper lambda to safely add a component
+    auto tryAddComponent = [&entity](auto &&addFunc, const char *name) {
+        try {
+            addFunc();
+            return true;
+        } catch (const Rapture::EntityException &e) {
+            // Component already exists, skip it
+            (void)e;
+            return false;
+        } catch (const std::exception &e) {
+            Rapture::RP_ERROR("Failed to add component {}: {}", name, e.what());
+            return false;
+        }
+    };
+
+    // Material Component
+    if (!entity.hasComponent<Rapture::MaterialComponent>()) {
+        if (ImGui::MenuItem("Material Component")) {
+            tryAddComponent(
+                [&entity]() {
+                    auto material =
+                        Rapture::AssetManager::importDefaultAsset<Rapture::MaterialInstance>(Rapture::AssetType::Material).first;
+                    if (material) {
+                        entity.addComponent<Rapture::MaterialComponent>(material);
+                    }
+                },
+                "Material Component");
+        }
+    }
+
+    // Mesh Component
+    if (!entity.hasComponent<Rapture::MeshComponent>()) {
+        if (ImGui::MenuItem("Mesh Component")) {
+            tryAddComponent([&entity]() { entity.addComponent<Rapture::MeshComponent>(); }, "Mesh Component");
+        }
+    }
+
+    // Light Component
+    if (!entity.hasComponent<Rapture::LightComponent>()) {
+        if (ImGui::MenuItem("Light Component")) {
+            tryAddComponent([&entity]() { entity.addComponent<Rapture::LightComponent>(); }, "Light Component");
+        }
+    }
+
+    // Camera Component
+    if (!entity.hasComponent<Rapture::CameraComponent>()) {
+        if (ImGui::MenuItem("Camera Component")) {
+            tryAddComponent([&entity]() { entity.addComponent<Rapture::CameraComponent>(); }, "Camera Component");
+        }
+    }
+
+    // Camera Controller Component
+    if (!entity.hasComponent<Rapture::CameraControllerComponent>()) {
+        if (ImGui::MenuItem("Camera Controller Component")) {
+            tryAddComponent([&entity]() { entity.addComponent<Rapture::CameraControllerComponent>(); },
+                            "Camera Controller Component");
+        }
+    }
+
+    // Fog Component
+    if (!entity.hasComponent<Rapture::FogComponent>()) {
+        if (ImGui::MenuItem("Fog Component")) {
+            tryAddComponent([&entity]() { entity.addComponent<Rapture::FogComponent>(); }, "Fog Component");
+        }
+    }
+
+    // Indirect Lighting Component
+    if (!entity.hasComponent<Rapture::IndirectLightingComponent>()) {
+        if (ImGui::MenuItem("Indirect Lighting Component")) {
+            tryAddComponent([&entity]() { entity.addComponent<Rapture::IndirectLightingComponent>(); },
+                            "Indirect Lighting Component");
+        }
+    }
+
+    // Bounding Box Component
+    if (!entity.hasComponent<Rapture::BoundingBoxComponent>()) {
+        if (ImGui::MenuItem("Bounding Box Component")) {
+            tryAddComponent([&entity]() { entity.addComponent<Rapture::BoundingBoxComponent>(); }, "Bounding Box Component");
+        }
+    }
+
+    // Skybox Component
+    if (!entity.hasComponent<Rapture::SkyboxComponent>()) {
+        if (ImGui::MenuItem("Skybox Component")) {
+            tryAddComponent([&entity]() { entity.addComponent<Rapture::SkyboxComponent>(); }, "Skybox Component");
         }
     }
 }

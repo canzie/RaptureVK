@@ -12,7 +12,6 @@
 
 #include "Components/Systems/BoundingBox.h"
 #include "Components/Systems/CameraController.h"
-#include "Components/Systems/EntityNode.h"
 #include "Components/Systems/ObjectDataBuffer.h"
 #include "Components/Systems/Transforms.h"
 
@@ -37,11 +36,6 @@ namespace Rapture {
 
 struct TagComponent {
     std::string tag;
-};
-
-// dummy component to identify the root entity
-struct RootComponent {
-    bool isRoot = true;
 };
 
 // need to store the data in the Transforms class because i want to support
@@ -242,21 +236,6 @@ struct InstanceShapeComponent {
             instanceCount = static_cast<uint32_t>(instanceData.size());
         }
     }
-};
-
-struct EntityNodeComponent {
-    std::shared_ptr<EntityNode> entity_node;
-
-    EntityNodeComponent() = default;
-
-    EntityNodeComponent(std::shared_ptr<Entity> entity) { entity_node = std::make_shared<EntityNode>(entity); }
-
-    EntityNodeComponent(std::shared_ptr<Entity> entity, std::shared_ptr<EntityNode> parent)
-    {
-        entity_node = std::make_shared<EntityNode>(entity, parent);
-    }
-
-    ~EntityNodeComponent() {}
 };
 
 struct SkyboxComponent {

@@ -9,6 +9,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "Components/Components.h"
+#include "Components/HierarchyComponent.h"
 
 #include "Buffers/VertexBuffers/BufferLayout.h"
 
@@ -306,7 +307,7 @@ bool glTF2Loader::loadModel(const std::string &filepath, bool calculateBoundingB
     } else if (m_nodes && getArraySize(m_nodes) > 0) {
         // If no scenes but has nodes, process the first node as root
         Entity nodeEntity = m_scene->createEntity("Root Node");
-        nodeEntity.addComponent<RootComponent>();
+        nodeEntity.addComponent<HierarchyComponent>();
 
         yyjson_val *firstNode = getArrayElement(m_nodes, 0);
         if (firstNode) {
@@ -335,6 +336,7 @@ void glTF2Loader::processScene(yyjson_val *sceneVal)
             unsigned int nodeIndex = getInt(nodeIndexVal, 0);
             if (nodeIndex < getArraySize(m_nodes)) {
                 Entity nodeEntity = m_scene->createEntity("Node " + std::to_string(nodeIndex));
+                nodeEntity.addComponent<HierarchyComponent>();
                 yyjson_val *nodeToProcess = getArrayElement(m_nodes, nodeIndex);
                 if (nodeToProcess) {
                     processNode(nodeEntity, nodeToProcess);
@@ -506,8 +508,8 @@ glm::mat4 glTF2Loader::getNodeTransform(yyjson_val *nodeVal)
 
 NodeType glTF2Loader::processNode(Entity nodeEntity, yyjson_val *nodeVal)
 {
-    if (!nodeEntity.hasComponent<EntityNodeComponent>()) {
-        nodeEntity.addComponent<EntityNodeComponent>(std::make_shared<Entity>(nodeEntity));
+    if (!nodeEntity.hasComponent<HierarchyComponent>()) {
+        return NodeType::Empty;
     }
 
     const char *nodeName = getString(getObjectValue(nodeVal, "name"), "");
@@ -517,15 +519,15 @@ NodeType glTF2Loader::processNode(Entity nodeEntity, yyjson_val *nodeVal)
     if (nodeName && strlen(nodeName) > 0) {
         nodeEntity.getComponent<TagComponent>().tag = std::string(nodeName);
     }
-    auto &nodeEntityComp = nodeEntity.getComponent<EntityNodeComponent>();
+    auto &nodeEntityComp = nodeEntity.getComponent<HierarchyComponent>();
 
     auto &transformComp = nodeEntity.addComponent<TransformComponent>();
 
     glm::mat4 nodeTransform = getNodeTransform(nodeVal);
 
-    std::shared_ptr<EntityNode> parent = nodeEntityComp.entity_node->getParent();
-    if (parent != nullptr) {
-        nodeTransform = parent->getEntity()->getComponent<TransformComponent>().transformMatrix() * nodeTransform;
+    Entity parent = nodeEntityComp.parent;
+    if (parent.isValid()) {
+        nodeTransform = parent.getComponent<TransformComponent>().transformMatrix() * nodeTransform;
     }
 
     transformComp.transforms.setTransform(nodeTransform);
@@ -549,11 +551,9 @@ NodeType glTF2Loader::processNode(Entity nodeEntity, yyjson_val *nodeVal)
             unsigned int childIndex = getInt(childIndexVal, 0);
             if (childIndex < getArraySize(m_nodes)) {
                 Entity childEntity = m_scene->createEntity("Node " + std::to_string(childIndex));
-                childEntity.addComponent<EntityNodeComponent>(std::make_shared<Entity>(childEntity),
-                                                              nodeEntity.getComponent<EntityNodeComponent>().entity_node);
+                childEntity.addComponent<HierarchyComponent>(nodeEntity);
 
-                nodeEntity.getComponent<EntityNodeComponent>().entity_node->addChild(
-                    childEntity.getComponent<EntityNodeComponent>().entity_node);
+                nodeEntity.getComponent<HierarchyComponent>().addChild(childEntity);
 
                 NodeType nodeType = processNode(childEntity, getArrayElement(m_nodes, childIndex));
 
@@ -600,24 +600,14 @@ Entity glTF2Loader::processMesh(Entity parent, yyjson_val *meshVal)
     // Create transform component that inherits parent transform
     meshEntity.addComponent<TransformComponent>(parentTransform.transformMatrix());
 
-    // Check if parent entity has EntityNodeComponent
-    if (!parent.hasComponent<EntityNodeComponent>()) {
-        RP_CORE_ERROR("Parent entity '{}' missing EntityNodeComponent", meshName);
+    // Check if parent entity has HierarchyComponent
+    if (!parent.hasComponent<HierarchyComponent>()) {
+        RP_CORE_ERROR("Parent entity '{}' missing HierarchyComponent", meshName);
         return meshEntity;
     }
 
-    meshEntity.addComponent<EntityNodeComponent>(std::make_shared<Entity>(meshEntity),
-                                                 parent.getComponent<EntityNodeComponent>().entity_node);
-
-    // Check if mesh entity has EntityNodeComponent after adding it
-    if (!meshEntity.hasComponent<EntityNodeComponent>()) {
-        RP_CORE_ERROR("Mesh entity '{}' failed to add EntityNodeComponent", meshName);
-        return meshEntity;
-    }
-
-    std::shared_ptr<EntityNode> mesh_entity_node = meshEntity.getComponent<EntityNodeComponent>().entity_node;
-
-    parent.getComponent<EntityNodeComponent>().entity_node->addChild(mesh_entity_node);
+    meshEntity.addComponent<HierarchyComponent>(parent);
+    parent.getComponent<HierarchyComponent>().addChild(meshEntity);
 
     // Process primitives
     yyjson_val *primitivesVal = getObjectValue(meshVal, "primitives");
@@ -628,8 +618,8 @@ Entity glTF2Loader::processMesh(Entity parent, yyjson_val *meshVal)
             Entity primitiveEntity = m_scene->createEntity("_Primitive_" + std::to_string(i) + "_" + meshName);
             // RP_CORE_INFO("glTF2Loader: Mesh loaded: {}", meshName);
 
-            primitiveEntity.addComponent<EntityNodeComponent>(std::make_shared<Entity>(primitiveEntity), mesh_entity_node);
-            mesh_entity_node->addChild(primitiveEntity.getComponent<EntityNodeComponent>().entity_node);
+            primitiveEntity.addComponent<HierarchyComponent>(meshEntity);
+            meshEntity.getComponent<HierarchyComponent>().addChild(primitiveEntity);
 
             primitiveEntity.addComponent<TransformComponent>(parentTransform.transformMatrix());
 

@@ -24,122 +24,129 @@ These fixes enable the modularity work and improve reliability.
   - Current approach is awkward - investigate alternatives, a system from the ecs itself would be perfect, as simulating it via 'meta' components is not cool.
   - *Solution:* Created `HierarchyComponent` in `Engine/src/Components/HierarchyComponent.h`. Simple struct with `Entity parent` + `std::vector<Entity> children`. Free functions (`setParent`, `removeFromParent`, `destroyHierarchy`, `getRoot`) handle bidirectional sync. No shared_ptr, no separate EntityNode class. See refactor guide below.
 
----
-
-### Hierarchy Refactor Guide (EntityNodeComponent → HierarchyComponent)
-
-**New file:** `Engine/src/Components/HierarchyComponent.h`
-
-**What changed:**
-- Old: `EntityNodeComponent` → `shared_ptr<EntityNode>` → `shared_ptr<Entity>` + weak_ptr parent/children
-- New: `HierarchyComponent` with `Entity parent` + `std::vector<Entity> children` directly
-
-**Files to update (use grep to find all usages):**
-
-```bash
-# Find all EntityNodeComponent usages
-grep -rn "EntityNodeComponent" Engine/ Editor/
-
-# Find all EntityNode usages
-grep -rn "EntityNode" Engine/ Editor/
-
-# Find entity_node member access
-grep -rn "entity_node" Engine/ Editor/
-```
-
-**Migration patterns:**
-
-1. **Include change:**
-   ```cpp
-   // Old
-   #include "Components/Systems/EntityNode.h"
-   // New
-   #include "Components/HierarchyComponent.h"
-   ```
-
-2. **Adding hierarchy (e.g., glTFLoader):**
-   ```cpp
-   // Old
-   childEntity.addComponent<EntityNodeComponent>(
-       std::make_shared<Entity>(childEntity),
-       nodeEntity.getComponent<EntityNodeComponent>().entity_node);
-   nodeEntity.getComponent<EntityNodeComponent>().entity_node->addChild(
-       childEntity.getComponent<EntityNodeComponent>().entity_node);
-
-   // New
-   Rapture::setParent(childEntity, nodeEntity);
-   ```
-
-3. **Getting parent:**
-   ```cpp
-   // Old
-   auto& nodeComp = entity.getComponent<EntityNodeComponent>();
-   auto parentNode = nodeComp.entity_node->getParent();
-   auto parentEntity = parentNode->getEntity();
-
-   // New
-   auto& hier = entity.getComponent<HierarchyComponent>();
-   Entity parentEntity = hier.parent;
-   ```
-
-4. **Getting children:**
-   ```cpp
-   // Old
-   auto children = nodeComp.entity_node->getChildren();
-   for (auto& childNode : children) {
-       auto childEntity = childNode->getEntity();
-   }
-
-   // New
-   auto& hier = entity.getComponent<HierarchyComponent>();
-   for (Entity child : hier.children) {
-       // use child directly
-   }
-   ```
-
-5. **Checking if has parent:**
-   ```cpp
-   // Old
-   if (nodeComp.entity_node && nodeComp.entity_node->getParent())
-
-   // New
-   if (hier.hasParent())
-   ```
-
-**Files that need updating:**
-- `Engine/src/Loaders/glTF2.0/glTFLoader.cpp` - main user, creates hierarchies
-- `Editor/src/imguiPanels/BrowserPanel.cpp` - reads hierarchy for UI tree
-- `Engine/src/Components/Components.h` - remove EntityNodeComponent, add include
-
-**After migration:**
-- Delete `Engine/src/Components/Systems/EntityNode.h`
-- Delete `Engine/src/Components/Systems/EntityNode.cpp` (if exists)
-- Remove EntityNodeComponent from Components.h
-
----
 
 ### Phase 2: Component Modularity (Main Goal)
 Move rendering features into components for hot-swapping and graceful degradation.
 
-- [ ] **5. Create Lighting entity with components**
-  - Scene stores entity ID (not ref) to a "Lighting" entity
-  - Contains: SkyboxComponent, FogComponent, IndirectLightingComponent, etc.
-  - Systems query for these components - work without them if missing, and if not possible to use the lighting entity, query any available, or lock these component into only being allowed in the lighting component
-  - **Child components**: Editor shows nested components (e.g. IndirectLightingComponent > DDGIComponent), internally can be std::variant or similar - editor UX vs internal representation can differ
+- [x] **5. Create Environment entity pattern**
+  - Scene stores entity ID (not ref) to a "Environment" entity via `Entity m_environmentEntity`
+  - Scene has `createEnvironmentEntity()` method to create/get it
+  - Components (SkyboxComponent, FogComponent, IndirectLightingComponent) added to this entity
+  - Systems query for these components directly via `registry.view<T>()`
+  - *Solution:* Scene refactored. mainCamera is `Entity m_mainCamera`, SceneSettings cleaned up to only actual settings. Environment entity pattern implemented.
 
-- [ ] **6. SkyboxComponent** - Extract skybox from hardcoded rendering
-  - *Solution:*
+- [x] **6. SkyboxComponent** - Extract skybox from hardcoded rendering
+  - *Solution:* DeferredRenderer and DDGI now query `registry.view<SkyboxComponent>()` directly. Removed Scene::getSkyboxComponent(). Falls back gracefully if no skybox exists.
 
-- [ ] **7. FogComponent** - Make fog configurable per-scene
-  - *Solution:*
+- [x] **7. FogComponent** - Make fog configurable per-scene
+  - *Solution:* Created `Engine/src/Components/FogComponent.h` with fog settings (color, density, start/end, type, enabled). Ready for renderer integration.
 
-- [ ] **8. IndirectLightingComponent** - Could have general settings for gi, with possible children components for specifics like ddgi, static ambient, radiance cascades, lightmapping etc with specifics.
-  - *Solution:*
+- [x] **8. IndirectLightingComponent** - Could have general settings for gi, with possible children components for specifics like ddgi, static ambient, radiance cascades, lightmapping etc with specifics.
+  - *Solution:* Created `Engine/src/Components/IndirectLightingComponent.h` with `std::variant<AmbientSettings, DDGISettings>` for technique selection. DDGI system has `updateFromIndirectLightingComponent()` to sync basic settings (grid dimensions, spacing, origin, rays per probe). Helper methods `isDDGI()`, `isAmbient()`, `isDisabled()`.
 
-- [ ] **9. Graceful degradation** - Systems work without optional components
-  - No camera? Don't render until one exists (editor cam vs player cam)
-  - No skybox? Render solid color or skip
-  - No DDGI? Fall back to ambient
+- [x] **9. Graceful degradation** - Systems work without optional components
+  - No skybox? Renderer returns early or uses default
+  - No IndirectLightingComponent? DDGI uses current/default settings
+  - *Solution:* All systems check for component existence before use. Query patterns like `if (view.empty()) return;` ensure graceful fallback.
+
+---
+
+### Phase 2 Implementation Plan
+
+**Approach:** One "Environment" entity per scene holds global rendering settings. Systems query for components on this entity (or any entity if we want flexibility).
+
+**Step 1: Fix Scene's entity storage first**
+- Change `SceneSettings` from `shared_ptr<Entity>` to storing `Entity` directly (it's already lightweight)
+- Update `setMainCamera`, `setSkybox` etc. to store Entity by value
+- This unblocks clean environment entity storage
+
+**Step 2: Create Environment entity pattern**
+```cpp
+// In Scene or on scene creation:
+Entity createEnvironmentEntity() {
+    Entity env = createEntity("Environment");
+    env.addComponent<SkyboxComponent>();      // optional, can be added later
+    env.addComponent<FogComponent>();         // optional
+    env.addComponent<IndirectLightingComponent>(); // optional
+    return env;
+}
+```
+- Scene stores this as `Entity m_environmentEntity`
+- Or: don't store at all, just query `registry.view<SkyboxComponent>()` - more flexible
+
+**Step 3: SkyboxComponent (already exists, just refactor usage)**
+- Current: `Scene::getSkyboxComponent()` fetches from stored entity
+- Change: Renderer queries `view<SkyboxComponent>()` directly
+- Falls back to solid color if no skybox found
+
+**Step 4: Create FogComponent**
+```cpp
+struct FogComponent {
+    glm::vec3 color = glm::vec3(0.5f);
+    float density = 0.01f;
+    float start = 10.0f;    // for linear fog
+    float end = 100.0f;
+    FogType type = FogType::Exponential; // Linear, Exponential, ExponentialSquared
+    bool enabled = true;
+};
+```
+- Renderer queries for this, uses defaults if missing
+
+**Step 5: Create IndirectLightingComponent**
+```cpp
+struct IndirectLightingComponent {
+    // General GI settings
+    float giIntensity = 1.0f;
+    bool enabled = true;
+
+    // Which technique to use (child component style via variant)
+    std::variant<std::monostate, DDGISettings, AmbientSettings> technique;
+};
+
+struct DDGISettings {
+    // get this from ddgi, we will store one inside of the ddgi object and one here
+    // this way the ddgi system can check for any changes and has its own stable truth, and it can also pick which settings to take from outside.
+};
+
+struct AmbientSettings {
+    glm::vec3 ambientColor = glm::vec3(0.03f);
+};
+```
+- DDGI system checks for this component, reads settings from variant
+- If no IndirectLightingComponent or disabled → use simple ambient
+
+**Step 6: Update renderers for graceful degradation**
+```cpp
+// Pattern for each system:
+void SkyboxPass::render(Scene& scene) {
+    auto view = scene.getRegistry().view<SkyboxComponent>();
+    if (view.empty()) {
+        return;
+    }
+    // render skybox from first (or specific) entity
+}
+```
+
+**Files to touch:**
+```bash
+# Find current skybox usage
+grep -rn "getSkybox\|SkyboxComponent" Engine/ Editor/
+
+# Find fog references (if any exist)
+grep -rn "fog\|Fog" Engine/src/Renderer/
+
+# Find DDGI config
+grep -rn "DDGIConfig\|m_ddgi" Engine/src/Renderer/
+```
+
+**Order of implementation:**
+1. Fix SceneSettings storage (shared_ptr → Entity)
+2. Create FogComponent (new file: `Engine/src/Components/FogComponent.h`)
+3. Create IndirectLightingComponent (new file or in Components.h for now)
+4. Refactor SkyboxPass to query component directly
+5. Add fog to lighting pass
+6. Refactor DDGI to read from IndirectLightingComponent
+7. Test graceful degradation (remove components, verify fallbacks)
 
 ---
 

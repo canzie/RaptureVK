@@ -12,6 +12,8 @@
 
 namespace Rapture {
 
+#define ENVIRONMENT_ENTITY_TAG "Environment"
+
 Scene::Scene(const std::string &sceneName)
 {
     m_config.sceneName = sceneName;
@@ -25,7 +27,7 @@ Scene::~Scene()
 Entity Scene::createEntity(const std::string &name)
 {
     // Create entity in the registry
-    entt::entity handle = m_Registry.create();
+    entt::entity handle = m_registry.create();
 
     // Create Entity wrapper
     Entity entity(handle, this);
@@ -39,7 +41,7 @@ Entity Scene::createEntity(const std::string &name)
 Entity Scene::createCube(const std::string &name)
 {
     // Create entity in the registry
-    entt::entity handle = m_Registry.create();
+    entt::entity handle = m_registry.create();
 
     // Create Entity wrapper
     Entity entity(handle, this);
@@ -67,7 +69,7 @@ Entity Scene::createCube(const std::string &name)
 Entity Scene::createSphere(const std::string &name)
 {
     // Create entity in the registry
-    entt::entity handle = m_Registry.create();
+    entt::entity handle = m_registry.create();
 
     // Create Entity wrapper
     Entity entity(handle, this);
@@ -95,7 +97,7 @@ Entity Scene::createSphere(const std::string &name)
 void Scene::destroyEntity(Entity entity)
 {
     if (entity.isValid() && entity.getScene() == this) {
-        m_Registry.destroy(entity.getHandle());
+        m_registry.destroy(entity.getHandle());
     }
 }
 
@@ -112,7 +114,7 @@ void Scene::onUpdate(float dt)
     uint32_t frameCount = swapChain->getImageCount();
 
     // Update mesh data buffers
-    auto meshView = m_Registry.view<TransformComponent, MeshComponent, MaterialComponent>();
+    auto meshView = m_registry.view<TransformComponent, MeshComponent, MaterialComponent>();
     for (auto entity : meshView) {
         auto [transform, mesh, material] = meshView.get<TransformComponent, MeshComponent, MaterialComponent>(entity);
 
@@ -146,7 +148,7 @@ void Scene::onUpdate(float dt)
     }
 
     // Update camera data buffer
-    auto cameraView = m_Registry.view<TransformComponent, CameraComponent>();
+    auto cameraView = m_registry.view<TransformComponent, CameraComponent>();
     for (auto entity : cameraView) {
         auto [transform, camera] = cameraView.get<TransformComponent, CameraComponent>(entity);
 
@@ -159,7 +161,7 @@ void Scene::onUpdate(float dt)
     }
 
     // Update light data buffers
-    auto lightView = m_Registry.view<LightComponent, TransformComponent>();
+    auto lightView = m_registry.view<LightComponent, TransformComponent>();
     for (auto entity : lightView) {
         auto [light, transform] = lightView.get<LightComponent, TransformComponent>(entity);
 
@@ -171,15 +173,16 @@ void Scene::onUpdate(float dt)
 
     // Get camera position for shadow calculations
     glm::vec3 cameraPosition = glm::vec3(0.0f);
-    if (m_config.mainCamera && m_config.mainCamera->isValid()) {
-        auto cameraTransform = m_config.mainCamera->tryGetComponent<TransformComponent>();
+    Entity mainCamera = getMainCamera();
+    if (mainCamera.isValid()) {
+        auto cameraTransform = mainCamera.tryGetComponent<TransformComponent>();
         if (cameraTransform) {
             cameraPosition = cameraTransform->translation();
         }
     }
 
     // Update regular shadow maps
-    auto shadowView = m_Registry.view<LightComponent, TransformComponent, ShadowComponent>();
+    auto shadowView = m_registry.view<LightComponent, TransformComponent, ShadowComponent>();
     for (auto entity : shadowView) {
         auto [light, transform, shadow] = shadowView.get<LightComponent, TransformComponent, ShadowComponent>(entity);
 
@@ -198,15 +201,16 @@ void Scene::onUpdate(float dt)
     }
 
     // Update cascaded shadow maps
-    auto cascadedShadowView = m_Registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
+    auto cascadedShadowView = m_registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
     for (auto entity : cascadedShadowView) {
         auto [light, transform, shadow] =
             cascadedShadowView.get<LightComponent, TransformComponent, CascadedShadowComponent>(entity);
 
         if (shadow.cascadedShadowMap && shadow.isActive) {
             // Update the cascaded shadow map view matrices
-            if (m_config.mainCamera && m_config.mainCamera->isValid()) {
-                auto cameraComp = m_config.mainCamera->tryGetComponent<CameraComponent>();
+            Entity mainCamera = getMainCamera();
+            if (mainCamera.isValid()) {
+                auto cameraComp = mainCamera.tryGetComponent<CameraComponent>();
                 if (cameraComp) {
                     shadow.cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
 
@@ -242,35 +246,58 @@ std::string Scene::getSceneName() const
 
 void Scene::setMainCamera(Entity camera)
 {
-    if (camera.isValid() && camera.hasComponent<CameraComponent>()) m_config.mainCamera = std::make_shared<Entity>(camera);
-}
+    if (!camera.isValid() || !camera.hasComponent<CameraComponent>()) {
+        return;
+    }
 
-void Scene::setMainCamera(std::shared_ptr<Entity> camera)
-{
-    m_config.mainCamera = camera;
-}
+    // Mark camera as main camera via component flag
+    camera.getComponent<CameraComponent>().isMainCamera = true;
 
-std::weak_ptr<Entity> Scene::getMainCamera()
-{
-    return m_config.mainCamera;
-}
-
-void Scene::setSkybox(Entity entity)
-{
-    if (entity.isValid() && entity.hasComponent<SkyboxComponent>()) {
-        m_config.skybox = std::make_shared<Entity>(entity);
+    // Unmark any other cameras
+    auto view = m_registry.view<CameraComponent>();
+    for (auto entity : view) {
+        if (Entity(entity, this) != camera) {
+            view.get<CameraComponent>(entity).isMainCamera = false;
+        }
     }
 }
 
-std::weak_ptr<Entity> Scene::getSkybox()
+Entity Scene::getMainCamera() const
 {
-    return m_config.skybox;
+    // Query for camera with isMainCamera flag
+    auto view = m_registry.view<CameraComponent>();
+    for (auto entity : view) {
+        if (view.get<CameraComponent>(entity).isMainCamera) {
+            return Entity(entity, const_cast<Scene *>(this));
+        }
+    }
+    return Entity::null();
 }
 
-SkyboxComponent *Scene::getSkyboxComponent()
+Entity Scene::createEnvironmentEntity()
 {
-    if (m_config.skybox && m_config.skybox->isValid()) return m_config.skybox->tryGetComponent<SkyboxComponent>();
-    return nullptr;
+    // Check if environment entity already exists
+    auto view = m_registry.view<TagComponent>();
+    for (auto entity : view) {
+        if (view.get<TagComponent>(entity).tag == ENVIRONMENT_ENTITY_TAG) {
+            return Entity(entity, this);
+        }
+    }
+
+    // Create new environment entity
+    return createEntity(ENVIRONMENT_ENTITY_TAG);
+}
+
+Entity Scene::getEnvironmentEntity() const
+{
+    // Query for environment entity
+    auto view = m_registry.view<TagComponent>();
+    for (auto entity : view) {
+        if (view.get<TagComponent>(entity).tag == ENVIRONMENT_ENTITY_TAG) {
+            return Entity(entity, const_cast<Scene *>(this));
+        }
+    }
+    return Entity::null();
 }
 
 void Scene::registerBLAS(Entity &entity)
@@ -293,24 +320,6 @@ void Scene::registerBLAS(Entity &entity)
     m_tlas->addInstance(instance);
 }
 
-void Scene::registerBLAS(std::shared_ptr<Entity> entity)
-{
-    if (!m_tlas) {
-        m_tlas = std::make_shared<TLAS>();
-    }
-
-    auto [blas, mesh, transform] = entity->tryGetComponents<BLASComponent, MeshComponent, TransformComponent>();
-    if (!blas || !mesh || !transform) {
-        RP_CORE_ERROR("Entity does not have a valid BLAS component");
-        return;
-    }
-
-    TLASInstance instance;
-    instance.blas = blas->blas;
-    instance.transform = transform->transformMatrix();
-    instance.entityID = entity->getID();
-    m_tlas->addInstance(instance);
-}
 void Scene::buildTLAS()
 {
     if (!m_tlas) {

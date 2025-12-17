@@ -66,14 +66,7 @@ class DynamicDiffuseGI {
 
     void updateSkybox(std::shared_ptr<Scene> scene);
     void updateProbeVolume();
-
-    ProbeVolume &getProbeVolume() { return m_ProbeVolume; }
-    void setProbeVolume(const ProbeVolume &probeVolume)
-    {
-        m_ProbeVolume = probeVolume;
-        m_isVolumeDirty = true;
-    }
-    void setVolumeDirty(bool dirty) { m_isVolumeDirty = dirty; }
+    void updateFromIndirectLightingComponent(std::shared_ptr<Scene> scene);
 
     void onResize(uint32_t framesInFlight);
 

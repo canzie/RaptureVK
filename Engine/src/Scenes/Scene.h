@@ -15,8 +15,6 @@ struct SkyboxComponent;
 struct SceneSettings {
     std::string sceneName;
     bool frustumCullingEnabled = true;
-    std::shared_ptr<Entity> mainCamera;
-    std::shared_ptr<Entity> skybox;
 };
 
 class Scene {
@@ -32,8 +30,8 @@ class Scene {
 
     void onUpdate(float dt);
 
-    entt::registry &getRegistry() { return m_Registry; }
-    const entt::registry &getRegistry() const { return m_Registry; }
+    entt::registry &getRegistry() { return m_registry; }
+    const entt::registry &getRegistry() const { return m_registry; }
 
     SceneSettings &getSettings();
     const SceneSettings &getSettings() const;
@@ -41,16 +39,12 @@ class Scene {
     std::string getSceneName() const;
 
     void setMainCamera(Entity camera);
-    void setMainCamera(std::shared_ptr<Entity> camera);
+    Entity getMainCamera() const;
 
-    std::weak_ptr<Entity> getMainCamera();
-
-    void setSkybox(Entity entity);
-    std::weak_ptr<Entity> getSkybox();
-    SkyboxComponent *getSkyboxComponent();
+    Entity createEnvironmentEntity();
+    Entity getEnvironmentEntity() const;
 
     void registerBLAS(Entity &entity);
-    void registerBLAS(std::shared_ptr<Entity> entity);
 
     void buildTLAS();
     std::shared_ptr<TLAS> getTLAS()
@@ -65,7 +59,7 @@ class Scene {
     void updateTLAS();
 
   private:
-    entt::registry m_Registry;
+    entt::registry m_registry;
     SceneSettings m_config;
 
     std::shared_ptr<TLAS> m_tlas;
