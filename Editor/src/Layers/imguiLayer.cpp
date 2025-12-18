@@ -5,6 +5,7 @@
 #include "RenderTargets/SwapChains/SwapChain.h"
 #include "Renderer/DeferredShading/DeferredRenderer.h"
 #include "WindowContext/Application.h"
+#include <algorithm>
 #include <stdlib.h> // abort
 
 #include "Events/ApplicationEvents.h"
@@ -30,6 +31,10 @@ ImGuiLayer::ImGuiLayer()
     auto swapChain = vulkanContext.getSwapChain();
 
     m_contentBrowserPanel.setProjectAssetsPath(app.getProject().getProjectRootDirectory().string());
+
+    m_contentBrowserPanel.setOpenImageViewerCallback([this](Rapture::AssetHandle handle) { openFloatingImageViewer(handle); });
+
+    m_imageViewerPanel.setDescriptorSetCleanupCallback([this](VkDescriptorSet ds) { requestDescriptorSetCleanup(ds); });
 
     m_viewportTextureDescriptorSets.clear();
     m_viewportTextureDescriptorSets.resize(swapChain->getImageCount(), VK_NULL_HANDLE);
@@ -222,6 +227,14 @@ void ImGuiLayer::renderImGui()
         m_contentBrowserPanel.render();
         m_imageViewerPanel.render();
         m_settingsPanel.render();
+
+        for (auto &viewer : m_floatingImageViews) {
+            if (viewer && viewer->isOpen()) {
+                viewer->render();
+            }
+        }
+
+        cleanupClosedImageViews();
     }
 
     // ImGui::ShowDemoWindow();
@@ -315,7 +328,8 @@ void ImGuiLayer::onUpdate(float ts)
         ImGuizmo::BeginFrame();
     }
 
-    // Acquire next swapchain image for ImGui to render to
+    processPendingDescriptorSetCleanups();
+
     int imageIndexi;
     {
         RAPTURE_PROFILE_SCOPE("SwapChain Image Acquisition");
@@ -579,4 +593,50 @@ void ImGuiLayer::onResize()
     }
 
     m_imageCount = newImageCount;
+}
+
+void ImGuiLayer::openFloatingImageViewer(Rapture::AssetHandle textureHandle)
+{
+    static uint32_t nextImageViewerId = 0;
+    std::string uniqueId = "Image Viewer " + std::to_string(nextImageViewerId++);
+
+    auto viewer = std::make_unique<ImageViewerPanel>(textureHandle, uniqueId);
+    viewer->setDescriptorSetCleanupCallback([this](VkDescriptorSet ds) { requestDescriptorSetCleanup(ds); });
+
+    m_floatingImageViews.push_back(std::move(viewer));
+}
+
+void ImGuiLayer::cleanupClosedImageViews()
+{
+    m_floatingImageViews.erase(
+        std::remove_if(m_floatingImageViews.begin(), m_floatingImageViews.end(),
+                       [](const std::unique_ptr<ImageViewerPanel> &viewer) { return !viewer || !viewer->isOpen(); }),
+        m_floatingImageViews.end());
+}
+
+void ImGuiLayer::requestDescriptorSetCleanup(VkDescriptorSet descriptorSet)
+{
+    PendingDescriptorSetCleanup cleanup;
+    cleanup.descriptorSet = descriptorSet;
+    cleanup.frameWhenRequested = m_currentFrame;
+    m_pendingDescriptorSetCleanups.push_back(cleanup);
+}
+
+void ImGuiLayer::processPendingDescriptorSetCleanups()
+{
+    uint32_t framesToWait = m_imageCount;
+
+    auto it = m_pendingDescriptorSetCleanups.begin();
+    while (it != m_pendingDescriptorSetCleanups.end()) {
+        uint32_t framesSinceRequest = (m_currentFrame >= it->frameWhenRequested)
+                                          ? (m_currentFrame - it->frameWhenRequested)
+                                          : (m_imageCount - it->frameWhenRequested + m_currentFrame);
+
+        if (framesSinceRequest >= framesToWait) {
+            ImGui_ImplVulkan_RemoveTexture(it->descriptorSet);
+            it = m_pendingDescriptorSetCleanups.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }

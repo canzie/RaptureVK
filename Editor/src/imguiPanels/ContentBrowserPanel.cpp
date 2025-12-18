@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cctype>
 
-ContentBrowserPanel::ContentBrowserPanel()
+ContentBrowserPanel::ContentBrowserPanel() : m_openImageViewerCallback(nullptr)
 {
     // Initialize current directory to the assets folder
     m_currentDirectory = m_projectAssetsPath;
@@ -55,9 +55,12 @@ void ContentBrowserPanel::render()
     if (ImGui::BeginPopup("FilterPopup")) {
         ImGui::Text("Filter by type:");
         ImGui::Separator();
-        if (ImGui::Selectable("All")) { /* TODO */ }
-        if (ImGui::Selectable("Texture")) { /* TODO */ }
-        if (ImGui::Selectable("Material")) { /* TODO */ }
+        if (ImGui::Selectable("All")) { /* TODO */
+        }
+        if (ImGui::Selectable("Texture")) { /* TODO */
+        }
+        if (ImGui::Selectable("Material")) { /* TODO */
+        }
         ImGui::EndPopup();
     }
 
@@ -134,7 +137,7 @@ void ContentBrowserPanel::renderTopPane()
     }
 
     // Refresh button on the right side
-    const char* refreshText = ICON_MD_REFRESH " Refresh";
+    const char *refreshText = ICON_MD_REFRESH " Refresh";
     float refreshButtonWidth = ImGui::CalcTextSize(refreshText).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - refreshButtonWidth);
     verticallyCenter();
@@ -227,7 +230,7 @@ void ContentBrowserPanel::renderAssetTypeHierarchy()
     ImGui::Separator();
 }
 
-void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rapture::AssetMetadata& metadata, float itemWidth)
+void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rapture::AssetMetadata &metadata, float itemWidth)
 {
     RAPTURE_PROFILE_FUNCTION();
     ImGui::PushID(static_cast<int>(handle));
@@ -238,26 +241,27 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
     ImVec2 p0 = ImGui::GetCursorScreenPos();
     float itemHeight = itemWidth * 1.25f; // rectangular item
     ImVec2 p1 = ImVec2(p0.x + itemWidth, p0.y + itemHeight);
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-    
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+
     // Card background
     drawList->AddRectFilled(p0, p1, IM_COL32(36, 36, 36, 255), 4.0f);
 
     // Image placeholder
     float imagePartHeight = itemWidth; // Square
     ImVec4 assetColor = getAssetTypeColor(metadata.m_assetType, false);
-    drawList->AddRectFilled(p0, ImVec2(p0.x + itemWidth, p0.y + imagePartHeight), ImGui::ColorConvertFloat4ToU32(assetColor), 4.0f, ImDrawFlags_RoundCornersTop);
-    
+    drawList->AddRectFilled(p0, ImVec2(p0.x + itemWidth, p0.y + imagePartHeight), ImGui::ColorConvertFloat4ToU32(assetColor), 4.0f,
+                            ImDrawFlags_RoundCornersTop);
+
     // -- Content --
     // Invisible button for interaction
     ImGui::InvisibleButton("##asset", ImVec2(itemWidth, itemHeight));
-    
+
     bool isHovered = ImGui::IsItemHovered();
 
     if (isHovered) {
         drawList->AddRect(p0, p1, ImGui::GetColorU32(ImGuiPanelStyle::ACCENT_PRIMARY), 4.0f, ImDrawFlags_RoundCornersAll, 2.0f);
     }
-    
+
     // Drag and drop source for textures
     if (metadata.m_assetType == Rapture::AssetType::Texture && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         RAPTURE_PROFILE_SCOPE("Texture Drag Drop Source");
@@ -266,7 +270,21 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
                     metadata.isDiskAsset() ? metadata.m_filePath.filename().string().c_str() : metadata.m_virtualName.c_str());
         ImGui::EndDragDropSource();
     }
-    
+
+    std::string contextMenuId = "AssetContextMenu_" + std::to_string(static_cast<uint64_t>(handle));
+    if (metadata.m_assetType == Rapture::AssetType::Texture && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+        ImGui::OpenPopup(contextMenuId.c_str());
+    }
+
+    if (ImGui::BeginPopup(contextMenuId.c_str())) {
+        if (ImGui::MenuItem("Open in Image Viewer")) {
+            if (m_openImageViewerCallback) {
+                m_openImageViewerCallback(handle);
+            }
+        }
+        ImGui::EndPopup();
+    }
+
     if (isHovered) {
         ImGui::BeginTooltip();
         ImGui::TextUnformatted(Rapture::AssetTypeToString(metadata.m_assetType).c_str());
@@ -274,9 +292,9 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
     }
 
     // Name (clipped and centered)
-    const std::string& name = metadata.isDiskAsset() ? metadata.m_filePath.filename().string() : metadata.m_virtualName;
+    const std::string &name = metadata.isDiskAsset() ? metadata.m_filePath.filename().string() : metadata.m_virtualName;
     ImVec2 nameTextSize = ImGui::CalcTextSize(name.c_str(), nullptr, false, itemWidth - 8.0f);
-    
+
     float textPosX = p0.x + (itemWidth - nameTextSize.x) * 0.5f;
     textPosX = std::max(p0.x + 4.0f, textPosX); // Clamp to avoid going off left edge
 
@@ -286,15 +304,14 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
     ImGui::PopTextWrapPos();
 
     ImGui::EndGroup();
-    
+
     ImGui::PopID();
 }
-
 
 void ContentBrowserPanel::renderAssetContent()
 {
     RAPTURE_PROFILE_FUNCTION();
-    
+
     // Grid settings
     float padding = 16.0f;
     float cellSize = m_itemSize + padding;
@@ -302,12 +319,11 @@ void ContentBrowserPanel::renderAssetContent()
     float panelWidth = ImGui::GetContentRegionAvail().x;
     int columnCount = std::max(1, static_cast<int>(panelWidth / cellSize));
 
-    auto& loadedAssets = Rapture::AssetManager::getLoadedAssets();
-    auto& assetRegistry = Rapture::AssetManager::getAssetRegistry();
+    auto &loadedAssets = Rapture::AssetManager::getLoadedAssets();
+    auto &assetRegistry = Rapture::AssetManager::getAssetRegistry();
 
-    if (ImGui::BeginTable("AssetGrid", columnCount))
-    {
-        for (const auto& [handle, asset] : loadedAssets) {
+    if (ImGui::BeginTable("AssetGrid", columnCount)) {
+        for (const auto &[handle, asset] : loadedAssets) {
             if (assetRegistry.find(handle) == assetRegistry.end()) {
                 continue;
             }
@@ -316,7 +332,7 @@ void ContentBrowserPanel::renderAssetContent()
                 continue;
             }
 
-            const std::string& name = metadata.isDiskAsset() ? metadata.m_filePath.filename().string() : metadata.m_virtualName;
+            const std::string &name = metadata.isDiskAsset() ? metadata.m_filePath.filename().string() : metadata.m_virtualName;
             if (!isSearchMatch(name, m_searchBuffer)) {
                 continue;
             }

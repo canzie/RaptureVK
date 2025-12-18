@@ -13,8 +13,6 @@
 #include <filesystem>
 #include <imgui.h>
 
-#include "Generators/Textures/PerlinNoiseGenerator.h"
-
 #include "Logging/TracyProfiler.h"
 
 #include "AccelerationStructures/CPU/BVH/BVH.h"

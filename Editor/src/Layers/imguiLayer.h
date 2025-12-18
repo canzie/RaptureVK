@@ -19,6 +19,7 @@
 
 #include "Textures/Texture.h"
 
+#include "AssetManager/AssetManager.h"
 #include "imguiPanels/BrowserPanel.h"
 #include "imguiPanels/ContentBrowserPanel.h"
 #include "imguiPanels/GBufferPanel.h"
@@ -83,6 +84,21 @@ class ImGuiLayer : public Rapture::Layer {
     ContentBrowserPanel m_contentBrowserPanel;
     ImageViewerPanel m_imageViewerPanel;
     SettingsPanel m_settingsPanel;
+
+    std::vector<std::unique_ptr<ImageViewerPanel>> m_floatingImageViews;
+
+    void openFloatingImageViewer(Rapture::AssetHandle textureHandle);
+    void cleanupClosedImageViews();
+    void requestDescriptorSetCleanup(VkDescriptorSet descriptorSet);
+
+  private:
+    void processPendingDescriptorSetCleanups();
+
+    struct PendingDescriptorSetCleanup {
+        VkDescriptorSet descriptorSet;
+        uint32_t frameWhenRequested;
+    };
+    std::vector<PendingDescriptorSetCleanup> m_pendingDescriptorSetCleanups;
 };
 
 #endif // IMGUI__LAYER_H
