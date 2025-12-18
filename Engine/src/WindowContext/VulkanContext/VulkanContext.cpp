@@ -140,7 +140,7 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
             windowContext->waitEvents();
         }
 
-        vkDeviceWaitIdle(m_device);
+        waitIdle();
 
         m_swapChain->recreate();
         ApplicationEvents::onSwapChainRecreated().publish(m_swapChain);
@@ -181,6 +181,12 @@ VulkanContext::~VulkanContext()
 
 void VulkanContext::waitIdle()
 {
+    std::vector<std::unique_lock<std::mutex>> locks(m_queues.size());
+    for (auto it = m_queues.begin(); it != m_queues.end(); it++) {
+        auto lock = it->second->acquireQueueLock();
+        locks.push_back(std::move(lock));
+    }
+
     vkDeviceWaitIdle(m_device);
 }
 

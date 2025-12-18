@@ -434,7 +434,9 @@ void ForwardRenderer::beginDynamicRendering(std::shared_ptr<CommandBuffer> comma
 void ForwardRenderer::cleanupSwapChain()
 {
 
-    vkDeviceWaitIdle(m_device);
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+    vc.waitIdle();
 
     m_commandBuffers.clear();
 

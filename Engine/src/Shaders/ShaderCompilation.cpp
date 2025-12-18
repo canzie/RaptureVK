@@ -73,7 +73,8 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
     shaderc::CompileOptions options;
     options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 #ifdef NDEBUG
-    options.SetOptimizationLevel(shaderc_optimization_level_performance);
+    // shaderc_optimization_level_performance breaks ddgi
+    options.SetOptimizationLevel(shaderc_optimization_level_zero);
 #else
     options.SetOptimizationLevel(shaderc_optimization_level_zero);
 #endif

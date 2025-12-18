@@ -42,7 +42,9 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
 GBufferPass::~GBufferPass()
 {
     // Wait for device to finish operations
-    vkDeviceWaitIdle(m_device);
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+    vc.waitIdle();
 
     GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
 

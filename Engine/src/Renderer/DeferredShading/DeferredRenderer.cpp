@@ -101,8 +101,9 @@ void DeferredRenderer::init()
 
 void DeferredRenderer::shutdown()
 {
-    // Wait for device to finish operations
-    vkDeviceWaitIdle(m_device);
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+    vc.waitIdle();
 
     m_skyboxPass.reset();
     m_stencilBorderPass.reset();
@@ -146,7 +147,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
         imageIndex = static_cast<uint32_t>(imageIndexi);
     }
 
-    m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
+    // m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
 
     bool success = m_commandBuffers[m_currentFrame]->reset();
     if (!success) {
@@ -215,7 +216,9 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
 void DeferredRenderer::onSwapChainRecreated()
 {
     // Wait for all operations to complete
-    vkDeviceWaitIdle(m_device);
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+    vc.waitIdle();
 
     // In PRESENTATION mode, the render target is backed by swapchain, so we need to recreate everything
     // In OFFSCREEN mode, only update the swapchain reference (image count may have changed)
@@ -297,7 +300,9 @@ void DeferredRenderer::processPendingViewportResize()
         return; // No change
     }
 
-    vkDeviceWaitIdle(m_device);
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+    vc.waitIdle();
 
     m_currentFrame = 0;
     m_width = static_cast<float>(width);
@@ -336,7 +341,7 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
     if (!m_skyboxPass->hasActiveSkybox()) {
         auto view = activeScene->getRegistry().view<SkyboxComponent>();
         if (!view.empty()) {
-            auto& skyboxComp = view.get<SkyboxComponent>(*view.begin());
+            auto &skyboxComp = view.get<SkyboxComponent>(*view.begin());
             m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture);
         }
     }
