@@ -45,7 +45,6 @@ class DynamicDiffuseGI {
     DynamicDiffuseGI(uint32_t framesInFlight);
     ~DynamicDiffuseGI();
 
-    void populateProbes(std::shared_ptr<Scene> scene);
     void populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex);
 
     std::shared_ptr<Texture> getRadianceTexture() { return m_RadianceTexture; }
@@ -75,9 +74,6 @@ class DynamicDiffuseGI {
     uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
     uint32_t getProbeOffsetBindlessIndex() const { return m_probeOffsetBindlessIndex; }
 
-    // Mesh data SSBO index for compute shader access
-    uint32_t getMeshDataSSBOIndex() const { return m_meshDataSSBOIndex; }
-
   private:
     void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
     void blendTextures(uint32_t frameIndex);
@@ -89,7 +85,6 @@ class DynamicDiffuseGI {
 
     void createPipelines();
     void setupProbeTextures();
-    void updateMeshInfoBuffer(std::shared_ptr<Scene> scene);
 
     uint32_t getSunLightDataIndex(std::shared_ptr<Scene> scene);
 
@@ -109,18 +104,6 @@ class DynamicDiffuseGI {
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeClassificationPipeline;
 
     ProbeVolume m_ProbeVolume;
-
-    // material to offsets
-    // key: raw pointer to MaterialInstance
-    // value: list of byte offsets in the MeshInfo SSBO where this material's parameters live
-    std::unordered_map<MaterialInstance *, std::vector<uint32_t>> m_MaterialToOffsets;
-    std::unordered_map<EntityID, uint32_t> m_MeshToOffsets;
-
-    // Queue of materials that have changed this frame and need patching
-    std::unordered_set<MaterialInstance *> m_dirtyMaterials;
-    std::unordered_set<EntityID> m_dirtyMeshes;
-
-    std::shared_ptr<StorageBuffer> m_MeshInfoBuffer;
 
     std::shared_ptr<UniformBuffer> m_ProbeInfoBuffer;
 
@@ -148,7 +131,6 @@ class DynamicDiffuseGI {
     std::vector<std::shared_ptr<CommandBuffer>> m_CommandBuffers;
     uint32_t m_framesInFlight;
 
-    bool m_isPopulated;
     bool m_isFirstFrame;
 
     bool m_isVolumeDirty;
@@ -160,9 +142,6 @@ class DynamicDiffuseGI {
     uint32_t m_probeIrradianceBindlessIndex = 0;
     uint32_t m_probeVisibilityBindlessIndex = 0;
     uint32_t m_probeOffsetBindlessIndex = 0;
-
-    // Mesh data SSBO index for compute shader access
-    uint32_t m_meshDataSSBOIndex = 0;
 
     std::shared_ptr<Texture> m_skyboxTexture;
 

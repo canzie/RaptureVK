@@ -114,9 +114,10 @@ void Scene::onUpdate(float dt)
     uint32_t frameCount = swapChain->getImageCount();
 
     // Update mesh data buffers
-    auto meshView = m_registry.view<TransformComponent, MeshComponent, MaterialComponent>();
+    auto meshView = m_registry.view<TransformComponent, MeshComponent, MaterialComponent, TagComponent>();
     for (auto entity : meshView) {
-        auto [transform, mesh, material] = meshView.get<TransformComponent, MeshComponent, MaterialComponent>(entity);
+        auto [transform, mesh, material, tag] =
+            meshView.get<TransformComponent, MeshComponent, MaterialComponent, TagComponent>(entity);
 
         // nothing changed
         if (transform.hasChanged()) {

@@ -128,8 +128,8 @@ void DescriptorManager::initializeSet3()
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::BINDLESS_SSBOS});
 
     // DDGI scene info SSBO
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024, TextureViewType::DEFAULT, false,
-                                 DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS});
+    bindings.bindings.push_back(
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS});
 
     // General purpose bindless storage textures
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 8, TextureViewType::DEFAULT, false,

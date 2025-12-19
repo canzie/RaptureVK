@@ -38,6 +38,8 @@ uint32_t DeferredRenderer::m_pendingViewportWidth = 0;
 uint32_t DeferredRenderer::m_pendingViewportHeight = 0;
 bool DeferredRenderer::m_viewportResizePending = false;
 std::shared_ptr<DynamicDiffuseGI> DeferredRenderer::m_dynamicDiffuseGI = nullptr;
+std::shared_ptr<RadianceCascades> DeferredRenderer::m_radianceCascades = nullptr;
+std::shared_ptr<RtInstanceData> DeferredRenderer::m_rtInstanceData = nullptr;
 
 void DeferredRenderer::init()
 {
@@ -58,7 +60,9 @@ void DeferredRenderer::init()
     setupCommandResources();
     createRenderTarget();
 
+    m_rtInstanceData = std::make_shared<RtInstanceData>();
     m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
+    m_radianceCascades = std::make_shared<RadianceCascades>(m_swapChain->getImageCount());
 
     // Get the render target format for pipeline creation
     VkFormat colorFormat = m_sceneRenderTarget->getFormat();
@@ -147,7 +151,9 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
         imageIndex = static_cast<uint32_t>(imageIndexi);
     }
 
+    m_rtInstanceData->update(activeScene);
     // m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
+    m_radianceCascades->update(activeScene, m_currentFrame);
 
     bool success = m_commandBuffers[m_currentFrame]->reset();
     if (!success) {
@@ -239,6 +245,7 @@ void DeferredRenderer::onSwapChainRecreated()
         }
 
         m_dynamicDiffuseGI->onResize(m_swapChain->getImageCount());
+        m_radianceCascades->onResize(m_swapChain->getImageCount());
     }
 
     m_commandBuffers.clear();
@@ -271,8 +278,8 @@ void DeferredRenderer::recreateRenderPasses()
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
 
-    // Recreate DDGI system
     m_dynamicDiffuseGI->onResize(m_swapChain->getImageCount());
+    m_radianceCascades->onResize(m_swapChain->getImageCount());
 
     VkFormat colorFormat = m_sceneRenderTarget->getFormat();
 

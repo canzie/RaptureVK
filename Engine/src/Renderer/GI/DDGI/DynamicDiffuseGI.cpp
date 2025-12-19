@@ -11,6 +11,7 @@
 #include "Events/AssetEvents.h"
 #include "Materials/MaterialParameters.h"
 #include "Renderer/GI/DDGI/DDGICommon.h"
+#include "Renderer/RtInstanceData.h"
 #include "Scenes/Entities/Entity.h"
 #include "Scenes/Scene.h"
 #include "Textures/Texture.h"
@@ -59,27 +60,13 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     : m_DDGI_ProbeTraceShader(nullptr), m_DDGI_ProbeIrradianceBlendingShader(nullptr), m_DDGI_ProbeDistanceBlendingShader(nullptr),
       m_DDGI_ProbeRelocationShader(nullptr), m_DDGI_ProbeClassificationShader(nullptr), m_DDGI_ProbeTracePipeline(nullptr),
       m_DDGI_ProbeIrradianceBlendingPipeline(nullptr), m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
-      m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_MeshInfoBuffer(nullptr),
-      m_ProbeInfoBuffer(nullptr), m_framesInFlight(framesInFlight), m_isPopulated(false), m_isFirstFrame(true), m_meshCount(0),
-      m_probeIrradianceBindlessIndex(UINT32_MAX), m_probeVisibilityBindlessIndex(UINT32_MAX),
-      m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr), m_probeTraceDescriptorSet(nullptr),
-      m_probeIrradianceBlendingDescriptorSet(nullptr), m_probeDistanceBlendingDescriptorSet(nullptr),
-      m_probeClassificationDescriptorSet(nullptr), m_probeRelocationDescriptorSet(nullptr)
+      m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_ProbeInfoBuffer(nullptr),
+      m_framesInFlight(framesInFlight), m_isFirstFrame(true), m_meshCount(0), m_probeIrradianceBindlessIndex(UINT32_MAX),
+      m_probeVisibilityBindlessIndex(UINT32_MAX), m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr),
+      m_probeTraceDescriptorSet(nullptr), m_probeIrradianceBlendingDescriptorSet(nullptr),
+      m_probeDistanceBlendingDescriptorSet(nullptr), m_probeClassificationDescriptorSet(nullptr),
+      m_probeRelocationDescriptorSet(nullptr)
 {
-
-    // Listen for material instance changes so we can patch the MeshInfo SSBO on-demand.
-    AssetEvents::onMaterialInstanceChanged().addListener([this](MaterialInstance *mat) {
-        if (mat) {
-            m_dirtyMaterials.insert(mat);
-        }
-    });
-
-    // Listen for mesh transform changes so we can patch the MeshInfo SSBO on-demand.
-    AssetEvents::onMeshTransformChanged().addListener([this](EntityID ent) {
-        if (ent) {
-            m_dirtyMeshes.insert(ent);
-        }
-    });
 
     if (!s_defaultSkyboxTexture) {
         s_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
@@ -177,64 +164,6 @@ void DynamicDiffuseGI::setupProbeTextures()
     }
 }
 
-void DynamicDiffuseGI::updateMeshInfoBuffer(std::shared_ptr<Scene> scene)
-{
-    if ((m_dirtyMaterials.empty() && m_dirtyMeshes.empty()) || !m_MeshInfoBuffer) {
-        return;
-    }
-
-    // Offsets inside MeshInfo struct that correspond to material parameters
-    constexpr size_t MATERIAL_START_OFFSET = offsetof(MeshInfo, AlbedoTextureIndex);
-    constexpr size_t MATERIAL_END_OFFSET = offsetof(MeshInfo, iboIndex); // first field after material params
-    constexpr size_t MATERIAL_PARAM_SIZE = MATERIAL_END_OFFSET - MATERIAL_START_OFFSET;
-    constexpr size_t TRANSFORM_OFFSET = offsetof(MeshInfo, modelMatrix);
-
-    struct PackedParams {
-        uint32_t AlbedoTextureIndex;
-        uint32_t NormalTextureIndex;
-        alignas(16) glm::vec3 albedo;
-        alignas(16) glm::vec3 emissiveColor;
-        uint32_t EmissiveFactorTextureIndex;
-    };
-
-    for (auto *mat : m_dirtyMaterials) {
-        if (!mat) continue;
-
-        // Build a small struct containing just the material-related parameters in the same layout as MeshInfo
-        PackedParams params = {};
-
-        params.AlbedoTextureIndex = mat->getParameter(ParameterID::ALBEDO_MAP).asUInt();
-        params.NormalTextureIndex = mat->getParameter(ParameterID::NORMAL_MAP).asUInt();
-        params.albedo = mat->getParameter(ParameterID::ALBEDO).asVec3();
-        params.emissiveColor = mat->getParameter(ParameterID::EMISSIVE).asVec3();
-        params.EmissiveFactorTextureIndex = UINT32_MAX;
-
-        auto offsetsIt = m_MaterialToOffsets.find(mat);
-        if (offsetsIt == m_MaterialToOffsets.end()) continue;
-
-        for (uint32_t baseOffset : offsetsIt->second) {
-            uint32_t dstOffset = baseOffset + static_cast<uint32_t>(MATERIAL_START_OFFSET);
-            m_MeshInfoBuffer->addData(&params, static_cast<uint32_t>(MATERIAL_PARAM_SIZE), dstOffset);
-        }
-    }
-
-    for (auto entityID : m_dirtyMeshes) {
-        Entity ent = Entity(entityID, scene.get());
-        if (!ent) continue;
-
-        auto offsetIt = m_MeshToOffsets.find(entityID);
-        if (offsetIt == m_MeshToOffsets.end()) continue;
-
-        uint32_t dstOffset = offsetIt->second + static_cast<uint32_t>(TRANSFORM_OFFSET);
-        glm::mat4 modelMatrix = ent.getComponent<TransformComponent>().transformMatrix();
-        // RP_CORE_TRACE("Updating mesh info buffer for entity: {}", ent.getID());
-        m_MeshInfoBuffer->addData((void *)&modelMatrix, sizeof(glm::mat4), dstOffset);
-    }
-
-    m_dirtyMeshes.clear();
-    m_dirtyMaterials.clear();
-}
-
 uint32_t DynamicDiffuseGI::getSunLightDataIndex(std::shared_ptr<Scene> scene)
 {
 
@@ -296,147 +225,9 @@ void DynamicDiffuseGI::clearTextures()
     m_computeQueue->submitQueue(m_CommandBuffers[0]);
 }
 
-void DynamicDiffuseGI::populateProbes(std::shared_ptr<Scene> scene)
-{
-
-    RAPTURE_PROFILE_FUNCTION();
-
-    auto tlas = scene->getTLAS();
-    if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
-        // RP_CORE_WARN("DynamicDiffuseGI::populateProbes - Scene TLAS is not built");
-        return;
-    }
-
-    auto &tlasInstances = tlas->getInstances();
-
-    if (m_meshCount == tlas->getInstanceCount()) {
-        return;
-    }
-
-    auto &reg = scene->getRegistry();
-    auto MMview = reg.view<MaterialComponent, MeshComponent, TransformComponent>(entt::exclude<LightComponent>);
-
-    std::vector<MeshInfo> meshInfos(tlas->getInstanceCount());
-
-    int i = 0;
-
-    for (auto inst : tlasInstances) {
-
-        Entity ent = Entity(inst.entityID, scene.get());
-
-        MeshInfo &meshinfo = meshInfos[i];
-        meshinfo = {};
-        meshinfo.AlbedoTextureIndex = 0;
-        meshinfo.NormalTextureIndex = 0;
-        meshinfo.vboIndex = 0;
-        meshinfo.iboIndex = 0;
-        meshinfo.positionAttributeOffsetBytes = 0;
-        meshinfo.texCoordAttributeOffsetBytes = 0;
-        meshinfo.normalAttributeOffsetBytes = 0;
-        meshinfo.tangentAttributeOffsetBytes = 0;
-        meshinfo.vertexStrideBytes = 0;
-        meshinfo.indexType = 0;
-        meshinfo.albedo = glm::vec3(1.0f);
-        meshinfo.EmissiveFactorTextureIndex = UINT32_MAX;
-        meshinfo.emissiveColor = glm::vec3(0.0f);
-
-        // Get the mesh component and retrieve buffer indices
-        if (MMview.contains(ent)) {
-            auto [meshComp, materialComp, transformComp] = MMview.get<MeshComponent, MaterialComponent, TransformComponent>(ent);
-
-            meshinfo.modelMatrix = transformComp.transformMatrix();
-
-            if (materialComp.material) {
-                auto &material = materialComp.material;
-                meshinfo.AlbedoTextureIndex = material->getParameter(ParameterID::ALBEDO_MAP).asUInt();
-                meshinfo.NormalTextureIndex = material->getParameter(ParameterID::NORMAL_MAP).asUInt();
-
-                meshinfo.albedo = material->getParameter(ParameterID::ALBEDO).asVec3();
-                meshinfo.emissiveColor = material->getParameter(ParameterID::EMISSIVE).asVec3();
-            }
-
-            if (meshComp.mesh) {
-                auto vertexBuffer = meshComp.mesh->getVertexBuffer();
-                auto indexBuffer = meshComp.mesh->getIndexBuffer();
-
-                if (vertexBuffer) {
-
-                    meshinfo.vboIndex = vertexBuffer->getBindlessIndex();
-
-                    auto &bfl = vertexBuffer->getBufferLayout();
-
-                    meshinfo.positionAttributeOffsetBytes = bfl.getAttributeOffset(BufferAttributeID::POSITION);
-                    meshinfo.texCoordAttributeOffsetBytes = bfl.getAttributeOffset(BufferAttributeID::TEXCOORD_0);
-                    meshinfo.normalAttributeOffsetBytes = bfl.getAttributeOffset(BufferAttributeID::NORMAL);
-                    meshinfo.tangentAttributeOffsetBytes = bfl.getAttributeOffset(BufferAttributeID::TANGENT);
-                    meshinfo.vertexStrideBytes = bfl.calculateVertexSize();
-                }
-
-                if (indexBuffer) {
-                    meshinfo.iboIndex = indexBuffer->getBindlessIndex();
-                    meshinfo.indexType = indexBuffer->getIndexType();
-                }
-            }
-        }
-
-        // Set the mesh index to match the TLAS instance custom index
-        meshinfo.meshIndex = inst.instanceCustomIndex;
-
-        i++;
-    }
-
-    // Update the mesh count
-    m_meshCount = static_cast<uint32_t>(meshInfos.size());
-
-    // Create or update the mesh info buffer
-    if (!m_MeshInfoBuffer || m_MeshInfoBuffer->getSize() < sizeof(MeshInfo) * meshInfos.size()) {
-        m_MeshInfoBuffer = std::make_shared<StorageBuffer>(sizeof(MeshInfo) * meshInfos.size(), BufferUsage::DYNAMIC, m_allocator,
-                                                           meshInfos.data());
-    } else {
-        m_MeshInfoBuffer->addData(meshInfos.data(), sizeof(MeshInfo) * meshInfos.size(), 0);
-    }
-
-    // Rebuild material-offset lookup table
-    m_MaterialToOffsets.clear();
-    m_MeshToOffsets.clear();
-
-    for (uint32_t idx = 0; idx < meshInfos.size(); ++idx) {
-        Entity ent = Entity(tlasInstances[idx].entityID, scene.get());
-        if (MMview.contains(ent)) {
-            auto [meshComp, materialComp, transformComp] = MMview.get<MeshComponent, MaterialComponent, TransformComponent>(ent);
-            if (materialComp.material) {
-                m_MeshToOffsets[ent.getID()] = idx * static_cast<uint32_t>(sizeof(MeshInfo));
-                m_MaterialToOffsets[materialComp.material.get()].push_back(idx * static_cast<uint32_t>(sizeof(MeshInfo)));
-            }
-        }
-    }
-
-    // Add mesh info buffer to the mesh data descriptor set
-    auto meshDataSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS);
-    if (meshDataSet) {
-        auto binding = meshDataSet->getSSBOBinding(DescriptorSetBindingLocation::DDGI_SCENE_INFO_SSBOS);
-        if (binding) {
-            m_meshDataSSBOIndex = binding->add(m_MeshInfoBuffer);
-            RP_CORE_INFO("DDGI Mesh data SSBO index: {}", m_meshDataSSBOIndex);
-        }
-    }
-
-    m_isPopulated = true;
-    RP_CORE_INFO("Populated {} mesh infos for DDGI", meshInfos.size());
-}
-
 void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex)
 {
-
     RAPTURE_PROFILE_FUNCTION();
-
-    // Apply any material changes collected since last frame
-    updateMeshInfoBuffer(scene);
-
-    if (!m_isPopulated) {
-        // First populate the probe data
-        populateProbes(scene);
-    }
 
     {
         // Compute a completely new random rotation each frame using James Arvo's method
@@ -490,7 +281,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     auto tlas = scene->getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
-        // RP_CORE_WARN("DynamicDiffuseGI::populateProbesCompute - Scene TLAS is not built");
+        RP_CORE_WARN("Scene TLAS is not built");
         return;
     }
 
@@ -503,10 +294,9 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::populateProbesCompute");
-        // Cast rays using compute shader
         castRays(scene, frameIndex);
     }
-    // Flatten ray data texture (within the same command buffer)
+
     if (m_RayDataTextureFlattened) {
         m_RayDataTextureFlattened->update(currentCommandBuffer);
     }
@@ -531,11 +321,9 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(currentCommandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::blendTextures");
-        // Blend textures
         blendTextures(frameIndex);
     }
 
-    // Flatten final textures (within the same command buffer)
     if (m_IrradianceTextureFlattened) {
         m_IrradianceTextureFlattened->update(currentCommandBuffer);
     }
@@ -550,7 +338,6 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
         return;
     }
 
-    // Submit command buffer (single submit for all operations)
     m_computeQueue->submitQueue(currentCommandBuffer);
 
     m_isFirstFrame = false;

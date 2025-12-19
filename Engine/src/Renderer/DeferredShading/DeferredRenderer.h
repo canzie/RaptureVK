@@ -18,7 +18,9 @@
 #include "Renderer/DeferredShading/GBufferPass.h"
 #include "Renderer/DeferredShading/LightingPass.h"
 #include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
+#include "Renderer/GI/radiance_cascades/radiance_cascades.h"
 #include "Renderer/InstancedShapesPass.h"
+#include "Renderer/RtInstanceData.h"
 #include "Renderer/SkyboxPass.h"
 #include "Renderer/StencilBorderPass.h"
 
@@ -108,6 +110,8 @@ class DeferredRenderer {
     static bool m_viewportResizePending;
 
     static std::shared_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
+    static std::shared_ptr<RadianceCascades> m_radianceCascades;
+    static std::shared_ptr<RtInstanceData> m_rtInstanceData;
 };
 
 } // namespace Rapture
