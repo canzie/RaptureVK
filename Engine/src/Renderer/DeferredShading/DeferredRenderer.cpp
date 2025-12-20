@@ -152,8 +152,8 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
     }
 
     m_rtInstanceData->update(activeScene);
-    // m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
-    m_radianceCascades->update(activeScene, m_currentFrame);
+    m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
+    // m_radianceCascades->update(activeScene, m_currentFrame);
 
     bool success = m_commandBuffers[m_currentFrame]->reset();
     if (!success) {

@@ -25,10 +25,10 @@ struct RCVolume {
 
     vec4 rotation;
 
-    float rangeMultiplier;
+    float rangeExp;
     float spacingMultiplier;
     float maxRayDistance;
-    uint _padding;
+    uint angularResolutionExp;
 
     RCCascade cascades[RC_MAX_CASCADES];
 };

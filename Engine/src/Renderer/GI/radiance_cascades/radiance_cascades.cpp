@@ -34,7 +34,7 @@ RadianceCascades::RadianceCascades(uint32_t framesInFlight)
     m_computeQueue = vc.getComputeQueue();
 
     m_config.origin = glm::vec3(0.0f, 5.0f, 0.0f);
-    m_config.baseProbeSpacing = glm::vec3(0.5f);
+    m_config.baseProbeSpacing = glm::vec3(0.2f);
     m_config.baseGridSize = glm::uvec3(64);
     m_config.numCascades = 4;
     m_config.baseRange = 1.0f;

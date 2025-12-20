@@ -16,9 +16,9 @@ struct RadianceCascadeConfig {
     glm::uvec3 baseGridSize = glm::uvec3(32);
 
     uint32_t numCascades = 4;
-    float rangeMultiplier = 2.0f;
+    float rangeExp = 4.0f;
     float spacingMultiplier = 2.0f;
-    uint32_t angularResolutionMultiplier = 2;
+    uint32_t angularResolutionExp = 2;
 
     float baseRange = 1.0f;
     uint32_t baseAngularResolution = 4;
@@ -27,10 +27,7 @@ struct RadianceCascadeConfig {
 
     float getCascadeRange(uint32_t cascade) const
     {
-        float range = baseRange;
-        for (uint32_t i = 0; i < cascade; ++i) {
-            range *= rangeMultiplier;
-        }
+        float range = baseRange * std::pow(rangeExp, cascade);
         return glm::min(range, maxRayDistance);
     }
 
@@ -43,9 +40,7 @@ struct RadianceCascadeConfig {
     glm::vec3 getCascadeSpacing(uint32_t cascade) const
     {
         glm::vec3 spacing = baseProbeSpacing;
-        for (uint32_t i = 0; i < cascade; ++i) {
-            spacing *= spacingMultiplier;
-        }
+        spacing *= std::pow(spacingMultiplier, cascade);
         return spacing;
     }
 
@@ -60,10 +55,7 @@ struct RadianceCascadeConfig {
 
     uint32_t getCascadeAngularResolution(uint32_t cascade) const
     {
-        uint32_t res = baseAngularResolution;
-        for (uint32_t i = 0; i < cascade; ++i) {
-            res *= angularResolutionMultiplier;
-        }
+        uint32_t res = baseAngularResolution * std::pow(angularResolutionExp, cascade);
         return res;
     }
 
@@ -97,10 +89,10 @@ struct alignas(16) RCVolumeGPU {
 
     alignas(16) glm::vec4 rotation;
 
-    alignas(4) float rangeMultiplier;
+    alignas(4) float rangeExp;
     alignas(4) float spacingMultiplier;
     alignas(4) float maxRayDistance;
-    alignas(4) uint32_t _padding;
+    alignas(4) uint32_t angularResolutionExp;
 
     RCCascadeGPU cascades[RC_MAX_CASCADES];
 };
@@ -112,9 +104,10 @@ inline RCVolumeGPU buildRCVolumeGPU(const RadianceCascadeConfig &config)
     gpu.volumeOrigin = config.origin;
     gpu.numCascades = config.numCascades;
     gpu.rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    gpu.rangeMultiplier = config.rangeMultiplier;
+    gpu.rangeExp = config.rangeExp;
     gpu.spacingMultiplier = config.spacingMultiplier;
     gpu.maxRayDistance = config.maxRayDistance;
+    gpu.angularResolutionExp = config.angularResolutionExp;
 
     for (uint32_t i = 0; i < config.numCascades && i < RC_MAX_CASCADES; ++i) {
         RCCascadeGPU &cascade = gpu.cascades[i];
@@ -139,9 +132,10 @@ inline void PrintRcVolumeGPU(const RCVolumeGPU &volume)
     RP_CORE_INFO("Origin: ({}, {}, {})", volume.volumeOrigin.x, volume.volumeOrigin.y, volume.volumeOrigin.z);
     RP_CORE_INFO("Num Cascades: {}", volume.numCascades);
     RP_CORE_INFO("Rotation: ({}, {}, {}, {})", volume.rotation.x, volume.rotation.y, volume.rotation.z, volume.rotation.w);
-    RP_CORE_INFO("Range Multiplier: {}", volume.rangeMultiplier);
+    RP_CORE_INFO("Range Exp: {}", volume.rangeExp);
     RP_CORE_INFO("Spacing Multiplier: {}", volume.spacingMultiplier);
     RP_CORE_INFO("Max Ray Distance: {}", volume.maxRayDistance);
+    RP_CORE_INFO("Angular Resolution Exp: {}", volume.angularResolutionExp);
 
     for (uint32_t i = 0; i < volume.numCascades; ++i) {
         const RCCascadeGPU &cascade = volume.cascades[i];
