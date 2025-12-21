@@ -18,12 +18,11 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 // Ray data output texture (set 4, binding 0)
 layout(set = 4, binding = 0, rgba32f) uniform restrict writeonly image2DArray RayData;
 
-layout(set = 4, binding = 3) uniform usampler2DArray ProbeStates;
-
 // Previous probe data (bindless textures in set 3)
 layout(set = 3, binding = 0) uniform sampler2D gTextures[];
 layout(set = 3, binding = 0) uniform samplerCube gCubemaps[];
 layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
+layout(set = 3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
 
 // TLAS binding (set 0)
 layout(set = 3, binding = 2) uniform accelerationStructureEXT topLevelAS[];
@@ -46,7 +45,7 @@ layout(push_constant) uniform PushConstants {
 
     uint tlasIndex;              // TLAS index (if using bindless TLAS)
     uint probeOffsetHandle;       // Probe offset texture bindless index
-    // vec3 cameraPosition;
+    uint probeClassificationHandle;
 
 } pc;
 
@@ -328,10 +327,12 @@ void main() {
     int probeIndex = (planeIndex * probesPerPlane) + probePlaneIndex;
     
     uvec3 probeTexelCoords = DDGIGetProbeTexelCoords(probeIndex, u_volume);
-    uint probeState = texelFetch(ProbeStates, ivec3(probeTexelCoords), 0).r;
-    
-    const uint PROBE_STATE_INACTIVE = 1u;
-    if (probeState == PROBE_STATE_INACTIVE && rayIndex >= int(u_volume.probeStaticRayCount)) return;
+    uint probeState = texelFetch(gUintTextureArrays[pc.probeClassificationHandle], ivec3(probeTexelCoords), 0).r;
+
+    const uint PROBE_STATE_ACTIVE = 0u;
+    if (probeState != PROBE_STATE_ACTIVE && rayIndex >= int(u_volume.probeStaticRayCount)) {
+        return;
+    } 
 
 
     // Get the probe's grid coordinates
@@ -356,18 +357,7 @@ void main() {
     uint instanceCustomIndex;
     bool isFrontFacing = true;
 
-    while (rayQueryProceedEXT(rayQuery)) {
-        if (rayQueryGetIntersectionTypeEXT(rayQuery, false) == gl_RayQueryCandidateIntersectionTriangleEXT) {
-            float t = rayQueryGetIntersectionTEXT(rayQuery, false);
-
-            if (t < hitT) {
-                hitT = t;
-                hit = true;
-                // Confirm this intersection as the committed one
-                rayQueryConfirmIntersectionEXT(rayQuery);
-            }
-        }
-    }
+    rayQueryProceedEXT(rayQuery);
 
     // After the loop, get data from the committed intersection
     if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
@@ -418,7 +408,6 @@ void main() {
             float volumeBlendWeight = DDGIGetVolumeBlendWeight(hitPosition, u_volume);
 
             if (volumeBlendWeight > 0.0) {
-                // Get irradiance from the DDGIVolume
                 irradiance = DDGIGetVolumeIrradiance(
                     hitPosition,
                     worldShadingNormal,
@@ -426,8 +415,11 @@ void main() {
                     gTextureArrays[pc.prevRadianceIndex],
                     gTextureArrays[pc.prevVisibilityIndex],
                     gTextureArrays[pc.probeOffsetHandle],
+#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
+                    gUintTextureArrays[pc.probeClassificationHandle],
+#endif
                     u_volume);
-                    
+
                 irradiance *= volumeBlendWeight;
             }
 

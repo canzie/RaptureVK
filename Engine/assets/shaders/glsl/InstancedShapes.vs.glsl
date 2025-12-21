@@ -58,7 +58,7 @@ mat4 getInstanceTransform(uint instanceIdx, uint ssboIdx) {
 void main() {
     mat4 instanceTransform = getInstanceTransform(gl_InstanceIndex, pc.instanceDataSSBOIndex);
     
-    outColor = pc.color; // Pass color to fragment shader
+    outColor = pc.color;
 
     mat4 modelMatrix = pc.globalTransform * instanceTransform;
     gl_Position = u_camera[pc.cameraUBOIndex].proj * u_camera[pc.cameraUBOIndex].view * modelMatrix * vec4(inPosition, 1.0);

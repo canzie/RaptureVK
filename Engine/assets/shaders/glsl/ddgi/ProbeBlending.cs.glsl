@@ -19,9 +19,7 @@
 
 // Bindless texture arrays (set 3, binding 0)
 layout (set=3, binding = 0) uniform sampler2DArray gTextureArrays[];
-
-// Probe classification texture (read-only)
-layout(set=4, binding = 3) uniform usampler2DArray ProbeStates;
+layout (set=3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
 
 // Storage image bindings for writing current probe data
 #ifdef DDGI_BLEND_RADIANCE
@@ -38,6 +36,7 @@ precision highp float;
 layout(push_constant) uniform PushConstants {
     uint prevTextureIndex; // will be irradiance or distance based on the blend type
     uint rayDataIndex;
+    uint probeClassificationHandle;
 } pc;
 
 #include "ProbeCommon.glsl"
@@ -121,9 +120,10 @@ void main() {
 
 #ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
         uvec3 probeTexelCoords = DDGIGetProbeTexelCoords(probeIndex, u_volume);
-        uint probeState = texelFetch(ProbeStates, ivec3(probeTexelCoords), 0).r;
-        const uint PROBE_STATE_INACTIVE = 1;
-        if (probeState == PROBE_STATE_INACTIVE) return;
+        uint probeState = texelFetch(gUintTextureArrays[pc.probeClassificationHandle], ivec3(probeTexelCoords), 0).r;
+        if (probeState != 0u) {
+            return;
+        }
 #endif
 
         ivec3 threadCoords = ivec3(gl_WorkGroupID.x * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, gl_WorkGroupID.y * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, int(gl_GlobalInvocationID.z)) + ivec3(gl_LocalInvocationID.xyz) - ivec3(1, 1, 0);

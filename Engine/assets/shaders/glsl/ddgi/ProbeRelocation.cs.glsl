@@ -124,7 +124,7 @@ void main() {
     if (closestBackfaceIndex != -1 && (backfaceCount / float(numRays)) > u_volume.probeFixedRayBackfaceThreshold) {
         // Enough backfaces: probe is likely inside geometry, move it outward
         vec3 closestBackfaceDirection = DDGIGetProbeRayDirection(closestBackfaceIndex, u_volume);
-        fullOffset = offset + closestBackfaceDirection * (closestBackfaceDistance + u_volume.probeMinFrontfaceDistance * 0.5);
+        fullOffset = offset + (closestBackfaceDirection * (closestBackfaceDistance + u_volume.probeMinFrontfaceDistance * 0.5));
 
     } else if (closestFrontfaceDistance < u_volume.probeMinFrontfaceDistance) {
         // Very close to front‑face geometry: try to move towards the farthest front‑face
@@ -143,7 +143,7 @@ void main() {
         // Probe isn't near anything, try to move it back towards zero offset
         float moveBackMargin  = min(closestFrontfaceDistance - u_volume.probeMinFrontfaceDistance, length(offset));
         vec3  moveBackDirection = normalize(-offset);
-        fullOffset = offset + moveBackMargin * moveBackDirection;
+        fullOffset = offset + (moveBackMargin * moveBackDirection);
     }
 
     // ---------------------------------------------------------------------

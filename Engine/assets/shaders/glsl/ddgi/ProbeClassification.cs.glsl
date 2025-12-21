@@ -7,12 +7,7 @@
 #define PROBE_OFFSETS_TEXTURE
 #endif
 
-// -----------------------------------------------------------------------------
-//  DDGI Probe-classification Compute Shader                                     
-//  Transitions probes between the seven logical states required by the paper:  
-//  Uninitialised, Sleeping, NewlyAwake, Awake, Off, NewlyVigilant, Vigilant.   
-// -----------------------------------------------------------------------------
-//  One probe per work-item (match dispatch in C++)
+
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 // -----------------------------------------------------------------------------
@@ -43,6 +38,8 @@ layout(push_constant) uniform PushConstants {
 // -----------------------------------------------------------------------------
 const uint PROBE_STATE_ACTIVE   = 0;
 const uint PROBE_STATE_INACTIVE = 1;
+const uint PROBE_STATE_INACTIVE_BACKFACE = 2;  // Debug: inactive due to backfaces
+const uint PROBE_STATE_INACTIVE_NO_GEOMETRY = 3;  // Debug: inactive due to no geometry in cell
 
 
 // Convenient alias
@@ -72,7 +69,7 @@ void main() {
 
     if((float(backfaceCount) / float(u_volume.probeStaticRayCount)) > u_volume.probeFixedRayBackfaceThreshold)
     {
-        imageStore(ProbeStates, outputCoords, uvec4(PROBE_STATE_INACTIVE, 0u, 0u, 0u));
+        imageStore(ProbeStates, outputCoords, uvec4(PROBE_STATE_INACTIVE_BACKFACE, 0u, 0u, 0u));
         return;
     }
 
@@ -119,5 +116,5 @@ void main() {
         }
     }
 
-    imageStore(ProbeStates, outputCoords, uvec4(PROBE_STATE_INACTIVE, 0, 0, 0));
+    imageStore(ProbeStates, outputCoords, uvec4(PROBE_STATE_INACTIVE_NO_GEOMETRY, 0, 0, 0));
 }

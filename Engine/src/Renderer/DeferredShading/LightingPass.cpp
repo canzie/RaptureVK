@@ -28,6 +28,7 @@ struct LightingPushConstants {
     uint32_t probeIrradianceHandle;
     uint32_t probeVisibilityHandle;
     uint32_t probeOffsetHandle;
+    uint32_t probeClassificationHandle;
 
     // Fog
     glm::vec4 fogColor;     // .rgb = color, .a = enabled
@@ -166,11 +167,13 @@ void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuf
         pushConstants.probeIrradianceHandle = m_ddgi->getProbeIrradianceBindlessIndex();
         pushConstants.probeVisibilityHandle = m_ddgi->getProbeVisibilityBindlessIndex();
         pushConstants.probeOffsetHandle = m_ddgi->getProbeOffsetBindlessIndex();
+        pushConstants.probeClassificationHandle = m_ddgi->getProbeClassificationBindlessIndex();
     } else {
         pushConstants.probeVolumeHandle = 0;
         pushConstants.probeIrradianceHandle = 0;
         pushConstants.probeVisibilityHandle = 0;
         pushConstants.probeOffsetHandle = 0;
+        pushConstants.probeClassificationHandle = 0;
     }
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_FRAGMENT_BIT, 0,

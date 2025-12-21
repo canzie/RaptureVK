@@ -170,12 +170,15 @@ vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorl
 
 // New function to calculate indirect diffuse from the single nearest probe
 vec3 DDGIGetVolumeIrradiance(
-    vec3 worldPosition, 
-    vec3 direction, 
-    vec3 surfaceBias, 
+    vec3 worldPosition,
+    vec3 direction,
+    vec3 surfaceBias,
     sampler2DArray probeIrradianceAtlas,
     sampler2DArray probeDistanceAtlas,
     sampler2DArray probeOffsetAtlas,
+#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
+    usampler2DArray probeClassificationAtlas,
+#endif
     ProbeVolume volume) {
 
     vec3 irradiance = vec3(0.0);
@@ -210,9 +213,9 @@ vec3 DDGIGetVolumeIrradiance(
 
 #ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
         uvec3 adjacentProbeTexelCoords = DDGIGetProbeTexelCoords(adjacentProbeIndex, volume);
-        uint adjacentProbeState = texelFetch(ProbeStates, ivec3(adjacentProbeTexelCoords), 0).r;
-        const uint PROBE_STATE_INACTIVE = 1u;
-        if (adjacentProbeState == PROBE_STATE_INACTIVE) continue;
+        uint adjacentProbeState = texelFetch(probeClassificationAtlas, ivec3(adjacentProbeTexelCoords), 0).r;
+        const uint PROBE_STATE_ACTIVE = 0u;
+        if (adjacentProbeState != PROBE_STATE_ACTIVE) continue;
 #endif
 
         vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume, probeOffsetAtlas);
@@ -252,8 +255,6 @@ vec3 DDGIGetVolumeIrradiance(
         // Sample the probe's distance texture to get the mean distance to nearby surfaces
         // Note: Multiplied by 2.0 to compensate for the division by 2 in the blending shader
         vec2 filteredDistance = 2.0 * textureLod(probeDistanceAtlas, probeTextureUV, 0.0).rg;
-
-
 
         // Find the variance of the mean distance
         float variance = abs((filteredDistance.x * filteredDistance.x) - filteredDistance.y);

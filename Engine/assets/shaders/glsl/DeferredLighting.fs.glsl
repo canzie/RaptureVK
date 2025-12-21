@@ -5,6 +5,11 @@
 #define PROBE_OFFSETS_TEXTURE
 #endif
 
+
+#ifndef DDGI_ENABLE_PROBE_CLASSIFICATION
+#define DDGI_ENABLE_PROBE_CLASSIFICATION
+#endif
+
 layout(location = 0) out vec4 outColor;
 
 layout(location = 0) in vec2 fragTexCoord;
@@ -34,6 +39,7 @@ layout(set = 3, binding = 0) uniform sampler2D gTextures[];
 layout(set = 3, binding = 0) uniform sampler2DShadow gShadowTextures[];
 layout(set = 3, binding = 0) uniform sampler2DArrayShadow gShadowArrays[];
 layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
+layout(set = 3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
 
 #include "ProbeCommon.glsl"
 #include "IrradianceCommon.glsl"
@@ -88,6 +94,7 @@ layout(push_constant) uniform PushConstants {
     uint probeIrradianceHandle;
     uint probeVisibilityHandle;
     uint probeOffsetHandle;
+    uint probeClassificationHandle;
 
     // Fog
     vec4 fogColor;     // .rgb = color, .a = enabled
@@ -433,8 +440,11 @@ vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume
             gTextureArrays[pc.probeIrradianceHandle],
             gTextureArrays[pc.probeVisibilityHandle],
             gTextureArrays[pc.probeOffsetHandle],
+#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
+            gUintTextureArrays[pc.probeClassificationHandle],
+#endif
             volume);
-            
+
         irradiance *= blendWeight;
     }
 
@@ -559,12 +569,12 @@ void main() {
         vec3 kD_indirect = (vec3(1.0) - fresnelSchlick(NdotV, F0)) * (1.0 - metallic);
         
         vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, V, u_DDGI_Volume);
-        indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
+        indirectDiffuse = indirectDiffuesIntensity; //* (albedo/3.14159265359) * kD_indirect;
 
         
     }
 
-    vec3 color = indirectDiffuse + Lo;
+    vec3 color = indirectDiffuse;
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {

@@ -63,6 +63,10 @@ class DynamicDiffuseGI {
 
     std::shared_ptr<UniformBuffer> getProbeVolumeUniformBuffer() { return m_ProbeInfoBuffer; }
 
+    uint32_t getRayDataTextureBindlessIndex() const { return m_RayDataTexture ? m_RayDataTexture->getBindlessIndex() : 0; }
+
+    const ProbeVolume &getProbeVolume() const { return m_ProbeVolume; }
+
     void updateSkybox(std::shared_ptr<Scene> scene);
     void updateProbeVolume();
     void updateFromIndirectLightingComponent(std::shared_ptr<Scene> scene);
@@ -73,6 +77,7 @@ class DynamicDiffuseGI {
     uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
     uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
     uint32_t getProbeOffsetBindlessIndex() const { return m_probeOffsetBindlessIndex; }
+    uint32_t getProbeClassificationBindlessIndex() const { return m_probeClassificationBindlessIndex; }
 
   private:
     void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
@@ -142,6 +147,7 @@ class DynamicDiffuseGI {
     uint32_t m_probeIrradianceBindlessIndex = 0;
     uint32_t m_probeVisibilityBindlessIndex = 0;
     uint32_t m_probeOffsetBindlessIndex = 0;
+    uint32_t m_probeClassificationBindlessIndex = 0;
 
     std::shared_ptr<Texture> m_skyboxTexture;
 

@@ -29,7 +29,6 @@ namespace Rapture {
 
 // Push constants for DDGI compute shaders
 struct DDGITracePushConstants {
-
     uint32_t skyboxTextureIndex;
     uint32_t sunLightDataIndex;
     uint32_t lightCount;
@@ -37,12 +36,13 @@ struct DDGITracePushConstants {
     uint32_t prevVisibilityIndex;
     uint32_t tlasIndex;
     uint32_t probeOffsetHandle;
-    // alignas(16) glm::vec3 cameraPosition;
+    uint32_t probeClassificationHandle;
 };
 
 struct DDGIBlendPushConstants {
     uint32_t prevTextureIndex;
     uint32_t rayDataIndex;
+    uint32_t probeClassificationHandle;
 };
 
 struct DDGIClassifyPushConstants {
@@ -105,9 +105,11 @@ void DynamicDiffuseGI::createPipelines()
 
     ShaderImportConfig shaderIrradianceBlendConfig;
     shaderIrradianceBlendConfig.compileInfo.macros.push_back("DDGI_BLEND_RADIANCE");
+    shaderIrradianceBlendConfig.compileInfo.macros.push_back("DDGI_ENABLE_PROBE_CLASSIFICATION");
     shaderIrradianceBlendConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
     ShaderImportConfig shaderDistanceBlendConfig;
     shaderDistanceBlendConfig.compileInfo.macros.push_back("DDGI_BLEND_DISTANCE");
+    shaderDistanceBlendConfig.compileInfo.macros.push_back("DDGI_ENABLE_PROBE_CLASSIFICATION");
     shaderDistanceBlendConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
 
     ShaderImportConfig shaderBaseProbeConfig;
@@ -161,6 +163,9 @@ void DynamicDiffuseGI::setupProbeTextures()
     }
     if (m_ProbeOffsetTexture) {
         m_probeOffsetBindlessIndex = m_ProbeOffsetTexture->getBindlessIndex();
+    }
+    if (m_ProbeClassificationTexture) {
+        m_probeClassificationBindlessIndex = m_ProbeClassificationTexture->getBindlessIndex();
     }
 }
 
@@ -570,6 +575,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     pushConstants.prevRadianceIndex = m_probeIrradianceBindlessIndex;
     pushConstants.prevVisibilityIndex = m_probeVisibilityBindlessIndex;
     pushConstants.probeOffsetHandle = m_probeOffsetBindlessIndex;
+    pushConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
 
     vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGITracePushConstants), &pushConstants);
@@ -632,6 +638,7 @@ void DynamicDiffuseGI::blendTextures(uint32_t frameIndex)
     DDGIBlendPushConstants radianceBlendConstants = {};
     radianceBlendConstants.prevTextureIndex = m_probeIrradianceBindlessIndex;
     radianceBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
+    radianceBlendConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
 
     vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeIrradianceBlendingPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIBlendPushConstants), &radianceBlendConstants);
@@ -650,6 +657,7 @@ void DynamicDiffuseGI::blendTextures(uint32_t frameIndex)
     DDGIBlendPushConstants visibilityBlendConstants = {};
     visibilityBlendConstants.prevTextureIndex = m_probeVisibilityBindlessIndex;
     visibilityBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
+    visibilityBlendConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
 
     vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeDistanceBlendingPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIBlendPushConstants), &visibilityBlendConstants);
@@ -750,15 +758,10 @@ void DynamicDiffuseGI::initTextures()
         bindings.setNumber = 4;
         bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS});
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, TextureViewType::DEFAULT, false,
-                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
         m_probeIrradianceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeIrradianceBlendingDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS)
             ->add(m_RadianceTexture);
-        m_probeIrradianceBlendingDescriptorSet
-            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
-            ->add(m_ProbeClassificationTexture);
     }
 
     // For Probe Distance Blending
@@ -767,15 +770,10 @@ void DynamicDiffuseGI::initTextures()
         bindings.setNumber = 4;
         bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS});
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, TextureViewType::DEFAULT, false,
-                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
         m_probeDistanceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeDistanceBlendingDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS)
             ->add(m_VisibilityTexture);
-        m_probeDistanceBlendingDescriptorSet
-            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
-            ->add(m_ProbeClassificationTexture);
     }
 
     // For Probe Tracing
@@ -784,14 +782,9 @@ void DynamicDiffuseGI::initTextures()
         bindings.setNumber = 4;
         bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA});
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, TextureViewType::DEFAULT, false,
-                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
         m_probeTraceDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeTraceDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA)
             ->add(m_RayDataTexture);
-        m_probeTraceDescriptorSet
-            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
-            ->add(m_ProbeClassificationTexture);
     }
 
     // For Probe Classification
