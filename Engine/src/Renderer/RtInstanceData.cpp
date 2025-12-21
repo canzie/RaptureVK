@@ -88,6 +88,7 @@ void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
                 auto &mat = materialComp.material;
                 info.AlbedoTextureIndex = mat->getParameter(ParameterID::ALBEDO_MAP).asUInt();
                 info.NormalTextureIndex = mat->getParameter(ParameterID::NORMAL_MAP).asUInt();
+                info.EmissiveFactorTextureIndex = mat->getParameter(ParameterID::EMISSIVE_MAP).asUInt();
                 info.albedo = mat->getParameter(ParameterID::ALBEDO).asVec3();
                 info.emissiveColor = mat->getParameter(ParameterID::EMISSIVE).asVec3();
             }
@@ -186,6 +187,7 @@ void RtInstanceData::patchDirty(std::shared_ptr<Scene> scene)
         packed.NormalTextureIndex = mat->getParameter(ParameterID::NORMAL_MAP).asUInt();
         packed.albedo = mat->getParameter(ParameterID::ALBEDO).asVec3();
         packed.emissiveColor = mat->getParameter(ParameterID::EMISSIVE).asVec3();
+        packed.EmissiveFactorTextureIndex = mat->getParameter(ParameterID::EMISSIVE_MAP).asUInt();
 
         for (uint32_t baseOffset : it->second) {
             uint32_t dst = baseOffset + static_cast<uint32_t>(MAT_START);

@@ -37,6 +37,7 @@ struct DDGITracePushConstants {
     uint32_t tlasIndex;
     uint32_t probeOffsetHandle;
     uint32_t probeClassificationHandle;
+    float skyIntensity;
 };
 
 struct DDGIBlendPushConstants {
@@ -63,6 +64,7 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
       m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_ProbeInfoBuffer(nullptr),
       m_framesInFlight(framesInFlight), m_isFirstFrame(true), m_meshCount(0), m_probeIrradianceBindlessIndex(UINT32_MAX),
       m_probeVisibilityBindlessIndex(UINT32_MAX), m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr),
+      m_skyIntensity(1.0f),
       m_probeTraceDescriptorSet(nullptr), m_probeIrradianceBlendingDescriptorSet(nullptr),
       m_probeDistanceBlendingDescriptorSet(nullptr), m_probeClassificationDescriptorSet(nullptr),
       m_probeRelocationDescriptorSet(nullptr)
@@ -211,16 +213,23 @@ void DynamicDiffuseGI::clearTextures()
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(visibilityTransition);
 
+    VkImageMemoryBarrier probeClassificationTransition = m_ProbeClassificationTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
+    layoutTransitions.push_back(probeClassificationTransition);
+
     vkCmdPipelineBarrier(m_CommandBuffers[0]->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(layoutTransitions.size()),
                          layoutTransitions.data());
 
     VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 0.0f}};
+    VkClearColorValue clearColorUint = {{0u, 0u, 0u, 0u}};
+
     vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_RadianceTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
                          &clearColor, 1, &subresourceRange);
-
     vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_VisibilityTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
                          &clearColor, 1, &subresourceRange);
+    vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_ProbeClassificationTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColorUint, 1, &subresourceRange);
 
     if (m_CommandBuffers[0]->end() != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to end command buffer");
@@ -485,12 +494,12 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
         (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling()) ? skyboxComp->skyboxTexture
                                                                                                      : s_defaultSkyboxTexture;
 
+    m_skyIntensity = skyboxComp ? skyboxComp->skyIntensity : 1.0f;
+
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_skyboxTexture != newTexture) {
         m_skyboxTexture = newTexture;
-        // Skybox texture doesn't need special handling in the new system
-        // since it's accessed via bindless
     }
 }
 
@@ -576,6 +585,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, uint32_t frameInde
     pushConstants.prevVisibilityIndex = m_probeVisibilityBindlessIndex;
     pushConstants.probeOffsetHandle = m_probeOffsetBindlessIndex;
     pushConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
+    pushConstants.skyIntensity = m_skyIntensity;
 
     vkCmdPushConstants(currentCommandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGITracePushConstants), &pushConstants);
@@ -841,7 +851,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
 
     probeVolume.origin = glm::vec3(-0.4f, 5.4f, -0.25f);
 
-    probeVolume.rotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+    probeVolume.rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     probeVolume.spacing = glm::vec3(1.02f, 0.5f, 0.45f);
     probeVolume.gridDimensions = glm::uvec3(22, 22, 22);
@@ -863,7 +873,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
 
     probeVolume.probeBrightnessThreshold = 1.0f;
 
-    probeVolume.probeMinFrontfaceDistance = 0.1f;
+    probeVolume.probeMinFrontfaceDistance = 0.3f;
 
     probeVolume.probeRandomRayBackfaceThreshold = 0.1f;
     probeVolume.probeFixedRayBackfaceThreshold = 0.25f;

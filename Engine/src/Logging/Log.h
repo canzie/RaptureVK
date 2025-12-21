@@ -8,6 +8,14 @@
 #include <string>
 #include <vector>
 
+#if defined(_MSC_VER)
+    #define FUNCTION_SIGNATURE __FUNCSIG__
+#elif defined(__GNUC__) || defined(__clang__)
+    #define FUNCTION_SIGNATURE __PRETTY_FUNCTION__
+#else
+    #define FUNCTION_SIGNATURE __func__
+#endif
+
 namespace Rapture {
 
 // Helper function to extract Class::Method from __PRETTY_FUNCTION__
@@ -103,15 +111,15 @@ class Log {
 
 // Helper macros to format log message with class/method and severity
 #define RP_LOG_TRACE(logger, ...) \
-    logger->trace("[TRACE] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+    logger->trace("[TRACE] {}: {}", Rapture::s_extractFunctionInfo(FUNCTION_SIGNATURE), fmt::format(__VA_ARGS__))
 #define RP_LOG_INFO(logger, ...) \
-    logger->info("[INFO] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+    logger->info("[INFO] {}: {}", Rapture::s_extractFunctionInfo(FUNCTION_SIGNATURE), fmt::format(__VA_ARGS__))
 #define RP_LOG_WARN(logger, ...) \
-    logger->warn("[WARN] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+    logger->warn("[WARN] {}: {}", Rapture::s_extractFunctionInfo(FUNCTION_SIGNATURE), fmt::format(__VA_ARGS__))
 #define RP_LOG_ERROR(logger, ...) \
-    logger->error("[ERROR] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+    logger->error("[ERROR] {}: {}", Rapture::s_extractFunctionInfo(FUNCTION_SIGNATURE), fmt::format(__VA_ARGS__))
 #define RP_LOG_CRITICAL(logger, ...) \
-    logger->critical("[CRITICAL] {}: {}", Rapture::s_extractFunctionInfo(__PRETTY_FUNCTION__), fmt::format(__VA_ARGS__))
+    logger->critical("[CRITICAL] {}: {}", Rapture::s_extractFunctionInfo(FUNCTION_SIGNATURE), fmt::format(__VA_ARGS__))
 
 // Core log macros
 #define RP_CORE_TRACE(...)    RP_LOG_TRACE(Log::GetCoreLogger(), __VA_ARGS__)

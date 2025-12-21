@@ -128,7 +128,12 @@ class MaterialParameter {
 
     float asFloat() { return std::get<float>(m_value); }
     int32_t asInt() { return std::get<int32_t>(m_value); }
-    uint32_t asUInt() { return std::get<uint32_t>(m_value); }
+    uint32_t asUInt() { 
+        if (m_info.type == MaterialParameterTypes::UINT) {
+            return std::get<uint32_t>(m_value);
+        }
+        return UINT32_MAX;
+    }
     uint64_t asUInt64() { return std::get<uint64_t>(m_value); }
     bool asBool() { return std::get<bool>(m_value); }
     glm::vec2 asVec2() { return std::get<glm::vec2>(m_value); }

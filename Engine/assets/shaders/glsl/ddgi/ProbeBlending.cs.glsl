@@ -118,17 +118,18 @@ void main() {
 
         if (probeIndex < 0 || probeIndex >= numProbes) return;
 
-#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
-        uvec3 probeTexelCoords = DDGIGetProbeTexelCoords(probeIndex, u_volume);
-        uint probeState = texelFetch(gUintTextureArrays[pc.probeClassificationHandle], ivec3(probeTexelCoords), 0).r;
+        uint probeState = DDGILoadProbeState(probeIndex, gUintTextureArrays[pc.probeClassificationHandle], u_volume);
         if (probeState != 0u) {
             return;
         }
-#endif
 
+        int rayIndex = 0;
         ivec3 threadCoords = ivec3(gl_WorkGroupID.x * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, gl_WorkGroupID.y * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, int(gl_GlobalInvocationID.z)) + ivec3(gl_LocalInvocationID.xyz) - ivec3(1, 1, 0);
 
-        int rayIndex = int(u_volume.probeStaticRayCount);
+        if (u_volume.probeClassificationEnabled > 0.0 || u_volume.probeRelocationEnabled > 0.0) {
+            rayIndex = int(u_volume.probeStaticRayCount);
+        }
+
         
     #ifdef DDGI_BLEND_RADIANCE
         uint backfaces = 0;

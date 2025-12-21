@@ -4,6 +4,10 @@
 
 #include "Scenes/Entities/Entity.h"
 #include "imgui_impl_vulkan.h"
+#include "Components/Components.h"
+#include "Components/FogComponent.h"
+#include "Components/IndirectLightingComponent.h"
+
 #include <memory>
 
 class PropertiesPanel {
@@ -27,6 +31,7 @@ class PropertiesPanel {
     void renderRigidBodyComponent();
     void renderFogComponent();
     void renderIndirectLightingComponent();
+    void renderSkyboxComponent(Rapture::SkyboxComponent &skyboxComp);
 
     void renderAddComponentMenu(Rapture::Entity entity);
 

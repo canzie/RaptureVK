@@ -57,11 +57,7 @@ float LightVisibility(
     rayQueryProceedEXT(visibilityQuery);
     
     // Check if we hit anything (if we did, the light is occluded)
-    if (rayQueryGetIntersectionTypeEXT(visibilityQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-        return 0.0; // Occluded
-    }
-    
-    return 1.0; // Visible
+    return float(rayQueryGetIntersectionTypeEXT(visibilityQuery, true) == gl_RayQueryCommittedIntersectionNoneEXT);
 }
 
 float LightFalloff(float distanceToLight) {
@@ -75,15 +71,15 @@ float LightWindowing(float distanceToLight, float maxDistance) {
 /**
  * Evaluate direct lighting for the current surface and the directional light using ray-traced visibility.
  */
-vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties) {   
+vec3 EvaluateDirectionalLight(vec3 surfaceNormal, vec3 hitPositionWorld, SunProperties sunProperties, vec3 shadingNormal) {   
     
     // Use ray-traced visibility instead of shadow maps
-    float normalBias = 0.01; // Small bias to avoid self-intersection
-    float viewBias = 0.0;    // Not used yet, but kept for future
+    float normalBias = 0.008; // Small bias to avoid self-intersection
+    float viewBias = 0.0001;    // Not used yet, but kept for future
     
     float visibility = LightVisibility(
         hitPositionWorld,
-        shadingNormal,
+        surfaceNormal,
         -sunProperties.direction.xyz,  // Light vector (towards sun)
         1e27,                              // Very large tmax for directional light
         normalBias,
@@ -96,7 +92,7 @@ vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProp
     }
     
     // Compute lighting
-    vec3 lightDirection = normalize(-sunProperties.direction.xyz);
+    vec3 lightDirection = -normalize(sunProperties.direction.xyz);
     float NdotL = max(dot(shadingNormal, lightDirection), 0.0);
     
     return sunProperties.color.xyz * sunProperties.color.w * NdotL * visibility;
@@ -139,7 +135,7 @@ vec3 EvaluatePointLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties
 /**
  * Computes the diffuse reflection of light off the given surface (direct lighting).
  */
-vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorld, uint lightCount) {
+vec3 DirectDiffuseLighting(vec3 albedo, vec3 surfaceNormal, vec3 hitPositionWorld, uint lightCount, vec3 shadingNormal) {
 
     vec3 brdf = (albedo / PI);
 
@@ -150,7 +146,7 @@ vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorl
         
         // light type is in light.position.w
         if (light.position.w == 1) { // Directional
-             totalLighting += EvaluateDirectionalLight(shadingNormal, hitPositionWorld, light);
+             totalLighting += EvaluateDirectionalLight(surfaceNormal, hitPositionWorld, light, shadingNormal);
         } else if (light.position.w == 0) { // Point
              totalLighting += EvaluatePointLight(shadingNormal, hitPositionWorld, light);
         } else if (light.position.w == 2) { // Spot
@@ -176,9 +172,7 @@ vec3 DDGIGetVolumeIrradiance(
     sampler2DArray probeIrradianceAtlas,
     sampler2DArray probeDistanceAtlas,
     sampler2DArray probeOffsetAtlas,
-#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
     usampler2DArray probeClassificationAtlas,
-#endif
     ProbeVolume volume) {
 
     vec3 irradiance = vec3(0.0);
@@ -211,12 +205,10 @@ vec3 DDGIGetVolumeIrradiance(
         // Get the adjacent probe's index, adjusting the adjacent probe index for scrolling offsets (if present)
         int adjacentProbeIndex = DDGIGetProbeIndex(adjacentProbeCoords, volume);
 
-#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
         uvec3 adjacentProbeTexelCoords = DDGIGetProbeTexelCoords(adjacentProbeIndex, volume);
         uint adjacentProbeState = texelFetch(probeClassificationAtlas, ivec3(adjacentProbeTexelCoords), 0).r;
         const uint PROBE_STATE_ACTIVE = 0u;
         if (adjacentProbeState != PROBE_STATE_ACTIVE) continue;
-#endif
 
         vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume, probeOffsetAtlas);
 

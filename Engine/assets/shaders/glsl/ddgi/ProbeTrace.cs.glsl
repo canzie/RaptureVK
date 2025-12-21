@@ -7,11 +7,6 @@
 
 #define RAY_DATA_TEXTURE
 #define DDGI_ENABLE_DIFFUSE_LIGHTING
-#define DDGI_ENABLE_PROBE_CLASSIFICATION
-
-#ifndef PROBE_OFFSETS_TEXTURE
-#define PROBE_OFFSETS_TEXTURE
-#endif
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
@@ -47,6 +42,7 @@ layout(push_constant) uniform PushConstants {
     uint probeOffsetHandle;       // Probe offset texture bindless index
     uint probeClassificationHandle;
 
+    float skyIntensity;
 } pc;
 
 precision highp float;
@@ -96,12 +92,6 @@ layout(std430, set=3, binding = 9) readonly buffer SceneInfo {
 layout(std140, set=0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
-
-
-
-
-
-
 
 // Ray query for intersection testing
 rayQueryEXT rayQuery;
@@ -269,26 +259,20 @@ vec3 sampleAlbedo(MeshInfo meshInfo, vec2 uv) {
     uint texIndex = meshInfo.AlbedoTextureIndex;
     vec3 baseColor = meshInfo.albedo;
 
-    if(texIndex == UINT32_MAX) {
+    if(texIndex == UINT32_MAX || texIndex == 0) {
         return baseColor; 
     }
 
-    return baseColor * texture(gTextures[texIndex], uv).rgb;
+    vec4 albedoMaterial = textureLod(gTextures[texIndex], uv, 0.0);
+    return baseColor * albedoMaterial.rgb;
 }
 
 vec3 sampleEmissiveColor(MeshInfo meshInfo, vec2 uv) {
     uint texIndex = meshInfo.EmissiveFactorTextureIndex;
-    if(texIndex == UINT32_MAX) {
+    if(texIndex == UINT32_MAX || texIndex == 0) {
         return meshInfo.emissiveColor;
     }
-    return texture(gTextures[texIndex], uv).rgb * meshInfo.emissiveColor;
-}
-
-vec3 sampleNormal(MeshInfo meshInfo, vec2 uv) {
-    if(meshInfo.NormalTextureIndex == UINT32_MAX) {
-        return vec3(0.0);
-    }
-    return texture(gTextures[meshInfo.NormalTextureIndex], uv).rgb;
+    return textureLod(gTextures[texIndex], uv, 0.0).rgb * meshInfo.emissiveColor;
 }
 
 vec3 calculateShadingNormal(
@@ -300,13 +284,13 @@ vec3 calculateShadingNormal(
 ) {
     // If no normal map is provided, just return the geometric normal
     // This avoids issues with inconsistent tangent generation
-    if (meshInfo.NormalTextureIndex == UINT32_MAX) {
+    if (meshInfo.NormalTextureIndex == UINT32_MAX || meshInfo.NormalTextureIndex == 0) {
         return normalize(N_geom);
     }
 
     // Apply normal map only if a valid texture index is provided
-    vec3 tangentNormal = texture(gTextures[meshInfo.NormalTextureIndex], uv).xyz;
-    tangentNormal = tangentNormal * 2.0 - 1.0;
+    vec3 tangentNormal = textureLod(gTextures[meshInfo.NormalTextureIndex], uv, 0.0).xyz;
+    tangentNormal = (tangentNormal * 2.0) - 1.0;
 
     // Use the pre-computed tangent, bitangent, and normal directly
     vec3 N = normalize(N_geom);
@@ -392,6 +376,7 @@ void main() {
             vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent, surface.bitangent);
             vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
             vec3 emissiveColor = sampleEmissiveColor(meshInfo, surface.texCoord);
+            albedo += emissiveColor; 
     
             // Indirect Lighting (recursive)
             vec3 irradiance = vec3(0.0);
@@ -401,23 +386,21 @@ void main() {
             // This is the correct "view" direction for probe tracing (not camera position)
             vec3 hitToProbe = -probeRayDirection;
 
-            vec3 surfaceBias = DDGIGetSurfaceBias(worldShadingNormal, hitToProbe, u_volume);
+            vec3 surfaceBias = DDGIGetSurfaceBias(surface.normal, hitToProbe, u_volume);
 
-            vec3 diffuse = DirectDiffuseLighting(albedo, worldShadingNormal, hitPosition, pc.lightCount);
+            vec3 diffuse = DirectDiffuseLighting(albedo, surface.normal, hitPosition, pc.lightCount, worldShadingNormal);
 
             float volumeBlendWeight = DDGIGetVolumeBlendWeight(hitPosition, u_volume);
 
             if (volumeBlendWeight > 0.0) {
                 irradiance = DDGIGetVolumeIrradiance(
                     hitPosition,
-                    worldShadingNormal,
+                    surface.normal,
                     surfaceBias,
                     gTextureArrays[pc.prevRadianceIndex],
                     gTextureArrays[pc.prevVisibilityIndex],
                     gTextureArrays[pc.probeOffsetHandle],
-#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
                     gUintTextureArrays[pc.probeClassificationHandle],
-#endif
                     u_volume);
 
                 irradiance *= volumeBlendWeight;
@@ -428,7 +411,7 @@ void main() {
             float maxAlbedo = 0.9;
 
             // Store the final ray radiance and hit distance
-            vec3 radiance = emissiveColor + diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
+            vec3 radiance = diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
 
             DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), clamp(radiance, vec3(0.0), vec3(1.0)), hitT);
         } else {
@@ -437,10 +420,10 @@ void main() {
         }
     } else {
         // Miss - sample skybox and store blue color for visualization
-        vec3 skyboxColor = texture(gCubemaps[pc.skyboxTextureIndex], probeRayDirection).rgb;
+        vec3 skyboxColor = textureLod(gCubemaps[pc.skyboxTextureIndex], probeRayDirection, 0.0).rgb;
         //skyboxColor = vec3(207.0/255.0, 236.0/255.0, 247.0/255.0);
         
-        DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor);
+        DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor * pc.skyIntensity);
     }
     
 }

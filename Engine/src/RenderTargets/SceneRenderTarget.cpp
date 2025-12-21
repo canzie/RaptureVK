@@ -43,7 +43,7 @@ void SceneRenderTarget::createOffscreenTextures(uint32_t width, uint32_t height,
     spec.depth = 1;
     spec.type = TextureType::TEXTURE2D;
     spec.format = format;
-    spec.srgb = true; // Use SRGB for color output
+    spec.srgb = false; // rgba32f/16f does not have srgb i think
     spec.mipLevels = 1;
     spec.wrap = TextureWrap::ClampToEdge;
     spec.filter = TextureFilter::Linear;

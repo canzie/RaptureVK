@@ -241,10 +241,12 @@ struct InstanceShapeComponent {
 struct SkyboxComponent {
     std::shared_ptr<Texture> skyboxTexture;
     AssetHandle skyboxTextureHandle;
-
+    float skyIntensity = 1.0f;
+    bool isEnabled = true;
+    
     SkyboxComponent() = default;
-    SkyboxComponent(std::shared_ptr<Texture> skyboxTexture) : skyboxTexture(skyboxTexture) {}
-    SkyboxComponent(std::filesystem::path skyboxTexturePath)
+    SkyboxComponent(std::shared_ptr<Texture> skyboxTexture, float skyIntensity = 1.0f) : skyboxTexture(skyboxTexture), skyIntensity(skyIntensity) {}
+    SkyboxComponent(std::filesystem::path skyboxTexturePath, float skyIntensity = 1.0f) : skyIntensity(skyIntensity)
     {
         auto [skyboxTexture, handle] = AssetManager::importAsset<Texture>(skyboxTexturePath);
         if (!skyboxTexture) {

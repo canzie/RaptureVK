@@ -3,9 +3,7 @@
 #include "Events/GameEvents.h"
 
 #include "AssetManager/AssetManager.h"
-#include "Components/Components.h"
-#include "Components/FogComponent.h"
-#include "Components/IndirectLightingComponent.h"
+
 #include "Scenes/Entities/Entity.h"
 #include "Textures/Texture.h"
 
@@ -101,6 +99,10 @@ void PropertiesPanel::render()
         if (ImGui::BeginPopup("AddComponentMenu")) {
             renderAddComponentMenu(*entity);
             ImGui::EndPopup();
+        }
+
+        if (auto skyboxComp = entity->tryGetComponent<Rapture::SkyboxComponent>(); skyboxComp != nullptr) {
+            renderSkyboxComponent(*skyboxComp);
         }
     }
 
@@ -694,6 +696,13 @@ void PropertiesPanel::renderIndirectLightingComponent()
             ImGui::Text("  Current: Disabled");
         }
     }
+}
+
+void PropertiesPanel::renderSkyboxComponent(Rapture::SkyboxComponent &skyboxComp)
+{
+    ImGui::CollapsingHeader("Skybox Component", ImGuiTreeNodeFlags_DefaultOpen);
+    ImGui::Checkbox("Enabled", &skyboxComp.isEnabled);
+    ImGui::DragFloat("Skybox Intensity", &skyboxComp.skyIntensity, 0.01f, 0.0f, 1.0f);
 }
 
 void PropertiesPanel::renderAddComponentMenu(Rapture::Entity entity)

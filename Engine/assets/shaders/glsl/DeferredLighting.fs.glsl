@@ -6,9 +6,6 @@
 #endif
 
 
-#ifndef DDGI_ENABLE_PROBE_CLASSIFICATION
-#define DDGI_ENABLE_PROBE_CLASSIFICATION
-#endif
 
 layout(location = 0) out vec4 outColor;
 
@@ -440,9 +437,7 @@ vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume
             gTextureArrays[pc.probeIrradianceHandle],
             gTextureArrays[pc.probeVisibilityHandle],
             gTextureArrays[pc.probeOffsetHandle],
-#ifdef DDGI_ENABLE_PROBE_CLASSIFICATION
             gUintTextureArrays[pc.probeClassificationHandle],
-#endif
             volume);
 
         irradiance *= blendWeight;
@@ -559,22 +554,16 @@ void main() {
     vec3 indirectDiffuse = vec3(0.03) * albedo ;
 
     if (pc.useDDGI > 0) {
-        // Calculate F0 (surface reflection at zero incidence)
         vec3 F0 = mix(vec3(0.04), albedo, metallic);
-
-        // Specular BRDF terms
-        float NdotV = max(dot(N, V), 0.0001);
-
-        //vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
-        vec3 kD_indirect = (vec3(1.0) - fresnelSchlick(NdotV, F0)) * (1.0 - metallic);
+        vec3 kD_indirect = (vec3(1.0) - F0) * (1.0 - metallic);
         
-        vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, V, u_DDGI_Volume);
-        indirectDiffuse = indirectDiffuesIntensity; //* (albedo/3.14159265359) * kD_indirect;
+        vec3 irradiance = getIrradiance(fragPos, N, V, u_DDGI_Volume);
+        indirectDiffuse = irradiance * (albedo/3.14159265359) * kD_indirect;
 
         
     }
 
-    vec3 color = indirectDiffuse;
+    vec3 color = indirectDiffuse + Lo;
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {
@@ -596,7 +585,7 @@ void main() {
 #endif
 
     // HDR tonemapping and gamma correction
-    color = color / (color + vec3(1.0));
+    //color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2)); 
 
     outColor = vec4(color, 1.0);

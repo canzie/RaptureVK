@@ -150,6 +150,7 @@ class DynamicDiffuseGI {
     uint32_t m_probeClassificationBindlessIndex = 0;
 
     std::shared_ptr<Texture> m_skyboxTexture;
+    float m_skyIntensity = 1.0f;
 
     static std::shared_ptr<Texture> s_defaultSkyboxTexture;
 

@@ -261,7 +261,7 @@ void DeferredRenderer::createRenderTarget()
         // Create offscreen render target for Editor mode
         // Use BGRA8 SRGB format (matches typical swapchain format)
         m_sceneRenderTarget = std::make_shared<SceneRenderTarget>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height),
-                                                                  m_swapChain->getImageCount(), TextureFormat::BGRA8);
+                                                                  m_swapChain->getImageCount(), TextureFormat::RGBA16F);
         RP_CORE_INFO("Created OFFSCREEN render target for Editor mode");
     } else {
         // Create swapchain-backed render target for Standalone mode

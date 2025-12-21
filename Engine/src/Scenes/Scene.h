@@ -10,8 +10,6 @@ namespace Rapture {
 // Forward declaration
 class Entity;
 
-struct SkyboxComponent;
-
 struct SceneSettings {
     std::string sceneName;
     bool frustumCullingEnabled = true;

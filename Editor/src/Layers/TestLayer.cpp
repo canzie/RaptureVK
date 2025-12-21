@@ -127,10 +127,10 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     // Note: Rotation is in RADIANS
     Rapture::Entity sunLight = activeScene->createEntity("Sun");
     sunLight.addComponent<Rapture::TransformComponent>(glm::vec3(-2.0f, 5.0f, -3.0f),  // Position
-                                                       glm::vec3(-1.504f, 0.0f, 0.0f), // Point downward (radians, ~-86 degrees)
+                                                       glm::vec3(-1.874f, 0.0f, 0.0f), // Point downwards
                                                        glm::vec3(0.2f));
     auto &sunLightComp = sunLight.addComponent<Rapture::LightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White sunlight
-                                                                        1.2f                         // Intensity
+                                                                        3.14f                         // Intensity
     );
     sunLightComp.castsShadow = true;
     sunLight.addComponent<Rapture::CascadedShadowComponent>(2048.0f, 2048.0f, 4, 0.8f);
@@ -139,7 +139,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     auto skyboxPath = rootPath / "assets/textures/cubemaps/default.cubemap";
     if (std::filesystem::exists(skyboxPath)) {
         auto envEntity = activeScene->createEnvironmentEntity();
-        envEntity.addComponent<Rapture::SkyboxComponent>(skyboxPath);
+        envEntity.addComponent<Rapture::SkyboxComponent>(skyboxPath, 0.1f);
         // Renderer will query for SkyboxComponent directly
     }
 

@@ -395,7 +395,6 @@ vec3 DDGIGetProbeWorldPosition(ivec3 probeCoords, ProbeVolume volume, sampler2DA
     //probeWorldPosition += volume.origin + (volume.probeScrollOffsets * volume.probeSpacing);
     probeWorldPosition += volume.origin;
 
-#ifdef PROBE_OFFSETS_TEXTURE
     if (volume.probeRelocationEnabled > 0.0) {
         int   probeIndex     = DDGIGetProbeIndex(probeCoords, volume);
         uvec3 offsetTexelPos = DDGIGetProbeTexelCoords(probeIndex, volume);
@@ -405,9 +404,18 @@ vec3 DDGIGetProbeWorldPosition(ivec3 probeCoords, ProbeVolume volume, sampler2DA
 
         probeWorldPosition += worldOffset;
     }
-#endif
 
     return probeWorldPosition;
+}
+
+uint DDGILoadProbeState(int probeIndex, usampler2DArray probeClassificationAtlas, ProbeVolume volume)
+{
+    uint state = 0; // active
+    if (volume.probeClassificationEnabled > 0.0) {
+        uvec3 probeTexelCoords = DDGIGetProbeTexelCoords(probeIndex, volume);
+        state = uint(texelFetch(probeClassificationAtlas, ivec3(probeTexelCoords), 0).r);
+    }
+    return state;
 }
 
 ///////////////////////////////////////////////////////////////////////////
