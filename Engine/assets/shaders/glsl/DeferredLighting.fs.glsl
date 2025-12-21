@@ -98,6 +98,40 @@ layout(push_constant) uniform PushConstants {
     vec2 fogDistances; // .x = near, .y = far
 } pc;
 
+float exposure(float fstop) {
+    return pow(2.0, fstop);
+}
+
+vec3 ACESFilm(vec3 color) {
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((color*(a*color + b)) / (color*(c*color + d) + e), vec3(0.0), vec3(1.0));
+}
+
+vec3 LessThan(vec3 f, float value)
+{
+    return vec3(
+        (f.x < value) ? 1.0 : 0.0,
+        (f.y < value) ? 1.0 : 0.0,
+        (f.z < value) ? 1.0 : 0.0);
+}
+
+vec3 pow3(vec3 x, float y) {
+    return vec3(pow(x.x, y), pow(x.y, y), pow(x.z, y));
+}
+
+vec3 LinearToSRGB(vec3 rgb)
+{
+    rgb = clamp(rgb, 0.0, 1.0);
+    return mix(
+        pow3(rgb * 1.055, 1.0 / 2.4) - 0.055,
+        rgb * 12.92,
+        LessThan(rgb, 0.0031308)
+    );
+}
 
 // Simple Fresnel approximation
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
@@ -558,7 +592,7 @@ void main() {
         vec3 kD_indirect = (vec3(1.0) - F0) * (1.0 - metallic);
         
         vec3 irradiance = getIrradiance(fragPos, N, V, u_DDGI_Volume);
-        indirectDiffuse = irradiance * (albedo/3.14159265359) * kD_indirect;
+        indirectDiffuse = irradiance * (albedo/3.14159265359) * kD_indirect * ao;
 
         
     }
@@ -586,7 +620,9 @@ void main() {
 
     // HDR tonemapping and gamma correction
     //color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0/2.2)); 
+    color *= exposure(1.0);
+    color = ACESFilm(color);
+    color = LinearToSRGB(color);
 
     outColor = vec4(color, 1.0);
 }

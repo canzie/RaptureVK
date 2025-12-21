@@ -24,6 +24,7 @@ class EditorApp : public Rapture::Application {
         pushLayer(new TestLayer());
 
         // Push ImGui layer as an overlay so it renders on top
+
         pushOverlay(new ImGuiLayer());
     }
 
