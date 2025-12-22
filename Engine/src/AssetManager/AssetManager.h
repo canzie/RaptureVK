@@ -66,14 +66,14 @@ class AssetManager {
     }
 
     // Virtual asset registration methods
-    static AssetHandle registerVirtualAsset(std::shared_ptr<AssetVariant> asset, const std::string &virtualName,
+    static AssetHandle registerVirtualAsset(AssetVariant asset, const std::string &virtualName,
                                             AssetType assetType)
     {
         if (!s_isInitialized || !s_activeAssetManager) {
             RP_CORE_ERROR("AssetManager not initialized");
             return AssetHandle();
         }
-        return s_activeAssetManager->registerVirtualAsset(asset, virtualName, assetType);
+        return s_activeAssetManager->registerVirtualAsset(std::move(asset), virtualName, assetType);
     }
 
     static bool unregisterVirtualAsset(AssetHandle handle)

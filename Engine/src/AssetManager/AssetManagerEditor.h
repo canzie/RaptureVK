@@ -29,7 +29,7 @@ class AssetManagerEditor : public AssetManagerBase {
 
     std::pair<std::shared_ptr<Asset>, AssetHandle> importDefaultAsset(AssetType assetType);
 
-    AssetHandle registerVirtualAsset(std::shared_ptr<AssetVariant> asset, const std::string &virtualName, AssetType assetType);
+    AssetHandle registerVirtualAsset(AssetVariant asset, const std::string &virtualName, AssetType assetType);
 
     bool unregisterVirtualAsset(AssetHandle handle);
 

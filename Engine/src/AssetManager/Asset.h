@@ -4,6 +4,7 @@
 
 #include "AssetImportConfig.h"
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -88,24 +89,30 @@ struct AssetMetadata {
 
 class Asset {
   public:
-    Asset(std::shared_ptr<AssetVariant> asset) : m_asset(asset) {}
+    // Rule of 5 - all defaulted since AssetVariant contains shared_ptrs
+    Asset() = default;
+    explicit Asset(AssetVariant asset) : m_asset(std::move(asset)) {}
+    ~Asset() = default;
+    Asset(const Asset&) = default;
+    Asset& operator=(const Asset&) = default;
+    Asset(Asset&&) noexcept = default;
+    Asset& operator=(Asset&&) noexcept = default;
 
     template <typename T> std::shared_ptr<T> getUnderlyingAsset() const
     {
-        if (std::holds_alternative<std::shared_ptr<T>>(*m_asset)) {
-            return std::get<std::shared_ptr<T>>(*m_asset);
+        if (std::holds_alternative<std::shared_ptr<T>>(m_asset)) {
+            return std::get<std::shared_ptr<T>>(m_asset);
         }
         return nullptr;
     }
 
-    bool isValid() const { return !std::holds_alternative<std::monostate>(*m_asset); }
+    bool isValid() const { return !std::holds_alternative<std::monostate>(m_asset); }
 
   public:
     AssetHandle m_handle;
-    AssetStatus m_status = AssetStatus::REQUESTED;
-    // AssetType getAssetType() const;
+    std::atomic<AssetStatus> m_status{AssetStatus::REQUESTED};
 
   private:
-    std::shared_ptr<AssetVariant> m_asset;
+    AssetVariant m_asset;
 };
 } // namespace Rapture

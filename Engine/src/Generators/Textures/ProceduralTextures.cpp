@@ -113,8 +113,7 @@ void ProceduralTexture::initTexture()
         textureName = "procedural_texture_" + std::to_string(s_proceduralTextureCounter++);
     }
 
-    auto textureVariant = std::make_shared<AssetVariant>(m_texture);
-    AssetManager::registerVirtualAsset(textureVariant, textureName, AssetType::Texture);
+    AssetManager::registerVirtualAsset(AssetVariant{m_texture}, textureName, AssetType::Texture);
 }
 
 void ProceduralTexture::initDescriptorSet()

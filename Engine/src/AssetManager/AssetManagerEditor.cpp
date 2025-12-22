@@ -159,9 +159,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefault
         metadata.m_importConfig = std::monostate(); // Initialize import config
 
         // Wrap the texture in an Asset object
-        AssetVariant assetVariant = defaultTexture;
-        std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(std::move(assetVariant));
-        std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+        auto asset = std::make_shared<Asset>(AssetVariant{defaultTexture});
         asset->m_handle = handle;
         asset->m_status = AssetStatus::LOADED;
 
@@ -200,9 +198,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefault
         metadata.m_indices = {};
         metadata.m_importConfig = std::monostate();
 
-        AssetVariant assetVariant = defaultMaterial;
-        std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(std::move(assetVariant));
-        std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+        auto asset = std::make_shared<Asset>(AssetVariant{defaultMaterial});
         asset->m_handle = handle;
         asset->m_status = AssetStatus::LOADED;
 
@@ -250,11 +246,11 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
     return AssetType::None;
 }
 
-AssetHandle AssetManagerEditor::registerVirtualAsset(std::shared_ptr<AssetVariant> asset, const std::string &virtualName,
+AssetHandle AssetManagerEditor::registerVirtualAsset(AssetVariant asset, const std::string &virtualName,
                                                      AssetType assetType)
 {
-    if (!asset) {
-        RP_CORE_ERROR("Asset variant is null");
+    if (std::holds_alternative<std::monostate>(asset)) {
+        RP_CORE_ERROR("Asset variant is empty");
         return AssetHandle{};
     }
 
@@ -275,7 +271,7 @@ AssetHandle AssetManagerEditor::registerVirtualAsset(std::shared_ptr<AssetVarian
     AssetHandle handle = UUIDGenerator::Generate();
 
     // Create Asset wrapper
-    auto assetWrapper = std::make_shared<Asset>(asset);
+    auto assetWrapper = std::make_shared<Asset>(std::move(asset));
     assetWrapper->m_handle = handle;
     assetWrapper->m_status = AssetStatus::LOADED; // Virtual assets are immediately loaded
 

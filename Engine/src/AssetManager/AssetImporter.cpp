@@ -121,10 +121,7 @@ std::shared_ptr<Asset> AssetImporter::loadShader(const AssetHandle &handle, cons
     }
 
     // Wrap the shader in an Asset object
-    AssetVariant assetVariant = shader;
-    std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
-    std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
-
+    auto asset = std::make_shared<Asset>(AssetVariant{shader});
     asset->m_status = AssetStatus::LOADED;
     asset->m_handle = handle;
 
@@ -161,9 +158,7 @@ std::shared_ptr<Asset> AssetImporter::loadTexture(const AssetHandle &handle, con
 
     auto tex = std::make_shared<Texture>(metadata.m_filePath.string(), texSpec, true);
 
-    AssetVariant assetVariant = tex;
-    std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
-    std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+    auto asset = std::make_shared<Asset>(AssetVariant{tex});
     asset->m_status = AssetStatus::LOADING;
     asset->m_handle = handle;
 
@@ -202,9 +197,7 @@ std::shared_ptr<Asset> AssetImporter::loadCubemap(const AssetHandle &handle, con
 
     auto tex = std::make_shared<Texture>(cubemapPaths, TextureSpecification(), true);
 
-    AssetVariant assetVariant = tex;
-    std::shared_ptr<AssetVariant> variantPtr = std::make_shared<AssetVariant>(assetVariant);
-    std::shared_ptr<Asset> asset = std::make_shared<Asset>(variantPtr);
+    auto asset = std::make_shared<Asset>(AssetVariant{tex});
     asset->m_status = AssetStatus::LOADING;
     asset->m_handle = handle;
 

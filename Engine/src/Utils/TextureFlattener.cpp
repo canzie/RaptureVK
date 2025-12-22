@@ -198,9 +198,7 @@ std::shared_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shar
     auto flattenTexture = std::make_shared<FlattenTexture>(inputTexture, flattenedTexture, name, dataType);
 
     // Register the flattened texture with the asset manager
-    AssetVariant flattenedVariant = flattenedTexture;
-    std::shared_ptr<AssetVariant> flattenedVariantPtr = std::make_shared<AssetVariant>(flattenedVariant);
-    AssetManager::registerVirtualAsset(flattenedVariantPtr, name, AssetType::Texture);
+    AssetManager::registerVirtualAsset(AssetVariant{flattenedTexture}, name, AssetType::Texture);
 
     // Mark as ready for sampling
     flattenedTexture->setReadyForSampling(true);
