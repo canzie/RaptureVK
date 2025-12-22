@@ -21,5 +21,6 @@ private:
 
 private:
     std::vector<VkDescriptorSet> m_gbufferDescriptorSets;
+    std::vector<std::shared_ptr<Rapture::Texture>> m_cachedTextures;
     bool m_initialized = false;
 }; 

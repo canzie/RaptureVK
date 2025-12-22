@@ -1,15 +1,15 @@
 #pragma once
 
-#include "Pipelines/GraphicsPipeline.h"
 #include "AssetManager/AssetManager.h"
+#include "Pipelines/GraphicsPipeline.h"
 #include "Shaders/Shader.h"
 #include "Textures/Texture.h"
 #include "Utils/TextureFlattener.h"
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
-#include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/Descriptors/DescriptorManager.h"
 #include "Buffers/Descriptors/DescriptorBinding.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
+#include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include "Renderer/Frustum/Frustum.h"
@@ -20,8 +20,8 @@
 #include "Scenes/Scene.h"
 
 #include <array>
-#include <memory>
 #include <glm/glm.hpp>
+#include <memory>
 
 namespace Rapture {
 
@@ -30,48 +30,45 @@ struct LightComponent;
 struct TransformComponent;
 struct CameraComponent;
 
-    // Projection type enum (to avoid dependency on Frustum.h)
-    enum class ProjectionType
-    {
-        Perspective,
-        Orthographic
-    };
+// Projection type enum (to avoid dependency on Frustum.h)
+enum class ProjectionType {
+    Perspective,
+    Orthographic
+};
 
-    struct CascadeData {
-        float nearPlane;
-        float farPlane;
-        glm::mat4 lightViewProj;
-    };
+struct CascadeData {
+    float nearPlane;
+    float farPlane;
+    glm::mat4 lightViewProj;
+};
 
 class CascadedShadowMap {
-public:
+  public:
     CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda);
 
     ~CascadedShadowMap();
 
     // Returns the calculated split depths for each cascade using a hybrid approach
     std::vector<float> calculateCascadeSplits(float nearPlane, float farPlane, float lambda = 0.5f);
-    
-    // Calculates the light space matrices for each cascade, and the split depths
-    std::vector<CascadeData> calculateCascades(
-        const glm::vec3& lightDir, 
-        const glm::mat4& viewMatrix, 
-        const glm::mat4& projMatrix,
-        float nearPlane,
-        float farPlane,
-        ProjectionType cameraProjectionType = ProjectionType::Perspective);
 
+    // Calculates the light space matrices for each cascade, and the split depths
+    std::vector<CascadeData> calculateCascades(const glm::vec3 &lightDir, const glm::mat4 &viewMatrix, const glm::mat4 &projMatrix,
+                                               float nearPlane, float farPlane,
+                                               ProjectionType cameraProjectionType = ProjectionType::Perspective);
 
     uint8_t getNumCascades() const { return m_NumCascades; }
-    
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, 
-                            std::shared_ptr<Scene> activeScene, 
-                            uint32_t currentFrame);
-    
-    std::vector<CascadeData> updateViewMatrix(const LightComponent& lightComp, const TransformComponent& transformComp, const CameraComponent& cameraComp);
+
+    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                             uint32_t currentFrame);
+
+    std::vector<CascadeData> updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp,
+                                              const CameraComponent &cameraComp);
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTextureArray; }
-    std::shared_ptr<Texture> getFlattenedShadowTexture() const { return m_flattenedShadowTexture ? m_flattenedShadowTexture->getFlattenedTexture() : nullptr; }
+    std::shared_ptr<Texture> getFlattenedShadowTexture() const
+    {
+        return m_flattenedShadowTexture ? m_flattenedShadowTexture->getFlattenedTexture() : nullptr;
+    }
 
     uint32_t getTextureHandle() { return m_shadowTextureArray->getBindlessIndex(); }
     std::shared_ptr<ShadowDataBuffer> getShadowDataBuffer() { return m_shadowDataBuffer; }
@@ -83,7 +80,7 @@ public:
 
     std::vector<float> getCascadeSplits() const { return m_cascadeSplits; }
 
-private:
+  private:
     void createPipeline();
     void createShadowTexture();
     void createUniformBuffers();
@@ -94,20 +91,18 @@ private:
 
     // Extracts view frustum corners for a specific cascade depth slice
     // All parameters relate to the camera, not the light
-    std::array<glm::vec3, 8> extractFrustumCorners(
-        const glm::mat4& cameraProjectionMatrix, // The camera's projection matrix
-        const glm::mat4& cameraViewMatrix,       // The camera's view matrix
-        float cascadeNearPlane,                  // Near plane for this specific cascade
-        float cascadeFarPlane,                   // Far plane for this specific cascade
-        ProjectionType cameraProjectionType);    // Type of projection used by the camera
+    std::array<glm::vec3, 8> extractFrustumCorners(const glm::mat4 &cameraProjectionMatrix, // The camera's projection matrix
+                                                   const glm::mat4 &cameraViewMatrix,       // The camera's view matrix
+                                                   float cascadeNearPlane,                  // Near plane for this specific cascade
+                                                   float cascadeFarPlane,                   // Far plane for this specific cascade
+                                                   ProjectionType cameraProjectionType);    // Type of projection used by the camera
 
-
-private:
+  private:
     float m_width;
     float m_height;
     float m_lambda;
     uint8_t m_NumCascades;
-    
+
     bool m_firstFrame = true;
 
     uint32_t m_currentFrame = 0;
@@ -131,16 +126,14 @@ private:
 
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};
-    
+
     std::weak_ptr<Shader> m_shader;
     AssetHandle m_handle;
 
     VmaAllocator m_allocator;
-    
+
     // MDI batching system - one per frame in flight
     std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
+};
 
-    
-    };
-
-}
+} // namespace Rapture

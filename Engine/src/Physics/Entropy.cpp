@@ -1,26 +1,24 @@
 #include "Entropy.h"
 
+#include "Buffers/StorageBuffers/StorageBuffer.h"
 #include "Components/Components.h"
 #include "EntropyComponents.h"
 #include "Meshes/MeshPrimitives.h"
-#include "Buffers/StorageBuffers/StorageBuffer.h"
 #include "WindowContext/Application.h"
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/glm.hpp>
-#include <set>
 #include <algorithm>
 #include <cmath>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <set>
 #include <unordered_set>
 
 namespace Rapture::Entropy {
 
-
-std::vector<std::pair<Entity, Entity>>& EntropyCollisions::broadPhase(std::shared_ptr<Scene> scene)
+std::vector<std::pair<Entity, Entity>> &EntropyCollisions::broadPhase(std::shared_ptr<Scene> scene)
 {
     m_potentialPairs.clear();
     if (!scene) return m_potentialPairs;
-
 
     if (!m_staticBVH) {
         m_staticBVH = std::make_shared<BVH>(Rapture::LeafType::AABB);
@@ -44,13 +42,11 @@ std::vector<std::pair<Entity, Entity>>& EntropyCollisions::broadPhase(std::share
     std::unordered_set<uint64_t> pairSet;
 
     for (const auto &node : nodes) {
-        if (!node.isLeaf())
-            continue; // skip internal or free nodes
+        if (!node.isLeaf()) continue; // skip internal or free nodes
 
         auto entityHandle = node.entityID;
         Entity entity(entityHandle, scene.get());
         auto boundingBox = BoundingBox(node.min, node.max);
-
 
         // check against static BVH
         auto result = m_staticBVH->getIntersectingAABBs(boundingBox);
@@ -59,14 +55,14 @@ std::vector<std::pair<Entity, Entity>>& EntropyCollisions::broadPhase(std::share
             if (otherEntityHandle == entityHandle) continue;
             Entity otherEntity(otherEntityHandle, scene.get());
 
-            if (!otherEntity.isValid()){
+            if (!otherEntity.isValid()) {
                 m_isSBVHDirty = true;
                 continue;
             }
-            
+
             uint64_t key = makeKey(entityHandle, otherEntityHandle);
             if (pairSet.insert(key).second) {
-                
+
                 m_potentialPairs.push_back({entity, otherEntity});
             }
         }
@@ -78,27 +74,25 @@ std::vector<std::pair<Entity, Entity>>& EntropyCollisions::broadPhase(std::share
             if (otherEntityHandle == entityHandle) continue;
             Entity otherEntity(otherEntityHandle, scene.get());
 
-            if (!otherEntity.isValid()){
+            if (!otherEntity.isValid()) {
                 m_dynamicBVH->remove(otherEntityHandle);
                 continue;
             }
-
 
             uint64_t key = makeKey(entityHandle, otherEntityHandle);
             if (pairSet.insert(key).second) {
                 m_potentialPairs.push_back({entity, otherEntity});
             }
         }
-
     }
-
 
     return m_potentialPairs;
 }
 
-void EntropyCollisions::narrowPhase(std::shared_ptr<Scene> scene, std::vector<ContactManifold> &manifolds) {
+void EntropyCollisions::narrowPhase(std::shared_ptr<Scene> scene, std::vector<ContactManifold> &manifolds)
+{
 
-    auto& reg = scene->getRegistry();
+    auto &reg = scene->getRegistry();
     auto view = reg.view<RigidBodyComponent, TransformComponent>();
 
     uint32_t contactPoints = 0;
@@ -120,31 +114,28 @@ void EntropyCollisions::narrowPhase(std::shared_ptr<Scene> scene, std::vector<Co
             // Apply default material properties for now
             for (auto &cp : manifold.contactPoints) {
                 cp.restitution = 0.0f; // inelastic
-                cp.friction    = 0.6f; // placeholder
+                cp.friction = 0.6f;    // placeholder
             }
         }
     }
 
-
-
-    //RP_PHYSICS_INFO("Found {0} manifolds, {1} contact points", manifolds.size(), contactPoints);
-
+    // RP_PHYSICS_INFO("Found {0} manifolds, {1} contact points", manifolds.size(), contactPoints);
 }
 
+void EntropyCollisions::updateVisualization(const std::vector<Rapture::BVHNode> &nodes, std::shared_ptr<Entity> vizEntity,
+                                            const glm::vec4 &color)
+{
 
-
-void EntropyCollisions::updateVisualization(const std::vector<Rapture::BVHNode> &nodes, std::shared_ptr<Entity> vizEntity, const glm::vec4 &color) {
-
-   if (vizEntity && vizEntity->isValid() && vizEntity->hasComponent<Rapture::InstanceShapeComponent>()) {
-        auto& instanceComp = vizEntity->getComponent<Rapture::InstanceShapeComponent>();
+    if (vizEntity && vizEntity->isValid() && vizEntity->hasComponent<Rapture::InstanceShapeComponent>()) {
+        auto &instanceComp = vizEntity->getComponent<Rapture::InstanceShapeComponent>();
         instanceComp.color = color;
 
         // Re-build instanceData from current DBVH leaves.
         std::vector<Rapture::InstanceData> instanceData;
-        for (const auto& node : nodes) {
+        for (const auto &node : nodes) {
             if (node.isLeaf()) {
                 glm::vec3 center = (node.min + node.max) * 0.5f;
-                glm::vec3 size   = node.max - node.min;
+                glm::vec3 size = node.max - node.min;
 
                 glm::mat4 transform = glm::translate(glm::mat4(1.0f), center);
                 transform = glm::scale(transform, size);
@@ -152,13 +143,11 @@ void EntropyCollisions::updateVisualization(const std::vector<Rapture::BVHNode> 
             }
         }
 
-
         // Check if buffer needs to grow/shrink.
         if (instanceData.size() != instanceComp.instanceCount) {
             // Recreate SSBO with new size.
             instanceComp.instanceSSBO = std::make_shared<Rapture::StorageBuffer>(
-                sizeof(Rapture::InstanceData) * instanceData.size(),
-                Rapture::BufferUsage::DYNAMIC,
+                sizeof(Rapture::InstanceData) * instanceData.size(), Rapture::BufferUsage::DYNAMIC,
                 Rapture::Application::getInstance().getVulkanContext().getVmaAllocator());
 
             instanceComp.instanceCount = static_cast<uint32_t>(instanceData.size());
@@ -168,16 +157,13 @@ void EntropyCollisions::updateVisualization(const std::vector<Rapture::BVHNode> 
         if (!instanceData.empty()) {
             instanceComp.instanceSSBO->addData(instanceData.data(), instanceData.size() * sizeof(Rapture::InstanceData), 0);
         }
-    } 
-
-
+    }
 }
-
-
-
 
 std::vector<ContactManifold> EntropyCollisions::detectCollisions(std::shared_ptr<Scene> scene, float dt)
 {
+    (void)dt;
+
     // For now just run broad phase and store the potential pairs.
     broadPhase(scene);
 
@@ -188,28 +174,28 @@ std::vector<ContactManifold> EntropyCollisions::detectCollisions(std::shared_ptr
     return manifolds;
 }
 
-void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene) {
+void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene)
+{
 
     if (!m_dynamicBVH) {
         m_dynamicBVH = std::make_shared<DBVH>();
         m_entityNodeMap.clear();
-    } 
+    }
 
-    auto& reg = scene->getRegistry();
+    auto &reg = scene->getRegistry();
     auto view = reg.view<RigidBodyComponent, MeshComponent, TransformComponent, BoundingBoxComponent>();
 
     // We need direct access to the node list to look up node indices by entity ID.
-    auto& nodes = m_dynamicBVH->getNodes();
+    // auto &nodes = m_dynamicBVH->getNodes();
 
     for (auto entityHandle : view) // TODO : NEEDS TO BE GIGA OPTIMISED
     {
-        auto [rigidBody, mesh, transform, boundingBox] = view.get<RigidBodyComponent, MeshComponent, TransformComponent, BoundingBoxComponent>(entityHandle);
-
+        auto [rigidBody, mesh, transform, boundingBox] =
+            view.get<RigidBodyComponent, MeshComponent, TransformComponent, BoundingBoxComponent>(entityHandle);
 
         if (mesh.isStatic) {
             continue;
         }
-
 
         glm::vec3 minLocal, maxLocal;
         rigidBody.collider->getAABB(minLocal, maxLocal);
@@ -217,7 +203,6 @@ void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene) {
         BoundingBox aabb = BoundingBox(minLocal, maxLocal);
 
         BoundingBox localAABB = aabb.transform(rigidBody.collider->localTransform) + boundingBox.localBoundingBox;
-
 
         BoundingBox worldAABB = localAABB.transform(transform.transformMatrix());
 
@@ -228,8 +213,7 @@ void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene) {
 
         if (nodeId != -1) {
             m_dynamicBVH->update(nodeId, worldAABB);
-        }
-        else {
+        } else {
             // Entity was added after the BVH build – insert a new leaf.
             int newId = m_dynamicBVH->insert(static_cast<uint32_t>(entityHandle), worldAABB);
             m_entityNodeMap[(uint32_t)entityHandle] = newId;
@@ -237,11 +221,11 @@ void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene) {
     }
 }
 
+void EntropyCollisions::debugVisualize(std::shared_ptr<Scene> scene)
+{
 
-void EntropyCollisions::debugVisualize(std::shared_ptr<Scene> scene) {
-
-    auto& app = Rapture::Application::getInstance();
-    auto& vulkanContext = app.getVulkanContext();
+    auto &app = Rapture::Application::getInstance();
+    auto &vulkanContext = app.getVulkanContext();
 
     if (!m_staticVizEntity) {
         auto cube = std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateCube());
@@ -251,10 +235,7 @@ void EntropyCollisions::debugVisualize(std::shared_ptr<Scene> scene) {
         m_staticVizEntity->addComponent<InstanceShapeComponent>(std::vector<InstanceData>(), vulkanContext.getVmaAllocator());
         m_staticVizEntity->addComponent<MeshComponent>(cube);
 
-
         updateVisualization(m_staticBVH->getNodes(), m_staticVizEntity, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-        
-
     }
 
     if (!m_dynamicVizEntity) {
@@ -266,28 +247,28 @@ void EntropyCollisions::debugVisualize(std::shared_ptr<Scene> scene) {
         m_dynamicVizEntity->addComponent<MeshComponent>(cube);
     }
 
-
-
     if (m_dynamicVizEntity) {
         updateVisualization(m_dynamicBVH->getNodes(), m_dynamicVizEntity, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
     }
-
 }
 
 // -------------------------------------------------------------
 //  EntropyDynamics implementation
 // -------------------------------------------------------------
 
-void EntropyDynamics::addGlobalForceGenerator(const std::shared_ptr<ForceGenerator> &gen) {
+void EntropyDynamics::addGlobalForceGenerator(const std::shared_ptr<ForceGenerator> &gen)
+{
     if (gen) m_globalGenerators.push_back(gen);
 }
 
-void EntropyDynamics::addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen) {
+void EntropyDynamics::addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen)
+{
     if (!gen || !entity.isValid()) return;
     m_bodyGenerators[entity.getID()].push_back(gen);
 }
 
-void EntropyDynamics::step(std::shared_ptr<Scene> scene, float dt) {
+void EntropyDynamics::step(std::shared_ptr<Scene> scene, float dt)
+{
     if (!scene) return;
 
     auto &reg = scene->getRegistry();
@@ -315,14 +296,15 @@ void EntropyDynamics::step(std::shared_ptr<Scene> scene, float dt) {
     integrate(scene, dt);
 }
 
-void EntropyDynamics::integrate(std::shared_ptr<Scene> scene, float dt) {
+void EntropyDynamics::integrate(std::shared_ptr<Scene> scene, float dt)
+{
 
-    auto& reg = scene->getRegistry();
+    auto &reg = scene->getRegistry();
     auto view = reg.view<RigidBodyComponent, TransformComponent>();
-    
+
     for (auto entityHandle : view) {
         auto [rb, transform] = view.get<RigidBodyComponent, TransformComponent>(entityHandle);
-        
+
         if (rb.invMass == 0.0f) { // infinite mass / static body
             rb.previousTransform = transform.transforms;
             rb.isFirstUpdate = false;
@@ -330,34 +312,32 @@ void EntropyDynamics::integrate(std::shared_ptr<Scene> scene, float dt) {
         }
 
         if (rb.isFirstUpdate) {
-			rb.previousTransform = transform.transforms;
-			rb.isFirstUpdate = false;
-		}
-        
+            rb.previousTransform = transform.transforms;
+            rb.isFirstUpdate = false;
+        }
+
         // linear motion
         glm::vec3 linearAcceleration = rb.accumulatedForce * rb.invMass;
         rb.velocity += linearAcceleration * dt;
         transform.transforms.setTranslation(transform.translation() + rb.velocity * dt);
-    
-        
+
         // angular motion
-		glm::quat rotationDelta = transform.transforms.getRotationQuat() * glm::inverse(rb.previousTransform.getRotationQuat());
+        (void)(transform.transforms.getRotationQuat() * glm::inverse(rb.previousTransform.getRotationQuat()));
 
         glm::mat3 R = glm::mat3_cast(transform.transforms.getRotationQuat());
         glm::mat3 invInertiaTensorWorld = R * rb.invInertiaTensor * glm::transpose(R);
 
         glm::vec3 angularAcceleration = invInertiaTensorWorld * rb.accumulatedTorque;
         rb.angularVelocity += angularAcceleration * dt;
-        
+
         // apply orientation
         glm::quat angularVelQuat = glm::quat(0.f, rb.angularVelocity.x, rb.angularVelocity.y, rb.angularVelocity.z);
         glm::quat deltaOrientation = 0.5f * angularVelQuat * transform.transforms.getRotationQuat();
         transform.transforms.setRotation(glm::normalize(transform.transforms.getRotationQuat() + (deltaOrientation * dt)));
-    
-        
+
         // Update previous transform for next frame
         rb.previousTransform = transform.transforms;
-        
+
         // clear accumulators
         rb.accumulatedForce = glm::vec3(0.0f);
         rb.accumulatedTorque = glm::vec3(0.0f);
@@ -368,11 +348,13 @@ void EntropyDynamics::integrate(std::shared_ptr<Scene> scene, float dt) {
 //  EntropyPhysics high-level step
 // -------------------------------------------------------------
 
-void EntropyPhysics::addGlobalForceGenerator(const std::shared_ptr<ForceGenerator> &gen) {
+void EntropyPhysics::addGlobalForceGenerator(const std::shared_ptr<ForceGenerator> &gen)
+{
     m_dynamics.addGlobalForceGenerator(gen);
 }
 
-void EntropyPhysics::addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen) {
+void EntropyPhysics::addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen)
+{
     m_dynamics.addBodyForceGenerator(entity, gen);
 }
 
@@ -396,12 +378,12 @@ std::vector<ContactManifold> EntropyPhysics::step(std::shared_ptr<Scene> scene, 
 // -------------------------------------------------------------
 using Constraint = ConstraintSolver::ContactConstraint;
 
-void ConstraintSolver::buildConstraints(std::shared_ptr<Scene> scene,
-                                        const std::vector<ContactManifold>& manifolds) {
+void ConstraintSolver::buildConstraints(std::shared_ptr<Scene> scene, const std::vector<ContactManifold> &manifolds)
+{
     m_constraints.clear();
     if (!scene) return;
 
-    auto& reg = scene->getRegistry();
+    auto &reg = scene->getRegistry();
 
     for (const auto &manifold : manifolds) {
         if (manifold.contactPoints.empty()) continue;
@@ -418,12 +400,12 @@ void ConstraintSolver::buildConstraints(std::shared_ptr<Scene> scene,
             c.b = manifold.entityB;
             c.normal = glm::normalize(cp.normalOnB); // ensure normal is normalised
             c.restitution = cp.restitution;
-            c.friction    = cp.friction;
+            c.friction = cp.friction;
             c.penetration = cp.penetrationDepth;
             c.contactPoint = 0.5f * (cp.worldPointA + cp.worldPointB);
 
-            c.bodyA  = &rbA;
-            c.bodyB  = &rbB;
+            c.bodyA = &rbA;
+            c.bodyB = &rbB;
             c.transA = &trA;
             c.transB = &trB;
 
@@ -440,7 +422,8 @@ void ConstraintSolver::buildConstraints(std::shared_ptr<Scene> scene,
     }
 }
 
-void ConstraintSolver::resolveInterpenetration(uint32_t iterations) {
+void ConstraintSolver::resolveInterpenetration(uint32_t iterations)
+{
     const float penetrationEpsilon = 0.0001f;
     for (uint32_t it = 0; it < iterations; ++it) {
         // Select the deepest penetration
@@ -473,17 +456,17 @@ void ConstraintSolver::resolveInterpenetration(uint32_t iterations) {
         // will result in 0 for static bodies since invMass is 0
         glm::vec3 newPosA = c.transA->transforms.getTranslation() + movePerInvMass * c.bodyA->invMass;
         c.transA->transforms.setTranslation(newPosA);
-    
+
         glm::vec3 newPosB = c.transB->transforms.getTranslation() - movePerInvMass * c.bodyB->invMass;
         c.transB->transforms.setTranslation(newPosB);
-    
 
         // Mark this constraint as resolved for penetration.
         c.penetration = 0.0f;
     }
 }
 
-void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations) {
+void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations)
+{
     if (dt <= 0.0f || m_constraints.empty()) return;
 
     const float velocityEpsilon = 0.0001f;
@@ -497,9 +480,8 @@ void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations) {
             glm::vec3 velB = c.bodyB->velocity + glm::cross(c.bodyB->angularVelocity, c.rb);
             glm::vec3 relVelWorld = velA - velB;
 
-
             glm::mat3 worldToContact = glm::transpose(c.contactToWorld);
-            glm::vec3 relVelContact  = worldToContact * relVelWorld;
+            glm::vec3 relVelContact = worldToContact * relVelWorld;
 
             // Positive x means the bodies are separating along the contact normal. If so, no
             // normal impulse is required for a friction-less resolution.
@@ -507,11 +489,9 @@ void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations) {
                 continue;
             }
 
-
             float desiredDeltaVel = -(1.0f + c.restitution) * relVelContact.x;
 
-
-            float invMassSum   = c.bodyA->invMass + c.bodyB->invMass;
+            float invMassSum = c.bodyA->invMass + c.bodyB->invMass;
             float deltaVelocity = invMassSum; // start with linear parts
 
             // Angular part for body A.
@@ -535,15 +515,12 @@ void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations) {
                 continue;
             }
 
-    
             float j = desiredDeltaVel / deltaVelocity;
 
-   
             glm::vec3 impulse = j * c.normal;
 
-
-            c.bodyA->velocity        += impulse * c.bodyA->invMass;
-            c.bodyB->velocity        -= impulse * c.bodyB->invMass;
+            c.bodyA->velocity += impulse * c.bodyA->invMass;
+            c.bodyB->velocity -= impulse * c.bodyB->invMass;
             c.bodyA->angularVelocity += c.bodyA->invInertiaTensor * glm::cross(c.ra, impulse);
             c.bodyB->angularVelocity -= c.bodyB->invInertiaTensor * glm::cross(c.rb, impulse);
 
@@ -558,9 +535,8 @@ void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations) {
 
                 glm::vec3 raCrossT = glm::cross(c.ra, tangent);
                 glm::vec3 rbCrossT = glm::cross(c.rb, tangent);
-                float angularTermT = glm::dot(tangent,
-                                              glm::cross(c.bodyA->invInertiaTensor * raCrossT, c.ra) +
-                                              glm::cross(c.bodyB->invInertiaTensor * rbCrossT, c.rb));
+                float angularTermT = glm::dot(tangent, glm::cross(c.bodyA->invInertiaTensor * raCrossT, c.ra) +
+                                                           glm::cross(c.bodyB->invInertiaTensor * rbCrossT, c.rb));
 
                 float denomT = invMassSum + angularTermT;
                 if (denomT > 0.0f) {
@@ -572,8 +548,8 @@ void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations) {
 
                     glm::vec3 frictionImpulse = jt * tangent;
 
-                    c.bodyA->velocity       += frictionImpulse * c.bodyA->invMass;
-                    c.bodyB->velocity       -= frictionImpulse * c.bodyB->invMass;
+                    c.bodyA->velocity += frictionImpulse * c.bodyA->invMass;
+                    c.bodyB->velocity -= frictionImpulse * c.bodyB->invMass;
                     c.bodyA->angularVelocity += c.bodyA->invInertiaTensor * glm::cross(c.ra, frictionImpulse);
                     c.bodyB->angularVelocity -= c.bodyB->invInertiaTensor * glm::cross(c.rb, frictionImpulse);
                 }
@@ -586,10 +562,9 @@ void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations) {
     }
 }
 
-void ConstraintSolver::solve(std::shared_ptr<Scene> scene,
-                             const std::vector<ContactManifold>& manifolds,
-                             float dt,
-                             uint32_t iterations) {
+void ConstraintSolver::solve(std::shared_ptr<Scene> scene, const std::vector<ContactManifold> &manifolds, float dt,
+                             uint32_t iterations)
+{
     if (!scene || manifolds.empty()) return;
 
     // 1. Build constraints from the current contacts

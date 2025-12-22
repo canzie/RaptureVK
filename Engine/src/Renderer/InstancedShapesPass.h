@@ -1,11 +1,12 @@
-#pragma once
+#ifndef RAPTURE__INSTANCED_SHAPES_PASS_H
+#define RAPTURE__INSTANCED_SHAPES_PASS_H
 
-#include "Scenes/Scene.h"
-#include "Pipelines/GraphicsPipeline.h"
-#include "RenderTargets/SwapChains/SwapChain.h"
-#include "Textures/Texture.h"
-#include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "AssetManager/Asset.h"
+#include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Pipelines/GraphicsPipeline.h"
+#include "RenderTargets/SceneRenderTarget.h"
+#include "Scenes/Scene.h"
+#include "Textures/Texture.h"
 
 #include <memory>
 #include <vector>
@@ -15,27 +16,21 @@ namespace Rapture {
 class Shader;
 
 class InstancedShapesPass {
-public:
-    InstancedShapesPass(
-        float width, float height,
-        uint32_t framesInFlight,
-        std::vector<std::shared_ptr<Texture>> depthStencilTextures
-    );
+  public:
+    InstancedShapesPass(float width, float height, uint32_t framesInFlight,
+                        std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
     ~InstancedShapesPass();
 
-    void recordCommandBuffer(
-        const std::shared_ptr<CommandBuffer>& commandBuffer,
-        const std::shared_ptr<Scene>& scene,
-        uint32_t imageIndex,
-        uint32_t frameInFlight
-    );
+    void recordCommandBuffer(const std::shared_ptr<CommandBuffer> &commandBuffer, const std::shared_ptr<Scene> &scene,
+                             SceneRenderTarget &renderTarget, uint32_t imageIndex, uint32_t frameInFlight);
 
-private:
+  private:
     void createPipeline();
-    void beginDynamicRendering(const std::shared_ptr<CommandBuffer>& commandBuffer, uint32_t imageIndex);
-    void setupDynamicRenderingMemoryBarriers(const std::shared_ptr<CommandBuffer>& commandBuffer, uint32_t imageIndex);
+    void setupDynamicRenderingMemoryBarriers(const std::shared_ptr<CommandBuffer> &commandBuffer, VkImage targetImage);
+    void beginDynamicRendering(const std::shared_ptr<CommandBuffer> &commandBuffer, VkImageView targetImageView,
+                               VkExtent2D targetExtent);
 
-private:
+  private:
     float m_width;
     float m_height;
     uint32_t m_framesInFlight;
@@ -50,7 +45,9 @@ private:
 
     VkDevice m_device;
     VmaAllocator m_vmaAllocator;
-    std::shared_ptr<SwapChain> m_swapChain;
+    VkFormat m_colorFormat;
 };
 
-}
+} // namespace Rapture
+
+#endif // RAPTURE__INSTANCED_SHAPES_PASS_H

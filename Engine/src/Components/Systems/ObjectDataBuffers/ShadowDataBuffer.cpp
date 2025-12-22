@@ -1,17 +1,19 @@
 #include "ShadowDataBuffer.h"
+#include "Buffers/Descriptors/DescriptorSet.h"
 #include "Components/Components.h"
+#include "Logging/Log.h"
 #include "Renderer/Shadows/ShadowCommon.h"
 #include "Scenes/Scene.h"
-#include "Buffers/Descriptors/DescriptorSet.h"
-#include "Logging/Log.h"
 
 namespace Rapture {
 
-ShadowDataBuffer::ShadowDataBuffer(uint32_t frameCount) 
-    : ObjectDataBuffer(DescriptorSetBindingLocation::SHADOW_DATA_UBO, sizeof(ShadowBufferData), frameCount) {
+ShadowDataBuffer::ShadowDataBuffer(uint32_t frameCount)
+    : ObjectDataBuffer(DescriptorSetBindingLocation::SHADOW_DATA_UBO, sizeof(ShadowBufferData), frameCount)
+{
 }
 
-void ShadowDataBuffer::update(const LightComponent& light, const ShadowComponent& shadow, uint32_t entityID, uint32_t frameIndex) {
+void ShadowDataBuffer::update(const LightComponent &light, const ShadowComponent &shadow, uint32_t entityID, uint32_t frameIndex)
+{
     if (!shadow.shadowMap || !shadow.isActive) {
         return;
     }
@@ -19,7 +21,8 @@ void ShadowDataBuffer::update(const LightComponent& light, const ShadowComponent
     update(light, shadow.shadowMap.get(), entityID, frameIndex);
 }
 
-void ShadowDataBuffer::update(const LightComponent &light, ShadowMap* shadowMap, uint32_t entityID, uint32_t frameIndex) {
+void ShadowDataBuffer::update(const LightComponent &light, ShadowMap *shadowMap, uint32_t entityID, uint32_t frameIndex)
+{
     if (!shadowMap) {
         return;
     }
@@ -34,10 +37,11 @@ void ShadowDataBuffer::update(const LightComponent &light, ShadowMap* shadowMap,
     shadowData.cascadeSplitsViewSpace[0] = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
 
     updateBuffer(&shadowData, sizeof(ShadowBufferData), frameIndex);
-
 }
 
-void ShadowDataBuffer::update(const LightComponent& light, const CascadedShadowComponent& shadow, uint32_t entityID, uint32_t frameIndex) {
+void ShadowDataBuffer::update(const LightComponent &light, const CascadedShadowComponent &shadow, uint32_t entityID,
+                              uint32_t frameIndex)
+{
     if (!shadow.cascadedShadowMap || !shadow.isActive) {
         return;
     }
@@ -45,7 +49,9 @@ void ShadowDataBuffer::update(const LightComponent& light, const CascadedShadowC
     update(light, shadow.cascadedShadowMap.get(), entityID, frameIndex);
 }
 
-void ShadowDataBuffer::update(const LightComponent &light, CascadedShadowMap *cascadedShadowMap, uint32_t entityID, uint32_t frameIndex) {
+void ShadowDataBuffer::update(const LightComponent &light, CascadedShadowMap *cascadedShadowMap, uint32_t entityID,
+                              uint32_t frameIndex)
+{
     if (!cascadedShadowMap) {
         return;
     }
@@ -63,9 +69,9 @@ void ShadowDataBuffer::update(const LightComponent &light, CascadedShadowMap *ca
     // Populate cascade data from the shadow map
     for (uint8_t i = 0; i < cascadedShadowMap->getNumCascades(); i++) {
         shadowData.cascadeMatrices[i] = cascadedShadowMap->getLightViewProjections()[i];
-        shadowData.cascadeSplitsViewSpace[i] = glm::vec4(splits[i], splits[i+1], 0.0f, -1.0f);
+        shadowData.cascadeSplitsViewSpace[i] = glm::vec4(splits[i], splits[i + 1], 0.0f, -1.0f);
     }
 
     updateBuffer(&shadowData, sizeof(ShadowBufferData), frameIndex);
 }
-} 
+} // namespace Rapture

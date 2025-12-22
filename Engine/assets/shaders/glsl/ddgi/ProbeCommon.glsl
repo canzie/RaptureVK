@@ -81,33 +81,6 @@ vec4 RTXGIQuaternionConjugate(vec4 q);
 vec3 RTXGIQuaternionRotate(vec3 v, vec4 q);
 
 /**
- * Determines if a ray at the given index should be dynamic (rotated) or static (fixed).
- * This function centralizes the logic for ray classification, making it easy to modify
- * the distribution pattern between static and dynamic rays.
- */
-bool DDGIIsRayDynamic(int rayIndex, ProbeVolume volume)
-{
-    int dynamicRayCount = volume.probeNumRays - int(volume.probeStaticRayCount);
-    
-    // Method 1: Evenly distributed dynamic rays (current implementation)
-    // Every Nth ray is dynamic where N = totalRays / dynamicRayCount
-    int rayStep = volume.probeNumRays / dynamicRayCount;
-    return (rayIndex % rayStep) == 0;
-    
-    // Alternative Method 2: First N rays are static, rest are dynamic
-    // return rayIndex >= int(volume.probeStaticRayCount);
-    
-    // Alternative Method 3: Interleaved pattern (every other ray alternates in groups)
-    // int groupSize = 8;
-    // int groupIndex = rayIndex / groupSize;
-    // int indexInGroup = rayIndex % groupSize;
-    // return (groupIndex % 2 == 0) ? (indexInGroup < groupSize/2) : (indexInGroup >= groupSize/2);
-    
-    // Alternative Method 4: Prime-based distribution for better coverage
-    // return (rayIndex * 7) % volume.probeNumRays < dynamicRayCount;
-}
-
-/**
  * Computes a low discrepancy spherically distributed direction on the unit sphere,
  * for the given index in a set of samples. Each direction is unique in
  * the set, but the set of directions is always the same.
@@ -123,27 +96,13 @@ vec3 SphericalFibonacci(uint sampleIndex, uint numSamples)
 }
 
 /**
- * Computes the world-space position of a probe from the probe's 3D grid-space coordinates.
- * Probe relocation is not considered.
+ * Reads the probe's position offset (from a RWTexture2DArray) and converts it to a world-space offset.
  */
-vec3 DDGIGetProbeWorldPosition(ivec3 probeCoords, ProbeVolume volume)
+vec3 DDGILoadProbeDataOffset(vec3 probeOffset, ProbeVolume volume)
 {
-    // Multiply the grid coordinates by the probe spacing
-    vec3 probeGridWorldPosition = vec3(probeCoords) * volume.spacing;
-
-    // Shift the grid of probes by half of each axis extent to center the volume about its origin
-    vec3 probeGridShift = (volume.spacing * vec3((volume.gridDimensions - 1))) * 0.5;
-
-    // Center the probe grid about the origin
-    vec3 probeWorldPosition = (probeGridWorldPosition - probeGridShift);
-
-    probeWorldPosition = RTXGIQuaternionRotate(probeWorldPosition, volume.rotation);
-
-    //probeWorldPosition += volume.origin + (volume.probeScrollOffsets * volume.probeSpacing);
-    probeWorldPosition += volume.origin;
-
-    return probeWorldPosition;
+    return probeOffset * volume.spacing;
 }
+
 
 /**
  * Computes the 3D grid-space coordinates for the probe at the given probe index in the range [0, numProbes-1].
@@ -160,16 +119,10 @@ ivec3 DDGIGetProbeCoords(int probeIndex, ProbeVolume volume)
     return probeCoords;
 }
 
-/**
- * Reads the probe's position offset (from a RWTexture2DArray) and converts it to a world-space offset.
- */
-vec3 DDGILoadProbeDataOffset(vec3 probeOffset, ProbeVolume volume)
-{
-    return probeOffset * volume.spacing;
-}
+
 
 /**
- * Computes a spherically distributed, normalized ray direction for the given ray index in a set of ray samples.
+ * Computes a spherically distributed, normalized ray direction for the given ray index.
  * Applies the volume's random probe ray rotation transformation to "non-fixed" ray direction samples.
  */
 vec3 DDGIGetProbeRayDirection(int rayIndex, ProbeVolume volume)
@@ -178,20 +131,20 @@ vec3 DDGIGetProbeRayDirection(int rayIndex, ProbeVolume volume)
     int sampleIndex = rayIndex;
     int numRays = volume.probeNumRays;
 
-    if (true) {
+    if (volume.probeRelocationEnabled > 0.0 || volume.probeClassificationEnabled > 0.0)
+    {
         isFixedRay = (rayIndex < int(volume.probeStaticRayCount));
-        sampleIndex = isFixedRay ? rayIndex : rayIndex - int(volume.probeStaticRayCount);
-        numRays = isFixedRay ? int(volume.probeStaticRayCount) : numRays - int(volume.probeStaticRayCount);
+        sampleIndex = isFixedRay ? rayIndex : (rayIndex - int(volume.probeStaticRayCount));
+        numRays = isFixedRay ? int(volume.probeStaticRayCount) : (volume.probeNumRays - int(volume.probeStaticRayCount));
     }
-    
-    // Get a deterministic direction on the sphere using the spherical Fibonacci sequence
+
+    // Get a ray direction on the sphere
     vec3 direction = SphericalFibonacci(uint(sampleIndex), uint(numRays));
 
-    if (isFixedRay) {
-        return normalize(direction);
-    }
+    // Don't rotate fixed rays so relocation/classification are temporally stable
+    if (isFixedRay) return normalize(direction);
 
-    // Rotate the ray direction by the per-frame random quaternion stored in the volume
+    // Apply a random rotation and normalize the direction
     return normalize(RTXGIQuaternionRotate(direction, RTXGIQuaternionConjugate(volume.probeRayRotation)));
 }
 
@@ -294,6 +247,9 @@ uvec3 DDGIGetRayDataTexelCoords(int rayIndex, int probeIndex, ProbeVolume volume
     return coords;
 }
 
+
+
+
 /**
  * Computes the surfaceBias parameter used by DDGIGetVolumeIrradiance().
  * The surfaceNormal and cameraDirection arguments are expected to be normalized.
@@ -378,8 +334,9 @@ vec3 DDGIGetProbeUV(int probeIndex, vec2 octantCoordinates, int numProbeInterior
     float textureWidth = numProbeTexels * float(volume.gridDimensions.x);
     float textureHeight = numProbeTexels * float(volume.gridDimensions.z);
 
-    // Move to the center of the probe and move to the octant texel before normalizing
-    vec2 uv = vec2(float(coords.x) * numProbeTexels, float(coords.y) * numProbeTexels) + (numProbeTexels * 0.5);
+    // Move to the center of the INTERIOR region (skip 1 border texel, then center within interior)
+    // This ensures UVs target interior texel centers only, not the center of the entire probe tile
+    vec2 uv = vec2(float(coords.x) * numProbeTexels, float(coords.y) * numProbeTexels) + vec2(1.0 + float(numProbeInteriorTexels) * 0.5);
     uv += octantCoordinates.xy * (float(numProbeInteriorTexels) * 0.5);
     uv /= vec2(textureWidth, textureHeight);
     return vec3(uv, float(coords.z));
@@ -420,6 +377,45 @@ float DDGIGetVolumeBlendWeight(vec3 worldPosition, ProbeVolume volume) {
     volumeBlendWeight *= (1.0 - clamp(delta.z / volume.spacing.z, 0.0, 1.0));
 
     return volumeBlendWeight;
+}
+
+vec3 DDGIGetProbeWorldPosition(ivec3 probeCoords, ProbeVolume volume, sampler2DArray probeOffsetAtlas)
+{
+    // Multiply the grid coordinates by the probe spacing
+    vec3 probeGridWorldPosition = vec3(probeCoords) * volume.spacing;
+
+    // Shift the grid of probes by half of each axis extent to center the volume about its origin
+    vec3 probeGridShift = (volume.spacing * vec3((volume.gridDimensions - 1))) * 0.5;
+
+    // Center the probe grid about the origin
+    vec3 probeWorldPosition = (probeGridWorldPosition - probeGridShift);
+
+    probeWorldPosition = RTXGIQuaternionRotate(probeWorldPosition, volume.rotation);
+
+    //probeWorldPosition += volume.origin + (volume.probeScrollOffsets * volume.probeSpacing);
+    probeWorldPosition += volume.origin;
+
+    if (volume.probeRelocationEnabled > 0.0) {
+        int   probeIndex     = DDGIGetProbeIndex(probeCoords, volume);
+        uvec3 offsetTexelPos = DDGIGetProbeTexelCoords(probeIndex, volume);
+
+        vec3 storedOffset = texelFetch(probeOffsetAtlas, ivec3(offsetTexelPos), 0).xyz;
+        vec3 worldOffset  = DDGILoadProbeDataOffset(storedOffset, volume);
+
+        probeWorldPosition += worldOffset;
+    }
+
+    return probeWorldPosition;
+}
+
+uint DDGILoadProbeState(int probeIndex, usampler2DArray probeClassificationAtlas, ProbeVolume volume)
+{
+    uint state = 0; // active
+    if (volume.probeClassificationEnabled > 0.0) {
+        uvec3 probeTexelCoords = DDGIGetProbeTexelCoords(probeIndex, volume);
+        state = uint(texelFetch(probeClassificationAtlas, ivec3(probeTexelCoords), 0).r);
+    }
+    return state;
 }
 
 ///////////////////////////////////////////////////////////////////////////

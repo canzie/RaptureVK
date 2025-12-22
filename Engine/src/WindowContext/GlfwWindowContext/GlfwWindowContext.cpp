@@ -11,18 +11,20 @@
 
 namespace Rapture {
 
-GlfwWindowContext::GlfwWindowContext(int width, int height, const char* title)
-    : m_glfwWindow(nullptr), m_title(title) {
+GlfwWindowContext::GlfwWindowContext(int width, int height, const char *title) : m_glfwWindow(nullptr), m_title(title)
+{
     m_context_data.width = width;
     m_context_data.height = height;
     initWindow();
 }
 
-GlfwWindowContext::~GlfwWindowContext() {
+GlfwWindowContext::~GlfwWindowContext()
+{
     closeWindow();
 }
 
-void GlfwWindowContext::initWindow() {
+void GlfwWindowContext::initWindow()
+{
     RP_CORE_INFO("========== Initializing GLFW Window Context ==========");
 
     if (!glfwInit()) {
@@ -35,7 +37,7 @@ void GlfwWindowContext::initWindow() {
     // For Vulkan, you'll need to tell GLFW not to create an OpenGL context
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    //glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     m_glfwWindow = glfwCreateWindow(m_context_data.width, m_context_data.height, m_title, nullptr, nullptr);
     if (!m_glfwWindow) {
@@ -61,7 +63,8 @@ void GlfwWindowContext::initWindow() {
     RP_CORE_INFO("========== GLFW Window Context Initialized Successfully. ==========");
 }
 
-void GlfwWindowContext::closeWindow() {
+void GlfwWindowContext::closeWindow()
+{
     if (m_glfwWindow) {
         glfwDestroyWindow(m_glfwWindow);
         m_glfwWindow = nullptr;
@@ -70,12 +73,14 @@ void GlfwWindowContext::closeWindow() {
     RP_CORE_INFO("========== GLFW Window Context Closed. ==========");
 }
 
-void GlfwWindowContext::onUpdate() {
+void GlfwWindowContext::onUpdate()
+{
     glfwPollEvents();
     // Swapping buffers will be handled by the Vulkan renderer, not directly here usually
 }
 
-void* GlfwWindowContext::getNativeWindowContext() {
+void *GlfwWindowContext::getNativeWindowContext()
+{
     return m_glfwWindow;
 }
 
@@ -92,7 +97,7 @@ void GlfwWindowContext::waitEvents() const
 const char **GlfwWindowContext::getExtensions()
 {
     uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
     return glfwExtensions;
 }
 
@@ -100,24 +105,28 @@ uint32_t GlfwWindowContext::getExtensionCount()
 {
     uint32_t glfwExtensionCount = 0;
     glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    
+
     return glfwExtensionCount;
 }
 
 // GLFW Static Callback Implementations
 
-void GlfwWindowContext::errorCallback(int error, const char* description) {
+void GlfwWindowContext::errorCallback(int error, const char *description)
+{
     RP_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
 }
 
-void GlfwWindowContext::windowCloseCallback(GLFWwindow* window) {
+void GlfwWindowContext::windowCloseCallback(GLFWwindow *window)
+{
+    (void)window;
     // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
     // if (context) { // Check if context is valid if necessary }
     ApplicationEvents::onWindowClose().publish();
 }
 
-void GlfwWindowContext::windowSizeCallback(GLFWwindow* window, int width, int height) {
-    GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
+void GlfwWindowContext::windowSizeCallback(GLFWwindow *window, int width, int height)
+{
+    GlfwWindowContext *context = static_cast<GlfwWindowContext *>(glfwGetWindowUserPointer(window));
     if (context) {
         context->m_context_data.width = width;
         context->m_context_data.height = height;
@@ -125,49 +134,61 @@ void GlfwWindowContext::windowSizeCallback(GLFWwindow* window, int width, int he
     ApplicationEvents::onWindowResize().publish(width, height);
 }
 
-void GlfwWindowContext::keyCallback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
+void GlfwWindowContext::keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int /*mods*/)
+{
+    (void)window;
     // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
     switch (action) {
-        case GLFW_PRESS:
-            InputEvents::onKeyPressed().publish(key, 0); // GLFW doesn't directly give repeat count here easily, need to track
-            break;
-        case GLFW_RELEASE:
-            InputEvents::onKeyReleased().publish(key);
-            break;
-        case GLFW_REPEAT: // GLFW_REPEAT can be handled as another KeyPressed event if your system expects it
-            InputEvents::onKeyPressed().publish(key, 1); // Or manage repeat count if your event takes it.
-            break;
+    case GLFW_PRESS:
+        InputEvents::onKeyPressed().publish(key, 0); // GLFW doesn't directly give repeat count here easily, need to track
+        break;
+    case GLFW_RELEASE:
+        InputEvents::onKeyReleased().publish(key);
+        break;
+    case GLFW_REPEAT: // GLFW_REPEAT can be handled as another KeyPressed event if your system expects it
+        InputEvents::onKeyPressed().publish(key, 1); // Or manage repeat count if your event takes it.
+        break;
     }
 }
 
-void GlfwWindowContext::charCallback(GLFWwindow* window, unsigned int codepoint) {
+void GlfwWindowContext::charCallback(GLFWwindow *window, unsigned int codepoint)
+{
+    (void)window;
     // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
     InputEvents::onKeyTyped().publish(codepoint);
 }
 
-void GlfwWindowContext::mouseButtonCallback(GLFWwindow* window, int button, int action, int /*mods*/) {
+void GlfwWindowContext::mouseButtonCallback(GLFWwindow *window, int button, int action, int /*mods*/)
+{
+    (void)window;
     // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
     switch (action) {
-        case GLFW_PRESS:
-            InputEvents::onMouseButtonPressed().publish(button);
-            break;
-        case GLFW_RELEASE:
-            InputEvents::onMouseButtonReleased().publish(button);
-            break;
+    case GLFW_PRESS:
+        InputEvents::onMouseButtonPressed().publish(button);
+        break;
+    case GLFW_RELEASE:
+        InputEvents::onMouseButtonReleased().publish(button);
+        break;
     }
 }
 
-void GlfwWindowContext::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+void GlfwWindowContext::cursorPosCallback(GLFWwindow *window, double xpos, double ypos)
+{
+    (void)window;
     // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
     InputEvents::onMouseMoved().publish(static_cast<float>(xpos), static_cast<float>(ypos));
 }
 
-void GlfwWindowContext::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+void GlfwWindowContext::scrollCallback(GLFWwindow *window, double xoffset, double yoffset)
+{
+    (void)window;
     // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
     InputEvents::onMouseScrolled().publish(static_cast<float>(xoffset), static_cast<float>(yoffset));
 }
 
-void GlfwWindowContext::windowFocusCallback(GLFWwindow* window, int focused) {
+void GlfwWindowContext::windowFocusCallback(GLFWwindow *window, int focused)
+{
+    (void)window;
     // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
     if (focused) {
         ApplicationEvents::onWindowFocus().publish();
@@ -180,8 +201,9 @@ void GlfwWindowContext::windowFocusCallback(GLFWwindow* window, int focused) {
 // void GlfwWindowContext::windowIconifyCallback(GLFWwindow* window, int iconified) { ... }
 // void GlfwWindowContext::windowMaximizeCallback(GLFWwindow* window, int maximized) { ... }
 
-WindowContext* WindowContext::createWindow(int width, int height, const char* title) {
+WindowContext *WindowContext::createWindow(int width, int height, const char *title)
+{
     return new GlfwWindowContext(width, height, title);
 }
 
-} // namespace Rapture 
+} // namespace Rapture

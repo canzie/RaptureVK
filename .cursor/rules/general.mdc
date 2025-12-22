@@ -1,0 +1,22 @@
+---
+description: General development guidelines and best practices
+globs: **/*.h, **/*.cpp, **/*.hpp
+alwaysApply: true
+---
+
+# General Development Guidelines
+
+## Code Style
+- Write concise, idiomatic C++ code with accurate examples.
+- Follow modern C++ conventions and best practices.
+- Use object-oriented, procedural, or functional programming patterns as appropriate.
+- Leverage STL and standard algorithms for collection operations.
+- Use descriptive variable and method names (e.g., 'isUserSignedIn', 'calculateTotal').
+
+## Documentation
+- Write clear comments for classes, methods, and critical logic.
+- Document assumptions, constraints, and expected behavior of code.
+
+## Development Practices
+- Do not change parts of the code which the user did not ask for.
+- Follow the official ISO C++ standards and guidelines for best practices in modern C++ development.

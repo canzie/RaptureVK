@@ -57,11 +57,7 @@ float LightVisibility(
     rayQueryProceedEXT(visibilityQuery);
     
     // Check if we hit anything (if we did, the light is occluded)
-    if (rayQueryGetIntersectionTypeEXT(visibilityQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-        return 0.0; // Occluded
-    }
-    
-    return 1.0; // Visible
+    return float(rayQueryGetIntersectionTypeEXT(visibilityQuery, true) == gl_RayQueryCommittedIntersectionNoneEXT);
 }
 
 float LightFalloff(float distanceToLight) {
@@ -75,15 +71,15 @@ float LightWindowing(float distanceToLight, float maxDistance) {
 /**
  * Evaluate direct lighting for the current surface and the directional light using ray-traced visibility.
  */
-vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties) {   
+vec3 EvaluateDirectionalLight(vec3 surfaceNormal, vec3 hitPositionWorld, SunProperties sunProperties, vec3 shadingNormal) {   
     
     // Use ray-traced visibility instead of shadow maps
-    float normalBias = 0.01; // Small bias to avoid self-intersection
-    float viewBias = 0.0;    // Not used yet, but kept for future
+    float normalBias = 0.008; // Small bias to avoid self-intersection
+    float viewBias = 0.0001;    // Not used yet, but kept for future
     
     float visibility = LightVisibility(
         hitPositionWorld,
-        shadingNormal,
+        surfaceNormal,
         -sunProperties.direction.xyz,  // Light vector (towards sun)
         1e27,                              // Very large tmax for directional light
         normalBias,
@@ -96,7 +92,7 @@ vec3 EvaluateDirectionalLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProp
     }
     
     // Compute lighting
-    vec3 lightDirection = normalize(-sunProperties.direction.xyz);
+    vec3 lightDirection = -normalize(sunProperties.direction.xyz);
     float NdotL = max(dot(shadingNormal, lightDirection), 0.0);
     
     return sunProperties.color.xyz * sunProperties.color.w * NdotL * visibility;
@@ -139,7 +135,7 @@ vec3 EvaluatePointLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties
 /**
  * Computes the diffuse reflection of light off the given surface (direct lighting).
  */
-vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorld, uint lightCount) {
+vec3 DirectDiffuseLighting(vec3 albedo, vec3 surfaceNormal, vec3 hitPositionWorld, uint lightCount, vec3 shadingNormal) {
 
     vec3 brdf = (albedo / PI);
 
@@ -150,7 +146,7 @@ vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorl
         
         // light type is in light.position.w
         if (light.position.w == 1) { // Directional
-             totalLighting += EvaluateDirectionalLight(shadingNormal, hitPositionWorld, light);
+             totalLighting += EvaluateDirectionalLight(surfaceNormal, hitPositionWorld, light, shadingNormal);
         } else if (light.position.w == 0) { // Point
              totalLighting += EvaluatePointLight(shadingNormal, hitPositionWorld, light);
         } else if (light.position.w == 2) { // Spot
@@ -170,11 +166,13 @@ vec3 DirectDiffuseLighting(vec3 albedo, vec3 shadingNormal, vec3 hitPositionWorl
 
 // New function to calculate indirect diffuse from the single nearest probe
 vec3 DDGIGetVolumeIrradiance(
-    vec3 worldPosition, 
-    vec3 direction, 
-    vec3 surfaceBias, 
+    vec3 worldPosition,
+    vec3 direction,
+    vec3 surfaceBias,
     sampler2DArray probeIrradianceAtlas,
     sampler2DArray probeDistanceAtlas,
+    sampler2DArray probeOffsetAtlas,
+    usampler2DArray probeClassificationAtlas,
     ProbeVolume volume) {
 
     vec3 irradiance = vec3(0.0);
@@ -186,7 +184,7 @@ vec3 DDGIGetVolumeIrradiance(
     ivec3 baseProbeCoords = DDGIGetBaseProbeGridCoords(biasedWorldPosition, volume);
 
     // Get the world-space position of the base probe (ignore relocation)
-    vec3 baseProbeWorldPosition = DDGIGetProbeWorldPosition(baseProbeCoords, volume);
+    vec3 baseProbeWorldPosition = DDGIGetProbeWorldPosition(baseProbeCoords, volume, probeOffsetAtlas);
 
     // Clamp the distance (in grid space) between the given point and the base probe's world position (on each axis) to [0, 1]
     vec3 gridSpaceDistance = (biasedWorldPosition - baseProbeWorldPosition);
@@ -207,7 +205,12 @@ vec3 DDGIGetVolumeIrradiance(
         // Get the adjacent probe's index, adjusting the adjacent probe index for scrolling offsets (if present)
         int adjacentProbeIndex = DDGIGetProbeIndex(adjacentProbeCoords, volume);
 
-        vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume);
+        uvec3 adjacentProbeTexelCoords = DDGIGetProbeTexelCoords(adjacentProbeIndex, volume);
+        uint adjacentProbeState = texelFetch(probeClassificationAtlas, ivec3(adjacentProbeTexelCoords), 0).r;
+        const uint PROBE_STATE_ACTIVE = 0u;
+        if (adjacentProbeState != PROBE_STATE_ACTIVE) continue;
+
+        vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume, probeOffsetAtlas);
 
         // Compute the distance and direction from the (biased and non-biased) shading point and the adjacent probe
         vec3  worldPosToAdjProbe = normalize(adjacentProbeWorldPosition - worldPosition);
@@ -234,14 +237,16 @@ vec3 DDGIGetVolumeIrradiance(
         // Compute the octahedral coordinates of the adjacent probe
         vec2 octantCoords = DDGIGetOctahedralCoordinates(-biasedPosToAdjProbe);
 
+        // Clamp octahedral coordinates inward by half a texel to prevent bilinear filtering from sampling border texels
+        float distanceOctInset = 1.0 / float(volume.probeNumDistanceInteriorTexels);
+        octantCoords = clamp(octantCoords, vec2(-1.0 + distanceOctInset), vec2(1.0 - distanceOctInset));
+
         // Get the texture array coordinates for the octant of the probe
         vec3 probeTextureUV = DDGIGetProbeUV(adjacentProbeIndex, octantCoords, volume.probeNumDistanceInteriorTexels, volume);
 
         // Sample the probe's distance texture to get the mean distance to nearby surfaces
         // Note: Multiplied by 2.0 to compensate for the division by 2 in the blending shader
-        vec2 filteredDistance = 2.0 * texture(probeDistanceAtlas, probeTextureUV).rg;
-
-
+        vec2 filteredDistance = 2.0 * textureLod(probeDistanceAtlas, probeTextureUV, 0.0).rg;
 
         // Find the variance of the mean distance
         float variance = abs((filteredDistance.x * filteredDistance.x) - filteredDistance.y);
@@ -279,11 +284,15 @@ vec3 DDGIGetVolumeIrradiance(
         // Get the octahedral coordinates for the sample direction
         octantCoords = DDGIGetOctahedralCoordinates(direction);
 
+        // Clamp octahedral coordinates inward by half a texel to prevent bilinear filtering from sampling border texels
+        float irradianceOctInset = 1.0 / float(volume.probeNumIrradianceInteriorTexels);
+        octantCoords = clamp(octantCoords, vec2(-1.0 + irradianceOctInset), vec2(1.0 - irradianceOctInset));
+
         // Get the probe's texture coordinates
         probeTextureUV = DDGIGetProbeUV(adjacentProbeIndex, octantCoords, volume.probeNumIrradianceInteriorTexels, volume);
 
         // Sample the probe's irradiance
-        vec3 probeIrradiance = texture(probeIrradianceAtlas, probeTextureUV).rgb;
+        vec3 probeIrradiance = textureLod(probeIrradianceAtlas, probeTextureUV, 0.0).rgb;
 
 
 
@@ -309,7 +318,11 @@ vec3 DDGIGetVolumeIrradiance(
 
     irradiance *= (1.0 / accumulatedWeights);   // Normalize by the accumulated weights
     irradiance *= irradiance;                   // Go back to linear irradiance
-    irradiance *= 6.28318530718;                    // Multiply by the area of the integration domain (hemisphere) to complete the Monte Carlo Estimator equation
-    //irradiance *= 1.0989;
+    irradiance *= 6.28318530718;                // Multiply by the area of the integration domain (hemisphere) to complete the Monte Carlo Estimator equation
+
+    // Adjust for energy loss due to reduced precision in the R11G11B10F irradiance texture format
+    // RTXGI uses 1.0989 for R10G10B10A2. R11G11B10F has similar precision issues (especially blue channel with 10 bits)
+    // irradiance *= 1.0989;
+
     return irradiance;
 }

@@ -1,6 +1,12 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 
+#ifndef PROBE_OFFSETS_TEXTURE
+#define PROBE_OFFSETS_TEXTURE
+#endif
+
+
+
 layout(location = 0) out vec4 outColor;
 
 layout(location = 0) in vec2 fragTexCoord;
@@ -30,6 +36,7 @@ layout(set = 3, binding = 0) uniform sampler2D gTextures[];
 layout(set = 3, binding = 0) uniform sampler2DShadow gShadowTextures[];
 layout(set = 3, binding = 0) uniform sampler2DArrayShadow gShadowArrays[];
 layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
+layout(set = 3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
 
 #include "ProbeCommon.glsl"
 #include "IrradianceCommon.glsl"
@@ -83,12 +90,48 @@ layout(push_constant) uniform PushConstants {
     uint probeVolumeHandle;
     uint probeIrradianceHandle;
     uint probeVisibilityHandle;
+    uint probeOffsetHandle;
+    uint probeClassificationHandle;
 
     // Fog
     vec4 fogColor;     // .rgb = color, .a = enabled
     vec2 fogDistances; // .x = near, .y = far
 } pc;
 
+float exposure(float fstop) {
+    return pow(2.0, fstop);
+}
+
+vec3 ACESFilm(vec3 color) {
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((color*(a*color + b)) / (color*(c*color + d) + e), vec3(0.0), vec3(1.0));
+}
+
+vec3 LessThan(vec3 f, float value)
+{
+    return vec3(
+        (f.x < value) ? 1.0 : 0.0,
+        (f.y < value) ? 1.0 : 0.0,
+        (f.z < value) ? 1.0 : 0.0);
+}
+
+vec3 pow3(vec3 x, float y) {
+    return vec3(pow(x.x, y), pow(x.y, y), pow(x.z, y));
+}
+
+vec3 LinearToSRGB(vec3 rgb)
+{
+    rgb = clamp(rgb, 0.0, 1.0);
+    return mix(
+        pow3(rgb * 1.055, 1.0 / 2.4) - 0.055,
+        rgb * 12.92,
+        LessThan(rgb, 0.0031308)
+    );
+}
 
 // Simple Fresnel approximation
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
@@ -427,8 +470,10 @@ vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume
             surfaceBias,
             gTextureArrays[pc.probeIrradianceHandle],
             gTextureArrays[pc.probeVisibilityHandle],
+            gTextureArrays[pc.probeOffsetHandle],
+            gUintTextureArrays[pc.probeClassificationHandle],
             volume);
-            
+
         irradiance *= blendWeight;
     }
 
@@ -542,18 +587,12 @@ void main() {
 
     vec3 indirectDiffuse = vec3(0.03) * albedo ;
 
-    if (pc.useDDGI > 0u) {
-        // Calculate F0 (surface reflection at zero incidence)
+    if (pc.useDDGI > 0) {
         vec3 F0 = mix(vec3(0.04), albedo, metallic);
-
-        // Specular BRDF terms
-        float NdotV = max(dot(N, V), 0.0001);
-
-        //vec3 kD_indirect = vec3(1.0) * (1.0 - metallic);
-        vec3 kD_indirect = (vec3(1.0) - fresnelSchlick(NdotV, F0)) * (1.0 - metallic);
+        vec3 kD_indirect = (vec3(1.0) - F0) * (1.0 - metallic);
         
-        vec3 indirectDiffuesIntensity = getIrradiance(fragPos, N, V, u_DDGI_Volume);
-        indirectDiffuse = indirectDiffuesIntensity * (albedo/3.14159265359) * kD_indirect;
+        vec3 irradiance = getIrradiance(fragPos, N, V, u_DDGI_Volume);
+        indirectDiffuse = irradiance * (albedo/3.14159265359) * kD_indirect * ao;
 
         
     }
@@ -580,8 +619,10 @@ void main() {
 #endif
 
     // HDR tonemapping and gamma correction
-    color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0/2.2)); 
+    //color = color / (color + vec3(1.0));
+    color *= exposure(1.0);
+    color = ACESFilm(color);
+    color = LinearToSRGB(color);
 
     outColor = vec4(color, 1.0);
 }

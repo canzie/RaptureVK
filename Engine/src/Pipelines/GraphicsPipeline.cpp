@@ -3,22 +3,19 @@
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
 
-#include <stdexcept>
 #include <glm/glm.hpp>
-
+#include <stdexcept>
 
 namespace Rapture {
 
-
-
-GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineConfiguration& config)
+GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineConfiguration &config)
 {
     buildPipelines(config);
 }
 
 GraphicsPipeline::~GraphicsPipeline()
 {
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     if (m_pipeline != VK_NULL_HANDLE) {
@@ -32,12 +29,10 @@ GraphicsPipeline::~GraphicsPipeline()
     m_pipelineLayout = VK_NULL_HANDLE;
 }
 
-
 void GraphicsPipeline::buildPipelines(const GraphicsPipelineConfiguration &config)
 {
     createPipelineLayout(config);
     createPipeline(config);
-
 }
 
 void GraphicsPipeline::bind(VkCommandBuffer commandBuffer)
@@ -45,10 +40,10 @@ void GraphicsPipeline::bind(VkCommandBuffer commandBuffer)
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 }
 
+void GraphicsPipeline::createPipelineLayout(const GraphicsPipelineConfiguration &config)
+{
 
-void GraphicsPipeline::createPipelineLayout(const GraphicsPipelineConfiguration& config) {
-
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -59,16 +54,15 @@ void GraphicsPipeline::createPipelineLayout(const GraphicsPipelineConfiguration&
     pipelineLayoutInfo.pPushConstantRanges = config.shader->getPushConstantLayouts().data();
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
-        RP_CORE_ERROR("GraphicsPipeline::createPipelineLayout - failed to create pipeline layout!");
-        throw std::runtime_error("GraphicsPipeline::createPipelineLayout - failed to create pipeline layout!");
+        RP_CORE_ERROR("failed to create pipeline layout!");
+        throw std::runtime_error("failed to create pipeline layout!");
     }
-
 }
 
-void GraphicsPipeline::createPipeline(const GraphicsPipelineConfiguration& config)
+void GraphicsPipeline::createPipeline(const GraphicsPipelineConfiguration &config)
 {
 
-    auto& app = Application::getInstance();
+    auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
 
     VkPipelineRenderingCreateInfoKHR pipelineDynamicRenderingInfo{};
@@ -77,10 +71,9 @@ void GraphicsPipeline::createPipeline(const GraphicsPipelineConfiguration& confi
     pipelineDynamicRenderingInfo.pColorAttachmentFormats = config.framebufferSpec.colorAttachments.data();
     pipelineDynamicRenderingInfo.depthAttachmentFormat = config.framebufferSpec.depthAttachment;
     pipelineDynamicRenderingInfo.stencilAttachmentFormat = config.framebufferSpec.stencilAttachment;
-    
+
     // Add multiview support
     pipelineDynamicRenderingInfo.viewMask = config.framebufferSpec.viewMask;
-
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -104,16 +97,14 @@ void GraphicsPipeline::createPipeline(const GraphicsPipelineConfiguration& confi
 
     // TODO: can be optimised to reuse pipelines
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-    pipelineInfo.basePipelineIndex = -1; // Optional
+    pipelineInfo.basePipelineIndex = -1;              // Optional
 
     pipelineInfo.pNext = &pipelineDynamicRenderingInfo;
 
-
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS) {
-        RP_CORE_ERROR("GraphicsPipeline::createPipeline - failed to create graphics pipeline!");
-        throw std::runtime_error("GraphicsPipeline::createPipeline - failed to create graphics pipeline!");
+        RP_CORE_ERROR("failed to create graphics pipeline!");
+        throw std::runtime_error("failed to create graphics pipeline!");
     }
 }
 
-
-}
+} // namespace Rapture

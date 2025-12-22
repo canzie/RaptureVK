@@ -1,79 +1,88 @@
-#pragma once
+#ifndef RAPTURE__COMMAND_POOL_H
+#define RAPTURE__COMMAND_POOL_H
 
 #include <vulkan/vulkan.h>
-#include <vector>
-#include <unordered_map>
-#include <memory>
+
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace Rapture {
 
-    // Forward declaration
-    class CommandBuffer;
+class CommandBuffer;
+struct CmdBufferDefferedDestruction;
 
-    struct CommandPoolConfig {
-        std::string name = "CommandPool";
-        size_t threadId=0;
-        uint32_t queueFamilyIndex;
-        VkCommandPoolCreateFlags flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+using CommandPoolHash = uint32_t;
 
-        uint32_t hash() const {
-            return static_cast<uint32_t>(std::hash<size_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^ std::hash<VkCommandPoolCreateFlags>()(flags));
-        }
+struct CommandPoolConfig {
+    std::string name = "CommandPool";
+    size_t threadId = 0;
+    uint32_t queueFamilyIndex;
+    VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    };
+    CommandPoolHash hash() const
+    {
+        return static_cast<CommandPoolHash>(std::hash<size_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^
+                                            std::hash<VkCommandPoolCreateFlags>()(flags));
+    }
+};
 
+// should automatically create a command pool for each queue family in a thread,
+// not for each call but use a manager system to create a new pool when the conditions are met
+// could also allow for manual specs.
+class CommandPool : public std::enable_shared_from_this<CommandPool> {
+  public:
+    CommandPool(const CommandPoolConfig &config);
+    ~CommandPool();
 
-    // should automatically create a command pool for each queue family in a thread, 
-    // not for each call but use a manager system to create a new pool when the conditions are met
-    // could also allow for manual specs.
-    class CommandPool : public std::enable_shared_from_this<CommandPool> {
-        public:
-            CommandPool(const CommandPoolConfig& config);
-            ~CommandPool();
+    void deferCmdBufferDestruction(CmdBufferDefferedDestruction cmdBufferDefferedDestruction);
+    void onUpdate(float dt);
 
-            VkCommandPool getCommandPoolVk() const { return m_commandPool; }
-            std::shared_ptr<CommandBuffer> getCommandBuffer(bool stayAlive=false);
-            std::vector<std::shared_ptr<CommandBuffer>> getCommandBuffers(uint32_t count);
+    VkCommandPool getCommandPoolVk() const { return m_commandPool; }
+    std::shared_ptr<CommandBuffer> getCommandBuffer(const std::string &name, bool stayAlive = false);
+    std::vector<std::shared_ptr<CommandBuffer>> getCommandBuffers(uint32_t count, const std::string &namePrefix = "cmd");
 
-        private:
-            //std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
-            VkCommandPoolCreateInfo m_createInfo;
-            VkCommandPool m_commandPool;
-            uint32_t m_hash;
+  private:
+    // std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
+    VkCommandPoolCreateInfo m_createInfo;
+    VkCommandPool m_commandPool;
+    CommandPoolHash m_hash;
 
-            VkDevice m_device;
+    VkDevice m_device;
 
-            // only added when stayAlive=true, can be usefull for liefetime commandbuffers which rapture does not manage directly
-            std::vector<std::shared_ptr<CommandBuffer>> m_savedCommandBuffers;
+    std::vector<CmdBufferDefferedDestruction> m_deferredCmdBufferDestructions;
+    // only added when stayAlive=true, can be usefull for liefetime commandbuffers which rapture does not manage directly
+    std::vector<std::shared_ptr<CommandBuffer>> m_savedCommandBuffers;
+};
 
-    };
+class CommandPoolManager {
+  public:
+    static void init();
+    static void shutdown();
 
+    static void onUpdate(float dt);
 
-    class CommandPoolManager {
-    public:
-        static void init();
-        static void shutdown();
+    static std::shared_ptr<CommandPool> createCommandPool(const CommandPoolConfig &config);
+    // access a pool by its hash
+    static std::shared_ptr<CommandPool> getCommandPool(CommandPoolHash hash);
+    // the strict flag will return the command pool closest to the config provided (most same values)
+    // assuming atleast 1 pool exists, this function will return a pool, given the strict flag=false
+    // static std::shared_ptr<CommandPool> getCommandPool(const CommandPoolConfig& config, bool isStrict = true);
 
-        static std::shared_ptr<CommandPool> createCommandPool(const CommandPoolConfig& config);
-        // access a pool by its hash
-        static std::shared_ptr<CommandPool> getCommandPool(uint32_t CPHash);
-        // the strict flag will return the command pool closest to the config provided (most same values)
-        // assuming atleast 1 pool exists, this function will return a pool, given the strict flag=false
-        //static std::shared_ptr<CommandPool> getCommandPool(const CommandPoolConfig& config, bool isStrict = true);
+    // currently still needs to destroy manually because when destroying some other thng ith a ptr
+    // to the bool could be using it, causing a crash or undefined behavior
+    // would probably have to either switch to weak ptrs or checking the poolvk value every time when retireving it
+    // static void closePool(uint32_t CPHash);
+    static void closeAllPools();
 
+  private:
+    static std::unordered_map<CommandPoolHash, std::shared_ptr<CommandPool>> s_commandPools;
+    static std::mutex s_mutex;
+};
 
-        // currently still needs to destroy manually because when destroying some other thng ith a ptr
-        // to the bool could be using it, causing a crash or undefined behavior
-        // would probably have to either switch to weak ptrs or checking the poolvk value every time when retireving it
-        //static void closePool(uint32_t CPHash);
-        static void closeAllPools();
+} // namespace Rapture
 
-    private:
-        static std::unordered_map<uint32_t, std::shared_ptr<CommandPool>> m_commandPools;
-
-
-    };
-
-}
+#endif // RAPTURE__COMMAND_POOL_H

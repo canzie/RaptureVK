@@ -4,131 +4,163 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 // -----------------------------------------------------------------------------
-//  DDGI Probe-relocation Compute Shader
-//  Computes an updated relocation offset for every probe using the rules
-//  described in the pseudo-code supplied by the user.
+//  DDGI Probe Relocation Compute Shader (GLSL port of RTXGI HLSL version)
+//  One invocation = one probe relocation.
 // -----------------------------------------------------------------------------
 
-// One probe per invocation (choose X threads for throughput – must match dispatch)
+// HLSL: [numthreads(32, 1, 1)]
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 // -----------------------------------------------------------------------------
-//  Resource bindings (match your engine's descriptor table)                    
+//  Resources
 // -----------------------------------------------------------------------------
-// 0,0  –  Ray-data texture (RGBA32F) produced by ProbeTrace pass
-layout(set = 3, binding = 0) uniform sampler2DArray RayData[];
+// Ray data produced by `ProbeTrace.cs.glsl` (bindless array, same convention as
+// `ProbeBlending.cs.glsl`)
+layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
 
-// 0,1  –  Probe state image (optional, not used in this shader)
-//layout(set = 0, binding = 1, r32ui) uniform restrict uimage2DArray ProbeStates;
+// Probe world–space offset storage. Alpha channel is unused here but kept as 1.0
+// for consistency with the rest of the DDGI system.
+layout(set = 4, binding = 4, rgba32f) uniform restrict image2DArray ProbeOffsets;
 
-// 0,2  –  Probe offset image (read-modify-write)
-layout(set = 4, binding = 6, rgba32f) uniform restrict image2DArray ProbeOffsets;
-
-// -----------------------------------------------------------------------------
-//  DDGI volume parameters                                                      
-// -----------------------------------------------------------------------------
+// DDGI volume parameters (shared with other DDGI shaders)
 #include "ProbeCommon.glsl"
 
-// Global DDGI info (same uniform block used everywhere else)
 layout(std140, set = 0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_volume;
 };
 
+// Push constants: index into bindless ray-data array
 layout(push_constant) uniform PushConstants {
     uint rayDataIndex;
 } pc;
 
+// -----------------------------------------------------------------------------
+//  Helper: load ray distance exactly as the HLSL version expects
+// -----------------------------------------------------------------------------
+// In `ProbeTrace.cs.glsl` we encode:
+//  - front‑face hit   -> RayData.a = +t
+//  - back‑face hit    -> RayData.a = -t * 0.2  ("visibility" term)
+// The original RTXGI relocation shader then does `hitDistance * -5` on
+// backfaces to reconstruct the original distance (since -t*0.2 * -5 = t).
+// This function mirrors that logic so the ported algorithm behaves the same.
+float DDGILoadProbeRayDistance_GLSL(ivec3 rayTexelCoords) {
+    vec4 data = texelFetch(gTextureArrays[pc.rayDataIndex], rayTexelCoords, 0);
+    return data.a;
+}
 
-
+// -----------------------------------------------------------------------------
+//  Entry point (GLSL port of DDGIProbeRelocationCS)
+// -----------------------------------------------------------------------------
 void main() {
+    // Probe index for this thread (1D dispatch: X dimension only)
+    uint probeIndex = gl_GlobalInvocationID.x;
+
+    // Total number of probes in the volume
+    uint numProbes = u_volume.gridDimensions.x * u_volume.gridDimensions.y * u_volume.gridDimensions.z;
+    if (probeIndex >= numProbes) {
+        return;
+    }
+
+    // Get the probe's texel coordinates in the ProbeOffsets texture array
+    uvec3 outputCoords = DDGIGetProbeTexelCoords(int(probeIndex), u_volume);
+    ivec3 texelCoord  = ivec3(outputCoords);
+
+    // Read the current world‑space position offset for this probe
+    vec3 storedOffset = imageLoad(ProbeOffsets, texelCoord).xyz;
+    vec3 offset       = DDGILoadProbeDataOffset(storedOffset, u_volume);
+
     // ---------------------------------------------------------------------
-    // Determine probe index and texture coordinates                         
+    //  Gather per‑probe ray statistics
     // ---------------------------------------------------------------------
-    uint probeIndex      = gl_GlobalInvocationID.x; // 1D dispatch ‑ one probe per thread
-    uint totalProbes     = u_volume.gridDimensions.x * u_volume.gridDimensions.y * u_volume.gridDimensions.z;
-    if (probeIndex >= totalProbes) return;
+    int   closestBackfaceIndex      = -1;
+    int   closestFrontfaceIndex     = -1;
+    int   farthestFrontfaceIndex    = -1;
 
-    uvec3 probeTexelCoord = DDGIGetProbeTexelCoords(int(probeIndex), u_volume);
-    ivec3 texelCoord      = ivec3(probeTexelCoord);
-    vec4 probeData        = imageLoad(ProbeOffsets, texelCoord);
+    float closestBackfaceDistance   = 1e27;
+    float closestFrontfaceDistance  = 1e27;
+    float farthestFrontfaceDistance = 0.0;
+    float backfaceCount             = 0.0;
 
-    vec3 offset =  DDGILoadProbeDataOffset(probeData.xyz, u_volume);
-
-
-    // ---------------------------------------------------------------------
-    // Gather per-probe ray statistics                                       
-    // ---------------------------------------------------------------------
-    int   backfaceCount               = 0;
-    float closestBackfaceDistance     = 1e30;
-    int   closestBackfaceIndex        = -1;
-
-    float closestFrontfaceDistance    = 1e30;
-    int   closestFrontfaceIndex       = -1;
-
-    float farthestFrontfaceDistance   = -1.0;
-    int   farthestFrontfaceIndex      = -1;
-
+    // Number of rays to inspect: limit to the fixed/static rays used for
+    // relocation/classification stability. In our GLSL setup the fixed ray
+    // count is stored in `probeStaticRayCount`.
     int numRays = min(u_volume.probeNumRays, int(u_volume.probeStaticRayCount));
 
-    for (int rayIdx = 0; rayIdx < numRays; rayIdx++) {
-        ivec3 rayDataTexCoords = ivec3(DDGIGetRayDataTexelCoords(rayIdx, int(probeIndex), u_volume));
-        vec4  rayData  = texelFetch(RayData[pc.rayDataIndex], rayDataTexCoords, 0);
+    for (int rayIndex = 0; rayIndex < numRays; ++rayIndex) {
+        // Get the coordinates for this probe ray in the RayData texture array
+        ivec3 rayDataTexCoords = ivec3(DDGIGetRayDataTexelCoords(rayIndex, int(probeIndex), u_volume));
 
-        float hitT = rayData.a;
+        // Load the hit distance for the ray
+        float hitDistance = DDGILoadProbeRayDistance_GLSL(rayDataTexCoords);
 
-        if (hitT < 0.0) {
-            backfaceCount++;
+        if (hitDistance < 0.0) {
+            // Found a back‑face
+            backfaceCount += 1.0;
 
-            hitT = hitT * -0.5;
-            if (hitT > closestBackfaceDistance) {
-                closestBackfaceDistance = hitT;
-                closestBackfaceIndex = rayIdx;
+            // Negate the hit distance on a backface hit and scale back to full distance
+            hitDistance = hitDistance * -5.0; // Undo -t * 0.2 stored in RayData
+
+            if (hitDistance < closestBackfaceDistance) {
+                closestBackfaceDistance = hitDistance;
+                closestBackfaceIndex    = rayIndex;
             }
         } else {
-            if (hitT < closestFrontfaceDistance) {
-                closestFrontfaceDistance = hitT;
-                closestFrontfaceIndex = rayIdx;
-            } else if (hitT > farthestFrontfaceDistance) {
-                farthestFrontfaceDistance = hitT;
-                farthestFrontfaceIndex = rayIdx;
+            // Front‑face hit
+            if (hitDistance < closestFrontfaceDistance) {
+                closestFrontfaceDistance = hitDistance;
+                closestFrontfaceIndex    = rayIndex;
+            } else if (hitDistance > farthestFrontfaceDistance) {
+                farthestFrontfaceDistance = hitDistance;
+                farthestFrontfaceIndex    = rayIndex;
             }
         }
     }
 
+    // ---------------------------------------------------------------------
+    //  Compute relocation offset (direct port of RTXGI logic)
+    // ---------------------------------------------------------------------
     vec3 fullOffset = vec3(1e27);
 
-    if (closestBackfaceIndex != -1 && (float(backfaceCount) / float(numRays)) > u_volume.probeFixedRayBackfaceThreshold) {
+    if (closestBackfaceIndex != -1 && (backfaceCount / float(numRays)) > u_volume.probeFixedRayBackfaceThreshold) {
+        // Enough backfaces: probe is likely inside geometry, move it outward
         vec3 closestBackfaceDirection = DDGIGetProbeRayDirection(closestBackfaceIndex, u_volume);
         fullOffset = offset + (closestBackfaceDirection * (closestBackfaceDistance + u_volume.probeMinFrontfaceDistance * 0.5));
+
     } else if (closestFrontfaceDistance < u_volume.probeMinFrontfaceDistance) {
-        // Don't move the probe if moving towards the farthest frontface will also bring us closer to the nearest frontface
-        vec3 closestFrontfaceDirection = DDGIGetProbeRayDirection(closestFrontfaceIndex, u_volume);
+        // Very close to front‑face geometry: try to move towards the farthest front‑face
+        vec3 closestFrontfaceDirection  = DDGIGetProbeRayDirection(closestFrontfaceIndex, u_volume);
         vec3 farthestFrontfaceDirection = DDGIGetProbeRayDirection(farthestFrontfaceIndex, u_volume);
 
-        if (dot(closestFrontfaceDirection, farthestFrontfaceDirection) <= 0.0)
-        {
-            // Ensures the probe never moves through the farthest frontface
+        // Don't move the probe if moving towards the farthest front‑face would also
+        // bring it closer to the nearest front‑face.
+        if (dot(closestFrontfaceDirection, farthestFrontfaceDirection) <= 0.0) {
+            // Ensure the probe never moves through the farthest front‑face
             farthestFrontfaceDirection *= min(farthestFrontfaceDistance, 1.0);
             fullOffset = offset + farthestFrontfaceDirection;
         }
+
     } else if (closestFrontfaceDistance > u_volume.probeMinFrontfaceDistance) {
         // Probe isn't near anything, try to move it back towards zero offset
-        float moveBackMargin = min(closestFrontfaceDistance - u_volume.probeMinFrontfaceDistance, length(offset));
-        vec3 moveBackDirection = normalize(-offset);
+        float moveBackMargin  = min(closestFrontfaceDistance - u_volume.probeMinFrontfaceDistance, length(offset));
+        vec3  moveBackDirection = normalize(-offset);
         fullOffset = offset + (moveBackMargin * moveBackDirection);
     }
 
+    // ---------------------------------------------------------------------
+    //  Clamp offset to lie well within the probe ellipsoid
+    // ---------------------------------------------------------------------
     // Absolute maximum distance that probe could be moved should satisfy ellipsoid equation:
-    // x^2 / probeGridSpacing.x^2 + y^2 / probeGridSpacing.y^2 + z^2 / probeGridSpacing.y^2 < (0.5)^2
-    // Clamp to less than maximum distance to avoid degenerate cases
+    // x^2 / spacing.x^2 + y^2 / spacing.y^2 + z^2 / spacing.z^2 < (0.5)^2
+    // Clamp to slightly less than maximum distance (0.45) to avoid degenerate cases.
     vec3 normalizedOffset = fullOffset / u_volume.spacing;
-    if (dot(normalizedOffset, normalizedOffset) < 0.2025) // 0.45 * 0.45 == 0.2025
-    {
+    if (dot(normalizedOffset, normalizedOffset) < 0.2025) { // 0.45 * 0.45
         offset = fullOffset;
     }
 
     // ---------------------------------------------------------------------
-    // Store back                                                             
+    //  Store updated probe offset back to texture
     // ---------------------------------------------------------------------
-    imageStore(ProbeOffsets, texelCoord, vec4(offset, 1.0));
-} 
+    // Convert world‑space offset back to normalized space (per‑axis spacing)
+    vec3 storedNewOffset = offset / u_volume.spacing;
+    imageStore(ProbeOffsets, texelCoord, vec4(storedNewOffset, 1.0));
+}

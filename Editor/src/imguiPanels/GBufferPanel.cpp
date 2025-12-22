@@ -1,18 +1,19 @@
 #include "GBufferPanel.h"
-#include "WindowContext/Application.h"
-#include "imgui_impl_vulkan.h" // Required for ImGui_ImplVulkan_AddTexture/RemoveTexture
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
+#include "WindowContext/Application.h"
+#include "imgui_impl_vulkan.h" // Required for ImGui_ImplVulkan_AddTexture/RemoveTexture
 
 // Anonymous namespace for helper functions or constants
 namespace {
-    const int TEXTURES_PER_ROW = 2; // How many textures to display per row
+const int TEXTURES_PER_ROW = 2; // How many textures to display per row
 }
 
-GBufferPanel::~GBufferPanel() {
+GBufferPanel::~GBufferPanel()
+{
     // Ensure descriptor sets are cleaned up
     if (m_initialized) {
-        for (auto& descSet : m_gbufferDescriptorSets) {
+        for (auto &descSet : m_gbufferDescriptorSets) {
             if (descSet != VK_NULL_HANDLE) {
                 ImGui_ImplVulkan_RemoveTexture(descSet);
             }
@@ -21,7 +22,8 @@ GBufferPanel::~GBufferPanel() {
     }
 }
 
-void GBufferPanel::renderTexture(const char* label, std::shared_ptr<Rapture::Texture> texture, VkDescriptorSet& descriptorSet) {
+void GBufferPanel::renderTexture(const char *label, std::shared_ptr<Rapture::Texture> texture, VkDescriptorSet &descriptorSet)
+{
     if (!texture) {
         ImGui::TextWrapped("%s: (Texture data not available or invalid)", label);
         ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x));
@@ -43,13 +45,10 @@ void GBufferPanel::renderTexture(const char* label, std::shared_ptr<Rapture::Tex
     }
 
     if (descriptorSet == VK_NULL_HANDLE) {
-        descriptorSet = ImGui_ImplVulkan_AddTexture(
-            texture->getSampler().getSamplerVk(),
-            imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        );
+        descriptorSet =
+            ImGui_ImplVulkan_AddTexture(texture->getSampler().getSamplerVk(), imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         if (descriptorSet == VK_NULL_HANDLE) {
-            Rapture::RP_CORE_ERROR("GBufferPanel: Failed to create ImGui descriptor set for texture: {}", label);
+            Rapture::RP_CORE_ERROR("Failed to create ImGui descriptor set for texture: {}", label);
             ImGui::TextWrapped("%s: (Failed to create ImGui descriptor set)", label);
             ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x));
             return;
@@ -60,23 +59,20 @@ void GBufferPanel::renderTexture(const char* label, std::shared_ptr<Rapture::Tex
 
     // Calculate display size maintaining aspect ratio
     float availableWidth = ImGui::GetContentRegionAvail().x;
-    float aspectRatio = static_cast<float>(texture->getSpecification().height) / static_cast<float>(texture->getSpecification().width);
+    float aspectRatio =
+        static_cast<float>(texture->getSpecification().height) / static_cast<float>(texture->getSpecification().width);
     ImVec2 displaySize(availableWidth, availableWidth * aspectRatio);
-    
+
     ImGui::Image((ImTextureID)descriptorSet, displaySize);
 }
 
-void GBufferPanel::render() {
+void GBufferPanel::render()
+{
     RAPTURE_PROFILE_FUNCTION();
-
-    if (!m_initialized) {
-        updateDescriptorSets(); // Initial setup
-    }
-
-    ImGui::Begin("G-Buffer Inspector");
 
     std::shared_ptr<Rapture::GBufferPass> gbufferPass = Rapture::DeferredRenderer::getGBufferPass();
     if (!gbufferPass) {
+        ImGui::Begin("G-Buffer Inspector");
         ImGui::TextWrapped("G-Buffer pass not available. Ensure DeferredRenderer is initialized and a scene is rendering.");
         ImGui::End();
         return;
@@ -91,21 +87,60 @@ void GBufferPanel::render() {
         expectedTextures += 1; // Single depth view
     }
 
+    if (!m_initialized) {
+        updateDescriptorSets();
+    }
+
     // Ensure we have enough descriptor sets
     if (m_gbufferDescriptorSets.size() != expectedTextures) {
-        updateDescriptorSets(); // Attempt to re-initialize if size mismatch
+        updateDescriptorSets();
         if (m_gbufferDescriptorSets.size() != expectedTextures) {
+            ImGui::Begin("G-Buffer Inspector");
             ImGui::TextWrapped("Error: Could not initialize descriptor sets for all G-Buffer textures. Check logs.");
             ImGui::End();
             return;
         }
     }
-    
+
+    // Detect texture changes (e.g., after resize) and invalidate all descriptor sets
+    std::vector<std::shared_ptr<Rapture::Texture>> currentTextures = {
+        gbufferPass->getPositionTexture(), gbufferPass->getNormalTexture(), gbufferPass->getAlbedoTexture(),
+        gbufferPass->getMaterialTexture()};
+    if (depthTexture) {
+        currentTextures.push_back(depthTexture);
+        if (Rapture::hasStencilComponent(depthTexture->getSpecification().format)) {
+            currentTextures.push_back(depthTexture);
+        }
+    }
+
+    bool texturesChanged = m_cachedTextures.size() != currentTextures.size();
+    if (!texturesChanged) {
+        for (size_t i = 0; i < currentTextures.size(); i++) {
+            if (m_cachedTextures[i] != currentTextures[i]) {
+                texturesChanged = true;
+                break;
+            }
+        }
+    }
+
+    if (texturesChanged) {
+        for (auto &descSet : m_gbufferDescriptorSets) {
+            if (descSet != VK_NULL_HANDLE) {
+                ImGui_ImplVulkan_RemoveTexture(descSet);
+                descSet = VK_NULL_HANDLE;
+            }
+        }
+        m_cachedTextures = currentTextures;
+    }
+
+    ImGui::Begin("G-Buffer Inspector");
+
     int currentTextureIndex = 0;
 
     ImGui::Columns(TEXTURES_PER_ROW, nullptr, false); // No borders for columns
 
-    auto renderEntry = [&](const char* name, std::shared_ptr<Rapture::Texture> tex, const char* formatNote, const char* displayNote) {
+    auto renderEntry = [&](const char *name, std::shared_ptr<Rapture::Texture> tex, const char *formatNote,
+                           const char *displayNote) {
         ImGui::BeginGroup();
         std::string fullLabel = std::string(name) + " " + formatNote;
         if (tex) {
@@ -119,13 +154,13 @@ void GBufferPanel::render() {
         currentTextureIndex++;
     };
 
-    renderEntry("Position+Depth", gbufferPass->getPositionTexture(), "(RGBA32F)", 
+    renderEntry("Position+Depth", gbufferPass->getPositionTexture(), "(RGBA32F)",
                 "World pos (RGB), View Z (A). Float data, direct view likely black/extreme.");
-    renderEntry("Normal", gbufferPass->getNormalTexture(), "(RGBA16F)", 
+    renderEntry("Normal", gbufferPass->getNormalTexture(), "(RGBA16F)",
                 "World normal (RGB). Float data (-1 to 1), direct view likely dark.");
-    renderEntry("Albedo+Specular", gbufferPass->getAlbedoTexture(), "(RGBA8 SRGB)", 
+    renderEntry("Albedo+Specular", gbufferPass->getAlbedoTexture(), "(RGBA8 SRGB)",
                 "Albedo (RGB), Spec (A). Should be visible if materials are set.");
-    renderEntry("Material Props", gbufferPass->getMaterialTexture(), "(RGBA8 UNORM)", 
+    renderEntry("Material Props", gbufferPass->getMaterialTexture(), "(RGBA8 UNORM)",
                 "Metallic (R), Roughness (G), AO (B). Should be visible.");
 
     // Special handling for depth texture to show both depth and stencil views if available
@@ -157,7 +192,7 @@ void GBufferPanel::render() {
         currentTextureIndex++;
     } else {
         // Regular depth texture display
-        renderEntry("Depth View", depthTexture, "(D24S8)", 
+        renderEntry("Depth View", depthTexture, "(D24S8)",
                     "Normalized depth (D24_UNORM). Displayed as Red channel (Red=far, Black=near).");
     }
 
@@ -165,9 +200,10 @@ void GBufferPanel::render() {
     ImGui::End();
 }
 
-void GBufferPanel::updateDescriptorSets() {
+void GBufferPanel::updateDescriptorSets()
+{
     // Clean up existing descriptor sets
-    for (auto& descSet : m_gbufferDescriptorSets) {
+    for (auto &descSet : m_gbufferDescriptorSets) {
         if (descSet != VK_NULL_HANDLE) {
             ImGui_ImplVulkan_RemoveTexture(descSet);
         }
@@ -176,7 +212,7 @@ void GBufferPanel::updateDescriptorSets() {
 
     std::shared_ptr<Rapture::GBufferPass> gbufferPass = Rapture::DeferredRenderer::getGBufferPass();
     if (!gbufferPass) {
-        Rapture::RP_CORE_WARN("GBufferPanel::updateDescriptorSets - G-Buffer pass not available during update.");
+        Rapture::RP_CORE_WARN("G-Buffer pass not available during update.");
         m_initialized = false;
         return;
     }
@@ -192,7 +228,7 @@ void GBufferPanel::updateDescriptorSets() {
 
     // Resize descriptor sets array
     m_gbufferDescriptorSets.resize(numTextures, VK_NULL_HANDLE);
-    
+
     // Textures are created (or attempted) in renderTexture on first use if null.
     // This function primarily clears them. Re-creation will happen in renderTexture.
     // However, to be safe and ensure slots are there:
@@ -205,7 +241,7 @@ void GBufferPanel::updateDescriptorSets() {
     initSetSlot(gbufferPass->getNormalTexture(), 1);
     initSetSlot(gbufferPass->getAlbedoTexture(), 2);
     initSetSlot(gbufferPass->getMaterialTexture(), 3);
-    
+
     // Handle depth texture
     if (depthTexture) {
         if (Rapture::hasStencilComponent(depthTexture->getSpecification().format)) {
@@ -217,6 +253,6 @@ void GBufferPanel::updateDescriptorSets() {
             initSetSlot(depthTexture, 4);
         }
     }
-    
+
     m_initialized = true;
 }

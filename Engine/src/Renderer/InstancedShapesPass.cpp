@@ -1,12 +1,14 @@
 #include "Renderer/InstancedShapesPass.h"
 
-#include "WindowContext/Application.h"
+#include <array>
+
+#include "AssetManager/AssetManager.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
+#include "Components/Components.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
-#include "Components/Components.h"
-#include "AssetManager/AssetManager.h"
 #include "Shaders/Shader.h"
-#include "Buffers/Descriptors/DescriptorManager.h"
+#include "WindowContext/Application.h"
 
 namespace Rapture {
 
@@ -17,27 +19,20 @@ struct InstancedShapesPushConstants {
     uint32_t instanceDataSSBOIndex;
 };
 
-InstancedShapesPass::InstancedShapesPass(
-    float width, float height, 
-    uint32_t framesInFlight, 
-    std::vector<std::shared_ptr<Texture>> depthStencilTextures)
-    : m_width(width), 
-      m_height(height), 
-      m_framesInFlight(framesInFlight), 
-      m_depthStencilTextures(depthStencilTextures) {
+InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t framesInFlight,
+                                         std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat)
+    : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_depthStencilTextures(depthStencilTextures),
+      m_colorFormat(colorFormat)
+{
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
-    
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
-    m_swapChain = vc.getSwapChain();
 
-    auto& project = app.getProject();
+    auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
-
-    m_width = static_cast<float>(m_swapChain->getExtent().width);
-    m_height = static_cast<float>(m_swapChain->getExtent().height);
 
     auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/InstancedShapes.vs.glsl");
 
@@ -47,24 +42,27 @@ InstancedShapesPass::InstancedShapesPass(
     createPipeline();
 }
 
-InstancedShapesPass::~InstancedShapesPass() {
-}
+InstancedShapesPass::~InstancedShapesPass() {}
 
-void InstancedShapesPass::recordCommandBuffer(
-    const std::shared_ptr<CommandBuffer>& commandBuffer, 
-    const std::shared_ptr<Scene>& scene,
-    uint32_t imageIndex,
-    uint32_t frameInFlight) {
+void InstancedShapesPass::recordCommandBuffer(const std::shared_ptr<CommandBuffer> &commandBuffer,
+                                              const std::shared_ptr<Scene> &scene, SceneRenderTarget &renderTarget,
+                                              uint32_t imageIndex, uint32_t frameInFlight)
+{
 
     RAPTURE_PROFILE_FUNCTION();
-    
-    m_currentImageIndex = imageIndex;
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer, imageIndex);
-    beginDynamicRendering(commandBuffer, imageIndex);
+    m_currentImageIndex = frameInFlight;
 
-    auto& app = Application::getInstance();
-    auto& vc = app.getVulkanContext();
+    // Get render target properties
+    VkImage targetImage = renderTarget.getImage(imageIndex);
+    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    VkExtent2D targetExtent = renderTarget.getExtent();
+
+    m_width = static_cast<float>(targetExtent.width);
+    m_height = static_cast<float>(targetExtent.height);
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
+    beginDynamicRendering(commandBuffer, targetImageView, targetExtent);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -77,19 +75,29 @@ void InstancedShapesPass::recordCommandBuffer(
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+    scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    auto camera = scene->getSettings().mainCamera;
-    if (camera == nullptr) return;
-    auto cameraComp = camera->tryGetComponent<CameraComponent>();
-    if (cameraComp == nullptr) return;
+    auto camera = scene->getMainCamera();
+    if (camera == nullptr) {
+        vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+        return;
+    }
+    auto cameraComp = camera.tryGetComponent<CameraComponent>();
+    if (cameraComp == nullptr) {
+        vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+        return;
+    }
 
-    auto& registry = scene->getRegistry();
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    auto &registry = scene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, InstanceShapeComponent>();
 
     for (auto entity : view) {
-        auto [transformComp, meshComp, instanceShapeComp] = view.get<TransformComponent, MeshComponent, InstanceShapeComponent>(entity);
+        auto [transformComp, meshComp, instanceShapeComp] =
+            view.get<TransformComponent, MeshComponent, InstanceShapeComponent>(entity);
 
         if (meshComp.mesh == nullptr || instanceShapeComp.instanceSSBO == nullptr) {
             continue;
@@ -104,57 +112,55 @@ void InstancedShapesPass::recordCommandBuffer(
         InstancedShapesPushConstants pushConstants;
         pushConstants.globalTransform = transformComp.transformMatrix();
         pushConstants.color = instanceShapeComp.color;
-        pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(imageIndex);
+        pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(frameInFlight);
         pushConstants.instanceDataSSBOIndex = instanceShapeComp.instanceSSBO->getBindlessIndex();
 
-        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), 
+        vkCmdPushConstants(
+            commandBuffer->getCommandBufferVk(),
             instanceShapeComp.useWireMode ? m_pipelineWireframe->getPipelineLayoutVk() : m_pipelineFilled->getPipelineLayoutVk(),
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
-            0,
-            sizeof(InstancedShapesPushConstants), 
-            &pushConstants);
-        
-        DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
-        DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(InstancedShapesPushConstants), &pushConstants);
 
-        auto& bufferLayout = meshComp.mesh->getVertexBuffer()->getBufferLayout();
+        DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(),
+                                                     instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
+        DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(),
+                                                     instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
+
+        auto &bufferLayout = meshComp.mesh->getVertexBuffer()->getBufferLayout();
         auto bindingDescription = bufferLayout.getBindingDescription2EXT();
         auto attributeDescriptions = bufferLayout.getAttributeDescriptions2EXT();
-        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 
-            1, &bindingDescription,
-            static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+        vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 1, &bindingDescription,
+                                  static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
 
         VkBuffer vertexBuffers[] = {meshComp.mesh->getVertexBuffer()->getBufferVk()};
         VkDeviceSize offsets[] = {meshComp.mesh->getVertexBuffer()->getOffset()};
         vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
-        
-        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexBuffer()->getBufferVk(), meshComp.mesh->getIndexBuffer()->getOffset(), meshComp.mesh->getIndexBuffer()->getIndexType());
-    
+
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexBuffer()->getBufferVk(),
+                             meshComp.mesh->getIndexBuffer()->getOffset(), meshComp.mesh->getIndexBuffer()->getIndexType());
+
         uint32_t instanceCount = instanceShapeComp.instanceCount;
         vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexCount(), instanceCount, 0, 0, 0);
     }
-    
+
     vkCmdEndRendering(commandBuffer->getCommandBufferVk());
 }
 
-void InstancedShapesPass::createPipeline() {
+void InstancedShapesPass::createPipeline()
+{
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_shader.expired()) {
-        RP_CORE_ERROR("InstancedShapesPass: Shader not loaded, cannot create pipeline.");
+        RP_CORE_ERROR("Shader not loaded, cannot create pipeline.");
         return;
     }
     auto shaderShared = m_shader.lock();
     if (!shaderShared) {
-        RP_CORE_ERROR("InstancedShapesPass: Shader is null after lock, cannot create pipeline.");
+        RP_CORE_ERROR("Shader is null after lock, cannot create pipeline.");
         return;
     }
 
-    std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR,
-        VK_DYNAMIC_STATE_VERTEX_INPUT_EXT
-    };
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                                 VK_DYNAMIC_STATE_VERTEX_INPUT_EXT};
 
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -194,12 +200,13 @@ void InstancedShapesPass::createPipeline() {
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_TRUE;
     colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; 
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
@@ -217,9 +224,9 @@ void InstancedShapesPass::createPipeline() {
     depthStencil.stencilTestEnable = VK_FALSE;
 
     FramebufferSpecification spec;
-    spec.colorAttachments.push_back(m_swapChain->getImageFormat());
+    spec.colorAttachments.push_back(m_colorFormat);
     spec.depthAttachment = m_depthStencilTextures[0]->getFormat();
-    
+
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
     config.inputAssemblyState = inputAssembly;
@@ -240,13 +247,14 @@ void InstancedShapesPass::createPipeline() {
     m_pipelineWireframe = std::make_shared<GraphicsPipeline>(config);
 }
 
-
-void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuffer>& commandBuffer, uint32_t imageIndex) {
+void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuffer> &commandBuffer, VkImageView targetImageView,
+                                                VkExtent2D targetExtent)
+{
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachmentInfo.imageView = m_swapChain->getImageViews()[imageIndex];
+    colorAttachmentInfo.imageView = targetImageView;
     colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // Preserve LightingPass output
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
     VkRenderingAttachmentInfo depthAttachmentInfo{};
@@ -259,7 +267,7 @@ void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuf
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent = m_swapChain->getExtent();
+    renderingInfo.renderArea.extent = targetExtent;
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
@@ -269,26 +277,49 @@ void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuf
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(const std::shared_ptr<CommandBuffer>& commandBuffer, uint32_t imageIndex) {
+void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(const std::shared_ptr<CommandBuffer> &commandBuffer,
+                                                              VkImage targetImage)
+{
+    // Execution barrier to ensure previous pass color writes are complete
+    // before this pass starts writing (write-after-write synchronization)
     VkImageMemoryBarrier colorBarrier{};
     colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; 
+    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    colorBarrier.image = m_swapChain->getImages()[imageIndex];
+    colorBarrier.image = targetImage;
     colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    colorBarrier.subresourceRange.baseMipLevel = 0;
     colorBarrier.subresourceRange.levelCount = 1;
+    colorBarrier.subresourceRange.baseArrayLayer = 0;
     colorBarrier.subresourceRange.layerCount = 1;
     colorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    vkCmdPipelineBarrier(
-        commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &colorBarrier
-    );
+    // Depth buffer is already in DEPTH_STENCIL_ATTACHMENT_OPTIMAL from SkyboxPass
+    // Just need execution barrier to sync with previous depth writes
+    VkImageMemoryBarrier depthBarrier{};
+    depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    depthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    depthBarrier.image = m_depthStencilTextures[m_currentImageIndex]->getImage();
+    depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    depthBarrier.subresourceRange.baseMipLevel = 0;
+    depthBarrier.subresourceRange.levelCount = 1;
+    depthBarrier.subresourceRange.baseArrayLayer = 0;
+    depthBarrier.subresourceRange.layerCount = 1;
+    depthBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    depthBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+    std::array<VkImageMemoryBarrier, 2> barriers = {colorBarrier, depthBarrier};
+
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(),
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, nullptr,
+                         0, nullptr, static_cast<uint32_t>(barriers.size()), barriers.data());
 }
 
-} // namespace Rapture 
+} // namespace Rapture

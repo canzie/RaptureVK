@@ -1,27 +1,41 @@
 
-### Components
-
-- WorldEnvironementComponent
-    - Controls stuff like wind
-
-
-
-
-### DDGI - shit is hard
-
-- stabilize the ray rotation
-- add probe relocation and classification to the ddgi system
-- add support for different probe volumes
-- test system in one of the test scenes
-- generate HDR cubemap for the skybox
-
-- perhaps giga optimisation
-    - get a new shader pass for identifying which probes should be active
-    - we can do this by stopping certain probes from updating if ...
-    https://arxiv.org/pdf/2009.10796
-    https://cescg.org/wp-content/uploads/2022/04/Rohacek-Improving-Probes-in-Dynamic-Diffuse-Global-Illumination.pdf
+- [ ] Add entity locking support
+  - Lock entities from editing and/or deletion (via PropertiesComponent flag?)
+  - Useful for: editor UX, protecting essebntial entities like main camera
+  - *Solution:*
+- [ ] Component dependency hints (editor UX)
+  - Shadow requires Light, CSM and regular shadow maps mutually exclusive
+  - Validation at editor level, runtime still double-checks
+  - Not critical - rare edge cases
+- [ ] Reduce direct EnTT bypassing
+  - Audit places where wrapper is bypassed for views/iteration
+  - improve wrapper, as these bypasses are being done because of the inneficiency of the wrapper (maybe an actual 10x directly)
 
 
+
+- fix stencil buffer
+- shader hot reloading
+
+- look at csm flickering again
+- material editor/viewer
+- jolt???
+
+
+### Procedural Texture Generation
+
+- Base class takes in a shader(Can be glsl file->assetManager) and inputs
+- Every shader NEEDS the following
+  - input via push constants (limited to 128 bytes)
+  - 1 output, which is a texture
+  - square local sizes
+  - 2d texture (for now)
+  - its local size needs to be via a macro so we can set it before compilation
+- After the texture has been generated, we "free" it so the asset manager can mark it (it can then decide to remove it or keep it in memory. not relevant externally)
+- it is acceptable to only accept certain sizes, e.g. ..., 256x256, 512x512, 1024x1024, 2048, 2048. (these can be added later, the point is preset sizes)
+- output of the cpp side is a texture, registered to the asset manager
+- ontop of this class, well have static functions to generate specifics where the shader does not have to be specified (like a generateWhiteNoise)
+- the cpp side needs to make sure to have the correct structs represented in the shader, reflection can be used to verify before dipatching it.
+- this system NEEDS to be thread safe, this means we create, dispatch, return and clean up, no static generator class, only the specific helpers can be static, but not the base class.
 
 
 ### PHYSICS
@@ -47,7 +61,7 @@
 
 ### Terrain Generation
 
-- allow for easy noise generation, should only need inputs, outputs and algo -> provide an image
+- allow for easy noise generation, should only need inputs, outputs and algo -> provide a registered virtual image
 - make basic terrain
 - blend multiple noise layers
 - use tesselation shaders

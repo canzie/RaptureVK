@@ -13,53 +13,50 @@ namespace Rapture {
 
 bool MaterialManager::s_initialized = false;
 
+std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::s_materials;
 
-std::unordered_map<std::string, std::shared_ptr<BaseMaterial>>
-    MaterialManager::s_materials;
+BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader, const std::string &name) : m_name(name), m_shader(shader)
+{
 
-BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
-                        const std::string &name)
-    : m_shader(shader) {
-
-    if (shader->getDescriptorSetLayouts().size() < 1) {
-        throw std::runtime_error("Material::BaseMaterial - shader has no "
-                                "descriptor set layout for a material!");
+    auto lockedShader = m_shader.lock();
+    if (!lockedShader) {
+        RP_CORE_ERROR("shader is no longer valid");
+        m_name.clear();
+        return;
     }
 
+    if (lockedShader->getDescriptorSetLayouts().size() < 1) {
+        return;
+    }
 
+    m_descriptorSetLayout = lockedShader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
 
-    m_descriptorSetLayout = shader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
-
-    auto infos = m_shader->getMaterialSets();
+    auto descriptorSetInfos = lockedShader->getMaterialSets();
 
     if (name.empty()) {
-        m_name = infos[0].name;
-    } else {
-        m_name = name;
+        m_name = std::string(descriptorSetInfos[0].name);
     }
 
     m_sizeBytes = 0;
-    for (auto &info : infos) {
-        // get descriptor set layout
-        for (auto &parameter : info.params) {
-        auto param = MaterialParameter(parameter, info.binding);
+    for (auto &info : descriptorSetInfos) {
+        for (auto &parameterInfo : info.params) {
+            auto param = MaterialParameter(parameterInfo, info.binding);
+
+            if (param.m_info.parameterId == ParameterID::UNKNOWN) {
+                RP_CORE_ERROR("unknown parameter id: {0} and type: {1}", parameterInfo.name, parameterInfo.type);
+                continue;
+            }
 
             if (param.m_info.parameterId == ParameterID::ALBEDO) {
                 param.setValue(glm::vec3(1.0f, 1.0f, 1.0f));
             }
 
-        if (param.m_info.parameterId != ParameterID::UNKNOWN) {
             m_parameterMap[param.m_info.parameterId] = param;
             // Ensure the overall buffer size encompasses this parameter (offset + its size)
             uint32_t endOffset = static_cast<uint32_t>(param.m_info.offset + param.m_info.size);
             if (endOffset > m_sizeBytes) {
                 m_sizeBytes = endOffset;
             }
-        } else {
-            RP_CORE_ERROR(
-                "Material::BaseMaterial - unknown parameter id: {0} and type: {1}",
-                parameter.name, parameter.type);
-        }
         }
     }
 
@@ -69,88 +66,83 @@ BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader,
     }
 
     if (m_sizeBytes == 0) {
-        RP_CORE_ERROR("Material::BaseMaterial - no valid parameters found in "
-                    "material set {0}",
-                    infos[0].name);
-        throw std::runtime_error("Material::BaseMaterial - no valid parameters "
-                                "found in material set {0}");
+        RP_CORE_ERROR("no valid parameters found in material set");
+        m_name.clear();
+        return;
     }
 }
 
-void MaterialManager::init() {
-  s_materials.clear();
+void MaterialManager::init()
+{
+    s_materials.clear();
 
-  auto &app = Application::getInstance();
-  auto &project = app.getProject();
+    auto &app = Application::getInstance();
+    auto &project = app.getProject();
 
-  auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = project.getProjectShaderDirectory();
 
-  // create material for simple shader
-  // load shader
-  const std::string basicShaderPath = "SPIRV/default.vs.spv";
+    // create material for simple shader
+    // load shader
+    const std::string basicShaderPath = "SPIRV/default.vs.spv";
 
-  auto [basicShader, basicShaderHandle] =
-      AssetManager::importAsset<Shader>(shaderPath / basicShaderPath);
-  // create material in a try catch
-  try {
-    auto material = std::make_shared<BaseMaterial>(basicShader, "material");
-    auto name = material->getName();
-    if (name.empty()) {
-      name = std::to_string(basicShaderHandle) + "_material";
+    auto [basicShader, basicShaderHandle] = AssetManager::importAsset<Shader>(shaderPath / basicShaderPath);
+    // create material in a try catch
+    try {
+        auto material = std::make_shared<BaseMaterial>(basicShader, "material");
+        auto name = material->getName();
+        if (name.empty()) {
+            name = std::to_string(basicShaderHandle) + "_material";
+        }
+        s_materials[name] = material;
+    } catch (const std::exception &e) {
+        RP_CORE_ERROR("{}", e.what());
     }
-    s_materials[name] = material;
-  } catch (const std::exception &e) {
-    RP_CORE_ERROR("MaterialManager::init - {}", e.what());
-  }
 
-  const std::string pbrShaderPath = "SPIRV/GBuffer.vs.spv";
+    const std::string pbrShaderPath = "SPIRV/GBuffer.vs.spv";
 
-  auto [pbrShader, pbrShaderHandle] =
-      AssetManager::importAsset<Shader>(shaderPath / pbrShaderPath);
-  // create material in a try catch
-  try {
-    auto material = std::make_shared<BaseMaterial>(pbrShader, "PBR");
-    auto name = material->getName();
-    if (name.empty()) {
-      name = std::to_string(pbrShaderHandle) + "_material";
+    auto [pbrShader, pbrShaderHandle] = AssetManager::importAsset<Shader>(shaderPath / pbrShaderPath);
+    // create material in a try catch
+    try {
+        auto material = std::make_shared<BaseMaterial>(pbrShader, "PBR");
+        auto name = material->getName();
+        if (name.empty()) {
+            name = std::to_string(pbrShaderHandle) + "_material";
+        }
+        s_materials[name] = material;
+    } catch (const std::exception &e) {
+        RP_CORE_ERROR("{}", e.what());
     }
-    s_materials[name] = material;
-  } catch (const std::exception &e) {
-    RP_CORE_ERROR("MaterialManager::init - {}", e.what());
-  }
 
-  s_initialized = true;
+    s_initialized = true;
 }
 
-void MaterialManager::shutdown() {
-  auto &app = Application::getInstance();
-  auto device = app.getVulkanContext().getLogicalDevice();
+void MaterialManager::shutdown()
+{
 
-  // destroy all materials
-  s_materials.clear();
+    // destroy all materials
+    s_materials.clear();
 
-  s_initialized = false;
+    s_initialized = false;
 }
 
-std::shared_ptr<BaseMaterial>
-MaterialManager::getMaterial(const std::string &name) {
-  if (!s_initialized) {
-    RP_CORE_ERROR(
-        "MaterialManager::getMaterial - material manager not initialized!");
-    return nullptr;
-  }
+std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &name)
+{
+    if (!s_initialized) {
+        RP_CORE_ERROR("material manager not initialized!");
+        return nullptr;
+    }
 
-  if (s_materials.find(name) == s_materials.end()) {
-    RP_CORE_ERROR("MaterialManager::getMaterial - material '{0}' not found!",
-                  name);
-    return nullptr;
-  }
-  return s_materials[name];
+    if (s_materials.find(name) == s_materials.end()) {
+        RP_CORE_ERROR("material '{0}' not found!", name);
+        return nullptr;
+    }
+    return s_materials[name];
 }
 
-void MaterialManager::printMaterialNames() {
-  for (auto &[name, material] : s_materials) {
-    RP_CORE_INFO("\t MaterialManager::printMaterialNames - {0}", name);
-  }
+void MaterialManager::printMaterialNames()
+{
+    for (auto &[name, material] : s_materials) {
+        RP_CORE_INFO("\t {0}", name);
+    }
 }
 } // namespace Rapture

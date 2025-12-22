@@ -40,6 +40,8 @@ bin/
 # Debug folder
 debug/
 
+logs/
+
 # Release folder
 release/
 

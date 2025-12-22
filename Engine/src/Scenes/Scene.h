@@ -1,75 +1,67 @@
 #pragma once
 
-#include <string>
-#include <memory>
-#include <entt/entt.hpp>
 #include "AccelerationStructures/TLAS.h"
+#include <entt/entt.hpp>
+#include <memory>
+#include <string>
 
 namespace Rapture {
 
-    // Forward declaration
-    class Entity;
+// Forward declaration
+class Entity;
 
-    struct SkyboxComponent;
-    
-    struct SceneSettings {
-        std::string sceneName;
-        bool frustumCullingEnabled = true;
-        std::shared_ptr<Entity> mainCamera;
-        std::shared_ptr<Entity> skybox;
-    };
-    
-    class Scene {
-    public:
-        Scene(const std::string& sceneName = "Untitled Scene");
-        ~Scene();
+struct SceneSettings {
+    std::string sceneName;
+    bool frustumCullingEnabled = true;
+};
 
-        Entity createEntity(const std::string& name = "Untitled Entity");
-        Entity createCube(const std::string& name = "Untitled Entity");
-        Entity createSphere(const std::string& name = "Untitled Entity");
-        
-        void destroyEntity(Entity entity);
+class Scene {
+  public:
+    Scene(const std::string &sceneName = "Untitled Scene");
+    ~Scene();
 
-        void onUpdate(float dt);
+    Entity createEntity(const std::string &name = "Untitled Entity");
+    Entity createCube(const std::string &name = "Untitled Entity");
+    Entity createSphere(const std::string &name = "Untitled Entity");
 
-        entt::registry& getRegistry() { return m_Registry; }
-        const entt::registry& getRegistry() const { return m_Registry; }
+    void destroyEntity(Entity entity);
 
-        SceneSettings& getSettings();
-        const SceneSettings& getSettings() const;
+    void onUpdate(float dt);
 
-        std::string getSceneName() const;
+    entt::registry &getRegistry() { return m_registry; }
+    const entt::registry &getRegistry() const { return m_registry; }
 
-        void setMainCamera(Entity camera);
-        void setMainCamera(std::shared_ptr<Entity> camera);
+    SceneSettings &getSettings();
+    const SceneSettings &getSettings() const;
 
-        std::weak_ptr<Entity> getMainCamera();
+    std::string getSceneName() const;
 
-        void setSkybox(Entity entity);
-        std::weak_ptr<Entity> getSkybox();
-        SkyboxComponent* getSkyboxComponent();
+    void setMainCamera(Entity camera);
+    Entity getMainCamera() const;
 
-        void registerBLAS(Entity& entity);
-        void registerBLAS(std::shared_ptr<Entity> entity);
+    Entity createEnvironmentEntity();
+    Entity getEnvironmentEntity() const;
 
-        void buildTLAS();
-        std::shared_ptr<TLAS> getTLAS() {
-            if (!m_tlas) {
-                //RP_CORE_ERROR("Scene::getTLAS - TLAS is not built");
-                return nullptr;
-            }
-            return m_tlas;
+    void registerBLAS(Entity &entity);
+
+    void buildTLAS();
+    std::shared_ptr<TLAS> getTLAS()
+    {
+        if (!m_tlas) {
+            // RP_CORE_ERROR("Scene::getTLAS - TLAS is not built");
+            return nullptr;
         }
+        return m_tlas;
+    }
 
-        void updateTLAS();
+    void updateTLAS();
 
-    private:
-        entt::registry m_Registry;
-        SceneSettings m_config;
+  private:
+    entt::registry m_registry;
+    SceneSettings m_config;
 
-        std::shared_ptr<TLAS> m_tlas;
-    
-        friend class Entity;
-    };
-}
+    std::shared_ptr<TLAS> m_tlas;
 
+    friend class Entity;
+};
+} // namespace Rapture

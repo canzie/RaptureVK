@@ -2,7 +2,6 @@
 
 namespace Rapture {
 
-    std::mutex UUIDGenerator::_mutex;
+std::mutex UUIDGenerator::_mutex;
 
 }
-

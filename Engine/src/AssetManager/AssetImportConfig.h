@@ -2,34 +2,28 @@
 
 #include "Shaders/Shader.h"
 
-#include <vector>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace Rapture {
-    
-    struct ShaderImportConfig {
 
-        ShaderCompileInfo compileInfo;
+struct ShaderImportConfig {
 
-        bool operator==(const ShaderImportConfig& other) const {
-            return compileInfo.macros == other.compileInfo.macros;
-        }
+    ShaderCompileInfo compileInfo;
 
-    };
+    bool operator==(const ShaderImportConfig &other) const {
+        return compileInfo.macros == other.compileInfo.macros &&
+               compileInfo.includePath == other.compileInfo.includePath;
+    }
+};
 
-    struct TextureImportConfig {
-        bool srgb = false;
+struct TextureImportConfig {
+    bool srgb = false;
 
+    bool operator==(const TextureImportConfig &other) const { return srgb == other.srgb; }
+};
 
-        bool operator==(const TextureImportConfig& other) const {
-            return srgb == other.srgb;
-        }
+using AssetImportConfigVariant = std::variant<std::monostate, ShaderImportConfig, TextureImportConfig>;
 
-    };
-
-
-
-    using AssetImportConfigVariant = std::variant<std::monostate, ShaderImportConfig, TextureImportConfig>;
-
-}
+} // namespace Rapture

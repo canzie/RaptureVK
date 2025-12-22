@@ -11,14 +11,10 @@ struct CameraComponent;
 struct TransformComponent;
 
 class CameraDataBuffer : public ObjectDataBuffer {
-public:
-
+  public:
     CameraDataBuffer(uint32_t frameCount = 1);
-    
 
-    void update(const CameraComponent& camera, uint32_t frameIndex = 0);
-    
-
+    void update(const CameraComponent &camera, uint32_t frameIndex = 0);
 };
 
-} 
+} // namespace Rapture

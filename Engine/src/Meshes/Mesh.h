@@ -1,47 +1,42 @@
 #pragma once
 
-
 #include <string>
 #include <vector>
 
 #include "Buffers/IndexBuffers/IndexBuffer.h"
-#include "Buffers/VertexBuffers/VertexBuffer.h"
 #include "Buffers/VertexBuffers/BufferLayout.h"
+#include "Buffers/VertexBuffers/VertexBuffer.h"
 
 #include "Buffers/BufferPool.h"
 
-
-namespace Rapture
-{
-
+namespace Rapture {
 
 struct AllocatorParams {
-    void* vertexData = nullptr;
+    void *vertexData = nullptr;
     uint32_t vertexDataSize = 0;
-    void* indexData = nullptr;
+    void *indexData = nullptr;
     uint32_t indexDataSize = 0;
     uint32_t indexCount = 0;
     uint32_t indexType = 0;
-    
+
     BufferLayout bufferLayout;
 };
 
-class Mesh
-{
+class Mesh {
 
-public:
-    Mesh(AllocatorParams& params);
+  public:
+    Mesh(AllocatorParams &params);
     Mesh();
     ~Mesh();
 
-    void setMeshData(AllocatorParams& params);
+    void setMeshData(AllocatorParams &params);
 
     std::shared_ptr<VertexBuffer> getVertexBuffer() const { return m_vertexBuffer; }
     std::shared_ptr<IndexBuffer> getIndexBuffer() const { return m_indexBuffer; }
 
     uint32_t getIndexCount() const { return m_indexCount; }
-    
-    //static std::shared_ptr<UniformBuffer> createBindlessMeshDataBuffer();
+
+    // static std::shared_ptr<UniformBuffer> createBindlessMeshDataBuffer();
 
     std::shared_ptr<BufferAllocation> getIndexAllocation() { return m_indexAllocation; }
     std::shared_ptr<BufferAllocation> getVertexAllocation() { return m_vertexAllocation; }
@@ -49,7 +44,7 @@ public:
     std::shared_ptr<BufferAllocation> getIndexAllocation() const { return m_indexAllocation; }
     std::shared_ptr<BufferAllocation> getVertexAllocation() const { return m_vertexAllocation; }
 
-private:
+  private:
     uint32_t m_indexCount;
     std::shared_ptr<VertexBuffer> m_vertexBuffer;
     std::shared_ptr<IndexBuffer> m_indexBuffer;
@@ -57,12 +52,9 @@ private:
     std::shared_ptr<BufferAllocation> m_indexAllocation;
     std::shared_ptr<BufferAllocation> m_vertexAllocation;
 
-    //std::shared_ptr<UniformBuffer> m_objectDataBuffer; // per mesh data
-    //uint32_t m_bindlessMeshDataIndex;
-    //static std::unique_ptr<DescriptorSubAllocationBase<Buffer>> s_bindlessMeshDataAllocation;
-
+    // std::shared_ptr<UniformBuffer> m_objectDataBuffer; // per mesh data
+    // uint32_t m_bindlessMeshDataIndex;
+    // static std::unique_ptr<DescriptorSubAllocationBase<Buffer>> s_bindlessMeshDataAllocation;
 };
 
-
-
-}
+} // namespace Rapture

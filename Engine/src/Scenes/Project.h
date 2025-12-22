@@ -101,11 +101,14 @@ namespace Rapture
         // Project file operations
         static void saveProject(std::filesystem::path path) 
         {
+            (void)path;
             // Implementation for serializing project
         }
         
         static std::shared_ptr<Project> loadProject(std::filesystem::path path)
         {
+            (void)path;
+            
             auto project = std::make_shared<Project>();
             
             // Implementation for deserializing project

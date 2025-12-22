@@ -2,23 +2,24 @@
 #include "Logging/Log.h"
 #include "VulkanContextHelpers.h"
 
-#include "RenderTargets/SwapChains/SwapChain.h"
-#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
+#include "RenderTargets/SwapChains/SwapChain.h"
 
 #ifdef _WIN32
-    #define VK_USE_PLATFORM_WIN32_KHR
+#define VK_USE_PLATFORM_WIN32_KHR
 #elif defined(__linux__)
-    // Runtime detection for Wayland vs X11
-    #include <cstdlib>
-    static bool isWaylandSession() {
-        return std::getenv("WAYLAND_DISPLAY") != nullptr;
-    }
-    
-    #define RAPTURE_RUNTIME_WAYLAND_DETECTION
-    // We'll define the appropriate platform at runtime, but include both headers
-    #define VK_USE_PLATFORM_X11_KHR
-    #define VK_USE_PLATFORM_WAYLAND_KHR
+// Runtime detection for Wayland vs X11
+#include <cstdlib>
+static bool isWaylandSession()
+{
+    return std::getenv("WAYLAND_DISPLAY") != nullptr;
+}
+
+#define RAPTURE_RUNTIME_WAYLAND_DETECTION
+// We'll define the appropriate platform at runtime, but include both headers
+#define VK_USE_PLATFORM_X11_KHR
+#define VK_USE_PLATFORM_WAYLAND_KHR
 #endif
 
 #define GLFW_INCLUDE_VULKAN
@@ -30,51 +31,48 @@
 #include <vulkan/vulkan_wayland.h>
 // Only include X11 headers if X11 development files are available
 #ifdef __has_include
-    #if __has_include(<X11/Xlib.h>)
-        #include <X11/Xlib.h>  // Must include X11 types before vulkan_xlib.h
-        #include <vulkan/vulkan_xlib.h>
-        #define RAPTURE_HAS_X11_HEADERS
-    #endif
+#if __has_include(<X11/Xlib.h>)
+#include <X11/Xlib.h> // Must include X11 types before vulkan_xlib.h
+#include <vulkan/vulkan_xlib.h>
+#define RAPTURE_HAS_X11_HEADERS
+#endif
 #else
-    // Fallback for older compilers - try to include and let it fail gracefully
-    #ifdef VK_USE_PLATFORM_X11_KHR
-        #include <X11/Xlib.h>  // Must include X11 types before vulkan_xlib.h
-        #include <vulkan/vulkan_xlib.h>
-        #define RAPTURE_HAS_X11_HEADERS
-    #endif
+// Fallback for older compilers - try to include and let it fail gracefully
+#ifdef VK_USE_PLATFORM_X11_KHR
+#include <X11/Xlib.h> // Must include X11 types before vulkan_xlib.h
+#include <vulkan/vulkan_xlib.h>
+#define RAPTURE_HAS_X11_HEADERS
+#endif
 #endif
 #endif
 
 #ifdef _WIN32
-    #define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
 #elif defined(__linux__)
-    #ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
-        // Include both native headers since we detect at runtime
-        #define GLFW_EXPOSE_NATIVE_X11
-        #define GLFW_EXPOSE_NATIVE_WAYLAND
-    #endif
+#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
+// Include both native headers since we detect at runtime
+#define GLFW_EXPOSE_NATIVE_X11
+#define GLFW_EXPOSE_NATIVE_WAYLAND
+#endif
 #endif
 
 #include <GLFW/glfw3native.h>
 
-#include <set>
-#include <cstdint> 
+#include <algorithm>
+#include <cstdint>
 #include <limits>
-#include <algorithm> 
+#include <set>
 
 #ifdef NDEBUG
-    const bool enableValidationLayers = false;
+const bool enableValidationLayers = false;
 #else
-    const bool enableValidationLayers = true;
+const bool enableValidationLayers = true;
 #endif
-
-
 
 namespace Rapture {
 
-
-    VulkanContext::VulkanContext(WindowContext* windowContext)
-    {
+VulkanContext::VulkanContext(WindowContext *windowContext)
+{
 
     m_applicationInfo = {};
     m_instanceCreateInfo = {};
@@ -85,6 +83,12 @@ namespace Rapture {
     m_vmaAllocator = VK_NULL_HANDLE;
     m_debugMessenger = VK_NULL_HANDLE;
     m_swapChain = nullptr;
+    m_vendorQueue = nullptr;
+    m_isVertexInputDynamicStateEnabled = false;
+    m_isVertexAttributeRobustnessEnabled = false;
+    m_isDynamicRenderingEnabled = false;
+    m_isNullDescriptorEnabled = false;
+    m_isRayTracingEnabled = false;
 
 #ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
     // Detect and log the windowing system being used
@@ -111,14 +115,13 @@ namespace Rapture {
     m_deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
-    
+
     // Ray tracing extensions
     m_deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-
 
     checkExtensionSupport();
     createInstance(windowContext);
@@ -130,7 +133,6 @@ namespace Rapture {
     createVmaAllocator();
 
     ApplicationEvents::onRequestSwapChainRecreation().addListener([this, windowContext]() {
-
         int width = 0, height = 0;
         windowContext->getFramebufferSize(&width, &height);
         while (width == 0 || height == 0) {
@@ -138,21 +140,18 @@ namespace Rapture {
             windowContext->waitEvents();
         }
 
-        vkDeviceWaitIdle(m_device);
+        waitIdle();
 
         m_swapChain->recreate();
         ApplicationEvents::onSwapChainRecreated().publish(m_swapChain);
     });
-
-
-    m_queueFamilyIndices = findQueueFamilies(m_physicalDevice);
-
-
 }
-
 
 VulkanContext::~VulkanContext()
 {
+    if (m_device) {
+        vkDeviceWaitIdle(m_device);
+    }
 
     m_swapChain.reset();
 
@@ -180,66 +179,79 @@ VulkanContext::~VulkanContext()
     RP_CORE_INFO("Destroyed Vulkan Context!");
 }
 
-
 void VulkanContext::waitIdle()
 {
+    std::vector<std::unique_lock<std::mutex>> locks(m_queues.size());
+    for (auto it = m_queues.begin(); it != m_queues.end(); it++) {
+        auto lock = it->second->acquireQueueLock();
+        locks.push_back(std::move(lock));
+    }
+
     vkDeviceWaitIdle(m_device);
 }
 
-
 std::shared_ptr<VulkanQueue> VulkanContext::getGraphicsQueue() const
 {
-    if (m_graphicsQueueIndex == -1) {
-        RP_CORE_ERROR("Graphics queue index is -1!");
-        throw std::runtime_error("Graphics queue index is -1!");
+    uint32_t graphicsQueueIndex = m_queueFamilyIndices.familyIndices[GRAPHICS];
+    if (graphicsQueueIndex == UINT32_MAX) {
+        RP_CORE_ERROR("Graphics queue index is UINT32_MAX!");
+        throw std::runtime_error("Graphics queue index is UINT32_MAX!");
     }
-    if (m_queues.find(m_graphicsQueueIndex) == m_queues.end()) {
+    if (m_queues.find(graphicsQueueIndex) == m_queues.end()) {
         RP_CORE_ERROR("Graphics queue index is not found!");
         throw std::runtime_error("Graphics queue index is not found!");
     }
-    return m_queues.find(m_graphicsQueueIndex)->second;
+    return m_queues.find(graphicsQueueIndex)->second;
 }
 
 std::shared_ptr<VulkanQueue> VulkanContext::getComputeQueue() const
 {
-    if (m_computeQueueIndex == -1) {
-        RP_CORE_ERROR("Compute queue index is -1!");
-        throw std::runtime_error("Compute queue index is -1!");
+    uint32_t computeQueueIndex = m_queueFamilyIndices.familyIndices[COMPUTE];
+    if (computeQueueIndex == UINT32_MAX) {
+        RP_CORE_ERROR("Compute queue index is UINT32_MAX!");
+        throw std::runtime_error("Compute queue index is UINT32_MAX!");
     }
-    if (m_queues.find(m_computeQueueIndex) == m_queues.end()) {
+    if (m_queues.find(computeQueueIndex) == m_queues.end()) {
         RP_CORE_ERROR("Compute queue index is not found!");
         throw std::runtime_error("Compute queue index is not found!");
     }
-    return m_queues.find(m_computeQueueIndex)->second;
+    return m_queues.find(computeQueueIndex)->second;
 }
 
 std::shared_ptr<VulkanQueue> VulkanContext::getTransferQueue() const
 {
-    if (m_transferQueueIndex == -1) {
-        RP_CORE_ERROR("Transfer queue index is -1!");
-        throw std::runtime_error("Transfer queue index is -1!");
+    uint32_t transferQueueIndex = m_queueFamilyIndices.familyIndices[TRANSFER];
+    if (transferQueueIndex == UINT32_MAX) {
+        RP_CORE_ERROR("Transfer queue index is UINT32_MAX!");
+        throw std::runtime_error("Transfer queue index is UINT32_MAX!");
     }
-    if (m_queues.find(m_transferQueueIndex) == m_queues.end()) {
+    if (m_queues.find(transferQueueIndex) == m_queues.end()) {
         RP_CORE_ERROR("Transfer queue index is not found!");
         throw std::runtime_error("Transfer queue index is not found!");
     }
-    return m_queues.find(m_transferQueueIndex)->second;
+    return m_queues.find(transferQueueIndex)->second;
 }
 
 std::shared_ptr<VulkanQueue> VulkanContext::getPresentQueue() const
 {
-    if (m_presentQueueIndex == -1) {
-        RP_CORE_ERROR("Present queue index is -1!");
-        throw std::runtime_error("Present queue index is -1!");
+    uint32_t presentQueueIndex = m_queueFamilyIndices.familyIndices[PRESENT];
+    if (presentQueueIndex == UINT32_MAX) {
+        RP_CORE_ERROR("Present queue index is UINT32_MAX!");
+        throw std::runtime_error("Present queue index is UINT32_MAX!");
     }
-    if (m_queues.find(m_presentQueueIndex) == m_queues.end()) {
+    if (m_queues.find(presentQueueIndex) == m_queues.end()) {
         RP_CORE_ERROR("Present queue index is not found!");
         throw std::runtime_error("Present queue index is not found!");
     }
-    return m_queues.find(m_presentQueueIndex)->second;
+    return m_queues.find(presentQueueIndex)->second;
 }
 
-void VulkanContext::createRecourses(WindowContext* windowContext)
+std::shared_ptr<VulkanQueue> VulkanContext::getVendorQueue() const
+{
+    return m_vendorQueue != nullptr ? m_vendorQueue : getGraphicsQueue();
+}
+
+void VulkanContext::createRecourses(WindowContext *windowContext)
 {
     m_swapChain = std::make_shared<SwapChain>(m_device, m_surface, m_physicalDevice, m_queueFamilyIndices, windowContext);
     m_swapChain->invalidate();
@@ -261,10 +273,8 @@ void VulkanContext::createInstance(WindowContext *windowContext)
     m_applicationInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
     m_applicationInfo.apiVersion = VK_API_VERSION_1_3;
 
-    RP_CORE_INFO("Creating Vulkan instance with API version: {}.{}.{}", 
-        VK_VERSION_MAJOR(m_applicationInfo.apiVersion),
-        VK_VERSION_MINOR(m_applicationInfo.apiVersion),
-        VK_VERSION_PATCH(m_applicationInfo.apiVersion));
+    RP_CORE_INFO("Creating Vulkan instance with API version: {}.{}.{}", VK_VERSION_MAJOR(m_applicationInfo.apiVersion),
+                 VK_VERSION_MINOR(m_applicationInfo.apiVersion), VK_VERSION_PATCH(m_applicationInfo.apiVersion));
 
     // Instance create info
     m_instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -278,9 +288,9 @@ void VulkanContext::createInstance(WindowContext *windowContext)
     if (enableValidationLayers) {
         m_instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
         m_instanceCreateInfo.ppEnabledLayerNames = m_validationLayers.data();
-            
+
         populateDebugMessengerCreateInfo(debugCreateInfo);
-        m_instanceCreateInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
+        m_instanceCreateInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
     } else {
         m_instanceCreateInfo.enabledLayerCount = 0;
         m_instanceCreateInfo.pNext = nullptr;
@@ -292,10 +302,7 @@ void VulkanContext::createInstance(WindowContext *windowContext)
     }
 
     RP_CORE_INFO("Vulkan instance created successfully!");
-
 }
-
-
 
 void VulkanContext::checkExtensionSupport()
 {
@@ -312,9 +319,9 @@ void VulkanContext::checkExtensionSupport()
     bool hasX11Support = false;
 #endif
 
-    for (const auto& extension : extensions) {
+    for (const auto &extension : extensions) {
         RP_CORE_INFO("\t Extension: {0}", extension.extensionName);
-        
+
 #ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
         if (strcmp(extension.extensionName, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME) == 0) {
             hasWaylandSupport = true;
@@ -349,7 +356,8 @@ void VulkanContext::checkExtensionSupport()
     RP_CORE_INFO("========================================================\n");
 }
 
-bool VulkanContext::checkDeviceExtensionSupport(VkPhysicalDevice device) {
+bool VulkanContext::checkDeviceExtensionSupport(VkPhysicalDevice device)
+{
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
@@ -358,20 +366,19 @@ bool VulkanContext::checkDeviceExtensionSupport(VkPhysicalDevice device) {
 
     std::set<std::string> requiredExtensions(m_deviceExtensions.begin(), m_deviceExtensions.end());
 
-    for (const auto& extension : availableExtensions) {
+    for (const auto &extension : availableExtensions) {
         requiredExtensions.erase(extension.extensionName);
     }
 
     return requiredExtensions.empty();
 }
 
-
-std::vector<const char *> VulkanContext::getRequiredExtensions(WindowContext* windowContext)
+std::vector<const char *> VulkanContext::getRequiredExtensions(WindowContext *windowContext)
 {
     uint32_t WCextensionCount = windowContext->getExtensionCount();
-    const char** WCextensions = windowContext->getExtensions();
+    const char **WCextensions = windowContext->getExtensions();
 
-    std::vector<const char*> extensions(WCextensions, WCextensions + WCextensionCount);
+    std::vector<const char *> extensions(WCextensions, WCextensions + WCextensionCount);
 
     if (enableValidationLayers) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -391,7 +398,7 @@ std::vector<const char *> VulkanContext::getRequiredExtensions(WindowContext* wi
         }
 #endif
     }
-    
+
     bool usingWayland = isWaylandSession();
     if (usingWayland && hasWaylandSurface) {
         RP_CORE_INFO("Requesting Wayland surface extension for Wayland session");
@@ -411,7 +418,8 @@ std::vector<const char *> VulkanContext::getRequiredExtensions(WindowContext* wi
     return extensions;
 }
 
-bool VulkanContext::checkValidationLayerSupport() {
+bool VulkanContext::checkValidationLayerSupport()
+{
 
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -419,10 +427,10 @@ bool VulkanContext::checkValidationLayerSupport() {
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-    for (const char* layerName : m_validationLayers) {
+    for (const char *layerName : m_validationLayers) {
         bool layerFound = false;
 
-        for (const auto& layerProperties : availableLayers) {
+        for (const auto &layerProperties : availableLayers) {
             if (strcmp(layerName, layerProperties.layerName) == 0) {
                 layerFound = true;
                 break;
@@ -430,6 +438,15 @@ bool VulkanContext::checkValidationLayerSupport() {
         }
 
         if (!layerFound) {
+            RP_CORE_ERROR("Required validation layer '{}' not found!", layerName);
+            RP_CORE_ERROR("Available validation layers:");
+            for (const auto &layerProperties : availableLayers) {
+                RP_CORE_ERROR("  - {}", layerProperties.layerName);
+            }
+            if (availableLayers.empty()) {
+                RP_CORE_ERROR("  (No validation layers available)");
+            }
+            RP_CORE_ERROR("To install validation layers on Arch Linux, run: sudo pacman -S vulkan-validation-layers");
             return false;
         }
     }
@@ -448,10 +465,7 @@ void VulkanContext::setupDebugMessenger()
         RP_CORE_ERROR("failed to set up debug messenger!");
         throw std::runtime_error("failed to set up debug messenger!");
     }
-
 }
-
-
 
 void VulkanContext::pickPhysicalDevice()
 {
@@ -464,11 +478,11 @@ void VulkanContext::pickPhysicalDevice()
         RP_CORE_ERROR("Failed to find GPUs with Vulkan support!");
         throw std::runtime_error("Failed to find GPUs with Vulkan support!");
     }
-    
+
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(m_instance, &deviceCount, devices.data());
 
-    for (const auto& device : devices) {
+    for (const auto &device : devices) {
         if (isDeviceSuitable(device)) {
             m_physicalDevice = device;
             break;
@@ -479,12 +493,11 @@ void VulkanContext::pickPhysicalDevice()
         RP_CORE_ERROR("failed to find a suitable GPU!");
         throw std::runtime_error("failed to find a suitable GPU!");
     }
-
-
 }
 
-bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
-    
+bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device)
+{
+
     VkPhysicalDeviceProperties deviceProperties;
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
@@ -493,19 +506,19 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
     RP_CORE_INFO("Evaluating GPU: {0}", deviceProperties.deviceName);
 
     bool isDeviceSuitable = true;
-    
+
     // Check queue family indices
     QueueFamilyIndices indices = findQueueFamilies(device);
     if (!indices.isComplete()) {
         RP_CORE_WARN("GPU {0}: Queue families incomplete:", deviceProperties.deviceName);
-        if (!indices.graphicsFamily.has_value()) {
-            RP_CORE_WARN("  - Graphics queue family not found");
+        if (indices.familyIndices[GRAPHICS] == UINT32_MAX) {
+            RP_CORE_WARN("\t- Graphics queue family not found");
         }
-        if (!indices.presentFamily.has_value()) {
-            RP_CORE_WARN("  - Present queue family not found");
+        if (indices.familyIndices[PRESENT] == UINT32_MAX) {
+            RP_CORE_WARN("\t- Present queue family not found");
         }
-        if (!indices.computeFamily.has_value()) {
-            RP_CORE_WARN("  - Compute queue family not found");
+        if (indices.familyIndices[COMPUTE] == UINT32_MAX) {
+            RP_CORE_WARN("\t- Compute queue family not found");
         }
         isDeviceSuitable = false;
     } else {
@@ -516,22 +529,22 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
     bool extensionsSupported = checkDeviceExtensionSupport(device);
     if (!extensionsSupported) {
         RP_CORE_WARN("GPU {0}: Required device extensions not supported", deviceProperties.deviceName);
-        
+
         // Get available extensions for this device
         uint32_t extensionCount;
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
-        
+
         // Create set of available extension names for quick lookup
         std::set<std::string> availableExtensionNames;
-        for (const auto& extension : availableExtensions) {
+        for (const auto &extension : availableExtensions) {
             availableExtensionNames.insert(extension.extensionName);
         }
-        
+
         // Log missing extensions
         RP_CORE_WARN("  Missing required extensions:");
-        for (const auto& requiredExtension : m_deviceExtensions) {
+        for (const auto &requiredExtension : m_deviceExtensions) {
             if (availableExtensionNames.find(requiredExtension) == availableExtensionNames.end()) {
                 RP_CORE_WARN("    - {0}", requiredExtension);
             }
@@ -546,7 +559,7 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
     if (extensionsSupported) {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-        
+
         if (!swapChainAdequate) {
             RP_CORE_WARN("GPU {0}: Swap chain support inadequate:", deviceProperties.deviceName);
             if (swapChainSupport.formats.empty()) {
@@ -557,10 +570,8 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
             }
             isDeviceSuitable = false;
         } else {
-            RP_CORE_INFO("GPU {0}: Swap chain support adequate ({1} formats, {2} present modes)", 
-                        deviceProperties.deviceName, 
-                        swapChainSupport.formats.size(), 
-                        swapChainSupport.presentModes.size());
+            RP_CORE_INFO("GPU {0}: Swap chain support adequate ({1} formats, {2} present modes)", deviceProperties.deviceName,
+                         swapChainSupport.formats.size(), swapChainSupport.presentModes.size());
         }
     } else {
         RP_CORE_WARN("GPU {0}: Cannot check swap chain support - extensions not supported", deviceProperties.deviceName);
@@ -577,6 +588,10 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device) {
     return isDeviceSuitable;
 }
 
+#define PREFER_QUEUE_INDEX(type)                                               \
+    (queueIndicesUses[indices.familyIndices[type]] < queueFamily.queueCount || \
+     queueIndicesUses[i] < queueIndicesUses[indices.familyIndices[type]])
+
 QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) const
 {
     QueueFamilyIndices indices;
@@ -585,23 +600,50 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    std::vector<uint32_t> queueIndicesUses(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
     int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
+    for (const auto &queueFamily : queueFamilies) {
         if (indices.isComplete()) {
             break;
         }
 
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            indices.graphicsFamily = i;
+            if (indices.familyIndices[GRAPHICS] == UINT32_MAX) {
+                indices.familyIndices[GRAPHICS] = i;
+                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            } else if (PREFER_QUEUE_INDEX(GRAPHICS)) {
+                queueIndicesUses[indices.familyIndices[GRAPHICS]]--;
+                indices.familyIndices[GRAPHICS] = i;
+                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            }
         }
-        
-        // Prefer a compute queue that also supports graphics for easier synchronization
         if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-            if (!indices.computeFamily.has_value() || 
-                (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-                indices.computeFamily = i;
+            if (indices.familyIndices[COMPUTE] == UINT32_MAX) {
+                indices.familyIndices[COMPUTE] = i;
+                indices.familyQueueCounts[COMPUTE] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            } else if (PREFER_QUEUE_INDEX(COMPUTE)) {
+                queueIndicesUses[indices.familyIndices[COMPUTE]]--;
+                indices.familyIndices[COMPUTE] = i;
+                indices.familyQueueCounts[COMPUTE] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            }
+        }
+
+        if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+            if (indices.familyIndices[TRANSFER] == UINT32_MAX) {
+                indices.familyIndices[TRANSFER] = i;
+                indices.familyQueueCounts[TRANSFER] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            } else if (PREFER_QUEUE_INDEX(TRANSFER)) {
+                queueIndicesUses[indices.familyIndices[TRANSFER]]--;
+                indices.familyIndices[TRANSFER] = i;
+                indices.familyQueueCounts[TRANSFER] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
             }
         }
 
@@ -609,259 +651,550 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &presentSupport);
 
         if (presentSupport) {
-            indices.presentFamily = i;
+            if (indices.familyIndices[PRESENT] == UINT32_MAX) {
+                indices.familyIndices[GRAPHICS] = i;
+                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            } else if (PREFER_QUEUE_INDEX(PRESENT)) {
+                queueIndicesUses[indices.familyIndices[PRESENT]]--;
+
+                indices.familyIndices[PRESENT] = i;
+                indices.familyQueueCounts[PRESENT] = queueFamily.queueCount;
+                queueIndicesUses[i]++;
+            }
         }
 
         i++;
     }
 
+    indices.print();
+
     return indices;
+}
+
+static void s_appendToPNextChain(VkPhysicalDeviceFeatures2 &root, VkBaseOutStructure *node)
+{
+    VkBaseOutStructure *current = reinterpret_cast<VkBaseOutStructure *>(&root);
+
+    while (current->pNext) {
+        current = reinterpret_cast<VkBaseOutStructure *>(current->pNext);
+    }
+
+    current->pNext = node;
+}
+
+static void s_enableCoreFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable)
+{
+    VkPhysicalDeviceFeatures2 supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &supported);
+
+    if (supported.features.geometryShader) {
+        featuresToEnable.features.geometryShader = VK_TRUE;
+    } else {
+        RP_CORE_WARN("geometryShader NOT supported.");
+    }
+
+    if (supported.features.tessellationShader) {
+        featuresToEnable.features.tessellationShader = VK_TRUE;
+    } else {
+        RP_CORE_WARN("tessellationShader NOT supported.");
+    }
+
+    if (supported.features.multiDrawIndirect) {
+        featuresToEnable.features.multiDrawIndirect = VK_TRUE;
+    } else {
+        RP_CORE_WARN("multiDrawIndirect NOT supported.");
+    }
+
+    if (supported.features.fillModeNonSolid) {
+        featuresToEnable.features.fillModeNonSolid = VK_TRUE;
+    } else {
+        RP_CORE_WARN("fillModeNonSolid NOT supported.");
+    }
+
+    if (supported.features.samplerAnisotropy) {
+        featuresToEnable.features.samplerAnisotropy = VK_TRUE;
+    } else {
+        RP_CORE_WARN("Sampler anisotropy not supported; disabling anisotropy in samplers");
+    }
+}
+
+static void s_enableDescriptorIndexingFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                               VkPhysicalDeviceDescriptorIndexingFeatures &descriptorIndexingFeatures)
+{
+    VkPhysicalDeviceDescriptorIndexingFeatures supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    // Enable only what is supported
+    if (supported.shaderSampledImageArrayNonUniformIndexing)
+        descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+
+    if (supported.runtimeDescriptorArray) descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+
+    if (supported.descriptorBindingVariableDescriptorCount)
+        descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+
+    if (supported.descriptorBindingPartiallyBound) descriptorIndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+
+    if (supported.descriptorBindingStorageImageUpdateAfterBind)
+        descriptorIndexingFeatures.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+
+    if (supported.descriptorBindingUniformBufferUpdateAfterBind)
+        descriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+
+    if (supported.descriptorBindingStorageBufferUpdateAfterBind)
+        descriptorIndexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+
+    if (supported.descriptorBindingSampledImageUpdateAfterBind)
+        descriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+
+    descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+
+    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&descriptorIndexingFeatures));
+}
+
+static bool s_enableVertexInputDynamicState(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                            VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT &outFeatures)
+{
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (supported.vertexInputDynamicState) {
+        outFeatures = {};
+        outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
+        outFeatures.vertexInputDynamicState = VK_TRUE;
+
+        s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+        RP_CORE_INFO("vertexInputDynamicState enabled.");
+    } else {
+        RP_CORE_WARN("vertexInputDynamicState NOT supported.");
+        return false;
+    }
+    return true;
+}
+
+static bool s_enableVertexAttributeRobustness(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                              VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT &outFeatures)
+{
+    VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_ROBUSTNESS_FEATURES_EXT;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (supported.vertexAttributeRobustness) {
+        outFeatures = {};
+        outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_ROBUSTNESS_FEATURES_EXT;
+        outFeatures.vertexAttributeRobustness = VK_TRUE;
+
+        s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+        RP_CORE_INFO("EXT::vertexAttributeRobustness enabled.");
+    } else {
+        RP_CORE_WARN("EXT::vertexAttributeRobustness NOT supported.");
+        return false;
+    }
+    return true;
+}
+
+static bool s_enableDynamicRendering(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                     VkPhysicalDeviceDynamicRenderingFeaturesKHR &outFeatures)
+{
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (supported.dynamicRendering) {
+        outFeatures = {};
+        outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+        outFeatures.dynamicRendering = VK_TRUE;
+
+        s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+        RP_CORE_INFO("KHR::dynamicRendering enabled.");
+    } else {
+        RP_CORE_WARN("KHR::dynamicRendering NOT supported.");
+        return false;
+    }
+    return true;
+}
+
+static void s_enableRobustness2(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                VkPhysicalDeviceRobustness2FeaturesEXT &outFeatures)
+{
+    VkPhysicalDeviceRobustness2FeaturesEXT supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (supported.nullDescriptor) {
+        outFeatures = {};
+        outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
+        outFeatures.nullDescriptor = VK_TRUE;
+
+        s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+        RP_CORE_INFO("KHR::robustness2::nullDescriptor enabled.");
+    } else {
+        RP_CORE_WARN("KHR::robustness2::nullDescriptor NOT supported.");
+    }
+}
+
+static void s_enableMultiview(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                              VkPhysicalDeviceMultiviewFeaturesKHR &outFeatures)
+{
+    VkPhysicalDeviceMultiviewFeaturesKHR supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (supported.multiview) {
+        outFeatures = {};
+        outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR;
+        outFeatures.multiview = VK_TRUE;
+
+        s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+        RP_CORE_INFO("KHR::multiview enabled.");
+    } else {
+        RP_CORE_WARN("KHR::multiview NOT supported.");
+    }
+}
+
+static bool s_enableRayTracingFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                       VkPhysicalDeviceBufferDeviceAddressFeatures &outBDA,
+                                       VkPhysicalDeviceAccelerationStructureFeaturesKHR &outAS,
+                                       VkPhysicalDeviceRayTracingPipelineFeaturesKHR &outRTP,
+                                       VkPhysicalDeviceRayQueryFeaturesKHR &outRQ)
+{
+    // --- Query support ---
+    VkPhysicalDeviceBufferDeviceAddressFeatures supportedBDA{};
+    supportedBDA.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR supportedAS{};
+    supportedAS.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR supportedRTP{};
+    supportedRTP.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+
+    VkPhysicalDeviceRayQueryFeaturesKHR supportedRQ{};
+    supportedRQ.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+    // Chain all queries at once
+    supportedBDA.pNext = &supportedAS;
+    supportedAS.pNext = &supportedRTP;
+    supportedRTP.pNext = &supportedRQ;
+    query.pNext = &supportedBDA;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    // --- Hard requirements ---
+    const bool supported = supportedBDA.bufferDeviceAddress && supportedAS.accelerationStructure &&
+                           supportedRTP.rayTracingPipeline && supportedRQ.rayQuery;
+
+    if (!supported) {
+        RP_CORE_WARN("Ray tracing NOT supported on this device.");
+        return false;
+    }
+
+    RP_CORE_INFO("Ray tracing supported. Enabling features.");
+
+    // --- Enable features ---
+    outBDA = {};
+    outBDA.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    outBDA.bufferDeviceAddress = VK_TRUE;
+
+    outAS = {};
+    outAS.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    outAS.accelerationStructure = VK_TRUE;
+    outAS.descriptorBindingAccelerationStructureUpdateAfterBind = VK_TRUE;
+
+    outRTP = {};
+    outRTP.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+    outRTP.rayTracingPipeline = VK_TRUE;
+
+    outRQ = {};
+    outRQ.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    outRQ.rayQuery = VK_TRUE;
+
+    // --- Chain in correct dependency order ---
+    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outBDA));
+    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outAS));
+    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outRTP));
+    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outRQ));
+
+    return true;
+}
+
+static bool s_enableTimelineSemaphores(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                       VkPhysicalDeviceTimelineSemaphoreFeatures &outFeatures)
+{
+    VkPhysicalDeviceTimelineSemaphoreFeatures supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (!supported.timelineSemaphore) {
+        RP_CORE_WARN("Timeline semaphores NOT supported.");
+        return false;
+    }
+
+    outFeatures = {};
+    outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+    outFeatures.timelineSemaphore = VK_TRUE;
+
+    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+    RP_CORE_INFO("Timeline semaphores enabled.");
+    return true;
+}
+
+template <typename T> static bool s_loadDeviceFunction(VkDevice device, const char *name, T &outFn)
+{
+    outFn = reinterpret_cast<T>(vkGetDeviceProcAddr(device, name));
+    return outFn != nullptr;
+}
+
+static void s_loadVertexInputDynamicState(VkDevice device, bool enabled, PFN_vkCmdSetVertexInputEXT &fn, bool &outEnabled)
+{
+    if (!enabled) {
+        outEnabled = false;
+        return;
+    }
+
+    outEnabled = s_loadDeviceFunction(device, "vkCmdSetVertexInputEXT", fn);
+
+    if (!outEnabled) RP_CORE_ERROR("Failed to load vkCmdSetVertexInputEXT");
+}
+
+static void s_loadDynamicRendering(VkDevice device, bool enabled, PFN_vkCmdBeginRenderingKHR &beginFn,
+                                   PFN_vkCmdEndRenderingKHR &endFn, bool &outEnabled)
+{
+    if (!enabled) {
+        outEnabled = false;
+        return;
+    }
+
+    const bool ok = s_loadDeviceFunction(device, "vkCmdBeginRenderingKHR", beginFn) &&
+                    s_loadDeviceFunction(device, "vkCmdEndRenderingKHR", endFn);
+
+    outEnabled = ok;
+
+    if (!ok) RP_CORE_ERROR("Failed to load dynamic rendering functions");
+}
+
+static void s_loadMultiDraw(VkDevice device, PFN_vkCmdDrawMultiEXT &draw, PFN_vkCmdDrawMultiIndexedEXT &drawIndexed)
+{
+    s_loadDeviceFunction(device, "vkCmdDrawMultiEXT", draw);
+    s_loadDeviceFunction(device, "vkCmdDrawMultiIndexedEXT", drawIndexed);
+}
+
+static bool
+s_loadRayTracing(VkPhysicalDevice physicalDevice, VkDevice device, PFN_vkCreateAccelerationStructureKHR &createAS,
+                 PFN_vkDestroyAccelerationStructureKHR &destroyAS, PFN_vkGetAccelerationStructureBuildSizesKHR &getBuildSizes,
+                 PFN_vkCmdBuildAccelerationStructuresKHR &cmdBuild, PFN_vkGetAccelerationStructureDeviceAddressKHR &getAddress,
+                 PFN_vkCreateRayTracingPipelinesKHR &createPipelines, PFN_vkGetRayTracingShaderGroupHandlesKHR &getHandles,
+                 PFN_vkCmdTraceRaysKHR &traceRays, VkPhysicalDeviceRayTracingPipelinePropertiesKHR &rtProps,
+                 VkPhysicalDeviceAccelerationStructurePropertiesKHR &asProps)
+{
+    const bool ok = s_loadDeviceFunction(device, "vkCreateAccelerationStructureKHR", createAS) &&
+                    s_loadDeviceFunction(device, "vkDestroyAccelerationStructureKHR", destroyAS) &&
+                    s_loadDeviceFunction(device, "vkGetAccelerationStructureBuildSizesKHR", getBuildSizes) &&
+                    s_loadDeviceFunction(device, "vkCmdBuildAccelerationStructuresKHR", cmdBuild) &&
+                    s_loadDeviceFunction(device, "vkGetAccelerationStructureDeviceAddressKHR", getAddress) &&
+                    s_loadDeviceFunction(device, "vkCreateRayTracingPipelinesKHR", createPipelines) &&
+                    s_loadDeviceFunction(device, "vkGetRayTracingShaderGroupHandlesKHR", getHandles) &&
+                    s_loadDeviceFunction(device, "vkCmdTraceRaysKHR", traceRays);
+
+    if (!ok) return false;
+
+    rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+    asProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
+
+    VkPhysicalDeviceProperties2 props{};
+    props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    props.pNext = &rtProps;
+    rtProps.pNext = &asProps;
+
+    vkGetPhysicalDeviceProperties2(physicalDevice, &props);
+
+    return true;
+}
+
+static void s_createQueues(VkDevice device, const QueueFamilyIndices &indices,
+                           std::map<uint32_t, std::shared_ptr<VulkanQueue>> &queues, std::shared_ptr<VulkanQueue> &vendorQueue)
+{
+
+    std::set<uint32_t> uniqueQueueFamilies = {indices.familyIndices[GRAPHICS], indices.familyIndices[PRESENT],
+                                              indices.familyIndices[COMPUTE], indices.familyIndices[TRANSFER]};
+
+    for (uint32_t queueFamily : uniqueQueueFamilies) {
+        if (queueFamily == UINT32_MAX) continue;
+
+        std::vector<std::string> queueTypeNames;
+
+        bool hasGraphics = (indices.familyIndices[GRAPHICS] == queueFamily);
+        bool hasPresent = (indices.familyIndices[PRESENT] == queueFamily);
+        bool hasCompute = (indices.familyIndices[COMPUTE] == queueFamily);
+        bool hasTransfer = (indices.familyIndices[TRANSFER] == queueFamily);
+
+        if (hasGraphics) queueTypeNames.push_back("graphics");
+        if (hasPresent) queueTypeNames.push_back("present");
+        if (hasCompute) queueTypeNames.push_back("compute");
+        if (hasTransfer) queueTypeNames.push_back("transfer");
+
+        std::string queueName;
+        for (size_t i = 0; i < queueTypeNames.size(); ++i) {
+            if (i > 0) queueName += "|";
+            queueName += queueTypeNames[i];
+        }
+
+        uint32_t queueCount = 0;
+        for (int i = 0; i < COUNT; ++i) {
+            if (indices.familyIndices[i] == queueFamily) {
+                queueCount = indices.familyQueueCounts[i];
+                break;
+            }
+        }
+
+        if (queueCount == 0) continue;
+
+        auto primaryQueue = std::make_shared<VulkanQueue>(device, queueFamily, 0, queueName);
+        queues[queueFamily] = primaryQueue;
+
+        if (hasGraphics && queueCount > 1 && vendorQueue == nullptr) {
+            vendorQueue = std::make_shared<VulkanQueue>(device, queueFamily, 1, "vendor");
+        }
+    }
 }
 
 void VulkanContext::createLogicalDevice()
 {
 
-    QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
+    m_queueFamilyIndices = findQueueFamilies(m_physicalDevice);
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
-    
-    // Add compute queue family if it's different from graphics/present
-    if (indices.computeFamily.has_value()) {
-        uniqueQueueFamilies.insert(indices.computeFamily.value());
-    }
+    std::set<uint32_t> uniqueQueueFamilies = {
+        m_queueFamilyIndices.familyIndices[GRAPHICS], m_queueFamilyIndices.familyIndices[PRESENT],
+        m_queueFamilyIndices.familyIndices[COMPUTE], m_queueFamilyIndices.familyIndices[TRANSFER]};
 
-    float queuePriority = 1.0f;
+    std::vector<std::vector<float>> queuePriorityVectors;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
+        if (queueFamily == UINT32_MAX) continue;
+
+        uint32_t queueCount = 0;
+        for (int i = 0; i < COUNT; ++i) {
+            if (m_queueFamilyIndices.familyIndices[i] == queueFamily) {
+                queueCount = m_queueFamilyIndices.familyQueueCounts[i];
+                break;
+            }
+        }
+
+        std::vector<float> priorities;
+        if (queueCount > 0) {
+            priorities.resize(queueCount);
+            if (queueCount == 1) {
+                priorities[0] = 1.0f;
+            } else {
+                for (uint32_t i = 0; i < queueCount; ++i) {
+                    priorities[i] = 1.0f - (static_cast<float>(i) / static_cast<float>(queueCount - 1));
+                }
+            }
+        }
+
         VkDeviceQueueCreateInfo queueCreateInfo{};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfo.queueCount = queueCount;
+        if (!priorities.empty()) {
+            queuePriorityVectors.push_back(std::move(priorities));
+            queueCreateInfo.pQueuePriorities = queuePriorityVectors.back().data();
+        } else {
+            queueCreateInfo.pQueuePriorities = nullptr;
+        }
+
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    // Main structure to enable features; this will be pointed to by VkDeviceCreateInfo.pNext
     VkPhysicalDeviceFeatures2 physicalDeviceFeaturesToEnable{};
     physicalDeviceFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
-    // --- Handle Vulkan 1.0 Core Features ---
-    // Query all supported Vulkan 1.0 features into the .features member.
-    // vkGetPhysicalDeviceFeatures(m_physicalDevice, &physicalDeviceFeaturesToEnable.features); // Alternative
-    // Or, more consistently with VkPhysicalDeviceFeatures2:
-    VkPhysicalDeviceFeatures2 coreFeaturesQuery = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &coreFeaturesQuery);
-    physicalDeviceFeaturesToEnable.features = coreFeaturesQuery.features; // Copy initially queried core features.
+    s_enableCoreFeatures(m_physicalDevice, physicalDeviceFeaturesToEnable);
 
-    // Ensure geometryShader is enabled if supported (as an example of a core feature)
-    if (physicalDeviceFeaturesToEnable.features.geometryShader) {
-        RP_CORE_INFO("Core::geometryShader is supported and enabled.");
-    } else {
-        RP_CORE_WARN("Core::geometryShader is NOT supported. If required, this could be an issue.");
-        // If it's critical and not supported, you might throw an error or adapt.
-        // For now, we'll try to enable it, and Vulkan will ignore if not supported (though we already know its status).
-    }
-    // physicalDeviceFeaturesToEnable.features.geometryShader remains as queried (true if supported, false otherwise)
-    // If you wanted to *request* it, and it's supported, it will be enabled. If not supported, request is ignored.
-    // The most robust is to check support and then request. If geometryShader is critical, one might check
-    // coreFeaturesQuery.features.geometryShader and throw if not present.
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
+    s_enableDescriptorIndexingFeatures(m_physicalDevice, physicalDeviceFeaturesToEnable, descriptorIndexingFeatures);
 
-    // Initialize pNext pointer for chaining extension features
-    void** ppNextChain = &physicalDeviceFeaturesToEnable.pNext;
+    VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphores{};
+    s_enableTimelineSemaphores(m_physicalDevice, physicalDeviceFeaturesToEnable, timelineSemaphores);
 
-    // --- VK_EXT_descriptor_indexing features ---
-    // Initialize and query descriptor indexing features
-    m_descriptorIndexingFeatures = {};
-    m_descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-    
-    VkPhysicalDeviceFeatures2 queryDescriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryDescriptorIndexing.pNext = &m_descriptorIndexingFeatures;
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryDescriptorIndexing);
-    
-    // Enable required descriptor indexing features
-    m_descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-    m_descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
-    m_descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-    m_descriptorIndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
-    
-    // Chain the descriptor indexing features
-    *ppNextChain = &m_descriptorIndexingFeatures;
-    ppNextChain = &m_descriptorIndexingFeatures.pNext;
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertexInputDynamic{};
+    m_isVertexInputDynamicStateEnabled =
+        s_enableVertexInputDynamicState(m_physicalDevice, physicalDeviceFeaturesToEnable, vertexInputDynamic);
 
-    // --- VK_EXT_vertex_input_dynamic_state ---
-    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT dynamicStateFeaturesToEnable{};
-    dynamicStateFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
-    
-    // Query specifically for this extension's features
-    VkPhysicalDeviceFeatures2 queryDynamicState = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryDynamicState.pNext = &dynamicStateFeaturesToEnable; // Temporarily chain for querying
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryDynamicState);
-    // After the call, dynamicStateFeaturesToEnable.vertexInputDynamicState holds the support status
+    VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT vertexAttribRobust{};
+    m_isVertexAttributeRobustnessEnabled =
+        s_enableVertexAttributeRobustness(m_physicalDevice, physicalDeviceFeaturesToEnable, vertexAttribRobust);
 
-    if (dynamicStateFeaturesToEnable.vertexInputDynamicState) {
-        RP_CORE_INFO("Feature EXT::vertexInputDynamicState is supported and will be enabled.");
-        // The struct dynamicStateFeaturesToEnable is already populated with sType and the feature set to VK_TRUE.
-        // We just need to chain it into the main physicalDeviceFeaturesToEnable.pNext chain.
-        *ppNextChain = &dynamicStateFeaturesToEnable;
-        ppNextChain = &dynamicStateFeaturesToEnable.pNext; // Advance the tail of our chain
-    } else {
-        RP_CORE_WARN("Feature EXT::vertexInputDynamicState is NOT supported.");
-    }
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRendering{};
+    m_isDynamicRenderingEnabled = s_enableDynamicRendering(m_physicalDevice, physicalDeviceFeaturesToEnable, dynamicRendering);
 
-    // --- VK_EXT_vertex_attribute_robustness ---
-    VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT attributeRobustnessFeaturesToEnable{};
-    attributeRobustnessFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_ROBUSTNESS_FEATURES_EXT;
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2{};
+    s_enableRobustness2(m_physicalDevice, physicalDeviceFeaturesToEnable, robustness2);
 
-    // Query specifically for this extension's features
-    VkPhysicalDeviceFeatures2 queryAttributeRobustness = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryAttributeRobustness.pNext = &attributeRobustnessFeaturesToEnable; // Temporarily chain for querying
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryAttributeRobustness);
-    // After the call, attributeRobustnessFeaturesToEnable.vertexAttributeRobustness holds the support status
+    VkPhysicalDeviceMultiviewFeaturesKHR multiview{};
+    s_enableMultiview(m_physicalDevice, physicalDeviceFeaturesToEnable, multiview);
 
-    if (attributeRobustnessFeaturesToEnable.vertexAttributeRobustness) {
-        RP_CORE_INFO("Feature EXT::vertexAttributeRobustness is supported and will be enabled.");
-        // The struct attributeRobustnessFeaturesToEnable is already populated with sType and the feature set to VK_TRUE.
-        // Chain it.
-        *ppNextChain = &attributeRobustnessFeaturesToEnable;
-        ppNextChain = &attributeRobustnessFeaturesToEnable.pNext; // Advance the tail of our chain
-    } else {
-        RP_CORE_WARN("Feature EXT::vertexAttributeRobustness is NOT supported.");
-    }
-
-
-
-    // --- VK_KHR_dynamic_rendering ---
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeaturesToEnable{};
-    dynamicRenderingFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
-
-    // Query specifically for this extension's features
-    VkPhysicalDeviceFeatures2 queryDynamicRendering = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryDynamicRendering.pNext = &dynamicRenderingFeaturesToEnable; // Temporarily chain for querying
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryDynamicRendering);
-
-    if (dynamicRenderingFeaturesToEnable.dynamicRendering) {
-        RP_CORE_INFO("Feature KHR::dynamicRendering is supported and will be enabled.");
-        *ppNextChain = &dynamicRenderingFeaturesToEnable;
-        ppNextChain = &dynamicRenderingFeaturesToEnable.pNext;
-    } else {
-        RP_CORE_WARN("Feature KHR::dynamicRendering is NOT supported.");
-    }
-
-    // --- VK_KHR_robustness2 ---
-    VkPhysicalDeviceRobustness2FeaturesEXT robustness2FeaturesToEnable{};
-    robustness2FeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
-
-    // Query specifically for this extension's features
-    VkPhysicalDeviceFeatures2 queryRobustness2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryRobustness2.pNext = &robustness2FeaturesToEnable; // Temporarily chain for querying
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryRobustness2);
-
-    if (robustness2FeaturesToEnable.nullDescriptor) {
-        RP_CORE_INFO("Feature KHR::robustness2::nullDescriptor is supported and will be enabled.");
-        // Enable null descriptor feature to handle sparse descriptor sets
-        robustness2FeaturesToEnable.nullDescriptor = VK_TRUE;
-        *ppNextChain = &robustness2FeaturesToEnable;
-        ppNextChain = &robustness2FeaturesToEnable.pNext;
-    } else {
-        RP_CORE_WARN("Feature KHR::robustness2::nullDescriptor is NOT supported.");
-    }
-
-    // --- VK_KHR_multiview ---
-    VkPhysicalDeviceMultiviewFeaturesKHR multiviewFeaturesToEnable{};
-    multiviewFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR;
-
-    // Query specifically for this extension's features
-    VkPhysicalDeviceFeatures2 queryMultiview = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryMultiview.pNext = &multiviewFeaturesToEnable; // Temporarily chain for querying
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryMultiview);
-
-    if (multiviewFeaturesToEnable.multiview) {
-        RP_CORE_INFO("Feature KHR::multiview is supported and will be enabled.");
-        multiviewFeaturesToEnable.multiview = VK_TRUE;
-        *ppNextChain = &multiviewFeaturesToEnable;
-        ppNextChain = &multiviewFeaturesToEnable.pNext;
-    } else {
-        RP_CORE_WARN("Feature KHR::multiview is NOT supported.");
-    }
-
-    // --- Ray Tracing Features ---
-    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddressFeaturesToEnable{};
-    bufferDeviceAddressFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
-    
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeaturesToEnable{};
-    accelerationStructureFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-    
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeaturesToEnable{};
-    rayTracingPipelineFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-
-    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeaturesToEnable{};
-    rayQueryFeaturesToEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
-
-    // Query buffer device address features
-    VkPhysicalDeviceFeatures2 queryBufferDeviceAddress = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryBufferDeviceAddress.pNext = &bufferDeviceAddressFeaturesToEnable;
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryBufferDeviceAddress);
-
-    // Query acceleration structure features
-    VkPhysicalDeviceFeatures2 queryAccelerationStructure = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryAccelerationStructure.pNext = &accelerationStructureFeaturesToEnable;
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryAccelerationStructure);
-
-    // Query ray tracing pipeline features
-    VkPhysicalDeviceFeatures2 queryRayTracingPipeline = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryRayTracingPipeline.pNext = &rayTracingPipelineFeaturesToEnable;
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryRayTracingPipeline);
-
-    // Query ray query features
-    VkPhysicalDeviceFeatures2 queryRayQuery = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-    queryRayQuery.pNext = &rayQueryFeaturesToEnable;
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &queryRayQuery);
-
-    // Enable ray tracing features if supported
-    bool rayTracingSupported = bufferDeviceAddressFeaturesToEnable.bufferDeviceAddress &&
-                              accelerationStructureFeaturesToEnable.accelerationStructure &&
-                              rayTracingPipelineFeaturesToEnable.rayTracingPipeline &&
-                              rayQueryFeaturesToEnable.rayQuery;
-
-    if (rayTracingSupported) {
-        RP_CORE_INFO("Ray tracing is supported and will be enabled.");
-        
-        // Enable buffer device address
-        bufferDeviceAddressFeaturesToEnable.bufferDeviceAddress = VK_TRUE;
-        *ppNextChain = &bufferDeviceAddressFeaturesToEnable;
-        ppNextChain = &bufferDeviceAddressFeaturesToEnable.pNext;
-        
-        // Enable acceleration structure
-        accelerationStructureFeaturesToEnable.accelerationStructure = VK_TRUE;
-        *ppNextChain = &accelerationStructureFeaturesToEnable;
-        ppNextChain = &accelerationStructureFeaturesToEnable.pNext;
-        
-        // Enable ray tracing pipeline
-        rayTracingPipelineFeaturesToEnable.rayTracingPipeline = VK_TRUE;
-        *ppNextChain = &rayTracingPipelineFeaturesToEnable;
-        ppNextChain = &rayTracingPipelineFeaturesToEnable.pNext;
-        
-        // Enable ray query
-        rayQueryFeaturesToEnable.rayQuery = VK_TRUE;
-        *ppNextChain = &rayQueryFeaturesToEnable;
-        ppNextChain = &rayQueryFeaturesToEnable.pNext;
-        
-        m_isRayTracingEnabled = true;
-    } else {
-        RP_CORE_WARN("Ray tracing is NOT supported on this device.");
-        m_isRayTracingEnabled = false;
-    }
-    
-    // Ensure the end of the chain is nullptr if no more features are added
-    *ppNextChain = nullptr;
-
+    VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddress{};
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructure{};
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipeline{};
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQuery{};
+    m_isRayTracingEnabled = s_enableRayTracingFeatures(m_physicalDevice, physicalDeviceFeaturesToEnable, bufferDeviceAddress,
+                                                       accelerationStructure, rayTracingPipeline, rayQuery);
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    
-    createInfo.pNext = &physicalDeviceFeaturesToEnable; // Point to the head of our features chain
-    createInfo.pEnabledFeatures = nullptr; // Must be nullptr if pNext includes VkPhysicalDeviceFeatures2
+
+    createInfo.pNext = &physicalDeviceFeaturesToEnable;
+    createInfo.pEnabledFeatures = nullptr;
 
     createInfo.enabledExtensionCount = static_cast<uint32_t>(m_deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = m_deviceExtensions.data();
@@ -869,136 +1202,26 @@ void VulkanContext::createLogicalDevice()
     if (enableValidationLayers) {
         createInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
         createInfo.ppEnabledLayerNames = m_validationLayers.data();
-    } else {
-        createInfo.enabledLayerCount = 0;
     }
 
+    if (vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create logical device");
 
-    if (vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device) != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to create logical device!");
-        throw std::runtime_error("failed to create logical device!");
-    }
+    s_loadVertexInputDynamicState(m_device, vertexInputDynamic.vertexInputDynamicState, vkCmdSetVertexInputEXT,
+                                  m_isVertexInputDynamicStateEnabled);
+    s_loadDynamicRendering(m_device, dynamicRendering.dynamicRendering, vkCmdBeginRenderingKHR, vkCmdEndRenderingKHR,
+                           m_isDynamicRenderingEnabled);
+    s_loadMultiDraw(m_device, vkCmdDrawMultiEXT, vkCmdDrawMultiIndexedEXT);
+    s_loadRayTracing(m_physicalDevice, m_device, vkCreateAccelerationStructureKHR, vkDestroyAccelerationStructureKHR,
+                     vkGetAccelerationStructureBuildSizesKHR, vkCmdBuildAccelerationStructuresKHR,
+                     vkGetAccelerationStructureDeviceAddressKHR, vkCreateRayTracingPipelinesKHR,
+                     vkGetRayTracingShaderGroupHandlesKHR, vkCmdTraceRaysKHR, m_rayTracingPipelineProperties,
+                     m_accelerationStructureProperties);
 
-
-    // Load extension function pointers
-    if (dynamicStateFeaturesToEnable.vertexInputDynamicState) {
-        vkCmdSetVertexInputEXT = (PFN_vkCmdSetVertexInputEXT)vkGetDeviceProcAddr(m_device, "vkCmdSetVertexInputEXT");
-        if (!vkCmdSetVertexInputEXT) {
-            RP_CORE_ERROR("Failed to load vkCmdSetVertexInputEXT function pointer!");
-            m_isVertexInputDynamicStateEnabled = false;
-        } else {
-            m_isVertexInputDynamicStateEnabled = true;
-            RP_CORE_INFO("Successfully loaded vkCmdSetVertexInputEXT function pointer.");
-        }
-    } else {
-        m_isVertexInputDynamicStateEnabled = false;
-    }
-
-    // Store vertex attribute robustness state
-    m_isVertexAttributeRobustnessEnabled = attributeRobustnessFeaturesToEnable.vertexAttributeRobustness;
-
-    // Store robustness2 state
-    m_isNullDescriptorEnabled = robustness2FeaturesToEnable.nullDescriptor;
-
-    // Store dynamic rendering state and load function pointers
-    if (dynamicRenderingFeaturesToEnable.dynamicRendering) {
-        vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdBeginRenderingKHR");
-        vkCmdEndRenderingKHR = (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(m_device, "vkCmdEndRenderingKHR");
-        if (!vkCmdBeginRenderingKHR || !vkCmdEndRenderingKHR) {
-            RP_CORE_ERROR("Failed to load dynamic rendering function pointers!");
-            m_isDynamicRenderingEnabled = false;
-        } else {
-            m_isDynamicRenderingEnabled = true;
-            RP_CORE_INFO("Successfully loaded dynamic rendering function pointers.");
-        }
-    } else {
-        m_isDynamicRenderingEnabled = false;
-    }
-
-    // Load multi-draw function pointers
-    vkCmdDrawMultiEXT = (PFN_vkCmdDrawMultiEXT)vkGetDeviceProcAddr(m_device, "vkCmdDrawMultiEXT");
-    vkCmdDrawMultiIndexedEXT = (PFN_vkCmdDrawMultiIndexedEXT)vkGetDeviceProcAddr(m_device, "vkCmdDrawMultiIndexedEXT");
-    
-    if (!vkCmdDrawMultiEXT || !vkCmdDrawMultiIndexedEXT) {
-        RP_CORE_WARN("Failed to load multi-draw function pointers! Multi-draw indirect will fall back to regular indirect.");
-    } else {
-        RP_CORE_INFO("Successfully loaded multi-draw function pointers.");
-    }
-
-    // Load ray tracing function pointers and query properties
-    if (m_isRayTracingEnabled) {
-        // Load acceleration structure function pointers
-        vkCreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)vkGetDeviceProcAddr(m_device, "vkCreateAccelerationStructureKHR");
-        vkDestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)vkGetDeviceProcAddr(m_device, "vkDestroyAccelerationStructureKHR");
-        vkGetAccelerationStructureBuildSizesKHR = (PFN_vkGetAccelerationStructureBuildSizesKHR)vkGetDeviceProcAddr(m_device, "vkGetAccelerationStructureBuildSizesKHR");
-        vkCmdBuildAccelerationStructuresKHR = (PFN_vkCmdBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(m_device, "vkCmdBuildAccelerationStructuresKHR");
-        vkGetAccelerationStructureDeviceAddressKHR = (PFN_vkGetAccelerationStructureDeviceAddressKHR)vkGetDeviceProcAddr(m_device, "vkGetAccelerationStructureDeviceAddressKHR");
-
-        // Load ray tracing pipeline function pointers
-        vkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr(m_device, "vkCreateRayTracingPipelinesKHR");
-        vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)vkGetDeviceProcAddr(m_device, "vkGetRayTracingShaderGroupHandlesKHR");
-        vkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr(m_device, "vkCmdTraceRaysKHR");
-
-        // Verify all function pointers were loaded successfully
-        if (!vkCreateAccelerationStructureKHR || !vkDestroyAccelerationStructureKHR || 
-            !vkGetAccelerationStructureBuildSizesKHR || !vkCmdBuildAccelerationStructuresKHR ||
-            !vkGetAccelerationStructureDeviceAddressKHR || !vkCreateRayTracingPipelinesKHR ||
-            !vkGetRayTracingShaderGroupHandlesKHR || !vkCmdTraceRaysKHR) {
-            RP_CORE_ERROR("Failed to load some ray tracing function pointers!");
-            m_isRayTracingEnabled = false;
-        } else {
-            RP_CORE_INFO("Successfully loaded all ray tracing function pointers.");
-            
-            // Query ray tracing properties
-            m_rayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-            m_accelerationStructureProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
-            
-            VkPhysicalDeviceProperties2 deviceProperties2{};
-            deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-            deviceProperties2.pNext = &m_rayTracingPipelineProperties;
-            m_rayTracingPipelineProperties.pNext = &m_accelerationStructureProperties;
-            
-            vkGetPhysicalDeviceProperties2(m_physicalDevice, &deviceProperties2);
-            
-            RP_CORE_INFO("Ray tracing properties queried successfully.");
-            RP_CORE_INFO("  Max ray recursion depth: {}", m_rayTracingPipelineProperties.maxRayRecursionDepth);
-            RP_CORE_INFO("  Shader group handle size: {}", m_rayTracingPipelineProperties.shaderGroupHandleSize);
-        }
-    }
-
-    // retrieve queues
-    if (indices.graphicsFamily.value() == indices.presentFamily.value()) {
-        // If graphics and present queues are from the same family, use the same instance
-        auto queue = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());
-        m_queues[indices.graphicsFamily.value()] = queue;
-        m_graphicsQueueIndex = indices.graphicsFamily.value();
-        m_presentQueueIndex = indices.graphicsFamily.value();
-    } else {
-        // If they're from different families, create separate instances
-        m_queues[indices.graphicsFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.graphicsFamily.value());
-        m_queues[indices.presentFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.presentFamily.value());
-        m_graphicsQueueIndex = indices.graphicsFamily.value();
-        m_presentQueueIndex = indices.presentFamily.value();
-    }
-
-    // Create compute queue
-    if (indices.computeFamily.has_value()) {
-        // Check if compute queue family is different from already created queues
-        if (m_queues.find(indices.computeFamily.value()) == m_queues.end()) {
-            m_queues[indices.computeFamily.value()] = std::make_shared<VulkanQueue>(m_device, indices.computeFamily.value());
-        }
-        m_computeQueueIndex = indices.computeFamily.value();
-        RP_CORE_INFO("Compute queue created using family index: {}", indices.computeFamily.value());
-    } else {
-        m_computeQueueIndex = -1;
-        RP_CORE_WARN("No compute queue family found!");
-    }
-
-    m_transferQueueIndex = -1;
+    s_createQueues(m_device, m_queueFamilyIndices, m_queues, m_vendorQueue);
 
     RP_CORE_INFO("Logical device created successfully!");
 }
-
 
 void VulkanContext::createWindowsSurface(WindowContext *windowContext)
 {
@@ -1011,7 +1234,8 @@ void VulkanContext::createWindowsSurface(WindowContext *windowContext)
     }
 #endif
 
-    if (glfwCreateWindowSurface(m_instance, (GLFWwindow*)windowContext->getNativeWindowContext(), nullptr, &m_surface) != VK_SUCCESS) {
+    if (glfwCreateWindowSurface(m_instance, (GLFWwindow *)windowContext->getNativeWindowContext(), nullptr, &m_surface) !=
+        VK_SUCCESS) {
 #ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
         if (usingWayland) {
             RP_CORE_ERROR("Failed to create Wayland window surface!");
@@ -1062,12 +1286,10 @@ SwapChainSupportDetails VulkanContext::querySwapChainSupport(VkPhysicalDevice de
     return details;
 }
 
-
-
 void VulkanContext::createVmaAllocator()
 {
     RP_CORE_INFO("Starting VMA allocator creation...");
-    
+
     RP_CORE_INFO("Checking Vulkan handles...");
     if (!m_physicalDevice) {
         RP_CORE_ERROR("Physical device is null!");
@@ -1090,23 +1312,15 @@ void VulkanContext::createVmaAllocator()
     allocatorInfo.device = m_device;
     allocatorInfo.instance = m_instance;
     allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-    
+
     RP_CORE_INFO("Calling vmaCreateAllocator...");
     VkResult result = vmaCreateAllocator(&allocatorInfo, &m_vmaAllocator);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create VMA allocator!");
         throw std::runtime_error("Failed to create VMA allocator!");
     }
-    
+
     RP_CORE_INFO("Successfully created VMA allocator");
 }
 
-
-
-
-
-
-
-
-
-}
+} // namespace Rapture

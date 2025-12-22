@@ -1,26 +1,25 @@
 #pragma once
 
-#include "Shaders/Shader.h"
 #include "Pipelines/GraphicsPipeline.h"
 #include "Renderer/MDIBatch.h"
+#include "Shaders/Shader.h"
 
 #include "AssetManager/AssetManager.h"
-#include "Scenes/Scene.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
-#include "Buffers/UniformBuffers/UniformBuffer.h"
-#include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/Descriptors/DescriptorManager.h"
 #include "Buffers/Descriptors/DescriptorBinding.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
+#include "Buffers/Descriptors/DescriptorSet.h"
+#include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Cameras/CameraCommon.h"
-#include "Textures/Texture.h"
-#include "WindowContext/VulkanContext/VulkanContext.h"
 #include "Components/Components.h"
 #include "Events/GameEvents.h"
+#include "Scenes/Scene.h"
+#include "Textures/Texture.h"
+#include "WindowContext/VulkanContext/VulkanContext.h"
 
 #include <memory>
 
 namespace Rapture {
-
 
 enum class GBufferFlags : uint32_t {
     // Vertex attribute flags (bits 0-4)
@@ -28,7 +27,7 @@ enum class GBufferFlags : uint32_t {
     HAS_TANGENTS = 2u,
     HAS_BITANGENTS = 4u,
     HAS_TEXCOORDS = 8u,
-    
+
     // Material texture flags (bits 5-13)
     HAS_ALBEDO_MAP = 32u,
     HAS_NORMAL_MAP = 64u,
@@ -42,14 +41,15 @@ enum class GBufferFlags : uint32_t {
 };
 
 class GBufferPass {
-public:
+  public:
     GBufferPass(float width, float height, uint32_t framesInFlight);
     ~GBufferPass();
 
     static FramebufferSpecification getFramebufferSpecification();
 
     // NOTE: assumes that the command buffer is already started, and will be ended by the caller
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                             uint32_t currentFrame);
 
     // Getters for current frame's GBuffer textures
     std::shared_ptr<Texture> getPositionTexture() const { return m_positionDepthTextures[m_currentFrame]; }
@@ -72,15 +72,13 @@ public:
     uint32_t getDepthTextureIndex() const { return m_depthTextureIndices[m_currentFrame]; }
 
     // Getters for all bindless texture indices
-    const std::vector<uint32_t>& getPositionTextureIndices() const { return m_positionTextureIndices; }
-    const std::vector<uint32_t>& getNormalTextureIndices() const { return m_normalTextureIndices; }
-    const std::vector<uint32_t>& getAlbedoTextureIndices() const { return m_albedoTextureIndices; }
-    const std::vector<uint32_t>& getMaterialTextureIndices() const { return m_materialTextureIndices; }
-    const std::vector<uint32_t>& getDepthTextureIndices() const { return m_depthTextureIndices; }
+    const std::vector<uint32_t> &getPositionTextureIndices() const { return m_positionTextureIndices; }
+    const std::vector<uint32_t> &getNormalTextureIndices() const { return m_normalTextureIndices; }
+    const std::vector<uint32_t> &getAlbedoTextureIndices() const { return m_albedoTextureIndices; }
+    const std::vector<uint32_t> &getMaterialTextureIndices() const { return m_materialTextureIndices; }
+    const std::vector<uint32_t> &getDepthTextureIndices() const { return m_depthTextureIndices; }
 
-
-
-private:
+  private:
     void createTextures();
     void createPipeline();
     void bindGBufferTexturesToBindlessSet();
@@ -91,9 +89,8 @@ private:
 
     void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
 
-
-private:
-    std::weak_ptr<Shader> m_shader; 
+  private:
+    std::weak_ptr<Shader> m_shader;
     AssetHandle m_handle;
     float m_width;
     float m_height;
@@ -130,4 +127,4 @@ private:
     size_t m_entitySelectedListenerId;
 };
 
-}
+} // namespace Rapture

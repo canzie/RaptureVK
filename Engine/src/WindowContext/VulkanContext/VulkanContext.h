@@ -2,14 +2,14 @@
 
 #include <vk_mem_alloc.h>
 
-#include "WindowContext/WindowContext.h"
-#include "WindowContext/VulkanContext/VulkanTypes.h"
 #include "WindowContext/VulkanContext/VulkanQueue.h"
+#include "WindowContext/VulkanContext/VulkanTypes.h"
+#include "WindowContext/WindowContext.h"
 
-#include <vector>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 namespace Rapture {
 
@@ -17,138 +17,125 @@ class SwapChain;
 class Renderpass;
 
 class VulkanContext {
-    public:
-        VulkanContext(WindowContext* windowContext);
-        ~VulkanContext();
+  public:
+    VulkanContext(WindowContext *windowContext);
+    ~VulkanContext();
 
-        void waitIdle();
+    void waitIdle();
 
-        VkDevice getLogicalDevice() const { return m_device; }
-        VkSurfaceKHR getSurface() const { return m_surface; }
-        VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
-        VkInstance getInstance() const { return m_instance; }
-        QueueFamilyIndices getQueueFamilyIndices() const { return m_queueFamilyIndices; }
-        std::shared_ptr<SwapChain> getSwapChain() const { return m_swapChain; }
+    VkDevice getLogicalDevice() const { return m_device; }
+    VkSurfaceKHR getSurface() const { return m_surface; }
+    VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
+    VkInstance getInstance() const { return m_instance; }
+    QueueFamilyIndices getQueueFamilyIndices() const { return m_queueFamilyIndices; }
+    std::shared_ptr<SwapChain> getSwapChain() const { return m_swapChain; }
 
-        VmaAllocator getVmaAllocator() const { return m_vmaAllocator; }
+    VmaAllocator getVmaAllocator() const { return m_vmaAllocator; }
 
-        std::shared_ptr<VulkanQueue> getGraphicsQueue() const;
-        std::shared_ptr<VulkanQueue> getComputeQueue() const;
-        std::shared_ptr<VulkanQueue> getTransferQueue() const;
-        std::shared_ptr<VulkanQueue> getPresentQueue() const;
+    uint32_t getGraphicsQueueIndex() const { return m_queueFamilyIndices.familyIndices[GRAPHICS]; }
+    uint32_t getComputeQueueIndex() const { return m_queueFamilyIndices.familyIndices[COMPUTE]; }
+    uint32_t getTransferQueueIndex() const { return m_queueFamilyIndices.familyIndices[TRANSFER]; }
+    uint32_t getPresentQueueIndex() const { return m_queueFamilyIndices.familyIndices[PRESENT]; }
 
-        bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
-        bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
-        bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
-        bool isNullDescriptorEnabled() const { return m_isNullDescriptorEnabled; }
-        bool isRayTracingEnabled() const { return m_isRayTracingEnabled; }
-        
-        // Get descriptor indexing features
-        const VkPhysicalDeviceDescriptorIndexingFeatures& getDescriptorIndexingFeatures() const { 
-            return m_descriptorIndexingFeatures; 
-        }
+    std::shared_ptr<VulkanQueue> getGraphicsQueue() const;
+    std::shared_ptr<VulkanQueue> getComputeQueue() const;
+    std::shared_ptr<VulkanQueue> getTransferQueue() const;
+    std::shared_ptr<VulkanQueue> getPresentQueue() const;
+    std::shared_ptr<VulkanQueue> getVendorQueue() const;
 
-        // Get ray tracing properties
-        const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& getRayTracingPipelineProperties() const {
-            return m_rayTracingPipelineProperties;
-        }
+    bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
+    bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
+    bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
+    bool isNullDescriptorEnabled() const { return m_isNullDescriptorEnabled; }
+    bool isRayTracingEnabled() const { return m_isRayTracingEnabled; }
 
-        const VkPhysicalDeviceAccelerationStructurePropertiesKHR& getAccelerationStructureProperties() const {
-            return m_accelerationStructureProperties;
-        }
+    const VkPhysicalDeviceAccelerationStructurePropertiesKHR &getAccelerationStructureProperties() const
+    {
+        return m_accelerationStructureProperties;
+    }
 
-            // Extension function pointers
+    // Extension function pointers
     PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
     PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR = nullptr;
     PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR = nullptr;
     PFN_vkCmdDrawMultiEXT vkCmdDrawMultiEXT = nullptr;
     PFN_vkCmdDrawMultiIndexedEXT vkCmdDrawMultiIndexedEXT = nullptr;
 
-        // Ray tracing extension function pointers
-        PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR = nullptr;
-        PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR = nullptr;
-        PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR = nullptr;
-        PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR = nullptr;
-        PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR = nullptr;
-        PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR = nullptr;
-        PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR = nullptr;
-        PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR = nullptr;
+    // Ray tracing extension function pointers
+    PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR = nullptr;
+    PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR = nullptr;
+    PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR = nullptr;
+    PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR = nullptr;
+    PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR = nullptr;
+    PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR = nullptr;
+    PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR = nullptr;
+    PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR = nullptr;
 
-        // 
-        void createRecourses(WindowContext* windowContext);
+    //
+    void createRecourses(WindowContext *windowContext);
 
-    private:
-        void createInstance(WindowContext* windowContext);
-        void checkExtensionSupport();
-        bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+  private:
+    void createInstance(WindowContext *windowContext);
+    void checkExtensionSupport();
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 
-        std::vector<const char*> getRequiredExtensions(WindowContext* windowContext);
+    std::vector<const char *> getRequiredExtensions(WindowContext *windowContext);
 
-        // Validation layers
-        bool checkValidationLayerSupport();
-        void setupDebugMessenger();
-    
-        // setting up physical device
-        void pickPhysicalDevice();
-        bool isDeviceSuitable(VkPhysicalDevice device);
+    // Validation layers
+    bool checkValidationLayerSupport();
+    void setupDebugMessenger();
 
-        // queue families
-        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const;
+    // setting up physical device
+    void pickPhysicalDevice();
+    bool isDeviceSuitable(VkPhysicalDevice device);
 
+    // queue families
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const;
 
-        // logical device
-        void createLogicalDevice();
-        void createWindowsSurface(WindowContext* windowContext);
-        
-        // swapchain
-        SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+    // logical device
+    void createLogicalDevice();
+    void createWindowsSurface(WindowContext *windowContext);
 
+    // swapchain
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 
-        void createVmaAllocator();
+    void createVmaAllocator();
 
-    private:
+  private:
+    VkApplicationInfo m_applicationInfo;
+    VkInstanceCreateInfo m_instanceCreateInfo;
+    VkInstance m_instance;
+    VkPhysicalDevice m_physicalDevice;
+    VkDevice m_device;
 
+    std::shared_ptr<SwapChain> m_swapChain;
 
-        VkApplicationInfo m_applicationInfo;
-        VkInstanceCreateInfo m_instanceCreateInfo;
-        VkInstance m_instance;
-        VkPhysicalDevice m_physicalDevice;
-        VkDevice m_device;
+    std::map<uint32_t, std::shared_ptr<VulkanQueue>> m_queues;
+    std::shared_ptr<VulkanQueue> m_vendorQueue;
 
-        std::shared_ptr<SwapChain> m_swapChain;
-        std::shared_ptr<Renderpass> m_renderpass;
+    VkSurfaceKHR m_surface;
 
-        int m_graphicsQueueIndex;
-        int m_computeQueueIndex;
-        int m_transferQueueIndex;
-        int m_presentQueueIndex;
+    VkDebugUtilsMessengerEXT m_debugMessenger;
 
-        std::map<uint32_t, std::shared_ptr<VulkanQueue>> m_queues;
+    std::vector<const char *> m_validationLayers;
+    std::vector<const char *> m_deviceExtensions;
 
-        VkSurfaceKHR m_surface;
+    QueueFamilyIndices m_queueFamilyIndices;
 
-        VkDebugUtilsMessengerEXT m_debugMessenger;
+    VmaAllocator m_vmaAllocator;
 
+    bool m_isVertexInputDynamicStateEnabled;
+    bool m_isVertexAttributeRobustnessEnabled;
+    bool m_isDynamicRenderingEnabled;
+    bool m_isNullDescriptorEnabled;
+    bool m_isRayTracingEnabled;
 
-        std::vector<const char*> m_validationLayers;
-        std::vector<const char*> m_deviceExtensions;
+    // Store descriptor indexing features support
+    VkPhysicalDeviceDescriptorIndexingFeatures m_descriptorIndexingFeatures{};
 
-        QueueFamilyIndices m_queueFamilyIndices;
+    // Store ray tracing properties
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rayTracingPipelineProperties{};
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR m_accelerationStructureProperties{};
+};
 
-        VmaAllocator m_vmaAllocator;
-
-        bool m_isVertexInputDynamicStateEnabled;
-        bool m_isVertexAttributeRobustnessEnabled;
-        bool m_isDynamicRenderingEnabled;
-        bool m_isNullDescriptorEnabled;
-        bool m_isRayTracingEnabled;
-        
-        // Store descriptor indexing features support
-        VkPhysicalDeviceDescriptorIndexingFeatures m_descriptorIndexingFeatures{};
-        
-        // Store ray tracing properties
-        VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rayTracingPipelineProperties{};
-        VkPhysicalDeviceAccelerationStructurePropertiesKHR m_accelerationStructureProperties{};
-    };
-
-}
+} // namespace Rapture

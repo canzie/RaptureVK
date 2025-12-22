@@ -1,0 +1,12 @@
+---
+description: Performance optimization guidelines
+globs: **/*.h, **/*.cpp, **/*.hpp
+alwaysApply: true
+---
+
+# Performance Guidelines
+
+## Optimization Practices
+- Avoid unnecessary heap allocations; prefer stack-based objects where possible.
+- Use `std::move` to enable move semantics and avoid copies.
+- Optimize loops with algorithms from `<algorithm>` (e.g., `std::sort`, `std::for_each`).
