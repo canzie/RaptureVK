@@ -22,6 +22,7 @@ std::queue<LoadRequest> AssetImporter::s_pendingRequests;
 std::vector<std::thread> AssetImporter::s_workerThreads;
 std::atomic<bool> AssetImporter::s_threadRunning = false;
 std::mutex AssetImporter::s_queueMutex;
+std::condition_variable AssetImporter::s_queueCondition;
 
 std::shared_ptr<Asset> AssetImporter::loadShader(const AssetHandle &handle, const AssetMetadata &metadata)
 {

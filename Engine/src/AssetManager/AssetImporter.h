@@ -11,6 +11,7 @@
 #include "AssetLoadRequests.h"
 #include "Logging/Log.h"
 #include <atomic>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 
@@ -98,6 +99,7 @@ class AssetImporter {
     static std::vector<std::thread> s_workerThreads;
     static std::atomic<bool> s_threadRunning;
     static std::mutex s_queueMutex;
+    static std::condition_variable s_queueCondition;
 };
 
 } // namespace Rapture

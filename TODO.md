@@ -13,13 +13,13 @@
 
 
 
-
+- fix stencil buffer
+- shader hot reloading
 
 - look at csm flickering again
 - material editor/viewer
-- fix stencil buffer
 - jolt???
-- shader hot reloading
+
 
 ### Procedural Texture Generation
 
@@ -36,23 +36,6 @@
 - ontop of this class, well have static functions to generate specifics where the shader does not have to be specified (like a generateWhiteNoise)
 - the cpp side needs to make sure to have the correct structs represented in the shader, reflection can be used to verify before dipatching it.
 - this system NEEDS to be thread safe, this means we create, dispatch, return and clean up, no static generator class, only the specific helpers can be static, but not the base class.
-
-
-### DDGI - shit is hard
-
-- stabilize the ray rotation
-- add probe relocation and classification to the ddgi system
-- add support for different probe volumes
-- test system in one of the test scenes
-- generate HDR cubemap for the skybox
-
-- perhaps giga optimisation
-    - get a new shader pass for identifying which probes should be active
-    - we can do this by stopping certain probes from updating if ...
-    https://arxiv.org/pdf/2009.10796
-    https://cescg.org/wp-content/uploads/2022/04/Rohacek-Improving-Probes-in-Dynamic-Diffuse-Global-Illumination.pdf
-
-
 
 
 ### PHYSICS

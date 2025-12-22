@@ -376,7 +376,7 @@ void main() {
             vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent, surface.bitangent);
             vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
             vec3 emissiveColor = sampleEmissiveColor(meshInfo, surface.texCoord);
-            albedo += emissiveColor; 
+            //albedo += emissiveColor; 
     
             // Indirect Lighting (recursive)
             vec3 irradiance = vec3(0.0);
@@ -411,7 +411,7 @@ void main() {
             float maxAlbedo = 0.9;
 
             // Store the final ray radiance and hit distance
-            vec3 radiance = diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
+            vec3 radiance = emissiveColor + diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
 
             DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), clamp(radiance, vec3(0.0), vec3(1.0)), hitT);
         } else {

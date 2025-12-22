@@ -18,6 +18,7 @@
 #include "AccelerationStructures/CPU/BVH/BVH.h"
 #include "AccelerationStructures/CPU/BVH/BVH_SAH.h"
 #include "AccelerationStructures/CPU/BVH/DBVH.h"
+#include "Generators/Textures/ProceduralTextures.h"
 #include "Meshes/MeshPrimitives.h"
 #include "Physics/EntropyComponents.h"
 #include "Utils/Timestep.h"
@@ -141,6 +142,16 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         auto envEntity = activeScene->createEnvironmentEntity();
         envEntity.addComponent<Rapture::SkyboxComponent>(skyboxPath, 0.1f);
         // Renderer will query for SkyboxComponent directly
+    }
+
+    // Test procedural texture generation
+    {
+        Rapture::ProceduralTextureConfig config;
+        config.name = "test_white_noise";
+        auto noiseTexture = Rapture::ProceduralTexture::generateWhiteNoise(12345, config);
+        if (noiseTexture) {
+            Rapture::RP_INFO("Generated white noise texture: {}", config.name);
+        }
     }
 
     // Build TLAS for ray tracing
