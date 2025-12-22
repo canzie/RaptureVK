@@ -246,14 +246,14 @@ void TextureFlattener::getOrCreateShaderAndPipeline(FlattenerDataType dataType)
 
     switch (dataType) {
     case FlattenerDataType::INT:
-        importConfig.compileInfo.macros.push_back("DATA_TYPE_INT");
+        importConfig.compileInfo.macros.push_back({"DATA_TYPE_INT"});
         break;
     case FlattenerDataType::UINT:
-        importConfig.compileInfo.macros.push_back("DATA_TYPE_UINT");
+        importConfig.compileInfo.macros.push_back({"DATA_TYPE_UINT"});
         break;
     case FlattenerDataType::FLOAT:
     default:
-        importConfig.compileInfo.macros.push_back("DATA_TYPE_FLOAT");
+        importConfig.compileInfo.macros.push_back({"DATA_TYPE_FLOAT"});
         break;
     }
 

@@ -106,12 +106,12 @@ void DynamicDiffuseGI::createPipelines()
     auto shaderDir = proj.getProjectShaderDirectory();
 
     ShaderImportConfig shaderIrradianceBlendConfig;
-    shaderIrradianceBlendConfig.compileInfo.macros.push_back("DDGI_BLEND_RADIANCE");
-    shaderIrradianceBlendConfig.compileInfo.macros.push_back("DDGI_ENABLE_PROBE_CLASSIFICATION");
+    shaderIrradianceBlendConfig.compileInfo.macros.push_back({"DDGI_BLEND_RADIANCE"});
+    shaderIrradianceBlendConfig.compileInfo.macros.push_back({"DDGI_ENABLE_PROBE_CLASSIFICATION"});
     shaderIrradianceBlendConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
     ShaderImportConfig shaderDistanceBlendConfig;
-    shaderDistanceBlendConfig.compileInfo.macros.push_back("DDGI_BLEND_DISTANCE");
-    shaderDistanceBlendConfig.compileInfo.macros.push_back("DDGI_ENABLE_PROBE_CLASSIFICATION");
+    shaderDistanceBlendConfig.compileInfo.macros.push_back({"DDGI_BLEND_DISTANCE"});
+    shaderDistanceBlendConfig.compileInfo.macros.push_back({"DDGI_ENABLE_PROBE_CLASSIFICATION"});
     shaderDistanceBlendConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
 
     ShaderImportConfig shaderBaseProbeConfig;

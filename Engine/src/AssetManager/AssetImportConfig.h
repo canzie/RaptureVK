@@ -12,7 +12,10 @@ struct ShaderImportConfig {
 
     ShaderCompileInfo compileInfo;
 
-    bool operator==(const ShaderImportConfig &other) const { return compileInfo.macros == other.compileInfo.macros; }
+    bool operator==(const ShaderImportConfig &other) const {
+        return compileInfo.macros == other.compileInfo.macros &&
+               compileInfo.includePath == other.compileInfo.includePath;
+    }
 };
 
 struct TextureImportConfig {

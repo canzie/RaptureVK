@@ -95,7 +95,11 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
     options.SetIncluder(std::make_unique<ShaderIncluder>(compileInfo.includePath));
 
     for (const auto &macro : compileInfo.macros) {
-        options.AddMacroDefinition(macro);
+        if (macro.value.empty()) {
+            options.AddMacroDefinition(macro.name);
+        } else {
+            options.AddMacroDefinition(macro.name, macro.value);
+        }
     }
 
     shaderc::SpvCompilationResult module = m_compiler.CompileGlslToSpv(source, kind, path.string().c_str(), options);
@@ -111,7 +115,18 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
     std::vector<char> spirv(spirv_size);
     memcpy(spirv.data(), spirv_data, spirv_size);
 
-    RP_CORE_INFO("Compiled shader: {0} \n\t using macros: [{1}]", path.string(), fmt::join(compileInfo.macros, ", "));
+    // Format macros for logging
+    std::vector<std::string> macroStrings;
+    macroStrings.reserve(compileInfo.macros.size());
+    for (const auto &macro : compileInfo.macros) {
+        if (macro.value.empty()) {
+            macroStrings.push_back(macro.name);
+        } else {
+            macroStrings.push_back(macro.name + "=" + macro.value);
+        }
+    }
+
+    RP_CORE_INFO("Compiled shader: {0} \n\t using macros: [{1}]", path.string(), fmt::join(macroStrings, ", "));
 
     return spirv;
 }
