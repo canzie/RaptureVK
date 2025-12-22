@@ -178,8 +178,9 @@ std::shared_ptr<Asset> AssetImporter::loadTexture(const AssetHandle &handle, con
     // Add the texture to the pending requests
     {
         std::lock_guard<std::mutex> lock(s_queueMutex);
-        s_pendingRequests.push(request);
+        s_pendingRequests.push(std::move(request));
     }
+    s_queueCondition.notify_one();
 
     return asset;
 }
@@ -218,8 +219,9 @@ std::shared_ptr<Asset> AssetImporter::loadCubemap(const AssetHandle &handle, con
     // Add the texture to the pending requests
     {
         std::lock_guard<std::mutex> lock(s_queueMutex);
-        s_pendingRequests.push(request);
+        s_pendingRequests.push(std::move(request));
     }
+    s_queueCondition.notify_one();
 
     return asset;
 }
@@ -228,66 +230,67 @@ void AssetImporter::assetLoadThread()
 {
     RP_CORE_INFO("Asset loading thread started");
 
-    while (s_threadRunning) {
+    while (true) {
         LoadRequest request;
-        bool hasRequest = false;
 
-        // Check if shutdown was requested before accessing the mutex
-        if (!s_threadRunning) break;
-
-        // Get a request from the queue
+        // Wait for work or shutdown signal
         {
-            std::lock_guard<std::mutex> lock(s_queueMutex);
-            if (!s_pendingRequests.empty()) {
-                request = s_pendingRequests.front();
-                s_pendingRequests.pop();
-                hasRequest = true;
+            std::unique_lock<std::mutex> lock(s_queueMutex);
+            s_queueCondition.wait(lock, [] {
+                return !s_pendingRequests.empty() || !s_threadRunning;
+            });
+
+            // Check shutdown after waking
+            if (!s_threadRunning && s_pendingRequests.empty()) {
+                break;
             }
+
+            // If shutting down but queue not empty, process remaining work
+            if (s_pendingRequests.empty()) {
+                continue;
+            }
+
+            request = std::move(s_pendingRequests.front());
+            s_pendingRequests.pop();
         }
 
-        // Check if shutdown was requested after acquiring a request
-        if (!s_threadRunning) break;
+        // Process request outside of lock
+        size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
 
-        if (hasRequest) {
-            size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+        if (auto tex = request.asset->getUnderlyingAsset<Texture>()) {
+            tex->loadImageFromFile(threadId);
 
-            if (request.asset->getUnderlyingAsset<Texture>()) {
-                std::shared_ptr<Texture> tex = request.asset->getUnderlyingAsset<Texture>();
-                tex->loadImageFromFile(threadId);
-
-                if (request.callback) {
-                    request.callback(request.asset);
-                }
+            if (request.callback) {
+                request.callback(request.asset);
             }
-        } else {
-            // No work to do, sleep to avoid busy waiting
-            // Use shorter sleep durations to respond to shutdown quicker
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
     }
+
+    RP_CORE_INFO("Asset loading thread exiting");
 }
 
 void AssetImporter::shutdownWorkers()
 {
     RP_CORE_INFO("AssetImporter: Shutting down worker threads");
 
-    // Set the flag to false to signal threads to stop
-    if (s_threadRunning.exchange(false)) {
-        // Wait for the thread to join if joinable
-        if (s_workerThreads.size() > 0 && s_workerThreads[0].joinable()) {
-            RP_CORE_INFO("AssetImporter: Waiting for worker thread to join");
-            for (auto &thread : s_workerThreads) {
-                if (thread.joinable()) {
-                    thread.join();
-                }
-            }
-            s_workerThreads.clear();
-            RP_CORE_INFO("AssetImporter: Worker threads joined successfully");
-        } else {
-            RP_CORE_WARN("AssetImporter: Worker threads not joinable");
-        }
-    } else {
+    // Signal threads to stop
+    bool wasRunning = s_threadRunning.exchange(false);
+    if (!wasRunning) {
         RP_CORE_INFO("AssetImporter: Worker threads already stopped");
+        return;
     }
+
+    // Wake all waiting threads so they can see the shutdown signal
+    s_queueCondition.notify_all();
+
+    // Join all threads
+    RP_CORE_INFO("AssetImporter: Waiting for {} worker threads to join", s_workerThreads.size());
+    for (auto &thread : s_workerThreads) {
+        if (thread.joinable()) {
+            thread.join();
+        }
+    }
+    s_workerThreads.clear();
+    RP_CORE_INFO("AssetImporter: Worker threads joined successfully");
 }
 } // namespace Rapture
