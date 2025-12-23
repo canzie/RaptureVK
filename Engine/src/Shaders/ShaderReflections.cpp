@@ -372,4 +372,69 @@ getCombinedPushConstantRanges(const std::vector<std::pair<const std::vector<char
     return resultVector;
 }
 
+PushConstantMemberInfo::BaseType PushConstantMemberInfo::getBaseType() const
+{
+    if (type == "float") return BaseType::FLOAT;
+    if (type == "int") return BaseType::INT;
+    if (type == "uint") return BaseType::UINT;
+    if (type == "vec2") return BaseType::VEC2;
+    if (type == "vec3") return BaseType::VEC3;
+    if (type == "vec4") return BaseType::VEC4;
+    if (type == "mat4") return BaseType::MAT4;
+    return BaseType::UNKNOWN;
+}
+
+std::vector<DetailedPushConstantInfo> extractDetailedPushConstants(const std::vector<char> &spirvCode)
+{
+    std::vector<DetailedPushConstantInfo> result;
+
+    const uint32_t *spirvData = reinterpret_cast<const uint32_t *>(spirvCode.data());
+    size_t spirvSize = spirvCode.size();
+    SpvReflectShaderModule module;
+    SpvReflectResult reflectResult = spvReflectCreateShaderModule(spirvSize, spirvData, &module);
+
+    if (reflectResult != SPV_REFLECT_RESULT_SUCCESS) {
+        RP_CORE_ERROR("Failed to create reflection data for push constant extraction!");
+        return result;
+    }
+
+    uint32_t count = 0;
+    reflectResult = spvReflectEnumeratePushConstantBlocks(&module, &count, nullptr);
+    if (reflectResult != SPV_REFLECT_RESULT_SUCCESS || count == 0) {
+        spvReflectDestroyShaderModule(&module);
+        return result;
+    }
+
+    std::vector<SpvReflectBlockVariable *> blocks(count);
+    reflectResult = spvReflectEnumeratePushConstantBlocks(&module, &count, blocks.data());
+
+    for (const auto *block : blocks) {
+        if (!block) continue;
+
+        DetailedPushConstantInfo info;
+        info.offset = block->offset;
+        info.size = block->size;
+        info.stageFlags = module.shader_stage;
+        info.blockName = block->name ? block->name : "unnamed";
+
+        for (uint32_t i = 0; i < block->member_count; ++i) {
+            const auto &member = block->members[i];
+
+            PushConstantMemberInfo memberInfo;
+            memberInfo.name = member.name ? member.name : "unnamed";
+            memberInfo.type = getSpirvTypeDescriptionString(member.type_description);
+            memberInfo.offset = member.offset;
+            memberInfo.size = member.size;
+            memberInfo.arraySize = member.array.dims_count > 0 ? member.array.dims[0] : 1;
+
+            info.members.push_back(memberInfo);
+        }
+
+        result.push_back(info);
+    }
+
+    spvReflectDestroyShaderModule(&module);
+    return result;
+}
+
 } // namespace Rapture

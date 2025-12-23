@@ -248,7 +248,7 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
 
     // Image placeholder
     float imagePartHeight = itemWidth; // Square
-    ImVec4 assetColor = getAssetTypeColor(metadata.m_assetType, false);
+    ImVec4 assetColor = getAssetTypeColor(metadata.assetType, false);
     drawList->AddRectFilled(p0, ImVec2(p0.x + itemWidth, p0.y + imagePartHeight), ImGui::ColorConvertFloat4ToU32(assetColor), 4.0f,
                             ImDrawFlags_RoundCornersTop);
 
@@ -263,7 +263,7 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
     }
 
     // Drag and drop source for textures
-    if (metadata.m_assetType == Rapture::AssetType::Texture && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+    if (metadata.assetType == Rapture::AssetType::Texture && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         RAPTURE_PROFILE_SCOPE("Texture Drag Drop Source");
         ImGui::SetDragDropPayload("TEXTURE_ASSET", &handle, sizeof(Rapture::AssetHandle));
         ImGui::Text("Texture: %s",
@@ -272,7 +272,7 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
     }
 
     std::string contextMenuId = "AssetContextMenu_" + std::to_string(static_cast<uint64_t>(handle));
-    if (metadata.m_assetType == Rapture::AssetType::Texture && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+    if (metadata.assetType == Rapture::AssetType::Texture && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
         ImGui::OpenPopup(contextMenuId.c_str());
     }
 
@@ -287,7 +287,7 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
 
     if (isHovered) {
         ImGui::BeginTooltip();
-        ImGui::TextUnformatted(Rapture::AssetTypeToString(metadata.m_assetType).c_str());
+        ImGui::TextUnformatted(Rapture::AssetTypeToString(metadata.assetType).c_str());
         ImGui::EndTooltip();
     }
 
@@ -328,7 +328,7 @@ void ContentBrowserPanel::renderAssetContent()
                 continue;
             }
             Rapture::AssetMetadata metadata = assetRegistry.at(handle);
-            if (metadata.m_assetType == Rapture::AssetType::None) {
+            if (metadata.assetType == Rapture::AssetType::None) {
                 continue;
             }
 

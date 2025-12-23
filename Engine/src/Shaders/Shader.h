@@ -17,6 +17,14 @@
 
 namespace Rapture {
 
+enum class ShaderStatus {
+    UNINITIALIZED,
+    COMPILING,
+    LINKING,
+    READY,
+    FAILED
+};
+
 void printDescriptorSetInfo(const DescriptorSetInfo &setInfo);
 void printDescriptorSetInfos(const std::vector<DescriptorSetInfo> &setInfos);
 
@@ -54,6 +62,9 @@ class Shader {
 
     const std::vector<VkPushConstantRange> &getPushConstantLayouts() const { return m_pushConstantLayouts; }
 
+    const std::vector<DetailedPushConstantInfo> &getDetailedPushConstants() const { return m_detailedPushConstants; }
+    bool isReady() const { return m_status == ShaderStatus::READY; }
+
   private:
     // Add new private methods
     std::vector<DescriptorSetInfo> collectDescriptorSetInfo(const std::vector<char> &vertexSpirv,
@@ -66,12 +77,15 @@ class Shader {
     std::vector<DescriptorSetInfo> m_descriptorSetInfos; // Store for later use
 
     std::vector<VkPushConstantRange> m_pushConstantLayouts;
+    std::vector<DetailedPushConstantInfo> m_detailedPushConstants;
 
     std::vector<DescriptorInfo> m_materialSets;
 
     ShaderCompileInfo m_compileInfo;
 
     ShaderCompiler m_compiler;
+
+    ShaderStatus m_status = ShaderStatus::UNINITIALIZED;
 };
 
 } // namespace Rapture

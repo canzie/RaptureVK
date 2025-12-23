@@ -28,6 +28,27 @@ struct PushConstantInfo {
     std::string name; // For debugging/identification
 };
 
+struct PushConstantMemberInfo {
+    std::string name;
+    std::string type;
+    uint32_t offset;
+    uint32_t size;
+    uint32_t arraySize;
+
+    enum class BaseType {
+        FLOAT, INT, UINT, VEC2, VEC3, VEC4, MAT4, UNKNOWN
+    };
+    BaseType getBaseType() const;
+};
+
+struct DetailedPushConstantInfo {
+    uint32_t offset;
+    uint32_t size;
+    VkShaderStageFlags stageFlags;
+    std::string blockName;
+    std::vector<PushConstantMemberInfo> members;
+};
+
 // Utility function to convert PushConstantInfo to VkPushConstantRange
 inline VkPushConstantRange pushConstantInfoToRange(const PushConstantInfo &pcInfo)
 {
@@ -68,5 +89,8 @@ std::string getSpirvTypeDescriptionString(const SpvReflectTypeDescription *typeD
 // into a single list, combining stage flags for ranges that span multiple shaders.
 std::vector<PushConstantInfo>
 getCombinedPushConstantRanges(const std::vector<std::pair<const std::vector<char> &, VkShaderStageFlags>> &shaderCodeWithStages);
+
+// Extract detailed push constant information including member-level data
+std::vector<DetailedPushConstantInfo> extractDetailedPushConstants(const std::vector<char> &spirvCode);
 
 } // namespace Rapture

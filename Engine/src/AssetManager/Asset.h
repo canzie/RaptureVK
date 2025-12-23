@@ -66,7 +66,7 @@ inline std::string AssetTypeToString(AssetType type)
 
 struct AssetMetadata {
 
-    AssetType m_assetType = AssetType::None;
+    AssetType assetType = AssetType::None;
     AssetStorageType m_storageType = AssetStorageType::Disk;
 
     // Disk-specific data (only used when m_storageType == Disk)
@@ -81,7 +81,7 @@ struct AssetMetadata {
     // Virtual-specific data (only used when m_storageType == Virtual)
     std::string m_virtualName;
 
-    operator bool() const { return m_assetType != AssetType::None; }
+    operator bool() const { return assetType != AssetType::None; }
 
     bool isDiskAsset() const { return m_storageType == AssetStorageType::Disk; }
     bool isVirtualAsset() const { return m_storageType == AssetStorageType::Virtual; }
@@ -93,10 +93,10 @@ class Asset {
     Asset() = default;
     explicit Asset(AssetVariant asset) : m_asset(std::move(asset)) {}
     ~Asset() = default;
-    Asset(const Asset&) = default;
-    Asset& operator=(const Asset&) = default;
-    Asset(Asset&&) noexcept = default;
-    Asset& operator=(Asset&&) noexcept = default;
+    Asset(const Asset &) = default;
+    Asset &operator=(const Asset &) = default;
+    Asset(Asset &&) noexcept = default;
+    Asset &operator=(Asset &&) noexcept = default;
 
     template <typename T> std::shared_ptr<T> getUnderlyingAsset() const
     {

@@ -18,11 +18,18 @@ Shader::Shader(const std::filesystem::path &vertexPath, const std::filesystem::p
     } else {
         createGraphicsShader(vertexPath, fragmentPath);
     }
+
+    if (m_status == ShaderStatus::FAILED) {
+        return;
+    }
+
     createDescriptorSetLayout();
 
     // Test SPIRV-Reflect library by reflecting on our shaders
     RP_CORE_INFO("Testing SPIRV-Reflect functionality:");
     printDescriptorSetInfos(m_descriptorSetInfos);
+
+    m_status = ShaderStatus::READY;
 }
 
 Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compileInfo) : m_compileInfo(compileInfo)
@@ -37,11 +44,16 @@ Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compi
     }
 
     createComputeShader(computePath);
+    if (m_status == ShaderStatus::FAILED) {
+        return;
+    }
     createDescriptorSetLayout();
 
     // Test SPIRV-Reflect library by reflecting on our shaders
     RP_CORE_INFO("Testing SPIRV-Reflect functionality for compute shader:");
     printDescriptorSetInfos(m_descriptorSetInfos);
+
+    m_status = ShaderStatus::READY;
 }
 
 Shader::~Shader()
@@ -64,10 +76,21 @@ void Shader::createGraphicsShader(const std::filesystem::path &vertexPath, const
     if (vertexPath.extension() == ".spv") vertexCode = readFile(vertexPath);
     else vertexCode = m_compiler.Compile(vertexPath, m_compileInfo);
 
+    if (vertexCode.empty()) {
+        m_status = ShaderStatus::FAILED;
+        return;
+    }
+
     std::vector<char> fragmentCode;
     if (!fragmentPath.empty()) {
         if (fragmentPath.extension() == ".spv") fragmentCode = readFile(fragmentPath);
         else fragmentCode = m_compiler.Compile(fragmentPath, m_compileInfo);
+    }
+
+    if (fragmentCode.empty()) {
+        // TODO: remove the current state since the vertex shader is still valid, and we dont want it to remain
+        m_status = ShaderStatus::FAILED;
+        return;
     }
 
     // Collect descriptor information before creating shader modules
@@ -82,6 +105,9 @@ void Shader::createGraphicsShader(const std::filesystem::path &vertexPath, const
     std::vector<PushConstantInfo> pushConstantInfos =
         getCombinedPushConstantRanges({{vertexCode, VK_SHADER_STAGE_VERTEX_BIT}, {fragmentCode, VK_SHADER_STAGE_FRAGMENT_BIT}});
     m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Extract detailed push constant information from vertex shader
+    m_detailedPushConstants = extractDetailedPushConstants(vertexCode);
 
     // Print push constant reflection data
     RP_CORE_INFO("Push Constant Reflection Data:");
@@ -126,6 +152,11 @@ void Shader::createGraphicsShader(const std::filesystem::path &vertexPath)
     if (vertexPath.extension() == ".spv") vertexCode = readFile(vertexPath);
     else vertexCode = m_compiler.Compile(vertexPath, m_compileInfo);
 
+    if (vertexCode.empty()) {
+        m_status = ShaderStatus::FAILED;
+        return;
+    }
+
     // Collect descriptor information before creating shader modules
     m_descriptorSetInfos = collectDescriptorSetInfo(vertexCode, {});
 
@@ -133,6 +164,9 @@ void Shader::createGraphicsShader(const std::filesystem::path &vertexPath)
 
     std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{vertexCode, VK_SHADER_STAGE_VERTEX_BIT}});
     m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Extract detailed push constant information
+    m_detailedPushConstants = extractDetailedPushConstants(vertexCode);
 
     // Print push constant reflection data
     RP_CORE_INFO("Push Constant Reflection Data:");
@@ -154,6 +188,11 @@ void Shader::createComputeShader(const std::filesystem::path &computePath)
     if (computePath.extension() == ".spv") computeCode = readFile(computePath);
     else computeCode = m_compiler.Compile(computePath, m_compileInfo);
 
+    if (computeCode.empty()) {
+        m_status = ShaderStatus::FAILED;
+        return;
+    }
+
     // Collect descriptor information before creating shader modules
     m_descriptorSetInfos = collectDescriptorSetInfo({}, computeCode);
 
@@ -162,6 +201,9 @@ void Shader::createComputeShader(const std::filesystem::path &computePath)
     // Extract push constants
     std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{computeCode, VK_SHADER_STAGE_COMPUTE_BIT}});
     m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Extract detailed push constant information
+    m_detailedPushConstants = extractDetailedPushConstants(computeCode);
 
     // Print push constant reflection data
     RP_CORE_INFO("Compute Shader Push Constant Reflection Data:");

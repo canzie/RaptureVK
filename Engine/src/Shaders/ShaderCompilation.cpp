@@ -58,18 +58,17 @@ void ShaderIncluder::ReleaseInclude(shaderc_include_result *data)
 }
 
 // --- ShaderCompiler Implementation ---
-ShaderCompiler::ShaderCompiler()
-{
-    if (!m_compiler.IsValid()) {
-        RP_CORE_ERROR("Shaderc compiler is not valid.");
-        throw std::runtime_error("Failed to initialize shader compiler");
-    }
-}
+ShaderCompiler::ShaderCompiler() {}
 
 ShaderCompiler::~ShaderCompiler() {}
 
 std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, const ShaderCompileInfo &compileInfo)
 {
+    if (!m_compiler.IsValid()) {
+        RP_CORE_ERROR("Shaderc compiler is not valid.");
+        return {};
+    }
+
     shaderc::CompileOptions options;
     options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 #ifdef NDEBUG

@@ -26,6 +26,7 @@
 #include "imguiPanels/ImageViewerPanel.h"
 #include "imguiPanels/ProprtiesPanel.h"
 #include "imguiPanels/SettingsPanel.h"
+#include "imguiPanels/TextureGeneratorPanel.h"
 #include "imguiPanels/ViewportPanel.h"
 
 #include "RenderTargets/SwapChains/SwapChain.h"
@@ -84,6 +85,7 @@ class ImGuiLayer : public Rapture::Layer {
     ContentBrowserPanel m_contentBrowserPanel;
     ImageViewerPanel m_imageViewerPanel;
     SettingsPanel m_settingsPanel;
+    TextureGeneratorPanel m_textureGeneratorPanel;
 
     std::vector<std::unique_ptr<ImageViewerPanel>> m_floatingImageViews;
 

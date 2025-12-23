@@ -96,12 +96,12 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(s
     metadata.m_storageType = AssetStorageType::Disk;
     metadata.m_filePath = path;
 
-    metadata.m_assetType = determineAssetType(path.string());
+    metadata.assetType = determineAssetType(path.string());
 
     metadata.m_indices = {};
     metadata.m_importConfig = importConfig;
 
-    if (metadata.m_assetType == AssetType::None) {
+    if (metadata.assetType == AssetType::None) {
         RP_CORE_ERROR("Unknown asset type for extension: {}", path.extension().string());
         return std::make_pair(nullptr, AssetHandle());
     }
@@ -152,7 +152,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefault
 
         // Create metadata for the default texture
         AssetMetadata metadata;
-        metadata.m_assetType = AssetType::Texture;
+        metadata.assetType = AssetType::Texture;
         metadata.m_storageType = AssetStorageType::Disk; // Default assets are treated as disk assets
         metadata.m_filePath = "<default_white_texture>"; // Special path to indicate default asset
         metadata.m_indices = {0};
@@ -192,7 +192,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importDefault
 
         // Create metadata for the default material
         AssetMetadata metadata;
-        metadata.m_assetType = AssetType::Material;
+        metadata.assetType = AssetType::Material;
         metadata.m_storageType = AssetStorageType::Disk;
         metadata.m_filePath = "<default_material>";
         metadata.m_indices = {};
@@ -246,8 +246,7 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
     return AssetType::None;
 }
 
-AssetHandle AssetManagerEditor::registerVirtualAsset(AssetVariant asset, const std::string &virtualName,
-                                                     AssetType assetType)
+AssetHandle AssetManagerEditor::registerVirtualAsset(AssetVariant asset, const std::string &virtualName, AssetType assetType)
 {
     if (std::holds_alternative<std::monostate>(asset)) {
         RP_CORE_ERROR("Asset variant is empty");
@@ -261,7 +260,7 @@ AssetHandle AssetManagerEditor::registerVirtualAsset(AssetVariant asset, const s
 
     // Check if virtual asset with this name already exists
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata.isVirtualAsset() && metadata.m_virtualName == virtualName && metadata.m_assetType != assetType) {
+        if (metadata.isVirtualAsset() && metadata.m_virtualName == virtualName && metadata.assetType != assetType) {
             RP_CORE_WARN("Virtual asset with name '{}' already exists, returning existing handle", virtualName);
             return handle;
         }
@@ -277,7 +276,7 @@ AssetHandle AssetManagerEditor::registerVirtualAsset(AssetVariant asset, const s
 
     // Create metadata
     AssetMetadata metadata;
-    metadata.m_assetType = assetType;
+    metadata.assetType = assetType;
     metadata.m_storageType = AssetStorageType::Virtual;
     metadata.m_virtualName = virtualName;
 
@@ -325,7 +324,7 @@ std::vector<AssetHandle> AssetManagerEditor::getVirtualAssetsByType(AssetType ty
 {
     std::vector<AssetHandle> result;
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata.isVirtualAsset() && metadata.m_assetType == type) {
+        if (metadata.isVirtualAsset() && metadata.assetType == type) {
             result.push_back(handle);
         }
     }

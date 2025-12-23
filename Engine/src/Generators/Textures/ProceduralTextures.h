@@ -9,6 +9,8 @@
 #include "Shaders/Shader.h"
 #include "Textures/Texture.h"
 
+#include <glm/glm.hpp>
+
 #include <cstring>
 #include <memory>
 #include <string>
@@ -34,6 +36,21 @@ struct ProceduralTextureConfig {
  */
 struct WhiteNoisePushConstants {
     uint32_t seed;
+};
+
+/**
+ * @brief Push constant data for atmospheric scattering.
+ *
+ * Layout matches GLSL std430: total size 52 bytes
+ */
+struct AtmospherePushConstants {
+    glm::vec3 sunDir;
+    float planetRadius;
+    float atmoRadius;
+    float _pad0[3];
+    glm::vec3 betaRay;
+    float scaleHeight;
+    float sunIntensity;
 };
 
 /**
@@ -120,6 +137,16 @@ class ProceduralTexture {
         return true;
     }
 
+    bool setPushConstantsRaw(const void *data, size_t size)
+    {
+        if (!verifyPushConstantSize(size)) {
+            return false;
+        }
+        m_pushConstantData.resize(size);
+        std::memcpy(m_pushConstantData.data(), data, size);
+        return true;
+    }
+
     /**
      * @brief Generates the texture.
      *
@@ -140,6 +167,7 @@ class ProceduralTexture {
      *         command buffer is submitted.
      */
     std::shared_ptr<Texture> getTexture() const { return m_texture; }
+    std::shared_ptr<Shader> getShader() const { return m_shader; }
 
     /**
      * @brief Checks if the generator was initialized successfully.
@@ -167,6 +195,26 @@ class ProceduralTexture {
      * @return Shared pointer to the generated texture.
      */
     static std::shared_ptr<Texture> generateWhiteNoise(uint32_t seed = 0,
+                                                       const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates an atmospheric scattering texture.
+     *
+     * Static helper method that creates an equirectangular panoramic texture
+     * with realistic atmospheric scattering using Rayleigh and Mie scattering.
+     * The texture can be used as a skybox or converted to a cubemap.
+     *
+     * Uses the built-in Atmosphere.cs.glsl shader with physically-based
+     * atmospheric scattering. The sun position is calculated from the time
+     * of day parameter.
+     *
+     * @param timeOfDay Time in hours (0.0 to 24.0, e.g., 14.5 = 2:30 PM).
+     *                  6.0 = sunrise, 12.0 = noon, 18.0 = sunset, 0.0 = midnight.
+     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
+     * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
+     * @return Shared pointer to the generated panoramic texture.
+     */
+    static std::shared_ptr<Texture> generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
                                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
   private:

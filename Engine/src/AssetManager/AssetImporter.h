@@ -76,7 +76,7 @@ class AssetImporter {
     static std::shared_ptr<Asset> importAsset(const AssetHandle &handle, const AssetMetadata &metadata)
     {
 
-        return s_assetImporters[metadata.m_assetType](handle, metadata);
+        return s_assetImporters[metadata.assetType](handle, metadata);
     }
 
   private:

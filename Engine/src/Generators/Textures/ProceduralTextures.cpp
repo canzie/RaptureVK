@@ -33,7 +33,7 @@ void ProceduralTexture::initFromShaderPath(const std::string &shaderPath, bool c
     auto shaderDir = proj.getProjectShaderDirectory();
 
     auto [shader, handle] = AssetManager::importAsset<Shader>(shaderDir / shaderPath);
-    if (!shader) {
+    if (!shader || !m_shader->isReady()) {
         RP_CORE_ERROR("Failed to load procedural texture shader: {}", shaderPath);
         return;
     }
@@ -54,8 +54,8 @@ void ProceduralTexture::initFromShaderPath(const std::string &shaderPath, bool c
 void ProceduralTexture::initFromShaderHandle(const AssetHandle &shaderHandle, bool createTexture)
 {
     m_shader = AssetManager::getAsset<Shader>(shaderHandle);
-    if (!m_shader) {
-        RP_CORE_ERROR("Failed to get shader from asset handle");
+    if (!m_shader || !m_shader->isReady()) {
+        RP_CORE_ERROR("Failed to get ready shader from asset handle");
         return;
     }
 
@@ -214,8 +214,8 @@ void ProceduralTexture::generate()
     postBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
     vkCmdPipelineBarrier(vkCmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                         1, &postBarrier);
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                         &postBarrier);
 
     m_commandBuffer->end();
 
@@ -257,6 +257,61 @@ std::shared_ptr<Texture> ProceduralTexture::generateWhiteNoise(uint32_t seed, co
 
     WhiteNoisePushConstants pc{};
     pc.seed = seed;
+    generator.setPushConstants(pc);
+    generator.generate();
+
+    return generator.getTexture();
+}
+
+std::shared_ptr<Texture> ProceduralTexture::generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params,
+                                                               const ProceduralTextureConfig &config)
+{
+    // Function-local static for shader handle - AssetManager handles caching
+    static AssetHandle s_shaderHandle;
+    static bool s_shaderLoaded = false;
+
+    if (!s_shaderLoaded) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        auto [shader, handle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/Generators/Atmosphere.cs.glsl");
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load Atmosphere shader");
+            return nullptr;
+        }
+        s_shaderHandle = handle;
+        s_shaderLoaded = true;
+    }
+
+    // Use HDR format by default for atmospheric scattering
+    ProceduralTextureConfig atmosphereConfig = config;
+    if (atmosphereConfig.format == TextureFormat::RGBA8) {
+        atmosphereConfig.format = TextureFormat::RGBA16F;
+    }
+
+    ProceduralTexture generator(s_shaderHandle, atmosphereConfig);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create atmosphere generator");
+        return nullptr;
+    }
+
+    (void)timeOfDay;
+
+    // Set up push constants with defaults if not provided
+    AtmospherePushConstants pc;
+    if (params) {
+        pc = *params;
+    } else {
+        // Earth-like atmospheric defaults
+        pc.sunDir = glm::vec3(1.0f);
+        pc.planetRadius = 6371e3f;
+        pc.atmoRadius = 6471e3f;
+        pc.betaRay = glm::vec3(5.5e-6, 13.0e-6, 22.4e-6);
+        pc.scaleHeight = 8000.0f;
+        pc.sunIntensity = 21e-6f;
+    }
+
     generator.setPushConstants(pc);
     generator.generate();
 

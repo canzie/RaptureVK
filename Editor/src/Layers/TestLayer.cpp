@@ -131,7 +131,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
                                                        glm::vec3(-1.874f, 0.0f, 0.0f), // Point downwards
                                                        glm::vec3(0.2f));
     auto &sunLightComp = sunLight.addComponent<Rapture::LightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White sunlight
-                                                                        3.14f                         // Intensity
+                                                                        3.14f                        // Intensity
     );
     sunLightComp.castsShadow = true;
     sunLight.addComponent<Rapture::CascadedShadowComponent>(2048.0f, 2048.0f, 4, 0.8f);
@@ -151,6 +151,19 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         auto noiseTexture = Rapture::ProceduralTexture::generateWhiteNoise(12345, config);
         if (noiseTexture) {
             Rapture::RP_INFO("Generated white noise texture: {}", config.name);
+        }
+    }
+
+    // Test atmospheric scattering texture generation
+    {
+        Rapture::ProceduralTextureConfig config;
+        config.name = "test_atmosphere_noon";
+        config.format = Rapture::TextureFormat::RGBA16F; // HDR for proper atmospheric colors
+        config.srgb = false;
+
+        auto atmosphereTexture = Rapture::ProceduralTexture::generateAtmosphere(12.0f, nullptr, config);
+        if (atmosphereTexture) {
+            Rapture::RP_INFO("Generated atmospheric scattering texture (noon): {}", config.name);
         }
     }
 
