@@ -751,6 +751,17 @@ void PropertiesPanel::renderAddComponentMenu(Rapture::Entity entity)
         }
     }
 
+    // BLAS Component
+    if (!entity.hasComponent<Rapture::BLASComponent>()) {
+        if (auto meshComp = entity.tryGetComponent<Rapture::MeshComponent>(); meshComp != nullptr) {
+            if (ImGui::MenuItem("BLAS Component")) {
+                tryAddComponent([&entity, meshComp]() { entity.addComponent<Rapture::BLASComponent>(meshComp->mesh); },
+                                "BLAS Component");
+                entity.getScene()->registerBLAS(entity);
+            }
+        }
+    }
+
     // Light Component
     if (!entity.hasComponent<Rapture::LightComponent>()) {
         if (ImGui::MenuItem("Light Component")) {

@@ -541,7 +541,7 @@ uint32_t Texture::getBindlessIndex()
     }
 
     if (s_bindlessTextures) {
-        m_bindlessIndex = s_bindlessTextures->add(shared_from_this());
+        m_bindlessIndex = s_bindlessTextures->add(*this);
     }
 
     return m_bindlessIndex;

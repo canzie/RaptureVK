@@ -43,7 +43,7 @@ FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::share
     m_descriptorSet = std::make_shared<DescriptorSet>(bindings);
 
     // Update the descriptor set with the output texture
-    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)->add(m_flattenedTexture);
+    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)->add(*m_flattenedTexture);
 }
 
 void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer)

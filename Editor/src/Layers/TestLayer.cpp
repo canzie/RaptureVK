@@ -18,9 +18,9 @@
 #include "AccelerationStructures/CPU/BVH/BVH.h"
 #include "AccelerationStructures/CPU/BVH/BVH_SAH.h"
 #include "AccelerationStructures/CPU/BVH/DBVH.h"
+#include "Generators/Terrain/TerrainGenerator.h"
 #include "Generators/Textures/ProceduralTextures.h"
 #include "Meshes/MeshPrimitives.h"
-#include "Physics/EntropyComponents.h"
 #include "Utils/Timestep.h"
 
 TestLayer::~TestLayer()
@@ -108,6 +108,11 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         activeScene->registerBLAS(floor);
     }
 
+    auto cube = activeScene->createCube("Test Cube");
+    cube.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
+    cube.addComponent<Rapture::BLASComponent>(cube.getComponent<Rapture::MeshComponent>().mesh);
+    activeScene->registerBLAS(cube);
+
     // Create a spot light with shadow mapping (inside Sponza courtyard)
     // Note: Rotation is in RADIANS
     Rapture::Entity spotLight = activeScene->createSphere("Spot Light");
@@ -167,6 +172,27 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         }
     }
 
+    // Initialize terrain
+    {
+        m_terrain = std::make_shared<Rapture::TerrainGenerator>();
+
+        Rapture::TerrainConfig terrainConfig;
+        terrainConfig.chunkWorldSize = 64.0f;
+        terrainConfig.chunkResolution = 33; // 32x32 quads per chunk
+        terrainConfig.heightScale = 50.0f;
+        terrainConfig.terrainWorldSize = 512.0f;
+
+        m_terrain->init(terrainConfig);
+        m_terrain->generateHeightmap(); // Generate test heightmap
+
+        // Load a 3x3 grid of chunks around origin
+        m_terrain->loadChunksAroundPosition(glm::vec3(0.0f), 1);
+        m_terrain->update(glm::vec3(0.0f)); // Generate geometry
+
+        auto readyChunks = m_terrain->getReadyChunks();
+        Rapture::RP_INFO("Terrain initialized: {} chunks ready", readyChunks.size());
+    }
+
     // Build TLAS for ray tracing
     try {
         activeScene->buildTLAS();
@@ -183,6 +209,9 @@ void TestLayer::onDetach()
         Rapture::GameEvents::onSceneActivated().removeListener(m_sceneActivatedListenerId);
         m_sceneActivatedListenerId = 0;
     }
+
+    // Clean up terrain
+    m_terrain.reset();
 }
 
 void TestLayer::notifyCameraChange() {}

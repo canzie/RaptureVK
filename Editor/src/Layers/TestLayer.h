@@ -2,21 +2,20 @@
 
 #include "Layers/Layer.h"
 #include "Meshes/Mesh.h"
-#include "Scenes/Scene.h"
+#include "Scenes/Entities/Entity.h"
 #include "Shaders/Shader.h"
 #include <functional>
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
 
-#include "Physics/Entropy.h"
-
 // Forward declarations
 class ViewportPanel;
 
 namespace Rapture {
 class DBVH;
-}
+class TerrainGenerator;
+} // namespace Rapture
 
 class TestLayer : public Rapture::Layer {
   public:
@@ -46,5 +45,6 @@ class TestLayer : public Rapture::Layer {
     int m_fpsCounter = 0;
     float m_fpsTimer = 0.0f;
 
-    std::shared_ptr<Rapture::Entropy::EntropyPhysics> m_entropyPhysics;
+    // Terrain
+    std::shared_ptr<Rapture::TerrainGenerator> m_terrain;
 };

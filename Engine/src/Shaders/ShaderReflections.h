@@ -88,7 +88,7 @@ std::string getSpirvTypeDescriptionString(const SpvReflectTypeDescription *typeD
 // The function will reflect on each SPIR-V, extract its push constants, and merge them
 // into a single list, combining stage flags for ranges that span multiple shaders.
 std::vector<PushConstantInfo>
-getCombinedPushConstantRanges(const std::vector<std::pair<const std::vector<char> &, VkShaderStageFlags>> &shaderCodeWithStages);
+getCombinedPushConstantRanges(const std::vector<std::pair<std::vector<char>, VkShaderStageFlags>> &shaderCodeWithStages);
 
 // Extract detailed push constant information including member-level data
 std::vector<DetailedPushConstantInfo> extractDetailedPushConstants(const std::vector<char> &spirvCode);

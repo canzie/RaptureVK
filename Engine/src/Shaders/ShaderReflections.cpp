@@ -285,7 +285,7 @@ std::vector<DescriptorInfo> extractMaterialSets(const std::vector<char> &spirvCo
 }
 
 std::vector<PushConstantInfo>
-getCombinedPushConstantRanges(const std::vector<std::pair<const std::vector<char> &, VkShaderStageFlags>> &shaderCodeWithStages)
+getCombinedPushConstantRanges(const std::vector<std::pair<std::vector<char>, VkShaderStageFlags>> &shaderCodeWithStages)
 {
     // Use a map to merge push constant ranges by offset and size, combining stage flags.
     // The key is a pair of {offset, size}, the value is PushConstantInfo.

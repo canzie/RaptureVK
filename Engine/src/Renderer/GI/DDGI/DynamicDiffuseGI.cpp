@@ -64,8 +64,7 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
       m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_ProbeInfoBuffer(nullptr),
       m_framesInFlight(framesInFlight), m_isFirstFrame(true), m_meshCount(0), m_probeIrradianceBindlessIndex(UINT32_MAX),
       m_probeVisibilityBindlessIndex(UINT32_MAX), m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr),
-      m_skyIntensity(1.0f),
-      m_probeTraceDescriptorSet(nullptr), m_probeIrradianceBlendingDescriptorSet(nullptr),
+      m_skyIntensity(1.0f), m_probeTraceDescriptorSet(nullptr), m_probeIrradianceBlendingDescriptorSet(nullptr),
       m_probeDistanceBlendingDescriptorSet(nullptr), m_probeClassificationDescriptorSet(nullptr),
       m_probeRelocationDescriptorSet(nullptr)
 {
@@ -228,8 +227,8 @@ void DynamicDiffuseGI::clearTextures()
                          &clearColor, 1, &subresourceRange);
     vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_VisibilityTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
                          &clearColor, 1, &subresourceRange);
-    vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_ProbeClassificationTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
-                         &clearColorUint, 1, &subresourceRange);
+    vkCmdClearColorImage(m_CommandBuffers[0]->getCommandBufferVk(), m_ProbeClassificationTexture->getImage(),
+                         VK_IMAGE_LAYOUT_GENERAL, &clearColorUint, 1, &subresourceRange);
 
     if (m_CommandBuffers[0]->end() != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to end command buffer");
@@ -771,7 +770,7 @@ void DynamicDiffuseGI::initTextures()
         m_probeIrradianceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeIrradianceBlendingDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS)
-            ->add(m_RadianceTexture);
+            ->add(*m_RadianceTexture);
     }
 
     // For Probe Distance Blending
@@ -783,7 +782,7 @@ void DynamicDiffuseGI::initTextures()
         m_probeDistanceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeDistanceBlendingDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS)
-            ->add(m_VisibilityTexture);
+            ->add(*m_VisibilityTexture);
     }
 
     // For Probe Tracing
@@ -794,7 +793,7 @@ void DynamicDiffuseGI::initTextures()
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA});
         m_probeTraceDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeTraceDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA)
-            ->add(m_RayDataTexture);
+            ->add(*m_RayDataTexture);
     }
 
     // For Probe Classification
@@ -806,7 +805,7 @@ void DynamicDiffuseGI::initTextures()
         m_probeClassificationDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeClassificationDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
-            ->add(m_ProbeClassificationTexture);
+            ->add(*m_ProbeClassificationTexture);
     }
 
     // For Probe Relocation
@@ -818,7 +817,7 @@ void DynamicDiffuseGI::initTextures()
         m_probeRelocationDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeRelocationDescriptorSet
             ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_RELOCATION)
-            ->add(m_ProbeOffsetTexture);
+            ->add(*m_ProbeOffsetTexture);
     }
 
     RP_CORE_INFO("DDGI: Created custom descriptor sets for compute pipelines.");
@@ -893,7 +892,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
     if (probeInfoSet) {
         auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
         if (binding) {
-            binding->add(m_ProbeInfoBuffer);
+            binding->add(*m_ProbeInfoBuffer);
             RP_CORE_INFO("Added probe volume UBO to descriptor set 0, binding 5");
         } else {
             RP_CORE_ERROR("Failed to get uniform buffer binding for probe info");

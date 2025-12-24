@@ -655,7 +655,7 @@ void CascadedShadowMap::createUniformBuffers()
     if (cascadeSet) {
         auto binding = cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
         if (binding) {
-            m_cascadeMatricesIndex = binding->add(m_cascadeMatricesBuffer);
+            m_cascadeMatricesIndex = binding->add(*m_cascadeMatricesBuffer);
         }
     }
 }

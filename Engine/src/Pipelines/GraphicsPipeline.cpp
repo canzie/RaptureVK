@@ -80,8 +80,9 @@ void GraphicsPipeline::createPipeline(const GraphicsPipelineConfiguration &confi
     pipelineInfo.stageCount = static_cast<uint32_t>(config.shader->getStages().size());
     pipelineInfo.pStages = config.shader->getStages().data();
 
-    pipelineInfo.pVertexInputState = &config.vertexInputState;
-    pipelineInfo.pInputAssemblyState = &config.inputAssemblyState;
+    // Vertex input and input assembly are optional (not used for mesh shaders)
+    pipelineInfo.pVertexInputState = config.vertexInputState.has_value() ? &config.vertexInputState.value() : nullptr;
+    pipelineInfo.pInputAssemblyState = config.inputAssemblyState.has_value() ? &config.inputAssemblyState.value() : nullptr;
     pipelineInfo.pViewportState = &config.viewportState;
     pipelineInfo.pRasterizationState = &config.rasterizationState;
     pipelineInfo.pMultisampleState = &config.multisampleState;

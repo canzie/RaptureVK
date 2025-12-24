@@ -32,7 +32,7 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
     if (materialSet) {
         auto binding = materialSet->getUniformBufferBinding(DescriptorSetBindingLocation::MATERIAL_UBO);
         if (binding) {
-            m_bindlessUniformBufferIndex = binding->add(m_uniformBuffer);
+            m_bindlessUniformBufferIndex = binding->add(*m_uniformBuffer);
         }
     }
 

@@ -20,24 +20,6 @@
 - material editor/viewer
 - jolt???
 
-
-### Procedural Texture Generation
-
-- Base class takes in a shader(Can be glsl file->assetManager) and inputs
-- Every shader NEEDS the following
-  - input via push constants (limited to 128 bytes)
-  - 1 output, which is a texture
-  - square local sizes
-  - 2d texture (for now)
-  - its local size needs to be via a macro so we can set it before compilation
-- After the texture has been generated, we "free" it so the asset manager can mark it (it can then decide to remove it or keep it in memory. not relevant externally)
-- it is acceptable to only accept certain sizes, e.g. ..., 256x256, 512x512, 1024x1024, 2048, 2048. (these can be added later, the point is preset sizes)
-- output of the cpp side is a texture, registered to the asset manager
-- ontop of this class, well have static functions to generate specifics where the shader does not have to be specified (like a generateWhiteNoise)
-- the cpp side needs to make sure to have the correct structs represented in the shader, reflection can be used to verify before dipatching it.
-- this system NEEDS to be thread safe, this means we create, dispatch, return and clean up, no static generator class, only the specific helpers can be static, but not the base class.
-
-
 ### PHYSICS
     - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)
     - fixing the imguizmo thing    
@@ -61,7 +43,6 @@
 
 ### Terrain Generation
 
-- allow for easy noise generation, should only need inputs, outputs and algo -> provide a registered virtual image
 - make basic terrain
 - blend multiple noise layers
 - use tesselation shaders

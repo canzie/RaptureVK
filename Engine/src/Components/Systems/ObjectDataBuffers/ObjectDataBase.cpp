@@ -36,7 +36,7 @@ ObjectDataBuffer::ObjectDataBuffer(DescriptorSetBindingLocation bindingLocation,
         m_buffers[i] = std::make_shared<UniformBuffer>(dataSize, BufferUsage::DYNAMIC, allocator);
 
         // Add buffer to descriptor binding
-        m_descriptorIndices[i] = m_descriptorBinding->add(m_buffers[i]);
+        m_descriptorIndices[i] = m_descriptorBinding->add(*m_buffers[i]);
 
         if (m_descriptorIndices[i] == UINT32_MAX) {
             RP_CORE_ERROR("Failed to allocate descriptor index for frame {}", i);

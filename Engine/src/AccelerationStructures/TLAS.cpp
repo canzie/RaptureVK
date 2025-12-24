@@ -343,7 +343,7 @@ void TLAS::registerWithDescriptorManager()
     if (bindlessSet) {
         auto binding = bindlessSet->getTLASBinding(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
         if (binding) {
-            m_bindlessIndex = binding->add(shared_from_this());
+            m_bindlessIndex = binding->add(*this);
             RP_CORE_INFO("TLAS: Registered with descriptor manager at bindless index {}", m_bindlessIndex);
         } else {
             RP_CORE_ERROR("TLAS: Failed to get TLAS binding from descriptor manager");

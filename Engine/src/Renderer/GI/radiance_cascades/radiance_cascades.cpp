@@ -112,7 +112,7 @@ void RadianceCascades::initTextures()
     m_traceDescriptorSet = std::make_shared<DescriptorSet>(bindings);
     m_traceDescriptorSet
         ->getUniformBufferBinding(static_cast<DescriptorSetBindingLocation>(RCDescriptorSetBindingLocation::VOLUME_UBO))
-        ->add(m_volumeUBO);
+        ->add(*m_volumeUBO);
 
     for (uint32_t i = 0; i < m_config.numCascades; ++i) {
         const auto &cascade = m_volumeGPU.cascades[i];
@@ -133,7 +133,7 @@ void RadianceCascades::initTextures()
 
         m_traceDescriptorSet
             ->getTextureBinding(static_cast<DescriptorSetBindingLocation>(RCDescriptorSetBindingLocation::RADIANCE_TEXTURE))
-            ->add(radianceTexture);
+            ->add(*radianceTexture);
 
         auto flattened = TextureFlattener::createFlattenTexture(radianceTexture, fmt::format("[RC] C{} Radiance Flattened", i));
         m_radianceTexturesFlattened.push_back(flattened);

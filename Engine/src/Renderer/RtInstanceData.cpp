@@ -145,7 +145,7 @@ void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
     if (set) {
         auto binding = set->getSSBOBinding(DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS);
         if (binding) {
-            m_meshDataSSBOIndex = binding->add(m_buffer);
+            m_meshDataSSBOIndex = binding->add(*m_buffer);
         }
     }
 

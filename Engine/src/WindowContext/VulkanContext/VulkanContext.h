@@ -48,6 +48,7 @@ class VulkanContext {
     bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
     bool isNullDescriptorEnabled() const { return m_isNullDescriptorEnabled; }
     bool isRayTracingEnabled() const { return m_isRayTracingEnabled; }
+    bool isMeshShaderEnabled() const { return m_isMeshShaderEnabled; }
 
     const VkPhysicalDeviceAccelerationStructurePropertiesKHR &getAccelerationStructureProperties() const
     {
@@ -70,6 +71,11 @@ class VulkanContext {
     PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR = nullptr;
     PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR = nullptr;
     PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR = nullptr;
+
+    // Mesh shader extension function pointers
+    PFN_vkCmdDrawMeshTasksEXT vkCmdDrawMeshTasksEXT = nullptr;
+    PFN_vkCmdDrawMeshTasksIndirectEXT vkCmdDrawMeshTasksIndirectEXT = nullptr;
+    PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT = nullptr;
 
     //
     void createRecourses(WindowContext *windowContext);
@@ -129,6 +135,7 @@ class VulkanContext {
     bool m_isDynamicRenderingEnabled;
     bool m_isNullDescriptorEnabled;
     bool m_isRayTracingEnabled;
+    bool m_isMeshShaderEnabled;
 
     // Store descriptor indexing features support
     VkPhysicalDeviceDescriptorIndexingFeatures m_descriptorIndexingFeatures{};

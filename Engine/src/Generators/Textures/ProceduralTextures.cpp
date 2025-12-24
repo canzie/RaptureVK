@@ -128,7 +128,7 @@ void ProceduralTexture::initDescriptorSet()
     bindings.bindings.push_back(outputBinding);
 
     m_descriptorSet = std::make_shared<DescriptorSet>(bindings);
-    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_0)->add(m_texture);
+    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_0)->add(*m_texture);
 }
 
 void ProceduralTexture::extractExpectedPushConstantSize()

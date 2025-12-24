@@ -116,6 +116,9 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     m_deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
 
+    // Mesh shader extension
+    m_deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+
     // Ray tracing extensions
     m_deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
@@ -842,6 +845,49 @@ static bool s_enableDynamicRendering(VkPhysicalDevice physicalDevice, VkPhysical
     return true;
 }
 
+static bool s_enableMeshShader(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                               VkPhysicalDeviceMeshShaderFeaturesEXT &outFeatures)
+{
+    VkPhysicalDeviceMeshShaderFeaturesEXT supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (supported.meshShader && supported.taskShader) {
+        outFeatures = {};
+        outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+        outFeatures.meshShader = VK_TRUE;
+        outFeatures.taskShader = VK_TRUE;
+
+        s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+        RP_CORE_INFO("EXT::meshShader enabled.");
+        return true;
+    } else {
+        RP_CORE_WARN("EXT::meshShader NOT supported.");
+        return false;
+    }
+}
+
+static void s_loadMeshShader(VkDevice device, PFN_vkCmdDrawMeshTasksEXT &vkCmdDrawMeshTasksEXT,
+                             PFN_vkCmdDrawMeshTasksIndirectEXT &vkCmdDrawMeshTasksIndirectEXT,
+                             PFN_vkCmdDrawMeshTasksIndirectCountEXT &vkCmdDrawMeshTasksIndirectCountEXT)
+{
+    vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksEXT"));
+    vkCmdDrawMeshTasksIndirectEXT =
+        reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectEXT>(vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectEXT"));
+    vkCmdDrawMeshTasksIndirectCountEXT =
+        reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectCountEXT>(vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectCountEXT"));
+
+    if (vkCmdDrawMeshTasksEXT) {
+        RP_CORE_INFO("Mesh shader function pointers loaded.");
+    }
+}
+
 static void s_enableRobustness2(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
                                 VkPhysicalDeviceRobustness2FeaturesEXT &outFeatures)
 {
@@ -1175,6 +1221,9 @@ void VulkanContext::createLogicalDevice()
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRendering{};
     m_isDynamicRenderingEnabled = s_enableDynamicRendering(m_physicalDevice, physicalDeviceFeaturesToEnable, dynamicRendering);
 
+    VkPhysicalDeviceMeshShaderFeaturesEXT meshShader{};
+    m_isMeshShaderEnabled = s_enableMeshShader(m_physicalDevice, physicalDeviceFeaturesToEnable, meshShader);
+
     VkPhysicalDeviceRobustness2FeaturesEXT robustness2{};
     s_enableRobustness2(m_physicalDevice, physicalDeviceFeaturesToEnable, robustness2);
 
@@ -1212,6 +1261,9 @@ void VulkanContext::createLogicalDevice()
     s_loadDynamicRendering(m_device, dynamicRendering.dynamicRendering, vkCmdBeginRenderingKHR, vkCmdEndRenderingKHR,
                            m_isDynamicRenderingEnabled);
     s_loadMultiDraw(m_device, vkCmdDrawMultiEXT, vkCmdDrawMultiIndexedEXT);
+    if (m_isMeshShaderEnabled) {
+        s_loadMeshShader(m_device, vkCmdDrawMeshTasksEXT, vkCmdDrawMeshTasksIndirectEXT, vkCmdDrawMeshTasksIndirectCountEXT);
+    }
     s_loadRayTracing(m_physicalDevice, m_device, vkCreateAccelerationStructureKHR, vkDestroyAccelerationStructureKHR,
                      vkGetAccelerationStructureBuildSizesKHR, vkCmdBuildAccelerationStructuresKHR,
                      vkGetAccelerationStructureDeviceAddressKHR, vkCreateRayTracingPipelinesKHR,
