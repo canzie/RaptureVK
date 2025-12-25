@@ -39,6 +39,17 @@ struct WhiteNoisePushConstants {
 };
 
 /**
+ * @brief Push constant data for Perlin noise generation.
+ */
+struct PerlinNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    uint32_t seed = 0;
+};
+
+/**
  * @brief Push constant data for atmospheric scattering.
  *
  * Layout matches GLSL std430: total size 52 bytes
@@ -196,6 +207,16 @@ class ProceduralTexture {
      */
     static std::shared_ptr<Texture> generateWhiteNoise(uint32_t seed = 0,
                                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates a Perlin noise texture.
+     *
+     * @param params Perlin noise parameters (octaves, persistence, lacunarity, scale, seed).
+     * @param config Optional texture configuration.
+     * @return Shared pointer to the generated texture.
+     */
+    static std::shared_ptr<Texture> generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
+                                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Generates an atmospheric scattering texture.

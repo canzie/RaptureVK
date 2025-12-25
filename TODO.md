@@ -19,6 +19,8 @@
 - look at csm flickering again
 - material editor/viewer
 - jolt???
+- look at removing the waitidles in some places like copyBuffer
+- jobify the deferred renderer command recording
 
 ### PHYSICS
     - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)

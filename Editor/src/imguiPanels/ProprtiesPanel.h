@@ -7,6 +7,7 @@
 #include "Components/Components.h"
 #include "Components/FogComponent.h"
 #include "Components/IndirectLightingComponent.h"
+#include "Components/TerrainComponent.h"
 
 #include <memory>
 
@@ -32,6 +33,7 @@ class PropertiesPanel {
     void renderFogComponent();
     void renderIndirectLightingComponent();
     void renderSkyboxComponent(Rapture::SkyboxComponent &skyboxComp);
+    void renderTerrainComponent(Rapture::TerrainComponent &terrainComp);
 
     void renderAddComponentMenu(Rapture::Entity entity);
 

@@ -14,7 +14,6 @@ class ViewportPanel;
 
 namespace Rapture {
 class DBVH;
-class TerrainGenerator;
 } // namespace Rapture
 
 class TestLayer : public Rapture::Layer {
@@ -44,7 +43,4 @@ class TestLayer : public Rapture::Layer {
     // FPS counter variables
     int m_fpsCounter = 0;
     float m_fpsTimer = 0.0f;
-
-    // Terrain
-    std::shared_ptr<Rapture::TerrainGenerator> m_terrain;
 };

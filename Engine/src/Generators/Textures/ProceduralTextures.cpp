@@ -33,7 +33,7 @@ void ProceduralTexture::initFromShaderPath(const std::string &shaderPath, bool c
     auto shaderDir = proj.getProjectShaderDirectory();
 
     auto [shader, handle] = AssetManager::importAsset<Shader>(shaderDir / shaderPath);
-    if (!shader || !m_shader->isReady()) {
+    if (!shader || !shader->isReady()) {
         RP_CORE_ERROR("Failed to load procedural texture shader: {}", shaderPath);
         return;
     }
@@ -258,6 +258,38 @@ std::shared_ptr<Texture> ProceduralTexture::generateWhiteNoise(uint32_t seed, co
     WhiteNoisePushConstants pc{};
     pc.seed = seed;
     generator.setPushConstants(pc);
+    generator.generate();
+
+    return generator.getTexture();
+}
+
+std::shared_ptr<Texture> ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &params,
+                                                                const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle;
+    static bool s_shaderLoaded = false;
+
+    if (!s_shaderLoaded) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        auto [shader, handle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/Generators/PerlinNoise.cs.glsl");
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load PerlinNoise shader");
+            return nullptr;
+        }
+        s_shaderHandle = handle;
+        s_shaderLoaded = true;
+    }
+
+    ProceduralTexture generator(s_shaderHandle, config);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create Perlin noise generator");
+        return nullptr;
+    }
+
+    generator.setPushConstants(params);
     generator.generate();
 
     return generator.getTexture();

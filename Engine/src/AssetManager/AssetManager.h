@@ -53,6 +53,9 @@ class AssetManager {
 
         auto [asset, handle] = s_activeAssetManager->importAsset(path, importConfig);
 
+        if (!asset || !asset->isValid()) {
+            return std::make_pair(nullptr, handle);
+        }
         return std::make_pair(asset->getUnderlyingAsset<T>(), handle);
     }
 
@@ -66,8 +69,7 @@ class AssetManager {
     }
 
     // Virtual asset registration methods
-    static AssetHandle registerVirtualAsset(AssetVariant asset, const std::string &virtualName,
-                                            AssetType assetType)
+    static AssetHandle registerVirtualAsset(AssetVariant asset, const std::string &virtualName, AssetType assetType)
     {
         if (!s_isInitialized || !s_activeAssetManager) {
             RP_CORE_ERROR("AssetManager not initialized");

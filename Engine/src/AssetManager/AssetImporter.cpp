@@ -122,7 +122,7 @@ std::shared_ptr<Asset> AssetImporter::loadShader(const AssetHandle &handle, cons
 
     // Wrap the shader in an Asset object
     auto asset = std::make_shared<Asset>(AssetVariant{shader});
-    asset->m_status = AssetStatus::LOADED;
+    asset->m_status = shader->isReady() ? AssetStatus::LOADED : AssetStatus::FAILED;
     asset->m_handle = handle;
 
     AssetEvents::onAssetLoaded().publish(handle);
@@ -229,9 +229,7 @@ void AssetImporter::assetLoadThread()
         // Wait for work or shutdown signal
         {
             std::unique_lock<std::mutex> lock(s_queueMutex);
-            s_queueCondition.wait(lock, [] {
-                return !s_pendingRequests.empty() || !s_threadRunning;
-            });
+            s_queueCondition.wait(lock, [] { return !s_pendingRequests.empty() || !s_threadRunning; });
 
             // Check shutdown after waking
             if (!s_threadRunning && s_pendingRequests.empty()) {

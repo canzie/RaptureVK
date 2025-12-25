@@ -106,7 +106,7 @@ class Asset {
         return nullptr;
     }
 
-    bool isValid() const { return !std::holds_alternative<std::monostate>(m_asset); }
+    bool isValid() const { return !std::holds_alternative<std::monostate>(m_asset) && m_status != AssetStatus::FAILED; }
 
   public:
     AssetHandle m_handle;

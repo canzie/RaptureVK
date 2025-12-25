@@ -18,7 +18,7 @@
 #include "AccelerationStructures/CPU/BVH/BVH.h"
 #include "AccelerationStructures/CPU/BVH/BVH_SAH.h"
 #include "AccelerationStructures/CPU/BVH/DBVH.h"
-#include "Generators/Terrain/TerrainGenerator.h"
+#include "Components/TerrainComponent.h"
 #include "Generators/Textures/ProceduralTextures.h"
 #include "Meshes/MeshPrimitives.h"
 #include "Utils/Timestep.h"
@@ -87,7 +87,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Load Sponza model
     auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
-    if (std::filesystem::exists(sponzaPath)) {
+    if (std::filesystem::exists(sponzaPath) && false) {
         Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
         auto loader = Rapture::ModelLoadersCache::getLoader(sponzaPath, activeScene);
         loader->loadModel(sponzaPath.string());
@@ -172,25 +172,22 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         }
     }
 
-    // Initialize terrain
     {
-        m_terrain = std::make_shared<Rapture::TerrainGenerator>();
+        constexpr float chunkSize = 64.0f;
+        constexpr int32_t chunkRadius = 3;
+        constexpr float terrainExtent = chunkSize * (2 * chunkRadius + 1);
 
-        Rapture::TerrainConfig terrainConfig;
-        terrainConfig.chunkWorldSize = 64.0f;
-        terrainConfig.chunkResolution = 33; // 32x32 quads per chunk
-        terrainConfig.heightScale = 50.0f;
-        terrainConfig.terrainWorldSize = 512.0f;
+        Rapture::TerrainConfig terrainConfig = {};
+        terrainConfig.chunkWorldSize = chunkSize;
+        terrainConfig.heightScale = 40.0f;
+        terrainConfig.terrainWorldSize = terrainExtent;
 
-        m_terrain->init(terrainConfig);
-        m_terrain->generateHeightmap(); // Generate test heightmap
+        auto terrainEntity = activeScene->createEntity("Terrain");
+        auto &terrainComp = terrainEntity.addComponent<Rapture::TerrainComponent>(terrainConfig);
+        terrainComp.generator.generateHeightmap();
+        terrainComp.generator.loadChunksAroundPosition(glm::vec3(0.0f), chunkRadius);
 
-        // Load a 3x3 grid of chunks around origin
-        m_terrain->loadChunksAroundPosition(glm::vec3(0.0f), 1);
-        m_terrain->update(glm::vec3(0.0f)); // Generate geometry
-
-        auto readyChunks = m_terrain->getReadyChunks();
-        Rapture::RP_INFO("Terrain initialized: {} chunks ready", readyChunks.size());
+        Rapture::RP_INFO("Terrain entity created with {} chunks", terrainComp.generator.getLoadedChunkCount());
     }
 
     // Build TLAS for ray tracing
@@ -209,9 +206,6 @@ void TestLayer::onDetach()
         Rapture::GameEvents::onSceneActivated().removeListener(m_sceneActivatedListenerId);
         m_sceneActivatedListenerId = 0;
     }
-
-    // Clean up terrain
-    m_terrain.reset();
 }
 
 void TestLayer::notifyCameraChange() {}

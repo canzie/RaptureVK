@@ -13,6 +13,7 @@
 #include "Cameras/CameraCommon.h"
 #include "Components/Components.h"
 #include "Events/GameEvents.h"
+#include "Generators/Terrain/TerrainGenerator.h"
 #include "Scenes/Scene.h"
 #include "Textures/Texture.h"
 #include "WindowContext/VulkanContext/VulkanContext.h"
@@ -47,9 +48,18 @@ class GBufferPass {
 
     static FramebufferSpecification getFramebufferSpecification();
 
+    // Main dispatcher: renders terrain (if provided) then entities
     // NOTE: assumes that the command buffer is already started, and will be ended by the caller
     void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                             uint32_t currentFrame);
+                             uint32_t currentFrame, TerrainGenerator *terrain = nullptr);
+
+    // Record terrain rendering only
+    void recordTerrainCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                                    TerrainGenerator &terrain, uint32_t currentFrame, bool clearAttachments = true);
+
+    // Record entity rendering only
+    void recordEntityCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                                   uint32_t currentFrame, bool clearAttachments = true);
 
     // Getters for current frame's GBuffer textures
     std::shared_ptr<Texture> getPositionTexture() const { return m_positionDepthTextures[m_currentFrame]; }
@@ -81,11 +91,12 @@ class GBufferPass {
   private:
     void createTextures();
     void createPipeline();
+    void createTerrainPipeline();
     void bindGBufferTexturesToBindlessSet();
 
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
+    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, bool clearAttachments = true);
 
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
+    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, bool clearAttachments = true);
 
     void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
 
@@ -115,6 +126,11 @@ class GBufferPass {
     std::vector<uint32_t> m_depthTextureIndices;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
+
+    // Terrain rendering
+    std::weak_ptr<Shader> m_terrainShader;
+    AssetHandle m_terrainShaderHandle;
+    std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
 
     // MDI batching system - one set per frame in flight
     std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;

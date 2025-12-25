@@ -61,6 +61,9 @@ class CascadedShadowMap {
     void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
                              uint32_t currentFrame);
 
+    void recordTerrainCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                                    uint32_t currentFrame);
+
     std::vector<CascadeData> updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp,
                                               const CameraComponent &cameraComp);
 

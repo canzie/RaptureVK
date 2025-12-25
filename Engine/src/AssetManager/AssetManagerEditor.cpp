@@ -110,7 +110,7 @@ std::pair<std::shared_ptr<Asset>, AssetHandle> AssetManagerEditor::importAsset(s
     AssetHandle handle = UUIDGenerator::Generate();
 
     auto asset = AssetImporter::importAsset(handle, metadata);
-    if (asset) {
+    if (asset && asset->isValid()) {
         m_assetRegistry.insert_or_assign(handle, metadata);
         m_loadedAssets.insert_or_assign(handle, asset);
 

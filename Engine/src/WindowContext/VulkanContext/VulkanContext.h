@@ -46,6 +46,7 @@ class VulkanContext {
     bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
     bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
     bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
+    bool isExtendedDynamicState3Enabled() const { return m_isExtendedDynamicState3Enabled; }
     bool isNullDescriptorEnabled() const { return m_isNullDescriptorEnabled; }
     bool isRayTracingEnabled() const { return m_isRayTracingEnabled; }
     bool isMeshShaderEnabled() const { return m_isMeshShaderEnabled; }
@@ -61,6 +62,9 @@ class VulkanContext {
     PFN_vkCmdEndRenderingKHR vkCmdEndRenderingKHR = nullptr;
     PFN_vkCmdDrawMultiEXT vkCmdDrawMultiEXT = nullptr;
     PFN_vkCmdDrawMultiIndexedEXT vkCmdDrawMultiIndexedEXT = nullptr;
+
+    // Extended dynamic state 3 function pointers
+    PFN_vkCmdSetPolygonModeEXT vkCmdSetPolygonModeEXT = nullptr;
 
     // Ray tracing extension function pointers
     PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR = nullptr;
@@ -133,6 +137,7 @@ class VulkanContext {
     bool m_isVertexInputDynamicStateEnabled;
     bool m_isVertexAttributeRobustnessEnabled;
     bool m_isDynamicRenderingEnabled;
+    bool m_isExtendedDynamicState3Enabled;
     bool m_isNullDescriptorEnabled;
     bool m_isRayTracingEnabled;
     bool m_isMeshShaderEnabled;

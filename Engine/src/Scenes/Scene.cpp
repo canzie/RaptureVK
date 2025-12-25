@@ -2,6 +2,7 @@
 #include "Entities/Entity.h"
 
 #include "Components/Components.h"
+#include "Components/TerrainComponent.h"
 
 #include "AssetManager/AssetManager.h"
 #include "Meshes/MeshPrimitives.h"
@@ -172,13 +173,22 @@ void Scene::onUpdate(float dt)
         }
     }
 
-    // Get camera position for shadow calculations
     glm::vec3 cameraPosition = glm::vec3(0.0f);
+    Frustum *frustum = nullptr;
     Entity mainCamera = getMainCamera();
     if (mainCamera.isValid()) {
-        auto cameraTransform = mainCamera.tryGetComponent<TransformComponent>();
-        if (cameraTransform) {
+        auto [cameraTransform, cameraComponent] = mainCamera.tryGetComponents<TransformComponent, CameraComponent>();
+        if (cameraTransform && cameraComponent) {
             cameraPosition = cameraTransform->translation();
+            frustum = &cameraComponent->frustum;
+        }
+    }
+
+    auto terrainView = m_registry.view<TerrainComponent>();
+    for (auto entity : terrainView) {
+        auto &terrain = terrainView.get<TerrainComponent>(entity);
+        if (terrain.isEnabled && terrain.generator.isInitialized()) {
+            terrain.generator.update(cameraPosition, *frustum);
         }
     }
 

@@ -104,6 +104,10 @@ void PropertiesPanel::render()
         if (auto skyboxComp = entity->tryGetComponent<Rapture::SkyboxComponent>(); skyboxComp != nullptr) {
             renderSkyboxComponent(*skyboxComp);
         }
+
+        if (auto terrainComp = entity->tryGetComponent<Rapture::TerrainComponent>(); terrainComp != nullptr) {
+            renderTerrainComponent(*terrainComp);
+        }
     }
 
     ImGui::End();
@@ -810,6 +814,65 @@ void PropertiesPanel::renderAddComponentMenu(Rapture::Entity entity)
     if (!entity.hasComponent<Rapture::SkyboxComponent>()) {
         if (ImGui::MenuItem("Skybox Component")) {
             tryAddComponent([&entity]() { entity.addComponent<Rapture::SkyboxComponent>(); }, "Skybox Component");
+        }
+    }
+}
+
+void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainComp)
+{
+    if (ImGui::CollapsingHeader("Terrain Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Enabled", &terrainComp.isEnabled);
+
+        if (!terrainComp.generator.isInitialized()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Terrain not initialized");
+            return;
+        }
+
+        auto &config = terrainComp.generator.getConfigMutable();
+
+        float heightScale = config.heightScale;
+        if (ImGui::DragFloat("Height Scale", &heightScale, 1.0f, 0.0f, 1000.0f)) {
+            terrainComp.generator.setHeightScale(heightScale);
+        }
+
+        ImGui::DragFloat("Chunk Size", &config.chunkWorldSize, 1.0f, 1.0f, 256.0f);
+        ImGui::DragFloat("Terrain Size", &config.terrainWorldSize, 10.0f, 64.0f, 8192.0f);
+
+        ImGui::Separator();
+        ImGui::Text("Loaded Chunks: %zu", terrainComp.generator.getLoadedChunkCount());
+        ImGui::Text("Visible Chunks: %u", terrainComp.generator.getTotalVisibleChunks());
+
+        for (uint32_t lod = 0; lod < Rapture::TERRAIN_LOD_COUNT; ++lod) {
+            uint32_t count = terrainComp.generator.getVisibleChunkCount(lod);
+            if (count > 0) {
+                ImGui::Text("  LOD%u: %u chunks", lod, count);
+            }
+        }
+
+        bool wireframe = terrainComp.generator.isWireframe();
+        if (ImGui::Checkbox("Wireframe", &wireframe)) {
+            terrainComp.generator.setWireframe(wireframe);
+        }
+
+        ImGui::Separator();
+        if (ImGui::CollapsingHeader("Noise Parameters")) {
+            auto &noiseParams = terrainComp.generator.getNoiseParams();
+            bool changed = false;
+
+            changed |= ImGui::SliderInt("Octaves", &noiseParams.octaves, 1, 8);
+            changed |= ImGui::DragFloat("Scale", &noiseParams.scale, 0.1f, 0.1f, 64.0f);
+            changed |= ImGui::DragFloat("Persistence", &noiseParams.persistence, 0.01f, 0.0f, 1.0f);
+            changed |= ImGui::DragFloat("Lacunarity", &noiseParams.lacunarity, 0.1f, 1.0f, 4.0f);
+
+            int seed = static_cast<int>(noiseParams.seed);
+            if (ImGui::DragInt("Seed", &seed, 1.0f, 0, 10000)) {
+                noiseParams.seed = static_cast<uint32_t>(seed);
+                changed = true;
+            }
+
+            if (changed) {
+                terrainComp.generator.generateHeightmap();
+            }
         }
     }
 }

@@ -6,6 +6,7 @@
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 
+#include "Components/TerrainComponent.h"
 #include "Events/ApplicationEvents.h"
 #include "Renderer/Shadows/ShadowCommon.h"
 
@@ -397,7 +398,17 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
 
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
-            m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+
+            TerrainGenerator *terrain = nullptr;
+            auto terrainView = registry.view<TerrainComponent>();
+            if (terrainView.size_hint() > 0) {
+                auto &terrainComp = terrainView.get<TerrainComponent>(*terrainView.begin());
+                if (terrainComp.isEnabled && terrainComp.generator.isInitialized()) {
+                    terrain = &terrainComp.generator;
+                }
+            }
+
+            m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame, terrain);
         }
 
         {

@@ -1,6 +1,7 @@
 #include "GBufferPass.h"
 
 #include "Components/Components.h"
+#include "Generators/Terrain/TerrainTypes.h"
 #include "Logging/TracyProfiler.h"
 #include "WindowContext/Application.h"
 
@@ -9,6 +10,16 @@ namespace Rapture {
 struct GBufferPushConstants {
     uint32_t batchInfoBufferIndex;
     uint32_t cameraBindlessIndex;
+};
+
+struct TerrainGBufferPushConstants {
+    uint32_t cameraBindlessIndex;
+    uint32_t chunkDataBufferIndex;
+    uint32_t heightmapIndex;
+    uint32_t tileMaterialIndex;
+    uint32_t lodResolution;
+    float heightScale;
+    float terrainWorldSize;
 };
 
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
@@ -22,6 +33,7 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     m_vmaAllocator = vc.getVmaAllocator();
 
     createPipeline();
+    createTerrainPipeline();
     createTextures();
 
     // Initialize MDI batching system - one set per frame in flight
@@ -55,8 +67,9 @@ GBufferPass::~GBufferPass()
     m_materialTextures.clear();
     m_depthStencilTextures.clear();
 
-    // Clean up pipeline
+    // Clean up pipelines
     m_pipeline.reset();
+    m_terrainPipeline.reset();
 }
 
 // order of the color attachments is important, it NEEDS to be the same order as the fragment shaders output attachments
@@ -74,15 +87,32 @@ FramebufferSpecification GBufferPass::getFramebufferSpecification()
 }
 
 void GBufferPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                      uint32_t currentFrame)
+                                      uint32_t currentFrame, TerrainGenerator *terrain)
 {
-
     RAPTURE_PROFILE_FUNCTION();
 
-    m_currentFrame = currentFrame; // Update current frame index
+    m_currentFrame = currentFrame;
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer);
-    beginDynamicRendering(commandBuffer);
+    bool terrainRendered = false;
+    if (terrain && terrain->isInitialized() && terrain->hasHeightmap()) {
+        recordTerrainCommandBuffer(commandBuffer, activeScene, *terrain, currentFrame, true);
+        terrainRendered = true;
+    }
+
+    recordEntityCommandBuffer(commandBuffer, activeScene, currentFrame, !terrainRendered);
+
+    transitionToShaderReadableLayout(commandBuffer);
+}
+
+void GBufferPass::recordEntityCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                                            uint32_t currentFrame, bool clearAttachments)
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    m_currentFrame = currentFrame;
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, clearAttachments);
+    beginDynamicRendering(commandBuffer, clearAttachments);
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
     auto &app = Application::getInstance();
@@ -292,20 +322,20 @@ void GBufferPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuff
     }
 
     vkCmdEndRendering(commandBuffer->getCommandBufferVk());
-
-    transitionToShaderReadableLayout(commandBuffer);
 }
 
-void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer)
+void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, bool clearAttachments)
 {
     RAPTURE_PROFILE_FUNCTION();
+
+    VkAttachmentLoadOp loadOp = clearAttachments ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
 
     // Update color attachment infos for current frame
     m_colorAttachmentInfo[0] = {};
     m_colorAttachmentInfo[0].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     m_colorAttachmentInfo[0].imageView = m_positionDepthTextures[m_currentFrame]->getImageView();
     m_colorAttachmentInfo[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    m_colorAttachmentInfo[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    m_colorAttachmentInfo[0].loadOp = loadOp;
     m_colorAttachmentInfo[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     m_colorAttachmentInfo[0].clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
 
@@ -313,7 +343,7 @@ void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBu
     m_colorAttachmentInfo[1].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     m_colorAttachmentInfo[1].imageView = m_normalTextures[m_currentFrame]->getImageView();
     m_colorAttachmentInfo[1].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    m_colorAttachmentInfo[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    m_colorAttachmentInfo[1].loadOp = loadOp;
     m_colorAttachmentInfo[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     m_colorAttachmentInfo[1].clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
 
@@ -321,7 +351,7 @@ void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBu
     m_colorAttachmentInfo[2].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     m_colorAttachmentInfo[2].imageView = m_albedoSpecTextures[m_currentFrame]->getImageView();
     m_colorAttachmentInfo[2].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    m_colorAttachmentInfo[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    m_colorAttachmentInfo[2].loadOp = loadOp;
     m_colorAttachmentInfo[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     m_colorAttachmentInfo[2].clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
 
@@ -329,7 +359,7 @@ void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBu
     m_colorAttachmentInfo[3].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     m_colorAttachmentInfo[3].imageView = m_materialTextures[m_currentFrame]->getImageView();
     m_colorAttachmentInfo[3].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    m_colorAttachmentInfo[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    m_colorAttachmentInfo[3].loadOp = loadOp;
     m_colorAttachmentInfo[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     m_colorAttachmentInfo[3].clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
 
@@ -338,7 +368,7 @@ void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBu
     m_depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     m_depthAttachmentInfo.imageView = m_depthStencilTextures[m_currentFrame]->getImageView();
     m_depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    m_depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    m_depthAttachmentInfo.loadOp = loadOp;
     m_depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     // Clear depth to 1.0f (far) and stencil to 0
     m_depthAttachmentInfo.clearValue.depthStencil = {1.0f, 0};
@@ -357,24 +387,36 @@ void GBufferPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBu
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void GBufferPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer)
+void GBufferPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, bool clearAttachments)
 {
     RAPTURE_PROFILE_FUNCTION();
 
+    VkImageLayout colorOldLayout = clearAttachments ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VkImageLayout depthOldLayout = clearAttachments ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    VkAccessFlags colorSrcAccess = clearAttachments ? 0 : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    VkAccessFlags depthSrcAccess = clearAttachments ? 0 : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    VkAccessFlags colorDstAccess = clearAttachments ? VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                                                    : (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+    VkAccessFlags depthDstAccess =
+        clearAttachments ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                         : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    VkPipelineStageFlags srcStage =
+        clearAttachments ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                         : (VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
+
     VkImageMemoryBarrier barriers[5];
     barriers[0] = m_positionDepthTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[1] = m_normalTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+        colorOldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, colorSrcAccess, colorDstAccess);
+    barriers[1] = m_normalTextures[m_currentFrame]->getImageMemoryBarrier(colorOldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                                                          colorSrcAccess, colorDstAccess);
     barriers[2] = m_albedoSpecTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+        colorOldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, colorSrcAccess, colorDstAccess);
     barriers[3] = m_materialTextures[m_currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[4] = m_depthStencilTextures[m_currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED,
-                                                                                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0,
-                                                                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+        colorOldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, colorSrcAccess, colorDstAccess);
+    barriers[4] = m_depthStencilTextures[m_currentFrame]->getImageMemoryBarrier(
+        depthOldLayout, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depthSrcAccess, depthDstAccess);
 
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), srcStage,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, nullptr,
                          0, nullptr, 5, barriers);
 }
@@ -611,6 +653,207 @@ void GBufferPass::createPipeline()
     m_handle = handle;
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
+}
+
+void GBufferPass::createTerrainPipeline()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    if (vc.isExtendedDynamicState3Enabled()) {
+        dynamicStates.push_back(VK_DYNAMIC_STATE_POLYGON_MODE_EXT);
+    }
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
+
+    // No vertex input - terrain generates vertices from gl_VertexIndex + heightmap
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = nullptr;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = m_width;
+    viewport.height = m_height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachments[4];
+    for (int i = 0; i < 4; ++i) {
+        colorBlendAttachments[i] = {};
+        colorBlendAttachments[i].colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachments[i].blendEnable = VK_FALSE;
+    }
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = 4;
+    colorBlending.pAttachments = colorBlendAttachments;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    auto &project = app.getProject();
+    auto shaderPath = project.getProjectShaderDirectory();
+
+    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl");
+
+    if (!shader) {
+        RP_CORE_WARN("Failed to load terrain GBuffer shader - terrain rendering disabled");
+        return;
+    }
+
+    GraphicsPipelineConfiguration config;
+    config.dynamicState = dynamicState;
+    config.inputAssemblyState = inputAssembly;
+    config.viewportState = viewportState;
+    config.rasterizationState = rasterizer;
+    config.multisampleState = multisampling;
+    config.colorBlendState = colorBlending;
+    config.vertexInputState = vertexInputInfo;
+    config.depthStencilState = depthStencil;
+    config.framebufferSpec = getFramebufferSpecification();
+    config.shader = shader;
+
+    m_terrainShader = shader;
+    m_terrainShaderHandle = handle;
+
+    m_terrainPipeline = std::make_shared<GraphicsPipeline>(config);
+
+    RP_CORE_TRACE("GBufferPass: Terrain pipeline created");
+}
+
+void GBufferPass::recordTerrainCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                                             TerrainGenerator &terrain, uint32_t currentFrame, bool clearAttachments)
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    if (!m_terrainPipeline || !terrain.isInitialized() || !terrain.hasHeightmap()) {
+        return;
+    }
+
+    m_currentFrame = currentFrame;
+
+    auto mainCamera = activeScene->getMainCamera();
+    if (!mainCamera) {
+        return;
+    }
+
+    auto *cameraComp = mainCamera.tryGetComponent<CameraComponent>();
+    if (!cameraComp) {
+        return;
+    }
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, clearAttachments);
+    beginDynamicRendering(commandBuffer, clearAttachments);
+
+    m_terrainPipeline->bind(commandBuffer->getCommandBufferVk());
+
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+    if (vc.isExtendedDynamicState3Enabled() && vc.vkCmdSetPolygonModeEXT) {
+        VkPolygonMode mode = terrain.isWireframe() ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
+        vc.vkCmdSetPolygonModeEXT(commandBuffer->getCommandBufferVk(), mode);
+    }
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(m_width);
+    viewport.height = static_cast<float>(m_height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer->getCommandBufferVk(), 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+    vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
+
+    DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline); // Camera + chunk data SSBOs
+    DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline); // Bindless textures
+
+    uint32_t chunkDataBufferIndex = terrain.getChunkDataBuffer()->getBindlessIndex();
+    uint32_t heightmapIndex = terrain.getHeightmapTexture()->getBindlessIndex();
+
+    const auto &terrainConfig = terrain.getConfig();
+    VkBuffer countBuffer = terrain.getDrawCountBuffer()->getBufferVk();
+
+    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain.getIndexBuffer(lod), 0, VK_INDEX_TYPE_UINT32);
+
+        TerrainGBufferPushConstants pc{};
+        pc.cameraBindlessIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame);
+        pc.chunkDataBufferIndex = chunkDataBufferIndex;
+        pc.heightmapIndex = heightmapIndex;
+        pc.lodResolution = getTerrainLODResolution(lod);
+        pc.heightScale = terrainConfig.heightScale;
+        pc.terrainWorldSize = terrainConfig.terrainWorldSize;
+        pc.tileMaterialIndex = 0;
+
+        VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        if (auto shader = m_terrainShader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        }
+
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,
+                           sizeof(TerrainGBufferPushConstants), &pc);
+
+        VkBuffer indirectBuffer = terrain.getIndirectBuffer(lod)->getBufferVk();
+        VkDeviceSize countOffset = lod * sizeof(uint32_t);
+        uint32_t maxDrawCount = terrain.getIndirectBufferCapacity(lod);
+
+        vkCmdDrawIndexedIndirectCount(commandBuffer->getCommandBufferVk(), indirectBuffer, 0, countBuffer, countOffset,
+                                      maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
+    }
+
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
 }
 
 } // namespace Rapture

@@ -4,6 +4,8 @@
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Generators/Textures/ProceduralTextures.h"
 #include "Logging/Log.h"
+#include "Logging/TracyProfiler.h"
+#include "Renderer/Frustum/Frustum.h"
 #include "WindowContext/Application.h"
 
 #include <algorithm>
@@ -11,16 +13,21 @@
 
 namespace Rapture {
 
-// Push constants matching the compute shader
-struct TerrainGenPushConstants {
-    glm::vec2 chunkWorldOffset;
-    float chunkWorldSize;
+struct alignas(16) TerrainCullPushConstants {
+    glm::vec3 cullOrigin;
+    uint32_t chunkCount;
+
     float heightScale;
-    uint32_t resolution;
-    uint32_t vertexOffset;
-    uint32_t indexOffset;
-    float terrainWorldSize;
-    uint32_t heightmapHandle;
+    float cullRange;
+    uint32_t lodMode;
+    uint32_t forcedLOD;
+
+    uint32_t frustumPlanesBufferIndex;
+    uint32_t chunkDataBufferIndex;
+    uint32_t drawCountBufferIndex;
+    uint32_t _pad0;
+
+    uint32_t indirectBufferIndices[TERRAIN_LOD_COUNT];
 };
 
 TerrainGenerator::~TerrainGenerator()
@@ -36,15 +43,16 @@ void TerrainGenerator::init(const TerrainConfig &config)
     }
 
     m_config = config;
-    initComputePipeline();
 
-    if (m_computeShader == nullptr) {
-        return;
-    }
+    createIndexBuffers();
+    createChunkDataBuffer();
+    createIndirectBuffer();
+    initCullComputePipeline();
+
     m_initialized = true;
 
-    RP_CORE_INFO("TerrainGenerator initialized: {} world units per chunk, {} height scale, {} resolution", m_config.chunkWorldSize,
-                 m_config.heightScale, m_config.chunkResolution);
+    RP_CORE_INFO("TerrainGenerator initialized: {} world units per chunk, {} height scale", m_config.chunkWorldSize,
+                 m_config.heightScale);
 }
 
 void TerrainGenerator::shutdown()
@@ -54,10 +62,21 @@ void TerrainGenerator::shutdown()
     }
 
     m_chunks.clear();
+    m_activeChunkIndices.clear();
     m_heightmapData.clear();
     m_heightmapTexture.reset();
-    m_computePipeline.reset();
-    m_computeShader.reset();
+
+    for (uint32_t i = 0; i < TERRAIN_LOD_COUNT; ++i) {
+        m_indexBuffers[i].reset();
+    }
+
+    m_chunkDataBuffer.reset();
+    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+        m_indirectBuffers[lod].reset();
+    }
+    m_drawCountBuffer.reset();
+    m_cullPipeline.reset();
+    m_cullShader.reset();
     m_commandBuffer.reset();
     m_commandPool.reset();
 
@@ -65,56 +84,341 @@ void TerrainGenerator::shutdown()
     RP_CORE_INFO("TerrainGenerator shutdown");
 }
 
-void TerrainGenerator::initComputePipeline()
+void TerrainGenerator::createIndexBuffers()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+        uint32_t resolution = getTerrainLODResolution(lod);
+        uint32_t indexCount = getTerrainLODIndexCount(lod);
+
+        std::vector<uint32_t> indices;
+        indices.reserve(indexCount);
+
+        for (uint32_t row = 0; row < resolution - 1; ++row) {
+            for (uint32_t col = 0; col < resolution - 1; ++col) {
+                uint32_t topLeft = row * resolution + col;
+                uint32_t topRight = topLeft + 1;
+                uint32_t bottomLeft = topLeft + resolution;
+                uint32_t bottomRight = bottomLeft + 1;
+
+                indices.push_back(topLeft);
+                indices.push_back(bottomLeft);
+                indices.push_back(bottomRight);
+
+                indices.push_back(topLeft);
+                indices.push_back(bottomRight);
+                indices.push_back(topRight);
+            }
+        }
+
+        VkDeviceSize bufferSize = indices.size() * sizeof(uint32_t);
+
+        m_indexBuffers[lod] =
+            std::make_shared<IndexBuffer>(bufferSize, BufferUsage::STATIC, vc.getVmaAllocator(), VK_INDEX_TYPE_UINT32);
+        m_indexBuffers[lod]->addDataGPU(indices.data(), bufferSize, 0);
+
+        RP_CORE_TRACE("TerrainGenerator: Created LOD{} index buffer ({} indices)", lod, indexCount);
+    }
+}
+
+void TerrainGenerator::createChunkDataBuffer()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    VkDeviceSize bufferSize = m_config.maxLoadedChunks * sizeof(TerrainChunkGPUData);
+
+    m_chunkDataBuffer = std::make_shared<StorageBuffer>(bufferSize, BufferUsage::DYNAMIC, vc.getVmaAllocator());
+
+    RP_CORE_TRACE("TerrainGenerator: Created chunk data buffer for {} chunks", m_config.maxLoadedChunks);
+}
+
+void TerrainGenerator::createIndirectBuffer()
+{
+    auto &vc = Application::getInstance().getVulkanContext();
+    VkBufferUsageFlags indirectFlags = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+
+    constexpr uint32_t initialCapacity = 64;
+    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+        VkDeviceSize bufferSize = initialCapacity * sizeof(VkDrawIndexedIndirectCommand);
+        m_indirectBuffers[lod] = std::make_shared<StorageBuffer>(bufferSize, BufferUsage::STATIC, vc.getVmaAllocator(), indirectFlags);
+        m_indirectBufferCapacity[lod] = initialCapacity;
+    }
+
+    VkDeviceSize countSize = TERRAIN_LOD_COUNT * sizeof(uint32_t);
+    VkBufferUsageFlags countFlags = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    m_drawCountBuffer = std::make_shared<StorageBuffer>(countSize, BufferUsage::STATIC, vc.getVmaAllocator(), countFlags);
+
+    RP_CORE_TRACE("TerrainGenerator: Created indirect command buffers");
+}
+
+void TerrainGenerator::initCullComputePipeline()
 {
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
     auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
-    // Load compute shader
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_generate.cs.glsl");
-    if (!shader or !shader->isReady()) {
-        RP_CORE_ERROR("TerrainGenerator: Failed to load compute shader");
+    // Load cull compute shader
+    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_cull.cs.glsl");
+    if (!shader || !shader->isReady()) {
+        RP_CORE_WARN("TerrainGenerator: Cull compute shader not found, using CPU fallback");
         return;
     }
-    m_computeShader = shader;
+    m_cullShader = shader;
 
     // Create compute pipeline
     ComputePipelineConfiguration pipelineConfig;
-    pipelineConfig.shader = m_computeShader;
-    m_computePipeline = std::make_shared<ComputePipeline>(pipelineConfig);
+    pipelineConfig.shader = m_cullShader;
+    m_cullPipeline = std::make_shared<ComputePipeline>(pipelineConfig);
 
     // Create command pool and buffer
     CommandPoolConfig poolConfig{};
-    poolConfig.name = "TerrainGenCommandPool";
+    poolConfig.name = "TerrainCullCommandPool";
     poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     m_commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    m_commandBuffer = m_commandPool->getCommandBuffer("TerrainGenCmd");
+    m_commandBuffer = m_commandPool->getCommandBuffer("TerrainCullCmd");
 
-    RP_CORE_TRACE("TerrainGenerator: Compute pipeline initialized");
+    RP_CORE_TRACE("TerrainGenerator: Cull compute pipeline initialized");
 }
 
 void TerrainGenerator::setHeightmap(std::shared_ptr<Texture> heightmap)
 {
     m_heightmapTexture = heightmap;
-    RP_CORE_INFO("Heightmap texture set");
+    RP_CORE_INFO("TerrainGenerator: Heightmap texture set");
 }
 
 void TerrainGenerator::generateHeightmap()
 {
+    if (!m_heightmapGenerator) {
+        ProceduralTextureConfig config;
+        config.format = TextureFormat::RGBA8;
+        config.filter = TextureFilter::Linear;
+        config.wrap = TextureWrap::ClampToEdge;
+        config.srgb = false;
+        config.name = "terrain_heightmap";
 
-    ProceduralTextureConfig specConfig;
-    specConfig.format = TextureFormat::RGBA32F;
-    specConfig.filter = TextureFilter::Linear;
-    specConfig.wrap = TextureWrap::ClampToEdge;
-    specConfig.srgb = false;
-    specConfig.name = "terrain_heightmap";
+        m_noiseParams.octaves = 4;
+        m_noiseParams.scale = 8.0f;
+        m_noiseParams.persistence = 0.5f;
+        m_noiseParams.lacunarity = 2.0f;
+        m_noiseParams.seed = 42;
 
-    m_heightmapTexture = ProceduralTexture::generateWhiteNoise(0, specConfig);
-    RP_CORE_TRACE("TerrainGenerator: Created GPU heightmap texture");
+        m_heightmapGenerator = std::make_unique<ProceduralTexture>("glsl/Generators/PerlinNoise.cs.glsl", config);
+        m_heightmapTexture = m_heightmapGenerator->getTexture();
+    }
+
+    m_heightmapGenerator->setPushConstants(m_noiseParams);
+    m_heightmapGenerator->generate();
+}
+
+void TerrainGenerator::loadChunk(glm::ivec2 coord)
+{
+    if (m_chunks.hasChunk(coord)) {
+        return;
+    }
+
+    if (m_nextChunkIndex >= m_config.maxLoadedChunks) {
+        RP_CORE_WARN("TerrainGenerator: Max chunks reached, cannot load ({}, {})", coord.x, coord.y);
+        return;
+    }
+
+    TerrainChunk chunk;
+    chunk.coord = coord;
+    chunk.chunkIndex = m_nextChunkIndex++;
+    chunk.state = TerrainChunk::State::Active;
+    chunk.lod = 0; // Will be updated in update()
+
+    m_chunks.setChunk(coord, std::move(chunk));
+    m_activeChunkIndices.push_back(chunk.chunkIndex);
+    m_chunkDataDirty = true;
+
+    RP_CORE_TRACE("TerrainGenerator: Loaded chunk ({}, {}) at index {}", coord.x, coord.y, chunk.chunkIndex);
+}
+
+void TerrainGenerator::unloadChunk(glm::ivec2 coord)
+{
+    auto *chunk = m_chunks.getChunk(coord);
+    if (!chunk) {
+        return;
+    }
+
+    // Remove from active indices
+    auto it = std::find(m_activeChunkIndices.begin(), m_activeChunkIndices.end(), chunk->chunkIndex);
+    if (it != m_activeChunkIndices.end()) {
+        m_activeChunkIndices.erase(it);
+    }
+
+    m_chunks.removeChunk(coord);
+    m_chunkDataDirty = true;
+
+    RP_CORE_TRACE("TerrainGenerator: Unloaded chunk ({}, {})", coord.x, coord.y);
+}
+
+void TerrainGenerator::loadChunksAroundPosition(const glm::vec3 &position, int32_t radius)
+{
+    glm::ivec2 centerCoord = worldToChunkCoord(position.x, position.z);
+
+    for (int32_t y = -radius; y <= radius; ++y) {
+        for (int32_t x = -radius; x <= radius; ++x) {
+            loadChunk(centerCoord + glm::ivec2(x, y));
+        }
+    }
+}
+
+void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum)
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    if (!m_initialized || !m_heightmapTexture) {
+        return;
+    }
+
+    if (m_chunkDataDirty) {
+        updateChunkGPUData();
+        m_chunkDataDirty = false;
+    }
+
+    runCullCompute(cameraPos, frustum);
+}
+
+void TerrainGenerator::updateChunkGPUData()
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    std::vector<TerrainChunkGPUData> gpuData;
+    gpuData.resize(m_config.maxLoadedChunks);
+
+    for (auto &[coord, chunk] : m_chunks) {
+        if (chunk.chunkIndex >= m_config.maxLoadedChunks) {
+            continue;
+        }
+
+        TerrainChunkGPUData &data = gpuData[chunk.chunkIndex];
+        data.worldOffset = glm::vec2((static_cast<float>(coord.x) - 0.5f) * m_config.chunkWorldSize,
+                                     (static_cast<float>(coord.y) - 0.5f) * m_config.chunkWorldSize);
+        data.chunkSize = m_config.chunkWorldSize;
+        data.lod = chunk.lod;
+
+        // Bounds
+        data.bounds = glm::vec4(data.worldOffset.x, data.worldOffset.y, data.worldOffset.x + m_config.chunkWorldSize,
+                                data.worldOffset.y + m_config.chunkWorldSize);
+        data.minHeight = chunk.minHeight;
+        data.maxHeight = chunk.maxHeight;
+        data.neighborLODs = 0; // TODO: pack neighbor LODs for seam stitching
+        data.flags = 1;        // Visible by default
+    }
+
+    // Upload to GPU
+    m_chunkDataBuffer->addData(gpuData.data(), gpuData.size() * sizeof(TerrainChunkGPUData), 0);
+}
+
+void TerrainGenerator::runCullCompute(const glm::vec3 &cameraPos, Frustum &frustum)
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    if (!m_cullPipeline || !m_commandBuffer) {
+        return;
+    }
+
+    auto &vc = Application::getInstance().getVulkanContext();
+
+    m_commandBuffer->reset();
+    m_commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    VkCommandBuffer cmd = m_commandBuffer->getCommandBufferVk();
+
+    // Zero draw counts on GPU
+    vkCmdFillBuffer(cmd, m_drawCountBuffer->getBufferVk(), 0, VK_WHOLE_SIZE, 0);
+
+    VkMemoryBarrier fillBarrier{};
+    fillBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    fillBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    fillBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &fillBarrier, 0, nullptr, 0,
+                         nullptr);
+
+    m_cullPipeline->bind(cmd);
+    DescriptorManager::bindSet(3, m_commandBuffer, m_cullPipeline);
+
+    TerrainCullPushConstants pc{};
+    pc.cullOrigin = cameraPos;
+    pc.chunkCount = static_cast<uint32_t>(m_chunks.size());
+    pc.heightScale = m_config.heightScale;
+    pc.cullRange = 0.0f;
+    pc.lodMode = 0;
+    pc.forcedLOD = 0;
+    pc.frustumPlanesBufferIndex = frustum.getBindlessIndex();
+    pc.chunkDataBufferIndex = m_chunkDataBuffer->getBindlessIndex();
+    pc.drawCountBufferIndex = m_drawCountBuffer->getBindlessIndex();
+    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+        pc.indirectBufferIndices[lod] = m_indirectBuffers[lod]->getBindlessIndex();
+    }
+
+    vkCmdPushConstants(cmd, m_cullPipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(TerrainCullPushConstants),
+                       &pc);
+
+    uint32_t numGroups = (pc.chunkCount + 63) / 64;
+    vkCmdDispatch(cmd, numGroups, 1, 1);
+
+    VkMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 1, &barrier, 0, nullptr,
+                         0, nullptr);
+
+    m_commandBuffer->end();
+
+    auto queue = vc.getComputeQueue();
+    queue->submitQueue(m_commandBuffer, VK_NULL_HANDLE);
+    queue->waitIdle();
+}
+
+VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const
+{
+    if (lod >= TERRAIN_LOD_COUNT || !m_indexBuffers[lod]) {
+        return VK_NULL_HANDLE;
+    }
+    return m_indexBuffers[lod]->getBufferVk();
+}
+
+uint32_t TerrainGenerator::getVisibleChunkCount(uint32_t lod) const
+{
+    (void)lod;
+    return 0; // GPU-driven: counts are only on GPU
+}
+
+uint32_t TerrainGenerator::getTotalVisibleChunks() const
+{
+    return static_cast<uint32_t>(m_chunks.size()); // Approximate: returns loaded chunks
+}
+
+TerrainChunk *TerrainGenerator::getChunkAtWorld(float worldX, float worldZ)
+{
+    glm::ivec2 coord = worldToChunkCoord(worldX, worldZ);
+    return m_chunks.getChunk(coord);
+}
+
+TerrainChunk *TerrainGenerator::getChunkAtCoord(glm::ivec2 coord)
+{
+    return m_chunks.getChunk(coord);
+}
+
+glm::ivec2 TerrainGenerator::worldToChunkCoord(float worldX, float worldZ) const
+{
+    return glm::ivec2(static_cast<int32_t>(std::floor(worldX / m_config.chunkWorldSize)),
+                      static_cast<int32_t>(std::floor(worldZ / m_config.chunkWorldSize)));
+}
+
+glm::vec2 TerrainGenerator::chunkCoordToWorldCenter(glm::ivec2 coord) const
+{
+    return glm::vec2(static_cast<float>(coord.x) * m_config.chunkWorldSize, static_cast<float>(coord.y) * m_config.chunkWorldSize);
 }
 
 float TerrainGenerator::sampleHeight(float worldX, float worldZ) const
@@ -125,7 +429,7 @@ float TerrainGenerator::sampleHeight(float worldX, float worldZ) const
 
     glm::vec2 uv = worldToHeightmapUV(worldX, worldZ);
     float normalizedHeight = sampleHeightmapBilinear(uv.x, uv.y);
-    return normalizedHeight * m_config.heightScale;
+    return (normalizedHeight - 0.5f) * m_config.heightScale;
 }
 
 glm::vec3 TerrainGenerator::sampleNormal(float worldX, float worldZ) const
@@ -148,209 +452,6 @@ bool TerrainGenerator::isInBounds(float worldX, float worldZ) const
 {
     glm::vec2 uv = worldToHeightmapUV(worldX, worldZ);
     return uv.x >= 0.0f && uv.x <= 1.0f && uv.y >= 0.0f && uv.y <= 1.0f;
-}
-
-void TerrainGenerator::loadChunk(glm::ivec2 coord)
-{
-    if (m_chunks.hasChunk(coord)) {
-        return;
-    }
-
-    TerrainChunk chunk;
-    chunk.coord = coord;
-    chunk.state = TerrainChunk::State::Dirty; // Needs generation
-
-    m_chunks.setChunk(coord, std::move(chunk));
-
-    RP_CORE_TRACE("Loaded chunk ({}, {}) - pending generation", coord.x, coord.y);
-}
-
-void TerrainGenerator::unloadChunk(glm::ivec2 coord)
-{
-    if (!m_chunks.hasChunk(coord)) {
-        return;
-    }
-
-    m_chunks.removeChunk(coord);
-    RP_CORE_TRACE("Unloaded chunk ({}, {})", coord.x, coord.y);
-}
-
-void TerrainGenerator::loadChunksAroundPosition(const glm::vec3 &position, int32_t radius)
-{
-    glm::ivec2 centerCoord = worldToChunkCoord(position.x, position.z);
-
-    for (int32_t y = -radius; y <= radius; ++y) {
-        for (int32_t x = -radius; x <= radius; ++x) {
-            loadChunk(centerCoord + glm::ivec2(x, y));
-        }
-    }
-}
-
-void TerrainGenerator::markChunkDirty(glm::ivec2 coord)
-{
-    auto *chunk = m_chunks.getChunk(coord);
-    if (chunk) {
-        chunk->state = TerrainChunk::State::Dirty;
-    }
-}
-
-void TerrainGenerator::update(const glm::vec3 &cameraPos)
-{
-    if (!m_heightmapTexture) {
-        return;
-    }
-
-    // Find and regenerate dirty chunks
-    auto dirtyChunks = m_chunks.getChunksByState(TerrainChunk::State::Dirty);
-
-    for (auto *chunk : dirtyChunks) {
-        generateChunkGeometry(*chunk);
-    }
-
-    (void)cameraPos; // TODO: LOD selection based on distance
-}
-
-void TerrainGenerator::createChunkBuffers(TerrainChunk &chunk)
-{
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
-    uint32_t vertexCount = m_config.verticesPerChunk();
-    uint32_t indexCount = m_config.indicesPerChunk();
-
-    VkDeviceSize vertexBufferSize = vertexCount * sizeof(TerrainVertex);
-    VkDeviceSize indexBufferSize = indexCount * sizeof(uint32_t);
-
-    // Create storage buffers for compute shader output
-    // Additional usage flags for vertex/index buffer use
-    VkBufferUsageFlags vertexUsage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    VkBufferUsageFlags indexUsage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-
-    chunk.vertexBuffer = std::make_unique<StorageBuffer>(vertexBufferSize, BufferUsage::STATIC, vc.getVmaAllocator(), vertexUsage);
-    chunk.indexBuffer = std::make_unique<StorageBuffer>(indexBufferSize, BufferUsage::STATIC, vc.getVmaAllocator(), indexUsage);
-
-    chunk.vertexCount = vertexCount;
-    chunk.indexCount = indexCount;
-
-    DescriptorSetBinding vertexBinding;
-    vertexBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    vertexBinding.location = DescriptorSetBindingLocation::CUSTOM_1;
-    vertexBinding.count = 1;
-    vertexBinding.viewType = TextureViewType::DEFAULT;
-    vertexBinding.useStorageImageInfo = true;
-
-    DescriptorSetBinding indexBinding;
-    indexBinding.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    indexBinding.location = DescriptorSetBindingLocation::CUSTOM_2;
-    indexBinding.count = 1;
-    indexBinding.viewType = TextureViewType::DEFAULT;
-    indexBinding.useStorageImageInfo = true;
-
-    DescriptorSetBindings bindings;
-    bindings.setNumber = 4;
-    bindings.bindings.push_back(vertexBinding);
-    bindings.bindings.push_back(indexBinding);
-    chunk.descriptorSet = std::make_unique<DescriptorSet>(bindings);
-    chunk.descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::CUSTOM_1)->add(*chunk.vertexBuffer);
-    chunk.descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::CUSTOM_2)->add(*chunk.indexBuffer);
-}
-
-void TerrainGenerator::generateChunkGeometry(TerrainChunk &chunk)
-{
-    if (!m_computePipeline || !m_heightmapTexture) {
-        RP_CORE_ERROR("TerrainGenerator: Cannot generate - pipeline or heightmap not ready");
-        return;
-    }
-
-    chunk.state = TerrainChunk::State::Generating;
-
-    // Create buffers if needed
-    if (!chunk.vertexBuffer || !chunk.indexBuffer) {
-        createChunkBuffers(chunk);
-    }
-
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
-    // Record command buffer
-    m_commandBuffer->reset();
-    m_commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    VkCommandBuffer cmd = m_commandBuffer->getCommandBufferVk();
-
-    m_computePipeline->bind(cmd);
-    chunk.descriptorSet->bind(cmd, m_computePipeline);
-    DescriptorManager::bindSet(3, m_commandBuffer, m_computePipeline);
-
-    // Push constants
-    TerrainGenPushConstants pc{};
-    pc.chunkWorldOffset = glm::vec2(chunk.coord.x * m_config.chunkWorldSize, chunk.coord.y * m_config.chunkWorldSize);
-    pc.chunkWorldSize = m_config.chunkWorldSize;
-    pc.heightScale = m_config.heightScale;
-    pc.resolution = m_config.chunkResolution;
-    pc.vertexOffset = 0;
-    pc.indexOffset = 0;
-    pc.terrainWorldSize = m_config.terrainWorldSize;
-    pc.heightmapHandle = m_heightmapTexture->getBindlessIndex();
-
-    vkCmdPushConstants(cmd, m_computePipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                       sizeof(TerrainGenPushConstants), &pc);
-
-    // Dispatch - one workgroup per row, 64 threads per workgroup
-    uint32_t workgroupsX = m_config.chunkResolution;
-    vkCmdDispatch(cmd, workgroupsX, 1, 1);
-
-    // Memory barrier to ensure compute writes are visible to vertex shader reads
-    VkMemoryBarrier memoryBarrier{};
-    memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    memoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    memoryBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
-
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 1, &memoryBarrier, 0,
-                         nullptr, 0, nullptr);
-
-    m_commandBuffer->end();
-
-    // Submit and wait
-    auto queue = vc.getComputeQueue();
-    queue->submitQueue(m_commandBuffer);
-
-    chunk.state = TerrainChunk::State::Ready;
-    RP_CORE_TRACE("Generated chunk ({}, {}): {} vertices, {} indices", chunk.coord.x, chunk.coord.y, chunk.vertexCount,
-                  chunk.indexCount);
-}
-
-TerrainChunk *TerrainGenerator::getChunkAtWorld(float worldX, float worldZ)
-{
-    glm::ivec2 coord = worldToChunkCoord(worldX, worldZ);
-    return m_chunks.getChunk(coord);
-}
-
-TerrainChunk *TerrainGenerator::getChunkAtCoord(glm::ivec2 coord)
-{
-    return m_chunks.getChunk(coord);
-}
-
-const TerrainChunk *TerrainGenerator::getChunkAtCoord(glm::ivec2 coord) const
-{
-    return m_chunks.getChunk(coord);
-}
-
-std::vector<TerrainChunk *> TerrainGenerator::getReadyChunks()
-{
-    return m_chunks.getChunksByState(TerrainChunk::State::Ready);
-}
-
-glm::ivec2 TerrainGenerator::worldToChunkCoord(float worldX, float worldZ) const
-{
-    return glm::ivec2(static_cast<int32_t>(std::floor(worldX / m_config.chunkWorldSize)),
-                      static_cast<int32_t>(std::floor(worldZ / m_config.chunkWorldSize)));
-}
-
-glm::vec2 TerrainGenerator::chunkCoordToWorldCenter(glm::ivec2 coord) const
-{
-    return glm::vec2((static_cast<float>(coord.x) + 0.5f) * m_config.chunkWorldSize,
-                     (static_cast<float>(coord.y) + 0.5f) * m_config.chunkWorldSize);
 }
 
 float TerrainGenerator::sampleHeightmapBilinear(float u, float v) const
