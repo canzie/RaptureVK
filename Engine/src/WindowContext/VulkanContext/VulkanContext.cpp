@@ -959,8 +959,8 @@ static bool s_enableRayTracingFeatures(VkPhysicalDevice physicalDevice, VkPhysic
     outRQ.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
     outRQ.rayQuery = VK_TRUE;
 
-    // --- Chain in correct dependency order ---
-    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outBDA));
+    // Chain in correct dependency order
+    // Note: bufferDeviceAddress is now in VkPhysicalDeviceVulkan12Features, don't add outBDA
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outAS));
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outRTP));
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outRQ));
@@ -1012,6 +1012,7 @@ static void s_enableVulkan12Features(VkPhysicalDevice physicalDevice, VkPhysical
     outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 
     // Descriptor indexing (promoted from VkPhysicalDeviceDescriptorIndexingFeatures)
+    if (supported.descriptorIndexing) outFeatures.descriptorIndexing = VK_TRUE;
     if (supported.shaderSampledImageArrayNonUniformIndexing)
         outFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
     if (supported.runtimeDescriptorArray) outFeatures.runtimeDescriptorArray = VK_TRUE;
@@ -1037,6 +1038,12 @@ static void s_enableVulkan12Features(VkPhysicalDevice physicalDevice, VkPhysical
     if (supported.drawIndirectCount) {
         outFeatures.drawIndirectCount = VK_TRUE;
         RP_CORE_INFO("drawIndirectCount enabled.");
+    }
+
+    // Buffer device address (promoted from VkPhysicalDeviceBufferDeviceAddressFeatures)
+    if (supported.bufferDeviceAddress) {
+        outFeatures.bufferDeviceAddress = VK_TRUE;
+        RP_CORE_INFO("bufferDeviceAddress enabled.");
     }
 
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));

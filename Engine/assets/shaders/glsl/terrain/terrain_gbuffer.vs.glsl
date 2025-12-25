@@ -47,9 +47,6 @@ layout(push_constant) uniform TerrainPushConstants {
     float terrainWorldSize;
 } pc;
 
-// LOD resolutions lookup (must match CPU)
-const uint LOD_RESOLUTIONS[4] = uint[4](129, 65, 33, 17);
-
 // Sample raw heightmap value [0,1]
 float sampleHeightmapRaw(vec2 worldXZ) {
     vec2 uv = worldXZ / pc.terrainWorldSize + 0.5;
@@ -71,8 +68,8 @@ void main() {
     uint chunkIndex = gl_InstanceIndex;
     TerrainChunkData chunk = u_chunks[pc.chunkDataBufferIndex].chunks[chunkIndex];
 
-    // Get resolution for this chunk's LOD
-    uint resolution = LOD_RESOLUTIONS[chunk.lod];
+    // Use resolution from push constants (matches bound index buffer)
+    uint resolution = pc.lodResolution;
 
     // Calculate grid position from vertex index
     uint row = gl_VertexIndex / resolution;

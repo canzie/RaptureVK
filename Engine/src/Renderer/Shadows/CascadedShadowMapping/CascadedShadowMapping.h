@@ -85,6 +85,7 @@ class CascadedShadowMap {
 
   private:
     void createPipeline();
+    void createTerrainPipeline();
     void createShadowTexture();
     void createUniformBuffers();
 
@@ -132,6 +133,10 @@ class CascadedShadowMap {
 
     std::weak_ptr<Shader> m_shader;
     AssetHandle m_handle;
+
+    // Terrain shadow rendering
+    std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
+    std::weak_ptr<Shader> m_terrainShader;
 
     VmaAllocator m_allocator;
 

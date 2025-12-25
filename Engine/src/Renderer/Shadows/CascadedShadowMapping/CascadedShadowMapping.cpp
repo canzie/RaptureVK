@@ -1,6 +1,8 @@
 #include "CascadedShadowMapping.h"
 
 #include "Components/Components.h"
+#include "Components/TerrainComponent.h"
+#include "Generators/Terrain/TerrainTypes.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 #include "RenderTargets/SwapChains/SwapChain.h"
@@ -19,6 +21,15 @@ struct PushConstantsCSM {
     uint32_t batchInfoBufferIndex;
 };
 
+struct TerrainCSMPushConstants {
+    uint32_t cascadeMatricesIndex;
+    uint32_t chunkDataBufferIndex;
+    uint32_t heightmapIndex;
+    uint32_t lodResolution;
+    float heightScale;
+    float terrainWorldSize;
+};
+
 CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda)
     : m_width(width), m_height(height), m_lambda(lambda),
       m_NumCascades(static_cast<uint8_t>(std::clamp(numCascades, 1u, MAX_CASCADES))), m_shadowTextureArray(nullptr)
@@ -33,6 +44,7 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
 
     createShadowTexture();
     createPipeline();
+    createTerrainPipeline();
     createUniformBuffers();
 
     // Initialize MDI batching system - one per frame in flight
@@ -313,6 +325,9 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
                                      sizeof(VkDrawIndexedIndirectCommand));
         }
     }
+
+    // Render terrain shadows
+    recordTerrainCommandBuffer(commandBuffer, activeScene, currentFrame);
 
     // End rendering and transition image for shader reading
     vkCmdEndRendering(commandBuffer->getCommandBufferVk());
@@ -627,6 +642,188 @@ void CascadedShadowMap::createPipeline()
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
+
+void CascadedShadowMap::createTerrainPipeline()
+{
+    std::vector<VkDynamicState> dynamicStates = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = nullptr;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = m_width;
+    viewport.height = m_height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_TRUE;
+    rasterizer.depthBiasConstantFactor = 2.0f;
+    rasterizer.depthBiasClamp = 0.0f;
+    rasterizer.depthBiasSlopeFactor = 2.0f;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = 0;
+    colorBlending.pAttachments = nullptr;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    auto &app = Application::getInstance();
+    auto &project = app.getProject();
+    auto shaderPath = project.getProjectShaderDirectory();
+
+    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_csm.vs.glsl");
+    if (!shader) {
+        RP_CORE_WARN("Terrain CSM shader not found");
+        return;
+    }
+
+    GraphicsPipelineConfiguration config;
+    config.dynamicState = dynamicState;
+    config.inputAssemblyState = inputAssembly;
+    config.viewportState = viewportState;
+    config.rasterizationState = rasterizer;
+    config.multisampleState = multisampling;
+    config.colorBlendState = colorBlending;
+    config.vertexInputState = vertexInputInfo;
+    config.depthStencilState = depthStencil;
+
+    FramebufferSpecification framebufferSpec;
+    framebufferSpec.depthAttachment = m_shadowTextureArray->getFormat();
+    framebufferSpec.viewMask = (1u << m_NumCascades) - 1;
+    framebufferSpec.correlationMask = (1u << m_NumCascades) - 1;
+
+    config.framebufferSpec = framebufferSpec;
+    config.shader = shader;
+
+    m_terrainShader = shader;
+    m_terrainPipeline = std::make_shared<GraphicsPipeline>(config);
+
+    RP_CORE_INFO("Terrain CSM pipeline created");
+}
+
+void CascadedShadowMap::recordTerrainCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
+                                                   uint32_t currentFrame)
+{
+    if (!m_terrainPipeline) {
+        return;
+    }
+
+    (void)currentFrame;
+
+    auto &registry = activeScene->getRegistry();
+    auto terrainView = registry.view<TerrainComponent>();
+
+    for (auto entity : terrainView) {
+        auto &terrain = terrainView.get<TerrainComponent>(entity);
+        if (!terrain.isEnabled || !terrain.generator.isInitialized() || !terrain.generator.hasHeightmap()) {
+            continue;
+        }
+
+        m_terrainPipeline->bind(commandBuffer->getCommandBufferVk());
+
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = m_width;
+        viewport.height = m_height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer->getCommandBufferVk(), 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+        vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
+
+        DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline);
+        DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline);
+
+        const auto &terrainConfig = terrain.generator.getConfig();
+        uint32_t chunkDataBufferIndex = terrain.generator.getChunkDataBuffer()->getBindlessIndex();
+        uint32_t heightmapIndex = terrain.generator.getHeightmapTexture()->getBindlessIndex();
+        VkBuffer countBuffer = terrain.generator.getDrawCountBuffer()->getBufferVk();
+
+        for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+            vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain.generator.getIndexBuffer(lod), 0,
+                                 VK_INDEX_TYPE_UINT32);
+
+            TerrainCSMPushConstants pc{};
+            pc.cascadeMatricesIndex = m_cascadeMatricesIndex;
+            pc.chunkDataBufferIndex = chunkDataBufferIndex;
+            pc.heightmapIndex = heightmapIndex;
+            pc.lodResolution = getTerrainLODResolution(lod);
+            pc.heightScale = terrainConfig.heightScale;
+            pc.terrainWorldSize = terrainConfig.terrainWorldSize;
+
+            VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            if (auto shader = m_terrainShader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
+                stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+            }
+
+            vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,
+                               sizeof(TerrainCSMPushConstants), &pc);
+
+            VkBuffer indirectBuffer = terrain.generator.getIndirectBuffer(lod)->getBufferVk();
+            VkDeviceSize countOffset = lod * sizeof(uint32_t);
+            uint32_t maxDrawCount = terrain.generator.getIndirectBufferCapacity(lod);
+
+            vkCmdDrawIndexedIndirectCount(commandBuffer->getCommandBufferVk(), indirectBuffer, 0, countBuffer, countOffset,
+                                          maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
+        }
+    }
+}
+
 void CascadedShadowMap::createShadowTexture()
 {
 
