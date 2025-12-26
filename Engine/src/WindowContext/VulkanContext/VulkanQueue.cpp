@@ -1,6 +1,8 @@
 #include "VulkanQueue.h"
 
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Logging/Log.h"
+#include <set>
 #include <stdexcept>
 
 namespace Rapture {
@@ -50,28 +52,13 @@ bool VulkanQueue::submitCommandBuffers(VkFence fence)
         return true;
     }
 
-    // Atomically prepare all command buffers (check state and transition to PENDING)
     std::vector<VkCommandBuffer> commandBuffers;
-    std::vector<std::shared_ptr<CommandBuffer>> preparedBuffers;
     commandBuffers.reserve(m_commandBuffers.size());
-    preparedBuffers.reserve(m_commandBuffers.size());
 
-    for (auto &cmdBuffer : m_commandBuffers) {
-        VkCommandBuffer vkCmdBuffer = cmdBuffer->prepareSubmit();
-        if (vkCmdBuffer == VK_NULL_HANDLE) {
-            RP_CORE_ERROR("VulkanQueue[{}]: Command buffer '{}' cannot be submitted", m_name, cmdBuffer->getName());
-            // Abort all previously prepared buffers
-            for (auto &prepared : preparedBuffers) {
-                prepared->abortSubmit();
-            }
-            m_commandBuffers.clear();
-            return false;
-        }
-        commandBuffers.push_back(vkCmdBuffer);
-        preparedBuffers.push_back(cmdBuffer);
+    for (auto *cmdBuffer : m_commandBuffers) {
+        commandBuffers.push_back(cmdBuffer->getCommandBufferVk());
     }
 
-    // Increment timeline value for this submission
     uint64_t signalValue = ++m_timelineValue;
 
     VkTimelineSemaphoreSubmitInfo timelineInfo{};
@@ -90,17 +77,19 @@ bool VulkanQueue::submitCommandBuffers(VkFence fence)
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}]: submitCommandBuffers(1) failed (VkResult: {})", m_name, static_cast<int>(result));
-        for (auto &cmdBuffer : preparedBuffers) {
-            cmdBuffer->abortSubmit();
-        }
         m_commandBuffers.clear();
         assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
 
-    // Complete all command buffers with timeline semaphore info
-    for (auto &cmdBuffer : preparedBuffers) {
-        cmdBuffer->completeSubmit(m_timelineSemaphore, signalValue);
+    std::set<CommandPool *> pools;
+    for (auto *cmdBuffer : m_commandBuffers) {
+        if (cmdBuffer->getCommandPool()) {
+            pools.insert(cmdBuffer->getCommandPool());
+        }
+    }
+    for (auto *pool : pools) {
+        pool->markPendingSignal(m_timelineSemaphore, signalValue);
     }
 
     m_commandBuffers.clear();
@@ -117,31 +106,15 @@ bool VulkanQueue::submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence)
         return true;
     }
 
-    // Atomically prepare all command buffers (check state and transition to PENDING)
     std::vector<VkCommandBuffer> commandBuffers;
-    std::vector<std::shared_ptr<CommandBuffer>> preparedBuffers;
     commandBuffers.reserve(m_commandBuffers.size());
-    preparedBuffers.reserve(m_commandBuffers.size());
 
-    for (auto &cmdBuffer : m_commandBuffers) {
-        VkCommandBuffer vkCmdBuffer = cmdBuffer->prepareSubmit();
-        if (vkCmdBuffer == VK_NULL_HANDLE) {
-            RP_CORE_ERROR("VulkanQueue[{}]: Command buffer '{}' cannot be submitted", m_name, cmdBuffer->getName());
-            // Abort all previously prepared buffers
-            for (auto &prepared : preparedBuffers) {
-                prepared->abortSubmit();
-            }
-            m_commandBuffers.clear();
-            return false;
-        }
-        commandBuffers.push_back(vkCmdBuffer);
-        preparedBuffers.push_back(cmdBuffer);
+    for (auto *cmdBuffer : m_commandBuffers) {
+        commandBuffers.push_back(cmdBuffer->getCommandBufferVk());
     }
 
-    // Increment timeline value for this submission
     uint64_t signalValue = ++m_timelineValue;
 
-    // Merge timeline semaphore with existing signal semaphores
     std::vector<VkSemaphore> signalSemaphores(submitInfo.pSignalSemaphores,
                                               submitInfo.pSignalSemaphores + submitInfo.signalSemaphoreCount);
     signalSemaphores.push_back(m_timelineSemaphore);
@@ -166,25 +139,26 @@ bool VulkanQueue::submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence)
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}]: submitCommandBuffers(2) failed (VkResult: {})", m_name, static_cast<int>(result));
-        for (auto &cmdBuffer : preparedBuffers) {
-            cmdBuffer->abortSubmit();
-        }
         m_commandBuffers.clear();
-
         assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
 
-    // Complete all command buffers with timeline semaphore info
-    for (auto &cmdBuffer : preparedBuffers) {
-        cmdBuffer->completeSubmit(m_timelineSemaphore, signalValue);
+    std::set<CommandPool *> pools;
+    for (auto *cmdBuffer : m_commandBuffers) {
+        if (cmdBuffer->getCommandPool()) {
+            pools.insert(cmdBuffer->getCommandPool());
+        }
+    }
+    for (auto *pool : pools) {
+        pool->markPendingSignal(m_timelineSemaphore, signalValue);
     }
 
     m_commandBuffers.clear();
     return true;
 }
 
-bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSubmitInfo &submitInfo, VkFence fence)
+bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, VkSubmitInfo &submitInfo, VkFence fence)
 {
     std::lock_guard<std::mutex> lock(m_queueMutex);
 
@@ -193,17 +167,10 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSu
         return false;
     }
 
-    // Atomically check state and transition to PENDING before vkQueueSubmit
-    VkCommandBuffer commandBufferVk = commandBuffer->prepareSubmit();
-    if (commandBufferVk == VK_NULL_HANDLE) {
-        RP_CORE_ERROR("VulkanQueue[{}](1) Command buffer '{}' cannot be submitted", m_name, commandBuffer->getName());
-        return false;
-    }
+    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
-    // Increment timeline value for this submission
     uint64_t signalValue = ++m_timelineValue;
 
-    // Merge timeline semaphore with existing signal semaphores
     std::vector<VkSemaphore> signalSemaphores(submitInfo.pSignalSemaphores,
                                               submitInfo.pSignalSemaphores + submitInfo.signalSemaphoreCount);
     signalSemaphores.push_back(m_timelineSemaphore);
@@ -228,16 +195,18 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSu
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}](1) failed (VkResult: {})", m_name, static_cast<int>(result));
-        commandBuffer->abortSubmit();
         assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
 
-    commandBuffer->completeSubmit(m_timelineSemaphore, signalValue);
+    if (commandBuffer->getCommandPool()) {
+        commandBuffer->getCommandPool()->markPendingSignal(m_timelineSemaphore, signalValue);
+    }
+
     return true;
 }
 
-bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFence fence)
+bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, VkFence fence)
 {
     std::lock_guard<std::mutex> lock(m_queueMutex);
 
@@ -246,14 +215,8 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFe
         return false;
     }
 
-    // Atomically check state and transition to PENDING before vkQueueSubmit
-    VkCommandBuffer commandBufferVk = commandBuffer->prepareSubmit();
-    if (commandBufferVk == VK_NULL_HANDLE) {
-        RP_CORE_ERROR("VulkanQueue[{}](2) Command buffer '{}' cannot be submitted", m_name, commandBuffer->getName());
-        return false;
-    }
+    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
-    // Increment timeline value for this submission
     uint64_t signalValue = ++m_timelineValue;
 
     VkTimelineSemaphoreSubmitInfo timelineInfo{};
@@ -272,16 +235,18 @@ bool VulkanQueue::submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFe
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}](2) submitQueue failed (VkResult: {})", m_name, static_cast<int>(result));
-        commandBuffer->abortSubmit();
         assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
 
-    commandBuffer->completeSubmit(m_timelineSemaphore, signalValue);
+    if (commandBuffer->getCommandPool()) {
+        commandBuffer->getCommandPool()->markPendingSignal(m_timelineSemaphore, signalValue);
+    }
+
     return true;
 }
 
-void VulkanQueue::addCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer)
+void VulkanQueue::addCommandBuffer(CommandBuffer *commandBuffer)
 {
     std::lock_guard<std::mutex> lock(m_commandBufferMutex);
     m_commandBuffers.push_back(commandBuffer);
@@ -298,6 +263,7 @@ VkResult VulkanQueue::presentQueue(VkPresentInfoKHR &presentInfo)
     std::lock_guard<std::mutex> lock(m_queueMutex);
     return vkQueuePresentKHR(m_queue, &presentInfo);
 }
+
 void VulkanQueue::clear()
 {
     std::lock_guard<std::mutex> lock(m_commandBufferMutex);

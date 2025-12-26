@@ -3,7 +3,6 @@
 #include "Components/Components.h"
 #include "Logging/Log.h"
 #include "Renderer/DeferredShading/DeferredRenderer.h"
-#include "Renderer/ForwardRenderer/ForwardRenderer.h"
 #include "Scenes/SceneManager.h"
 #include "Utils/Timestep.h"
 #include "WindowContext/Application.h"

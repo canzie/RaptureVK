@@ -6,6 +6,7 @@
 
 #include "AssetManager/AssetManager.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Cameras/CameraCommon.h"
@@ -26,27 +27,21 @@ class LightingPass {
   public:
     LightingPass(float width, float height, uint32_t framesInFlight, std::shared_ptr<GBufferPass> gBufferPass,
                  std::shared_ptr<DynamicDiffuseGI> ddgi, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
-
     ~LightingPass();
+
+    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex);
+    void endDynamicRendering(CommandBuffer *commandBuffer);
 
     FramebufferSpecification getFramebufferSpecification();
 
-    /**
-     * @brief Record commands to render the lighting pass
-     * @param commandBuffer The command buffer to record to
-     * @param activeScene The scene to render
-     * @param renderTarget The render target to render to
-     * @param imageIndex The image index within the render target
-     * @param frameInFlightIndex The current frame in flight index
-     */
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                             SceneRenderTarget &renderTarget, uint32_t imageIndex, uint32_t frameInFlightIndex);
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
+                                   const SecondaryBufferInheritance &inheritance);
 
   private:
     void createPipeline();
+    void setupCommandResources();
 
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView, VkExtent2D targetExtent);
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage);
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage);
 
   private:
     std::weak_ptr<Shader> m_shader;
@@ -73,6 +68,8 @@ class LightingPass {
     float m_height;
 
     bool m_lightsChanged = true;
+
+    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture

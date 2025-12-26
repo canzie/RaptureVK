@@ -144,8 +144,7 @@ void DescriptorManager::initializeSet3()
     RP_CORE_INFO("Initialized set {}", bindings.setNumber);
 }
 
-void DescriptorManager::bindSet(uint32_t setNumber, std::shared_ptr<CommandBuffer> commandBuffer,
-                                std::shared_ptr<PipelineBase> pipeline)
+void DescriptorManager::bindSet(uint32_t setNumber, CommandBuffer *commandBuffer, std::shared_ptr<PipelineBase> pipeline)
 {
 
     if (setNumber >= s_descriptorSets.size()) {
@@ -156,7 +155,7 @@ void DescriptorManager::bindSet(uint32_t setNumber, std::shared_ptr<CommandBuffe
     s_descriptorSets[setNumber]->bind(commandBuffer->getCommandBufferVk(), pipeline);
 }
 
-void DescriptorManager::bindSet(DescriptorSetBindingLocation location, std::shared_ptr<CommandBuffer> commandBuffer,
+void DescriptorManager::bindSet(DescriptorSetBindingLocation location, CommandBuffer *commandBuffer,
                                 std::shared_ptr<PipelineBase> pipeline)
 {
     uint32_t setNumber = getBindingSetNumber(location);

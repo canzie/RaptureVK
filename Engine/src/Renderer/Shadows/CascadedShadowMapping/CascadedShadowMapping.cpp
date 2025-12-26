@@ -55,6 +55,19 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
 
     // Create flattened texture for debugging/visualization
     m_flattenedShadowTexture = TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
+
+    setupCommandResources();
+}
+
+void CascadedShadowMap::setupCommandResources()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 CascadedShadowMap::~CascadedShadowMap() {}
@@ -194,19 +207,22 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     return cascadeData;
 }
 
-void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                            uint32_t currentFrame)
+CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame)
 {
-
     RAPTURE_PROFILE_FUNCTION();
+
+    m_currentFrame = currentFrame;
+
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrame);
+    auto commandBuffer = pool->getSecondaryCommandBuffer();
+
+    SecondaryBufferInheritance inheritance{};
+    inheritance.depthFormat = m_shadowTextureArray->getFormat();
+    inheritance.viewMask = (1u << m_NumCascades) - 1;
+    commandBuffer->beginSecondary(inheritance);
 
     m_writeIndex = (m_writeIndex + 1) % 2;
     m_readIndex = (m_readIndex + 1) % 2;
-
-    setupDynamicRenderingMemoryBarriers(commandBuffer);
-    beginDynamicRendering(commandBuffer);
-
-    m_currentFrame = currentFrame;
 
     // Begin frame for MDI batching - use current frame's batch map
     m_mdiBatchMaps[m_currentFrame]->beginFrame();
@@ -327,12 +343,11 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
     }
 
     // Render terrain shadows
-    recordTerrainCommandBuffer(commandBuffer, activeScene, currentFrame);
+    recordTerrainCommands(commandBuffer, activeScene, currentFrame);
 
-    // End rendering and transition image for shader reading
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    commandBuffer->end();
 
-    transitionToShaderReadableLayout(commandBuffer);
+    return commandBuffer;
 }
 
 std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponent &lightComp,
@@ -752,8 +767,8 @@ void CascadedShadowMap::createTerrainPipeline()
     RP_CORE_INFO("Terrain CSM pipeline created");
 }
 
-void CascadedShadowMap::recordTerrainCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                                   uint32_t currentFrame)
+void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene,
+                                              uint32_t currentFrame)
 {
     if (!m_terrainPipeline) {
         return;
@@ -857,9 +872,8 @@ void CascadedShadowMap::createUniformBuffers()
     }
 }
 
-void CascadedShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer)
+void CascadedShadowMap::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer)
 {
-
     // Transition shadow map to depth attachment layout
     VkImageMemoryBarrier barrier = m_shadowTextureArray->getImageMemoryBarrier(
         m_firstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -871,8 +885,12 @@ void CascadedShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<Comm
     vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
-void CascadedShadowMap::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer)
+
+void CascadedShadowMap::beginDynamicRendering(CommandBuffer *commandBuffer)
 {
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer);
+
     // Configure depth attachment info
     m_depthAttachmentInfo = {};
     m_depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -893,11 +911,18 @@ void CascadedShadowMap::beginDynamicRendering(std::shared_ptr<CommandBuffer> com
     renderingInfo.pColorAttachments = nullptr;
     renderingInfo.pDepthAttachment = &m_depthAttachmentInfo;
     renderingInfo.pStencilAttachment = nullptr;
+    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void CascadedShadowMap::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer)
+void CascadedShadowMap::endDynamicRendering(CommandBuffer *commandBuffer)
+{
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    transitionToShaderReadableLayout(commandBuffer);
+}
+
+void CascadedShadowMap::transitionToShaderReadableLayout(CommandBuffer *commandBuffer)
 {
     // Transition shadow map to shader readable layout
     VkImageMemoryBarrier barrier = m_shadowTextureArray->getImageMemoryBarrier(

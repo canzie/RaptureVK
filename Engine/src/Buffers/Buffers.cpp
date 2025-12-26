@@ -1,5 +1,7 @@
 #include "Buffers.h"
 
+#include "Logging/TracyProfiler.h"
+
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "WindowContext/Application.h"
 
@@ -22,7 +24,9 @@ Buffer::~Buffer()
 
 void Buffer::destoryObjects()
 {
-    if (m_Buffer != VK_NULL_HANDLE && m_Allocation != VK_NULL_HANDLE) vmaDestroyBuffer(m_Allocator, m_Buffer, m_Allocation);
+    if (m_Buffer != VK_NULL_HANDLE && m_Allocation != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(m_Allocator, m_Buffer, m_Allocation);
+    }
 }
 
 void Buffer::addData(void *newData, VkDeviceSize size, VkDeviceSize offset)
@@ -64,13 +68,14 @@ void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize siz
 
     CommandPoolConfig config;
     config.queueFamilyIndex = graphicsQueueIndex;
-    config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    config.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     config.threadId = 0;
 
-    auto commandPool = CommandPoolManager::createCommandPool(config);
+    auto commandPoolHash = CommandPoolManager::createCommandPool(config);
+    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
 
     // Create command buffer for transfer
-    auto commandBuffer = commandPool->getCommandBuffer("Buffer Copy");
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     // Begin command buffer
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -86,7 +91,6 @@ void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize siz
     auto &vulkanContext = app.getVulkanContext();
 
     auto queue = vulkanContext.getGraphicsQueue();
-    // queue->addCommandBuffer(commandBuffer);
     queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     queue->waitIdle();
 }

@@ -14,6 +14,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include <memory>
 #include <vector>
 
@@ -42,13 +43,13 @@ class ImGuiLayer : public Rapture::Layer {
 
   private:
     // ImGui Vulkan logic, sets up the dynamic rendering and ImGui draw commands
-    void drawImGui(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView);
+    void drawImGui(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView);
 
     // imgui logic loop
     void renderImGui();
 
-    void beginDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView);
-    void endDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer);
+    void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView);
+    void endDynamicRendering(Rapture::CommandBuffer *commandBuffer);
     void onResize();
     void updateViewportDescriptorSet();
 
@@ -62,7 +63,7 @@ class ImGuiLayer : public Rapture::Layer {
 
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
-    std::vector<std::shared_ptr<Rapture::CommandBuffer>> m_imguiCommandBuffers;
+    Rapture::CommandPoolHash m_commandPoolHash = 0;
     uint32_t m_currentFrame = 0;
     uint32_t m_currentImageIndex = 0;
     uint32_t m_imageCount = 0;

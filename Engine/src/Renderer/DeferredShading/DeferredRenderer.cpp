@@ -16,8 +16,7 @@ namespace Rapture {
 static constexpr uint32_t MAX_LIGHTS = 16;
 
 // Static member definitions
-std::vector<std::shared_ptr<CommandBuffer>> DeferredRenderer::m_commandBuffers;
-std::shared_ptr<CommandPool> DeferredRenderer::m_commandPool = nullptr;
+CommandPoolHash DeferredRenderer::m_commandPoolHash = 0;
 VmaAllocator DeferredRenderer::m_vmaAllocator = VK_NULL_HANDLE;
 VkDevice DeferredRenderer::m_device = VK_NULL_HANDLE;
 std::shared_ptr<SwapChain> DeferredRenderer::m_swapChain = nullptr;
@@ -39,7 +38,6 @@ uint32_t DeferredRenderer::m_pendingViewportWidth = 0;
 uint32_t DeferredRenderer::m_pendingViewportHeight = 0;
 bool DeferredRenderer::m_viewportResizePending = false;
 std::shared_ptr<DynamicDiffuseGI> DeferredRenderer::m_dynamicDiffuseGI = nullptr;
-std::shared_ptr<RadianceCascades> DeferredRenderer::m_radianceCascades = nullptr;
 std::shared_ptr<RtInstanceData> DeferredRenderer::m_rtInstanceData = nullptr;
 
 void DeferredRenderer::init()
@@ -63,7 +61,6 @@ void DeferredRenderer::init()
 
     m_rtInstanceData = std::make_shared<RtInstanceData>();
     m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
-    m_radianceCascades = std::make_shared<RadianceCascades>(m_swapChain->getImageCount());
 
     // Get the render target format for pipeline creation
     VkFormat colorFormat = m_sceneRenderTarget->getFormat();
@@ -119,10 +116,6 @@ void DeferredRenderer::shutdown()
     // Clean up scene render target
     m_sceneRenderTarget.reset();
 
-    // Clean up command buffers and pool
-    m_commandBuffers.clear();
-    m_commandPool.reset();
-
     // Clean up queues
     m_graphicsQueue.reset();
     m_presentQueue.reset();
@@ -154,17 +147,13 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
 
     m_rtInstanceData->update(activeScene);
     m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
-    // m_radianceCascades->update(activeScene, m_currentFrame);
 
-    bool success = m_commandBuffers[m_currentFrame]->reset();
-    if (!success) {
-        m_currentFrame = (m_currentFrame + 1) % m_swapChain->getImageCount();
-        return;
-    }
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, m_currentFrame);
+    auto commandBuffer = pool->getPrimaryCommandBuffer();
 
-    recordCommandBuffer(m_commandBuffers[m_currentFrame], activeScene, imageIndex);
+    recordCommandBuffer(commandBuffer, activeScene, imageIndex);
 
-    m_graphicsQueue->addCommandBuffer(m_commandBuffers[m_currentFrame]);
+    m_graphicsQueue->addCommandBuffer(commandBuffer);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -244,13 +233,7 @@ void DeferredRenderer::onSwapChainRecreated()
         if (m_sceneRenderTarget) {
             m_sceneRenderTarget->onSwapChainRecreated();
         }
-
-        m_dynamicDiffuseGI->onResize(m_swapChain->getImageCount());
-        m_radianceCascades->onResize(m_swapChain->getImageCount());
     }
-
-    m_commandBuffers.clear();
-    setupCommandResources();
 
     m_currentFrame = 0;
     m_framebufferNeedsResize = false;
@@ -278,9 +261,6 @@ void DeferredRenderer::recreateRenderPasses()
     m_lightingPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
-
-    m_dynamicDiffuseGI->onResize(m_swapChain->getImageCount());
-    m_radianceCascades->onResize(m_swapChain->getImageCount());
 
     VkFormat colorFormat = m_sceneRenderTarget->getFormat();
 
@@ -327,20 +307,16 @@ void DeferredRenderer::processPendingViewportResize()
 
 void DeferredRenderer::setupCommandResources()
 {
-
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    m_commandPool = CommandPoolManager::createCommandPool(config);
-
-    m_commandBuffers = m_commandPool->getCommandBuffers(m_swapChain->getImageCount(), "DeferredRenderer");
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
-void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                           uint32_t imageIndex)
+void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t imageIndex)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -378,7 +354,12 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
                                            lightComp.type == LightType::Directional || lightComp.type == LightType::Spot);
 
                 if (shadowComp.shadowMap && shouldUpdateShadow) {
-                    shadowComp.shadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+                    auto shadowBuffer = shadowComp.shadowMap->recordSecondary(activeScene, m_currentFrame);
+                    if (shadowBuffer) {
+                        shadowComp.shadowMap->beginDynamicRendering(commandBuffer);
+                        commandBuffer->executeSecondary(*shadowBuffer);
+                        shadowComp.shadowMap->endDynamicRendering(commandBuffer);
+                    }
                 }
             }
 
@@ -391,10 +372,21 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
                                            lightComp.type == LightType::Directional);
 
                 if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
-                    shadowComp.cascadedShadowMap->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame);
+                    auto shadowBuffer = shadowComp.cascadedShadowMap->recordSecondary(activeScene, m_currentFrame);
+                    if (shadowBuffer) {
+                        shadowComp.cascadedShadowMap->beginDynamicRendering(commandBuffer);
+                        commandBuffer->executeSecondary(*shadowBuffer);
+                        shadowComp.cascadedShadowMap->endDynamicRendering(commandBuffer);
+                    }
                 }
             }
         }
+
+        CommandBuffer *gbufferBuffer = nullptr;
+        CommandBuffer *lightingBuffer = nullptr;
+        CommandBuffer *skyboxBuffer = nullptr;
+        CommandBuffer *instancedShapesBuffer = nullptr;
+        CommandBuffer *stencilBorderBuffer = nullptr;
 
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
@@ -408,28 +400,84 @@ void DeferredRenderer::recordCommandBuffer(std::shared_ptr<CommandBuffer> comman
                 }
             }
 
-            m_gbufferPass->recordCommandBuffer(commandBuffer, activeScene, m_currentFrame, terrain);
+            SecondaryBufferInheritance gbufferInheritance;
+            auto fbSpec = GBufferPass::getFramebufferSpecification();
+            gbufferInheritance.colorFormats = fbSpec.colorAttachments;
+            gbufferInheritance.depthFormat = fbSpec.depthAttachment;
+            gbufferInheritance.stencilFormat = fbSpec.stencilAttachment;
+
+            gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
         }
 
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
-            m_lightingPass->recordCommandBuffer(commandBuffer, activeScene, *m_sceneRenderTarget, imageIndex, m_currentFrame);
+
+            SecondaryBufferInheritance lightingInheritance;
+            lightingInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
+
+            lightingBuffer =
+                m_lightingPass->recordSecondary(activeScene, *m_sceneRenderTarget, m_currentFrame, lightingInheritance);
         }
 
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
-            m_skyboxPass->recordCommandBuffer(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame);
+
+            SecondaryBufferInheritance skyboxInheritance;
+            skyboxInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
+            skyboxInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
+
+            skyboxBuffer = m_skyboxPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, skyboxInheritance);
         }
 
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
-            m_instancedShapesPass->recordCommandBuffer(commandBuffer, activeScene, *m_sceneRenderTarget, imageIndex,
-                                                       m_currentFrame);
+
+            SecondaryBufferInheritance instancedInheritance;
+            instancedInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
+            instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
+
+            instancedShapesBuffer =
+                m_instancedShapesPass->recordSecondary(activeScene, *m_sceneRenderTarget, m_currentFrame, instancedInheritance);
         }
 
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Stencil Border Pass");
-            m_stencilBorderPass->recordCommandBuffer(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame, activeScene);
+
+            SecondaryBufferInheritance stencilInheritance;
+            stencilInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
+            // stencilInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
+            stencilInheritance.stencilFormat = m_gbufferPass->getDepthTexture()->getFormat();
+
+            // stencilBorderBuffer =
+            //     m_stencilBorderPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, activeScene, stencilInheritance);
+        }
+
+        // Here we wait for all of them to be finished (if in parallel)
+
+        if (gbufferBuffer) {
+            m_gbufferPass->beginDynamicRendering(commandBuffer);
+            commandBuffer->executeSecondary(*gbufferBuffer);
+            m_gbufferPass->endDynamicRendering(commandBuffer);
+        }
+        if (lightingBuffer) {
+            m_lightingPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
+            commandBuffer->executeSecondary(*lightingBuffer);
+            m_lightingPass->endDynamicRendering(commandBuffer);
+        }
+        if (skyboxBuffer) {
+            m_skyboxPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame);
+            commandBuffer->executeSecondary(*skyboxBuffer);
+            m_skyboxPass->endDynamicRendering(commandBuffer);
+        }
+        if (instancedShapesBuffer) {
+            m_instancedShapesPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
+            commandBuffer->executeSecondary(*instancedShapesBuffer);
+            m_instancedShapesPass->endDynamicRendering(commandBuffer);
+        }
+        if (stencilBorderBuffer) {
+            m_stencilBorderPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
+            commandBuffer->executeSecondary(*stencilBorderBuffer);
+            m_stencilBorderPass->endDynamicRendering(commandBuffer);
         }
 
         // Transition to shader read layout for OFFSCREEN mode so ImGui can sample it

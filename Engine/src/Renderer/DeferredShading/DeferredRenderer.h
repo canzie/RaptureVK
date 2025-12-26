@@ -2,6 +2,7 @@
 #define RAPTURE__DEFERRED_RENDERER_H
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/IndexBuffers/IndexBuffer.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Buffers/VertexBuffers/VertexBuffer.h"
@@ -18,7 +19,6 @@
 #include "Renderer/DeferredShading/GBufferPass.h"
 #include "Renderer/DeferredShading/LightingPass.h"
 #include "Renderer/GI/DDGI/DynamicDiffuseGI.h"
-#include "Renderer/GI/radiance_cascades/radiance_cascades.h"
 #include "Renderer/InstancedShapesPass.h"
 #include "Renderer/RtInstanceData.h"
 #include "Renderer/SkyboxPass.h"
@@ -77,8 +77,7 @@ class DeferredRenderer {
     static void recreateRenderPasses();
     static void processPendingViewportResize();
 
-    static void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                    uint32_t imageIndex);
+    static void recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t imageIndex);
 
   private:
     static std::shared_ptr<GBufferPass> m_gbufferPass;
@@ -87,8 +86,7 @@ class DeferredRenderer {
     static std::shared_ptr<SkyboxPass> m_skyboxPass;
     static std::shared_ptr<InstancedShapesPass> m_instancedShapesPass;
 
-    static std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
-    static std::shared_ptr<CommandPool> m_commandPool;
+    static CommandPoolHash m_commandPoolHash;
 
     static VmaAllocator m_vmaAllocator;
     static VkDevice m_device;
@@ -110,7 +108,6 @@ class DeferredRenderer {
     static bool m_viewportResizePending;
 
     static std::shared_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
-    static std::shared_ptr<RadianceCascades> m_radianceCascades;
     static std::shared_ptr<RtInstanceData> m_rtInstanceData;
 };
 

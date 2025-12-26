@@ -77,8 +77,6 @@ void TerrainGenerator::shutdown()
     m_drawCountBuffer.reset();
     m_cullPipeline.reset();
     m_cullShader.reset();
-    m_commandBuffer.reset();
-    m_commandPool.reset();
 
     m_initialized = false;
     RP_CORE_INFO("TerrainGenerator shutdown");
@@ -174,14 +172,13 @@ void TerrainGenerator::initCullComputePipeline()
     pipelineConfig.shader = m_cullShader;
     m_cullPipeline = std::make_shared<ComputePipeline>(pipelineConfig);
 
-    // Create command pool and buffer
+    // Create command pool
     CommandPoolConfig poolConfig{};
     poolConfig.name = "TerrainCullCommandPool";
     poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolConfig.flags = 0;
 
-    m_commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    m_commandBuffer = m_commandPool->getCommandBuffer("TerrainCullCmd");
+    m_commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
 
     RP_CORE_TRACE("TerrainGenerator: Cull compute pipeline initialized");
 }
@@ -321,16 +318,18 @@ void TerrainGenerator::runCullCompute(const glm::vec3 &cameraPos, Frustum &frust
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_cullPipeline || !m_commandBuffer) {
+    if (!m_cullPipeline || m_commandPoolHash == 0) {
         return;
     }
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    m_commandBuffer->reset();
-    m_commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash);
+    auto commandBuffer = pool->getPrimaryCommandBuffer();
 
-    VkCommandBuffer cmd = m_commandBuffer->getCommandBufferVk();
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
 
     // Zero draw counts on GPU
     vkCmdFillBuffer(cmd, m_drawCountBuffer->getBufferVk(), 0, VK_WHOLE_SIZE, 0);
@@ -343,7 +342,7 @@ void TerrainGenerator::runCullCompute(const glm::vec3 &cameraPos, Frustum &frust
                          nullptr);
 
     m_cullPipeline->bind(cmd);
-    DescriptorManager::bindSet(3, m_commandBuffer, m_cullPipeline);
+    DescriptorManager::bindSet(3, commandBuffer, m_cullPipeline);
 
     TerrainCullPushConstants pc{};
     pc.cullOrigin = cameraPos;
@@ -373,10 +372,10 @@ void TerrainGenerator::runCullCompute(const glm::vec3 &cameraPos, Frustum &frust
     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 1, &barrier, 0, nullptr,
                          0, nullptr);
 
-    m_commandBuffer->end();
+    commandBuffer->end();
 
     auto queue = vc.getComputeQueue();
-    queue->submitQueue(m_commandBuffer, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     queue->waitIdle();
 }
 

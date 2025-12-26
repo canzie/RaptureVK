@@ -10,6 +10,7 @@
 
 #include "Buffers/Buffers.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/StorageBuffers/StorageBuffer.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
@@ -71,8 +72,6 @@ class DynamicDiffuseGI {
     void updateProbeVolume();
     void updateFromIndirectLightingComponent(std::shared_ptr<Scene> scene);
 
-    void onResize(uint32_t framesInFlight);
-
     // Get bindless indices for probe textures
     uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
     uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
@@ -80,10 +79,10 @@ class DynamicDiffuseGI {
     uint32_t getProbeClassificationBindlessIndex() const { return m_probeClassificationBindlessIndex; }
 
   private:
-    void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
-    void blendTextures(uint32_t frameIndex);
-    void classifyProbes(uint32_t frameIndex);
-    void relocateProbes(uint32_t frameIndex);
+    void castRays(std::shared_ptr<Scene> scene, CommandBuffer *commandBuffer);
+    void blendTextures(CommandBuffer *commandBuffer);
+    void classifyProbes(CommandBuffer *commandBuffer);
+    void relocateProbes(CommandBuffer *commandBuffer);
 
     void initTextures();
     void initProbeInfoBuffer();
@@ -133,7 +132,7 @@ class DynamicDiffuseGI {
     VmaAllocator m_allocator;
     std::shared_ptr<VulkanQueue> m_computeQueue;
 
-    std::vector<std::shared_ptr<CommandBuffer>> m_CommandBuffers;
+    CommandPoolHash m_commandPoolHash = 0;
     uint32_t m_framesInFlight;
 
     bool m_isFirstFrame;

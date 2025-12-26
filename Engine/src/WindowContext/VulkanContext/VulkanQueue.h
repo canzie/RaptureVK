@@ -17,11 +17,11 @@ class VulkanQueue {
     bool submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence = nullptr);
 
     // execute immediately (returns false if command buffer cannot be submitted)
-    bool submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSubmitInfo &submitInfo, VkFence fence = nullptr);
-    bool submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFence fence = nullptr);
+    bool submitQueue(CommandBuffer *commandBuffer, VkSubmitInfo &submitInfo, VkFence fence = nullptr);
+    bool submitQueue(CommandBuffer *commandBuffer, VkFence fence = nullptr);
 
     // add command buffer to queue
-    void addCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer);
+    void addCommandBuffer(CommandBuffer *commandBuffer);
     void waitIdle();
 
     // should probably check if queue is present but well see
@@ -38,7 +38,7 @@ class VulkanQueue {
   private:
     void createTimelineSemaphore();
 
-    std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
+    std::vector<CommandBuffer *> m_commandBuffers;
     VkDevice m_device;
     VkQueue m_queue;
     uint32_t m_queueFamilyIndex;

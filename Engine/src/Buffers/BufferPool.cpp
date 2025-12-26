@@ -83,15 +83,17 @@ void BufferAllocation::uploadData(const void *data, VkDeviceSize size, VkDeviceS
     CommandPoolConfig poolConfig;
     poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex(); // Using graphics queue for transfer
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
 
-    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
     if (!commandPool) {
-        RP_CORE_ERROR("Failed to create command pool");
+        RP_CORE_ERROR("Failed to get command pool");
         vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
         return;
     }
 
-    auto commandBuffer = commandPool->getCommandBuffer("BufferPool Upload");
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
     if (!commandBuffer) {
         RP_CORE_ERROR("Failed to get command buffer");
         vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);

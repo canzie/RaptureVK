@@ -298,8 +298,9 @@ void TLAS::build()
     poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
-    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer("TLAS");
+    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -439,8 +440,9 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>> &in
         poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
         poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
-        auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-        auto commandBuffer = commandPool->getCommandBuffer("TLAS Update");
+        auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+        auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+        auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
         commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 

@@ -2,38 +2,24 @@
 
 #include "CommandBuffer.h"
 #include "Logging/Log.h"
+#include "Logging/TracyProfiler.h"
 #include "WindowContext/Application.h"
 
 namespace Rapture {
 
-#define MAX_DEFERRED_CMD_BUFFER_DESTROY_ATTEMPTS 100
+// NVIDIA driver has internal state accumulation issues with vkResetCommandPool causing growing latency.
+// When enabled, uses VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT and skips vkResetCommandPool entirely.
+// Command buffers reset implicitly on vkBeginCommandBuffer instead.
+#define RAPTURE_SKIP_COMMAND_POOL_RESET 1
 
-std::unordered_map<CommandPoolHash, std::shared_ptr<CommandPool>> CommandPoolManager::s_commandPools;
+std::unordered_map<CommandPoolHash, std::vector<std::unique_ptr<CommandPool>>> CommandPoolManager::s_commandPools;
 std::mutex CommandPoolManager::s_mutex;
-
-void s_updatePendingState(CmdBufferDefferedDestruction &cmdBufferDefferedDestruction, VkDevice device)
-{
-    if (cmdBufferDefferedDestruction.state != CmdBufferState::PENDING ||
-        cmdBufferDefferedDestruction.pendingSemaphore == VK_NULL_HANDLE) {
-        return;
-    }
-
-    uint64_t currentValue = 0;
-    VkResult result = vkGetSemaphoreCounterValue(device, cmdBufferDefferedDestruction.pendingSemaphore, &currentValue);
-    if (result != VK_SUCCESS) {
-        RP_CORE_WARN("CommandBuffer[{}]: failed to query timeline semaphore value", cmdBufferDefferedDestruction.name);
-        return;
-    }
-
-    if (currentValue >= cmdBufferDefferedDestruction.pendingSignalValue) {
-        cmdBufferDefferedDestruction.state = CmdBufferState::INVALID;
-        cmdBufferDefferedDestruction.pendingSemaphore = VK_NULL_HANDLE;
-        cmdBufferDefferedDestruction.pendingSignalValue = 0;
-    }
-}
+uint32_t CommandPoolManager::s_framesInFlight = 0;
+uint32_t CommandPoolManager::s_currentFrameIndex = 0;
 
 CommandPool::CommandPool(const CommandPoolConfig &config)
-    : m_createInfo{}, m_commandPool(VK_NULL_HANDLE), m_hash(config.hash()), m_device(VK_NULL_HANDLE)
+    : m_createInfo{}, m_commandPool(VK_NULL_HANDLE), m_hash(config.hash()), m_device(VK_NULL_HANDLE),
+      m_resetFlags(config.resetFlags)
 {
 
     auto &app = Application::getInstance();
@@ -43,7 +29,11 @@ CommandPool::CommandPool(const CommandPoolConfig &config)
 
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.flags = config.flags;
+#if RAPTURE_SKIP_COMMAND_POOL_RESET
+    poolInfo.flags = config.flags | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+#else
+    poolInfo.flags = config.flags | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+#endif
     poolInfo.queueFamilyIndex = config.queueFamilyIndex;
 
     if (vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS) {
@@ -54,67 +44,97 @@ CommandPool::CommandPool(const CommandPoolConfig &config)
 
 CommandPool::~CommandPool()
 {
-    RP_CORE_TRACE("Command Pool destroying remaining command buffers...");
-    for (auto &cmdBufferDefferedDestruction : m_deferredCmdBufferDestructions) {
-        vkFreeCommandBuffers(m_device, m_commandPool, 1, &cmdBufferDefferedDestruction.commandBuffer);
-    }
-    m_deferredCmdBufferDestructions.clear();
 
-    m_savedCommandBuffers.clear();
     vkDestroyCommandPool(m_device, m_commandPool, nullptr);
     m_commandPool = VK_NULL_HANDLE;
 }
 
-void CommandPool::deferCmdBufferDestruction(CmdBufferDefferedDestruction cmdBufferDefferedDestruction)
+CommandBuffer *CommandPool::getPrimaryCommandBuffer()
 {
-    m_deferredCmdBufferDestructions.push_back(cmdBufferDefferedDestruction);
+    if (m_primaryCommandBufferIndex >= m_primaryCommandBuffers.size()) {
+        allocateCommandBuffer(CmdBufferLevel::PRIMARY);
+    }
+    m_needsReset = true;
+    return m_primaryCommandBuffers[m_primaryCommandBufferIndex++].get();
 }
 
-void CommandPool::onUpdate(float dt)
+CommandBuffer *CommandPool::getSecondaryCommandBuffer()
 {
-    (void)dt;
+    if (m_secondaryCommandBufferIndex >= m_secondaryCommandBuffers.size()) {
+        allocateCommandBuffer(CmdBufferLevel::SECONDARY);
+    }
+    m_needsReset = true;
+    return m_secondaryCommandBuffers[m_secondaryCommandBufferIndex++].get();
+}
 
-    for (auto it = m_deferredCmdBufferDestructions.begin(); it != m_deferredCmdBufferDestructions.end();) {
-        auto &cmdBufferDefferedDestruction = *it;
+void CommandPool::markPendingSignal(VkSemaphore timelineSemaphore, uint64_t signalValue)
+{
+    auto it = m_pendingSignals.find(timelineSemaphore);
+    if (it != m_pendingSignals.end()) {
+        it->second = std::max(it->second, signalValue);
+    } else {
+        m_pendingSignals[timelineSemaphore] = signalValue;
+    }
+    m_needsReset = true;
+}
 
-        cmdBufferDefferedDestruction.destroyAttempts++;
-        if (cmdBufferDefferedDestruction.destroyAttempts > MAX_DEFERRED_CMD_BUFFER_DESTROY_ATTEMPTS) {
-            RP_CORE_ERROR("CommandBuffer[{}]: failed to destroy command buffer after {} attempts! forcing removal",
-                          cmdBufferDefferedDestruction.name, MAX_DEFERRED_CMD_BUFFER_DESTROY_ATTEMPTS);
-            vkFreeCommandBuffers(m_device, m_commandPool, 1, &cmdBufferDefferedDestruction.commandBuffer);
-            it = m_deferredCmdBufferDestructions.erase(it);
-            continue;
+void CommandPool::resetIfNeeded()
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    if (!m_needsReset) {
+        return;
+    }
+
+    if (!m_pendingSignals.empty()) {
+        std::vector<VkSemaphore> semaphores;
+        std::vector<uint64_t> values;
+        semaphores.reserve(m_pendingSignals.size());
+        values.reserve(m_pendingSignals.size());
+
+        for (const auto &[sem, val] : m_pendingSignals) {
+            semaphores.push_back(sem);
+            values.push_back(val);
         }
 
-        s_updatePendingState(cmdBufferDefferedDestruction, m_device);
-        if (cmdBufferDefferedDestruction.state != CmdBufferState::PENDING) {
-            RP_CORE_TRACE("Command Pool cleaned up command buffer: {}", cmdBufferDefferedDestruction.name);
-            vkFreeCommandBuffers(m_device, m_commandPool, 1, &cmdBufferDefferedDestruction.commandBuffer);
-            it = m_deferredCmdBufferDestructions.erase(it);
-            continue;
-        }
+        VkSemaphoreWaitInfo waitInfo{};
+        waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+        waitInfo.semaphoreCount = static_cast<uint32_t>(semaphores.size());
+        waitInfo.pSemaphores = semaphores.data();
+        waitInfo.pValues = values.data();
 
-        it++;
+        vkWaitSemaphores(m_device, &waitInfo, UINT64_MAX);
+        m_pendingSignals.clear();
+    }
+
+    if (m_resetFlags & VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT) {
+        m_primaryCommandBuffers.clear();
+        m_secondaryCommandBuffers.clear();
+    }
+
+    m_primaryCommandBufferIndex = 0;
+    m_secondaryCommandBufferIndex = 0;
+#if !RAPTURE_SKIP_COMMAND_POOL_RESET
+    vkResetCommandPool(m_device, m_commandPool, m_resetFlags);
+#endif
+    m_needsReset = false;
+}
+
+void CommandPool::allocateCommandBuffer(CmdBufferLevel level)
+{
+    auto commandBuffer = std::make_unique<CommandBuffer>(this, level, "cmd");
+    if (level == CmdBufferLevel::PRIMARY) {
+        m_primaryCommandBuffers.push_back(std::move(commandBuffer));
+    } else {
+        m_secondaryCommandBuffers.push_back(std::move(commandBuffer));
     }
 }
 
-std::shared_ptr<CommandBuffer> CommandPool::getCommandBuffer(const std::string &name, bool stayAlive)
+void CommandPoolManager::init(uint32_t framesInFlight)
 {
-    auto commandBuffer = std::make_shared<CommandBuffer>(shared_from_this(), name);
-    if (stayAlive) {
-        m_savedCommandBuffers.push_back(commandBuffer);
-    }
-    return commandBuffer;
-}
+    s_framesInFlight = framesInFlight;
 
-std::vector<std::shared_ptr<CommandBuffer>> CommandPool::getCommandBuffers(uint32_t count, const std::string &namePrefix)
-{
-    return CommandBuffer::createCommandBuffers(shared_from_this(), count, namePrefix);
-}
-
-void CommandPoolManager::init()
-{
-    // s_commandPools.clear();
+    RP_CORE_INFO("Initialized CommandPoolManager with {} frames in flight!", framesInFlight);
 }
 
 void CommandPoolManager::shutdown()
@@ -122,64 +142,69 @@ void CommandPoolManager::shutdown()
     closeAllPools();
 }
 
-void CommandPoolManager::onUpdate(float dt)
+CommandPoolHash CommandPoolManager::createCommandPool(const CommandPoolConfig &config)
 {
-    for (auto &commandPool : s_commandPools) {
-        commandPool.second->onUpdate(dt);
-    }
-}
+    RAPTURE_PROFILE_FUNCTION();
 
-std::shared_ptr<CommandPool> CommandPoolManager::createCommandPool(const CommandPoolConfig &config)
-{
     std::lock_guard<std::mutex> lock(s_mutex);
 
     if (s_commandPools.find(config.hash()) != s_commandPools.end()) {
-        return s_commandPools[config.hash()];
+        return config.hash();
     }
 
-    auto commandPool = std::make_shared<CommandPool>(config);
-    if (commandPool->getCommandPoolVk() == VK_NULL_HANDLE) {
-        RP_CORE_ERROR("Failed to create command pool!");
+    std::vector<std::unique_ptr<CommandPool>> commandPools(s_framesInFlight);
+    for (uint32_t i = 0; i < s_framesInFlight; i++) {
+        commandPools[i] = std::make_unique<CommandPool>(config);
+        if (commandPools[i]->getCommandPoolVk() == VK_NULL_HANDLE) {
+            RP_CORE_ERROR("Failed to create command pool({})!", i);
+            return 0;
+        }
+    }
+    s_commandPools.insert(std::make_pair(config.hash(), std::move(commandPools)));
+    return config.hash();
+}
+
+CommandPool *CommandPoolManager::getCommandPool(CommandPoolHash cpHash, uint32_t frameIndex)
+{
+
+    (void)frameIndex;
+
+    auto it = s_commandPools.find(cpHash);
+    if (it == s_commandPools.end()) {
+        RP_CORE_ERROR("Command pool not found for hash {}!", cpHash);
         return nullptr;
     }
 
-    s_commandPools.insert(std::make_pair(config.hash(), commandPool));
+    if (s_currentFrameIndex >= it->second.size()) {
+        RP_CORE_ERROR("Frame index {} out of bounds (pool size: {}, framesInFlight: {})!", s_currentFrameIndex, it->second.size(),
+                      s_framesInFlight);
+        return nullptr;
+    }
 
-    return commandPool;
+    return it->second[s_currentFrameIndex].get();
 }
 
-/*
-std::shared_ptr<CommandPool> CommandPoolManager::getCommandPool(const CommandPoolConfig& config, bool isStrict)
+CommandPool *CommandPoolManager::getCommandPool(CommandPoolHash cpHash)
 {
-    uint32_t hash = config.hash();
-
-    return getCommandPool(hash);
+    return getCommandPool(cpHash, s_currentFrameIndex);
 }
-*/
 
-std::shared_ptr<CommandPool> CommandPoolManager::getCommandPool(CommandPoolHash cpHash)
+void CommandPoolManager::beginFrame()
 {
+    RAPTURE_PROFILE_FUNCTION();
+
     std::lock_guard<std::mutex> lock(s_mutex);
-
-    if (s_commandPools.find(cpHash) == s_commandPools.end()) {
-        RP_CORE_ERROR("Command pool not found!");
-        return nullptr;
+    for (auto &[hash, pools] : s_commandPools) {
+        if (s_currentFrameIndex < pools.size()) {
+            pools[s_currentFrameIndex]->resetIfNeeded();
+        }
     }
-
-    return s_commandPools[cpHash];
 }
 
-/*
-void CommandPoolManager::closePool(uint32_t CPHash)
+void CommandPoolManager::endFrame()
 {
-    if (s_commandPools.find(CPHash) == s_commandPools.end()) {
-        RP_CORE_ERROR("CommandPoolManager::closePool - command pool not found!");
-        return;
-    }
-
-    s_commandPools.erase(CPHash);
+    s_currentFrameIndex = (s_currentFrameIndex + 1) % s_framesInFlight;
 }
-*/
 
 void CommandPoolManager::closeAllPools()
 {

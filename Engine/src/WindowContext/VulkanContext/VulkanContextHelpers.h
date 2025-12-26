@@ -6,6 +6,9 @@
 
 namespace Rapture {
 
+// Enable to see all validation layer messages including INFO and VERBOSE
+#define RAPTURE_VERBOSE_VALIDATION 0
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                                     VkDebugUtilsMessageTypeFlagsEXT messageType,
                                                     const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
@@ -13,6 +16,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
     (void)messageType;
     (void)pUserData;
 
+#if RAPTURE_VERBOSE_VALIDATION
+    if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+        RP_CORE_TRACE("validation layer [VERBOSE]: {0}", pCallbackData->pMessage);
+    } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+        RP_CORE_INFO("validation layer [INFO]: {0}", pCallbackData->pMessage);
+    } else
+#endif
     if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         RP_CORE_WARN("validation layer: {0}", pCallbackData->pMessage);
     } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {

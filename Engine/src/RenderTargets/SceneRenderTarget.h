@@ -91,7 +91,7 @@ class SceneRenderTarget {
      * @param commandBuffer The command buffer to record the transition to
      * @param imageIndex The image index to transition
      */
-    void transitionToShaderReadLayout(const std::shared_ptr<CommandBuffer> &commandBuffer, uint32_t imageIndex);
+    void transitionToShaderReadLayout(CommandBuffer *commandBuffer, uint32_t imageIndex);
 
   private:
     void createOffscreenTextures(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format);

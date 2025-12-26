@@ -252,8 +252,7 @@ class ProceduralTexture {
     std::shared_ptr<ComputePipeline> m_pipeline;
     std::shared_ptr<DescriptorSet> m_descriptorSet;
     std::shared_ptr<Texture> m_texture;
-    std::shared_ptr<CommandPool> m_commandPool;
-    std::shared_ptr<CommandBuffer> m_commandBuffer;
+    CommandPoolHash m_commandPoolHash = 0;
 
     std::vector<uint8_t> m_pushConstantData;
     size_t m_expectedPushConstantSize = 0;

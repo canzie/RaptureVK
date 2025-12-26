@@ -136,6 +136,8 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     createLogicalDevice();
     createVmaAllocator();
 
+    m_swapChain = std::make_shared<SwapChain>(m_device, m_surface, m_physicalDevice, m_queueFamilyIndices, windowContext);
+
     ApplicationEvents::onRequestSwapChainRecreation().addListener([this, windowContext]() {
         int width = 0, height = 0;
         windowContext->getFramebufferSize(&width, &height);
@@ -255,9 +257,8 @@ std::shared_ptr<VulkanQueue> VulkanContext::getVendorQueue() const
     return m_vendorQueue != nullptr ? m_vendorQueue : getGraphicsQueue();
 }
 
-void VulkanContext::createRecourses(WindowContext *windowContext)
+void VulkanContext::createRecourses()
 {
-    m_swapChain = std::make_shared<SwapChain>(m_device, m_surface, m_physicalDevice, m_queueFamilyIndices, windowContext);
     m_swapChain->invalidate();
 }
 
@@ -725,7 +726,6 @@ static void s_enableCoreFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDevi
     }
 }
 
-
 static bool s_enableVertexInputDynamicState(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
                                             VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT &outFeatures)
 {
@@ -995,7 +995,6 @@ static bool s_enableExtendedDynamicState3(VkPhysicalDevice physicalDevice, VkPhy
     return true;
 }
 
-
 static void s_enableVulkan12Features(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
                                      VkPhysicalDeviceVulkan12Features &outFeatures)
 {
@@ -1013,20 +1012,16 @@ static void s_enableVulkan12Features(VkPhysicalDevice physicalDevice, VkPhysical
 
     // Descriptor indexing (promoted from VkPhysicalDeviceDescriptorIndexingFeatures)
     if (supported.descriptorIndexing) outFeatures.descriptorIndexing = VK_TRUE;
-    if (supported.shaderSampledImageArrayNonUniformIndexing)
-        outFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    if (supported.shaderSampledImageArrayNonUniformIndexing) outFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
     if (supported.runtimeDescriptorArray) outFeatures.runtimeDescriptorArray = VK_TRUE;
-    if (supported.descriptorBindingVariableDescriptorCount)
-        outFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+    if (supported.descriptorBindingVariableDescriptorCount) outFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
     if (supported.descriptorBindingPartiallyBound) outFeatures.descriptorBindingPartiallyBound = VK_TRUE;
-    if (supported.descriptorBindingStorageImageUpdateAfterBind)
-        outFeatures.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+    if (supported.descriptorBindingStorageImageUpdateAfterBind) outFeatures.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
     if (supported.descriptorBindingUniformBufferUpdateAfterBind)
         outFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
     if (supported.descriptorBindingStorageBufferUpdateAfterBind)
         outFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
-    if (supported.descriptorBindingSampledImageUpdateAfterBind)
-        outFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+    if (supported.descriptorBindingSampledImageUpdateAfterBind) outFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
 
     // Timeline semaphores (promoted from VkPhysicalDeviceTimelineSemaphoreFeatures)
     if (supported.timelineSemaphore) {

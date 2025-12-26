@@ -31,6 +31,7 @@ SkyboxPass::SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::
 
     createSkyboxGeometry();
     createPipeline();
+    setupCommandResources();
 }
 
 SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat)
@@ -51,6 +52,18 @@ SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFo
 
     createSkyboxGeometry();
     createPipeline();
+    setupCommandResources();
+}
+
+void SkyboxPass::setupCommandResources()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 SkyboxPass::~SkyboxPass()
@@ -60,33 +73,28 @@ SkyboxPass::~SkyboxPass()
     m_skyboxIndexBuffer.reset();
 }
 
-void SkyboxPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, SceneRenderTarget &renderTarget,
-                                     uint32_t imageIndex, uint32_t frameInFlightIndex)
+CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
+                                           const SecondaryBufferInheritance &inheritance)
 {
-
     if (!m_skyboxTexture || !m_skyboxTexture->isReadyForSampling()) {
-        return;
+        return nullptr;
     }
 
     if (!m_pipeline) {
         RP_CORE_ERROR("Pipeline is not initialized!");
-        return;
+        return nullptr;
     }
 
-    // Get render target properties
-    VkImage targetImage = renderTarget.getImage(imageIndex);
-    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, frameInFlightIndex);
+    auto commandBuffer = pool->getSecondaryCommandBuffer();
+
+    commandBuffer->beginSecondary(inheritance);
+
     VkExtent2D targetExtent = renderTarget.getExtent();
 
     // Update dimensions from target extent
     m_width = static_cast<float>(targetExtent.width);
     m_height = static_cast<float>(targetExtent.height);
-
-    VkImage depthImage = m_depthTextures[frameInFlightIndex]->getImage();
-    VkImageView depthImageView = m_depthTextures[frameInFlightIndex]->getImageView();
-
-    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage, depthImage);
-    beginDynamicRendering(commandBuffer, targetImageView, depthImageView, targetExtent);
 
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
@@ -113,7 +121,6 @@ void SkyboxPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffe
     pushConstants.frameIndex = frameInFlightIndex;
     pushConstants.skyboxTextureIndex = m_skyboxTexture->getBindlessIndex();
 
-    // Get push constant stage flags from shader reflection data
     VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
         stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
@@ -134,7 +141,9 @@ void SkyboxPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffe
 
     vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), 36, 1, 0, 0, 0);
 
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    commandBuffer->end();
+
+    return commandBuffer;
 }
 
 void SkyboxPass::setSkyboxTexture(std::shared_ptr<Texture> skyboxTexture)
@@ -264,9 +273,17 @@ void SkyboxPass::createSkyboxGeometry()
     m_skyboxIndexBuffer->addDataGPU(indices.data(), indices.size() * sizeof(uint32_t), 0);
 }
 
-void SkyboxPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView,
-                                       VkImageView depthImageView, VkExtent2D targetExtent)
+void SkyboxPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
+                                       uint32_t frameInFlightIndex)
 {
+    VkImage targetImage = renderTarget.getImage(imageIndex);
+    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    VkExtent2D targetExtent = renderTarget.getExtent();
+
+    VkImage depthImage = m_depthTextures[frameInFlightIndex]->getImage();
+    VkImageView depthImageView = m_depthTextures[frameInFlightIndex]->getImageView();
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage, depthImage);
 
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -291,12 +308,17 @@ void SkyboxPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuf
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
     renderingInfo.pDepthAttachment = &depthAttachmentInfo;
     renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
+    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void SkyboxPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage,
-                                                     VkImage depthImage)
+void SkyboxPass::endDynamicRendering(CommandBuffer *commandBuffer)
+{
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+}
+
+void SkyboxPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, VkImage depthImage)
 {
     if (!m_depthTextures.empty() && m_depthTextures[0]) {
         VkImageMemoryBarrier barriers[2];

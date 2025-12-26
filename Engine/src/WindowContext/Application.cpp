@@ -4,7 +4,6 @@
 
 #include "Loaders/glTF2.0/glTFLoader.h"
 #include "Renderer/DeferredShading/DeferredRenderer.h"
-#include "Renderer/ForwardRenderer/ForwardRenderer.h"
 
 #include "Buffers/BufferPool.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
@@ -30,10 +29,10 @@ Application::Application(int width, int height, const char *title) : m_running(t
     RP_CORE_INFO("Creating Vulkan context...");
     m_vulkanContext = std::unique_ptr<VulkanContext>(new VulkanContext(m_window.get()));
 
-    m_vulkanContext->createRecourses(m_window.get());
-
-    CommandPoolManager::init();
+    CommandPoolManager::init(m_vulkanContext->getSwapChain()->getImageCount());
     BufferPoolManager::init(m_vulkanContext->getVmaAllocator());
+    m_vulkanContext->createRecourses();
+
     TracyProfiler::init();
 
 #if RAPTURE_TRACY_PROFILING_ENABLED
@@ -43,10 +42,11 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
         CommandPoolConfig config = {};
         config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-        config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        auto tempCommandPool = CommandPoolManager::createCommandPool(config);
+        config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Pool reset handles this now
+        auto tracyPoolHash = CommandPoolManager::createCommandPool(config);
+        auto tracyPool = CommandPoolManager::getCommandPool(tracyPoolHash, 0);
 
-        auto tempCmdBuffer = tempCommandPool->getCommandBuffer("Tmp TracyBuffer", true);
+        auto tempCmdBuffer = tracyPool->getPrimaryCommandBuffer();
 
         {
             auto queueLock = vendorQueue->acquireQueueLock();
@@ -84,7 +84,6 @@ Application::Application(int width, int height, const char *title) : m_running(t
     DescriptorManager::init();
     MaterialManager::init();
 
-    // ForwardRenderer::init();
     DeferredRenderer::init();
 
     ModelLoadersCache::init();
@@ -113,7 +112,6 @@ Application::~Application()
     m_layerStack.clear();
     m_project.reset();
 
-    // ForwardRenderer::shutdown();
     DeferredRenderer::shutdown();
     DescriptorManager::shutdown();
 
@@ -138,7 +136,7 @@ void Application::run()
 
         Timestep::onUpdate();
 
-        CommandPoolManager::onUpdate(Timestep::deltaTime());
+        CommandPoolManager::beginFrame();
 
         for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
             (*it)->onUpdate(Timestep::deltaTime());
@@ -156,6 +154,8 @@ void Application::run()
         }
 
         m_window->onUpdate();
+
+        CommandPoolManager::endFrame();
 
         TracyProfiler::endFrame();
     }

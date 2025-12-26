@@ -5,6 +5,7 @@
 #include "AssetManager/AssetManager.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Components/Components.h"
+#include "InstancedShapesPass.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 #include "Shaders/Shader.h"
@@ -40,29 +41,47 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
     m_shaderHandle = handle;
 
     createPipeline();
+    setupCommandResources();
+}
+
+void InstancedShapesPass::setupCommandResources()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 InstancedShapesPass::~InstancedShapesPass() {}
 
-void InstancedShapesPass::recordCommandBuffer(const std::shared_ptr<CommandBuffer> &commandBuffer,
-                                              const std::shared_ptr<Scene> &scene, SceneRenderTarget &renderTarget,
-                                              uint32_t imageIndex, uint32_t frameInFlight)
+CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene> &scene, SceneRenderTarget &renderTarget,
+                                                    uint32_t frameInFlight, const SecondaryBufferInheritance &inheritance)
 {
-
     RAPTURE_PROFILE_FUNCTION();
 
     m_currentImageIndex = frameInFlight;
 
-    // Get render target properties
-    VkImage targetImage = renderTarget.getImage(imageIndex);
-    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    auto camera = scene->getMainCamera();
+    if (camera == nullptr) {
+        return nullptr;
+    }
+    auto cameraComp = camera.tryGetComponent<CameraComponent>();
+    if (cameraComp == nullptr) {
+        return nullptr;
+    }
+
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, frameInFlight);
+    auto commandBuffer = pool->getSecondaryCommandBuffer();
+
+    commandBuffer->beginSecondary(inheritance);
+
     VkExtent2D targetExtent = renderTarget.getExtent();
 
     m_width = static_cast<float>(targetExtent.width);
     m_height = static_cast<float>(targetExtent.height);
-
-    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
-    beginDynamicRendering(commandBuffer, targetImageView, targetExtent);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -77,17 +96,6 @@ void InstancedShapesPass::recordCommandBuffer(const std::shared_ptr<CommandBuffe
     scissor.offset = {0, 0};
     scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
-
-    auto camera = scene->getMainCamera();
-    if (camera == nullptr) {
-        vkCmdEndRendering(commandBuffer->getCommandBufferVk());
-        return;
-    }
-    auto cameraComp = camera.tryGetComponent<CameraComponent>();
-    if (cameraComp == nullptr) {
-        vkCmdEndRendering(commandBuffer->getCommandBufferVk());
-        return;
-    }
 
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
@@ -142,7 +150,9 @@ void InstancedShapesPass::recordCommandBuffer(const std::shared_ptr<CommandBuffe
         vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexCount(), instanceCount, 0, 0, 0);
     }
 
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    commandBuffer->end();
+
+    return commandBuffer;
 }
 
 void InstancedShapesPass::createPipeline()
@@ -247,9 +257,14 @@ void InstancedShapesPass::createPipeline()
     m_pipelineWireframe = std::make_shared<GraphicsPipeline>(config);
 }
 
-void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuffer> &commandBuffer, VkImageView targetImageView,
-                                                VkExtent2D targetExtent)
+void InstancedShapesPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex)
 {
+    VkImage targetImage = renderTarget.getImage(imageIndex);
+    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    VkExtent2D targetExtent = renderTarget.getExtent();
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
+
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachmentInfo.imageView = targetImageView;
@@ -273,12 +288,17 @@ void InstancedShapesPass::beginDynamicRendering(const std::shared_ptr<CommandBuf
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
     renderingInfo.pDepthAttachment = &depthAttachmentInfo;
     renderingInfo.pStencilAttachment = nullptr;
+    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(const std::shared_ptr<CommandBuffer> &commandBuffer,
-                                                              VkImage targetImage)
+void InstancedShapesPass::endDynamicRendering(CommandBuffer *commandBuffer)
+{
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+}
+
+void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage)
 {
     // Execution barrier to ensure previous pass color writes are complete
     // before this pass starts writing (write-after-write synchronization)

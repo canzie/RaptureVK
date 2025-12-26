@@ -134,8 +134,7 @@ class TerrainGenerator {
     // Cull/LOD compute shader
     std::shared_ptr<Shader> m_cullShader;
     std::shared_ptr<ComputePipeline> m_cullPipeline;
-    std::shared_ptr<CommandPool> m_commandPool;
-    std::shared_ptr<CommandBuffer> m_commandBuffer;
+    CommandPoolHash m_commandPoolHash = 0;
 
     bool m_initialized = false;
     bool m_wireframe = false;

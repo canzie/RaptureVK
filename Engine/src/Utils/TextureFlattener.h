@@ -31,7 +31,7 @@ class FlattenTexture {
      * @brief Update the flattened texture with new data from the input texture
      * @param commandBuffer Command buffer to record commands into
      */
-    void update(std::shared_ptr<CommandBuffer> commandBuffer);
+    void update(CommandBuffer *commandBuffer);
 
     /**
      * @brief Get the flattened texture

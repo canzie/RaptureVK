@@ -357,7 +357,7 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
     auto &app = Application::getInstance();
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
 
-    std::shared_ptr<CommandBuffer> internalCommandBuffer = nullptr;
+    CommandBuffer *internalCommandBuffer = nullptr;
     VkCommandBuffer commandBufferVk;
 
     bool useExternalCommandBuffer = (extCommandBuffer != VK_NULL_HANDLE);
@@ -367,9 +367,11 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
         CommandPoolConfig poolConfig{};
         poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
         poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
 
-        auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-        internalCommandBuffer = commandPool->getCommandBuffer("CopyFromImage");
+        auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+        auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+        internalCommandBuffer = commandPool->getPrimaryCommandBuffer();
         commandBufferVk = internalCommandBuffer->getCommandBufferVk();
 
         internalCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -842,10 +844,12 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
     CommandPoolConfig poolConfig{};
     poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     poolConfig.threadId = threadId;
 
-    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer("TransitionImageLayout");
+    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -944,10 +948,12 @@ void Texture::generateMipmaps(size_t threadId)
     CommandPoolConfig poolConfig{};
     poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     poolConfig.threadId = threadId;
 
-    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer(std::string("GenerateMipmaps_") + std::to_string(threadId));
+    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -1038,10 +1044,12 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
     CommandPoolConfig poolConfig{};
     poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     poolConfig.threadId = threadId;
 
-    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer("CopyBufferToImage");
+    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 

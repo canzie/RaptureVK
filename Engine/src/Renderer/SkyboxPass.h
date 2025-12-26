@@ -1,6 +1,8 @@
-#pragma once
+#ifndef RAPTURE__SKYBOX_PASS_H
+#define RAPTURE__SKYBOX_PASS_H
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/IndexBuffers/IndexBuffer.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
@@ -23,11 +25,13 @@ class SkyboxPass {
 
     ~SkyboxPass();
 
-    // NOTE: assumes that the command buffer is already started, and will be ended by the caller
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
-                             uint32_t frameInFlightIndex);
+    CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
+                                   const SecondaryBufferInheritance &inheritance);
 
-    // Set the skybox texture
+    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
+                               uint32_t frameInFlightIndex);
+    void endDynamicRendering(CommandBuffer *commandBuffer);
+
     void setSkyboxTexture(std::shared_ptr<Texture> skyboxTexture);
 
     bool hasActiveSkybox() const { return m_skyboxTexture != nullptr; }
@@ -35,10 +39,9 @@ class SkyboxPass {
   private:
     void createPipeline();
     void createSkyboxGeometry();
+    void setupCommandResources();
 
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView,
-                               VkImageView depthImageView, VkExtent2D targetExtent);
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage, VkImage depthImage);
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, VkImage depthImage);
 
   private:
     VkDevice m_device;
@@ -55,6 +58,10 @@ class SkyboxPass {
     float m_width;
     float m_height;
     VkFormat m_colorFormat;
+
+    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__SKYBOX_PASS_H

@@ -82,7 +82,7 @@ class VulkanContext {
     PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT = nullptr;
 
     //
-    void createRecourses(WindowContext *windowContext);
+    void createRecourses();
 
   private:
     void createInstance(WindowContext *windowContext);

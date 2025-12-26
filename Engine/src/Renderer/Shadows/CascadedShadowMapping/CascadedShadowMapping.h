@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__CASCADEDSHADOWMAPPING_H
+#define RAPTURE__CASCADEDSHADOWMAPPING_H
 
 #include "AssetManager/AssetManager.h"
 #include "Pipelines/GraphicsPipeline.h"
@@ -7,6 +8,7 @@
 #include "Utils/TextureFlattener.h"
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorBinding.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
@@ -45,8 +47,12 @@ struct CascadeData {
 class CascadedShadowMap {
   public:
     CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda);
-
     ~CascadedShadowMap();
+
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+
+    void beginDynamicRendering(CommandBuffer *commandBuffer);
+    void endDynamicRendering(CommandBuffer *commandBuffer);
 
     // Returns the calculated split depths for each cascade using a hybrid approach
     std::vector<float> calculateCascadeSplits(float nearPlane, float farPlane, float lambda = 0.5f);
@@ -57,12 +63,6 @@ class CascadedShadowMap {
                                                ProjectionType cameraProjectionType = ProjectionType::Perspective);
 
     uint8_t getNumCascades() const { return m_NumCascades; }
-
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                             uint32_t currentFrame);
-
-    void recordTerrainCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                    uint32_t currentFrame);
 
     std::vector<CascadeData> updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp,
                                               const CameraComponent &cameraComp);
@@ -88,10 +88,12 @@ class CascadedShadowMap {
     void createTerrainPipeline();
     void createShadowTexture();
     void createUniformBuffers();
+    void setupCommandResources();
 
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
-    void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
+    void recordTerrainCommands(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer);
+    void transitionToShaderReadableLayout(CommandBuffer *commandBuffer);
 
     // Extracts view frustum corners for a specific cascade depth slice
     // All parameters relate to the camera, not the light
@@ -142,6 +144,10 @@ class CascadedShadowMap {
 
     // MDI batching system - one per frame in flight
     std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
+
+    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__CASCADEDSHADOWMAPPING_H

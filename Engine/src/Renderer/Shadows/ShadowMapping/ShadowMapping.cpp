@@ -28,6 +28,18 @@ ShadowMap::ShadowMap(float width, float height) : m_width(width), m_height(heigh
     m_allocator = vulkanContext.getVmaAllocator();
 
     createUniformBuffers();
+    setupCommandResources();
+}
+
+void ShadowMap::setupCommandResources()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 ShadowMap::~ShadowMap() {}
@@ -40,7 +52,7 @@ void ShadowMap::createUniformBuffers()
     m_shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
 }
 
-void ShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer)
+void ShadowMap::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -53,9 +65,11 @@ void ShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffe
                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void ShadowMap::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer)
+void ShadowMap::beginDynamicRendering(CommandBuffer *commandBuffer)
 {
     RAPTURE_PROFILE_FUNCTION();
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer);
 
     // Configure depth attachment info
     m_depthAttachmentInfo = {};
@@ -76,11 +90,18 @@ void ShadowMap::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuff
     renderingInfo.pColorAttachments = nullptr;
     renderingInfo.pDepthAttachment = &m_depthAttachmentInfo;
     renderingInfo.pStencilAttachment = nullptr;
+    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void ShadowMap::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer)
+void ShadowMap::endDynamicRendering(CommandBuffer *commandBuffer)
+{
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    transitionToShaderReadableLayout(commandBuffer);
+}
+
+void ShadowMap::transitionToShaderReadableLayout(CommandBuffer *commandBuffer)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -186,16 +207,18 @@ void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const Transfor
     m_lightViewProjection = shadowMapData.lightViewProjection;
 }
 
-void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                    uint32_t currentFrame)
+CommandBuffer *ShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     m_currentFrame = currentFrame;
 
-    // Setup pipeline barriers and begin rendering
-    setupDynamicRenderingMemoryBarriers(commandBuffer);
-    beginDynamicRendering(commandBuffer);
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrame);
+    auto commandBuffer = pool->getSecondaryCommandBuffer();
+
+    SecondaryBufferInheritance inheritance{};
+    inheritance.depthFormat = m_shadowTexture->getFormat();
+    commandBuffer->beginSecondary(inheritance);
 
     // Bind pipeline
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
@@ -290,9 +313,9 @@ void ShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer
         vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexCount(), 1, 0, 0, 0);
     }
 
-    // End rendering and transition image for shader reading
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
-    transitionToShaderReadableLayout(commandBuffer);
+    commandBuffer->end();
+
+    return commandBuffer;
 }
 
 void ShadowMap::createPipeline()

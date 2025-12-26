@@ -46,7 +46,7 @@ FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::share
     m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)->add(*m_flattenedTexture);
 }
 
-void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer)
+void FlattenTexture::update(CommandBuffer *commandBuffer)
 {
 #if FLATTENING_ENABLED
     if (!m_inputTexture || !m_flattenedTexture) {

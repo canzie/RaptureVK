@@ -85,10 +85,9 @@ void ProceduralTexture::initCommandBuffer()
 
     CommandPoolConfig poolConfig{};
     poolConfig.queueFamilyIndex = vulkanContext.getComputeQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolConfig.flags = 0;
 
-    m_commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    m_commandBuffer = m_commandPool->getCommandBuffer("ProceduralTexture");
+    m_commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
 }
 
 void ProceduralTexture::initTexture()
@@ -163,10 +162,12 @@ void ProceduralTexture::generate()
         return;
     }
 
-    m_commandBuffer->reset();
-    m_commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash);
+    auto commandBuffer = pool->getPrimaryCommandBuffer();
 
-    VkCommandBuffer vkCmd = m_commandBuffer->getCommandBufferVk();
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    VkCommandBuffer vkCmd = commandBuffer->getCommandBufferVk();
 
     VkImageMemoryBarrier preBarrier{};
     preBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -217,13 +218,13 @@ void ProceduralTexture::generate()
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                          &postBarrier);
 
-    m_commandBuffer->end();
+    commandBuffer->end();
 
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
     auto queue = vulkanContext.getComputeQueue();
 
-    queue->submitQueue(m_commandBuffer, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     queue->waitIdle();
 
     m_texture->setReadyForSampling(true);

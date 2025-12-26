@@ -47,7 +47,8 @@ Shader::~Shader()
 Shader::Shader(Shader &&other) noexcept
     : m_stages(std::move(other.m_stages)), m_compileInfo(std::move(other.m_compileInfo)), m_status(other.m_status),
       m_pipelineStages(std::move(other.m_pipelineStages)), m_descriptorSetInfos(std::move(other.m_descriptorSetInfos)),
-      m_descriptorSetLayouts(std::move(other.m_descriptorSetLayouts)), m_pushConstantLayouts(std::move(other.m_pushConstantLayouts)),
+      m_descriptorSetLayouts(std::move(other.m_descriptorSetLayouts)),
+      m_pushConstantLayouts(std::move(other.m_pushConstantLayouts)),
       m_detailedPushConstants(std::move(other.m_detailedPushConstants)), m_materialSets(std::move(other.m_materialSets))
 {
     other.m_status = ShaderStatus::UNINITIALIZED;
@@ -276,8 +277,8 @@ void Shader::mergeReflectionData()
     }
 
     RP_CORE_INFO("Shader reflection data:");
-    printDescriptorSetInfos(m_descriptorSetInfos);
-    printPushConstantLayouts(pushConstantInfos);
+    // printDescriptorSetInfos(m_descriptorSetInfos);
+    // printPushConstantLayouts(pushConstantInfos);
 }
 
 void Shader::buildPipelineStages()

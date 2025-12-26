@@ -60,6 +60,18 @@ LightingPass::LightingPass(float width, float height, uint32_t framesInFlight, s
     m_handle = handle;
 
     createPipeline();
+    setupCommandResources();
+}
+
+void LightingPass::setupCommandResources()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 LightingPass::~LightingPass()
@@ -80,31 +92,30 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
     }
 
     FramebufferSpecification spec;
-    spec.depthAttachment = VK_FORMAT_D32_SFLOAT; // Standard depth format
+    // spec.depthAttachment = VK_FORMAT_D32_SFLOAT; // Standard depth format
     spec.colorAttachments.push_back(m_colorFormat);
 
     return spec;
 }
 
-void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                       SceneRenderTarget &renderTarget, uint32_t imageIndex, uint32_t frameInFlightIndex)
+CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene, SceneRenderTarget &renderTarget,
+                                             uint32_t frameInFlightIndex, const SecondaryBufferInheritance &inheritance)
 {
-
     RAPTURE_PROFILE_FUNCTION();
 
     m_currentFrame = frameInFlightIndex;
 
-    // Get render target properties
-    VkImage targetImage = renderTarget.getImage(imageIndex);
-    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, frameInFlightIndex);
+    auto commandBuffer = pool->getSecondaryCommandBuffer();
+
+    commandBuffer->beginSecondary(inheritance);
+
     VkExtent2D targetExtent = renderTarget.getExtent();
 
     // Update dimensions from target extent
     m_width = static_cast<float>(targetExtent.width);
     m_height = static_cast<float>(targetExtent.height);
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
-    beginDynamicRendering(commandBuffer, targetImageView, targetExtent);
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
     VkViewport viewport{};
@@ -187,7 +198,9 @@ void LightingPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuf
     // Draw 6 vertices for 2 triangles
     vkCmdDraw(commandBuffer->getCommandBufferVk(), 6, 1, 0, 0);
 
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    commandBuffer->end();
+
+    return commandBuffer;
 }
 
 void LightingPass::createPipeline()
@@ -297,9 +310,14 @@ void LightingPass::createPipeline()
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
 
-void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView,
-                                         VkExtent2D targetExtent)
+void LightingPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex)
 {
+
+    VkImage targetImage = renderTarget.getImage(imageIndex);
+    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    VkExtent2D targetExtent = renderTarget.getExtent();
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
 
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -318,11 +336,17 @@ void LightingPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandB
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
     renderingInfo.pDepthAttachment = VK_NULL_HANDLE;
     renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
+    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void LightingPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage)
+void LightingPass::endDynamicRendering(CommandBuffer *commandBuffer)
+{
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+}
+
+void LightingPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage)
 {
 
     VkImageMemoryBarrier colorBarrier{};

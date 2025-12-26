@@ -21,6 +21,12 @@
 - jolt???
 - look at removing the waitidles in some places like copyBuffer
 - jobify the deferred renderer command recording
+- allow for multiple heightmap
+- allow for spline point (continentlenes, peaks and valleys, and erosion)
+- materials for terrain
+- pre generated normals?
+- virtual texturing??? like decima i guess
+- phyics -> raypicking -> custom gizmo and terrain editor and mesh placer
 
 ### PHYSICS
     - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)
@@ -43,25 +49,17 @@
 - add material editor
 
 
-### Terrain Generation
-
-- make basic terrain
-- blend multiple noise layers
-- use tesselation shaders
-- generate normals, use textures, deal with collision??? 
-- add lod and spatial partitioning
-- look into clipmaps
-
-
 ### J*B SYSTEM
 #### Requirements
 
 - easy to add new jobs
 - easy to set dependencies between jobs
 - a way to cancel jobs and its children
-- a way to wait for a job to finish
 - lightweight
-- job queues can be static (dependency chain needs to be defined when the job queue is created)
+- jobs need to be able to yield
+- kind of like fibers
+- seperate io thread to defer to jobs after
+- static permanent job threads so the os does not redistribute them (like saying, oh yoink this thread, then os sees that other threads have been going for a while and take them for the one it took for itself, this cascades and caues multiple context switches for no reason)
 
 
 ### ASSET MANAGER
