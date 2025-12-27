@@ -296,6 +296,70 @@ std::shared_ptr<Texture> ProceduralTexture::generatePerlinNoise(const PerlinNois
     return generator.getTexture();
 }
 
+std::shared_ptr<Texture> ProceduralTexture::generateSimplexNoise(const SimplexNoisePushConstants &params,
+                                                                 const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle;
+    static bool s_shaderLoaded = false;
+
+    if (!s_shaderLoaded) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        auto [shader, handle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/Generators/SimplexNoise.cs.glsl");
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load SimplexNoise shader");
+            return nullptr;
+        }
+        s_shaderHandle = handle;
+        s_shaderLoaded = true;
+    }
+
+    ProceduralTexture generator(s_shaderHandle, config);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create Simplex noise generator");
+        return nullptr;
+    }
+
+    generator.setPushConstants(params);
+    generator.generate();
+
+    return generator.getTexture();
+}
+
+std::shared_ptr<Texture> ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &params,
+                                                                const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle;
+    static bool s_shaderLoaded = false;
+
+    if (!s_shaderLoaded) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        auto [shader, handle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/Generators/RidgedNoise.cs.glsl");
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load RidgedNoise shader");
+            return nullptr;
+        }
+        s_shaderHandle = handle;
+        s_shaderLoaded = true;
+    }
+
+    ProceduralTexture generator(s_shaderHandle, config);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create Ridged noise generator");
+        return nullptr;
+    }
+
+    generator.setPushConstants(params);
+    generator.generate();
+
+    return generator.getTexture();
+}
+
 std::shared_ptr<Texture> ProceduralTexture::generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params,
                                                                const ProceduralTextureConfig &config)
 {

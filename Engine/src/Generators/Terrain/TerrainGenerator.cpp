@@ -8,6 +8,8 @@
 #include "Renderer/Frustum/Frustum.h"
 #include "WindowContext/Application.h"
 
+#include <glm/gtc/packing.hpp>
+
 #include <algorithm>
 #include <cmath>
 
@@ -29,6 +31,22 @@ struct alignas(16) TerrainCullPushConstants {
 
     uint32_t indirectBufferIndices[TERRAIN_LOD_COUNT];
 };
+
+static float s_evaluateSpline(const TerrainSpline &spline, float x)
+{
+    if (spline.points.empty()) return 0.0f;
+    if (spline.points.size() == 1) return spline.points[0].y;
+    if (x <= spline.points.front().x) return spline.points.front().y;
+    if (x >= spline.points.back().x) return spline.points.back().y;
+
+    for (size_t i = 0; i < spline.points.size() - 1; ++i) {
+        if (x < spline.points[i + 1].x) {
+            float t = (x - spline.points[i].x) / (spline.points[i + 1].x - spline.points[i].x);
+            return spline.points[i].y + t * (spline.points[i + 1].y - spline.points[i].y);
+        }
+    }
+    return spline.points.back().y;
+}
 
 TerrainGenerator::~TerrainGenerator()
 {
@@ -63,8 +81,6 @@ void TerrainGenerator::shutdown()
 
     m_chunks.clear();
     m_activeChunkIndices.clear();
-    m_heightmapData.clear();
-    m_heightmapTexture.reset();
 
     for (uint32_t i = 0; i < TERRAIN_LOD_COUNT; ++i) {
         m_indexBuffers[i].reset();
@@ -184,34 +200,101 @@ void TerrainGenerator::initCullComputePipeline()
     RP_CORE_TRACE("TerrainGenerator: Cull compute pipeline initialized");
 }
 
-void TerrainGenerator::setHeightmap(std::shared_ptr<Texture> heightmap)
+void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, std::shared_ptr<Texture> texture)
 {
-    m_heightmapTexture = heightmap;
-    RP_CORE_INFO("TerrainGenerator: Heightmap texture set");
+    if (category >= TERRAIN_NC_COUNT) {
+        return;
+    }
+    m_noiseTextures[category] = texture;
 }
 
-void TerrainGenerator::generateHeightmap()
+std::shared_ptr<Texture> TerrainGenerator::getNoiseTexture(TerrainNoiseCategory category) const
 {
-    if (!m_heightmapGenerator) {
-        ProceduralTextureConfig config;
-        config.format = TextureFormat::RGBA8;
-        config.filter = TextureFilter::Linear;
-        config.wrap = TextureWrap::ClampToEdge;
-        config.srgb = false;
-        config.name = "terrain_heightmap";
+    if (category >= TERRAIN_NC_COUNT) {
+        return nullptr;
+    }
+    return m_noiseTextures[category];
+}
 
-        m_noiseParams.octaves = 4;
-        m_noiseParams.scale = 8.0f;
-        m_noiseParams.persistence = 0.5f;
-        m_noiseParams.lacunarity = 2.0f;
-        m_noiseParams.seed = 42;
+void TerrainGenerator::bakeNoiseLUT()
+{
+    constexpr uint32_t size = TERRAIN_NOISE_LUT_SIZE;
+    std::vector<uint16_t> lutData(size * size * size);
 
-        m_heightmapGenerator = std::make_unique<ProceduralTexture>("glsl/Generators/PerlinNoise.cs.glsl", config);
-        m_heightmapTexture = m_heightmapGenerator->getTexture();
+    for (uint32_t z = 0; z < size; ++z) {
+        float pv = (static_cast<float>(z) / (size - 1)) * 2.0f - 1.0f;
+        float pvFactor = s_evaluateSpline(m_multiNoiseConfig.splines[PEAKS_VALLEYS], pv);
+
+        for (uint32_t y = 0; y < size; ++y) {
+            float e = (static_cast<float>(y) / (size - 1)) * 2.0f - 1.0f;
+            float eFactor = s_evaluateSpline(m_multiNoiseConfig.splines[EROSION], e);
+
+            for (uint32_t x = 0; x < size; ++x) {
+                float c = (static_cast<float>(x) / (size - 1)) * 2.0f - 1.0f;
+                float cFactor = s_evaluateSpline(m_multiNoiseConfig.splines[CONTINENTALNESS], c);
+
+                float combined = (cFactor + eFactor + pvFactor) / 3.0f;
+                combined = glm::clamp(combined, 0.0f, 1.0f);
+
+                uint32_t idx = z * size * size + y * size + x;
+                lutData[idx] = glm::packHalf1x16(combined);
+            }
+        }
     }
 
-    m_heightmapGenerator->setPushConstants(m_noiseParams);
-    m_heightmapGenerator->generate();
+    if (!m_noiseLUT) {
+        TextureSpecification spec;
+        spec.type = TextureType::TEXTURE3D;
+        spec.format = TextureFormat::R16F;
+        spec.width = size;
+        spec.height = size;
+        spec.depth = size;
+        spec.filter = TextureFilter::Linear;
+        spec.wrap = TextureWrap::ClampToEdge;
+        spec.srgb = false;
+        m_noiseLUT = std::make_shared<Texture>(spec);
+    }
+
+    m_noiseLUT->uploadData(lutData.data(), lutData.size() * sizeof(uint16_t));
+}
+
+void TerrainGenerator::generateDefaultNoiseTextures()
+{
+    ProceduralTextureConfig config;
+    config.format = TextureFormat::RGBA8;
+    config.filter = TextureFilter::Linear;
+    config.wrap = TextureWrap::ClampToEdge;
+    config.srgb = false;
+
+    PerlinNoisePushConstants params;
+
+    params.octaves = 4;
+    params.scale = 1.5f;
+    params.persistence = 0.5f;
+    params.lacunarity = 2.0f;
+    params.seed = 100;
+    m_noiseTextures[CONTINENTALNESS] = ProceduralTexture::generatePerlinNoise(params, config);
+
+    params.octaves = 5;
+    params.scale = 4.0f;
+    params.persistence = 0.5f;
+    params.lacunarity = 2.0f;
+    params.seed = 200;
+    m_noiseTextures[EROSION] = ProceduralTexture::generatePerlinNoise(params, config);
+
+    RidgedNoisePushConstants ridgedParams;
+    ridgedParams.octaves = 6;
+    ridgedParams.scale = 8.0f;
+    ridgedParams.persistence = 0.55f;
+    ridgedParams.lacunarity = 2.0f;
+    ridgedParams.seed = 300;
+    m_noiseTextures[PEAKS_VALLEYS] = ProceduralTexture::generateRidgedNoise(ridgedParams, config);
+
+    m_multiNoiseConfig.splines[CONTINENTALNESS].points = {{-1.0f, 0.0f}, {1.0f, 1.0f}};
+    m_multiNoiseConfig.splines[EROSION].points = {{-1.0f, 0.0f}, {1.0f, 1.0f}};
+    m_multiNoiseConfig.splines[PEAKS_VALLEYS].points = {{-1.0f, 0.0f}, {1.0f, 1.0f}};
+
+    bakeNoiseLUT();
 }
 
 void TerrainGenerator::loadChunk(glm::ivec2 coord)
@@ -272,7 +355,7 @@ void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_initialized || !m_heightmapTexture) {
+    if (!m_initialized) {
         return;
     }
 
@@ -419,75 +502,6 @@ glm::ivec2 TerrainGenerator::worldToChunkCoord(float worldX, float worldZ) const
 glm::vec2 TerrainGenerator::chunkCoordToWorldCenter(glm::ivec2 coord) const
 {
     return glm::vec2(static_cast<float>(coord.x) * m_config.chunkWorldSize, static_cast<float>(coord.y) * m_config.chunkWorldSize);
-}
-
-float TerrainGenerator::sampleHeight(float worldX, float worldZ) const
-{
-    if (m_heightmapData.empty()) {
-        return 0.0f;
-    }
-
-    glm::vec2 uv = worldToHeightmapUV(worldX, worldZ);
-    float normalizedHeight = sampleHeightmapBilinear(uv.x, uv.y);
-    return (normalizedHeight - 0.5f) * m_config.heightScale;
-}
-
-glm::vec3 TerrainGenerator::sampleNormal(float worldX, float worldZ) const
-{
-    if (m_heightmapData.empty()) {
-        return glm::vec3(0.0f, 1.0f, 0.0f);
-    }
-
-    float delta = 1.0f;
-    float hL = sampleHeight(worldX - delta, worldZ);
-    float hR = sampleHeight(worldX + delta, worldZ);
-    float hD = sampleHeight(worldX, worldZ - delta);
-    float hU = sampleHeight(worldX, worldZ + delta);
-
-    glm::vec3 normal(hL - hR, 2.0f * delta, hD - hU);
-    return glm::normalize(normal);
-}
-
-bool TerrainGenerator::isInBounds(float worldX, float worldZ) const
-{
-    glm::vec2 uv = worldToHeightmapUV(worldX, worldZ);
-    return uv.x >= 0.0f && uv.x <= 1.0f && uv.y >= 0.0f && uv.y <= 1.0f;
-}
-
-float TerrainGenerator::sampleHeightmapBilinear(float u, float v) const
-{
-    if (m_heightmapData.empty()) {
-        return 0.0f;
-    }
-
-    u = std::clamp(u, 0.0f, 1.0f);
-    v = std::clamp(v, 0.0f, 1.0f);
-
-    float texX = u * static_cast<float>(m_heightmapWidth - 1);
-    float texY = v * static_cast<float>(m_heightmapHeight - 1);
-
-    uint32_t x0 = static_cast<uint32_t>(texX);
-    uint32_t y0 = static_cast<uint32_t>(texY);
-    uint32_t x1 = std::min(x0 + 1, m_heightmapWidth - 1);
-    uint32_t y1 = std::min(y0 + 1, m_heightmapHeight - 1);
-
-    float fx = texX - static_cast<float>(x0);
-    float fy = texY - static_cast<float>(y0);
-
-    float h00 = m_heightmapData[y0 * m_heightmapWidth + x0];
-    float h10 = m_heightmapData[y0 * m_heightmapWidth + x1];
-    float h01 = m_heightmapData[y1 * m_heightmapWidth + x0];
-    float h11 = m_heightmapData[y1 * m_heightmapWidth + x1];
-
-    float h0 = h00 * (1.0f - fx) + h10 * fx;
-    float h1 = h01 * (1.0f - fx) + h11 * fx;
-
-    return h0 * (1.0f - fy) + h1 * fy;
-}
-
-glm::vec2 TerrainGenerator::worldToHeightmapUV(float worldX, float worldZ) const
-{
-    return glm::vec2(worldX / m_config.terrainWorldSize + 0.5f, worldZ / m_config.terrainWorldSize + 0.5f);
 }
 
 } // namespace Rapture

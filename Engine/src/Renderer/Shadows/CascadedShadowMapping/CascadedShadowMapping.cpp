@@ -24,7 +24,10 @@ struct PushConstantsCSM {
 struct TerrainCSMPushConstants {
     uint32_t cascadeMatricesIndex;
     uint32_t chunkDataBufferIndex;
-    uint32_t heightmapIndex;
+    uint32_t continentalnessIndex;
+    uint32_t erosionIndex;
+    uint32_t peaksValleysIndex;
+    uint32_t noiseLUTIndex;
     uint32_t lodResolution;
     float heightScale;
     float terrainWorldSize;
@@ -781,7 +784,7 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, std:
 
     for (auto entity : terrainView) {
         auto &terrain = terrainView.get<TerrainComponent>(entity);
-        if (!terrain.isEnabled || !terrain.generator.isInitialized() || !terrain.generator.hasHeightmap()) {
+        if (!terrain.isEnabled || !terrain.generator.isInitialized()) {
             continue;
         }
 
@@ -806,7 +809,10 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, std:
 
         const auto &terrainConfig = terrain.generator.getConfig();
         uint32_t chunkDataBufferIndex = terrain.generator.getChunkDataBuffer()->getBindlessIndex();
-        uint32_t heightmapIndex = terrain.generator.getHeightmapTexture()->getBindlessIndex();
+        uint32_t continentalnessIndex = terrain.generator.getNoiseTexture(CONTINENTALNESS)->getBindlessIndex();
+        uint32_t erosionIndex = terrain.generator.getNoiseTexture(EROSION)->getBindlessIndex();
+        uint32_t peaksValleysIndex = terrain.generator.getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
+        uint32_t noiseLUTIndex = terrain.generator.getNoiseLUT()->getBindlessIndex();
         VkBuffer countBuffer = terrain.generator.getDrawCountBuffer()->getBufferVk();
 
         for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
@@ -816,7 +822,10 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, std:
             TerrainCSMPushConstants pc{};
             pc.cascadeMatricesIndex = m_cascadeMatricesIndex;
             pc.chunkDataBufferIndex = chunkDataBufferIndex;
-            pc.heightmapIndex = heightmapIndex;
+            pc.continentalnessIndex = continentalnessIndex;
+            pc.erosionIndex = erosionIndex;
+            pc.peaksValleysIndex = peaksValleysIndex;
+            pc.noiseLUTIndex = noiseLUTIndex;
             pc.lodResolution = getTerrainLODResolution(lod);
             pc.heightScale = terrainConfig.heightScale;
             pc.terrainWorldSize = terrainConfig.terrainWorldSize;

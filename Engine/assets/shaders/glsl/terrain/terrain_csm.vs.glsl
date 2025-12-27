@@ -25,14 +25,16 @@ layout(set = 3, binding = 1) readonly buffer TerrainChunkBuffer {
     TerrainChunkData chunks[];
 } u_chunks[];
 
-// Heightmap texture (bindless)
 layout(set = 3, binding = 0) uniform sampler2D u_textures[];
+layout(set = 3, binding = 0) uniform sampler3D u_textures3D[];
 
-// Push constants
 layout(push_constant) uniform TerrainCSMPushConstants {
     uint cascadeMatricesIndex;
     uint chunkDataBufferIndex;
-    uint heightmapIndex;
+    uint continentalnessIndex;
+    uint erosionIndex;
+    uint peaksValleysIndex;
+    uint noiseLUTIndex;
     uint lodResolution;
     float heightScale;
     float terrainWorldSize;
@@ -40,7 +42,14 @@ layout(push_constant) uniform TerrainCSMPushConstants {
 
 float sampleHeight(vec2 worldXZ) {
     vec2 uv = worldXZ / pc.terrainWorldSize + 0.5;
-    float raw = texture(u_textures[pc.heightmapIndex], uv).r;
+
+    float c = texture(u_textures[pc.continentalnessIndex], uv).r * 2.0 - 1.0;
+    float e = texture(u_textures[pc.erosionIndex], uv).r * 2.0 - 1.0;
+    float pv = texture(u_textures[pc.peaksValleysIndex], uv).r * 2.0 - 1.0;
+
+    vec3 lutCoord = vec3(c, e, pv) * 0.5 + 0.5;
+    float raw = texture(u_textures3D[pc.noiseLUTIndex], lutCoord).r;
+
     return (raw - 0.5) * pc.heightScale;
 }
 

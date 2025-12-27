@@ -17,13 +17,16 @@ layout(location = 5) in float inNormalizedHeight;
 
 
 layout(set = 3, binding = 0) uniform sampler2D u_textures[];
+layout(set = 3, binding = 0) uniform sampler3D u_textures3D[];
 
 layout(push_constant) uniform TerrainPushConstants {
     uint cameraBindlessIndex;
     uint chunkDataBufferIndex;
-    uint heightmapIndex;
-    uint tileMaterialIndex;
-    uint lodResolution;     // Vertices per edge for current LOD
+    uint continentalnessIndex;
+    uint erosionIndex;
+    uint peaksValleysIndex;
+    uint noiseLUTIndex;
+    uint lodResolution;
     float heightScale;
     float terrainWorldSize;
 } pc;
@@ -70,14 +73,21 @@ vec3 triplanarChecker(vec3 worldPos, vec3 normal, float cellSize, vec3 colorA, v
 
 float getHeightTexelWorldSize()
 {
-    ivec2 texSize = textureSize(u_textures[pc.heightmapIndex], 0);
+    ivec2 texSize = textureSize(u_textures[pc.continentalnessIndex], 0);
     return pc.terrainWorldSize / float(texSize.x);
 }
 
 float sampleHeightWorld(vec2 worldXZ)
 {
     vec2 uv = worldXZ / pc.terrainWorldSize + 0.5;
-    float raw = texture(u_textures[pc.heightmapIndex], uv).r;
+
+    float c = texture(u_textures[pc.continentalnessIndex], uv).r * 2.0 - 1.0;
+    float e = texture(u_textures[pc.erosionIndex], uv).r * 2.0 - 1.0;
+    float pv = texture(u_textures[pc.peaksValleysIndex], uv).r * 2.0 - 1.0;
+
+    vec3 lutCoord = vec3(c, e, pv) * 0.5 + 0.5;
+    float raw = texture(u_textures3D[pc.noiseLUTIndex], lutCoord).r;
+
     return (raw - 0.5) * pc.heightScale;
 }
 

@@ -14,6 +14,8 @@
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 
+#include "imguiPanels/modules/PlotEditor.h"
+
 // Implementation of HelpMarker function
 void PropertiesPanel::HelpMarker(const char *desc)
 {
@@ -855,24 +857,29 @@ void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainC
         }
 
         ImGui::Separator();
-        if (ImGui::CollapsingHeader("Noise Parameters")) {
-            auto &noiseParams = terrainComp.generator.getNoiseParams();
-            bool changed = false;
 
-            changed |= ImGui::SliderInt("Octaves", &noiseParams.octaves, 1, 8);
-            changed |= ImGui::DragFloat("Scale", &noiseParams.scale, 0.1f, 0.1f, 64.0f);
-            changed |= ImGui::DragFloat("Persistence", &noiseParams.persistence, 0.01f, 0.0f, 1.0f);
-            changed |= ImGui::DragFloat("Lacunarity", &noiseParams.lacunarity, 0.1f, 1.0f, 4.0f);
+        auto &multiNoise = terrainComp.generator.getMultiNoiseConfig();
+        bool splineChanged = false;
 
-            int seed = static_cast<int>(noiseParams.seed);
-            if (ImGui::DragInt("Seed", &seed, 1.0f, 0, 10000)) {
-                noiseParams.seed = static_cast<uint32_t>(seed);
-                changed = true;
+        const char *categoryNames[] = {"Continentalness", "Erosion", "Peaks & Valleys"};
+
+        if (ImGui::TreeNode("Multi-Noise Splines")) {
+            for (uint8_t cat = 0; cat < Rapture::TERRAIN_NC_COUNT; ++cat) {
+                auto &spline = multiNoise.splines[cat];
+                Modules::SplinePoints splinePoints =
+                    Modules::createSplinePoints(&spline.points, Modules::InterpolationType::LINEAR);
+                if (Modules::plotEditor(categoryNames[cat], splinePoints, ImVec2(0, 150))) {
+                    splineChanged = true;
+                }
+                ImGui::Spacing();
             }
-
-            if (changed) {
-                terrainComp.generator.generateHeightmap();
-            }
+            ImGui::TreePop();
         }
+
+        if (splineChanged || ImGui::Button("Rebake LUT")) {
+            terrainComp.generator.bakeNoiseLUT();
+        }
+
+        ImGui::Separator();
     }
 }

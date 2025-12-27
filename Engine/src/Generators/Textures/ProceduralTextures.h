@@ -49,6 +49,22 @@ struct PerlinNoisePushConstants {
     uint32_t seed = 0;
 };
 
+struct SimplexNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    uint32_t seed = 0;
+};
+
+struct RidgedNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    uint32_t seed = 0;
+};
+
 /**
  * @brief Push constant data for atmospheric scattering.
  *
@@ -216,6 +232,12 @@ class ProceduralTexture {
      * @return Shared pointer to the generated texture.
      */
     static std::shared_ptr<Texture> generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
+                                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    static std::shared_ptr<Texture> generateSimplexNoise(const SimplexNoisePushConstants &params = SimplexNoisePushConstants(),
+                                                         const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    static std::shared_ptr<Texture> generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
                                                         const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**

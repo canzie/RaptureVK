@@ -38,17 +38,13 @@ class TerrainGenerator {
     void init(const TerrainConfig &config);
     void shutdown();
 
-    // Heightmap management
-    void setHeightmap(std::shared_ptr<Texture> heightmap);
-    void generateHeightmap();
-    bool hasHeightmap() const { return m_heightmapTexture != nullptr; }
-
-    PerlinNoisePushConstants &getNoiseParams() { return m_noiseParams; }
-
-    // CPU height sampling (for physics, object placement)
-    float sampleHeight(float worldX, float worldZ) const;
-    glm::vec3 sampleNormal(float worldX, float worldZ) const;
-    bool isInBounds(float worldX, float worldZ) const;
+    void setNoiseTexture(TerrainNoiseCategory category, std::shared_ptr<Texture> texture);
+    std::shared_ptr<Texture> getNoiseTexture(TerrainNoiseCategory category) const;
+    MultiNoiseConfig &getMultiNoiseConfig() { return m_multiNoiseConfig; }
+    const MultiNoiseConfig &getMultiNoiseConfig() const { return m_multiNoiseConfig; }
+    void bakeNoiseLUT();
+    std::shared_ptr<Texture> getNoiseLUT() const { return m_noiseLUT; }
+    void generateDefaultNoiseTextures();
 
     // Chunk management
     void loadChunk(glm::ivec2 coord);
@@ -64,7 +60,6 @@ class TerrainGenerator {
     std::shared_ptr<StorageBuffer> getDrawCountBuffer() const { return m_drawCountBuffer; }
     VkBuffer getIndexBuffer(uint32_t lod) const;
     uint32_t getIndexCount(uint32_t lod) const { return getTerrainLODIndexCount(lod); }
-    std::shared_ptr<Texture> getHeightmapTexture() const { return m_heightmapTexture; }
     uint32_t getIndirectBufferCapacity(uint32_t lod) const { return m_indirectBufferCapacity[lod]; }
 
     // Get visible chunk count per LOD (after update)
@@ -98,10 +93,6 @@ class TerrainGenerator {
     void updateChunkGPUData();
     void runCullCompute(const glm::vec3 &cameraPos, Frustum &frustum);
 
-    // Height sampling helpers
-    float sampleHeightmapBilinear(float u, float v) const;
-    glm::vec2 worldToHeightmapUV(float worldX, float worldZ) const;
-
     TerrainConfig m_config;
     ChunkGrid m_chunks;
 
@@ -109,15 +100,9 @@ class TerrainGenerator {
     std::vector<uint32_t> m_activeChunkIndices;
     uint32_t m_nextChunkIndex = 0;
 
-    // Heightmap data (CPU-side for sampling)
-    std::vector<float> m_heightmapData;
-    uint32_t m_heightmapWidth = 0;
-    uint32_t m_heightmapHeight = 0;
-
-    // GPU heightmap texture (for vertex shader sampling)
-    std::shared_ptr<Texture> m_heightmapTexture;
-    std::unique_ptr<ProceduralTexture> m_heightmapGenerator = nullptr;
-    PerlinNoisePushConstants m_noiseParams;
+    MultiNoiseConfig m_multiNoiseConfig;
+    std::shared_ptr<Texture> m_noiseTextures[TERRAIN_NC_COUNT];
+    std::shared_ptr<Texture> m_noiseLUT;
 
     // Shared index buffers (one per LOD, grid topology)
     std::shared_ptr<IndexBuffer> m_indexBuffers[TERRAIN_LOD_COUNT];

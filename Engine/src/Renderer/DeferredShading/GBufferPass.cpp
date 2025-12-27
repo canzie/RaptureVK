@@ -15,8 +15,10 @@ struct GBufferPushConstants {
 struct TerrainGBufferPushConstants {
     uint32_t cameraBindlessIndex;
     uint32_t chunkDataBufferIndex;
-    uint32_t heightmapIndex;
-    uint32_t tileMaterialIndex;
+    uint32_t continentalnessIndex;
+    uint32_t erosionIndex;
+    uint32_t peaksValleysIndex;
+    uint32_t noiseLUTIndex;
     uint32_t lodResolution;
     float heightScale;
     float terrainWorldSize;
@@ -111,7 +113,7 @@ CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, 
 
     commandBuffer->beginSecondary(inheritance);
 
-    if (terrain && terrain->isInitialized() && terrain->hasHeightmap()) {
+    if (terrain && terrain->isInitialized()) {
         recordTerrainCommands(commandBuffer, activeScene, *terrain, currentFrame);
     }
 
@@ -782,7 +784,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_terrainPipeline || !terrain.isInitialized() || !terrain.hasHeightmap()) {
+    if (!m_terrainPipeline || !terrain.isInitialized()) {
         return;
     }
 
@@ -825,7 +827,10 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
     DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline); // Bindless textures
 
     uint32_t chunkDataBufferIndex = terrain.getChunkDataBuffer()->getBindlessIndex();
-    uint32_t heightmapIndex = terrain.getHeightmapTexture()->getBindlessIndex();
+    uint32_t continentalnessIndex = terrain.getNoiseTexture(CONTINENTALNESS)->getBindlessIndex();
+    uint32_t erosionIndex = terrain.getNoiseTexture(EROSION)->getBindlessIndex();
+    uint32_t peaksValleysIndex = terrain.getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
+    uint32_t noiseLUTIndex = terrain.getNoiseLUT()->getBindlessIndex();
 
     const auto &terrainConfig = terrain.getConfig();
     VkBuffer countBuffer = terrain.getDrawCountBuffer()->getBufferVk();
@@ -836,11 +841,13 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
         TerrainGBufferPushConstants pc{};
         pc.cameraBindlessIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame);
         pc.chunkDataBufferIndex = chunkDataBufferIndex;
-        pc.heightmapIndex = heightmapIndex;
+        pc.continentalnessIndex = continentalnessIndex;
+        pc.erosionIndex = erosionIndex;
+        pc.peaksValleysIndex = peaksValleysIndex;
+        pc.noiseLUTIndex = noiseLUTIndex;
         pc.lodResolution = getTerrainLODResolution(lod);
         pc.heightScale = terrainConfig.heightScale;
         pc.terrainWorldSize = terrainConfig.terrainWorldSize;
-        pc.tileMaterialIndex = 0;
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (auto shader = m_terrainShader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {

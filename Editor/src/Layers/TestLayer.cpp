@@ -86,7 +86,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Load Sponza model
     auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
-    if (std::filesystem::exists(sponzaPath)) {
+    if (std::filesystem::exists(sponzaPath) && false) {
         Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
         auto loader = Rapture::ModelLoadersCache::getLoader(sponzaPath, activeScene);
         loader->loadModel(sponzaPath.string());
@@ -178,7 +178,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
         auto terrainEntity = activeScene->createEntity("Terrain");
         auto &terrainComp = terrainEntity.addComponent<Rapture::TerrainComponent>(terrainConfig);
-        terrainComp.generator.generateHeightmap();
+        terrainComp.generator.generateDefaultNoiseTextures();
         terrainComp.generator.loadChunksAroundPosition(glm::vec3(0.0f), chunkRadius);
 
         Rapture::RP_INFO("Terrain entity created with {} chunks", terrainComp.generator.getLoadedChunkCount());

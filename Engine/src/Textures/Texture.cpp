@@ -1034,13 +1034,12 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
 {
     if (m_image == VK_NULL_HANDLE) {
         RP_CORE_ERROR("Cannot copy buffer to image: VkImage is VK_NULL_HANDLE");
-        throw std::runtime_error("Cannot copy buffer to image: VkImage is VK_NULL_HANDLE");
+        return;
     }
 
     auto &app = Application::getInstance();
     auto queue = app.getVulkanContext().getGraphicsQueue();
 
-    // Get or create a command pool for graphics operations
     CommandPoolConfig poolConfig{};
     poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
@@ -1053,33 +1052,92 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    std::vector<VkBufferImageCopy> bufferCopyRegions;
-    uint32_t layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
-    VkDeviceSize offset = 0;
-    VkDeviceSize layerSize = static_cast<VkDeviceSize>(width) * height * 4; // Assuming RGBA8
+    VkDeviceSize bytesPerPixel = getBytesPerPixel(m_spec.format);
 
-    for (uint32_t layer = 0; layer < layerCount; ++layer) {
+    if (m_spec.type == TextureType::TEXTURE3D) {
         VkBufferImageCopy region{};
-        region.bufferOffset = offset;
+        region.bufferOffset = 0;
         region.bufferRowLength = 0;
         region.bufferImageHeight = 0;
         region.imageSubresource.aspectMask = getImageAspectFlags(m_spec.format);
         region.imageSubresource.mipLevel = 0;
-        region.imageSubresource.baseArrayLayer = layer;
+        region.imageSubresource.baseArrayLayer = 0;
         region.imageSubresource.layerCount = 1;
         region.imageOffset = {0, 0, 0};
-        region.imageExtent = {width, height, 1};
-        bufferCopyRegions.push_back(region);
-        offset += layerSize;
-    }
+        region.imageExtent = {width, height, m_spec.depth};
 
-    vkCmdCopyBufferToImage(commandBuffer->getCommandBufferVk(), buffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           static_cast<uint32_t>(bufferCopyRegions.size()), bufferCopyRegions.data());
+        vkCmdCopyBufferToImage(commandBuffer->getCommandBufferVk(), buffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                               &region);
+    } else {
+        std::vector<VkBufferImageCopy> bufferCopyRegions;
+        uint32_t layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
+        VkDeviceSize offset = 0;
+        VkDeviceSize layerSize = static_cast<VkDeviceSize>(width) * height * bytesPerPixel;
+
+        for (uint32_t layer = 0; layer < layerCount; ++layer) {
+            VkBufferImageCopy region{};
+            region.bufferOffset = offset;
+            region.bufferRowLength = 0;
+            region.bufferImageHeight = 0;
+            region.imageSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+            region.imageSubresource.mipLevel = 0;
+            region.imageSubresource.baseArrayLayer = layer;
+            region.imageSubresource.layerCount = 1;
+            region.imageOffset = {0, 0, 0};
+            region.imageExtent = {width, height, 1};
+            bufferCopyRegions.push_back(region);
+            offset += layerSize;
+        }
+
+        vkCmdCopyBufferToImage(commandBuffer->getCommandBufferVk(), buffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               static_cast<uint32_t>(bufferCopyRegions.size()), bufferCopyRegions.data());
+    }
 
     commandBuffer->end();
 
     queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     queue->waitIdle();
+}
+
+void Texture::uploadData(const void *data, size_t dataSize, size_t threadId)
+{
+    if (m_image == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("Cannot upload data: VkImage is VK_NULL_HANDLE");
+        return;
+    }
+
+    auto &app = Application::getInstance();
+    VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    VkBuffer stagingBuffer;
+    VmaAllocation stagingAllocation;
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = dataSize;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+    if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create staging buffer for texture upload");
+        return;
+    }
+
+    void *mapped;
+    vmaMapMemory(allocator, stagingAllocation, &mapped);
+    memcpy(mapped, data, dataSize);
+    vmaUnmapMemory(allocator, stagingAllocation);
+
+    transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, threadId);
+    copyBufferToImage(stagingBuffer, m_spec.width, m_spec.height, threadId);
+    transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, threadId);
+
+    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+
+    m_readyForSampling = true;
 }
 
 } // namespace Rapture

@@ -5,8 +5,26 @@
 
 #include <cstdint>
 #include <functional>
+#include <vector>
 
 namespace Rapture {
+
+constexpr uint32_t TERRAIN_NOISE_LUT_SIZE = 16;
+
+enum TerrainNoiseCategory : uint8_t {
+    CONTINENTALNESS = 0,
+    EROSION = 1,
+    PEAKS_VALLEYS = 2,
+    TERRAIN_NC_COUNT
+};
+
+struct TerrainSpline {
+    std::vector<glm::vec2> points;
+};
+
+struct MultiNoiseConfig {
+    TerrainSpline splines[TERRAIN_NC_COUNT];
+};
 
 // LOD System Constants
 constexpr uint32_t TERRAIN_LOD_COUNT = 4;

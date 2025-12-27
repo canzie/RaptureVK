@@ -37,6 +37,8 @@ class Texture : public std::enable_shared_from_this<Texture> {
 
     void loadImageFromFile(size_t threadId = 0);
 
+    void uploadData(const void *data, size_t dataSize, size_t threadId = 0);
+
     void copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLayout newLayout,
                        VkSemaphore waitSemaphore = VK_NULL_HANDLE, VkSemaphore signalSemaphore = VK_NULL_HANDLE,
                        VkCommandBuffer extCommandBuffer = VK_NULL_HANDLE, bool useInternalFence = true);
