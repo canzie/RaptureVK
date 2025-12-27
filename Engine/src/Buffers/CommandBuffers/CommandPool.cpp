@@ -10,7 +10,7 @@ namespace Rapture {
 // NVIDIA driver has internal state accumulation issues with vkResetCommandPool causing growing latency.
 // When enabled, uses VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT and skips vkResetCommandPool entirely.
 // Command buffers reset implicitly on vkBeginCommandBuffer instead.
-#define RAPTURE_SKIP_COMMAND_POOL_RESET 1
+#define RAPTURE_SKIP_COMMAND_POOL_RESET 0
 
 std::unordered_map<CommandPoolHash, std::vector<std::unique_ptr<CommandPool>>> CommandPoolManager::s_commandPools;
 std::mutex CommandPoolManager::s_mutex;

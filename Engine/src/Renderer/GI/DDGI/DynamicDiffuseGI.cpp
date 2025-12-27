@@ -828,7 +828,7 @@ void DynamicDiffuseGI::updateProbeVolume()
         return;
     }
 
-    m_ProbeInfoBuffer->addDataGPU(&m_ProbeVolume, sizeof(ProbeVolume), 0);
+    m_ProbeInfoBuffer->addData(&m_ProbeVolume, sizeof(ProbeVolume), 0);
     m_isVolumeDirty = false;
 }
 
@@ -875,8 +875,8 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
 
     m_ProbeVolume = probeVolume;
 
-    m_ProbeInfoBuffer = std::make_shared<UniformBuffer>(sizeof(ProbeVolume), BufferUsage::STATIC, m_allocator);
-    m_ProbeInfoBuffer->addDataGPU(&probeVolume, sizeof(ProbeVolume), 0);
+    m_ProbeInfoBuffer = std::make_shared<UniformBuffer>(sizeof(ProbeVolume), BufferUsage::STREAM, m_allocator);
+    m_ProbeInfoBuffer->addData(&probeVolume, sizeof(ProbeVolume), 0);
 
     // Add probe volume UBO to the descriptor manager immediately
     auto probeInfoSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);

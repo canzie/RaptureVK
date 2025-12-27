@@ -3,9 +3,16 @@
 #include <array>
 #include <string>
 
-// Tracy profiling is enabled by default in debug builds and can be manually enabled in release builds
+// ============================================================================
+// TRACY PROFILING TOGGLE
+// Set to 0 to completely disable Tracy profiling (useful for debugging issues)
+// Set to 1 to enable Tracy profiling
+// ============================================================================
+#define RAPTURE_USE_TRACY 1
+
+// Tracy profiling is enabled based on the toggle above AND debug mode
 #ifndef RAPTURE_TRACY_PROFILING_ENABLED
-#if defined(RAPTURE_DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
+#if RAPTURE_USE_TRACY && (defined(RAPTURE_DEBUG) || defined(_DEBUG) || !defined(NDEBUG))
 #define RAPTURE_TRACY_PROFILING_ENABLED 1
 #else
 #define RAPTURE_TRACY_PROFILING_ENABLED 0
@@ -16,6 +23,9 @@
 #if RAPTURE_TRACY_PROFILING_ENABLED
 #ifndef TRACY_ENABLE
 #define TRACY_ENABLE
+#endif
+#ifndef TRACY_MEMORY
+#define TRACY_MEMORY
 #endif
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -36,7 +46,7 @@
 #include <vulkan/vulkan.h>
 
 // Define profiling macros based on Tracy availability
-#if defined(RAPTURE_DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
+#if RAPTURE_TRACY_PROFILING_ENABLED
 // CPU profiling
 #define RAPTURE_PROFILE_FUNCTION()       ZoneScoped
 #define RAPTURE_PROFILE_SCOPE(name)      ZoneScopedN(name)

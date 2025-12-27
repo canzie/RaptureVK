@@ -141,7 +141,8 @@ void TerrainGenerator::createIndirectBuffer()
     constexpr uint32_t initialCapacity = 64;
     for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
         VkDeviceSize bufferSize = initialCapacity * sizeof(VkDrawIndexedIndirectCommand);
-        m_indirectBuffers[lod] = std::make_shared<StorageBuffer>(bufferSize, BufferUsage::STATIC, vc.getVmaAllocator(), indirectFlags);
+        m_indirectBuffers[lod] =
+            std::make_shared<StorageBuffer>(bufferSize, BufferUsage::STATIC, vc.getVmaAllocator(), indirectFlags);
         m_indirectBufferCapacity[lod] = initialCapacity;
     }
 
@@ -338,8 +339,8 @@ void TerrainGenerator::runCullCompute(const glm::vec3 &cameraPos, Frustum &frust
     fillBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     fillBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     fillBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &fillBarrier, 0, nullptr, 0,
-                         nullptr);
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &fillBarrier, 0, nullptr,
+                         0, nullptr);
 
     m_cullPipeline->bind(cmd);
     DescriptorManager::bindSet(3, commandBuffer, m_cullPipeline);
@@ -376,7 +377,7 @@ void TerrainGenerator::runCullCompute(const glm::vec3 &cameraPos, Frustum &frust
 
     auto queue = vc.getComputeQueue();
     queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
-    queue->waitIdle();
+    // queue->waitIdle();
 }
 
 VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const

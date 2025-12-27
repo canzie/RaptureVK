@@ -47,7 +47,6 @@ void RtInstanceData::update(std::shared_ptr<Scene> scene)
 {
     auto tlas = scene->getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
-        RP_CORE_ERROR("No TLAS found");
         return;
     }
 
