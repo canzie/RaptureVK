@@ -16,7 +16,6 @@
 - fix stencil buffer
 - shader hot reloading
 
-- look at csm flickering again
 - material editor/viewer
 - jolt???
 - look at removing the waitidles in some places like copyBuffer

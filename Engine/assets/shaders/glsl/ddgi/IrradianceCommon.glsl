@@ -68,6 +68,14 @@ float LightWindowing(float distanceToLight, float maxDistance) {
     return pow(clamp(1.0 - pow((distanceToLight / maxDistance), 4), 0.0, 1.0), 2);
 }
 
+float SpotAttenuation(vec3 spotDirection, vec3 lightDirection, float umbra, float penumbra)
+{
+    // Spot attenuation function from Frostbite, pg 115 in RTR4
+    float cosTheta = clamp(dot(spotDirection, lightDirection), 0.0, 1.0);
+    float t = clamp((cosTheta - cos(umbra)) / (cos(penumbra) - cos(umbra)), 0.0, 1.0);
+    return t * t;
+}
+
 /**
  * Evaluate direct lighting for the current surface and the directional light using ray-traced visibility.
  */
@@ -98,10 +106,32 @@ vec3 EvaluateDirectionalLight(vec3 surfaceNormal, vec3 hitPositionWorld, SunProp
     return sunProperties.color.xyz * sunProperties.color.w * NdotL * visibility;
 }
 
-vec3 EvaluateSpotLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties sunProperties)
+vec3 EvaluateSpotLight(vec3 surfaceNormal, vec3 hitPositionWorld, SunProperties sunProperties)
 {   
 
-    return vec3(0.0);
+    float normalBias = 0.008; // Small bias to avoid self-intersection
+    float viewBias = 0.0001; 
+
+    vec3 lightVector = (sunProperties.position.xyz - hitPositionWorld);
+    float lightDistance = length(lightVector);
+    float lightRange = sunProperties.direction.w;
+
+    if (lightDistance > lightRange) return vec3(0.0);
+
+    float tmax = (lightDistance - viewBias);
+    float visibility = LightVisibility(hitPositionWorld, surfaceNormal, lightVector, tmax, normalBias, viewBias);
+
+    if (visibility <= 0.f) return vec3(0.0);
+
+    // Compute lighting
+    vec3 lightDirection = normalize(lightVector);
+    float NdotL = max(dot(surfaceNormal, lightDirection), 0.0);
+    vec3 spotDirection = normalize(sunProperties.direction.xyz);
+    float attenuation = SpotAttenuation(spotDirection, -lightDirection, sunProperties.spotAngles.x, sunProperties.spotAngles.y);
+    float falloff = LightFalloff(lightDistance);
+    float window = LightWindowing(lightDistance, lightRange);
+
+    return sunProperties.color.xyz * sunProperties.color.w * NdotL * attenuation * falloff * window * visibility;
 }
 
 vec3 EvaluatePointLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties PointLight)
@@ -148,14 +178,11 @@ vec3 DirectDiffuseLighting(vec3 albedo, vec3 surfaceNormal, vec3 hitPositionWorl
         if (light.position.w == 1) { // Directional
              totalLighting += EvaluateDirectionalLight(surfaceNormal, hitPositionWorld, light, shadingNormal);
         } else if (light.position.w == 0) { // Point
-             totalLighting += EvaluatePointLight(shadingNormal, hitPositionWorld, light);
+             totalLighting += EvaluatePointLight(surfaceNormal, hitPositionWorld, light);
         } else if (light.position.w == 2) { // Spot
-             totalLighting += EvaluateSpotLight(shadingNormal, hitPositionWorld, light);
+             totalLighting += EvaluateSpotLight(surfaceNormal, hitPositionWorld, light);
         }
     }
-
-    //vec3 lighting = EvaluateDirectionalLight(shadingNormal, hitPositionWorld, sunProperties);
-    //vec3 lighting = EvaluatePointLight(shadingNormal, hitPositionWorld, sunProperties);
 
     return (brdf * totalLighting);
 }

@@ -121,7 +121,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
                                                                           45.0f                        // Outer cone angle (degrees)
     );
     spotLightComp.castsShadow = false;
-    // spotLight.addComponent<Rapture::ShadowComponent>(2048.0f, 2048.0f);
+    spotLight.addComponent<Rapture::ShadowComponent>(1028.0f, 1028.0f);
 
     // Create a directional light with CSM (sun) - pointing down into Sponza
     // Note: Rotation is in RADIANS

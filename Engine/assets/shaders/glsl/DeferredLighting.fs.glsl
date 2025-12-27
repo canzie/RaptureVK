@@ -12,19 +12,17 @@ layout(location = 0) out vec4 outColor;
 layout(location = 0) in vec2 fragTexCoord;
 
 
-// Define max light count - must match the C++ side
-#define MAX_LIGHTS 16
-
 // Light types
 #define LIGHT_TYPE_POINT       0
 #define LIGHT_TYPE_DIRECTIONAL 1
 #define LIGHT_TYPE_SPOT        2
 
+#define MAX_CASCADES 4
+
 // Add a debug mode flag at the top
 #define DEBUG_SPOTLIGHTS 0
-#define MAX_CASCADES 4
-#define MAX_SHADOW_CASTERS 4
-#define DEBUG_CASCADES 1
+
+#define DEBUG_CASCADES 0
 #define DEBUG_DIRECTIONAL_SHADOWS 0  // Set to 1 to enable debugging
 #define DEBUG_SHADOW_COORDS 0
 #define USE_PCF 0
@@ -165,46 +163,31 @@ float calculateAttenuation(vec3 lightPos, vec3 fragPos, float range) {
     float distance = length(lightPos - fragPos);
     float attenuation = 1.0;
     
-    // Apply attenuation only if it's a point or spot light with specified range
-    if (range > 0.0) {
-        // Quadratic attenuation with range control
-        float rangeSquared = range * range;
-        attenuation = clamp(1.0 - (distance * distance) / rangeSquared, 0.0, 1.0);
-        attenuation *= attenuation; // Apply squared falloff for smoother transition
-    }
+    float rangeSquared = range * range;
+    attenuation = clamp(1.0 - (distance * distance) / rangeSquared, 0.0, 1.0);
+    attenuation *= attenuation; // Apply squared falloff for smoother transition
+    
     
     return attenuation;
 }
 
-// Calculate spot light cone effect
-float calculateSpotEffect(vec3 lightToFrag, vec3 spotDirection, float cosInnerAngle, float cosOuterAngle) {
-    // lightToFrag: vector from light to fragment (points toward the fragment)
-    // spotDirection: direction the spotlight is pointing (points away from the light)
-    
-    // Calculate the cosine of the angle between the negative light-to-fragment direction 
-    // and the spotlight direction.
-    // dot(-lightToFragDir, spotDirection) gives cos(angle between them)
-    float cosAngle = dot(-lightToFrag, spotDirection); 
-    
-#if DEBUG_SPOTLIGHTS
-    // For debugging, return a clear visualization
-    // 0.0 = outside cone (black)
-    // 0.25 = between outer and inner (red)
-    // 1.0 = inside inner cone (green)
-    if (cosAngle < cosOuterAngle)
-        return 0.0; // Outside cone
-    else if (cosAngle < cosInnerAngle)
-        return 0.25; // Between outer and inner cone
-    else
-        return 1.0; // Inside inner cone
-#else
-    if (cosAngle < cosOuterAngle) return 0.0;
-    
-    if (cosAngle > cosInnerAngle) return 1.0;
-    
-    return smoothstep(cosOuterAngle, cosInnerAngle, cosAngle);
-#endif
+float SpotAttenuation(vec3 spotDirection, vec3 lightDirection, float umbra, float penumbra)
+{
+    // Spot attenuation function from Frostbite, pg 115 in RTR4
+    float cosTheta = clamp(dot(spotDirection, lightDirection), 0.0, 1.0);
+    float t = clamp((cosTheta - cos(umbra)) / (cos(penumbra) - cos(umbra)), 0.0, 1.0);
+    return t * t;
 }
+
+float LightFalloff(float distanceToLight) {
+    return 1.0 / pow(max(distanceToLight, 1.0), 2);
+}
+
+float LightWindowing(float distanceToLight, float maxDistance) {
+    return pow(clamp(1.0 - pow((distanceToLight / maxDistance), 4), 0.0, 1.0), 2);
+}
+
+
 
 vec3 calculateLightContribution(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float roughness, float ao, vec3 lightColor, float intensity) {
     vec3 H = normalize(V + L);
@@ -251,7 +234,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
     
 #if DEBUG_SHADOW_COORDS
     // Debug: Visualize shadow coordinates for directional lights
-    if (shadowInfo.type == 1) { // Directional light
+    if (shadowInfo.type == LIGHT_TYPE_DIRECTIONAL) { // Directional light
         // Show coordinates as colors
         vec3 debugColor = vec3(projCoords.xy, projCoords.z * 0.1);
         return length(debugColor); // Return a debug value
@@ -264,7 +247,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         
 #if DEBUG_DIRECTIONAL_SHADOWS
         // Debug: Show fragments outside shadow frustum as red for directional lights
-        if (shadowInfo.type == 1) {
+        if (shadowInfo.type == LIGHT_TYPE_DIRECTIONAL) {
             return 0.0; /
         }
 #endif
@@ -286,10 +269,10 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         float cascadeBiasMultiplier = 1.0 / (1.0 + float(cascadeIndex) * 0.5);
 
         float distanceScale = 1.0;
-        if (shadowInfo.type == 2) { // Spotlight
+        if (shadowInfo.type == LIGHT_TYPE_SPOT) { // Spotlight
             float viewDepth = abs(fragPosLightSpace.z);
             distanceScale = mix(1.0, 3.0, clamp(viewDepth / 50.0, 0.0, 1.0));
-        }else if (shadowInfo.type == 1) { // Directional light
+        }else if (shadowInfo.type == LIGHT_TYPE_DIRECTIONAL) { // Directional light
             distanceScale = 0.5;
         }
 
@@ -327,10 +310,10 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
 
         float distanceScale = 1.0;
-        if (shadowInfo.type == 2) { // Spotlight
+        if (shadowInfo.type == LIGHT_TYPE_SPOT) { // Spotlight
             float viewDepth = abs(fragPosLightSpace.z);
             distanceScale = mix(1.0, 3.0, clamp(viewDepth / 50.0, 0.0, 1.0));
-        } else if (shadowInfo.type == 1) { // Directional light
+        } else if (shadowInfo.type == LIGHT_TYPE_DIRECTIONAL) { // Directional light
             distanceScale = 0.5;
         }
 
@@ -500,34 +483,18 @@ void main() {
 #endif
         }
         else if (abs(lightType - 2.0) < 0.1) { // Spot light
-            lightDirWorld = normalize(lightPos - fragPos); 
-            attenuation = calculateAttenuation(lightPos, fragPos, lightRange);
+            vec3 lightVector = (lightPos - fragPos);
 
-            attenuation *= calculateSpotEffect(
-                lightDirWorld,            
-                normalize(light.direction.xyz), 
-                light.spotAngles.x, 
-                light.spotAngles.y
-            );
-            
+            lightDirWorld = normalize(lightVector); 
+            float lightDistance = length(lightVector);
+            float  falloff = LightFalloff(lightDistance);
+            float  window = LightWindowing(lightDistance, lightRange);
+            attenuation = SpotAttenuation(normalize(light.direction.xyz), -lightDirWorld, light.spotAngles.x, light.spotAngles.y);
+            attenuation *= falloff * window;
         }
         else {
             continue;
-        }
-
-#if DEBUG_SPOTLIGHTS
-        if (abs(lightType - 2.0) < 0.1 && attenuation > 0.0) { 
-           float spotEffectValue = calculateSpotEffect(lightDirWorld, normalize(light.direction.xyz), light.spotAngles.x, light.spotAngles.y);
-           if (spotEffectValue < 0.01) { // Outside
-               lightColor = vec3(1.0, 0.0, 1.0); // Purple
-           } else if (spotEffectValue < 0.99) { // Penumbra
-                lightColor = vec3(1.0, 0.0, 0.0); // Red
-           } else { // Umbra
-                lightColor = vec3(0.0, 1.0, 0.0); // Green
-           }
-           attenuation = 1.0; 
-        }
-#endif   
+        } 
 
 
         float shadowFactor = 1.0;
