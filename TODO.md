@@ -20,9 +20,14 @@
 - material editor/viewer
 - jolt???
 - look at removing the waitidles in some places like copyBuffer
-- jobify the deferred renderer command recording
-- allow for multiple heightmap
-- allow for spline point (continentlenes, peaks and valleys, and erosion)
+- parallise/jobify shader compilation
+- add material to asset manager
+- add model to the asset manager
+  - ditinction between static and dynamic meshes here
+  - the asset importer in the editor will be able to set these options and they can be either metadata or ...
+    - editor settings could be static/dynamic, prefab options?
+    - animation options etc (once they exist)
+    - checkox for importing material from gltf and auto making the materials and applying them
 - materials for terrain
 - pre generated normals?
 - virtual texturing??? like decima i guess
@@ -51,16 +56,7 @@
 
 ### J*B SYSTEM
 #### Requirements
-
-- easy to add new jobs
-- easy to set dependencies between jobs
-- a way to cancel jobs and its children
-- lightweight
-- jobs need to be able to yield
-- kind of like fibers
-- seperate io thread to defer to jobs after
-- static permanent job threads so the os does not redistribute them (like saying, oh yoink this thread, then os sees that other threads have been going for a while and take them for the one it took for itself, this cascades and caues multiple context switches for no reason)
-
+- see design document
 
 ### ASSET MANAGER
 - materials in the asset manager -> Material Graph editor
@@ -71,8 +67,6 @@
 - fix CSM on triple buffering
 - optimisations
     - lighting pass optimisations
-- [ 9 implement a weakptr caching system in the bindings -> resize support (after the base works) ]
-- fix the issue where not rendering the sponza scene -> not tlas -> crash, should be able to render empty scene or a full scene no matter what (except vertex only meshes)
 
 --------------------------------
 
@@ -80,9 +74,12 @@
 
 - static meshes
 - ssao
-- path tracer ...
-- Photometry (use camera settings to calculate the correct exposure)
+- ss reflections
 - animations
+- job system
+- scripting
+- jolt
+- Photometry (use camera settings to calculate the correct exposure)
 - giga serializaiton
 - post processing
 - some limit testing

@@ -128,12 +128,14 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     std::vector<CascadeData> cascadeData(m_NumCascades);
     m_lightViewProjections.resize(m_NumCascades);
 
-    // Light direction and up vector for view matrix
     glm::vec3 lightDirection = glm::normalize(lightDir);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-    if (std::abs(glm::dot(lightDirection, up)) > 0.99f) {
+    if (std::abs(lightDirection.y) < 0.99f) {
+        up = glm::vec3(0.0f, 1.0f, 0.0f);
+    } else {
         up = glm::vec3(0.0f, 0.0f, 1.0f);
     }
+    up = glm::normalize(up - lightDirection * glm::dot(up, lightDirection));
 
     for (uint8_t cascadeIdx = 0; cascadeIdx < m_NumCascades; cascadeIdx++) {
         cascadeData[cascadeIdx].nearPlane = cascadeSplits[cascadeIdx];
@@ -150,8 +152,9 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
         }
         frustumCenter /= 8.0f;
 
-        // 3. Create Light View Matrix, looking at the cascade's center
-        glm::mat4 lightViewMatrix = glm::lookAt(frustumCenter - lightDirection, frustumCenter, up);
+        float lightDistance = glm::length(frustumCorners[0] - frustumCenter) * 2.0f;
+        glm::vec3 lightPos = frustumCenter - (lightDirection * lightDistance);
+        glm::mat4 lightViewMatrix = glm::lookAt(lightPos, frustumCenter, up);
 
         // 4. Find AABB of the cascade frustum in light-space
         float minX = std::numeric_limits<float>::max();
@@ -184,22 +187,24 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
         frustumCenterLS.x = std::floor(frustumCenterLS.x / texelSizeX) * texelSizeX;
         frustumCenterLS.y = std::floor(frustumCenterLS.y / texelSizeY) * texelSizeY;
 
-        // Re-derive min/max in light-space using snapped center
-        minX = frustumCenterLS.x - orthoWidth * 0.5f;
-        maxX = frustumCenterLS.x + orthoWidth * 0.5f;
-        minY = frustumCenterLS.y - orthoHeight * 0.5f;
-        maxY = frustumCenterLS.y + orthoHeight * 0.5f;
+        // Add padding to X/Y to ensure coverage at all angles
+        float xPadding = orthoWidth * 0.1f;
+        float yPadding = orthoHeight * 0.1f;
 
-        // Add padding to avoid clipping issues
-        constexpr float zMult = 10.0f;
-        if (minZ < 0) minZ *= zMult;
-        else minZ /= zMult;
-        if (maxZ < 0) maxZ /= zMult;
-        else maxZ *= zMult;
+        minX = frustumCenterLS.x - (orthoWidth * 0.5f + xPadding);
+        maxX = frustumCenterLS.x + (orthoWidth * 0.5f + xPadding);
+        minY = frustumCenterLS.y - (orthoHeight * 0.5f + yPadding);
+        maxY = frustumCenterLS.y + (orthoHeight * 0.5f + yPadding);
+
+        float zRange = maxZ - minZ;
+        float zPadding = zRange * 2.0f;
+        minZ = minZ - zPadding;
+        maxZ = maxZ + zPadding;
 
         // 5. Create the orthographic projection for this cascade (now stabilized)
         glm::mat4 lightProjectionMatrix = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
 
+        // Vulkan Y-flip for correct coordinate system
         lightProjectionMatrix[1][1] *= -1;
 
         // 6. Store Final Matrix
@@ -597,8 +602,8 @@ void CascadedShadowMap::createPipeline()
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT; // Use front face culling for shadow mapping
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_TRUE;      // Enable depth bias
-    rasterizer.depthBiasConstantFactor = 2.0f; // Adjust these values based on your needs
+    rasterizer.depthBiasEnable = VK_TRUE;
+    rasterizer.depthBiasConstantFactor = 2.0f;
     rasterizer.depthBiasClamp = 0.0f;
     rasterizer.depthBiasSlopeFactor = 2.0f;
 

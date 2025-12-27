@@ -86,7 +86,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Load Sponza model
     auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
-    if (std::filesystem::exists(sponzaPath) && false) {
+    if (std::filesystem::exists(sponzaPath)) {
         Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
         auto loader = Rapture::ModelLoadersCache::getLoader(sponzaPath, activeScene);
         loader->loadModel(sponzaPath.string());
@@ -120,8 +120,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
                                                                           30.0f,                       // Inner cone angle (degrees)
                                                                           45.0f                        // Outer cone angle (degrees)
     );
-    spotLightComp.castsShadow = true;
-    spotLight.addComponent<Rapture::ShadowComponent>(2048.0f, 2048.0f);
+    spotLightComp.castsShadow = false;
+    // spotLight.addComponent<Rapture::ShadowComponent>(2048.0f, 2048.0f);
 
     // Create a directional light with CSM (sun) - pointing down into Sponza
     // Note: Rotation is in RADIANS
@@ -143,7 +143,6 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         // Renderer will query for SkyboxComponent directly
     }
 
-    // Test procedural texture generation
     {
         Rapture::ProceduralTextureConfig config;
         config.name = "test_white_noise";
@@ -153,7 +152,6 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         }
     }
 
-    // Test atmospheric scattering texture generation
     {
         Rapture::ProceduralTextureConfig config;
         config.name = "test_atmosphere_noon";
@@ -180,7 +178,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         auto &terrainComp = terrainEntity.addComponent<Rapture::TerrainComponent>(terrainConfig);
         terrainComp.generator.generateDefaultNoiseTextures();
         terrainComp.generator.loadChunksAroundPosition(glm::vec3(0.0f), chunkRadius);
-
+        terrainComp.isEnabled = false;
         Rapture::RP_INFO("Terrain entity created with {} chunks", terrainComp.generator.getLoadedChunkCount());
     }
 
