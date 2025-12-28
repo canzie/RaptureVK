@@ -47,6 +47,9 @@ layout(push_constant) uniform TerrainPushConstants {
     uint lodResolution;
     float heightScale;
     float terrainWorldSize;
+    uint grassMaterialIndex;
+    uint rockMaterialIndex;
+    uint snowMaterialIndex;
 } pc;
 
 float sampleMultiNoise(vec2 worldXZ) {

@@ -2,19 +2,21 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
-// GBuffer outputs
+#include "common/MaterialCommon.glsl"
+
 layout(location = 0) out vec4 gPositionDepth;
 layout(location = 1) out vec4 gNormal;
 layout(location = 2) out vec4 gAlbedoSpec;
 layout(location = 3) out vec4 gMaterial;
 
-// Inputs from vertex shader
 layout(location = 0) in vec4 inFragPosDepth;
 layout(location = 3) in flat uint inChunkIndex;
 layout(location = 4) in flat uint inLOD;
 layout(location = 5) in float inNormalizedHeight;
 
-
+layout(set = 1, binding = 0) uniform MaterialDataBuffer {
+    MaterialData data;
+} u_materials[];
 
 layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 layout(set = 3, binding = 0) uniform sampler3D u_textures3D[];
@@ -29,56 +31,17 @@ layout(push_constant) uniform TerrainPushConstants {
     uint lodResolution;
     float heightScale;
     float terrainWorldSize;
+    uint grassMaterialIndex;
+    uint rockMaterialIndex;
+    uint snowMaterialIndex;
 } pc;
 
-// Height-based color gradient (cold to warm)
-vec3 heightToColor(float t) {
-    // Cold (blue) to warm (orange/red) gradient
-    vec3 cold = vec3(0.1, 0.3, 0.6);      // Deep blue
-    vec3 mid1 = vec3(0.2, 0.6, 0.4);      // Teal/green
-    vec3 mid2 = vec3(0.6, 0.7, 0.3);      // Yellow-green
-    vec3 warm = vec3(0.8, 0.4, 0.2);      // Orange-red
-
-    if (t < 0.33) {
-        return mix(cold, mid1, t * 3.0);
-    } else if (t < 0.66) {
-        return mix(mid1, mid2, (t - 0.33) * 3.0);
-    } else {
-        return mix(mid2, warm, (t - 0.66) * 3.0);
-    }
-}
-
-
-vec3 checker2D(vec2 p, float cellSize, vec3 a, vec3 b)
-{
-    ivec2 cell = ivec2(floor(p / cellSize));
-    int parity = (cell.x ^ cell.y) & 1;
-    return parity == 0 ? a : b;
-}
-
-vec3 triplanarChecker(vec3 worldPos, vec3 normal, float cellSize, vec3 colorA, vec3 colorB)
-{
-    vec3 n = abs(normalize(normal));
-
-    // Pick dominant axis - blending discrete checker colors causes gray artifacts
-    if (n.y >= n.x && n.y >= n.z) {
-        return checker2D(worldPos.xz, cellSize, colorA, colorB);
-    } else if (n.x >= n.z) {
-        return checker2D(worldPos.yz, cellSize, colorA, colorB);
-    } else {
-        return checker2D(worldPos.xy, cellSize, colorA, colorB);
-    }
-}
-
-
-float getHeightTexelWorldSize()
-{
+float getHeightTexelWorldSize() {
     ivec2 texSize = textureSize(u_textures[pc.continentalnessIndex], 0);
     return pc.terrainWorldSize / float(texSize.x);
 }
 
-float sampleHeightWorld(vec2 worldXZ)
-{
+float sampleHeightWorld(vec2 worldXZ) {
     vec2 uv = worldXZ / pc.terrainWorldSize + 0.5;
 
     float c = texture(u_textures[pc.continentalnessIndex], uv).r * 2.0 - 1.0;
@@ -91,8 +54,7 @@ float sampleHeightWorld(vec2 worldXZ)
     return (raw - 0.5) * pc.heightScale;
 }
 
-vec3 computeTerrainNormal(vec3 worldPos)
-{
+vec3 computeTerrainNormal(vec3 worldPos) {
     float step = getHeightTexelWorldSize();
 
     float hL = sampleHeightWorld(worldPos.xz + vec2(-step, 0.0));
@@ -109,23 +71,69 @@ vec3 computeTerrainNormal(vec3 worldPos)
     return normalize(cross(dz, dx));
 }
 
+vec2 triplanarUV(vec3 worldPos, vec3 normal, float scale) {
+    vec3 n = abs(normal);
+    if (n.y >= n.x && n.y >= n.z) {
+        return worldPos.xz * scale;
+    } else if (n.x >= n.z) {
+        return worldPos.yz * scale;
+    } else {
+        return worldPos.xy * scale;
+    }
+}
+
+struct TerrainSample {
+    vec3 albedo;
+    float roughness;
+    float metallic;
+    float ao;
+};
+
+TerrainSample sampleTerrainMaterial(uint matIndex, vec3 worldPos, vec3 normal) {
+    MaterialData mat = u_materials[matIndex].data;
+    float scale = mat.tilingScale > 0.0 ? mat.tilingScale : 1.0;
+    vec2 uv = triplanarUV(worldPos, normal, scale);
+
+    TerrainSample s;
+    s.albedo = SAMPLE_ALBEDO(mat, u_textures, uv);
+    s.roughness = SAMPLE_ROUGHNESS(mat, u_textures, uv);
+    s.metallic = SAMPLE_METALLIC(mat, u_textures, uv);
+    s.ao = SAMPLE_AO(mat, u_textures, uv);
+    return s;
+}
+
+TerrainSample blendSamples(TerrainSample a, TerrainSample b, float t) {
+    TerrainSample result;
+    result.albedo = mix(a.albedo, b.albedo, t);
+    result.roughness = mix(a.roughness, b.roughness, t);
+    result.metallic = mix(a.metallic, b.metallic, t);
+    result.ao = mix(a.ao, b.ao, t);
+    return result;
+}
 
 void main() {
     gPositionDepth = inFragPosDepth;
 
-
     vec3 normalWS = computeTerrainNormal(inFragPosDepth.xyz);
-
-
     gNormal = vec4(normalWS, 1.0);
 
-    //vec3 albedo = heightToColor(clamp(inNormalizedHeight, 0.0, 1.0));
-    vec3 albedo = triplanarChecker(inFragPosDepth.xyz, normalWS, 2.0, vec3(0.1, 0.1, 0.1), vec3(0.9, 0.9, 0.9));
+    MaterialData grassMat = u_materials[pc.grassMaterialIndex].data;
+    float slopeThreshold = grassMat.slopeThreshold > 0.0 ? grassMat.slopeThreshold : 0.7;
+    float heightBlend = grassMat.heightBlend > 0.0 ? grassMat.heightBlend : 0.8;
 
-    gAlbedoSpec = vec4(albedo,1.0);
+    float slope = 1.0 - normalWS.y;
+    float height = inNormalizedHeight;
 
-    float metallic = 0.0;
-    float roughness = 0.9;
-    float ao = 1.0;
-    gMaterial = vec4(metallic, roughness, ao, 1.0);
+    TerrainSample grass = sampleTerrainMaterial(pc.grassMaterialIndex, inFragPosDepth.xyz, normalWS);
+    TerrainSample rock = sampleTerrainMaterial(pc.rockMaterialIndex, inFragPosDepth.xyz, normalWS);
+    TerrainSample snow = sampleTerrainMaterial(pc.snowMaterialIndex, inFragPosDepth.xyz, normalWS);
+
+    float slopeBlend = smoothstep(slopeThreshold - 0.1, slopeThreshold + 0.1, slope);
+    TerrainSample groundLayer = blendSamples(grass, rock, slopeBlend);
+
+    float snowBlend = smoothstep(heightBlend - 0.1, heightBlend + 0.1, height) * (1.0 - slope * 0.5);
+    TerrainSample finalSample = blendSamples(groundLayer, snow, snowBlend);
+
+    gAlbedoSpec = vec4(finalSample.albedo, 1.0);
+    gMaterial = vec4(finalSample.metallic, finalSample.roughness, finalSample.ao, 1.0);
 }

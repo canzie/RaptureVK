@@ -13,6 +13,7 @@
 #include "Pipelines/ComputePipeline.h"
 #include "Shaders/Shader.h"
 #include "Textures/Texture.h"
+#include "Materials/MaterialInstance.h"
 
 #include <glm/glm.hpp>
 
@@ -85,7 +86,13 @@ class TerrainGenerator {
     void setWireframe(bool enabled) { m_wireframe = enabled; }
     bool isWireframe() const { return m_wireframe; }
 
+    // Materials
+    uint32_t getGrassMaterialIndex() const;
+    uint32_t getRockMaterialIndex() const;
+    uint32_t getSnowMaterialIndex() const;
+
   private:
+    void createTerrainMaterials();
     void createIndexBuffers();
     void createChunkDataBuffer();
 
@@ -113,6 +120,10 @@ class TerrainGenerator {
 
     bool m_initialized = false;
     bool m_wireframe = false;
+
+    std::shared_ptr<MaterialInstance> m_grassMaterial;
+    std::shared_ptr<MaterialInstance> m_rockMaterial;
+    std::shared_ptr<MaterialInstance> m_snowMaterial;
 };
 
 } // namespace Rapture

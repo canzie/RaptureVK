@@ -23,6 +23,9 @@ struct TerrainGBufferPushConstants {
     uint32_t lodResolution;
     float heightScale;
     float terrainWorldSize;
+    uint32_t grassMaterialIndex;
+    uint32_t rockMaterialIndex;
+    uint32_t snowMaterialIndex;
 };
 
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
@@ -831,6 +834,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
     DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline); // Camera + chunk data SSBOs
+    DescriptorManager::bindSet(1, commandBuffer, m_terrainPipeline); // Materials
     DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline); // Bindless textures
 
     uint32_t chunkDataBufferIndex = terrain.getChunkDataBuffer()->getBindlessIndex();
@@ -864,6 +868,9 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
         pc.lodResolution = getTerrainLODResolution(lod);
         pc.heightScale = terrainConfig.heightScale;
         pc.terrainWorldSize = terrainConfig.terrainWorldSize;
+        pc.grassMaterialIndex = terrain.getGrassMaterialIndex();
+        pc.rockMaterialIndex = terrain.getRockMaterialIndex();
+        pc.snowMaterialIndex = terrain.getSnowMaterialIndex();
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (auto shader = m_terrainShader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {

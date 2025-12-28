@@ -27,7 +27,6 @@
     - editor settings could be static/dynamic, prefab options?
     - animation options etc (once they exist)
     - checkox for importing material from gltf and auto making the materials and applying them
-- materials for terrain
 - pre generated normals?
 - virtual texturing??? like decima i guess
 - phyics -> raypicking -> custom gizmo and terrain editor and mesh placer

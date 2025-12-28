@@ -4,6 +4,7 @@
 #include "Generators/Textures/ProceduralTextures.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
+#include "Materials/Material.h"
 #include "Renderer/Frustum/Frustum.h"
 #include "WindowContext/Application.h"
 
@@ -52,6 +53,8 @@ void TerrainGenerator::init(const TerrainConfig &config)
 
     std::vector<uint32_t> allLODs = {0, 1, 2, 3};
     m_cullBuffers = m_culler->createBuffers(allLODs);
+
+    createTerrainMaterials();
 
     m_initialized = true;
 
@@ -130,7 +133,6 @@ void TerrainGenerator::createChunkDataBuffer()
     RP_CORE_TRACE("TerrainGenerator: Created chunk data buffer for {} chunks", m_config.maxLoadedChunks);
 }
 
-
 void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, std::shared_ptr<Texture> texture)
 {
     if (category >= TERRAIN_NC_COUNT) {
@@ -164,7 +166,27 @@ void TerrainGenerator::bakeNoiseLUT()
                 float c = (static_cast<float>(x) / (size - 1)) * 2.0f - 1.0f;
                 float cFactor = s_evaluateSpline(m_multiNoiseConfig.splines[CONTINENTALNESS], c);
 
-                float combined = (cFactor + eFactor + pvFactor) / 3.0f;
+                // Minecraft-style combination:
+                // Continentalness: base terrain shape (0=ocean, 0.5=coast, 1=inland)
+                // Erosion: controls amplitude (0=mountains allowed, 1=flat/eroded)
+                // PV: local peaks and valleys, scaled by erosion
+
+                // Base height from continentalness, centered at 0
+                float baseHeight = (cFactor - 0.5f) * 2.0f;
+
+                // Erosion controls how much PV can contribute
+                // High erosion (1) = flat terrain, low PV influence
+                // Low erosion (0) = rugged terrain, full PV influence
+                float pvAmplitude = 1.0f - eFactor;
+
+                // PV adds peaks/valleys, centered at 0, scaled by erosion
+                float pvContrib = (pvFactor - 0.5f) * 2.0f * pvAmplitude;
+
+                // Combine: continentalness dominates, PV adds detail
+                float combined = baseHeight * 0.6f + pvContrib * 0.4f;
+
+                // Map to 0-1 for storage (shader does -0.5 to center at 0)
+                combined = combined * 0.5f + 0.5f;
                 combined = glm::clamp(combined, 0.0f, 1.0f);
 
                 uint32_t idx = z * size * size + y * size + x;
@@ -214,16 +236,44 @@ void TerrainGenerator::generateDefaultNoiseTextures()
     m_noiseTextures[EROSION] = ProceduralTexture::generatePerlinNoise(params, config);
 
     RidgedNoisePushConstants ridgedParams;
-    ridgedParams.octaves = 6;
+    ridgedParams.octaves = 4;
     ridgedParams.scale = 8.0f;
     ridgedParams.persistence = 0.55f;
     ridgedParams.lacunarity = 2.0f;
-    ridgedParams.seed = 300;
+    ridgedParams.seed = 1;
     m_noiseTextures[PEAKS_VALLEYS] = ProceduralTexture::generateRidgedNoise(ridgedParams, config);
 
-    m_multiNoiseConfig.splines[CONTINENTALNESS].points = {{-1.0f, 0.0f}, {1.0f, 1.0f}};
-    m_multiNoiseConfig.splines[EROSION].points = {{-1.0f, 0.0f}, {1.0f, 1.0f}};
-    m_multiNoiseConfig.splines[PEAKS_VALLEYS].points = {{-1.0f, 0.0f}, {1.0f, 1.0f}};
+    // Continentalness: ocean -> coast -> plains -> hills -> mountains
+    // Low values = below sea level, high values = elevated terrain
+    m_multiNoiseConfig.splines[CONTINENTALNESS].points = {
+        {-1.0f, 0.1f},  // Deep ocean
+        {-0.4f, 0.3f},  // Shallow ocean
+        {-0.2f, 0.45f}, // Coast/beach
+        {0.0f, 0.5f},   // Sea level
+        {0.3f, 0.55f},  // Plains
+        {0.6f, 0.7f},   // Hills
+        {1.0f, 1.0f}    // Mountains
+    };
+
+    // Erosion: controls terrain roughness
+    // Low erosion = rugged mountains, high erosion = flat plains
+    m_multiNoiseConfig.splines[EROSION].points = {
+        {-1.0f, 0.0f}, // No erosion - full mountain amplitude
+        {-0.5f, 0.2f}, // Light erosion
+        {0.0f, 0.5f},  // Medium erosion
+        {0.5f, 0.8f},  // Heavy erosion
+        {1.0f, 1.0f}   // Fully eroded - flat
+    };
+
+    // Peaks/Valleys: local height variation
+    // Creates the actual bumps and dips
+    m_multiNoiseConfig.splines[PEAKS_VALLEYS].points = {
+        {-1.0f, 0.0f}, // Deep valley
+        {-0.5f, 0.3f}, // Shallow valley
+        {0.0f, 0.5f},  // Neutral
+        {0.5f, 0.7f},  // Small peak
+        {1.0f, 1.0f}   // Tall peak
+    };
 
     bakeNoiseLUT();
 }
@@ -331,7 +381,6 @@ void TerrainGenerator::updateChunkGPUData()
     m_chunkDataBuffer->addData(gpuData.data(), gpuData.size() * sizeof(TerrainChunkGPUData), 0);
 }
 
-
 VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const
 {
     if (lod >= TERRAIN_LOD_COUNT || !m_indexBuffers[lod]) {
@@ -371,6 +420,53 @@ glm::ivec2 TerrainGenerator::worldToChunkCoord(float worldX, float worldZ) const
 glm::vec2 TerrainGenerator::chunkCoordToWorldCenter(glm::ivec2 coord) const
 {
     return glm::vec2(static_cast<float>(coord.x) * m_config.chunkWorldSize, static_cast<float>(coord.y) * m_config.chunkWorldSize);
+}
+
+void TerrainGenerator::createTerrainMaterials()
+{
+    auto terrainBase = MaterialManager::getMaterial("Terrain");
+    if (!terrainBase) {
+        RP_CORE_ERROR("Terrain base material not found");
+        return;
+    }
+
+    m_grassMaterial = std::make_shared<MaterialInstance>(terrainBase, "TerrainGrass");
+    m_grassMaterial->setParameter(ParameterID::ALBEDO, glm::vec4(19.0f / 255.0f, 109.0f / 255.0f, 21.0f / 255.0f, 1.0f));
+    m_grassMaterial->setParameter(ParameterID::ROUGHNESS, 0.9f);
+    m_grassMaterial->setParameter(ParameterID::METALLIC, 0.0f);
+    m_grassMaterial->setParameter(ParameterID::TILING_SCALE, 0.1f);
+    m_grassMaterial->setParameter(ParameterID::SLOPE_THRESHOLD, 0.4f);
+    m_grassMaterial->setParameter(ParameterID::HEIGHT_BLEND, 0.75f);
+
+    m_rockMaterial = std::make_shared<MaterialInstance>(terrainBase, "TerrainRock");
+    m_rockMaterial->setParameter(ParameterID::ALBEDO, glm::vec4(0.4f, 0.35f, 0.3f, 1.0f));
+    m_rockMaterial->setParameter(ParameterID::ROUGHNESS, 0.85f);
+    m_rockMaterial->setParameter(ParameterID::METALLIC, 0.0f);
+    m_rockMaterial->setParameter(ParameterID::TILING_SCALE, 0.15f);
+
+    m_snowMaterial = std::make_shared<MaterialInstance>(terrainBase, "TerrainSnow");
+    m_snowMaterial->setParameter(ParameterID::ALBEDO, glm::vec4(0.95f, 0.95f, 0.98f, 1.0f));
+    m_snowMaterial->setParameter(ParameterID::ROUGHNESS, 0.3f);
+    m_snowMaterial->setParameter(ParameterID::METALLIC, 0.0f);
+    m_snowMaterial->setParameter(ParameterID::TILING_SCALE, 0.2f);
+
+    RP_CORE_INFO("Terrain materials created: grass={}, rock={}, snow={}", m_grassMaterial->getBindlessIndex(),
+                 m_rockMaterial->getBindlessIndex(), m_snowMaterial->getBindlessIndex());
+}
+
+uint32_t TerrainGenerator::getGrassMaterialIndex() const
+{
+    return m_grassMaterial ? m_grassMaterial->getBindlessIndex() : 0;
+}
+
+uint32_t TerrainGenerator::getRockMaterialIndex() const
+{
+    return m_rockMaterial ? m_rockMaterial->getBindlessIndex() : 0;
+}
+
+uint32_t TerrainGenerator::getSnowMaterialIndex() const
+{
+    return m_snowMaterial ? m_snowMaterial->getBindlessIndex() : 0;
 }
 
 } // namespace Rapture
