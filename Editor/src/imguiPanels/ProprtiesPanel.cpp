@@ -124,39 +124,26 @@ void PropertiesPanel::renderMaterialComponent()
             ImGui::Text("Base Material: %s", material.material->getBaseMaterial()->getName().c_str());
             ImGui::Text("Material Instance: %s", material.material->getName().c_str());
 
-            auto &parameterMap = material.material->getParameterMap();
+            auto baseMat = material.material->getBaseMaterial();
+            for (Rapture::ParameterID paramID : baseMat->getEditableParams()) {
+                const Rapture::ParamInfo *info = Rapture::getParamInfo(paramID);
+                if (!info || info->type == Rapture::ParamType::TEXTURE) continue;
 
-            for (auto &[paramID, materialParameter] : parameterMap) {
-                ImGui::Text("%s", Rapture::parameterIdToString(paramID).c_str());
-                if (paramID == Rapture::ParameterID::ALBEDO) {
-                    ImGui::SameLine();
-                    glm::vec3 albedo = materialParameter.asVec3();
-                    if (ImGui::ColorEdit3("##albedo", glm::value_ptr(albedo))) {
-                        material.material->setParameter(Rapture::ParameterID::ALBEDO, albedo);
+                ImGui::Text("%s", std::string(info->name).c_str());
+                ImGui::SameLine();
+
+                std::string label = "##" + std::string(info->name);
+
+                if (info->type == Rapture::ParamType::VEC4 || info->type == Rapture::ParamType::VEC3) {
+                    glm::vec4 val = material.material->getParameter<glm::vec4>(paramID);
+                    glm::vec3 color(val.x, val.y, val.z);
+                    if (ImGui::ColorEdit3(label.c_str(), glm::value_ptr(color))) {
+                        material.material->setParameter(paramID, glm::vec4(color, val.w));
                     }
-                }
-
-                if (paramID == Rapture::ParameterID::ROUGHNESS) {
-                    ImGui::SameLine();
-                    float roughness = materialParameter.asFloat();
-                    if (ImGui::DragFloat("##roughness", &roughness, 0.01f, 0.0f, 1.0f)) {
-                        material.material->setParameter(Rapture::ParameterID::ROUGHNESS, roughness);
-                    }
-                }
-
-                if (paramID == Rapture::ParameterID::METALLIC) {
-                    ImGui::SameLine();
-                    float metallic = materialParameter.asFloat();
-                    if (ImGui::DragFloat("##metallic", &metallic, 0.01f, 0.0f, 1.0f)) {
-                        material.material->setParameter(Rapture::ParameterID::METALLIC, metallic);
-                    }
-                }
-
-                if (paramID == Rapture::ParameterID::EMISSIVE) {
-                    ImGui::SameLine();
-                    glm::vec3 emissive = materialParameter.asVec3();
-                    if (ImGui::ColorEdit3("##emissive", glm::value_ptr(emissive))) {
-                        material.material->setParameter(Rapture::ParameterID::EMISSIVE, emissive);
+                } else if (info->type == Rapture::ParamType::FLOAT) {
+                    float val = material.material->getParameter<float>(paramID);
+                    if (ImGui::DragFloat(label.c_str(), &val, 0.01f, 0.0f, 1.0f)) {
+                        material.material->setParameter(paramID, val);
                     }
                 }
             }

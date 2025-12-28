@@ -1,205 +1,94 @@
-#pragma once
+#ifndef RAPTURE__MATERIAL_PARAMETERS_H
+#define RAPTURE__MATERIAL_PARAMETERS_H
 
-#include "Shaders/ShaderReflections.h"
-
-#include <algorithm>
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-#include "Logging/Log.h"
-
-#include <variant>
-
-#include "glm/glm.hpp"
-
-#include "Textures/Texture.h"
+#include "MaterialData.h"
+#include <cstddef>
+#include <string_view>
 
 namespace Rapture {
 
-enum class ParameterID : uint16_t {
-    // Base color/albedo parameters
+enum class ParameterID {
     ALBEDO,
-    ALBEDO_MAP,
-
-    // Metallic workflow parameters
-    METALLIC,
-    METALLIC_MAP,
-
-    // Roughness parameters
     ROUGHNESS,
-    ROUGHNESS_MAP,
-
-    METALLIC_ROUGHNESS_MAP,
-
-    // Normal mapping
-    NORMAL,
-    NORMAL_MAP,
-
-    // Additional texture maps
-    HEIGHT_MAP,
-    AO_MAP,
+    METALLIC,
     AO,
-
-    // Extended PBR parameters
     EMISSIVE,
-    EMISSIVE_MAP,
+    ALPHA,
 
-    SPECULAR,
+    ALBEDO_MAP,
+    NORMAL_MAP,
+    METALLIC_ROUGHNESS_MAP,
+    AO_MAP,
+    EMISSIVE_MAP,
+    HEIGHT_MAP,
     SPECULAR_MAP,
 
-    UNKNOWN = 0xFFFF
+    TILING_SCALE,
+    HEIGHT_BLEND,
+    SLOPE_THRESHOLD,
+    SPLAT_MAP
 };
 
-enum class MaterialParameterTypes {
-    FLOAT = 1,
-    INT = 2,
-    UINT = 4,
-    UINT64 = 8,
-    BOOL = 16,
-    VEC2 = 32,
-    VEC3 = 64,
-    VEC4 = 128,
-    UVEC2 = 256,
-    UVEC3 = 512,
-    UVEC4 = 1024,
-    IVEC2 = 2048,
-    IVEC3 = 4096,
-    IVEC4 = 8192,
-    MAT3 = 16384,
-    MAT4 = 32768,
-    TEXTURE = 65536,
-    COMBINED_IMAGE_SAMPLER = 131072,
-    SAMPLER = 262144,
-
-    UNKNOWN = 0
+enum class ParamType {
+    FLOAT,
+    VEC3,
+    VEC4,
+    TEXTURE
 };
 
-// Helper functions for bitwise operations on MaterialParameterTypes
-inline MaterialParameterTypes operator|(MaterialParameterTypes a, MaterialParameterTypes b)
-{
-    return static_cast<MaterialParameterTypes>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
-}
-
-inline MaterialParameterTypes operator&(MaterialParameterTypes a, MaterialParameterTypes b)
-{
-    return static_cast<MaterialParameterTypes>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
-}
-
-inline bool hasType(MaterialParameterTypes combined, MaterialParameterTypes type)
-{
-    return (combined & type) == type;
-}
-
-// Extended parameter information
-struct MaterialParameterInfo {
-    ParameterID parameterId;
-    MaterialParameterTypes type;
-    std::string parameterName;
-    uint32_t binding = 0;
-    uint32_t offset = 0; // For uniform buffer offsets
-    uint32_t size = 0;   // Size in bytes
-    bool isTexture = false;
-    bool isUniform = false;
-    bool isPushConstant = false;
+struct ParamInfo {
+    ParameterID id;
+    ParamType type;
+    uint32_t flag;
+    size_t offset;
+    size_t size;
+    std::string_view name;
 };
 
-MaterialParameterTypes stringToMaterialParameterType(const std::string &str);
-std::string parameterTypeToString(MaterialParameterTypes type);
-std::string parameterIdToString(ParameterID id);
+// clang-format off
+constexpr ParamInfo PARAM_REGISTRY[] = {
+    {ParameterID::ALBEDO,      ParamType::VEC4,  0, offsetof(MaterialData, albedo),      sizeof(glm::vec4), "albedo"},
+    {ParameterID::ROUGHNESS,   ParamType::FLOAT, 0, offsetof(MaterialData, roughness),   sizeof(float),     "roughness"},
+    {ParameterID::METALLIC,    ParamType::FLOAT, 0, offsetof(MaterialData, metallic),    sizeof(float),     "metallic"},
+    {ParameterID::AO,          ParamType::FLOAT, 0, offsetof(MaterialData, ao),          sizeof(float),     "ao"},
+    {ParameterID::EMISSIVE,    ParamType::VEC4,  0, offsetof(MaterialData, emissive),    sizeof(glm::vec4), "emissive"},
+    {ParameterID::ALPHA,       ParamType::FLOAT, 0, offsetof(MaterialData, albedo) + 12, sizeof(float),     "alpha"},
 
-using MaterialTypes = std::variant<std::monostate, int32_t, uint32_t, uint64_t, bool, float, glm::vec2, glm::vec3, glm::vec4,
-                                   glm::mat3, glm::mat4, std::shared_ptr<Texture>>;
+    {ParameterID::ALBEDO_MAP,             ParamType::TEXTURE, MAT_FLAG_HAS_ALBEDO_MAP,             offsetof(MaterialData, texIndices0),      sizeof(uint32_t), "albedoMap"},
+    {ParameterID::NORMAL_MAP,             ParamType::TEXTURE, MAT_FLAG_HAS_NORMAL_MAP,             offsetof(MaterialData, texIndices0) + 4,  sizeof(uint32_t), "normalMap"},
+    {ParameterID::METALLIC_ROUGHNESS_MAP, ParamType::TEXTURE, MAT_FLAG_HAS_METALLIC_ROUGHNESS_MAP, offsetof(MaterialData, texIndices0) + 8,  sizeof(uint32_t), "metallicRoughnessMap"},
+    {ParameterID::AO_MAP,                 ParamType::TEXTURE, MAT_FLAG_HAS_AO_MAP,                 offsetof(MaterialData, texIndices0) + 12, sizeof(uint32_t), "aoMap"},
+    {ParameterID::EMISSIVE_MAP,           ParamType::TEXTURE, MAT_FLAG_HAS_EMISSIVE_MAP,           offsetof(MaterialData, texIndices1),      sizeof(uint32_t), "emissiveMap"},
+    {ParameterID::HEIGHT_MAP,             ParamType::TEXTURE, MAT_FLAG_HAS_HEIGHT_MAP,             offsetof(MaterialData, texIndices1) + 4,  sizeof(uint32_t), "heightMap"},
+    {ParameterID::SPECULAR_MAP,           ParamType::TEXTURE, MAT_FLAG_HAS_SPECULAR_MAP,           offsetof(MaterialData, texIndices1) + 8,  sizeof(uint32_t), "specularMap"},
 
-class MaterialParameter {
-  public:
-    MaterialParameter() : m_value(std::monostate{})
-    {
-        m_info.parameterId = ParameterID::UNKNOWN;
-        m_info.type = MaterialParameterTypes::UNKNOWN;
-        m_info.parameterName = "";
-        // Other members of m_info (binding, offset, size, bool flags)
-        // will use their default member initializers if present, or be zero/false.
-    }
+    {ParameterID::TILING_SCALE,    ParamType::FLOAT,   0,                      offsetof(MaterialData, tilingScale),      sizeof(float),    "tilingScale"},
+    {ParameterID::HEIGHT_BLEND,    ParamType::FLOAT,   0,                      offsetof(MaterialData, heightBlend),      sizeof(float),    "heightBlend"},
+    {ParameterID::SLOPE_THRESHOLD, ParamType::FLOAT,   0,                      offsetof(MaterialData, slopeThreshold),   sizeof(float),    "slopeThreshold"},
+    {ParameterID::SPLAT_MAP,       ParamType::TEXTURE, MAT_FLAG_HAS_SPLAT_MAP, offsetof(MaterialData, texIndices1) + 12, sizeof(uint32_t), "splatMap"},
+};
+// clang-format on
 
-    MaterialParameter(const DescriptorParamInfo &info, uint32_t binding = 0);
+constexpr size_t PARAM_COUNT = sizeof(PARAM_REGISTRY) / sizeof(PARAM_REGISTRY[0]);
 
-    float asFloat() { return std::get<float>(m_value); }
-    int32_t asInt() { return std::get<int32_t>(m_value); }
-    uint32_t asUInt() { 
-        if (m_info.type == MaterialParameterTypes::UINT) {
-            return std::get<uint32_t>(m_value);
-        }
-        return UINT32_MAX;
-    }
-    uint64_t asUInt64() { return std::get<uint64_t>(m_value); }
-    bool asBool() { return std::get<bool>(m_value); }
-    glm::vec2 asVec2() { return std::get<glm::vec2>(m_value); }
-    glm::vec3 asVec3() { return std::get<glm::vec3>(m_value); }
-    glm::vec4 asVec4() { return std::get<glm::vec4>(m_value); }
-    glm::mat3 asMat3() { return std::get<glm::mat3>(m_value); }
-    glm::mat4 asMat4() { return std::get<glm::mat4>(m_value); }
-    std::shared_ptr<Texture> asTexture() { return std::get<std::shared_ptr<Texture>>(m_value); }
-
-    void *asRaw()
-    {
-        switch (m_info.type) {
-        case MaterialParameterTypes::FLOAT:
-            return &std::get<float>(m_value);
-        case MaterialParameterTypes::INT:
-            return &std::get<int32_t>(m_value);
-        case MaterialParameterTypes::UINT:
-            return &std::get<uint32_t>(m_value);
-        case MaterialParameterTypes::UINT64:
-            return &std::get<uint64_t>(m_value);
-        case MaterialParameterTypes::BOOL:
-            return &std::get<bool>(m_value);
-        case MaterialParameterTypes::VEC2:
-            return &std::get<glm::vec2>(m_value);
-        case MaterialParameterTypes::VEC3:
-            return &std::get<glm::vec3>(m_value);
-        case MaterialParameterTypes::VEC4:
-            return &std::get<glm::vec4>(m_value);
-        case MaterialParameterTypes::MAT3:
-            return &std::get<glm::mat3>(m_value);
-        case MaterialParameterTypes::MAT4:
-            return &std::get<glm::mat4>(m_value);
-        default:
-            return nullptr;
+inline const ParamInfo *getParamInfo(ParameterID id)
+{
+    for (size_t i = 0; i < PARAM_COUNT; ++i) {
+        if (PARAM_REGISTRY[i].id == id) {
+            return &PARAM_REGISTRY[i];
         }
     }
+    return nullptr;
+}
 
-    template <typename T> void setValue(const T &value)
-    {
-        // Assign the value to the variant.
-        // If T is not one of the types in MaterialTypes, this will result in a compile-time error.
-        // Runtime checks to ensure T aligns with m_info.type can be added if needed.
-        m_value = value;
-    }
+inline bool isTextureParam(ParameterID id)
+{
+    const ParamInfo *info = getParamInfo(id);
+    return info && info->type == ParamType::TEXTURE;
+}
 
-  public:
-    MaterialParameterInfo m_info;
-    MaterialTypes m_value;
-};
-
-// Parameter name mappings for fuzzy string matching
-class MaterialParameterMapper {
-  public:
-    static void initializeMappings();
-    static ParameterID getParameterID(const std::string &rawName, MaterialParameterTypes type);
-
-  private:
-    static void addParameterVariants(ParameterID id, MaterialParameterTypes type, const std::vector<std::string> &variants);
-
-    static std::string toLowerCase(const std::string &str);
-
-  private:
-    // leave me alone
-    static std::unordered_map<MaterialParameterTypes, std::unordered_map<ParameterID, std::vector<std::string>>>
-        m_typeToIDsToStringsMap;
-    static bool m_isInitialized;
-};
+std::string_view parameterIdToString(ParameterID id);
 
 } // namespace Rapture
+
+#endif // RAPTURE__MATERIAL_PARAMETERS_H

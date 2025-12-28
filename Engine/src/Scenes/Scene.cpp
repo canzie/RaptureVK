@@ -143,8 +143,7 @@ void Scene::onUpdate(float dt)
         material.material->updatePendingTextures();
 
         uint32_t vertexFlags = mesh.mesh->getVertexBuffer()->getBufferLayout().getFlags();
-        uint32_t materialFlags = material.material->getMaterialFlags();
-        uint32_t flags = vertexFlags | materialFlags;
+        uint32_t flags = vertexFlags;
 
         mesh.meshDataBuffer->update(transform, flags, frameCounter);
     }

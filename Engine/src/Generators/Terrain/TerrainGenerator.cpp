@@ -1,6 +1,5 @@
 #include "TerrainGenerator.h"
 
-#include "AssetManager/AssetManager.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Generators/Textures/ProceduralTextures.h"
 #include "Logging/Log.h"
@@ -14,23 +13,6 @@
 #include <cmath>
 
 namespace Rapture {
-
-struct alignas(16) TerrainCullPushConstants {
-    glm::vec3 cullOrigin;
-    uint32_t chunkCount;
-
-    float heightScale;
-    float cullRange;
-    uint32_t lodMode;
-    uint32_t forcedLOD;
-
-    uint32_t frustumPlanesBufferIndex;
-    uint32_t chunkDataBufferIndex;
-    uint32_t drawCountBufferIndex;
-    uint32_t _pad0;
-
-    uint32_t indirectBufferIndices[TERRAIN_LOD_COUNT];
-};
 
 static float s_evaluateSpline(const TerrainSpline &spline, float x)
 {
@@ -64,8 +46,12 @@ void TerrainGenerator::init(const TerrainConfig &config)
 
     createIndexBuffers();
     createChunkDataBuffer();
-    createIndirectBuffer();
-    initCullComputePipeline();
+
+    auto &vc = Application::getInstance().getVulkanContext();
+    m_culler = std::make_unique<TerrainCuller>(m_chunkDataBuffer, &m_chunks, m_config.heightScale, 64, vc.getVmaAllocator());
+
+    std::vector<uint32_t> allLODs = {0, 1, 2, 3};
+    m_cullBuffers = m_culler->createBuffers(allLODs);
 
     m_initialized = true;
 
@@ -87,12 +73,7 @@ void TerrainGenerator::shutdown()
     }
 
     m_chunkDataBuffer.reset();
-    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
-        m_indirectBuffers[lod].reset();
-    }
-    m_drawCountBuffer.reset();
-    m_cullPipeline.reset();
-    m_cullShader.reset();
+    m_culler.reset();
 
     m_initialized = false;
     RP_CORE_INFO("TerrainGenerator shutdown");
@@ -149,56 +130,6 @@ void TerrainGenerator::createChunkDataBuffer()
     RP_CORE_TRACE("TerrainGenerator: Created chunk data buffer for {} chunks", m_config.maxLoadedChunks);
 }
 
-void TerrainGenerator::createIndirectBuffer()
-{
-    auto &vc = Application::getInstance().getVulkanContext();
-    VkBufferUsageFlags indirectFlags = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-
-    constexpr uint32_t initialCapacity = 64;
-    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
-        VkDeviceSize bufferSize = initialCapacity * sizeof(VkDrawIndexedIndirectCommand);
-        m_indirectBuffers[lod] =
-            std::make_shared<StorageBuffer>(bufferSize, BufferUsage::STATIC, vc.getVmaAllocator(), indirectFlags);
-        m_indirectBufferCapacity[lod] = initialCapacity;
-    }
-
-    VkDeviceSize countSize = TERRAIN_LOD_COUNT * sizeof(uint32_t);
-    VkBufferUsageFlags countFlags = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    m_drawCountBuffer = std::make_shared<StorageBuffer>(countSize, BufferUsage::STATIC, vc.getVmaAllocator(), countFlags);
-
-    RP_CORE_TRACE("TerrainGenerator: Created indirect command buffers");
-}
-
-void TerrainGenerator::initCullComputePipeline()
-{
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-    auto &project = app.getProject();
-    auto shaderPath = project.getProjectShaderDirectory();
-
-    // Load cull compute shader
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_cull.cs.glsl");
-    if (!shader || !shader->isReady()) {
-        RP_CORE_WARN("TerrainGenerator: Cull compute shader not found, using CPU fallback");
-        return;
-    }
-    m_cullShader = shader;
-
-    // Create compute pipeline
-    ComputePipelineConfiguration pipelineConfig;
-    pipelineConfig.shader = m_cullShader;
-    m_cullPipeline = std::make_shared<ComputePipeline>(pipelineConfig);
-
-    // Create command pool
-    CommandPoolConfig poolConfig{};
-    poolConfig.name = "TerrainCullCommandPool";
-    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
-    poolConfig.flags = 0;
-
-    m_commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-
-    RP_CORE_TRACE("TerrainGenerator: Cull compute pipeline initialized");
-}
 
 void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, std::shared_ptr<Texture> texture)
 {
@@ -364,7 +295,9 @@ void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum)
         m_chunkDataDirty = false;
     }
 
-    runCullCompute(cameraPos, frustum);
+    if (m_culler) {
+        m_culler->runCull(m_cullBuffers, frustum.getBindlessIndex(), cameraPos);
+    }
 }
 
 void TerrainGenerator::updateChunkGPUData()
@@ -398,70 +331,6 @@ void TerrainGenerator::updateChunkGPUData()
     m_chunkDataBuffer->addData(gpuData.data(), gpuData.size() * sizeof(TerrainChunkGPUData), 0);
 }
 
-void TerrainGenerator::runCullCompute(const glm::vec3 &cameraPos, Frustum &frustum)
-{
-    RAPTURE_PROFILE_FUNCTION();
-
-    if (!m_cullPipeline || m_commandPoolHash == 0) {
-        return;
-    }
-
-    auto &vc = Application::getInstance().getVulkanContext();
-
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash);
-    auto commandBuffer = pool->getPrimaryCommandBuffer();
-
-    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
-
-    // Zero draw counts on GPU
-    vkCmdFillBuffer(cmd, m_drawCountBuffer->getBufferVk(), 0, VK_WHOLE_SIZE, 0);
-
-    VkMemoryBarrier fillBarrier{};
-    fillBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    fillBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    fillBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &fillBarrier, 0, nullptr,
-                         0, nullptr);
-
-    m_cullPipeline->bind(cmd);
-    DescriptorManager::bindSet(3, commandBuffer, m_cullPipeline);
-
-    TerrainCullPushConstants pc{};
-    pc.cullOrigin = cameraPos;
-    pc.chunkCount = static_cast<uint32_t>(m_chunks.size());
-    pc.heightScale = m_config.heightScale;
-    pc.cullRange = 0.0f;
-    pc.lodMode = 0;
-    pc.forcedLOD = 0;
-    pc.frustumPlanesBufferIndex = frustum.getBindlessIndex();
-    pc.chunkDataBufferIndex = m_chunkDataBuffer->getBindlessIndex();
-    pc.drawCountBufferIndex = m_drawCountBuffer->getBindlessIndex();
-    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
-        pc.indirectBufferIndices[lod] = m_indirectBuffers[lod]->getBindlessIndex();
-    }
-
-    vkCmdPushConstants(cmd, m_cullPipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(TerrainCullPushConstants),
-                       &pc);
-
-    uint32_t numGroups = (pc.chunkCount + 63) / 64;
-    vkCmdDispatch(cmd, numGroups, 1, 1);
-
-    VkMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 1, &barrier, 0, nullptr,
-                         0, nullptr);
-
-    commandBuffer->end();
-
-    auto queue = vc.getComputeQueue();
-    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
-    // queue->waitIdle();
-}
 
 VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const
 {

@@ -1,5 +1,6 @@
 #include "GBufferPass.h"
 
+#include "AssetManager/AssetImportConfig.h"
 #include "Components/Components.h"
 #include "Generators/Terrain/TerrainTypes.h"
 #include "Logging/TracyProfiler.h"
@@ -640,7 +641,10 @@ void GBufferPass::createPipeline()
 
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/GBuffer.vs.spv");
+    ShaderImportConfig shaderConfig;
+    shaderConfig.compileInfo.includePath = shaderPath / "glsl";
+
+    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/GBuffer.vs.glsl", shaderConfig);
 
     if (!shader) {
         RP_CORE_ERROR("Failed to load GBuffer vertex shader");
@@ -752,7 +756,10 @@ void GBufferPass::createTerrainPipeline()
     auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl");
+    ShaderImportConfig terrainShaderConfig;
+    terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
+
+    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
 
     if (!shader) {
         RP_CORE_WARN("Failed to load terrain GBuffer shader - terrain rendering disabled");
@@ -833,9 +840,18 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
     uint32_t noiseLUTIndex = terrain.getNoiseLUT()->getBindlessIndex();
 
     const auto &terrainConfig = terrain.getConfig();
-    VkBuffer countBuffer = terrain.getDrawCountBuffer()->getBufferVk();
+    auto *cullBuffers = terrain.getCullBuffers();
+    if (!cullBuffers || !cullBuffers->drawCountBuffer) {
+        return;
+    }
+
+    VkBuffer countBuffer = cullBuffers->drawCountBuffer->getBufferVk();
 
     for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+        if (!cullBuffers->indirectBuffers[lod]) {
+            continue;
+        }
+
         vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain.getIndexBuffer(lod), 0, VK_INDEX_TYPE_UINT32);
 
         TerrainGBufferPushConstants pc{};
@@ -857,9 +873,9 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
         vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,
                            sizeof(TerrainGBufferPushConstants), &pc);
 
-        VkBuffer indirectBuffer = terrain.getIndirectBuffer(lod)->getBufferVk();
+        VkBuffer indirectBuffer = cullBuffers->indirectBuffers[lod]->getBufferVk();
         VkDeviceSize countOffset = lod * sizeof(uint32_t);
-        uint32_t maxDrawCount = terrain.getIndirectBufferCapacity(lod);
+        uint32_t maxDrawCount = cullBuffers->indirectCapacities[lod];
 
         vkCmdDrawIndexedIndirectCount(commandBuffer->getCommandBufferVk(), indirectBuffer, 0, countBuffer, countOffset,
                                       maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));

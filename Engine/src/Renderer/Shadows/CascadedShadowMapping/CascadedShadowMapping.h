@@ -14,6 +14,7 @@
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
+#include "Generators/Terrain/TerrainCuller.h"
 #include "Renderer/Frustum/Frustum.h"
 
 #include "Components/Systems/ObjectDataBuffers/ShadowDataBuffer.h"
@@ -139,6 +140,8 @@ class CascadedShadowMap {
     // Terrain shadow rendering
     std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
     std::weak_ptr<Shader> m_terrainShader;
+    Frustum m_shadowFrustum;
+    TerrainCullBuffers m_terrainShadowBuffers;
 
     VmaAllocator m_allocator;
 

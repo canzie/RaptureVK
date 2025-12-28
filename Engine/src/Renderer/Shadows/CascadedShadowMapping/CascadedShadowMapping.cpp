@@ -137,6 +137,9 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     }
     up = glm::normalize(up - lightDirection * glm::dot(up, lightDirection));
 
+    glm::vec3 combinedCenter = glm::vec3(0.0f);
+    std::vector<glm::vec3> allCorners;
+
     for (uint8_t cascadeIdx = 0; cascadeIdx < m_NumCascades; cascadeIdx++) {
         cascadeData[cascadeIdx].nearPlane = cascadeSplits[cascadeIdx];
         cascadeData[cascadeIdx].farPlane = cascadeSplits[cascadeIdx + 1];
@@ -149,6 +152,8 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
         glm::vec3 frustumCenter = glm::vec3(0.0f);
         for (const auto &corner : frustumCorners) {
             frustumCenter += corner;
+            combinedCenter += corner;
+            allCorners.push_back(corner);
         }
         frustumCenter /= 8.0f;
 
@@ -212,6 +217,45 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
         m_lightViewProjections[cascadeIdx] = cascadeData[cascadeIdx].lightViewProj;
     }
 
+    combinedCenter /= static_cast<float>(allCorners.size());
+    float combinedDistance = 0.0f;
+    for (const auto &corner : allCorners) {
+        combinedDistance = std::max(combinedDistance, glm::length(corner - combinedCenter));
+    }
+    combinedDistance *= 2.0f;
+
+    glm::vec3 combinedLightPos = combinedCenter - (lightDirection * combinedDistance);
+    glm::mat4 combinedLightView = glm::lookAt(combinedLightPos, combinedCenter, up);
+
+    float combinedMinX = std::numeric_limits<float>::max();
+    float combinedMaxX = std::numeric_limits<float>::lowest();
+    float combinedMinY = std::numeric_limits<float>::max();
+    float combinedMaxY = std::numeric_limits<float>::lowest();
+    float combinedMinZ = std::numeric_limits<float>::max();
+    float combinedMaxZ = std::numeric_limits<float>::lowest();
+
+    for (const auto &corner : allCorners) {
+        glm::vec4 trf = combinedLightView * glm::vec4(corner, 1.0f);
+        combinedMinX = std::min(combinedMinX, trf.x);
+        combinedMaxX = std::max(combinedMaxX, trf.x);
+        combinedMinY = std::min(combinedMinY, trf.y);
+        combinedMaxY = std::max(combinedMaxY, trf.y);
+        combinedMinZ = std::min(combinedMinZ, trf.z);
+        combinedMaxZ = std::max(combinedMaxZ, trf.z);
+    }
+
+    // Add padding for shadow casters outside camera frustum
+    float xPad = (combinedMaxX - combinedMinX) * 0.1f;
+    float yPad = (combinedMaxY - combinedMinY) * 0.1f;
+    float zPad = (combinedMaxZ - combinedMinZ) * 2.0f;
+
+    // Z values in light view space are negative (objects in front of light)
+    // glm::ortho expects zNear < zFar, so use -max as near and -min as far
+    glm::mat4 combinedLightProj = glm::ortho(combinedMinX - xPad, combinedMaxX + xPad, combinedMinY - yPad, combinedMaxY + yPad,
+                                             -combinedMaxZ - zPad, -combinedMinZ + zPad);
+
+    m_shadowFrustum.update(combinedLightProj, combinedLightView);
+
     return cascadeData;
 }
 
@@ -220,6 +264,25 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
     RAPTURE_PROFILE_FUNCTION();
 
     m_currentFrame = currentFrame;
+
+    auto &registry = activeScene->getRegistry();
+    auto terrainView = registry.view<TerrainComponent>();
+
+    if (terrainView.begin() != terrainView.end()) {
+        auto &terrain = terrainView.get<TerrainComponent>(*terrainView.begin());
+
+        if (terrain.isEnabled && terrain.generator.isInitialized()) {
+            auto *culler = terrain.generator.getTerrainCuller();
+            if (culler) {
+                if (m_terrainShadowBuffers.indirectBuffers.empty()) {
+                    std::vector<uint32_t> highestLOD = {0};
+                    m_terrainShadowBuffers = culler->createBuffers(highestLOD);
+                }
+
+                culler->runCull(m_terrainShadowBuffers, m_shadowFrustum.getBindlessIndex(), glm::vec3(0.0f));
+            }
+        }
+    }
 
     auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrame);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
@@ -232,7 +295,6 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
     m_writeIndex = (m_writeIndex + 1) % 2;
     m_readIndex = (m_readIndex + 1) % 2;
 
-    // Begin frame for MDI batching - use current frame's batch map
     m_mdiBatchMaps[m_currentFrame]->beginFrame();
 
     // Bind pipeline
@@ -257,7 +319,6 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
     DescriptorManager::bindSet(2, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
-    auto &registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
 
     // First pass: Populate MDI batches with mesh data
@@ -812,15 +873,23 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, std:
         DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline);
         DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline);
 
+        if (m_terrainShadowBuffers.indirectBuffers.empty() || !m_terrainShadowBuffers.drawCountBuffer) {
+            return;
+        }
+
         const auto &terrainConfig = terrain.generator.getConfig();
         uint32_t chunkDataBufferIndex = terrain.generator.getChunkDataBuffer()->getBindlessIndex();
         uint32_t continentalnessIndex = terrain.generator.getNoiseTexture(CONTINENTALNESS)->getBindlessIndex();
         uint32_t erosionIndex = terrain.generator.getNoiseTexture(EROSION)->getBindlessIndex();
         uint32_t peaksValleysIndex = terrain.generator.getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
         uint32_t noiseLUTIndex = terrain.generator.getNoiseLUT()->getBindlessIndex();
-        VkBuffer countBuffer = terrain.generator.getDrawCountBuffer()->getBufferVk();
+        VkBuffer countBuffer = m_terrainShadowBuffers.drawCountBuffer->getBufferVk();
 
         for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+            if (!m_terrainShadowBuffers.indirectBuffers[lod]) {
+                continue;
+            }
+
             vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain.generator.getIndexBuffer(lod), 0,
                                  VK_INDEX_TYPE_UINT32);
 
@@ -843,9 +912,9 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, std:
             vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,
                                sizeof(TerrainCSMPushConstants), &pc);
 
-            VkBuffer indirectBuffer = terrain.generator.getIndirectBuffer(lod)->getBufferVk();
+            VkBuffer indirectBuffer = m_terrainShadowBuffers.indirectBuffers[lod]->getBufferVk();
             VkDeviceSize countOffset = lod * sizeof(uint32_t);
-            uint32_t maxDrawCount = terrain.generator.getIndirectBufferCapacity(lod);
+            uint32_t maxDrawCount = m_terrainShadowBuffers.indirectCapacities[lod];
 
             vkCmdDrawIndexedIndirectCount(commandBuffer->getCommandBufferVk(), indirectBuffer, 0, countBuffer, countOffset,
                                           maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));

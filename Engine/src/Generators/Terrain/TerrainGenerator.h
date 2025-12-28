@@ -2,6 +2,7 @@
 #define RAPTURE__TERRAIN_GENERATOR_H
 
 #include "ChunkGrid.h"
+#include "TerrainCuller.h"
 #include "TerrainTypes.h"
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
@@ -56,11 +57,11 @@ class TerrainGenerator {
 
     // Rendering resources (used by GBufferPass)
     std::shared_ptr<StorageBuffer> getChunkDataBuffer() const { return m_chunkDataBuffer; }
-    std::shared_ptr<StorageBuffer> getIndirectBuffer(uint32_t lod) const { return m_indirectBuffers[lod]; }
-    std::shared_ptr<StorageBuffer> getDrawCountBuffer() const { return m_drawCountBuffer; }
     VkBuffer getIndexBuffer(uint32_t lod) const;
     uint32_t getIndexCount(uint32_t lod) const { return getTerrainLODIndexCount(lod); }
-    uint32_t getIndirectBufferCapacity(uint32_t lod) const { return m_indirectBufferCapacity[lod]; }
+
+    TerrainCuller *getTerrainCuller() { return m_culler.get(); }
+    TerrainCullBuffers *getCullBuffers() { return &m_cullBuffers; }
 
     // Get visible chunk count per LOD (after update)
     uint32_t getVisibleChunkCount(uint32_t lod) const;
@@ -87,11 +88,8 @@ class TerrainGenerator {
   private:
     void createIndexBuffers();
     void createChunkDataBuffer();
-    void createIndirectBuffer();
-    void initCullComputePipeline();
 
     void updateChunkGPUData();
-    void runCullCompute(const glm::vec3 &cameraPos, Frustum &frustum);
 
     TerrainConfig m_config;
     ChunkGrid m_chunks;
@@ -107,19 +105,11 @@ class TerrainGenerator {
     // Shared index buffers (one per LOD, grid topology)
     std::shared_ptr<IndexBuffer> m_indexBuffers[TERRAIN_LOD_COUNT];
 
-    // Chunk data SSBO (TerrainChunkGPUData array)
     std::shared_ptr<StorageBuffer> m_chunkDataBuffer;
     bool m_chunkDataDirty = true;
 
-    // Indirect draw commands per LOD (built by compute shader)
-    std::shared_ptr<StorageBuffer> m_indirectBuffers[TERRAIN_LOD_COUNT];
-    std::shared_ptr<StorageBuffer> m_drawCountBuffer;
-    uint32_t m_indirectBufferCapacity[TERRAIN_LOD_COUNT] = {0};
-
-    // Cull/LOD compute shader
-    std::shared_ptr<Shader> m_cullShader;
-    std::shared_ptr<ComputePipeline> m_cullPipeline;
-    CommandPoolHash m_commandPoolHash = 0;
+    std::unique_ptr<TerrainCuller> m_culler;
+    TerrainCullBuffers m_cullBuffers;
 
     bool m_initialized = false;
     bool m_wireframe = false;

@@ -85,11 +85,13 @@ void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
 
             if (materialComp.material) {
                 auto &mat = materialComp.material;
-                info.AlbedoTextureIndex = mat->getParameter(ParameterID::ALBEDO_MAP).asUInt();
-                info.NormalTextureIndex = mat->getParameter(ParameterID::NORMAL_MAP).asUInt();
-                info.EmissiveFactorTextureIndex = mat->getParameter(ParameterID::EMISSIVE_MAP).asUInt();
-                info.albedo = mat->getParameter(ParameterID::ALBEDO).asVec3();
-                info.emissiveColor = mat->getParameter(ParameterID::EMISSIVE).asVec3();
+                info.AlbedoTextureIndex = mat->getParameter<uint32_t>(ParameterID::ALBEDO_MAP);
+                info.NormalTextureIndex = mat->getParameter<uint32_t>(ParameterID::NORMAL_MAP);
+                info.EmissiveFactorTextureIndex = mat->getParameter<uint32_t>(ParameterID::EMISSIVE_MAP);
+                glm::vec4 albedo4 = mat->getParameter<glm::vec4>(ParameterID::ALBEDO);
+                glm::vec4 emissive4 = mat->getParameter<glm::vec4>(ParameterID::EMISSIVE);
+                info.albedo = glm::vec3(albedo4.x, albedo4.y, albedo4.z);
+                info.emissiveColor = glm::vec3(emissive4.x, emissive4.y, emissive4.z);
             }
 
             if (meshComp.mesh) {
@@ -182,11 +184,13 @@ void RtInstanceData::patchDirty(std::shared_ptr<Scene> scene)
         if (it == m_materialToOffsets.end()) continue;
 
         PackedMat packed = {};
-        packed.AlbedoTextureIndex = mat->getParameter(ParameterID::ALBEDO_MAP).asUInt();
-        packed.NormalTextureIndex = mat->getParameter(ParameterID::NORMAL_MAP).asUInt();
-        packed.albedo = mat->getParameter(ParameterID::ALBEDO).asVec3();
-        packed.emissiveColor = mat->getParameter(ParameterID::EMISSIVE).asVec3();
-        packed.EmissiveFactorTextureIndex = mat->getParameter(ParameterID::EMISSIVE_MAP).asUInt();
+        packed.AlbedoTextureIndex = mat->getParameter<uint32_t>(ParameterID::ALBEDO_MAP);
+        packed.NormalTextureIndex = mat->getParameter<uint32_t>(ParameterID::NORMAL_MAP);
+        glm::vec4 albedo4 = mat->getParameter<glm::vec4>(ParameterID::ALBEDO);
+        glm::vec4 emissive4 = mat->getParameter<glm::vec4>(ParameterID::EMISSIVE);
+        packed.albedo = glm::vec3(albedo4.x, albedo4.y, albedo4.z);
+        packed.emissiveColor = glm::vec3(emissive4.x, emissive4.y, emissive4.z);
+        packed.EmissiveFactorTextureIndex = mat->getParameter<uint32_t>(ParameterID::EMISSIVE_MAP);
 
         for (uint32_t baseOffset : it->second) {
             uint32_t dst = baseOffset + static_cast<uint32_t>(MAT_START);

@@ -1,18 +1,21 @@
-#pragma once
+#ifndef RAPTURE__MATERIAL_INSTANCE_H
+#define RAPTURE__MATERIAL_INSTANCE_H
 
-#include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/UniformBuffers/UniformBuffer.h"
-#include "Events/AssetEvents.h" // Publish material change events
 #include "Material.h"
-#include "Materials/MaterialParameters.h"
+#include "MaterialData.h"
+#include "MaterialParameters.h"
+#include "Buffers/UniformBuffers/UniformBuffer.h"
+#include "Events/AssetEvents.h"
 
-#include <atomic>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
+#include <cstring>
 
 namespace Rapture {
+
+class Texture;
 
 struct PendingTexture {
     ParameterID parameterId;
@@ -25,75 +28,51 @@ class MaterialInstance {
     ~MaterialInstance();
 
     std::shared_ptr<BaseMaterial> getBaseMaterial() const { return m_baseMaterial; }
-
     const std::string &getName() const { return m_name; }
+    uint32_t getBindlessIndex() const { return m_bindlessIndex; }
+    const MaterialData &getData() const { return m_data; }
+    uint32_t getFlags() const { return m_data.flags; }
 
-    template <typename T> void setParameter(ParameterID id, T value)
-    {
-        if (m_parameterMap.find(id) != m_parameterMap.end()) {
-            m_parameterMap[id].setValue<T>(value);
-            updateUniformBuffer(id);
+    template <typename T>
+    void setParameter(ParameterID id, const T &value) {
+        const ParamInfo* info = getParamInfo(id);
+        if (!info) return;
+        if (sizeof(T) != info->size) return;
 
-            // Notify listeners that this material instance has changed
-            Rapture::AssetEvents::onMaterialInstanceChanged().publish(this);
+        char* dataPtr = reinterpret_cast<char*>(&m_data);
+        std::memcpy(dataPtr + info->offset, &value, info->size);
+        syncToGPU();
+        AssetEvents::onMaterialInstanceChanged().publish(this);
+    }
 
-            // Update material flags when setting texture parameters
-            if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>) {
-                m_flagsDirty = true;
-            }
-        } else {
-            RP_CORE_WARN("Parameter ID '{}' not found for this material", parameterIdToString(id));
-        }
+    template <typename T>
+    T getParameter(ParameterID id) const {
+        const ParamInfo* info = getParamInfo(id);
+        if (!info || sizeof(T) != info->size) return T{};
+
+        T value{};
+        const char* dataPtr = reinterpret_cast<const char*>(&m_data);
+        std::memcpy(&value, dataPtr + info->offset, info->size);
+        return value;
     }
 
     void setParameter(ParameterID id, std::shared_ptr<Texture> texture);
-
-    MaterialParameter getParameter(ParameterID id);
-
     void updatePendingTextures();
 
-    void updateUniformBuffer(ParameterID id);
-
-    std::unordered_map<ParameterID, MaterialParameter> &getParameterMap() { return m_parameterMap; }
-
-    // Get the cached material flags
-    uint32_t getMaterialFlags() const;
-
-    // Force recalculation of material flags (useful after bulk parameter changes)
-    void recalculateMaterialFlags();
-
-    // Get the bindless index for this material's uniform buffer
-    uint32_t getBindlessIndex() const { return m_bindlessUniformBufferIndex; }
-
   private:
+    void syncToGPU();
+
     std::string m_name;
-    std::shared_ptr<DescriptorSet> m_descriptorSet;
-    bool m_isDirty = false;
-    bool m_isReady = false;
+    std::shared_ptr<BaseMaterial> m_baseMaterial;
+    std::shared_ptr<UniformBuffer> m_uniformBuffer;
+    uint32_t m_bindlessIndex;
+
+    MaterialData m_data;
 
     std::vector<PendingTexture> m_pendingTextures;
     std::mutex m_pendingTexturesMutex;
-
-    uint32_t m_bindlessUniformBufferIndex;
-    // uint32_t m_bindlessTextureIndex;
-
-    std::shared_ptr<BaseMaterial> m_baseMaterial;
-    std::shared_ptr<UniformBuffer> m_uniformBuffer;
-
-    std::unordered_map<ParameterID, MaterialParameter> m_parameterMap;
-
-    // Material flags cache
-    mutable uint32_t m_materialFlags = 0;
-    mutable bool m_flagsDirty = true;
-
-    // Calculate material flags from current parameters
-    uint32_t calculateMaterialFlags() const;
-
-    // Helper to check if a texture parameter is valid (not null)
-    bool hasValidTexture(ParameterID id) const;
-
-    // Helper to check if a parameter ID represents a texture
-    bool isTextureParameter(ParameterID id) const;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__MATERIAL_INSTANCE_H

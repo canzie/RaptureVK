@@ -15,6 +15,7 @@
 
 #include "Meshes/Mesh.h"
 
+#include "Materials/MaterialParameters.h"
 #include "AssetManager/AssetManager.h"
 #include "Events/AssetEvents.h"
 
@@ -436,17 +437,18 @@ std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEnti
     // Emissive factor - common to both workflows
     yyjson_val *emissiveFactorVal = getObjectValue(materialVal, "emissiveFactor");
     if (emissiveFactorVal && yyjson_is_arr(emissiveFactorVal) && getArraySize(emissiveFactorVal) >= 3) {
-        glm::vec3 emissiveFactor((float)getDouble(getArrayElement(emissiveFactorVal, 0), 0.0),
+        glm::vec4 emissiveFactor((float)getDouble(getArrayElement(emissiveFactorVal, 0), 0.0),
                                  (float)getDouble(getArrayElement(emissiveFactorVal, 1), 0.0),
-                                 (float)getDouble(getArrayElement(emissiveFactorVal, 2), 0.0));
-        material->setParameter<glm::vec3>(ParameterID::EMISSIVE, emissiveFactor);
+                                 (float)getDouble(getArrayElement(emissiveFactorVal, 2), 0.0),
+                                 1.0f); // strength
+        material->setParameter(ParameterID::EMISSIVE, emissiveFactor);
     }
 
     // dont need to update the descriptor set here, as the ubo is already good, only the textures need to be added to the descriptor
     // set
-    material->setParameter<glm::vec3>(ParameterID::ALBEDO, baseColor);
-    material->setParameter<float>(ParameterID::METALLIC, metallic);
-    material->setParameter<float>(ParameterID::ROUGHNESS, roughness);
+    material->setParameter(ParameterID::ALBEDO, glm::vec4(baseColor, 1.0f));
+    material->setParameter(ParameterID::METALLIC, metallic);
+    material->setParameter(ParameterID::ROUGHNESS, roughness);
 
     // material->updateDescriptorSet();
 
