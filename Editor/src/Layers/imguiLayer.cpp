@@ -225,6 +225,7 @@ void ImGuiLayer::renderImGui()
         m_imageViewerPanel.render();
         m_settingsPanel.render();
         m_textureGeneratorPanel.render();
+        m_graphEditorPanel.render();
 
         for (auto &viewer : m_floatingImageViews) {
             if (viewer && viewer->isOpen()) {

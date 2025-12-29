@@ -181,8 +181,8 @@ void TerrainGenerator::bakeNoiseLUT()
 
                 // PV adds peaks/valleys, centered at 0, scaled by erosion
                 float pvContrib = (pvFactor - 0.5f) * 2.0f * pvAmplitude;
-
                 // Combine: continentalness dominates, PV adds detail
+
                 float combined = baseHeight * 0.6f + pvContrib * 0.4f;
 
                 // Map to 0-1 for storage (shader does -0.5 to center at 0)
