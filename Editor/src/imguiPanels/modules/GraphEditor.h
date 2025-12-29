@@ -18,9 +18,16 @@ class GraphEditor {
     bool removeNode(uint32_t nodeId);
 
   private:
+    void renderGrid();
     void renderNode(GraphNode &node);
+    void renderConnections();
+    void renderInputPins(GraphNode &node, ImVec2 screenPos, float headerHeight, float lineHeight, float textScale);
+    void renderOutputPins(GraphNode &node, ImVec2 screenPos, float headerHeight, float lineHeight, float textScale);
+    void handleNodeInteraction(GraphNode &node, ImVec2 screenPos, ImVec2 screenSize, float headerHeight);
+
     ImVec2 canvasToScreen(ImVec2 canvasPos);
     ImVec2 screenToCanvas(ImVec2 screenPos);
+    ImVec2 getParameterPinPosition(uint32_t nodeId, uint32_t paramIndex, bool isInput);
 
   private:
     std::string m_label;
@@ -29,6 +36,12 @@ class GraphEditor {
 
     ImVec2 m_scrolling;
     float m_zoom;
+
+    bool m_isDraggingConnection;
+    bool m_isOutputPin;
+    uint32_t m_connectionSourceNode;
+    uint32_t m_connectionSourceParam;
+    ImVec2 m_connectionDragPos;
 };
 
 } // namespace Modules
