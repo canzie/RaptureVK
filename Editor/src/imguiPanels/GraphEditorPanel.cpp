@@ -23,7 +23,6 @@ void GraphEditorPanel::setupDemoGraph()
     colorAOut.name = "Color";
     colorAOut.pType = ParameterType::VEC3;
     colorAOut.value = glm::vec3(1.0f, 0.0f, 0.0f); // Red
-    colorAOut.color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
     inputA.outputs.push_back(colorAOut);
 
     GraphNode inputB;
@@ -36,7 +35,6 @@ void GraphEditorPanel::setupDemoGraph()
     colorBOut.name = "Color";
     colorBOut.pType = ParameterType::VEC3;
     colorBOut.value = glm::vec3(0.0f, 0.0f, 1.0f); // Blue
-    colorBOut.color = ImVec4(0.3f, 0.3f, 1.0f, 1.0f);
     inputB.outputs.push_back(colorBOut);
 
     GraphNode alphaInput;
@@ -49,21 +47,54 @@ void GraphEditorPanel::setupDemoGraph()
     alphaOut.name = "Value";
     alphaOut.pType = ParameterType::F32;
     alphaOut.value = 0.5f;
-    alphaOut.color = ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
     alphaInput.outputs.push_back(alphaOut);
 
     // Create output node
     GraphNode output;
-    output.name = "Final Color";
+    output.name = "PrimaryMaterialNode";
     output.opType = NodeOpType::OUTPUT;
     output.windowPosition = ImVec2(640, 128);
     output.color = ImVec4(0.5f, 0.2f, 0.2f, 1.0f);
 
     NodeParameter finalColorIn;
-    finalColorIn.name = "Color";
+    finalColorIn.name = "Albedo";
     finalColorIn.pType = ParameterType::VEC3;
-    finalColorIn.color = ImVec4(1.0f, 1.0f, 0.3f, 1.0f);
     output.inputs.push_back(finalColorIn);
+
+    NodeParameter finalMetallicIn;
+    finalMetallicIn.name = "Metallic";
+    finalMetallicIn.pType = ParameterType::F32;
+    output.inputs.push_back(finalMetallicIn);
+
+    NodeParameter finalRougnessIn;
+    finalRougnessIn.name = "Rougness";
+    finalRougnessIn.pType = ParameterType::F32;
+    output.inputs.push_back(finalRougnessIn);
+
+    NodeParameter finalEmissionIn;
+    finalEmissionIn.name = "Emission";
+    finalEmissionIn.pType = ParameterType::VEC3;
+    output.inputs.push_back(finalEmissionIn);
+
+    NodeParameter finalEmissionStrIn;
+    finalEmissionStrIn.name = "Emission Strength";
+    finalEmissionStrIn.pType = ParameterType::F32;
+    output.inputs.push_back(finalEmissionStrIn);
+
+    NodeParameter finalAlbedoMapIn;
+    finalAlbedoMapIn.name = "Albedo Map";
+    finalAlbedoMapIn.pType = ParameterType::TEXTURE_HANDLE;
+    output.inputs.push_back(finalAlbedoMapIn);
+
+    NodeParameter finalNormalMapIn;
+    finalNormalMapIn.name = "Normal Map";
+    finalNormalMapIn.pType = ParameterType::TEXTURE_HANDLE;
+    output.inputs.push_back(finalNormalMapIn);
+
+    NodeParameter finalORMMapIn;
+    finalORMMapIn.name = "Occlusion, Rougness, Metallic Map";
+    finalORMMapIn.pType = ParameterType::TEXTURE_HANDLE;
+    output.inputs.push_back(finalORMMapIn);
 
     // Create mix node
     GraphNode mixNode;
@@ -75,25 +106,21 @@ void GraphEditorPanel::setupDemoGraph()
     NodeParameter mixInA;
     mixInA.name = "A";
     mixInA.pType = ParameterType::VEC3;
-    mixInA.color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
     mixNode.inputs.push_back(mixInA);
 
     NodeParameter mixInB;
     mixInB.name = "B";
     mixInB.pType = ParameterType::VEC3;
-    mixInB.color = ImVec4(0.3f, 0.3f, 1.0f, 1.0f);
     mixNode.inputs.push_back(mixInB);
 
     NodeParameter mixInAlpha;
     mixInAlpha.name = "Alpha";
     mixInAlpha.pType = ParameterType::F32;
-    mixInAlpha.color = ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
     mixNode.inputs.push_back(mixInAlpha);
 
     NodeParameter mixOut;
     mixOut.name = "Result";
     mixOut.pType = ParameterType::VEC3;
-    mixOut.color = ImVec4(1.0f, 1.0f, 0.3f, 1.0f);
     mixNode.outputs.push_back(mixOut);
 
     // Create graph with inputs and output
@@ -114,14 +141,10 @@ void GraphEditorPanel::setupDemoGraph()
 
     // Find the input/output node IDs by their names
     for (auto &[id, node] : nodes) {
-        if (node.name == "Color A")
-            inputAId = id;
-        else if (node.name == "Color B")
-            inputBId = id;
-        else if (node.name == "Mix Factor")
-            alphaId = id;
-        else if (node.name == "Final Color")
-            outputId = id;
+        if (node.name == "Color A") inputAId = id;
+        else if (node.name == "Color B") inputBId = id;
+        else if (node.name == "Mix Factor") alphaId = id;
+        else if (node.name == "Final Color") outputId = id;
     }
 
     // Create connections

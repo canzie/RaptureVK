@@ -48,9 +48,9 @@ struct NodeParameter {
     std::string name;
     ParameterType pType;
     NodeValue value;
-    ImVec4 color; // Visual color for the parameter pin
 
-    NodeParameter() : name(""), pType(ParameterType::F32), value(0.0f), color(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)) {}
+    NodeParameter() : name(""), pType(ParameterType::F32), value(0.0f) {}
+    NodeParameter(std::string name, ParameterType pType, NodeValue value) : name(name), pType(pType), value(value) {}
 };
 
 struct NodeConnection {
