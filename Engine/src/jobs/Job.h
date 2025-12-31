@@ -1,24 +1,36 @@
 #ifndef RAPTURE__JOB_H
 #define RAPTURE__JOB_H
 
-#include "Counter.h"
 #include "Fiber.h"
+#include "InplaceFunction.h"
 #include "JobCommon.h"
 
+#include <cstdint>
 #include <span>
 
 namespace Rapture {
 
-template <typename Sig, size_t Size = 48> class InplaceFunction; // Implementation omitted
+struct Counter;
+
+class JobSystem;
+struct JobContext;
 
 using JobFunction = InplaceFunction<void(JobContext &), 48>;
 
 struct JobDeclaration {
     JobFunction function;
-    JobPriority priority = NORMAL;
+    JobPriority priority = JobPriority::NORMAL;
     QueueAffinity affinity = ANY;
     Counter *signalOnComplete = nullptr;
     const char *debugName = nullptr;
+
+    JobDeclaration(const JobFunction &_func, JobPriority _prio, QueueAffinity _affinity, Counter *onComplete = nullptr,
+                   const char *name = nullptr)
+        : function(_func), priority(_prio), affinity(_affinity), signalOnComplete(onComplete), debugName(name)
+    {
+    }
+
+    JobDeclaration() = default;
 };
 
 struct Job {
@@ -29,15 +41,26 @@ struct Job {
     int32_t waitTarget = 0;
 
     Fiber *fiber = nullptr;
+
+    Job(JobDeclaration _decl, Counter *_waitCounter, int32_t _waitTarget, Fiber *_fiber)
+        : decl(_decl), waitCounter(_waitCounter), waitTarget(_waitTarget), fiber(_fiber)
+    {
+    }
+    Job() = default;
 };
 
+/*
+ * @brief Context used for every job.
+ *
+ *        Passing this context as every jobs function allows the jobs to both yield and spawn other jobs in a lightweight manner
+ *
+ * */
 struct JobContext {
     JobSystem *system;
     Job *currentJob;
-    Fiber *currentFiber; // nullptr for Task jobs
+    Fiber *currentFiber;
 
     // Yield this fiber until counter reaches value
-    // ONLY valid for Fiber jobs - asserts on Task jobs
     void waitFor(Counter &c, int32_t targetValue);
 
     // Spawn child jobs
@@ -46,11 +69,7 @@ struct JobContext {
 
     // Batch spawn with automatic counter setup
     Counter *runBatch(std::span<JobDeclaration> jobs);
-
-    // Check if running as fiber (can yield)
-    bool canYield() const { return currentFiber != nullptr; }
 };
-
 } // namespace Rapture
 
 #endif // RAPTURE__JOB_H

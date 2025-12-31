@@ -1,14 +1,14 @@
 #ifndef RAPTURE__COUNTER_H
 #define RAPTURE__COUNTER_H
 
-#include "JobCommon.h"
-
 #include <array>
 #include <atomic>
 #include <cstdint>
 #include <vector>
 
 namespace Rapture {
+
+class JobSystem;
 
 struct Counter {
     std::atomic<int32_t> value{0};

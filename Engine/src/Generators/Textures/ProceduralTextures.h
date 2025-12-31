@@ -62,6 +62,8 @@ struct RidgedNoisePushConstants {
     float persistence = 0.5f;
     float lacunarity = 2.0f;
     float scale = 8.0f;
+    float ridgeExponent = 0.8;
+    float amplitudeMultiplier = 0.5;
     uint32_t seed = 0;
 };
 

@@ -3,11 +3,10 @@
 
 namespace Rapture {
 
-enum JobPriority {
+enum class JobPriority {
     LOW,    // Background work, can be starved
     NORMAL, // Default priority
-    HIGH,   // Latency-sensitive (frame-critical rendering)
-    PRIORITY_COUNT
+    HIGH    // Latency-sensitive (frame-critical rendering)
 };
 
 enum QueueAffinity {

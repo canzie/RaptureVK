@@ -9,6 +9,8 @@ layout(push_constant) uniform RidgedNoisePushConstants {
     float persistence;
     float lacunarity;
     float scale;
+    float ridgeExponent;
+    float amplitudeMultiplier;
     uint seed;
 } pc;
 
@@ -47,8 +49,32 @@ float snoise(vec2 v) {
     g.yz = a0.yz * x12.xz + h.yz * x12.yw;
     return 130.0 * dot(m, g);
 }
+float ridgedFbm(vec2 p)
+{
+    float value = 0.0;
+    float amplitude = 1.0;
+    float frequency = 1.0;
+    float maxAmplitude = 0.0;
 
-float ridgedFbm(vec2 p) {
+    for (int i = 0; i < pc.octaves; i++) {
+        // standard ridged noise
+        float n = 1.0 - abs(snoise(p * frequency));
+        n = pow(n, pc.ridgeExponent); // softer peaks
+        value += amplitude * n;
+
+        maxAmplitude += amplitude;
+
+        frequency *= pc.lacunarity;
+        amplitude *= pc.persistence;
+    }
+
+    // normalize to [0,1]
+    value *= pc.amplitudeMultiplier;
+    value /= maxAmplitude;
+
+    return value;
+}
+float _ridgedFbm(vec2 p) {
     float value = 0.0;
     float amplitude = 1.0;
     float frequency = 1.0;

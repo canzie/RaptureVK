@@ -3,8 +3,6 @@
 
 #include "Counter.h"
 #include "Fiber.h"
-#include "Job.h"
-#include "JobCommon.h"
 #include "JobQueue.h"
 
 #include <shared_mutex>
@@ -14,8 +12,8 @@
 namespace Rapture {
 
 class WaitList {
-
   public:
+    WaitList(JobSystem *system);
     /**
      * @brief Add a job to the wait list
      * @param job The job to add
@@ -35,12 +33,14 @@ class WaitList {
      * @param fiberPool The fiber pool to dispatch to
      */
     // Only scans jobs waiting on THIS counter - O(jobs_per_counter) not O(total_jobs)
-    void onCounterChanged(Counter *counter, AffinityQueueSet &queues, FiberPool &fiberPool);
+    void onCounterChanged(Counter *counter);
 
     size_t size() const;
 
   private:
     mutable std::shared_mutex m_mutex;
+
+    JobSystem *system;
 
     // Partitioned by counter - O(1) lookup
     std::unordered_map<Counter *, std::vector<Job>> m_waitingJobs;

@@ -253,7 +253,7 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     // glm::ortho expects zNear < zFar, so use -max as near and -min as far
     glm::mat4 combinedLightProj = glm::ortho(combinedMinX - xPad, combinedMaxX + xPad, combinedMinY - yPad, combinedMaxY + yPad,
                                              -combinedMaxZ - zPad, -combinedMinZ + zPad);
-
+    combinedLightProj[1][1] *= -1;
     m_shadowFrustum.update(combinedLightProj, combinedLightView);
 
     return cascadeData;

@@ -1,10 +1,6 @@
 #ifndef RAPTURE__FIBER_H
 #define RAPTURE__FIBER_H
 
-#include "Counter.h"
-#include "Job.h"
-#include "JobCommon.h"
-
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -12,8 +8,12 @@
 
 namespace Rapture {
 
+struct Job;
+struct Counter;
+
 struct FiberContext {
     // Platform-specific context (registers, etc.)
+    // manual asm implementation for linux, windows we can use the win32 api
 };
 
 struct Fiber {
@@ -30,11 +30,24 @@ struct Fiber {
     void switchTo();          // Context switch TO this fiber
     void switchToScheduler(); // Context switch back to worker's scheduler
 };
+/*
+void fiberEntryPoint(Fiber *fiber)
+{
+    JobContext ctx{&JobSystem::instance(), fiber->currentJob, fiber};
+
+    fiber->currentJob->decl.function(ctx);
+
+    fiber->finished = true;
+    fiber->switchToScheduler();
+}
+*/
 
 class FiberPool {
   public:
-    static constexpr size_t FIBER_STACK_SIZE = 64 * 1024; // 64KB per fiber
-    static constexpr size_t MAX_FIBERS = 256;             // ~16MB total
+    static constexpr size_t FIBER_STACK_SIZE = 64 * 1024;
+    static constexpr size_t FIBER_STACK_SIZE_LARGE = 512 * 1024;
+    static constexpr size_t MAX_FIBERS = 128;
+    static constexpr size_t MAX_LARGE_FIBERS = 32;
 
     Fiber *acquire();             // Get a free fiber (blocks if none available)
     bool tryAcquire(Fiber **out); // Non-blocking acquire

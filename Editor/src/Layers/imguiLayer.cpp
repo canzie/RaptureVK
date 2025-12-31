@@ -220,7 +220,7 @@ void ImGuiLayer::renderImGui()
         m_viewportPanel.renderSceneViewport((ImTextureID)m_viewportTextureDescriptorSets[m_currentFrame]);
         m_propertiesPanel.render();
         m_browserPanel.render();
-        // m_gbufferPanel.render();
+        m_gbufferPanel.render();
         m_contentBrowserPanel.render();
         m_imageViewerPanel.render();
         m_settingsPanel.render();

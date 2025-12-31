@@ -1,6 +1,5 @@
 #include "TerrainGenerator.h"
 
-#include "Buffers/Descriptors/DescriptorManager.h"
 #include "Generators/Textures/ProceduralTextures.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
@@ -166,26 +165,15 @@ void TerrainGenerator::bakeNoiseLUT()
                 float c = (static_cast<float>(x) / (size - 1)) * 2.0f - 1.0f;
                 float cFactor = s_evaluateSpline(m_multiNoiseConfig.splines[CONTINENTALNESS], c);
 
-                // Minecraft-style combination:
-                // Continentalness: base terrain shape (0=ocean, 0.5=coast, 1=inland)
-                // Erosion: controls amplitude (0=mountains allowed, 1=flat/eroded)
-                // PV: local peaks and valleys, scaled by erosion
+                // conditional influence (no extra splines required)
+                float pvAmplitude = 1.0f - eFactor; // peaks/valleys suppressed by erosion
 
-                // Base height from continentalness, centered at 0
+                // combine base height with PV contribution
                 float baseHeight = (cFactor - 0.5f) * 2.0f;
-
-                // Erosion controls how much PV can contribute
-                // High erosion (1) = flat terrain, low PV influence
-                // Low erosion (0) = rugged terrain, full PV influence
-                float pvAmplitude = 1.0f - eFactor;
-
-                // PV adds peaks/valleys, centered at 0, scaled by erosion
                 float pvContrib = (pvFactor - 0.5f) * 2.0f * pvAmplitude;
-                // Combine: continentalness dominates, PV adds detail
-
                 float combined = baseHeight * 0.6f + pvContrib * 0.4f;
 
-                // Map to 0-1 for storage (shader does -0.5 to center at 0)
+                // clamp to [0,1] for LUT storage
                 combined = combined * 0.5f + 0.5f;
                 combined = glm::clamp(combined, 0.0f, 1.0f);
 
@@ -236,11 +224,13 @@ void TerrainGenerator::generateDefaultNoiseTextures()
     m_noiseTextures[EROSION] = ProceduralTexture::generatePerlinNoise(params, config);
 
     RidgedNoisePushConstants ridgedParams;
-    ridgedParams.octaves = 4;
-    ridgedParams.scale = 8.0f;
-    ridgedParams.persistence = 0.55f;
-    ridgedParams.lacunarity = 2.0f;
-    ridgedParams.seed = 1;
+    ridgedParams.octaves = 2;
+    ridgedParams.scale = 0.8f;
+    ridgedParams.persistence = 0.5f;
+    ridgedParams.lacunarity = 0.5f;
+    ridgedParams.seed = 300;
+    ridgedParams.ridgeExponent = 0.6;
+    ridgedParams.amplitudeMultiplier = 0.4;
     m_noiseTextures[PEAKS_VALLEYS] = ProceduralTexture::generateRidgedNoise(ridgedParams, config);
 
     // Continentalness: ocean -> coast -> plains -> hills -> mountains

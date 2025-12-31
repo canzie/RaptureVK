@@ -191,6 +191,15 @@ FetchContent_Declare(
     GIT_PROGRESS TRUE
 )
 
+# --- concurrentqueue ---
+FetchContent_Declare(
+    concurrentqueue
+    GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
+    GIT_TAG v1.0.4
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+)
+
 
 # ==================== Make Dependencies Available ====================
 
@@ -216,6 +225,7 @@ FetchContent_MakeAvailable(glslang)
 FetchContent_MakeAvailable(shaderc)
 
 FetchContent_MakeAvailable(tomlplusplus)
+FetchContent_MakeAvailable(concurrentqueue)
 message(STATUS "=== All vendor dependencies available ===")
 
 # ==================== Suppress Warnings from Vendor Libraries ====================
@@ -372,6 +382,7 @@ target_link_libraries(vendor_libraries INTERFACE
     tracy::client
     shaderc_combined
     tomlplusplus::tomlplusplus
+    concurrentqueue
 )
 
 # Mark vendor_libraries includes as SYSTEM to suppress warnings
