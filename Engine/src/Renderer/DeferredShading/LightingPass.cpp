@@ -2,7 +2,6 @@
 #include "WindowContext/Application.h"
 
 #include "Components/FogComponent.h"
-#include "Renderer/Shadows/ShadowCommon.h"
 #include "Renderer/Shadows/ShadowMapping/ShadowMapping.h"
 
 #include "Logging/Log.h"
@@ -35,10 +34,9 @@ struct LightingPushConstants {
     glm::vec2 fogDistances; // .x = near, .y = far
 };
 
-LightingPass::LightingPass(float width, float height, uint32_t framesInFlight, std::shared_ptr<GBufferPass> gBufferPass,
+LightingPass::LightingPass(float width, float height, std::shared_ptr<GBufferPass> gBufferPass,
                            std::shared_ptr<DynamicDiffuseGI> ddgi, VkFormat colorFormat)
-    : m_framesInFlight(framesInFlight), m_currentFrame(0), m_colorFormat(colorFormat), m_gBufferPass(gBufferPass), m_ddgi(ddgi),
-      m_width(width), m_height(height)
+    : m_colorFormat(colorFormat), m_gBufferPass(gBufferPass), m_ddgi(ddgi), m_width(width), m_height(height)
 {
 
     auto &app = Application::getInstance();
@@ -60,18 +58,6 @@ LightingPass::LightingPass(float width, float height, uint32_t framesInFlight, s
     m_handle = handle;
 
     createPipeline();
-    setupCommandResources();
-}
-
-void LightingPass::setupCommandResources()
-{
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 LightingPass::~LightingPass()
@@ -99,13 +85,21 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
 }
 
 CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene, SceneRenderTarget &renderTarget,
-                                             uint32_t frameInFlightIndex, const SecondaryBufferInheritance &inheritance)
+                                             const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    m_currentFrame = frameInFlightIndex;
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, frameInFlightIndex);
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    config.threadId = threadId;
+    auto hash = CommandPoolManager::createCommandPool(config);
+
+    auto pool = CommandPoolManager::getCommandPool(hash);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);

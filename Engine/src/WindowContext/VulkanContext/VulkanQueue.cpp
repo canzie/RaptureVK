@@ -91,6 +91,7 @@ bool VulkanQueue::submitCommandBuffers(VkFence fence)
                     pools.insert(secCmdBuffer->getCommandPool());
                 }
             }
+            cmdBuffer->clearSecondaries();
         }
     }
     for (auto *pool : pools) {
@@ -158,6 +159,7 @@ bool VulkanQueue::submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence)
                     pools.insert(secCmdBuffer->getCommandPool());
                 }
             }
+            cmdBuffer->clearSecondaries();
         }
     }
     for (auto *pool : pools) {
@@ -221,6 +223,7 @@ bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, VkSubmitInfo &submit
         }
     }
 
+    commandBuffer->clearSecondaries();
     for (auto *pool : pools) {
         pool->markPendingSignal(m_timelineSemaphore, signalValue);
     }
@@ -273,6 +276,7 @@ bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, VkFence fence)
         }
     }
 
+    commandBuffer->clearSecondaries();
     for (auto *pool : pools) {
         pool->markPendingSignal(m_timelineSemaphore, signalValue);
     }

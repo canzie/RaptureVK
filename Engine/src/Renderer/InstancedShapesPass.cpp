@@ -41,18 +41,6 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
     m_shaderHandle = handle;
 
     createPipeline();
-    setupCommandResources();
-}
-
-void InstancedShapesPass::setupCommandResources()
-{
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 InstancedShapesPass::~InstancedShapesPass() {}
@@ -61,8 +49,6 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
                                                     uint32_t frameInFlight, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
-
-    m_currentImageIndex = frameInFlight;
 
     auto camera = scene->getMainCamera();
     if (camera == nullptr) {
@@ -73,7 +59,17 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
         return nullptr;
     }
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, frameInFlight);
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    config.threadId = threadId;
+    auto hash = CommandPoolManager::createCommandPool(config);
+
+    auto pool = CommandPoolManager::getCommandPool(hash);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
@@ -96,9 +92,6 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
     scissor.offset = {0, 0};
     scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
-
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
 
     auto &registry = scene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, InstanceShapeComponent>();
@@ -257,24 +250,25 @@ void InstancedShapesPass::createPipeline()
     m_pipelineWireframe = std::make_shared<GraphicsPipeline>(config);
 }
 
-void InstancedShapesPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex)
+void InstancedShapesPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
+                                                uint32_t frameInFlightIndex)
 {
     VkImage targetImage = renderTarget.getImage(imageIndex);
     VkImageView targetImageView = renderTarget.getImageView(imageIndex);
     VkExtent2D targetExtent = renderTarget.getExtent();
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage, frameInFlightIndex);
 
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachmentInfo.imageView = targetImageView;
     colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // Preserve LightingPass output
+    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
     VkRenderingAttachmentInfo depthAttachmentInfo{};
     depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depthAttachmentInfo.imageView = m_depthStencilTextures[m_currentImageIndex]->getImageView();
+    depthAttachmentInfo.imageView = m_depthStencilTextures[frameInFlightIndex]->getImageView();
     depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -298,10 +292,9 @@ void InstancedShapesPass::endDynamicRendering(CommandBuffer *commandBuffer)
     vkCmdEndRendering(commandBuffer->getCommandBufferVk());
 }
 
-void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage)
+void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage,
+                                                              uint32_t frameInFlightIndex)
 {
-    // Execution barrier to ensure previous pass color writes are complete
-    // before this pass starts writing (write-after-write synchronization)
     VkImageMemoryBarrier colorBarrier{};
     colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -317,15 +310,13 @@ void InstancedShapesPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *com
     colorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    // Depth buffer is already in DEPTH_STENCIL_ATTACHMENT_OPTIMAL from SkyboxPass
-    // Just need execution barrier to sync with previous depth writes
     VkImageMemoryBarrier depthBarrier{};
     depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     depthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    depthBarrier.image = m_depthStencilTextures[m_currentImageIndex]->getImage();
+    depthBarrier.image = m_depthStencilTextures[frameInFlightIndex]->getImage();
     depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     depthBarrier.subresourceRange.baseMipLevel = 0;
     depthBarrier.subresourceRange.levelCount = 1;

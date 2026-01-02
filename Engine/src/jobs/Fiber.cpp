@@ -86,7 +86,9 @@ void initializeFiber(Fiber *fiber)
 
     uintptr_t stackAddr = reinterpret_cast<uintptr_t>(stackTop);
     stackAddr &= ~0xFull;
-    stackAddr -= 8;
+    // NOTE: Do NOT subtract 8 here. The x86-64 ABI requires RSP to be 16-byte
+    // aligned BEFORE a CALL instruction. Since fiber_entry_point does
+    // "call fiberEntryPointImpl", RSP must be 16-aligned when we enter.
 
     fiber->stackPointer = reinterpret_cast<void *>(stackAddr);
 

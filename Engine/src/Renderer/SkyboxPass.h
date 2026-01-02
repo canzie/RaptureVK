@@ -39,7 +39,6 @@ class SkyboxPass {
   private:
     void createPipeline();
     void createSkyboxGeometry();
-    void setupCommandResources();
 
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, VkImage depthImage);
 
@@ -58,8 +57,6 @@ class SkyboxPass {
     float m_width;
     float m_height;
     VkFormat m_colorFormat;
-
-    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture

@@ -25,19 +25,17 @@ class InstancedShapesPass {
     CommandBuffer *recordSecondary(const std::shared_ptr<Scene> &scene, SceneRenderTarget &renderTarget, uint32_t frameInFlight,
                                    const SecondaryBufferInheritance &inheritance);
 
-    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex);
+    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex, uint32_t frameInFlightIndex);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 
   private:
     void createPipeline();
-    void setupCommandResources();
-    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage);
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, uint32_t frameInFlightIndex);
 
   private:
     float m_width;
     float m_height;
     uint32_t m_framesInFlight;
-    uint32_t m_currentImageIndex = 0;
 
     std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
     std::weak_ptr<Shader> m_shader;
@@ -49,8 +47,6 @@ class InstancedShapesPass {
     VkDevice m_device;
     VmaAllocator m_vmaAllocator;
     VkFormat m_colorFormat;
-
-    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture

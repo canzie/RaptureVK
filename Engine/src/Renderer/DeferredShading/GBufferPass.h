@@ -20,6 +20,7 @@
 #include "Textures/Texture.h"
 #include "WindowContext/VulkanContext/VulkanContext.h"
 
+#include <cstdint>
 #include <memory>
 
 namespace Rapture {
@@ -55,8 +56,8 @@ class GBufferPass {
     CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame,
                                    const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain = nullptr);
 
-    void beginDynamicRendering(CommandBuffer *primaryCb);
-    void endDynamicRendering(CommandBuffer *primaryCb);
+    void beginDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
+    void endDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
 
     // Getters for current frame's GBuffer textures
     std::shared_ptr<Texture> getPositionTexture() const { return m_positionDepthTextures[m_currentFrame]; }
@@ -99,9 +100,9 @@ class GBufferPass {
     // Record entity rendering only
     void recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
 
-    void setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb);
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb, uint32_t currentFrame);
 
-    void transitionToShaderReadableLayout(CommandBuffer *primaryCb);
+    void transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame);
 
   private:
     std::weak_ptr<Shader> m_shader;

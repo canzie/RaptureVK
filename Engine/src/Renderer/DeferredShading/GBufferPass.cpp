@@ -5,6 +5,8 @@
 #include "Generators/Terrain/TerrainTypes.h"
 #include "Logging/TracyProfiler.h"
 #include "WindowContext/Application.h"
+#include <cstdint>
+#include <cstdio>
 
 namespace Rapture {
 
@@ -125,7 +127,7 @@ CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, 
     config.threadId = threadId;
     auto hash = CommandPoolManager::createCommandPool(config);
 
-    auto pool = CommandPoolManager::getCommandPool(hash, currentFrame);
+    auto pool = CommandPoolManager::getCommandPool(hash);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
@@ -354,16 +356,16 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     }
 }
 
-void GBufferPass::beginDynamicRendering(CommandBuffer *primaryCb)
+void GBufferPass::beginDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    setupDynamicRenderingMemoryBarriers(primaryCb);
+    setupDynamicRenderingMemoryBarriers(primaryCb, currentFrame);
 
     // Update color attachment infos for current frame
     m_colorAttachmentInfo[0] = {};
     m_colorAttachmentInfo[0].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_colorAttachmentInfo[0].imageView = m_positionDepthTextures[m_currentFrame]->getImageView();
+    m_colorAttachmentInfo[0].imageView = m_positionDepthTextures[currentFrame]->getImageView();
     m_colorAttachmentInfo[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     m_colorAttachmentInfo[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     m_colorAttachmentInfo[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -371,7 +373,7 @@ void GBufferPass::beginDynamicRendering(CommandBuffer *primaryCb)
 
     m_colorAttachmentInfo[1] = {};
     m_colorAttachmentInfo[1].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_colorAttachmentInfo[1].imageView = m_normalTextures[m_currentFrame]->getImageView();
+    m_colorAttachmentInfo[1].imageView = m_normalTextures[currentFrame]->getImageView();
     m_colorAttachmentInfo[1].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     m_colorAttachmentInfo[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     m_colorAttachmentInfo[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -379,7 +381,7 @@ void GBufferPass::beginDynamicRendering(CommandBuffer *primaryCb)
 
     m_colorAttachmentInfo[2] = {};
     m_colorAttachmentInfo[2].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_colorAttachmentInfo[2].imageView = m_albedoSpecTextures[m_currentFrame]->getImageView();
+    m_colorAttachmentInfo[2].imageView = m_albedoSpecTextures[currentFrame]->getImageView();
     m_colorAttachmentInfo[2].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     m_colorAttachmentInfo[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     m_colorAttachmentInfo[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -387,7 +389,7 @@ void GBufferPass::beginDynamicRendering(CommandBuffer *primaryCb)
 
     m_colorAttachmentInfo[3] = {};
     m_colorAttachmentInfo[3].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_colorAttachmentInfo[3].imageView = m_materialTextures[m_currentFrame]->getImageView();
+    m_colorAttachmentInfo[3].imageView = m_materialTextures[currentFrame]->getImageView();
     m_colorAttachmentInfo[3].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     m_colorAttachmentInfo[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     m_colorAttachmentInfo[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -396,7 +398,7 @@ void GBufferPass::beginDynamicRendering(CommandBuffer *primaryCb)
     // Depth-stencil attachment configuration
     m_depthAttachmentInfo = {};
     m_depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_depthAttachmentInfo.imageView = m_depthStencilTextures[m_currentFrame]->getImageView();
+    m_depthAttachmentInfo.imageView = m_depthStencilTextures[currentFrame]->getImageView();
     m_depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     m_depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     m_depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -418,52 +420,52 @@ void GBufferPass::beginDynamicRendering(CommandBuffer *primaryCb)
     vkCmdBeginRendering(primaryCb->getCommandBufferVk(), &renderingInfo);
 }
 
-void GBufferPass::endDynamicRendering(CommandBuffer *primaryCb)
+void GBufferPass::endDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame)
 {
     vkCmdEndRendering(primaryCb->getCommandBufferVk());
-    transitionToShaderReadableLayout(primaryCb);
+    transitionToShaderReadableLayout(primaryCb, currentFrame);
 }
 
-void GBufferPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb)
+void GBufferPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     VkImageMemoryBarrier barriers[5];
-    barriers[0] = m_positionDepthTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[0] = m_positionDepthTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[1] = m_normalTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[1] = m_normalTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[2] = m_albedoSpecTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[2] = m_albedoSpecTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[3] = m_materialTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[3] = m_materialTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[4] = m_depthStencilTextures[m_currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED,
-                                                                                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0,
-                                                                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    barriers[4] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED,
+                                                                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0,
+                                                                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
     vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, nullptr,
                          0, nullptr, 5, barriers);
 }
 
-void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb)
+void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     VkImageMemoryBarrier barriers[5];
-    barriers[0] = m_positionDepthTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[0] = m_positionDepthTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
-    barriers[1] = m_normalTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[1] = m_normalTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
-    barriers[2] = m_albedoSpecTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[2] = m_albedoSpecTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
-    barriers[3] = m_materialTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[3] = m_materialTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
-    barriers[4] = m_depthStencilTextures[m_currentFrame]->getImageMemoryBarrier(
+    barriers[4] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 

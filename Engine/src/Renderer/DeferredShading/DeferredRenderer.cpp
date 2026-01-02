@@ -72,8 +72,7 @@ void DeferredRenderer::init()
 
     m_gbufferPass = std::make_shared<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
 
-    m_lightingPass = std::make_shared<LightingPass>(m_width, m_height, m_swapChain->getImageCount(), m_gbufferPass,
-                                                    m_dynamicDiffuseGI, colorFormat);
+    m_lightingPass = std::make_shared<LightingPass>(m_width, m_height, m_gbufferPass, m_dynamicDiffuseGI, colorFormat);
 
     m_stencilBorderPass = std::make_shared<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
                                                               m_gbufferPass->getDepthTextures(), colorFormat);
@@ -271,8 +270,7 @@ void DeferredRenderer::recreateRenderPasses()
 
     m_gbufferPass = std::make_shared<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
 
-    m_lightingPass = std::make_shared<LightingPass>(m_width, m_height, m_swapChain->getImageCount(), m_gbufferPass,
-                                                    m_dynamicDiffuseGI, colorFormat);
+    m_lightingPass = std::make_shared<LightingPass>(m_width, m_height, m_gbufferPass, m_dynamicDiffuseGI, colorFormat);
 
     m_stencilBorderPass = std::make_shared<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
                                                               m_gbufferPass->getDepthTextures(), colorFormat);
@@ -394,74 +392,71 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         CommandBuffer *stencilBorderBuffer = nullptr;
 
         Counter cmdCounter = Counter();
-        cmdCounter.increment(1);
+        cmdCounter.increment(4); // GBuffer, Lighting, Skybox, Instanced Shapes
 
         JobSystem &system = jobs();
 
-        int bla = 0;
-        {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
-
-            TerrainGenerator *terrain = nullptr;
-            auto terrainView = registry.view<TerrainComponent>();
-            if (terrainView.size_hint() > 0) {
-                auto &terrainComp = terrainView.get<TerrainComponent>(*terrainView.begin());
-                if (terrainComp.isEnabled && terrainComp.generator.isInitialized()) {
-                    terrain = &terrainComp.generator;
-                }
+        // Prepare GBuffer Pass data
+        TerrainGenerator *terrain = nullptr;
+        auto terrainView = registry.view<TerrainComponent>();
+        if (terrainView.size_hint() > 0) {
+            auto &terrainComp = terrainView.get<TerrainComponent>(*terrainView.begin());
+            if (terrainComp.isEnabled && terrainComp.generator.isInitialized()) {
+                terrain = &terrainComp.generator;
             }
-
-            SecondaryBufferInheritance gbufferInheritance;
-            auto fbSpec = GBufferPass::getFramebufferSpecification();
-            gbufferInheritance.colorFormats = fbSpec.colorAttachments;
-            gbufferInheritance.depthFormat = fbSpec.depthAttachment;
-            gbufferInheritance.stencilFormat = fbSpec.stencilAttachment;
-            auto decl = JobDeclaration(
-
-                [&gbufferBuffer, activeScene, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
-                 m_gbufferPass = m_gbufferPass](JobContext &ctx) {
-                    (void)ctx;
-                    gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
-                },
-                JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "GBUFFER");
-            system.run(decl);
-            // gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
         }
 
+        SecondaryBufferInheritance gbufferInheritance;
+        auto fbSpec = GBufferPass::getFramebufferSpecification();
+        gbufferInheritance.colorFormats = fbSpec.colorAttachments;
+        gbufferInheritance.depthFormat = fbSpec.depthAttachment;
+        gbufferInheritance.stencilFormat = fbSpec.stencilAttachment;
+
+        system.run(JobDeclaration(
+            [&gbufferBuffer, activeScene, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
+             m_gbufferPass = m_gbufferPass](JobContext &ctx) {
+                (void)ctx;
+                gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
+            },
+            JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "GBUFFER"));
+
+        SecondaryBufferInheritance lightingInheritance;
+        lightingInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
+
+        system.run(JobDeclaration(
+            [&lightingBuffer, activeScene, m_sceneRenderTarget = m_sceneRenderTarget, lightingInheritance,
+             m_lightingPass = m_lightingPass](JobContext &ctx) {
+                (void)ctx;
+                lightingBuffer = m_lightingPass->recordSecondary(activeScene, *m_sceneRenderTarget, lightingInheritance);
+            },
+            JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "LIGHTING"));
+
+        SecondaryBufferInheritance skyboxInheritance;
+        skyboxInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
+        skyboxInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
+
+        system.run(JobDeclaration(
+            [&skyboxBuffer, m_sceneRenderTarget = m_sceneRenderTarget, m_currentFrame = m_currentFrame, skyboxInheritance,
+             m_skyboxPass = m_skyboxPass](JobContext &ctx) {
+                (void)ctx;
+                skyboxBuffer = m_skyboxPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, skyboxInheritance);
+            },
+            JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "SKYBOX"));
+
+        SecondaryBufferInheritance instancedInheritance;
+        instancedInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
+        instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
+
+        system.run(JobDeclaration(
+            [&instancedShapesBuffer, activeScene, m_sceneRenderTarget = m_sceneRenderTarget, m_currentFrame = m_currentFrame,
+             instancedInheritance, m_instancedShapesPass = m_instancedShapesPass](JobContext &ctx) {
+                (void)ctx;
+                instancedShapesBuffer =
+                    m_instancedShapesPass->recordSecondary(activeScene, *m_sceneRenderTarget, m_currentFrame, instancedInheritance);
+            },
+            JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "INSTANCED_SHAPES"));
+
         {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
-
-            SecondaryBufferInheritance lightingInheritance;
-            lightingInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
-
-            lightingBuffer =
-                m_lightingPass->recordSecondary(activeScene, *m_sceneRenderTarget, m_currentFrame, lightingInheritance);
-        }
-
-        {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
-
-            SecondaryBufferInheritance skyboxInheritance;
-            skyboxInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
-            skyboxInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
-
-            skyboxBuffer = m_skyboxPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, skyboxInheritance);
-        }
-
-        {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
-
-            SecondaryBufferInheritance instancedInheritance;
-            instancedInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
-            instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
-
-            instancedShapesBuffer =
-                m_instancedShapesPass->recordSecondary(activeScene, *m_sceneRenderTarget, m_currentFrame, instancedInheritance);
-        }
-
-        {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Stencil Border Pass");
-
             SecondaryBufferInheritance stencilInheritance;
             stencilInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
             // stencilInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
@@ -471,15 +466,17 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
             //     m_stencilBorderPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, activeScene, stencilInheritance);
         }
 
-        system.waitFor(cmdCounter, 0);
-        RP_CORE_TRACE("THE BLA: {}", bla);
+        {
 
+            RAPTURE_PROFILE_SCOPE("command buffer Wait");
+            system.waitFor(cmdCounter, 0);
+        }
         // Here we wait for all of them to be finished (if in parallel)
 
         if (gbufferBuffer) {
-            m_gbufferPass->beginDynamicRendering(commandBuffer);
+            m_gbufferPass->beginDynamicRendering(commandBuffer, m_currentFrame);
             commandBuffer->executeSecondary(*gbufferBuffer);
-            m_gbufferPass->endDynamicRendering(commandBuffer);
+            m_gbufferPass->endDynamicRendering(commandBuffer, m_currentFrame);
         }
         if (lightingBuffer) {
             m_lightingPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
@@ -492,7 +489,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
             m_skyboxPass->endDynamicRendering(commandBuffer);
         }
         if (instancedShapesBuffer) {
-            m_instancedShapesPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
+            m_instancedShapesPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame);
             commandBuffer->executeSecondary(*instancedShapesBuffer);
             m_instancedShapesPass->endDynamicRendering(commandBuffer);
         }

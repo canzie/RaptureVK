@@ -50,7 +50,8 @@ JobSystem &JobSystem::instance()
 
 void workerThread(JobSystem *system)
 {
-    // thread_local Fiber *t_schedulerFiber = createSchedulerFiber();
+    thread_local Fiber *t_schedulerFiber = createSchedulerFiber();
+    (void)t_schedulerFiber;
 
     while (!system->shouldShutdown()) {
         Job job;

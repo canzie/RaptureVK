@@ -31,7 +31,6 @@ SkyboxPass::SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::
 
     createSkyboxGeometry();
     createPipeline();
-    setupCommandResources();
 }
 
 SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat)
@@ -52,19 +51,8 @@ SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFo
 
     createSkyboxGeometry();
     createPipeline();
-    setupCommandResources();
 }
 
-void SkyboxPass::setupCommandResources()
-{
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
-}
 
 SkyboxPass::~SkyboxPass()
 {
@@ -85,7 +73,17 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
         return nullptr;
     }
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, frameInFlightIndex);
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    config.threadId = threadId;
+    auto hash = CommandPoolManager::createCommandPool(config);
+
+    auto pool = CommandPoolManager::getCommandPool(hash);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
