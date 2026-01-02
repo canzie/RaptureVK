@@ -100,6 +100,7 @@ JobSystem::JobSystem() : m_waitList(this)
 
     uint32_t maxThreads = std::thread::hardware_concurrency();
     uint32_t workerThreadCount = (std::max)(1u, maxThreads - 2u);
+    workerThreadCount = 2;
     m_workers.resize(workerThreadCount);
     for (uint32_t i = 0; i < workerThreadCount; ++i) {
         m_workers[i] = std::thread(workerThread, this);

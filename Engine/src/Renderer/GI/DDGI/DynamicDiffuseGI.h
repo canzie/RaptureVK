@@ -1,9 +1,6 @@
 #pragma once
 
-#include <cmath>
 #include <memory>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -12,7 +9,6 @@
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/StorageBuffers/StorageBuffer.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Scenes/Scene.h"
 #include "Shaders/Shader.h"
@@ -23,8 +19,6 @@
 #include "WindowContext/VulkanContext/VulkanQueue.h"
 
 #include "DDGICommon.h"
-
-#include "Scenes/Entities/EntityCommon.h"
 
 namespace Rapture {
 

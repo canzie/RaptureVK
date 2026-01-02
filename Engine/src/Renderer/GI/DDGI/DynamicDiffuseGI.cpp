@@ -8,11 +8,7 @@
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Components/Components.h"
 #include "Components/IndirectLightingComponent.h"
-#include "Events/AssetEvents.h"
-#include "Materials/MaterialParameters.h"
 #include "Renderer/GI/DDGI/DDGICommon.h"
-#include "Renderer/RtInstanceData.h"
-#include "Scenes/Entities/Entity.h"
 #include "Scenes/Scene.h"
 #include "Textures/Texture.h"
 #include "Textures/TextureCommon.h"
@@ -295,8 +291,19 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
         RP_CORE_WARN("Scene TLAS is not built");
         return;
     }
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, frameIndex);
+    CommandPoolConfig poolConfig;
+    poolConfig.name = "DDGI Command Pool";
+    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
+    poolConfig.flags = 0;
+    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    poolConfig.threadId = threadId;
+
+    auto hash = CommandPoolManager::createCommandPool(poolConfig);
+
+    auto pool = CommandPoolManager::getCommandPool(hash, frameIndex);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
     if (commandBuffer->begin() != VK_SUCCESS) {

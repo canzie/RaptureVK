@@ -86,7 +86,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Load Sponza model
     auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
-    if (std::filesystem::exists(sponzaPath) && false) {
+    if (std::filesystem::exists(sponzaPath)) {
         Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
         auto loader = Rapture::ModelLoadersCache::getLoader(sponzaPath, activeScene);
         loader->loadModel(sponzaPath.string());

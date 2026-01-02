@@ -150,7 +150,14 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
     }
 
     m_rtInstanceData->update(activeScene);
-    m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
+    JobSystem &system = jobs();
+    system.run(JobDeclaration(
+        [m_dynamicDiffuseGI = m_dynamicDiffuseGI, activeScene, m_currentFrame = m_currentFrame](JobContext &ctx) {
+            (void)ctx;
+            m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
+        },
+        JobPriority::NORMAL, QueueAffinity::COMPUTE, nullptr, "DDGI POPULATE"));
+    // m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
 
     auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, m_currentFrame);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
