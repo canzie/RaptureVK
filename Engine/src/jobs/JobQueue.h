@@ -43,29 +43,42 @@ class JobQueue {
 
 class PriorityQueueSet {
   public:
-    /*
-     * @brief pushes a job onto the correct queue depending on job.decl.priority
-     *
-     * @note it will NOT attempt to push to a different queue if the declared one is full or a failure occured
+    /**
+     * @brief Push a job onto the correct queue depending on job.decl.priority
+     * @note Will NOT attempt to push to a different queue if the declared one is full
      */
-    bool push(Job &&j); // Routes based on job.decl.priority
+    bool push(Job &&j);
+
+    /**
+     * @brief Push a resumed job (fiber) onto the resume queue
+     * @note Resume queues have higher priority than regular queues
+     */
+    bool pushResume(Job &&j);
+
     /**
      * @brief Pop a job from the queue based on priority
      * @param out The job ref to pop to
      * @return True if a job was popped
+     * @note Checks resume queues first, then regular queues
      */
     bool pop(Job &out);
 
     bool isEmpty() const;
 
   private:
+    // Resume queues (checked first - for yielded fibers)
+    JobQueue m_resumeHigh;
+    JobQueue m_resumeNormal;
+    JobQueue m_resumeLow;
+
+    // Regular queues
     JobQueue m_high;
     JobQueue m_normal;
     JobQueue m_low;
 };
 
 class AffinityQueueSet {
-    std::array<PriorityQueueSet, AFFINITY_COUNT> m_queues; // Indexed by QueueAffinity
+    std::array<PriorityQueueSet, 5> m_queues; // Indexed by QueueAffinity
 
   public:
     void push(Job &&j); // Routes based on job.decl.affinity

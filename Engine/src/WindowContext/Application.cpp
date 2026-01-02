@@ -1,14 +1,14 @@
 #include "Application.h"
-#include "Logging/Log.h"
-#include "Logging/TracyProfiler.h"
-
-#include "Loaders/glTF2.0/glTFLoader.h"
-#include "Renderer/DeferredShading/DeferredRenderer.h"
 
 #include "Buffers/BufferPool.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
+#include "Loaders/glTF2.0/glTFLoader.h"
+#include "Logging/Log.h"
+#include "Logging/TracyProfiler.h"
+#include "Renderer/DeferredShading/DeferredRenderer.h"
 #include "Utils/Timestep.h"
+#include "jobs/JobSystem.h"
 
 namespace Rapture {
 
@@ -56,6 +56,8 @@ Application::Application(int width, int height, const char *title) : m_running(t
     }
 #endif // RAPTURE_TRACY_PROFILING_ENABLED
 
+    JobSystem::init();
+
     m_project = std::make_unique<Project>();
     auto working_dir = std::filesystem::current_path();
     auto root_dir = working_dir;
@@ -90,12 +92,12 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     ApplicationEvents::onWindowClose().addListener([this]() { m_running = false; });
 
-    ApplicationEvents::onWindowFocus().addListener([this]() { RP_CORE_INFO("Window focused"); });
+    ApplicationEvents::onWindowFocus().addListener([]() { RP_CORE_INFO("Window focused"); });
 
-    ApplicationEvents::onWindowLostFocus().addListener([this]() { RP_CORE_INFO("Window lost focus"); });
+    ApplicationEvents::onWindowLostFocus().addListener([]() { RP_CORE_INFO("Window lost focus"); });
 
     ApplicationEvents::onWindowResize().addListener(
-        [this](unsigned int width, unsigned int height) { RP_CORE_INFO("Window resized to {0}x{1}", width, height); });
+        [](unsigned int width, unsigned int height) { RP_CORE_INFO("Window resized to {0}x{1}", width, height); });
 
     RP_CORE_INFO("========== Application created ==========");
 }
@@ -124,6 +126,8 @@ Application::~Application()
 
     // Shutdown the event system and clear all listeners
     EventRegistry::getInstance().shutdown();
+
+    JobSystem::shutdown();
 
     RP_CORE_INFO("Application shutting down...");
 }

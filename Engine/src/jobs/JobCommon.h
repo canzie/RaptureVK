@@ -9,7 +9,7 @@ enum class JobPriority {
     HIGH    // Latency-sensitive (frame-critical rendering)
 };
 
-enum QueueAffinity {
+enum class QueueAffinity {
     ANY,
     GRAPHICS,
     COMPUTE,

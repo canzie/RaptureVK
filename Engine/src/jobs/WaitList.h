@@ -1,53 +1,65 @@
 #ifndef RAPTURE__WAITLIST_H
 #define RAPTURE__WAITLIST_H
 
-#include "Counter.h"
-#include "Fiber.h"
-#include "JobQueue.h"
+#include "Job.h"
+#include "LockFreeBucketMap.h"
 
-#include <shared_mutex>
-#include <unordered_map>
-#include <vector>
+#include <cstddef>
+#include <cstdint>
 
 namespace Rapture {
 
+class JobSystem;
+struct Counter;
+
+struct WaitKey {
+    Counter *counter;
+    int32_t targetValue;
+
+    bool operator==(const WaitKey &other) const { return counter == other.counter && targetValue == other.targetValue; }
+};
+
+struct WaitKeyHash {
+    size_t operator()(const WaitKey &key) const
+    {
+        size_t h1 = std::hash<void *>{}(key.counter);
+        size_t h2 = std::hash<int32_t>{}(key.targetValue);
+        return h1 ^ (h2 << 1);
+    }
+};
+
 class WaitList {
   public:
+    static constexpr size_t BUCKET_COUNT = 1024;
+
     WaitList(JobSystem *system);
+
     /**
      * @brief Add a job to the wait list
-     * @param job The job to add
+     * @param job The job to add (uses job.waitCounter and job.waitTarget)
      */
     void add(Job &&job);
 
     /**
-     * @brief Add a fiber to the wait list
-     * @param fiber The fiber to add
+     * @brief Add a job to the wait list with explicit counter/target
+     * @param job The job to add
+     * @param counter The counter to wait on
+     * @param targetValue The value to wait for
      */
-    void add(Fiber *fiber);
+    void add(Job &&job, Counter *counter, int32_t targetValue);
 
     /**
      * @brief Called when counter value changes - moves ready jobs/fibers to queues
-     * @param counter The counter to check
-     * @param queues The queues to dispatch to
-     * @param fiberPool The fiber pool to dispatch to
+     * @param counter The counter that changed
      */
-    // Only scans jobs waiting on THIS counter - O(jobs_per_counter) not O(total_jobs)
     void onCounterChanged(Counter *counter);
 
     size_t size() const;
 
   private:
-    mutable std::shared_mutex m_mutex;
-
-    JobSystem *system;
-
-    // Partitioned by counter - O(1) lookup
-    std::unordered_map<Counter *, std::vector<Job>> m_waitingJobs;
-    std::unordered_map<Counter *, std::vector<Fiber *>> m_waitingFibers;
-
-    void dispatchReadyJobs(Counter *counter, int32_t currentValue, AffinityQueueSet &queues);
-    void dispatchReadyFibers(Counter *counter, int32_t currentValue, AffinityQueueSet &queues);
+    JobSystem *m_system;
+    LockFreeBucketMap<WaitKey, Job, BUCKET_COUNT, WaitKeyHash> m_map;
+    std::atomic<size_t> m_size{0};
 };
 
 } // namespace Rapture

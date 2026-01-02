@@ -106,7 +106,7 @@ VkResult CommandBuffer::end()
     return result;
 }
 
-void CommandBuffer::executeSecondary(const CommandBuffer &secondary)
+void CommandBuffer::executeSecondary(CommandBuffer &secondary)
 {
     if (m_level != CmdBufferLevel::PRIMARY) {
         RP_CORE_ERROR("CommandBuffer[{}]: executeSecondary called on non-primary buffer", m_name);
@@ -118,11 +118,12 @@ void CommandBuffer::executeSecondary(const CommandBuffer &secondary)
         return;
     }
 
+    secondaries.push_back(&secondary);
     VkCommandBuffer secondaryVk = secondary.getCommandBufferVk();
     vkCmdExecuteCommands(m_commandBuffer, 1, &secondaryVk);
 }
 
-void CommandBuffer::executeSecondaries(const std::vector<const CommandBuffer*> &secondaries)
+void CommandBuffer::executeSecondaries(const std::vector<const CommandBuffer *> &secondaries)
 {
     if (m_level != CmdBufferLevel::PRIMARY) {
         RP_CORE_ERROR("CommandBuffer[{}]: executeSecondaries called on non-primary buffer", m_name);
@@ -135,7 +136,7 @@ void CommandBuffer::executeSecondaries(const std::vector<const CommandBuffer*> &
 
     std::vector<VkCommandBuffer> secondaryBuffers;
     secondaryBuffers.reserve(secondaries.size());
-    for (const auto* secondary : secondaries) {
+    for (const auto *secondary : secondaries) {
         if (!secondary || !secondary->isSecondary()) {
             RP_CORE_ERROR("CommandBuffer[{}]: executeSecondaries contains invalid secondary buffer", m_name);
             return;

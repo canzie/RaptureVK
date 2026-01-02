@@ -27,12 +27,17 @@ void JobSystem::init()
 
 void JobSystem::close()
 {
-    m_shutdown.exchange(true);
+    m_shutdown.store(true, std::memory_order_release);
+
+    for (auto &worker : m_workers) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
 }
 
 void JobSystem::shutdown()
 {
-
     s_instance->close();
 }
 
@@ -45,6 +50,8 @@ JobSystem &JobSystem::instance()
 
 void workerThread(JobSystem *system)
 {
+    // thread_local Fiber *t_schedulerFiber = createSchedulerFiber();
+
     while (!system->shouldShutdown()) {
         Job job;
 
@@ -64,19 +71,31 @@ void workerThread(JobSystem *system)
         Fiber *fiber = job.fiber;
 
         if (fiber == nullptr) {
-
             fiber = system->getFiberPool().acquire();
-            // fiber->currentJob = ;
-            fiber->finished = false;
-            fiber->waitingOn = nullptr;
+            job.fiber = fiber;
+            initializeFiber(fiber);
+        }
 
-            // initialie fiber
+        // after returning from the waitlist, we need to set the current job back
+        // so this cannot be set in the if above
+        fiber->currentJob = std::move(job);
+        fiber->switchTo();
+
+        if (fiber->finished) {
+            if (fiber->currentJob.decl.signalOnComplete) {
+                fiber->currentJob.decl.signalOnComplete->decrement();
+            }
+            system->getFiberPool().release(fiber);
+        } else if (fiber->waitingOn != nullptr) {
+            system->getWaitList().add(std::move(fiber->currentJob), fiber->waitingOn, fiber->waitTarget);
+            continue;
         }
     }
 }
 
 JobSystem::JobSystem() : m_waitList(this)
 {
+    m_fiberPool.initializeFiberStacks();
 
     uint32_t maxThreads = std::thread::hardware_concurrency();
     uint32_t workerThreadCount = (std::max)(1u, maxThreads - 2u);
@@ -86,11 +105,46 @@ JobSystem::JobSystem() : m_waitList(this)
     }
 }
 
+void JobSystem::run(const JobDeclaration &decl)
+{
+    Job job(decl, nullptr, 0, nullptr);
+    m_queues.push(std::move(job));
+}
+
 void JobSystem::run(const JobDeclaration &decl, Counter &waitCounter, int32_t waitTarget)
 {
     Job job(decl, &waitCounter, waitTarget, nullptr);
 
-    m_queues.push(std::move(job));
+    if (waitCounter.get() <= waitTarget) {
+        m_queues.push(std::move(job));
+    } else {
+        m_waitList.add(std::move(job));
+    }
+}
+
+bool JobSystem::shouldShutdown()
+{
+    return m_shutdown.load(std::memory_order_acquire);
+}
+
+// TODO: Consider having main thread do small jobs while waiting, or yield
+void JobSystem::waitFor(Counter &c, int32_t targetValue)
+{
+    while (c.get() != targetValue) {
+        _mm_pause();
+    }
+}
+
+void JobSystem::beginFrame() {}
+
+void JobSystem::endFrame() {}
+
+JobSystem::Stats JobSystem::getStats() const
+{
+    return Stats{.jobsExecuted = 0,
+                 .jobsPending = 0,
+                 .fibersInUse = FiberPool::MAX_FIBERS - m_fiberPool.availableCount(),
+                 .waitListSize = m_waitList.size()};
 }
 
 } // namespace Rapture

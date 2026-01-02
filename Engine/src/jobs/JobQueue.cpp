@@ -34,17 +34,42 @@ bool PriorityQueueSet::push(Job &&j)
     }
 }
 
-// TODO: check if its better to check for sizes instead of attempting a pop
+bool PriorityQueueSet::pushResume(Job &&j)
+{
+    switch (j.decl.priority) {
+    case JobPriority::HIGH:
+        return m_resumeHigh.push(std::move(j));
+    case JobPriority::NORMAL:
+        return m_resumeNormal.push(std::move(j));
+    case JobPriority::LOW:
+        return m_resumeLow.push(std::move(j));
+    default:
+        return false;
+    }
+}
+
 bool PriorityQueueSet::pop(Job &out)
 {
+    // Resume queues first (yielded fibers have priority)
+    if (m_resumeHigh.pop(out)) {
+        return true;
+    }
+    if (m_resumeNormal.pop(out)) {
+        return true;
+    }
+    if (m_resumeLow.pop(out)) {
+        return true;
+    }
+
+    // Then regular queues
     if (m_high.pop(out)) {
         return true;
     }
     if (m_normal.pop(out)) {
         return true;
     }
-    if (m_normal.pop(out)) {
-        return false;
+    if (m_low.pop(out)) {
+        return true;
     }
 
     return false;

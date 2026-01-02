@@ -2,6 +2,7 @@
 #ifndef RAPTURE__JOB_SYSTEM_H
 #define RAPTURE__JOB_SYSTEM_H
 
+#include "Counter.h"
 #include "Job.h"
 #include "WaitList.h"
 #include "jobs/Fiber.h"
@@ -66,7 +67,6 @@ class JobSystem {
     PriorityQueueSet m_queues;
     WaitList m_waitList;
     FiberPool m_fiberPool;
-    FrameCounterPool m_frameCounters;
 
     std::atomic<bool> m_shutdown{false};
 };

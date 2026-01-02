@@ -25,7 +25,6 @@ void Counter::notify(JobSystem *system)
 
 int32_t Counter::get() const
 {
-
     return value.load(std::memory_order_acquire);
 }
 

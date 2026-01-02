@@ -67,6 +67,8 @@ void GBufferPass::setupCommandResources()
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getGraphicsQueueIndex();
     config.flags = 0;
+    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    config.threadId = threadId;
     m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
@@ -112,7 +114,18 @@ CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, 
 
     m_currentFrame = currentFrame;
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrame);
+    // updates the hash according to the current thread
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    config.threadId = threadId;
+    auto hash = CommandPoolManager::createCommandPool(config);
+
+    auto pool = CommandPoolManager::getCommandPool(hash, currentFrame);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
@@ -131,8 +144,6 @@ CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, 
 void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
-
-    m_currentFrame = currentFrame;
 
     m_pipeline->bind(secondaryCb->getCommandBufferVk());
 
@@ -165,8 +176,8 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     }
 
     // Begin frame for MDI batching - use current frame's batch maps
-    m_mdiBatchMaps[m_currentFrame]->beginFrame();
-    m_selectedEntityBatchMaps[m_currentFrame]->beginFrame();
+    m_mdiBatchMaps[currentFrame]->beginFrame();
+    m_selectedEntityBatchMaps[currentFrame]->beginFrame();
 
     // bind descriptor sets
     DescriptorManager::bindSet(0, secondaryCb, m_pipeline); // camera stuff
@@ -222,7 +233,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
         }
 
         // Choose the appropriate batch map based on selection state
-        MDIBatchMap *batchMap = isSelected ? m_selectedEntityBatchMaps[m_currentFrame].get() : m_mdiBatchMaps[m_currentFrame].get();
+        MDIBatchMap *batchMap = isSelected ? m_selectedEntityBatchMaps[currentFrame].get() : m_mdiBatchMaps[currentFrame].get();
 
         // Get or create batch for this VBO/IBO arena combination
         MDIBatch *batch = batchMap->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(),
@@ -242,7 +253,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     // Disable stencil writing for non-selected entities
     vkCmdSetStencilWriteMask(secondaryCb->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0x00);
 
-    for (const auto &[batchKey, batch] : m_mdiBatchMaps[m_currentFrame]->getBatches()) {
+    for (const auto &[batchKey, batch] : m_mdiBatchMaps[currentFrame]->getBatches()) {
         if (batch->getDrawCount() == 0) {
             continue;
         }
@@ -262,7 +273,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
         // Set push constants for this batch
         GBufferPushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
-        pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
+        pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(currentFrame) : 0;
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
@@ -295,7 +306,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     // Enable stencil writing for selected entity
     vkCmdSetStencilWriteMask(secondaryCb->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0xFF);
 
-    for (const auto &[batchKey, batch] : m_selectedEntityBatchMaps[m_currentFrame]->getBatches()) {
+    for (const auto &[batchKey, batch] : m_selectedEntityBatchMaps[currentFrame]->getBatches()) {
         if (batch->getDrawCount() == 0) {
             continue;
         }
@@ -315,7 +326,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
         // Set push constants for this batch
         GBufferPushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
-        pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame) : 0;
+        pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(currentFrame) : 0;
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
@@ -762,7 +773,8 @@ void GBufferPass::createTerrainPipeline()
     ShaderImportConfig terrainShaderConfig;
     terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
+    auto [shader, handle] =
+        AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
 
     if (!shader) {
         RP_CORE_WARN("Failed to load terrain GBuffer shader - terrain rendering disabled");
@@ -797,8 +809,6 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
     if (!m_terrainPipeline || !terrain.isInitialized()) {
         return;
     }
-
-    m_currentFrame = currentFrame;
 
     auto mainCamera = activeScene->getMainCamera();
     if (!mainCamera) {
@@ -859,7 +869,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
         vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain.getIndexBuffer(lod), 0, VK_INDEX_TYPE_UINT32);
 
         TerrainGBufferPushConstants pc{};
-        pc.cameraBindlessIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentFrame);
+        pc.cameraBindlessIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(currentFrame);
         pc.chunkDataBufferIndex = chunkDataBufferIndex;
         pc.continentalnessIndex = continentalnessIndex;
         pc.erosionIndex = erosionIndex;

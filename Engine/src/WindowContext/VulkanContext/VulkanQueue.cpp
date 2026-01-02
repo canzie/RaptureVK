@@ -86,6 +86,11 @@ bool VulkanQueue::submitCommandBuffers(VkFence fence)
     for (auto *cmdBuffer : m_commandBuffers) {
         if (cmdBuffer->getCommandPool()) {
             pools.insert(cmdBuffer->getCommandPool());
+            for (auto *secCmdBuffer : cmdBuffer->getSecondaries()) {
+                if (secCmdBuffer->getCommandPool()) {
+                    pools.insert(secCmdBuffer->getCommandPool());
+                }
+            }
         }
     }
     for (auto *pool : pools) {
@@ -148,6 +153,11 @@ bool VulkanQueue::submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence)
     for (auto *cmdBuffer : m_commandBuffers) {
         if (cmdBuffer->getCommandPool()) {
             pools.insert(cmdBuffer->getCommandPool());
+            for (auto *secCmdBuffer : cmdBuffer->getSecondaries()) {
+                if (secCmdBuffer->getCommandPool()) {
+                    pools.insert(secCmdBuffer->getCommandPool());
+                }
+            }
         }
     }
     for (auto *pool : pools) {
@@ -199,8 +209,20 @@ bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, VkSubmitInfo &submit
         return false;
     }
 
+    std::set<CommandPool *> pools;
+
     if (commandBuffer->getCommandPool()) {
-        commandBuffer->getCommandPool()->markPendingSignal(m_timelineSemaphore, signalValue);
+        pools.insert(commandBuffer->getCommandPool());
+    }
+
+    for (auto *secCmdBuffer : commandBuffer->getSecondaries()) {
+        if (secCmdBuffer->getCommandPool()) {
+            pools.insert(secCmdBuffer->getCommandPool());
+        }
+    }
+
+    for (auto *pool : pools) {
+        pool->markPendingSignal(m_timelineSemaphore, signalValue);
     }
 
     return true;
@@ -239,8 +261,20 @@ bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, VkFence fence)
         return false;
     }
 
+    std::set<CommandPool *> pools;
+
     if (commandBuffer->getCommandPool()) {
-        commandBuffer->getCommandPool()->markPendingSignal(m_timelineSemaphore, signalValue);
+        pools.insert(commandBuffer->getCommandPool());
+    }
+
+    for (auto *secCmdBuffer : commandBuffer->getSecondaries()) {
+        if (secCmdBuffer->getCommandPool()) {
+            pools.insert(secCmdBuffer->getCommandPool());
+        }
+    }
+
+    for (auto *pool : pools) {
+        pool->markPendingSignal(m_timelineSemaphore, signalValue);
     }
 
     return true;

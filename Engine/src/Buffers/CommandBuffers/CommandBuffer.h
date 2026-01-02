@@ -63,8 +63,11 @@ class CommandBuffer {
                             VkCommandBufferUsageFlags flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkResult end();
 
-    void executeSecondary(const CommandBuffer &secondary);
-    void executeSecondaries(const std::vector<const CommandBuffer*> &secondaries);
+    void executeSecondary(CommandBuffer &secondary);
+    void executeSecondaries(const std::vector<const CommandBuffer *> &secondaries);
+
+    std::vector<CommandBuffer *> &getSecondaries() { return secondaries; }
+    void clearSecondaries() { secondaries.clear(); }
 
     static std::vector<std::unique_ptr<CommandBuffer>> createCommandBuffers(CommandPool *commandPool, uint32_t count,
                                                                             const std::string &namePrefix = "cmd");
@@ -80,6 +83,8 @@ class CommandBuffer {
     VkDevice m_device;
     CmdBufferLevel m_level = CmdBufferLevel::PRIMARY;
     std::string m_name;
+
+    std::vector<CommandBuffer *> secondaries;
 };
 
 } // namespace Rapture

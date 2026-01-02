@@ -1,7 +1,6 @@
 #ifndef RAPTURE__JOB_H
 #define RAPTURE__JOB_H
 
-#include "Fiber.h"
 #include "InplaceFunction.h"
 #include "JobCommon.h"
 
@@ -14,13 +13,14 @@ struct Counter;
 
 class JobSystem;
 struct JobContext;
+struct Fiber;
 
-using JobFunction = InplaceFunction<void(JobContext &), 48>;
+using JobFunction = InplaceFunction<void(JobContext &), 128>;
 
 struct JobDeclaration {
     JobFunction function;
     JobPriority priority = JobPriority::NORMAL;
-    QueueAffinity affinity = ANY;
+    QueueAffinity affinity = QueueAffinity::ANY;
     Counter *signalOnComplete = nullptr;
     const char *debugName = nullptr;
 
@@ -68,7 +68,7 @@ struct JobContext {
     void run(const JobDeclaration &decl, Counter &waitCounter, int32_t waitTarget);
 
     // Batch spawn with automatic counter setup
-    Counter *runBatch(std::span<JobDeclaration> jobs);
+    void runBatch(std::span<JobDeclaration> jobs, Counter &counter);
 };
 } // namespace Rapture
 

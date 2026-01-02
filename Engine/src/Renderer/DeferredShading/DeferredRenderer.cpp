@@ -9,6 +9,11 @@
 #include "Components/TerrainComponent.h"
 #include "Events/ApplicationEvents.h"
 #include "Renderer/Shadows/ShadowCommon.h"
+#include "jobs/InplaceFunction.h"
+#include "jobs/Job.h"
+#include "jobs/JobCommon.h"
+#include "jobs/JobSystem.h"
+#include <cstdio>
 
 namespace Rapture {
 
@@ -388,6 +393,12 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         CommandBuffer *instancedShapesBuffer = nullptr;
         CommandBuffer *stencilBorderBuffer = nullptr;
 
+        Counter cmdCounter = Counter();
+        cmdCounter.increment(1);
+
+        JobSystem &system = jobs();
+
+        int bla = 0;
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
 
@@ -405,8 +416,16 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
             gbufferInheritance.colorFormats = fbSpec.colorAttachments;
             gbufferInheritance.depthFormat = fbSpec.depthAttachment;
             gbufferInheritance.stencilFormat = fbSpec.stencilAttachment;
+            auto decl = JobDeclaration(
 
-            gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
+                [&gbufferBuffer, activeScene, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
+                 m_gbufferPass = m_gbufferPass](JobContext &ctx) {
+                    (void)ctx;
+                    gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
+                },
+                JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "GBUFFER");
+            system.run(decl);
+            // gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
         }
 
         {
@@ -451,6 +470,9 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
             // stencilBorderBuffer =
             //     m_stencilBorderPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, activeScene, stencilInheritance);
         }
+
+        system.waitFor(cmdCounter, 0);
+        RP_CORE_TRACE("THE BLA: {}", bla);
 
         // Here we wait for all of them to be finished (if in parallel)
 
