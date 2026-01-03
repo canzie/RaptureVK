@@ -8,14 +8,25 @@
 namespace Rapture {
 
 struct TerrainComponent {
-    TerrainGenerator generator;
-    bool isEnabled = true;
+    std::unique_ptr<TerrainGenerator> generator = nullptr;
+    bool isEnabled = false;
+    bool renderChunkBounds = false;
+    int32_t forcedLOD = -1;
 
-    TerrainComponent() = default;
+    TerrainComponent()
+    {
+        generator = std::make_unique<TerrainGenerator>();
+        generator->init({});
+        generator->generateDefaultNoiseTextures();
+    }
 
-    explicit TerrainComponent(const TerrainConfig &config) { generator.init(config); }
-
-    ~TerrainComponent() { generator.shutdown(); }
+    TerrainComponent(const TerrainConfig &config)
+    {
+        (void)config;
+        generator = std::make_unique<TerrainGenerator>();
+        generator->init(config);
+        generator->generateDefaultNoiseTextures();
+    }
 };
 
 } // namespace Rapture

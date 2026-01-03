@@ -78,6 +78,8 @@ class DescriptorBindingTexture : public DescriptorBinding<Texture> {
     virtual void update(Texture &resource, uint32_t index = 0) override;
 
   private:
+    void fillAllSlotsWithPlaceholder();
+
     TextureViewType m_viewType;
     bool m_isStorageImage;
 };

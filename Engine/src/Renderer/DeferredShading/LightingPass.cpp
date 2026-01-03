@@ -144,7 +144,7 @@ CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene,
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 
-    pushConstants.useDDGI = 1;
+    pushConstants.useDDGI = m_ddgi ? 1 : 0;
 
     // Query FogComponent from scene
     auto fogView = activeScene->getRegistry().view<FogComponent>();

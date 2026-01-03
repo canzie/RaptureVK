@@ -1,10 +1,10 @@
 #include "TerrainCuller.h"
 
+#include "AssetManager/AssetImportConfig.h"
 #include "AssetManager/AssetManager.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
-#include "ChunkGrid.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 #include "Renderer/Frustum/Frustum.h"
@@ -29,9 +29,9 @@ struct alignas(16) TerrainCullPushConstants {
     uint32_t indirectBufferIndices[TERRAIN_LOD_COUNT];
 };
 
-TerrainCuller::TerrainCuller(std::shared_ptr<StorageBuffer> chunkDataBuffer, const ChunkGrid *chunkGrid, float heightScale,
+TerrainCuller::TerrainCuller(std::shared_ptr<StorageBuffer> chunkDataBuffer, uint32_t chunkCount, float heightScale,
                              uint32_t initialIndirectCapacity, VmaAllocator allocator)
-    : m_chunkDataBuffer(chunkDataBuffer), m_chunkGrid(chunkGrid), m_heightScale(heightScale),
+    : m_chunkDataBuffer(chunkDataBuffer), m_chunkCount(chunkCount), m_heightScale(heightScale),
       m_initialIndirectCapacity(initialIndirectCapacity), m_allocator(allocator), m_commandPoolHash(0)
 {
     initCullPipeline();
@@ -46,7 +46,10 @@ void TerrainCuller::initCullPipeline()
     auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_cull.cs.glsl");
+    ShaderImportConfig shaderConfig;
+    shaderConfig.compileInfo.includePath = shaderPath / "glsl/terrain/";
+
+    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_cull.cs.glsl", shaderConfig);
     if (!shader || !shader->isReady()) {
         RP_CORE_WARN("TerrainCuller: Cull compute shader not found");
         return;
@@ -129,7 +132,7 @@ void TerrainCuller::runCull(TerrainCullBuffers &buffers, uint32_t frustumBindles
 
     TerrainCullPushConstants pc{};
     pc.cullOrigin = cullOrigin;
-    pc.chunkCount = static_cast<uint32_t>(m_chunkGrid->size());
+    pc.chunkCount = m_chunkCount;
     pc.heightScale = m_heightScale;
     pc.cullRange = 0.0f;
     pc.lodMode = useForcedLOD ? 1 : 0;

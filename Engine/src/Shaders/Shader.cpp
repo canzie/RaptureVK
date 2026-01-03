@@ -397,7 +397,8 @@ void Shader::createDescriptorSetLayoutFromInfo(const DescriptorSetInfo &setInfo)
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
     layoutBindings.reserve(setInfo.bindings.size());
-    std::vector<VkDescriptorBindingFlags> bindingFlags(setInfo.bindings.size(), VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+    std::vector<VkDescriptorBindingFlags> bindingFlags(setInfo.bindings.size(), VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+                                                                                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT);
 
     for (const auto &bindingInfo : setInfo.bindings) {
         VkDescriptorSetLayoutBinding layoutBinding{};

@@ -1,22 +1,13 @@
 
-- [ ] Add entity locking support
-  - Lock entities from editing and/or deletion (via PropertiesComponent flag?)
-  - Useful for: editor UX, protecting essebntial entities like main camera
-  - *Solution:*
-- [ ] Component dependency hints (editor UX)
-  - Shadow requires Light, CSM and regular shadow maps mutually exclusive
-  - Validation at editor level, runtime still double-checks
-  - Not critical - rare edge cases
-- [ ] Reduce direct EnTT bypassing
-  - Audit places where wrapper is bypassed for views/iteration
-  - improve wrapper, as these bypasses are being done because of the inneficiency of the wrapper (maybe an actual 10x directly)
 
-
+- jobify mesh loading (probably cant store data on the stack so circumvent this by letting the main or io thread load it and provide a ptr when its loaded)
+- Make rendering things like bounds easier
+  - current method is creating an instancedshapes component and providing the transformmatrix
+  - this is akward as it cannot be used from inside the editor, only in code, we should be able to add it to certain things, like a mesh, terrain, etc, and depending on if we only need 1 or more to visualise debug use a simple mesh or instancing, like if the user selects aabb of a mesh, just a mesh, but if they select aabbs of the terrain we use instanced meshes, we can do this by seeing if the get aabb method returns 1 or multiple aabbs. , so it becomes a specific thing per mesh, per terrain comp etc. the thing to decide is how we enable/disable it while not storing the instanced data like the buffers in the same component.... 
+- fix the scuffed shit where the chunk data is first writting manually and then via the compute shader, its shit i hate it
 
 - fix stencil buffer
 - shader hot reloading
-
-- material editor/viewer
 - jolt???
 - look at removing the waitidles in some places like copyBuffer
 - parallise/jobify shader compilation

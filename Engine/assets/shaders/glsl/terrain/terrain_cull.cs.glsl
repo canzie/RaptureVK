@@ -4,18 +4,7 @@
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-// Chunk data structure (must match CPU TerrainChunkGPUData)
-struct TerrainChunkData {
-    vec2 worldOffset;   // World position of chunk corner
-    float chunkSize;    // World size of chunk edge
-    uint lod;           // Current LOD (ignored - we compute it)
-
-    vec4 bounds;        // minX, minZ, maxX, maxZ
-    float minHeight;    // Min Y for AABB culling
-    float maxHeight;    // Max Y for AABB culling
-    uint neighborLODs;  // Packed neighbor LOD info
-    uint flags;         // Visibility flags
-};
+#include "terrain_common.glsl"
 
 // VkDrawIndexedIndirectCommand structure
 struct DrawIndexedIndirectCommand {
@@ -133,15 +122,14 @@ void main() {
         return;
     }
 
-    // Build AABB from chunk data
     vec3 aabbMin = vec3(
         chunk.worldOffset.x,
-        (chunk.minHeight - 0.5) * pc.heightScale,
+        chunk.minHeight,
         chunk.worldOffset.y
     );
     vec3 aabbMax = vec3(
         chunk.worldOffset.x + chunk.chunkSize,
-        (chunk.maxHeight - 0.5) * pc.heightScale + pc.heightScale * 0.5,
+        chunk.maxHeight,
         chunk.worldOffset.y + chunk.chunkSize
     );
 

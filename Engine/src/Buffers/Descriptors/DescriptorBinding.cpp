@@ -1,6 +1,7 @@
 #include "DescriptorBinding.h"
 
 #include "AccelerationStructures/TLAS.h"
+#include "AssetManager/AssetManager.h"
 #include "Buffers/Buffers.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
@@ -84,6 +85,41 @@ DescriptorBindingTexture::DescriptorBindingTexture(DescriptorSet *set, uint32_t 
           set, binding, isStorageImage ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, size),
       m_viewType(viewType), m_isStorageImage(isStorageImage)
 {
+    if (m_isArray && !m_isStorageImage) {
+        fillAllSlotsWithPlaceholder();
+    }
+}
+
+void DescriptorBindingTexture::fillAllSlotsWithPlaceholder()
+{
+    auto [defaultAsset, handle] = AssetManager::importDefaultAsset<Texture>(AssetType::Texture);
+    if (!defaultAsset) {
+        RP_CORE_ERROR("Failed to get default texture for filling bindless slots");
+        return;
+    }
+
+    VkDescriptorImageInfo imageInfo = defaultAsset->getDescriptorImageInfo(m_viewType);
+
+    auto &app = Application::getInstance();
+    auto device = app.getVulkanContext().getLogicalDevice();
+
+    std::vector<VkWriteDescriptorSet> writes(m_size);
+    std::vector<VkDescriptorImageInfo> imageInfos(m_size, imageInfo);
+
+    for (uint32_t i = 0; i < m_size; ++i) {
+        writes[i] = {};
+        writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[i].dstSet = m_set->getDescriptorSet();
+        writes[i].dstBinding = m_binding;
+        writes[i].dstArrayElement = i;
+        writes[i].descriptorType = m_type;
+        writes[i].descriptorCount = 1;
+        writes[i].pImageInfo = &imageInfos[i];
+    }
+
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+
+    RP_CORE_TRACE("Filled {} bindless texture slots with placeholder", m_size);
 }
 
 uint32_t DescriptorBindingTexture::add(Texture &resource)

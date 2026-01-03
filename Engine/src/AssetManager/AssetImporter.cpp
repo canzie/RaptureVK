@@ -149,33 +149,21 @@ std::shared_ptr<Asset> AssetImporter::loadTexture(const AssetHandle &handle, con
     }
 
     TextureSpecification texSpec = TextureSpecification();
-    texSpec.mipLevels = 0; // Auto-calculate mip levels
-
+    texSpec.mipLevels = 0; // 0 is auto
     if (std::holds_alternative<TextureImportConfig>(metadata.m_importConfig)) {
         auto importConfig = std::get<TextureImportConfig>(metadata.m_importConfig);
         texSpec.srgb = importConfig.srgb;
     }
 
-    auto tex = std::make_shared<Texture>(metadata.m_filePath.string(), texSpec, true);
+    // TEMP: sync loading for debug - load immediately, skip async queue
+    auto tex = std::make_shared<Texture>(metadata.m_filePath.string(), texSpec, false);
+    tex->setReadyForSampling(true);
 
     auto asset = std::make_shared<Asset>(AssetVariant{tex});
-    asset->m_status = AssetStatus::LOADING;
+    asset->m_status = AssetStatus::LOADED;
     asset->m_handle = handle;
 
-    LoadRequest request;
-    request.asset = asset;
-    request.callback = [](std::shared_ptr<Asset> _asset) {
-        _asset->getUnderlyingAsset<Texture>()->setReadyForSampling(true);
-        _asset->m_status = AssetStatus::LOADED;
-        AssetEvents::onAssetLoaded().publish(_asset->m_handle);
-    };
-
-    // Add the texture to the pending requests
-    {
-        std::lock_guard<std::mutex> lock(s_queueMutex);
-        s_pendingRequests.push(std::move(request));
-    }
-    s_queueCondition.notify_one();
+    AssetEvents::onAssetLoaded().publish(asset->m_handle);
 
     return asset;
 }

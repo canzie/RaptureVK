@@ -145,7 +145,7 @@ void DescriptorSet::createDescriptorSetLayout(const DescriptorSetBindings &bindi
         layoutBindings.push_back(layoutBinding);
 
         // Add UPDATE_AFTER_BIND flag to allow updating descriptors while bound to pending command buffers
-        bindingFlags.push_back(VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+        bindingFlags.push_back(VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT);
     }
 
     // Set up binding flags info

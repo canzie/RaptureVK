@@ -15,7 +15,6 @@
 
 namespace Rapture {
 
-class ChunkGrid;
 class Frustum;
 
 struct TerrainCullBuffers {
@@ -27,7 +26,7 @@ struct TerrainCullBuffers {
 
 class TerrainCuller {
   public:
-    TerrainCuller(std::shared_ptr<StorageBuffer> chunkDataBuffer, const ChunkGrid *chunkGrid, float heightScale,
+    TerrainCuller(std::shared_ptr<StorageBuffer> chunkDataBuffer, uint32_t chunkCount, float heightScale,
                   uint32_t initialIndirectCapacity, VmaAllocator allocator);
     ~TerrainCuller();
 
@@ -38,11 +37,13 @@ class TerrainCuller {
 
     void runCull(TerrainCullBuffers &buffers, uint32_t frustumBindlessIndex, const glm::vec3 &cullOrigin);
 
+    void setChunkCount(uint32_t count) { m_chunkCount = count; }
+
   private:
     void initCullPipeline();
 
     std::shared_ptr<StorageBuffer> m_chunkDataBuffer;
-    const ChunkGrid *m_chunkGrid;
+    uint32_t m_chunkCount;
     float m_heightScale;
     uint32_t m_initialIndirectCapacity;
     VmaAllocator m_allocator;

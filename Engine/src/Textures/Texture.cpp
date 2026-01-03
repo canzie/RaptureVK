@@ -29,7 +29,7 @@ Sampler::Sampler(const TextureSpecification &spec)
     samplerInfo.addressModeV = toVkSamplerAddressMode(spec.wrap);
     samplerInfo.addressModeW = toVkSamplerAddressMode(spec.wrap);
     samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = 16.0f; // Could be made configurable
+    samplerInfo.maxAnisotropy = 16.0f;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
 

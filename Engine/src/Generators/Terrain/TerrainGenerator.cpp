@@ -1,5 +1,10 @@
 #include "TerrainGenerator.h"
 
+#include "AssetManager/AssetImportConfig.h"
+#include "AssetManager/AssetManager.h"
+#include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
+#include "Buffers/Descriptors/DescriptorManager.h"
 #include "Generators/Textures/ProceduralTextures.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
@@ -9,8 +14,8 @@
 
 #include <glm/gtc/packing.hpp>
 
-#include <algorithm>
 #include <cmath>
+#include <thread>
 
 namespace Rapture {
 
@@ -43,12 +48,14 @@ void TerrainGenerator::init(const TerrainConfig &config)
     }
 
     m_config = config;
+    m_chunkCount = m_config.chunkGridSize;
 
     createIndexBuffers();
     createChunkDataBuffer();
+    initComputePipeline();
 
     auto &vc = Application::getInstance().getVulkanContext();
-    m_culler = std::make_unique<TerrainCuller>(m_chunkDataBuffer, &m_chunks, m_config.heightScale, 64, vc.getVmaAllocator());
+    m_culler = std::make_unique<TerrainCuller>(m_chunkDataBuffer, m_chunkCount, m_config.heightScale, 64, vc.getVmaAllocator());
 
     std::vector<uint32_t> allLODs = {0, 1, 2, 3};
     m_cullBuffers = m_culler->createBuffers(allLODs);
@@ -57,8 +64,8 @@ void TerrainGenerator::init(const TerrainConfig &config)
 
     m_initialized = true;
 
-    RP_CORE_INFO("TerrainGenerator initialized: {} world units per chunk, {} height scale", m_config.chunkWorldSize,
-                 m_config.heightScale);
+    RP_CORE_INFO("TerrainGenerator initialized: {} chunks (radius {}), {} world units per chunk, {} height scale", m_chunkCount,
+                 m_config.getChunkRadius(), m_config.chunkWorldSize, m_config.heightScale);
 }
 
 void TerrainGenerator::shutdown()
@@ -66,9 +73,6 @@ void TerrainGenerator::shutdown()
     if (!m_initialized) {
         return;
     }
-
-    m_chunks.clear();
-    m_activeChunkIndices.clear();
 
     for (uint32_t i = 0; i < TERRAIN_LOD_COUNT; ++i) {
         m_indexBuffers[i].reset();
@@ -125,11 +129,11 @@ void TerrainGenerator::createChunkDataBuffer()
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
-    VkDeviceSize bufferSize = m_config.maxLoadedChunks * sizeof(TerrainChunkGPUData);
+    VkDeviceSize bufferSize = m_chunkCount * sizeof(TerrainChunkGPUData);
 
     m_chunkDataBuffer = std::make_shared<StorageBuffer>(bufferSize, BufferUsage::DYNAMIC, vc.getVmaAllocator());
 
-    RP_CORE_TRACE("TerrainGenerator: Created chunk data buffer for {} chunks", m_config.maxLoadedChunks);
+    RP_CORE_TRACE("TerrainGenerator: Created chunk data buffer for {} chunks", m_chunkCount);
 }
 
 void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, std::shared_ptr<Texture> texture)
@@ -150,6 +154,11 @@ std::shared_ptr<Texture> TerrainGenerator::getNoiseTexture(TerrainNoiseCategory 
 
 void TerrainGenerator::bakeNoiseLUT()
 {
+    if (!m_initialized || m_config.hmType != HM_CEPV) {
+        RP_CORE_WARN("TerrainGenerator: Cannot bake noise LUT for single heightmap");
+        return;
+    }
+
     constexpr uint32_t size = TERRAIN_NOISE_LUT_SIZE;
     std::vector<uint16_t> lutData(size * size * size);
 
@@ -165,15 +174,12 @@ void TerrainGenerator::bakeNoiseLUT()
                 float c = (static_cast<float>(x) / (size - 1)) * 2.0f - 1.0f;
                 float cFactor = s_evaluateSpline(m_multiNoiseConfig.splines[CONTINENTALNESS], c);
 
-                // conditional influence (no extra splines required)
-                float pvAmplitude = 1.0f - eFactor; // peaks/valleys suppressed by erosion
+                float pvAmplitude = 1.0f - eFactor;
 
-                // combine base height with PV contribution
                 float baseHeight = (cFactor - 0.5f) * 2.0f;
                 float pvContrib = (pvFactor - 0.5f) * 2.0f * pvAmplitude;
                 float combined = baseHeight * 0.6f + pvContrib * 0.4f;
 
-                // clamp to [0,1] for LUT storage
                 combined = combined * 0.5f + 0.5f;
                 combined = glm::clamp(combined, 0.0f, 1.0f);
 
@@ -233,142 +239,143 @@ void TerrainGenerator::generateDefaultNoiseTextures()
     ridgedParams.amplitudeMultiplier = 0.4;
     m_noiseTextures[PEAKS_VALLEYS] = ProceduralTexture::generateRidgedNoise(ridgedParams, config);
 
-    // Continentalness: ocean -> coast -> plains -> hills -> mountains
-    // Low values = below sea level, high values = elevated terrain
-    m_multiNoiseConfig.splines[CONTINENTALNESS].points = {
-        {-1.0f, 0.1f},  // Deep ocean
-        {-0.4f, 0.3f},  // Shallow ocean
-        {-0.2f, 0.45f}, // Coast/beach
-        {0.0f, 0.5f},   // Sea level
-        {0.3f, 0.55f},  // Plains
-        {0.6f, 0.7f},   // Hills
-        {1.0f, 1.0f}    // Mountains
-    };
+    m_multiNoiseConfig.splines[CONTINENTALNESS].points = {{-1.0f, 0.1f}, {-0.4f, 0.3f}, {-0.2f, 0.45f}, {0.0f, 0.5f},
+                                                          {0.3f, 0.55f}, {0.6f, 0.7f},  {1.0f, 1.0f}};
 
-    // Erosion: controls terrain roughness
-    // Low erosion = rugged mountains, high erosion = flat plains
-    m_multiNoiseConfig.splines[EROSION].points = {
-        {-1.0f, 0.0f}, // No erosion - full mountain amplitude
-        {-0.5f, 0.2f}, // Light erosion
-        {0.0f, 0.5f},  // Medium erosion
-        {0.5f, 0.8f},  // Heavy erosion
-        {1.0f, 1.0f}   // Fully eroded - flat
-    };
+    m_multiNoiseConfig.splines[EROSION].points = {{-1.0f, 0.0f}, {-0.5f, 0.2f}, {0.0f, 0.5f}, {0.5f, 0.8f}, {1.0f, 1.0f}};
 
-    // Peaks/Valleys: local height variation
-    // Creates the actual bumps and dips
-    m_multiNoiseConfig.splines[PEAKS_VALLEYS].points = {
-        {-1.0f, 0.0f}, // Deep valley
-        {-0.5f, 0.3f}, // Shallow valley
-        {0.0f, 0.5f},  // Neutral
-        {0.5f, 0.7f},  // Small peak
-        {1.0f, 1.0f}   // Tall peak
-    };
+    m_multiNoiseConfig.splines[PEAKS_VALLEYS].points = {{-1.0f, 0.0f}, {-0.5f, 0.3f}, {0.0f, 0.5f}, {0.5f, 0.7f}, {1.0f, 1.0f}};
 
     bakeNoiseLUT();
-}
-
-void TerrainGenerator::loadChunk(glm::ivec2 coord)
-{
-    if (m_chunks.hasChunk(coord)) {
-        return;
-    }
-
-    if (m_nextChunkIndex >= m_config.maxLoadedChunks) {
-        RP_CORE_WARN("TerrainGenerator: Max chunks reached, cannot load ({}, {})", coord.x, coord.y);
-        return;
-    }
-
-    TerrainChunk chunk;
-    chunk.coord = coord;
-    chunk.chunkIndex = m_nextChunkIndex++;
-    chunk.state = TerrainChunk::State::Active;
-    chunk.lod = 0; // Will be updated in update()
-
-    m_chunks.setChunk(coord, std::move(chunk));
-    m_activeChunkIndices.push_back(chunk.chunkIndex);
-    m_chunkDataDirty = true;
-
-    RP_CORE_TRACE("TerrainGenerator: Loaded chunk ({}, {}) at index {}", coord.x, coord.y, chunk.chunkIndex);
-}
-
-void TerrainGenerator::unloadChunk(glm::ivec2 coord)
-{
-    auto *chunk = m_chunks.getChunk(coord);
-    if (!chunk) {
-        return;
-    }
-
-    // Remove from active indices
-    auto it = std::find(m_activeChunkIndices.begin(), m_activeChunkIndices.end(), chunk->chunkIndex);
-    if (it != m_activeChunkIndices.end()) {
-        m_activeChunkIndices.erase(it);
-    }
-
-    m_chunks.removeChunk(coord);
-    m_chunkDataDirty = true;
-
-    RP_CORE_TRACE("TerrainGenerator: Unloaded chunk ({}, {})", coord.x, coord.y);
-}
-
-void TerrainGenerator::loadChunksAroundPosition(const glm::vec3 &position, int32_t radius)
-{
-    glm::ivec2 centerCoord = worldToChunkCoord(position.x, position.z);
-
-    for (int32_t y = -radius; y <= radius; ++y) {
-        for (int32_t x = -radius; x <= radius; ++x) {
-            loadChunk(centerCoord + glm::ivec2(x, y));
-        }
-    }
 }
 
 void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum)
 {
     RAPTURE_PROFILE_FUNCTION();
-
     if (!m_initialized) {
         return;
     }
+    // GPU compute: generate chunk grid around camera, compute bounds
+    dispatchChunkUpdate(cameraPos);
 
-    if (m_chunkDataDirty) {
-        updateChunkGPUData();
-        m_chunkDataDirty = false;
-    }
-
+    // GPU compute: frustum cull chunks, write indirect draw commands
     if (m_culler) {
         m_culler->runCull(m_cullBuffers, frustum.getBindlessIndex(), cameraPos);
     }
 }
 
-void TerrainGenerator::updateChunkGPUData()
+void TerrainGenerator::initComputePipeline()
 {
-    RAPTURE_PROFILE_FUNCTION();
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+    auto &project = app.getProject();
+    auto shaderPath = project.getProjectShaderDirectory();
 
-    std::vector<TerrainChunkGPUData> gpuData;
-    gpuData.resize(m_config.maxLoadedChunks);
+    ShaderImportConfig shaderConfig;
+    shaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    for (auto &[coord, chunk] : m_chunks) {
-        if (chunk.chunkIndex >= m_config.maxLoadedChunks) {
-            continue;
-        }
+    auto [shader, handle] =
+        AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_compute_bounds.cs.glsl", shaderConfig);
+    if (!shader || !shader->isReady()) {
+        RP_CORE_WARN("TerrainGenerator: Chunk compute shader not found");
+        return;
+    }
+    m_chunkComputeShader = shader;
 
-        TerrainChunkGPUData &data = gpuData[chunk.chunkIndex];
-        data.worldOffset = glm::vec2((static_cast<float>(coord.x) - 0.5f) * m_config.chunkWorldSize,
-                                     (static_cast<float>(coord.y) - 0.5f) * m_config.chunkWorldSize);
-        data.chunkSize = m_config.chunkWorldSize;
-        data.lod = chunk.lod;
+    ComputePipelineConfiguration pipelineConfig;
+    pipelineConfig.shader = m_chunkComputeShader;
+    m_chunkComputePipeline = std::make_shared<ComputePipeline>(pipelineConfig);
 
-        // Bounds
-        data.bounds = glm::vec4(data.worldOffset.x, data.worldOffset.y, data.worldOffset.x + m_config.chunkWorldSize,
-                                data.worldOffset.y + m_config.chunkWorldSize);
-        data.minHeight = chunk.minHeight;
-        data.maxHeight = chunk.maxHeight;
-        data.neighborLODs = 0; // TODO: pack neighbor LODs for seam stitching
-        data.flags = 1;        // Visible by default
+    CommandPoolConfig poolConfig{};
+    poolConfig.name = "TerrainChunkComputePool";
+    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
+    poolConfig.flags = 0;
+
+    m_computePoolHash = CommandPoolManager::createCommandPool(poolConfig);
+}
+
+void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
+{
+
+    if (!m_chunkComputePipeline || m_computePoolHash == 0) {
+        return;
     }
 
-    // Upload to GPU
-    m_chunkDataBuffer->addData(gpuData.data(), gpuData.size() * sizeof(TerrainChunkGPUData), 0);
+    if (!m_noiseLUT || !m_noiseTextures[CONTINENTALNESS] || !m_noiseTextures[EROSION] || !m_noiseTextures[PEAKS_VALLEYS]) {
+        return;
+    }
+
+    if (!m_chunkDataBuffer) {
+        return;
+    }
+
+    auto &vc = Application::getInstance().getVulkanContext();
+
+    auto pool = CommandPoolManager::getCommandPool(m_computePoolHash);
+    auto commandBuffer = pool->getPrimaryCommandBuffer();
+
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
+
+    m_chunkComputePipeline->bind(cmd);
+    DescriptorManager::bindSet(3, commandBuffer, m_chunkComputePipeline);
+
+    struct ChunkUpdatePushConstants {
+        uint32_t chunkDataBufferIndex;
+        uint32_t continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
+        uint32_t erosionIndex;
+        uint32_t peaksValleysIndex;
+        uint32_t noiseLUTIndex;
+        uint32_t useMultiNoise;
+        float heightScale;
+        float terrainWorldSize;
+        float chunkSize;
+        alignas(8) glm::vec2 cameraPos;
+        int32_t loadRadius;
+        uint32_t sampleResolution;
+    } pc;
+
+    static_assert(sizeof(ChunkUpdatePushConstants) == 56, "ChunkUpdatePushConstants must be 64 bytes");
+
+    pc.chunkDataBufferIndex = m_chunkDataBuffer->getBindlessIndex();
+    pc.continentalnessIndex = m_noiseTextures[CONTINENTALNESS]->getBindlessIndex();
+    pc.useMultiNoise = m_config.hmType == HM_CEPV ? 1u : 0u;
+
+    if (m_config.hmType == HM_CEPV) {
+        pc.erosionIndex = m_noiseTextures[EROSION]->getBindlessIndex();
+        pc.peaksValleysIndex = m_noiseTextures[PEAKS_VALLEYS]->getBindlessIndex();
+        pc.noiseLUTIndex = m_noiseLUT->getBindlessIndex();
+    } else {
+        pc.erosionIndex = 0;
+        pc.peaksValleysIndex = 0;
+        pc.noiseLUTIndex = 0;
+    }
+    pc.heightScale = m_config.heightScale;
+    pc.terrainWorldSize = m_config.terrainWorldSize;
+    pc.chunkSize = m_config.chunkWorldSize;
+    pc.cameraPos = glm::vec2(cameraPos.x, cameraPos.z);
+    pc.loadRadius = m_config.getChunkRadius();
+    pc.sampleResolution = 16;
+
+    vkCmdPushConstants(cmd, m_chunkComputePipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                       sizeof(ChunkUpdatePushConstants), &pc);
+
+    uint32_t numGroups = (m_chunkCount + 63) / 64;
+    vkCmdDispatch(cmd, numGroups, 1, 1);
+
+    VkMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0,
+                         nullptr, 0, nullptr);
+
+    commandBuffer->end();
+
+    auto queue = vc.getComputeQueue();
+    queue->submitQueue(commandBuffer);
+    queue->waitIdle();
 }
 
 VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const
@@ -377,39 +384,6 @@ VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const
         return VK_NULL_HANDLE;
     }
     return m_indexBuffers[lod]->getBufferVk();
-}
-
-uint32_t TerrainGenerator::getVisibleChunkCount(uint32_t lod) const
-{
-    (void)lod;
-    return 0; // GPU-driven: counts are only on GPU
-}
-
-uint32_t TerrainGenerator::getTotalVisibleChunks() const
-{
-    return static_cast<uint32_t>(m_chunks.size()); // Approximate: returns loaded chunks
-}
-
-TerrainChunk *TerrainGenerator::getChunkAtWorld(float worldX, float worldZ)
-{
-    glm::ivec2 coord = worldToChunkCoord(worldX, worldZ);
-    return m_chunks.getChunk(coord);
-}
-
-TerrainChunk *TerrainGenerator::getChunkAtCoord(glm::ivec2 coord)
-{
-    return m_chunks.getChunk(coord);
-}
-
-glm::ivec2 TerrainGenerator::worldToChunkCoord(float worldX, float worldZ) const
-{
-    return glm::ivec2(static_cast<int32_t>(std::floor(worldX / m_config.chunkWorldSize)),
-                      static_cast<int32_t>(std::floor(worldZ / m_config.chunkWorldSize)));
-}
-
-glm::vec2 TerrainGenerator::chunkCoordToWorldCenter(glm::ivec2 coord) const
-{
-    return glm::vec2(static_cast<float>(coord.x) * m_config.chunkWorldSize, static_cast<float>(coord.y) * m_config.chunkWorldSize);
 }
 
 void TerrainGenerator::createTerrainMaterials()

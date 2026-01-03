@@ -15,6 +15,7 @@
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
 #include "Generators/Terrain/TerrainCuller.h"
+#include "Generators/Terrain/TerrainGenerator.h"
 #include "Renderer/Frustum/Frustum.h"
 
 #include "Components/Systems/ObjectDataBuffers/ShadowDataBuffer.h"
@@ -50,7 +51,7 @@ class CascadedShadowMap {
     CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda);
     ~CascadedShadowMap();
 
-    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame, TerrainGenerator *terrain);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);
@@ -91,7 +92,7 @@ class CascadedShadowMap {
     void createUniformBuffers();
     void setupCommandResources();
 
-    void recordTerrainCommands(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+    void recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain);
 
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer);
     void transitionToShaderReadableLayout(CommandBuffer *commandBuffer);

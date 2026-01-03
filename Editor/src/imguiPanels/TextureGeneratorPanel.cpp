@@ -81,6 +81,8 @@ struct TextureGeneratorInstance {
     std::vector<ParameterEditState> editStates;
     Rapture::ProceduralTextureConfig config;
     std::shared_ptr<Rapture::ProceduralTexture> generator;
+    bool isDirty = false;
+    bool autoUpdate = false;
 };
 
 TextureGeneratorPanel::TextureGeneratorPanel() {}
@@ -255,6 +257,7 @@ void TextureGeneratorPanel::renderParameterEditor()
                 ImGui::PopID();
 
                 if (changed) {
+                    instance.isDirty = true;
                     editState.writeToBuffer(instance.buffer.data(), member);
                 }
             }
@@ -266,13 +269,18 @@ void TextureGeneratorPanel::renderParameterEditor()
 
 void TextureGeneratorPanel::renderGenerateButton()
 {
-    if (ImGui::Button("Generate")) {
-        auto &instance = m_instances[m_selectedIndex];
-        if (instance.generator && instance.generator->isValid()) {
+
+    auto &instance = m_instances[m_selectedIndex];
+    if (instance.generator && instance.generator->isValid()) {
+
+        ImGui::Checkbox("Auto Update", &instance.autoUpdate);
+
+        if (ImGui::Button("Generate") || (instance.isDirty && instance.autoUpdate)) {
             if (!instance.buffer.empty()) {
                 instance.generator->setPushConstantsRaw(instance.buffer.data(), instance.buffer.size());
             }
             instance.generator->generate();
+            instance.isDirty = false;
         }
     }
 }

@@ -2,6 +2,8 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
+#include "terrain/terrain_common.glsl"
+
 // No vertex attributes - position generated from gl_VertexIndex
 
 // Outputs to fragment shader
@@ -16,19 +18,6 @@ layout(set = 0, binding = 0) uniform CameraDataBuffer {
     mat4 proj;
 } u_camera[];
 
-// Chunk data (bindless SSBO - set 3, binding 1)
-struct TerrainChunkData {
-    vec2 worldOffset;
-    float chunkSize;
-    uint lod;
-
-    vec4 bounds;        // minX, minZ, maxX, maxZ
-    float minHeight;
-    float maxHeight;
-    uint neighborLODs;
-    uint flags;
-};
-
 layout(set = 3, binding = 1) readonly buffer TerrainChunkBuffer {
     TerrainChunkData chunks[];
 } u_chunks[];
@@ -40,10 +29,11 @@ layout(set = 3, binding = 0) uniform sampler3D u_textures3D[];
 layout(push_constant) uniform TerrainPushConstants {
     uint cameraBindlessIndex;
     uint chunkDataBufferIndex;
-    uint continentalnessIndex;
+    uint continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint erosionIndex;
     uint peaksValleysIndex;
     uint noiseLUTIndex;
+    uint useMultiNoise;
     uint lodResolution;
     float heightScale;
     float terrainWorldSize;
@@ -51,25 +41,6 @@ layout(push_constant) uniform TerrainPushConstants {
     uint rockMaterialIndex;
     uint snowMaterialIndex;
 } pc;
-
-float sampleMultiNoise(vec2 worldXZ) {
-    vec2 uv = worldXZ / pc.terrainWorldSize + 0.5;
-
-    float c = texture(u_textures[pc.continentalnessIndex], uv).r * 2.0 - 1.0;
-    float e = texture(u_textures[pc.erosionIndex], uv).r * 2.0 - 1.0;
-    float pv = texture(u_textures[pc.peaksValleysIndex], uv).r * 2.0 - 1.0;
-
-    vec3 lutCoord = vec3(c, e, pv) * 0.5 + 0.5;
-    return texture(u_textures3D[pc.noiseLUTIndex], lutCoord).r;
-}
-
-float rawToWorldHeight(float raw) {
-    return (raw - 0.5) * pc.heightScale;
-}
-
-float sampleHeight(vec2 worldXZ) {
-    return rawToWorldHeight(sampleMultiNoise(worldXZ));
-}
 
 void main() {
     // Get chunk index from instance ID (set by indirect draw command)
@@ -90,8 +61,10 @@ void main() {
     // World position XZ
     vec2 worldXZ = chunk.worldOffset + localPos;
 
-    float rawHeight = sampleMultiNoise(worldXZ);
-    float height = rawToWorldHeight(rawHeight);
+    float rawHeight = pc.useMultiNoise > 0u
+        ? sampleHeightRaw_CEPV(worldXZ, pc.terrainWorldSize, u_textures[pc.continentalnessIndex], u_textures[pc.erosionIndex], u_textures[pc.peaksValleysIndex], u_textures3D[pc.noiseLUTIndex])
+        : sampleHeightRaw_Single(worldXZ, pc.terrainWorldSize, u_textures[pc.continentalnessIndex]);
+    float height = rawToWorldHeight(rawHeight, pc.heightScale);
 
     vec3 worldPos = vec3(worldXZ.x, height, worldXZ.y);
 

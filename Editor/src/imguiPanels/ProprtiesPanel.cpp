@@ -2,6 +2,7 @@
 
 #include "Events/GameEvents.h"
 
+#include "AssetManager/Asset.h"
 #include "AssetManager/AssetManager.h"
 
 #include "Scenes/Entities/Entity.h"
@@ -15,6 +16,7 @@
 #include "Logging/TracyProfiler.h"
 
 #include "imguiPanels/modules/PlotEditor.h"
+#include <functional>
 
 // Implementation of HelpMarker function
 void PropertiesPanel::HelpMarker(const char *desc)
@@ -809,43 +811,47 @@ void PropertiesPanel::renderAddComponentMenu(Rapture::Entity entity)
 
 void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainComp)
 {
+    if (!terrainComp.generator) {
+        return;
+    }
+
     if (ImGui::CollapsingHeader("Terrain Component", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Enabled", &terrainComp.isEnabled);
 
-        if (!terrainComp.generator.isInitialized()) {
+        if (!terrainComp.generator->isInitialized()) {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Terrain not initialized");
             return;
         }
 
-        auto &config = terrainComp.generator.getConfigMutable();
+        auto &config = terrainComp.generator->getConfigMutable();
 
         float heightScale = config.heightScale;
         if (ImGui::DragFloat("Height Scale", &heightScale, 1.0f, 0.0f, 1000.0f)) {
-            terrainComp.generator.setHeightScale(heightScale);
+            terrainComp.generator->setHeightScale(heightScale);
         }
 
         ImGui::DragFloat("Chunk Size", &config.chunkWorldSize, 1.0f, 1.0f, 256.0f);
         ImGui::DragFloat("Terrain Size", &config.terrainWorldSize, 10.0f, 64.0f, 8192.0f);
 
         ImGui::Separator();
-        ImGui::Text("Loaded Chunks: %zu", terrainComp.generator.getLoadedChunkCount());
-        ImGui::Text("Visible Chunks: %u", terrainComp.generator.getTotalVisibleChunks());
 
-        for (uint32_t lod = 0; lod < Rapture::TERRAIN_LOD_COUNT; ++lod) {
-            uint32_t count = terrainComp.generator.getVisibleChunkCount(lod);
-            if (count > 0) {
-                ImGui::Text("  LOD%u: %u chunks", lod, count);
-            }
+        const char *modeNames[] = {"Single Heightmap", "Multi-Noise (CEPV)"};
+        int currentMode = static_cast<int>(config.hmType);
+        if (ImGui::Combo("Heightmap Mode", &currentMode, modeNames, IM_ARRAYSIZE(modeNames))) {
+            config.hmType = static_cast<Rapture::HeightmapType>(currentMode);
         }
 
-        bool wireframe = terrainComp.generator.isWireframe();
+        ImGui::Separator();
+        ImGui::Text("Chunk Grid: %u (radius %d)", terrainComp.generator->getChunkCount(), config.getChunkRadius());
+
+        bool wireframe = terrainComp.generator->isWireframe();
         if (ImGui::Checkbox("Wireframe", &wireframe)) {
-            terrainComp.generator.setWireframe(wireframe);
+            terrainComp.generator->setWireframe(wireframe);
         }
 
         ImGui::Separator();
 
-        auto &multiNoise = terrainComp.generator.getMultiNoiseConfig();
+        auto &multiNoise = terrainComp.generator->getMultiNoiseConfig();
         bool splineChanged = false;
 
         const char *categoryNames[] = {"Continentalness", "Erosion", "Peaks & Valleys"};
@@ -864,7 +870,7 @@ void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainC
         }
 
         if (splineChanged || ImGui::Button("Rebake LUT")) {
-            terrainComp.generator.bakeNoiseLUT();
+            terrainComp.generator->bakeNoiseLUT();
         }
 
         ImGui::Separator();

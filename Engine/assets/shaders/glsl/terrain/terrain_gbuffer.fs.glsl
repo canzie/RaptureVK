@@ -3,6 +3,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "common/MaterialCommon.glsl"
+#include "terrain/terrain_common.glsl"
 
 layout(location = 0) out vec4 gPositionDepth;
 layout(location = 1) out vec4 gNormal;
@@ -24,10 +25,11 @@ layout(set = 3, binding = 0) uniform sampler3D u_textures3D[];
 layout(push_constant) uniform TerrainPushConstants {
     uint cameraBindlessIndex;
     uint chunkDataBufferIndex;
-    uint continentalnessIndex;
+    uint continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint erosionIndex;
     uint peaksValleysIndex;
     uint noiseLUTIndex;
+    uint useMultiNoise;
     uint lodResolution;
     float heightScale;
     float terrainWorldSize;
@@ -42,16 +44,10 @@ float getHeightTexelWorldSize() {
 }
 
 float sampleHeightWorld(vec2 worldXZ) {
-    vec2 uv = worldXZ / pc.terrainWorldSize + 0.5;
-
-    float c = texture(u_textures[pc.continentalnessIndex], uv).r * 2.0 - 1.0;
-    float e = texture(u_textures[pc.erosionIndex], uv).r * 2.0 - 1.0;
-    float pv = texture(u_textures[pc.peaksValleysIndex], uv).r * 2.0 - 1.0;
-
-    vec3 lutCoord = vec3(c, e, pv) * 0.5 + 0.5;
-    float raw = texture(u_textures3D[pc.noiseLUTIndex], lutCoord).r;
-
-    return (raw - 0.5) * pc.heightScale;
+    float raw = pc.useMultiNoise > 0u
+        ? sampleHeightRaw_CEPV(worldXZ, pc.terrainWorldSize, u_textures[pc.continentalnessIndex], u_textures[pc.erosionIndex], u_textures[pc.peaksValleysIndex], u_textures3D[pc.noiseLUTIndex])
+        : sampleHeightRaw_Single(worldXZ, pc.terrainWorldSize, u_textures[pc.continentalnessIndex]);
+    return rawToWorldHeight(raw, pc.heightScale);
 }
 
 vec3 computeTerrainNormal(vec3 worldPos) {

@@ -1,7 +1,6 @@
 #include "CascadedShadowMapping.h"
 
 #include "Components/Components.h"
-#include "Components/TerrainComponent.h"
 #include "Generators/Terrain/TerrainTypes.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
@@ -24,10 +23,11 @@ struct PushConstantsCSM {
 struct TerrainCSMPushConstants {
     uint32_t cascadeMatricesIndex;
     uint32_t chunkDataBufferIndex;
-    uint32_t continentalnessIndex;
+    uint32_t continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint32_t erosionIndex;
     uint32_t peaksValleysIndex;
     uint32_t noiseLUTIndex;
+    uint32_t useMultiNoise;
     uint32_t lodResolution;
     float heightScale;
     float terrainWorldSize;
@@ -259,30 +259,14 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     return cascadeData;
 }
 
-CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame)
+CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame,
+                                                  TerrainGenerator *terrain)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     m_currentFrame = currentFrame;
 
     auto &registry = activeScene->getRegistry();
-    auto terrainView = registry.view<TerrainComponent>();
-
-    if (terrainView.begin() != terrainView.end()) {
-        auto &terrain = terrainView.get<TerrainComponent>(*terrainView.begin());
-
-        if (terrain.isEnabled && terrain.generator.isInitialized()) {
-            auto *culler = terrain.generator.getTerrainCuller();
-            if (culler) {
-                if (m_terrainShadowBuffers.indirectBuffers.empty()) {
-                    std::vector<uint32_t> highestLOD = {0};
-                    m_terrainShadowBuffers = culler->createBuffers(highestLOD);
-                }
-
-                culler->runCull(m_terrainShadowBuffers, m_shadowFrustum.getBindlessIndex(), glm::vec3(0.0f));
-            }
-        }
-    }
 
     auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrame);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
@@ -411,8 +395,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
         }
     }
 
-    // Render terrain shadows
-    recordTerrainCommands(commandBuffer, activeScene, currentFrame);
+    recordTerrainCommands(commandBuffer, terrain);
 
     commandBuffer->end();
 
@@ -806,7 +789,10 @@ void CascadedShadowMap::createTerrainPipeline()
     auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_csm.vs.glsl");
+    ShaderImportConfig terrainShaderConfig;
+    terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
+
+    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_csm.vs.glsl", terrainShaderConfig);
     if (!shader) {
         RP_CORE_WARN("Terrain CSM shader not found");
         return;
@@ -836,89 +822,91 @@ void CascadedShadowMap::createTerrainPipeline()
     RP_CORE_INFO("Terrain CSM pipeline created");
 }
 
-void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene,
-                                              uint32_t currentFrame)
+void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain)
 {
-    if (!m_terrainPipeline) {
+    if (!m_terrainPipeline || !terrain || !terrain->isInitialized()) {
         return;
     }
 
-    (void)currentFrame;
+    if (auto *culler = terrain->getTerrainCuller(); culler) {
+        if (m_terrainShadowBuffers.indirectBuffers.empty()) {
+            std::vector<uint32_t> highestLOD = {0};
+            m_terrainShadowBuffers = culler->createBuffers(highestLOD);
+        }
 
-    auto &registry = activeScene->getRegistry();
-    auto terrainView = registry.view<TerrainComponent>();
+        culler->runCull(m_terrainShadowBuffers, m_shadowFrustum.getBindlessIndex(), glm::vec3(0.0f));
+    }
 
-    for (auto entity : terrainView) {
-        auto &terrain = terrainView.get<TerrainComponent>(entity);
-        if (!terrain.isEnabled || !terrain.generator.isInitialized()) {
+    m_terrainPipeline->bind(commandBuffer->getCommandBufferVk());
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = m_width;
+    viewport.height = m_height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer->getCommandBufferVk(), 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+    vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
+
+    DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline);
+    DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline);
+
+    if (m_terrainShadowBuffers.indirectBuffers.empty() || !m_terrainShadowBuffers.drawCountBuffer) {
+        return;
+    }
+
+    const auto &terrainConfig = terrain->getConfig();
+    uint32_t chunkDataBufferIndex = terrain->getChunkDataBuffer()->getBindlessIndex();
+    uint32_t continentalnessIndex = terrain->getNoiseTexture(CONTINENTALNESS)->getBindlessIndex();
+    uint32_t erosionIndex = 0;
+    uint32_t peaksValleysIndex = 0;
+    uint32_t noiseLUTIndex = 0;
+
+    if (terrainConfig.hmType == HM_CEPV) {
+        erosionIndex = terrain->getNoiseTexture(EROSION)->getBindlessIndex();
+        peaksValleysIndex = terrain->getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
+        noiseLUTIndex = terrain->getNoiseLUT()->getBindlessIndex();
+    }
+    VkBuffer countBuffer = m_terrainShadowBuffers.drawCountBuffer->getBufferVk();
+
+    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+        if (!m_terrainShadowBuffers.indirectBuffers[lod]) {
             continue;
         }
 
-        m_terrainPipeline->bind(commandBuffer->getCommandBufferVk());
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain->getIndexBuffer(lod), 0, VK_INDEX_TYPE_UINT32);
 
-        VkViewport viewport{};
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = m_width;
-        viewport.height = m_height;
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(commandBuffer->getCommandBufferVk(), 0, 1, &viewport);
+        TerrainCSMPushConstants pc{};
+        pc.cascadeMatricesIndex = m_cascadeMatricesIndex;
+        pc.chunkDataBufferIndex = chunkDataBufferIndex;
+        pc.continentalnessIndex = continentalnessIndex;
+        pc.erosionIndex = erosionIndex;
+        pc.peaksValleysIndex = peaksValleysIndex;
+        pc.noiseLUTIndex = noiseLUTIndex;
+        pc.useMultiNoise = terrainConfig.hmType == HM_CEPV ? 1u : 0u;
+        pc.lodResolution = getTerrainLODResolution(lod);
+        pc.heightScale = terrainConfig.heightScale;
+        pc.terrainWorldSize = terrainConfig.terrainWorldSize;
 
-        VkRect2D scissor{};
-        scissor.offset = {0, 0};
-        scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
-        vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
-
-        DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline);
-        DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline);
-
-        if (m_terrainShadowBuffers.indirectBuffers.empty() || !m_terrainShadowBuffers.drawCountBuffer) {
-            return;
+        VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        if (auto shader = m_terrainShader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
         }
 
-        const auto &terrainConfig = terrain.generator.getConfig();
-        uint32_t chunkDataBufferIndex = terrain.generator.getChunkDataBuffer()->getBindlessIndex();
-        uint32_t continentalnessIndex = terrain.generator.getNoiseTexture(CONTINENTALNESS)->getBindlessIndex();
-        uint32_t erosionIndex = terrain.generator.getNoiseTexture(EROSION)->getBindlessIndex();
-        uint32_t peaksValleysIndex = terrain.generator.getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
-        uint32_t noiseLUTIndex = terrain.generator.getNoiseLUT()->getBindlessIndex();
-        VkBuffer countBuffer = m_terrainShadowBuffers.drawCountBuffer->getBufferVk();
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,
+                           sizeof(TerrainCSMPushConstants), &pc);
 
-        for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
-            if (!m_terrainShadowBuffers.indirectBuffers[lod]) {
-                continue;
-            }
+        VkBuffer indirectBuffer = m_terrainShadowBuffers.indirectBuffers[lod]->getBufferVk();
+        VkDeviceSize countOffset = lod * sizeof(uint32_t);
+        uint32_t maxDrawCount = m_terrainShadowBuffers.indirectCapacities[lod];
 
-            vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain.generator.getIndexBuffer(lod), 0,
-                                 VK_INDEX_TYPE_UINT32);
-
-            TerrainCSMPushConstants pc{};
-            pc.cascadeMatricesIndex = m_cascadeMatricesIndex;
-            pc.chunkDataBufferIndex = chunkDataBufferIndex;
-            pc.continentalnessIndex = continentalnessIndex;
-            pc.erosionIndex = erosionIndex;
-            pc.peaksValleysIndex = peaksValleysIndex;
-            pc.noiseLUTIndex = noiseLUTIndex;
-            pc.lodResolution = getTerrainLODResolution(lod);
-            pc.heightScale = terrainConfig.heightScale;
-            pc.terrainWorldSize = terrainConfig.terrainWorldSize;
-
-            VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-            if (auto shader = m_terrainShader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-                stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
-            }
-
-            vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,
-                               sizeof(TerrainCSMPushConstants), &pc);
-
-            VkBuffer indirectBuffer = m_terrainShadowBuffers.indirectBuffers[lod]->getBufferVk();
-            VkDeviceSize countOffset = lod * sizeof(uint32_t);
-            uint32_t maxDrawCount = m_terrainShadowBuffers.indirectCapacities[lod];
-
-            vkCmdDrawIndexedIndirectCount(commandBuffer->getCommandBufferVk(), indirectBuffer, 0, countBuffer, countOffset,
-                                          maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
-        }
+        vkCmdDrawIndexedIndirectCount(commandBuffer->getCommandBufferVk(), indirectBuffer, 0, countBuffer, countOffset,
+                                      maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
     }
 }
 

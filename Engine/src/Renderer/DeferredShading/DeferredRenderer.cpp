@@ -45,6 +45,8 @@ bool DeferredRenderer::m_viewportResizePending = false;
 std::shared_ptr<DynamicDiffuseGI> DeferredRenderer::m_dynamicDiffuseGI = nullptr;
 std::shared_ptr<RtInstanceData> DeferredRenderer::m_rtInstanceData = nullptr;
 
+static Counter s_cmdCounter{};
+
 void DeferredRenderer::init()
 {
 
@@ -150,6 +152,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
     }
 
     m_rtInstanceData->update(activeScene);
+
     JobSystem &system = jobs();
     system.run(JobDeclaration(
         [m_dynamicDiffuseGI = m_dynamicDiffuseGI, activeScene, m_currentFrame = m_currentFrame](JobContext &ctx) {
@@ -157,6 +160,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
             m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
         },
         JobPriority::NORMAL, QueueAffinity::COMPUTE, nullptr, "DDGI POPULATE"));
+
     // m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
 
     auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, m_currentFrame);
@@ -226,6 +230,7 @@ void DeferredRenderer::onSwapChainRecreated()
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
     vc.waitIdle();
+    jobs().waitFor(s_cmdCounter, 0);
 
     // In PRESENTATION mode, the render target is backed by swapchain, so we need to recreate everything
     // In OFFSCREEN mode, only update the swapchain reference (image count may have changed)
@@ -267,6 +272,8 @@ void DeferredRenderer::createRenderTarget()
 
 void DeferredRenderer::recreateRenderPasses()
 {
+    jobs().waitFor(s_cmdCounter, 0);
+
     m_skyboxPass.reset();
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
@@ -352,6 +359,15 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
         auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
 
+        TerrainGenerator *terrain = nullptr;
+        auto terrainView = registry.view<TerrainComponent>();
+        if (!terrainView.empty()) {
+            auto &terrainComp = terrainView.get<TerrainComponent>(*terrainView.begin());
+            if (terrainComp.generator && terrainComp.isEnabled && terrainComp.generator->isInitialized()) {
+                terrain = terrainComp.generator.get();
+            }
+        }
+
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Shadow Maps");
 
@@ -382,7 +398,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                                            lightComp.type == LightType::Directional);
 
                 if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
-                    auto shadowBuffer = shadowComp.cascadedShadowMap->recordSecondary(activeScene, m_currentFrame);
+                    auto shadowBuffer = shadowComp.cascadedShadowMap->recordSecondary(activeScene, m_currentFrame, terrain);
                     if (shadowBuffer) {
                         shadowComp.cascadedShadowMap->beginDynamicRendering(commandBuffer);
                         commandBuffer->executeSecondary(*shadowBuffer);
@@ -398,20 +414,12 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         CommandBuffer *instancedShapesBuffer = nullptr;
         CommandBuffer *stencilBorderBuffer = nullptr;
 
-        Counter cmdCounter = Counter();
-        cmdCounter.increment(4); // GBuffer, Lighting, Skybox, Instanced Shapes
+        // mainCounter = Counter();
+        s_cmdCounter.increment(4); // GBuffer, Lighting, Skybox, Instanced Shapes
 
         JobSystem &system = jobs();
 
         // Prepare GBuffer Pass data
-        TerrainGenerator *terrain = nullptr;
-        auto terrainView = registry.view<TerrainComponent>();
-        if (terrainView.size_hint() > 0) {
-            auto &terrainComp = terrainView.get<TerrainComponent>(*terrainView.begin());
-            if (terrainComp.isEnabled && terrainComp.generator.isInitialized()) {
-                terrain = &terrainComp.generator;
-            }
-        }
 
         SecondaryBufferInheritance gbufferInheritance;
         auto fbSpec = GBufferPass::getFramebufferSpecification();
@@ -425,7 +433,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 (void)ctx;
                 gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
             },
-            JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "GBUFFER"));
+            JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "GBUFFER"));
 
         SecondaryBufferInheritance lightingInheritance;
         lightingInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
@@ -436,7 +444,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 (void)ctx;
                 lightingBuffer = m_lightingPass->recordSecondary(activeScene, *m_sceneRenderTarget, lightingInheritance);
             },
-            JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "LIGHTING"));
+            JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 
         SecondaryBufferInheritance skyboxInheritance;
         skyboxInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
@@ -448,7 +456,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 (void)ctx;
                 skyboxBuffer = m_skyboxPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, skyboxInheritance);
             },
-            JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "SKYBOX"));
+            JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SKYBOX"));
 
         SecondaryBufferInheritance instancedInheritance;
         instancedInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
@@ -461,7 +469,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 instancedShapesBuffer =
                     m_instancedShapesPass->recordSecondary(activeScene, *m_sceneRenderTarget, m_currentFrame, instancedInheritance);
             },
-            JobPriority::HIGH, QueueAffinity::ANY, &cmdCounter, "INSTANCED_SHAPES"));
+            JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "INSTANCED_SHAPES"));
 
         {
             SecondaryBufferInheritance stencilInheritance;
@@ -476,7 +484,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         {
 
             RAPTURE_PROFILE_SCOPE("command buffer Wait");
-            system.waitFor(cmdCounter, 0);
+            system.waitFor(s_cmdCounter, 0);
         }
         // Here we wait for all of them to be finished (if in parallel)
 

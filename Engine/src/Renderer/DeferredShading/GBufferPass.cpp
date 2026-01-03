@@ -2,9 +2,11 @@
 
 #include "AssetManager/AssetImportConfig.h"
 #include "Components/Components.h"
+#include "Generators/Terrain/TerrainGenerator.h"
 #include "Generators/Terrain/TerrainTypes.h"
 #include "Logging/TracyProfiler.h"
 #include "WindowContext/Application.h"
+
 #include <cstdint>
 #include <cstdio>
 
@@ -18,10 +20,11 @@ struct GBufferPushConstants {
 struct TerrainGBufferPushConstants {
     uint32_t cameraBindlessIndex;
     uint32_t chunkDataBufferIndex;
-    uint32_t continentalnessIndex;
+    uint32_t continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint32_t erosionIndex;
     uint32_t peaksValleysIndex;
     uint32_t noiseLUTIndex;
+    uint32_t useMultiNoise;
     uint32_t lodResolution;
     float heightScale;
     float terrainWorldSize;
@@ -849,13 +852,19 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
     DescriptorManager::bindSet(1, commandBuffer, m_terrainPipeline); // Materials
     DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline); // Bindless textures
 
+    const auto &terrainConfig = terrain.getConfig();
+
     uint32_t chunkDataBufferIndex = terrain.getChunkDataBuffer()->getBindlessIndex();
     uint32_t continentalnessIndex = terrain.getNoiseTexture(CONTINENTALNESS)->getBindlessIndex();
-    uint32_t erosionIndex = terrain.getNoiseTexture(EROSION)->getBindlessIndex();
-    uint32_t peaksValleysIndex = terrain.getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
-    uint32_t noiseLUTIndex = terrain.getNoiseLUT()->getBindlessIndex();
+    uint32_t erosionIndex = 0;
+    uint32_t peaksValleysIndex = 0;
+    uint32_t noiseLUTIndex = 0;
 
-    const auto &terrainConfig = terrain.getConfig();
+    if (terrainConfig.hmType == HM_CEPV) {
+        erosionIndex = terrain.getNoiseTexture(EROSION)->getBindlessIndex();
+        peaksValleysIndex = terrain.getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
+        noiseLUTIndex = terrain.getNoiseLUT()->getBindlessIndex();
+    }
     auto *cullBuffers = terrain.getCullBuffers();
     if (!cullBuffers || !cullBuffers->drawCountBuffer) {
         return;
@@ -877,6 +886,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
         pc.erosionIndex = erosionIndex;
         pc.peaksValleysIndex = peaksValleysIndex;
         pc.noiseLUTIndex = noiseLUTIndex;
+        pc.useMultiNoise = terrainConfig.hmType == HM_CEPV ? 1u : 0u;
         pc.lodResolution = getTerrainLODResolution(lod);
         pc.heightScale = terrainConfig.heightScale;
         pc.terrainWorldSize = terrainConfig.terrainWorldSize;
