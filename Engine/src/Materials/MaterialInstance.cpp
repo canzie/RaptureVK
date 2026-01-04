@@ -42,7 +42,7 @@ MaterialInstance::~MaterialInstance()
     }
 }
 
-void MaterialInstance::setParameter(ParameterID id, std::shared_ptr<Texture> texture)
+void MaterialInstance::setParameter(ParameterID id, Texture *texture)
 {
     const ParamInfo *info = getParamInfo(id);
     if (!info || info->type != ParamType::TEXTURE) return;

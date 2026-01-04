@@ -1,17 +1,17 @@
 #ifndef RAPTURE__MATERIAL_INSTANCE_H
 #define RAPTURE__MATERIAL_INSTANCE_H
 
+#include "Buffers/UniformBuffers/UniformBuffer.h"
+#include "Events/AssetEvents.h"
 #include "Material.h"
 #include "MaterialData.h"
 #include "MaterialParameters.h"
-#include "Buffers/UniformBuffers/UniformBuffer.h"
-#include "Events/AssetEvents.h"
 
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
-#include <cstring>
 
 namespace Rapture {
 
@@ -19,7 +19,7 @@ class Texture;
 
 struct PendingTexture {
     ParameterID parameterId;
-    std::shared_ptr<Texture> texture;
+    Texture *texture;
 };
 
 class MaterialInstance {
@@ -33,30 +33,30 @@ class MaterialInstance {
     const MaterialData &getData() const { return m_data; }
     uint32_t getFlags() const { return m_data.flags; }
 
-    template <typename T>
-    void setParameter(ParameterID id, const T &value) {
-        const ParamInfo* info = getParamInfo(id);
+    template <typename T> void setParameter(ParameterID id, const T &value)
+    {
+        const ParamInfo *info = getParamInfo(id);
         if (!info) return;
         if (sizeof(T) != info->size) return;
 
-        char* dataPtr = reinterpret_cast<char*>(&m_data);
+        char *dataPtr = reinterpret_cast<char *>(&m_data);
         std::memcpy(dataPtr + info->offset, &value, info->size);
         syncToGPU();
         AssetEvents::onMaterialInstanceChanged().publish(this);
     }
 
-    template <typename T>
-    T getParameter(ParameterID id) const {
-        const ParamInfo* info = getParamInfo(id);
+    template <typename T> T getParameter(ParameterID id) const
+    {
+        const ParamInfo *info = getParamInfo(id);
         if (!info || sizeof(T) != info->size) return T{};
 
         T value{};
-        const char* dataPtr = reinterpret_cast<const char*>(&m_data);
+        const char *dataPtr = reinterpret_cast<const char *>(&m_data);
         std::memcpy(&value, dataPtr + info->offset, info->size);
         return value;
     }
 
-    void setParameter(ParameterID id, std::shared_ptr<Texture> texture);
+    void setParameter(ParameterID id, Texture *texture);
     void updatePendingTextures();
 
   private:

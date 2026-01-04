@@ -293,8 +293,8 @@ CommandBuffer *ShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, ui
 
         // Get push constant stage flags from shader
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = m_shader->getPushConstantLayouts()[0].stageFlags;
         }
 
         vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
@@ -401,12 +401,14 @@ void ShadowMap::createPipeline()
 
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/shadows/ShadowPass.vs.spv");
+    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/shadows/ShadowPass.vs.spv");
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
 
-    if (!shader) {
+    if (!m_shader) {
         RP_CORE_ERROR("Failed to load ShadowPass vertex shader");
         return;
     }
+    m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -422,10 +424,7 @@ void ShadowMap::createPipeline()
     framebufferSpec.depthAttachment = m_shadowTexture->getFormat();
 
     config.framebufferSpec = framebufferSpec;
-    config.shader = shader;
-
-    m_shader = shader;
-    m_handle = handle;
+    config.shader = m_shader;
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

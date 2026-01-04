@@ -281,8 +281,8 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
         pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(currentFrame) : 0;
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = m_shader->getPushConstantLayouts()[0].stageFlags;
         }
 
         vkCmdPushConstants(secondaryCb->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
@@ -334,8 +334,8 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
         pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(currentFrame) : 0;
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = m_shader->getPushConstantLayouts()[0].stageFlags;
         }
 
         vkCmdPushConstants(secondaryCb->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
@@ -663,12 +663,14 @@ void GBufferPass::createPipeline()
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/GBuffer.vs.glsl", shaderConfig);
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/GBuffer.vs.glsl", shaderConfig);
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
 
-    if (!shader) {
+    if (!m_shader) {
         RP_CORE_ERROR("Failed to load GBuffer vertex shader");
         return;
     }
+    if (m_shader) m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -680,10 +682,7 @@ void GBufferPass::createPipeline()
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = getFramebufferSpecification();
-    config.shader = shader;
-
-    m_shader = shader;
-    m_handle = handle;
+    config.shader = m_shader;
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
@@ -778,13 +777,13 @@ void GBufferPass::createTerrainPipeline()
     ShaderImportConfig terrainShaderConfig;
     terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto [shader, handle] =
-        AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
-
-    if (!shader) {
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
+    m_terrainShader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (!m_terrainShader) {
         RP_CORE_WARN("Failed to load terrain GBuffer shader - terrain rendering disabled");
         return;
     }
+    m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -796,10 +795,7 @@ void GBufferPass::createTerrainPipeline()
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = getFramebufferSpecification();
-    config.shader = shader;
-
-    m_terrainShader = shader;
-    m_terrainShaderHandle = handle;
+    config.shader = m_terrainShader;
 
     m_terrainPipeline = std::make_shared<GraphicsPipeline>(config);
 
@@ -895,8 +891,8 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
         pc.snowMaterialIndex = terrain.getSnowMaterialIndex();
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        if (auto shader = m_terrainShader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        if (m_terrainShader && m_terrainShader->getPushConstantLayouts().size() > 0) {
+            stageFlags = m_terrainShader->getPushConstantLayouts()[0].stageFlags;
         }
 
         vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,

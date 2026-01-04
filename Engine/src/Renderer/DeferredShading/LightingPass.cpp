@@ -52,10 +52,9 @@ LightingPass::LightingPass(float width, float height, std::shared_ptr<GBufferPas
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/ddgi/";
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/DeferredLighting.fs.glsl", shaderConfig);
-
-    m_shader = shader;
-    m_handle = handle;
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/DeferredLighting.fs.glsl", shaderConfig);
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_shader) m_shaderAssets.push_back(std::move(asset));
 
     createPipeline();
 }
@@ -299,7 +298,7 @@ void LightingPass::createPipeline()
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = getFramebufferSpecification();
-    config.shader = m_shader.lock();
+    config.shader = m_shader;
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

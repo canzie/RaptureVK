@@ -39,16 +39,16 @@ class TerrainGenerator {
     void shutdown();
 
     // Noise configuration
-    void setNoiseTexture(TerrainNoiseCategory category, std::shared_ptr<Texture> texture);
-    std::shared_ptr<Texture> getNoiseTexture(TerrainNoiseCategory category) const;
+    void setNoiseTexture(TerrainNoiseCategory category, Texture *texture);
+    Texture *getNoiseTexture(TerrainNoiseCategory category) const;
     MultiNoiseConfig &getMultiNoiseConfig() { return m_multiNoiseConfig; }
     const MultiNoiseConfig &getMultiNoiseConfig() const { return m_multiNoiseConfig; }
     void bakeNoiseLUT();
-    std::shared_ptr<Texture> getNoiseLUT() const { return m_noiseLUT; }
+    Texture *getNoiseLUT() const { return m_noiseLUT.get(); }
     void generateDefaultNoiseTextures();
 
-    void setSingleHeightmap(std::shared_ptr<Texture> texture) { m_noiseTextures[CONTINENTALNESS] = texture; }
-    std::shared_ptr<Texture> getSingleHeightmap() const { return m_noiseTextures[CONTINENTALNESS]; }
+    void setSingleHeightmap(Texture *texture) { m_noiseTextures[CONTINENTALNESS] = texture; }
+    Texture *getSingleHeightmap() const { return m_noiseTextures[CONTINENTALNESS]; }
 
     // Per-frame update: computes chunk data on GPU, runs culling
     void update(const glm::vec3 &cameraPos, Frustum &frustum);
@@ -91,8 +91,8 @@ class TerrainGenerator {
     uint32_t m_chunkCount = 0;
 
     MultiNoiseConfig m_multiNoiseConfig;
-    std::shared_ptr<Texture> m_noiseTextures[TERRAIN_NC_COUNT];
-    std::shared_ptr<Texture> m_noiseLUT;
+    Texture *m_noiseTextures[TERRAIN_NC_COUNT];
+    std::unique_ptr<Texture> m_noiseLUT;
 
     // Shared index buffers (one per LOD, grid topology)
     std::shared_ptr<IndexBuffer> m_indexBuffers[TERRAIN_LOD_COUNT];
@@ -102,12 +102,14 @@ class TerrainGenerator {
     std::unique_ptr<TerrainCuller> m_culler;
     TerrainCullBuffers m_cullBuffers;
 
-    std::shared_ptr<Shader> m_chunkComputeShader;
+    Shader *m_chunkComputeShader;
     std::shared_ptr<ComputePipeline> m_chunkComputePipeline;
     CommandPoolHash m_computePoolHash = 0;
 
     bool m_initialized = false;
     bool m_wireframe = false;
+
+    std::vector<AssetRef> m_assets;
 
     std::shared_ptr<MaterialInstance> m_grassMaterial;
     std::shared_ptr<MaterialInstance> m_rockMaterial;

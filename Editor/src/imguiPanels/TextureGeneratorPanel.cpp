@@ -134,15 +134,16 @@ void TextureGeneratorPanel::renderInstanceSelector()
         const auto &loadedAssets = Rapture::AssetManager::getLoadedAssets();
         const auto &assetRegistry = Rapture::AssetManager::getAssetRegistry();
 
-        for (const auto &[handle, asset] : loadedAssets) {
+        for (const auto &[handle, asset_] : loadedAssets) {
             if (assetRegistry.find(handle) == assetRegistry.end()) continue;
 
             const auto &metadata = assetRegistry.at(handle);
-            if (metadata.assetType != Rapture::AssetType::Shader) continue;
+            if (metadata.assetType != Rapture::AssetType::SHADER) continue;
 
-            auto shader = Rapture::AssetManager::getAsset<Rapture::Shader>(handle);
+            auto asset = Rapture::AssetManager::getAsset(handle);
+            auto shader = asset ? asset.get()->getUnderlyingAsset<Rapture::Shader>() : nullptr;
             if (!shader || !shader->isReady()) continue;
-            const std::string &name = metadata.isDiskAsset() ? metadata.m_filePath.filename().string() : metadata.m_virtualName;
+            const std::string &name = metadata.isDiskAsset() ? metadata.filePath.filename().string() : metadata.virtualName;
 
             if (ImGui::Selectable(name.c_str())) {
                 TextureGeneratorInstance newInstance;
@@ -200,13 +201,13 @@ void TextureGeneratorPanel::renderParameterEditor()
         return;
     }
 
-    auto shader = instance.generator->getShader();
-    if (!shader || !shader->isReady()) {
+    auto &shader = instance.generator->getShader();
+    if (!shader.isReady()) {
         ImGui::TextColored(ImVec4(1, 0.3, 0.3, 1), "Shader not ready");
         return;
     }
 
-    const auto &detailedPc = shader->getDetailedPushConstants();
+    const auto &detailedPc = shader.getDetailedPushConstants();
     if (detailedPc.empty()) {
         ImGui::Text("No parameters");
         return;

@@ -137,7 +137,7 @@ void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
             auto &materialComp = view.get<MaterialComponent>(ent);
             if (materialComp.material) {
                 m_entityToOffset[ent.getID()] = idx * static_cast<uint32_t>(sizeof(RtInstanceInfo));
-                m_materialToOffsets[materialComp.material.get()].push_back(idx * static_cast<uint32_t>(sizeof(RtInstanceInfo)));
+                m_materialToOffsets[materialComp.material].push_back(idx * static_cast<uint32_t>(sizeof(RtInstanceInfo)));
             }
         }
     }

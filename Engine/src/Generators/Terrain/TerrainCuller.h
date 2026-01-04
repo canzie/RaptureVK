@@ -8,6 +8,8 @@
 #include "Pipelines/ComputePipeline.h"
 #include "Shaders/Shader.h"
 
+#include "AssetManager/Asset.h"
+
 #include <glm/glm.hpp>
 
 #include <memory>
@@ -48,7 +50,8 @@ class TerrainCuller {
     uint32_t m_initialIndirectCapacity;
     VmaAllocator m_allocator;
 
-    std::shared_ptr<Shader> m_cullShader;
+    Shader *m_cullShader;
+    std::vector<AssetRef> m_assets;
     std::shared_ptr<ComputePipeline> m_cullPipeline;
     CommandPoolHash m_commandPoolHash;
 };

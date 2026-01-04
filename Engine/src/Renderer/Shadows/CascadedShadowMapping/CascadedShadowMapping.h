@@ -70,7 +70,7 @@ class CascadedShadowMap {
                                               const CameraComponent &cameraComp);
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTextureArray; }
-    std::shared_ptr<Texture> getFlattenedShadowTexture() const
+    Texture *getFlattenedShadowTexture() const
     {
         return m_flattenedShadowTexture ? m_flattenedShadowTexture->getFlattenedTexture() : nullptr;
     }
@@ -125,7 +125,7 @@ class CascadedShadowMap {
     uint32_t m_writeIndex = 0;
     uint32_t m_readIndex = 1;
 
-    std::shared_ptr<FlattenTexture> m_flattenedShadowTexture;
+    std::unique_ptr<FlattenTexture> m_flattenedShadowTexture;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     std::shared_ptr<ShadowDataBuffer> m_shadowDataBuffer;
@@ -135,12 +135,13 @@ class CascadedShadowMap {
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};
 
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_handle;
+    Shader *m_shader = nullptr;
 
     // Terrain shadow rendering
     std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
-    std::weak_ptr<Shader> m_terrainShader;
+    Shader *m_terrainShader = nullptr;
+
+    std::vector<AssetRef> m_shaderAssets;
     Frustum m_shadowFrustum;
     TerrainCullBuffers m_terrainShadowBuffers;
 

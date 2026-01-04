@@ -9,6 +9,7 @@
 
 #include "stb_image.h"
 
+#include <memory>
 #include <stdexcept>
 
 namespace Rapture {
@@ -697,7 +698,7 @@ VkDescriptorImageInfo Texture::getStorageImageDescriptorInfo() const
     return imageInfo;
 }
 
-std::shared_ptr<Texture> Texture::createDefaultWhiteTexture()
+std::unique_ptr<Texture> Texture::createDefaultWhiteTexture()
 {
 
     // Create a 1x1 white texture
@@ -712,7 +713,7 @@ std::shared_ptr<Texture> Texture::createDefaultWhiteTexture()
     spec.srgb = false; // Use linear for default texture
     spec.mipLevels = 1;
 
-    auto defaultWhiteTexture = std::make_shared<Texture>(spec);
+    auto defaultWhiteTexture = std::make_unique<Texture>(spec);
 
     // Fill with white pixel data
     auto &app = Application::getInstance();
@@ -765,7 +766,7 @@ std::shared_ptr<Texture> Texture::createDefaultWhiteTexture()
     return defaultWhiteTexture;
 }
 
-std::shared_ptr<Texture> Texture::createDefaultWhiteCubemapTexture()
+std::unique_ptr<Texture> Texture::createDefaultWhiteCubemapTexture()
 {
     // Create a 1x1 white cubemap
     TextureSpecification spec{};
@@ -779,7 +780,7 @@ std::shared_ptr<Texture> Texture::createDefaultWhiteCubemapTexture()
     spec.srgb = false;
     spec.mipLevels = 1;
 
-    auto defaultCubemap = std::make_shared<Texture>(spec);
+    auto defaultCubemap = std::make_unique<Texture>(spec);
 
     auto &app = Application::getInstance();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();

@@ -92,7 +92,8 @@ DescriptorBindingTexture::DescriptorBindingTexture(DescriptorSet *set, uint32_t 
 
 void DescriptorBindingTexture::fillAllSlotsWithPlaceholder()
 {
-    auto [defaultAsset, handle] = AssetManager::importDefaultAsset<Texture>(AssetType::Texture);
+    auto asset = AssetManager::importDefaultAsset(AssetType::TEXTURE);
+    auto defaultAsset = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
     if (!defaultAsset) {
         RP_CORE_ERROR("Failed to get default texture for filling bindless slots");
         return;

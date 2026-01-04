@@ -105,8 +105,7 @@ class GBufferPass {
     void transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame);
 
   private:
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_handle;
+    Shader *m_shader = nullptr;
     float m_width;
     float m_height;
     uint32_t m_framesInFlight;
@@ -132,8 +131,9 @@ class GBufferPass {
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     // Terrain rendering
-    std::weak_ptr<Shader> m_terrainShader;
-    AssetHandle m_terrainShaderHandle;
+    Shader *m_terrainShader = nullptr;
+
+    std::vector<AssetRef> m_shaderAssets;
     std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
 
     // MDI batching system - one set per frame in flight

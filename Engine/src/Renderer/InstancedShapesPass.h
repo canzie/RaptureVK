@@ -25,7 +25,8 @@ class InstancedShapesPass {
     CommandBuffer *recordSecondary(const std::shared_ptr<Scene> &scene, SceneRenderTarget &renderTarget, uint32_t frameInFlight,
                                    const SecondaryBufferInheritance &inheritance);
 
-    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex, uint32_t frameInFlightIndex);
+    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
+                               uint32_t frameInFlightIndex);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 
   private:
@@ -38,8 +39,8 @@ class InstancedShapesPass {
     uint32_t m_framesInFlight;
 
     std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_shaderHandle;
+    Shader *m_shader;
+    std::vector<AssetRef> m_assets;
 
     std::shared_ptr<GraphicsPipeline> m_pipelineFilled;
     std::shared_ptr<GraphicsPipeline> m_pipelineWireframe;

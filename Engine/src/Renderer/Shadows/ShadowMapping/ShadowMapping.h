@@ -72,8 +72,8 @@ class ShadowMap {
 
     Frustum m_frustum;
 
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_handle;
+    Shader *m_shader = nullptr;
+    std::vector<AssetRef> m_shaderAssets;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
     VmaAllocator m_allocator;

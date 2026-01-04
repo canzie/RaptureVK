@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "Asset.h"
@@ -14,8 +13,6 @@
 #include "Logging/Log.h"
 
 namespace Rapture {
-
-// using AssetCallback = std::function<void(std::shared_ptr<Asset> asset)>;
 
 class AssetManager {
   public:
@@ -39,43 +36,46 @@ class AssetManager {
         s_isInitialized = false;
     }
 
-    template <typename T> static std::shared_ptr<T> getAsset(AssetHandle handle)
+    static AssetRef getAsset(AssetHandle handle)
     {
-        // get the active asset manager from the "project"
-        std::shared_ptr<Asset> asset = s_activeAssetManager->getAsset(handle);
-        return asset->getUnderlyingAsset<T>();
+        Asset &asset = s_activeAssetManager->getAsset(handle);
+        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(handle);
+
+        return AssetRef(&asset, &metadata.useCount);
     }
 
-    template <typename T>
-    static std::pair<std::shared_ptr<T>, AssetHandle> importAsset(std::filesystem::path path,
-                                                                  AssetImportConfigVariant importConfig = std::monostate())
+    static AssetRef importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate())
     {
+        auto &asset = s_activeAssetManager->importAsset(path, importConfig);
 
-        auto [asset, handle] = s_activeAssetManager->importAsset(path, importConfig);
-
-        if (!asset || !asset->isValid()) {
-            return std::make_pair(nullptr, handle);
+        if (!asset || !asset.isValid()) {
+            return AssetRef();
         }
-        return std::make_pair(asset->getUnderlyingAsset<T>(), handle);
+
+        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
+        return AssetRef(&asset, &metadata.useCount);
     }
 
-    template <typename T> static std::pair<std::shared_ptr<T>, AssetHandle> importDefaultAsset(AssetType assetType)
+    static AssetRef importDefaultAsset(AssetType assetType)
     {
-        auto [asset, handle] = s_activeAssetManager->importDefaultAsset(assetType);
+        auto &asset = s_activeAssetManager->importDefaultAsset(assetType);
         if (!asset) {
-            return std::make_pair(nullptr, handle);
+            return AssetRef();
         }
-        return std::make_pair(asset->getUnderlyingAsset<T>(), handle);
+
+        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
+        return AssetRef(&asset, &metadata.useCount);
     }
 
-    // Virtual asset registration methods
-    static AssetHandle registerVirtualAsset(AssetVariant asset, const std::string &virtualName, AssetType assetType)
+    static AssetRef registerVirtualAsset(AssetVariant &&assetValue, const std::string &virtualName, AssetType assetType)
     {
         if (!s_isInitialized || !s_activeAssetManager) {
             RP_CORE_ERROR("AssetManager not initialized");
-            return AssetHandle();
+            return AssetRef();
         }
-        return s_activeAssetManager->registerVirtualAsset(std::move(asset), virtualName, assetType);
+        auto &asset = s_activeAssetManager->registerVirtualAsset(std::move(assetValue), virtualName, assetType);
+        auto metdata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
+        return asset ? AssetRef(&asset, &metdata.useCount) : AssetRef();
     }
 
     static bool unregisterVirtualAsset(AssetHandle handle)
@@ -87,17 +87,19 @@ class AssetManager {
         return s_activeAssetManager->unregisterVirtualAsset(handle);
     }
 
-    template <typename T> static std::shared_ptr<T> getVirtualAsset(const std::string &virtualName)
+    static AssetRef getVirtualAsset(const std::string &virtualName)
     {
         if (!s_isInitialized || !s_activeAssetManager) {
             RP_CORE_ERROR("AssetManager not initialized");
-            return nullptr;
+            return AssetRef();
         }
-        AssetHandle handle = s_activeAssetManager->getVirtualAssetByName(virtualName);
-        if (UUIDGenerator::IsValid(handle)) {
-            return getAsset<T>(handle);
+        Asset &asset = s_activeAssetManager->getVirtualAssetByName(virtualName);
+        if (!asset || !asset.isValid()) {
+            return AssetRef();
         }
-        return nullptr;
+
+        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
+        return AssetRef(&asset, &metadata.useCount);
     }
 
     static std::vector<AssetHandle> getVirtualAssetsByType(AssetType type)
@@ -109,7 +111,6 @@ class AssetManager {
         return s_activeAssetManager->getVirtualAssetsByType(type);
     }
 
-    // Helper method for UI to access the asset registry
     static const AssetRegistry &getAssetRegistry()
     {
         if (!s_isInitialized || !s_activeAssetManager) {
@@ -128,6 +129,23 @@ class AssetManager {
             return emptyMap;
         }
         return s_activeAssetManager->getLoadedAssets();
+    }
+
+    static const std::vector<AssetHandle> getTextures()
+    {
+        static std::vector<AssetHandle> textures;
+        if (!s_isInitialized || !s_activeAssetManager) {
+            RP_CORE_ERROR("AssetManager not initialized");
+            return {};
+        }
+
+        for (const auto &[handle, metadata] : s_activeAssetManager->getAssetRegistry()) {
+            if (metadata.assetType == AssetType::TEXTURE) {
+                textures.push_back(handle);
+            }
+        }
+
+        return textures;
     }
 
   private:

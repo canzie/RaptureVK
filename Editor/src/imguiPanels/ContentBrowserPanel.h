@@ -40,7 +40,7 @@ class ContentBrowserPanel {
     char m_searchBuffer[256] = "";
 
     // Asset filtering
-    Rapture::AssetType m_currentAssetFilter = Rapture::AssetType::None; // None means "All"
+    Rapture::AssetType m_currentAssetFilter = Rapture::AssetType::NONE; // None means "All"
 
     // Asset selection and interaction
     std::set<Rapture::AssetHandle> m_selectedAssets;

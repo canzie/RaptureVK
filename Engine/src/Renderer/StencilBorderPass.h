@@ -51,8 +51,8 @@ class StencilBorderPass {
     uint32_t m_framesInFlight;
     uint32_t m_currentImageIndex;
 
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_shaderHandle;
+    Shader *m_shader = nullptr;
+    std::vector<AssetRef> m_shaderAssets;
 
     std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
 

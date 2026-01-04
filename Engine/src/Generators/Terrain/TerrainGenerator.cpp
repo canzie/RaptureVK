@@ -136,7 +136,7 @@ void TerrainGenerator::createChunkDataBuffer()
     RP_CORE_TRACE("TerrainGenerator: Created chunk data buffer for {} chunks", m_chunkCount);
 }
 
-void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, std::shared_ptr<Texture> texture)
+void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, Texture *texture)
 {
     if (category >= TERRAIN_NC_COUNT) {
         return;
@@ -144,7 +144,7 @@ void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, std::share
     m_noiseTextures[category] = texture;
 }
 
-std::shared_ptr<Texture> TerrainGenerator::getNoiseTexture(TerrainNoiseCategory category) const
+Texture *TerrainGenerator::getNoiseTexture(TerrainNoiseCategory category) const
 {
     if (category >= TERRAIN_NC_COUNT) {
         return nullptr;
@@ -199,7 +199,7 @@ void TerrainGenerator::bakeNoiseLUT()
         spec.filter = TextureFilter::Linear;
         spec.wrap = TextureWrap::ClampToEdge;
         spec.srgb = false;
-        m_noiseLUT = std::make_shared<Texture>(spec);
+        m_noiseLUT = std::make_unique<Texture>(spec);
     }
 
     m_noiseLUT->uploadData(lutData.data(), lutData.size() * sizeof(uint16_t));
@@ -274,13 +274,14 @@ void TerrainGenerator::initComputePipeline()
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto [shader, handle] =
-        AssetManager::importAsset<Shader>(shaderPath / "glsl/terrain/terrain_compute_bounds.cs.glsl", shaderConfig);
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_compute_bounds.cs.glsl", shaderConfig);
+    Shader *shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
     if (!shader || !shader->isReady()) {
         RP_CORE_WARN("TerrainGenerator: Chunk compute shader not found");
         return;
     }
     m_chunkComputeShader = shader;
+    m_assets.push_back(std::move(asset));
 
     ComputePipelineConfiguration pipelineConfig;
     pipelineConfig.shader = m_chunkComputeShader;
@@ -375,7 +376,6 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
 
     auto queue = vc.getComputeQueue();
     queue->submitQueue(commandBuffer);
-    queue->waitIdle();
 }
 
 VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const

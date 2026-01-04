@@ -1,7 +1,7 @@
 #pragma once
 
 #include "yyjson.h"
-#include <functional>
+#include <filesystem>
 #include <glm/glm.hpp>
 #include <map>
 #include <memory>
@@ -132,7 +132,7 @@ class glTF2Loader {
      */
     void processScene(yyjson_val *sceneVal);
 
-    std::shared_ptr<MaterialInstance> processMaterial(Entity parentEntity, yyjson_val *materialVal);
+    std::unique_ptr<MaterialInstance> processMaterial(Entity parentEntity, yyjson_val *materialVal);
 
     /**
      * @brief Clean up all data after loading
@@ -164,7 +164,7 @@ class glTF2Loader {
     bool getBool(yyjson_val *val, bool defaultValue = false);
     size_t getArraySize(yyjson_val *arr);
 
-    void loadAndSetTexture(std::shared_ptr<MaterialInstance> material, ParameterID id, int texIndex);
+    void loadAndSetTexture(MaterialInstance *material, ParameterID id, int texIndex);
 
   private:
     // Reference to the scene being populated

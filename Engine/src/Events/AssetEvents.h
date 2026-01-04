@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AssetManager/Asset.h"
+#include "AssetManager/AssetCommon.h"
 #include "Events.h"
 #include "Scenes/Entities/EntityCommon.h"
 

@@ -33,10 +33,9 @@ StencilBorderPass::StencilBorderPass(float width, float height, uint32_t framesI
 
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/StencilBorder.vs.spv");
-
-    m_shader = shader;
-    m_shaderHandle = handle;
+    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/StencilBorder.vs.spv");
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_shader) m_shaderAssets.push_back(std::move(asset));
 
     createPipeline();
     setupCommandResources();
@@ -165,13 +164,8 @@ void StencilBorderPass::createPipeline()
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (m_shader.expired()) {
+    if (!m_shader) {
         RP_CORE_ERROR("Shader not loaded, cannot create pipeline.");
-        return;
-    }
-    auto shaderShared = m_shader.lock();
-    if (!shaderShared) {
-        RP_CORE_ERROR("Shader is null after lock, cannot create pipeline.");
         return;
     }
 
@@ -268,7 +262,7 @@ void StencilBorderPass::createPipeline()
 
     config.framebufferSpec = spec;
 
-    config.shader = shaderShared;
+    config.shader = m_shader;
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

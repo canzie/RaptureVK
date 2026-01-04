@@ -19,6 +19,21 @@ enum TerrainNoiseCategory : uint8_t {
     TERRAIN_NC_COUNT
 };
 
+inline const char *ToString(TerrainNoiseCategory category)
+{
+    switch (category) {
+    case CONTINENTALNESS:
+        return "Continentalness";
+    case EROSION:
+        return "Erosion";
+    case PEAKS_VALLEYS:
+        return "Peaks & Valleys";
+    default:
+        return "Unknown";
+    }
+}
+
+
 enum HeightmapType {
     HM_SINGLE,
     HM_CEPV, // CONT, EROSION, PEAKS AND VALLEYS

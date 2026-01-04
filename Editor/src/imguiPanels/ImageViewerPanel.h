@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__IMAGEVIEWERPANEL_H
+#define RAPTURE__IMAGEVIEWERPANEL_H
 
 #include "AssetManager/AssetManager.h"
 #include "Textures/Texture.h"
@@ -39,7 +40,8 @@ class ImageViewerPanel {
     bool isWindowDocked() const;
 
   private:
-    std::shared_ptr<Rapture::Texture> m_texture;
+    Rapture::Texture *m_texture = nullptr;
+    Rapture::AssetRef m_textureAsset;
     VkDescriptorSet m_textureDescriptorSet = VK_NULL_HANDLE;
     Rapture::AssetHandle m_currentTextureHandle;
     std::string m_uniqueId;
@@ -48,3 +50,5 @@ class ImageViewerPanel {
     float m_zoomFactor = 1.0f;
     DescriptorSetCleanupCallback m_cleanupCallback;
 };
+
+#endif // RAPTURE__IMAGEVIEWERPANEL_H

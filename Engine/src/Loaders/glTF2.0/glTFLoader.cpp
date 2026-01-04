@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <type_traits>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -15,9 +16,9 @@
 
 #include "Meshes/Mesh.h"
 
-#include "Materials/MaterialParameters.h"
 #include "AssetManager/AssetManager.h"
 #include "Events/AssetEvents.h"
+#include "Materials/MaterialParameters.h"
 
 namespace Rapture {
 
@@ -88,7 +89,7 @@ size_t glTF2Loader::getArraySize(yyjson_val *arr)
     return yyjson_arr_size(arr);
 }
 
-void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, ParameterID id, int textureIndex)
+void glTF2Loader::loadAndSetTexture(MaterialInstance *material, ParameterID id, int textureIndex)
 {
     if (textureIndex < 0 || static_cast<size_t>(textureIndex) >= getArraySize(m_textures)) {
         RP_CORE_ERROR("glTF2Loader: Invalid texture index {}", textureIndex);
@@ -138,7 +139,8 @@ void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, 
         texImportConfig.srgb = true;
     }
 
-    auto [tex, handle] = AssetManager::importAsset<Texture>(texturePathFS, texImportConfig);
+    auto asset = AssetManager::importAsset(texturePathFS, texImportConfig);
+    auto tex = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
 
     if (!tex) {
         RP_CORE_ERROR("Failed to import or get texture {}", texturePath);
@@ -347,7 +349,7 @@ void glTF2Loader::processScene(yyjson_val *sceneVal)
     }
 }
 
-std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEntity, yyjson_val *materialVal)
+std::unique_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEntity, yyjson_val *materialVal)
 {
     (void)parentEntity;
 
@@ -361,7 +363,7 @@ std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEnti
 
     // Create a PBR material using the MaterialLibrary
     auto baseMaterial = MaterialManager::getMaterial("PBR");
-    std::shared_ptr<MaterialInstance> material = std::make_shared<MaterialInstance>(baseMaterial, materialName);
+    std::unique_ptr<MaterialInstance> material = std::make_unique<MaterialInstance>(baseMaterial, materialName);
 
     // If no specular-glossiness extension, process standard metallic-roughness
     yyjson_val *pbrMetallicRoughness = getObjectValue(materialVal, "pbrMetallicRoughness");
@@ -393,7 +395,7 @@ std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEnti
         if (baseColorTextureInfo) {
             int texIndex = getInt(getObjectValue(baseColorTextureInfo, "index"), -1);
             if (texIndex != -1) {
-                loadAndSetTexture(material, ParameterID::ALBEDO_MAP, texIndex);
+                loadAndSetTexture(material.get(), ParameterID::ALBEDO_MAP, texIndex);
             }
         }
 
@@ -402,7 +404,7 @@ std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEnti
         if (metallicRoughnessTextureInfo) {
             int texIndex = getInt(getObjectValue(metallicRoughnessTextureInfo, "index"), -1);
             if (texIndex != -1) {
-                loadAndSetTexture(material, ParameterID::METALLIC_ROUGHNESS_MAP, texIndex);
+                loadAndSetTexture(material.get(), ParameterID::METALLIC_ROUGHNESS_MAP, texIndex);
             }
         }
     }
@@ -412,7 +414,7 @@ std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEnti
     if (normalTextureInfo) {
         int texIndex = getInt(getObjectValue(normalTextureInfo, "index"), -1);
         if (texIndex != -1) {
-            loadAndSetTexture(material, ParameterID::NORMAL_MAP, texIndex);
+            loadAndSetTexture(material.get(), ParameterID::NORMAL_MAP, texIndex);
         }
     }
 
@@ -421,7 +423,7 @@ std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEnti
     if (occlusionTextureInfo) {
         int texIndex = getInt(getObjectValue(occlusionTextureInfo, "index"), -1);
         if (texIndex != -1) {
-            loadAndSetTexture(material, ParameterID::AO_MAP, texIndex);
+            loadAndSetTexture(material.get(), ParameterID::AO_MAP, texIndex);
         }
     }
 
@@ -430,7 +432,7 @@ std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEnti
     if (emissiveTextureInfo) {
         int texIndex = getInt(getObjectValue(emissiveTextureInfo, "index"), -1);
         if (texIndex != -1) {
-            loadAndSetTexture(material, ParameterID::EMISSIVE_MAP, texIndex);
+            loadAndSetTexture(material.get(), ParameterID::EMISSIVE_MAP, texIndex);
         }
     }
 
@@ -824,9 +826,9 @@ void glTF2Loader::processPrimitive(Entity entity, yyjson_val *primitiveVal)
 
                 if (material && entity.hasComponent<MaterialComponent>()) {
                     // Add material component to the entity
-                    entity.getComponent<MaterialComponent>().material = material;
+                    entity.getComponent<MaterialComponent>().setFromUnique(std::move(material));
                 } else {
-                    entity.addComponent<MaterialComponent>(material);
+                    entity.addComponent<MaterialComponent>(std::move(material));
                 }
             }
         }

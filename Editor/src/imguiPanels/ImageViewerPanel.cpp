@@ -9,7 +9,8 @@ ImageViewerPanel::ImageViewerPanel(Rapture::AssetHandle textureHandle, const std
     : m_currentTextureHandle(textureHandle), m_uniqueId(uniqueId)
 {
     if (textureHandle != Rapture::AssetHandle()) {
-        m_texture = Rapture::AssetManager::getAsset<Rapture::Texture>(textureHandle);
+        m_textureAsset = Rapture::AssetManager::getAsset(textureHandle);
+        m_texture = m_textureAsset ? m_textureAsset.get()->getUnderlyingAsset<Rapture::Texture>() : nullptr;
         if (m_texture) {
             Rapture::RP_CORE_INFO("Loaded texture for viewing in panel: {}", uniqueId);
         } else {
@@ -28,7 +29,8 @@ void ImageViewerPanel::setTextureHandle(Rapture::AssetHandle textureHandle)
 {
     if (textureHandle != m_currentTextureHandle) {
         cleanupDescriptorSet();
-        m_texture = Rapture::AssetManager::getAsset<Rapture::Texture>(textureHandle);
+        m_textureAsset = Rapture::AssetManager::getAsset(textureHandle);
+        m_texture = m_textureAsset ? m_textureAsset.get()->getUnderlyingAsset<Rapture::Texture>() : nullptr;
         m_currentTextureHandle = textureHandle;
         if (m_texture) {
             Rapture::RP_CORE_INFO("Loaded texture for viewing");
@@ -140,7 +142,8 @@ void ImageViewerPanel::handleDragAndDrop()
 
             if (droppedHandle != m_currentTextureHandle) {
                 cleanupDescriptorSet();
-                m_texture = Rapture::AssetManager::getAsset<Rapture::Texture>(droppedHandle);
+                m_textureAsset = Rapture::AssetManager::getAsset(droppedHandle);
+                m_texture = m_texture ? m_textureAsset.get()->getUnderlyingAsset<Rapture::Texture>() : nullptr;
                 m_currentTextureHandle = droppedHandle;
 
                 if (m_texture) {

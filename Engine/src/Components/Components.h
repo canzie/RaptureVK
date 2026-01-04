@@ -4,6 +4,7 @@
     Stores the state part of the ecs, mainly the data/instance of a system
 */
 
+#include "AssetManager/Asset.h"
 #include "ComponentsCommon.h"
 
 #include <glm/glm.hpp>
@@ -28,6 +29,9 @@
 #include "Meshes/Mesh.h"
 #include "Physics/Colliders/ColliderPrimitives.h"
 #include "Physics/EntropyComponents.h"
+
+#include "AssetManager/AssetManager.h"
+#include "Textures/Texture.h"
 
 #include <memory>
 #include <string>
@@ -155,14 +159,47 @@ struct CameraControllerComponent {
 };
 
 struct MaterialComponent {
-    std::shared_ptr<MaterialInstance> material;
+    MaterialInstance *material;
 
     MaterialComponent(std::shared_ptr<BaseMaterial> baseMaterial, std::string name = "")
     {
-        material = std::make_shared<MaterialInstance>(baseMaterial, name);
-    };
+        material = new MaterialInstance(baseMaterial, name);
+        isAlloced = true;
+    }
 
-    MaterialComponent(std::shared_ptr<MaterialInstance> material) { this->material = material; };
+    MaterialComponent(AssetRef ref)
+    {
+        asset = ref;
+        material = asset ? asset.get()->getUnderlyingAsset<MaterialInstance>() : nullptr;
+        isAlloced = false;
+    }
+
+    MaterialComponent(std::shared_ptr<MaterialInstance> material)
+    {
+        this->material = material.get();
+        isAlloced = false;
+    }
+
+    MaterialComponent(std::unique_ptr<MaterialInstance> mat)
+    {
+        material = mat.release();
+        isAlloced = true;
+    }
+
+    void setFromUnique(std::unique_ptr<MaterialInstance> mat)
+    {
+        material = mat.release();
+        isAlloced = true;
+    }
+
+    ~MaterialComponent()
+    {
+        if (isAlloced && material != nullptr) delete material;
+    }
+
+  private:
+    bool isAlloced = false;
+    AssetRef asset;
 };
 
 struct MeshComponent {
@@ -239,24 +276,22 @@ struct InstanceShapeComponent {
 };
 
 struct SkyboxComponent {
-    std::shared_ptr<Texture> skyboxTexture;
-    AssetHandle skyboxTextureHandle;
+    Texture *skyboxTexture;
     float skyIntensity = 1.0f;
     bool isEnabled = true;
-    
+
     SkyboxComponent() = default;
-    SkyboxComponent(std::shared_ptr<Texture> skyboxTexture, float skyIntensity = 1.0f) : skyboxTexture(skyboxTexture), skyIntensity(skyIntensity) {}
     SkyboxComponent(std::filesystem::path skyboxTexturePath, float skyIntensity = 1.0f) : skyIntensity(skyIntensity)
     {
-        auto [skyboxTexture, handle] = AssetManager::importAsset<Texture>(skyboxTexturePath);
+        asset = AssetManager::importAsset(skyboxTexturePath);
+        skyboxTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
         if (!skyboxTexture) {
             RP_CORE_ERROR("Failed to load skybox texture: {}", skyboxTexturePath.string());
-            this->skyboxTextureHandle = AssetHandle();
-        } else {
-            this->skyboxTexture = skyboxTexture;
-            this->skyboxTextureHandle = handle;
         }
     }
+
+  private:
+    AssetRef asset;
 };
 
 struct LightComponent {

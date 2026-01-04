@@ -11,7 +11,7 @@
 namespace Rapture {
 
 struct ComputePipelineConfiguration {
-    std::shared_ptr<Shader> shader;
+    Shader *shader;
 };
 
 class ComputePipeline : public PipelineBase {

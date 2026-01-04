@@ -1,6 +1,7 @@
 #ifndef RAPTURE__SKYBOX_PASS_H
 #define RAPTURE__SKYBOX_PASS_H
 
+#include "AssetManager/Asset.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
@@ -20,7 +21,6 @@ namespace Rapture {
 
 class SkyboxPass {
   public:
-    SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat);
     SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat);
 
     ~SkyboxPass();
@@ -32,7 +32,7 @@ class SkyboxPass {
                                uint32_t frameInFlightIndex);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 
-    void setSkyboxTexture(std::shared_ptr<Texture> skyboxTexture);
+    void setSkyboxTexture(Texture *skyboxTexture);
 
     bool hasActiveSkybox() const { return m_skyboxTexture != nullptr; }
 
@@ -46,10 +46,11 @@ class SkyboxPass {
     VkDevice m_device;
     VmaAllocator m_vmaAllocator;
 
-    std::weak_ptr<Shader> m_shader;
+    Shader *m_shader = nullptr;
+    std::vector<AssetRef> m_shaderAssets;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
-    std::shared_ptr<Texture> m_skyboxTexture;
+    Texture *m_skyboxTexture;
     std::vector<std::shared_ptr<Texture>> m_depthTextures;
     std::shared_ptr<VertexBuffer> m_skyboxVertexBuffer;
     std::shared_ptr<IndexBuffer> m_skyboxIndexBuffer;

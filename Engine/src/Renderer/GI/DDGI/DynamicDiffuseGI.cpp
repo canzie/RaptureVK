@@ -19,6 +19,7 @@
 #include <cmath>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <memory>
 #include <random>
 
 namespace Rapture {
@@ -51,7 +52,7 @@ struct DDGIRelocatePushConstants {
     uint32_t rayDataIndex;
 };
 
-std::shared_ptr<Texture> DynamicDiffuseGI::s_defaultSkyboxTexture = nullptr;
+std::unique_ptr<Texture> DynamicDiffuseGI::s_defaultSkyboxTexture = nullptr;
 
 DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     : m_DDGI_ProbeTraceShader(nullptr), m_DDGI_ProbeIrradianceBlendingShader(nullptr), m_DDGI_ProbeDistanceBlendingShader(nullptr),
@@ -68,7 +69,7 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     if (!s_defaultSkyboxTexture) {
         s_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
     }
-    m_skyboxTexture = s_defaultSkyboxTexture;
+    m_skyboxTexture = s_defaultSkyboxTexture.get();
 
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
@@ -110,22 +111,31 @@ void DynamicDiffuseGI::createPipelines()
     ShaderImportConfig shaderBaseProbeConfig;
     shaderBaseProbeConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
 
-    auto [probeTraceShader, probeTraceShaderHandle] =
-        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", shaderBaseProbeConfig);
-    auto [probeIrradianceBlendShader, probeIrradianceBlendShaderHandle] =
-        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderIrradianceBlendConfig);
-    auto [probeDistanceBlendShader, probeDistanceBlendShaderHandle] =
-        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderDistanceBlendConfig);
-    auto [probeRelocationShader, probeRelocationShaderHandle] =
-        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeRelocation.cs.glsl", shaderBaseProbeConfig);
-    auto [probeClassificationShader, probeClassificationShaderHandle] =
-        AssetManager::importAsset<Shader>(shaderDir / "glsl/ddgi/ProbeClassification.cs.glsl", shaderBaseProbeConfig);
+    auto probeTraceAsset = AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", shaderBaseProbeConfig);
+    m_DDGI_ProbeTraceShader = probeTraceAsset ? probeTraceAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_DDGI_ProbeTraceShader) m_shaderAssets.push_back(std::move(probeTraceAsset));
 
-    m_DDGI_ProbeTraceShader = probeTraceShader;
-    m_DDGI_ProbeIrradianceBlendingShader = probeIrradianceBlendShader;
-    m_DDGI_ProbeDistanceBlendingShader = probeDistanceBlendShader;
-    m_DDGI_ProbeRelocationShader = probeRelocationShader;
-    m_DDGI_ProbeClassificationShader = probeClassificationShader;
+    auto probeIrradianceBlendAsset =
+        AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderIrradianceBlendConfig);
+    m_DDGI_ProbeIrradianceBlendingShader =
+        probeIrradianceBlendAsset ? probeIrradianceBlendAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_DDGI_ProbeIrradianceBlendingShader) m_shaderAssets.push_back(std::move(probeIrradianceBlendAsset));
+
+    auto probeDistanceBlendAsset =
+        AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderDistanceBlendConfig);
+    m_DDGI_ProbeDistanceBlendingShader =
+        probeDistanceBlendAsset ? probeDistanceBlendAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_DDGI_ProbeDistanceBlendingShader) m_shaderAssets.push_back(std::move(probeDistanceBlendAsset));
+
+    auto probeRelocationAsset = AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeRelocation.cs.glsl", shaderBaseProbeConfig);
+    m_DDGI_ProbeRelocationShader = probeRelocationAsset ? probeRelocationAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_DDGI_ProbeRelocationShader) m_shaderAssets.push_back(std::move(probeRelocationAsset));
+
+    auto probeClassificationAsset =
+        AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeClassification.cs.glsl", shaderBaseProbeConfig);
+    m_DDGI_ProbeClassificationShader =
+        probeClassificationAsset ? probeClassificationAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_DDGI_ProbeClassificationShader) m_shaderAssets.push_back(std::move(probeClassificationAsset));
 
     ComputePipelineConfiguration probeTraceConfig;
     probeTraceConfig.shader = m_DDGI_ProbeTraceShader;
@@ -492,9 +502,9 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
         skyboxComp = &view.get<SkyboxComponent>(*view.begin());
     }
 
-    std::shared_ptr<Texture> newTexture =
-        (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling()) ? skyboxComp->skyboxTexture
-                                                                                                     : s_defaultSkyboxTexture;
+    Texture *newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling())
+                              ? skyboxComp->skyboxTexture
+                              : s_defaultSkyboxTexture.get();
 
     m_skyIntensity = skyboxComp ? skyboxComp->skyIntensity : 1.0f;
 

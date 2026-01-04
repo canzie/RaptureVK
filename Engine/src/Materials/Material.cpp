@@ -1,7 +1,7 @@
 #include "Material.h"
 
-#include "Logging/Log.h"
 #include "AssetManager/AssetManager.h"
+#include "Logging/Log.h"
 #include "Textures/Texture.h"
 
 namespace Rapture {
@@ -24,7 +24,8 @@ void MaterialManager::init()
 
     s_materials.clear();
 
-    auto [defaultTexture, handle] = AssetManager::importDefaultAsset<Texture>(AssetType::Texture);
+    auto asset = AssetManager::importDefaultAsset(AssetType::TEXTURE);
+    auto defaultTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
     if (defaultTexture && defaultTexture->isReadyForSampling()) {
         s_defaultTextureIndex = defaultTexture->getBindlessIndex();
     } else {
@@ -48,19 +49,20 @@ void MaterialManager::createDefaultMaterials()
 
     {
         MaterialData defaults = MaterialData::createDefault(defTex);
-        auto pbr = std::make_shared<BaseMaterial>("PBR", std::initializer_list<ParameterID>{
-            ParameterID::ALBEDO, ParameterID::ROUGHNESS, ParameterID::METALLIC, ParameterID::AO, ParameterID::EMISSIVE,
-            ParameterID::ALBEDO_MAP, ParameterID::NORMAL_MAP, ParameterID::METALLIC_ROUGHNESS_MAP, ParameterID::AO_MAP, ParameterID::EMISSIVE_MAP
-        }, defaults);
+        auto pbr = std::make_shared<BaseMaterial>(
+            "PBR",
+            std::initializer_list<ParameterID>{ParameterID::ALBEDO, ParameterID::ROUGHNESS, ParameterID::METALLIC, ParameterID::AO,
+                                               ParameterID::EMISSIVE, ParameterID::ALBEDO_MAP, ParameterID::NORMAL_MAP,
+                                               ParameterID::METALLIC_ROUGHNESS_MAP, ParameterID::AO_MAP, ParameterID::EMISSIVE_MAP},
+            defaults);
         s_materials["PBR"] = pbr;
     }
 
     {
         MaterialData defaults = MaterialData::createDefault(defTex);
         defaults.roughness = 0.9f;
-        auto simple = std::make_shared<BaseMaterial>("Simple", std::initializer_list<ParameterID>{
-            ParameterID::ALBEDO, ParameterID::ALBEDO_MAP
-        }, defaults);
+        auto simple = std::make_shared<BaseMaterial>(
+            "Simple", std::initializer_list<ParameterID>{ParameterID::ALBEDO, ParameterID::ALBEDO_MAP}, defaults);
         s_materials["Simple"] = simple;
     }
 
@@ -68,11 +70,13 @@ void MaterialManager::createDefaultMaterials()
         MaterialData defaults = MaterialData::createDefault(defTex);
         defaults.flags = MAT_FLAG_IS_TERRAIN;
         defaults.roughness = 0.9f;
-        auto terrain = std::make_shared<BaseMaterial>("Terrain", std::initializer_list<ParameterID>{
-            ParameterID::ALBEDO, ParameterID::ROUGHNESS, ParameterID::METALLIC, ParameterID::AO,
-            ParameterID::ALBEDO_MAP, ParameterID::NORMAL_MAP, ParameterID::METALLIC_ROUGHNESS_MAP, ParameterID::AO_MAP,
-            ParameterID::TILING_SCALE, ParameterID::HEIGHT_BLEND, ParameterID::SLOPE_THRESHOLD, ParameterID::SPLAT_MAP
-        }, defaults);
+        auto terrain = std::make_shared<BaseMaterial>(
+            "Terrain",
+            std::initializer_list<ParameterID>{ParameterID::ALBEDO, ParameterID::ROUGHNESS, ParameterID::METALLIC, ParameterID::AO,
+                                               ParameterID::ALBEDO_MAP, ParameterID::NORMAL_MAP,
+                                               ParameterID::METALLIC_ROUGHNESS_MAP, ParameterID::AO_MAP, ParameterID::TILING_SCALE,
+                                               ParameterID::HEIGHT_BLEND, ParameterID::SLOPE_THRESHOLD, ParameterID::SPLAT_MAP},
+            defaults);
         s_materials["Terrain"] = terrain;
     }
 
@@ -95,8 +99,8 @@ std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &na
 }
 
 std::shared_ptr<BaseMaterial> MaterialManager::createMaterial(const std::string &name,
-                                                               std::initializer_list<ParameterID> editableParams,
-                                                               const MaterialData &defaults)
+                                                              std::initializer_list<ParameterID> editableParams,
+                                                              const MaterialData &defaults)
 {
     if (!s_initialized) {
         RP_CORE_ERROR("MaterialManager not initialized");

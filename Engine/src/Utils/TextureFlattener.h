@@ -3,7 +3,9 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
+#include "AssetManager/Asset.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Pipelines/ComputePipeline.h"
@@ -23,7 +25,7 @@ enum class FlattenerDataType {
  */
 class FlattenTexture {
   public:
-    FlattenTexture(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> flattenedTexture, const std::string &name,
+    FlattenTexture(std::shared_ptr<Texture> inputTexture, std::unique_ptr<Texture> &&flattenedTexture, const std::string &name,
                    FlattenerDataType dataType);
     ~FlattenTexture() = default;
 
@@ -36,7 +38,7 @@ class FlattenTexture {
     /**
      * @brief Get the flattened texture
      */
-    std::shared_ptr<Texture> getFlattenedTexture() const { return m_flattenedTexture; }
+    Texture *getFlattenedTexture() const { return m_flattenedTexture; }
 
     /**
      * @brief Get the input texture
@@ -50,7 +52,8 @@ class FlattenTexture {
 
   private:
     std::shared_ptr<Texture> m_inputTexture;
-    std::shared_ptr<Texture> m_flattenedTexture;
+    Texture *m_flattenedTexture;
+    AssetRef m_assetRef;
     uint32_t m_inputTextureBindlessIndex = 0;
     std::shared_ptr<DescriptorSet> m_descriptorSet;
     FlattenerDataType m_dataType;
@@ -68,9 +71,9 @@ class TextureFlattener {
      * @param inputTexture The input texture array to flatten
      * @param name Name for the flattened texture (used for asset registration)
      * @param dataType The data type of the texture's components
-     * @return std::shared_ptr<FlattenTexture> The FlattenTexture instance
+     * @return std::unique_ptr<FlattenTexture> The FlattenTexture instance
      */
-    static std::shared_ptr<FlattenTexture> createFlattenTexture(std::shared_ptr<Texture> inputTexture, const std::string &name,
+    static std::unique_ptr<FlattenTexture> createFlattenTexture(std::shared_ptr<Texture> inputTexture, const std::string &name,
                                                                 FlattenerDataType dataType = FlattenerDataType::FLOAT);
 
   private:
@@ -84,13 +87,14 @@ class TextureFlattener {
 
     static void initializeSharedResources();
     static void getOrCreateShaderAndPipeline(FlattenerDataType dataType);
-    static std::shared_ptr<Texture> createFlattenedTextureSpec(std::shared_ptr<Texture> inputTexture);
+    static std::unique_ptr<Texture> createFlattenedTextureSpec(std::shared_ptr<Texture> inputTexture);
 
     // Shared resources
-    static std::map<FlattenerDataType, std::shared_ptr<Shader>> s_flattenShaders;
-    static std::shared_ptr<Shader> s_flattenDepthShader;
+    static std::map<FlattenerDataType, Shader *> s_flattenShaders;
+    static Shader *s_flattenDepthShader;
     static std::map<FlattenerDataType, std::shared_ptr<ComputePipeline>> s_flattenPipelines;
     static std::shared_ptr<ComputePipeline> s_flattenDepthPipeline;
+    static std::vector<AssetRef> s_shaderAssets;
     static bool s_initialized;
 
     friend class FlattenTexture;

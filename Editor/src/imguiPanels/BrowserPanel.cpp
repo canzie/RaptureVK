@@ -338,21 +338,6 @@ void BrowserPanel::renderAddComponentMenu(Rapture::Entity entity)
         }
     };
 
-    // Material Component
-    if (!entity.hasComponent<Rapture::MaterialComponent>()) {
-        if (ImGui::MenuItem("Material Component")) {
-            tryAddComponent(
-                [&entity]() {
-                    auto material =
-                        Rapture::AssetManager::importDefaultAsset<Rapture::MaterialInstance>(Rapture::AssetType::Material).first;
-                    if (material) {
-                        entity.addComponent<Rapture::MaterialComponent>(material);
-                    }
-                },
-                "Material Component");
-        }
-    }
-
     // Mesh Component
     if (!entity.hasComponent<Rapture::MeshComponent>()) {
         if (ImGui::MenuItem("Mesh Component")) {

@@ -5,6 +5,7 @@
 #include "AssetManager/Asset.h"
 #include "AssetManager/AssetManager.h"
 
+#include "Generators/Terrain/TerrainTypes.h"
 #include "Scenes/Entities/Entity.h"
 #include "Textures/Texture.h"
 
@@ -17,6 +18,8 @@
 
 #include "imguiPanels/modules/PlotEditor.h"
 #include <functional>
+#include <imgui.h>
+#include <memory>
 
 // Implementation of HelpMarker function
 void PropertiesPanel::HelpMarker(const char *desc)
@@ -725,19 +728,6 @@ void PropertiesPanel::renderAddComponentMenu(Rapture::Entity entity)
     };
 
     // Material Component
-    if (!entity.hasComponent<Rapture::MaterialComponent>()) {
-        if (ImGui::MenuItem("Material Component")) {
-            tryAddComponent(
-                [&entity]() {
-                    auto material =
-                        Rapture::AssetManager::importDefaultAsset<Rapture::MaterialInstance>(Rapture::AssetType::Material).first;
-                    if (material) {
-                        entity.addComponent<Rapture::MaterialComponent>(material);
-                    }
-                },
-                "Material Component");
-        }
-    }
 
     // Mesh Component
     if (!entity.hasComponent<Rapture::MeshComponent>()) {
@@ -851,26 +841,45 @@ void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainC
 
         ImGui::Separator();
 
-        auto &multiNoise = terrainComp.generator->getMultiNoiseConfig();
-        bool splineChanged = false;
+        Rapture::Texture *selectedTexture = terrainComp.generator->getSingleHeightmap();
+        if (ImGui::BeginCombo("##InstanceSelect", "TEXTURE NAME")) {
+            // for (auto handle : Rapture::AssetManager::getTextures()) {
+            // auto asset = Rapture::AssetManager::getAsset(handle);
+            // auto texture = asset ? asset.get()->getUnderlyingAsset<Rapture::Texture>() : nullptr;
 
-        const char *categoryNames[] = {"Continentalness", "Erosion", "Peaks & Valleys"};
+            // bool isSelected = selectedTexture == texture;
+            // if (ImGui::Selectable(asset.get()->getName(), isSelected)) {
+            // }
+            //}
 
-        if (ImGui::TreeNode("Multi-Noise Splines")) {
-            for (uint8_t cat = 0; cat < Rapture::TERRAIN_NC_COUNT; ++cat) {
-                auto &spline = multiNoise.splines[cat];
-                Modules::SplinePoints splinePoints =
-                    Modules::createSplinePoints(&spline.points, Modules::InterpolationType::LINEAR);
-                if (Modules::plotEditor(categoryNames[cat], splinePoints, ImVec2(0, 150))) {
-                    splineChanged = true;
-                }
-                ImGui::Spacing();
-            }
-            ImGui::TreePop();
+            ImGui::EndCombo();
         }
 
-        if (splineChanged || ImGui::Button("Rebake LUT")) {
-            terrainComp.generator->bakeNoiseLUT();
+        ImGui::Separator();
+
+        if (config.hmType == Rapture::HeightmapType::HM_CEPV) {
+
+            auto &multiNoise = terrainComp.generator->getMultiNoiseConfig();
+            bool splineChanged = false;
+
+            const char *categoryNames[] = {"Continentalness", "Erosion", "Peaks & Valleys"};
+
+            if (ImGui::TreeNode("Multi-Noise Splines")) {
+                for (uint8_t cat = 0; cat < Rapture::TERRAIN_NC_COUNT; ++cat) {
+                    auto &spline = multiNoise.splines[cat];
+                    Modules::SplinePoints splinePoints =
+                        Modules::createSplinePoints(&spline.points, Modules::InterpolationType::LINEAR);
+                    if (Modules::plotEditor(categoryNames[cat], splinePoints, ImVec2(0, 150))) {
+                        splineChanged = true;
+                    }
+                    ImGui::Spacing();
+                }
+                ImGui::TreePop();
+            }
+
+            if (splineChanged || ImGui::Button("Rebake LUT")) {
+                terrainComp.generator->bakeNoiseLUT();
+            }
         }
 
         ImGui::Separator();

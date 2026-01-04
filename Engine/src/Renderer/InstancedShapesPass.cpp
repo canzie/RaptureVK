@@ -1,6 +1,7 @@
 #include "Renderer/InstancedShapesPass.h"
 
 #include <array>
+#include <memory>
 
 #include "AssetManager/AssetManager.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
@@ -35,10 +36,9 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
     auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "glsl/InstancedShapes.vs.glsl");
-
-    m_shader = shader;
-    m_shaderHandle = handle;
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/InstancedShapes.vs.glsl");
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    m_assets.push_back(std::move(asset));
 
     createPipeline();
 }
@@ -152,16 +152,6 @@ void InstancedShapesPass::createPipeline()
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (m_shader.expired()) {
-        RP_CORE_ERROR("Shader not loaded, cannot create pipeline.");
-        return;
-    }
-    auto shaderShared = m_shader.lock();
-    if (!shaderShared) {
-        RP_CORE_ERROR("Shader is null after lock, cannot create pipeline.");
-        return;
-    }
-
     std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
                                                  VK_DYNAMIC_STATE_VERTEX_INPUT_EXT};
 
@@ -240,7 +230,7 @@ void InstancedShapesPass::createPipeline()
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = spec;
-    config.shader = shaderShared;
+    config.shader = m_shader;
 
     // Filled pipeline
     m_pipelineFilled = std::make_shared<GraphicsPipeline>(config);

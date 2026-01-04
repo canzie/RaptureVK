@@ -32,7 +32,7 @@ struct GraphicsPipelineConfiguration {
     // std::vector<VkDynamicState>                         dynamicStates;
 
     FramebufferSpecification framebufferSpec;
-    std::shared_ptr<Shader> shader;
+    Shader *shader;
 };
 
 class GraphicsPipeline : public PipelineBase {

@@ -64,8 +64,8 @@ class Texture : public std::enable_shared_from_this<Texture> {
     bool isReadyForSampling() const { return m_readyForSampling; }
 
     // Static method to create a default white texture
-    static std::shared_ptr<Texture> createDefaultWhiteTexture();
-    static std::shared_ptr<Texture> createDefaultWhiteCubemapTexture();
+    static std::unique_ptr<Texture> createDefaultWhiteTexture();
+    static std::unique_ptr<Texture> createDefaultWhiteCubemapTexture();
 
   private:
     // creates a vulkan image using the specification

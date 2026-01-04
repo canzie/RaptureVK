@@ -12,27 +12,6 @@ struct SkyboxPushConstants {
     uint32_t skyboxTextureIndex;
 };
 
-SkyboxPass::SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::shared_ptr<Texture>> depthTextures,
-                       VkFormat colorFormat)
-    : m_skyboxTexture(skyboxTexture), m_depthTextures(depthTextures), m_width(0.0f), m_height(0.0f), m_colorFormat(colorFormat)
-{
-
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
-    m_device = vc.getLogicalDevice();
-    m_vmaAllocator = vc.getVmaAllocator();
-
-    auto &project = app.getProject();
-    auto shaderPath = project.getProjectShaderDirectory();
-
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/SkyboxPass.vs.spv");
-    m_shader = shader;
-
-    createSkyboxGeometry();
-    createPipeline();
-}
-
 SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat)
     : m_skyboxTexture(nullptr), m_depthTextures(depthTextures), m_width(0.0f), m_height(0.0f), m_colorFormat(colorFormat)
 {
@@ -46,13 +25,13 @@ SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFo
     auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/SkyboxPass.vs.spv");
-    m_shader = shader;
+    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/SkyboxPass.vs.spv");
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_shader) m_shaderAssets.push_back(std::move(asset));
 
     createSkyboxGeometry();
     createPipeline();
 }
-
 
 SkyboxPass::~SkyboxPass()
 {
@@ -120,8 +99,8 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
     pushConstants.skyboxTextureIndex = m_skyboxTexture->getBindlessIndex();
 
     VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-        stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+    if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
+        stageFlags = m_shader->getPushConstantLayouts()[0].stageFlags;
     }
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
@@ -144,7 +123,7 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
     return commandBuffer;
 }
 
-void SkyboxPass::setSkyboxTexture(std::shared_ptr<Texture> skyboxTexture)
+void SkyboxPass::setSkyboxTexture(Texture *skyboxTexture)
 {
     if (!skyboxTexture) {
         RP_CORE_ERROR("Skybox texture is not set!");
@@ -156,8 +135,7 @@ void SkyboxPass::setSkyboxTexture(std::shared_ptr<Texture> skyboxTexture)
 
 void SkyboxPass::createPipeline()
 {
-    auto shader = m_shader.lock();
-    if (!shader) {
+    if (!m_shader) {
         RP_CORE_ERROR("Shader is not available for pipeline creation.");
         return;
     }
@@ -244,7 +222,7 @@ void SkyboxPass::createPipeline()
     fbSpec.depthAttachment = m_depthTextures[0]->getFormat();
     fbSpec.colorAttachments.push_back(m_colorFormat);
     config.framebufferSpec = fbSpec;
-    config.shader = shader;
+    config.shader = m_shader;
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

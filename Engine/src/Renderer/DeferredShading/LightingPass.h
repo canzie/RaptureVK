@@ -38,8 +38,8 @@ class LightingPass {
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage);
 
   private:
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_handle;
+    Shader *m_shader = nullptr;
+    std::vector<AssetRef> m_shaderAssets;
 
     VkFormat m_colorFormat;
     VmaAllocator m_vmaAllocator;
