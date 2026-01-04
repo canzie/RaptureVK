@@ -16,6 +16,12 @@ void JobContext::waitFor(Counter &c, int32_t targetValue)
     currentFiber->waitingOn = nullptr;
 }
 
+void JobContext::waitFor(Counter &c, int32_t targetValue, const TimelineSemaphore *semaphore, uint64_t semaphoreTargetValue)
+{
+    system->submitGpuWait(semaphore, semaphoreTargetValue, c);
+    waitFor(c, targetValue);
+}
+
 void JobContext::run(const JobDeclaration &decl)
 {
     system->run(decl);

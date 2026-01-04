@@ -44,4 +44,16 @@ class PropertiesPanel {
     VkDescriptorSet m_currentCSMDescriptorSet;
 
     size_t m_entitySelectedListenerId;
+
+    struct TerrainTextureCache {
+        Rapture::AssetHandle cachedHandles[Rapture::TERRAIN_NC_COUNT] = {};
+        static constexpr int MAX_VISIBLE = 25;
+
+        void clear() {
+            for (uint8_t i = 0; i < Rapture::TERRAIN_NC_COUNT; ++i) {
+                cachedHandles[i] = 0;
+            }
+        }
+    };
+    TerrainTextureCache m_terrainTextureCache;
 };

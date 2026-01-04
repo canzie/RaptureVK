@@ -15,10 +15,12 @@ enum class AssetType {
     CUBEMAP,
     SHADER,
     MATERIAL,
+    MESH,
     MODEL,
     ANIMATION,
     AUDIO,
-    VIDEO
+    VIDEO,
+    SCENE // glTF, fbx, etc
 };
 
 enum class AssetStorageType {
@@ -45,6 +47,8 @@ inline std::string AssetTypeToString(AssetType type)
         return "Shader";
     case AssetType::MATERIAL:
         return "Material";
+    case AssetType::MESH:
+        return "Mesh";
     case AssetType::MODEL:
         return "Model";
     case AssetType::ANIMATION:
@@ -53,6 +57,8 @@ inline std::string AssetTypeToString(AssetType type)
         return "Audio";
     case AssetType::VIDEO:
         return "Video";
+    case AssetType::SCENE:
+        return "Scene";
     default:
         return "Unknown";
     }

@@ -43,7 +43,7 @@ SkyboxPass::~SkyboxPass()
 CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
                                            const SecondaryBufferInheritance &inheritance)
 {
-    if (!m_skyboxTexture || !m_skyboxTexture->isReadyForSampling()) {
+    if (!m_skyboxTexture || !m_skyboxTexture->isReady()) {
         return nullptr;
     }
 

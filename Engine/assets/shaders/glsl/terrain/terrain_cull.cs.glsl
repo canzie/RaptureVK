@@ -157,6 +157,7 @@ void main() {
         lod = calculateLOD(distance);
     }
 
+
     // Atomically get slot in output buffer for this LOD
     uint slotInLOD = atomicAdd(u_drawCounts[pc.drawCountBufferIndex].counts[lod], 1);
 

@@ -5,11 +5,14 @@
 #include "JobCommon.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <span>
+#include <vector>
 
 namespace Rapture {
 
 struct Counter;
+class TimelineSemaphore;
 
 class JobSystem;
 struct JobContext;
@@ -60,16 +63,31 @@ struct JobContext {
     Job *currentJob;
     Fiber *currentFiber;
 
-    // Yield this fiber until counter reaches value
     void waitFor(Counter &c, int32_t targetValue);
+    void waitFor(Counter &c, int32_t targetValue, const TimelineSemaphore *semaphore, uint64_t semaphoreTargetValue);
 
-    // Spawn child jobs
     void run(const JobDeclaration &decl);
     void run(const JobDeclaration &decl, Counter &waitCounter, int32_t waitTarget);
 
-    // Batch spawn with automatic counter setup
     void runBatch(std::span<JobDeclaration> jobs, Counter &counter);
 };
+
+// Io callback - receives loaded data and success flag
+// Runs on a worker fiber after IO completes
+using IoCallback = InplaceFunction<void(std::vector<uint8_t> &&, bool), 192>;
+
+struct IoRequest {
+    std::filesystem::path path;
+    IoCallback callback;
+    JobPriority priority = JobPriority::NORMAL;
+};
+
+struct GpuWaitRequest {
+    const TimelineSemaphore *semaphore;
+    uint64_t waitValue;
+    Counter *counter;  // Decrement when semaphore signals
+};
+
 } // namespace Rapture
 
 #endif // RAPTURE__JOB_H

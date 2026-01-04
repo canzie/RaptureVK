@@ -131,14 +131,14 @@ class AssetManager {
         return s_activeAssetManager->getLoadedAssets();
     }
 
-    static const std::vector<AssetHandle> getTextures()
+    static std::vector<AssetHandle> getTextures()
     {
-        static std::vector<AssetHandle> textures;
         if (!s_isInitialized || !s_activeAssetManager) {
             RP_CORE_ERROR("AssetManager not initialized");
             return {};
         }
 
+        std::vector<AssetHandle> textures;
         for (const auto &[handle, metadata] : s_activeAssetManager->getAssetRegistry()) {
             if (metadata.assetType == AssetType::TEXTURE) {
                 textures.push_back(handle);
@@ -146,6 +146,15 @@ class AssetManager {
         }
 
         return textures;
+    }
+
+    static AssetMetadata getAssetMetadata(AssetHandle handle)
+    {
+        if (!s_isInitialized || !s_activeAssetManager) {
+            RP_CORE_ERROR("AssetManager not initialized");
+            return AssetMetadata();
+        }
+        return s_activeAssetManager->getAssetMetadata(handle);
     }
 
   private:

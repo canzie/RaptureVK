@@ -33,5 +33,5 @@ float sampleHeightRaw_Single(vec2 worldXZ, float terrainWorldSize, sampler2D hmS
 }
 
 float rawToWorldHeight(float raw, float heightScale) {
-    return (raw - 0.5) * heightScale;
+    return (raw * 2.0 - 1.0) * heightScale;
 }

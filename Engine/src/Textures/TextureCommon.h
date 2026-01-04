@@ -58,6 +58,14 @@ enum class TextureViewType : uint8_t {
     COLOR
 };
 
+enum class TextureStatus {
+    NOT_LOADED,
+    LOADING,
+    UPLOADING,
+    READY,
+    FAILED
+};
+
 struct TextureSpecification {
     TextureType type = TextureType::TEXTURE2D;
     TextureFormat format = TextureFormat::RGB8;

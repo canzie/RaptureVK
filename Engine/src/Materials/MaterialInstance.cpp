@@ -47,7 +47,7 @@ void MaterialInstance::setParameter(ParameterID id, Texture *texture)
     const ParamInfo *info = getParamInfo(id);
     if (!info || info->type != ParamType::TEXTURE) return;
 
-    if (texture && texture->isReadyForSampling()) {
+    if (texture && texture->isReady()) {
         uint32_t bindlessIdx = texture->getBindlessIndex();
         char *dataPtr = reinterpret_cast<char *>(&m_data);
         std::memcpy(dataPtr + info->offset, &bindlessIdx, sizeof(uint32_t));
@@ -73,7 +73,7 @@ void MaterialInstance::updatePendingTextures()
 
     m_pendingTextures.erase(std::remove_if(m_pendingTextures.begin(), m_pendingTextures.end(),
                                            [this](const PendingTexture &pending) {
-                                               if (!pending.texture || !pending.texture->isReadyForSampling()) {
+                                               if (!pending.texture || !pending.texture->isReady()) {
                                                    return false;
                                                }
 

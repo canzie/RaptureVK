@@ -216,7 +216,7 @@ void TerrainGenerator::generateDefaultNoiseTextures()
     PerlinNoisePushConstants params;
 
     params.octaves = 4;
-    params.scale = 1.5f;
+    params.scale = 20.0f;
     params.persistence = 0.5f;
     params.lacunarity = 2.0f;
     params.seed = 100;

@@ -130,6 +130,20 @@ void main() {
     float snowBlend = smoothstep(heightBlend - 0.1, heightBlend + 0.1, height) * (1.0 - slope * 0.5);
     TerrainSample finalSample = blendSamples(groundLayer, snow, snowBlend);
 
+    //vec3 finalCol = vec3(1.0);
+    //if (height < 0.4) {
+    //    finalCol = vec3(0.0, 0.0, 1.0);
+    //} else if (height < 0.5) {
+    //    finalCol = vec3(0.0, 1.0, 0.0);
+    //} else if (height <= 0.6) {
+    //    finalCol = vec3(0.1, 0.1, 0.1);
+    //} else {
+    //    finalCol = vec3(0.9, 0.9, 0.9);
+    //}
+
+
+
+
     gAlbedoSpec = vec4(finalSample.albedo, 1.0);
     gMaterial = vec4(finalSample.metallic, finalSample.roughness, finalSample.ao, 1.0);
 }

@@ -10,14 +10,16 @@
 #include <string>
 #include <variant>
 
+#include "Loaders/glTF2.0/glTFCommon.h"
 #include "Materials/MaterialInstance.h"
+#include "Meshes/Mesh.h"
 #include "Shaders/Shader.h"
 #include "Textures/Texture.h"
 
 namespace Rapture {
 
-using AssetVariant =
-    std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>, std::unique_ptr<MaterialInstance>>;
+using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
+                                  std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>, std::unique_ptr<SceneFileData>>;
 
 struct AssetMetadata {
 

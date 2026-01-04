@@ -136,7 +136,7 @@ Asset &AssetManagerEditor::importDefaultAsset(AssetType assetType)
             RP_CORE_ERROR("Failed to create default white texture");
             return Asset::null;
         }
-        defaultTexture->setReadyForSampling(true);
+        defaultTexture->setStatus(TextureStatus::READY);
 
         AssetHandle handle = UUIDGenerator::Generate();
 
@@ -206,8 +206,8 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
         return AssetType::TEXTURE;
     } else if (extension == ".cubemap") {
         return AssetType::CUBEMAP;
-    } else if (extension == ".gltf") {
-        return AssetType::NONE;
+    } else if (extension == ".gltf" || extension == ".glb" || extension == ".fbx") {
+        return AssetType::SCENE;
     } else if (extension == ".rmat") {
         return AssetType::MATERIAL;
     } else if (extension == ".spv" || extension == ".glsl") {

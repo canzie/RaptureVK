@@ -39,10 +39,12 @@ class JobSystem {
     // Frame counter pool
     // FrameCounterPool& frameCounters() { return m_frameCounters; }
 
-    // IO requests
-    // void requestFileRead(const std::filesystem::path& path,
-    //                     std::function<void(std::span<uint8_t>, JobContext&)> callback,
-    //                     JobPriority priority = JobPriority::Normal);
+    // Io request - reads file on dedicated thread, then spawns job with data
+    void requestIo(std::filesystem::path path, IoCallback callback,
+                   JobPriority priority = JobPriority::NORMAL);
+
+    // GPU poll - submit a semaphore wait request, counter decrements when signaled
+    void submitGpuWait(const TimelineSemaphore *semaphore, uint64_t waitValue, Counter &counter);
 
     // Frame lifecycle (call from main thread)
     void beginFrame();
@@ -63,10 +65,13 @@ class JobSystem {
   private:
     std::vector<std::thread> m_workers;
     std::thread m_ioThread;
+    std::thread m_gpuPollThread;
 
     PriorityQueueSet m_queues;
     WaitList m_waitList;
     FiberPool m_fiberPool;
+    IoQueue m_ioQueue;
+    GpuPollQueue m_gpuPollQueue;
 
     std::atomic<bool> m_shutdown{false};
 };

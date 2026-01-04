@@ -466,7 +466,7 @@ void PropertiesPanel::renderCascadedShadowComponent()
                     }
 
                     // Display flattened shadow map texture if available
-                    if (flattenedShadowTexture && flattenedShadowTexture->isReadyForSampling()) {
+                    if (flattenedShadowTexture && flattenedShadowTexture->isReady()) {
                         ImGui::Separator();
                         ImGui::Text("Flattened Shadow Map Visualization:");
 
@@ -829,6 +829,7 @@ void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainC
         int currentMode = static_cast<int>(config.hmType);
         if (ImGui::Combo("Heightmap Mode", &currentMode, modeNames, IM_ARRAYSIZE(modeNames))) {
             config.hmType = static_cast<Rapture::HeightmapType>(currentMode);
+            m_terrainTextureCache.clear();
         }
 
         ImGui::Separator();
@@ -841,28 +842,79 @@ void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainC
 
         ImGui::Separator();
 
-        Rapture::Texture *selectedTexture = terrainComp.generator->getSingleHeightmap();
-        if (ImGui::BeginCombo("##InstanceSelect", "TEXTURE NAME")) {
-            // for (auto handle : Rapture::AssetManager::getTextures()) {
-            // auto asset = Rapture::AssetManager::getAsset(handle);
-            // auto texture = asset ? asset.get()->getUnderlyingAsset<Rapture::Texture>() : nullptr;
+        auto renderTextureCombo = [&](const char *label, Rapture::TerrainNoiseCategory category) {
+            Rapture::Texture *selectedTexture = terrainComp.generator->getNoiseTexture(category);
+            std::string previewName = "None";
 
-            // bool isSelected = selectedTexture == texture;
-            // if (ImGui::Selectable(asset.get()->getName(), isSelected)) {
-            // }
-            //}
+            if (selectedTexture && m_terrainTextureCache.cachedHandles[category] == 0) {
+                auto allHandles = Rapture::AssetManager::getTextures();
+                for (auto handle : allHandles) {
+                    auto asset = Rapture::AssetManager::getAsset(handle);
+                    if (asset && asset.get()->getUnderlyingAsset<Rapture::Texture>() == selectedTexture) {
+                        m_terrainTextureCache.cachedHandles[category] = handle;
+                        break;
+                    }
+                }
+            }
 
-            ImGui::EndCombo();
+            if (m_terrainTextureCache.cachedHandles[category] != 0) {
+                auto metadata = Rapture::AssetManager::getAssetMetadata(m_terrainTextureCache.cachedHandles[category]);
+                previewName = metadata.getName();
+            }
+
+            ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0),
+                                                  ImVec2(FLT_MAX, ImGui::GetTextLineHeightWithSpacing() * m_terrainTextureCache.MAX_VISIBLE));
+            if (ImGui::BeginCombo(label, previewName.c_str())) {
+                auto allHandles = Rapture::AssetManager::getTextures();
+
+                ImGuiListClipper clipper;
+                clipper.Begin(static_cast<int>(allHandles.size()));
+                while (clipper.Step()) {
+                    for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+                        auto handle = allHandles[i];
+                        auto asset = Rapture::AssetManager::getAsset(handle);
+                        if (!asset) continue;
+
+                        auto texture = asset.get()->getUnderlyingAsset<Rapture::Texture>();
+                        if (!texture) continue;
+
+                        auto metadata = Rapture::AssetManager::getAssetMetadata(handle);
+                        bool isSelected = (m_terrainTextureCache.cachedHandles[category] == handle);
+
+                        if (ImGui::Selectable(metadata.getName().c_str(), isSelected)) {
+                            terrainComp.generator->setNoiseTexture(category, texture);
+                            m_terrainTextureCache.cachedHandles[category] = handle;
+                        }
+                        if (isSelected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        };
+
+        if (config.hmType == Rapture::HeightmapType::HM_SINGLE) {
+            ImGui::Text("Single Heightmap");
+            renderTextureCombo("Heightmap Texture", Rapture::CONTINENTALNESS);
         }
 
         ImGui::Separator();
 
         if (config.hmType == Rapture::HeightmapType::HM_CEPV) {
+            ImGui::Text("Multi-Noise Textures");
 
             auto &multiNoise = terrainComp.generator->getMultiNoiseConfig();
             bool splineChanged = false;
 
             const char *categoryNames[] = {"Continentalness", "Erosion", "Peaks & Valleys"};
+
+            for (uint8_t i = 0; i < Rapture::TERRAIN_NC_COUNT; ++i) {
+                std::string label = std::string(categoryNames[i]) + " Texture";
+                renderTextureCombo(label.c_str(), static_cast<Rapture::TerrainNoiseCategory>(i));
+            }
+
+            ImGui::Separator();
 
             if (ImGui::TreeNode("Multi-Noise Splines")) {
                 for (uint8_t cat = 0; cat < Rapture::TERRAIN_NC_COUNT; ++cat) {

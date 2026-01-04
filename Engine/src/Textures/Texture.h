@@ -2,6 +2,8 @@
 
 #include "Buffers/Descriptors/DescriptorBinding.h"
 #include "TextureCommon.h"
+
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -59,9 +61,9 @@ class Texture : public std::enable_shared_from_this<Texture> {
                                                VkAccessFlags dstAccessMask);
     uint32_t getBindlessIndex();
 
-    void setReadyForSampling(bool ready) { m_readyForSampling = ready; }
-
-    bool isReadyForSampling() const { return m_readyForSampling; }
+    void setStatus(TextureStatus status) { m_status.store(status, std::memory_order_release); }
+    TextureStatus getStatus() const { return m_status.load(std::memory_order_acquire); }
+    bool isReady() const { return m_status.load(std::memory_order_acquire) == TextureStatus::READY; }
 
     // Static method to create a default white texture
     static std::unique_ptr<Texture> createDefaultWhiteTexture();
@@ -98,7 +100,7 @@ class Texture : public std::enable_shared_from_this<Texture> {
 
     TextureSpecification m_spec;
 
-    bool m_readyForSampling = false;
+    std::atomic<TextureStatus> m_status{TextureStatus::NOT_LOADED};
 
     uint32_t m_bindlessIndex = UINT32_MAX;
 

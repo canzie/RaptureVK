@@ -2,6 +2,7 @@
 
 #include "Counter.h"
 #include "Utils/rp_assert.h"
+#include "WindowContext/VulkanContext/TimelineSemaphore.h"
 #include "jobs/Job.h"
 #include "jobs/WaitList.h"
 
@@ -9,6 +10,7 @@
 #include <cassert>
 #include <cstdint>
 #include <emmintrin.h>
+#include <fstream>
 #include <memory>
 #include <thread>
 
@@ -33,6 +35,14 @@ void JobSystem::close()
         if (worker.joinable()) {
             worker.join();
         }
+    }
+
+    if (m_ioThread.joinable()) {
+        m_ioThread.join();
+    }
+
+    if (m_gpuPollThread.joinable()) {
+        m_gpuPollThread.join();
     }
 }
 
@@ -94,6 +104,75 @@ void workerThread(JobSystem *system)
     }
 }
 
+void ioThread(JobSystem *system, IoQueue *queue)
+{
+    while (!system->shouldShutdown()) {
+        IoRequest request;
+
+        if (!queue->pop(request)) {
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            continue;
+        }
+
+        std::vector<uint8_t> data;
+        bool success = false;
+
+        std::ifstream file(request.path, std::ios::binary | std::ios::ate);
+        if (file) {
+            auto size = file.tellg();
+            file.seekg(0);
+            data.resize(static_cast<size_t>(size));
+            file.read(reinterpret_cast<char *>(data.data()), size);
+            success = file.good();
+        }
+
+        // Move data to heap to avoid large lambda captures in JobFunction
+        auto dataPtr = new std::vector<uint8_t>(std::move(data));
+        auto callbackPtr = new IoCallback(std::move(request.callback));
+
+        system->run(JobDeclaration(
+            [callbackPtr, dataPtr, success](JobContext &) {
+                (*callbackPtr)(std::move(*dataPtr), success);
+                delete dataPtr;
+                delete callbackPtr;
+            },
+            request.priority, QueueAffinity::ANY, nullptr, "Io callback"));
+    }
+}
+
+void gpuPollThread(JobSystem *system, GpuPollQueue *queue)
+{
+    constexpr uint64_t POLL_TIMEOUT_NS = 1 * 1000 * 1000;
+
+    std::vector<GpuWaitRequest> pending;
+
+    while (!system->shouldShutdown()) {
+        GpuWaitRequest req;
+        while (queue->pop(req)) {
+            pending.push_back(req);
+        }
+
+        if (pending.empty()) {
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            continue;
+        }
+
+        auto it = pending.begin();
+        while (it != pending.end()) {
+            if (it->semaphore->wait(it->waitValue, POLL_TIMEOUT_NS)) {
+                it->counter->decrement();
+                it = pending.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    for (auto &req : pending) {
+        req.counter->decrement();
+    }
+}
+
 JobSystem::JobSystem() : m_waitList(this)
 {
     m_fiberPool.initializeFiberStacks();
@@ -105,6 +184,9 @@ JobSystem::JobSystem() : m_waitList(this)
     for (uint32_t i = 0; i < workerThreadCount; ++i) {
         m_workers[i] = std::thread(workerThread, this);
     }
+
+    m_ioThread = std::thread(ioThread, this, &m_ioQueue);
+    m_gpuPollThread = std::thread(gpuPollThread, this, &m_gpuPollQueue);
 }
 
 void JobSystem::run(const JobDeclaration &decl)
@@ -122,6 +204,16 @@ void JobSystem::run(const JobDeclaration &decl, Counter &waitCounter, int32_t wa
     } else {
         m_waitList.add(std::move(job));
     }
+}
+
+void JobSystem::requestIo(std::filesystem::path path, IoCallback callback, JobPriority priority)
+{
+    m_ioQueue.push(IoRequest{std::move(path), std::move(callback), priority});
+}
+
+void JobSystem::submitGpuWait(const TimelineSemaphore *semaphore, uint64_t waitValue, Counter &counter)
+{
+    m_gpuPollQueue.push(GpuWaitRequest{semaphore, waitValue, &counter});
 }
 
 bool JobSystem::shouldShutdown()

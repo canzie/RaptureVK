@@ -502,7 +502,7 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
         skyboxComp = &view.get<SkyboxComponent>(*view.begin());
     }
 
-    Texture *newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReadyForSampling())
+    Texture *newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReady())
                               ? skyboxComp->skyboxTexture
                               : s_defaultSkyboxTexture.get();
 

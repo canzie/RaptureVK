@@ -2,6 +2,7 @@
 
 #include "AssetHelpers.h"
 #include "Events/AssetEvents.h"
+#include "Loaders/glTF2.0/glTFCommon.h"
 #include "Logging/Log.h"
 #include "Shaders/Shader.h"
 #include "Textures/Texture.h"
@@ -149,9 +150,9 @@ bool AssetImporter::loadTexture(Asset &asset, const AssetMetadata &metadata)
     }
 
     auto tex = std::make_unique<Texture>(metadata.filePath.string(), texSpec, false);
-    tex->setReadyForSampling(true);
+    tex->setStatus(TextureStatus::READY);
 
-    asset.status = AssetStatus::LOADED; // TODO: need to be able to actually verify texture status
+    asset.status = AssetStatus::LOADED;
     asset.setAssetVariant(std::move(tex));
 
     AssetEvents::onAssetLoaded().publish(asset.getHandle());
@@ -161,7 +162,6 @@ bool AssetImporter::loadTexture(Asset &asset, const AssetMetadata &metadata)
 
 bool AssetImporter::loadCubemap(Asset &asset, const AssetMetadata &metadata)
 {
-    // read the .cubemap file
     std::vector<std::string> cubemapPaths = getCubemapPaths(metadata.filePath);
     if (cubemapPaths.size() != 6) {
         RP_CORE_ERROR("Cubemap file must contain exactly 6 paths. File: {}", metadata.filePath.string());
@@ -170,13 +170,44 @@ bool AssetImporter::loadCubemap(Asset &asset, const AssetMetadata &metadata)
     }
 
     auto tex = std::make_unique<Texture>(cubemapPaths, TextureSpecification(), false);
-    tex->setReadyForSampling(true);
+    tex->setStatus(TextureStatus::READY);
 
-    asset.status = AssetStatus::LOADED; // TODO: need to be able to actually verify texture status
+    asset.status = AssetStatus::LOADED;
     asset.setAssetVariant(std::move(tex));
 
     AssetEvents::onAssetLoaded().publish(asset.getHandle());
     return true;
+}
+
+bool AssetImporter::loadScene(Asset &asset, const AssetMetadata &metadata)
+{
+    const auto &path = metadata.filePath;
+    if (!std::filesystem::exists(path)) {
+        FILE_NOT_FOUND_ERROR(path);
+        asset.status = AssetStatus::FILE_NOT_FOUND;
+        return false;
+    }
+
+    std::string extension = path.extension().string();
+    for (char &c : extension) {
+        c = std::tolower(c);
+    }
+
+    auto sceneData = std::make_unique<SceneFileData>();
+    sceneData->metadata.sourcePath = path;
+
+    if (extension == ".gltf" || extension == ".glb") {
+        RP_CORE_WARN("glTF loading not yet implemented via asset importer");
+        asset.status = AssetStatus::FAILED;
+        return false;
+    } else if (extension == ".fbx") {
+        RP_CORE_WARN("FBX loading not supported");
+        asset.status = AssetStatus::FAILED;
+        return false;
+    }
+
+    asset.status = AssetStatus::FAILED;
+    return false;
 }
 
 } // namespace Rapture

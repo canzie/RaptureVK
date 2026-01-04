@@ -54,7 +54,7 @@ void ImageViewerPanel::render()
         handleDragAndDrop();
     }
 
-    if (m_texture && m_texture->isReadyForSampling()) {
+    if (m_texture && m_texture->isReady()) {
         if (m_textureDescriptorSet == VK_NULL_HANDLE) {
             createTextureDescriptor();
         }
@@ -68,7 +68,7 @@ void ImageViewerPanel::render()
             renderTextureImage(displaySize);
             handleMouseWheelZoom();
         }
-    } else if (m_texture && !m_texture->isReadyForSampling()) {
+    } else if (m_texture && !m_texture->isReady()) {
         ImGui::Text("Loading texture...");
     } else {
         renderEmptyState();
@@ -96,7 +96,7 @@ ImVec2 ImageViewerPanel::calculateWindowSizeFromTexture() const
     const float MIN_SIZE = 300.0f;
     const float MAX_SIZE = 1200.0f;
 
-    if (!m_texture || !m_texture->isReadyForSampling()) {
+    if (!m_texture || !m_texture->isReady()) {
         return ImVec2(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     }
 
@@ -237,7 +237,7 @@ void ImageViewerPanel::cleanupDescriptorSet()
 
 void ImageViewerPanel::createTextureDescriptor()
 {
-    if (!m_texture || !m_texture->isReadyForSampling()) {
+    if (!m_texture || !m_texture->isReady()) {
         Rapture::RP_CORE_WARN("Cannot create descriptor for texture that's not ready");
         return;
     }

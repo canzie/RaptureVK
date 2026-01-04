@@ -85,6 +85,34 @@ class AffinityQueueSet {
     bool pop(Job &out, QueueAffinity preferredAffinity);
 };
 
+class IoQueue {
+  public:
+    static constexpr size_t CAPACITY = 256;
+
+    IoQueue() : m_queue(CAPACITY) {}
+
+    bool push(IoRequest &&req) { return m_queue.enqueue(std::move(req)); }
+    bool pop(IoRequest &out) { return m_queue.try_dequeue(out); }
+    size_t size() const { return m_queue.size_approx(); }
+
+  private:
+    moodycamel::ConcurrentQueue<IoRequest> m_queue;
+};
+
+class GpuPollQueue {
+  public:
+    static constexpr size_t CAPACITY = 256;
+
+    GpuPollQueue() : m_queue(CAPACITY) {}
+
+    bool push(GpuWaitRequest &&req) { return m_queue.enqueue(std::move(req)); }
+    bool pop(GpuWaitRequest &out) { return m_queue.try_dequeue(out); }
+    size_t size() const { return m_queue.size_approx(); }
+
+  private:
+    moodycamel::ConcurrentQueue<GpuWaitRequest> m_queue;
+};
+
 } // namespace Rapture
 
 #endif // RAPTURE__JOBQUEUE_H

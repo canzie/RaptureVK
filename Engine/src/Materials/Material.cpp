@@ -26,7 +26,7 @@ void MaterialManager::init()
 
     auto asset = AssetManager::importDefaultAsset(AssetType::TEXTURE);
     auto defaultTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
-    if (defaultTexture && defaultTexture->isReadyForSampling()) {
+    if (defaultTexture && defaultTexture->isReady()) {
         s_defaultTextureIndex = defaultTexture->getBindlessIndex();
     } else {
         RP_CORE_ERROR("Failed to get default white texture index");

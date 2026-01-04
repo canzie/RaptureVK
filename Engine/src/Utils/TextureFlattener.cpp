@@ -206,9 +206,8 @@ std::unique_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shar
     // Create FlattenTexture instance (registers with asset manager and keeps asset alive)
     auto flattenTexture = std::make_unique<FlattenTexture>(inputTexture, std::move(flattenedTexture), name, dataType);
 
-    // Mark as ready for sampling
     if (flattenTexture->getFlattenedTexture()) {
-        flattenTexture->getFlattenedTexture()->setReadyForSampling(true);
+        flattenTexture->getFlattenedTexture()->setStatus(TextureStatus::READY);
     }
 
     RP_CORE_INFO("TextureFlattener: Successfully created flattened texture '{}' ({}x{}x{} -> {}x{})", name,
