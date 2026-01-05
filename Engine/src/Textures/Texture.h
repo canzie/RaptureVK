@@ -1,15 +1,19 @@
-#pragma once
+#ifndef RAPTURE__TEXTURE_H
+#define RAPTURE__TEXTURE_H
 
 #include "Buffers/Descriptors/DescriptorBinding.h"
 #include "TextureCommon.h"
 
 #include <atomic>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 #include <vk_mem_alloc.h>
 
 namespace Rapture {
+
+struct Counter;
 
 class Sampler {
   public:
@@ -23,80 +27,113 @@ class Sampler {
     VkSampler m_sampler;
 };
 
-class Texture : public std::enable_shared_from_this<Texture> {
+class Texture {
   public:
-    // Constructor for loading from file path
-    // when isLoadingAsync is true, it is expected to use the loadImageFromFile manually with the given threadId
-    Texture(const std::string &path, TextureSpecification spec = TextureSpecification(), bool isLoadingAsync = false);
+    /**
+     * @brief Create texture from specification only (no file loading)
+     */
+    explicit Texture(TextureSpecification spec);
 
-    // Constructor for loading cubemap from multiple file paths
-    Texture(const std::vector<std::string> &paths, TextureSpecification spec = TextureSpecification(), bool isLoadingAsync = false);
+    /**
+     * @brief Create texture from file path (synchronous)
+     */
+    explicit Texture(const std::string &path, TextureSpecification spec = TextureSpecification());
 
-    // Constructor for creating texture from specification (no file loading)
-    Texture(TextureSpecification spec);
+    /**
+     * @brief Create cubemap from 6 file paths (synchronous)
+     */
+    explicit Texture(const std::vector<std::string> &paths, TextureSpecification spec = TextureSpecification());
 
     ~Texture();
 
-    void loadImageFromFile(size_t threadId = 0);
+    Texture(const Texture &) = delete;
+    Texture &operator=(const Texture &) = delete;
 
-    void uploadData(const void *data, size_t dataSize, size_t threadId = 0);
+    /**
+     * @brief Load texture asynchronously via job system, optionally decrements counter when done
+     */
+    static std::unique_ptr<Texture> loadAsync(const std::string &path,
+                                              TextureSpecification spec = TextureSpecification(),
+                                              Counter *completionCounter = nullptr);
+
+    /**
+     * @brief Load cubemap asynchronously via job system, optionally decrements counter when done
+     */
+    static std::unique_ptr<Texture> loadAsync(const std::vector<std::string> &paths,
+                                              TextureSpecification spec = TextureSpecification(),
+                                              Counter *completionCounter = nullptr);
+
+    TextureStatus getStatus() const { return m_status.load(std::memory_order_acquire); }
+    bool isReady() const { return getStatus() == TextureStatus::READY; }
+
+    VkImage getImage() const { return m_image; }
+    VkImageView getImageView() const { return m_imageView; }
+    VkImageView getDepthOnlyImageView() const { return m_imageViewDepthOnly; }
+    VkImageView getStencilOnlyImageView() const { return m_imageViewStencilOnly; }
+
+    const Sampler &getSampler() const { return *m_sampler; }
+    const TextureSpecification &getSpecification() const { return m_spec; }
+    VkFormat getFormat() const { return toVkFormat(m_spec.format); }
+
+    VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType = TextureViewType::DEFAULT) const;
+    VkDescriptorImageInfo getStorageImageDescriptorInfo() const;
+    uint32_t getBindlessIndex();
+
+    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout,
+                                               VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask);
+
+    void uploadData(std::span<const uint8_t> data);
+
+    /**
+     * @brief Set a single pixel value (fire-and-forget, no GPU wait)
+     */
+    void setPixel(uint32_t x, uint32_t y, uint32_t rgba);
+
+    /**
+     * @brief Set a single pixel value for 3D textures (fire-and-forget, no GPU wait)
+     */
+    void setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba);
+
+    /**
+     * @brief Set multiple pixels from raw data (fire-and-forget, no GPU wait)
+     */
+    void setPixels(std::span<const uint8_t> data);
 
     void copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLayout newLayout,
                        VkSemaphore waitSemaphore = VK_NULL_HANDLE, VkSemaphore signalSemaphore = VK_NULL_HANDLE,
                        VkCommandBuffer extCommandBuffer = VK_NULL_HANDLE, bool useInternalFence = true);
 
-    // Getters
-    VkImage getImage() const { return m_image; }
-    VkImageView getImageView() const { return m_imageView; }
-    VkImageView getDepthOnlyImageView() const { return m_imageViewDepthOnly; }
-    VkImageView getStencilOnlyImageView() const { return m_imageViewStencilOnly; }
-    const Sampler &getSampler() const { return *m_sampler; }
-    const TextureSpecification &getSpecification() const { return m_spec; }
-    VkFormat getFormat() const { return toVkFormat(m_spec.format); }
-    // Get descriptor image info for use in descriptor sets
-    VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType = TextureViewType::DEFAULT) const;
-    // Get descriptor image info for storage images (used in compute shaders)
-    VkDescriptorImageInfo getStorageImageDescriptorInfo() const;
-    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask,
-                                               VkAccessFlags dstAccessMask);
-    uint32_t getBindlessIndex();
-
-    void setStatus(TextureStatus status) { m_status.store(status, std::memory_order_release); }
-    TextureStatus getStatus() const { return m_status.load(std::memory_order_acquire); }
-    bool isReady() const { return m_status.load(std::memory_order_acquire) == TextureStatus::READY; }
-
-    // Static method to create a default white texture
     static std::unique_ptr<Texture> createDefaultWhiteTexture();
     static std::unique_ptr<Texture> createDefaultWhiteCubemapTexture();
 
   private:
-    // creates a vulkan image using the specification
+    Texture(const std::vector<std::string> &paths, TextureSpecification spec, bool deferLoading);
+
     void createImage();
-    // creates a vulkan image view using the specification and the image from createImage
     void createImageView();
-
-    void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, size_t threadId = 0);
-    void copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height, size_t threadId = 0);
-
-    // Generate mipmaps for the texture using vkCmdBlitImage
-    void generateMipmaps(size_t threadId = 0);
-
-    // Helper function to validate spec against loaded image data
+    void createSpecificationFromImageFile(const std::vector<std::string> &paths);
     bool validateSpecificationAgainstImageData(int width, int height, int channels);
 
-    // Helper function to create spec from image file info
-    void createSpecificationFromImageFile(const std::vector<std::string> &paths);
+    void recordTransitionImageLayout(VkCommandBuffer cmd, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void recordCopyBufferToImage(VkCommandBuffer cmd, VkBuffer buffer, uint32_t width, uint32_t height);
+    void recordGenerateMipmaps(VkCommandBuffer cmd);
 
-  private:
+    void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout);
+    void copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height);
+    void generateMipmaps();
+    void loadImageFromFileSync();
+
+    void startAsyncLoad(Counter *completionCounter);
+
     std::vector<std::string> m_paths;
 
     std::unique_ptr<Sampler> m_sampler;
-    VkImage m_image;
-    VkImageView m_imageView{VK_NULL_HANDLE};
-    VkImageView m_imageViewStencilOnly{VK_NULL_HANDLE};
-    VkImageView m_imageViewDepthOnly{VK_NULL_HANDLE};
+    VkImage m_image = VK_NULL_HANDLE;
+    VkImageView m_imageView = VK_NULL_HANDLE;
+    VkImageView m_imageViewStencilOnly = VK_NULL_HANDLE;
+    VkImageView m_imageViewDepthOnly = VK_NULL_HANDLE;
 
-    VmaAllocation m_allocation;
+    VmaAllocation m_allocation = VK_NULL_HANDLE;
 
     TextureSpecification m_spec;
 
@@ -108,3 +145,5 @@ class Texture : public std::enable_shared_from_this<Texture> {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__TEXTURE_H

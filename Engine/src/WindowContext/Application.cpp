@@ -88,8 +88,6 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     DeferredRenderer::init();
 
-    ModelLoadersCache::init();
-
     ApplicationEvents::onWindowClose().addListener([this]() { m_running = false; });
 
     ApplicationEvents::onWindowFocus().addListener([]() { RP_CORE_INFO("Window focused"); });
@@ -108,8 +106,6 @@ Application::~Application()
     m_vulkanContext->waitIdle();
 
     TracyProfiler::shutdown();
-
-    ModelLoadersCache::clear();
 
     m_layerStack.clear();
     m_project.reset();

@@ -19,32 +19,39 @@ TimelineSemaphore::TimelineSemaphore()
     createInfo.pNext = &typeInfo;
 
     vkCreateSemaphore(device, &createInfo, nullptr, &m_semaphore);
+    m_owning = true;
 }
+
+TimelineSemaphore::TimelineSemaphore(VkSemaphore existingSemaphore) : m_semaphore(existingSemaphore), m_owning(false) {}
 
 TimelineSemaphore::~TimelineSemaphore()
 {
-    if (m_semaphore != VK_NULL_HANDLE) {
+    if (m_semaphore != VK_NULL_HANDLE && m_owning) {
         auto &app = Application::getInstance();
         VkDevice device = app.getVulkanContext().getLogicalDevice();
         vkDestroySemaphore(device, m_semaphore, nullptr);
     }
 }
 
-TimelineSemaphore::TimelineSemaphore(TimelineSemaphore &&other) noexcept : m_semaphore(other.m_semaphore)
+TimelineSemaphore::TimelineSemaphore(TimelineSemaphore &&other) noexcept
+    : m_semaphore(other.m_semaphore), m_owning(other.m_owning)
 {
     other.m_semaphore = VK_NULL_HANDLE;
+    other.m_owning = false;
 }
 
 TimelineSemaphore &TimelineSemaphore::operator=(TimelineSemaphore &&other) noexcept
 {
     if (this != &other) {
-        if (m_semaphore != VK_NULL_HANDLE) {
+        if (m_semaphore != VK_NULL_HANDLE && m_owning) {
             auto &app = Application::getInstance();
             VkDevice device = app.getVulkanContext().getLogicalDevice();
             vkDestroySemaphore(device, m_semaphore, nullptr);
         }
         m_semaphore = other.m_semaphore;
+        m_owning = other.m_owning;
         other.m_semaphore = VK_NULL_HANDLE;
+        other.m_owning = false;
     }
     return *this;
 }

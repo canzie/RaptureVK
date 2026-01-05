@@ -53,15 +53,16 @@ Entity Scene::createCube(const std::string &name)
     entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
     // Add a cube mesh
-    auto cubeMesh = std::make_shared<Mesh>(Primitives::CreateCube());
-    entity.addComponent<MeshComponent>(cubeMesh);
+    auto cubeMesh = std::make_unique<Mesh>(Primitives::CreateCube());
+    auto meshRef = AssetManager::registerVirtualAsset(std::move(cubeMesh), "Primitive_Cube_" + name, AssetType::MESH);
+    entity.addComponent<MeshComponent>(meshRef);
 
     entity.addComponent<BoundingBoxComponent>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
 
     // Add a material
-    auto asset = AssetManager::importDefaultAsset(AssetType::MATERIAL);
-    if (asset) {
-        entity.addComponent<MaterialComponent>(std::move(asset));
+    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL);
+    if (materialRef) {
+        entity.addComponent<MaterialComponent>(materialRef);
     }
 
     return entity;
@@ -80,16 +81,17 @@ Entity Scene::createSphere(const std::string &name)
 
     entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
-    // Add a cube mesh
-    auto sphereMesh = std::make_shared<Mesh>(Primitives::CreateSphere(1.0f, 32));
-    entity.addComponent<MeshComponent>(sphereMesh);
+    // Add a sphere mesh
+    auto sphereMesh = std::make_unique<Mesh>(Primitives::CreateSphere(1.0f, 32));
+    auto meshRef = AssetManager::registerVirtualAsset(std::move(sphereMesh), "Primitive_Sphere_" + name, AssetType::MESH);
+    entity.addComponent<MeshComponent>(meshRef);
 
     entity.addComponent<BoundingBoxComponent>(glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
     // Add a material
-    auto asset = AssetManager::importDefaultAsset(AssetType::MATERIAL);
-    if (asset) {
-        entity.addComponent<MaterialComponent>(asset);
+    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL);
+    if (materialRef) {
+        entity.addComponent<MaterialComponent>(materialRef);
     }
 
     return entity;
@@ -324,7 +326,7 @@ void Scene::registerBLAS(Entity &entity)
     }
 
     TLASInstance instance;
-    instance.blas = blas->blas;
+    instance.blas = blas->blas.get();
     instance.transform = transform->transformMatrix();
     instance.entityID = entity.getID();
     m_tlas->addInstance(instance);

@@ -10,7 +10,7 @@
 #include <string>
 #include <variant>
 
-#include "Loaders/glTF2.0/glTFCommon.h"
+#include "Loaders/SceneFileCommon.h"
 #include "Materials/MaterialInstance.h"
 #include "Meshes/Mesh.h"
 #include "Shaders/Shader.h"

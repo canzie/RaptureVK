@@ -3,7 +3,6 @@
 #include "Meshes/Mesh.h"
 #include "Buffers/Buffers.h"
 
-#include <memory>
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 
@@ -11,7 +10,7 @@ namespace Rapture {
 
 class BLAS {
 public:
-    BLAS(std::shared_ptr<Mesh> mesh);
+    BLAS(Mesh *mesh);
     ~BLAS();
 
     // Build the acceleration structure
@@ -31,7 +30,7 @@ private:
     void createGeometry();
 
 private:
-    std::shared_ptr<Mesh> m_mesh;
+    Mesh *m_mesh;
     
     VkAccelerationStructureKHR m_accelerationStructure;
     VkAccelerationStructureGeometryKHR m_geometry;

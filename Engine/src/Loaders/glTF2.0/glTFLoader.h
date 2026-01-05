@@ -1,161 +1,77 @@
-#pragma once
+#ifndef RAPTURE__GLTF_LOADER_H
+#define RAPTURE__GLTF_LOADER_H
 
+#include "glTFCommon.h"
 #include "yyjson.h"
+
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <glm/glm.hpp>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
-#include "Logging/Log.h"
-#include "Materials/MaterialInstance.h"
-#include "Scenes/Entities/Entity.h"
-#include "Scenes/Scene.h"
-
 namespace Rapture {
-// Forward declaration
-// class ModelAssetCache;
+
+struct Counter;
+class Scene;
+class MaterialInstance;
+enum class ParameterID;
 
 /**
- * @brief Structure to hold glTF file metadata
- */
-struct glTFMetadata {
-    size_t materialCount = 0;
-    size_t primitiveCount = 0;
-    size_t animationCount = 0;
-    size_t nodeCount = 0;
-    size_t meshCount = 0;
-    size_t textureCount = 0;
-    bool hasSkeletons = false;
-    std::string version;
-    std::string generator;
-};
-
-enum class NodeType {
-    Empty,
-    Mesh,
-    Bone,
-    Skeleton,
-};
-
-/**
- * @brief Modern loader for glTF 2.0 format 3D models using entity-component architecture
+ * @brief Loader for glTF 2.0 format 3D models
  *
- * This class handles loading glTF model files and creating entities with appropriate components.
- * Each glTF node becomes an entity with transform and mesh components as needed.
+ * Parses glTF files into an intermediate scene graph (glTF_LoadedSceneData).
+ * If a scene is provided to load(), finalizes to ECS entities after loading.
  */
 class glTF2Loader {
   public:
     /**
-     * @brief Constructor that takes a scene to populate
-     *
-     * @param scene Pointer to the scene where entities will be created
+     * @brief Constructor
+     * @param filepath Path to the .gltf file
      */
-    glTF2Loader(std::shared_ptr<Scene> scene);
-
-    /**
-     * @brief Destructor
-     */
+    explicit glTF2Loader(const std::filesystem::path &filepath);
     ~glTF2Loader();
 
     /**
-     * @brief Static method to quickly analyze a glTF file and return metadata
-     *
-     * @param filepath Path to the .gltf file
-     * @param isAbsolute If true, filepath is an absolute path
-     * @return glTFMetadata structure containing file information
+     * @brief Load the glTF file and build scene graph
+     * @param scene Optional scene for finalization (nullptr to skip ECS creation)
+     * @param sceneIndex glTF scene index to load (-1 for default)
+     * @return true if loading was successful
      */
-    static glTFMetadata getFileMetadata(const std::string &filepath, bool isAbsolute = false);
-
-    bool initialize(const std::string &filepath);
+    bool load(Scene *scene = nullptr, int32_t sceneIndex = -1);
 
     /**
-     * @brief Load a model from a glTF file and populate the scene with entities
-     *
-     * @param filepath Path to the .gltf file
-     * @param calculateBoundingBoxes If true, bounding boxes will be calculated for all primitives
-     * @return true if loading was successful, false otherwise
+     * @brief Get metadata without full load
      */
-    bool loadModel(const std::string &filepath, bool calculateBoundingBoxes = false);
+    SceneFileMetadata getMetadata();
 
-    /**
-     * @brief Check if file was successfully loaded
-     *
-     * @return true if file is loaded and ready
-     */
+    const glTF_LoadedSceneData *getLoadedData() const { return m_loadedData.get(); }
     bool isLoaded() const { return m_isLoaded; }
 
-    // Friend declaration for the cache
-    friend class ModelAssetCache;
-
   private:
-    /**
-     * @brief Process a glTF primitive and set up mesh data
-     *
-     * @param entity Entity to attach mesh data to
-     * @param primitive yyjson value containing primitive data
-     */
-    void processPrimitive(Entity entity, yyjson_val *primitive);
+    bool loadScene(yyjson_val *sceneRoot);
+    bool loadNode(glTF_SceneNode *parent, size_t nodeIndex);
+    bool loadMesh(glTF_SceneNode *node, size_t meshIndex);
+    bool loadPrimitive(glTF_SceneNode *parent, yyjson_val *primitiveJson, size_t primitiveIndex);
 
-    /**
-     * @brief Extract raw binary data from an accessor
-     *
-     * @param accessorVal yyjson value containing accessor information
-     * @param data_vec Vector to store the extracted binary data
-     */
-    void loadAccessor(yyjson_val *accessorVal, std::vector<unsigned char> &data_vec);
+    void loadSkin(yyjson_val *skinVal);
+    void loadWeights(yyjson_val *weightsVal);
+    void loadAnimation(yyjson_val *animationVal);
 
-    /**
-     * @brief Process a mesh from the glTF file and create entities
-     *
-     * @param parentEntity Parent entity for this mesh
-     * @param meshVal yyjson value containing mesh data
-     * @return Entity The created entity
-     */
-    Entity processMesh(Entity parentEntity, yyjson_val *meshVal);
+    AssetRef loadMaterial(size_t materialIndex);
 
-    /**
-     * @brief Process the node hierarchy and create entities with proper transforms
-     *
-     * @param parentEntity Parent entity
-     * @param nodeVal yyjson value containing node data
-     * @return Entity The created entity
-     */
-    NodeType processNode(Entity parentEntity, yyjson_val *nodeVal);
+    void finalizeToScene(Scene *scene);
 
-    /**
-     * @brief Process a scene from the glTF file
-     *
-     * @param sceneVal yyjson value containing scene data
-     * @return Entity The root scene entity
-     */
-    void processScene(yyjson_val *sceneVal);
-
-    std::unique_ptr<MaterialInstance> processMaterial(Entity parentEntity, yyjson_val *materialVal);
-
-    /**
-     * @brief Clean up all data after loading
-     */
+    void loadAccessor(yyjson_val *accessorVal, std::vector<unsigned char> &dataVec);
     void cleanUp();
 
-    /**
-     * @brief Get the transform matrix of a node
-     *
-     * @param nodeVal yyjson value containing node data
-     * @return The transform matrix of the node
-     */
     glm::mat4 getNodeTransform(yyjson_val *nodeVal);
+    std::string getNodeName(size_t nodeIndex);
 
-    /**
-     * @brief Get node name from glTF node index
-     *
-     * @param nodeIndex Index of the node in glTF file
-     * @return Name of the node
-     */
-    std::string getNodeName(unsigned int nodeIndex);
-
-    // Helper functions for yyjson
     yyjson_val *getObjectValue(yyjson_val *obj, const char *key);
     yyjson_val *getArrayElement(yyjson_val *arr, uint32_t index);
     const char *getString(yyjson_val *val, const char *defaultValue = "");
@@ -167,139 +83,37 @@ class glTF2Loader {
     void loadAndSetTexture(MaterialInstance *material, ParameterID id, int texIndex);
 
   private:
-    // Reference to the scene being populated
-    std::shared_ptr<Scene> m_scene;
+    std::unique_ptr<glTF_LoadedSceneData> m_loadedData;
 
-    // JSON document and main sections from the glTF file
-    yyjson_doc *m_glTFdoc;
-    yyjson_val *m_glTFroot;
-    yyjson_val *m_accessors;
-    yyjson_val *m_meshes;
-    yyjson_val *m_bufferViews;
-    yyjson_val *m_buffers;
-    yyjson_val *m_nodes;
-    yyjson_val *m_materials;
-    yyjson_val *m_animations;
-    yyjson_val *m_skins;
-    yyjson_val *m_textures;
-    yyjson_val *m_images;
-    yyjson_val *m_samplers;
+    yyjson_doc *m_glTFdoc = nullptr;
+    yyjson_val *m_glTFroot = nullptr;
+    yyjson_val *m_accessors = nullptr;
+    yyjson_val *m_meshes = nullptr;
+    yyjson_val *m_bufferViews = nullptr;
+    yyjson_val *m_buffers = nullptr;
+    yyjson_val *m_nodes = nullptr;
+    yyjson_val *m_materials = nullptr;
+    yyjson_val *m_animations = nullptr;
+    yyjson_val *m_skins = nullptr;
+    yyjson_val *m_textures = nullptr;
+    yyjson_val *m_images = nullptr;
+    yyjson_val *m_samplers = nullptr;
 
-    bool m_calculateBoundingBoxes = false;
-
-    // Raw binary data from the .bin file
     std::vector<unsigned char> m_binVec;
-
-    // Base path for loading external resources
+    std::filesystem::path m_filepath;
     std::string m_basePath;
-
-    // Constants for glTF component types
-    static const unsigned int GLTF_FLOAT = 5126;
-    static const unsigned int GLTF_UINT = 5125;
-    static const unsigned int GLTF_USHORT = 5123;
-    static const unsigned int GLTF_SHORT = 5122;
-    static const unsigned int GLTF_UBYTE = 5121;
-    static const unsigned int GLTF_BYTE = 5120;
 
     bool m_isLoaded = false;
     bool m_isInitialized = false;
-    std::string m_filepath;
+
+    static constexpr unsigned int GLTF_FLOAT = 5126;
+    static constexpr unsigned int GLTF_UINT = 5125;
+    static constexpr unsigned int GLTF_USHORT = 5123;
+    static constexpr unsigned int GLTF_SHORT = 5122;
+    static constexpr unsigned int GLTF_UBYTE = 5121;
+    static constexpr unsigned int GLTF_BYTE = 5120;
 };
 
-/**
- * @brief Cache for loaded model assets to avoid redundant file operations
- * @note This caching system only works because a reference to the loader will be used in the loader itself...
- *       The loader will call importasset, the import asset will then get the loader which called the importasset...
- *       This way the loader will not get expired atleast until the original loader shared pointer goes out of scope.
- *       very goofy, so watch out for weird bugs.
- *       (asssumtion) one cenario which will negate the benefits is if the original caller of the loader does not get its loader
- * trough the modelassetcache and it does not keep a shared pointer to the loader (return value of getLoader).
- */
-class ModelLoadersCache {
-  public:
-    /**
-     * @brief Get a loader for a specific model file
-     *
-     * @param filepath Path to the model file
-     * @param isAbsolute If true, filepath is an absolute path
-     * @return std::shared_ptr<glTF2Loader> A loader instance for the file
-     */
-
-    static void init()
-    {
-        if (s_initialized) return;
-        s_loaders.clear();
-        s_initialized = true;
-    }
-
-    static std::shared_ptr<glTF2Loader> getLoader(const std::filesystem::path &filepath, std::shared_ptr<Scene> scene = nullptr)
-    {
-        if (!s_initialized) {
-            RP_CORE_ERROR("Not initialized");
-            return nullptr;
-        }
-
-        if (s_loaders.find(filepath) != s_loaders.end()) {
-            if (auto loader = s_loaders[filepath].lock()) {
-                return loader;
-            } else {
-                RP_CORE_WARN("Loader for '{}' expired, removing from cache", filepath.string());
-                s_loaders.erase(filepath);
-            }
-        }
-
-        auto loader = std::make_shared<glTF2Loader>(scene);
-
-        {
-
-            std::lock_guard<std::mutex> lock(s_mutex);
-
-            if (!loader->initialize(filepath.string())) {
-                RP_CORE_ERROR("Failed to initialize loader for '{}'", filepath.string());
-                return nullptr;
-            }
-            s_loaders[filepath] = loader;
-        }
-
-        return loader;
-    }
-
-    /**
-     * @brief Clear cache entries not used recently
-     */
-    static void cleanup()
-    {
-        if (!s_initialized) return;
-
-        std::lock_guard<std::mutex> lock(s_mutex);
-        for (auto it = s_loaders.begin(); it != s_loaders.end();) {
-            if (it->second.expired()) {
-                // RP_CORE_INFO("ModelLoadersCache::cleanup - Loader for '{}' expired, removing from cache", it->first); //
-                // Commented out for stability
-                it = s_loaders.erase(it);
-            } else {
-                ++it;
-            }
-        }
-    }
-
-    /**
-     * @brief Clear all cached loaders
-     */
-    static void clear()
-    {
-        if (!s_initialized) return;
-
-        std::lock_guard<std::mutex> lock(s_mutex);
-        s_loaders.clear();
-    }
-
-    friend class glTF2Loader;
-
-  private:
-    // Maps the filepath to the loader
-    static bool s_initialized;
-    static std::map<std::filesystem::path, std::weak_ptr<glTF2Loader>> s_loaders;
-    static std::mutex s_mutex;
-};
 } // namespace Rapture
+
+#endif // RAPTURE__GLTF_LOADER_H

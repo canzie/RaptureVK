@@ -9,7 +9,12 @@ namespace Rapture {
 
 class TimelineSemaphore {
   public:
+    // Creates and owns a new timeline semaphore
     TimelineSemaphore();
+
+    // Wraps an existing timeline semaphore (non-owning)
+    explicit TimelineSemaphore(VkSemaphore existingSemaphore);
+
     ~TimelineSemaphore();
 
     TimelineSemaphore(const TimelineSemaphore &) = delete;
@@ -36,6 +41,7 @@ class TimelineSemaphore {
 
   private:
     VkSemaphore m_semaphore = VK_NULL_HANDLE;
+    bool m_owning = true; // If false, destructor won't destroy the semaphore
 };
 
 } // namespace Rapture

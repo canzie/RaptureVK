@@ -7,7 +7,7 @@
 
 namespace Rapture {
 
-BLAS::BLAS(std::shared_ptr<Mesh> mesh)
+BLAS::BLAS(Mesh *mesh)
     : m_mesh(mesh), m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE),
       m_scratchBuffer(VK_NULL_HANDLE), m_scratchAllocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0),
       m_scratchSize(0), m_isBuilt(false)

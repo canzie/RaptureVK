@@ -235,8 +235,6 @@ void ProceduralTexture::generate()
 
     queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
     queue->waitIdle();
-
-    m_texture->setStatus(Rapture::TextureStatus::READY);
 }
 
 Texture *ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTextureConfig &config)

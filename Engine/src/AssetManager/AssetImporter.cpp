@@ -149,8 +149,7 @@ bool AssetImporter::loadTexture(Asset &asset, const AssetMetadata &metadata)
         texSpec.srgb = importConfig.srgb;
     }
 
-    auto tex = std::make_unique<Texture>(metadata.filePath.string(), texSpec, false);
-    tex->setStatus(TextureStatus::READY);
+    auto tex = Texture::loadAsync(metadata.filePath.string(), texSpec);
 
     asset.status = AssetStatus::LOADED;
     asset.setAssetVariant(std::move(tex));
@@ -169,8 +168,7 @@ bool AssetImporter::loadCubemap(Asset &asset, const AssetMetadata &metadata)
         return false;
     }
 
-    auto tex = std::make_unique<Texture>(cubemapPaths, TextureSpecification(), false);
-    tex->setStatus(TextureStatus::READY);
+    auto tex = std::make_unique<Texture>(cubemapPaths, TextureSpecification());
 
     asset.status = AssetStatus::LOADED;
     asset.setAssetVariant(std::move(tex));

@@ -12,7 +12,7 @@
 namespace Rapture {
 
 struct TLASInstance {
-    std::shared_ptr<BLAS> blas;
+    BLAS *blas = nullptr;
     glm::mat4 transform = glm::mat4(1.0f);
     uint32_t instanceCustomIndex = 0;
     uint32_t mask = 0xFF;

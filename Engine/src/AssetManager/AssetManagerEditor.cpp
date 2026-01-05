@@ -136,7 +136,6 @@ Asset &AssetManagerEditor::importDefaultAsset(AssetType assetType)
             RP_CORE_ERROR("Failed to create default white texture");
             return Asset::null;
         }
-        defaultTexture->setStatus(TextureStatus::READY);
 
         AssetHandle handle = UUIDGenerator::Generate();
 

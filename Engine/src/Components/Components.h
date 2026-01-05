@@ -159,69 +159,40 @@ struct CameraControllerComponent {
 };
 
 struct MaterialComponent {
-    MaterialInstance *material;
+    MaterialInstance *material = nullptr;
 
-    MaterialComponent(std::shared_ptr<BaseMaterial> baseMaterial, std::string name = "")
-    {
-        material = new MaterialInstance(baseMaterial, name);
-        isAlloced = true;
-    }
+    MaterialComponent() = default;
 
     MaterialComponent(AssetRef ref)
     {
         asset = ref;
         material = asset ? asset.get()->getUnderlyingAsset<MaterialInstance>() : nullptr;
-        isAlloced = false;
-    }
-
-    MaterialComponent(std::shared_ptr<MaterialInstance> material)
-    {
-        this->material = material.get();
-        isAlloced = false;
-    }
-
-    MaterialComponent(std::unique_ptr<MaterialInstance> mat)
-    {
-        material = mat.release();
-        isAlloced = true;
-    }
-
-    void setFromUnique(std::unique_ptr<MaterialInstance> mat)
-    {
-        material = mat.release();
-        isAlloced = true;
-    }
-
-    ~MaterialComponent()
-    {
-        if (isAlloced && material != nullptr) delete material;
     }
 
   private:
-    bool isAlloced = false;
     AssetRef asset;
 };
 
 struct MeshComponent {
-    std::shared_ptr<Mesh> mesh;
+    Mesh *mesh = nullptr;
     bool isLoading = true;
     bool isStatic = true;
     bool isEnabled = true;
 
     std::shared_ptr<MeshDataBuffer> meshDataBuffer;
 
-    MeshComponent()
-    {
-        mesh = std::make_shared<Mesh>();
-        meshDataBuffer = std::make_shared<MeshDataBuffer>(3);
-    };
+    MeshComponent() { meshDataBuffer = std::make_shared<MeshDataBuffer>(3); };
 
-    MeshComponent(std::shared_ptr<Mesh> mesh)
+    MeshComponent(AssetRef ref)
     {
-        this->mesh = mesh;
+        asset = ref;
+        mesh = asset ? asset.get()->getUnderlyingAsset<Mesh>() : nullptr;
         isLoading = false;
         meshDataBuffer = std::make_shared<MeshDataBuffer>(3);
-    };
+    }
+
+  private:
+    AssetRef asset;
 };
 
 struct InstanceComponent {
@@ -400,16 +371,12 @@ struct LightComponent {
 };
 
 struct BLASComponent {
-    std::shared_ptr<BLAS> blas;
+    std::unique_ptr<BLAS> blas;
 
-    BLASComponent(std::shared_ptr<Mesh> mesh)
+    BLASComponent(Mesh *mesh)
     {
-        try {
-            blas = std::make_shared<BLAS>(mesh);
-            blas->build();
-        } catch (const std::runtime_error &e) {
-            RP_CORE_ERROR("Failed to create BLAS: {}", e.what());
-        }
+        blas = std::make_unique<BLAS>(mesh);
+        blas->build();
     }
 };
 

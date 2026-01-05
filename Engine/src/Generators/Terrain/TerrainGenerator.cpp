@@ -202,7 +202,7 @@ void TerrainGenerator::bakeNoiseLUT()
         m_noiseLUT = std::make_unique<Texture>(spec);
     }
 
-    m_noiseLUT->uploadData(lutData.data(), lutData.size() * sizeof(uint16_t));
+    m_noiseLUT->uploadData(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(lutData.data()), lutData.size() * sizeof(uint16_t)));
 }
 
 void TerrainGenerator::generateDefaultNoiseTextures()
