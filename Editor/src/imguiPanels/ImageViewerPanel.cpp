@@ -9,7 +9,8 @@ ImageViewerPanel::ImageViewerPanel(Rapture::AssetHandle textureHandle, const std
     : m_currentTextureHandle(textureHandle), m_uniqueId(uniqueId)
 {
     if (textureHandle != Rapture::AssetHandle()) {
-        m_texture = Rapture::AssetManager::getAsset<Rapture::Texture>(textureHandle);
+        m_textureAsset = Rapture::AssetManager::getAsset(textureHandle);
+        m_texture = m_textureAsset ? m_textureAsset.get()->getUnderlyingAsset<Rapture::Texture>() : nullptr;
         if (m_texture) {
             Rapture::RP_CORE_INFO("Loaded texture for viewing in panel: {}", uniqueId);
         } else {
@@ -28,7 +29,8 @@ void ImageViewerPanel::setTextureHandle(Rapture::AssetHandle textureHandle)
 {
     if (textureHandle != m_currentTextureHandle) {
         cleanupDescriptorSet();
-        m_texture = Rapture::AssetManager::getAsset<Rapture::Texture>(textureHandle);
+        m_textureAsset = Rapture::AssetManager::getAsset(textureHandle);
+        m_texture = m_textureAsset ? m_textureAsset.get()->getUnderlyingAsset<Rapture::Texture>() : nullptr;
         m_currentTextureHandle = textureHandle;
         if (m_texture) {
             Rapture::RP_CORE_INFO("Loaded texture for viewing");
@@ -52,7 +54,7 @@ void ImageViewerPanel::render()
         handleDragAndDrop();
     }
 
-    if (m_texture && m_texture->isReadyForSampling()) {
+    if (m_texture && m_texture->isReady()) {
         if (m_textureDescriptorSet == VK_NULL_HANDLE) {
             createTextureDescriptor();
         }
@@ -66,7 +68,7 @@ void ImageViewerPanel::render()
             renderTextureImage(displaySize);
             handleMouseWheelZoom();
         }
-    } else if (m_texture && !m_texture->isReadyForSampling()) {
+    } else if (m_texture && !m_texture->isReady()) {
         ImGui::Text("Loading texture...");
     } else {
         renderEmptyState();
@@ -94,7 +96,7 @@ ImVec2 ImageViewerPanel::calculateWindowSizeFromTexture() const
     const float MIN_SIZE = 300.0f;
     const float MAX_SIZE = 1200.0f;
 
-    if (!m_texture || !m_texture->isReadyForSampling()) {
+    if (!m_texture || !m_texture->isReady()) {
         return ImVec2(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     }
 
@@ -140,7 +142,8 @@ void ImageViewerPanel::handleDragAndDrop()
 
             if (droppedHandle != m_currentTextureHandle) {
                 cleanupDescriptorSet();
-                m_texture = Rapture::AssetManager::getAsset<Rapture::Texture>(droppedHandle);
+                m_textureAsset = Rapture::AssetManager::getAsset(droppedHandle);
+                m_texture = m_texture ? m_textureAsset.get()->getUnderlyingAsset<Rapture::Texture>() : nullptr;
                 m_currentTextureHandle = droppedHandle;
 
                 if (m_texture) {
@@ -234,7 +237,7 @@ void ImageViewerPanel::cleanupDescriptorSet()
 
 void ImageViewerPanel::createTextureDescriptor()
 {
-    if (!m_texture || !m_texture->isReadyForSampling()) {
+    if (!m_texture || !m_texture->isReady()) {
         Rapture::RP_CORE_WARN("Cannot create descriptor for texture that's not ready");
         return;
     }

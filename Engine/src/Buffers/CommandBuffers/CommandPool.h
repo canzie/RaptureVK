@@ -14,19 +14,30 @@ namespace Rapture {
 
 class CommandBuffer;
 struct CmdBufferDefferedDestruction;
+enum class CmdBufferLevel;
 
 using CommandPoolHash = uint32_t;
+
+static inline void hash_combine(size_t &seed, size_t value)
+{
+    seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+}
 
 struct CommandPoolConfig {
     std::string name = "CommandPool";
     size_t threadId = 0;
     uint32_t queueFamilyIndex;
-    VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    VkCommandPoolResetFlags resetFlags = 0;
 
     CommandPoolHash hash() const
     {
-        return static_cast<CommandPoolHash>(std::hash<size_t>()(threadId) ^ std::hash<uint32_t>()(queueFamilyIndex) ^
-                                            std::hash<VkCommandPoolCreateFlags>()(flags));
+        size_t seed = 0;
+        hash_combine(seed, std::hash<size_t>{}(threadId));
+        hash_combine(seed, std::hash<uint32_t>{}(queueFamilyIndex));
+        hash_combine(seed, std::hash<VkCommandPoolCreateFlags>{}(flags));
+        hash_combine(seed, std::hash<VkCommandPoolResetFlags>{}(resetFlags));
+        return static_cast<CommandPoolHash>(seed);
     }
 };
 
@@ -38,49 +49,56 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     CommandPool(const CommandPoolConfig &config);
     ~CommandPool();
 
-    void deferCmdBufferDestruction(CmdBufferDefferedDestruction cmdBufferDefferedDestruction);
-    void onUpdate(float dt);
-
     VkCommandPool getCommandPoolVk() const { return m_commandPool; }
-    std::shared_ptr<CommandBuffer> getCommandBuffer(const std::string &name, bool stayAlive = false);
-    std::vector<std::shared_ptr<CommandBuffer>> getCommandBuffers(uint32_t count, const std::string &namePrefix = "cmd");
+    CommandBuffer *getPrimaryCommandBuffer();
+    CommandBuffer *getSecondaryCommandBuffer();
+
+    void markPendingSignal(VkSemaphore timelineSemaphore, uint64_t signalValue);
+    void resetIfNeeded();
 
   private:
-    // std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
+    void allocateCommandBuffer(CmdBufferLevel level);
+
+  private:
     VkCommandPoolCreateInfo m_createInfo;
     VkCommandPool m_commandPool;
     CommandPoolHash m_hash;
 
     VkDevice m_device;
 
-    std::vector<CmdBufferDefferedDestruction> m_deferredCmdBufferDestructions;
-    // only added when stayAlive=true, can be usefull for liefetime commandbuffers which rapture does not manage directly
-    std::vector<std::shared_ptr<CommandBuffer>> m_savedCommandBuffers;
+    VkCommandPoolResetFlags m_resetFlags;
+
+    uint32_t m_primaryCommandBufferIndex = 0;
+    uint32_t m_secondaryCommandBufferIndex = 0;
+    std::vector<std::unique_ptr<CommandBuffer>> m_primaryCommandBuffers;
+    std::vector<std::unique_ptr<CommandBuffer>> m_secondaryCommandBuffers;
+
+    std::unordered_map<VkSemaphore, uint64_t> m_pendingSignals;
+    bool m_needsReset = false;
 };
 
 class CommandPoolManager {
   public:
-    static void init();
+    static void init(uint32_t framesInFlight);
     static void shutdown();
 
-    static void onUpdate(float dt);
-
-    static std::shared_ptr<CommandPool> createCommandPool(const CommandPoolConfig &config);
+    static CommandPoolHash createCommandPool(const CommandPoolConfig &config);
     // access a pool by its hash
-    static std::shared_ptr<CommandPool> getCommandPool(CommandPoolHash hash);
+    static CommandPool *getCommandPool(CommandPoolHash hash, uint32_t frameIndex);
+    static CommandPool *getCommandPool(CommandPoolHash hash);
     // the strict flag will return the command pool closest to the config provided (most same values)
     // assuming atleast 1 pool exists, this function will return a pool, given the strict flag=false
     // static std::shared_ptr<CommandPool> getCommandPool(const CommandPoolConfig& config, bool isStrict = true);
 
-    // currently still needs to destroy manually because when destroying some other thng ith a ptr
-    // to the bool could be using it, causing a crash or undefined behavior
-    // would probably have to either switch to weak ptrs or checking the poolvk value every time when retireving it
-    // static void closePool(uint32_t CPHash);
+    static void beginFrame();
+    static void endFrame();
     static void closeAllPools();
 
   private:
-    static std::unordered_map<CommandPoolHash, std::shared_ptr<CommandPool>> s_commandPools;
+    static std::unordered_map<CommandPoolHash, std::vector<std::unique_ptr<CommandPool>>> s_commandPools;
     static std::mutex s_mutex;
+    static uint32_t s_framesInFlight;
+    static uint32_t s_currentFrameIndex;
 };
 
 } // namespace Rapture

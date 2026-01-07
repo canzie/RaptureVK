@@ -14,6 +14,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include <memory>
 #include <vector>
 
@@ -23,9 +24,11 @@
 #include "imguiPanels/BrowserPanel.h"
 #include "imguiPanels/ContentBrowserPanel.h"
 #include "imguiPanels/GBufferPanel.h"
+#include "imguiPanels/GraphEditorPanel.h"
 #include "imguiPanels/ImageViewerPanel.h"
 #include "imguiPanels/ProprtiesPanel.h"
 #include "imguiPanels/SettingsPanel.h"
+#include "imguiPanels/TextureGeneratorPanel.h"
 #include "imguiPanels/ViewportPanel.h"
 
 #include "RenderTargets/SwapChains/SwapChain.h"
@@ -41,13 +44,13 @@ class ImGuiLayer : public Rapture::Layer {
 
   private:
     // ImGui Vulkan logic, sets up the dynamic rendering and ImGui draw commands
-    void drawImGui(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView);
+    void drawImGui(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView);
 
     // imgui logic loop
     void renderImGui();
 
-    void beginDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView);
-    void endDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer);
+    void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView);
+    void endDynamicRendering(Rapture::CommandBuffer *commandBuffer);
     void onResize();
     void updateViewportDescriptorSet();
 
@@ -61,7 +64,7 @@ class ImGuiLayer : public Rapture::Layer {
 
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
-    std::vector<std::shared_ptr<Rapture::CommandBuffer>> m_imguiCommandBuffers;
+    Rapture::CommandPoolHash m_commandPoolHash = 0;
     uint32_t m_currentFrame = 0;
     uint32_t m_currentImageIndex = 0;
     uint32_t m_imageCount = 0;
@@ -84,6 +87,8 @@ class ImGuiLayer : public Rapture::Layer {
     ContentBrowserPanel m_contentBrowserPanel;
     ImageViewerPanel m_imageViewerPanel;
     SettingsPanel m_settingsPanel;
+    TextureGeneratorPanel m_textureGeneratorPanel;
+    GraphEditorPanel m_graphEditorPanel;
 
     std::vector<std::unique_ptr<ImageViewerPanel>> m_floatingImageViews;
 

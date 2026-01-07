@@ -12,10 +12,12 @@ namespace Rapture {
 
 struct GraphicsPipelineConfiguration {
 
-    VkPipelineVertexInputStateCreateInfo vertexInputState;
+    // Optional for mesh shaders (set to nullopt when using mesh/task shaders)
+    std::optional<VkPipelineVertexInputStateCreateInfo> vertexInputState;
+    std::optional<VkPipelineInputAssemblyStateCreateInfo> inputAssemblyState;
+
     VkPipelineDynamicStateCreateInfo dynamicState;
     VkPipelineViewportStateCreateInfo viewportState;
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState;
 
     VkPipelineRasterizationStateCreateInfo rasterizationState;
 
@@ -30,7 +32,7 @@ struct GraphicsPipelineConfiguration {
     // std::vector<VkDynamicState>                         dynamicStates;
 
     FramebufferSpecification framebufferSpec;
-    std::shared_ptr<Shader> shader;
+    Shader *shader;
 };
 
 class GraphicsPipeline : public PipelineBase {

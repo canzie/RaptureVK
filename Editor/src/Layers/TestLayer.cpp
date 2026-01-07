@@ -1,9 +1,10 @@
 #include "TestLayer.h"
 
 #include "Components/Components.h"
+#include "Generators/Terrain/TerrainTypes.h"
 #include "Logging/Log.h"
 #include "Renderer/DeferredShading/DeferredRenderer.h"
-#include "Renderer/ForwardRenderer/ForwardRenderer.h"
+#include "Scenes/Scene.h"
 #include "Scenes/SceneManager.h"
 #include "Utils/Timestep.h"
 #include "WindowContext/Application.h"
@@ -18,9 +19,9 @@
 #include "AccelerationStructures/CPU/BVH/BVH.h"
 #include "AccelerationStructures/CPU/BVH/BVH_SAH.h"
 #include "AccelerationStructures/CPU/BVH/DBVH.h"
+#include "Components/TerrainComponent.h"
 #include "Generators/Textures/ProceduralTextures.h"
 #include "Meshes/MeshPrimitives.h"
-#include "Physics/EntropyComponents.h"
 #include "Utils/Timestep.h"
 
 TestLayer::~TestLayer()
@@ -89,8 +90,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
     if (std::filesystem::exists(sponzaPath)) {
         Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
-        auto loader = Rapture::ModelLoadersCache::getLoader(sponzaPath, activeScene);
-        loader->loadModel(sponzaPath.string());
+        auto loader = Rapture::glTF2Loader(sponzaPath);
+        loader.load(activeScene.get());
     } else {
         Rapture::RP_WARN("Sponza model not found at: {}", sponzaPath.string());
 
@@ -121,8 +122,8 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
                                                                           30.0f,                       // Inner cone angle (degrees)
                                                                           45.0f                        // Outer cone angle (degrees)
     );
-    spotLightComp.castsShadow = true;
-    spotLight.addComponent<Rapture::ShadowComponent>(2048.0f, 2048.0f);
+    spotLightComp.castsShadow = false;
+    spotLight.addComponent<Rapture::ShadowComponent>(1028.0f, 1028.0f);
 
     // Create a directional light with CSM (sun) - pointing down into Sponza
     // Note: Rotation is in RADIANS
@@ -131,7 +132,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
                                                        glm::vec3(-1.874f, 0.0f, 0.0f), // Point downwards
                                                        glm::vec3(0.2f));
     auto &sunLightComp = sunLight.addComponent<Rapture::LightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White sunlight
-                                                                        3.14f                         // Intensity
+                                                                        3.14f                        // Intensity
     );
     sunLightComp.castsShadow = true;
     sunLight.addComponent<Rapture::CascadedShadowComponent>(2048.0f, 2048.0f, 4, 0.8f);
@@ -144,7 +145,6 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         // Renderer will query for SkyboxComponent directly
     }
 
-    // Test procedural texture generation
     {
         Rapture::ProceduralTextureConfig config;
         config.name = "test_white_noise";
@@ -153,6 +153,37 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
             Rapture::RP_INFO("Generated white noise texture: {}", config.name);
         }
     }
+
+    {
+        Rapture::ProceduralTextureConfig config;
+        config.name = "test_atmosphere_noon";
+        config.format = Rapture::TextureFormat::RGBA16F; // HDR for proper atmospheric colors
+        config.srgb = false;
+
+        auto atmosphereTexture = Rapture::ProceduralTexture::generateAtmosphere(12.0f, nullptr, config);
+        if (atmosphereTexture) {
+            Rapture::RP_INFO("Generated atmospheric scattering texture (noon): {}", config.name);
+        }
+    }
+
+    // giga unstable
+    constexpr float chunkSize = 64.0f;
+    constexpr int32_t chunkRadius = 6;
+    constexpr uint32_t chunkGridSize = (2 * chunkRadius + 1) * (2 * chunkRadius + 1); // 49 chunks
+    constexpr float terrainExtent = chunkSize * (2 * chunkRadius + 1);
+
+    Rapture::TerrainConfig terrainConfig = {};
+    terrainConfig.chunkWorldSize = chunkSize;
+    terrainConfig.heightScale = 40.0f;
+    terrainConfig.terrainWorldSize = terrainExtent;
+    terrainConfig.chunkGridSize = chunkGridSize;
+    terrainConfig.hmType = Rapture::HM_CEPV;
+
+    auto terrainEntity = activeScene->createEntity("Terrain");
+    auto &terrainComp = terrainEntity.addComponent<Rapture::TerrainComponent>(terrainConfig);
+    terrainComp.isEnabled = true;
+    Rapture::RP_INFO("Terrain entity created with {} chunks (radius {})", terrainComp.generator->getChunkCount(),
+                     terrainConfig.getChunkRadius());
 
     // Build TLAS for ray tracing
     try {

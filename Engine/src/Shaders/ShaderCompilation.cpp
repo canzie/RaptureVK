@@ -58,18 +58,17 @@ void ShaderIncluder::ReleaseInclude(shaderc_include_result *data)
 }
 
 // --- ShaderCompiler Implementation ---
-ShaderCompiler::ShaderCompiler()
-{
-    if (!m_compiler.IsValid()) {
-        RP_CORE_ERROR("Shaderc compiler is not valid.");
-        throw std::runtime_error("Failed to initialize shader compiler");
-    }
-}
+ShaderCompiler::ShaderCompiler() {}
 
 ShaderCompiler::~ShaderCompiler() {}
 
 std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, const ShaderCompileInfo &compileInfo)
 {
+    if (!m_compiler.IsValid()) {
+        RP_CORE_ERROR("Shaderc compiler is not valid.");
+        return {};
+    }
+
     shaderc::CompileOptions options;
     options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 #ifdef NDEBUG
@@ -134,14 +133,22 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
 shaderc_shader_kind ShaderCompiler::getShaderKind(const std::filesystem::path &path)
 {
     std::string filepath = path.string();
-    if (filepath.find(".vert") != std::string::npos || filepath.find(".vs") != std::string::npos) return shaderc_glsl_vertex_shader;
+    if (filepath.find(".vert") != std::string::npos || filepath.find(".vs") != std::string::npos)
+        return shaderc_glsl_vertex_shader;
     if (filepath.find(".frag") != std::string::npos || filepath.find(".fs") != std::string::npos)
         return shaderc_glsl_fragment_shader;
     if (filepath.find(".comp") != std::string::npos || filepath.find(".cs") != std::string::npos)
         return shaderc_glsl_compute_shader;
     if (filepath.find(".geom") != std::string::npos || filepath.find(".gs") != std::string::npos)
         return shaderc_glsl_geometry_shader;
-    // Add other shader types if needed
+    if (filepath.find(".tesc") != std::string::npos)
+        return shaderc_glsl_tess_control_shader;
+    if (filepath.find(".tese") != std::string::npos)
+        return shaderc_glsl_tess_evaluation_shader;
+    if (filepath.find(".mesh") != std::string::npos)
+        return shaderc_glsl_mesh_shader;
+    if (filepath.find(".task") != std::string::npos)
+        return shaderc_glsl_task_shader;
     return (shaderc_shader_kind)-1;
 }
 

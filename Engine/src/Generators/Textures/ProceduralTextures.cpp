@@ -1,8 +1,10 @@
 #include "ProceduralTextures.h"
 
+#include "AssetManager/Asset.h"
 #include "AssetManager/AssetManager.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Logging/Log.h"
+#include "Textures/Texture.h"
 #include "WindowContext/Application.h"
 #include "WindowContext/VulkanContext/VulkanQueue.h"
 
@@ -18,8 +20,7 @@ ProceduralTexture::ProceduralTexture(const AssetHandle &shaderHandle, const Proc
     initFromShaderHandle(shaderHandle);
 }
 
-ProceduralTexture::ProceduralTexture(const std::string &shaderPath, std::shared_ptr<Texture> outputTexture)
-    : m_texture(outputTexture)
+ProceduralTexture::ProceduralTexture(const std::string &shaderPath, Texture &outputTexture) : m_texture(&outputTexture)
 {
     initFromShaderPath(shaderPath, false);
 }
@@ -32,13 +33,14 @@ void ProceduralTexture::initFromShaderPath(const std::string &shaderPath, bool c
     auto &proj = app.getProject();
     auto shaderDir = proj.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderDir / shaderPath);
-    if (!shader) {
+    auto asset = AssetManager::importAsset(shaderDir / shaderPath);
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (!m_shader || !m_shader->isReady()) {
         RP_CORE_ERROR("Failed to load procedural texture shader: {}", shaderPath);
         return;
     }
 
-    m_shader = shader;
+    m_assets.push_back(std::move(asset));
     extractExpectedPushConstantSize();
     initPipeline();
     initCommandBuffer();
@@ -53,9 +55,10 @@ void ProceduralTexture::initFromShaderPath(const std::string &shaderPath, bool c
 
 void ProceduralTexture::initFromShaderHandle(const AssetHandle &shaderHandle, bool createTexture)
 {
-    m_shader = AssetManager::getAsset<Shader>(shaderHandle);
-    if (!m_shader) {
-        RP_CORE_ERROR("Failed to get shader from asset handle");
+    auto asset = AssetManager::getAsset(shaderHandle);
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (!m_shader || !m_shader->isReady()) {
+        RP_CORE_ERROR("Failed to get ready shader from asset handle");
         return;
     }
 
@@ -85,10 +88,9 @@ void ProceduralTexture::initCommandBuffer()
 
     CommandPoolConfig poolConfig{};
     poolConfig.queueFamilyIndex = vulkanContext.getComputeQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolConfig.flags = 0;
 
-    m_commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    m_commandBuffer = m_commandPool->getCommandBuffer("ProceduralTexture");
+    m_commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
 }
 
 void ProceduralTexture::initTexture()
@@ -105,7 +107,7 @@ void ProceduralTexture::initTexture()
     spec.storageImage = true;
     spec.mipLevels = 1;
 
-    m_texture = std::make_shared<Texture>(spec);
+    auto texture = std::make_unique<Texture>(spec);
 
     std::string textureName = m_config.name;
     if (textureName.empty()) {
@@ -113,11 +115,17 @@ void ProceduralTexture::initTexture()
         textureName = "procedural_texture_" + std::to_string(s_proceduralTextureCounter++);
     }
 
-    AssetManager::registerVirtualAsset(AssetVariant{m_texture}, textureName, AssetType::Texture);
+    auto asset = AssetManager::registerVirtualAsset(std::move(texture), textureName, AssetType::TEXTURE);
+    m_texture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
+    m_assets.push_back(asset);
 }
 
 void ProceduralTexture::initDescriptorSet()
 {
+    if (!m_texture) {
+        return;
+    }
+
     DescriptorSetBindings bindings;
     bindings.setNumber = 4;
 
@@ -128,7 +136,7 @@ void ProceduralTexture::initDescriptorSet()
     bindings.bindings.push_back(outputBinding);
 
     m_descriptorSet = std::make_shared<DescriptorSet>(bindings);
-    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_0)->add(m_texture);
+    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_0)->add(*m_texture);
 }
 
 void ProceduralTexture::extractExpectedPushConstantSize()
@@ -163,10 +171,12 @@ void ProceduralTexture::generate()
         return;
     }
 
-    m_commandBuffer->reset();
-    m_commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash);
+    auto commandBuffer = pool->getPrimaryCommandBuffer();
 
-    VkCommandBuffer vkCmd = m_commandBuffer->getCommandBufferVk();
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    VkCommandBuffer vkCmd = commandBuffer->getCommandBufferVk();
 
     VkImageMemoryBarrier preBarrier{};
     preBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -214,39 +224,36 @@ void ProceduralTexture::generate()
     postBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
     vkCmdPipelineBarrier(vkCmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                         1, &postBarrier);
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                         &postBarrier);
 
-    m_commandBuffer->end();
+    commandBuffer->end();
 
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
     auto queue = vulkanContext.getComputeQueue();
 
-    queue->submitQueue(m_commandBuffer, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
     queue->waitIdle();
-
-    m_texture->setReadyForSampling(true);
 }
 
-std::shared_ptr<Texture> ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTextureConfig &config)
+Texture *ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTextureConfig &config)
 {
     // Function-local static for shader handle - AssetManager handles caching
-    static AssetHandle s_shaderHandle;
-    static bool s_shaderLoaded = false;
+    static AssetHandle s_shaderHandle = 0;
 
-    if (!s_shaderLoaded) {
+    if (s_shaderHandle == 0) {
         auto &app = Application::getInstance();
         auto &proj = app.getProject();
         auto shaderDir = proj.getProjectShaderDirectory();
 
-        auto [shader, handle] = AssetManager::importAsset<Shader>(shaderDir / "glsl/Generators/WhiteNoise.cs.glsl");
+        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/WhiteNoise.cs.glsl");
+        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
         if (!shader) {
             RP_CORE_ERROR("Failed to load WhiteNoise shader");
             return nullptr;
         }
-        s_shaderHandle = handle;
-        s_shaderLoaded = true;
+        s_shaderHandle = asset.get()->getHandle();
     }
 
     ProceduralTexture generator(s_shaderHandle, config);
@@ -260,7 +267,151 @@ std::shared_ptr<Texture> ProceduralTexture::generateWhiteNoise(uint32_t seed, co
     generator.setPushConstants(pc);
     generator.generate();
 
-    return generator.getTexture();
+    return &generator.getTexture();
+}
+
+Texture *ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &params, const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle;
+
+    if (0 == s_shaderHandle) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/PerlinNoise.cs.glsl");
+        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load PerlinNoise shader");
+            return nullptr;
+        }
+        s_shaderHandle = asset.get()->getHandle();
+    }
+
+    ProceduralTexture generator(s_shaderHandle, config);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create Perlin noise generator");
+        return nullptr;
+    }
+
+    generator.setPushConstants(params);
+    generator.generate();
+
+    return &generator.getTexture();
+}
+
+Texture *ProceduralTexture::generateSimplexNoise(const SimplexNoisePushConstants &params, const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle;
+
+    if (s_shaderHandle == 0) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/SimplexNoise.cs.glsl");
+        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load SimplexNoise shader");
+            return nullptr;
+        }
+        s_shaderHandle = asset.get()->getHandle();
+    }
+
+    ProceduralTexture generator(s_shaderHandle, config);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create Simplex noise generator");
+        return nullptr;
+    }
+
+    generator.setPushConstants(params);
+    generator.generate();
+
+    return &generator.getTexture();
+}
+
+Texture *ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &params, const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle;
+
+    if (s_shaderHandle == 0) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/RidgedNoise.cs.glsl");
+        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load RidgedNoise shader");
+            return nullptr;
+        }
+        s_shaderHandle = asset.get()->getHandle();
+    }
+
+    ProceduralTexture generator(s_shaderHandle, config);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create Ridged noise generator");
+        return nullptr;
+    }
+
+    generator.setPushConstants(params);
+    generator.generate();
+
+    return &generator.getTexture();
+}
+
+Texture *ProceduralTexture::generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params,
+                                               const ProceduralTextureConfig &config)
+{
+    // Function-local static for shader handle - AssetManager handles caching
+    static AssetHandle s_shaderHandle;
+
+    if (s_shaderHandle == 0) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/Atmosphere.cs.glsl");
+        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load Atmosphere shader");
+            return nullptr;
+        }
+        s_shaderHandle = asset.get()->getHandle();
+    }
+
+    // Use HDR format by default for atmospheric scattering
+    ProceduralTextureConfig atmosphereConfig = config;
+    if (atmosphereConfig.format == TextureFormat::RGBA8) {
+        atmosphereConfig.format = TextureFormat::RGBA16F;
+    }
+
+    ProceduralTexture generator(s_shaderHandle, atmosphereConfig);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create atmosphere generator");
+        return nullptr;
+    }
+
+    (void)timeOfDay;
+
+    // Set up push constants with defaults if not provided
+    AtmospherePushConstants pc;
+    if (params) {
+        pc = *params;
+    } else {
+        // Earth-like atmospheric defaults
+        pc.sunDir = glm::vec3(1.0f);
+        pc.planetRadius = 6371e3f;
+        pc.atmoRadius = 6471e3f;
+        pc.betaRay = glm::vec3(5.5e-6, 13.0e-6, 22.4e-6);
+        pc.scaleHeight = 8000.0f;
+        pc.sunIntensity = 21e-6f;
+    }
+
+    generator.setPushConstants(pc);
+    generator.generate();
+
+    return &generator.getTexture();
 }
 
 } // namespace Rapture

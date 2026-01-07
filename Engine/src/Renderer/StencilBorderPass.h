@@ -3,6 +3,7 @@
 
 #include "AssetManager/AssetManager.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Cameras/CameraCommon.h"
@@ -26,14 +27,17 @@ class StencilBorderPass {
 
     ~StencilBorderPass();
 
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
-                             uint32_t currentFrameInFlight, std::shared_ptr<Scene> activeScene);
+    CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
+                                   std::shared_ptr<Scene> activeScene, const SecondaryBufferInheritance &inheritance);
+
+    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex);
+    void endDynamicRendering(CommandBuffer *commandBuffer);
 
   private:
     void createPipeline();
+    void setupCommandResources();
 
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage);
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView, VkExtent2D targetExtent);
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage);
 
   private:
     float m_width;
@@ -47,13 +51,15 @@ class StencilBorderPass {
     uint32_t m_framesInFlight;
     uint32_t m_currentImageIndex;
 
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_shaderHandle;
+    Shader *m_shader = nullptr;
+    std::vector<AssetRef> m_shaderAssets;
 
     std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
 
     std::shared_ptr<Entity> m_selectedEntity;
     size_t m_entitySelectedListenerId = 0;
+
+    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture

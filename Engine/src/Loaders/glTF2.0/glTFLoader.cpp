@@ -1,36 +1,36 @@
 #include "glTFLoader.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <fstream>
-#include <iostream>
-#include <type_traits>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <string>
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-#include "Components/Components.h"
-#include "Components/HierarchyComponent.h"
-
-#include "Buffers/VertexBuffers/BufferLayout.h"
-
-#include "Meshes/Mesh.h"
+#include <yyjson.h>
 
 #include "AssetManager/AssetManager.h"
-#include "Events/AssetEvents.h"
+#include "Buffers/VertexBuffers/BufferLayout.h"
+#include "Components/Components.h"
+#include "Components/HierarchyComponent.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInstance.h"
+#include "Materials/MaterialParameters.h"
+#include "Meshes/Mesh.h"
+#include "Scenes/Entities/Entity.h"
 
 namespace Rapture {
 
-bool ModelLoadersCache::s_initialized = false;
-std::map<std::filesystem::path, std::weak_ptr<glTF2Loader>> ModelLoadersCache::s_loaders;
-std::mutex ModelLoadersCache::s_mutex;
-
-glTF2Loader::glTF2Loader(std::shared_ptr<Scene> scene)
-    : m_scene(scene), m_glTFdoc(nullptr), m_glTFroot(nullptr), m_accessors(nullptr), m_meshes(nullptr), m_bufferViews(nullptr),
-      m_buffers(nullptr), m_nodes(nullptr), m_materials(nullptr), m_animations(nullptr), m_skins(nullptr), m_textures(nullptr),
-      m_images(nullptr), m_samplers(nullptr)
+glTF2Loader::glTF2Loader(const std::filesystem::path &filepath) : m_filepath(filepath)
 {
-    if (!m_scene) {
-        RP_CORE_WARN("Scene pointer is null");
+    m_basePath = filepath.parent_path().string();
+    if (!m_basePath.empty() && m_basePath.back() != '/' && m_basePath.back() != '\\') {
+        m_basePath += '/';
     }
 }
 
@@ -87,7 +87,7 @@ size_t glTF2Loader::getArraySize(yyjson_val *arr)
     return yyjson_arr_size(arr);
 }
 
-void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, ParameterID id, int textureIndex)
+void glTF2Loader::loadAndSetTexture(MaterialInstance *material, ParameterID id, int textureIndex)
 {
     if (textureIndex < 0 || static_cast<size_t>(textureIndex) >= getArraySize(m_textures)) {
         RP_CORE_ERROR("glTF2Loader: Invalid texture index {}", textureIndex);
@@ -137,7 +137,8 @@ void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, 
         texImportConfig.srgb = true;
     }
 
-    auto [tex, handle] = AssetManager::importAsset<Texture>(texturePathFS, texImportConfig);
+    auto asset = AssetManager::importAsset(texturePathFS, texImportConfig);
+    auto tex = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
 
     if (!tex) {
         RP_CORE_ERROR("Failed to import or get texture {}", texturePath);
@@ -156,36 +157,29 @@ void glTF2Loader::loadAndSetTexture(std::shared_ptr<MaterialInstance> material, 
     material->setParameter(id, tex);
 }
 
-bool glTF2Loader::initialize(const std::string &filepath)
+bool glTF2Loader::load(Scene *scene, int32_t sceneIndex)
 {
-    RP_CORE_INFO("Initializing loader for '{}'", filepath);
-
     m_isLoaded = false;
-    if (m_isInitialized) return true;
-
     cleanUp();
 
-    // Read the gltf file content into string
-    std::ifstream gltf_file(filepath);
-    if (!gltf_file) {
-        RP_CORE_ERROR("Couldn't load glTF file '{}'", filepath);
+    m_loadedData = std::make_unique<glTF_LoadedSceneData>();
+
+    std::ifstream gltfFile(m_filepath);
+    if (!gltfFile) {
+        RP_CORE_ERROR("Couldn't load glTF file '{}'", m_filepath.string());
         return false;
     }
 
-    m_filepath = filepath;
+    std::string gltfContent((std::istreambuf_iterator<char>(gltfFile)), std::istreambuf_iterator<char>());
+    gltfFile.close();
 
-    // Read entire file into string
-    std::string gltf_content((std::istreambuf_iterator<char>(gltf_file)), std::istreambuf_iterator<char>());
-    gltf_file.close();
-
-    if (gltf_content.empty()) {
-        RP_CORE_ERROR("Empty glTF file '{}'", filepath);
+    if (gltfContent.empty()) {
+        RP_CORE_ERROR("Empty glTF file '{}'", m_filepath.string());
         return false;
     }
 
-    // Parse the JSON using yyjson
     yyjson_read_err err;
-    m_glTFdoc = yyjson_read(gltf_content.c_str(), gltf_content.length(), 0);
+    m_glTFdoc = yyjson_read(gltfContent.c_str(), gltfContent.length(), 0);
 
     if (!m_glTFdoc) {
         RP_CORE_ERROR("Failed to parse glTF JSON: {} at position {}", err.msg, err.pos);
@@ -200,7 +194,6 @@ bool glTF2Loader::initialize(const std::string &filepath)
         return false;
     }
 
-    // Load references to major sections
     m_accessors = getObjectValue(m_glTFroot, "accessors");
     m_meshes = getObjectValue(m_glTFroot, "meshes");
     m_bufferViews = getObjectValue(m_glTFroot, "bufferViews");
@@ -213,20 +206,11 @@ bool glTF2Loader::initialize(const std::string &filepath)
     m_images = getObjectValue(m_glTFroot, "images");
     m_samplers = getObjectValue(m_glTFroot, "samplers");
 
-    // Validate required sections
     if (!m_accessors || !m_meshes || !m_bufferViews || !m_buffers) {
         RP_CORE_ERROR("Missing required glTF sections");
         return false;
     }
 
-    // Extract the directory path from the filepath
-    m_basePath = "";
-    size_t lastSlashPos = filepath.find_last_of("/\\");
-    if (lastSlashPos != std::string::npos) {
-        m_basePath = filepath.substr(0, lastSlashPos + 1);
-    }
-
-    // Load the bin file with all the buffer data
     yyjson_val *firstBuffer = getArrayElement(m_buffers, 0);
     if (!firstBuffer) {
         RP_CORE_ERROR("No buffers found");
@@ -239,218 +223,300 @@ bool glTF2Loader::initialize(const std::string &filepath)
         return false;
     }
 
-    // Check if the buffer URI is a relative path
     std::string fullBufferPath;
     if (strstr(bufferURI, "://") == nullptr && strlen(bufferURI) > 0) {
-        // Combine the directory path with the buffer URI
         fullBufferPath = m_basePath + bufferURI;
     } else {
         fullBufferPath = bufferURI;
     }
 
-    std::ifstream binary_file(fullBufferPath, std::ios::binary);
-    if (!binary_file) {
+    std::ifstream binaryFile(fullBufferPath, std::ios::binary);
+    if (!binaryFile) {
         RP_CORE_ERROR("Couldn't load binary file '{}'", fullBufferPath);
         return false;
     }
 
-    // Get file size and reserve space
-    binary_file.seekg(0, std::ios::end);
-    size_t fileSize = binary_file.tellg();
-    binary_file.seekg(0, std::ios::beg);
+    binaryFile.seekg(0, std::ios::end);
+    size_t fileSize = binaryFile.tellg();
+    binaryFile.seekg(0, std::ios::beg);
 
     m_binVec.resize(fileSize);
 
-    // Read the entire file at once for efficiency
-    if (!binary_file.read(reinterpret_cast<char *>(m_binVec.data()), fileSize)) {
+    if (!binaryFile.read(reinterpret_cast<char *>(m_binVec.data()), fileSize)) {
         RP_CORE_ERROR("Failed to read binary data");
         return false;
     }
 
-    binary_file.close();
-
-    m_isInitialized = true;
-    return true;
-}
-
-bool glTF2Loader::loadModel(const std::string &filepath, bool calculateBoundingBoxes)
-{
-    (void)calculateBoundingBoxes;
-    if (m_scene == nullptr) {
-        RP_CORE_ERROR("Scene pointer is null");
-        return false;
-    }
-
-    if (!m_isInitialized || !initialize(filepath)) {
-        RP_CORE_ERROR("Failed to initialize loader for '{}'", filepath);
-        return false;
-    }
-
-    // Create a root entity for the model
-    m_scene->createEntity("glTF_Model");
-
-    // Check if the model has animations
-    if (m_animations && getArraySize(m_animations) > 0) {
-        RP_CORE_INFO("Model has {} animations", getArraySize(m_animations));
-    }
-
-    // Process the default scene or the first scene if default not specified
-    yyjson_val *sceneIndexVal = getObjectValue(m_glTFroot, "scene");
-    int defaultScene = getInt(sceneIndexVal, 0);
+    binaryFile.close();
 
     yyjson_val *scenes = getObjectValue(m_glTFroot, "scenes");
     if (scenes && getArraySize(scenes) > 0) {
-        yyjson_val *sceneToProcess = getArrayElement(scenes, defaultScene);
+        if (sceneIndex < 0 || sceneIndex >= static_cast<int32_t>(getArraySize(scenes))) {
+            yyjson_val *sceneIndexVal = getObjectValue(m_glTFroot, "scene");
+            sceneIndex = static_cast<int32_t>(getInt(sceneIndexVal, 0));
+        }
+        yyjson_val *sceneToProcess = getArrayElement(scenes, sceneIndex);
         if (sceneToProcess) {
-            processScene(sceneToProcess);
+            loadScene(sceneToProcess);
         }
     } else if (m_nodes && getArraySize(m_nodes) > 0) {
-        // If no scenes but has nodes, process the first node as root
-        Entity nodeEntity = m_scene->createEntity("Root Node");
-        nodeEntity.addComponent<HierarchyComponent>();
-
-        yyjson_val *firstNode = getArrayElement(m_nodes, 0);
-        if (firstNode) {
-            processNode(nodeEntity, firstNode);
+        for (size_t i = 0; i < getArraySize(m_nodes); ++i) {
+            loadNode(nullptr, i);
         }
     }
 
-    // Clean up
-    cleanUp();
-
+    m_isInitialized = true;
     m_isLoaded = true;
+
+    if (scene) {
+        finalizeToScene(scene);
+    }
+
     return true;
 }
 
-void glTF2Loader::processScene(yyjson_val *sceneVal)
+bool glTF2Loader::loadScene(yyjson_val *scene)
 {
-    // Create a root entity for the scene
-    // const char *sceneName = getString(getObjectValue(sceneVal, "name"), "Scene");
-
-    // Process each node in the scene
-    yyjson_val *sceneNodes = getObjectValue(sceneVal, "nodes");
-    if (sceneNodes && yyjson_is_arr(sceneNodes)) {
-        size_t nodeCount = getArraySize(sceneNodes);
-        for (size_t i = 0; i < nodeCount; i++) {
-            yyjson_val *nodeIndexVal = getArrayElement(sceneNodes, i);
-            unsigned int nodeIndex = getInt(nodeIndexVal, 0);
-            if (nodeIndex < getArraySize(m_nodes)) {
-                Entity nodeEntity = m_scene->createEntity("Node " + std::to_string(nodeIndex));
-                nodeEntity.addComponent<HierarchyComponent>();
-                yyjson_val *nodeToProcess = getArrayElement(m_nodes, nodeIndex);
-                if (nodeToProcess) {
-                    processNode(nodeEntity, nodeToProcess);
-                }
-            }
-        }
+    yyjson_val *node;
+    size_t idx, max;
+    yyjson_val *nodes = getObjectValue(scene, "nodes");
+    auto sceneNode = std::make_unique<glTF_SceneNode>();
+    sceneNode->name = "Scene";
+    yyjson_arr_foreach(nodes, idx, max, node)
+    {
+        loadNode(sceneNode.get(), idx);
     }
+
+    m_loadedData->rootNodes.push_back(std::move(sceneNode));
+    return true;
 }
 
-std::shared_ptr<MaterialInstance> glTF2Loader::processMaterial(Entity parentEntity, yyjson_val *materialVal)
+bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
 {
-    (void)parentEntity;
+    yyjson_val *nodeJson = getArrayElement(m_nodes, idx);
+    if (!nodeJson) return false;
 
-    // Get material name if available
-    std::string materialName = getString(getObjectValue(materialVal, "name"), "");
+    auto node = std::make_unique<glTF_SceneNode>();
+    node->parent = parent;
+    node->name = getString(getObjectValue(nodeJson, "name"), "Node");
 
-    // Extract PBR parameters from material JSON
-    glm::vec3 baseColor(0.5f, 0.5f, 0.5f); // Default base color
-    float metallic = 0.0f;                 // Default metallic
-    float roughness = 0.5f;                // Default roughness
+    glm::mat4 localTransform = getNodeTransform(nodeJson);
+    node->worldTransform = (parent ? parent->worldTransform : glm::mat4(1.0f)) * localTransform;
 
-    // Create a PBR material using the MaterialLibrary
-    auto baseMaterial = MaterialManager::getMaterial("PBR");
-    std::shared_ptr<MaterialInstance> material = std::make_shared<MaterialInstance>(baseMaterial, materialName);
-
-    // If no specular-glossiness extension, process standard metallic-roughness
-    yyjson_val *pbrMetallicRoughness = getObjectValue(materialVal, "pbrMetallicRoughness");
-    if (pbrMetallicRoughness) {
-
-        // Base color factor
-        yyjson_val *baseColorFactorVal = getObjectValue(pbrMetallicRoughness, "baseColorFactor");
-        if (baseColorFactorVal && yyjson_is_arr(baseColorFactorVal) && getArraySize(baseColorFactorVal) >= 3) {
-            baseColor = glm::vec3((float)getDouble(getArrayElement(baseColorFactorVal, 0), 0.5),
-                                  (float)getDouble(getArrayElement(baseColorFactorVal, 1), 0.5),
-                                  (float)getDouble(getArrayElement(baseColorFactorVal, 2), 0.5));
+    yyjson_val *meshIdxVal = getObjectValue(nodeJson, "mesh");
+    if (meshIdxVal && yyjson_is_int(meshIdxVal)) {
+        size_t meshIndex = static_cast<size_t>(getInt(meshIdxVal, 0));
+        if (meshIndex < getArraySize(m_meshes)) {
+            loadMesh(node.get(), meshIndex);
         }
+    }
 
-        // Metallic factor
-        yyjson_val *metallicFactorVal = getObjectValue(pbrMetallicRoughness, "metallicFactor");
-        if (metallicFactorVal) {
-            metallic = (float)getDouble(metallicFactorVal, 0.0);
-        }
-
-        // Roughness factor
-        yyjson_val *roughnessFactorVal = getObjectValue(pbrMetallicRoughness, "roughnessFactor");
-        if (roughnessFactorVal) {
-            roughness = (float)getDouble(roughnessFactorVal, 0.5);
-        }
-
-        // Load textures
-        // Base color texture
-        yyjson_val *baseColorTextureInfo = getObjectValue(pbrMetallicRoughness, "baseColorTexture");
-        if (baseColorTextureInfo) {
-            int texIndex = getInt(getObjectValue(baseColorTextureInfo, "index"), -1);
-            if (texIndex != -1) {
-                loadAndSetTexture(material, ParameterID::ALBEDO_MAP, texIndex);
-            }
-        }
-
-        // Metallic roughness texture
-        yyjson_val *metallicRoughnessTextureInfo = getObjectValue(pbrMetallicRoughness, "metallicRoughnessTexture");
-        if (metallicRoughnessTextureInfo) {
-            int texIndex = getInt(getObjectValue(metallicRoughnessTextureInfo, "index"), -1);
-            if (texIndex != -1) {
-                loadAndSetTexture(material, ParameterID::METALLIC_ROUGHNESS_MAP, texIndex);
+    yyjson_val *childrenVal = getObjectValue(nodeJson, "children");
+    if (childrenVal && yyjson_is_arr(childrenVal)) {
+        size_t childCount = getArraySize(childrenVal);
+        for (size_t i = 0; i < childCount; i++) {
+            yyjson_val *childIndexVal = getArrayElement(childrenVal, i);
+            size_t childIndex = static_cast<size_t>(getInt(childIndexVal, 0));
+            if (childIndex < getArraySize(m_nodes)) {
+                loadNode(node.get(), childIndex);
             }
         }
     }
 
-    // Normal map - common to both workflows
-    yyjson_val *normalTextureInfo = getObjectValue(materialVal, "normalTexture");
-    if (normalTextureInfo) {
-        int texIndex = getInt(getObjectValue(normalTextureInfo, "index"), -1);
-        if (texIndex != -1) {
-            loadAndSetTexture(material, ParameterID::NORMAL_MAP, texIndex);
+    yyjson_val *skinVal = getObjectValue(nodeJson, "skin");
+    if (skinVal) {
+        loadSkin(skinVal);
+        node->type = glTF_NodeType::SKELETON;
+    }
+
+    yyjson_val *weightsVal = getObjectValue(nodeJson, "weights");
+    if (weightsVal) {
+        loadWeights(weightsVal);
+    }
+
+    if (parent) {
+        parent->children.push_back(std::move(node));
+    }
+    return true;
+}
+
+bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex)
+{
+    yyjson_val *meshJson = getArrayElement(m_meshes, static_cast<uint32_t>(meshIndex));
+    if (!meshJson) return false;
+
+    std::string meshName = getString(getObjectValue(meshJson, "name"), "");
+    if (meshName.empty()) {
+        meshName = "Mesh_" + std::to_string(meshIndex);
+    }
+
+    yyjson_val *primitivesVal = getObjectValue(meshJson, "primitives");
+    if (!primitivesVal || !yyjson_is_arr(primitivesVal)) return false;
+
+    size_t primitiveCount = getArraySize(primitivesVal);
+    if (primitiveCount < 1) return false;
+
+    size_t idx, max;
+    yyjson_val *primitiveJson;
+    yyjson_arr_foreach(primitivesVal, idx, max, primitiveJson)
+    {
+        loadPrimitive(node, primitiveJson, idx);
+    }
+
+    return true;
+}
+
+bool glTF2Loader::loadPrimitive(glTF_SceneNode *parent, yyjson_val *primitiveJson, size_t primitiveIndex)
+{
+    auto node = std::make_unique<glTF_SceneNode>();
+    node->parent = parent;
+    node->name = parent->name + "_Primitive_" + std::to_string(primitiveIndex);
+    node->type = glTF_NodeType::PRIMITIVE;
+    node->worldTransform = parent->worldTransform;
+
+    std::vector<std::pair<std::string, std::vector<uint8_t>>> attributeData;
+    uint32_t vertexCount = 0;
+
+    glm::vec3 minBounds(std::numeric_limits<float>::infinity());
+    glm::vec3 maxBounds(-std::numeric_limits<float>::infinity());
+    bool hasBounds = false;
+
+    yyjson_val *attributesVal = getObjectValue(primitiveJson, "attributes");
+    if (attributesVal && yyjson_is_obj(attributesVal)) {
+        yyjson_obj_iter iter = yyjson_obj_iter_with(attributesVal);
+        yyjson_val *key, *val;
+        while ((key = yyjson_obj_iter_next(&iter))) {
+            val = yyjson_obj_iter_get_val(key);
+            const char *attribName = yyjson_get_str(key);
+            if (strcmp(attribName, "COLOR_0") == 0) continue;
+
+            size_t accessorIdx = static_cast<size_t>(getInt(val, 0));
+            yyjson_val *accessor = getArrayElement(m_accessors, static_cast<uint32_t>(accessorIdx));
+
+            if (strcmp(attribName, "POSITION") == 0 && accessor) {
+                vertexCount = static_cast<uint32_t>(getInt(getObjectValue(accessor, "count"), 0));
+
+                yyjson_val *minVal = getObjectValue(accessor, "min");
+                yyjson_val *maxVal = getObjectValue(accessor, "max");
+                if (minVal && yyjson_is_arr(minVal) && getArraySize(minVal) >= 3 && maxVal && yyjson_is_arr(maxVal) &&
+                    getArraySize(maxVal) >= 3) {
+                    minBounds = glm::vec3(static_cast<float>(getDouble(getArrayElement(minVal, 0), 0.0)),
+                                          static_cast<float>(getDouble(getArrayElement(minVal, 1), 0.0)),
+                                          static_cast<float>(getDouble(getArrayElement(minVal, 2), 0.0)));
+                    maxBounds = glm::vec3(static_cast<float>(getDouble(getArrayElement(maxVal, 0), 0.0)),
+                                          static_cast<float>(getDouble(getArrayElement(maxVal, 1), 0.0)),
+                                          static_cast<float>(getDouble(getArrayElement(maxVal, 2), 0.0)));
+                    hasBounds = true;
+                }
+            }
+
+            std::vector<uint8_t> attrData;
+            loadAccessor(getArrayElement(m_accessors, static_cast<uint32_t>(accessorIdx)), attrData);
+
+            if (!attrData.empty()) {
+                attributeData.push_back({attribName, std::move(attrData)});
+            }
         }
     }
 
-    // Occlusion map - common to both workflows
-    yyjson_val *occlusionTextureInfo = getObjectValue(materialVal, "occlusionTexture");
-    if (occlusionTextureInfo) {
-        int texIndex = getInt(getObjectValue(occlusionTextureInfo, "index"), -1);
-        if (texIndex != -1) {
-            loadAndSetTexture(material, ParameterID::AO_MAP, texIndex);
+    if (attributeData.empty() || vertexCount == 0) {
+        RP_CORE_ERROR("No vertex data found for primitive");
+        return false;
+    }
+
+    if (hasBounds) {
+        node->boundingBoxMin = minBounds;
+        node->boundingBoxMax = maxBounds;
+        node->hasBoundingBox = true;
+    }
+
+    uint32_t vertexStride = 0;
+    std::vector<uint32_t> attrSizes;
+    std::vector<uint32_t> attrOffsets;
+
+    for (const auto &[name, data] : attributeData) {
+        uint32_t attrSize = static_cast<uint32_t>(data.size() / vertexCount);
+        attrSizes.push_back(attrSize);
+        attrOffsets.push_back(vertexStride);
+        vertexStride += attrSize;
+    }
+
+    BufferLayout bufferLayout;
+
+    for (uint32_t i = 0; i < attributeData.size(); i++) {
+        const auto &[name, data] = attributeData[i];
+        yyjson_val *attributesObj = getObjectValue(primitiveJson, "attributes");
+        int accessorIdx = getInt(getObjectValue(attributesObj, name.c_str()), 0);
+        yyjson_val *accessor = getArrayElement(m_accessors, static_cast<uint32_t>(accessorIdx));
+
+        int componentType = getInt(getObjectValue(accessor, "componentType"), 0);
+        const char *type = getString(getObjectValue(accessor, "type"), "");
+
+        bufferLayout.buffer_attribs.push_back(
+            {stringToBufferAttributeID(name), static_cast<uint32_t>(componentType), std::string(type), attrOffsets[i]});
+    }
+
+    bufferLayout.isInterleaved = true;
+    bufferLayout.vertexSize = vertexStride;
+
+    uint32_t totalVertexDataSize = vertexCount * vertexStride;
+
+    std::vector<unsigned char> interleavedData(totalVertexDataSize);
+
+    for (uint32_t v = 0; v < vertexCount; v++) {
+        unsigned char *vertexDest = interleavedData.data() + (v * vertexStride);
+        for (uint32_t a = 0; a < attributeData.size(); a++) {
+            const auto &[name, data] = attributeData[a];
+            uint32_t attrSize = attrSizes[a];
+            const unsigned char *attrSrc = data.data() + (v * attrSize);
+            std::memcpy(vertexDest + attrOffsets[a], attrSrc, attrSize);
         }
     }
 
-    // Emissive map - common to both workflows
-    yyjson_val *emissiveTextureInfo = getObjectValue(materialVal, "emissiveTexture");
-    if (emissiveTextureInfo) {
-        int texIndex = getInt(getObjectValue(emissiveTextureInfo, "index"), -1);
-        if (texIndex != -1) {
-            loadAndSetTexture(material, ParameterID::EMISSIVE_MAP, texIndex);
+    std::vector<unsigned char> indexData;
+    uint32_t indexType = 0;
+    uint32_t indexCount = 0;
+
+    yyjson_val *indicesVal = getObjectValue(primitiveJson, "indices");
+    if (indicesVal && yyjson_is_int(indicesVal)) {
+        uint32_t indicesIdx = static_cast<uint32_t>(getInt(indicesVal, 0));
+
+        loadAccessor(getArrayElement(m_accessors, indicesIdx), indexData);
+
+        if (!indexData.empty()) {
+            indexType = static_cast<uint32_t>(getInt(getObjectValue(getArrayElement(m_accessors, indicesIdx), "componentType"), 0));
+            indexCount = static_cast<uint32_t>(getInt(getObjectValue(getArrayElement(m_accessors, indicesIdx), "count"), 0));
         }
     }
 
-    // Emissive factor - common to both workflows
-    yyjson_val *emissiveFactorVal = getObjectValue(materialVal, "emissiveFactor");
-    if (emissiveFactorVal && yyjson_is_arr(emissiveFactorVal) && getArraySize(emissiveFactorVal) >= 3) {
-        glm::vec3 emissiveFactor((float)getDouble(getArrayElement(emissiveFactorVal, 0), 0.0),
-                                 (float)getDouble(getArrayElement(emissiveFactorVal, 1), 0.0),
-                                 (float)getDouble(getArrayElement(emissiveFactorVal, 2), 0.0));
-        material->setParameter<glm::vec3>(ParameterID::EMISSIVE, emissiveFactor);
+    if (indexData.empty()) {
+        RP_CORE_ERROR("glTF2Loader: Vertex data only not supported yet");
+        return false;
     }
 
-    // dont need to update the descriptor set here, as the ubo is already good, only the textures need to be added to the descriptor
-    // set
-    material->setParameter<glm::vec3>(ParameterID::ALBEDO, baseColor);
-    material->setParameter<float>(ParameterID::METALLIC, metallic);
-    material->setParameter<float>(ParameterID::ROUGHNESS, roughness);
+    AllocatorParams params;
+    params.bufferLayout = bufferLayout;
+    params.vertexData = interleavedData.data();
+    params.vertexDataSize = totalVertexDataSize;
+    params.indexData = indexData.data();
+    params.indexDataSize = static_cast<uint32_t>(indexData.size());
+    params.indexCount = indexCount;
+    params.indexType = indexType;
 
-    // material->updateDescriptorSet();
+    auto mesh = std::make_unique<Mesh>(params);
+    std::string meshAssetName = m_filepath.stem().string() + "_" + node->name;
+    node->meshRef = AssetManager::registerVirtualAsset(std::move(mesh), meshAssetName, AssetType::MESH);
 
-    return material;
+    yyjson_val *materialVal = getObjectValue(primitiveJson, "material");
+    if (materialVal && yyjson_is_int(materialVal)) {
+        node->materialIndex = getInt(materialVal, -1);
+        if (node->materialIndex >= 0) {
+            loadMaterial(static_cast<size_t>(node->materialIndex));
+        }
+    }
+
+    parent->children.push_back(std::move(node));
+    return true;
 }
 
 glm::mat4 glTF2Loader::getNodeTransform(yyjson_val *nodeVal)
@@ -506,339 +572,54 @@ glm::mat4 glTF2Loader::getNodeTransform(yyjson_val *nodeVal)
     return transformMatrix;
 }
 
-NodeType glTF2Loader::processNode(Entity nodeEntity, yyjson_val *nodeVal)
+void glTF2Loader::finalizeToScene(Scene *scene)
 {
-    if (!nodeEntity.hasComponent<HierarchyComponent>()) {
-        return NodeType::Empty;
-    }
+    if (!scene || !m_loadedData) return;
 
-    const char *nodeName = getString(getObjectValue(nodeVal, "name"), "");
-    // Entity nodeEntity = m_scene->createEntity(nodeName);
+    std::function<Entity(glTF_SceneNode *, Entity)> createEntityFromNode = [&](glTF_SceneNode *node,
+                                                                               Entity parentEntity) -> Entity {
+        if (!node) return Entity::null();
 
-    // Update the tag
-    if (nodeName && strlen(nodeName) > 0) {
-        nodeEntity.getComponent<TagComponent>().tag = std::string(nodeName);
-    }
-    auto &nodeEntityComp = nodeEntity.getComponent<HierarchyComponent>();
+        Entity entity = scene->createEntity(node->name);
+        entity.addComponent<TransformComponent>(node->worldTransform);
 
-    auto &transformComp = nodeEntity.addComponent<TransformComponent>();
-
-    glm::mat4 nodeTransform = getNodeTransform(nodeVal);
-
-    Entity parent = nodeEntityComp.parent;
-    if (parent.isValid()) {
-        nodeTransform = parent.getComponent<TransformComponent>().transformMatrix() * nodeTransform;
-    }
-
-    transformComp.transforms.setTransform(nodeTransform);
-
-    // If this node has a mesh, process it
-    yyjson_val *meshVal = getObjectValue(nodeVal, "mesh");
-    if (meshVal && yyjson_is_int(meshVal)) {
-        unsigned int meshIndex = getInt(meshVal, 0);
-        if (meshIndex < getArraySize(m_meshes)) {
-            processMesh(nodeEntity, getArrayElement(m_meshes, meshIndex));
+        if (parentEntity.isValid()) {
+            setParent(entity, parentEntity);
         }
-    }
 
-    bool hasMeshChild = false;
-    // Process children
-    yyjson_val *childrenVal = getObjectValue(nodeVal, "children");
-    if (childrenVal && yyjson_is_arr(childrenVal)) {
-        size_t childCount = getArraySize(childrenVal);
-        for (size_t i = 0; i < childCount; i++) {
-            yyjson_val *childIndexVal = getArrayElement(childrenVal, i);
-            unsigned int childIndex = getInt(childIndexVal, 0);
-            if (childIndex < getArraySize(m_nodes)) {
-                Entity childEntity = m_scene->createEntity("Node " + std::to_string(childIndex));
-                childEntity.addComponent<HierarchyComponent>(nodeEntity);
+        if (node->type == glTF_NodeType::PRIMITIVE) {
+            if (node->meshRef) {
+                entity.addComponent<MeshComponent>(node->meshRef);
+                Mesh *mesh = node->meshRef.get()->getUnderlyingAsset<Mesh>();
 
-                nodeEntity.getComponent<HierarchyComponent>().addChild(childEntity);
+                if (mesh) {
+                    if (node->hasBoundingBox) {
+                        entity.addComponent<BoundingBoxComponent>(node->boundingBoxMin, node->boundingBoxMax);
+                    }
 
-                NodeType nodeType = processNode(childEntity, getArrayElement(m_nodes, childIndex));
-
-                if (nodeType == NodeType::Bone) {
-                    // use the child transform as the bone transform
-
-                    // then remove the entity, as it is a bone and we just need the transform
-                    m_scene->destroyEntity(childEntity);
-
-                    // child is either a mesh, or an empty node which has a mesh somewhere as its child
-                    //    if the leaf node was not a mesh, it would be a bone type
-                    //    and propagated up the tree until a mesh was found, then it will always be a mesh or empty type
-                } else if (nodeType == NodeType::Mesh || nodeType == NodeType::Empty) {
-                    hasMeshChild = true;
-                }
-            }
-        }
-    }
-
-    // we are the mesh
-    if (meshVal && yyjson_is_int(meshVal)) {
-        return NodeType::Mesh;
-
-        // descendants have a mesh
-    } else if (hasMeshChild) {
-        return NodeType::Empty;
-
-        // we have a skeleton
-    } else if (getObjectValue(nodeVal, "skin")) {
-        return NodeType::Skeleton;
-
-        // we are a bone
-    } else {
-        return NodeType::Bone;
-    }
-}
-
-Entity glTF2Loader::processMesh(Entity parent, yyjson_val *meshVal)
-{
-    auto &parentTransform = parent.getComponent<TransformComponent>();
-
-    const char *meshName = getString(getObjectValue(meshVal, "name"), "Mesh");
-    Entity meshEntity = m_scene->createEntity(meshName);
-    // Create transform component that inherits parent transform
-    meshEntity.addComponent<TransformComponent>(parentTransform.transformMatrix());
-
-    // Check if parent entity has HierarchyComponent
-    if (!parent.hasComponent<HierarchyComponent>()) {
-        RP_CORE_ERROR("Parent entity '{}' missing HierarchyComponent", meshName);
-        return meshEntity;
-    }
-
-    meshEntity.addComponent<HierarchyComponent>(parent);
-    parent.getComponent<HierarchyComponent>().addChild(meshEntity);
-
-    // Process primitives
-    yyjson_val *primitivesVal = getObjectValue(meshVal, "primitives");
-    if (primitivesVal && yyjson_is_arr(primitivesVal)) {
-        size_t primitiveCount = getArraySize(primitivesVal);
-        for (size_t i = 0; i < primitiveCount; i++) {
-            // For each primitive, create a new entity
-            Entity primitiveEntity = m_scene->createEntity("_Primitive_" + std::to_string(i) + "_" + meshName);
-            // RP_CORE_INFO("glTF2Loader: Mesh loaded: {}", meshName);
-
-            primitiveEntity.addComponent<HierarchyComponent>(meshEntity);
-            meshEntity.getComponent<HierarchyComponent>().addChild(primitiveEntity);
-
-            primitiveEntity.addComponent<TransformComponent>(parentTransform.transformMatrix());
-
-            // Process the primitive data
-            processPrimitive(primitiveEntity, getArrayElement(primitivesVal, i));
-        }
-    }
-
-    return meshEntity;
-}
-
-void glTF2Loader::processPrimitive(Entity entity, yyjson_val *primitiveVal)
-{
-    // Add mesh component to the entity
-    auto &meshComp = entity.addComponent<MeshComponent>();
-
-    // Gather attribute data and calculate attribute sizes
-    std::vector<std::pair<std::string, std::vector<unsigned char>>> attributeData;
-
-    std::vector<unsigned char> temp_indexData;
-
-    unsigned int vertexCount = 0;
-
-    glm::vec3 minBounds(std::numeric_limits<float>::infinity());
-    glm::vec3 maxBounds(-std::numeric_limits<float>::infinity());
-    bool calculatedBounds = false;
-
-    // Process vertex attributes
-    yyjson_val *attributesVal = getObjectValue(primitiveVal, "attributes");
-    if (attributesVal && yyjson_is_obj(attributesVal)) {
-
-        // First pass: gather data and determine vertex count
-        yyjson_obj_iter iter = yyjson_obj_iter_with(attributesVal);
-        yyjson_val *key, *val;
-        while ((key = yyjson_obj_iter_next(&iter))) {
-            val = yyjson_obj_iter_get_val(key);
-            const char *attribName = yyjson_get_str(key);
-            if (strcmp(attribName, "COLOR_0") == 0) continue; // Skip color data for now
-
-            unsigned int accessorIdx = getInt(val, 0);
-            yyjson_val *accessor = getArrayElement(m_accessors, accessorIdx);
-
-            if (strcmp(attribName, "POSITION") == 0 && accessor) {
-                yyjson_val *minVal = getObjectValue(accessor, "min");
-                yyjson_val *maxVal = getObjectValue(accessor, "max");
-                if (minVal && yyjson_is_arr(minVal) && getArraySize(minVal) >= 3 && maxVal && yyjson_is_arr(maxVal) &&
-                    getArraySize(maxVal) >= 3) {
-                    minBounds = glm::vec3((float)getDouble(getArrayElement(minVal, 0), 0.0),
-                                          (float)getDouble(getArrayElement(minVal, 1), 0.0),
-                                          (float)getDouble(getArrayElement(minVal, 2), 0.0));
-                    maxBounds = glm::vec3((float)getDouble(getArrayElement(maxVal, 0), 0.0),
-                                          (float)getDouble(getArrayElement(maxVal, 1), 0.0),
-                                          (float)getDouble(getArrayElement(maxVal, 2), 0.0));
-                    calculatedBounds = true;
+                    entity.addComponent<BLASComponent>(mesh);
+                    scene->registerBLAS(entity);
                 }
             }
 
-            // Get vertex count from the first attribute (should be the same for all attributes)
-            if (vertexCount == 0 && accessor) {
-                vertexCount = getInt(getObjectValue(accessor, "count"), 0);
-            }
-
-            // Load attribute data
-            std::vector<unsigned char> attrData;
-            loadAccessor(getArrayElement(m_accessors, accessorIdx), attrData);
-
-            if (!attrData.empty()) {
-                attributeData.push_back({attribName, attrData});
-            }
-        }
-    }
-
-    // Early exit if no vertex data
-    if (attributeData.empty() || vertexCount == 0) {
-        RP_CORE_ERROR("No vertex data found for primitive");
-        return;
-    }
-
-    // Calculate attribute sizes and strides
-    uint32_t vertexStride = 0;
-    std::vector<uint32_t> attrSizes;
-    std::vector<uint32_t> attrOffsets;
-
-    for (const auto &[name, data] : attributeData) {
-        uint32_t attrSize = static_cast<uint32_t>(data.size() / vertexCount);
-        attrSizes.push_back(attrSize);
-        attrOffsets.push_back(vertexStride);
-        vertexStride += attrSize;
-    }
-
-    BufferLayout bufferLayout;
-
-    // Create buffer layout for interleaved data
-
-    for (uint32_t i = 0; i < attributeData.size(); i++) {
-        const auto &[name, data] = attributeData[i];
-        yyjson_val *attributesObj = getObjectValue(primitiveVal, "attributes");
-        int accessorIdx = getInt(getObjectValue(attributesObj, name.c_str()), 0);
-        yyjson_val *accessor = getArrayElement(m_accessors, accessorIdx);
-
-        int componentType = getInt(getObjectValue(accessor, "componentType"), 0);
-        const char *type = getString(getObjectValue(accessor, "type"), "");
-
-        // For interleaved data, the offset is the relative position within a single vertex
-        try {
-            bufferLayout.buffer_attribs.push_back(
-                {stringToBufferAttributeID(name), static_cast<uint32_t>(componentType), std::string(type), attrOffsets[i]});
-        } catch (const std::runtime_error &e) {
-            RP_CORE_ERROR("{}", e.what());
-        }
-
-        // Find position attribute and record its offset
-        if (name == "POSITION") {
-
-            if (entity.hasComponent<BoundingBoxComponent>() && calculatedBounds) {
-                entity.getComponent<BoundingBoxComponent>().localBoundingBox = BoundingBox(minBounds, maxBounds);
-            } else if (calculatedBounds) {
-                entity.addComponent<BoundingBoxComponent>(minBounds, maxBounds);
-                // entity.addComponent<Entropy::RigidBodyComponent>(std::make_unique<Entropy::AABBCollider>(minBounds, maxBounds));
-            }
-        }
-    }
-
-    // Set interleaved flag to true
-    bufferLayout.isInterleaved = true;
-    bufferLayout.vertexSize = vertexStride;
-
-    // Create vertex buffer with the correct size
-    uint32_t totalVertexDataSize = vertexCount * vertexStride;
-
-    // Pre-allocate interleaved data with the exact known size
-    std::vector<unsigned char> interleavedData;
-    interleavedData.reserve(totalVertexDataSize);
-    interleavedData.resize(totalVertexDataSize);
-
-    // Fill the interleaved buffer using direct memory access
-    for (uint32_t v = 0; v < vertexCount; v++) {
-        unsigned char *vertexDest = interleavedData.data() + (v * vertexStride);
-        for (uint32_t a = 0; a < attributeData.size(); a++) {
-            const auto &[name, data] = attributeData[a];
-            uint32_t attrSize = attrSizes[a];
-            const unsigned char *attrSrc = data.data() + (v * attrSize);
-            unsigned char *attrDest = vertexDest + attrOffsets[a];
-
-            // Direct memory copy
-            std::memcpy(attrDest, attrSrc, attrSize);
-        }
-    }
-
-    // Process indices if present
-    std::vector<unsigned char> indexData;
-    unsigned int compType = 0;
-    unsigned int indCount = 0;
-
-    yyjson_val *indicesVal = getObjectValue(primitiveVal, "indices");
-    if (indicesVal && yyjson_is_int(indicesVal)) {
-        unsigned int indicesIdx = getInt(indicesVal, 0);
-
-        // Pre-allocate index data to avoid reallocation
-        indexData.reserve(getInt(getObjectValue(getArrayElement(m_accessors, indicesIdx), "count"), 0) *
-                          4); // Worst case: 4 bytes per index
-
-        // Load index data
-        loadAccessor(getArrayElement(m_accessors, indicesIdx), indexData);
-
-        if (!indexData.empty()) {
-            // Get index component type
-            compType = getInt(getObjectValue(getArrayElement(m_accessors, indicesIdx), "componentType"), 0);
-            indCount = getInt(getObjectValue(getArrayElement(m_accessors, indicesIdx), "count"), 0);
-        }
-    }
-
-    {
-        if (indexData.size() > 0) {
-            AllocatorParams params;
-            params.bufferLayout = bufferLayout;
-            params.vertexData = (void *)interleavedData.data();
-            params.vertexDataSize = totalVertexDataSize;
-            params.indexData = (void *)indexData.data();
-            params.indexDataSize = static_cast<uint32_t>(indexData.size());
-            params.indexCount = indCount;
-            params.indexType = compType;
-
-            meshComp.mesh->setMeshData(params);
-        } else {
-            RP_CORE_ERROR("glTF2Loader: Vertex data only not supported yet");
-            entity.removeComponent<MeshComponent>();
-            return;
-        }
-    }
-
-    // Process material if present
-    yyjson_val *materialVal = getObjectValue(primitiveVal, "material");
-    if (materialVal) {
-        uint32_t materialIdx = getInt(materialVal, 0);
-        if (materialIdx < getArraySize(m_materials)) {
-            yyjson_val *materialData = getArrayElement(m_materials, materialIdx);
-            if (materialData) {
-                auto material = processMaterial(entity, materialData);
-
-                if (material && entity.hasComponent<MaterialComponent>()) {
-                    // Add material component to the entity
-                    entity.getComponent<MaterialComponent>().material = material;
-                } else {
-                    entity.addComponent<MaterialComponent>(material);
+            if (node->materialIndex >= 0) {
+                auto matIt = m_loadedData->materials.find(static_cast<size_t>(node->materialIndex));
+                if (matIt != m_loadedData->materials.end() && matIt->second) {
+                    entity.addComponent<MaterialComponent>(matIt->second);
                 }
             }
         }
-    }
-    try {
-        entity.addComponent<BLASComponent>(meshComp.mesh);
 
-        m_scene->registerBLAS(entity);
-    } catch (const std::runtime_error &e) {
-        RP_CORE_ERROR("glTF2Loader: Failed to add BLAS component: {}", e.what());
-    }
+        for (auto &child : node->children) {
+            createEntityFromNode(child.get(), entity);
+        }
 
-    // Mark the mesh as loaded
-    meshComp.isLoading = false;
+        return entity;
+    };
+
+    for (auto &rootNode : m_loadedData->rootNodes) {
+        createEntityFromNode(rootNode.get(), Entity::null());
+    }
 }
 
 void glTF2Loader::loadAccessor(yyjson_val *accessorVal, std::vector<unsigned char> &dataVec)
@@ -936,6 +717,152 @@ void glTF2Loader::loadAccessor(yyjson_val *accessorVal, std::vector<unsigned cha
     }
 }
 
+SceneFileMetadata glTF2Loader::getMetadata()
+{
+    SceneFileMetadata metadata;
+    metadata.sourcePath = m_filepath;
+
+    if (!m_glTFroot) {
+        return metadata;
+    }
+
+    yyjson_val *asset = getObjectValue(m_glTFroot, "asset");
+    if (asset) {
+        metadata.version = getString(getObjectValue(asset, "version"), "");
+        metadata.generator = getString(getObjectValue(asset, "generator"), "");
+    }
+
+    metadata.meshCount = getArraySize(m_meshes);
+    metadata.materialCount = getArraySize(m_materials);
+    metadata.animationCount = getArraySize(m_animations);
+    metadata.nodeCount = getArraySize(m_nodes);
+    metadata.textureCount = getArraySize(m_textures);
+    metadata.hasSkeletons = getArraySize(m_skins) > 0;
+
+    return metadata;
+}
+
+AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
+{
+    auto it = m_loadedData->materials.find(materialIndex);
+    if (it != m_loadedData->materials.end()) {
+        return it->second;
+    }
+
+    if (materialIndex >= getArraySize(m_materials)) {
+        return AssetRef();
+    }
+
+    yyjson_val *materialVal = getArrayElement(m_materials, static_cast<uint32_t>(materialIndex));
+    if (!materialVal) {
+        return AssetRef();
+    }
+
+    std::string materialName = getString(getObjectValue(materialVal, "name"), "");
+    if (materialName.empty()) {
+        materialName = "Material_" + std::to_string(materialIndex);
+    }
+
+    glm::vec3 baseColor(0.5f, 0.5f, 0.5f);
+    float metallic = 0.0f;
+    float roughness = 0.5f;
+
+    auto baseMaterial = MaterialManager::getMaterial("PBR");
+    auto material = std::make_unique<MaterialInstance>(baseMaterial, materialName);
+
+    yyjson_val *pbrMetallicRoughness = getObjectValue(materialVal, "pbrMetallicRoughness");
+    if (pbrMetallicRoughness) {
+        yyjson_val *baseColorFactorVal = getObjectValue(pbrMetallicRoughness, "baseColorFactor");
+        if (baseColorFactorVal && yyjson_is_arr(baseColorFactorVal) && getArraySize(baseColorFactorVal) >= 3) {
+            baseColor = glm::vec3(static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 0), 0.5)),
+                                  static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 1), 0.5)),
+                                  static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 2), 0.5)));
+        }
+
+        yyjson_val *metallicFactorVal = getObjectValue(pbrMetallicRoughness, "metallicFactor");
+        if (metallicFactorVal) {
+            metallic = static_cast<float>(getDouble(metallicFactorVal, 0.0));
+        }
+
+        yyjson_val *roughnessFactorVal = getObjectValue(pbrMetallicRoughness, "roughnessFactor");
+        if (roughnessFactorVal) {
+            roughness = static_cast<float>(getDouble(roughnessFactorVal, 0.5));
+        }
+
+        yyjson_val *baseColorTextureInfo = getObjectValue(pbrMetallicRoughness, "baseColorTexture");
+        if (baseColorTextureInfo) {
+            int texIndex = getInt(getObjectValue(baseColorTextureInfo, "index"), -1);
+            if (texIndex != -1) {
+                loadAndSetTexture(material.get(), ParameterID::ALBEDO_MAP, texIndex);
+            }
+        }
+
+        yyjson_val *metallicRoughnessTextureInfo = getObjectValue(pbrMetallicRoughness, "metallicRoughnessTexture");
+        if (metallicRoughnessTextureInfo) {
+            int texIndex = getInt(getObjectValue(metallicRoughnessTextureInfo, "index"), -1);
+            if (texIndex != -1) {
+                loadAndSetTexture(material.get(), ParameterID::METALLIC_ROUGHNESS_MAP, texIndex);
+            }
+        }
+    }
+
+    yyjson_val *normalTextureInfo = getObjectValue(materialVal, "normalTexture");
+    if (normalTextureInfo) {
+        int texIndex = getInt(getObjectValue(normalTextureInfo, "index"), -1);
+        if (texIndex != -1) {
+            loadAndSetTexture(material.get(), ParameterID::NORMAL_MAP, texIndex);
+        }
+    }
+
+    yyjson_val *occlusionTextureInfo = getObjectValue(materialVal, "occlusionTexture");
+    if (occlusionTextureInfo) {
+        int texIndex = getInt(getObjectValue(occlusionTextureInfo, "index"), -1);
+        if (texIndex != -1) {
+            loadAndSetTexture(material.get(), ParameterID::AO_MAP, texIndex);
+        }
+    }
+
+    yyjson_val *emissiveTextureInfo = getObjectValue(materialVal, "emissiveTexture");
+    if (emissiveTextureInfo) {
+        int texIndex = getInt(getObjectValue(emissiveTextureInfo, "index"), -1);
+        if (texIndex != -1) {
+            loadAndSetTexture(material.get(), ParameterID::EMISSIVE_MAP, texIndex);
+        }
+    }
+
+    yyjson_val *emissiveFactorVal = getObjectValue(materialVal, "emissiveFactor");
+    if (emissiveFactorVal && yyjson_is_arr(emissiveFactorVal) && getArraySize(emissiveFactorVal) >= 3) {
+        glm::vec4 emissiveFactor(static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 0), 0.0)),
+                                 static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 1), 0.0)),
+                                 static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 2), 0.0)), 1.0f);
+        material->setParameter(ParameterID::EMISSIVE, emissiveFactor);
+    }
+
+    material->setParameter(ParameterID::ALBEDO, glm::vec4(baseColor, 1.0f));
+    material->setParameter(ParameterID::METALLIC, metallic);
+    material->setParameter(ParameterID::ROUGHNESS, roughness);
+
+    AssetRef ref = AssetManager::registerVirtualAsset(std::move(material), materialName, AssetType::MATERIAL);
+    m_loadedData->materials[materialIndex] = ref;
+
+    return ref;
+}
+
+void glTF2Loader::loadSkin(yyjson_val *skinVal)
+{
+    (void)skinVal;
+}
+
+void glTF2Loader::loadWeights(yyjson_val *weightsVal)
+{
+    (void)weightsVal;
+}
+
+void glTF2Loader::loadAnimation(yyjson_val *animationVal)
+{
+    (void)animationVal;
+}
+
 void glTF2Loader::cleanUp()
 {
     if (m_glTFdoc != nullptr) {
@@ -957,23 +884,17 @@ void glTF2Loader::cleanUp()
 
     m_binVec.clear();
 
-    // Clean up the cache when a loader is cleaned up
-    // ONLY call this when initialized already, otherwise we can end up in a deadlock->crash
-    if (m_isInitialized) {
-        ModelLoadersCache::cleanup();
-    }
-
     m_isInitialized = false;
     m_isLoaded = false;
 }
 
-std::string glTF2Loader::getNodeName(unsigned int nodeIndex)
+std::string glTF2Loader::getNodeName(size_t nodeIndex)
 {
     if (nodeIndex >= getArraySize(m_nodes)) {
         return std::to_string(nodeIndex);
     }
 
-    yyjson_val *nodeVal = getArrayElement(m_nodes, nodeIndex);
+    yyjson_val *nodeVal = getArrayElement(m_nodes, static_cast<uint32_t>(nodeIndex));
     const char *nodeName = getString(getObjectValue(nodeVal, "name"), "");
 
     if (strlen(nodeName) == 0) {

@@ -101,7 +101,7 @@ uint32_t VertexBuffer::getBindlessIndex()
 
     if (s_bindlessBuffers) {
         // For now, we'll use a placeholder index based on buffer address
-        m_bindlessIndex = s_bindlessBuffers->add(shared_from_this());
+        m_bindlessIndex = s_bindlessBuffers->add(*this);
     }
 
     return m_bindlessIndex;

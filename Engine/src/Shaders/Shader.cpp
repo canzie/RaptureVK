@@ -7,212 +7,349 @@
 
 #include "ShaderReflections.h"
 
+#include <algorithm>
+
 namespace Rapture {
 
+// Legacy constructor: vertex + fragment
 Shader::Shader(const std::filesystem::path &vertexPath, const std::filesystem::path &fragmentPath, ShaderCompileInfo compileInfo)
-    : m_compileInfo(compileInfo)
 {
+    m_compileInfo = compileInfo;
 
-    if (fragmentPath.empty()) {
-        createGraphicsShader(vertexPath);
-    } else {
-        createGraphicsShader(vertexPath, fragmentPath);
+    addStage(ShaderType::VERTEX, vertexPath);
+    if (!fragmentPath.empty()) {
+        addStage(ShaderType::FRAGMENT, fragmentPath);
     }
-    createDescriptorSetLayout();
 
-    // Test SPIRV-Reflect library by reflecting on our shaders
-    RP_CORE_INFO("Testing SPIRV-Reflect functionality:");
-    printDescriptorSetInfos(m_descriptorSetInfos);
+    if (!build()) {
+        m_status = ShaderStatus::FAILED;
+    }
 }
 
-Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compileInfo) : m_compileInfo(compileInfo)
+// Legacy constructor: compute
+Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compileInfo)
 {
+    m_compileInfo = compileInfo;
 
-    if (computePath.empty()) {
-        return;
+    if (!computePath.empty()) {
+        addStage(ShaderType::COMPUTE, computePath);
+        if (!build()) {
+            m_status = ShaderStatus::FAILED;
+        }
     }
-
-    if (computePath.extension() == ".glsl") {
-        // compileShaderToSPIRV
-    }
-
-    createComputeShader(computePath);
-    createDescriptorSetLayout();
-
-    // Test SPIRV-Reflect library by reflecting on our shaders
-    RP_CORE_INFO("Testing SPIRV-Reflect functionality for compute shader:");
-    printDescriptorSetInfos(m_descriptorSetInfos);
 }
 
 Shader::~Shader()
 {
+    cleanup();
+}
+
+Shader::Shader(Shader &&other) noexcept
+    : m_stages(std::move(other.m_stages)), m_compileInfo(std::move(other.m_compileInfo)), m_status(other.m_status),
+      m_pipelineStages(std::move(other.m_pipelineStages)), m_descriptorSetInfos(std::move(other.m_descriptorSetInfos)),
+      m_descriptorSetLayouts(std::move(other.m_descriptorSetLayouts)),
+      m_pushConstantLayouts(std::move(other.m_pushConstantLayouts)),
+      m_detailedPushConstants(std::move(other.m_detailedPushConstants)), m_materialSets(std::move(other.m_materialSets))
+{
+    other.m_status = ShaderStatus::UNINITIALIZED;
+    other.m_descriptorSetLayouts.clear();
+}
+
+Shader &Shader::operator=(Shader &&other) noexcept
+{
+    if (this != &other) {
+        cleanup();
+
+        m_stages = std::move(other.m_stages);
+        m_compileInfo = std::move(other.m_compileInfo);
+        m_status = other.m_status;
+        m_pipelineStages = std::move(other.m_pipelineStages);
+        m_descriptorSetInfos = std::move(other.m_descriptorSetInfos);
+        m_descriptorSetLayouts = std::move(other.m_descriptorSetLayouts);
+        m_pushConstantLayouts = std::move(other.m_pushConstantLayouts);
+        m_detailedPushConstants = std::move(other.m_detailedPushConstants);
+        m_materialSets = std::move(other.m_materialSets);
+
+        other.m_status = ShaderStatus::UNINITIALIZED;
+        other.m_descriptorSetLayouts.clear();
+    }
+    return *this;
+}
+
+void Shader::cleanup()
+{
     Application &app = Application::getInstance();
     VkDevice device = app.getVulkanContext().getLogicalDevice();
 
-    for (auto &descriptorSetLayout : m_descriptorSetLayouts) {
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+    for (auto &layout : m_descriptorSetLayouts) {
+        if (layout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, layout, nullptr);
+        }
     }
+    m_descriptorSetLayouts.clear();
 
-    for (auto &source : m_sources) {
-        vkDestroyShaderModule(device, source.second, nullptr);
-    }
-}
-
-void Shader::createGraphicsShader(const std::filesystem::path &vertexPath, const std::filesystem::path &fragmentPath)
-{
-    std::vector<char> vertexCode;
-    if (vertexPath.extension() == ".spv") vertexCode = readFile(vertexPath);
-    else vertexCode = m_compiler.Compile(vertexPath, m_compileInfo);
-
-    std::vector<char> fragmentCode;
-    if (!fragmentPath.empty()) {
-        if (fragmentPath.extension() == ".spv") fragmentCode = readFile(fragmentPath);
-        else fragmentCode = m_compiler.Compile(fragmentPath, m_compileInfo);
-    }
-
-    // Collect descriptor information before creating shader modules
-    m_descriptorSetInfos = collectDescriptorSetInfo(vertexCode, fragmentCode);
-
-    createShaderModule(vertexCode, ShaderType::VERTEX);
-    createShaderModule(fragmentCode, ShaderType::FRAGMENT);
-
-    m_materialSets = extractMaterialSets(vertexCode);
-    std::vector<DescriptorInfo> fragmentMaterialSets = extractMaterialSets(fragmentCode);
-
-    std::vector<PushConstantInfo> pushConstantInfos =
-        getCombinedPushConstantRanges({{vertexCode, VK_SHADER_STAGE_VERTEX_BIT}, {fragmentCode, VK_SHADER_STAGE_FRAGMENT_BIT}});
-    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
-
-    // Print push constant reflection data
-    RP_CORE_INFO("Push Constant Reflection Data:");
-    printPushConstantLayouts(pushConstantInfos);
-
-    // Helper lambda to check if a descriptor is already in the material sets
-    auto isDescriptorDuplicate = [](const std::vector<DescriptorInfo> &sets, const DescriptorInfo &info) {
-        return std::find_if(sets.begin(), sets.end(), [&info](const DescriptorInfo &existing) {
-                   return existing.setNumber == info.setNumber && existing.binding == info.binding;
-               }) != sets.end();
-    };
-
-    // Add fragment material sets, skipping duplicates
-    for (const auto &fragmentSet : fragmentMaterialSets) {
-        if (!isDescriptorDuplicate(m_materialSets, fragmentSet)) {
-            m_materialSets.push_back(fragmentSet);
+    for (auto &stage : m_stages) {
+        if (stage.module != VK_NULL_HANDLE) {
+            vkDestroyShaderModule(device, stage.module, nullptr);
+            stage.module = VK_NULL_HANDLE;
         }
     }
 
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = m_sources[ShaderType::VERTEX];
-    vertShaderStageInfo.pName = "main";
-    vertShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
-
-    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module = m_sources[ShaderType::FRAGMENT];
-    fragShaderStageInfo.pName = "main";
-    fragShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
-
-    m_stages.push_back(vertShaderStageInfo);
-    m_stages.push_back(fragShaderStageInfo);
+    m_pipelineStages.clear();
 }
 
-void Shader::createGraphicsShader(const std::filesystem::path &vertexPath)
+Shader &Shader::addStage(ShaderType type, const std::filesystem::path &path)
 {
-
-    std::vector<char> vertexCode;
-    if (vertexPath.extension() == ".spv") vertexCode = readFile(vertexPath);
-    else vertexCode = m_compiler.Compile(vertexPath, m_compileInfo);
-
-    // Collect descriptor information before creating shader modules
-    m_descriptorSetInfos = collectDescriptorSetInfo(vertexCode, {});
-
-    createShaderModule(vertexCode, ShaderType::VERTEX);
-
-    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{vertexCode, VK_SHADER_STAGE_VERTEX_BIT}});
-    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
-
-    // Print push constant reflection data
-    RP_CORE_INFO("Push Constant Reflection Data:");
-    printPushConstantLayouts(pushConstantInfos);
-
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = m_sources[ShaderType::VERTEX];
-    vertShaderStageInfo.pName = "main";
-    vertShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
-
-    m_stages.push_back(vertShaderStageInfo);
-}
-
-void Shader::createComputeShader(const std::filesystem::path &computePath)
-{
-    std::vector<char> computeCode;
-    if (computePath.extension() == ".spv") computeCode = readFile(computePath);
-    else computeCode = m_compiler.Compile(computePath, m_compileInfo);
-
-    // Collect descriptor information before creating shader modules
-    m_descriptorSetInfos = collectDescriptorSetInfo({}, computeCode);
-
-    createShaderModule(computeCode, ShaderType::COMPUTE);
-
-    // Extract push constants
-    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges({{computeCode, VK_SHADER_STAGE_COMPUTE_BIT}});
-    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
-
-    // Print push constant reflection data
-    RP_CORE_INFO("Compute Shader Push Constant Reflection Data:");
-    printPushConstantLayouts(pushConstantInfos);
-
-    VkPipelineShaderStageCreateInfo computeShaderStageInfo{};
-    computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    computeShaderStageInfo.module = m_sources[ShaderType::COMPUTE];
-    computeShaderStageInfo.pName = "main";
-    computeShaderStageInfo.pSpecializationInfo = nullptr; // constants i think idk
-
-    m_stages.push_back(computeShaderStageInfo);
-}
-
-void Shader::createShaderModule(const std::vector<char> &code, ShaderType type)
-{
-
-    if (m_sources.find(type) != m_sources.end()) {
-        RP_CORE_WARN("shader module of type {0} already exists! overwriting...", shaderTypeToString(type));
+    // Check for duplicate stage
+    if (hasStage(type)) {
+        RP_CORE_WARN("Shader stage {} already added, replacing", shaderTypeToString(type));
     }
 
+    // Remove existing stage of same type
+    m_stages.erase(std::remove_if(m_stages.begin(), m_stages.end(), [type](const ShaderStage &s) { return s.type == type; }),
+                   m_stages.end());
+
+    ShaderStage stage;
+    stage.type = type;
+    stage.sourcePath = path;
+    m_stages.push_back(stage);
+
+    if (m_status == ShaderStatus::UNINITIALIZED) {
+        m_status = ShaderStatus::STAGES_ADDED;
+    }
+
+    return *this;
+}
+
+Shader &Shader::setCompileInfo(const ShaderCompileInfo &info)
+{
+    m_compileInfo = info;
+    return *this;
+}
+
+bool Shader::hasStage(ShaderType type) const
+{
+    for (const auto &stage : m_stages) {
+        if (stage.type == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const VkShaderModule &Shader::getModule(ShaderType type) const
+{
+    static VkShaderModule nullModule = VK_NULL_HANDLE;
+    for (const auto &stage : m_stages) {
+        if (stage.type == type) {
+            return stage.module;
+        }
+    }
+    return nullModule;
+}
+
+bool Shader::compileStage(ShaderStage &stage)
+{
+    if (stage.sourcePath.extension() == ".spv") {
+        stage.spirv = readFile(stage.sourcePath);
+    } else {
+        stage.spirv = m_compiler.Compile(stage.sourcePath, m_compileInfo);
+    }
+
+    if (stage.spirv.empty()) {
+        RP_CORE_ERROR("Failed to compile shader: {}", stage.sourcePath.string());
+        return false;
+    }
+
+    // Create VkShaderModule
     Application &app = Application::getInstance();
     VkDevice device = app.getVulkanContext().getLogicalDevice();
 
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+    createInfo.codeSize = stage.spirv.size();
+    createInfo.pCode = reinterpret_cast<const uint32_t *>(stage.spirv.data());
 
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to create shader module!");
-        throw std::runtime_error("Shader::createShaderModule - failed to create shader module!");
+    if (vkCreateShaderModule(device, &createInfo, nullptr, &stage.module) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create shader module: {}", stage.sourcePath.string());
+        return false;
     }
 
-    m_sources[type] = shaderModule;
+    return true;
 }
 
-void Shader::createDescriptorSetLayout()
+void Shader::reflectStage(const ShaderStage &stage)
 {
+    VkShaderStageFlags stageFlags = shaderTypeToVkStage(stage.type);
+
+    const uint32_t *spirvData = reinterpret_cast<const uint32_t *>(stage.spirv.data());
+    size_t spirvSize = stage.spirv.size();
+
+    SpvReflectShaderModule module;
+    SpvReflectResult result = spvReflectCreateShaderModule(spirvSize, spirvData, &module);
+    if (result != SPV_REFLECT_RESULT_SUCCESS) {
+        RP_CORE_ERROR("Failed to create reflection data for stage {}", shaderTypeToString(stage.type));
+        return;
+    }
+
+    // Reflect descriptor bindings
+    uint32_t count = 0;
+    result = spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
+    if (result == SPV_REFLECT_RESULT_SUCCESS && count > 0) {
+        std::vector<SpvReflectDescriptorBinding *> bindings(count);
+        result = spvReflectEnumerateDescriptorBindings(&module, &count, bindings.data());
+
+        for (auto binding : bindings) {
+            DescriptorBindingInfo bindingInfo{};
+            bindingInfo.binding = binding->binding;
+            bindingInfo.descriptorType = static_cast<VkDescriptorType>(binding->descriptor_type);
+            bindingInfo.descriptorCount = binding->count;
+            bindingInfo.stageFlags = stageFlags;
+            bindingInfo.name = binding->name ? binding->name : "unnamed";
+
+            uint32_t setNumber = binding->set;
+
+            // Find or create set info
+            auto it = std::find_if(m_descriptorSetInfos.begin(), m_descriptorSetInfos.end(),
+                                   [setNumber](const DescriptorSetInfo &info) { return info.setNumber == setNumber; });
+
+            if (it == m_descriptorSetInfos.end()) {
+                m_descriptorSetInfos.push_back(DescriptorSetInfo{setNumber, {}});
+                it = m_descriptorSetInfos.end() - 1;
+            }
+
+            // Check if binding already exists (merge stage flags)
+            auto bindIt = std::find_if(it->bindings.begin(), it->bindings.end(),
+                                       [&](const DescriptorBindingInfo &b) { return b.binding == bindingInfo.binding; });
+
+            if (bindIt != it->bindings.end()) {
+                bindIt->stageFlags |= stageFlags;
+            } else {
+                it->bindings.push_back(bindingInfo);
+            }
+        }
+    }
+
+    spvReflectDestroyShaderModule(&module);
+}
+
+void Shader::mergeReflectionData()
+{
+    // Sort sets by number
+    std::sort(m_descriptorSetInfos.begin(), m_descriptorSetInfos.end(),
+              [](const DescriptorSetInfo &a, const DescriptorSetInfo &b) { return a.setNumber < b.setNumber; });
+
+    // Sort bindings within each set
+    for (auto &setInfo : m_descriptorSetInfos) {
+        std::sort(setInfo.bindings.begin(), setInfo.bindings.end(),
+                  [](const DescriptorBindingInfo &a, const DescriptorBindingInfo &b) { return a.binding < b.binding; });
+    }
+
+    // Extract push constants from all stages
+    std::vector<std::pair<std::vector<char>, VkShaderStageFlags>> stageSpirvs;
+    for (const auto &stage : m_stages) {
+        stageSpirvs.push_back({stage.spirv, shaderTypeToVkStage(stage.type)});
+    }
+
+    std::vector<PushConstantInfo> pushConstantInfos = getCombinedPushConstantRanges(stageSpirvs);
+    m_pushConstantLayouts = pushConstantInfoToRanges(pushConstantInfos);
+
+    // Extract detailed push constants from first stage that has them
+    for (const auto &stage : m_stages) {
+        auto detailed = extractDetailedPushConstants(stage.spirv);
+        if (!detailed.empty()) {
+            m_detailedPushConstants = detailed;
+            break;
+        }
+    }
+
+    // Extract material sets
+    for (const auto &stage : m_stages) {
+        std::vector<DescriptorInfo> stageMaterialSets = extractMaterialSets(stage.spirv);
+        for (const auto &matSet : stageMaterialSets) {
+            auto it = std::find_if(m_materialSets.begin(), m_materialSets.end(), [&](const DescriptorInfo &existing) {
+                return existing.setNumber == matSet.setNumber && existing.binding == matSet.binding;
+            });
+            if (it == m_materialSets.end()) {
+                m_materialSets.push_back(matSet);
+            }
+        }
+    }
+
+    RP_CORE_INFO("Shader reflection data:");
+    // printDescriptorSetInfos(m_descriptorSetInfos);
+    // printPushConstantLayouts(pushConstantInfos);
+}
+
+void Shader::buildPipelineStages()
+{
+    m_pipelineStages.clear();
+
+    for (const auto &stage : m_stages) {
+        if (!stage.hasModule()) continue;
+
+        VkPipelineShaderStageCreateInfo stageInfo{};
+        stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stageInfo.stage = shaderTypeToVkStage(stage.type);
+        stageInfo.module = stage.module;
+        stageInfo.pName = "main";
+        stageInfo.pSpecializationInfo = nullptr;
+
+        m_pipelineStages.push_back(stageInfo);
+    }
+}
+
+bool Shader::compile()
+{
+    if (m_stages.empty()) {
+        RP_CORE_ERROR("No shader stages added");
+        m_status = ShaderStatus::FAILED;
+        return false;
+    }
+
+    // Compile all stages
+    for (auto &stage : m_stages) {
+        if (!compileStage(stage)) {
+            m_status = ShaderStatus::FAILED;
+            return false;
+        }
+    }
+
+    // Reflect all stages
+    m_descriptorSetInfos.clear();
+    for (const auto &stage : m_stages) {
+        reflectStage(stage);
+    }
+
+    // Merge reflection data
+    mergeReflectionData();
+
+    // Build pipeline stage infos
+    buildPipelineStages();
+
+    m_status = ShaderStatus::COMPILED;
+    return true;
+}
+
+bool Shader::createDescriptorLayouts()
+{
+    if (m_status < ShaderStatus::COMPILED) {
+        RP_CORE_ERROR("Cannot create descriptor layouts before compiling");
+        return false;
+    }
+
     Application &app = Application::getInstance();
     VkDevice device = app.getVulkanContext().getLogicalDevice();
 
-    // Clear any existing layouts
+    // Clear existing layouts
     for (auto &layout : m_descriptorSetLayouts) {
-        vkDestroyDescriptorSetLayout(device, layout, nullptr);
+        if (layout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, layout, nullptr);
+        }
     }
     m_descriptorSetLayouts.clear();
 
-    // First, determine the maximum set number we need
+    // Determine max set number
     uint32_t maxSetNumber = 0;
     for (const auto &setInfo : m_descriptorSetInfos) {
         maxSetNumber = std::max(maxSetNumber, setInfo.setNumber);
@@ -224,7 +361,7 @@ void Shader::createDescriptorSetLayout()
     for (uint32_t setNumber = 0; setNumber <= maxSetNumber; ++setNumber) {
         std::shared_ptr<DescriptorSet> descriptorSet = nullptr;
 
-        // Sets 0-3 are considered "managed" and can be retrieved from the DescriptorManager.
+        // Sets 0-3 are managed by DescriptorManager
         if (setNumber <= 3) {
             descriptorSet = DescriptorManager::getDescriptorSet(setNumber);
         }
@@ -232,7 +369,6 @@ void Shader::createDescriptorSetLayout()
         if (descriptorSet) {
             m_descriptorSetLayouts[setNumber] = descriptorSet->getLayout();
         } else {
-            // For sets > 3, or if a managed set is not available, we fall back to creating the layout from reflection data.
             if (setNumber <= 3) {
                 RP_CORE_WARN("DescriptorManager set {} not available, falling back to shader layout", setNumber);
             }
@@ -247,8 +383,11 @@ void Shader::createDescriptorSetLayout()
     }
 
     if (m_descriptorSetLayouts.empty()) {
-        RP_CORE_WARN("No descriptor set layouts were created - shader might not use any descriptors");
+        RP_CORE_WARN("No descriptor set layouts created - shader might not use any descriptors");
     }
+
+    m_status = ShaderStatus::READY;
+    return true;
 }
 
 void Shader::createDescriptorSetLayoutFromInfo(const DescriptorSetInfo &setInfo)
@@ -258,9 +397,9 @@ void Shader::createDescriptorSetLayoutFromInfo(const DescriptorSetInfo &setInfo)
 
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
     layoutBindings.reserve(setInfo.bindings.size());
-    std::vector<VkDescriptorBindingFlags> bindingFlags(setInfo.bindings.size(), VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT);
+    std::vector<VkDescriptorBindingFlags> bindingFlags(setInfo.bindings.size(), VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+                                                                                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT);
 
-    // each binding in a set
     for (const auto &bindingInfo : setInfo.bindings) {
         VkDescriptorSetLayoutBinding layoutBinding{};
         layoutBinding.binding = bindingInfo.binding;
@@ -272,7 +411,6 @@ void Shader::createDescriptorSetLayoutFromInfo(const DescriptorSetInfo &setInfo)
         layoutBindings.push_back(layoutBinding);
     }
 
-    // Set up binding flags info
     VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
     bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
     bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
@@ -280,118 +418,34 @@ void Shader::createDescriptorSetLayoutFromInfo(const DescriptorSetInfo &setInfo)
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT; // Required for UPDATE_AFTER_BIND
+    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
     layoutInfo.pNext = &bindingFlagsInfo;
     layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
     layoutInfo.pBindings = layoutBindings.data();
 
-    // layout for all bindings in a set
     VkDescriptorSetLayout layout;
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &layout) != VK_SUCCESS) {
-        RP_CORE_ERROR("Failed to create descriptor set layout for set {0}!", setInfo.setNumber);
-        throw std::runtime_error("Failed to create descriptor set layout!");
+        RP_CORE_ERROR("Failed to create descriptor set layout for set {}!", setInfo.setNumber);
+        return;
     }
 
-    // Ensure we have space in our layout vector for this set number
     if (m_descriptorSetLayouts.size() <= setInfo.setNumber) {
         m_descriptorSetLayouts.resize(setInfo.setNumber + 1, VK_NULL_HANDLE);
     }
     m_descriptorSetLayouts[setInfo.setNumber] = layout;
 }
 
-std::vector<DescriptorSetInfo> Shader::collectDescriptorSetInfo(const std::vector<char> &vertexSpirv,
-                                                                const std::vector<char> &fragmentSpirv)
+bool Shader::build()
 {
-    std::map<uint32_t, DescriptorSetInfo> setInfoMap; // Map set number to DescriptorSetInfo
-
-    // Helper lambda to process shader module
-    auto processShaderModule = [&](const std::vector<char> &spirv, VkShaderStageFlags stageFlags) {
-        const uint32_t *spirvData = reinterpret_cast<const uint32_t *>(spirv.data());
-        size_t spirvSize = spirv.size();
-
-        SpvReflectShaderModule module;
-        SpvReflectResult result = spvReflectCreateShaderModule(spirvSize, spirvData, &module);
-        if (result != SPV_REFLECT_RESULT_SUCCESS) {
-            RP_CORE_ERROR("Failed to create reflection data for shader stage {0}!", stageFlags);
-            return;
-        }
-
-        // Get descriptor bindings
-        uint32_t count = 0;
-        result = spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
-        if (result == SPV_REFLECT_RESULT_SUCCESS && count > 0) {
-            std::vector<SpvReflectDescriptorBinding *> bindings(count);
-            result = spvReflectEnumerateDescriptorBindings(&module, &count, bindings.data());
-
-            for (auto binding : bindings) {
-                DescriptorBindingInfo bindingInfo{};
-                bindingInfo.binding = binding->binding;
-                bindingInfo.descriptorType = static_cast<VkDescriptorType>(binding->descriptor_type);
-                bindingInfo.descriptorCount = binding->count;
-                bindingInfo.stageFlags = stageFlags;
-                bindingInfo.name = binding->name ? binding->name : "unnamed";
-
-                uint32_t setNumber = binding->set;
-
-                // Create or get the set info
-                if (setInfoMap.find(setNumber) == setInfoMap.end()) {
-                    setInfoMap[setNumber] = DescriptorSetInfo{setNumber, {}};
-                }
-
-                // Check if this binding already exists
-                auto &existingBindings = setInfoMap[setNumber].bindings;
-                auto it =
-                    std::find_if(existingBindings.begin(), existingBindings.end(),
-                                 [&](const DescriptorBindingInfo &existing) { return existing.binding == bindingInfo.binding; });
-
-                if (it != existingBindings.end()) {
-                    // Binding exists, merge stage flags
-                    it->stageFlags |= stageFlags;
-                } else {
-                    // New binding
-                    existingBindings.push_back(bindingInfo);
-                }
-            }
-        }
-
-        spvReflectDestroyShaderModule(&module);
-    };
-
-    // Process shader stages
-    if (!vertexSpirv.empty()) {
-        processShaderModule(vertexSpirv, VK_SHADER_STAGE_VERTEX_BIT);
+    if (!compile()) {
+        return false;
     }
 
-    if (!fragmentSpirv.empty()) {
-        if (vertexSpirv.empty()) {
-            // This is a compute shader (compute code passed as fragmentSpirv)
-            processShaderModule(fragmentSpirv, VK_SHADER_STAGE_COMPUTE_BIT);
-        } else {
-            // This is a fragment shader
-            processShaderModule(fragmentSpirv, VK_SHADER_STAGE_FRAGMENT_BIT);
-        }
+    if (!createDescriptorLayouts()) {
+        return false;
     }
 
-    // Convert map to vector, sorted by set number
-    std::vector<DescriptorSetInfo> result;
-    result.reserve(setInfoMap.size());
-    for (auto &[setNumber, setInfo] : setInfoMap) {
-        // Sort bindings by binding number for consistency
-        std::sort(setInfo.bindings.begin(), setInfo.bindings.end(),
-                  [](const DescriptorBindingInfo &a, const DescriptorBindingInfo &b) { return a.binding < b.binding; });
-        result.push_back(std::move(setInfo));
-    }
-
-    // Sort by set number
-    std::sort(result.begin(), result.end(),
-              [](const DescriptorSetInfo &a, const DescriptorSetInfo &b) { return a.setNumber < b.setNumber; });
-
-    return result;
-}
-
-const VkShaderModule &Shader::getSource(ShaderType type)
-{
-    return m_sources[type];
+    return true;
 }
 
 std::string shaderTypeToString(ShaderType type)
@@ -405,13 +459,20 @@ std::string shaderTypeToString(ShaderType type)
         return "GEOMETRY";
     case ShaderType::COMPUTE:
         return "COMPUTE";
+    case ShaderType::TESSELLATION_CONTROL:
+        return "TESSELLATION_CONTROL";
+    case ShaderType::TESSELLATION_EVALUATION:
+        return "TESSELLATION_EVALUATION";
+    case ShaderType::MESH:
+        return "MESH";
+    case ShaderType::TASK:
+        return "TASK";
     default:
         return "UNKNOWN";
     }
 }
 
 namespace {
-// Helper function to convert VkDescriptorType to string
 std::string descriptorTypeToString(VkDescriptorType type)
 {
     switch (type) {
@@ -444,7 +505,6 @@ std::string descriptorTypeToString(VkDescriptorType type)
     }
 }
 
-// Helper function to convert shader stage flags to string
 std::string shaderStageFlagsToString(VkShaderStageFlags flags)
 {
     std::string result;
@@ -454,9 +514,10 @@ std::string shaderStageFlagsToString(VkShaderStageFlags flags)
     if (flags & VK_SHADER_STAGE_GEOMETRY_BIT) result += "GEOMETRY | ";
     if (flags & VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) result += "TESS_CONTROL | ";
     if (flags & VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) result += "TESS_EVAL | ";
+    if (flags & VK_SHADER_STAGE_MESH_BIT_EXT) result += "MESH | ";
+    if (flags & VK_SHADER_STAGE_TASK_BIT_EXT) result += "TASK | ";
 
     if (result.empty()) return "NONE";
-    // Remove trailing " | "
     return result.substr(0, result.length() - 3);
 }
 } // namespace

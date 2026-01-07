@@ -7,7 +7,7 @@
 
 namespace Rapture {
 
-BLAS::BLAS(std::shared_ptr<Mesh> mesh)
+BLAS::BLAS(Mesh *mesh)
     : m_mesh(mesh), m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE),
       m_scratchBuffer(VK_NULL_HANDLE), m_scratchAllocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0),
       m_scratchSize(0), m_isBuilt(false)
@@ -237,9 +237,11 @@ void BLAS::build()
     CommandPoolConfig poolConfig{};
     poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
 
-    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer("BLAS");
+    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -260,7 +262,7 @@ void BLAS::build()
 
     // Submit command buffer
     auto queue = vulkanContext.getGraphicsQueue();
-    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
     queue->waitIdle();
 
     // Clean up scratch buffer immediately as it's no longer needed

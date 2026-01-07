@@ -69,8 +69,6 @@ ImGuiLayer::~ImGuiLayer()
     }
 
     Rapture::RP_INFO("---Closing ImGuiLayer---");
-
-    m_imguiCommandBuffers.clear();
 }
 
 void ImGuiLayer::onAttach()
@@ -161,11 +159,10 @@ void ImGuiLayer::onAttach()
 
     Rapture::CommandPoolConfig config;
     config.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
-    config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    config.flags = 0;
     config.threadId = 0;
 
-    auto commandPool = Rapture::CommandPoolManager::createCommandPool(config);
-    m_imguiCommandBuffers = commandPool->getCommandBuffers(imageCount, "ImGui");
+    m_commandPoolHash = Rapture::CommandPoolManager::createCommandPool(config);
     m_imageCount = imageCount;
     m_currentFrame = 0;
 }
@@ -223,10 +220,12 @@ void ImGuiLayer::renderImGui()
         m_viewportPanel.renderSceneViewport((ImTextureID)m_viewportTextureDescriptorSets[m_currentFrame]);
         m_propertiesPanel.render();
         m_browserPanel.render();
-        // m_gbufferPanel.render();
+        m_gbufferPanel.render();
         m_contentBrowserPanel.render();
         m_imageViewerPanel.render();
         m_settingsPanel.render();
+        m_textureGeneratorPanel.render();
+        m_graphEditorPanel.render();
 
         for (auto &viewer : m_floatingImageViews) {
             if (viewer && viewer->isOpen()) {
@@ -358,9 +357,8 @@ void ImGuiLayer::onUpdate(float ts)
     }
 
     // Record ImGui command buffer
-    auto imguiCommandBuffer = m_imguiCommandBuffers[m_currentFrame];
-
-    imguiCommandBuffer->reset();
+    auto pool = Rapture::CommandPoolManager::getCommandPool(m_commandPoolHash, m_currentFrame);
+    auto imguiCommandBuffer = pool->getPrimaryCommandBuffer();
 
     if (imguiCommandBuffer->begin(0) != VK_SUCCESS) {
         Rapture::RP_ERROR("failed to begin recording command buffer for ImGui!");
@@ -380,19 +378,14 @@ void ImGuiLayer::onUpdate(float ts)
         return;
     }
 
-    graphicsQueue->addCommandBuffer(imguiCommandBuffer);
-
     {
         RAPTURE_PROFILE_SCOPE("Combined Render Submit");
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
-        submitInfo.pWaitDstStageMask = waitStages;
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
+        std::span<VkSemaphore> waitSemaphoresSpan(&imageAvailableSemaphore, 1);
+        std::span<VkSemaphore> signalSemaphoresSpan(&renderFinishedSemaphore, 1);
+        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-        graphicsQueue->submitCommandBuffers(submitInfo, swapChain->getInFlightFence(m_currentFrame));
+        graphicsQueue->submitAndFlushQueue(imguiCommandBuffer, &signalSemaphoresSpan, &waitSemaphoresSpan, &waitStage,
+                                           swapChain->getInFlightFence(m_currentFrame));
     }
 
     // Present - waits for all rendering (scene + imgui) to complete
@@ -430,7 +423,7 @@ void ImGuiLayer::onUpdate(float ts)
     m_currentFrame = (m_currentFrame + 1) % m_imageCount;
 }
 
-void ImGuiLayer::drawImGui(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView)
+void ImGuiLayer::drawImGui(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -465,7 +458,7 @@ void ImGuiLayer::drawImGui(std::shared_ptr<Rapture::CommandBuffer> commandBuffer
     }
 }
 
-void ImGuiLayer::beginDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer, VkImageView targetImageView)
+void ImGuiLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -520,7 +513,7 @@ void ImGuiLayer::beginDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> c
     vkCmdBeginRendering(commandBufferVk, &renderingInfo);
 }
 
-void ImGuiLayer::endDynamicRendering(std::shared_ptr<Rapture::CommandBuffer> commandBuffer)
+void ImGuiLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -578,19 +571,6 @@ void ImGuiLayer::onResize()
     m_viewportTextureDescriptorSets.resize(newImageCount, VK_NULL_HANDLE);
     m_cachedViewportTextures.clear();
     m_cachedViewportTextures.resize(newImageCount);
-
-    // Recreate command buffers if image count changed
-    if (newImageCount != m_imageCount) {
-        m_imguiCommandBuffers.clear();
-
-        Rapture::CommandPoolConfig config;
-        config.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
-        config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        config.threadId = 0;
-
-        auto commandPool = Rapture::CommandPoolManager::createCommandPool(config);
-        m_imguiCommandBuffers = commandPool->getCommandBuffers(newImageCount, "ImGui");
-    }
 
     m_imageCount = newImageCount;
 }

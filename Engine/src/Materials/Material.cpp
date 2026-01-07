@@ -1,148 +1,132 @@
 #include "Material.h"
 
-#include "Logging/Log.h"
-
 #include "AssetManager/AssetManager.h"
-
-#include "WindowContext/Application.h"
-
-#include "Shaders/Shader.h"
-#include <string>
+#include "Logging/Log.h"
+#include "Textures/Texture.h"
 
 namespace Rapture {
 
 bool MaterialManager::s_initialized = false;
-
+uint32_t MaterialManager::s_defaultTextureIndex = 0;
 std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::s_materials;
 
-BaseMaterial::BaseMaterial(std::shared_ptr<Shader> shader, const std::string &name) : m_name(name), m_shader(shader)
+BaseMaterial::BaseMaterial(const std::string &name, std::initializer_list<ParameterID> editableParams, const MaterialData &defaults)
+    : m_name(name), m_editableParams(editableParams), m_defaults(defaults)
 {
-
-    auto lockedShader = m_shader.lock();
-    if (!lockedShader) {
-        RP_CORE_ERROR("shader is no longer valid");
-        m_name.clear();
-        return;
-    }
-
-    if (lockedShader->getDescriptorSetLayouts().size() < 1) {
-        return;
-    }
-
-    m_descriptorSetLayout = lockedShader->getDescriptorSetLayouts()[static_cast<uint32_t>(DESCRIPTOR_SET_INDICES::MATERIAL)];
-
-    auto descriptorSetInfos = lockedShader->getMaterialSets();
-
-    if (name.empty()) {
-        m_name = std::string(descriptorSetInfos[0].name);
-    }
-
-    m_sizeBytes = 0;
-    for (auto &info : descriptorSetInfos) {
-        for (auto &parameterInfo : info.params) {
-            auto param = MaterialParameter(parameterInfo, info.binding);
-
-            if (param.m_info.parameterId == ParameterID::UNKNOWN) {
-                RP_CORE_ERROR("unknown parameter id: {0} and type: {1}", parameterInfo.name, parameterInfo.type);
-                continue;
-            }
-
-            if (param.m_info.parameterId == ParameterID::ALBEDO) {
-                param.setValue(glm::vec3(1.0f, 1.0f, 1.0f));
-            }
-
-            m_parameterMap[param.m_info.parameterId] = param;
-            // Ensure the overall buffer size encompasses this parameter (offset + its size)
-            uint32_t endOffset = static_cast<uint32_t>(param.m_info.offset + param.m_info.size);
-            if (endOffset > m_sizeBytes) {
-                m_sizeBytes = endOffset;
-            }
-        }
-    }
-
-    // Align size to 16 bytes for std140 compliance
-    if (m_sizeBytes % 16 != 0) {
-        m_sizeBytes = (m_sizeBytes + 15) & ~15u; // round up to next multiple of 16
-    }
-
-    if (m_sizeBytes == 0) {
-        RP_CORE_ERROR("no valid parameters found in material set");
-        m_name.clear();
-        return;
-    }
 }
 
 void MaterialManager::init()
 {
+    if (s_initialized) {
+        RP_CORE_WARN("MaterialManager already initialized");
+        return;
+    }
+
     s_materials.clear();
 
-    auto &app = Application::getInstance();
-    auto &project = app.getProject();
-
-    auto shaderPath = project.getProjectShaderDirectory();
-
-    // create material for simple shader
-    // load shader
-    const std::string basicShaderPath = "SPIRV/default.vs.spv";
-
-    auto [basicShader, basicShaderHandle] = AssetManager::importAsset<Shader>(shaderPath / basicShaderPath);
-    // create material in a try catch
-    try {
-        auto material = std::make_shared<BaseMaterial>(basicShader, "material");
-        auto name = material->getName();
-        if (name.empty()) {
-            name = std::to_string(basicShaderHandle) + "_material";
-        }
-        s_materials[name] = material;
-    } catch (const std::exception &e) {
-        RP_CORE_ERROR("{}", e.what());
+    auto asset = AssetManager::importDefaultAsset(AssetType::TEXTURE);
+    auto defaultTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
+    if (defaultTexture && defaultTexture->isReady()) {
+        s_defaultTextureIndex = defaultTexture->getBindlessIndex();
+    } else {
+        RP_CORE_ERROR("Failed to get default white texture index");
+        s_defaultTextureIndex = 0;
     }
 
-    const std::string pbrShaderPath = "SPIRV/GBuffer.vs.spv";
-
-    auto [pbrShader, pbrShaderHandle] = AssetManager::importAsset<Shader>(shaderPath / pbrShaderPath);
-    // create material in a try catch
-    try {
-        auto material = std::make_shared<BaseMaterial>(pbrShader, "PBR");
-        auto name = material->getName();
-        if (name.empty()) {
-            name = std::to_string(pbrShaderHandle) + "_material";
-        }
-        s_materials[name] = material;
-    } catch (const std::exception &e) {
-        RP_CORE_ERROR("{}", e.what());
-    }
-
+    createDefaultMaterials();
     s_initialized = true;
 }
 
 void MaterialManager::shutdown()
 {
-
-    // destroy all materials
     s_materials.clear();
-
     s_initialized = false;
+}
+
+void MaterialManager::createDefaultMaterials()
+{
+    uint32_t defTex = s_defaultTextureIndex;
+
+    {
+        MaterialData defaults = MaterialData::createDefault(defTex);
+        auto pbr = std::make_shared<BaseMaterial>(
+            "PBR",
+            std::initializer_list<ParameterID>{ParameterID::ALBEDO, ParameterID::ROUGHNESS, ParameterID::METALLIC, ParameterID::AO,
+                                               ParameterID::EMISSIVE, ParameterID::ALBEDO_MAP, ParameterID::NORMAL_MAP,
+                                               ParameterID::METALLIC_ROUGHNESS_MAP, ParameterID::AO_MAP, ParameterID::EMISSIVE_MAP},
+            defaults);
+        s_materials["PBR"] = pbr;
+    }
+
+    {
+        MaterialData defaults = MaterialData::createDefault(defTex);
+        defaults.roughness = 0.9f;
+        auto simple = std::make_shared<BaseMaterial>(
+            "Simple", std::initializer_list<ParameterID>{ParameterID::ALBEDO, ParameterID::ALBEDO_MAP}, defaults);
+        s_materials["Simple"] = simple;
+    }
+
+    {
+        MaterialData defaults = MaterialData::createDefault(defTex);
+        defaults.flags = MAT_FLAG_IS_TERRAIN;
+        defaults.roughness = 0.9f;
+        auto terrain = std::make_shared<BaseMaterial>(
+            "Terrain",
+            std::initializer_list<ParameterID>{ParameterID::ALBEDO, ParameterID::ROUGHNESS, ParameterID::METALLIC, ParameterID::AO,
+                                               ParameterID::ALBEDO_MAP, ParameterID::NORMAL_MAP,
+                                               ParameterID::METALLIC_ROUGHNESS_MAP, ParameterID::AO_MAP, ParameterID::TILING_SCALE,
+                                               ParameterID::HEIGHT_BLEND, ParameterID::SLOPE_THRESHOLD, ParameterID::SPLAT_MAP},
+            defaults);
+        s_materials["Terrain"] = terrain;
+    }
+
+    RP_CORE_INFO("Created {} default materials", s_materials.size());
 }
 
 std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &name)
 {
     if (!s_initialized) {
-        RP_CORE_ERROR("material manager not initialized!");
+        RP_CORE_ERROR("MaterialManager not initialized");
         return nullptr;
     }
 
-    if (s_materials.find(name) == s_materials.end()) {
-        RP_CORE_ERROR("material '{0}' not found!", name);
+    auto it = s_materials.find(name);
+    if (it == s_materials.end()) {
+        RP_CORE_ERROR("Material '{}' not found", name);
         return nullptr;
     }
-    return s_materials[name];
+    return it->second;
+}
+
+std::shared_ptr<BaseMaterial> MaterialManager::createMaterial(const std::string &name,
+                                                              std::initializer_list<ParameterID> editableParams,
+                                                              const MaterialData &defaults)
+{
+    if (!s_initialized) {
+        RP_CORE_ERROR("MaterialManager not initialized");
+        return nullptr;
+    }
+
+    if (s_materials.find(name) != s_materials.end()) {
+        RP_CORE_WARN("Material '{}' already exists, returning existing", name);
+        return s_materials[name];
+    }
+
+    auto material = std::make_shared<BaseMaterial>(name, editableParams, defaults);
+    s_materials[name] = material;
+    return material;
+}
+
+uint32_t MaterialManager::getDefaultTextureIndex()
+{
+    return s_defaultTextureIndex;
 }
 
 void MaterialManager::printMaterialNames()
 {
     for (auto &[name, material] : s_materials) {
-        RP_CORE_INFO("\t {0}", name);
+        RP_CORE_INFO("\t {}", name);
     }
 }
+
 } // namespace Rapture

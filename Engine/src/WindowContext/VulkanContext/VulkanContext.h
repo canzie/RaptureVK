@@ -46,8 +46,10 @@ class VulkanContext {
     bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
     bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
     bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
+    bool isExtendedDynamicState3Enabled() const { return m_isExtendedDynamicState3Enabled; }
     bool isNullDescriptorEnabled() const { return m_isNullDescriptorEnabled; }
     bool isRayTracingEnabled() const { return m_isRayTracingEnabled; }
+    bool isMeshShaderEnabled() const { return m_isMeshShaderEnabled; }
 
     const VkPhysicalDeviceAccelerationStructurePropertiesKHR &getAccelerationStructureProperties() const
     {
@@ -61,6 +63,9 @@ class VulkanContext {
     PFN_vkCmdDrawMultiEXT vkCmdDrawMultiEXT = nullptr;
     PFN_vkCmdDrawMultiIndexedEXT vkCmdDrawMultiIndexedEXT = nullptr;
 
+    // Extended dynamic state 3 function pointers
+    PFN_vkCmdSetPolygonModeEXT vkCmdSetPolygonModeEXT = nullptr;
+
     // Ray tracing extension function pointers
     PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR = nullptr;
     PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR = nullptr;
@@ -71,8 +76,13 @@ class VulkanContext {
     PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR = nullptr;
     PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR = nullptr;
 
+    // Mesh shader extension function pointers
+    PFN_vkCmdDrawMeshTasksEXT vkCmdDrawMeshTasksEXT = nullptr;
+    PFN_vkCmdDrawMeshTasksIndirectEXT vkCmdDrawMeshTasksIndirectEXT = nullptr;
+    PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT = nullptr;
+
     //
-    void createRecourses(WindowContext *windowContext);
+    void createRecourses();
 
   private:
     void createInstance(WindowContext *windowContext);
@@ -127,8 +137,10 @@ class VulkanContext {
     bool m_isVertexInputDynamicStateEnabled;
     bool m_isVertexAttributeRobustnessEnabled;
     bool m_isDynamicRenderingEnabled;
+    bool m_isExtendedDynamicState3Enabled;
     bool m_isNullDescriptorEnabled;
     bool m_isRayTracingEnabled;
+    bool m_isMeshShaderEnabled;
 
     // Store descriptor indexing features support
     VkPhysicalDeviceDescriptorIndexingFeatures m_descriptorIndexingFeatures{};

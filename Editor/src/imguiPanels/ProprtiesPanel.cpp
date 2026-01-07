@@ -2,8 +2,10 @@
 
 #include "Events/GameEvents.h"
 
+#include "AssetManager/Asset.h"
 #include "AssetManager/AssetManager.h"
 
+#include "Generators/Terrain/TerrainTypes.h"
 #include "Scenes/Entities/Entity.h"
 #include "Textures/Texture.h"
 
@@ -13,6 +15,11 @@
 
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
+
+#include "imguiPanels/modules/PlotEditor.h"
+#include <functional>
+#include <imgui.h>
+#include <memory>
 
 // Implementation of HelpMarker function
 void PropertiesPanel::HelpMarker(const char *desc)
@@ -104,6 +111,10 @@ void PropertiesPanel::render()
         if (auto skyboxComp = entity->tryGetComponent<Rapture::SkyboxComponent>(); skyboxComp != nullptr) {
             renderSkyboxComponent(*skyboxComp);
         }
+
+        if (auto terrainComp = entity->tryGetComponent<Rapture::TerrainComponent>(); terrainComp != nullptr) {
+            renderTerrainComponent(*terrainComp);
+        }
     }
 
     ImGui::End();
@@ -118,39 +129,26 @@ void PropertiesPanel::renderMaterialComponent()
             ImGui::Text("Base Material: %s", material.material->getBaseMaterial()->getName().c_str());
             ImGui::Text("Material Instance: %s", material.material->getName().c_str());
 
-            auto &parameterMap = material.material->getParameterMap();
+            auto baseMat = material.material->getBaseMaterial();
+            for (Rapture::ParameterID paramID : baseMat->getEditableParams()) {
+                const Rapture::ParamInfo *info = Rapture::getParamInfo(paramID);
+                if (!info || info->type == Rapture::ParamType::TEXTURE) continue;
 
-            for (auto &[paramID, materialParameter] : parameterMap) {
-                ImGui::Text("%s", Rapture::parameterIdToString(paramID).c_str());
-                if (paramID == Rapture::ParameterID::ALBEDO) {
-                    ImGui::SameLine();
-                    glm::vec3 albedo = materialParameter.asVec3();
-                    if (ImGui::ColorEdit3("##albedo", glm::value_ptr(albedo))) {
-                        material.material->setParameter(Rapture::ParameterID::ALBEDO, albedo);
+                ImGui::Text("%s", std::string(info->name).c_str());
+                ImGui::SameLine();
+
+                std::string label = "##" + std::string(info->name);
+
+                if (info->type == Rapture::ParamType::VEC4 || info->type == Rapture::ParamType::VEC3) {
+                    glm::vec4 val = material.material->getParameter<glm::vec4>(paramID);
+                    glm::vec3 color(val.x, val.y, val.z);
+                    if (ImGui::ColorEdit3(label.c_str(), glm::value_ptr(color))) {
+                        material.material->setParameter(paramID, glm::vec4(color, val.w));
                     }
-                }
-
-                if (paramID == Rapture::ParameterID::ROUGHNESS) {
-                    ImGui::SameLine();
-                    float roughness = materialParameter.asFloat();
-                    if (ImGui::DragFloat("##roughness", &roughness, 0.01f, 0.0f, 1.0f)) {
-                        material.material->setParameter(Rapture::ParameterID::ROUGHNESS, roughness);
-                    }
-                }
-
-                if (paramID == Rapture::ParameterID::METALLIC) {
-                    ImGui::SameLine();
-                    float metallic = materialParameter.asFloat();
-                    if (ImGui::DragFloat("##metallic", &metallic, 0.01f, 0.0f, 1.0f)) {
-                        material.material->setParameter(Rapture::ParameterID::METALLIC, metallic);
-                    }
-                }
-
-                if (paramID == Rapture::ParameterID::EMISSIVE) {
-                    ImGui::SameLine();
-                    glm::vec3 emissive = materialParameter.asVec3();
-                    if (ImGui::ColorEdit3("##emissive", glm::value_ptr(emissive))) {
-                        material.material->setParameter(Rapture::ParameterID::EMISSIVE, emissive);
+                } else if (info->type == Rapture::ParamType::FLOAT) {
+                    float val = material.material->getParameter<float>(paramID);
+                    if (ImGui::DragFloat(label.c_str(), &val, 0.01f, 0.0f, 1.0f)) {
+                        material.material->setParameter(paramID, val);
                     }
                 }
             }
@@ -468,7 +466,7 @@ void PropertiesPanel::renderCascadedShadowComponent()
                     }
 
                     // Display flattened shadow map texture if available
-                    if (flattenedShadowTexture && flattenedShadowTexture->isReadyForSampling()) {
+                    if (flattenedShadowTexture && flattenedShadowTexture->isReady()) {
                         ImGui::Separator();
                         ImGui::Text("Flattened Shadow Map Visualization:");
 
@@ -730,24 +728,22 @@ void PropertiesPanel::renderAddComponentMenu(Rapture::Entity entity)
     };
 
     // Material Component
-    if (!entity.hasComponent<Rapture::MaterialComponent>()) {
-        if (ImGui::MenuItem("Material Component")) {
-            tryAddComponent(
-                [&entity]() {
-                    auto material =
-                        Rapture::AssetManager::importDefaultAsset<Rapture::MaterialInstance>(Rapture::AssetType::Material).first;
-                    if (material) {
-                        entity.addComponent<Rapture::MaterialComponent>(material);
-                    }
-                },
-                "Material Component");
-        }
-    }
 
     // Mesh Component
     if (!entity.hasComponent<Rapture::MeshComponent>()) {
         if (ImGui::MenuItem("Mesh Component")) {
             tryAddComponent([&entity]() { entity.addComponent<Rapture::MeshComponent>(); }, "Mesh Component");
+        }
+    }
+
+    // BLAS Component
+    if (!entity.hasComponent<Rapture::BLASComponent>()) {
+        if (auto meshComp = entity.tryGetComponent<Rapture::MeshComponent>(); meshComp != nullptr) {
+            if (ImGui::MenuItem("BLAS Component")) {
+                tryAddComponent([&entity, meshComp]() { entity.addComponent<Rapture::BLASComponent>(meshComp->mesh); },
+                                "BLAS Component");
+                entity.getScene()->registerBLAS(entity);
+            }
         }
     }
 
@@ -800,5 +796,144 @@ void PropertiesPanel::renderAddComponentMenu(Rapture::Entity entity)
         if (ImGui::MenuItem("Skybox Component")) {
             tryAddComponent([&entity]() { entity.addComponent<Rapture::SkyboxComponent>(); }, "Skybox Component");
         }
+    }
+}
+
+void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainComp)
+{
+    if (!terrainComp.generator) {
+        return;
+    }
+
+    if (ImGui::CollapsingHeader("Terrain Component", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Enabled", &terrainComp.isEnabled);
+
+        if (!terrainComp.generator->isInitialized()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Terrain not initialized");
+            return;
+        }
+
+        auto &config = terrainComp.generator->getConfigMutable();
+
+        float heightScale = config.heightScale;
+        if (ImGui::DragFloat("Height Scale", &heightScale, 1.0f, 0.0f, 1000.0f)) {
+            terrainComp.generator->setHeightScale(heightScale);
+        }
+
+        ImGui::DragFloat("Chunk Size", &config.chunkWorldSize, 1.0f, 1.0f, 256.0f);
+        ImGui::DragFloat("Terrain Size", &config.terrainWorldSize, 10.0f, 64.0f, 8192.0f);
+
+        ImGui::Separator();
+
+        const char *modeNames[] = {"Single Heightmap", "Multi-Noise (CEPV)"};
+        int currentMode = static_cast<int>(config.hmType);
+        if (ImGui::Combo("Heightmap Mode", &currentMode, modeNames, IM_ARRAYSIZE(modeNames))) {
+            config.hmType = static_cast<Rapture::HeightmapType>(currentMode);
+            m_terrainTextureCache.clear();
+        }
+
+        ImGui::Separator();
+        ImGui::Text("Chunk Grid: %u (radius %d)", terrainComp.generator->getChunkCount(), config.getChunkRadius());
+
+        bool wireframe = terrainComp.generator->isWireframe();
+        if (ImGui::Checkbox("Wireframe", &wireframe)) {
+            terrainComp.generator->setWireframe(wireframe);
+        }
+
+        ImGui::Separator();
+
+        auto renderTextureCombo = [&](const char *label, Rapture::TerrainNoiseCategory category) {
+            Rapture::Texture *selectedTexture = terrainComp.generator->getNoiseTexture(category);
+            std::string previewName = "None";
+
+            if (selectedTexture && m_terrainTextureCache.cachedHandles[category] == 0) {
+                auto allHandles = Rapture::AssetManager::getTextures();
+                for (auto handle : allHandles) {
+                    auto asset = Rapture::AssetManager::getAsset(handle);
+                    if (asset && asset.get()->getUnderlyingAsset<Rapture::Texture>() == selectedTexture) {
+                        m_terrainTextureCache.cachedHandles[category] = handle;
+                        break;
+                    }
+                }
+            }
+
+            if (m_terrainTextureCache.cachedHandles[category] != 0) {
+                auto &metadata = Rapture::AssetManager::getAssetMetadata(m_terrainTextureCache.cachedHandles[category]);
+                previewName = metadata.getName();
+            }
+
+            ImGui::SetNextWindowSizeConstraints(
+                ImVec2(0, 0), ImVec2(FLT_MAX, ImGui::GetTextLineHeightWithSpacing() * m_terrainTextureCache.MAX_VISIBLE));
+            if (ImGui::BeginCombo(label, previewName.c_str())) {
+                auto allHandles = Rapture::AssetManager::getTextures();
+
+                ImGuiListClipper clipper;
+                clipper.Begin(static_cast<int>(allHandles.size()));
+                while (clipper.Step()) {
+                    for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+                        auto handle = allHandles[i];
+                        auto asset = Rapture::AssetManager::getAsset(handle);
+                        if (!asset) continue;
+
+                        auto texture = asset.get()->getUnderlyingAsset<Rapture::Texture>();
+                        if (!texture) continue;
+
+                        auto &metadata = Rapture::AssetManager::getAssetMetadata(handle);
+                        bool isSelected = (m_terrainTextureCache.cachedHandles[category] == handle);
+
+                        if (ImGui::Selectable(metadata.getName().c_str(), isSelected)) {
+                            terrainComp.generator->setNoiseTexture(category, texture);
+                            m_terrainTextureCache.cachedHandles[category] = handle;
+                        }
+                        if (isSelected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        };
+
+        if (config.hmType == Rapture::HeightmapType::HM_SINGLE) {
+            ImGui::Text("Single Heightmap");
+            renderTextureCombo("Heightmap Texture", Rapture::CONTINENTALNESS);
+        }
+
+        ImGui::Separator();
+
+        if (config.hmType == Rapture::HeightmapType::HM_CEPV) {
+            ImGui::Text("Multi-Noise Textures");
+
+            auto &multiNoise = terrainComp.generator->getMultiNoiseConfig();
+            bool splineChanged = false;
+
+            const char *categoryNames[] = {"Continentalness", "Erosion", "Peaks & Valleys"};
+
+            for (uint8_t i = 0; i < Rapture::TERRAIN_NC_COUNT; ++i) {
+                std::string label = std::string(categoryNames[i]) + " Texture";
+                renderTextureCombo(label.c_str(), static_cast<Rapture::TerrainNoiseCategory>(i));
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::TreeNode("Multi-Noise Splines")) {
+                for (uint8_t cat = 0; cat < Rapture::TERRAIN_NC_COUNT; ++cat) {
+                    auto &spline = multiNoise.splines[cat];
+                    Modules::SplinePoints splinePoints =
+                        Modules::createSplinePoints(&spline.points, Modules::InterpolationType::LINEAR);
+                    if (Modules::plotEditor(categoryNames[cat], splinePoints, ImVec2(0, 150))) {
+                        splineChanged = true;
+                    }
+                    ImGui::Spacing();
+                }
+                ImGui::TreePop();
+            }
+
+            if (splineChanged || ImGui::Button("Rebake LUT")) {
+                terrainComp.generator->bakeNoiseLUT();
+            }
+        }
+
+        ImGui::Separator();
     }
 }

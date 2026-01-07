@@ -50,6 +50,7 @@ enum class DescriptorSetBindingLocation {
     BINDLESS_TEXTURES = 300,
     BINDLESS_SSBOS = 301,
     BINDLESS_ACCELERATION_STRUCTURES = 302,
+    // BINDLESS_FRUSTUM_PLANES = 303,
     // Specific storage image bindings in set 3
     RT_SCENE_INFO_SSBOS = 309, // Will be at binding 9 in set 3
 

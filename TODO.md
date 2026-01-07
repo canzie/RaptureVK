@@ -1,42 +1,26 @@
 
-- [ ] Add entity locking support
-  - Lock entities from editing and/or deletion (via PropertiesComponent flag?)
-  - Useful for: editor UX, protecting essebntial entities like main camera
-  - *Solution:*
-- [ ] Component dependency hints (editor UX)
-  - Shadow requires Light, CSM and regular shadow maps mutually exclusive
-  - Validation at editor level, runtime still double-checks
-  - Not critical - rare edge cases
-- [ ] Reduce direct EnTT bypassing
-  - Audit places where wrapper is bypassed for views/iteration
-  - improve wrapper, as these bypasses are being done because of the inneficiency of the wrapper (maybe an actual 10x directly)
 
-
+- jobify mesh loading (probably cant store data on the stack so circumvent this by letting the main or io thread load it and provide a ptr when its loaded)
+- Make rendering things like bounds easier
+  - current method is creating an instancedshapes component and providing the transformmatrix
+  - this is akward as it cannot be used from inside the editor, only in code, we should be able to add it to certain things, like a mesh, terrain, etc, and depending on if we only need 1 or more to visualise debug use a simple mesh or instancing, like if the user selects aabb of a mesh, just a mesh, but if they select aabbs of the terrain we use instanced meshes, we can do this by seeing if the get aabb method returns 1 or multiple aabbs. , so it becomes a specific thing per mesh, per terrain comp etc. the thing to decide is how we enable/disable it while not storing the instanced data like the buffers in the same component.... 
+- fix the scuffed shit where the chunk data is first writting manually and then via the compute shader, its shit i hate it
 
 - fix stencil buffer
 - shader hot reloading
-
-- look at csm flickering again
-- material editor/viewer
 - jolt???
-
-
-### Procedural Texture Generation
-
-- Base class takes in a shader(Can be glsl file->assetManager) and inputs
-- Every shader NEEDS the following
-  - input via push constants (limited to 128 bytes)
-  - 1 output, which is a texture
-  - square local sizes
-  - 2d texture (for now)
-  - its local size needs to be via a macro so we can set it before compilation
-- After the texture has been generated, we "free" it so the asset manager can mark it (it can then decide to remove it or keep it in memory. not relevant externally)
-- it is acceptable to only accept certain sizes, e.g. ..., 256x256, 512x512, 1024x1024, 2048, 2048. (these can be added later, the point is preset sizes)
-- output of the cpp side is a texture, registered to the asset manager
-- ontop of this class, well have static functions to generate specifics where the shader does not have to be specified (like a generateWhiteNoise)
-- the cpp side needs to make sure to have the correct structs represented in the shader, reflection can be used to verify before dipatching it.
-- this system NEEDS to be thread safe, this means we create, dispatch, return and clean up, no static generator class, only the specific helpers can be static, but not the base class.
-
+- look at removing the waitidles in some places like copyBuffer
+- parallise/jobify shader compilation
+- add material to asset manager
+- add model to the asset manager
+  - ditinction between static and dynamic meshes here
+  - the asset importer in the editor will be able to set these options and they can be either metadata or ...
+    - editor settings could be static/dynamic, prefab options?
+    - animation options etc (once they exist)
+    - checkox for importing material from gltf and auto making the materials and applying them
+- pre generated normals?
+- virtual texturing??? like decima i guess
+- phyics -> raypicking -> custom gizmo and terrain editor and mesh placer
 
 ### PHYSICS
     - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)
@@ -59,27 +43,9 @@
 - add material editor
 
 
-### Terrain Generation
-
-- allow for easy noise generation, should only need inputs, outputs and algo -> provide a registered virtual image
-- make basic terrain
-- blend multiple noise layers
-- use tesselation shaders
-- generate normals, use textures, deal with collision??? 
-- add lod and spatial partitioning
-- look into clipmaps
-
-
 ### J*B SYSTEM
 #### Requirements
-
-- easy to add new jobs
-- easy to set dependencies between jobs
-- a way to cancel jobs and its children
-- a way to wait for a job to finish
-- lightweight
-- job queues can be static (dependency chain needs to be defined when the job queue is created)
-
+- see design document
 
 ### ASSET MANAGER
 - materials in the asset manager -> Material Graph editor
@@ -90,8 +56,6 @@
 - fix CSM on triple buffering
 - optimisations
     - lighting pass optimisations
-- [ 9 implement a weakptr caching system in the bindings -> resize support (after the base works) ]
-- fix the issue where not rendering the sponza scene -> not tlas -> crash, should be able to render empty scene or a full scene no matter what (except vertex only meshes)
 
 --------------------------------
 
@@ -99,9 +63,12 @@
 
 - static meshes
 - ssao
-- path tracer ...
-- Photometry (use camera settings to calculate the correct exposure)
+- ss reflections
 - animations
+- job system
+- scripting
+- jolt
+- Photometry (use camera settings to calculate the correct exposure)
 - giga serializaiton
 - post processing
 - some limit testing

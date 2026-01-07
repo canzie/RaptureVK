@@ -2,9 +2,7 @@
 
 #include "Shaders/Shader.h"
 
-#include <string>
 #include <variant>
-#include <vector>
 
 namespace Rapture {
 
@@ -12,9 +10,9 @@ struct ShaderImportConfig {
 
     ShaderCompileInfo compileInfo;
 
-    bool operator==(const ShaderImportConfig &other) const {
-        return compileInfo.macros == other.compileInfo.macros &&
-               compileInfo.includePath == other.compileInfo.includePath;
+    bool operator==(const ShaderImportConfig &other) const
+    {
+        return compileInfo.macros == other.compileInfo.macros && compileInfo.includePath == other.compileInfo.includePath;
     }
 };
 

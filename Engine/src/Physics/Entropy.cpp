@@ -1,5 +1,6 @@
 #include "Entropy.h"
 
+#include "AssetManager/AssetManager.h"
 #include "Buffers/StorageBuffers/StorageBuffer.h"
 #include "Components/Components.h"
 #include "EntropyComponents.h"
@@ -228,23 +229,25 @@ void EntropyCollisions::debugVisualize(std::shared_ptr<Scene> scene)
     auto &vulkanContext = app.getVulkanContext();
 
     if (!m_staticVizEntity) {
-        auto cube = std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateCube());
+        auto cube = std::make_unique<Rapture::Mesh>(Rapture::Primitives::CreateCube());
+        auto meshRef = AssetManager::registerVirtualAsset(std::move(cube), "BVH_Viz_Static_Cube", AssetType::MESH);
 
         m_staticVizEntity = std::make_shared<Entity>(scene->createEntity("Static BVH Visualization"));
         m_staticVizEntity->addComponent<TransformComponent>();
         m_staticVizEntity->addComponent<InstanceShapeComponent>(std::vector<InstanceData>(), vulkanContext.getVmaAllocator());
-        m_staticVizEntity->addComponent<MeshComponent>(cube);
+        m_staticVizEntity->addComponent<MeshComponent>(meshRef);
 
         updateVisualization(m_staticBVH->getNodes(), m_staticVizEntity, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
     }
 
     if (!m_dynamicVizEntity) {
-        auto cube = std::make_shared<Rapture::Mesh>(Rapture::Primitives::CreateCube());
+        auto cube = std::make_unique<Rapture::Mesh>(Rapture::Primitives::CreateCube());
+        auto meshRef = AssetManager::registerVirtualAsset(std::move(cube), "BVH_Viz_Dynamic_Cube", AssetType::MESH);
 
         m_dynamicVizEntity = std::make_shared<Entity>(scene->createEntity("Dynamic BVH Visualization"));
         m_dynamicVizEntity->addComponent<TransformComponent>();
         m_dynamicVizEntity->addComponent<InstanceShapeComponent>(std::vector<InstanceData>(), vulkanContext.getVmaAllocator());
-        m_dynamicVizEntity->addComponent<MeshComponent>(cube);
+        m_dynamicVizEntity->addComponent<MeshComponent>(meshRef);
     }
 
     if (m_dynamicVizEntity) {

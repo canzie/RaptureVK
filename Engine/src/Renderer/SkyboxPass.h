@@ -1,6 +1,9 @@
-#pragma once
+#ifndef RAPTURE__SKYBOX_PASS_H
+#define RAPTURE__SKYBOX_PASS_H
 
+#include "AssetManager/Asset.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/IndexBuffers/IndexBuffer.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
@@ -18,17 +21,18 @@ namespace Rapture {
 
 class SkyboxPass {
   public:
-    SkyboxPass(std::shared_ptr<Texture> skyboxTexture, std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat);
     SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat);
 
     ~SkyboxPass();
 
-    // NOTE: assumes that the command buffer is already started, and will be ended by the caller
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
-                             uint32_t frameInFlightIndex);
+    CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
+                                   const SecondaryBufferInheritance &inheritance);
 
-    // Set the skybox texture
-    void setSkyboxTexture(std::shared_ptr<Texture> skyboxTexture);
+    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
+                               uint32_t frameInFlightIndex);
+    void endDynamicRendering(CommandBuffer *commandBuffer);
+
+    void setSkyboxTexture(Texture *skyboxTexture);
 
     bool hasActiveSkybox() const { return m_skyboxTexture != nullptr; }
 
@@ -36,18 +40,17 @@ class SkyboxPass {
     void createPipeline();
     void createSkyboxGeometry();
 
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView,
-                               VkImageView depthImageView, VkExtent2D targetExtent);
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage, VkImage depthImage);
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, VkImage depthImage);
 
   private:
     VkDevice m_device;
     VmaAllocator m_vmaAllocator;
 
-    std::weak_ptr<Shader> m_shader;
+    Shader *m_shader = nullptr;
+    std::vector<AssetRef> m_shaderAssets;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
-    std::shared_ptr<Texture> m_skyboxTexture;
+    Texture *m_skyboxTexture;
     std::vector<std::shared_ptr<Texture>> m_depthTextures;
     std::shared_ptr<VertexBuffer> m_skyboxVertexBuffer;
     std::shared_ptr<IndexBuffer> m_skyboxIndexBuffer;
@@ -58,3 +61,5 @@ class SkyboxPass {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__SKYBOX_PASS_H

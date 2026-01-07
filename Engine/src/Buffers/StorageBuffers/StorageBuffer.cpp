@@ -113,7 +113,7 @@ uint32_t StorageBuffer::getBindlessIndex()
         auto binding = set->getSSBOBinding(DescriptorSetBindingLocation::BINDLESS_SSBOS);
 
         if (binding) {
-            m_bindlessIndex = binding->add(shared_from_this());
+            m_bindlessIndex = binding->add(*this);
         }
     }
 

@@ -777,3 +777,1004 @@ The Vulkan spec states: All elements of pCommandBuffers must not be in the pendi
 terminate called after throwing an instance of 'std::runtime_error'
   what():  VulkanQueue::submitQueue - failed to submit draw command buffer!
 Aborted                    (core dumped) ./'Rapture Editor'
+[00:41:35] RAPTURE: Enabled logging for RENDER to file logs/render.log
+[00:41:35] RAPTURE: Enabled logging for PHYSICS to file logs/physics.log
+[00:41:35] RAPTURE: Logger initialized with advanced features
+[00:41:35] RAPTURE: [INFO] Application::Application: Creating window...
+[00:41:35] RAPTURE: [INFO] GlfwWindowContext::initWindow: ========== Initializing GLFW Window Context ==========
+[00:41:35] RAPTURE: [INFO] GlfwWindowContext::initWindow: ========== GLFW Window Context Initialized Successfully. ==========
+[00:41:35] RAPTURE: [INFO] Application::Application: Creating Vulkan context...
+[00:41:35] RAPTURE: [INFO] VulkanContext::VulkanContext: Detected Wayland session - using Wayland surface support
+[00:41:35] RAPTURE: [INFO] VulkanContext::VulkanContext: Validation layers enabled!
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: ========== Supported Vulkan extensions: ==========
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_device_group_creation
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_display
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_external_fence_capabilities
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_external_memory_capabilities
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_external_semaphore_capabilities
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_get_display_properties2
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_get_physical_device_properties2
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_get_surface_capabilities2
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_surface
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_surface_maintenance1
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_surface_protected_capabilities
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_wayland_surface
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_xcb_surface
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_xlib_surface
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_acquire_drm_display
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_acquire_xlib_display
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_debug_report
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_debug_utils
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_direct_mode_display
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_display_surface_counter
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_surface_maintenance1
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_swapchain_colorspace
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_NV_display_stereo
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_portability_enumeration
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_LUNARG_direct_driver_loading
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: Wayland surface extension is supported!
+[00:41:35] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: ========================================================
+
+[00:41:35] RAPTURE: [INFO] VulkanContext::createInstance: Creating Vulkan instance with API version: 1.3.0
+[00:41:35] RAPTURE: [INFO] vector<const char*> Rapture::VulkanContext::getRequiredExtensions: Requesting Wayland surface extension for Wayland session
+[00:41:35] RAPTURE: [INFO] VulkanContext::createInstance: Vulkan instance created successfully!
+[00:41:35] RAPTURE: [INFO] VulkanContext::createWindowsSurface: Creating Wayland surface...
+[00:41:35] RAPTURE: [INFO] VulkanContext::createWindowsSurface: Wayland surface created successfully!
+[00:41:35] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: Evaluating GPU: NVIDIA GeForce RTX 4070
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Queue family indices:
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Graphics: 0:16
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Compute: 0:16
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Present: 0:16
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Transfer: 0:16
+[00:41:35] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: GPU NVIDIA GeForce RTX 4070: All required queue families found
+[00:41:35] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: GPU NVIDIA GeForce RTX 4070: All required device extensions supported
+[00:41:35] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: GPU NVIDIA GeForce RTX 4070: Swap chain support adequate (7 formats, 4 present modes)
+[00:41:35] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: GPU NVIDIA GeForce RTX 4070: Device is SUITABLE for use
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Queue family indices:
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Graphics: 0:16
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Compute: 0:16
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Present: 0:16
+[00:41:35] RAPTURE: [INFO] QueueFamilyIndices::print: Transfer: 0:16
+[00:41:35] RAPTURE: [INFO] s_enableVulkan12Features: Timeline semaphores enabled.
+[00:41:35] RAPTURE: [INFO] s_enableVulkan12Features: drawIndirectCount enabled.
+[00:41:35] RAPTURE: [INFO] s_enableVulkan12Features: bufferDeviceAddress enabled.
+[00:41:35] RAPTURE: [INFO] s_enableVertexInputDynamicState: vertexInputDynamicState enabled.
+[00:41:35] RAPTURE: [INFO] s_enableVertexAttributeRobustness: EXT::vertexAttributeRobustness enabled.
+[00:41:35] RAPTURE: [INFO] s_enableDynamicRendering: KHR::dynamicRendering enabled.
+[00:41:35] RAPTURE: [INFO] s_enableMeshShader: EXT::meshShader enabled.
+[00:41:35] RAPTURE: [INFO] s_enableRobustness2: KHR::robustness2::nullDescriptor enabled.
+[00:41:35] RAPTURE: [INFO] s_enableMultiview: KHR::multiview enabled.
+[00:41:35] RAPTURE: [INFO] s_enableExtendedDynamicState3: Extended dynamic state 3 (polygon mode) enabled.
+[00:41:35] RAPTURE: [INFO] s_enableRayTracingFeatures: Ray tracing supported. Enabling features.
+[00:41:36] RAPTURE: [INFO] s_loadMeshShader: Mesh shader function pointers loaded.
+[00:41:36] RAPTURE: [INFO] VulkanQueue::VulkanQueue: VulkanQueue[graphics|present|compute|transfer]: Created with timeline semaphore
+[00:41:36] RAPTURE: [INFO] VulkanQueue::VulkanQueue: VulkanQueue[vendor]: Created with timeline semaphore
+[00:41:36] RAPTURE: [INFO] VulkanContext::createLogicalDevice: Logical device created successfully!
+[00:41:36] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Starting VMA allocator creation...
+[00:41:36] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Checking Vulkan handles...
+[00:41:36] RAPTURE: [INFO] VulkanContext::createVmaAllocator: All Vulkan handles valid
+[00:41:36] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Creating VMA allocator create info...
+[00:41:36] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Calling vmaCreateAllocator...
+[00:41:36] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Successfully created VMA allocator
+[00:41:36] RAPTURE: [INFO] CommandPoolManager::init: Initialized CommandPoolManager with 3 frames in flight!
+[00:41:36] RAPTURE: [INFO] BufferPoolManager::init: Initialized with VMA allocator
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:36] RAPTURE: [INFO] SwapChain::createDepthTexture: Created depth texture: 956x536
+[00:41:36] RAPTURE: [INFO] TracyProfiler::init: Tracy Profiler initialized
+[00:41:36] RAPTURE: [INFO] Project::Project: Creating Project: New Project
+[00:41:36] RAPTURE: [INFO] SceneManager::setActiveScene: Setting active scene to: DefaultScene
+[00:41:36] RAPTURE: [INFO] AssetImporter::assetLoadThread: Asset loading thread started
+[00:41:36] RAPTURE: [INFO] AssetImporter::assetLoadThread: Asset loading thread started
+[00:41:36] RAPTURE: [INFO] AssetImporter::assetLoadThread: Asset loading thread started
+[00:41:36] RAPTURE: [INFO] DescriptorManager::init: Initializing DescriptorManager
+[00:41:36] RAPTURE: [INFO] AssetImporter::assetLoadThread: Asset loading thread started
+[00:41:36] RAPTURE: [INFO] DescriptorSet::createDescriptorPool: Created descriptor pool with 1000 max sets
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 0 - Buffers: 196, Textures: 0, StorageBuffers: 2048, StorageImages: 0, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 0 - Pool usage: Sets 1/1000, Buffers 196/20000, Textures 0/16000, StorageBuffers 2048/8000, StorageImages 0/8000, AccelStructs 0/128
+[00:41:36] RAPTURE: [INFO] DescriptorManager::initializeSet0: DescriptorManager Initialized set 0
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 1 - Buffers: 1024, Textures: 0, StorageBuffers: 0, StorageImages: 0, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 1 - Pool usage: Sets 2/1000, Buffers 1220/20000, Textures 0/16000, StorageBuffers 2048/8000, StorageImages 0/8000, AccelStructs 0/128
+[00:41:36] RAPTURE: [INFO] DescriptorManager::initializeSet1: DescriptorManager Initialized set 1
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 2 - Buffers: 16384, Textures: 0, StorageBuffers: 0, StorageImages: 0, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 2 - Pool usage: Sets 3/1000, Buffers 17604/20000, Textures 0/16000, StorageBuffers 2048/8000, StorageImages 0/8000, AccelStructs 0/128
+[00:41:36] RAPTURE: [INFO] DescriptorManager::initializeSet2: DescriptorManager Initialized set 2
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 3 - Buffers: 0, Textures: 4096, StorageBuffers: 2049, StorageImages: 0, InputAttachments: 0, AccelStructs: 8
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 3 - Pool usage: Sets 4/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 0/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [INFO] DescriptorManager::initializeSet3: Initialized set 3
+[00:41:36] RAPTURE: [INFO] shared_ptr<Rapture::Texture> Rapture::Texture::createDefaultWhiteTexture: Created default white texture (1x1 RGBA8)
+[00:41:36] RAPTURE: [INFO] pair<std::shared_ptr<Rapture::Asset>, long unsigned int> Rapture::AssetManagerEditor::importDefaultAsset: Created default white texture with handle
+[00:41:36] RAPTURE: [INFO] MaterialManager::createDefaultMaterials: Created 3 default materials
+[00:41:36] RAPTURE: [INFO] SceneRenderTarget::SceneRenderTarget: Created offscreen SceneRenderTarget: 956x536 with 3 images
+[00:41:36] RAPTURE: [INFO] DeferredRenderer::createRenderTarget: Created OFFSCREEN render target for Editor mode
+[00:41:36] RAPTURE: [INFO] shared_ptr<Rapture::Texture> Rapture::Texture::createDefaultWhiteCubemapTexture: Created default white cubemap texture (1x1x6 RGBA8)
+[00:41:36] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeTrace.cs.glsl 
+	 using macros: []
+[00:41:36] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:36] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeBlending.cs.glsl 
+	 using macros: [DDGI_BLEND_RADIANCE, DDGI_ENABLE_PROBE_CLASSIFICATION]
+[00:41:36] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:36] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeBlending.cs.glsl 
+	 using macros: [DDGI_BLEND_DISTANCE, DDGI_ENABLE_PROBE_CLASSIFICATION]
+[00:41:36] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:36] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeRelocation.cs.glsl 
+	 using macros: []
+[00:41:36] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:36] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeClassification.cs.glsl 
+	 using macros: []
+[00:41:36] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:36] RAPTURE: [INFO] DynamicDiffuseGI::initProbeInfoBuffer: Added probe volume UBO to descriptor set 0, binding 5
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/FlattenDepthArray.cs.glsl 
+	 using macros: []
+[00:41:36] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:36] RAPTURE: [INFO] TextureFlattener::initializeSharedResources: Initialized shared resources (depth shader)
+[00:41:36] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Flatten2dArray.cs.glsl 
+	 using macros: [DATA_TYPE_FLOAT]
+[00:41:36] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:36] RAPTURE: [INFO] TextureFlattener::getOrCreateShaderAndPipeline: Created shader and pipeline for data type 0
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 5/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 1/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Flattened Ray Data'
+[00:41:36] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Flattened Ray Data' (256x484x22 -> 1280x2420)
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 6/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 2/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Irradiance Flattened'
+[00:41:36] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Irradiance Flattened' (176x176x22 -> 880x880)
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 7/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 3/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Distance Flattened'
+[00:41:36] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Distance Flattened' (352x352x22 -> 1760x1760)
+[00:41:36] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Flatten2dArray.cs.glsl 
+	 using macros: [DATA_TYPE_UINT]
+[00:41:36] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:36] RAPTURE: [INFO] TextureFlattener::getOrCreateShaderAndPipeline: Created shader and pipeline for data type 2
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 8/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 4/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Probe Classification Flattened'
+[00:41:36] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Probe Classification Flattened' (22x22x22 -> 110x110)
+[00:41:36] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 9/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 5/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Probe Offset Flattened'
+[00:41:36] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Probe Offset Flattened' (22x22x22 -> 110x110)
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 10/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 6/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 11/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 7/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 12/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 8/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 13/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 9/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:36] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 14/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 10/8000, AccelStructs 8/128
+[00:41:36] RAPTURE: [INFO] DynamicDiffuseGI::initTextures: DDGI: Created custom descriptor sets for compute pipelines.
+[00:41:36] RAPTURE: [TRACE] DynamicDiffuseGI::setupProbeTextures: Setting up probe textures for bindless access
+[00:41:36] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/GBuffer.vs.glsl
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/GBuffer.vs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/GBuffer.fs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_gbuffer.vs.glsl
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_gbuffer.vs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_gbuffer.fs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [TRACE] GBufferPass::createTerrainPipeline: GBufferPass: Terrain pipeline created
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/DeferredLighting.fs.glsl
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/DeferredLighting.vs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/DeferredLighting.fs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/StencilBorder.vs.spv
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/InstancedShapes.vs.glsl
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/InstancedShapes.vs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/InstancedShapes.fs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/SkyboxPass.vs.spv
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [INFO] Application::Application: ========== Application created ==========
+[00:41:37] EDITOR: [INFO] EditorApp: Rapture Editor starting up...
+[00:41:37] EDITOR: [INFO] onAttach: TestLayer attached
+[00:41:37] EDITOR: [INFO] onAttach: TestLayer::onAttach - Initial scene already active: Untitled Scene
+[00:41:37] EDITOR: [INFO] onNewActiveScene: Loading Sponza scene from: /home/Thomas/dev/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf
+[00:41:37] RAPTURE: [INFO] glTF2Loader::initialize: Initializing loader for '/home/Thomas/dev/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf'
+[00:41:37] RAPTURE: [INFO] glTF2Loader::initialize: Initializing loader for '/home/Thomas/dev/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf'
+[00:41:37] RAPTURE: [INFO] BufferArena::BufferArena: Created arena 0 with size 64 MB
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=202680, aligned_offset=202704, padding=24
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=261815, aligned_offset=261840, padding=25
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=319499, aligned_offset=319536, padding=37
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=325690, aligned_offset=325728, padding=38
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=458424, aligned_offset=458448, padding=24
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=540455, aligned_offset=540480, padding=25
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=549238, aligned_offset=549264, padding=26
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=702501, aligned_offset=702528, padding=27
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=719924, aligned_offset=719952, padding=28
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=720739, aligned_offset=720768, padding=29
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=720882, aligned_offset=720912, padding=30
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=810401, aligned_offset=810432, padding=31
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1192991, aligned_offset=1192992, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1226712, aligned_offset=1226736, padding=24
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1236935, aligned_offset=1236960, padding=25
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1245767, aligned_offset=1245792, padding=25
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1251862, aligned_offset=1251888, padding=26
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1252869, aligned_offset=1252896, padding=27
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1258772, aligned_offset=1258800, padding=28
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1259491, aligned_offset=1259520, padding=29
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1265586, aligned_offset=1265616, padding=30
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1266593, aligned_offset=1266624, padding=31
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1286831, aligned_offset=1286832, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1300463, aligned_offset=1300464, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1314095, aligned_offset=1314096, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1327727, aligned_offset=1327728, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1341359, aligned_offset=1341360, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1354991, aligned_offset=1354992, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1368623, aligned_offset=1368624, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1410910, aligned_offset=1410912, padding=2
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1413597, aligned_offset=1413600, padding=3
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1448303, aligned_offset=1448304, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1448674, aligned_offset=1448688, padding=14
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1472495, aligned_offset=1472496, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1473034, aligned_offset=1473072, padding=38
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1475385, aligned_offset=1475424, padding=39
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1475576, aligned_offset=1475616, padding=40
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1512024, aligned_offset=1512048, padding=24
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1516487, aligned_offset=1516512, padding=25
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1516834, aligned_offset=1516848, padding=14
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1800273, aligned_offset=1800288, padding=15
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1820768, aligned_offset=1820784, padding=16
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1825231, aligned_offset=1825248, padding=17
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1825578, aligned_offset=1825584, padding=6
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1825961, aligned_offset=1825968, padding=7
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1826038, aligned_offset=1826064, padding=26
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1913637, aligned_offset=1913664, padding=27
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1921844, aligned_offset=1921872, padding=28
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=2102563, aligned_offset=2102592, padding=29
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=2125026, aligned_offset=2125056, padding=30
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=3230897, aligned_offset=3230928, padding=31
+[00:41:37] RAPTURE: [INFO] BufferArena::BufferArena: Created arena 1 with size 64 MB
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=3370192, aligned_offset=3370224, padding=32
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=3375999, aligned_offset=3376032, padding=33
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=4606319, aligned_offset=4606320, padding=1
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=4773142, aligned_offset=4773168, padding=26
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=4929669, aligned_offset=4929696, padding=27
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=4962740, aligned_offset=4962768, padding=28
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=5119267, aligned_offset=5119296, padding=29
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=5152338, aligned_offset=5152368, padding=30
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=5308865, aligned_offset=5308896, padding=31
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8449229, aligned_offset=8449248, padding=19
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8450044, aligned_offset=8450064, padding=20
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8450139, aligned_offset=8450160, padding=21
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8592122, aligned_offset=8592144, padding=22
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8794494, aligned_offset=8794512, padding=18
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8795309, aligned_offset=8795328, padding=19
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8795404, aligned_offset=8795424, padding=20
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8937387, aligned_offset=8937408, padding=21
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8967176, aligned_offset=8967216, padding=40
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8995656, aligned_offset=8995680, padding=24
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9054791, aligned_offset=9054816, padding=25
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9096504, aligned_offset=9096528, padding=24
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9155639, aligned_offset=9155664, padding=25
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9197399, aligned_offset=9197424, padding=25
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9256534, aligned_offset=9256560, padding=26
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9269847, aligned_offset=9269856, padding=9
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9291494, aligned_offset=9291504, padding=10
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9366306, aligned_offset=9366336, padding=30
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9387953, aligned_offset=9387984, padding=31
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9390400, aligned_offset=9390432, padding=32
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9449535, aligned_offset=9449568, padding=33
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9462848, aligned_offset=9462864, padding=16
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9484495, aligned_offset=9484512, padding=17
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9486942, aligned_offset=9486960, padding=18
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9546077, aligned_offset=9546096, padding=19
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9559390, aligned_offset=9559392, padding=2
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9581037, aligned_offset=9581040, padding=3
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9655842, aligned_offset=9655872, padding=30
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9910673, aligned_offset=9910704, padding=31
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9965824, aligned_offset=9965856, padding=32
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10007439, aligned_offset=10007472, padding=33
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10016612, aligned_offset=10016640, padding=28
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10052803, aligned_offset=10052832, padding=29
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10061022, aligned_offset=10061040, padding=18
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10102637, aligned_offset=10102656, padding=19
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10158791, aligned_offset=10158816, padding=25
+[00:41:37] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10729558, aligned_offset=10729584, padding=26
+[00:41:37] RAPTURE: [INFO] BufferArena::BufferArena: Created arena 2 with size 64 MB
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related fragment shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/ShadowPass.vs.spv
+[00:41:37] RAPTURE: [INFO] shared_ptr<Rapture::Asset> Rapture::AssetImporter::loadShader: No fragment shader found, assuming vertex only shader for: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/ShadowPass.vs.spv
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/ShadowPass.vs.spv
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related fragment shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/CascadedShadowPass.vs.spv
+[00:41:37] RAPTURE: [INFO] shared_ptr<Rapture::Asset> Rapture::AssetImporter::loadShader: No fragment shader found, assuming vertex only shader for: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/CascadedShadowPass.vs.spv
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/CascadedShadowPass.vs.spv
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related fragment shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_csm.vs.glsl
+[00:41:37] RAPTURE: [INFO] shared_ptr<Rapture::Asset> Rapture::AssetImporter::loadShader: No fragment shader found, assuming vertex only shader for: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_csm.vs.glsl
+[00:41:37] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_csm.vs.glsl
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_csm.vs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [INFO] CascadedShadowMap::createTerrainPipeline: Terrain CSM pipeline created
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:37] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:37] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 15/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 11/8000, AccelStructs 8/128
+[00:41:37] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[CSM] Flattened Shadow Map Array'
+[00:41:37] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[CSM] Flattened Shadow Map Array' (2048x2048x4 -> 4096x4096)
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Generators/WhiteNoise.cs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:37] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'test_white_noise'
+[00:41:37] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:37] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:41:37] EDITOR: [INFO] onNewActiveScene: Generated white noise texture: test_white_noise
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Generators/Atmosphere.cs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:37] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'test_atmosphere_noon'
+[00:41:37] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:37] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:41:37] EDITOR: [INFO] onNewActiveScene: Generated atmospheric scattering texture (noon): test_atmosphere_noon
+[00:41:37] RAPTURE: [TRACE] TerrainGenerator::createIndexBuffers: TerrainGenerator: Created LOD0 index buffer (98304 indices)
+[00:41:37] RAPTURE: [TRACE] TerrainGenerator::createIndexBuffers: TerrainGenerator: Created LOD1 index buffer (24576 indices)
+[00:41:37] RAPTURE: [TRACE] TerrainGenerator::createIndexBuffers: TerrainGenerator: Created LOD2 index buffer (6144 indices)
+[00:41:37] RAPTURE: [TRACE] TerrainGenerator::createIndexBuffers: TerrainGenerator: Created LOD3 index buffer (1536 indices)
+[00:41:37] RAPTURE: [TRACE] TerrainGenerator::createChunkDataBuffer: TerrainGenerator: Created chunk data buffer for 256 chunks
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_compute_bounds.cs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_cull.cs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [TRACE] TerrainCuller::initCullPipeline: TerrainCuller: Cull compute pipeline initialized
+[00:41:37] RAPTURE: [INFO] TerrainGenerator::createTerrainMaterials: Terrain materials created: grass=104, rock=105, snow=106
+[00:41:37] RAPTURE: [INFO] TerrainGenerator::init: TerrainGenerator initialized: 256 chunks (radius 7), 64 world units per chunk, 40 height scale
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Generators/PerlinNoise.cs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:37] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'procedural_texture_0'
+[00:41:37] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:37] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:37] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'procedural_texture_1'
+[00:41:37] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:37] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Generators/RidgedNoise.cs.glsl 
+	 using macros: []
+[00:41:37] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:41:37] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:41:37] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'procedural_texture_2'
+[00:41:37] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:41:37] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:41:37] EDITOR: [INFO] onNewActiveScene: Terrain entity created with 256 chunks (radius 7)
+[00:41:37] RAPTURE: [INFO] TLAS::createAccelerationStructure: Acceleration structure created successfully
+[00:41:37] RAPTURE: [INFO] TLAS::build: TLAS: Acceleration structure built successfully with 103 instances
+[00:41:37] RAPTURE: [INFO] TLAS::registerWithDescriptorManager: TLAS: Registered with descriptor manager at bindless index 0
+[00:41:37] EDITOR: [INFO] onNewActiveScene: Scene setup complete for: Untitled Scene
+[00:41:37] EDITOR: [INFO] onAttach: Attaching ImGuiLayer...
+[00:41:37] EDITOR: [INFO] main: Starting application
+[00:41:37] EDITOR: [INFO] onUpdate: FPS: 0.4
+[00:41:37] RAPTURE: [INFO] RtInstanceData::rebuild: RtInstanceData: rebuilt 103 instances
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:37] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 3 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [INFO] Application::Application: Window focused
+[00:41:38] RAPTURE: [INFO] Application::Application: Window resized to 1430x1542
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562cc6d047c0 expects VkImage 0xcb00000000cb (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562cc6d047c0 expects VkImage 0xcb00000000cb (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [INFO] SceneRenderTarget::resize: Resizing SceneRenderTarget: 956x536 -> 12x62
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] GBufferPass::createTerrainPipeline: GBufferPass: Terrain pipeline created
+[00:41:38] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:38] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:38] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:38] RAPTURE: [INFO] DeferredRenderer::processPendingViewportResize: Resized render target to 12x62
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562cc53f8420 expects VkImage 0x6cb00000006cb (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562cc53f8420 expects VkImage 0x6cb00000006cb (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:41:38] RAPTURE: [INFO] SwapChain::createDepthTexture: Created depth texture: 1906x2056
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7260000000726 that is currently in use by VkCommandBuffer 0x562ccaa4bcb0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7270000000727 that is currently in use by VkCommandBuffer 0x562ccaa4bcb0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7280000000728 that is currently in use by VkCommandBuffer 0x562ccaa4bcb0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7290000000729 that is currently in use by VkCommandBuffer 0x562ccaa4bcb0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x72a000000072a that is currently in use by VkCommandBuffer 0x562ccaa4bcb0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x72b000000072b that is currently in use by VkCommandBuffer 0x562ccaa4bcb0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7350000000735 that is currently in use by VkCommandBuffer 0x562cc6d047c0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7360000000736 that is currently in use by VkCommandBuffer 0x562cc6d047c0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7370000000737 that is currently in use by VkCommandBuffer 0x562cc6d047c0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: (Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7380000000738 that is currently in use by VkCommandBuffer 0x562cc6d047c0.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562ccaa4bcb0 expects VkImage 0x6cb00000006cb (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562ccaa4bcb0 expects VkImage 0x6cb00000006cb (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562cc6d047c0 expects VkImage 0x6dc00000006dc (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562cc6d047c0 expects VkImage 0x6dc00000006dc (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562cc53f8420 expects VkImage 0x6ed00000006ed (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [ERROR] debugCallback: validation layer: (Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x562cc53f8420 expects VkImage 0x6ed00000006ed (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:38] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:42] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:41:42] RAPTURE: [ERROR] VulkanQueue::submitQueue: VulkanQueue[graphics|present|compute|transfer](2) submitQueue failed (VkResult: -4)
+[00:42:02] RAPTURE: Enabled logging for RENDER to file logs/render.log
+[00:42:02] RAPTURE: Enabled logging for PHYSICS to file logs/physics.log
+[00:42:02] RAPTURE: Logger initialized with advanced features
+[00:42:02] RAPTURE: [INFO] Application::Application: Creating window...
+[00:42:02] RAPTURE: [INFO] GlfwWindowContext::initWindow: ========== Initializing GLFW Window Context ==========
+[00:42:02] RAPTURE: [INFO] GlfwWindowContext::initWindow: ========== GLFW Window Context Initialized Successfully. ==========
+[00:42:02] RAPTURE: [INFO] Application::Application: Creating Vulkan context...
+[00:42:02] RAPTURE: [INFO] VulkanContext::VulkanContext: Detected Wayland session - using Wayland surface support
+[00:42:02] RAPTURE: [INFO] VulkanContext::VulkanContext: Validation layers enabled!
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: ========== Supported Vulkan extensions: ==========
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_device_group_creation
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_display
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_external_fence_capabilities
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_external_memory_capabilities
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_external_semaphore_capabilities
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_get_display_properties2
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_get_physical_device_properties2
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_get_surface_capabilities2
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_surface
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_surface_maintenance1
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_surface_protected_capabilities
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_wayland_surface
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_xcb_surface
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_xlib_surface
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_acquire_drm_display
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_acquire_xlib_display
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_debug_report
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_debug_utils
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_direct_mode_display
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_display_surface_counter
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_surface_maintenance1
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_EXT_swapchain_colorspace
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_NV_display_stereo
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_KHR_portability_enumeration
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: 	 Extension: VK_LUNARG_direct_driver_loading
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: Wayland surface extension is supported!
+[00:42:02] RAPTURE: [INFO] VulkanContext::checkExtensionSupport: ========================================================
+
+[00:42:02] RAPTURE: [INFO] VulkanContext::createInstance: Creating Vulkan instance with API version: 1.3.0
+[00:42:02] RAPTURE: [INFO] vector<const char*> Rapture::VulkanContext::getRequiredExtensions: Requesting Wayland surface extension for Wayland session
+[00:42:02] RAPTURE: [INFO] VulkanContext::createInstance: Vulkan instance created successfully!
+[00:42:02] RAPTURE: [INFO] VulkanContext::createWindowsSurface: Creating Wayland surface...
+[00:42:02] RAPTURE: [INFO] VulkanContext::createWindowsSurface: Wayland surface created successfully!
+[00:42:02] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: Evaluating GPU: NVIDIA GeForce RTX 4070
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Queue family indices:
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Graphics: 0:16
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Compute: 0:16
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Present: 0:16
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Transfer: 0:16
+[00:42:02] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: GPU NVIDIA GeForce RTX 4070: All required queue families found
+[00:42:02] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: GPU NVIDIA GeForce RTX 4070: All required device extensions supported
+[00:42:02] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: GPU NVIDIA GeForce RTX 4070: Swap chain support adequate (7 formats, 4 present modes)
+[00:42:02] RAPTURE: [INFO] VulkanContext::isDeviceSuitable: GPU NVIDIA GeForce RTX 4070: Device is SUITABLE for use
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Queue family indices:
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Graphics: 0:16
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Compute: 0:16
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Present: 0:16
+[00:42:02] RAPTURE: [INFO] QueueFamilyIndices::print: Transfer: 0:16
+[00:42:02] RAPTURE: [INFO] s_enableVulkan12Features: Timeline semaphores enabled.
+[00:42:02] RAPTURE: [INFO] s_enableVulkan12Features: drawIndirectCount enabled.
+[00:42:02] RAPTURE: [INFO] s_enableVulkan12Features: bufferDeviceAddress enabled.
+[00:42:02] RAPTURE: [INFO] s_enableVertexInputDynamicState: vertexInputDynamicState enabled.
+[00:42:02] RAPTURE: [INFO] s_enableVertexAttributeRobustness: EXT::vertexAttributeRobustness enabled.
+[00:42:02] RAPTURE: [INFO] s_enableDynamicRendering: KHR::dynamicRendering enabled.
+[00:42:02] RAPTURE: [INFO] s_enableMeshShader: EXT::meshShader enabled.
+[00:42:02] RAPTURE: [INFO] s_enableRobustness2: KHR::robustness2::nullDescriptor enabled.
+[00:42:02] RAPTURE: [INFO] s_enableMultiview: KHR::multiview enabled.
+[00:42:02] RAPTURE: [INFO] s_enableExtendedDynamicState3: Extended dynamic state 3 (polygon mode) enabled.
+[00:42:02] RAPTURE: [INFO] s_enableRayTracingFeatures: Ray tracing supported. Enabling features.
+[00:42:03] RAPTURE: [INFO] s_loadMeshShader: Mesh shader function pointers loaded.
+[00:42:03] RAPTURE: [INFO] VulkanQueue::VulkanQueue: VulkanQueue[graphics|present|compute|transfer]: Created with timeline semaphore
+[00:42:03] RAPTURE: [INFO] VulkanQueue::VulkanQueue: VulkanQueue[vendor]: Created with timeline semaphore
+[00:42:03] RAPTURE: [INFO] VulkanContext::createLogicalDevice: Logical device created successfully!
+[00:42:03] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Starting VMA allocator creation...
+[00:42:03] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Checking Vulkan handles...
+[00:42:03] RAPTURE: [INFO] VulkanContext::createVmaAllocator: All Vulkan handles valid
+[00:42:03] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Creating VMA allocator create info...
+[00:42:03] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Calling vmaCreateAllocator...
+[00:42:03] RAPTURE: [INFO] VulkanContext::createVmaAllocator: Successfully created VMA allocator
+[00:42:03] RAPTURE: [INFO] CommandPoolManager::init: Initialized CommandPoolManager with 3 frames in flight!
+[00:42:03] RAPTURE: [INFO] BufferPoolManager::init: Initialized with VMA allocator
+[00:42:03] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:03] RAPTURE: [INFO] SwapChain::createDepthTexture: Created depth texture: 956x536
+[00:42:03] RAPTURE: [INFO] TracyProfiler::init: Tracy Profiler initialized
+[00:42:03] RAPTURE: [INFO] Project::Project: Creating Project: New Project
+[00:42:03] RAPTURE: [INFO] SceneManager::setActiveScene: Setting active scene to: DefaultScene
+[00:42:03] RAPTURE: [INFO] AssetImporter::assetLoadThread: Asset loading thread started
+[00:42:03] RAPTURE: [INFO] AssetImporter::assetLoadThread: Asset loading thread started
+[00:42:03] RAPTURE: [INFO] AssetImporter::assetLoadThread: Asset loading thread started
+[00:42:03] RAPTURE: [INFO] DescriptorManager::init: Initializing DescriptorManager
+[00:42:03] RAPTURE: [INFO] AssetImporter::assetLoadThread: Asset loading thread started
+[00:42:03] RAPTURE: [INFO] DescriptorSet::createDescriptorPool: Created descriptor pool with 1000 max sets
+[00:42:03] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 0 - Buffers: 196, Textures: 0, StorageBuffers: 2048, StorageImages: 0, InputAttachments: 0, AccelStructs: 0
+[00:42:03] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 0 - Pool usage: Sets 1/1000, Buffers 196/20000, Textures 0/16000, StorageBuffers 2048/8000, StorageImages 0/8000, AccelStructs 0/128
+[00:42:03] RAPTURE: [INFO] DescriptorManager::initializeSet0: DescriptorManager Initialized set 0
+[00:42:03] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 1 - Buffers: 1024, Textures: 0, StorageBuffers: 0, StorageImages: 0, InputAttachments: 0, AccelStructs: 0
+[00:42:03] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 1 - Pool usage: Sets 2/1000, Buffers 1220/20000, Textures 0/16000, StorageBuffers 2048/8000, StorageImages 0/8000, AccelStructs 0/128
+[00:42:03] RAPTURE: [INFO] DescriptorManager::initializeSet1: DescriptorManager Initialized set 1
+[00:42:03] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 2 - Buffers: 16384, Textures: 0, StorageBuffers: 0, StorageImages: 0, InputAttachments: 0, AccelStructs: 0
+[00:42:03] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 2 - Pool usage: Sets 3/1000, Buffers 17604/20000, Textures 0/16000, StorageBuffers 2048/8000, StorageImages 0/8000, AccelStructs 0/128
+[00:42:03] RAPTURE: [INFO] DescriptorManager::initializeSet2: DescriptorManager Initialized set 2
+[00:42:03] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 3 - Buffers: 0, Textures: 4096, StorageBuffers: 2049, StorageImages: 0, InputAttachments: 0, AccelStructs: 8
+[00:42:03] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 3 - Pool usage: Sets 4/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 0/8000, AccelStructs 8/128
+[00:42:03] RAPTURE: [INFO] DescriptorManager::initializeSet3: Initialized set 3
+[00:42:03] RAPTURE: [INFO] shared_ptr<Rapture::Texture> Rapture::Texture::createDefaultWhiteTexture: Created default white texture (1x1 RGBA8)
+[00:42:03] RAPTURE: [INFO] pair<std::shared_ptr<Rapture::Asset>, long unsigned int> Rapture::AssetManagerEditor::importDefaultAsset: Created default white texture with handle
+[00:42:03] RAPTURE: [INFO] MaterialManager::createDefaultMaterials: Created 3 default materials
+[00:42:03] RAPTURE: [INFO] SceneRenderTarget::SceneRenderTarget: Created offscreen SceneRenderTarget: 956x536 with 3 images
+[00:42:03] RAPTURE: [INFO] DeferredRenderer::createRenderTarget: Created OFFSCREEN render target for Editor mode
+[00:42:03] RAPTURE: [INFO] shared_ptr<Rapture::Texture> Rapture::Texture::createDefaultWhiteCubemapTexture: Created default white cubemap texture (1x1x6 RGBA8)
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeTrace.cs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeBlending.cs.glsl 
+	 using macros: [DDGI_BLEND_RADIANCE, DDGI_ENABLE_PROBE_CLASSIFICATION]
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeBlending.cs.glsl 
+	 using macros: [DDGI_BLEND_DISTANCE, DDGI_ENABLE_PROBE_CLASSIFICATION]
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeRelocation.cs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/ddgi/ProbeClassification.cs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] DynamicDiffuseGI::initProbeInfoBuffer: Added probe volume UBO to descriptor set 0, binding 5
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/FlattenDepthArray.cs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] TextureFlattener::initializeSharedResources: Initialized shared resources (depth shader)
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Flatten2dArray.cs.glsl 
+	 using macros: [DATA_TYPE_FLOAT]
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] TextureFlattener::getOrCreateShaderAndPipeline: Created shader and pipeline for data type 0
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 5/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 1/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Flattened Ray Data'
+[00:42:04] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Flattened Ray Data' (256x484x22 -> 1280x2420)
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 6/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 2/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Irradiance Flattened'
+[00:42:04] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Irradiance Flattened' (176x176x22 -> 880x880)
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 7/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 3/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Distance Flattened'
+[00:42:04] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Distance Flattened' (352x352x22 -> 1760x1760)
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Flatten2dArray.cs.glsl 
+	 using macros: [DATA_TYPE_UINT]
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] TextureFlattener::getOrCreateShaderAndPipeline: Created shader and pipeline for data type 2
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 8/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 4/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Probe Classification Flattened'
+[00:42:04] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Probe Classification Flattened' (22x22x22 -> 110x110)
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 9/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 5/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[DDGI] Probe Offset Flattened'
+[00:42:04] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[DDGI] Probe Offset Flattened' (22x22x22 -> 110x110)
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 10/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 6/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 11/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 7/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 12/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 8/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 13/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 9/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:04] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 14/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 10/8000, AccelStructs 8/128
+[00:42:04] RAPTURE: [INFO] DynamicDiffuseGI::initTextures: DDGI: Created custom descriptor sets for compute pipelines.
+[00:42:04] RAPTURE: [TRACE] DynamicDiffuseGI::setupProbeTextures: Setting up probe textures for bindless access
+[00:42:04] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/GBuffer.vs.glsl
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/GBuffer.vs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/GBuffer.fs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_gbuffer.vs.glsl
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_gbuffer.vs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_gbuffer.fs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [TRACE] GBufferPass::createTerrainPipeline: GBufferPass: Terrain pipeline created
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:04] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:04] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/DeferredLighting.fs.glsl
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/DeferredLighting.vs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/DeferredLighting.fs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/StencilBorder.vs.spv
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/InstancedShapes.vs.glsl
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/InstancedShapes.vs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/InstancedShapes.fs.glsl 
+	 using macros: []
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/SkyboxPass.vs.spv
+[00:42:04] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:04] RAPTURE: [INFO] Application::Application: ========== Application created ==========
+[00:42:04] EDITOR: [INFO] EditorApp: Rapture Editor starting up...
+[00:42:04] EDITOR: [INFO] onAttach: TestLayer attached
+[00:42:04] EDITOR: [INFO] onAttach: TestLayer::onAttach - Initial scene already active: Untitled Scene
+[00:42:04] EDITOR: [INFO] onNewActiveScene: Loading Sponza scene from: /home/Thomas/dev/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf
+[00:42:04] RAPTURE: [INFO] glTF2Loader::initialize: Initializing loader for '/home/Thomas/dev/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf'
+[00:42:04] RAPTURE: [INFO] glTF2Loader::initialize: Initializing loader for '/home/Thomas/dev/RaptureVK/assets/models/glTF2.0/Sponza/Sponza.gltf'
+[00:42:04] RAPTURE: [INFO] BufferArena::BufferArena: Created arena 0 with size 64 MB
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=202680, aligned_offset=202704, padding=24
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=261815, aligned_offset=261840, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=319499, aligned_offset=319536, padding=37
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=325690, aligned_offset=325728, padding=38
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=458424, aligned_offset=458448, padding=24
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=540455, aligned_offset=540480, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=549238, aligned_offset=549264, padding=26
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=702501, aligned_offset=702528, padding=27
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=719924, aligned_offset=719952, padding=28
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=720739, aligned_offset=720768, padding=29
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=720882, aligned_offset=720912, padding=30
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=810401, aligned_offset=810432, padding=31
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1192991, aligned_offset=1192992, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1226712, aligned_offset=1226736, padding=24
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1236935, aligned_offset=1236960, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1245767, aligned_offset=1245792, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1251862, aligned_offset=1251888, padding=26
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1252869, aligned_offset=1252896, padding=27
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1258772, aligned_offset=1258800, padding=28
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1259491, aligned_offset=1259520, padding=29
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1265586, aligned_offset=1265616, padding=30
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1266593, aligned_offset=1266624, padding=31
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1286831, aligned_offset=1286832, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1300463, aligned_offset=1300464, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1314095, aligned_offset=1314096, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1327727, aligned_offset=1327728, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1341359, aligned_offset=1341360, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1354991, aligned_offset=1354992, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1368623, aligned_offset=1368624, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1410910, aligned_offset=1410912, padding=2
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1413597, aligned_offset=1413600, padding=3
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1448303, aligned_offset=1448304, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1448674, aligned_offset=1448688, padding=14
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1472495, aligned_offset=1472496, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1473034, aligned_offset=1473072, padding=38
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1475385, aligned_offset=1475424, padding=39
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1475576, aligned_offset=1475616, padding=40
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1512024, aligned_offset=1512048, padding=24
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1516487, aligned_offset=1516512, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1516834, aligned_offset=1516848, padding=14
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1800273, aligned_offset=1800288, padding=15
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1820768, aligned_offset=1820784, padding=16
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1825231, aligned_offset=1825248, padding=17
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1825578, aligned_offset=1825584, padding=6
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1825961, aligned_offset=1825968, padding=7
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1826038, aligned_offset=1826064, padding=26
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1913637, aligned_offset=1913664, padding=27
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=1921844, aligned_offset=1921872, padding=28
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=2102563, aligned_offset=2102592, padding=29
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=2125026, aligned_offset=2125056, padding=30
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=3230897, aligned_offset=3230928, padding=31
+[00:42:05] RAPTURE: [INFO] BufferArena::BufferArena: Created arena 1 with size 64 MB
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=3370192, aligned_offset=3370224, padding=32
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=3375999, aligned_offset=3376032, padding=33
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=4606319, aligned_offset=4606320, padding=1
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=4773142, aligned_offset=4773168, padding=26
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=4929669, aligned_offset=4929696, padding=27
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=4962740, aligned_offset=4962768, padding=28
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=5119267, aligned_offset=5119296, padding=29
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=5152338, aligned_offset=5152368, padding=30
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=5308865, aligned_offset=5308896, padding=31
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8449229, aligned_offset=8449248, padding=19
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8450044, aligned_offset=8450064, padding=20
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8450139, aligned_offset=8450160, padding=21
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8592122, aligned_offset=8592144, padding=22
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8794494, aligned_offset=8794512, padding=18
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8795309, aligned_offset=8795328, padding=19
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8795404, aligned_offset=8795424, padding=20
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8937387, aligned_offset=8937408, padding=21
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8967176, aligned_offset=8967216, padding=40
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=8995656, aligned_offset=8995680, padding=24
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9054791, aligned_offset=9054816, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9096504, aligned_offset=9096528, padding=24
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9155639, aligned_offset=9155664, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9197399, aligned_offset=9197424, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9256534, aligned_offset=9256560, padding=26
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9269847, aligned_offset=9269856, padding=9
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9291494, aligned_offset=9291504, padding=10
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9366306, aligned_offset=9366336, padding=30
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9387953, aligned_offset=9387984, padding=31
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9390400, aligned_offset=9390432, padding=32
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9449535, aligned_offset=9449568, padding=33
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9462848, aligned_offset=9462864, padding=16
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9484495, aligned_offset=9484512, padding=17
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9486942, aligned_offset=9486960, padding=18
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9546077, aligned_offset=9546096, padding=19
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9559390, aligned_offset=9559392, padding=2
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9581037, aligned_offset=9581040, padding=3
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9655842, aligned_offset=9655872, padding=30
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9910673, aligned_offset=9910704, padding=31
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=9965824, aligned_offset=9965856, padding=32
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10007439, aligned_offset=10007472, padding=33
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10016612, aligned_offset=10016640, padding=28
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10052803, aligned_offset=10052832, padding=29
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10061022, aligned_offset=10061040, padding=18
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10102637, aligned_offset=10102656, padding=19
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10158791, aligned_offset=10158816, padding=25
+[00:42:05] RAPTURE: [TRACE] BufferArena::allocate: BufferArena 0: Manual alignment: raw_offset=10729558, aligned_offset=10729584, padding=26
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] BufferArena::BufferArena: Created arena 2 with size 64 MB
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:05] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related fragment shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/ShadowPass.vs.spv
+[00:42:05] RAPTURE: [INFO] shared_ptr<Rapture::Asset> Rapture::AssetImporter::loadShader: No fragment shader found, assuming vertex only shader for: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/ShadowPass.vs.spv
+[00:42:05] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/ShadowPass.vs.spv
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:05] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related fragment shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/CascadedShadowPass.vs.spv
+[00:42:05] RAPTURE: [INFO] shared_ptr<Rapture::Asset> Rapture::AssetImporter::loadShader: No fragment shader found, assuming vertex only shader for: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/CascadedShadowPass.vs.spv
+[00:42:05] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/SPIRV/shadows/CascadedShadowPass.vs.spv
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related fragment shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_csm.vs.glsl
+[00:42:05] RAPTURE: [INFO] shared_ptr<Rapture::Asset> Rapture::AssetImporter::loadShader: No fragment shader found, assuming vertex only shader for: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_csm.vs.glsl
+[00:42:05] RAPTURE: [WARN] optional<std::filesystem::__cxx11::path> Rapture::getRelatedShaderPath: Could not find related geometry shader for base path: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_csm.vs.glsl
+[00:42:05] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_csm.vs.glsl 
+	 using macros: []
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [INFO] CascadedShadowMap::createTerrainPipeline: Terrain CSM pipeline created
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:05] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:05] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 15/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 11/8000, AccelStructs 8/128
+[00:42:05] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: '[CSM] Flattened Shadow Map Array'
+[00:42:05] RAPTURE: [INFO] shared_ptr<Rapture::FlattenTexture> Rapture::TextureFlattener::createFlattenTexture: TextureFlattener: Successfully created flattened texture '[CSM] Flattened Shadow Map Array' (2048x2048x4 -> 4096x4096)
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Generators/WhiteNoise.cs.glsl 
+	 using macros: []
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:05] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'test_white_noise'
+[00:42:05] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:05] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:42:05] EDITOR: [INFO] onNewActiveScene: Generated white noise texture: test_white_noise
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Generators/Atmosphere.cs.glsl 
+	 using macros: []
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:05] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'test_atmosphere_noon'
+[00:42:05] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:05] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:42:05] EDITOR: [INFO] onNewActiveScene: Generated atmospheric scattering texture (noon): test_atmosphere_noon
+[00:42:05] RAPTURE: [TRACE] TerrainGenerator::createIndexBuffers: TerrainGenerator: Created LOD0 index buffer (98304 indices)
+[00:42:05] RAPTURE: [TRACE] TerrainGenerator::createIndexBuffers: TerrainGenerator: Created LOD1 index buffer (24576 indices)
+[00:42:05] RAPTURE: [TRACE] TerrainGenerator::createIndexBuffers: TerrainGenerator: Created LOD2 index buffer (6144 indices)
+[00:42:05] RAPTURE: [TRACE] TerrainGenerator::createIndexBuffers: TerrainGenerator: Created LOD3 index buffer (1536 indices)
+[00:42:05] RAPTURE: [TRACE] TerrainGenerator::createChunkDataBuffer: TerrainGenerator: Created chunk data buffer for 256 chunks
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_compute_bounds.cs.glsl 
+	 using macros: []
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/terrain/terrain_cull.cs.glsl 
+	 using macros: []
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [TRACE] TerrainCuller::initCullPipeline: TerrainCuller: Cull compute pipeline initialized
+[00:42:05] RAPTURE: [INFO] TerrainGenerator::createTerrainMaterials: Terrain materials created: grass=104, rock=105, snow=106
+[00:42:05] RAPTURE: [INFO] TerrainGenerator::init: TerrainGenerator initialized: 256 chunks (radius 7), 64 world units per chunk, 40 height scale
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Generators/PerlinNoise.cs.glsl 
+	 using macros: []
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:05] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'procedural_texture_0'
+[00:42:05] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:05] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:05] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'procedural_texture_1'
+[00:42:05] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:05] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] vector<char> Rapture::ShaderCompiler::Compile: Compiled shader: /home/Thomas/dev/RaptureVK/Engine/assets/shaders/glsl/Generators/RidgedNoise.cs.glsl 
+	 using macros: []
+[00:42:05] RAPTURE: [INFO] Shader::mergeReflectionData: Shader reflection data:
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned storage image to GENERAL layout
+[00:42:05] RAPTURE: [INFO] AssetHandle Rapture::AssetManagerEditor::registerVirtualAsset: Registered virtual Texture asset: 'procedural_texture_2'
+[00:42:05] RAPTURE: [TRACE] DescriptorSet::updateUsedCounts: DescriptorSet: Resource usage for set 4 - Buffers: 0, Textures: 0, StorageBuffers: 0, StorageImages: 1, InputAttachments: 0, AccelStructs: 0
+[00:42:05] RAPTURE: [INFO] DescriptorSet::updateUsedCounts: DescriptorSet: Successfully allocated resources for set 4 - Pool usage: Sets 16/1000, Buffers 17604/20000, Textures 4096/16000, StorageBuffers 4097/8000, StorageImages 12/8000, AccelStructs 8/128
+[00:42:05] EDITOR: [INFO] onNewActiveScene: Terrain entity created with 256 chunks (radius 7)
+[00:42:05] RAPTURE: [INFO] TLAS::createAccelerationStructure: Acceleration structure created successfully
+[00:42:05] RAPTURE: [INFO] TLAS::build: TLAS: Acceleration structure built successfully with 103 instances
+[00:42:05] RAPTURE: [INFO] TLAS::registerWithDescriptorManager: TLAS: Registered with descriptor manager at bindless index 0
+[00:42:05] EDITOR: [INFO] onNewActiveScene: Scene setup complete for: Untitled Scene
+[00:42:05] EDITOR: [INFO] onAttach: Attaching ImGuiLayer...
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] EDITOR: [INFO] main: Starting application
+[00:42:05] EDITOR: [INFO] onUpdate: FPS: 0.4
+[00:42:05] RAPTURE: [INFO] RtInstanceData::rebuild: RtInstanceData: rebuilt 103 instances
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 3 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] Application::Application: Window focused
+[00:42:05] RAPTURE: [INFO] Application::Application: Window resized to 950x530
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e72570e20 expects VkImage 0xcb00000000cb (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e72570e20 expects VkImage 0xcb00000000cb (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [INFO] SceneRenderTarget::resize: Resizing SceneRenderTarget: 956x536 -> 12x62
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] GBufferPass::createTerrainPipeline: GBufferPass: Terrain pipeline created
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:05] RAPTURE: [INFO] DeferredRenderer::processPendingViewportResize: Resized render target to 12x62
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e70ca1fa0 expects VkImage 0x6ce00000006ce (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e70ca1fa0 expects VkImage 0x6ce00000006ce (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [INFO] Texture::Texture: Transitioned depth texture to DEPTH_STENCIL_ATTACHMENT_OPTIMAL layout
+[00:42:05] RAPTURE: [INFO] SwapChain::createDepthTexture: Created depth texture: 950x530
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7280000000728 that is currently in use by VkCommandBuffer 0x556e76240d50.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7290000000729 that is currently in use by VkCommandBuffer 0x556e76240d50.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x72a000000072a that is currently in use by VkCommandBuffer 0x556e76240d50.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x72b000000072b that is currently in use by VkCommandBuffer 0x556e76240d50.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x72c000000072c that is currently in use by VkCommandBuffer 0x556e76240d50.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x72d000000072d that is currently in use by VkCommandBuffer 0x556e76240d50.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7370000000737 that is currently in use by VkCommandBuffer 0x556e72570e20.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7380000000738 that is currently in use by VkCommandBuffer 0x556e72570e20.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x7390000000739 that is currently in use by VkCommandBuffer 0x556e72570e20.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: (Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkFreeDescriptorSets(): pDescriptorSets[0] can't be called on VkDescriptorSet 0x73a000000073a that is currently in use by VkCommandBuffer 0x556e72570e20.
+The Vulkan spec states: All submitted commands that refer to any element of pDescriptorSets must have completed execution (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkFreeDescriptorSets-pDescriptorSets-00309)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e76240d50 expects VkImage 0x6ce00000006ce (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e76240d50 expects VkImage 0x6ce00000006ce (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e72570e20 expects VkImage 0x6df00000006df (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e72570e20 expects VkImage 0x6df00000006df (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e70ca1fa0 expects VkImage 0x6f000000006f0 (subresource: aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [ERROR] debugCallback: validation layer: (Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkQueueSubmit(): pSubmits[0] command buffer VkCommandBuffer 0x556e70ca1fa0 expects VkImage 0x6f000000006f0 (subresource: aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT, mipLevel = 0, arrayLayer = 0) to be in layout VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+The Vulkan spec states: If a descriptor with type equal to any of VK_DESCRIPTOR_TYPE_SAMPLE_WEIGHT_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, or VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT is accessed as a result of this command, all image subresources identified by that descriptor must be in the image layout identified when the descriptor was written (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDraw-None-09600)
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:05] RAPTURE: [TRACE] Texture::generateMipmaps: Generated 11 mip levels for texture
+[00:42:10] RAPTURE: [ERROR] VulkanQueue::submitQueue: VulkanQueue[graphics|present|compute|transfer](2) submitQueue failed (VkResult: -4)

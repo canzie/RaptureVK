@@ -20,6 +20,10 @@ SwapChain::SwapChain(VkDevice device, VkSurfaceKHR surface, VkPhysicalDevice phy
     : m_framebufferNeedsResize(false), m_device(device), m_surface(surface), m_physicalDevice(physicalDevice),
       m_queueFamilyIndices(queueFamilyIndices), m_windowContext(windowContext)
 {
+    SwapChainSupportDetails2 swapChainSupport = querySwapChainSupport();
+
+    uint32_t desiredImageCount = swapChainSupport.capabilities.minImageCount + 1;
+    m_imageCount = std::min<uint32_t>(desiredImageCount, swapChainSupport.capabilities.maxImageCount);
 
     m_windowResizeEventListenerID = ApplicationEvents::onWindowResize().addListener(
         [this](unsigned int width,
@@ -89,7 +93,6 @@ void SwapChain::invalidate()
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
-    // Calculate desired image count, ensuring it's within valid bounds
     uint32_t desiredImageCount = swapChainSupport.capabilities.minImageCount + 1;
     m_imageCount = std::min<uint32_t>(desiredImageCount, swapChainSupport.capabilities.maxImageCount);
 

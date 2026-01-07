@@ -1,17 +1,14 @@
 #pragma once
 
-#include <cmath>
 #include <memory>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include <glm/glm.hpp>
 
 #include "Buffers/Buffers.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
-#include "Buffers/StorageBuffers/StorageBuffer.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 #include "Scenes/Scene.h"
 #include "Shaders/Shader.h"
@@ -22,8 +19,6 @@
 #include "WindowContext/VulkanContext/VulkanQueue.h"
 
 #include "DDGICommon.h"
-
-#include "Scenes/Entities/EntityCommon.h"
 
 namespace Rapture {
 
@@ -50,11 +45,11 @@ class DynamicDiffuseGI {
     std::shared_ptr<Texture> getRadianceTexture() { return m_RadianceTexture; }
     std::shared_ptr<Texture> getVisibilityTexture() { return m_VisibilityTexture; }
 
-    std::shared_ptr<Texture> getRadianceTextureFlattened()
+    Texture *getRadianceTextureFlattened()
     {
         return m_IrradianceTextureFlattened ? m_IrradianceTextureFlattened->getFlattenedTexture() : nullptr;
     }
-    std::shared_ptr<Texture> getVisibilityTextureFlattened()
+    Texture *getVisibilityTextureFlattened()
     {
         return m_DistanceTextureFlattened ? m_DistanceTextureFlattened->getFlattenedTexture() : nullptr;
     }
@@ -71,8 +66,6 @@ class DynamicDiffuseGI {
     void updateProbeVolume();
     void updateFromIndirectLightingComponent(std::shared_ptr<Scene> scene);
 
-    void onResize(uint32_t framesInFlight);
-
     // Get bindless indices for probe textures
     uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
     uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
@@ -80,10 +73,10 @@ class DynamicDiffuseGI {
     uint32_t getProbeClassificationBindlessIndex() const { return m_probeClassificationBindlessIndex; }
 
   private:
-    void castRays(std::shared_ptr<Scene> scene, uint32_t frameIndex);
-    void blendTextures(uint32_t frameIndex);
-    void classifyProbes(uint32_t frameIndex);
-    void relocateProbes(uint32_t frameIndex);
+    void castRays(std::shared_ptr<Scene> scene, CommandBuffer *commandBuffer);
+    void blendTextures(CommandBuffer *commandBuffer);
+    void classifyProbes(CommandBuffer *commandBuffer);
+    void relocateProbes(CommandBuffer *commandBuffer);
 
     void initTextures();
     void initProbeInfoBuffer();
@@ -96,11 +89,13 @@ class DynamicDiffuseGI {
     void clearTextures();
 
   private:
-    std::shared_ptr<Shader> m_DDGI_ProbeTraceShader;
-    std::shared_ptr<Shader> m_DDGI_ProbeIrradianceBlendingShader;
-    std::shared_ptr<Shader> m_DDGI_ProbeDistanceBlendingShader;
-    std::shared_ptr<Shader> m_DDGI_ProbeRelocationShader;
-    std::shared_ptr<Shader> m_DDGI_ProbeClassificationShader;
+    Shader *m_DDGI_ProbeTraceShader = nullptr;
+    Shader *m_DDGI_ProbeIrradianceBlendingShader = nullptr;
+    Shader *m_DDGI_ProbeDistanceBlendingShader = nullptr;
+    Shader *m_DDGI_ProbeRelocationShader = nullptr;
+    Shader *m_DDGI_ProbeClassificationShader = nullptr;
+
+    std::vector<AssetRef> m_shaderAssets;
 
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeTracePipeline;
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeIrradianceBlendingPipeline;
@@ -121,19 +116,19 @@ class DynamicDiffuseGI {
     std::shared_ptr<Texture> m_ProbeClassificationTexture;
     std::shared_ptr<Texture> m_ProbeOffsetTexture; // stores an offset for each probe, enables the use of the relocation shader
 
-    std::shared_ptr<FlattenTexture> m_IrradianceTextureFlattened;
-    std::shared_ptr<FlattenTexture> m_DistanceTextureFlattened;
+    std::unique_ptr<FlattenTexture> m_IrradianceTextureFlattened;
+    std::unique_ptr<FlattenTexture> m_DistanceTextureFlattened;
 
-    std::shared_ptr<FlattenTexture> m_RayDataTextureFlattened;
-    std::shared_ptr<FlattenTexture> m_ProbeClassificationTextureFlattened;
-    std::shared_ptr<FlattenTexture> m_ProbeOffsetTextureFlattened;
+    std::unique_ptr<FlattenTexture> m_RayDataTextureFlattened;
+    std::unique_ptr<FlattenTexture> m_ProbeClassificationTextureFlattened;
+    std::unique_ptr<FlattenTexture> m_ProbeOffsetTextureFlattened;
 
     std::vector<glm::vec3> m_DebugProbePositions;
 
     VmaAllocator m_allocator;
     std::shared_ptr<VulkanQueue> m_computeQueue;
 
-    std::vector<std::shared_ptr<CommandBuffer>> m_CommandBuffers;
+    CommandPoolHash m_commandPoolHash = 0;
     uint32_t m_framesInFlight;
 
     bool m_isFirstFrame;
@@ -149,10 +144,10 @@ class DynamicDiffuseGI {
     uint32_t m_probeOffsetBindlessIndex = 0;
     uint32_t m_probeClassificationBindlessIndex = 0;
 
-    std::shared_ptr<Texture> m_skyboxTexture;
+    Texture *m_skyboxTexture;
     float m_skyIntensity = 1.0f;
 
-    static std::shared_ptr<Texture> s_defaultSkyboxTexture;
+    static std::unique_ptr<Texture> s_defaultSkyboxTexture;
 
     std::shared_ptr<DescriptorSet> m_probeTraceDescriptorSet;
     std::shared_ptr<DescriptorSet> m_probeIrradianceBlendingDescriptorSet;

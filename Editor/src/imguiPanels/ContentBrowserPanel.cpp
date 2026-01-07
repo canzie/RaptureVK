@@ -1,5 +1,6 @@
 #include "ContentBrowserPanel.h"
 
+#include "AssetManager/AssetManager.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 #include "imguiPanelStyleLinear.h"
@@ -248,7 +249,7 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
 
     // Image placeholder
     float imagePartHeight = itemWidth; // Square
-    ImVec4 assetColor = getAssetTypeColor(metadata.m_assetType, false);
+    ImVec4 assetColor = getAssetTypeColor(metadata.assetType, false);
     drawList->AddRectFilled(p0, ImVec2(p0.x + itemWidth, p0.y + imagePartHeight), ImGui::ColorConvertFloat4ToU32(assetColor), 4.0f,
                             ImDrawFlags_RoundCornersTop);
 
@@ -263,16 +264,16 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
     }
 
     // Drag and drop source for textures
-    if (metadata.m_assetType == Rapture::AssetType::Texture && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+    if (metadata.assetType == Rapture::AssetType::TEXTURE && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         RAPTURE_PROFILE_SCOPE("Texture Drag Drop Source");
         ImGui::SetDragDropPayload("TEXTURE_ASSET", &handle, sizeof(Rapture::AssetHandle));
         ImGui::Text("Texture: %s",
-                    metadata.isDiskAsset() ? metadata.m_filePath.filename().string().c_str() : metadata.m_virtualName.c_str());
+                    metadata.isDiskAsset() ? metadata.filePath.filename().string().c_str() : metadata.virtualName.c_str());
         ImGui::EndDragDropSource();
     }
 
     std::string contextMenuId = "AssetContextMenu_" + std::to_string(static_cast<uint64_t>(handle));
-    if (metadata.m_assetType == Rapture::AssetType::Texture && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+    if (metadata.assetType == Rapture::AssetType::TEXTURE && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
         ImGui::OpenPopup(contextMenuId.c_str());
     }
 
@@ -287,12 +288,12 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
 
     if (isHovered) {
         ImGui::BeginTooltip();
-        ImGui::TextUnformatted(Rapture::AssetTypeToString(metadata.m_assetType).c_str());
+        ImGui::TextUnformatted(Rapture::AssetTypeToString(metadata.assetType).c_str());
         ImGui::EndTooltip();
     }
 
     // Name (clipped and centered)
-    const std::string &name = metadata.isDiskAsset() ? metadata.m_filePath.filename().string() : metadata.m_virtualName;
+    const std::string &name = metadata.isDiskAsset() ? metadata.filePath.filename().string() : metadata.virtualName;
     ImVec2 nameTextSize = ImGui::CalcTextSize(name.c_str(), nullptr, false, itemWidth - 8.0f);
 
     float textPosX = p0.x + (itemWidth - nameTextSize.x) * 0.5f;
@@ -327,12 +328,12 @@ void ContentBrowserPanel::renderAssetContent()
             if (assetRegistry.find(handle) == assetRegistry.end()) {
                 continue;
             }
-            Rapture::AssetMetadata metadata = assetRegistry.at(handle);
-            if (metadata.m_assetType == Rapture::AssetType::None) {
+            auto &metadata = Rapture::AssetManager::getAssetMetadata(handle);
+            if (metadata.assetType == Rapture::AssetType::NONE) {
                 continue;
             }
 
-            const std::string &name = metadata.isDiskAsset() ? metadata.m_filePath.filename().string() : metadata.m_virtualName;
+            const std::string &name = metadata.isDiskAsset() ? metadata.filePath.filename().string() : metadata.virtualName;
             if (!isSearchMatch(name, m_searchBuffer)) {
                 continue;
             }
@@ -378,11 +379,11 @@ bool ContentBrowserPanel::isSearchMatch(const std::string &name, const std::stri
 ImVec4 ContentBrowserPanel::getAssetTypeColor(Rapture::AssetType type, bool isHovered) const
 {
     switch (type) {
-    case Rapture::AssetType::Texture:
+    case Rapture::AssetType::TEXTURE:
         return isHovered ? ImGuiPanelStyle::GRUVBOX_ORANGE_BRIGHT : ImGuiPanelStyle::GRUVBOX_ORANGE_NORMAL;
-    case Rapture::AssetType::Shader:
+    case Rapture::AssetType::SHADER:
         return isHovered ? ImGuiPanelStyle::GRUVBOX_RED_BRIGHT : ImGuiPanelStyle::GRUVBOX_RED_NORMAL;
-    case Rapture::AssetType::Material:
+    case Rapture::AssetType::MATERIAL:
         return isHovered ? ImGuiPanelStyle::GRUVBOX_PURPLE_BRIGHT : ImGuiPanelStyle::GRUVBOX_PURPLE_NORMAL;
     default:
         return isHovered ? ImGuiPanelStyle::ACCENT_PRIMARY : ImGuiPanelStyle::ACCENT_PRIMARY;

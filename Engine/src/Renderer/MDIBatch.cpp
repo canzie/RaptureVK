@@ -101,7 +101,7 @@ void MDIBatch::uploadBuffers()
         if (descriptorSet) {
             auto ssboBinding = descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
             if (ssboBinding) {
-                m_batchInfoBufferIndex = ssboBinding->add(m_batchInfoBuffer);
+                m_batchInfoBufferIndex = ssboBinding->add(*m_batchInfoBuffer);
                 if (m_batchInfoBufferIndex == UINT32_MAX) {
                     RP_CORE_ERROR("Failed to add batch info buffer to descriptor set");
                 }

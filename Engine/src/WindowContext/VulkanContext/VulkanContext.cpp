@@ -115,6 +115,10 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     m_deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+
+    // Mesh shader extension
+    m_deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
 
     // Ray tracing extensions
     m_deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
@@ -131,6 +135,8 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     pickPhysicalDevice();
     createLogicalDevice();
     createVmaAllocator();
+
+    m_swapChain = std::make_shared<SwapChain>(m_device, m_surface, m_physicalDevice, m_queueFamilyIndices, windowContext);
 
     ApplicationEvents::onRequestSwapChainRecreation().addListener([this, windowContext]() {
         int width = 0, height = 0;
@@ -251,9 +257,8 @@ std::shared_ptr<VulkanQueue> VulkanContext::getVendorQueue() const
     return m_vendorQueue != nullptr ? m_vendorQueue : getGraphicsQueue();
 }
 
-void VulkanContext::createRecourses(WindowContext *windowContext)
+void VulkanContext::createRecourses()
 {
-    m_swapChain = std::make_shared<SwapChain>(m_device, m_surface, m_physicalDevice, m_queueFamilyIndices, windowContext);
     m_swapChain->invalidate();
 }
 
@@ -721,46 +726,6 @@ static void s_enableCoreFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDevi
     }
 }
 
-static void s_enableDescriptorIndexingFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
-                                               VkPhysicalDeviceDescriptorIndexingFeatures &descriptorIndexingFeatures)
-{
-    VkPhysicalDeviceDescriptorIndexingFeatures supported{};
-    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-
-    VkPhysicalDeviceFeatures2 query{};
-    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    query.pNext = &supported;
-
-    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
-
-    // Enable only what is supported
-    if (supported.shaderSampledImageArrayNonUniformIndexing)
-        descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-
-    if (supported.runtimeDescriptorArray) descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
-
-    if (supported.descriptorBindingVariableDescriptorCount)
-        descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-
-    if (supported.descriptorBindingPartiallyBound) descriptorIndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
-
-    if (supported.descriptorBindingStorageImageUpdateAfterBind)
-        descriptorIndexingFeatures.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
-
-    if (supported.descriptorBindingUniformBufferUpdateAfterBind)
-        descriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
-
-    if (supported.descriptorBindingStorageBufferUpdateAfterBind)
-        descriptorIndexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
-
-    if (supported.descriptorBindingSampledImageUpdateAfterBind)
-        descriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
-
-    descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-
-    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&descriptorIndexingFeatures));
-}
-
 static bool s_enableVertexInputDynamicState(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
                                             VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT &outFeatures)
 {
@@ -840,6 +805,49 @@ static bool s_enableDynamicRendering(VkPhysicalDevice physicalDevice, VkPhysical
         return false;
     }
     return true;
+}
+
+static bool s_enableMeshShader(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                               VkPhysicalDeviceMeshShaderFeaturesEXT &outFeatures)
+{
+    VkPhysicalDeviceMeshShaderFeaturesEXT supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (supported.meshShader && supported.taskShader) {
+        outFeatures = {};
+        outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+        outFeatures.meshShader = VK_TRUE;
+        outFeatures.taskShader = VK_TRUE;
+
+        s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+        RP_CORE_INFO("EXT::meshShader enabled.");
+        return true;
+    } else {
+        RP_CORE_WARN("EXT::meshShader NOT supported.");
+        return false;
+    }
+}
+
+static void s_loadMeshShader(VkDevice device, PFN_vkCmdDrawMeshTasksEXT &vkCmdDrawMeshTasksEXT,
+                             PFN_vkCmdDrawMeshTasksIndirectEXT &vkCmdDrawMeshTasksIndirectEXT,
+                             PFN_vkCmdDrawMeshTasksIndirectCountEXT &vkCmdDrawMeshTasksIndirectCountEXT)
+{
+    vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksEXT"));
+    vkCmdDrawMeshTasksIndirectEXT =
+        reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectEXT>(vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectEXT"));
+    vkCmdDrawMeshTasksIndirectCountEXT =
+        reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectCountEXT>(vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectCountEXT"));
+
+    if (vkCmdDrawMeshTasksEXT) {
+        RP_CORE_INFO("Mesh shader function pointers loaded.");
+    }
 }
 
 static void s_enableRobustness2(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
@@ -951,8 +959,8 @@ static bool s_enableRayTracingFeatures(VkPhysicalDevice physicalDevice, VkPhysic
     outRQ.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
     outRQ.rayQuery = VK_TRUE;
 
-    // --- Chain in correct dependency order ---
-    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outBDA));
+    // Chain in correct dependency order
+    // Note: bufferDeviceAddress is now in VkPhysicalDeviceVulkan12Features, don't add outBDA
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outAS));
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outRTP));
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outRQ));
@@ -960,11 +968,11 @@ static bool s_enableRayTracingFeatures(VkPhysicalDevice physicalDevice, VkPhysic
     return true;
 }
 
-static bool s_enableTimelineSemaphores(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
-                                       VkPhysicalDeviceTimelineSemaphoreFeatures &outFeatures)
+static bool s_enableExtendedDynamicState3(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                          VkPhysicalDeviceExtendedDynamicState3FeaturesEXT &outFeatures)
 {
-    VkPhysicalDeviceTimelineSemaphoreFeatures supported{};
-    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
 
     VkPhysicalDeviceFeatures2 query{};
     query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -972,19 +980,68 @@ static bool s_enableTimelineSemaphores(VkPhysicalDevice physicalDevice, VkPhysic
 
     vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
 
-    if (!supported.timelineSemaphore) {
-        RP_CORE_WARN("Timeline semaphores NOT supported.");
+    if (!supported.extendedDynamicState3PolygonMode) {
+        RP_CORE_WARN("Extended dynamic state 3 (polygon mode) not supported");
         return false;
     }
 
     outFeatures = {};
-    outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-    outFeatures.timelineSemaphore = VK_TRUE;
+    outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+    outFeatures.extendedDynamicState3PolygonMode = VK_TRUE;
 
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
 
-    RP_CORE_INFO("Timeline semaphores enabled.");
+    RP_CORE_INFO("Extended dynamic state 3 (polygon mode) enabled.");
     return true;
+}
+
+static void s_enableVulkan12Features(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                     VkPhysicalDeviceVulkan12Features &outFeatures)
+{
+    VkPhysicalDeviceVulkan12Features supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    outFeatures = {};
+    outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+
+    // Descriptor indexing (promoted from VkPhysicalDeviceDescriptorIndexingFeatures)
+    if (supported.descriptorIndexing) outFeatures.descriptorIndexing = VK_TRUE;
+    if (supported.shaderSampledImageArrayNonUniformIndexing) outFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    if (supported.runtimeDescriptorArray) outFeatures.runtimeDescriptorArray = VK_TRUE;
+    if (supported.descriptorBindingVariableDescriptorCount) outFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+    if (supported.descriptorBindingPartiallyBound) outFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+    if (supported.descriptorBindingStorageImageUpdateAfterBind) outFeatures.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+    if (supported.descriptorBindingUniformBufferUpdateAfterBind)
+        outFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+    if (supported.descriptorBindingStorageBufferUpdateAfterBind)
+        outFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+    if (supported.descriptorBindingSampledImageUpdateAfterBind) outFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+
+    // Timeline semaphores (promoted from VkPhysicalDeviceTimelineSemaphoreFeatures)
+    if (supported.timelineSemaphore) {
+        outFeatures.timelineSemaphore = VK_TRUE;
+        RP_CORE_INFO("Timeline semaphores enabled.");
+    }
+
+    // Draw indirect count
+    if (supported.drawIndirectCount) {
+        outFeatures.drawIndirectCount = VK_TRUE;
+        RP_CORE_INFO("drawIndirectCount enabled.");
+    }
+
+    // Buffer device address (promoted from VkPhysicalDeviceBufferDeviceAddressFeatures)
+    if (supported.bufferDeviceAddress) {
+        outFeatures.bufferDeviceAddress = VK_TRUE;
+        RP_CORE_INFO("bufferDeviceAddress enabled.");
+    }
+
+    s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
 }
 
 template <typename T> static bool s_loadDeviceFunction(VkDevice device, const char *name, T &outFn)
@@ -1019,6 +1076,18 @@ static void s_loadDynamicRendering(VkDevice device, bool enabled, PFN_vkCmdBegin
     outEnabled = ok;
 
     if (!ok) RP_CORE_ERROR("Failed to load dynamic rendering functions");
+}
+
+static void s_loadExtendedDynamicState3(VkDevice device, bool enabled, PFN_vkCmdSetPolygonModeEXT &fn, bool &outEnabled)
+{
+    if (!enabled) {
+        outEnabled = false;
+        return;
+    }
+
+    outEnabled = s_loadDeviceFunction(device, "vkCmdSetPolygonModeEXT", fn);
+
+    if (!outEnabled) RP_CORE_ERROR("Failed to load vkCmdSetPolygonModeEXT");
 }
 
 static void s_loadMultiDraw(VkDevice device, PFN_vkCmdDrawMultiEXT &draw, PFN_vkCmdDrawMultiIndexedEXT &drawIndexed)
@@ -1158,11 +1227,8 @@ void VulkanContext::createLogicalDevice()
 
     s_enableCoreFeatures(m_physicalDevice, physicalDeviceFeaturesToEnable);
 
-    VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
-    s_enableDescriptorIndexingFeatures(m_physicalDevice, physicalDeviceFeaturesToEnable, descriptorIndexingFeatures);
-
-    VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphores{};
-    s_enableTimelineSemaphores(m_physicalDevice, physicalDeviceFeaturesToEnable, timelineSemaphores);
+    VkPhysicalDeviceVulkan12Features vulkan12Features{};
+    s_enableVulkan12Features(m_physicalDevice, physicalDeviceFeaturesToEnable, vulkan12Features);
 
     VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertexInputDynamic{};
     m_isVertexInputDynamicStateEnabled =
@@ -1175,11 +1241,18 @@ void VulkanContext::createLogicalDevice()
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRendering{};
     m_isDynamicRenderingEnabled = s_enableDynamicRendering(m_physicalDevice, physicalDeviceFeaturesToEnable, dynamicRendering);
 
+    VkPhysicalDeviceMeshShaderFeaturesEXT meshShader{};
+    m_isMeshShaderEnabled = s_enableMeshShader(m_physicalDevice, physicalDeviceFeaturesToEnable, meshShader);
+
     VkPhysicalDeviceRobustness2FeaturesEXT robustness2{};
     s_enableRobustness2(m_physicalDevice, physicalDeviceFeaturesToEnable, robustness2);
 
     VkPhysicalDeviceMultiviewFeaturesKHR multiview{};
     s_enableMultiview(m_physicalDevice, physicalDeviceFeaturesToEnable, multiview);
+
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extendedDynamicState3{};
+    m_isExtendedDynamicState3Enabled =
+        s_enableExtendedDynamicState3(m_physicalDevice, physicalDeviceFeaturesToEnable, extendedDynamicState3);
 
     VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddress{};
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructure{};
@@ -1212,6 +1285,11 @@ void VulkanContext::createLogicalDevice()
     s_loadDynamicRendering(m_device, dynamicRendering.dynamicRendering, vkCmdBeginRenderingKHR, vkCmdEndRenderingKHR,
                            m_isDynamicRenderingEnabled);
     s_loadMultiDraw(m_device, vkCmdDrawMultiEXT, vkCmdDrawMultiIndexedEXT);
+    s_loadExtendedDynamicState3(m_device, extendedDynamicState3.extendedDynamicState3PolygonMode, vkCmdSetPolygonModeEXT,
+                                m_isExtendedDynamicState3Enabled);
+    if (m_isMeshShaderEnabled) {
+        s_loadMeshShader(m_device, vkCmdDrawMeshTasksEXT, vkCmdDrawMeshTasksIndirectEXT, vkCmdDrawMeshTasksIndirectCountEXT);
+    }
     s_loadRayTracing(m_physicalDevice, m_device, vkCreateAccelerationStructureKHR, vkDestroyAccelerationStructureKHR,
                      vkGetAccelerationStructureBuildSizesKHR, vkCmdBuildAccelerationStructuresKHR,
                      vkGetAccelerationStructureDeviceAddressKHR, vkCreateRayTracingPipelinesKHR,

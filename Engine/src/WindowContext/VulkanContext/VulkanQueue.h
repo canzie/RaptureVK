@@ -3,8 +3,11 @@
 #include <vulkan/vulkan.h>
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include <atomic>
 #include <mutex>
+#include <span>
 #include <string>
+#include <vector>
 
 namespace Rapture {
 class VulkanQueue {
@@ -12,16 +15,17 @@ class VulkanQueue {
     VulkanQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex = 0, const std::string &name = "unnamed");
     ~VulkanQueue();
 
-    // execute saved command buffers (returns false if any command buffer cannot be submitted)
-    bool submitCommandBuffers(VkFence fence = nullptr);
-    bool submitCommandBuffers(VkSubmitInfo &submitInfo, VkFence fence = nullptr);
+    bool flush();
+    uint64_t addToBatch(CommandBuffer *commandBuffer);
 
-    // execute immediately (returns false if command buffer cannot be submitted)
-    bool submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkSubmitInfo &submitInfo, VkFence fence = nullptr);
-    bool submitQueue(std::shared_ptr<CommandBuffer> commandBuffer, VkFence fence = nullptr);
+    // execute immediately
+    bool submitQueue(CommandBuffer *commandBuffer, std::span<VkSemaphore> *signalSemaphores = nullptr,
+                     std::span<VkSemaphore> *waitSemaphores = nullptr, VkPipelineStageFlags *waitStage = nullptr,
+                     VkFence fence = nullptr);
+    bool submitAndFlushQueue(CommandBuffer *commandBuffer, std::span<VkSemaphore> *signalSemaphores = nullptr,
+                             std::span<VkSemaphore> *waitSemaphores = nullptr, VkPipelineStageFlags *waitStage = nullptr,
+                             VkFence fence = nullptr);
 
-    // add command buffer to queue
-    void addCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer);
     void waitIdle();
 
     // should probably check if queue is present but well see
@@ -29,7 +33,7 @@ class VulkanQueue {
 
     VkQueue getQueueVk() const { return m_queue; }
     VkSemaphore getTimelineSemaphore() const { return m_timelineSemaphore; }
-    uint64_t getCurrentTimelineValue() const { return m_timelineValue; }
+    uint64_t getCurrentTimelineValue() const { return m_nextTimelineValue.load(); }
 
     [[nodiscard]] std::unique_lock<std::mutex> acquireQueueLock() { return std::unique_lock<std::mutex>(m_queueMutex); }
 
@@ -38,16 +42,18 @@ class VulkanQueue {
   private:
     void createTimelineSemaphore();
 
-    std::vector<std::shared_ptr<CommandBuffer>> m_commandBuffers;
+    std::vector<CommandBuffer *> m_cmdBufferBatch;
+
     VkDevice m_device;
     VkQueue m_queue;
     uint32_t m_queueFamilyIndex;
     std::string m_name;
-    std::mutex m_commandBufferMutex;
     std::mutex m_queueMutex;
+    std::mutex m_cmdBatchMutex;
 
-    // Timeline semaphore for tracking command buffer completion
+    VkSemaphore m_immediateTimeSema = VK_NULL_HANDLE;
     VkSemaphore m_timelineSemaphore = VK_NULL_HANDLE;
-    uint64_t m_timelineValue = 0;
+    std::atomic<uint64_t> m_nextTimelineValue = 1;
+    std::atomic<uint64_t> m_nextImmediateTimelineValue = 1;
 };
 } // namespace Rapture

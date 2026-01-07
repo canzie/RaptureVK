@@ -164,7 +164,7 @@ std::shared_ptr<Texture> SceneRenderTarget::getTexture(uint32_t index) const
     return nullptr;
 }
 
-void SceneRenderTarget::transitionToShaderReadLayout(const std::shared_ptr<CommandBuffer> &commandBuffer, uint32_t imageIndex)
+void SceneRenderTarget::transitionToShaderReadLayout(CommandBuffer *commandBuffer, uint32_t imageIndex)
 {
     if (m_type != TargetType::OFFSCREEN) {
         return; // Only offscreen targets need this transition

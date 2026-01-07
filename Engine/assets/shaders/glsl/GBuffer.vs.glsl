@@ -104,9 +104,8 @@ void main() {
     // Calculate position in view space
     vec4 viewPos = u_camera[pc.cameraBindlessIndex].view * vec4(outFragPosDepth.xyz, 1.0);
 
-    // Store the negative Z value (common convention, depth increases into the screen)
-    // Ensure this matches how cascade splits are calculated on the CPU.
-    // If cascade splits are positive distances, use abs(viewPos.z) or just viewPos.z
+    // Store linear view-space depth (positive = into screen)
+    // For visible objects in front of camera: viewPos.z < 0, so -viewPos.z > 0
     outFragPosDepth.w = -viewPos.z;
 
     // Final clip space position

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__CASCADEDSHADOWMAPPING_H
+#define RAPTURE__CASCADEDSHADOWMAPPING_H
 
 #include "AssetManager/AssetManager.h"
 #include "Pipelines/GraphicsPipeline.h"
@@ -7,11 +8,14 @@
 #include "Utils/TextureFlattener.h"
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorBinding.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
 
+#include "Generators/Terrain/TerrainCuller.h"
+#include "Generators/Terrain/TerrainGenerator.h"
 #include "Renderer/Frustum/Frustum.h"
 
 #include "Components/Systems/ObjectDataBuffers/ShadowDataBuffer.h"
@@ -45,8 +49,12 @@ struct CascadeData {
 class CascadedShadowMap {
   public:
     CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda);
-
     ~CascadedShadowMap();
+
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame, TerrainGenerator *terrain);
+
+    void beginDynamicRendering(CommandBuffer *commandBuffer);
+    void endDynamicRendering(CommandBuffer *commandBuffer);
 
     // Returns the calculated split depths for each cascade using a hybrid approach
     std::vector<float> calculateCascadeSplits(float nearPlane, float farPlane, float lambda = 0.5f);
@@ -58,14 +66,11 @@ class CascadedShadowMap {
 
     uint8_t getNumCascades() const { return m_NumCascades; }
 
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                             uint32_t currentFrame);
-
     std::vector<CascadeData> updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp,
                                               const CameraComponent &cameraComp);
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTextureArray; }
-    std::shared_ptr<Texture> getFlattenedShadowTexture() const
+    Texture *getFlattenedShadowTexture() const
     {
         return m_flattenedShadowTexture ? m_flattenedShadowTexture->getFlattenedTexture() : nullptr;
     }
@@ -82,12 +87,15 @@ class CascadedShadowMap {
 
   private:
     void createPipeline();
+    void createTerrainPipeline();
     void createShadowTexture();
     void createUniformBuffers();
+    void setupCommandResources();
 
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
-    void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
+    void recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain);
+
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer);
+    void transitionToShaderReadableLayout(CommandBuffer *commandBuffer);
 
     // Extracts view frustum corners for a specific cascade depth slice
     // All parameters relate to the camera, not the light
@@ -117,7 +125,7 @@ class CascadedShadowMap {
     uint32_t m_writeIndex = 0;
     uint32_t m_readIndex = 1;
 
-    std::shared_ptr<FlattenTexture> m_flattenedShadowTexture;
+    std::unique_ptr<FlattenTexture> m_flattenedShadowTexture;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     std::shared_ptr<ShadowDataBuffer> m_shadowDataBuffer;
@@ -127,13 +135,24 @@ class CascadedShadowMap {
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};
 
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_handle;
+    Shader *m_shader = nullptr;
+
+    // Terrain shadow rendering
+    std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
+    Shader *m_terrainShader = nullptr;
+
+    std::vector<AssetRef> m_shaderAssets;
+    Frustum m_shadowFrustum;
+    TerrainCullBuffers m_terrainShadowBuffers;
 
     VmaAllocator m_allocator;
 
     // MDI batching system - one per frame in flight
     std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
+
+    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__CASCADEDSHADOWMAPPING_H

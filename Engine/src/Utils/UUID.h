@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <mutex>
@@ -8,6 +9,7 @@
 namespace Rapture {
 
 using UUID = uint64_t;
+using UID = uint32_t;
 
 class UUIDGenerator {
   public:
@@ -36,11 +38,20 @@ class UUIDGenerator {
         return uuid;
     }
 
-    // Check if a UUID is valid (non-zero)
-    static bool IsValid(UUID uuid) { return uuid != 0; }
+    static bool IsValid(UUID other) { return other != 0; }
 
   private:
     static std::mutex _mutex;
+};
+
+class UidGenerator {
+  public:
+    UidGenerator() : counter(0) {}
+
+    UID next() { return counter.fetch_add(1, std::memory_order_relaxed); }
+
+  private:
+    std::atomic<UID> counter;
 };
 
 } // namespace Rapture

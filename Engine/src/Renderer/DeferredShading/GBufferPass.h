@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__GBUFFERPASS_H
+#define RAPTURE__GBUFFERPASS_H
 
 #include "Pipelines/GraphicsPipeline.h"
 #include "Renderer/MDIBatch.h"
@@ -6,6 +7,7 @@
 
 #include "AssetManager/AssetManager.h"
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorBinding.h"
 #include "Buffers/Descriptors/DescriptorManager.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
@@ -13,10 +15,12 @@
 #include "Cameras/CameraCommon.h"
 #include "Components/Components.h"
 #include "Events/GameEvents.h"
+#include "Generators/Terrain/TerrainGenerator.h"
 #include "Scenes/Scene.h"
 #include "Textures/Texture.h"
 #include "WindowContext/VulkanContext/VulkanContext.h"
 
+#include <cstdint>
 #include <memory>
 
 namespace Rapture {
@@ -47,9 +51,13 @@ class GBufferPass {
 
     static FramebufferSpecification getFramebufferSpecification();
 
-    // NOTE: assumes that the command buffer is already started, and will be ended by the caller
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                             uint32_t currentFrame);
+    // Main entry point: records to internal secondary command buffer
+    // Returns the secondary command buffer for the caller to execute
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame,
+                                   const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain = nullptr);
+
+    void beginDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
+    void endDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
 
     // Getters for current frame's GBuffer textures
     std::shared_ptr<Texture> getPositionTexture() const { return m_positionDepthTextures[m_currentFrame]; }
@@ -81,17 +89,23 @@ class GBufferPass {
   private:
     void createTextures();
     void createPipeline();
+    void createTerrainPipeline();
     void bindGBufferTexturesToBindlessSet();
+    void setupCommandResources();
 
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
+    // Record terrain rendering only
+    void recordTerrainCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, TerrainGenerator &terrain,
+                               uint32_t currentFrame);
 
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
+    // Record entity rendering only
+    void recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
 
-    void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb, uint32_t currentFrame);
+
+    void transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame);
 
   private:
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_handle;
+    Shader *m_shader = nullptr;
     float m_width;
     float m_height;
     uint32_t m_framesInFlight;
@@ -116,6 +130,12 @@ class GBufferPass {
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
+    // Terrain rendering
+    Shader *m_terrainShader = nullptr;
+
+    std::vector<AssetRef> m_shaderAssets;
+    std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
+
     // MDI batching system - one set per frame in flight
     std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
     std::vector<std::unique_ptr<MDIBatchMap>> m_selectedEntityBatchMaps; // Separate batches for selected entities
@@ -125,6 +145,9 @@ class GBufferPass {
 
     std::shared_ptr<Entity> m_selectedEntity;
     size_t m_entitySelectedListenerId;
+
+    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture
+#endif // RAPTURE__GBUFFERPASS_H

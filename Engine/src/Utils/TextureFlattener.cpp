@@ -15,17 +15,22 @@ namespace Rapture {
 #define FLATTENING_ENABLED 1
 
 // Static member definitions
-std::map<FlattenerDataType, std::shared_ptr<Shader>> TextureFlattener::s_flattenShaders;
-std::shared_ptr<Shader> TextureFlattener::s_flattenDepthShader = nullptr;
+std::map<FlattenerDataType, Shader *> TextureFlattener::s_flattenShaders;
+Shader *TextureFlattener::s_flattenDepthShader = nullptr;
 std::map<FlattenerDataType, std::shared_ptr<ComputePipeline>> TextureFlattener::s_flattenPipelines;
 std::shared_ptr<ComputePipeline> TextureFlattener::s_flattenDepthPipeline = nullptr;
+std::vector<AssetRef> TextureFlattener::s_shaderAssets;
 bool TextureFlattener::s_initialized = false;
 
 // FlattenTexture implementation
-FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::shared_ptr<Texture> flattenedTexture,
+FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::unique_ptr<Texture> &&flattenedTexture,
                                const std::string &name, FlattenerDataType dataType)
-    : m_inputTexture(inputTexture), m_flattenedTexture(flattenedTexture), m_dataType(dataType), m_name(name)
+    : m_inputTexture(inputTexture), m_dataType(dataType), m_name(name)
 {
+    // Register the texture with the asset manager and keep the AssetRef alive
+    auto asset = AssetManager::registerVirtualAsset(AssetVariant{std::move(flattenedTexture)}, name, AssetType::TEXTURE);
+    m_flattenedTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
+    m_assetRef = std::move(asset);
 
     // Add input texture to bindless texture array and get its index
     m_inputTextureBindlessIndex = inputTexture->getBindlessIndex();
@@ -43,10 +48,10 @@ FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::share
     m_descriptorSet = std::make_shared<DescriptorSet>(bindings);
 
     // Update the descriptor set with the output texture
-    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)->add(m_flattenedTexture);
+    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)->add(*m_flattenedTexture);
 }
 
-void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer)
+void FlattenTexture::update(CommandBuffer *commandBuffer)
 {
 #if FLATTENING_ENABLED
     if (!m_inputTexture || !m_flattenedTexture) {
@@ -166,8 +171,8 @@ void FlattenTexture::update(std::shared_ptr<CommandBuffer> commandBuffer)
 }
 
 // TextureFlattener implementation
-std::shared_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shared_ptr<Texture> inputTexture,
-                                                                       const std::string &name, FlattenerDataType dataType)
+std::unique_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shared_ptr<Texture> inputTexture,
+                                                                        const std::string &name, FlattenerDataType dataType)
 {
     if (!inputTexture) {
         RP_CORE_ERROR("Input texture is null");
@@ -194,19 +199,16 @@ std::shared_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shar
         return nullptr;
     }
 
-    // Create FlattenTexture instance
-    auto flattenTexture = std::make_shared<FlattenTexture>(inputTexture, flattenedTexture, name, dataType);
+    // Save texture spec before moving
+    auto flattenedWidth = flattenedTexture->getSpecification().width;
+    auto flattenedHeight = flattenedTexture->getSpecification().height;
 
-    // Register the flattened texture with the asset manager
-    AssetManager::registerVirtualAsset(AssetVariant{flattenedTexture}, name, AssetType::Texture);
-
-    // Mark as ready for sampling
-    flattenedTexture->setReadyForSampling(true);
+    // Create FlattenTexture instance (registers with asset manager and keeps asset alive)
+    auto flattenTexture = std::make_unique<FlattenTexture>(inputTexture, std::move(flattenedTexture), name, dataType);
 
     RP_CORE_INFO("TextureFlattener: Successfully created flattened texture '{}' ({}x{}x{} -> {}x{})", name,
                  inputTexture->getSpecification().width, inputTexture->getSpecification().height,
-                 inputTexture->getSpecification().depth, flattenedTexture->getSpecification().width,
-                 flattenedTexture->getSpecification().height);
+                 inputTexture->getSpecification().depth, flattenedWidth, flattenedHeight);
 
     return flattenTexture;
 }
@@ -218,9 +220,11 @@ void TextureFlattener::initializeSharedResources()
     auto shaderDir = proj.getProjectShaderDirectory();
 
     // Load the depth texture flatten shader
-    auto [flattenDepthShader, flattenDepthShaderHandle] =
-        AssetManager::importAsset<Shader>(shaderDir / "glsl/FlattenDepthArray.cs.glsl");
-    s_flattenDepthShader = flattenDepthShader;
+    auto asset = AssetManager::importAsset(shaderDir / "glsl/FlattenDepthArray.cs.glsl");
+    s_flattenDepthShader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (s_flattenDepthShader) {
+        s_shaderAssets.push_back(std::move(asset));
+    }
 
     // Create compute pipelines
     ComputePipelineConfiguration flattenDepthConfig;
@@ -257,17 +261,21 @@ void TextureFlattener::getOrCreateShaderAndPipeline(FlattenerDataType dataType)
         break;
     }
 
-    auto [shader, shaderHandle] = AssetManager::importAsset<Shader>(shaderPath, importConfig);
-    s_flattenShaders[dataType] = shader;
+    auto asset = AssetManager::importAsset(shaderPath, importConfig);
+    auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (shader) {
+        s_flattenShaders[dataType] = shader;
+        s_shaderAssets.push_back(std::move(asset));
 
-    ComputePipelineConfiguration pipelineConfig;
-    pipelineConfig.shader = shader;
-    s_flattenPipelines[dataType] = std::make_shared<ComputePipeline>(pipelineConfig);
+        ComputePipelineConfiguration pipelineConfig;
+        pipelineConfig.shader = shader;
+        s_flattenPipelines[dataType] = std::make_shared<ComputePipeline>(pipelineConfig);
 
-    RP_CORE_INFO("Created shader and pipeline for data type {}", (int)dataType);
+        RP_CORE_INFO("Created shader and pipeline for data type {}", (int)dataType);
+    }
 }
 
-std::shared_ptr<Texture> TextureFlattener::createFlattenedTextureSpec(std::shared_ptr<Texture> inputTexture)
+std::unique_ptr<Texture> TextureFlattener::createFlattenedTextureSpec(std::shared_ptr<Texture> inputTexture)
 {
     const auto &inputSpec = inputTexture->getSpecification();
 
@@ -296,7 +304,7 @@ std::shared_ptr<Texture> TextureFlattener::createFlattenedTextureSpec(std::share
     flattenedSpec.srgb = inputSpec.srgb;
     flattenedSpec.wrap = inputSpec.wrap;
 
-    return std::make_shared<Texture>(flattenedSpec);
+    return std::make_unique<Texture>(flattenedSpec);
 }
 
 } // namespace Rapture

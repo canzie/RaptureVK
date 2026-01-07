@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__SHADERCOMMON_H
+#define RAPTURE__SHADERCOMMON_H
 
 #include <vulkan/vulkan.h>
 
@@ -12,8 +13,37 @@ enum class ShaderType {
     VERTEX,
     FRAGMENT,
     GEOMETRY,
-    COMPUTE
+    COMPUTE,
+    TESSELLATION_CONTROL,
+    TESSELLATION_EVALUATION,
+    MESH,
+    TASK
 };
+
+// Convert ShaderType to Vulkan stage flag
+inline VkShaderStageFlagBits shaderTypeToVkStage(ShaderType type)
+{
+    switch (type) {
+    case ShaderType::VERTEX:
+        return VK_SHADER_STAGE_VERTEX_BIT;
+    case ShaderType::FRAGMENT:
+        return VK_SHADER_STAGE_FRAGMENT_BIT;
+    case ShaderType::GEOMETRY:
+        return VK_SHADER_STAGE_GEOMETRY_BIT;
+    case ShaderType::COMPUTE:
+        return VK_SHADER_STAGE_COMPUTE_BIT;
+    case ShaderType::TESSELLATION_CONTROL:
+        return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+    case ShaderType::TESSELLATION_EVALUATION:
+        return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+    case ShaderType::MESH:
+        return VK_SHADER_STAGE_MESH_BIT_EXT;
+    case ShaderType::TASK:
+        return VK_SHADER_STAGE_TASK_BIT_EXT;
+    default:
+        return VK_SHADER_STAGE_ALL;
+    }
+}
 
 // neetly organises descriptor sets based on their usage
 // any common resources are stored in the first set
@@ -57,3 +87,5 @@ struct ShaderCompileInfo {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__SHADERCOMMON_H

@@ -298,8 +298,9 @@ void TLAS::build()
     poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
-    auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandBuffer = commandPool->getCommandBuffer("TLAS");
+    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -320,7 +321,7 @@ void TLAS::build()
 
     // Submit command buffer
     auto queue = vulkanContext.getGraphicsQueue();
-    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
     queue->waitIdle();
 
     // Clean up scratch buffer immediately as it's no longer needed
@@ -343,7 +344,7 @@ void TLAS::registerWithDescriptorManager()
     if (bindlessSet) {
         auto binding = bindlessSet->getTLASBinding(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
         if (binding) {
-            m_bindlessIndex = binding->add(shared_from_this());
+            m_bindlessIndex = binding->add(*this);
             RP_CORE_INFO("TLAS: Registered with descriptor manager at bindless index {}", m_bindlessIndex);
         } else {
             RP_CORE_ERROR("TLAS: Failed to get TLAS binding from descriptor manager");
@@ -439,8 +440,9 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>> &in
         poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
         poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
-        auto commandPool = CommandPoolManager::createCommandPool(poolConfig);
-        auto commandBuffer = commandPool->getCommandBuffer("TLAS Update");
+        auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+        auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+        auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
         commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -461,7 +463,7 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>> &in
 
         // Submit command buffer
         auto queue = vulkanContext.getGraphicsQueue();
-        queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+        queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
         queue->waitIdle();
 
         // Clean up update scratch buffer

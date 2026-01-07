@@ -33,15 +33,26 @@ StencilBorderPass::StencilBorderPass(float width, float height, uint32_t framesI
 
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/StencilBorder.vs.spv");
-
-    m_shader = shader;
-    m_shaderHandle = handle;
+    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/StencilBorder.vs.spv");
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_shader) m_shaderAssets.push_back(std::move(asset));
 
     createPipeline();
+    setupCommandResources();
 
     m_entitySelectedListenerId =
         GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
+}
+
+void StencilBorderPass::setupCommandResources()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 StencilBorderPass::~StencilBorderPass()
@@ -49,43 +60,42 @@ StencilBorderPass::~StencilBorderPass()
     GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
 }
 
-void StencilBorderPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, SceneRenderTarget &renderTarget,
-                                            uint32_t imageIndex, uint32_t currentFrameInFlight, std::shared_ptr<Scene> activeScene)
+CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
+                                                  std::shared_ptr<Scene> activeScene, const SecondaryBufferInheritance &inheritance)
 {
-
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_selectedEntity == nullptr) {
-        return;
+        return nullptr;
     }
 
     auto [transformComp, meshComp, materialComp] =
         m_selectedEntity->tryGetComponents<TransformComponent, MeshComponent, MaterialComponent>();
 
     if (transformComp == nullptr || meshComp == nullptr || meshComp->mesh == nullptr || materialComp == nullptr) {
-        return;
+        return nullptr;
     }
 
     auto camera = activeScene->getMainCamera();
     if (camera == nullptr) {
-        return;
+        return nullptr;
     }
     auto cameraComp = camera.tryGetComponent<CameraComponent>();
     if (cameraComp == nullptr) {
-        return;
+        return nullptr;
     }
 
-    // Get render target properties
-    VkImage targetImage = renderTarget.getImage(imageIndex);
-    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrameInFlight);
+    auto commandBuffer = pool->getSecondaryCommandBuffer();
+
+    commandBuffer->beginSecondary(inheritance);
+
     VkExtent2D targetExtent = renderTarget.getExtent();
 
     m_currentImageIndex = currentFrameInFlight;
     m_width = static_cast<float>(targetExtent.width);
     m_height = static_cast<float>(targetExtent.height);
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
-    beginDynamicRendering(commandBuffer, targetImageView, targetExtent);
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
     auto &app = Application::getInstance();
@@ -145,20 +155,17 @@ void StencilBorderPass::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
     // Draw the mesh
     vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), mesh->getIndexCount(), 1, 0, 0, 0);
 
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    commandBuffer->end();
+
+    return commandBuffer;
 }
 
 void StencilBorderPass::createPipeline()
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (m_shader.expired()) {
+    if (!m_shader) {
         RP_CORE_ERROR("Shader not loaded, cannot create pipeline.");
-        return;
-    }
-    auto shaderShared = m_shader.lock();
-    if (!shaderShared) {
-        RP_CORE_ERROR("Shader is null after lock, cannot create pipeline.");
         return;
     }
 
@@ -255,14 +262,18 @@ void StencilBorderPass::createPipeline()
 
     config.framebufferSpec = spec;
 
-    config.shader = shaderShared;
+    config.shader = m_shader;
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
 
-void StencilBorderPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer, VkImageView targetImageView,
-                                              VkExtent2D targetExtent)
+void StencilBorderPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex)
 {
+    VkImage targetImage = renderTarget.getImage(imageIndex);
+    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    VkExtent2D targetExtent = renderTarget.getExtent();
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
 
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -281,11 +292,17 @@ void StencilBorderPass::beginDynamicRendering(std::shared_ptr<CommandBuffer> com
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
     renderingInfo.pDepthAttachment = VK_NULL_HANDLE;
     renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
+    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void StencilBorderPass::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer, VkImage targetImage)
+void StencilBorderPass::endDynamicRendering(CommandBuffer *commandBuffer)
+{
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+}
+
+void StencilBorderPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage)
 {
     // Execution barrier to ensure previous pass color writes are complete
     // before this pass starts writing (write-after-write synchronization)

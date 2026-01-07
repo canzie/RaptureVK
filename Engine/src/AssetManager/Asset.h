@@ -1,118 +1,143 @@
 #pragma once
 
-#include "Utils/UUID.h"
-
+#include "AssetCommon.h"
 #include "AssetImportConfig.h"
 
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <variant>
 
+#include "Loaders/SceneFileCommon.h"
+#include "Materials/MaterialInstance.h"
+#include "Meshes/Mesh.h"
+#include "Shaders/Shader.h"
+#include "Textures/Texture.h"
+
 namespace Rapture {
 
-// Forward declarations to break circular dependency
-class Material;
-class Shader; // Forward declare Shader
-class Texture;
-class MaterialInstance;
-
-using AssetHandle = UUID;
-// NOTE: i dont like this but dont know variants well enough and dont want to change the entire codebase
-using AssetVariant = std::variant<std::monostate, std::shared_ptr<Material>, std::shared_ptr<Shader>, std::shared_ptr<Texture>,
-                                  std::shared_ptr<MaterialInstance>>;
-
-enum class AssetType {
-    None = 0,
-    Texture,
-    Cubemap,
-    Shader,
-    Material,
-    Model
-};
-
-enum class AssetStorageType {
-    Disk,
-    Virtual
-};
-
-enum class AssetStatus {
-    REQUESTED,
-    LOADING,
-    LOADED,
-    FAILED
-};
-
-inline std::string AssetTypeToString(AssetType type)
-{
-    switch (type) {
-    case AssetType::None:
-        return "None";
-    case AssetType::Material:
-        return "Material";
-    case AssetType::Shader:
-        return "Shader";
-    case AssetType::Texture:
-        return "Texture";
-    case AssetType::Cubemap:
-        return "Cubemap";
-    case AssetType::Model:
-        return "Model";
-    default:
-        return "Unknown";
-    }
-}
+using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
+                                  std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>, std::unique_ptr<SceneFileData>>;
 
 struct AssetMetadata {
 
-    AssetType m_assetType = AssetType::None;
-    AssetStorageType m_storageType = AssetStorageType::Disk;
+    AssetMetadata(const AssetMetadata &) = delete;
+    AssetMetadata &operator=(const AssetMetadata &) = delete;
+    AssetMetadata(AssetMetadata &&) noexcept = default;
+    AssetMetadata &operator=(AssetMetadata &&) noexcept = default;
+    AssetMetadata() = default;
+    static AssetMetadata null;
+    static const AssetMetadata const_null;
 
-    // Disk-specific data (only used when m_storageType == Disk)
-    std::filesystem::path m_filePath;
-    // some assets might be in the same file, the indices should point to them
-    // indices will be mostly 1 element, but in case of loading multiple primitives in 1 static mesh
-    // the indices will indicate which ones
-    std::vector<uint32_t> m_indices;
+    AssetType assetType = AssetType::NONE;
+    AssetStorageType storageType = AssetStorageType::DISK;
 
-    AssetImportConfigVariant m_importConfig;
+    std::filesystem::path filePath;
+    AssetImportConfigVariant importConfig = std::monostate();
+    std::string virtualName = "untitled";
 
-    // Virtual-specific data (only used when m_storageType == Virtual)
-    std::string m_virtualName;
+    uint32_t useCount = 0;
 
-    operator bool() const { return m_assetType != AssetType::None; }
+    bool isDiskAsset() const { return storageType == AssetStorageType::DISK; }
+    bool isVirtualAsset() const { return storageType == AssetStorageType::VIRTUAL; }
+    const std::string getName()
+    {
+        if (storageType == AssetStorageType::DISK) {
+            return filePath.string();
+        } else if (storageType == AssetStorageType::VIRTUAL) {
+            return virtualName;
+        }
+        return "No Name";
+    }
 
-    bool isDiskAsset() const { return m_storageType == AssetStorageType::Disk; }
-    bool isVirtualAsset() const { return m_storageType == AssetStorageType::Virtual; }
+    operator bool() const { return assetType != AssetType::NONE; }
 };
 
 class Asset {
   public:
-    // Rule of 5 - all defaulted since AssetVariant contains shared_ptrs
-    Asset() = default;
-    explicit Asset(AssetVariant asset) : m_asset(std::move(asset)) {}
-    ~Asset() = default;
-    Asset(const Asset&) = default;
-    Asset& operator=(const Asset&) = default;
-    Asset(Asset&&) noexcept = default;
-    Asset& operator=(Asset&&) noexcept = default;
+    Asset() = delete;
 
-    template <typename T> std::shared_ptr<T> getUnderlyingAsset() const
+    explicit Asset(AssetHandle _handle) : handle(_handle), m_asset(std::monostate()) {}
+    explicit Asset(AssetVariant asset, AssetHandle _handle) : handle(_handle), m_asset(std::move(asset)) {}
+    static const Asset const_null;
+    static Asset null;
+
+    ~Asset() = default;
+
+    template <typename T> T *getUnderlyingAsset() const
     {
-        if (std::holds_alternative<std::shared_ptr<T>>(m_asset)) {
-            return std::get<std::shared_ptr<T>>(m_asset);
+        if (std::holds_alternative<std::unique_ptr<T>>(m_asset)) {
+            return std::get<std::unique_ptr<T>>(m_asset).get();
         }
         return nullptr;
     }
 
-    bool isValid() const { return !std::holds_alternative<std::monostate>(m_asset); }
+    bool isValid() const { return !std::holds_alternative<std::monostate>(m_asset) && status != AssetStatus::FAILED; }
+    AssetStatus getStatus() const { return status; }
+    AssetHandle getHandle() const { return handle; }
+    void setAssetVariant(AssetVariant &&asset) { m_asset = std::move(asset); }
+
+    bool operator==(Asset &other) { return handle == other.getHandle(); };
+    operator bool() const { return handle != Asset::null.getHandle(); }
 
   public:
-    AssetHandle m_handle;
-    std::atomic<AssetStatus> m_status{AssetStatus::REQUESTED};
+    const AssetHandle handle;
+    std::atomic<AssetStatus> status{AssetStatus::REQUESTED};
 
   private:
     AssetVariant m_asset;
 };
+
+/*
+ @brief Wrapper for assets so the assetmanager can keep track of the amount of uses
+
+  I did not want to use a shared_ptr because the asset manager needs to own it, and overwriting the shared_ptr destructor is just a
+ garbage hack.
+*/
+class AssetRef {
+  public:
+    AssetRef() noexcept : asset(nullptr), m_useCount(nullptr) {}
+    AssetRef(Asset *_asset, uint32_t *_useCount) noexcept;
+    AssetRef(const AssetRef &other) noexcept;
+    AssetRef(AssetRef &&other) noexcept;
+    ~AssetRef() noexcept;
+
+    bool operator==(const AssetRef &other) const { return asset == other.asset; }
+    explicit operator bool() const { return asset != nullptr; }
+
+    Asset *get() const { return asset; }
+
+    AssetRef &operator=(const AssetRef &other) noexcept
+    {
+        if (this == &other) return *this;
+
+        if (m_useCount) (*m_useCount)--;
+
+        asset = other.asset;
+        m_useCount = other.m_useCount;
+        if (m_useCount) (*m_useCount)++;
+        return *this;
+    }
+
+    AssetRef &operator=(AssetRef &&other) noexcept
+    {
+        if (this == &other) return *this;
+        if (m_useCount) (*m_useCount)--;
+
+        asset = other.asset;
+        m_useCount = other.m_useCount;
+
+        other.asset = nullptr;
+        other.m_useCount = nullptr;
+
+        return *this;
+    }
+
+  private:
+    Asset *asset;
+    uint32_t *m_useCount;
+};
+
 } // namespace Rapture

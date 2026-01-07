@@ -2,6 +2,7 @@
 #include "Entities/Entity.h"
 
 #include "Components/Components.h"
+#include "Components/TerrainComponent.h"
 
 #include "AssetManager/AssetManager.h"
 #include "Meshes/MeshPrimitives.h"
@@ -52,15 +53,16 @@ Entity Scene::createCube(const std::string &name)
     entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
     // Add a cube mesh
-    auto cubeMesh = std::make_shared<Mesh>(Primitives::CreateCube());
-    entity.addComponent<MeshComponent>(cubeMesh);
+    auto cubeMesh = std::make_unique<Mesh>(Primitives::CreateCube());
+    auto meshRef = AssetManager::registerVirtualAsset(std::move(cubeMesh), "Primitive_Cube_" + name, AssetType::MESH);
+    entity.addComponent<MeshComponent>(meshRef);
 
     entity.addComponent<BoundingBoxComponent>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
 
     // Add a material
-    auto material = AssetManager::importDefaultAsset<MaterialInstance>(AssetType::Material).first;
-    if (material) {
-        entity.addComponent<MaterialComponent>(material);
+    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL);
+    if (materialRef) {
+        entity.addComponent<MaterialComponent>(materialRef);
     }
 
     return entity;
@@ -79,16 +81,17 @@ Entity Scene::createSphere(const std::string &name)
 
     entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
-    // Add a cube mesh
-    auto sphereMesh = std::make_shared<Mesh>(Primitives::CreateSphere(1.0f, 32));
-    entity.addComponent<MeshComponent>(sphereMesh);
+    // Add a sphere mesh
+    auto sphereMesh = std::make_unique<Mesh>(Primitives::CreateSphere(1.0f, 32));
+    auto meshRef = AssetManager::registerVirtualAsset(std::move(sphereMesh), "Primitive_Sphere_" + name, AssetType::MESH);
+    entity.addComponent<MeshComponent>(meshRef);
 
     entity.addComponent<BoundingBoxComponent>(glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
     // Add a material
-    auto material = AssetManager::importDefaultAsset<MaterialInstance>(AssetType::Material).first;
-    if (material) {
-        entity.addComponent<MaterialComponent>(material);
+    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL);
+    if (materialRef) {
+        entity.addComponent<MaterialComponent>(materialRef);
     }
 
     return entity;
@@ -142,8 +145,7 @@ void Scene::onUpdate(float dt)
         material.material->updatePendingTextures();
 
         uint32_t vertexFlags = mesh.mesh->getVertexBuffer()->getBufferLayout().getFlags();
-        uint32_t materialFlags = material.material->getMaterialFlags();
-        uint32_t flags = vertexFlags | materialFlags;
+        uint32_t flags = vertexFlags;
 
         mesh.meshDataBuffer->update(transform, flags, frameCounter);
     }
@@ -172,13 +174,22 @@ void Scene::onUpdate(float dt)
         }
     }
 
-    // Get camera position for shadow calculations
     glm::vec3 cameraPosition = glm::vec3(0.0f);
+    Frustum *frustum = nullptr;
     Entity mainCamera = getMainCamera();
     if (mainCamera.isValid()) {
-        auto cameraTransform = mainCamera.tryGetComponent<TransformComponent>();
-        if (cameraTransform) {
+        auto [cameraTransform, cameraComponent] = mainCamera.tryGetComponents<TransformComponent, CameraComponent>();
+        if (cameraTransform && cameraComponent) {
             cameraPosition = cameraTransform->translation();
+            frustum = &cameraComponent->frustum;
+        }
+    }
+
+    auto terrainView = m_registry.view<TerrainComponent>();
+    for (auto entity : terrainView) {
+        auto &terrain = terrainView.get<TerrainComponent>(entity);
+        if (terrain.generator && terrain.isEnabled && terrain.generator->isInitialized()) {
+            terrain.generator->update(cameraPosition, *frustum);
         }
     }
 
@@ -315,7 +326,7 @@ void Scene::registerBLAS(Entity &entity)
     }
 
     TLASInstance instance;
-    instance.blas = blas->blas;
+    instance.blas = blas->blas.get();
     instance.transform = transform->transformMatrix();
     instance.entityID = entity.getID();
     m_tlas->addInstance(instance);

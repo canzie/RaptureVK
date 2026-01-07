@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__SHADOWMAPPING_H
+#define RAPTURE__SHADOWMAPPING_H
 
 #include "AssetManager/AssetManager.h"
 #include "Pipelines/GraphicsPipeline.h"
@@ -6,6 +7,7 @@
 #include "Textures/Texture.h"
 
 #include "Buffers/CommandBuffers/CommandBuffer.h"
+#include "Buffers/CommandBuffers/CommandPool.h"
 #include "Buffers/Descriptors/DescriptorBinding.h"
 #include "Buffers/Descriptors/DescriptorSet.h"
 #include "Buffers/UniformBuffers/UniformBuffer.h"
@@ -30,12 +32,9 @@ class ShadowMap {
     ShadowMap(float width, float height);
     ~ShadowMap();
 
-    void createPipeline();
-    void createShadowTexture();
-    void createUniformBuffers();
-
-    void recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                             uint32_t currentFrame);
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+    void beginDynamicRendering(CommandBuffer *commandBuffer);
+    void endDynamicRendering(CommandBuffer *commandBuffer);
 
     void updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp,
                           const glm::vec3 &cameraPosition);
@@ -49,9 +48,13 @@ class ShadowMap {
     std::shared_ptr<ShadowDataBuffer> getShadowDataBuffer() { return m_shadowDataBuffer; }
 
   private:
-    void setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer);
-    void beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer);
-    void transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer);
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer);
+    void transitionToShaderReadableLayout(CommandBuffer *commandBuffer);
+
+    void createPipeline();
+    void createShadowTexture();
+    void createUniformBuffers();
+    void setupCommandResources();
 
   private:
     float m_width;
@@ -69,11 +72,15 @@ class ShadowMap {
 
     Frustum m_frustum;
 
-    std::weak_ptr<Shader> m_shader;
-    AssetHandle m_handle;
+    Shader *m_shader = nullptr;
+    std::vector<AssetRef> m_shaderAssets;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
     VmaAllocator m_allocator;
+
+    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__SHADOWMAPPING_H

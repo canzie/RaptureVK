@@ -1,6 +1,7 @@
 #include "CascadedShadowMapping.h"
 
 #include "Components/Components.h"
+#include "Generators/Terrain/TerrainTypes.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 #include "RenderTargets/SwapChains/SwapChain.h"
@@ -19,6 +20,19 @@ struct PushConstantsCSM {
     uint32_t batchInfoBufferIndex;
 };
 
+struct TerrainCSMPushConstants {
+    uint32_t cascadeMatricesIndex;
+    uint32_t chunkDataBufferIndex;
+    uint32_t continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
+    uint32_t erosionIndex;
+    uint32_t peaksValleysIndex;
+    uint32_t noiseLUTIndex;
+    uint32_t useMultiNoise;
+    uint32_t lodResolution;
+    float heightScale;
+    float terrainWorldSize;
+};
+
 CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda)
     : m_width(width), m_height(height), m_lambda(lambda),
       m_NumCascades(static_cast<uint8_t>(std::clamp(numCascades, 1u, MAX_CASCADES))), m_shadowTextureArray(nullptr)
@@ -33,6 +47,7 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
 
     createShadowTexture();
     createPipeline();
+    createTerrainPipeline();
     createUniformBuffers();
 
     // Initialize MDI batching system - one per frame in flight
@@ -43,6 +58,19 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
 
     // Create flattened texture for debugging/visualization
     m_flattenedShadowTexture = TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
+
+    setupCommandResources();
+}
+
+void CascadedShadowMap::setupCommandResources()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
 }
 
 CascadedShadowMap::~CascadedShadowMap() {}
@@ -100,12 +128,17 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     std::vector<CascadeData> cascadeData(m_NumCascades);
     m_lightViewProjections.resize(m_NumCascades);
 
-    // Light direction and up vector for view matrix
     glm::vec3 lightDirection = glm::normalize(lightDir);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-    if (std::abs(glm::dot(lightDirection, up)) > 0.99f) {
+    if (std::abs(lightDirection.y) < 0.99f) {
+        up = glm::vec3(0.0f, 1.0f, 0.0f);
+    } else {
         up = glm::vec3(0.0f, 0.0f, 1.0f);
     }
+    up = glm::normalize(up - lightDirection * glm::dot(up, lightDirection));
+
+    glm::vec3 combinedCenter = glm::vec3(0.0f);
+    std::vector<glm::vec3> allCorners;
 
     for (uint8_t cascadeIdx = 0; cascadeIdx < m_NumCascades; cascadeIdx++) {
         cascadeData[cascadeIdx].nearPlane = cascadeSplits[cascadeIdx];
@@ -119,11 +152,14 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
         glm::vec3 frustumCenter = glm::vec3(0.0f);
         for (const auto &corner : frustumCorners) {
             frustumCenter += corner;
+            combinedCenter += corner;
+            allCorners.push_back(corner);
         }
         frustumCenter /= 8.0f;
 
-        // 3. Create Light View Matrix, looking at the cascade's center
-        glm::mat4 lightViewMatrix = glm::lookAt(frustumCenter - lightDirection, frustumCenter, up);
+        float lightDistance = glm::length(frustumCorners[0] - frustumCenter) * 2.0f;
+        glm::vec3 lightPos = frustumCenter - (lightDirection * lightDistance);
+        glm::mat4 lightViewMatrix = glm::lookAt(lightPos, frustumCenter, up);
 
         // 4. Find AABB of the cascade frustum in light-space
         float minX = std::numeric_limits<float>::max();
@@ -156,22 +192,24 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
         frustumCenterLS.x = std::floor(frustumCenterLS.x / texelSizeX) * texelSizeX;
         frustumCenterLS.y = std::floor(frustumCenterLS.y / texelSizeY) * texelSizeY;
 
-        // Re-derive min/max in light-space using snapped center
-        minX = frustumCenterLS.x - orthoWidth * 0.5f;
-        maxX = frustumCenterLS.x + orthoWidth * 0.5f;
-        minY = frustumCenterLS.y - orthoHeight * 0.5f;
-        maxY = frustumCenterLS.y + orthoHeight * 0.5f;
+        // Add padding to X/Y to ensure coverage at all angles
+        float xPadding = orthoWidth * 0.1f;
+        float yPadding = orthoHeight * 0.1f;
 
-        // Add padding to avoid clipping issues
-        constexpr float zMult = 10.0f;
-        if (minZ < 0) minZ *= zMult;
-        else minZ /= zMult;
-        if (maxZ < 0) maxZ /= zMult;
-        else maxZ *= zMult;
+        minX = frustumCenterLS.x - (orthoWidth * 0.5f + xPadding);
+        maxX = frustumCenterLS.x + (orthoWidth * 0.5f + xPadding);
+        minY = frustumCenterLS.y - (orthoHeight * 0.5f + yPadding);
+        maxY = frustumCenterLS.y + (orthoHeight * 0.5f + yPadding);
+
+        float zRange = maxZ - minZ;
+        float zPadding = zRange * 2.0f;
+        minZ = minZ - zPadding;
+        maxZ = maxZ + zPadding;
 
         // 5. Create the orthographic projection for this cascade (now stabilized)
         glm::mat4 lightProjectionMatrix = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
 
+        // Vulkan Y-flip for correct coordinate system
         lightProjectionMatrix[1][1] *= -1;
 
         // 6. Store Final Matrix
@@ -179,24 +217,68 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
         m_lightViewProjections[cascadeIdx] = cascadeData[cascadeIdx].lightViewProj;
     }
 
+    combinedCenter /= static_cast<float>(allCorners.size());
+    float combinedDistance = 0.0f;
+    for (const auto &corner : allCorners) {
+        combinedDistance = std::max(combinedDistance, glm::length(corner - combinedCenter));
+    }
+    combinedDistance *= 2.0f;
+
+    glm::vec3 combinedLightPos = combinedCenter - (lightDirection * combinedDistance);
+    glm::mat4 combinedLightView = glm::lookAt(combinedLightPos, combinedCenter, up);
+
+    float combinedMinX = std::numeric_limits<float>::max();
+    float combinedMaxX = std::numeric_limits<float>::lowest();
+    float combinedMinY = std::numeric_limits<float>::max();
+    float combinedMaxY = std::numeric_limits<float>::lowest();
+    float combinedMinZ = std::numeric_limits<float>::max();
+    float combinedMaxZ = std::numeric_limits<float>::lowest();
+
+    for (const auto &corner : allCorners) {
+        glm::vec4 trf = combinedLightView * glm::vec4(corner, 1.0f);
+        combinedMinX = std::min(combinedMinX, trf.x);
+        combinedMaxX = std::max(combinedMaxX, trf.x);
+        combinedMinY = std::min(combinedMinY, trf.y);
+        combinedMaxY = std::max(combinedMaxY, trf.y);
+        combinedMinZ = std::min(combinedMinZ, trf.z);
+        combinedMaxZ = std::max(combinedMaxZ, trf.z);
+    }
+
+    // Add padding for shadow casters outside camera frustum
+    float xPad = (combinedMaxX - combinedMinX) * 0.1f;
+    float yPad = (combinedMaxY - combinedMinY) * 0.1f;
+    float zPad = (combinedMaxZ - combinedMinZ) * 2.0f;
+
+    // Z values in light view space are negative (objects in front of light)
+    // glm::ortho expects zNear < zFar, so use -max as near and -min as far
+    glm::mat4 combinedLightProj = glm::ortho(combinedMinX - xPad, combinedMaxX + xPad, combinedMinY - yPad, combinedMaxY + yPad,
+                                             -combinedMaxZ - zPad, -combinedMinZ + zPad);
+    combinedLightProj[1][1] *= -1;
+    m_shadowFrustum.update(combinedLightProj, combinedLightView);
+
     return cascadeData;
 }
 
-void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> commandBuffer, std::shared_ptr<Scene> activeScene,
-                                            uint32_t currentFrame)
+CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame,
+                                                  TerrainGenerator *terrain)
 {
-
     RAPTURE_PROFILE_FUNCTION();
+
+    m_currentFrame = currentFrame;
+
+    auto &registry = activeScene->getRegistry();
+
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrame);
+    auto commandBuffer = pool->getSecondaryCommandBuffer();
+
+    SecondaryBufferInheritance inheritance{};
+    inheritance.depthFormat = m_shadowTextureArray->getFormat();
+    inheritance.viewMask = (1u << m_NumCascades) - 1;
+    commandBuffer->beginSecondary(inheritance);
 
     m_writeIndex = (m_writeIndex + 1) % 2;
     m_readIndex = (m_readIndex + 1) % 2;
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer);
-    beginDynamicRendering(commandBuffer);
-
-    m_currentFrame = currentFrame;
-
-    // Begin frame for MDI batching - use current frame's batch map
     m_mdiBatchMaps[m_currentFrame]->beginFrame();
 
     // Bind pipeline
@@ -221,7 +303,6 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
     DescriptorManager::bindSet(2, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
-    auto &registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
 
     // First pass: Populate MDI batches with mesh data
@@ -290,8 +371,8 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        if (auto shader = m_shader.lock(); shader && shader->getPushConstantLayouts().size() > 0) {
-            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
+        if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = m_shader->getPushConstantLayouts()[0].stageFlags;
         }
 
         vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
@@ -314,10 +395,11 @@ void CascadedShadowMap::recordCommandBuffer(std::shared_ptr<CommandBuffer> comma
         }
     }
 
-    // End rendering and transition image for shader reading
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    recordTerrainCommands(commandBuffer, terrain);
 
-    transitionToShaderReadableLayout(commandBuffer);
+    commandBuffer->end();
+
+    return commandBuffer;
 }
 
 std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponent &lightComp,
@@ -564,8 +646,8 @@ void CascadedShadowMap::createPipeline()
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT; // Use front face culling for shadow mapping
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_TRUE;      // Enable depth bias
-    rasterizer.depthBiasConstantFactor = 2.0f; // Adjust these values based on your needs
+    rasterizer.depthBiasEnable = VK_TRUE;
+    rasterizer.depthBiasConstantFactor = 2.0f;
     rasterizer.depthBiasClamp = 0.0f;
     rasterizer.depthBiasSlopeFactor = 2.0f;
 
@@ -595,12 +677,14 @@ void CascadedShadowMap::createPipeline()
 
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto [shader, handle] = AssetManager::importAsset<Shader>(shaderPath / "SPIRV/shadows/CascadedShadowPass.vs.spv");
+    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/shadows/CascadedShadowPass.vs.spv");
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
 
-    if (!shader) {
+    if (!m_shader) {
         RP_CORE_ERROR("Failed to load CascadedShadowPass vertex shader");
         return;
     }
+    if (m_shader) m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -620,13 +704,211 @@ void CascadedShadowMap::createPipeline()
     framebufferSpec.correlationMask = (1u << m_NumCascades) - 1; // All views are correlated
 
     config.framebufferSpec = framebufferSpec;
-    config.shader = shader;
-
-    m_shader = shader;
-    m_handle = handle;
+    config.shader = m_shader;
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
+
+void CascadedShadowMap::createTerrainPipeline()
+{
+    std::vector<VkDynamicState> dynamicStates = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = nullptr;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = m_width;
+    viewport.height = m_height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_TRUE;
+    rasterizer.depthBiasConstantFactor = 2.0f;
+    rasterizer.depthBiasClamp = 0.0f;
+    rasterizer.depthBiasSlopeFactor = 2.0f;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = 0;
+    colorBlending.pAttachments = nullptr;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
+    auto &app = Application::getInstance();
+    auto &project = app.getProject();
+    auto shaderPath = project.getProjectShaderDirectory();
+
+    ShaderImportConfig terrainShaderConfig;
+    terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
+
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_csm.vs.glsl", terrainShaderConfig);
+    m_terrainShader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (!m_terrainShader) {
+        RP_CORE_WARN("Terrain CSM shader not found");
+        return;
+    }
+    if (m_terrainShader) m_shaderAssets.push_back(std::move(asset));
+
+    GraphicsPipelineConfiguration config;
+    config.dynamicState = dynamicState;
+    config.inputAssemblyState = inputAssembly;
+    config.viewportState = viewportState;
+    config.rasterizationState = rasterizer;
+    config.multisampleState = multisampling;
+    config.colorBlendState = colorBlending;
+    config.vertexInputState = vertexInputInfo;
+    config.depthStencilState = depthStencil;
+
+    FramebufferSpecification framebufferSpec;
+    framebufferSpec.depthAttachment = m_shadowTextureArray->getFormat();
+    framebufferSpec.viewMask = (1u << m_NumCascades) - 1;
+    framebufferSpec.correlationMask = (1u << m_NumCascades) - 1;
+
+    config.framebufferSpec = framebufferSpec;
+    config.shader = m_terrainShader;
+    m_terrainPipeline = std::make_shared<GraphicsPipeline>(config);
+
+    RP_CORE_INFO("Terrain CSM pipeline created");
+}
+
+void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain)
+{
+    if (!m_terrainPipeline || !terrain || !terrain->isInitialized()) {
+        return;
+    }
+
+    if (auto *culler = terrain->getTerrainCuller(); culler) {
+        if (m_terrainShadowBuffers.indirectBuffers.empty()) {
+            std::vector<uint32_t> highestLOD = {0};
+            m_terrainShadowBuffers = culler->createBuffers(highestLOD);
+        }
+
+        culler->runCull(m_terrainShadowBuffers, m_shadowFrustum.getBindlessIndex(), glm::vec3(0.0f));
+    }
+
+    m_terrainPipeline->bind(commandBuffer->getCommandBufferVk());
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = m_width;
+    viewport.height = m_height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer->getCommandBufferVk(), 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+    vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
+
+    DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline);
+    DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline);
+
+    if (m_terrainShadowBuffers.indirectBuffers.empty() || !m_terrainShadowBuffers.drawCountBuffer) {
+        return;
+    }
+
+    const auto &terrainConfig = terrain->getConfig();
+    uint32_t chunkDataBufferIndex = terrain->getChunkDataBuffer()->getBindlessIndex();
+    uint32_t continentalnessIndex = terrain->getNoiseTexture(CONTINENTALNESS)->getBindlessIndex();
+    uint32_t erosionIndex = 0;
+    uint32_t peaksValleysIndex = 0;
+    uint32_t noiseLUTIndex = 0;
+
+    if (terrainConfig.hmType == HM_CEPV) {
+        erosionIndex = terrain->getNoiseTexture(EROSION)->getBindlessIndex();
+        peaksValleysIndex = terrain->getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
+        noiseLUTIndex = terrain->getNoiseLUT()->getBindlessIndex();
+    }
+    VkBuffer countBuffer = m_terrainShadowBuffers.drawCountBuffer->getBufferVk();
+
+    for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
+        if (!m_terrainShadowBuffers.indirectBuffers[lod]) {
+            continue;
+        }
+
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain->getIndexBuffer(lod), 0, VK_INDEX_TYPE_UINT32);
+
+        TerrainCSMPushConstants pc{};
+        pc.cascadeMatricesIndex = m_cascadeMatricesIndex;
+        pc.chunkDataBufferIndex = chunkDataBufferIndex;
+        pc.continentalnessIndex = continentalnessIndex;
+        pc.erosionIndex = erosionIndex;
+        pc.peaksValleysIndex = peaksValleysIndex;
+        pc.noiseLUTIndex = noiseLUTIndex;
+        pc.useMultiNoise = terrainConfig.hmType == HM_CEPV ? 1u : 0u;
+        pc.lodResolution = getTerrainLODResolution(lod);
+        pc.heightScale = terrainConfig.heightScale;
+        pc.terrainWorldSize = terrainConfig.terrainWorldSize;
+
+        VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        if (m_terrainShader && m_terrainShader->getPushConstantLayouts().size() > 0) {
+            stageFlags = m_terrainShader->getPushConstantLayouts()[0].stageFlags;
+        }
+
+        vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,
+                           sizeof(TerrainCSMPushConstants), &pc);
+
+        VkBuffer indirectBuffer = m_terrainShadowBuffers.indirectBuffers[lod]->getBufferVk();
+        VkDeviceSize countOffset = lod * sizeof(uint32_t);
+        uint32_t maxDrawCount = m_terrainShadowBuffers.indirectCapacities[lod];
+
+        vkCmdDrawIndexedIndirectCount(commandBuffer->getCommandBufferVk(), indirectBuffer, 0, countBuffer, countOffset,
+                                      maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
+    }
+}
+
 void CascadedShadowMap::createShadowTexture()
 {
 
@@ -655,14 +937,13 @@ void CascadedShadowMap::createUniformBuffers()
     if (cascadeSet) {
         auto binding = cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
         if (binding) {
-            m_cascadeMatricesIndex = binding->add(m_cascadeMatricesBuffer);
+            m_cascadeMatricesIndex = binding->add(*m_cascadeMatricesBuffer);
         }
     }
 }
 
-void CascadedShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<CommandBuffer> commandBuffer)
+void CascadedShadowMap::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer)
 {
-
     // Transition shadow map to depth attachment layout
     VkImageMemoryBarrier barrier = m_shadowTextureArray->getImageMemoryBarrier(
         m_firstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -674,8 +955,12 @@ void CascadedShadowMap::setupDynamicRenderingMemoryBarriers(std::shared_ptr<Comm
     vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
-void CascadedShadowMap::beginDynamicRendering(std::shared_ptr<CommandBuffer> commandBuffer)
+
+void CascadedShadowMap::beginDynamicRendering(CommandBuffer *commandBuffer)
 {
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer);
+
     // Configure depth attachment info
     m_depthAttachmentInfo = {};
     m_depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -696,11 +981,18 @@ void CascadedShadowMap::beginDynamicRendering(std::shared_ptr<CommandBuffer> com
     renderingInfo.pColorAttachments = nullptr;
     renderingInfo.pDepthAttachment = &m_depthAttachmentInfo;
     renderingInfo.pStencilAttachment = nullptr;
+    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
     vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
 }
 
-void CascadedShadowMap::transitionToShaderReadableLayout(std::shared_ptr<CommandBuffer> commandBuffer)
+void CascadedShadowMap::endDynamicRendering(CommandBuffer *commandBuffer)
+{
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    transitionToShaderReadableLayout(commandBuffer);
+}
+
+void CascadedShadowMap::transitionToShaderReadableLayout(CommandBuffer *commandBuffer)
 {
     // Transition shadow map to shader readable layout
     VkImageMemoryBarrier barrier = m_shadowTextureArray->getImageMemoryBarrier(

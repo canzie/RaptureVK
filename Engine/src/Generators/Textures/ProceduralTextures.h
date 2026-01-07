@@ -9,6 +9,8 @@
 #include "Shaders/Shader.h"
 #include "Textures/Texture.h"
 
+#include <glm/glm.hpp>
+
 #include <cstring>
 #include <memory>
 #include <string>
@@ -34,6 +36,50 @@ struct ProceduralTextureConfig {
  */
 struct WhiteNoisePushConstants {
     uint32_t seed;
+};
+
+/**
+ * @brief Push constant data for Perlin noise generation.
+ */
+struct PerlinNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    uint32_t seed = 0;
+};
+
+struct SimplexNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    uint32_t seed = 0;
+};
+
+struct RidgedNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    float ridgeExponent = 0.8;
+    float amplitudeMultiplier = 0.5;
+    uint32_t seed = 0;
+};
+
+/**
+ * @brief Push constant data for atmospheric scattering.
+ *
+ * Layout matches GLSL std430: total size 52 bytes
+ */
+struct AtmospherePushConstants {
+    glm::vec3 sunDir;
+    float planetRadius;
+    float atmoRadius;
+    float _pad0[3];
+    glm::vec3 betaRay;
+    float scaleHeight;
+    float sunIntensity;
 };
 
 /**
@@ -96,7 +142,7 @@ class ProceduralTexture {
      * @param shaderPath Path to the compute shader (.glsl or .spv), relative to shader directory.
      * @param outputTexture Existing texture to write into. Must have storageImage = true.
      */
-    ProceduralTexture(const std::string &shaderPath, std::shared_ptr<Texture> outputTexture);
+    ProceduralTexture(const std::string &shaderPath, Texture &outputTexture);
 
     ~ProceduralTexture();
 
@@ -120,6 +166,16 @@ class ProceduralTexture {
         return true;
     }
 
+    bool setPushConstantsRaw(const void *data, size_t size)
+    {
+        if (!verifyPushConstantSize(size)) {
+            return false;
+        }
+        m_pushConstantData.resize(size);
+        std::memcpy(m_pushConstantData.data(), data, size);
+        return true;
+    }
+
     /**
      * @brief Generates the texture.
      *
@@ -139,7 +195,8 @@ class ProceduralTexture {
      *         construction but only filled after generate() is called and the
      *         command buffer is submitted.
      */
-    std::shared_ptr<Texture> getTexture() const { return m_texture; }
+    Texture &getTexture() const { return *m_texture; }
+    Shader &getShader() const { return *m_shader; }
 
     /**
      * @brief Checks if the generator was initialized successfully.
@@ -166,8 +223,43 @@ class ProceduralTexture {
      * @param config Optional texture configuration.
      * @return Shared pointer to the generated texture.
      */
-    static std::shared_ptr<Texture> generateWhiteNoise(uint32_t seed = 0,
-                                                       const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static Texture *generateWhiteNoise(uint32_t seed = 0, const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates a Perlin noise texture.
+     *
+     * @param params Perlin noise parameters (octaves, persistence, lacunarity, scale, seed).
+     * @param config Optional texture configuration.
+     * @return Shared pointer to the generated texture.
+     */
+    static Texture *generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
+                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    static Texture *generateSimplexNoise(const SimplexNoisePushConstants &params = SimplexNoisePushConstants(),
+                                         const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    static Texture *generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
+                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates an atmospheric scattering texture.
+     *
+     * Static helper method that creates an equirectangular panoramic texture
+     * with realistic atmospheric scattering using Rayleigh and Mie scattering.
+     * The texture can be used as a skybox or converted to a cubemap.
+     *
+     * Uses the built-in Atmosphere.cs.glsl shader with physically-based
+     * atmospheric scattering. The sun position is calculated from the time
+     * of day parameter.
+     *
+     * @param timeOfDay Time in hours (0.0 to 24.0, e.g., 14.5 = 2:30 PM).
+     *                  6.0 = sunrise, 12.0 = noon, 18.0 = sunset, 0.0 = midnight.
+     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
+     * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
+     * @return Shared pointer to the generated panoramic texture.
+     */
+    static Texture *generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
+                                       const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
   private:
     void initFromShaderPath(const std::string &shaderPath, bool createTexture = true);
@@ -179,17 +271,18 @@ class ProceduralTexture {
     void extractExpectedPushConstantSize();
     bool verifyPushConstantSize(size_t providedSize);
 
-    std::shared_ptr<Shader> m_shader;
+    Shader *m_shader;
     std::shared_ptr<ComputePipeline> m_pipeline;
     std::shared_ptr<DescriptorSet> m_descriptorSet;
-    std::shared_ptr<Texture> m_texture;
-    std::shared_ptr<CommandPool> m_commandPool;
-    std::shared_ptr<CommandBuffer> m_commandBuffer;
+    Texture *m_texture;
+    CommandPoolHash m_commandPoolHash = 0;
 
     std::vector<uint8_t> m_pushConstantData;
     size_t m_expectedPushConstantSize = 0;
     ProceduralTextureConfig m_config;
     bool m_isValid = false;
+
+    std::vector<AssetRef> m_assets;
 
     static constexpr uint32_t TEXTURE_SIZE = 1024;
     static constexpr uint32_t WORKGROUP_SIZE = 8;
