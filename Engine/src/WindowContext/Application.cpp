@@ -136,6 +136,11 @@ void Application::run()
 
         Timestep::onUpdate();
 
+        // Flush queues before beginFrame to handle any work queued during initialization
+        m_vulkanContext->getComputeQueue()->flush();
+        m_vulkanContext->getGraphicsQueue()->flush();
+        m_vulkanContext->getTransferQueue()->flush();
+
         CommandPoolManager::beginFrame();
 
         for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {

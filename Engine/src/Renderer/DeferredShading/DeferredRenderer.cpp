@@ -168,27 +168,20 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
 
     recordCommandBuffer(commandBuffer, activeScene, imageIndex);
 
-    m_graphicsQueue->addCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
     VkSemaphore frWaitSemaphores[1];
-    VkPipelineStageFlags frWaitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     VkSemaphore frSignalSemaphores[1];
+    VkPipelineStageFlags frWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
     if (SwapChain::renderMode == RenderMode::PRESENTATION) {
         // PRESENTATION mode: Wait for swapchain image, signal when done, then present
         frWaitSemaphores[0] = m_swapChain->getImageAvailableSemaphore(m_currentFrame);
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = frWaitSemaphores;
-        submitInfo.pWaitDstStageMask = frWaitStages;
-
         frSignalSemaphores[0] = m_swapChain->getRenderFinishedSemaphore(m_currentFrame);
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = frSignalSemaphores;
 
-        m_graphicsQueue->submitCommandBuffers(submitInfo, m_swapChain->getInFlightFence(m_currentFrame));
+        std::span<VkSemaphore> waitSemaphores(frWaitSemaphores, 1);
+        std::span<VkSemaphore> signalSemaphores(frSignalSemaphores, 1);
+
+        m_graphicsQueue->submitAndFlushQueue(commandBuffer, &signalSemaphores, &waitSemaphores, &frWaitStage,
+                                             m_swapChain->getInFlightFence(m_currentFrame));
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -216,6 +209,8 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
             return;
         }
     } else {
+        m_graphicsQueue->addToBatch(commandBuffer);
+
         // OFFSCREEN mode: Do NOT submit here - ImguiLayer handles submission
         // The command buffer has been recorded and added to the queue.
         // ImguiLayer will submit it with proper semaphore synchronization.

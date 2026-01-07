@@ -9,7 +9,7 @@
 namespace Rapture {
 
 using AssetMap = std::unordered_map<AssetHandle, std::unique_ptr<Asset>>;
-using AssetRegistry = std::unordered_map<AssetHandle, AssetMetadata>;
+using AssetRegistry = std::unordered_map<AssetHandle, std::unique_ptr<AssetMetadata>>;
 
 /*
  @brief Base class for all asset manager implementations

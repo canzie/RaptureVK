@@ -1,6 +1,7 @@
 #include "JobSystem.h"
 
 #include "Counter.h"
+#include "Logging/TracyProfiler.h"
 #include "Utils/rp_assert.h"
 #include "WindowContext/VulkanContext/TimelineSemaphore.h"
 #include "jobs/Job.h"
@@ -58,8 +59,10 @@ JobSystem &JobSystem::instance()
     return *s_instance;
 }
 
-void workerThread(JobSystem *system)
+void workerThread(JobSystem *system, int32_t threadId)
 {
+    RAPTURE_PROFILE_THREAD(("Job Worker " + std::to_string(threadId)).c_str());
+
     thread_local Fiber *t_schedulerFiber = createSchedulerFiber();
     (void)t_schedulerFiber;
 
@@ -106,6 +109,8 @@ void workerThread(JobSystem *system)
 
 void ioThread(JobSystem *system, IoQueue *queue)
 {
+    RAPTURE_PROFILE_THREAD("IO Thread");
+
     while (!system->shouldShutdown()) {
         IoRequest request;
 
@@ -114,26 +119,28 @@ void ioThread(JobSystem *system, IoQueue *queue)
             continue;
         }
 
-        std::vector<uint8_t> data;
+        auto data = std::make_shared<std::vector<uint8_t>>();
         bool success = false;
-
-        std::ifstream file(request.path, std::ios::binary | std::ios::ate);
+        std::ifstream file(request.path, std::ios::binary);
         if (file) {
+            file.seekg(0, std::ios::end);
             auto size = file.tellg();
-            file.seekg(0);
-            data.resize(static_cast<size_t>(size));
-            file.read(reinterpret_cast<char *>(data.data()), size);
-            success = file.good();
+            file.seekg(0, std::ios::beg);
+
+            data->resize(static_cast<size_t>(size));
+            if (!file.read(reinterpret_cast<char *>(data->data()), size)) {
+                success = false;
+            } else {
+                success = true;
+            }
         }
 
         // Move data to heap to avoid large lambda captures in JobFunction
-        auto dataPtr = new std::vector<uint8_t>(std::move(data));
         auto callbackPtr = new IoCallback(std::move(request.callback));
 
         system->run(JobDeclaration(
-            [callbackPtr, dataPtr, success](JobContext &) {
-                (*callbackPtr)(std::move(*dataPtr), success);
-                delete dataPtr;
+            [callbackPtr, data, success](JobContext &) {
+                (*callbackPtr)(std::move(*data), success);
                 delete callbackPtr;
             },
             request.priority, QueueAffinity::ANY, nullptr, "Io callback"));
@@ -142,6 +149,8 @@ void ioThread(JobSystem *system, IoQueue *queue)
 
 void gpuPollThread(JobSystem *system, GpuPollQueue *queue)
 {
+    RAPTURE_PROFILE_THREAD("GPU Poll Thread");
+
     constexpr uint64_t POLL_TIMEOUT_NS = 1 * 1000 * 1000;
 
     std::vector<GpuWaitRequest> pending;
@@ -182,7 +191,7 @@ JobSystem::JobSystem() : m_waitList(this)
     workerThreadCount = 2;
     m_workers.resize(workerThreadCount);
     for (uint32_t i = 0; i < workerThreadCount; ++i) {
-        m_workers[i] = std::thread(workerThread, this);
+        m_workers[i] = std::thread(workerThread, this, static_cast<int32_t>(i));
     }
 
     m_ioThread = std::thread(ioThread, this, &m_ioQueue);

@@ -321,7 +321,7 @@ void TLAS::build()
 
     // Submit command buffer
     auto queue = vulkanContext.getGraphicsQueue();
-    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
     queue->waitIdle();
 
     // Clean up scratch buffer immediately as it's no longer needed
@@ -463,7 +463,7 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>> &in
 
         // Submit command buffer
         auto queue = vulkanContext.getGraphicsQueue();
-        queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+        queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
         queue->waitIdle();
 
         // Clean up update scratch buffer

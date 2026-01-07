@@ -1,5 +1,6 @@
 #include "ContentBrowserPanel.h"
 
+#include "AssetManager/AssetManager.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
 #include "imguiPanelStyleLinear.h"
@@ -327,7 +328,7 @@ void ContentBrowserPanel::renderAssetContent()
             if (assetRegistry.find(handle) == assetRegistry.end()) {
                 continue;
             }
-            Rapture::AssetMetadata metadata = assetRegistry.at(handle);
+            auto &metadata = Rapture::AssetManager::getAssetMetadata(handle);
             if (metadata.assetType == Rapture::AssetType::NONE) {
                 continue;
             }

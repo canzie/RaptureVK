@@ -8,6 +8,7 @@
 #include "Textures/Texture.h"
 
 #include <filesystem>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -18,7 +19,7 @@ namespace Rapture {
 
 bool AssetImporter::s_isInitialized = false;
 
-bool AssetImporter::loadShader(Asset &asset, const AssetMetadata &metadata)
+bool AssetImporter::loadShader(Asset &asset, AssetMetadata &metadata)
 {
     const auto &initialPath = metadata.filePath;
     if (!std::filesystem::exists(initialPath)) {
@@ -128,7 +129,7 @@ bool AssetImporter::loadShader(Asset &asset, const AssetMetadata &metadata)
     return true;
 }
 
-bool AssetImporter::loadMaterial(Asset &asset, const AssetMetadata &metadata)
+bool AssetImporter::loadMaterial(Asset &asset, AssetMetadata &metadata)
 {
     (void)asset;
     (void)metadata;
@@ -139,7 +140,7 @@ bool AssetImporter::loadMaterial(Asset &asset, const AssetMetadata &metadata)
     return false;
 }
 
-bool AssetImporter::loadTexture(Asset &asset, const AssetMetadata &metadata)
+bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
 {
 
     TextureSpecification texSpec = TextureSpecification();
@@ -151,6 +152,8 @@ bool AssetImporter::loadTexture(Asset &asset, const AssetMetadata &metadata)
 
     auto tex = Texture::loadAsync(metadata.filePath.string(), texSpec);
 
+    // auto tex = std::make_unique<Texture>(metadata.filePath.string(), texSpec);
+
     asset.status = AssetStatus::LOADED;
     asset.setAssetVariant(std::move(tex));
 
@@ -159,7 +162,7 @@ bool AssetImporter::loadTexture(Asset &asset, const AssetMetadata &metadata)
     return true;
 }
 
-bool AssetImporter::loadCubemap(Asset &asset, const AssetMetadata &metadata)
+bool AssetImporter::loadCubemap(Asset &asset, AssetMetadata &metadata)
 {
     std::vector<std::string> cubemapPaths = getCubemapPaths(metadata.filePath);
     if (cubemapPaths.size() != 6) {
@@ -177,7 +180,7 @@ bool AssetImporter::loadCubemap(Asset &asset, const AssetMetadata &metadata)
     return true;
 }
 
-bool AssetImporter::loadScene(Asset &asset, const AssetMetadata &metadata)
+bool AssetImporter::loadScene(Asset &asset, AssetMetadata &metadata)
 {
     const auto &path = metadata.filePath;
     if (!std::filesystem::exists(path)) {

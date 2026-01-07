@@ -858,12 +858,12 @@ void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainC
             }
 
             if (m_terrainTextureCache.cachedHandles[category] != 0) {
-                auto metadata = Rapture::AssetManager::getAssetMetadata(m_terrainTextureCache.cachedHandles[category]);
+                auto &metadata = Rapture::AssetManager::getAssetMetadata(m_terrainTextureCache.cachedHandles[category]);
                 previewName = metadata.getName();
             }
 
-            ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0),
-                                                  ImVec2(FLT_MAX, ImGui::GetTextLineHeightWithSpacing() * m_terrainTextureCache.MAX_VISIBLE));
+            ImGui::SetNextWindowSizeConstraints(
+                ImVec2(0, 0), ImVec2(FLT_MAX, ImGui::GetTextLineHeightWithSpacing() * m_terrainTextureCache.MAX_VISIBLE));
             if (ImGui::BeginCombo(label, previewName.c_str())) {
                 auto allHandles = Rapture::AssetManager::getTextures();
 
@@ -878,7 +878,7 @@ void PropertiesPanel::renderTerrainComponent(Rapture::TerrainComponent &terrainC
                         auto texture = asset.get()->getUnderlyingAsset<Rapture::Texture>();
                         if (!texture) continue;
 
-                        auto metadata = Rapture::AssetManager::getAssetMetadata(handle);
+                        auto &metadata = Rapture::AssetManager::getAssetMetadata(handle);
                         bool isSelected = (m_terrainTextureCache.cachedHandles[category] == handle);
 
                         if (ImGui::Selectable(metadata.getName().c_str(), isSelected)) {

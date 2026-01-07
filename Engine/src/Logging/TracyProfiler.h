@@ -27,6 +27,9 @@
 #ifndef TRACY_MEMORY
 #define TRACY_MEMORY
 #endif
+#ifndef TRACY_FIBERS
+#define TRACY_FIBERS
+#endif
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -99,6 +102,15 @@
 // Message logging (empty macros)
 #define RAPTURE_PROFILE_MESSAGE(txt, size)
 #define RAPTURE_PROFILE_MESSAGE_COLOR(txt, size, color)
+#endif
+
+#if RAPTURE_TRACY_PROFILING_ENABLED && defined(TRACY_FIBERS)
+#define RAPTURE_PROFILE_FIBER_ENTER(name) TracyFiberEnter(name)
+#define RAPTURE_PROFILE_FIBER_LEAVE       TracyFiberLeave
+#else
+// Fiber profiling (empty macros)
+#define RAPTURE_PROFILE_FIBER_ENTER(name)
+#define RAPTURE_PROFILE_FIBER_LEAVE
 #endif
 
 namespace Rapture {

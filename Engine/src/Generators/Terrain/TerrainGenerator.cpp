@@ -202,7 +202,8 @@ void TerrainGenerator::bakeNoiseLUT()
         m_noiseLUT = std::make_unique<Texture>(spec);
     }
 
-    m_noiseLUT->uploadData(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(lutData.data()), lutData.size() * sizeof(uint16_t)));
+    m_noiseLUT->uploadData(
+        std::span<const uint8_t>(reinterpret_cast<const uint8_t *>(lutData.data()), lutData.size() * sizeof(uint16_t)));
 }
 
 void TerrainGenerator::generateDefaultNoiseTextures()
@@ -375,7 +376,7 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
     commandBuffer->end();
 
     auto queue = vc.getComputeQueue();
-    queue->submitQueue(commandBuffer);
+    queue->submitQueue(commandBuffer, nullptr, nullptr);
 }
 
 VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const

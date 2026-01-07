@@ -23,27 +23,26 @@ using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::
 
 struct AssetMetadata {
 
+    AssetMetadata(const AssetMetadata &) = delete;
+    AssetMetadata &operator=(const AssetMetadata &) = delete;
+    AssetMetadata(AssetMetadata &&) noexcept = default;
+    AssetMetadata &operator=(AssetMetadata &&) noexcept = default;
+    AssetMetadata() = default;
+    static AssetMetadata null;
+    static const AssetMetadata const_null;
+
     AssetType assetType = AssetType::NONE;
     AssetStorageType storageType = AssetStorageType::DISK;
 
-    // Disk-specific data (only used when m_storageType == Disk)
     std::filesystem::path filePath;
-    // some assets might be in the same file, the indices should point to them
-    // indices will be mostly 1 element, but in case of loading multiple primitives in 1 static mesh
-    // the indices will indicate which ones
-    std::vector<uint32_t> indices;
+    AssetImportConfigVariant importConfig = std::monostate();
+    std::string virtualName = "untitled";
 
-    AssetImportConfigVariant importConfig;
-
-    // Virtual-specific data (only used when m_storageType == Virtual)
-    std::string virtualName;
-
-    // TODO: Should be atomic
     uint32_t useCount = 0;
 
     bool isDiskAsset() const { return storageType == AssetStorageType::DISK; }
     bool isVirtualAsset() const { return storageType == AssetStorageType::VIRTUAL; }
-    std::string getName()
+    const std::string getName()
     {
         if (storageType == AssetStorageType::DISK) {
             return filePath.string();

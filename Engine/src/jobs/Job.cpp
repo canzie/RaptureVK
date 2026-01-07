@@ -6,7 +6,7 @@ namespace Rapture {
 
 void JobContext::waitFor(Counter &c, int32_t targetValue)
 {
-    if (c.get() == targetValue) {
+    if (c.get() <= targetValue) {
         return;
     }
 

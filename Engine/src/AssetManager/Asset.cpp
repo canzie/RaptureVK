@@ -5,6 +5,9 @@ namespace Rapture {
 const Asset Asset::const_null{std::monostate(), 0};
 Asset Asset::null{std::monostate(), 0};
 
+AssetMetadata AssetMetadata::null{};
+const AssetMetadata AssetMetadata::const_null{};
+
 AssetRef::AssetRef(Asset *_asset, uint32_t *_useCount) noexcept : asset(_asset), m_useCount(_useCount)
 {
     if (m_useCount) (*m_useCount)++;

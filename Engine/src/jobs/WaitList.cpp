@@ -14,6 +14,7 @@ void WaitList::add(Job &&job)
 void WaitList::add(Job &&job, Counter *counter, int32_t targetValue)
 {
     if (counter->get() <= targetValue) {
+
         if (job.fiber) {
             m_system->getQueue().pushResume(std::move(job));
         } else {
@@ -38,7 +39,8 @@ void WaitList::onCounterChanged(Counter *counter)
     WaitKey key{counter, currentValue};
 
     auto predicate = [](const WaitKey &k, const Job &job) {
-        return job.waitCounter == k.counter && job.waitTarget == k.targetValue;
+        return job.fiber == nullptr ? job.waitCounter == k.counter && job.waitTarget == k.targetValue
+                                    : job.fiber->waitingOn == k.counter && job.fiber->waitTarget == k.targetValue;
     };
 
     std::vector<Job> readyJobs = m_map.stealMatching(key, predicate);

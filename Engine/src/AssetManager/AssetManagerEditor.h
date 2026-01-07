@@ -20,6 +20,7 @@ class AssetManagerEditor : public AssetManagerBase {
     virtual Asset &getAsset(AssetHandle handle) override;
 
     AssetMetadata &getAssetMetadata(AssetHandle handle);
+    const AssetMetadata &getAssetMetadata(AssetHandle handle) const;
 
     Asset &importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate());
 

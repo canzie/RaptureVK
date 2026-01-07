@@ -135,8 +135,7 @@ Texture::Texture(const std::vector<std::string> &paths, TextureSpecification spe
     loadImageFromFileSync();
 }
 
-Texture::Texture(const std::vector<std::string> &paths, TextureSpecification spec, bool)
-    : m_paths(paths), m_spec(spec)
+Texture::Texture(const std::vector<std::string> &paths, TextureSpecification spec, bool) : m_paths(paths), m_spec(spec)
 {
     createSpecificationFromImageFile(m_paths);
     m_sampler = std::make_unique<Sampler>(m_spec);
@@ -178,7 +177,7 @@ std::unique_ptr<Texture> Texture::loadAsync(const std::string &path, TextureSpec
 }
 
 std::unique_ptr<Texture> Texture::loadAsync(const std::vector<std::string> &paths, TextureSpecification spec,
-                                             Counter *completionCounter)
+                                            Counter *completionCounter)
 {
     if (paths.size() > 1) {
         RP_CORE_WARN("Async loading for cubemaps/arrays not supported, falling back to sync");
@@ -203,132 +202,128 @@ void Texture::startAsyncLoad(Counter *completionCounter)
 
     auto ioData = std::make_shared<std::pair<std::vector<uint8_t>, bool>>();
 
-    jobs().run(
-        JobDeclaration(
-            [texturePtr, completionCounter, path, ioData](JobContext &jctx) {
-                Counter ioCounter;
-                ioCounter.increment();
+    jobs().run(JobDeclaration(
+        [texturePtr, completionCounter, path, ioData](JobContext &jctx) {
+            Counter ioCounter{};
+            ioCounter.increment();
 
-                jobs().requestIo(
-                    path,
-                    [ioData, &ioCounter](std::vector<uint8_t> &&data, bool success) {
-                        ioData->first = std::move(data);
-                        ioData->second = success;
-                        ioCounter.decrement();
-                    },
-                    JobPriority::LOW);
+            jobs().requestIo(
+                path,
+                [ioData, &ioCounter](std::vector<uint8_t> &&data, bool success) {
+                    ioData->first = std::move(data);
+                    ioData->second = success;
+                    ioCounter.decrement();
+                },
+                JobPriority::LOW);
 
-                jctx.waitFor(ioCounter, 0);
+            jctx.waitFor(ioCounter, 0);
 
-                if (!ioData->second) {
-                    RP_CORE_ERROR("Failed to load texture file: {}", path);
-                    texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
-                    if (completionCounter) {
-                        completionCounter->decrement();
-                    }
-                    return;
-                }
-
-                auto &fileData = ioData->first;
-                int width, height, channels;
-                int desiredChannels = 4;
-
-                stbi_uc *pixels = stbi_load_from_memory(fileData.data(), static_cast<int>(fileData.size()), &width,
-                                                         &height, &channels, desiredChannels);
-                if (!pixels) {
-                    RP_CORE_ERROR("Failed to decode texture: {}", path);
-                    texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
-                    if (completionCounter) {
-                        completionCounter->decrement();
-                    }
-                    return;
-                }
-
-                texturePtr->m_status.store(TextureStatus::UPLOADING, std::memory_order_release);
-
-                auto &app = Application::getInstance();
-                VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
-                auto transferQueue = app.getVulkanContext().getTransferQueue();
-
-                VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * desiredChannels;
-
-                VkBuffer stagingBuffer;
-                VmaAllocation stagingAllocation;
-
-                VkBufferCreateInfo bufferInfo{};
-                bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-                bufferInfo.size = imageSize;
-                bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-                bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-                VmaAllocationCreateInfo allocInfo = {};
-                allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-
-                if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) !=
-                    VK_SUCCESS) {
-                    RP_CORE_ERROR("Failed to create staging buffer for texture!");
-                    stbi_image_free(pixels);
-                    texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
-                    if (completionCounter) {
-                        completionCounter->decrement();
-                    }
-                    return;
-                }
-
-                void *data;
-                vmaMapMemory(allocator, stagingAllocation, &data);
-                memcpy(data, pixels, static_cast<size_t>(imageSize));
-                vmaUnmapMemory(allocator, stagingAllocation);
-
-                stbi_image_free(pixels);
-
-                size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-                CommandPoolConfig poolConfig{};
-                poolConfig.queueFamilyIndex = app.getVulkanContext().getTransferQueueIndex();
-                poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-                poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-                poolConfig.threadId = threadId;
-
-                auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-                auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
-                auto commandBuffer = commandPool->getPrimaryCommandBuffer();
-
-                commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-                texturePtr->recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_UNDEFINED,
-                                                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-                texturePtr->recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), stagingBuffer,
-                                                     static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-
-                if (texturePtr->m_spec.mipLevels > 1) {
-                    texturePtr->recordGenerateMipmaps(commandBuffer->getCommandBufferVk());
-                } else {
-                    texturePtr->recordTransitionImageLayout(commandBuffer->getCommandBufferVk(),
-                                                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                }
-
-                commandBuffer->end();
-
-                transferQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
-                uint64_t signalValue = transferQueue->getCurrentTimelineValue();
-
-                TimelineSemaphore semaphoreWrapper(transferQueue->getTimelineSemaphore());
-                Counter gpuCounter;
-                gpuCounter.increment();
-
-                jobs().submitGpuWait(&semaphoreWrapper, signalValue, gpuCounter);
-                jctx.waitFor(gpuCounter, 0);
-
-                vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
-                texturePtr->m_status.store(TextureStatus::READY, std::memory_order_release);
-
+            if (!ioData->second) {
+                RP_CORE_ERROR("Failed to load texture file: {}", path);
+                texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
                 if (completionCounter) {
                     completionCounter->decrement();
                 }
-            },
-            JobPriority::NORMAL, QueueAffinity::ANY, nullptr, "Texture async load"));
+                return;
+            }
+
+            auto &fileData = ioData->first;
+            int width, height, channels;
+            int desiredChannels = 4;
+
+            stbi_uc *pixels = stbi_load_from_memory(fileData.data(), static_cast<int>(fileData.size()), &width, &height, &channels,
+                                                    desiredChannels);
+            if (!pixels) {
+                RP_CORE_ERROR("Failed to decode texture: {}", path);
+                texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
+                if (completionCounter) {
+                    completionCounter->decrement();
+                }
+                return;
+            }
+
+            texturePtr->m_status.store(TextureStatus::UPLOADING, std::memory_order_release);
+
+            auto &app = Application::getInstance();
+            VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+            auto transferQueue = app.getVulkanContext().getTransferQueue();
+
+            VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * desiredChannels;
+
+            VkBuffer stagingBuffer;
+            VmaAllocation stagingAllocation;
+
+            VkBufferCreateInfo bufferInfo{};
+            bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            bufferInfo.size = imageSize;
+            bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+            VmaAllocationCreateInfo allocInfo = {};
+            allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+            if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
+                RP_CORE_ERROR("Failed to create staging buffer for texture!");
+                stbi_image_free(pixels);
+                texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
+                if (completionCounter) {
+                    completionCounter->decrement();
+                }
+                return;
+            }
+
+            void *data;
+            vmaMapMemory(allocator, stagingAllocation, &data);
+            memcpy(data, pixels, static_cast<size_t>(imageSize));
+            vmaUnmapMemory(allocator, stagingAllocation);
+
+            stbi_image_free(pixels);
+
+            size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+
+            CommandPoolConfig poolConfig{};
+            poolConfig.queueFamilyIndex = app.getVulkanContext().getTransferQueueIndex();
+            poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+            poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
+            poolConfig.threadId = threadId;
+
+            auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+            auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+            auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+
+            commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+            texturePtr->recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_UNDEFINED,
+                                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            texturePtr->recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), stagingBuffer, static_cast<uint32_t>(width),
+                                                static_cast<uint32_t>(height));
+
+            if (texturePtr->m_spec.mipLevels > 1) {
+                texturePtr->recordGenerateMipmaps(commandBuffer->getCommandBufferVk());
+            } else {
+                texturePtr->recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+
+            commandBuffer->end();
+
+            uint64_t signalValue = transferQueue->addToBatch(commandBuffer);
+
+            TimelineSemaphore semaphoreWrapper(transferQueue->getTimelineSemaphore());
+            Counter gpuCounter;
+            gpuCounter.increment();
+
+            jobs().submitGpuWait(&semaphoreWrapper, signalValue, gpuCounter);
+            jctx.waitFor(gpuCounter, 0);
+
+            vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+            texturePtr->m_status.store(TextureStatus::READY, std::memory_order_release);
+
+            if (completionCounter) {
+                completionCounter->decrement();
+            }
+        },
+        JobPriority::NORMAL, QueueAffinity::ANY, nullptr, "Texture async load"));
 }
 
 void Texture::createSpecificationFromImageFile(const std::vector<std::string> &paths)
@@ -611,18 +606,22 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
         internalCommandBuffer->end();
 
         // Submit the command buffer
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        std::span<VkSemaphore> *waitSemaphoresSpan = nullptr;
+        std::span<VkSemaphore> *signalSemaphoresSpan = nullptr;
+        VkPipelineStageFlags *waitStagePtr = nullptr;
 
-        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_TRANSFER_BIT};
+        std::span<VkSemaphore> waitSpan;
+        std::span<VkSemaphore> signalSpan;
+        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
         if (waitSemaphore != VK_NULL_HANDLE) {
-            submitInfo.waitSemaphoreCount = 1;
-            submitInfo.pWaitSemaphores = &waitSemaphore;
-            submitInfo.pWaitDstStageMask = waitStages;
+            waitSpan = std::span<VkSemaphore>(&waitSemaphore, 1);
+            waitSemaphoresSpan = &waitSpan;
+            waitStagePtr = &waitStage;
         }
         if (signalSemaphore != VK_NULL_HANDLE) {
-            submitInfo.signalSemaphoreCount = 1;
-            submitInfo.pSignalSemaphores = &signalSemaphore;
+            signalSpan = std::span<VkSemaphore>(&signalSemaphore, 1);
+            signalSemaphoresSpan = &signalSpan;
         }
 
         if (useInternalFence) {
@@ -632,13 +631,14 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
             fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
             vkCreateFence(app.getVulkanContext().getLogicalDevice(), &fenceInfo, nullptr, &fence);
 
-            graphicsQueue->submitQueue(internalCommandBuffer, submitInfo, fence);
+            graphicsQueue->submitQueue(internalCommandBuffer, signalSemaphoresSpan, waitSemaphoresSpan, waitStagePtr, fence);
 
             vkWaitForFences(app.getVulkanContext().getLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
             vkDestroyFence(app.getVulkanContext().getLogicalDevice(), fence, nullptr);
         } else {
             // Non-blocking approach - caller handles synchronization
-            graphicsQueue->submitQueue(internalCommandBuffer, submitInfo, VK_NULL_HANDLE);
+            graphicsQueue->submitQueue(internalCommandBuffer, signalSemaphoresSpan, waitSemaphoresSpan, waitStagePtr,
+                                       VK_NULL_HANDLE);
         }
     }
 }
@@ -995,7 +995,7 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
     recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), oldLayout, newLayout);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
 }
 
@@ -1099,7 +1099,7 @@ void Texture::generateMipmaps()
     recordGenerateMipmaps(commandBuffer->getCommandBufferVk());
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
 
     RP_CORE_TRACE("Generated {} mip levels for texture", m_spec.mipLevels);
@@ -1199,7 +1199,7 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
     recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), buffer, width, height);
     commandBuffer->end();
 
-    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
     queue->waitIdle();
 }
 
@@ -1345,7 +1345,7 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
@@ -1358,15 +1358,15 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
     region.imageOffset = {static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};
     region.imageExtent = {1, 1, 1};
 
-    vkCmdCopyBufferToImage(commandBuffer->getCommandBufferVk(), stagingBuffer, m_image,
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    vkCmdCopyBufferToImage(commandBuffer->getCommandBufferVk(), stagingBuffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                           &region);
 
     recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     commandBuffer->end();
 
-    transferQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    transferQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
 
     // Fire-and-forget: staging buffer will be reused/recycled by command pool reset
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
@@ -1420,14 +1420,14 @@ void Texture::setPixels(std::span<const uint8_t> data)
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), stagingBuffer, m_spec.width, m_spec.height);
     recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     commandBuffer->end();
 
-    transferQueue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    transferQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
 
     // Fire-and-forget: staging buffer cleanup
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);

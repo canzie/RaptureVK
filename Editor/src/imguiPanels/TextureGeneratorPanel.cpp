@@ -137,7 +137,7 @@ void TextureGeneratorPanel::renderInstanceSelector()
         for (const auto &[handle, asset_] : loadedAssets) {
             if (assetRegistry.find(handle) == assetRegistry.end()) continue;
 
-            const auto &metadata = assetRegistry.at(handle);
+            auto &metadata = Rapture::AssetManager::getAssetMetadata(handle);
             if (metadata.assetType != Rapture::AssetType::SHADER) continue;
 
             auto asset = Rapture::AssetManager::getAsset(handle);

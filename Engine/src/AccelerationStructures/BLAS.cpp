@@ -262,7 +262,7 @@ void BLAS::build()
 
     // Submit command buffer
     auto queue = vulkanContext.getGraphicsQueue();
-    queue->submitQueue(commandBuffer, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
     queue->waitIdle();
 
     // Clean up scratch buffer immediately as it's no longer needed

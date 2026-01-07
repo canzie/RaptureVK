@@ -378,19 +378,14 @@ void ImGuiLayer::onUpdate(float ts)
         return;
     }
 
-    graphicsQueue->addCommandBuffer(imguiCommandBuffer);
-
     {
         RAPTURE_PROFILE_SCOPE("Combined Render Submit");
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
-        submitInfo.pWaitDstStageMask = waitStages;
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
+        std::span<VkSemaphore> waitSemaphoresSpan(&imageAvailableSemaphore, 1);
+        std::span<VkSemaphore> signalSemaphoresSpan(&renderFinishedSemaphore, 1);
+        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-        graphicsQueue->submitCommandBuffers(submitInfo, swapChain->getInFlightFence(m_currentFrame));
+        graphicsQueue->submitAndFlushQueue(imguiCommandBuffer, &signalSemaphoresSpan, &waitSemaphoresSpan, &waitStage,
+                                           swapChain->getInFlightFence(m_currentFrame));
     }
 
     // Present - waits for all rendering (scene + imgui) to complete

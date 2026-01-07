@@ -239,7 +239,7 @@ void DynamicDiffuseGI::clearTextures()
         return;
     }
 
-    m_computeQueue->submitQueue(commandBuffer);
+    m_computeQueue->submitQueue(commandBuffer, nullptr, nullptr);
 }
 
 void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex)
@@ -367,7 +367,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
         return;
     }
 
-    m_computeQueue->submitQueue(commandBuffer);
+    m_computeQueue->submitQueue(commandBuffer, nullptr, nullptr);
 
     m_isFirstFrame = false;
 }

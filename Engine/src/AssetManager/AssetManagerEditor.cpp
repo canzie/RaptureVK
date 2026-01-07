@@ -43,7 +43,7 @@ Asset &AssetManagerEditor::getAsset(AssetHandle handle)
     if (isAssetLoaded(handle)) {
         return *m_loadedAssets.at(handle);
     } else {
-        const AssetMetadata &metadata = getAssetMetadata(handle);
+        AssetMetadata &metadata = getAssetMetadata(handle);
         if (!metadata) {
             RP_CORE_ERROR("Invalid asset metadata, import asset first");
             return Asset::null;
@@ -63,13 +63,20 @@ Asset &AssetManagerEditor::getAsset(AssetHandle handle)
 
 AssetMetadata &AssetManagerEditor::getAssetMetadata(AssetHandle handle)
 {
-    static AssetMetadata s_nullMetadata;
-
     auto it = m_assetRegistry.find(handle);
     if (it != m_assetRegistry.end()) {
-        return it->second;
+        return *it->second;
     }
-    return s_nullMetadata;
+    return AssetMetadata::null;
+}
+
+const AssetMetadata &AssetManagerEditor::getAssetMetadata(AssetHandle handle) const
+{
+    auto it = m_assetRegistry.find(handle);
+    if (it != m_assetRegistry.end()) {
+        return *it->second;
+    }
+    return AssetMetadata::const_null;
 }
 
 Asset &AssetManagerEditor::importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig)
@@ -81,30 +88,28 @@ Asset &AssetManagerEditor::importAsset(std::filesystem::path path, AssetImportCo
     }
 
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata.filePath == path && metadata.importConfig == importConfig) {
+        if (metadata->filePath == path && metadata->importConfig == importConfig) {
             return getAsset(handle);
         }
     }
 
-    AssetMetadata metadata;
-    metadata.storageType = AssetStorageType::DISK;
-    metadata.filePath = path;
+    auto metadata = std::make_unique<AssetMetadata>();
+    metadata->storageType = AssetStorageType::DISK;
+    metadata->filePath = path;
+    metadata->assetType = determineAssetType(path.string());
+    metadata->importConfig = importConfig;
 
-    metadata.assetType = determineAssetType(path.string());
-
-    metadata.indices = {};
-    metadata.importConfig = importConfig;
-
-    if (!metadata) {
+    // idk how cpp evaluates this if the bool() is overloaded
+    if (metadata == nullptr || !metadata) {
         RP_CORE_ERROR("Unknown asset type for extension: {}", path.extension().string());
         return Asset::null;
     }
 
     AssetHandle handle = UUIDGenerator::Generate();
     auto asset = std::make_unique<Asset>(handle);
-    bool success = AssetImporter::importAsset(*asset, metadata);
+    bool success = AssetImporter::importAsset(*asset, *metadata);
     if (success) {
-        m_assetRegistry.insert_or_assign(handle, metadata);
+        m_assetRegistry.insert_or_assign(handle, std::move(metadata));
         auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
 
         return *it->second;
@@ -139,14 +144,13 @@ Asset &AssetManagerEditor::importDefaultAsset(AssetType assetType)
 
         AssetHandle handle = UUIDGenerator::Generate();
 
-        AssetMetadata metadata;
-        metadata.assetType = AssetType::TEXTURE;
-        metadata.storageType = AssetStorageType::DISK; // Default assets are treated as disk assets
-        metadata.filePath = "<default_white_texture>"; // Special path to indicate default asset
-        metadata.indices = {0};
-        metadata.importConfig = std::monostate();
+        auto metadata = std::make_unique<AssetMetadata>();
+        metadata->assetType = AssetType::TEXTURE;
+        metadata->storageType = AssetStorageType::DISK; // Default assets are treated as disk assets
+        metadata->filePath = "<default_white_texture>"; // Special path to indicate default asset
+        metadata->importConfig = std::monostate();
 
-        m_assetRegistry.insert_or_assign(handle, metadata);
+        m_assetRegistry.insert_or_assign(handle, std::move(metadata));
         auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::make_unique<Asset>(std::move(defaultTexture), handle));
         it->second->status = AssetStatus::LOADED;
         m_defaultAssetHandles[assetType] = handle;
@@ -169,15 +173,14 @@ Asset &AssetManagerEditor::importDefaultAsset(AssetType assetType)
 
         AssetHandle handle = UUIDGenerator::Generate();
 
-        AssetMetadata metadata;
-        metadata.assetType = AssetType::MATERIAL;
-        metadata.storageType = AssetStorageType::VIRTUAL;
-        metadata.virtualName = "<default_material>";
-        metadata.indices = {};
-        metadata.importConfig = std::monostate();
+        auto metadata = std::make_unique<AssetMetadata>();
+        metadata->assetType = AssetType::MATERIAL;
+        metadata->storageType = AssetStorageType::VIRTUAL;
+        metadata->virtualName = "<default_material>";
+        metadata->importConfig = std::monostate();
 
         // Register the asset
-        m_assetRegistry.insert_or_assign(handle, metadata);
+        m_assetRegistry.insert_or_assign(handle, std::move(metadata));
         auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::make_unique<Asset>(std::move(defaultMaterial), handle));
         it->second->status = AssetStatus::LOADED;
         // Track this as a default asset
@@ -230,7 +233,7 @@ Asset &AssetManagerEditor::registerVirtualAsset(AssetVariant assetValue, const s
     }
 
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata.isVirtualAsset() && metadata.virtualName == virtualName && metadata.assetType != assetType) {
+        if (metadata->isVirtualAsset() && metadata->virtualName == virtualName && metadata->assetType != assetType) {
             RP_CORE_WARN("Virtual asset with name '{}' already exists", virtualName);
             return Asset::null;
         }
@@ -240,13 +243,13 @@ Asset &AssetManagerEditor::registerVirtualAsset(AssetVariant assetValue, const s
     auto asset = std::make_unique<Asset>(std::move(assetValue), handle);
     asset->status = AssetStatus::LOADED; // Virtual assets are immediately loaded
 
-    AssetMetadata metadata;
-    metadata.assetType = assetType;
-    metadata.storageType = AssetStorageType::VIRTUAL;
-    metadata.virtualName = virtualName;
+    auto metadata = std::make_unique<AssetMetadata>();
+    metadata->assetType = assetType;
+    metadata->storageType = AssetStorageType::VIRTUAL;
+    metadata->virtualName = virtualName;
 
     auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
-    m_assetRegistry.insert_or_assign(handle, metadata);
+    m_assetRegistry.insert_or_assign(handle, std::move(metadata));
 
     RP_CORE_INFO("Registered virtual {} asset: '{}'", AssetTypeToString(assetType), virtualName);
     return *it->second;
@@ -260,7 +263,7 @@ bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
         return false;
     }
 
-    const AssetMetadata &metadata = registryIt->second;
+    const AssetMetadata &metadata = *registryIt->second;
     if (!metadata.isVirtualAsset()) {
         RP_CORE_ERROR("Cannot unregister non-virtual asset: {}", metadata.filePath.string());
         return false;
@@ -276,7 +279,7 @@ bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
 Asset &AssetManagerEditor::getVirtualAssetByName(const std::string &virtualName)
 {
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata.isVirtualAsset() && metadata.virtualName == virtualName) {
+        if (metadata->isVirtualAsset() && metadata->virtualName == virtualName) {
             return getAsset(handle);
         }
     }
@@ -287,7 +290,7 @@ std::vector<AssetHandle> AssetManagerEditor::getVirtualAssetsByType(AssetType ty
 {
     std::vector<AssetHandle> result;
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata.isVirtualAsset() && metadata.assetType == type) {
+        if (metadata->isVirtualAsset() && metadata->assetType == type) {
             result.push_back(handle);
         }
     }

@@ -10,7 +10,7 @@
 
 namespace Rapture {
 
-using AssetImporterFunction = std::function<bool(Asset &, const AssetMetadata &)>;
+using AssetImporterFunction = std::function<bool(Asset &, AssetMetadata &)>;
 static std::map<AssetType, AssetImporterFunction> s_assetImporters;
 
 class AssetImporter {
@@ -41,18 +41,14 @@ class AssetImporter {
         s_isInitialized = false;
     }
 
-    static bool importAsset(Asset &asset, const AssetMetadata &metadata)
-    {
-
-        return s_assetImporters[metadata.assetType](asset, metadata);
-    }
+    static bool importAsset(Asset &asset, AssetMetadata &metadata) { return s_assetImporters[metadata.assetType](asset, metadata); }
 
   private:
-    static bool loadShader(Asset &asset, const AssetMetadata &metadata);
-    static bool loadMaterial(Asset &asset, const AssetMetadata &metadata);
-    static bool loadTexture(Asset &asset, const AssetMetadata &metadata);
-    static bool loadCubemap(Asset &asset, const AssetMetadata &metadata);
-    static bool loadScene(Asset &asset, const AssetMetadata &metadata);
+    static bool loadShader(Asset &asset, AssetMetadata &metadata);
+    static bool loadMaterial(Asset &asset, AssetMetadata &metadata);
+    static bool loadTexture(Asset &asset, AssetMetadata &metadata);
+    static bool loadCubemap(Asset &asset, AssetMetadata &metadata);
+    static bool loadScene(Asset &asset, AssetMetadata &metadata);
 
   private:
     static bool s_isInitialized;

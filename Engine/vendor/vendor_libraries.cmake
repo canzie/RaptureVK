@@ -120,6 +120,7 @@ FetchContent_Declare(
 
 # --- Tracy Profiler ---
 set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
+set(TRACY_FIBERS ON CACHE BOOL "" FORCE)
 set(TRACY_DOWNLOAD ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
     tracy

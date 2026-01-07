@@ -1,5 +1,6 @@
 #include "Fiber.h"
 #include "JobSystem.h"
+#include "Logging/TracyProfiler.h"
 #include <cstdlib>
 #include <cstring>
 #include <thread>
@@ -58,6 +59,8 @@ extern "C" void fiberEntryPointImpl()
 {
     Fiber *fiber = t_currentFiber;
 
+    RAPTURE_PROFILE_FIBER_ENTER("Job Fiber");
+
     JobContext ctx{&JobSystem::instance(), &fiber->currentJob, fiber};
 
     fiber->currentJob.decl.function(ctx);
@@ -77,7 +80,9 @@ void Fiber::switchTo()
 
 void Fiber::switchToScheduler()
 {
+    RAPTURE_PROFILE_FIBER_LEAVE;
     fiber_switch(&this->context, &t_schedulerFiber.context);
+    RAPTURE_PROFILE_FIBER_ENTER("Job Fiber");
 }
 
 void initializeFiber(Fiber *fiber)

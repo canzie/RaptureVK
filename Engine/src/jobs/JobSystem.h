@@ -40,8 +40,7 @@ class JobSystem {
     // FrameCounterPool& frameCounters() { return m_frameCounters; }
 
     // Io request - reads file on dedicated thread, then spawns job with data
-    void requestIo(std::filesystem::path path, IoCallback callback,
-                   JobPriority priority = JobPriority::NORMAL);
+    void requestIo(std::filesystem::path path, IoCallback callback, JobPriority priority = JobPriority::NORMAL);
 
     // GPU poll - submit a semaphore wait request, counter decrements when signaled
     void submitGpuWait(const TimelineSemaphore *semaphore, uint64_t waitValue, Counter &counter);
