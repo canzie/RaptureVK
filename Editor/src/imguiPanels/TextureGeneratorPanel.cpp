@@ -4,6 +4,7 @@
 #include "Shaders/ShaderReflections.h"
 #include "WindowContext/Application.h"
 
+#include <cfloat>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 
@@ -17,6 +18,37 @@ struct ParameterEditState {
     glm::vec3 vec3Value = glm::vec3(1.0f);
     glm::vec4 vec4Value = glm::vec4(1.0f);
     Rapture::PushConstantMemberInfo::BaseType activeType;
+
+    void initFromMetadata(const Rapture::PushConstantMemberMetadata &metadata)
+    {
+        if (!metadata.hasDefault || metadata.defaultValue.empty()) {
+            return;
+        }
+        const auto &def = metadata.defaultValue;
+        switch (activeType) {
+        case Rapture::PushConstantMemberInfo::BaseType::FLOAT:
+            floatValue = def[0];
+            break;
+        case Rapture::PushConstantMemberInfo::BaseType::INT:
+            intValue = static_cast<int>(def[0]);
+            break;
+        case Rapture::PushConstantMemberInfo::BaseType::UINT:
+            uintValue = static_cast<uint32_t>(def[0]);
+            break;
+        case Rapture::PushConstantMemberInfo::BaseType::VEC2:
+            vec2Value = glm::vec2(def.size() > 0 ? def[0] : 0.0f, def.size() > 1 ? def[1] : 0.0f);
+            break;
+        case Rapture::PushConstantMemberInfo::BaseType::VEC3:
+            vec3Value = glm::vec3(def.size() > 0 ? def[0] : 0.0f, def.size() > 1 ? def[1] : 0.0f, def.size() > 2 ? def[2] : 0.0f);
+            break;
+        case Rapture::PushConstantMemberInfo::BaseType::VEC4:
+            vec4Value = glm::vec4(def.size() > 0 ? def[0] : 0.0f, def.size() > 1 ? def[1] : 0.0f, def.size() > 2 ? def[2] : 0.0f,
+                                  def.size() > 3 ? def[3] : 0.0f);
+            break;
+        default:
+            break;
+        }
+    }
 
     void loadFromBuffer(const uint8_t *buffer, const Rapture::PushConstantMemberInfo &member)
     {
@@ -170,6 +202,7 @@ void TextureGeneratorPanel::renderInstanceSelector()
                         for (const auto &member : pcInfo.members) {
                             ParameterEditState editState;
                             editState.activeType = member.getBaseType();
+                            editState.initFromMetadata(member.metadata);
                             newInstance.editStates.push_back(editState);
                             editState.writeToBuffer(newInstance.buffer.data(), member);
                         }
@@ -219,6 +252,11 @@ void TextureGeneratorPanel::renderParameterEditor()
         if (ImGui::TreeNodeEx(pcInfo.blockName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
             for (size_t memberIdx = 0; memberIdx < pcInfo.members.size(); ++memberIdx) {
                 const auto &member = pcInfo.members[memberIdx];
+                const auto &metadata = member.metadata;
+
+                if (metadata.hidden) {
+                    continue;
+                }
 
                 if (memberIdx >= instance.editStates.size()) {
                     continue;
@@ -226,31 +264,60 @@ void TextureGeneratorPanel::renderParameterEditor()
 
                 auto &editState = instance.editStates[memberIdx];
                 bool changed = false;
+                const char *label = metadata.displayName.empty() ? member.name.c_str() : metadata.displayName.c_str();
+
+                float minVal = metadata.hasRange ? metadata.minValue : -FLT_MAX;
+                float maxVal = metadata.hasRange ? metadata.maxValue : FLT_MAX;
+                float speed = metadata.hasRange ? (metadata.maxValue - metadata.minValue) * 0.01f : 0.1f;
 
                 ImGui::PushID(static_cast<int>(memberIdx));
 
                 switch (editState.activeType) {
                 case Rapture::PushConstantMemberInfo::BaseType::FLOAT:
-                    changed = ImGui::DragFloat(member.name.c_str(), &editState.floatValue, 0.1f);
+                    if (metadata.hasRange) {
+                        changed = ImGui::SliderFloat(label, &editState.floatValue, minVal, maxVal);
+                    } else {
+                        changed = ImGui::DragFloat(label, &editState.floatValue, speed);
+                    }
                     break;
                 case Rapture::PushConstantMemberInfo::BaseType::INT:
-                    changed = ImGui::DragInt(member.name.c_str(), &editState.intValue);
+                    if (metadata.hasRange) {
+                        changed = ImGui::SliderInt(label, &editState.intValue, static_cast<int>(minVal), static_cast<int>(maxVal));
+                    } else {
+                        changed = ImGui::DragInt(label, &editState.intValue);
+                    }
                     break;
                 case Rapture::PushConstantMemberInfo::BaseType::UINT:
-                    changed = ImGui::DragScalar(member.name.c_str(), ImGuiDataType_U32, &editState.uintValue);
+                    changed = ImGui::DragScalar(label, ImGuiDataType_U32, &editState.uintValue);
                     break;
                 case Rapture::PushConstantMemberInfo::BaseType::VEC2:
-                    changed = ImGui::DragFloat2(member.name.c_str(), glm::value_ptr(editState.vec2Value), 0.1f);
+                    if (metadata.hasRange) {
+                        changed = ImGui::SliderFloat2(label, glm::value_ptr(editState.vec2Value), minVal, maxVal);
+                    } else {
+                        changed = ImGui::DragFloat2(label, glm::value_ptr(editState.vec2Value), speed);
+                    }
                     break;
                 case Rapture::PushConstantMemberInfo::BaseType::VEC3:
-                    changed = ImGui::DragFloat3(member.name.c_str(), glm::value_ptr(editState.vec3Value), 0.1f);
+                    if (metadata.isColor) {
+                        changed = ImGui::ColorEdit3(label, glm::value_ptr(editState.vec3Value));
+                    } else if (metadata.hasRange) {
+                        changed = ImGui::SliderFloat3(label, glm::value_ptr(editState.vec3Value), minVal, maxVal);
+                    } else {
+                        changed = ImGui::DragFloat3(label, glm::value_ptr(editState.vec3Value), speed);
+                    }
                     break;
                 case Rapture::PushConstantMemberInfo::BaseType::VEC4:
-                    changed = ImGui::DragFloat4(member.name.c_str(), glm::value_ptr(editState.vec4Value), 0.1f);
+                    if (metadata.isColor) {
+                        changed = ImGui::ColorEdit4(label, glm::value_ptr(editState.vec4Value));
+                    } else if (metadata.hasRange) {
+                        changed = ImGui::SliderFloat4(label, glm::value_ptr(editState.vec4Value), minVal, maxVal);
+                    } else {
+                        changed = ImGui::DragFloat4(label, glm::value_ptr(editState.vec4Value), speed);
+                    }
                     break;
                 default:
                     ImGui::BeginDisabled();
-                    ImGui::Text("%s: (unsupported type: %s)", member.name.c_str(), member.type.c_str());
+                    ImGui::Text("%s: (unsupported type: %s)", label, member.type.c_str());
                     ImGui::EndDisabled();
                     break;
                 }

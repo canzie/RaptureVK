@@ -70,17 +70,32 @@ struct RidgedNoisePushConstants {
 /**
  * @brief Push constant data for atmospheric scattering.
  *
- * Layout matches GLSL std430: total size 52 bytes
+ * Based on GPU Gems 2 Chapter 16 "Accurate Atmospheric Scattering" by Sean O'Neil.
+ * Total size: 96 bytes. Each vec3+float pair is 16-byte aligned.
  */
 struct AtmospherePushConstants {
-    glm::vec3 sunDir;
-    float planetRadius;
-    float atmoRadius;
-    float _pad0[3];
-    glm::vec3 betaRay;
-    float scaleHeight;
-    float sunIntensity;
+    glm::vec3 cameraPos; ///< Camera position (normalized, e.g., 0, 1.001, 0)
+    float innerRadius;   ///< Planet radius (e.g., 1.0)
+
+    glm::vec3 sunDirection; ///< Sun direction (normalized)
+    float outerRadius;      ///< Atmosphere outer radius (e.g., 1.025)
+
+    glm::vec3 cameraDir; ///< Camera forward direction
+    float scaleDepth;    ///< Scale depth (~0.25)
+
+    glm::vec3 cameraUp; ///< Camera up vector
+    float kr;           ///< Rayleigh constant (~0.0025)
+
+    glm::vec3 invWavelength; ///< 1/pow(wavelength,4) for RGB
+    float km;                ///< Mie constant (~0.001)
+
+    float eSun;           ///< Sun intensity
+    float g;              ///< Mie phase asymmetry
+    float fovY;           ///< Field of view (radians)
+    float cameraAltitude; ///< Camera altitude above planet surface (added to innerRadius)
 };
+
+static_assert(sizeof(AtmospherePushConstants) == 96, "AtmospherePushConstants size must be 96 bytes");
 
 /**
  * @brief Generates textures using compute shaders.

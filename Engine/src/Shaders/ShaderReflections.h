@@ -1,6 +1,9 @@
-#pragma once
+#ifndef RAPTURE__SHADER_REFLECTIONS_H
+#define RAPTURE__SHADER_REFLECTIONS_H
 
 #include <spirv_reflect.h>
+#include <string>
+#include <unordered_map>
 #include <vector>
 #include <vulkan/vulkan.h>
 
@@ -28,15 +31,42 @@ struct PushConstantInfo {
     std::string name; // For debugging/identification
 };
 
+/**
+ * @brief Metadata for push constant members parsed from GLSL annotations.
+ *
+ * Annotations are parsed from comments following member declarations:
+ *   float kr;    // @range(0.0, 0.1) @default(0.0025) @name("Rayleigh")
+ *   vec4 color;  // @color @default(1.0, 0.5, 0.2, 1.0)
+ *   vec4 data;   // @hidden
+ */
+struct PushConstantMemberMetadata {
+    std::string displayName;         ///< @name("...") - Human-readable name for UI
+    float minValue = 0.0f;           ///< @range(min, max) - Minimum value for sliders
+    float maxValue = 1.0f;           ///< @range(min, max) - Maximum value for sliders
+    std::vector<float> defaultValue; ///< @default(...) - Default value(s)
+    bool hidden = false;             ///< @hidden - Don't show in UI
+    bool isColor = false;            ///< @color - Use color picker for vec3/vec4
+    bool hasRange = false;           ///< True if @range was specified
+    bool hasDefault = false;         ///< True if @default was specified
+};
+
 struct PushConstantMemberInfo {
     std::string name;
     std::string type;
     uint32_t offset;
     uint32_t size;
     uint32_t arraySize;
+    PushConstantMemberMetadata metadata; ///< Parsed annotations from GLSL comments
 
     enum class BaseType {
-        FLOAT, INT, UINT, VEC2, VEC3, VEC4, MAT4, UNKNOWN
+        FLOAT,
+        INT,
+        UINT,
+        VEC2,
+        VEC3,
+        VEC4,
+        MAT4,
+        UNKNOWN
     };
     BaseType getBaseType() const;
 };
@@ -93,4 +123,32 @@ getCombinedPushConstantRanges(const std::vector<std::pair<std::vector<char>, VkS
 // Extract detailed push constant information including member-level data
 std::vector<DetailedPushConstantInfo> extractDetailedPushConstants(const std::vector<char> &spirvCode);
 
+/**
+ * @brief Parse push constant annotations from GLSL source code.
+ *
+ * Extracts metadata from comments in push_constant blocks. Supported annotations:
+ *   @range(min, max)     - Value range for UI sliders
+ *   @default(value, ...) - Default value(s)
+ *   @name("Display Name") - Human-readable name
+ *   @hidden              - Hide from UI
+ *   @color               - Use color picker (for vec3/vec4)
+ *
+ * @param glslSource The raw GLSL source code
+ * @return Map of member name to metadata
+ */
+std::unordered_map<std::string, PushConstantMemberMetadata> parsePushConstantAnnotations(const std::string &glslSource);
+
+/**
+ * @brief Apply parsed annotations to detailed push constant info.
+ *
+ * Matches annotations by member name and populates the metadata field.
+ *
+ * @param detailedInfo The reflected push constant info to update
+ * @param annotations Parsed annotations from parsePushConstantAnnotations
+ */
+void applyPushConstantAnnotations(std::vector<DetailedPushConstantInfo> &detailedInfo,
+                                  const std::unordered_map<std::string, PushConstantMemberMetadata> &annotations);
+
 } // namespace Rapture
+
+#endif // RAPTURE__SHADER_REFLECTIONS_H

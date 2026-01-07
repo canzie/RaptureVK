@@ -263,6 +263,21 @@ void Shader::mergeReflectionData()
         }
     }
 
+    // Parse and apply push constant annotations from GLSL source files
+    // (skip for .spv files as they don't have comments)
+    for (const auto &stage : m_stages) {
+        if (stage.sourcePath.extension() != ".spv") {
+            std::string glslSource = readFileAsString(stage.sourcePath);
+            if (!glslSource.empty()) {
+                auto annotations = parsePushConstantAnnotations(glslSource);
+                if (!annotations.empty()) {
+                    applyPushConstantAnnotations(m_detailedPushConstants, annotations);
+                    break; // Only need annotations from one file
+                }
+            }
+        }
+    }
+
     // Extract material sets
     for (const auto &stage : m_stages) {
         std::vector<DescriptorInfo> stageMaterialSets = extractMaterialSets(stage.spirv);

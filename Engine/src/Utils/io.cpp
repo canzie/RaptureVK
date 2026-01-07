@@ -2,6 +2,7 @@
 #include "Logging/Log.h"
 
 #include <fstream>
+#include <sstream>
 
 namespace Rapture {
 
@@ -23,6 +24,20 @@ std::vector<char> readFile(const std::filesystem::path &path)
     file.close();
 
     return buffer;
+}
+
+std::string readFileAsString(const std::filesystem::path &path)
+{
+    std::ifstream file(path);
+
+    if (!file.is_open()) {
+        RP_CORE_ERROR("failed to open file! {0}", path.string());
+        return {};
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
 }
 
 } // namespace Rapture

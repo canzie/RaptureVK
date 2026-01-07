@@ -392,20 +392,35 @@ Texture *ProceduralTexture::generateAtmosphere(float timeOfDay, const Atmosphere
         return nullptr;
     }
 
-    (void)timeOfDay;
-
-    // Set up push constants with defaults if not provided
     AtmospherePushConstants pc;
     if (params) {
         pc = *params;
     } else {
-        // Earth-like atmospheric defaults
-        pc.sunDir = glm::vec3(1.0f);
-        pc.planetRadius = 6371e3f;
-        pc.atmoRadius = 6471e3f;
-        pc.betaRay = glm::vec3(5.5e-6, 13.0e-6, 22.4e-6);
-        pc.scaleHeight = 8000.0f;
-        pc.sunIntensity = 21e-6f;
+        // 0 = midnight, 6 = sunrise, 12 = noon, 18 = sunset
+        // Sun must have -Z component to be in front of camera (which looks in -Z)
+        float sunAngle = (timeOfDay - 6.0f) / 12.0f * 3.14159265359f; // 0 at 6am, PI at 6pm
+        float sunY = glm::sin(sunAngle);                              // Height in sky
+        float sunHoriz = glm::cos(sunAngle);
+        // Sun orbits in front of camera (XZ plane with -Z forward)
+        glm::vec3 sunDir = glm::normalize(glm::vec3(sunHoriz * 0.3f, sunY, -0.8f));
+
+        // Earth-like atmospheric defaults based on GPU Gems 2 Chapter 16
+        // Using NORMALIZED space: planet radius = 1.0, atmosphere extends to ~1.025
+        pc.cameraPos = glm::vec3(0.0f, 1.001f, 0.0f);
+        pc.innerRadius = 1.0f;
+        pc.sunDirection = sunDir;
+        pc.outerRadius = 1.025f;
+        pc.cameraDir = glm::vec3(0.0f, 0.0f, -1.0f);
+        pc.scaleDepth = 0.25f;
+        pc.cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        pc.kr = 0.0025f;
+        // Precomputed 1/pow(wavelength, 4) for RGB (650nm, 570nm, 475nm)
+        pc.invWavelength = glm::vec3(1.0f / glm::pow(0.650f, 4.0f), 1.0f / glm::pow(0.570f, 4.0f), 1.0f / glm::pow(0.475f, 4.0f));
+        pc.km = 0.001f;
+        pc.eSun = 20.0f;
+        pc.g = 0.76f;
+        pc.fovY = 1.5708f;
+        pc.cameraAltitude = 0.0003f;
     }
 
     generator.setPushConstants(pc);
