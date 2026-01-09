@@ -54,13 +54,13 @@ void ContentBrowserPanel::recordContent()
 
     if (m_currentMode == ContentBrowserMode::FILE) {
         float leftPaneWidth = ImGui::GetContentRegionAvail().x * 0.25f;
-        ImGui::BeginChild("LeftPane", ImVec2(leftPaneWidth, 0), ImGuiChildFlags_ResizeX | ImGuiChildFlags_Border);
+        ImGui::BeginChild("LeftPane", ImVec2(leftPaneWidth, 0), ImGuiChildFlags_ResizeX | ImGuiChildFlags_Borders);
         renderFileHierarchy();
         ImGui::EndChild();
         ImGui::SameLine();
     }
 
-    ImGui::BeginChild("RightPane", ImVec2(0, 0), ImGuiChildFlags_Border);
+    ImGui::BeginChild("RightPane", ImVec2(0, 0), ImGuiChildFlags_Borders);
 
     if (ImGui::Button("Filter")) {
         ImGui::OpenPopup("FilterPopup");
@@ -102,7 +102,7 @@ void ContentBrowserPanel::recordContent()
 void ContentBrowserPanel::renderTopPane()
 {
     RAPTURE_PROFILE_FUNCTION();
-    ImGui::BeginChild("TopPane", ImVec2(0, 36), ImGuiChildFlags_ResizeY | ImGuiChildFlags_Border);
+    ImGui::BeginChild("TopPane", ImVec2(0, 36), ImGuiChildFlags_ResizeY | ImGuiChildFlags_Borders);
 
     // Helper to vertically center the next item
     auto verticallyCenter = []() {

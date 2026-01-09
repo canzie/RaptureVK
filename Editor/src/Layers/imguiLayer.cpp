@@ -131,6 +131,7 @@ void ImGuiLayer::onAttach()
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForVulkan((GLFWwindow *)window.getNativeWindowContext(), true);
     ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.ApiVersion = vulkanContext.getApiVersion();
     init_info.Instance = vulkanContext.getInstance();
     init_info.PhysicalDevice = vulkanContext.getPhysicalDevice();
     init_info.Device = vulkanContext.getLogicalDevice();
@@ -146,14 +147,14 @@ void ImGuiLayer::onAttach()
     // Dynamic rendering configuration
     init_info.UseDynamicRendering = true;
     m_imguiColorAttachmentFormats[0] = swapChain->getImageFormat();
-    init_info.PipelineRenderingCreateInfo = {};
-    init_info.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-    init_info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = m_imguiColorAttachmentFormats.data();
-    init_info.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
-    init_info.PipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo = {};
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = m_imguiColorAttachmentFormats.data();
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.CheckVkResultFn = s_checkVkResult;
 
     {
@@ -197,10 +198,13 @@ void ImGuiLayer::renderImGui()
     if (opt_fullscreen) {
         ImGuiViewport *viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(viewport->WorkPos);
-        ImGui::SetNextWindowSize(viewport->WorkSize);
+        ImVec2 dockspaceSize = viewport->WorkSize;
+        dockspaceSize.y -= 30.0f; // Bottom bar tab height
+        ImGui::SetNextWindowSize(dockspaceSize);
         ImGui::SetNextWindowViewport(viewport->ID);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 4.0f));
         window_flags |=
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
         window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
@@ -210,7 +214,7 @@ void ImGuiLayer::renderImGui()
 
     ImGui::Begin("RaptureVK Editor", &dockspaceOpen, window_flags);
 
-    if (opt_fullscreen) ImGui::PopStyleVar(2);
+    if (opt_fullscreen) ImGui::PopStyleVar(3);
 
     ImGuiIO &io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
@@ -218,7 +222,6 @@ void ImGuiLayer::renderImGui()
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
     }
 
-    // Update viewport texture descriptor from scene render target
     updateViewportDescriptorSet();
 
     {
@@ -226,7 +229,7 @@ void ImGuiLayer::renderImGui()
         m_viewportPanel.renderSceneViewport((ImTextureID)m_viewportTextureDescriptorSets[m_currentFrame]);
         m_propertiesPanel.render();
         m_browserPanel.render();
-        m_gbufferPanel.render();
+        // m_gbufferPanel.render();
         m_imageViewerPanel.render();
         m_settingsPanel.render();
         m_textureGeneratorPanel.render();

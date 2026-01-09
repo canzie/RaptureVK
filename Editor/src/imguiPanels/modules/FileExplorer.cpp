@@ -61,13 +61,13 @@ bool FileExplorer::render()
         float shortcutsPaneWidth = 150.0f;
 
         ImGui::BeginChild("ShortcutsPane", ImVec2(shortcutsPaneWidth, -ImGui::GetFrameHeightWithSpacing() - 30.0f),
-                          ImGuiChildFlags_Border);
+                          ImGuiChildFlags_Borders);
         renderShortcutsPane();
         ImGui::EndChild();
 
         ImGui::SameLine();
 
-        ImGui::BeginChild("MainPane", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 30.0f), ImGuiChildFlags_Border);
+        ImGui::BeginChild("MainPane", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 30.0f), ImGuiChildFlags_Borders);
         renderMainPane();
         ImGui::EndChild();
 

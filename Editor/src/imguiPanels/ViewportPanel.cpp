@@ -221,11 +221,10 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
     }
 
     ImGui::EndChild();
-
-    renderEntityGizmo();
-
     BetterUi::EndContent();
     BetterUi::EndPanel();
+
+    renderEntityGizmo();
 }
 
 void ViewportPanel::renderEntityGizmo()

@@ -121,7 +121,7 @@ inline void ApplyTheme(const ThemeColors &colors)
     c[ImGuiCol_DockingPreview] = ImVec4(colors.accentPrimary.x, colors.accentPrimary.y, colors.accentPrimary.z, 0.7f);
     c[ImGuiCol_DockingEmptyBg] = colors.backgroundHard;
 
-    c[ImGuiCol_MenuBarBg] = colors.bg1;
+    c[ImGuiCol_MenuBarBg] = colors.backgroundHard;
 
     style.WindowPadding = ImVec2(10, 10);
     style.FramePadding = ImVec2(10, 8);
@@ -136,14 +136,17 @@ inline void ApplyTheme(const ThemeColors &colors)
     style.PopupBorderSize = 1.0f;
     style.FrameBorderSize = 0.0f;
     style.TabBorderSize = 0.0f;
+    style.TabBarOverlineSize = 0.0f;
 
     style.WindowRounding = 4.0f;
-    style.ChildRounding = 4.0f;
+    style.ChildRounding = 6.0f;
     style.FrameRounding = 2.0f;
     style.PopupRounding = 4.0f;
     style.ScrollbarRounding = 2.0f;
     style.GrabRounding = 2.0f;
-    style.TabRounding = 0.0f;
+    style.TabRounding = 6.0f;
+
+    style.CircleTessellationMaxError = 0.1f;
 }
 
 inline bool SetTheme(const std::string &themePath, bool forceLinear = true)

@@ -158,8 +158,6 @@ bool renderComponentLayout(const ComponentLayout<ComponentType> &layout, Compone
 {
     bool anyChanged = false;
     if (ImGui::CollapsingHeader(layout.componentName, ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::BeginChild((std::string(layout.componentName) + "Child").c_str(), ImVec2(0, 0), ImGuiChildFlags_AutoResizeY,
-                          ImGuiWindowFlags_AlwaysUseWindowPadding);
 
         ImGui::BeginTable(layout.componentName, 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp);
 
@@ -314,7 +312,7 @@ bool renderComponentLayout(const ComponentLayout<ComponentType> &layout, Compone
                 void *previewDescriptor = opts->getPreviewDescriptor(*assetHandle);
 
                 if (previewDescriptor) {
-                    ImGui::Image(static_cast<ImTextureID>(previewDescriptor), ImVec2(opts->previewSize, opts->previewSize));
+                    ImGui::Image(reinterpret_cast<ImTextureID>(previewDescriptor), ImVec2(opts->previewSize, opts->previewSize));
                     ImGui::SameLine();
                 }
 
@@ -363,8 +361,6 @@ bool renderComponentLayout(const ComponentLayout<ComponentType> &layout, Compone
         }
 
         ImGui::EndTable();
-
-        ImGui::EndChild();
     }
     return anyChanged;
 }

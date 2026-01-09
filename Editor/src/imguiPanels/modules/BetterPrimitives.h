@@ -21,7 +21,8 @@ namespace BetterUi {
  */
 inline bool BeginPanel(const char *name, bool *p_open = nullptr, ImGuiWindowFlags flags = 0)
 {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    constexpr float borderPadding = 2.0f;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(borderPadding, borderPadding));
     bool isOpen = ImGui::Begin(name, p_open, flags);
     ImGui::PopStyleVar();
 
@@ -29,14 +30,13 @@ inline bool BeginPanel(const char *name, bool *p_open = nullptr, ImGuiWindowFlag
     availSize.y -= 8.0f;
 
     bool isHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-    float borderSize = isHovered ? 4.0f : 0.0f;
-    ImVec4 borderColor = isHovered ? ColorPalette::ACCENT_PRIMARY : ImVec4(0, 0, 0, 0);
+    float borderSize = isHovered ? 2.0f : 0.0f;
 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ColorPalette::BACKGROUND_PANEL);
-    ImGui::PushStyleColor(ImGuiCol_Border, ColorPalette::BG0);
+    ImGui::PushStyleColor(ImGuiCol_Border, ColorPalette::BG3);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, borderSize);
-    ImGui::BeginChild("##PanelContent", availSize, ImGuiChildFlags_Border, 0);
+    ImGui::BeginChild("##PanelContent", availSize, ImGuiChildFlags_Borders, 0);
     ImGui::PopStyleVar(2);
 
     return isOpen;
@@ -60,7 +60,7 @@ inline void EndPanel()
 inline void BeginContent(float paddingX = 10.0f, float paddingY = 10.0f)
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(paddingX, paddingY));
-    ImGui::BeginChild("##Content", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysUseWindowPadding);
+    ImGui::BeginChild("##Content", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding, 0);
     ImGui::PopStyleVar();
 }
 
@@ -84,8 +84,8 @@ inline bool BeginCollapsingHeader(const char *name, ImGuiTreeNodeFlags flags = I
 
     if (isOpen) {
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ColorPalette::BG1);
-        ImGui::BeginChild((std::string(name) + "##CollapsingHeader").c_str(), ImVec2(0, 0), ImGuiChildFlags_AutoResizeY,
-                          ImGuiWindowFlags_AlwaysUseWindowPadding);
+        ImGui::BeginChild((std::string(name) + "##CollapsingHeader").c_str(), ImVec2(0, 0),
+                          ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding, 0);
     }
 
     return isOpen;

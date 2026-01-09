@@ -91,13 +91,21 @@ void BottomBarPanel::renderTabBar()
     ImGui::SetNextWindowViewport(viewport->ID);
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
+                             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings |
+                             ImGuiWindowFlags_NoDocking;
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 4));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 0));
     ImGui::Begin("##BottomBarTabs", nullptr, flags);
 
     m_tabBarMin = ImGui::GetWindowPos();
     m_tabBarMax = ImVec2(m_tabBarMin.x + ImGui::GetWindowSize().x, m_tabBarMin.y + ImGui::GetWindowSize().y);
+
+    float buttonHeight = ImGui::GetFrameHeight();
+    float verticalPadding = (m_tabBarHeight - buttonHeight) * 0.5f;
+    if (verticalPadding > 0) {
+        ImGui::SetCursorPosY(verticalPadding);
+    }
 
     for (auto &panel : m_registeredPanels) {
         handleTabInteraction(panel);
@@ -107,7 +115,7 @@ void BottomBarPanel::renderTabBar()
     }
 
     ImGui::End();
-    ImGui::PopStyleVar();
+    ImGui::PopStyleVar(2);
 }
 
 void BottomBarPanel::renderActivePanel()
