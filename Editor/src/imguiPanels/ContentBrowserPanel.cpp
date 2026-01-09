@@ -3,7 +3,9 @@
 #include "AssetManager/AssetManager.h"
 #include "Logging/Log.h"
 #include "Logging/TracyProfiler.h"
-#include "imguiPanelStyleLinear.h"
+#include "imguiPanels/IconsMaterialDesign.h"
+#include "modules/BetterPrimitives.h"
+#include "themes/imguiPanelStyle.h"
 #include <algorithm>
 #include <cctype>
 
@@ -34,11 +36,22 @@ void ContentBrowserPanel::render()
     RAPTURE_PROFILE_FUNCTION();
 
     std::string title = "Content Browser " + std::string(ICON_MD_FOLDER);
-    ImGui::Begin(title.c_str());
 
+    if (!BetterUi::BeginPanel(title.c_str())) {
+        BetterUi::EndPanel();
+        return;
+    }
+
+    BetterUi::BeginContent();
+    recordContent();
+    BetterUi::EndContent();
+    BetterUi::EndPanel();
+}
+
+void ContentBrowserPanel::recordContent()
+{
     renderTopPane();
 
-    // Main content area
     if (m_currentMode == ContentBrowserMode::FILE) {
         float leftPaneWidth = ImGui::GetContentRegionAvail().x * 0.25f;
         ImGui::BeginChild("LeftPane", ImVec2(leftPaneWidth, 0), ImGuiChildFlags_ResizeX | ImGuiChildFlags_Border);
@@ -49,7 +62,6 @@ void ContentBrowserPanel::render()
 
     ImGui::BeginChild("RightPane", ImVec2(0, 0), ImGuiChildFlags_Border);
 
-    // Filter button on the left
     if (ImGui::Button("Filter")) {
         ImGui::OpenPopup("FilterPopup");
     }
@@ -67,12 +79,10 @@ void ContentBrowserPanel::render()
 
     ImGui::SameLine();
 
-    // Search bar (centered)
     ImGui::Text("Search:");
     ImGui::SameLine();
     ImGui::InputText("##Search", m_searchBuffer, sizeof(m_searchBuffer));
 
-    // Size slider on the right
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - 120);
     ImGui::PushItemWidth(120);
     ImGui::SliderFloat("##Size", &m_itemSize, 32.0f, 256.0f, "Size: %.0f");
@@ -87,8 +97,6 @@ void ContentBrowserPanel::render()
     }
 
     ImGui::EndChild();
-
-    ImGui::End();
 }
 
 void ContentBrowserPanel::renderTopPane()
@@ -260,7 +268,7 @@ void ContentBrowserPanel::renderAssetItem(Rapture::AssetHandle handle, const Rap
     bool isHovered = ImGui::IsItemHovered();
 
     if (isHovered) {
-        drawList->AddRect(p0, p1, ImGui::GetColorU32(ImGuiPanelStyle::ACCENT_PRIMARY), 4.0f, ImDrawFlags_RoundCornersAll, 2.0f);
+        drawList->AddRect(p0, p1, ImGui::GetColorU32(ColorPalette::ACCENT_PRIMARY), 4.0f, ImDrawFlags_RoundCornersAll, 2.0f);
     }
 
     // Drag and drop source for textures
@@ -380,12 +388,12 @@ ImVec4 ContentBrowserPanel::getAssetTypeColor(Rapture::AssetType type, bool isHo
 {
     switch (type) {
     case Rapture::AssetType::TEXTURE:
-        return isHovered ? ImGuiPanelStyle::GRUVBOX_ORANGE_BRIGHT : ImGuiPanelStyle::GRUVBOX_ORANGE_NORMAL;
+        return isHovered ? ColorPalette::ACCENT_HOVER : ColorPalette::WARNING_COLOR;
     case Rapture::AssetType::SHADER:
-        return isHovered ? ImGuiPanelStyle::GRUVBOX_RED_BRIGHT : ImGuiPanelStyle::GRUVBOX_RED_NORMAL;
+        return isHovered ? ColorPalette::ACCENT_HOVER : ColorPalette::ERROR_COLOR;
     case Rapture::AssetType::MATERIAL:
-        return isHovered ? ImGuiPanelStyle::GRUVBOX_PURPLE_BRIGHT : ImGuiPanelStyle::GRUVBOX_PURPLE_NORMAL;
+        return isHovered ? ColorPalette::ACCENT_HOVER : ColorPalette::ACCENT_TERTIARY;
     default:
-        return isHovered ? ImGuiPanelStyle::ACCENT_PRIMARY : ImGuiPanelStyle::ACCENT_PRIMARY;
+        return isHovered ? ColorPalette::ACCENT_HOVER : ColorPalette::ACCENT_PRIMARY;
     }
 }

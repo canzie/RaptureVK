@@ -21,15 +21,17 @@
 #include "Textures/Texture.h"
 
 #include "AssetManager/AssetManager.h"
+#include "imguiPanels/BottomBarPanel.h"
 #include "imguiPanels/BrowserPanel.h"
 #include "imguiPanels/ContentBrowserPanel.h"
 #include "imguiPanels/GBufferPanel.h"
 #include "imguiPanels/GraphEditorPanel.h"
 #include "imguiPanels/ImageViewerPanel.h"
-#include "imguiPanels/ProprtiesPanel.h"
+#include "imguiPanels/PropertiesPanel.h"
 #include "imguiPanels/SettingsPanel.h"
 #include "imguiPanels/TextureGeneratorPanel.h"
 #include "imguiPanels/ViewportPanel.h"
+#include "imguiPanels/modules/FileExplorer.h"
 
 #include "RenderTargets/SwapChains/SwapChain.h"
 
@@ -60,6 +62,7 @@ class ImGuiLayer : public Rapture::Layer {
     float m_Time = 0.0f;
     float m_FontScale = 1.0f; // Default font scale
     bool m_framebufferNeedsResize = false;
+    bool m_showStyleEditor = false;
     size_t m_windowResizeEventListenerID = 0;
 
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
@@ -89,6 +92,8 @@ class ImGuiLayer : public Rapture::Layer {
     SettingsPanel m_settingsPanel;
     TextureGeneratorPanel m_textureGeneratorPanel;
     GraphEditorPanel m_graphEditorPanel;
+    FileExplorer m_fileExplorer;
+    BottomBarPanel m_bottomBarPanel;
 
     std::vector<std::unique_ptr<ImageViewerPanel>> m_floatingImageViews;
 

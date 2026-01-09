@@ -3,6 +3,8 @@
 #include "Logging/TracyProfiler.h"
 #include "WindowContext/Application.h"
 #include "imgui_impl_vulkan.h" // Required for ImGui_ImplVulkan_AddTexture/RemoveTexture
+#include "modules/BetterPrimitives.h"
+#include "themes/imguiPanelStyle.h"
 
 // Anonymous namespace for helper functions or constants
 namespace {
@@ -72,9 +74,14 @@ void GBufferPanel::render()
 
     std::shared_ptr<Rapture::GBufferPass> gbufferPass = Rapture::DeferredRenderer::getGBufferPass();
     if (!gbufferPass) {
-        ImGui::Begin("G-Buffer Inspector");
+        if (!BetterUi::BeginPanel("G-Buffer Inspector")) {
+            BetterUi::EndPanel();
+            return;
+        }
+        BetterUi::BeginContent();
         ImGui::TextWrapped("G-Buffer pass not available. Ensure DeferredRenderer is initialized and a scene is rendering.");
-        ImGui::End();
+        BetterUi::EndContent();
+        BetterUi::EndPanel();
         return;
     }
 
@@ -95,9 +102,14 @@ void GBufferPanel::render()
     if (m_gbufferDescriptorSets.size() != expectedTextures) {
         updateDescriptorSets();
         if (m_gbufferDescriptorSets.size() != expectedTextures) {
-            ImGui::Begin("G-Buffer Inspector");
+            if (!BetterUi::BeginPanel("G-Buffer Inspector")) {
+                BetterUi::EndPanel();
+                return;
+            }
+            BetterUi::BeginContent();
             ImGui::TextWrapped("Error: Could not initialize descriptor sets for all G-Buffer textures. Check logs.");
-            ImGui::End();
+            BetterUi::EndContent();
+            BetterUi::EndPanel();
             return;
         }
     }
@@ -133,7 +145,12 @@ void GBufferPanel::render()
         m_cachedTextures = currentTextures;
     }
 
-    ImGui::Begin("G-Buffer Inspector");
+    if (!BetterUi::BeginPanel("G-Buffer Inspector")) {
+        BetterUi::EndPanel();
+        return;
+    }
+
+    BetterUi::BeginContent();
 
     int currentTextureIndex = 0;
 
@@ -197,7 +214,9 @@ void GBufferPanel::render()
     }
 
     ImGui::Columns(1); // Reset columns
-    ImGui::End();
+
+    BetterUi::EndContent();
+    BetterUi::EndPanel();
 }
 
 void GBufferPanel::updateDescriptorSets()

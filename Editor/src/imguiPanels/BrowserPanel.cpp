@@ -4,7 +4,9 @@
 #include "Components/FogComponent.h"
 #include "Components/HierarchyComponent.h"
 #include "Components/IndirectLightingComponent.h"
-#include "imguiPanelStyleLinear.h"
+#include "imguiPanels/IconsMaterialDesign.h"
+#include "imguiPanels/modules/BetterPrimitives.h"
+#include "imguiPanels/themes/imguiPanelStyle.h"
 
 #include "AssetManager/AssetManager.h"
 #include "Events/GameEvents.h"
@@ -39,7 +41,9 @@ void BrowserPanel::render()
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    ImGui::Begin("Entity Browser");
+    BetterUi::BeginPanel("Entity Browser");
+
+    BetterUi::BeginContent();
 
     if (auto scene = m_scene.lock()) {
         auto &registry = scene->getRegistry();
@@ -92,7 +96,8 @@ void BrowserPanel::render()
         ImGui::Text("No active scene available");
     }
 
-    ImGui::End();
+    BetterUi::EndContent();
+    BetterUi::EndPanel();
 }
 
 void BrowserPanel::buildHierarchyCache()
@@ -196,7 +201,7 @@ void BrowserPanel::renderHierarchyRow(const std::shared_ptr<HierarchyNode> &node
     ImGui::Indent(indentSize);
 
     // Apply custom styling for selected tree nodes
-    ImGui::PushStyleColor(ImGuiCol_Header, ImGuiPanelStyle::ACCENT_PRIMARY);
+    ImGui::PushStyleColor(ImGuiCol_Header, ColorPalette::ACCENT_PRIMARY);
 
     bool nodeOpen = false;
     if (m_renamingEntity == node->entity) {

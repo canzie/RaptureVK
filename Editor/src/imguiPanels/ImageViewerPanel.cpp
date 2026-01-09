@@ -2,6 +2,7 @@
 #include "IconsMaterialDesign.h"
 #include "Logging/Log.h"
 #include "imgui_impl_vulkan.h"
+#include "modules/BetterPrimitives.h"
 
 ImageViewerPanel::ImageViewerPanel() : m_uniqueId("Image Viewer") {}
 
@@ -45,10 +46,12 @@ void ImageViewerPanel::render()
 {
     setupInitialWindowSize();
 
-    if (!ImGui::Begin(m_uniqueId.c_str(), &m_isOpen)) {
-        ImGui::End();
+    if (!BetterUi::BeginPanel(m_uniqueId.c_str(), &m_isOpen)) {
+        BetterUi::EndPanel();
         return;
     }
+
+    BetterUi::BeginContent();
 
     if (isWindowDocked()) {
         handleDragAndDrop();
@@ -74,7 +77,8 @@ void ImageViewerPanel::render()
         renderEmptyState();
     }
 
-    ImGui::End();
+    BetterUi::EndContent();
+    BetterUi::EndPanel();
 }
 
 void ImageViewerPanel::setupInitialWindowSize()

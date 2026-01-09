@@ -1,0 +1,26 @@
+#ifndef RAPTURE__GRAPH_NODE_REGISTRY_H
+#define RAPTURE__GRAPH_NODE_REGISTRY_H
+
+#include "Graph.h"
+
+namespace Modules {
+
+enum NodeEntry {
+    NODE_ADD_SCALAR,
+    NODE_SUBTRACT_SCALAR,
+    NODE_MULTIPLY_SCALAR,
+    NODE_DIVIDE_SCALAR,
+    NODE_MIX,
+    NODE_CLAMP,
+    NODE_LENGTH,
+    NODE_NORMALIZE,
+    NODE_SPLIT,
+    NODE_GROUP,
+    NODE_COUNT
+};
+
+GraphNode NODE_REGISTRY[NODE_COUNT];
+
+} // namespace Modules
+
+#endif // RAPTURE__GRAPH_NODE_REGISTRY_H

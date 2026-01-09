@@ -5,7 +5,9 @@
 #include "Components/Components.h"
 
 #include "Scenes/SceneManager.h"
-#include "imguiPanelStyleLinear.h"
+#include "imguiPanels/IconsMaterialDesign.h"
+#include "imguiPanels/modules/BetterPrimitives.h"
+#include "imguiPanels/themes/imguiPanelStyle.h"
 
 #include "Events/ApplicationEvents.h"
 #include "Events/GameEvents.h"
@@ -35,21 +37,28 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
 
     std::string title = "Viewport " + std::string(ICON_MD_WEB_ASSET);
 
-    ImGui::Begin(title.c_str());
+    if (!BetterUi::BeginPanel(title.c_str())) {
+        BetterUi::EndPanel();
+        return;
+    }
 
+    BetterUi::BeginContent();
+
+    // Render the topbar first
+    renderTopbar();
+
+    // After the topbar, get the actual viewport position and size
     m_viewportPosition = ImGui::GetCursorScreenPos();
     m_viewportSize = ImGui::GetContentRegionAvail();
 
     // Check for size changes and publish resize event if needed
     checkForSizeChange();
 
-    ImVec2 windowSize = ImGui::GetContentRegionAvail();
-    ImGui::Image((ImTextureID)textureID, windowSize);
+    ImGui::Image(textureID, m_viewportSize);
 
-    // Calculate position for the gizmo controls overlay
-    ImVec2 windowPos = ImGui::GetWindowPos();
-    ImVec2 controlPos(windowPos.x + ImGui::GetWindowWidth() - 200, // Move further left
-                      windowPos.y + 40                             // Keep the same vertical position
+    // Calculate position for the gizmo controls overlay (relative to viewport image, not window)
+    ImVec2 controlPos(m_viewportPosition.x + m_viewportSize.x - 180, // Right side of viewport
+                      m_viewportPosition.y + 10                      // Below topbar with small padding
     );
 
     // Save the current cursor position
@@ -66,11 +75,11 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
     bool isScale = m_currentGizmoOperation == ImGuizmo::SCALE;
 
     // Get the background and hover colors from style
-    ImVec4 defaultBgColor = ImGuiPanelStyle::BACKGROUND_TERTIARY;
-    ImVec4 selectedBgColor = ImGuiPanelStyle::ACCENT_PRIMARY;
-    ImVec4 textColor = ImGuiPanelStyle::TEXT_NORMAL;
-    ImVec4 hoverColor = ImGuiPanelStyle::ACCENT_PRIMARY;
-    ImVec4 accentColor = ImGuiPanelStyle::ACCENT_PRIMARY;
+    ImVec4 defaultBgColor = ColorPalette::BACKGROUND_TERTIARY;
+    ImVec4 selectedBgColor = ColorPalette::ACCENT_PRIMARY;
+    ImVec4 textColor = ColorPalette::TEXT_NORMAL;
+    ImVec4 hoverColor = ColorPalette::ACCENT_PRIMARY;
+    ImVec4 accentColor = ColorPalette::ACCENT_PRIMARY;
 
     // Button size
     const float buttonSize = 39.0f;
@@ -215,7 +224,8 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
 
     renderEntityGizmo();
 
-    ImGui::End();
+    BetterUi::EndContent();
+    BetterUi::EndPanel();
 }
 
 void ViewportPanel::renderEntityGizmo()
@@ -319,6 +329,73 @@ void ViewportPanel::renderEntityGizmo()
             //}
         }
     }
+}
+
+void ViewportPanel::renderTopbar()
+{
+    ImVec2 contentRegion = ImGui::GetContentRegionAvail();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 4.0f));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ColorPalette::BACKGROUND_SECONDARY);
+
+    ImGui::BeginChild("ViewportTopbar", ImVec2(contentRegion.x, TOPBAR_HEIGHT), false,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    // Play/Pause button placeholder
+    if (ImGui::Button(ICON_MD_PLAY_ARROW "##Play", ImVec2(28, 24))) {
+        // TODO: Play scene
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Play");
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button(ICON_MD_PAUSE "##Pause", ImVec2(28, 24))) {
+        // TODO: Pause scene
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Pause");
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button(ICON_MD_STOP "##Stop", ImVec2(28, 24))) {
+        // TODO: Stop scene
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Stop");
+    }
+
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+
+    // Add mesh dropdown placeholder
+    if (ImGui::Button(ICON_MD_ADD_BOX " Add##AddMesh", ImVec2(0, 24))) {
+        ImGui::OpenPopup("AddMeshPopup");
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Add mesh to scene");
+    }
+
+    if (ImGui::BeginPopup("AddMeshPopup")) {
+        if (ImGui::MenuItem(ICON_MD_CROP_SQUARE " Cube")) {
+            // TODO: Add cube
+        }
+        if (ImGui::MenuItem(ICON_MD_CIRCLE " Sphere")) {
+            // TODO: Add sphere
+        }
+        if (ImGui::MenuItem(ICON_MD_CHANGE_HISTORY " Plane")) {
+            // TODO: Add plane
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
 }
 
 void ViewportPanel::checkForSizeChange()

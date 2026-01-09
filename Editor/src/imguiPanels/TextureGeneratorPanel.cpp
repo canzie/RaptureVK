@@ -3,6 +3,7 @@
 #include "AssetManager/AssetManager.h"
 #include "Shaders/ShaderReflections.h"
 #include "WindowContext/Application.h"
+#include "imguiPanels/modules/BetterPrimitives.h"
 
 #include <cfloat>
 #include <glm/gtc/type_ptr.hpp>
@@ -123,7 +124,12 @@ TextureGeneratorPanel::~TextureGeneratorPanel() {}
 
 void TextureGeneratorPanel::render()
 {
-    ImGui::Begin("Texture Generator");
+    if (!BetterUi::BeginPanel("Texture Generator")) {
+        BetterUi::EndPanel();
+        return;
+    }
+
+    BetterUi::BeginContent();
 
     renderInstanceSelector();
     ImGui::Separator();
@@ -134,7 +140,8 @@ void TextureGeneratorPanel::render()
         renderGenerateButton();
     }
 
-    ImGui::End();
+    BetterUi::EndContent();
+    BetterUi::EndPanel();
 }
 
 void TextureGeneratorPanel::renderInstanceSelector()

@@ -2,6 +2,7 @@
 
 #include "Renderer/DeferredShading/DeferredRenderer.h"
 #include "Renderer/DeferredShading/LightingPass.h"
+#include "imguiPanels/modules/BetterPrimitives.h"
 
 SettingsPanel::SettingsPanel() {}
 
@@ -9,11 +10,15 @@ SettingsPanel::~SettingsPanel() {}
 
 void SettingsPanel::render()
 {
-    ImGui::Begin("Settings");
+    if (!BetterUi::BeginPanel("Settings")) {
+        BetterUi::EndPanel();
+        return;
+    }
 
+    BetterUi::BeginContent();
     renderRendererSettings();
-
-    ImGui::End();
+    BetterUi::EndContent();
+    BetterUi::EndPanel();
 }
 
 void SettingsPanel::renderRendererSettings()

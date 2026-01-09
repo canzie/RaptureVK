@@ -1,4 +1,5 @@
 #include "GraphEditorPanel.h"
+#include "modules/BetterPrimitives.h"
 #include <imgui.h>
 
 GraphEditorPanel::GraphEditorPanel()
@@ -186,11 +187,17 @@ void GraphEditorPanel::setupDemoGraph()
 
 void GraphEditorPanel::render()
 {
-    ImGui::Begin("Graph Editor Demo");
+    if (!BetterUi::BeginPanel("Graph Editor Demo")) {
+        BetterUi::EndPanel();
+        return;
+    }
+
+    BetterUi::BeginContent();
 
     if (m_editor) {
         m_editor->render();
     }
 
-    ImGui::End();
+    BetterUi::EndContent();
+    BetterUi::EndPanel();
 }

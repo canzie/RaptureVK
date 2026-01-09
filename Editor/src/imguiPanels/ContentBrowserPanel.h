@@ -21,6 +21,7 @@ class ContentBrowserPanel {
     ContentBrowserPanel();
     ~ContentBrowserPanel();
     void render();
+    void recordContent();
 
     void setProjectAssetsPath(std::filesystem::path projectAssetsPath);
 

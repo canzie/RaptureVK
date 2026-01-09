@@ -5,13 +5,14 @@
 #include "RenderTargets/SwapChains/SwapChain.h"
 #include "Renderer/DeferredShading/DeferredRenderer.h"
 #include "WindowContext/Application.h"
+#include "imgui_internal.h"
 #include <algorithm>
 #include <stdlib.h> // abort
 
 #include "Events/ApplicationEvents.h"
-
-#include "../imguiPanels/imguiPanelStyleLinear.h"
 #include "Logging/TracyProfiler.h"
+#include "imguiPanels/IconsMaterialDesign.h"
+#include "imguiPanels/themes/imguiPanelStyle.h"
 
 #include "vendor/ImGuizmo/ImGuizmo.h"
 
@@ -35,6 +36,10 @@ ImGuiLayer::ImGuiLayer()
     m_contentBrowserPanel.setOpenImageViewerCallback([this](Rapture::AssetHandle handle) { openFloatingImageViewer(handle); });
 
     m_imageViewerPanel.setDescriptorSetCleanupCallback([this](VkDescriptorSet ds) { requestDescriptorSetCleanup(ds); });
+
+    m_bottomBarPanel.registerPanel(
+        "content_browser", std::string(ICON_MD_FOLDER) + " Content Browser", [this]() { m_contentBrowserPanel.recordContent(); },
+        350.0f);
 
     m_viewportTextureDescriptorSets.clear();
     m_viewportTextureDescriptorSets.resize(swapChain->getImageCount(), VK_NULL_HANDLE);
@@ -117,10 +122,11 @@ void ImGuiLayer::onAttach()
     // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport
     io.FontGlobalScale = m_FontScale;
 
-    // Setup Dear ImGui style
-    ImGuiPanelStyle::InitializeStyle();
+    // Setup Dear ImGui style - load theme from TOML file
+    std::string themePath = app.getProject().getProjectRootDirectory().string() + "/assets/themes/ue5.toml";
+    ColorPalette::SetTheme(themePath);
 
-    ImGuiPanelStyle::InitializeFonts(app.getProject().getProjectRootDirectory().string());
+    ColorPalette::InitializeFonts(app.getProject().getProjectRootDirectory().string());
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForVulkan((GLFWwindow *)window.getNativeWindowContext(), true);
@@ -184,7 +190,7 @@ void ImGuiLayer::renderImGui()
     // Setup docking space
     static bool dockspaceOpen = true;
     static bool opt_fullscreen = true;
-    static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+    static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_NoWindowMenuButton;
 
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 
@@ -221,11 +227,11 @@ void ImGuiLayer::renderImGui()
         m_propertiesPanel.render();
         m_browserPanel.render();
         m_gbufferPanel.render();
-        m_contentBrowserPanel.render();
         m_imageViewerPanel.render();
         m_settingsPanel.render();
         m_textureGeneratorPanel.render();
         m_graphEditorPanel.render();
+        m_fileExplorer.render();
 
         for (auto &viewer : m_floatingImageViews) {
             if (viewer && viewer->isOpen()) {
@@ -236,12 +242,24 @@ void ImGuiLayer::renderImGui()
         cleanupClosedImageViews();
     }
 
+    if (m_showStyleEditor) {
+        ImGui::Begin("Style Editor", &m_showStyleEditor);
+        ImGui::ShowStyleEditor();
+        ImGui::End();
+    }
+
     // ImGui::ShowDemoWindow();
 
     {
         RAPTURE_PROFILE_SCOPE("Menu Bar Rendering");
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("Import...")) {
+                    m_fileExplorer.open(std::filesystem::current_path(), [](const std::filesystem::path &path) {
+                        Rapture::RP_INFO("Selected file: {}", path.string());
+                    });
+                }
+                ImGui::Separator();
                 if (ImGui::MenuItem("Exit")) { /* Handle exit */
                 }
                 ImGui::EndMenu();
@@ -262,6 +280,11 @@ void ImGuiLayer::renderImGui()
                 if (ImGui::MenuItem("Settings")) { /* Handle exit */
                 }
 
+                ImGui::Separator();
+                if (ImGui::MenuItem("Style Editor", nullptr, m_showStyleEditor)) {
+                    m_showStyleEditor = !m_showStyleEditor;
+                }
+
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
@@ -271,6 +294,9 @@ void ImGuiLayer::renderImGui()
     {
         RAPTURE_PROFILE_SCOPE("ImGui Frame Finalization");
         ImGui::End(); // End dockspace
+
+        m_bottomBarPanel.render();
+
         ImGui::Render();
         ImGui::EndFrame();
     }
