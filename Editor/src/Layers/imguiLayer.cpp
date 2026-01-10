@@ -14,8 +14,6 @@
 #include "imguiPanels/IconsMaterialDesign.h"
 #include "imguiPanels/themes/imguiPanelStyle.h"
 
-#include "vendor/ImGuizmo/ImGuizmo.h"
-
 static void s_checkVkResult(VkResult err)
 {
     if (err == VK_SUCCESS) return;
@@ -353,7 +351,6 @@ void ImGuiLayer::onUpdate(float ts)
         }
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        ImGuizmo::BeginFrame();
     }
 
     processPendingDescriptorSetCleanups();

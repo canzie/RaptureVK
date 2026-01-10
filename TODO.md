@@ -1,4 +1,9 @@
 
+- gizmo (fuck imguizmo)
+- Standardise and map all inputs, use macros for each input key
+  - generate a mapping from action to key, this can be (de)serialised from/in a config file
+
+
 - Make rendering things like bounds easier
   - current method is creating an instancedshapes component and providing the transformmatrix
   - this is akward as it cannot be used from inside the editor, only in code, we should be able to add it to certain things, like a mesh, terrain, etc, and depending on if we only need 1 or more to visualise debug use a simple mesh or instancing, like if the user selects aabb of a mesh, just a mesh, but if they select aabbs of the terrain we use instanced meshes, we can do this by seeing if the get aabb method returns 1 or multiple aabbs. , so it becomes a specific thing per mesh, per terrain comp etc. the thing to decide is how we enable/disable it while not storing the instanced data like the buffers in the same component.... 
@@ -33,8 +38,6 @@
 - add material editor
 
 
-### ISSUES
-- fix the gizmo translation math
 
 --------------------------------
 

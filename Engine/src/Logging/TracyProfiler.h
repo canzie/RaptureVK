@@ -104,7 +104,7 @@
 #define RAPTURE_PROFILE_MESSAGE_COLOR(txt, size, color)
 #endif
 
-#if RAPTURE_TRACY_PROFILING_ENABLED && defined(TRACY_FIBERS)
+#if RAPTURE_TRACY_PROFILING_ENABLED && defined(TRACY_FIBERS) && false
 #define RAPTURE_PROFILE_FIBER_ENTER(name) TracyFiberEnter(name)
 #define RAPTURE_PROFILE_FIBER_LEAVE       TracyFiberLeave
 #else

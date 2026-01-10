@@ -5,7 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 
-#include "vendor/ImGuizmo/ImGuizmo.h"
+#include "imguiPanels/modules/Gizmo.h"
 
 #include "Scenes/Entities/Entity.h"
 #include "Scenes/Scene.h"
@@ -19,11 +19,18 @@ class ViewportPanel {
 
     void renderSceneViewport(ImTextureID textureID);
 
-    // ImGuizmo state controls
-    ImGuizmo::OPERATION getCurrentGizmoOperation() const { return m_currentGizmoOperation; }
-    ImGuizmo::MODE getCurrentGizmoMode() const { return m_currentGizmoMode; }
+    // Gizmo state controls
+    Modules::Gizmo::Operation getCurrentGizmoOperation() const { return m_currentGizmoOperation; }
+    void setCurrentGizmoOperation(Modules::Gizmo::Operation op) { m_currentGizmoOperation = op; }
+    Modules::Gizmo::Space getCurrentGizmoSpace() const { return m_currentGizmoSpace; }
+    void setCurrentGizmoSpace(Modules::Gizmo::Space space) { m_currentGizmoSpace = space; }
+    void toggleGizmoSpace()
+    {
+        m_currentGizmoSpace =
+            (m_currentGizmoSpace == Modules::Gizmo::Space::WORLD) ? Modules::Gizmo::Space::LOCAL : Modules::Gizmo::Space::WORLD;
+    }
 
-    // Add a method to render ImGuizmo for the selected entity
+    // Render gizmo for the selected entity
     void renderEntityGizmo();
 
     void setVisible(bool visible) { m_isVisible = visible; }
@@ -46,12 +53,14 @@ class ViewportPanel {
     ImVec2 m_viewportSize;     // Actual viewport image size (excluding topbar)
     ImVec2 m_lastViewportSize; // Previous frame's size for change detection
 
-    // ImGuizmo state
-    ImGuizmo::OPERATION m_currentGizmoOperation = ImGuizmo::TRANSLATE;
-    ImGuizmo::MODE m_currentGizmoMode = ImGuizmo::WORLD;
+    // Gizmo
+    Modules::Gizmo::Gizmo m_gizmo;
+    Modules::Gizmo::Operation m_currentGizmoOperation = Modules::Gizmo::Operation::TRANSLATE;
+    Modules::Gizmo::Space m_currentGizmoSpace = Modules::Gizmo::Space::WORLD;
 
     // Entity selection
     std::shared_ptr<Rapture::Entity> m_selectedEntity;
+    std::shared_ptr<Rapture::Entity> m_previousSelectedEntity;
     size_t m_entitySelectedListenerId = 0;
 };
 

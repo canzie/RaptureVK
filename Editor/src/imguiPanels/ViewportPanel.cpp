@@ -70,9 +70,9 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
     ImGui::BeginChild("GizmoControls", ImVec2(160, 60), true, // Wider panel
                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar);
 
-    bool isTranslate = m_currentGizmoOperation == ImGuizmo::TRANSLATE;
-    bool isRotate = m_currentGizmoOperation == ImGuizmo::ROTATE;
-    bool isScale = m_currentGizmoOperation == ImGuizmo::SCALE;
+    bool isTranslate = m_currentGizmoOperation == Modules::Gizmo::Operation::TRANSLATE;
+    bool isRotate = m_currentGizmoOperation == Modules::Gizmo::Operation::ROTATE;
+    bool isScale = m_currentGizmoOperation == Modules::Gizmo::Operation::SCALE;
 
     // Get the background and hover colors from style
     ImVec4 defaultBgColor = ColorPalette::BACKGROUND_TERTIARY;
@@ -129,7 +129,7 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
     ImGui::PopStyleColor(2);
 
     if (translateClicked) {
-        m_currentGizmoOperation = ImGuizmo::TRANSLATE;
+        m_currentGizmoOperation = Modules::Gizmo::Operation::TRANSLATE;
         Rapture::RP_INFO("Gizmo operation set to Translate");
     }
 
@@ -165,7 +165,7 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
     ImGui::PopStyleColor(2);
 
     if (rotateClicked) {
-        m_currentGizmoOperation = ImGuizmo::ROTATE;
+        m_currentGizmoOperation = Modules::Gizmo::Operation::ROTATE;
         Rapture::RP_INFO("Gizmo operation set to Rotate");
     }
 
@@ -216,23 +216,29 @@ void ViewportPanel::renderSceneViewport(ImTextureID textureID)
     ImGui::PopStyleColor(2);
 
     if (scaleClicked) {
-        m_currentGizmoOperation = ImGuizmo::SCALE;
+        m_currentGizmoOperation = Modules::Gizmo::Operation::SCALE;
         Rapture::RP_INFO("Gizmo operation set to Scale");
     }
 
     ImGui::EndChild();
+
+    // Render gizmo while still inside the content window so GetWindowDrawList() works
+    renderEntityGizmo();
+
     BetterUi::EndContent();
     BetterUi::EndPanel();
-
-    renderEntityGizmo();
 }
 
 void ViewportPanel::renderEntityGizmo()
 {
-
-    // Only proceed if we have valid data
     if (!m_selectedEntity) {
+        m_previousSelectedEntity = nullptr;
         return;
+    }
+
+    if (m_selectedEntity != m_previousSelectedEntity) {
+        m_gizmo.reset();
+        m_previousSelectedEntity = m_selectedEntity;
     }
 
     auto [transformComponent, bbComp] =
@@ -241,92 +247,53 @@ void ViewportPanel::renderEntityGizmo()
         return;
     }
 
-    glm::mat4 originalTransform = transformComponent->transforms.getTransform();
-    glm::mat4 transformMatrix = originalTransform;
-
-    glm::vec3 centerOffset = glm::vec3(0.0f);
-    if (bbComp) {
-        centerOffset = bbComp->localBoundingBox.getCenter();
-        // Create gizmo matrix: T * translate(C) - this puts the gizmo at the center of the bounding box in world space
-        transformMatrix = originalTransform * glm::translate(glm::mat4(1.0f), centerOffset);
-    }
-
     auto &sceneManager = Rapture::SceneManager::getInstance();
     auto scene = sceneManager.getActiveScene();
     if (!scene) {
-        Rapture::RP_ERROR("ViewportPanel::renderEntityGizmo - No active scene found");
         return;
     }
 
     auto mainCamera = scene->getMainCamera();
     if (!mainCamera) {
-        Rapture::RP_ERROR("ViewportPanel::renderEntityGizmo - No main camera found");
         return;
     }
 
     auto &camComp = mainCamera.getComponent<Rapture::CameraComponent>();
-    auto viewMatrix = camComp.camera.getViewMatrix();
-    auto projectionMatrix = camComp.camera.getProjectionMatrix();
+    glm::mat4 viewMatrix = camComp.camera.getViewMatrix();
+    glm::mat4 projectionMatrix = camComp.camera.getProjectionMatrix();
 
-    // Set up ImGuizmo
-    ImGuizmo::SetOrthographic(false); // Using perspective view
-    ImGuizmo::SetDrawlist();
+    glm::mat4 objectTransform = transformComponent->transforms.getTransform();
+    glm::vec3 pivot = bbComp ? bbComp->localBoundingBox.getCenter() : glm::vec3(0.0f);
 
-    // Set the ImGuizmo rect to match our viewport
-    ImGuizmo::SetRect(m_viewportPosition.x, m_viewportPosition.y, m_viewportSize.x, m_viewportSize.y);
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
 
-    // Manipulate the transform
-    ImGuizmo::Manipulate(glm::value_ptr(viewMatrix),       // View matrix (from camera callback)
-                         glm::value_ptr(projectionMatrix), // Projection matrix (from camera callback)
-                         m_currentGizmoOperation,          // Current operation (translate, rotate, scale)
-                         m_currentGizmoMode,               // Current mode (local or world)
-                         glm::value_ptr(transformMatrix),  // Transform matrix to manipulate
-                         nullptr,                          // Delta matrix (optional)
-                         nullptr                           // Snap values (optional)
-    );
+    Modules::Gizmo::Result result = m_gizmo.update(viewMatrix, projectionMatrix, objectTransform, pivot, m_currentGizmoOperation,
+                                                   m_currentGizmoSpace, drawList, m_viewportPosition, m_viewportSize);
 
-    // Check if gizmo is being used
-    if (ImGuizmo::IsOver()) {
-    }
+    if (result.active) {
+        glm::vec3 position = transformComponent->transforms.getTranslation();
+        glm::quat rotation = transformComponent->transforms.getRotationQuat(); // Get as quaternion
+        glm::vec3 scale = transformComponent->transforms.getScale();
 
-    // If ImGuizmo changed the transform matrix, update the entity
-    if (ImGuizmo::IsUsing()) {
+        position += result.deltaPosition;
+        scale *= result.deltaScale;
 
-        Rapture::TransformComponent *transformComponent = m_selectedEntity->tryGetComponent<Rapture::TransformComponent>();
-        if (transformComponent) {
+        float rotationAngle = glm::length(result.deltaRotation);
+        if (rotationAngle > 0.0001f) {
+            glm::vec3 rotationAxis = result.deltaRotation / rotationAngle;
+            glm::quat deltaQuat = glm::angleAxis(rotationAngle, rotationAxis);
 
-            glm::vec3 position, rotation, scale;
-            ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(transformMatrix), glm::value_ptr(position),
-                                                  glm::value_ptr(rotation), glm::value_ptr(scale));
-
-            // If we have a bounding box, we need to subtract the center offset from the new position
-            if (bbComp) {
-                // Create a matrix with the new rotation and scale to transform the center offset
-                glm::mat4 rotationScaleMatrix = glm::mat4(1.0f);
-                rotationScaleMatrix = glm::rotate(rotationScaleMatrix, glm::radians(rotation.x), glm::vec3(1, 0, 0));
-                rotationScaleMatrix = glm::rotate(rotationScaleMatrix, glm::radians(rotation.y), glm::vec3(0, 1, 0));
-                rotationScaleMatrix = glm::rotate(rotationScaleMatrix, glm::radians(rotation.z), glm::vec3(0, 0, 1));
-                rotationScaleMatrix = glm::scale(rotationScaleMatrix, scale);
-
-                // Transform the center offset to world space with the new rotation and scale
-                glm::vec3 worldCenterOffset = glm::vec3(rotationScaleMatrix * glm::vec4(centerOffset, 1.0f));
-
-                // Subtract the transformed center offset from the gizmo position to get the actual object position
-                position = position - worldCenterOffset;
+            if (m_currentGizmoSpace == Modules::Gizmo::Space::WORLD) {
+                rotation = deltaQuat * rotation; // World space (pre-multiply)
+            } else {
+                rotation = rotation * deltaQuat; // Local space (post-multiply)
             }
-
-            // Update the transform component with new values using proper setters
-            transformComponent->transforms.setTranslation(position);
-            transformComponent->transforms.setRotation(glm::radians(rotation)); // Convert from degrees to radians
-            transformComponent->transforms.setScale(scale);
-
-            // Make sure to recalculate the transform matrix
-            transformComponent->transforms.recalculateTransform();
-            // Update bounding box if it exists
-            // if (auto* bb = selectedEntity->tryGetComponent<Rapture::BoundingBoxComponent>()) {
-            //    bb->needsUpdate = true;
-            //}
         }
+
+        transformComponent->transforms.setTranslation(position);
+        transformComponent->transforms.setRotation(rotation);
+        transformComponent->transforms.setScale(scale);
+        transformComponent->transforms.recalculateTransform();
     }
 }
 
