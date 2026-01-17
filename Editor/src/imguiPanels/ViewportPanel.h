@@ -6,6 +6,7 @@
 #include <imgui.h>
 
 #include "imguiPanels/modules/Gizmo.h"
+#include "imguiPanels/modules/UiCommon/UiTree.h"
 
 #include "Scenes/Entities/Entity.h"
 #include "Scenes/Scene.h"
@@ -43,6 +44,8 @@ class ViewportPanel {
   private:
     void renderTopbar();
     void checkForSizeChange();
+    void renderHotBar();
+    void renderGizmoControls();
 
   private:
     static constexpr float TOPBAR_HEIGHT = 40.0f;

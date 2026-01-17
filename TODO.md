@@ -1,5 +1,9 @@
 
-- gizmo (fuck imguizmo)
+- i cant use imgui anymore, its just too shit for an actual application....... custom ui lib?
+  - zenith / zenith UI
+  - amethyst https://github.com/canzie/Amethyst
+  - Nimbus
+
 - Standardise and map all inputs, use macros for each input key
   - generate a mapping from action to key, this can be (de)serialised from/in a config file
 
