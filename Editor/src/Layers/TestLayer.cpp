@@ -12,7 +12,6 @@
 #include "Loaders/glTF2.0/glTFLoader.h"
 
 #include <filesystem>
-#include <imgui.h>
 
 #include "Logging/TracyProfiler.h"
 
@@ -21,7 +20,6 @@
 #include "AccelerationStructures/CPU/BVH/DBVH.h"
 #include "Components/TerrainComponent.h"
 #include "Generators/Textures/ProceduralTextures.h"
-#include "Meshes/MeshPrimitives.h"
 #include "Utils/Timestep.h"
 
 TestLayer::~TestLayer()
@@ -88,7 +86,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Load Sponza model
     auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
-    if (std::filesystem::exists(sponzaPath) && false) {
+    if (std::filesystem::exists(sponzaPath)) {
         Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
         auto loader = Rapture::glTF2Loader(sponzaPath);
         loader.load(activeScene.get());

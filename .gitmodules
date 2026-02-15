@@ -1,0 +1,3 @@
+[submodule "Engine/vendor/Amethyst"]
+	path = Engine/vendor/Amethyst
+	url = git@github.com:canzie/Amethyst.git

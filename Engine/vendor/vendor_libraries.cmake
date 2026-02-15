@@ -49,15 +49,9 @@ FetchContent_Declare(
     GIT_PROGRESS TRUE
 )
 
-# --- ImGui ---
-# Using v1.92.5 - stable release with docking support (2025)
-FetchContent_Declare(
-    imgui
-    GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG v1.92.5-docking
-    GIT_SHALLOW TRUE
-    GIT_PROGRESS TRUE
-)
+# --- Amethyst UI Library ---
+# Using submodule - custom UI library for editor and in-game UI
+# Located at Engine/vendor/Amethyst (git submodule)
 
 # --- EnTT ---
 FetchContent_Declare(
@@ -209,7 +203,6 @@ message(STATUS "This will only happen once. Subsequent builds will use cached ve
 
 FetchContent_MakeAvailable(glfw)
 FetchContent_MakeAvailable(glm)
-FetchContent_MakeAvailable(imgui)
 FetchContent_MakeAvailable(entt)
 FetchContent_MakeAvailable(spdlog)
 FetchContent_MakeAvailable(stb)
@@ -226,6 +219,7 @@ FetchContent_MakeAvailable(glslang)
 FetchContent_MakeAvailable(shaderc)
 
 FetchContent_MakeAvailable(tomlplusplus)
+target_compile_definitions(tomlplusplus_tomlplusplus INTERFACE TOML_EXCEPTIONS=0)
 FetchContent_MakeAvailable(concurrentqueue)
 message(STATUS "=== All vendor dependencies available ===")
 
@@ -298,27 +292,16 @@ if(TARGET TracyClient AND NOT TARGET tracy::client)
     add_library(tracy::client ALIAS TracyClient)
 endif()
 
-# --- ImGui Target ---
-add_library(imgui_static STATIC
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
-)
-target_include_directories(imgui_static SYSTEM PUBLIC
-    ${imgui_SOURCE_DIR}
-    ${imgui_SOURCE_DIR}/backends
-)
-target_link_libraries(imgui_static PUBLIC glfw Vulkan::Vulkan)
+# --- Amethyst UI Library ---
+# Disable test app build
+set(AMETHYST_BUILD_TESTAPP OFF CACHE BOOL "Don't build Amethyst test app" FORCE)
 
-# Suppress ImGui warnings and disable LTO
-target_compile_options(imgui_static PRIVATE
-    $<$<CXX_COMPILER_ID:GNU>:-w -Wno-odr -Wno-lto-type-mismatch -fno-lto>
-    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-w>
-    $<$<CXX_COMPILER_ID:MSVC>:/w>
-)
+# Add Amethyst as a subdirectory
+add_subdirectory(${CMAKE_SOURCE_DIR}/Engine/vendor/Amethyst ${CMAKE_BINARY_DIR}/amethyst)
+
+# Suppress Amethyst warnings
+mark_as_system_includes(amethyst)
+mark_as_system_includes(amethyst_vk13_glfw)
 
 # --- stb_image Target ---
 set(STB_IMAGE_IMPL_FILE "${stb_BINARY_DIR}/stb_image_impl.cpp")
@@ -372,7 +355,8 @@ target_compile_options(yyjson_static PRIVATE
 target_link_libraries(vendor_libraries INTERFACE
     glfw
     glm
-    imgui_static
+    amethyst
+    amethyst_vk13_glfw
     EnTT
     spdlog
     stb_image

@@ -1,5 +1,5 @@
 #include "Layers/TestLayer.h"
-#include "Layers/imguiLayer.h"
+#include "Layers/AmethystLayer.h"
 #include "Logging/Log.h"
 #include "WindowContext/Application.h"
 
@@ -23,9 +23,9 @@ class EditorApp : public Rapture::Application {
         // Push main editor layer
         pushLayer(new TestLayer());
 
-        // Push ImGui layer as an overlay so it renders on top
+        // Push Amethyst UI layer as an overlay so it renders on top
 
-        pushOverlay(new ImGuiLayer());
+        pushOverlay(new AmethystLayer());
     }
 
     ~EditorApp()
