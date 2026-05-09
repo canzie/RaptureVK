@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Components/ComponentsCommon.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -26,7 +28,7 @@ class Transforms {
     glm::quat &getRotationQuat() { return m_rotationQ; }
     glm::vec3 &getScale() { return m_scale; }
 
-    bool *getDirtyFlag() { return &m_isDirty; }
+    generation_t getGeneration() const { return m_generation; }
 
     void setTransform(const glm::mat4 &transform);
     void setTranslation(const glm::vec3 &translation);
@@ -48,6 +50,6 @@ class Transforms {
     glm::vec3 m_scale;
     glm::mat4 m_transform;
 
-    bool m_isDirty = true;
+    generation_t m_generation = 1;
 };
 } // namespace Rapture

@@ -264,9 +264,7 @@ CommandBuffer *ShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, ui
         }
 
         // Update world bounding box if transform changed
-        if (transform.hasChanged()) {
-            boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
-        }
+        boundingBoxComp.updateWorldBoundingBox(transform);
 
         // Perform frustum culling
         if (m_frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside) {

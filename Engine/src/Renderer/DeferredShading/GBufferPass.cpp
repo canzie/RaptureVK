@@ -211,9 +211,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
             continue;
         }
 
-        if (transform.hasChanged()) {
-            boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
-        }
+        boundingBoxComp.updateWorldBoundingBox(transform);
 
         if (cameraComp && activeScene->getSettings().frustumCullingEnabled) {
             if (cameraComp->frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside) {

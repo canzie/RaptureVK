@@ -7,9 +7,8 @@ namespace Rapture {
 
 class BoundingBox {
 
-public:
-
-    BoundingBox(const glm::vec3& min, const glm::vec3& max);
+  public:
+    BoundingBox(const glm::vec3 &min, const glm::vec3 &max);
     BoundingBox();
     ~BoundingBox() = default;
 
@@ -20,26 +19,21 @@ public:
     glm::vec3 getSize() const { return m_max - m_min; }
 
     bool isValid() const { return m_isValid; }
-    bool contains(const BoundingBox& other) const;
+    bool contains(const BoundingBox &other) const;
     float getSurfaceArea() const;
 
     void logBounds() const;
 
-    static BoundingBox calculateFromVertices(const std::vector<float>& vertices, size_t stride, size_t offset);
+    static BoundingBox calculateFromVertices(const std::vector<float> &vertices, size_t stride, size_t offset);
 
-    BoundingBox transform(const glm::mat4& matrix) const;
+    BoundingBox transform(const glm::mat4 &matrix) const;
 
-    BoundingBox operator+(const BoundingBox& other) const;
+    BoundingBox operator+(const BoundingBox &other) const;
 
-private:
+  private:
     glm::vec3 m_min;
     glm::vec3 m_max;
     bool m_isValid;
-
-
-
 };
 
-
-
-}
+} // namespace Rapture

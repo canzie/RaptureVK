@@ -48,41 +48,21 @@ struct TagComponent {
 struct TransformComponent {
     Transforms transforms;
 
-    bool *isDirty = nullptr;
-    // used to help with a case where a transform is updated in 1 frame but we also need to update the other frames in flight
-    // this will say how many frames have been updated
-    // at 0 we ignore
-    // at else we continue updating untill dirtyFrames is equal to # frames in flight
-    uint8_t dirtyFrames = 0;
-
     glm::vec3 translation() const { return transforms.getTranslation(); }
     glm::vec3 rotation() const { return transforms.getRotation(); }
     glm::vec3 scale() const { return transforms.getScale(); }
     glm::mat4 transformMatrix() const { return transforms.getTransform(); }
 
+    generation_t getGeneration() const { return transforms.getGeneration(); }
+
   public:
     TransformComponent() = default;
 
-    TransformComponent(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale)
-    {
-        transforms = Transforms(translation, rotation, scale);
-        isDirty = transforms.getDirtyFlag();
-    }
+    TransformComponent(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale) : transforms(translation, rotation, scale) {}
 
-    // Add constructor for quaternion rotation
-    TransformComponent(glm::vec3 translation, glm::quat rotation, glm::vec3 scale)
-    {
-        transforms = Transforms(translation, rotation, scale);
-        isDirty = transforms.getDirtyFlag();
-    }
+    TransformComponent(glm::vec3 translation, glm::quat rotation, glm::vec3 scale) : transforms(translation, rotation, scale) {}
 
-    TransformComponent(glm::mat4 transformMatrix)
-    {
-        transforms.setTransform(transformMatrix);
-        isDirty = transforms.getDirtyFlag();
-    }
-
-    bool hasChanged() { return *isDirty; }
+    TransformComponent(glm::mat4 transformMatrix) : transforms(transformMatrix) {}
 };
 
 // Pure camera component - only contains camera-specific data
@@ -284,90 +264,71 @@ struct LightComponent {
 
     std::shared_ptr<LightDataBuffer> lightDataBuffer;
 
-  private:
-    mutable uint32_t m_lastHash = 0;
-    mutable uint32_t m_lastFrame = 10; // random number larger than framesinglight
-    mutable bool changedThisFrame = false;
+    generation_t getGeneration() const { return m_generation; }
 
-  public:
-    // Constructors
-    LightComponent()
-    {
-        lightDataBuffer = std::make_shared<LightDataBuffer>(); // 3 frames in flight
-    }
+    LightComponent() { lightDataBuffer = std::make_shared<LightDataBuffer>(); }
 
-    // Constructor for point light
     LightComponent(const glm::vec3 &color, float intensity, float range)
         : type(LightType::Point), color(color), intensity(intensity), range(range)
     {
-        lightDataBuffer = std::make_shared<LightDataBuffer>(); // 3 frames in flight
+        lightDataBuffer = std::make_shared<LightDataBuffer>();
     }
 
-    // Constructor for directional light
     LightComponent(const glm::vec3 &color, float intensity) : type(LightType::Directional), color(color), intensity(intensity)
     {
-        lightDataBuffer = std::make_shared<LightDataBuffer>(); // 3 frames in flight
+        lightDataBuffer = std::make_shared<LightDataBuffer>();
     }
 
-    // Constructor for spot light
     LightComponent(const glm::vec3 &color, float intensity, float range, float innerAngleDegrees, float outerAngleDegrees)
         : type(LightType::Spot), color(color), intensity(intensity), range(range), innerConeAngle(glm::radians(innerAngleDegrees)),
           outerConeAngle(glm::radians(outerAngleDegrees))
     {
-        lightDataBuffer = std::make_shared<LightDataBuffer>(); // 3 frames in flight
+        lightDataBuffer = std::make_shared<LightDataBuffer>();
     }
 
-    std::uint32_t calculateCurrentHash() const
+    void setColor(const glm::vec3 &c)
     {
-        std::uint32_t hash = 0;
-
-        // Common properties for all light types
-        hash ^= std::hash<LightType>{}(type) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= std::hash<bool>{}(isActive) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= std::hash<bool>{}(castsShadow) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= std::hash<float>{}(intensity) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-
-        // Hash color components
-        hash ^= std::hash<float>{}(color.r) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= std::hash<float>{}(color.g) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= std::hash<float>{}(color.b) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-
-        // Properties specific to light types
-        switch (type) {
-        case LightType::Point:
-            // Point lights use range
-            hash ^= std::hash<float>{}(range) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            break;
-
-        case LightType::Directional:
-            // Directional lights don't need additional properties
-            break;
-
-        case LightType::Spot:
-            // Spot lights use range and cone angles
-            hash ^= std::hash<float>{}(range) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= std::hash<float>{}(innerConeAngle) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= std::hash<float>{}(outerConeAngle) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            break;
-        }
-
-        return hash;
+        color = c;
+        m_generation++;
     }
-
-    bool hasChanged(uint32_t currentFrame) const
+    void setIntensity(float i)
     {
-        if (m_lastFrame != currentFrame) {
-            m_lastFrame = currentFrame;
-            changedThisFrame = false;
-            uint32_t currentHash = calculateCurrentHash();
-            if (m_lastHash != currentHash) {
-                m_lastHash = currentHash;
-                changedThisFrame = true;
-                return true;
-            }
-        }
-        return changedThisFrame;
+        intensity = i;
+        m_generation++;
     }
+    void setRange(float r)
+    {
+        range = r;
+        m_generation++;
+    }
+    void setType(LightType t)
+    {
+        type = t;
+        m_generation++;
+    }
+    void setActive(bool active)
+    {
+        isActive = active;
+        m_generation++;
+    }
+    void setCastsShadow(bool casts)
+    {
+        castsShadow = casts;
+        m_generation++;
+    }
+    void setInnerConeAngle(float angle)
+    {
+        innerConeAngle = angle;
+        m_generation++;
+    }
+    void setOuterConeAngle(float angle)
+    {
+        outerConeAngle = angle;
+        m_generation++;
+    }
+
+  private:
+    generation_t m_generation = 1;
 };
 
 struct BLASComponent {
@@ -385,6 +346,20 @@ struct ShadowComponent {
     bool isActive = true;
 
     ShadowComponent(float width, float height) { shadowMap = std::make_unique<ShadowMap>(width, height); }
+
+    bool needsUpdate(const LightComponent &light, const TransformComponent &transform)
+    {
+        generation_t lGen = light.getGeneration();
+        generation_t tGen = transform.getGeneration();
+        if (lGen == m_lastLightGeneration && tGen == m_lastTransformGeneration) return false;
+        m_lastLightGeneration = lGen;
+        m_lastTransformGeneration = tGen;
+        return true;
+    }
+
+  private:
+    generation_t m_lastLightGeneration = 0;
+    generation_t m_lastTransformGeneration = 0;
 };
 
 struct CascadedShadowComponent {
@@ -395,10 +370,23 @@ struct CascadedShadowComponent {
     {
         cascadedShadowMap = std::make_unique<CascadedShadowMap>(width, height, numCascades, lambda);
     }
+
+    bool needsUpdate(const LightComponent &light, const TransformComponent &transform)
+    {
+        generation_t lGen = light.getGeneration();
+        generation_t tGen = transform.getGeneration();
+        if (lGen == m_lastLightGeneration && tGen == m_lastTransformGeneration) return false;
+        m_lastLightGeneration = lGen;
+        m_lastTransformGeneration = tGen;
+        return true;
+    }
+
+  private:
+    generation_t m_lastLightGeneration = 0;
+    generation_t m_lastTransformGeneration = 0;
 };
 
 struct BoundingBoxComponent {
-    // start off as invalid
     BoundingBox localBoundingBox;
     BoundingBox worldBoundingBox;
 
@@ -409,7 +397,16 @@ struct BoundingBoxComponent {
         worldBoundingBox = localBoundingBox;
     }
 
-    void updateWorldBoundingBox(const glm::mat4 &transform) { worldBoundingBox = localBoundingBox.transform(transform); }
+    void updateWorldBoundingBox(const TransformComponent &transform)
+    {
+        generation_t gen = transform.getGeneration();
+        if (gen == m_lastTransformGeneration) return;
+        m_lastTransformGeneration = gen;
+        worldBoundingBox = localBoundingBox.transform(transform.transformMatrix());
+    }
+
+  private:
+    generation_t m_lastTransformGeneration = 0;
 };
 
 } // namespace Rapture
