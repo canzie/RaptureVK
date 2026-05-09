@@ -88,8 +88,6 @@ class DeferredRenderer {
 
     static CommandPoolHash m_commandPoolHash;
 
-    static VmaAllocator m_vmaAllocator;
-    static VkDevice m_device;
     static std::shared_ptr<SwapChain> m_swapChain;
     static std::shared_ptr<SceneRenderTarget> m_sceneRenderTarget;
 

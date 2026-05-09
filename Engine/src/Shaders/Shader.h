@@ -135,6 +135,7 @@ class Shader {
     // Merged reflection data
     std::vector<DescriptorSetInfo> m_descriptorSetInfos;
     std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+    std::vector<bool> m_ownedLayouts; // true = created by this Shader, false = borrowed from DescriptorManager
     std::vector<VkPushConstantRange> m_pushConstantLayouts;
     std::vector<DetailedPushConstantInfo> m_detailedPushConstants;
     std::vector<DescriptorInfo> m_materialSets;

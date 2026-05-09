@@ -70,7 +70,10 @@ DescriptorSet::DescriptorSet(const DescriptorSetBindings &bindings)
 
 DescriptorSet::~DescriptorSet()
 {
-    // Layout is managed externally (by shader reflection), so we don't destroy it
+    if (m_layout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(m_device, m_layout, nullptr);
+        m_layout = VK_NULL_HANDLE;
+    }
 
     // Decrement counters
     s_poolBufferCount -= m_usedBuffers;

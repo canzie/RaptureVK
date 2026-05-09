@@ -147,7 +147,7 @@ class DynamicDiffuseGI {
     Texture *m_skyboxTexture;
     float m_skyIntensity = 1.0f;
 
-    static std::unique_ptr<Texture> s_defaultSkyboxTexture;
+    std::unique_ptr<Texture> m_defaultSkyboxTexture;
 
     std::shared_ptr<DescriptorSet> m_probeTraceDescriptorSet;
     std::shared_ptr<DescriptorSet> m_probeIrradianceBlendingDescriptorSet;
