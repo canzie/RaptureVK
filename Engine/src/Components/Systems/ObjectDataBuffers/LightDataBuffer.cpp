@@ -7,16 +7,23 @@
 namespace Rapture {
 
 LightDataBuffer::LightDataBuffer(uint32_t frameCount)
-    : ObjectDataBuffer(DescriptorSetBindingLocation::LIGHTS_UBO, sizeof(LightObjectData), frameCount)
+    : ObjectDataBuffer(DescriptorSetBindingLocation::LIGHTS_UBO, sizeof(LightObjectData), frameCount),
+      m_lastTransformGenerations(frameCount, 0), m_lastLightGenerations(frameCount, 0)
 {
 }
 
-void LightDataBuffer::update(const TransformComponent &transform, const LightComponent &light, uint32_t entityID,
-                             uint32_t frameIndex)
+void LightDataBuffer::onUpdate(const TransformComponent &transform, const LightComponent &light, uint32_t entityID,
+                               uint32_t frameIndex)
 {
     if (!light.isActive) {
         return;
     }
+
+    generation_t tGen = transform.getGeneration();
+    generation_t lGen = light.getGeneration();
+    if (tGen == m_lastTransformGenerations[frameIndex] && lGen == m_lastLightGenerations[frameIndex]) return;
+    m_lastTransformGenerations[frameIndex] = tGen;
+    m_lastLightGenerations[frameIndex] = lGen;
 
     LightObjectData data{};
 

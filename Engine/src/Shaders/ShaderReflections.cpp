@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <map>
+#include <regex>
+#include <sstream>
 #include <utility> // For std::pair
 
 namespace Rapture {
@@ -435,6 +437,144 @@ std::vector<DetailedPushConstantInfo> extractDetailedPushConstants(const std::ve
 
     spvReflectDestroyShaderModule(&module);
     return result;
+}
+
+// Helper to parse a list of float values from a string like "1.0, 2.0, 3.0"
+static std::vector<float> s_parseFloatList(const std::string &str)
+{
+    std::vector<float> values;
+    std::stringstream ss(str);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        // Trim whitespace
+        size_t start = token.find_first_not_of(" \t");
+        size_t end = token.find_last_not_of(" \t");
+        if (start != std::string::npos && end != std::string::npos) {
+            try {
+                values.push_back(std::stof(token.substr(start, end - start + 1)));
+            } catch (...) {
+                // Ignore parse errors
+            }
+        }
+    }
+    return values;
+}
+
+// Helper to extract member name from a GLSL declaration line
+// e.g., "    vec4 cameraPosAndInnerRadius;   // @hidden" -> "cameraPosAndInnerRadius"
+static std::string s_extractMemberName(const std::string &line)
+{
+    // Find the semicolon
+    size_t semicolonPos = line.find(';');
+    if (semicolonPos == std::string::npos) return "";
+
+    // Work backwards to find the member name
+    size_t nameEnd = semicolonPos;
+    while (nameEnd > 0 && std::isspace(line[nameEnd - 1])) nameEnd--;
+
+    size_t nameStart = nameEnd;
+    while (nameStart > 0 && (std::isalnum(line[nameStart - 1]) || line[nameStart - 1] == '_')) {
+        nameStart--;
+    }
+
+    if (nameStart < nameEnd) {
+        return line.substr(nameStart, nameEnd - nameStart);
+    }
+    return "";
+}
+
+std::unordered_map<std::string, PushConstantMemberMetadata> parsePushConstantAnnotations(const std::string &glslSource)
+{
+    std::unordered_map<std::string, PushConstantMemberMetadata> result;
+
+    // Find push_constant block(s)
+    // Pattern: layout(push_constant) ... { ... }
+    std::regex pushConstantBlockRegex(R"(layout\s*\(\s*push_constant\s*\)[^{]*\{([^}]*)\})");
+
+    auto blocksBegin = std::sregex_iterator(glslSource.begin(), glslSource.end(), pushConstantBlockRegex);
+    auto blocksEnd = std::sregex_iterator();
+
+    for (auto it = blocksBegin; it != blocksEnd; ++it) {
+        std::string blockContent = (*it)[1].str();
+
+        // Process each line in the block
+        std::istringstream stream(blockContent);
+        std::string line;
+
+        while (std::getline(stream, line)) {
+            // Skip lines without a semicolon (not member declarations)
+            if (line.find(';') == std::string::npos) continue;
+
+            // Extract member name
+            std::string memberName = s_extractMemberName(line);
+            if (memberName.empty()) continue;
+
+            // Look for comment annotations
+            size_t commentPos = line.find("//");
+            if (commentPos == std::string::npos) continue;
+
+            std::string comment = line.substr(commentPos + 2);
+            PushConstantMemberMetadata metadata;
+
+            // Parse @hidden
+            if (comment.find("@hidden") != std::string::npos) {
+                metadata.hidden = true;
+            }
+
+            // Parse @color
+            if (comment.find("@color") != std::string::npos) {
+                metadata.isColor = true;
+            }
+
+            // Parse @range(min, max)
+            std::regex rangeRegex(R"(@range\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\))");
+            std::smatch rangeMatch;
+            if (std::regex_search(comment, rangeMatch, rangeRegex)) {
+                try {
+                    metadata.minValue = std::stof(rangeMatch[1].str());
+                    metadata.maxValue = std::stof(rangeMatch[2].str());
+                    metadata.hasRange = true;
+                } catch (...) {
+                    RP_CORE_WARN("Failed to parse @range for member '{}'", memberName);
+                }
+            }
+
+            // Parse @default(value, ...)
+            std::regex defaultRegex(R"(@default\s*\(\s*([^)]+)\s*\))");
+            std::smatch defaultMatch;
+            if (std::regex_search(comment, defaultMatch, defaultRegex)) {
+                metadata.defaultValue = s_parseFloatList(defaultMatch[1].str());
+                metadata.hasDefault = !metadata.defaultValue.empty();
+            }
+
+            // Parse @name("...")
+            std::regex nameRegex(R"_(@name\s*\(\s*"([^"]+)"\s*\))_");
+            std::smatch nameMatch;
+            if (std::regex_search(comment, nameMatch, nameRegex)) {
+                metadata.displayName = nameMatch[1].str();
+            }
+
+            // Only add if we found any annotations
+            if (metadata.hidden || metadata.isColor || metadata.hasRange || metadata.hasDefault || !metadata.displayName.empty()) {
+                result[memberName] = metadata;
+            }
+        }
+    }
+
+    return result;
+}
+
+void applyPushConstantAnnotations(std::vector<DetailedPushConstantInfo> &detailedInfo,
+                                  const std::unordered_map<std::string, PushConstantMemberMetadata> &annotations)
+{
+    for (auto &block : detailedInfo) {
+        for (auto &member : block.members) {
+            auto it = annotations.find(member.name);
+            if (it != annotations.end()) {
+                member.metadata = it->second;
+            }
+        }
+    }
 }
 
 } // namespace Rapture

@@ -22,8 +22,6 @@ static constexpr uint32_t MAX_LIGHTS = 16;
 
 // Static member definitions
 CommandPoolHash DeferredRenderer::m_commandPoolHash = 0;
-VmaAllocator DeferredRenderer::m_vmaAllocator = VK_NULL_HANDLE;
-VkDevice DeferredRenderer::m_device = VK_NULL_HANDLE;
 std::shared_ptr<SwapChain> DeferredRenderer::m_swapChain = nullptr;
 std::shared_ptr<SceneRenderTarget> DeferredRenderer::m_sceneRenderTarget = nullptr;
 uint32_t DeferredRenderer::m_currentFrame = 0;
@@ -53,9 +51,7 @@ void DeferredRenderer::init()
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
-    m_device = vc.getLogicalDevice();
     m_swapChain = vc.getSwapChain();
-    m_vmaAllocator = vc.getVmaAllocator();
 
     m_graphicsQueue = vc.getGraphicsQueue();
     m_presentQueue = vc.getPresentQueue();
@@ -118,6 +114,8 @@ void DeferredRenderer::shutdown()
     m_lightingPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
+    m_dynamicDiffuseGI.reset();
+    m_rtInstanceData.reset();
 
     // Clean up scene render target
     m_sceneRenderTarget.reset();
@@ -371,8 +369,8 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 auto &transformComp = lightView.get<TransformComponent>(entity);
                 auto &shadowComp = lightView.get<ShadowComponent>(entity);
 
-                bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) || transformComp.hasChanged() ||
-                                           lightComp.type == LightType::Directional || lightComp.type == LightType::Spot);
+                bool shouldUpdateShadow = shadowComp.needsUpdate(lightComp, transformComp) ||
+                                         lightComp.type == LightType::Directional;
 
                 if (shadowComp.shadowMap && shouldUpdateShadow) {
                     auto shadowBuffer = shadowComp.shadowMap->recordSecondary(activeScene, m_currentFrame);
@@ -389,8 +387,8 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
                 auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
 
-                bool shouldUpdateShadow = (lightComp.hasChanged(m_currentFrame) || transformComp.hasChanged() ||
-                                           lightComp.type == LightType::Directional);
+                bool shouldUpdateShadow = shadowComp.needsUpdate(lightComp, transformComp) ||
+                                         lightComp.type == LightType::Directional;
 
                 if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
                     auto shadowBuffer = shadowComp.cascadedShadowMap->recordSecondary(activeScene, m_currentFrame, terrain);

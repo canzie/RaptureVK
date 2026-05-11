@@ -1,7 +1,9 @@
-#pragma once
+#ifndef RAPTURE__TLAS_H
+#define RAPTURE__TLAS_H
 
 #include "BLAS.h"
 #include "Buffers/Buffers.h"
+#include "Components/ComponentsCommon.h"
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -19,6 +21,7 @@ struct TLASInstance {
     uint32_t shaderBindingTableRecordOffset = 0;
     VkGeometryInstanceFlagsKHR flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     uint32_t entityID = 0;
+    generation_t lastTransformGeneration = 0;
 };
 
 class TLAS : public std::enable_shared_from_this<TLAS> {
@@ -104,3 +107,5 @@ class TLAS : public std::enable_shared_from_this<TLAS> {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__TLAS_H

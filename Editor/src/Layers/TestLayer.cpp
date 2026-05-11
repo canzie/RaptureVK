@@ -12,7 +12,6 @@
 #include "Loaders/glTF2.0/glTFLoader.h"
 
 #include <filesystem>
-#include <imgui.h>
 
 #include "Logging/TracyProfiler.h"
 
@@ -21,7 +20,6 @@
 #include "AccelerationStructures/CPU/BVH/DBVH.h"
 #include "Components/TerrainComponent.h"
 #include "Generators/Textures/ProceduralTextures.h"
-#include "Meshes/MeshPrimitives.h"
 #include "Utils/Timestep.h"
 
 TestLayer::~TestLayer()
@@ -154,15 +152,35 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         }
     }
 
+    // Generate atmospheric scattering texture (GPU Gems 2 implementation)
     {
         Rapture::ProceduralTextureConfig config;
-        config.name = "test_atmosphere_noon";
-        config.format = Rapture::TextureFormat::RGBA16F; // HDR for proper atmospheric colors
+        config.name = "test_atmosphere";
+        config.format = Rapture::TextureFormat::RGBA16F;
         config.srgb = false;
 
-        auto atmosphereTexture = Rapture::ProceduralTexture::generateAtmosphere(12.0f, nullptr, config);
+        // Use normalized space: planet radius = 1.0, atmosphere to ~1.025
+        Rapture::AtmospherePushConstants atmoParams{};
+        // Sun must have -Z component to be in front of camera (which looks in -Z)
+        glm::vec3 sunDir = glm::normalize(glm::vec3(0.3f, 0.5f, -0.8f));
+        atmoParams.cameraPos = glm::vec3(0.0f, 1.001f, 0.0f);
+        atmoParams.innerRadius = 1.0f;
+        atmoParams.sunDirection = sunDir;
+        atmoParams.outerRadius = 1.025f;
+        atmoParams.cameraDir = glm::vec3(0.0f, 0.0f, -1.0f);
+        atmoParams.scaleDepth = 0.25f;
+        atmoParams.cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        atmoParams.kr = 0.0025f;
+        atmoParams.invWavelength = glm::vec3(5.602f, 9.473f, 19.644f);
+        atmoParams.km = 0.0015f;
+        atmoParams.eSun = 20.0f;
+        atmoParams.g = 0.76f;
+        atmoParams.fovY = 1.5708f;
+        atmoParams.cameraAltitude = 0.0003f;
+
+        auto atmosphereTexture = Rapture::ProceduralTexture::generateAtmosphere(12.0f, &atmoParams, config);
         if (atmosphereTexture) {
-            Rapture::RP_INFO("Generated atmospheric scattering texture (noon): {}", config.name);
+            Rapture::RP_INFO("Generated atmospheric scattering texture: {}", config.name);
         }
     }
 

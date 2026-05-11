@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__SHADOWDATABUFFER_H
+#define RAPTURE__SHADOWDATABUFFER_H
 
 #include "ObjectDataBase.h"
 
@@ -28,3 +29,5 @@ class ShadowDataBuffer : public ObjectDataBuffer {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__SHADOWDATABUFFER_H

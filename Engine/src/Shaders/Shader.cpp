@@ -47,12 +47,13 @@ Shader::~Shader()
 Shader::Shader(Shader &&other) noexcept
     : m_stages(std::move(other.m_stages)), m_compileInfo(std::move(other.m_compileInfo)), m_status(other.m_status),
       m_pipelineStages(std::move(other.m_pipelineStages)), m_descriptorSetInfos(std::move(other.m_descriptorSetInfos)),
-      m_descriptorSetLayouts(std::move(other.m_descriptorSetLayouts)),
+      m_descriptorSetLayouts(std::move(other.m_descriptorSetLayouts)), m_ownedLayouts(std::move(other.m_ownedLayouts)),
       m_pushConstantLayouts(std::move(other.m_pushConstantLayouts)),
       m_detailedPushConstants(std::move(other.m_detailedPushConstants)), m_materialSets(std::move(other.m_materialSets))
 {
     other.m_status = ShaderStatus::UNINITIALIZED;
     other.m_descriptorSetLayouts.clear();
+    other.m_ownedLayouts.clear();
 }
 
 Shader &Shader::operator=(Shader &&other) noexcept
@@ -66,12 +67,14 @@ Shader &Shader::operator=(Shader &&other) noexcept
         m_pipelineStages = std::move(other.m_pipelineStages);
         m_descriptorSetInfos = std::move(other.m_descriptorSetInfos);
         m_descriptorSetLayouts = std::move(other.m_descriptorSetLayouts);
+        m_ownedLayouts = std::move(other.m_ownedLayouts);
         m_pushConstantLayouts = std::move(other.m_pushConstantLayouts);
         m_detailedPushConstants = std::move(other.m_detailedPushConstants);
         m_materialSets = std::move(other.m_materialSets);
 
         other.m_status = ShaderStatus::UNINITIALIZED;
         other.m_descriptorSetLayouts.clear();
+        other.m_ownedLayouts.clear();
     }
     return *this;
 }
@@ -81,12 +84,13 @@ void Shader::cleanup()
     Application &app = Application::getInstance();
     VkDevice device = app.getVulkanContext().getLogicalDevice();
 
-    for (auto &layout : m_descriptorSetLayouts) {
-        if (layout != VK_NULL_HANDLE) {
-            vkDestroyDescriptorSetLayout(device, layout, nullptr);
+    for (size_t i = 0; i < m_descriptorSetLayouts.size(); ++i) {
+        if (i < m_ownedLayouts.size() && m_ownedLayouts[i] && m_descriptorSetLayouts[i] != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, m_descriptorSetLayouts[i], nullptr);
         }
     }
     m_descriptorSetLayouts.clear();
+    m_ownedLayouts.clear();
 
     for (auto &stage : m_stages) {
         if (stage.module != VK_NULL_HANDLE) {
@@ -263,6 +267,21 @@ void Shader::mergeReflectionData()
         }
     }
 
+    // Parse and apply push constant annotations from GLSL source files
+    // (skip for .spv files as they don't have comments)
+    for (const auto &stage : m_stages) {
+        if (stage.sourcePath.extension() != ".spv") {
+            std::string glslSource = readFileAsString(stage.sourcePath);
+            if (!glslSource.empty()) {
+                auto annotations = parsePushConstantAnnotations(glslSource);
+                if (!annotations.empty()) {
+                    applyPushConstantAnnotations(m_detailedPushConstants, annotations);
+                    break; // Only need annotations from one file
+                }
+            }
+        }
+    }
+
     // Extract material sets
     for (const auto &stage : m_stages) {
         std::vector<DescriptorInfo> stageMaterialSets = extractMaterialSets(stage.spirv);
@@ -342,12 +361,13 @@ bool Shader::createDescriptorLayouts()
     VkDevice device = app.getVulkanContext().getLogicalDevice();
 
     // Clear existing layouts
-    for (auto &layout : m_descriptorSetLayouts) {
-        if (layout != VK_NULL_HANDLE) {
-            vkDestroyDescriptorSetLayout(device, layout, nullptr);
+    for (size_t i = 0; i < m_descriptorSetLayouts.size(); ++i) {
+        if (i < m_ownedLayouts.size() && m_ownedLayouts[i] && m_descriptorSetLayouts[i] != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, m_descriptorSetLayouts[i], nullptr);
         }
     }
     m_descriptorSetLayouts.clear();
+    m_ownedLayouts.clear();
 
     // Determine max set number
     uint32_t maxSetNumber = 0;
@@ -356,6 +376,7 @@ bool Shader::createDescriptorLayouts()
     }
 
     m_descriptorSetLayouts.resize(maxSetNumber + 1, VK_NULL_HANDLE);
+    m_ownedLayouts.resize(maxSetNumber + 1, false);
 
     // Process each set
     for (uint32_t setNumber = 0; setNumber <= maxSetNumber; ++setNumber) {
@@ -378,6 +399,7 @@ bool Shader::createDescriptorLayouts()
 
             if (it != m_descriptorSetInfos.end()) {
                 createDescriptorSetLayoutFromInfo(*it);
+                m_ownedLayouts[setNumber] = true;
             }
         }
     }

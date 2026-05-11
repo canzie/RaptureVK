@@ -62,10 +62,8 @@ void Rapture::CameraController::handleMouseInput(float deltaTime)
     pitch += m_mouseOffset.y;
 
     // Clamp pitch to avoid flipping
-    if (pitch > 89.0f)
-        pitch = 89.0f;
-    if (pitch < -89.0f)
-        pitch = -89.0f;
+    if (pitch > 89.0f) pitch = 89.0f;
+    if (pitch < -89.0f) pitch = -89.0f;
 
     // Update camera front direction
     glm::vec3 front;

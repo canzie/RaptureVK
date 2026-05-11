@@ -322,9 +322,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
         }
 
         // Update world bounding box if transform changed
-        if (transform.hasChanged()) {
-            boundingBoxComp.updateWorldBoundingBox(transform.transformMatrix());
-        }
+        boundingBoxComp.updateWorldBoundingBox(transform);
 
         // Get buffer allocation info to determine batch
         auto vboAlloc = meshComp.mesh->getVertexAllocation();

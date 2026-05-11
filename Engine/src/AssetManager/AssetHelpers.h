@@ -69,47 +69,40 @@ inline std::vector<std::string> getCubemapPaths(const std::filesystem::path &bas
     std::vector<std::string> cubemapPaths;
     cubemapPaths.reserve(6); // Reserve space for 6 faces
 
-    try {
-        auto config = toml::parse_file(basePath.string());
+    toml::parse_result config = toml::parse_file(basePath.string());
+    if (!config) {
+        RP_CORE_ERROR("Failed to parse cubemap file '{}':\n{}", basePath.string(), config.error().description());
+        return cubemapPaths;
+    }
 
-        // Check if paths section exists
-        auto paths_table = config["paths"];
-        if (!paths_table.is_table()) {
-            RP_CORE_ERROR("Cubemap file '{}' does not contain a valid 'paths' section.", basePath.string());
-            return cubemapPaths;
-        }
+    auto paths_table = config["paths"];
+    if (!paths_table.is_table()) {
+        RP_CORE_ERROR("Cubemap file '{}' does not contain a valid 'paths' section.", basePath.string());
+        return cubemapPaths;
+    }
 
-        // Check if paths are relative to the cubemap file
-        bool relative = false;
-        if (auto rel_val = paths_table["relative"].value<bool>()) {
-            relative = *rel_val;
-        }
+    bool relative = false;
+    if (auto rel_val = paths_table["relative"].value<bool>()) {
+        relative = *rel_val;
+    }
 
-        // Get the directory of the cubemap file for relative path resolution
-        std::filesystem::path cubemapDir = basePath.parent_path();
+    std::filesystem::path cubemapDir = basePath.parent_path();
+    const std::array<std::string, 6> faceNames = {"right", "left", "top", "bottom", "front", "back"};
 
-        // Define the order of cubemap faces: right(+X), left(-X), top(+Y), bottom(-Y), front(+Z), back(-Z)
-        const std::array<std::string, 6> faceNames = {"right", "left", "top", "bottom", "front", "back"};
+    for (const auto &faceName : faceNames) {
+        if (auto face_path = paths_table[faceName].value<std::string>()) {
+            std::string finalPath = *face_path;
 
-        for (const auto &faceName : faceNames) {
-            if (auto face_path = paths_table[faceName].value<std::string>()) {
-                std::string finalPath = *face_path;
-
-                // If paths are relative, resolve them relative to the cubemap file
-                if (relative) {
-                    std::filesystem::path resolvedPath = cubemapDir / finalPath;
-                    finalPath = resolvedPath.string();
-                }
-
-                cubemapPaths.push_back(finalPath);
-            } else {
-                RP_CORE_ERROR("Cubemap file '{}' is missing '{}' face path.", basePath.string(), faceName);
-                return {}; // Return empty vector on error
+            if (relative) {
+                std::filesystem::path resolvedPath = cubemapDir / finalPath;
+                finalPath = resolvedPath.string();
             }
-        }
 
-    } catch (const toml::parse_error &err) {
-        RP_CORE_ERROR("Failed to parse cubemap file '{}':\n{}", basePath.string(), err.what());
+            cubemapPaths.push_back(finalPath);
+        } else {
+            RP_CORE_ERROR("Cubemap file '{}' is missing '{}' face path.", basePath.string(), faceName);
+            return {};
+        }
     }
 
     return cubemapPaths;

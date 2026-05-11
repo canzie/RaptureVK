@@ -52,8 +52,6 @@ struct DDGIRelocatePushConstants {
     uint32_t rayDataIndex;
 };
 
-std::unique_ptr<Texture> DynamicDiffuseGI::s_defaultSkyboxTexture = nullptr;
-
 DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     : m_DDGI_ProbeTraceShader(nullptr), m_DDGI_ProbeIrradianceBlendingShader(nullptr), m_DDGI_ProbeDistanceBlendingShader(nullptr),
       m_DDGI_ProbeRelocationShader(nullptr), m_DDGI_ProbeClassificationShader(nullptr), m_DDGI_ProbeTracePipeline(nullptr),
@@ -65,11 +63,8 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
       m_probeDistanceBlendingDescriptorSet(nullptr), m_probeClassificationDescriptorSet(nullptr),
       m_probeRelocationDescriptorSet(nullptr)
 {
-
-    if (!s_defaultSkyboxTexture) {
-        s_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
-    }
-    m_skyboxTexture = s_defaultSkyboxTexture.get();
+    m_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
+    m_skyboxTexture = m_defaultSkyboxTexture.get();
 
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
@@ -504,7 +499,7 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
 
     Texture *newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReady())
                               ? skyboxComp->skyboxTexture
-                              : s_defaultSkyboxTexture.get();
+                              : m_defaultSkyboxTexture.get();
 
     m_skyIntensity = skyboxComp ? skyboxComp->skyIntensity : 1.0f;
 

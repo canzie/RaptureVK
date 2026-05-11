@@ -31,6 +31,7 @@ class VulkanContext {
     std::shared_ptr<SwapChain> getSwapChain() const { return m_swapChain; }
 
     VmaAllocator getVmaAllocator() const { return m_vmaAllocator; }
+    uint32_t getApiVersion() const { return m_applicationInfo.apiVersion; }
 
     uint32_t getGraphicsQueueIndex() const { return m_queueFamilyIndices.familyIndices[GRAPHICS]; }
     uint32_t getComputeQueueIndex() const { return m_queueFamilyIndices.familyIndices[COMPUTE]; }

@@ -1,8 +1,12 @@
-#pragma once
+#ifndef RAPTURE__COMPONENTSCOMMON_H
+#define RAPTURE__COMPONENTSCOMMON_H
 
+#include <cstdint>
 #include <glm/glm.hpp>
 
 namespace Rapture {
+
+using generation_t = uint64_t;
 
 struct InstanceData {
     glm::mat4 transform;
@@ -24,3 +28,5 @@ struct LightData {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__COMPONENTSCOMMON_H

@@ -13,7 +13,7 @@ CameraDataBuffer::CameraDataBuffer(uint32_t frameCount)
 {
 }
 
-void CameraDataBuffer::update(const CameraComponent &camera, uint32_t frameIndex)
+void CameraDataBuffer::onUpdate(const CameraComponent &camera, uint32_t frameIndex)
 {
     CameraUniformBufferObject ubo{};
 

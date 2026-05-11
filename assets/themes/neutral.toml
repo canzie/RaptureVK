@@ -1,0 +1,47 @@
+[metadata]
+name = "Neutral Dark"
+color_space = "srgb"
+
+[colors.background]
+primary = [0.157, 0.157, 0.176]
+secondary = [0.220, 0.220, 0.240]
+tertiary = [0.196, 0.196, 0.216]
+hard = [0.110, 0.110, 0.125]
+soft = [0.196, 0.196, 0.216]
+panel = [0.180, 0.180, 0.200]
+
+[colors.background.levels]
+bg0 = [0.157, 0.157, 0.176]
+bg1 = [0.220, 0.220, 0.240]
+bg2 = [0.286, 0.286, 0.310]
+bg3 = [0.361, 0.361, 0.388]
+bg4 = [0.435, 0.435, 0.463]
+
+[colors.foreground]
+normal = [0.859, 0.859, 0.859]
+muted = [0.682, 0.682, 0.682]
+faint = [0.600, 0.600, 0.600]
+
+[colors.foreground.levels]
+fg1 = [0.859, 0.859, 0.859]
+fg3 = [0.682, 0.682, 0.682]
+fg4 = [0.600, 0.600, 0.600]
+
+[colors.accent]
+primary = [0.408, 0.616, 0.843]
+hover = [0.557, 0.733, 0.980]
+secondary = [0.408, 0.753, 0.753]
+tertiary = [0.843, 0.741, 0.286]
+
+[colors.state]
+success = [0.408, 0.722, 0.408]
+warning = [0.902, 0.557, 0.286]
+error = [0.800, 0.286, 0.286]
+info = [0.408, 0.616, 0.843]
+
+[colors.ui]
+border = [0.361, 0.361, 0.388]
+separator = [0.286, 0.286, 0.310]
+highlight = [0.843, 0.741, 0.286]
+button = [0.514, 0.514, 0.537]
+button_hover = [0.600, 0.600, 0.600]

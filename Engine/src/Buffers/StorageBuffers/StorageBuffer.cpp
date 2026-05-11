@@ -66,7 +66,7 @@ VkBufferUsageFlags StorageBuffer::getBufferUsage()
     case BufferUsage::STAGING:
         return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
-    return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; // fallback}
+    return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 }
 
 VkMemoryPropertyFlags StorageBuffer::getMemoryPropertyFlags()
@@ -81,25 +81,21 @@ VkMemoryPropertyFlags StorageBuffer::getMemoryPropertyFlags()
     case BufferUsage::STAGING:
         return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     }
-    return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT; // fallback
+    return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 }
 
 void StorageBuffer::addDataGPU(void *data, VkDeviceSize size, VkDeviceSize offset)
 {
-    // Check for buffer overflow
     if (offset + size > m_Size) {
         RP_CORE_ERROR("Buffer overflow detected! Attempted to write {} bytes at offset {} in buffer of size {}", size, offset,
                       m_Size);
         return;
     }
 
-    // Create a staging buffer
     StorageBuffer stagingBuffer(size, BufferUsage::STAGING, m_Allocator);
 
-    // Copy data to staging buffer
     stagingBuffer.addData(data, size, 0);
 
-    // Copy from staging buffer to device local buffer
     copyBuffer(stagingBuffer.getBufferVk(), m_Buffer, size);
 }
 uint32_t StorageBuffer::getBindlessIndex()

@@ -122,32 +122,17 @@ void Scene::onUpdate(float dt)
         auto [transform, mesh, material, tag] =
             meshView.get<TransformComponent, MeshComponent, MaterialComponent, TagComponent>(entity);
 
-        // nothing changed
-        if (transform.hasChanged()) {
-            // TODO: This will break the last frame if the transform is not continuesly changed
-            // for example frame 1 and 2 will have isdirty to true, then frame 3 will have isdirty to false
-            // this works here but the other updates like for the lights will break
-            // after this we should be clean
-            if (transform.dirtyFrames == frameCount) {
-                *transform.isDirty = false;
-                transform.dirtyFrames = 0;
-            } else {
-                transform.dirtyFrames++;
-            }
-
-            Entity ent = Entity(entity, this);
-            // publish the event
-            AssetEvents::onMeshTransformChanged().publish(ent.getID());
-        }
-
-        // should be shot for this but feels kindof dumb to do another loop just for the materials
-        // + when there are no more pending texutres, it should be 0 cost since we just check if the vector is empty then return.
         material.material->updatePendingTextures();
 
         uint32_t vertexFlags = mesh.mesh->getVertexBuffer()->getBufferLayout().getFlags();
         uint32_t flags = vertexFlags;
 
-        mesh.meshDataBuffer->update(transform, flags, frameCounter);
+        mesh.meshDataBuffer->onUpdate(transform, flags, frameCounter);
+
+        if (mesh.meshDataBuffer->transformChanged) {
+            Entity ent = Entity(entity, this);
+            AssetEvents::onMeshTransformChanged().publish(ent.getID());
+        }
     }
 
     // Update camera data buffer
@@ -160,7 +145,7 @@ void Scene::onUpdate(float dt)
         if (camera.aspectRatio != aspectRatio) {
             camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane, camera.farPlane);
         }
-        camera.cameraDataBuffer->update(camera, frameCounter);
+        camera.cameraDataBuffer->onUpdate(camera, frameCounter);
     }
 
     // Update light data buffers
@@ -168,10 +153,7 @@ void Scene::onUpdate(float dt)
     for (auto entity : lightView) {
         auto [light, transform] = lightView.get<LightComponent, TransformComponent>(entity);
 
-        if (light.hasChanged(frameCounter) || transform.hasChanged() || light.type == LightType::Directional ||
-            light.type == LightType::Spot) {
-            light.lightDataBuffer->update(transform, light, static_cast<uint32_t>(entity));
-        }
+        light.lightDataBuffer->onUpdate(transform, light, static_cast<uint32_t>(entity));
     }
 
     glm::vec3 cameraPosition = glm::vec3(0.0f);
@@ -198,8 +180,7 @@ void Scene::onUpdate(float dt)
     for (auto entity : shadowView) {
         auto [light, transform, shadow] = shadowView.get<LightComponent, TransformComponent, ShadowComponent>(entity);
 
-        if (shadow.shadowMap && shadow.isActive &&
-            (light.hasChanged(frameCounter) || transform.hasChanged() || light.type == LightType::Spot)) {
+        if (shadow.shadowMap && shadow.isActive && shadow.needsUpdate(light, transform)) {
 
             // Update the shadow map view matrix
             shadow.shadowMap->updateViewMatrix(light, transform, cameraPosition);
@@ -358,10 +339,11 @@ void Scene::updateTLAS()
         auto entity = Entity(instance.entityID, this);
 
         if (entity.isValid()) {
-            auto [transform] = entity.tryGetComponents<TransformComponent>();
-            if (transform && transform->hasChanged()) { // we just lie about the haschanged index, this SHOULD just force a recalc
-                                                        // which is fine, i SHOULD not break logic.
-                instanceUpdates.push_back({instanceIndex, transform->transformMatrix()});
+            auto &transform = entity.getComponent<TransformComponent>();
+            generation_t gen = transform.getGeneration();
+            if (gen != instance.lastTransformGeneration) {
+                instance.lastTransformGeneration = gen;
+                instanceUpdates.push_back({instanceIndex, transform.transformMatrix()});
             }
         }
         instanceIndex++;

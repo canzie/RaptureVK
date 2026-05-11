@@ -61,5 +61,6 @@ release/
 Engine/vendor/*
 !Engine/vendor/vendor_libraries.cmake
 !Engine/vendor/vendor_libraries_self.cmake
+!Engine/vendor/Amethyst
 
 !Editor/vendor/*
