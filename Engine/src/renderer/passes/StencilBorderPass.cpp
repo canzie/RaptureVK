@@ -1,0 +1,328 @@
+#include "renderer/passes/StencilBorderPass.h"
+
+#include "components/Components.h"
+#include "logging/Log.h"
+#include "logging/TracyProfiler.h"
+#include "StencilBorderPass.h"
+#include "window_context/Application.h"
+
+namespace Rapture {
+
+struct StencilBorderPushConstants {
+    glm::mat4 modelMatrix;
+    glm::vec4 color;
+    float borderWidth;
+    uint32_t depthStencilTextureHandle;
+    uint32_t cameraUBOIndex;
+};
+
+StencilBorderPass::StencilBorderPass(float width, float height, uint32_t framesInFlight,
+                                     std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat)
+    : m_width(width), m_height(height), m_colorFormat(colorFormat), m_device(VK_NULL_HANDLE), m_vmaAllocator(nullptr),
+      m_pipeline(nullptr), m_framesInFlight(framesInFlight), m_currentImageIndex(0), m_depthStencilTextures(depthStencilTextures),
+      m_selectedEntity(nullptr)
+{
+
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    m_device = vc.getLogicalDevice();
+    m_vmaAllocator = vc.getVmaAllocator();
+
+    auto &project = app.getProject();
+
+    auto shaderPath = project.getProjectShaderDirectory();
+
+    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/StencilBorder.vs.spv");
+    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    if (m_shader) m_shaderAssets.push_back(std::move(asset));
+
+    createPipeline();
+    setupCommandResources();
+
+    m_entitySelectedListenerId =
+        GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
+}
+
+void StencilBorderPass::setupCommandResources()
+{
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    CommandPoolConfig config = {};
+    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.flags = 0;
+    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
+}
+
+StencilBorderPass::~StencilBorderPass()
+{
+    GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
+}
+
+CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
+                                                  std::shared_ptr<Scene> activeScene, const SecondaryBufferInheritance &inheritance)
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    if (m_selectedEntity == nullptr) {
+        return nullptr;
+    }
+
+    auto [transformComp, meshComp, materialComp] =
+        m_selectedEntity->tryGetComponents<TransformComponent, MeshComponent, MaterialComponent>();
+
+    if (transformComp == nullptr || meshComp == nullptr || meshComp->mesh == nullptr || materialComp == nullptr) {
+        return nullptr;
+    }
+
+    auto camera = activeScene->getMainCamera();
+    if (camera == nullptr) {
+        return nullptr;
+    }
+    auto cameraComp = camera.tryGetComponent<CameraComponent>();
+    if (cameraComp == nullptr) {
+        return nullptr;
+    }
+
+    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrameInFlight);
+    auto commandBuffer = pool->getSecondaryCommandBuffer();
+
+    commandBuffer->beginSecondary(inheritance);
+
+    VkExtent2D targetExtent = renderTarget.getExtent();
+
+    m_currentImageIndex = currentFrameInFlight;
+    m_width = static_cast<float>(targetExtent.width);
+    m_height = static_cast<float>(targetExtent.height);
+
+    m_pipeline->bind(commandBuffer->getCommandBufferVk());
+
+    auto &app = Application::getInstance();
+    auto &vc = app.getVulkanContext();
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = m_width;
+    viewport.height = m_height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer->getCommandBufferVk(), 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = targetExtent;
+    vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
+
+    auto mesh = meshComp->mesh;
+
+    StencilBorderPushConstants pushConstants;
+    pushConstants.modelMatrix = transformComp->transformMatrix();
+    pushConstants.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    pushConstants.borderWidth = 0.01f;
+    pushConstants.depthStencilTextureHandle = m_depthStencilTextures[currentFrameInFlight]->getBindlessIndex();
+    pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentImageIndex);
+
+    vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+                       sizeof(StencilBorderPushConstants), &pushConstants);
+
+    DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // camera stuff
+    DescriptorManager::getDescriptorSet(2)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // model matrix
+    DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // depth texture
+
+    // Get the vertex buffer layout
+    auto &bufferLayout = mesh->getVertexBuffer()->getBufferLayout();
+
+    // Convert to EXT variants required by vkCmdSetVertexInputEXT
+    auto bindingDescription = bufferLayout.getBindingDescription2EXT();
+
+    auto attributeDescriptions = bufferLayout.getAttributeDescriptions2EXT();
+
+    // Use the function pointer from VulkanContext
+    vc.vkCmdSetVertexInputEXT(commandBuffer->getCommandBufferVk(), 1, &bindingDescription,
+                              static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+
+    // Bind vertex buffers
+    VkBuffer vertexBuffers[] = {mesh->getVertexBuffer()->getBufferVk()};
+    VkDeviceSize offsets[] = {mesh->getVertexBuffer()->getOffset()};
+    vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
+
+    // Bind index buffer
+    vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), mesh->getIndexBuffer()->getBufferVk(),
+                         mesh->getIndexBuffer()->getOffset(), mesh->getIndexBuffer()->getIndexType());
+
+    // Draw the mesh
+    vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), mesh->getIndexCount(), 1, 0, 0, 0);
+
+    commandBuffer->end();
+
+    return commandBuffer;
+}
+
+void StencilBorderPass::createPipeline()
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    if (!m_shader) {
+        RP_CORE_ERROR("Shader not loaded, cannot create pipeline.");
+        return;
+    }
+
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                                 VK_DYNAMIC_STATE_VERTEX_INPUT_EXT};
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = nullptr;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = m_width;
+    viewport.height = m_height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_FALSE;
+    depthStencil.depthWriteEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS; // No depth test
+
+    GraphicsPipelineConfiguration config;
+    config.dynamicState = dynamicState;
+    config.inputAssemblyState = inputAssembly;
+    config.viewportState = viewportState;
+    config.rasterizationState = rasterizer;
+    config.multisampleState = multisampling;
+    config.colorBlendState = colorBlending;
+    config.vertexInputState = vertexInputInfo;
+    config.depthStencilState = depthStencil;
+
+    FramebufferSpecification spec;
+    spec.colorAttachments.push_back(m_colorFormat);
+
+    config.framebufferSpec = spec;
+
+    config.shader = m_shader;
+
+    m_pipeline = std::make_shared<GraphicsPipeline>(config);
+}
+
+void StencilBorderPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex)
+{
+    VkImage targetImage = renderTarget.getImage(imageIndex);
+    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
+    VkExtent2D targetExtent = renderTarget.getExtent();
+
+    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
+
+    VkRenderingAttachmentInfo colorAttachmentInfo{};
+    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachmentInfo.imageView = targetImageView;
+    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // Preserve previous pass output
+    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderingInfo.renderArea.offset = {0, 0};
+    renderingInfo.renderArea.extent = targetExtent;
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachmentInfo;
+    renderingInfo.pDepthAttachment = VK_NULL_HANDLE;
+    renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
+    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
+
+    vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
+}
+
+void StencilBorderPass::endDynamicRendering(CommandBuffer *commandBuffer)
+{
+    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+}
+
+void StencilBorderPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage)
+{
+    // Execution barrier to ensure previous pass color writes are complete
+    // before this pass starts writing (write-after-write synchronization)
+    VkImageMemoryBarrier colorBarrier{};
+    colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    colorBarrier.image = targetImage;
+    colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    colorBarrier.subresourceRange.baseMipLevel = 0;
+    colorBarrier.subresourceRange.levelCount = 1;
+    colorBarrier.subresourceRange.baseArrayLayer = 0;
+    colorBarrier.subresourceRange.layerCount = 1;
+    colorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &colorBarrier);
+}
+
+} // namespace Rapture

@@ -1,0 +1,153 @@
+#ifndef RAPTURE__GBUFFERPASS_H
+#define RAPTURE__GBUFFERPASS_H
+
+#include "pipelines/GraphicsPipeline.h"
+#include "renderer/MDIBatch.h"
+#include "shaders/Shader.h"
+
+#include "asset_manager/AssetManager.h"
+#include "buffers/command_buffers/CommandBuffer.h"
+#include "buffers/command_buffers/CommandPool.h"
+#include "buffers/descriptors/DescriptorBinding.h"
+#include "buffers/descriptors/DescriptorManager.h"
+#include "buffers/descriptors/DescriptorSet.h"
+#include "buffers/UniformBuffer.h"
+#include "cameras/CameraCommon.h"
+#include "components/Components.h"
+#include "events/GameEvents.h"
+#include "generators/terrain/TerrainGenerator.h"
+#include "scenes/Scene.h"
+#include "textures/Texture.h"
+#include "window_context/vulkan_context/VulkanContext.h"
+
+#include <cstdint>
+#include <memory>
+
+namespace Rapture {
+
+enum class GBufferFlags : uint32_t {
+    // Vertex attribute flags (bits 0-4)
+    HAS_NORMALS = 1u,
+    HAS_TANGENTS = 2u,
+    HAS_BITANGENTS = 4u,
+    HAS_TEXCOORDS = 8u,
+
+    // Material texture flags (bits 5-13)
+    HAS_ALBEDO_MAP = 32u,
+    HAS_NORMAL_MAP = 64u,
+    HAS_METALLIC_ROUGHNESS_MAP = 128u,
+    HAS_AO_MAP = 256u,
+    HAS_METALLIC_MAP = 512u,
+    HAS_ROUGHNESS_MAP = 1024u,
+    HAS_EMISSIVE_MAP = 2048u,
+    HAS_SPECULAR_MAP = 4096u,
+    HAS_HEIGHT_MAP = 8192u
+};
+
+class GBufferPass {
+  public:
+    GBufferPass(float width, float height, uint32_t framesInFlight);
+    ~GBufferPass();
+
+    static FramebufferSpecification getFramebufferSpecification();
+
+    // Main entry point: records to internal secondary command buffer
+    // Returns the secondary command buffer for the caller to execute
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame,
+                                   const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain = nullptr);
+
+    void beginDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
+    void endDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
+
+    // Getters for current frame's GBuffer textures
+    std::shared_ptr<Texture> getPositionTexture() const { return m_positionDepthTextures[m_currentFrame]; }
+    std::shared_ptr<Texture> getNormalTexture() const { return m_normalTextures[m_currentFrame]; }
+    std::shared_ptr<Texture> getAlbedoTexture() const { return m_albedoSpecTextures[m_currentFrame]; }
+    std::shared_ptr<Texture> getMaterialTexture() const { return m_materialTextures[m_currentFrame]; }
+    std::shared_ptr<Texture> getDepthTexture() const { return m_depthStencilTextures[m_currentFrame]; }
+
+    std::vector<std::shared_ptr<Texture>> getPositionDepthTextures() const { return m_positionDepthTextures; }
+    std::vector<std::shared_ptr<Texture>> getNormalTextures() const { return m_normalTextures; }
+    std::vector<std::shared_ptr<Texture>> getAlbedoSpecTextures() const { return m_albedoSpecTextures; }
+    std::vector<std::shared_ptr<Texture>> getMaterialTextures() const { return m_materialTextures; }
+    std::vector<std::shared_ptr<Texture>> getDepthTextures() const { return m_depthStencilTextures; }
+
+    // Getters for bindless texture indices for current frame
+    uint32_t getPositionTextureIndex() const { return m_positionTextureIndices[m_currentFrame]; }
+    uint32_t getNormalTextureIndex() const { return m_normalTextureIndices[m_currentFrame]; }
+    uint32_t getAlbedoTextureIndex() const { return m_albedoTextureIndices[m_currentFrame]; }
+    uint32_t getMaterialTextureIndex() const { return m_materialTextureIndices[m_currentFrame]; }
+    uint32_t getDepthTextureIndex() const { return m_depthTextureIndices[m_currentFrame]; }
+
+    // Getters for all bindless texture indices
+    const std::vector<uint32_t> &getPositionTextureIndices() const { return m_positionTextureIndices; }
+    const std::vector<uint32_t> &getNormalTextureIndices() const { return m_normalTextureIndices; }
+    const std::vector<uint32_t> &getAlbedoTextureIndices() const { return m_albedoTextureIndices; }
+    const std::vector<uint32_t> &getMaterialTextureIndices() const { return m_materialTextureIndices; }
+    const std::vector<uint32_t> &getDepthTextureIndices() const { return m_depthTextureIndices; }
+
+  private:
+    void createTextures();
+    void createPipeline();
+    void createTerrainPipeline();
+    void bindGBufferTexturesToBindlessSet();
+    void setupCommandResources();
+
+    // Record terrain rendering only
+    void recordTerrainCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, TerrainGenerator &terrain,
+                               uint32_t currentFrame);
+
+    // Record entity rendering only
+    void recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+
+    void setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb, uint32_t currentFrame);
+
+    void transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame);
+
+  private:
+    Shader *m_shader = nullptr;
+    float m_width;
+    float m_height;
+    uint32_t m_framesInFlight;
+    uint32_t m_currentFrame;
+
+    VmaAllocator m_vmaAllocator;
+    VkDevice m_device;
+
+    // Multiple textures for each frame in flight
+    std::vector<std::shared_ptr<Texture>> m_positionDepthTextures;
+    std::vector<std::shared_ptr<Texture>> m_normalTextures;
+    std::vector<std::shared_ptr<Texture>> m_albedoSpecTextures;
+    std::vector<std::shared_ptr<Texture>> m_materialTextures;
+    std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
+
+    // Bindless texture indices for each frame in flight
+    std::vector<uint32_t> m_positionTextureIndices;
+    std::vector<uint32_t> m_normalTextureIndices;
+    std::vector<uint32_t> m_albedoTextureIndices;
+    std::vector<uint32_t> m_materialTextureIndices;
+    std::vector<uint32_t> m_depthTextureIndices;
+
+    std::shared_ptr<GraphicsPipeline> m_pipeline;
+
+    // Terrain rendering
+    Shader *m_terrainShader = nullptr;
+
+    std::vector<AssetRef> m_shaderAssets;
+    std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
+
+    // MDI batching system - one set per frame in flight
+    std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
+    std::vector<std::unique_ptr<MDIBatchMap>> m_selectedEntityBatchMaps; // Separate batches for selected entities
+
+    VkRenderingAttachmentInfo m_colorAttachmentInfo[4];
+    VkRenderingAttachmentInfo m_depthAttachmentInfo;
+
+    std::shared_ptr<Entity> m_selectedEntity;
+    size_t m_entitySelectedListenerId;
+
+    CommandPoolHash m_commandPoolHash = 0;
+};
+
+} // namespace Rapture
+#endif // RAPTURE__GBUFFERPASS_H

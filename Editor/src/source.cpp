@@ -1,12 +1,12 @@
-#include "Layers/TestLayer.h"
-#include "Layers/AmethystLayer.h"
-#include "Logging/Log.h"
-#include "WindowContext/Application.h"
+#include "layers/TestLayer.h"
+#include "layers/AmethystLayer.h"
+#include "logging/Log.h"
+#include "window_context/Application.h"
 
 #include "EntryPoint.h"
-#include "Events/Events.h"
-#include "Scenes/Project.h"
-#include "Scenes/SceneManager.h"
+#include "events/Events.h"
+#include "scenes/Project.h"
+#include "scenes/SceneManager.h"
 
 // The main Editor application class
 class EditorApp : public Rapture::Application {

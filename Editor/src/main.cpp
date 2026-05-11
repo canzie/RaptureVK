@@ -1,7 +1,7 @@
 #include "EntryPoint.h"
-#include "Logging/Log.h"
-#include "RenderTargets/SwapChains/SwapChain.h"
-#include "WindowContext/Application.h"
+#include "logging/Log.h"
+#include "render_targets/swap_chains/SwapChain.h"
+#include "window_context/Application.h"
 
 // The main entry point of the application
 int main(int argc, char **argv)

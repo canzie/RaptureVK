@@ -1,9 +1,9 @@
 #include "JobSystem.h"
 
 #include "Counter.h"
-#include "Logging/TracyProfiler.h"
-#include "Utils/rp_assert.h"
-#include "WindowContext/VulkanContext/TimelineSemaphore.h"
+#include "logging/TracyProfiler.h"
+#include "utils/rp_assert.h"
+#include "window_context/vulkan_context/TimelineSemaphore.h"
 #include "jobs/Job.h"
 #include "jobs/WaitList.h"
 

@@ -1,6 +1,6 @@
 #include "Fiber.h"
 #include "JobSystem.h"
-#include "Logging/TracyProfiler.h"
+#include "logging/TracyProfiler.h"
 #include <cstdlib>
 #include <cstring>
 #include <thread>
