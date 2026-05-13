@@ -25,7 +25,7 @@ class DeferredRenderer : public Renderer {
     DeferredRenderer(RenderContext renderContext, SceneRenderTarget::TargetType targetType);
     ~DeferredRenderer() override;
 
-    void drawFrame(std::shared_ptr<Scene> activeScene) override;
+    void drawFrame(std::shared_ptr<Scene> activeScene, Entity camera) override;
     void onSwapChainRecreated() override;
 
     std::shared_ptr<GBufferPass> getGBufferPass() { return m_gbufferPass; }
@@ -36,7 +36,7 @@ class DeferredRenderer : public Renderer {
     void recreateRenderPasses();
     void processPendingViewportResize();
 
-    void recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t imageIndex);
+    void recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, Entity camera, uint32_t imageIndex);
 
   private:
     std::shared_ptr<GBufferPass> m_gbufferPass;

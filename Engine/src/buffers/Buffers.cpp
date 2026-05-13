@@ -71,8 +71,9 @@ void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize siz
     config.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     config.threadId = 0;
 
-    auto commandPoolHash = CommandPoolManager::createCommandPool(config);
-    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto& rc = app.getVulkanContext().getRenderContext();
+    auto commandPoolHash = rc.commandPoolManager->createCommandPool(config);
+    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
 
     // Create command buffer for transfer
     auto commandBuffer = commandPool->getPrimaryCommandBuffer();

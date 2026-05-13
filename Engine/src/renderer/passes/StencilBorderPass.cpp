@@ -26,6 +26,7 @@ StencilBorderPass::StencilBorderPass(float width, float height, uint32_t framesI
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
+    m_rc = &vc.getRenderContext();
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
@@ -46,13 +47,12 @@ StencilBorderPass::StencilBorderPass(float width, float height, uint32_t framesI
 
 void StencilBorderPass::setupCommandResources()
 {
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
+    auto &vc = Application::getInstance().getVulkanContext();
 
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getGraphicsQueueIndex();
     config.flags = 0;
-    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
+    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
 StencilBorderPass::~StencilBorderPass()
@@ -61,8 +61,9 @@ StencilBorderPass::~StencilBorderPass()
 }
 
 CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
-                                                  std::shared_ptr<Scene> activeScene, const SecondaryBufferInheritance &inheritance)
+                                                  std::shared_ptr<Scene> activeScene, Entity camera, const SecondaryBufferInheritance &inheritance)
 {
+    (void)activeScene;
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_selectedEntity == nullptr) {
@@ -76,8 +77,7 @@ CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarge
         return nullptr;
     }
 
-    auto camera = activeScene->getMainCamera();
-    if (camera == nullptr) {
+    if (!camera.isValid()) {
         return nullptr;
     }
     auto cameraComp = camera.tryGetComponent<CameraComponent>();
@@ -85,7 +85,7 @@ CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarge
         return nullptr;
     }
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrameInFlight);
+    auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash, currentFrameInFlight);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
@@ -127,9 +127,9 @@ CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarge
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(StencilBorderPushConstants), &pushConstants);
 
-    DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // camera stuff
-    DescriptorManager::getDescriptorSet(2)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // model matrix
-    DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // depth texture
+    m_rc->descriptorManager->getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // camera stuff
+    m_rc->descriptorManager->getDescriptorSet(2)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // model matrix
+    m_rc->descriptorManager->getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline); // depth texture
 
     // Get the vertex buffer layout
     auto &bufferLayout = mesh->getVertexBuffer()->getBufferLayout();

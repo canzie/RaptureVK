@@ -1,7 +1,7 @@
 #include "GlfwWindowContext.h"
-#include "../../events/ApplicationEvents.h"
-#include "../../events/InputEvents.h"
-#include "../../logging/Log.h" // Assuming you have a logger
+#include "events/ApplicationEvents.h"
+#include "events/InputEvents.h"
+#include "logging/Log.h"
 
 #include <stdexcept> // For std::runtime_error
 

@@ -44,7 +44,8 @@ StorageBuffer::~StorageBuffer()
 {
 
     if (m_bindlessIndex != UINT32_MAX) {
-        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+        auto& rc = Application::getInstance().getVulkanContext().getRenderContext();
+        auto set = rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
         if (set) {
             auto binding = set->getSSBOBinding(DescriptorSetBindingLocation::BINDLESS_SSBOS);
             if (binding) {
@@ -104,7 +105,8 @@ uint32_t StorageBuffer::getBindlessIndex()
         return m_bindlessIndex;
     }
 
-    auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+    auto& rc = Application::getInstance().getVulkanContext().getRenderContext();
+    auto set = rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
     if (set) {
         auto binding = set->getSSBOBinding(DescriptorSetBindingLocation::BINDLESS_SSBOS);
 

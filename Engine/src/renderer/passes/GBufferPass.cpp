@@ -40,6 +40,7 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
+    m_rc = &vc.getRenderContext();
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
@@ -51,8 +52,8 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     m_mdiBatchMaps.resize(framesInFlight);
     m_selectedEntityBatchMaps.resize(framesInFlight);
     for (uint32_t i = 0; i < framesInFlight; i++) {
-        m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>();
-        m_selectedEntityBatchMaps[i] = std::make_unique<MDIBatchMap>();
+        m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>(*m_rc);
+        m_selectedEntityBatchMaps[i] = std::make_unique<MDIBatchMap>(*m_rc);
     }
 
     // Bind GBuffer textures to bindless set
@@ -74,7 +75,7 @@ void GBufferPass::setupCommandResources()
     config.flags = 0;
     size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
     config.threadId = threadId;
-    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
+    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
 GBufferPass::~GBufferPass()
@@ -112,7 +113,7 @@ FramebufferSpecification GBufferPass::getFramebufferSpecification()
     return spec;
 }
 
-CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame,
+CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, uint32_t currentFrame,
                                             const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -128,25 +129,25 @@ CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, 
     config.flags = 0;
     size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
     config.threadId = threadId;
-    auto hash = CommandPoolManager::createCommandPool(config);
+    auto hash = m_rc->commandPoolManager->createCommandPool(config);
 
-    auto pool = CommandPoolManager::getCommandPool(hash);
+    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
 
     if (terrain && terrain->isInitialized()) {
-        recordTerrainCommands(commandBuffer, activeScene, *terrain, currentFrame);
+        recordTerrainCommands(commandBuffer, activeScene, camera, *terrain, currentFrame);
     }
 
-    recordEntityCommands(commandBuffer, activeScene, currentFrame);
+    recordEntityCommands(commandBuffer, activeScene, camera, currentFrame);
 
     commandBuffer->end();
 
     return commandBuffer;
 }
 
-void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, uint32_t currentFrame)
+void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, Entity camera, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -172,12 +173,10 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     // Get entities with TransformComponent and MeshComponent
     auto &registry = activeScene->getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, MaterialComponent, BoundingBoxComponent>();
-    auto mainCamera = activeScene->getMainCamera();
-
     CameraComponent *cameraComp = nullptr;
 
-    if (mainCamera) {
-        cameraComp = mainCamera.tryGetComponent<CameraComponent>();
+    if (camera.isValid()) {
+        cameraComp = camera.tryGetComponent<CameraComponent>();
     }
 
     // Begin frame for MDI batching - use current frame's batch maps
@@ -185,10 +184,10 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     m_selectedEntityBatchMaps[currentFrame]->beginFrame();
 
     // bind descriptor sets
-    DescriptorManager::bindSet(0, secondaryCb, m_pipeline); // camera stuff
-    DescriptorManager::bindSet(1, secondaryCb, m_pipeline); // materials
-    DescriptorManager::bindSet(2, secondaryCb, m_pipeline); // model data
-    DescriptorManager::bindSet(3, secondaryCb, m_pipeline); // bindless textures for the material stuff
+    m_rc->descriptorManager->bindSet(0, secondaryCb, m_pipeline); // camera stuff
+    m_rc->descriptorManager->bindSet(1, secondaryCb, m_pipeline); // materials
+    m_rc->descriptorManager->bindSet(2, secondaryCb, m_pipeline); // model data
+    m_rc->descriptorManager->bindSet(3, secondaryCb, m_pipeline); // bindless textures for the material stuff
 
     // First pass: Populate MDI batches with mesh data
     for (auto entity : view) {
@@ -800,22 +799,22 @@ void GBufferPass::createTerrainPipeline()
     RP_CORE_TRACE("GBufferPass: Terrain pipeline created");
 }
 
-void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, TerrainGenerator &terrain,
-                                        uint32_t currentFrame)
+void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, Entity camera,
+                                        TerrainGenerator &terrain, uint32_t currentFrame)
 {
+    (void)activeScene;
     RAPTURE_PROFILE_FUNCTION();
 
     if (!m_terrainPipeline || !terrain.isInitialized()) {
         return;
     }
 
-    auto mainCamera = activeScene->getMainCamera();
-    if (!mainCamera) {
+    if (!camera.isValid()) {
         return;
     }
 
-    auto *cameraComp = mainCamera.tryGetComponent<CameraComponent>();
-    if (!cameraComp) {
+    auto *cameraComp = camera.tryGetComponent<CameraComponent>();
+    if (cameraComp == nullptr) {
         return;
     }
 
@@ -842,9 +841,9 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
     scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline); // Camera + chunk data SSBOs
-    DescriptorManager::bindSet(1, commandBuffer, m_terrainPipeline); // Materials
-    DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline); // Bindless textures
+    m_rc->descriptorManager->bindSet(0, commandBuffer, m_terrainPipeline); // Camera + chunk data SSBOs
+    m_rc->descriptorManager->bindSet(1, commandBuffer, m_terrainPipeline); // Materials
+    m_rc->descriptorManager->bindSet(3, commandBuffer, m_terrainPipeline); // Bindless textures
 
     const auto &terrainConfig = terrain.getConfig();
 

@@ -9,8 +9,8 @@
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "render_targets/swap_chains/SwapChain.h"
-#include "renderer/DeferredRenderer.h"
 #include "scenes/SceneManager.h"
+#include "viewport/ViewportManager.h"
 #include "window_context/Application.h"
 
 #include <components/common.h>
@@ -181,7 +181,7 @@ void AmethystLayer::onAttach()
     config.flags = 0;
     config.threadId = 0;
 
-    m_commandPoolHash = Rapture::CommandPoolManager::createCommandPool(config);
+    m_commandPoolHash = vulkanContext.getRenderContext().commandPoolManager->createCommandPool(config);
     m_imageCount = swapChain->getImageCount();
     m_currentFrame = 0;
 }
@@ -218,8 +218,9 @@ void AmethystLayer::onUpdate(float ts)
     VkSemaphore imageAvailableSemaphore = swapChain->getImageAvailableSemaphore(m_currentFrame);
     VkSemaphore renderFinishedSemaphore = swapChain->getRenderFinishedSemaphore(m_currentImageIndex);
 
-    auto sceneRenderTarget = Rapture::DeferredRenderer::getSceneRenderTarget();
-    if (sceneRenderTarget) {
+    auto* sceneViewport = app.getViewportManager().getPrimaryViewport();
+    auto* sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
+    if (sceneRenderTarget != nullptr) {
         auto texture = sceneRenderTarget->getTexture(m_currentFrame);
         if (texture) {
             if (m_viewportTextureIds[m_currentFrame].isValid()) {
@@ -237,7 +238,7 @@ void AmethystLayer::onUpdate(float ts)
         m_window.draw(m_drawContext);
     }
 
-    auto pool = Rapture::CommandPoolManager::getCommandPool(m_commandPoolHash, m_currentFrame);
+    auto pool = vulkanContext.getRenderContext().commandPoolManager->getCommandPool(m_commandPoolHash, m_currentFrame);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
     if (commandBuffer->begin(0) != VK_SUCCESS) {

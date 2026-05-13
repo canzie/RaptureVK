@@ -68,6 +68,7 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
 
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
+    m_rc = &vc.getRenderContext();
     m_allocator = vc.getVmaAllocator();
     m_computeQueue = vc.getComputeQueue();
 
@@ -78,7 +79,7 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
     poolConfig.flags = 0;
 
-    m_commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(poolConfig);
 
     initProbeInfoBuffer();
     initTextures();
@@ -187,7 +188,7 @@ uint32_t DynamicDiffuseGI::getSunLightDataIndex(std::shared_ptr<Scene> scene)
 
 void DynamicDiffuseGI::clearTextures()
 {
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash);
+    auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
     if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
@@ -296,8 +297,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
         RP_CORE_WARN("Scene TLAS is not built");
         return;
     }
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
+    auto &vc = Application::getInstance().getVulkanContext();
 
     CommandPoolConfig poolConfig;
     poolConfig.name = "DDGI Command Pool";
@@ -306,9 +306,9 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
     poolConfig.threadId = threadId;
 
-    auto hash = CommandPoolManager::createCommandPool(poolConfig);
+    auto hash = m_rc->commandPoolManager->createCommandPool(poolConfig);
 
-    auto pool = CommandPoolManager::getCommandPool(hash, frameIndex);
+    auto pool = m_rc->commandPoolManager->getCommandPool(hash, frameIndex);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
     if (commandBuffer->begin() != VK_SUCCESS) {
@@ -384,8 +384,8 @@ void DynamicDiffuseGI::classifyProbes(CommandBuffer *commandBuffer)
 
     // Bind pipeline and descriptor sets
     m_DDGI_ProbeClassificationPipeline->bind(commandBuffer->getCommandBufferVk());
-    DescriptorManager::bindSet(0, commandBuffer, m_DDGI_ProbeClassificationPipeline);
-    DescriptorManager::bindSet(3, commandBuffer, m_DDGI_ProbeClassificationPipeline);
+    m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeClassificationPipeline);
+    m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeClassificationPipeline);
     m_probeClassificationDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeClassificationPipeline);
 
     // Push constants
@@ -423,8 +423,8 @@ void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer)
 
     // Bind pipeline and descriptor sets
     m_DDGI_ProbeRelocationPipeline->bind(commandBuffer->getCommandBufferVk());
-    DescriptorManager::bindSet(0, commandBuffer, m_DDGI_ProbeRelocationPipeline);
-    DescriptorManager::bindSet(3, commandBuffer, m_DDGI_ProbeRelocationPipeline);
+    m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeRelocationPipeline);
+    m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeRelocationPipeline);
     m_probeRelocationDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeRelocationPipeline);
 
     // Push constants
@@ -565,14 +565,14 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, CommandBuffer *com
 
     // Use the new descriptor manager system
     // Set 0: Common resources (camera, lights, shadows, probe volume)
-    DescriptorManager::bindSet(0, commandBuffer, m_DDGI_ProbeTracePipeline);
+    m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeTracePipeline);
 
     // Set 1: Material resources (not used in DDGI)
     // Set 2: Object/Mesh resources (mesh data SSBO)
-    // DescriptorManager::bindSet(2, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
+    // m_rc->descriptorManager->bindSet(2, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
 
     // Set 3: Bindless arrays
-    DescriptorManager::bindSet(3, commandBuffer, m_DDGI_ProbeTracePipeline);
+    m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeTracePipeline);
 
     // Set 4: DDGI specific storage images
     m_probeTraceDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline);
@@ -642,8 +642,8 @@ void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer)
     m_DDGI_ProbeIrradianceBlendingPipeline->bind(commandBuffer->getCommandBufferVk());
 
     // Use the new descriptor manager system for blending shaders
-    DescriptorManager::bindSet(0, commandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // probe volume
-    DescriptorManager::bindSet(3, commandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // bindless
+    m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // probe volume
+    m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // bindless
     m_probeIrradianceBlendingDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeIrradianceBlendingPipeline);
 
     // Set push constants for radiance blending
@@ -661,8 +661,8 @@ void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer)
     // Distance blending shader
     m_DDGI_ProbeDistanceBlendingPipeline->bind(commandBuffer->getCommandBufferVk());
 
-    DescriptorManager::bindSet(0, commandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // probe volume
-    DescriptorManager::bindSet(3, commandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // bindless
+    m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // probe volume
+    m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // bindless
     m_probeDistanceBlendingDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeDistanceBlendingPipeline);
 
     // Set push constants for visibility blending
@@ -891,7 +891,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
     m_ProbeInfoBuffer->addData(&probeVolume, sizeof(ProbeVolume), 0);
 
     // Add probe volume UBO to the descriptor manager immediately
-    auto probeInfoSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
+    auto probeInfoSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
     if (probeInfoSet) {
         auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
         if (binding) {

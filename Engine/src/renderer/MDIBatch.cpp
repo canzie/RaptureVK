@@ -10,10 +10,10 @@
 namespace Rapture {
 static constexpr uint32_t INITIAL_BATCH_SIZE = 128;
 
-MDIBatch::MDIBatch(std::shared_ptr<BufferAllocation> vboArena, std::shared_ptr<BufferAllocation> iboArena,
-                   BufferLayout &bufferLayout, VkIndexType indexType)
-    : m_vboArenaId(vboArena->parentArena->id), m_iboArenaId(iboArena->parentArena->id), m_bufferLayout(bufferLayout),
-      m_indexType(indexType)
+MDIBatch::MDIBatch(RenderContext renderContext, std::shared_ptr<BufferAllocation> vboArena,
+                   std::shared_ptr<BufferAllocation> iboArena, BufferLayout &bufferLayout, VkIndexType indexType)
+    : m_rc(renderContext), m_vboArenaId(vboArena->parentArena->id), m_iboArenaId(iboArena->parentArena->id),
+      m_bufferLayout(bufferLayout), m_indexType(indexType)
 {
     m_vertexBuffer = vboArena->getBuffer();
     m_indexBuffer = iboArena->getBuffer();
@@ -24,7 +24,7 @@ MDIBatch::~MDIBatch()
 {
     // Free the descriptor binding if it was allocated
     if (m_batchInfoBufferIndex != UINT32_MAX) {
-        auto descriptorSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
+        auto descriptorSet = m_rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
         if (descriptorSet) {
             auto ssboBinding = descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
             if (ssboBinding) {
@@ -80,7 +80,7 @@ void MDIBatch::uploadBuffers()
 
         // If resizing, we need to free the old descriptor binding first
         if (m_buffersCreated && m_batchInfoBufferIndex != UINT32_MAX) {
-            auto descriptorSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
+            auto descriptorSet = m_rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
             if (descriptorSet) {
                 auto ssboBinding = descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
                 if (ssboBinding) {
@@ -97,7 +97,7 @@ void MDIBatch::uploadBuffers()
         m_batchInfoBuffer = std::make_shared<StorageBuffer>(newSize * sizeof(ObjectInfo), BufferUsage::STREAM, allocator);
 
         // Add new batch info buffer to descriptor set and get index
-        auto descriptorSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
+        auto descriptorSet = m_rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
         if (descriptorSet) {
             auto ssboBinding = descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS);
             if (ssboBinding) {
@@ -149,6 +149,11 @@ uint32_t MDIBatch::getBatchInfoBufferIndex() const
     return m_batchInfoBufferIndex;
 }
 
+MDIBatchMap::MDIBatchMap(RenderContext renderContext)
+    : m_rc(renderContext)
+{
+}
+
 void MDIBatchMap::beginFrame()
 {
     for (auto &[key, batch] : m_batches) {
@@ -165,7 +170,7 @@ MDIBatch *MDIBatchMap::obtainBatch(std::shared_ptr<BufferAllocation> vboArena, s
         return it->second.get();
     }
 
-    auto newBatch = std::make_unique<MDIBatch>(vboArena, iboArena, bufferLayout, indexType);
+    auto newBatch = std::make_unique<MDIBatch>(m_rc, vboArena, iboArena, bufferLayout, indexType);
     MDIBatch *batchPtr = newBatch.get();
     m_batches[key] = std::move(newBatch);
     return batchPtr;

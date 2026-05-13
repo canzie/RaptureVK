@@ -14,6 +14,8 @@
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
 
+#include "window_context/vulkan_context/RenderContext.h"
+
 #include "glm/glm.hpp"
 #include <memory>
 #include <vector>
@@ -28,7 +30,7 @@ class StencilBorderPass {
     ~StencilBorderPass();
 
     CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
-                                   std::shared_ptr<Scene> activeScene, const SecondaryBufferInheritance &inheritance);
+                                   std::shared_ptr<Scene> activeScene, Entity camera, const SecondaryBufferInheritance &inheritance);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex);
     void endDynamicRendering(CommandBuffer *commandBuffer);
@@ -40,6 +42,7 @@ class StencilBorderPass {
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage);
 
   private:
+    const RenderContext *m_rc = nullptr;
     float m_width;
     float m_height;
     VkFormat m_colorFormat;

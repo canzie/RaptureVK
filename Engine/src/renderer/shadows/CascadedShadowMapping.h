@@ -23,6 +23,8 @@
 
 #include "scenes/Scene.h"
 
+#include "window_context/vulkan_context/RenderContext.h"
+
 #include <array>
 #include <glm/glm.hpp>
 #include <memory>
@@ -106,6 +108,7 @@ class CascadedShadowMap {
                                                    ProjectionType cameraProjectionType);    // Type of projection used by the camera
 
   private:
+    const RenderContext *m_rc = nullptr;
     float m_width;
     float m_height;
     float m_lambda;

@@ -1,8 +1,9 @@
 #include "Application.h"
 
+#include "asset_manager/AssetManager.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
-#include "renderer/DeferredRenderer.h"
+#include "materials/Material.h"
 #include "utils/Timestep.h"
 #include "jobs/JobSystem.h"
 
@@ -24,6 +25,8 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     RP_CORE_INFO("Creating Vulkan context...");
     m_vulkanContext = std::unique_ptr<VulkanContext>(new VulkanContext(m_window.get()));
+
+    AssetManager::init();
 
     m_vulkanContext->initManagers();
     m_vulkanContext->createResources();
@@ -78,10 +81,14 @@ Application::Application(int width, int height, const char *title) : m_running(t
     m_project->setProjectRootDirectory(root_dir);
     m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/");
 
-    AssetManager::init();
-    MaterialManager::init();
+    m_viewportManager = std::make_unique<ViewportManager>(m_vulkanContext->getRenderContext());
 
-    DeferredRenderer::init();
+    auto swapExtent = m_vulkanContext->getSwapChain()->getExtent();
+    auto *primaryViewport = m_viewportManager->createViewport(
+        "main", SceneRenderTarget::TargetType::OFFSCREEN, swapExtent.width, swapExtent.height);
+    primaryViewport->createRenderer(RendererType::DEFERRED);
+
+    MaterialManager::init();
 
     ApplicationEvents::onWindowClose().addListener([this]() { m_running = false; });
 
@@ -105,7 +112,7 @@ Application::~Application()
     m_layerStack.clear();
     m_project.reset();
 
-    DeferredRenderer::shutdown();
+    m_viewportManager.reset();
 
     MaterialManager::shutdown();
     AssetManager::shutdown();
@@ -138,11 +145,17 @@ void Application::run()
         }
 
         auto activeScene = m_project->getActiveScene();
-        if (activeScene) {
+        if (activeScene != nullptr) {
             activeScene->onUpdate(Timestep::deltaTime());
-
-            DeferredRenderer::drawFrame(activeScene);
         }
+
+        // TODO: scene-viewport binding should not live in the main loop
+        auto *primaryViewport = m_viewportManager->getPrimaryViewport();
+        if (primaryViewport != nullptr && activeScene != nullptr) {
+            primaryViewport->setScene(activeScene);
+        }
+
+        m_viewportManager->drawAll();
 
         for (auto it = m_layerStack.overlayBegin(); it != m_layerStack.overlayEnd(); ++it) {
             (*it)->onUpdate(Timestep::deltaTime());

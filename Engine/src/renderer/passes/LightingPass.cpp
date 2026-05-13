@@ -42,6 +42,7 @@ LightingPass::LightingPass(float width, float height, std::shared_ptr<GBufferPas
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
+    m_rc = &vc.getRenderContext();
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
@@ -83,22 +84,21 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
     return spec;
 }
 
-CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene, SceneRenderTarget &renderTarget,
+CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, SceneRenderTarget &renderTarget,
                                              const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
+    auto &vc = Application::getInstance().getVulkanContext();
 
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getGraphicsQueueIndex();
     config.flags = 0;
     size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
     config.threadId = threadId;
-    auto hash = CommandPoolManager::createCommandPool(config);
+    auto hash = m_rc->commandPoolManager->createCommandPool(config);
 
-    auto pool = CommandPoolManager::getCommandPool(hash);
+    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
@@ -125,10 +125,9 @@ CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene,
     scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    auto camera = activeScene->getMainCamera();
     glm::vec3 cameraPos = glm::vec3(0.0f);
 
-    if (camera != nullptr) {
+    if (camera.isValid()) {
         cameraPos = camera.tryGetComponent<TransformComponent>()->translation();
     } else {
         RP_CORE_WARN("No main camera found!");
@@ -184,9 +183,9 @@ CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene,
                        sizeof(LightingPushConstants), &pushConstants);
 
     // light and shadow and probe volume data
-    DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
+    m_rc->descriptorManager->getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
     // bindless textures for gbuffer textures
-    DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
+    m_rc->descriptorManager->getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
 
     // Draw 6 vertices for 2 triangles
     vkCmdDraw(commandBuffer->getCommandBufferVk(), 6, 1, 0, 0);

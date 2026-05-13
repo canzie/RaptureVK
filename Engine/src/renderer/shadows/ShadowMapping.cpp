@@ -23,6 +23,7 @@ ShadowMap::ShadowMap(float width, float height) : m_width(width), m_height(heigh
     // Get the frame count from the application
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
+    m_rc = &vulkanContext.getRenderContext();
     auto swapchain = vulkanContext.getSwapChain();
     m_framesInFlight = swapchain->getImageCount();
     m_allocator = vulkanContext.getVmaAllocator();
@@ -33,13 +34,12 @@ ShadowMap::ShadowMap(float width, float height) : m_width(width), m_height(heigh
 
 void ShadowMap::setupCommandResources()
 {
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
+    auto &vc = Application::getInstance().getVulkanContext();
 
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getGraphicsQueueIndex();
     config.flags = 0;
-    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
+    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
 ShadowMap::~ShadowMap() {}
@@ -213,7 +213,7 @@ CommandBuffer *ShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, ui
 
     m_currentFrame = currentFrame;
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrame);
+    auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash, currentFrame);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     SecondaryBufferInheritance inheritance{};
@@ -240,7 +240,7 @@ CommandBuffer *ShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, ui
 
     // Bind descriptor sets
     // via pushconstants for now, since it is only one matrix
-    // DescriptorManager::bindSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO, commandBuffer, m_pipeline);
+    // m_rc->descriptorManager->bindSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
     auto &registry = activeScene->getRegistry();

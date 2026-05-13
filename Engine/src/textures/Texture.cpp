@@ -287,8 +287,8 @@ void Texture::startAsyncLoad(Counter *completionCounter)
             poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
             poolConfig.threadId = threadId;
 
-            auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-            auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+            auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
+            auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
             auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
             commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -503,8 +503,8 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
         poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
         poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
 
-        auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-        auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+        auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
+        auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
         internalCommandBuffer = commandPool->getPrimaryCommandBuffer();
         commandBufferVk = internalCommandBuffer->getCommandBufferVk();
 
@@ -675,7 +675,7 @@ uint32_t Texture::getBindlessIndex()
 
     // Initialize the bindless buffer pool if not already done
     if (s_bindlessTextures == nullptr) {
-        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+        auto set = Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
         if (set) {
             s_bindlessTextures = set->getTextureBinding(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
         }
@@ -987,8 +987,8 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
     poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     poolConfig.threadId = threadId;
 
-    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
     auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -1091,8 +1091,8 @@ void Texture::generateMipmaps()
     poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     poolConfig.threadId = threadId;
 
-    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
     auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -1191,8 +1191,8 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
     poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     poolConfig.threadId = threadId;
 
-    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
     auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -1338,8 +1338,8 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
     poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     poolConfig.threadId = threadId;
 
-    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
     auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -1413,8 +1413,8 @@ void Texture::setPixels(std::span<const uint8_t> data)
     poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
     poolConfig.threadId = threadId;
 
-    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
     auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);

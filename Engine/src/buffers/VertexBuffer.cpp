@@ -21,7 +21,8 @@ VertexBuffer::VertexBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator al
 VertexBuffer::VertexBuffer(BufferAllocationRequest &request, VmaAllocator allocator, void *data)
     : Buffer(request.size, request.usage, allocator), m_bufferLayout(request.layout)
 {
-    auto &bufferPoolManager = BufferPoolManager::getInstance();
+    auto &app = Application::getInstance();
+    auto &bufferPoolManager = *app.getVulkanContext().getRenderContext().bufferPoolManager;
 
     request.type = BufferType::VERTEX;
     m_bufferAllocation = bufferPoolManager.allocateBuffer(request);
@@ -90,7 +91,8 @@ uint32_t VertexBuffer::getBindlessIndex()
     }
 
     if (s_bindlessBuffers == nullptr) {
-        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+        auto& rc = Application::getInstance().getVulkanContext().getRenderContext();
+        auto set = rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
         if (set) {
             s_bindlessBuffers = set->getSSBOBinding(DescriptorSetBindingLocation::BINDLESS_SSBOS);
         }

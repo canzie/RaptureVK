@@ -67,7 +67,8 @@ void TerrainCuller::initCullPipeline()
     poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
     poolConfig.flags = 0;
 
-    m_commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto& rc = vc.getRenderContext();
+    m_commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 
     RP_CORE_TRACE("TerrainCuller: Cull compute pipeline initialized");
 }
@@ -110,7 +111,8 @@ void TerrainCuller::runCull(TerrainCullBuffers &buffers, uint32_t frustumBindles
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash);
+    auto& rc = vc.getRenderContext();
+    auto pool = rc.commandPoolManager->getCommandPool(m_commandPoolHash);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -127,7 +129,7 @@ void TerrainCuller::runCull(TerrainCullBuffers &buffers, uint32_t frustumBindles
                          0, nullptr);
 
     m_cullPipeline->bind(cmd);
-    DescriptorManager::bindSet(3, commandBuffer, m_cullPipeline);
+    rc.descriptorManager->bindSet(3, commandBuffer, m_cullPipeline);
 
     bool useForcedLOD = buffers.processedLODs.size() == 1;
     uint32_t forcedLODValue = useForcedLOD ? buffers.processedLODs[0] : 0;

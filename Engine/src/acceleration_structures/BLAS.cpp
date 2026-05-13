@@ -239,8 +239,9 @@ void BLAS::build()
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
 
-    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto &rc = vulkanContext.getRenderContext();
+    auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
     auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);

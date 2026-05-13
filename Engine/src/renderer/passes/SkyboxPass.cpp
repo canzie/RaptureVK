@@ -19,6 +19,7 @@ SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFo
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
+    m_rc = &vc.getRenderContext();
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
@@ -52,17 +53,14 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
         return nullptr;
     }
 
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
     CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
+    config.queueFamilyIndex = Application::getInstance().getVulkanContext().getGraphicsQueueIndex();
     config.flags = 0;
     size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
     config.threadId = threadId;
-    auto hash = CommandPoolManager::createCommandPool(config);
+    auto hash = m_rc->commandPoolManager->createCommandPool(config);
 
-    auto pool = CommandPoolManager::getCommandPool(hash);
+    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
@@ -106,12 +104,12 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
                        sizeof(SkyboxPushConstants), &pushConstants);
 
-    auto cameraSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::CAMERA_UBO);
+    auto cameraSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::CAMERA_UBO);
     if (cameraSet) {
         cameraSet->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
     }
 
-    auto skyboxSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+    auto skyboxSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
     if (skyboxSet) {
         skyboxSet->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
     }

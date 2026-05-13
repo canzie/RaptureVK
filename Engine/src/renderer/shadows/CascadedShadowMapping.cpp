@@ -41,6 +41,7 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
     // Get VMA allocator and frames in flight from application
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
+    m_rc = &vulkanContext.getRenderContext();
     auto swapchain = vulkanContext.getSwapChain();
     m_framesInFlight = swapchain->getImageCount();
     m_allocator = vulkanContext.getVmaAllocator();
@@ -53,7 +54,7 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
     // Initialize MDI batching system - one per frame in flight
     m_mdiBatchMaps.resize(m_framesInFlight);
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
-        m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>();
+        m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>(*m_rc);
     }
 
     // Create flattened texture for debugging/visualization
@@ -64,13 +65,12 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
 
 void CascadedShadowMap::setupCommandResources()
 {
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
+    auto &vc = Application::getInstance().getVulkanContext();
 
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getGraphicsQueueIndex();
     config.flags = 0;
-    m_commandPoolHash = CommandPoolManager::createCommandPool(config);
+    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
 CascadedShadowMap::~CascadedShadowMap() {}
@@ -268,7 +268,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
 
     auto &registry = activeScene->getRegistry();
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash, currentFrame);
+    auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash, currentFrame);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     SecondaryBufferInheritance inheritance{};
@@ -299,8 +299,8 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
     scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    DescriptorManager::bindSet(0, commandBuffer, m_pipeline);
-    DescriptorManager::bindSet(2, commandBuffer, m_pipeline);
+    m_rc->descriptorManager->bindSet(0, commandBuffer, m_pipeline);
+    m_rc->descriptorManager->bindSet(2, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
     auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
@@ -850,8 +850,8 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, Terr
     scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    DescriptorManager::bindSet(0, commandBuffer, m_terrainPipeline);
-    DescriptorManager::bindSet(3, commandBuffer, m_terrainPipeline);
+    m_rc->descriptorManager->bindSet(0, commandBuffer, m_terrainPipeline);
+    m_rc->descriptorManager->bindSet(3, commandBuffer, m_terrainPipeline);
 
     if (m_terrainShadowBuffers.indirectBuffers.empty() || !m_terrainShadowBuffers.drawCountBuffer) {
         return;
@@ -931,7 +931,7 @@ void CascadedShadowMap::createUniformBuffers()
     m_cascadeMatricesBuffer = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::STREAM, m_allocator, nullptr);
 
     // Add to descriptor set
-    auto cascadeSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
+    auto cascadeSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
     if (cascadeSet) {
         auto binding = cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
         if (binding) {

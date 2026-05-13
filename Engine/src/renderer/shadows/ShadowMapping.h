@@ -18,6 +18,8 @@
 
 #include "components/systems/object_data_buffers/ShadowDataBuffer.h"
 
+#include "window_context/vulkan_context/RenderContext.h"
+
 #include <glm/glm.hpp>
 #include <memory>
 
@@ -57,6 +59,7 @@ class ShadowMap {
     void setupCommandResources();
 
   private:
+    const RenderContext *m_rc = nullptr;
     float m_width;
     float m_height;
     uint32_t m_currentFrame = 0;

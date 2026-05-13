@@ -28,7 +28,7 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarge
     setupCommandResources();
     createRenderTarget();
 
-    m_rtInstanceData = std::make_shared<RtInstanceData>();
+    m_rtInstanceData = std::make_shared<RtInstanceData>(m_renderContext);
     m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
 
     // Get the render target format for pipeline creation
@@ -92,7 +92,7 @@ DeferredRenderer::~DeferredRenderer()
     m_swapChain.reset();
 }
 
-void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
+void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene, Entity camera)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -128,7 +128,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene)
     auto pool = m_renderContext.commandPoolManager->getCommandPool(m_commandPoolHash, m_currentFrame);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
-    recordCommandBuffer(commandBuffer, activeScene, imageIndex);
+    recordCommandBuffer(commandBuffer, activeScene, camera, imageIndex);
 
     VkSemaphore frWaitSemaphores[1];
     VkSemaphore frSignalSemaphores[1];
@@ -285,7 +285,7 @@ void DeferredRenderer::setupCommandResources()
     m_commandPoolHash = m_renderContext.commandPoolManager->createCommandPool(config);
 }
 
-void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, uint32_t imageIndex)
+void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, Entity camera, uint32_t imageIndex)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -380,10 +380,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         gbufferInheritance.stencilFormat = fbSpec.stencilAttachment;
 
         system.run(JobDeclaration(
-            [&gbufferBuffer, activeScene, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
+            [&gbufferBuffer, activeScene, camera, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
              m_gbufferPass = m_gbufferPass](JobContext &ctx) {
                 (void)ctx;
-                gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, m_currentFrame, gbufferInheritance, terrain);
+                gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, camera, m_currentFrame, gbufferInheritance, terrain);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "GBUFFER"));
 
@@ -391,10 +391,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         lightingInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
 
         system.run(JobDeclaration(
-            [&lightingBuffer, activeScene, sceneRT = m_sceneRenderTarget.get(), lightingInheritance,
+            [&lightingBuffer, activeScene, camera, sceneRT = m_sceneRenderTarget.get(), lightingInheritance,
              m_lightingPass = m_lightingPass](JobContext &ctx) {
                 (void)ctx;
-                lightingBuffer = m_lightingPass->recordSecondary(activeScene, *sceneRT, lightingInheritance);
+                lightingBuffer = m_lightingPass->recordSecondary(activeScene, camera, *sceneRT, lightingInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 
@@ -415,11 +415,11 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
 
         system.run(JobDeclaration(
-            [&instancedShapesBuffer, activeScene, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
+            [&instancedShapesBuffer, activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
              instancedInheritance, m_instancedShapesPass = m_instancedShapesPass](JobContext &ctx) {
                 (void)ctx;
                 instancedShapesBuffer =
-                    m_instancedShapesPass->recordSecondary(activeScene, *sceneRT, m_currentFrame, instancedInheritance);
+                    m_instancedShapesPass->recordSecondary(activeScene, camera, *sceneRT, m_currentFrame, instancedInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "INSTANCED_SHAPES"));
 
@@ -430,7 +430,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
             stencilInheritance.stencilFormat = m_gbufferPass->getDepthTexture()->getFormat();
 
             // stencilBorderBuffer =
-            //     m_stencilBorderPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, activeScene, stencilInheritance);
+            //     m_stencilBorderPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, activeScene, camera, stencilInheritance);
         }
 
         {

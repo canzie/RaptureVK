@@ -384,7 +384,7 @@ bool Shader::createDescriptorLayouts()
 
         // Sets 0-3 are managed by DescriptorManager
         if (setNumber <= 3) {
-            descriptorSet = DescriptorManager::getDescriptorSet(setNumber);
+            descriptorSet = Application::getRenderContext().descriptorManager->getDescriptorSet(setNumber);
         }
 
         if (descriptorSet) {

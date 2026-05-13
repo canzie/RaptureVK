@@ -10,6 +10,7 @@
 
 #include "buffers/StorageBuffer.h"
 #include "scenes/Scene.h"
+#include "window_context/vulkan_context/RenderContext.h"
 
 namespace Rapture {
 
@@ -43,7 +44,7 @@ struct RtInstanceInfo {
 
 class RtInstanceData {
   public:
-    RtInstanceData();
+    RtInstanceData(const RenderContext &renderContext);
     ~RtInstanceData();
 
     void update(std::shared_ptr<Scene> scene);
@@ -57,6 +58,8 @@ class RtInstanceData {
   private:
     void rebuild(std::shared_ptr<Scene> scene);
     void patchDirty(std::shared_ptr<Scene> scene);
+
+    RenderContext m_rc;
 
     std::shared_ptr<StorageBuffer> m_buffer;
     uint32_t m_instanceCount = 0;

@@ -15,11 +15,9 @@
 
 namespace Rapture {
 
-RtInstanceData::RtInstanceData()
+RtInstanceData::RtInstanceData(const RenderContext &renderContext)
+    : m_rc(renderContext), m_allocator(renderContext.vulkanContext->getVmaAllocator())
 {
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-    m_allocator = vc.getVmaAllocator();
 
     AssetEvents::onMaterialInstanceChanged().addListener([this](MaterialInstance *mat) {
         if (mat) m_dirtyMaterials.insert(mat);
@@ -142,7 +140,7 @@ void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
         }
     }
 
-    auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS);
+    auto set = m_rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS);
     if (set) {
         auto binding = set->getSSBOBinding(DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS);
         if (binding) {

@@ -9,6 +9,7 @@
 #include "buffers/descriptors/DescriptorSet.h"
 #include "buffers/UniformBuffer.h"
 #include "scenes/Scene.h"
+#include "scenes/entities/Entity.h"
 
 #include "render_targets/SceneRenderTarget.h"
 #include "renderer/passes/GBufferPass.h"
@@ -29,7 +30,7 @@ class LightingPass {
 
     FramebufferSpecification getFramebufferSpecification();
 
-    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, SceneRenderTarget &renderTarget,
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, SceneRenderTarget &renderTarget,
                                    const SecondaryBufferInheritance &inheritance);
 
   private:
@@ -38,6 +39,7 @@ class LightingPass {
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage);
 
   private:
+    const RenderContext *m_rc = nullptr;
     Shader *m_shader = nullptr;
     std::vector<AssetRef> m_shaderAssets;
 

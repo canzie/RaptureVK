@@ -38,17 +38,17 @@ RaptureVK is a Vulkan 1.3 renderer/editor using modern extensions (Dynamic Rende
 
 ### Key Systems
 
-**ECS (EnTT)**: Data-oriented entity management. Components defined in `Engine/src/Components/Components.h`.
+**ECS (EnTT)**: Data-oriented entity management. Components defined in `Engine/src/components/Components.h`.
 
-**Buffer Pool System** (`Engine/src/Buffers/`): Sub-allocates from large GPU arenas (64-256MB) using VMA virtual blocks. Vertex and index buffers share arenas for cache locality. See `Engine/src/Buffers/README.md`.
+**Buffer Pool System** (`Engine/src/buffers/`): Sub-allocates from large GPU arenas (64-256MB) using VMA virtual blocks. Vertex and index buffers share arenas for cache locality. See `Engine/src/buffers/README.md`.
 
-**MDI Batching** (`Engine/src/Renderer/MDIBatch.h`): Groups draws by buffer arena into single `vkCmdDrawIndexedIndirect` calls. Uses `ObjectInfo` structs for bindless mesh/material indices. See `Engine/src/Renderer/README.md`.
+**MDI Batching** (`Engine/src/renderer/MDIBatch.h`): Groups draws by buffer arena into single `vkCmdDrawIndexedIndirect` calls. Uses `ObjectInfo` structs for bindless mesh/material indices. See `Engine/src/renderer/README.md`.
 
-**DDGI** (`Engine/src/Renderer/GI/DDGI/`): Probe-based global illumination using GPU ray tracing. Work in progress.
+**DDGI** (`Engine/src/renderer/gi/ddgi/`): Probe-based global illumination using GPU ray tracing. Work in progress.
 
-**Physics - Entropy** (`Engine/src/Physics/`): Custom impulse-based rigid body engine with BVH collision detection.
+**Physics - Entropy** (`Engine/src/physics/`): Custom impulse-based rigid body engine with BVH collision detection.
 
-**Asset Loading** (`Engine/src/AssetManager/`): Async multi-threaded pipeline supporting glTF 2.0.
+**Asset Loading** (`Engine/src/asset_manager/`): Async multi-threaded pipeline supporting glTF 2.0.
 
 ## Code Standards
 
@@ -56,12 +56,13 @@ RaptureVK is a Vulkan 1.3 renderer/editor using modern extensions (Dynamic Rende
 - PascalCase for classes, camelCase for variables/methods, SCREAMING_SNAKE_CASE for constants
 - Member variables: `m_userId`
 - Static functions: prefix with `s_`
+- Folder names: snake_case (e.g. `render_targets/`, `command_buffers/`)
 
 **Header guards**: Use `#ifndef RAPTURE__FILENAME_H` pattern, NOT `#pragma once`
 
 **Error handling**: DO NOT throw exceptions - return empty/default values instead. Use RAII for resources. If something early or critical fails an assert is preferred
 
-**Logging**: Use macros from `Engine/src/Logging/Log.h`. Do not include function names in messages.
+**Logging**: Use macros from `Engine/src/logging/Log.h`. Do not include function names in messages.
 
 **Memory**: Prefer smart pointers (`std::unique_ptr`, `std::shared_ptr`), use `std::move` for move semantics, avoid heap allocations where stack suffices.
 
@@ -73,7 +74,7 @@ All engine code is in the `Rapture::` namespace.
 
 ## ECS Design Philosophy
 
-**Entity wrapper approach**: The `Entity` class (`Engine/src/Scenes/Entities/Entity.h`) is a lightweight handle (~12-16 bytes: entt::entity + Scene*). It's cheap to copy and pass by value. Avoid storing `shared_ptr<Entity>` - just store `Entity` directly.
+**Entity wrapper approach**: The `Entity` class (`Engine/src/scenes/entities/Entity.h`) is a lightweight handle (~12-16 bytes: entt::entity + Scene*). It's cheap to copy and pass by value. Avoid storing `shared_ptr<Entity>` - just store `Entity` directly.
 
 **Avoid exposing EnTT directly**: The wrapper exists so EnTT can be swapped out. Don't use `entt::entity` or `entt::registry` outside the wrapper. Methods like `getHandle()` that return EnTT types should be avoided in engine code.
 
@@ -81,19 +82,19 @@ All engine code is in the `Rapture::` namespace.
 
 **Components are data**: Keep components as pure data structs where possible. Helper methods on components are fine for accessing/modifying that data. Complex logic belongs in systems or free functions, not component methods.
 
-**Hierarchy component design** (`Engine/src/Components/HierarchyComponent.h`):
+**Hierarchy component design** (`Engine/src/components/HierarchyComponent.h`):
 - Stores `Entity parent` + `std::vector<Entity> children` directly
 - Free functions (`setParent`, `removeFromParent`) handle bidirectional sync
 - No separate "node" class, no shared_ptr indirection
 - Bidirectional storage is intentional - transform propagation needs fast parent→children traversal
 
-**EntityView performance note**: The current `EntityView` wrapper in `Engine/src/Scenes/Entities/EntityView.h` has overhead compared to raw EnTT views. For performance-critical loops, using `registry.view<>().each()` directly is ~10x faster. This is a known issue to address.
+**EntityView performance note**: The current `EntityView` wrapper in `Engine/src/scenes/entities/EntityView.h` has overhead compared to raw EnTT views. For performance-critical loops, using `registry.view<>().each()` directly is ~10x faster. This is a known issue to address.
 
 ## Radiance Cascades (Experimental)
 
 **Author**: Alexander Sannikov (Grinding Gear Games). This is a DISTINCT technique - NOT related to DDGI, radiance caching, or path tracing.
 
-**Full theory reference**: See `Engine/src/Renderer/GI/radiance_cascades/RADIANCE_CASCADES_THEORY.md`
+**Full theory reference**: See `Engine/src/renderer/gi/radiance_cascades/RADIANCE_CASCADES_THEORY.md`
 
 ### Core Insight: The Penumbra Hypothesis
 

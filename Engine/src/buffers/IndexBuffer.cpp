@@ -44,7 +44,8 @@ IndexBuffer::IndexBuffer(BufferAllocationRequest &request, VmaAllocator allocato
       m_indexType(request.indexSize == 4 ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16)
 {
 
-    auto &bufferPoolManager = BufferPoolManager::getInstance();
+    auto &app = Application::getInstance();
+    auto &bufferPoolManager = *app.getVulkanContext().getRenderContext().bufferPoolManager;
 
     request.type = BufferType::INDEX;
     m_bufferAllocation = bufferPoolManager.allocateBuffer(request);
@@ -110,7 +111,8 @@ uint32_t IndexBuffer::getBindlessIndex()
 
     // Initialize the bindless buffer pool if not already done
     if (s_bindlessBuffers == nullptr) {
-        auto set = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
+        auto& rc = Application::getInstance().getVulkanContext().getRenderContext();
+        auto set = rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_SSBOS);
         if (set) {
             s_bindlessBuffers = set->getSSBOBinding(DescriptorSetBindingLocation::BINDLESS_SSBOS);
         }

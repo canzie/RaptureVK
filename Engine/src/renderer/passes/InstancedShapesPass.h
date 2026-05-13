@@ -7,7 +7,10 @@
 #include "pipelines/GraphicsPipeline.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "scenes/Scene.h"
+#include "scenes/entities/Entity.h"
 #include "textures/Texture.h"
+
+#include "window_context/vulkan_context/RenderContext.h"
 
 #include <memory>
 #include <vector>
@@ -22,7 +25,7 @@ class InstancedShapesPass {
                         std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
     ~InstancedShapesPass();
 
-    CommandBuffer *recordSecondary(const std::shared_ptr<Scene> &scene, SceneRenderTarget &renderTarget, uint32_t frameInFlight,
+    CommandBuffer *recordSecondary(const std::shared_ptr<Scene> &scene, Entity camera, SceneRenderTarget &renderTarget, uint32_t frameInFlight,
                                    const SecondaryBufferInheritance &inheritance);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
@@ -34,6 +37,7 @@ class InstancedShapesPass {
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, uint32_t frameInFlightIndex);
 
   private:
+    const RenderContext *m_rc = nullptr;
     float m_width;
     float m_height;
     uint32_t m_framesInFlight;

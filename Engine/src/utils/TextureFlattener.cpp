@@ -129,7 +129,7 @@ void FlattenTexture::update(CommandBuffer *commandBuffer)
     pipeline->bind(commandBuffer->getCommandBufferVk());
 
     // Bind descriptor sets
-    DescriptorManager::bindSet(3, commandBuffer, pipeline);               // Bindless textures
+    Application::getRenderContext().descriptorManager->bindSet(3, commandBuffer, pipeline); // Bindless textures
     m_descriptorSet->bind(commandBuffer->getCommandBufferVk(), pipeline); // Custom output texture
 
     // Set push constants with bindless indices and texture dimensions

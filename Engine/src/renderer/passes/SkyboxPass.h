@@ -43,6 +43,7 @@ class SkyboxPass {
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, VkImage depthImage);
 
   private:
+    const RenderContext *m_rc = nullptr;
     VkDevice m_device;
     VmaAllocator m_vmaAllocator;
 

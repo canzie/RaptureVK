@@ -51,7 +51,9 @@ TLAS::~TLAS()
     }
 
     if (m_bindlessIndex != UINT32_MAX) {
-        auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
+        auto &app = Application::getInstance();
+        auto &rc = app.getVulkanContext().getRenderContext();
+        auto bindlessSet = rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
         if (bindlessSet) {
             auto binding = bindlessSet->getTLASBinding(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
             binding->free(m_bindlessIndex);
@@ -298,8 +300,9 @@ void TLAS::build()
     poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
     poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
-    auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-    auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+    auto &rc = vulkanContext.getRenderContext();
+    auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
     auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -340,7 +343,9 @@ void TLAS::build()
 void TLAS::registerWithDescriptorManager()
 {
     // Add this TLAS to the bindless acceleration structures descriptor set
-    auto bindlessSet = DescriptorManager::getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
+    auto &app = Application::getInstance();
+    auto &rc = app.getVulkanContext().getRenderContext();
+    auto bindlessSet = rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
     if (bindlessSet) {
         auto binding = bindlessSet->getTLASBinding(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
         if (binding) {
@@ -440,8 +445,9 @@ void TLAS::updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>> &in
         poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
         poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
-        auto commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
-        auto commandPool = CommandPoolManager::getCommandPool(commandPoolHash);
+        auto &rc = vulkanContext.getRenderContext();
+        auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
+        auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
         auto commandBuffer = commandPool->getPrimaryCommandBuffer();
 
         commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);

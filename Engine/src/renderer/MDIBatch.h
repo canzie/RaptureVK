@@ -3,6 +3,7 @@
 #include "buffers/BufferPool.h"
 #include "buffers/StorageBuffer.h"
 #include "buffers/UniformBuffer.h"
+#include "window_context/vulkan_context/RenderContext.h"
 
 #include <cstdint>
 #include <vector>
@@ -21,8 +22,8 @@ struct ObjectInfo {
 
 class MDIBatch {
   public:
-    MDIBatch(std::shared_ptr<BufferAllocation> vboArena, std::shared_ptr<BufferAllocation> iboArena, BufferLayout &bufferLayout,
-             VkIndexType indexType);
+    MDIBatch(RenderContext renderContext, std::shared_ptr<BufferAllocation> vboArena, std::shared_ptr<BufferAllocation> iboArena,
+             BufferLayout &bufferLayout, VkIndexType indexType);
     ~MDIBatch();
 
     void addObject(const Mesh &mesh, uint32_t meshIndex, uint32_t materialIndex);
@@ -54,6 +55,8 @@ class MDIBatch {
     std::vector<VkDrawIndexedIndirectCommand> m_cpuIndirectCommands;
     std::vector<ObjectInfo> m_cpuObjectInfo;
 
+    RenderContext m_rc;
+
     uint32_t m_vboArenaId;
     uint32_t m_iboArenaId;
 
@@ -73,7 +76,7 @@ class MDIBatch {
 // when a render pass uses multiple batches we need a way to neatly organise this
 class MDIBatchMap {
   public:
-    MDIBatchMap() = default;
+    MDIBatchMap(RenderContext renderContext);
 
     // called at the start of the frame
     // this is used to clear the batch map
@@ -86,6 +89,8 @@ class MDIBatchMap {
     const std::unordered_map<uint64_t, std::unique_ptr<MDIBatch>> &getBatches() const { return m_batches; }
 
   private:
+    RenderContext m_rc;
+
     // we take the buffer ids from both buffers, then add these numbers to generate a unique key
     // e.g. 123 + 456 = 123456
     std::unordered_map<uint64_t, std::unique_ptr<MDIBatch>> m_batches;

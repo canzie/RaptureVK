@@ -13,7 +13,7 @@ ObjectDataBuffer::ObjectDataBuffer(DescriptorSetBindingLocation bindingLocation,
 {
 
     // Get the descriptor set and binding
-    auto descriptorSet = DescriptorManager::getDescriptorSet(bindingLocation);
+    auto descriptorSet = Application::getRenderContext().descriptorManager->getDescriptorSet(bindingLocation);
     if (descriptorSet) {
         m_descriptorBinding = descriptorSet->getUniformBufferBinding(bindingLocation);
     }

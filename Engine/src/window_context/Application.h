@@ -2,9 +2,9 @@
 #define RAPTURE__APPLICATION_H
 
 #include "layers/LayerStack.h"
-#include "renderer/Renderer.h"
 #include "scenes/Project.h"
 #include "scenes/Scene.h"
+#include "viewport/ViewportManager.h"
 #include "vulkan_context/VulkanContext.h"
 #include "WindowContext.h"
 
@@ -28,8 +28,11 @@ class Application {
     const WindowContext &getWindowContext() const { return *m_window; }
     WindowContext &getWindowContext() { return *m_window; }
     const Project &getProject() const { return *m_project; }
+    ViewportManager &getViewportManager() { return *m_viewportManager; }
+    const ViewportManager &getViewportManager() const { return *m_viewportManager; }
 
     static Application &getInstance() { return *s_instance; }
+    static const RenderContext &getRenderContext() { return s_instance->m_vulkanContext->getRenderContext(); }
 
   private:
     bool m_running;
@@ -42,6 +45,8 @@ class Application {
     std::unique_ptr<WindowContext> m_window;
 
     std::unique_ptr<VulkanContext> m_vulkanContext;
+
+    std::unique_ptr<ViewportManager> m_viewportManager;
 
     static Application *s_instance;
 };

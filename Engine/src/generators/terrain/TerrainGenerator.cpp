@@ -293,7 +293,8 @@ void TerrainGenerator::initComputePipeline()
     poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
     poolConfig.flags = 0;
 
-    m_computePoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto& rc = vc.getRenderContext();
+    m_computePoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 }
 
 void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
@@ -313,14 +314,15 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    auto pool = CommandPoolManager::getCommandPool(m_computePoolHash);
+    auto& rc = vc.getRenderContext();
+    auto pool = rc.commandPoolManager->getCommandPool(m_computePoolHash);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
 
     m_chunkComputePipeline->bind(cmd);
-    DescriptorManager::bindSet(3, commandBuffer, m_chunkComputePipeline);
+    rc.descriptorManager->bindSet(3, commandBuffer, m_chunkComputePipeline);
 
     struct ChunkUpdatePushConstants {
         uint32_t chunkDataBufferIndex;

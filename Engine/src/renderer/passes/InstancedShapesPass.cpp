@@ -30,6 +30,7 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
+    m_rc = &vc.getRenderContext();
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
@@ -45,13 +46,12 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
 
 InstancedShapesPass::~InstancedShapesPass() {}
 
-CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene> &scene, SceneRenderTarget &renderTarget,
+CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene> &scene, Entity camera, SceneRenderTarget &renderTarget,
                                                     uint32_t frameInFlight, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    auto camera = scene->getMainCamera();
-    if (camera == nullptr) {
+    if (!camera.isValid()) {
         return nullptr;
     }
     auto cameraComp = camera.tryGetComponent<CameraComponent>();
@@ -59,17 +59,16 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
         return nullptr;
     }
 
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
+    auto &vc = Application::getInstance().getVulkanContext();
 
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getGraphicsQueueIndex();
     config.flags = 0;
     size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
     config.threadId = threadId;
-    auto hash = CommandPoolManager::createCommandPool(config);
+    auto hash = m_rc->commandPoolManager->createCommandPool(config);
 
-    auto pool = CommandPoolManager::getCommandPool(hash);
+    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
 
     commandBuffer->beginSecondary(inheritance);
@@ -121,9 +120,9 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
             instanceShapeComp.useWireMode ? m_pipelineWireframe->getPipelineLayoutVk() : m_pipelineFilled->getPipelineLayoutVk(),
             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(InstancedShapesPushConstants), &pushConstants);
 
-        DescriptorManager::getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(),
+        m_rc->descriptorManager->getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(),
                                                      instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
-        DescriptorManager::getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(),
+        m_rc->descriptorManager->getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(),
                                                      instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
 
         auto &bufferLayout = meshComp.mesh->getVertexBuffer()->getBufferLayout();

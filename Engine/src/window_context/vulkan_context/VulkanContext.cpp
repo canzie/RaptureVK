@@ -270,11 +270,16 @@ void VulkanContext::createResources()
 
 void VulkanContext::initManagers()
 {
-    m_commandPoolManager = std::make_unique<CommandPoolManager>(m_swapChain->getImageCount());
-    m_bufferPoolManager = std::make_unique<BufferPoolManager>(m_vmaAllocator);
-    m_descriptorManager = std::make_unique<DescriptorManager>();
+    m_renderContext.vulkanContext = this;
 
-    m_renderContext = {this, m_bufferPoolManager.get(), m_commandPoolManager.get(), m_descriptorManager.get()};
+    m_commandPoolManager = std::make_unique<CommandPoolManager>(m_swapChain->getImageCount());
+    m_renderContext.commandPoolManager = m_commandPoolManager.get();
+
+    m_bufferPoolManager = std::make_unique<BufferPoolManager>(m_vmaAllocator);
+    m_renderContext.bufferPoolManager = m_bufferPoolManager.get();
+
+    m_descriptorManager = std::make_unique<DescriptorManager>();
+    m_renderContext.descriptorManager = m_descriptorManager.get();
 }
 
 void VulkanContext::createInstance(WindowContext *windowContext)

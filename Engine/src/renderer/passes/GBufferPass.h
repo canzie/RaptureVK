@@ -53,7 +53,7 @@ class GBufferPass {
 
     // Main entry point: records to internal secondary command buffer
     // Returns the secondary command buffer for the caller to execute
-    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame,
+    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, uint32_t currentFrame,
                                    const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain = nullptr);
 
     void beginDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
@@ -94,17 +94,18 @@ class GBufferPass {
     void setupCommandResources();
 
     // Record terrain rendering only
-    void recordTerrainCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, TerrainGenerator &terrain,
-                               uint32_t currentFrame);
+    void recordTerrainCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, Entity camera,
+                               TerrainGenerator &terrain, uint32_t currentFrame);
 
     // Record entity rendering only
-    void recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+    void recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, Entity camera, uint32_t currentFrame);
 
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb, uint32_t currentFrame);
 
     void transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame);
 
   private:
+    const RenderContext *m_rc = nullptr;
     Shader *m_shader = nullptr;
     float m_width;
     float m_height;

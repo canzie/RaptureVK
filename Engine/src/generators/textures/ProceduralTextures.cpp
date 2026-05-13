@@ -90,7 +90,8 @@ void ProceduralTexture::initCommandBuffer()
     poolConfig.queueFamilyIndex = vulkanContext.getComputeQueueIndex();
     poolConfig.flags = 0;
 
-    m_commandPoolHash = CommandPoolManager::createCommandPool(poolConfig);
+    auto& rc = vulkanContext.getRenderContext();
+    m_commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 }
 
 void ProceduralTexture::initTexture()
@@ -171,7 +172,8 @@ void ProceduralTexture::generate()
         return;
     }
 
-    auto pool = CommandPoolManager::getCommandPool(m_commandPoolHash);
+    auto& rc = Application::getInstance().getVulkanContext().getRenderContext();
+    auto pool = rc.commandPoolManager->getCommandPool(m_commandPoolHash);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);

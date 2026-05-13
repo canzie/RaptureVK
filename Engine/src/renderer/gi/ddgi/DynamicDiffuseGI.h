@@ -19,6 +19,7 @@
 #include "window_context/vulkan_context/VulkanQueue.h"
 
 #include "DDGICommon.h"
+#include "window_context/vulkan_context/RenderContext.h"
 
 namespace Rapture {
 
@@ -89,6 +90,7 @@ class DynamicDiffuseGI {
     void clearTextures();
 
   private:
+    const RenderContext *m_rc = nullptr;
     Shader *m_DDGI_ProbeTraceShader = nullptr;
     Shader *m_DDGI_ProbeIrradianceBlendingShader = nullptr;
     Shader *m_DDGI_ProbeDistanceBlendingShader = nullptr;
