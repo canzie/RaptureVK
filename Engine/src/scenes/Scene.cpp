@@ -3,6 +3,7 @@
 
 #include "components/Components.h"
 #include "components/TerrainComponent.h"
+#include "renderer/SceneRenderData.h"
 
 #include "asset_manager/AssetManager.h"
 #include "meshes/MeshPrimitives.h"
@@ -217,9 +218,18 @@ void Scene::onUpdate(float dt)
         }
     }
 
+    if (m_renderData) {
+        m_renderData->onUpdate(frameCounter);
+    }
+
     frameCounter = (frameCounter + 1) % frameCount;
 
     updateTLAS();
+}
+
+void Scene::initRenderData(RenderContext* renderContext, uint32_t frameCount)
+{
+    m_renderData = std::make_unique<SceneRenderData>(renderContext, *this, frameCount);
 }
 
 SceneSettings &Scene::getSettings()

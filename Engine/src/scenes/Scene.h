@@ -7,8 +7,9 @@
 
 namespace Rapture {
 
-// Forward declaration
 class Entity;
+class SceneRenderData;
+struct RenderContext;
 
 struct SceneSettings {
     std::string sceneName;
@@ -56,8 +57,23 @@ class Scene {
 
     void updateTLAS();
 
+    /**
+     * @brief Initialize the GPU data mirror for this scene
+     * @param renderContext Vulkan context for buffer allocation
+     * @param frameCount Number of frames in flight
+     */
+    void initRenderData(RenderContext* renderContext, uint32_t frameCount);
+
+    /**
+     * @brief Get the GPU data mirror, or nullptr if not initialized
+     * @return Pointer to SceneRenderData
+     */
+    SceneRenderData* getRenderData() { return m_renderData.get(); }
+    const SceneRenderData* getRenderData() const { return m_renderData.get(); }
+
   private:
     entt::registry m_registry;
+    std::unique_ptr<SceneRenderData> m_renderData;
     SceneSettings m_config;
 
     std::shared_ptr<TLAS> m_tlas;
