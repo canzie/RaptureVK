@@ -1,8 +1,10 @@
-# SceneRenderData
+# SceneRenderData (Design)
 
 GPU-side mirror of a scene's ECS data. Replaces per-entity GPU buffers (`MeshDataBuffer`, `LightDataBuffer`, `CameraDataBuffer`, `ShadowDataBuffer`) with shared, partitioned SSBOs managed by a single system.
 
-**Location**: `Engine/src/renderer/gpu_data/`
+See [[SceneRenderData Implementation]] for what was actually built and any deviations.
+
+**Location**: `Engine/src/renderer/`
 
 ## Problem
 

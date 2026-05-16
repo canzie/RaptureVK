@@ -12,11 +12,14 @@ layout(location = 3) out flat uint outChunkIndex;
 layout(location = 4) out flat uint outLOD;
 layout(location = 5) out float outNormalizedHeight;
 
-// Camera data (bindless)
-layout(set = 0, binding = 0) uniform CameraDataBuffer {
+struct CameraGPUData {
     mat4 view;
     mat4 proj;
-} u_camera[];
+};
+
+layout(set = 0, binding = 0) readonly buffer CameraDataSSBO {
+    CameraGPUData cameras[];
+} u_cameraSSBO[];
 
 layout(set = 3, binding = 1) readonly buffer TerrainChunkBuffer {
     TerrainChunkData chunks[];
@@ -27,7 +30,8 @@ layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 layout(set = 3, binding = 0) uniform sampler3D u_textures3D[];
 
 layout(push_constant) uniform TerrainPushConstants {
-    uint cameraBindlessIndex;
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
     uint chunkDataBufferIndex;
     uint continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint erosionIndex;
@@ -69,8 +73,8 @@ void main() {
     vec3 worldPos = vec3(worldXZ.x, height, worldXZ.y);
 
     // Transform to clip space
-    mat4 view = u_camera[pc.cameraBindlessIndex].view;
-    mat4 proj = u_camera[pc.cameraBindlessIndex].proj;
+    mat4 view = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex].view;
+    mat4 proj = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex].proj;
     vec4 viewPos = view * vec4(worldPos, 1.0);
     gl_Position = proj * viewPos;
 

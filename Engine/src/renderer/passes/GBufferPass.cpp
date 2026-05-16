@@ -5,6 +5,8 @@
 #include "generators/terrain/TerrainGenerator.h"
 #include "generators/terrain/TerrainTypes.h"
 #include "logging/TracyProfiler.h"
+#include "renderer/SceneRenderData.h"
+#include "scenes/entities/Entity.h"
 #include "window_context/Application.h"
 
 #include <cstdint>
@@ -14,11 +16,14 @@ namespace Rapture {
 
 struct GBufferPushConstants {
     uint32_t batchInfoBufferIndex;
-    uint32_t cameraBindlessIndex;
+    uint32_t cameraSSBOIndex;
+    uint32_t cameraSlotIndex;
+    uint32_t meshSSBOIndex;
 };
 
 struct TerrainGBufferPushConstants {
-    uint32_t cameraBindlessIndex;
+    uint32_t cameraSSBOIndex;
+    uint32_t cameraSlotIndex;
     uint32_t chunkDataBufferIndex;
     uint32_t continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint32_t erosionIndex;
@@ -147,7 +152,8 @@ CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, 
     return commandBuffer;
 }
 
-void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, Entity camera, uint32_t currentFrame)
+void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, Entity camera,
+                                       uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -188,6 +194,11 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     m_rc->descriptorManager->bindSet(1, secondaryCb, m_pipeline); // materials
     m_rc->descriptorManager->bindSet(2, secondaryCb, m_pipeline); // model data
     m_rc->descriptorManager->bindSet(3, secondaryCb, m_pipeline); // bindless textures for the material stuff
+
+    auto &renderData = *activeScene->getRenderData();
+    uint32_t meshSSBOIndex = renderData.getMeshes().getDescriptorIndex(currentFrame);
+    uint32_t cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrame);
+    uint32_t cameraSlotIndex = (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
 
     // First pass: Populate MDI batches with mesh data
     for (auto entity : view) {
@@ -241,12 +252,10 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
         MDIBatch *batch = batchMap->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(),
                                                 meshComp.mesh->getIndexBuffer()->getIndexType());
 
-        // Get mesh buffer index from the MeshComponent
-        uint32_t meshBufferIndex = meshComp.meshDataBuffer ? meshComp.meshDataBuffer->getDescriptorIndex(currentFrame) : 0;
-        uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
+        uint32_t meshSlotIndex = meshComp.renderDataSlot;
+        uint32_t materialIndex = materialComp.material != nullptr ? materialComp.material->getBindlessIndex() : 0;
 
-        // Add mesh to batch
-        batch->addObject(*meshComp.mesh, meshBufferIndex, materialIndex);
+        batch->addObject(*meshComp.mesh, meshSlotIndex, materialIndex);
     }
 
     // Second pass: Render non-selected entities using MDI
@@ -275,7 +284,9 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
         // Set push constants for this batch
         GBufferPushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
-        pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(currentFrame) : 0;
+        pushConstants.cameraSSBOIndex = cameraSSBOIndex;
+        pushConstants.cameraSlotIndex = cameraSlotIndex;
+        pushConstants.meshSSBOIndex = meshSSBOIndex;
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
@@ -328,7 +339,9 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
         // Set push constants for this batch
         GBufferPushConstants pushConstants{};
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
-        pushConstants.cameraBindlessIndex = cameraComp ? cameraComp->cameraDataBuffer->getDescriptorIndex(currentFrame) : 0;
+        pushConstants.cameraSSBOIndex = cameraSSBOIndex;
+        pushConstants.cameraSlotIndex = cameraSlotIndex;
+        pushConstants.meshSSBOIndex = meshSSBOIndex;
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
@@ -873,7 +886,9 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
         vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain.getIndexBuffer(lod), 0, VK_INDEX_TYPE_UINT32);
 
         TerrainGBufferPushConstants pc{};
-        pc.cameraBindlessIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(currentFrame);
+        auto &terrainRenderData = *activeScene->getRenderData();
+        pc.cameraSSBOIndex = terrainRenderData.getCameras().getDescriptorIndex(currentFrame);
+        pc.cameraSlotIndex = (cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
         pc.chunkDataBufferIndex = chunkDataBufferIndex;
         pc.continentalnessIndex = continentalnessIndex;
         pc.erosionIndex = erosionIndex;

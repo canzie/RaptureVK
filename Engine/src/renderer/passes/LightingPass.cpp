@@ -2,6 +2,7 @@
 #include "window_context/Application.h"
 
 #include "components/FogComponent.h"
+#include "renderer/SceneRenderData.h"
 #include "renderer/shadows/ShadowMapping.h"
 
 #include "logging/Log.h"
@@ -13,8 +14,14 @@ struct LightingPushConstants {
 
     glm::vec4 cameraPos;
 
-    uint32_t lightCount;
-    uint32_t shadowCount;
+    uint32_t lightDataSSBOIndex;
+    uint32_t lightStaticCount;
+    uint32_t lightDynamicOffset;
+    uint32_t lightDynamicCount;
+    uint32_t shadowDataSSBOIndex;
+    uint32_t shadowStaticCount;
+    uint32_t shadowDynamicOffset;
+    uint32_t shadowDynamicCount;
 
     uint32_t GBufferAlbedoHandle;
     uint32_t GBufferNormalHandle;
@@ -85,7 +92,7 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
 }
 
 CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, SceneRenderTarget &renderTarget,
-                                             const SecondaryBufferInheritance &inheritance)
+                                             uint32_t frameIndex, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -156,13 +163,18 @@ CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene,
         pushConstants.fogDistances = glm::vec2(0.0f, 0.0f);
     }
 
-    auto &reg = activeScene->getRegistry();
-    auto lightView = reg.view<LightComponent>();
-    auto shadowView = reg.view<ShadowComponent>();
-    auto cascadedShadowView = reg.view<CascadedShadowComponent>();
+    auto &renderData = *activeScene->getRenderData();
+    auto &lightStore = renderData.getLights();
+    pushConstants.lightDataSSBOIndex = lightStore.getDescriptorIndex(frameIndex);
+    pushConstants.lightStaticCount = lightStore.getPartition(MOBILITY_STATIC).getCount();
+    pushConstants.lightDynamicOffset = lightStore.getGlobalSlot(MOBILITY_DYNAMIC, 0);
+    pushConstants.lightDynamicCount = lightStore.getPartition(MOBILITY_DYNAMIC).getCount();
 
-    pushConstants.lightCount = static_cast<uint32_t>(lightView.size());
-    pushConstants.shadowCount = static_cast<uint32_t>(shadowView.size() + cascadedShadowView.size());
+    auto &shadowStore = renderData.getShadows();
+    pushConstants.shadowDataSSBOIndex = shadowStore.getDescriptorIndex(frameIndex);
+    pushConstants.shadowStaticCount = shadowStore.getPartition(MOBILITY_STATIC).getCount();
+    pushConstants.shadowDynamicOffset = shadowStore.getGlobalSlot(MOBILITY_DYNAMIC, 0);
+    pushConstants.shadowDynamicCount = shadowStore.getPartition(MOBILITY_DYNAMIC).getCount();
 
     // Get probe texture indices from DDGI system
     if (m_ddgi) {

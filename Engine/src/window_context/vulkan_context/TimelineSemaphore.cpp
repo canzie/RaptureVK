@@ -33,8 +33,7 @@ TimelineSemaphore::~TimelineSemaphore()
     }
 }
 
-TimelineSemaphore::TimelineSemaphore(TimelineSemaphore &&other) noexcept
-    : m_semaphore(other.m_semaphore), m_owning(other.m_owning)
+TimelineSemaphore::TimelineSemaphore(TimelineSemaphore &&other) noexcept : m_semaphore(other.m_semaphore), m_owning(other.m_owning)
 {
     other.m_semaphore = VK_NULL_HANDLE;
     other.m_owning = false;

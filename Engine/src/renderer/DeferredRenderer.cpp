@@ -8,11 +8,11 @@
 
 #include "components/TerrainComponent.h"
 #include "events/ApplicationEvents.h"
-#include "renderer/shadows/ShadowCommon.h"
 #include "jobs/InplaceFunction.h"
 #include "jobs/Job.h"
 #include "jobs/JobCommon.h"
 #include "jobs/JobSystem.h"
+#include "renderer/shadows/ShadowCommon.h"
 #include <cstdio>
 
 namespace Rapture {
@@ -122,8 +122,6 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene, Entity came
             m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
         },
         JobPriority::NORMAL, QueueAffinity::COMPUTE, nullptr, "DDGI POPULATE"));
-
-    // m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
 
     auto pool = m_renderContext.commandPoolManager->getCommandPool(m_commandPoolHash, m_currentFrame);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
@@ -277,7 +275,7 @@ void DeferredRenderer::processPendingViewportResize()
 
 void DeferredRenderer::setupCommandResources()
 {
-    auto& vc = *m_renderContext.vulkanContext;
+    auto &vc = *m_renderContext.vulkanContext;
 
     CommandPoolConfig config = {};
     config.queueFamilyIndex = vc.getGraphicsQueueIndex();
@@ -285,7 +283,8 @@ void DeferredRenderer::setupCommandResources()
     m_commandPoolHash = m_renderContext.commandPoolManager->createCommandPool(config);
 }
 
-void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, Entity camera, uint32_t imageIndex)
+void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, Entity camera,
+                                           uint32_t imageIndex)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -328,8 +327,8 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 auto &transformComp = lightView.get<TransformComponent>(entity);
                 auto &shadowComp = lightView.get<ShadowComponent>(entity);
 
-                bool shouldUpdateShadow = shadowComp.needsUpdate(lightComp, transformComp) ||
-                                         lightComp.type == LightType::Directional;
+                bool shouldUpdateShadow =
+                    shadowComp.needsUpdate(lightComp, transformComp) || lightComp.type == LightType::Directional;
 
                 if (shadowComp.shadowMap && shouldUpdateShadow) {
                     auto shadowBuffer = shadowComp.shadowMap->recordSecondary(activeScene, m_currentFrame);
@@ -346,8 +345,8 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
                 auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
 
-                bool shouldUpdateShadow = shadowComp.needsUpdate(lightComp, transformComp) ||
-                                         lightComp.type == LightType::Directional;
+                bool shouldUpdateShadow =
+                    shadowComp.needsUpdate(lightComp, transformComp) || lightComp.type == LightType::Directional;
 
                 if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
                     auto shadowBuffer = shadowComp.cascadedShadowMap->recordSecondary(activeScene, m_currentFrame, terrain);
@@ -391,10 +390,11 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         lightingInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
 
         system.run(JobDeclaration(
-            [&lightingBuffer, activeScene, camera, sceneRT = m_sceneRenderTarget.get(), lightingInheritance,
-             m_lightingPass = m_lightingPass](JobContext &ctx) {
+            [&lightingBuffer, activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
+             lightingInheritance, m_lightingPass = m_lightingPass](JobContext &ctx) {
                 (void)ctx;
-                lightingBuffer = m_lightingPass->recordSecondary(activeScene, camera, *sceneRT, lightingInheritance);
+                lightingBuffer =
+                    m_lightingPass->recordSecondary(activeScene, camera, *sceneRT, m_currentFrame, lightingInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 
@@ -403,10 +403,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         skyboxInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
 
         system.run(JobDeclaration(
-            [&skyboxBuffer, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame, skyboxInheritance,
-             m_skyboxPass = m_skyboxPass](JobContext &ctx) {
+            [&skyboxBuffer, activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
+             skyboxInheritance, m_skyboxPass = m_skyboxPass](JobContext &ctx) {
                 (void)ctx;
-                skyboxBuffer = m_skyboxPass->recordSecondary(*sceneRT, m_currentFrame, skyboxInheritance);
+                skyboxBuffer = m_skyboxPass->recordSecondary(*sceneRT, m_currentFrame, activeScene, camera, skyboxInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SKYBOX"));
 
@@ -430,7 +430,8 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
             stencilInheritance.stencilFormat = m_gbufferPass->getDepthTexture()->getFormat();
 
             // stencilBorderBuffer =
-            //     m_stencilBorderPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, activeScene, camera, stencilInheritance);
+            //     m_stencilBorderPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, activeScene, camera,
+            //     stencilInheritance);
         }
 
         {

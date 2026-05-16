@@ -1,29 +1,31 @@
 #include "BVH_SAH.h"
 
-#include "scenes/Scene.h"
 #include "components/Components.h"
-#include "physics/colliders/ColliderPrimitives.h"
 #include "components/systems/BoundingBox.h"
 #include "physics/EntropyComponents.h"
+#include "physics/colliders/ColliderPrimitives.h"
+#include "scenes/Scene.h"
 #include <algorithm>
 #include <iostream>
 
 namespace Rapture {
 
-inline float calculateSurfaceArea(const BVHNode& node) {
+inline float calculateSurfaceArea(const BVHNode &node)
+{
     glm::vec3 extent = node.max - node.min;
     return 2.0f * (extent.x * extent.y + extent.x * extent.z + extent.y * extent.z);
 }
 
-BVH_SAH::BVH_SAH(LeafType leafType)
-    : m_leafType(leafType) {}
+BVH_SAH::BVH_SAH(LeafType leafType) : m_leafType(leafType) {}
 
-BVH_SAH::~BVH_SAH() {
+BVH_SAH::~BVH_SAH()
+{
     m_nodes.clear();
 }
 
-void BVH_SAH::build(std::shared_ptr<Scene> scene) {
-    auto& reg = scene->getRegistry();
+void BVH_SAH::build(std::shared_ptr<Scene> scene)
+{
+    auto &reg = scene->getRegistry();
     std::vector<BVHNode> primitives;
     auto bbView = reg.view<BoundingBoxComponent, TransformComponent>();
 
@@ -38,7 +40,7 @@ void BVH_SAH::build(std::shared_ptr<Scene> scene) {
         node.max = bb.worldBoundingBox.getMax();
 
         if (reg.any_of<Entropy::RigidBodyComponent>(entity)) {
-            auto& collider = reg.get<Entropy::RigidBodyComponent>(entity);
+            auto &collider = reg.get<Entropy::RigidBodyComponent>(entity);
             glm::vec3 min, max;
             collider.collider->getAABB(min, max);
             node.min = glm::min(node.min, min);
@@ -59,7 +61,8 @@ void BVH_SAH::build(std::shared_ptr<Scene> scene) {
     recursiveBuild(primitives, 0, primitives.size() - 1);
 }
 
-int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size_t end) {
+int BVH_SAH::recursiveBuild(std::vector<BVHNode> &primitives, size_t start, size_t end)
+{
     if (start > end) {
         return -1;
     }
@@ -69,7 +72,7 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size
     BVHNode node;
     m_nodes.push_back(node);
 
-    BVHNode& currentNode = m_nodes[currentNodeIndex];
+    BVHNode &currentNode = m_nodes[currentNodeIndex];
     currentNode.min = primitives[start].min;
     currentNode.max = primitives[start].max;
     for (size_t i = start + 1; i <= end; ++i) {
@@ -84,9 +87,7 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size
 
     for (int axis = 0; axis < 3; ++axis) {
         std::sort(primitives.begin() + start, primitives.begin() + end + 1,
-            [axis](const BVHNode& a, const BVHNode& b) {
-                return (a.min[axis] + a.max[axis]) < (b.min[axis] + b.max[axis]);
-            });
+                  [axis](const BVHNode &a, const BVHNode &b) { return (a.min[axis] + a.max[axis]) < (b.min[axis] + b.max[axis]); });
 
         std::vector<float> leftAreas(numPrimitives);
         BVHNode leftBox;
@@ -107,7 +108,9 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size
         size_t i = numPrimitives - 1;
         while (i > 0) {
             i--;
-            float cost = 0.125f + (leftAreas[i] * static_cast<float>(i + 1) + rightArea * static_cast<float>(numPrimitives - 1 - i)) / parentSurfaceArea;
+            float cost =
+                0.125f + (leftAreas[i] * static_cast<float>(i + 1) + rightArea * static_cast<float>(numPrimitives - 1 - i)) /
+                             parentSurfaceArea;
 
             if (cost < bestCost) {
                 bestCost = cost;
@@ -129,19 +132,19 @@ int BVH_SAH::recursiveBuild(std::vector<BVHNode>& primitives, size_t start, size
         currentNode.rightChildIndex = -1;
         return currentNodeIndex;
     }
-    
-    std::sort(primitives.begin() + start, primitives.begin() + end + 1,
-        [bestAxis](const BVHNode& a, const BVHNode& b) {
-            return (a.min[bestAxis] + a.max[bestAxis]) < (b.min[bestAxis] + b.max[bestAxis]);
-        });
-    
+
+    std::sort(primitives.begin() + start, primitives.begin() + end + 1, [bestAxis](const BVHNode &a, const BVHNode &b) {
+        return (a.min[bestAxis] + a.max[bestAxis]) < (b.min[bestAxis] + b.max[bestAxis]);
+    });
+
     currentNode.leftChildIndex = recursiveBuild(primitives, start, bestSplitIndex);
     currentNode.rightChildIndex = recursiveBuild(primitives, bestSplitIndex + 1, end);
-    
+
     return currentNodeIndex;
 }
 
-std::vector<EntityID> BVH_SAH::getIntersectingAABBs(const BoundingBox& worldAABB) const {
+std::vector<EntityID> BVH_SAH::getIntersectingAABBs(const BoundingBox &worldAABB) const
+{
     std::vector<EntityID> intersectingEntities;
     if (m_nodes.empty()) {
         return intersectingEntities;
@@ -150,29 +153,27 @@ std::vector<EntityID> BVH_SAH::getIntersectingAABBs(const BoundingBox& worldAABB
     return intersectingEntities;
 }
 
-void BVH_SAH::getIntersectingAABBsRecursive(const BoundingBox& worldAABB, int nodeIndex, std::vector<EntityID>& intersectingEntities) const {
+void BVH_SAH::getIntersectingAABBsRecursive(const BoundingBox &worldAABB, int nodeIndex,
+                                            std::vector<EntityID> &intersectingEntities) const
+{
     if (nodeIndex == -1) {
         return;
     }
 
-    const auto& node = m_nodes[nodeIndex];
-    const auto& world_min = worldAABB.getMin();
-    const auto& world_max = worldAABB.getMax();
-    const auto& node_min = node.min;
-    const auto& node_max = node.max;
+    const auto &node = m_nodes[nodeIndex];
+    const auto &world_min = worldAABB.getMin();
+    const auto &world_max = worldAABB.getMax();
+    const auto &node_min = node.min;
+    const auto &node_max = node.max;
 
-    bool intersects = (world_max.x > node_min.x &&
-        world_min.x < node_max.x &&
-        world_max.y > node_min.y &&
-        world_min.y < node_max.y &&
-        world_max.z > node_min.z &&
-        world_min.z < node_max.z);
+    bool intersects = (world_max.x > node_min.x && world_min.x < node_max.x && world_max.y > node_min.y &&
+                       world_min.y < node_max.y && world_max.z > node_min.z && world_min.z < node_max.z);
 
     if (!intersects) {
         return;
     }
 
-    if (node.leftChildIndex == -1) { 
+    if (node.leftChildIndex == -1) {
         intersectingEntities.push_back(node.entityID);
         return;
     }
@@ -181,4 +182,4 @@ void BVH_SAH::getIntersectingAABBsRecursive(const BoundingBox& worldAABB, int no
     getIntersectingAABBsRecursive(worldAABB, node.rightChildIndex, intersectingEntities);
 }
 
-} 
+} // namespace Rapture

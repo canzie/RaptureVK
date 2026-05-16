@@ -1,11 +1,10 @@
 namespace Rapture {
 
-    class Input {
-    public:
-        static bool isKeyPressed(int key);
+class Input {
+  public:
+    static bool isKeyPressed(int key);
 
-        //static std::map<int, bool> m_keyPressed;
+    // static std::map<int, bool> m_keyPressed;
+};
 
-    };
-
-}
+} // namespace Rapture

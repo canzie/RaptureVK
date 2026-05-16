@@ -1,12 +1,12 @@
 #ifndef RAPTURE__APPLICATION_H
 #define RAPTURE__APPLICATION_H
 
+#include "WindowContext.h"
 #include "layers/LayerStack.h"
 #include "scenes/Project.h"
 #include "scenes/Scene.h"
 #include "viewport/ViewportManager.h"
 #include "vulkan_context/VulkanContext.h"
-#include "WindowContext.h"
 
 #include <memory>
 

@@ -7,7 +7,7 @@ namespace Rapture {
 Renderer::Renderer(RenderContext renderContext, SceneRenderTarget::TargetType targetType)
     : m_renderContext(renderContext), m_targetType(targetType)
 {
-    auto& vc = *m_renderContext.vulkanContext;
+    auto &vc = *m_renderContext.vulkanContext;
 
     m_swapChain = vc.getSwapChain();
     m_graphicsQueue = vc.getGraphicsQueue();

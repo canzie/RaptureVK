@@ -6,17 +6,15 @@
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
 
+#include "buffers/UniformBuffer.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorBinding.h"
 #include "buffers/descriptors/DescriptorSet.h"
-#include "buffers/UniformBuffer.h"
 
 #include "renderer/Frustum.h"
 
 #include "scenes/Scene.h"
-
-#include "components/systems/object_data_buffers/ShadowDataBuffer.h"
 
 #include "window_context/vulkan_context/RenderContext.h"
 
@@ -47,8 +45,6 @@ class ShadowMap {
 
     glm::mat4 getLightViewProjection() const { return m_lightViewProjection; }
 
-    std::shared_ptr<ShadowDataBuffer> getShadowDataBuffer() { return m_shadowDataBuffer; }
-
   private:
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer);
     void transitionToShaderReadableLayout(CommandBuffer *commandBuffer);
@@ -68,7 +64,6 @@ class ShadowMap {
     glm::mat4 m_lightViewProjection;
 
     std::shared_ptr<Texture> m_shadowTexture;
-    std::shared_ptr<ShadowDataBuffer> m_shadowDataBuffer;
 
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};

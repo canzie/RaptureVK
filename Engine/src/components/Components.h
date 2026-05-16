@@ -4,8 +4,8 @@
     Stores the state part of the ecs, mainly the data/instance of a system
 */
 
-#include "asset_manager/Asset.h"
 #include "ComponentsCommon.h"
+#include "asset_manager/Asset.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -13,7 +13,6 @@
 
 #include "components/systems/BoundingBox.h"
 #include "components/systems/CameraController.h"
-#include "components/systems/ObjectDataBuffer.h"
 #include "components/systems/Transforms.h"
 
 #include "renderer/Frustum.h"
@@ -27,10 +26,11 @@
 #include "cameras/PerspectiveCamera.h"
 #include "materials/MaterialInstance.h"
 #include "meshes/Mesh.h"
-#include "physics/colliders/ColliderPrimitives.h"
 #include "physics/EntropyComponents.h"
+#include "physics/colliders/ColliderPrimitives.h"
 
 #include "asset_manager/AssetManager.h"
+#include "scenes/entities/EntityCommon.h"
 #include "textures/Texture.h"
 
 #include <memory>
@@ -77,15 +77,14 @@ struct CameraComponent {
 
     // Optional: Camera could be marked as main camera for rendering
     bool isMainCamera = false;
-
-    std::shared_ptr<CameraDataBuffer> cameraDataBuffer;
+    // slot into the SSBO where the camera metadata lives
+    uint32_t renderDataSlot = UINT32_MAX;
 
     CameraComponent(float fovy = 45.0f, float ar = 16.0f / 9.0f, float near_ = 0.1f, float far_ = 100.0f)
         : fov(fovy), aspectRatio(ar), nearPlane(near_), farPlane(far_)
     {
         camera = PerspectiveCamera(fovy, ar, near_, far_);
         frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
-        cameraDataBuffer = std::make_shared<CameraDataBuffer>(3);
     }
 
     void updateProjectionMatrix(float fovy, float ar, float near_, float far_)
@@ -156,19 +155,18 @@ struct MaterialComponent {
 struct MeshComponent {
     Mesh *mesh = nullptr;
     bool isLoading = true;
-    bool isStatic = true;
+    Mobility mobility = MOBILITY_STATIC;
     bool isEnabled = true;
+    // slot into the SSBO where the mesh metadata lives
+    uint32_t renderDataSlot = UINT32_MAX;
 
-    std::shared_ptr<MeshDataBuffer> meshDataBuffer;
-
-    MeshComponent() { meshDataBuffer = std::make_shared<MeshDataBuffer>(3); };
+    MeshComponent() = default;
 
     MeshComponent(AssetRef ref)
     {
         asset = ref;
         mesh = asset ? asset.get()->getUnderlyingAsset<Mesh>() : nullptr;
         isLoading = false;
-        meshDataBuffer = std::make_shared<MeshDataBuffer>(3);
     }
 
   private:
@@ -258,32 +256,27 @@ struct LightComponent {
     float innerConeAngle = glm::radians(30.0f); // Inner cone angle in radians
     float outerConeAngle = glm::radians(45.0f); // Outer cone angle in radians
 
-    // Flag indicating if the light is active
     bool isActive = true;
+    Mobility mobility = MOBILITY_STATIC;
     bool castsShadow = false;
-
-    std::shared_ptr<LightDataBuffer> lightDataBuffer;
+    // slot into the SSBO where the light metadata lives
+    uint32_t renderDataSlot = UINT32_MAX;
 
     generation_t getGeneration() const { return m_generation; }
 
-    LightComponent() { lightDataBuffer = std::make_shared<LightDataBuffer>(); }
+    LightComponent() = default;
 
     LightComponent(const glm::vec3 &color, float intensity, float range)
         : type(LightType::Point), color(color), intensity(intensity), range(range)
     {
-        lightDataBuffer = std::make_shared<LightDataBuffer>();
     }
 
-    LightComponent(const glm::vec3 &color, float intensity) : type(LightType::Directional), color(color), intensity(intensity)
-    {
-        lightDataBuffer = std::make_shared<LightDataBuffer>();
-    }
+    LightComponent(const glm::vec3 &color, float intensity) : type(LightType::Directional), color(color), intensity(intensity) {}
 
     LightComponent(const glm::vec3 &color, float intensity, float range, float innerAngleDegrees, float outerAngleDegrees)
         : type(LightType::Spot), color(color), intensity(intensity), range(range), innerConeAngle(glm::radians(innerAngleDegrees)),
           outerConeAngle(glm::radians(outerAngleDegrees))
     {
-        lightDataBuffer = std::make_shared<LightDataBuffer>();
     }
 
     void setColor(const glm::vec3 &c)
@@ -344,6 +337,8 @@ struct BLASComponent {
 struct ShadowComponent {
     std::unique_ptr<ShadowMap> shadowMap;
     bool isActive = true;
+    Mobility mobility = MOBILITY_DYNAMIC;
+    uint32_t renderDataSlot = UINT32_MAX;
 
     ShadowComponent(float width, float height) { shadowMap = std::make_unique<ShadowMap>(width, height); }
 
@@ -365,6 +360,8 @@ struct ShadowComponent {
 struct CascadedShadowComponent {
     std::unique_ptr<CascadedShadowMap> cascadedShadowMap;
     bool isActive = true;
+    Mobility mobility = MOBILITY_DYNAMIC;
+    uint32_t renderDataSlot = UINT32_MAX;
 
     CascadedShadowComponent(float width, float height, uint8_t numCascades, float lambda)
     {

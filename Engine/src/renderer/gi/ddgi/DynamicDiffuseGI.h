@@ -74,7 +74,7 @@ class DynamicDiffuseGI {
     uint32_t getProbeClassificationBindlessIndex() const { return m_probeClassificationBindlessIndex; }
 
   private:
-    void castRays(std::shared_ptr<Scene> scene, CommandBuffer *commandBuffer);
+    void castRays(std::shared_ptr<Scene> scene, CommandBuffer *commandBuffer, uint32_t frameIndex);
     void blendTextures(CommandBuffer *commandBuffer);
     void classifyProbes(CommandBuffer *commandBuffer);
     void relocateProbes(CommandBuffer *commandBuffer);
@@ -84,8 +84,6 @@ class DynamicDiffuseGI {
 
     void createPipelines();
     void setupProbeTextures();
-
-    uint32_t getSunLightDataIndex(std::shared_ptr<Scene> scene);
 
     void clearTextures();
 

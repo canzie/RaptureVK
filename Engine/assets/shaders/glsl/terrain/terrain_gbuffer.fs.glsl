@@ -23,7 +23,8 @@ layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 layout(set = 3, binding = 0) uniform sampler3D u_textures3D[];
 
 layout(push_constant) uniform TerrainPushConstants {
-    uint cameraBindlessIndex;
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
     uint chunkDataBufferIndex;
     uint continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint erosionIndex;

@@ -47,9 +47,6 @@ ShadowMap::~ShadowMap() {}
 void ShadowMap::createUniformBuffers()
 {
     RAPTURE_PROFILE_FUNCTION();
-
-    // Create uniform buffers for each frame in flight
-    m_shadowDataBuffer = std::make_shared<ShadowDataBuffer>();
 }
 
 void ShadowMap::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer)

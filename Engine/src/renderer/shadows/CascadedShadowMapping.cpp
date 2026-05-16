@@ -2,6 +2,7 @@
 
 #include "components/Components.h"
 #include "generators/terrain/TerrainTypes.h"
+#include "renderer/SceneRenderData.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "render_targets/swap_chains/SwapChain.h"
@@ -18,6 +19,7 @@ namespace Rapture {
 struct PushConstantsCSM {
     uint32_t shadowMatrixIndices;
     uint32_t batchInfoBufferIndex;
+    uint32_t meshDataSSBOIndex;
 };
 
 struct TerrainCSMPushConstants {
@@ -337,11 +339,8 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
             m_mdiBatchMaps[m_currentFrame]->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(),
                                                         meshComp.mesh->getIndexBuffer()->getIndexType());
 
-        // Get mesh buffer index from the MeshComponent
-        uint32_t meshBufferIndex = meshComp.meshDataBuffer ? meshComp.meshDataBuffer->getDescriptorIndex(currentFrame) : 0;
-
         // Add mesh to batch (materialIndex = 0 for shadow pass)
-        batch->addObject(*meshComp.mesh, meshBufferIndex, 0);
+        batch->addObject(*meshComp.mesh, meshComp.renderDataSlot, 0);
     }
 
     // Second pass: Upload batch data and render using MDI
@@ -364,9 +363,12 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
                                   static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
 
         // Set push constants for this batch
+        auto &renderData = *activeScene->getRenderData();
+
         PushConstantsCSM pushConstants{};
         pushConstants.shadowMatrixIndices = m_cascadeMatricesIndex;
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
+        pushConstants.meshDataSSBOIndex = renderData.getMeshes().getDescriptorIndex(currentFrame);
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
@@ -926,8 +928,6 @@ void CascadedShadowMap::createShadowTexture()
 }
 void CascadedShadowMap::createUniformBuffers()
 {
-    m_shadowDataBuffer = std::make_shared<ShadowDataBuffer>(m_framesInFlight);
-
     m_cascadeMatricesBuffer = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::STREAM, m_allocator, nullptr);
 
     // Add to descriptor set

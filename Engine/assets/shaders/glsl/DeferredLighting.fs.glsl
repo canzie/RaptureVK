@@ -40,7 +40,6 @@ layout(set = 3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
 #include "IrradianceCommon.glsl"
 
 
-// Light data structure for shader
 struct LightData {
     vec4 position;      // w = light type (0 = point, 1 = directional, 2 = spot)
     vec4 direction;     // w = range
@@ -49,7 +48,7 @@ struct LightData {
 };
 
 
-struct ShadowBufferData {
+struct ShadowGPUData {
     int type; // 0 = point, 1 = directional, 2 = spot
     uint cascadeCount;
     uint lightIndex; // Index of the light this shadow maps to
@@ -58,14 +57,14 @@ struct ShadowBufferData {
     vec4 cascadeSplitsViewSpace[MAX_CASCADES]; // Contains view-space Z split depths in .x component
 };
 
-layout(std140, set = 0, binding = 1) uniform LightDataBuffer {
-    LightData lightData;
-} u_lightData[];
+layout(std430, set = 0, binding = 1) readonly buffer LightDataSSBO {
+    LightData lights[];
+} u_lightSSBO[];
 
 
-layout(std140, set = 0, binding = 4) uniform ShadowDataBuffer {
-    ShadowBufferData shadowData;
-} u_shadowData[];
+layout(std430, set = 0, binding = 4) readonly buffer ShadowDataSSBO {
+    ShadowGPUData shadows[];
+} u_shadowSSBO[];
 
 
 layout(std140, set = 0, binding = 5) uniform ProbeInfo {
@@ -75,9 +74,15 @@ layout(std140, set = 0, binding = 5) uniform ProbeInfo {
 
 layout(push_constant) uniform PushConstants {
     vec4 cameraPos;
-    uint lightCount;
-    uint shadowCount;
-    
+    uint lightDataSSBOIndex;
+    uint lightStaticCount;
+    uint lightDynamicOffset;
+    uint lightDynamicCount;
+    uint shadowDataSSBOIndex;
+    uint shadowStaticCount;
+    uint shadowDynamicOffset;
+    uint shadowDynamicCount;
+
     uint GBufferAlbedoHandle;
     uint GBufferNormalHandle;
     uint GBufferPositionHandle;
@@ -220,7 +225,7 @@ vec3 calculateLightContribution(vec3 N, vec3 V, vec3 L, vec3 albedo, float metal
 }
 
 // Helper function to calculate shadow for a specific cascade - this contains the PCF shadow mapping logic
-float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, ShadowBufferData shadowInfo, 
+float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, ShadowGPUData shadowInfo, 
                               mat4 lightMatrix, int cascadeIndex) {
     // Transform fragment position from world space to light clip space
     vec4 fragPosLightSpace = lightMatrix * vec4(fragPosWorld, 1.0);
@@ -347,7 +352,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
     return clamp(shadowFactor, 0.0, 1.0);
 }
 
-float calculateShadow(vec3 fragPosWorld, float fragDepthView, vec3 normal, vec3 lightDir, ShadowBufferData shadowInfo, out int cascadeIndexOut) { // Added fragDepthView parameter
+float calculateShadow(vec3 fragPosWorld, float fragDepthView, vec3 normal, vec3 lightDir, ShadowGPUData shadowInfo, out int cascadeIndexOut) { // Added fragDepthView parameter
     cascadeIndexOut = -1; // Default value
 
     if (shadowInfo.type < 0) return 1.0;
@@ -456,8 +461,10 @@ void main() {
     vec3 Lo = vec3(0.0);
     int debugCascadeIndex = -1;
 
-    for(uint i = 0; i < pc.lightCount; i++) {
-        LightData light = u_lightData[i].lightData;
+    uint lightCount = pc.lightStaticCount + pc.lightDynamicCount;
+    for(uint li = 0; li < lightCount; li++) {
+        uint lightSlot = (li < pc.lightStaticCount) ? li : (pc.lightDynamicOffset + li - pc.lightStaticCount);
+        LightData light = u_lightSSBO[pc.lightDataSSBOIndex].lights[lightSlot];
         vec3 lightPos = light.position.xyz;
         vec3 lightDirWorld;
         float attenuation = 1.0;
@@ -498,9 +505,11 @@ void main() {
 
 
         float shadowFactor = 1.0;
-        int currentCascadeIndex = -1; 
-        for (uint j = 0u; j < pc.shadowCount; j++) {
-           ShadowBufferData shadowInfo = u_shadowData[j].shadowData;
+        int currentCascadeIndex = -1;
+        uint shadowCount = pc.shadowStaticCount + pc.shadowDynamicCount;
+        for (uint sj = 0u; sj < shadowCount; sj++) {
+            uint shadowSlot = (sj < pc.shadowStaticCount) ? sj : (pc.shadowDynamicOffset + sj - pc.shadowStaticCount);
+            ShadowGPUData shadowInfo = u_shadowSSBO[pc.shadowDataSSBOIndex].shadows[shadowSlot];
             if (shadowInfo.lightIndex == light.spotAngles.z && shadowInfo.type >= 0) {
                
                shadowFactor = calculateShadow(fragPos, positionDepth.a, N, lightDirWorld, shadowInfo, currentCascadeIndex);

@@ -1,15 +1,15 @@
 #pragma once
 
-#include "meshes/Mesh.h"
 #include "buffers/Buffers.h"
+#include "meshes/Mesh.h"
 
-#include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
+#include <vulkan/vulkan.h>
 
 namespace Rapture {
 
 class BLAS {
-public:
+  public:
     BLAS(Mesh *mesh);
     ~BLAS();
 
@@ -18,42 +18,42 @@ public:
 
     // Get the acceleration structure handle
     VkAccelerationStructureKHR getAccelerationStructure() const { return m_accelerationStructure; }
-    
+
     // Get the device address of the acceleration structure
     VkDeviceAddress getDeviceAddress() const { return m_deviceAddress; }
 
     // Check if the acceleration structure has been built
     bool isBuilt() const { return m_isBuilt; }
 
-private:
+  private:
     void createAccelerationStructure();
     void createGeometry();
 
-private:
+  private:
     Mesh *m_mesh;
-    
+
     VkAccelerationStructureKHR m_accelerationStructure;
     VkAccelerationStructureGeometryKHR m_geometry;
     VkAccelerationStructureBuildGeometryInfoKHR m_buildInfo;
     VkAccelerationStructureBuildRangeInfoKHR m_buildRangeInfo;
-    
+
     // Buffer to hold the acceleration structure
     VkBuffer m_buffer;
     VmaAllocation m_allocation;
-    
+
     // Scratch buffer for building
     VkBuffer m_scratchBuffer;
     VmaAllocation m_scratchAllocation;
-    
+
     VkDeviceAddress m_deviceAddress;
     VkDeviceSize m_accelerationStructureSize;
     VkDeviceSize m_scratchSize;
-    
+
     bool m_isBuilt;
-    
+
     // Vulkan handles
     VkDevice m_device;
     VmaAllocator m_allocator;
 };
 
-}
+} // namespace Rapture

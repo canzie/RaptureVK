@@ -6,12 +6,12 @@
 #include "shaders/Shader.h"
 
 #include "asset_manager/AssetManager.h"
+#include "buffers/UniformBuffer.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorBinding.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "buffers/descriptors/DescriptorSet.h"
-#include "buffers/UniformBuffer.h"
 #include "cameras/CameraCommon.h"
 #include "components/Components.h"
 #include "events/GameEvents.h"

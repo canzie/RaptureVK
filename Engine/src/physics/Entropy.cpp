@@ -194,7 +194,7 @@ void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene)
         auto [rigidBody, mesh, transform, boundingBox] =
             view.get<RigidBodyComponent, MeshComponent, TransformComponent, BoundingBoxComponent>(entityHandle);
 
-        if (mesh.isStatic) {
+        if (mesh.mobility == MOBILITY_STATIC) {
             continue;
         }
 

@@ -3,12 +3,12 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "buffers/descriptors/DescriptorSet.h"
-#include "logging/Log.h"
-#include "window_context/Application.h"
-#include "window_context/vulkan_context/TimelineSemaphore.h"
 #include "jobs/Counter.h"
 #include "jobs/Job.h"
 #include "jobs/JobSystem.h"
+#include "logging/Log.h"
+#include "window_context/Application.h"
+#include "window_context/vulkan_context/TimelineSemaphore.h"
 
 #include "stb_image.h"
 
@@ -675,7 +675,8 @@ uint32_t Texture::getBindlessIndex()
 
     // Initialize the bindless buffer pool if not already done
     if (s_bindlessTextures == nullptr) {
-        auto set = Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
+        auto set =
+            Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
         if (set) {
             s_bindlessTextures = set->getTextureBinding(DescriptorSetBindingLocation::BINDLESS_TEXTURES);
         }

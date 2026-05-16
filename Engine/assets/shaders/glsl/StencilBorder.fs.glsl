@@ -8,11 +8,12 @@ layout(location = 1) in vec3 vPosition;
 layout(set = 3, binding = 0) uniform usampler2D u_gTextures[];
 
 layout(push_constant) uniform PushConstants {
-    uint modelDataIndex;
+    mat4 model;
     vec4 color;
     float borderWidth;
     uint depthStencilTextureHandle;
-    uint cameraUBOIndex;
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
 } pc;
 
 layout(location = 0) out vec4 outColor;

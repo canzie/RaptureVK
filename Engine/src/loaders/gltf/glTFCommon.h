@@ -18,10 +18,10 @@ namespace Rapture {
  * @brief Type of a glTF node for processing purposes
  */
 enum class glTF_NodeType {
-    EMPTY,      ///< Node with no mesh (transform node or group)
-    PRIMITIVE,  ///< Node containing a single primitive (renderable)
-    SKELETON,   ///< Node containing skeleton data
-    BONE,       ///< Bone node within a skeleton
+    EMPTY,     ///< Node with no mesh (transform node or group)
+    PRIMITIVE, ///< Node containing a single primitive (renderable)
+    SKELETON,  ///< Node containing skeleton data
+    BONE,      ///< Bone node within a skeleton
 };
 
 /**
@@ -52,7 +52,7 @@ struct glTF_SceneNode {
  * Built during async loading, then finalized to ECS on main thread
  */
 struct glTF_LoadedSceneData {
-    std::unordered_map<size_t, AssetRef> materials;  ///< Keyed by glTF material index
+    std::unordered_map<size_t, AssetRef> materials; ///< Keyed by glTF material index
 
     std::vector<std::unique_ptr<glTF_SceneNode>> rootNodes;
 

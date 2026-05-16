@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "buffers/IndexBuffer.h"
 #include "buffers/BufferLayout.h"
+#include "buffers/IndexBuffer.h"
 #include "buffers/VertexBuffer.h"
 
 #include "buffers/BufferPool.h"

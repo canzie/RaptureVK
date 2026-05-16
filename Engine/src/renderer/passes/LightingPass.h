@@ -4,10 +4,10 @@
 #include "pipelines/GraphicsPipeline.h"
 #include "shaders/Shader.h"
 
+#include "buffers/UniformBuffer.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorSet.h"
-#include "buffers/UniformBuffer.h"
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
 
@@ -31,7 +31,7 @@ class LightingPass {
     FramebufferSpecification getFramebufferSpecification();
 
     CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, SceneRenderTarget &renderTarget,
-                                   const SecondaryBufferInheritance &inheritance);
+                                   uint32_t frameIndex, const SecondaryBufferInheritance &inheritance);
 
   private:
     void createPipeline();

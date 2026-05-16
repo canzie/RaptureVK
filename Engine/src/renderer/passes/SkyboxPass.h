@@ -2,22 +2,26 @@
 #define RAPTURE__SKYBOX_PASS_H
 
 #include "asset_manager/Asset.h"
-#include "buffers/command_buffers/CommandBuffer.h"
-#include "buffers/command_buffers/CommandPool.h"
-#include "buffers/descriptors/DescriptorSet.h"
 #include "buffers/IndexBuffer.h"
 #include "buffers/UniformBuffer.h"
 #include "buffers/VertexBuffer.h"
+#include "buffers/command_buffers/CommandBuffer.h"
+#include "buffers/command_buffers/CommandPool.h"
+#include "buffers/descriptors/DescriptorSet.h"
 #include "pipelines/GraphicsPipeline.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
 #include "window_context/Application.h"
 
+#include "scenes/entities/Entity.h"
+
 #include <memory>
 #include <vector>
 
 namespace Rapture {
+
+class Scene;
 
 class SkyboxPass {
   public:
@@ -26,6 +30,7 @@ class SkyboxPass {
     ~SkyboxPass();
 
     CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
+                                   std::shared_ptr<Scene> activeScene, Entity camera,
                                    const SecondaryBufferInheritance &inheritance);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,

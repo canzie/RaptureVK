@@ -30,13 +30,11 @@ class TimelineSemaphore {
     bool wait(uint64_t value, uint64_t timeoutNs = UINT64_MAX) const;
 
     // Wait for multiple semaphores - returns true if all signaled
-    static bool waitAll(std::span<const TimelineSemaphore *> semaphores,
-                        std::span<const uint64_t> values,
+    static bool waitAll(std::span<const TimelineSemaphore *> semaphores, std::span<const uint64_t> values,
                         uint64_t timeoutNs = UINT64_MAX);
 
     // Wait for any semaphore - returns true if any signaled
-    static bool waitAny(std::span<const TimelineSemaphore *> semaphores,
-                        std::span<const uint64_t> values,
+    static bool waitAny(std::span<const TimelineSemaphore *> semaphores, std::span<const uint64_t> values,
                         uint64_t timeoutNs = UINT64_MAX);
 
   private:

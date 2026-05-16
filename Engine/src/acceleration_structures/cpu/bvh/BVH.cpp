@@ -2,8 +2,8 @@
 
 #include "components/Components.h"
 #include "components/systems/BoundingBox.h"
-#include "physics/colliders/ColliderPrimitives.h"
 #include "physics/EntropyComponents.h"
+#include "physics/colliders/ColliderPrimitives.h"
 #include "scenes/Scene.h"
 
 #include <algorithm>
@@ -33,7 +33,7 @@ void BVH::build(std::shared_ptr<Scene> scene)
             bbView.get<BoundingBoxComponent, Entropy::RigidBodyComponent, TransformComponent, MeshComponent>(entity);
 
         // Skip dynamic objects
-        if (!mesh.isStatic) {
+        if (mesh.mobility != MOBILITY_STATIC) {
             continue;
         }
 
@@ -152,10 +152,8 @@ int BVH::recursiveBuild(std::vector<BVHNode> &primitives, size_t start, size_t e
 
     glm::vec3 extent = max - min;
     int axis = 0;
-    if (extent.y > extent.x)
-        axis = 1;
-    if (extent.z > extent[axis])
-        axis = 2;
+    if (extent.y > extent.x) axis = 1;
+    if (extent.z > extent[axis]) axis = 2;
 
     size_t mid = start + (end - start) / 2;
     std::sort(primitives.begin() + start, primitives.begin() + end + 1, [axis](const BVHNode &a, const BVHNode &b) {

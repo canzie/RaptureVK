@@ -1,7 +1,7 @@
 
 // ==============  SET 0 ==============
-#define S0_B0_CAMERA_UBO 0              // camera data like projection and view matrices
-#define S0_B1_LIGHTS_UBO 1              // light data like position, direction, color, type, etc.
+#define S0_B0_CAMERA_DATA_SSBO 0        // camera data like projection and view matrices
+#define S0_B1_LIGHT_DATA_SSBO 1         // light data like position, direction, color, type, etc.
 #define S0_B2_SHADOW_MATRICES_UBO 2     // Shadow lightviewmatrix for regular shadow maps
 #define S0_B3_CASCADE_MATRICES_UBO 3    // Shadow lightviewmatrices for cascaded shadow maps (n matrices instead of 1)
 #define S0_B4_SHADOW_DATA_UBO 4         // Shadow data like shadow map handles, cascade splits, etc.
@@ -12,7 +12,7 @@
 
 
 // ==============  SET 2 ==============
-#define S2_B0_MESH_DATA_UBO 0          // model matrix, flags, ...
+#define S2_B0_MESH_DATA_SSBO 0         // model matrix, flags, ...
 
 
 // ==============  SET 3 ==============

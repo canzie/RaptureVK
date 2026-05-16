@@ -18,10 +18,9 @@ struct SunProperties {
 
 #ifdef DDGI_ENABLE_DIFFUSE_LIGHTING
 
-// Sun shadow uniforms
-layout(std140, set=0, binding = 1) uniform SunPropertiesUBO { // use the light thing here instead
-    SunProperties sunProperties;
-}u_sunProperties[];
+layout(std430, set=0, binding = 1) readonly buffer LightDataSSBO {
+    SunProperties lights[];
+} u_lightSSBO[];
 
 /**
  * Computes the visibility factor for a given vector to a light using ray tracing.
@@ -165,16 +164,20 @@ vec3 EvaluatePointLight(vec3 shadingNormal, vec3 hitPositionWorld, SunProperties
 /**
  * Computes the diffuse reflection of light off the given surface (direct lighting).
  */
-vec3 DirectDiffuseLighting(vec3 albedo, vec3 surfaceNormal, vec3 hitPositionWorld, uint lightCount, vec3 shadingNormal) {
+vec3 DirectDiffuseLighting(vec3 albedo, vec3 surfaceNormal, vec3 hitPositionWorld,
+                           uint lightDataSSBOIndex, uint lightStaticCount,
+                           uint lightDynamicOffset, uint lightDynamicCount,
+                           vec3 shadingNormal) {
 
     vec3 brdf = (albedo / PI);
 
     vec3 totalLighting = vec3(0.0);
 
-    for (uint i = 0; i < lightCount; ++i) {
-        SunProperties light = u_sunProperties[i].sunProperties;
-        
-        // light type is in light.position.w
+    uint lightCount = lightStaticCount + lightDynamicCount;
+    for (uint li = 0; li < lightCount; ++li) {
+        uint lightSlot = (li < lightStaticCount) ? li : (lightDynamicOffset + li - lightStaticCount);
+        SunProperties light = u_lightSSBO[lightDataSSBOIndex].lights[lightSlot];
+
         if (light.position.w == 1) { // Directional
              totalLighting += EvaluateDirectionalLight(surfaceNormal, hitPositionWorld, light, shadingNormal);
         } else if (light.position.w == 0) { // Point

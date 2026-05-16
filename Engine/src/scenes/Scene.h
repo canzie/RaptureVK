@@ -58,18 +58,10 @@ class Scene {
     void updateTLAS();
 
     /**
-     * @brief Initialize the GPU data mirror for this scene
-     * @param renderContext Vulkan context for buffer allocation
-     * @param frameCount Number of frames in flight
+     * @brief Get the GPU data mirror
      */
-    void initRenderData(RenderContext* renderContext, uint32_t frameCount);
-
-    /**
-     * @brief Get the GPU data mirror, or nullptr if not initialized
-     * @return Pointer to SceneRenderData
-     */
-    SceneRenderData* getRenderData() { return m_renderData.get(); }
-    const SceneRenderData* getRenderData() const { return m_renderData.get(); }
+    SceneRenderData *getRenderData() { return m_renderData.get(); }
+    const SceneRenderData *getRenderData() const { return m_renderData.get(); }
 
   private:
     entt::registry m_registry;

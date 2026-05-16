@@ -3,11 +3,12 @@
 #include <array>
 #include <memory>
 
+#include "InstancedShapesPass.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "components/Components.h"
-#include "InstancedShapesPass.h"
 #include "logging/Log.h"
+#include "renderer/SceneRenderData.h"
 #include "logging/TracyProfiler.h"
 #include "shaders/Shader.h"
 #include "window_context/Application.h"
@@ -17,7 +18,8 @@ namespace Rapture {
 struct InstancedShapesPushConstants {
     glm::mat4 globalTransform;
     glm::vec4 color;
-    uint32_t cameraUBOIndex;
+    uint32_t cameraSSBOIndex;
+    uint32_t cameraSlotIndex;
     uint32_t instanceDataSSBOIndex;
 };
 
@@ -46,8 +48,9 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
 
 InstancedShapesPass::~InstancedShapesPass() {}
 
-CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene> &scene, Entity camera, SceneRenderTarget &renderTarget,
-                                                    uint32_t frameInFlight, const SecondaryBufferInheritance &inheritance)
+CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene> &scene, Entity camera,
+                                                    SceneRenderTarget &renderTarget, uint32_t frameInFlight,
+                                                    const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -109,10 +112,13 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
             m_pipelineFilled->bind(commandBuffer->getCommandBufferVk());
         }
 
+        auto &renderData = *scene->getRenderData();
+
         InstancedShapesPushConstants pushConstants;
         pushConstants.globalTransform = transformComp.transformMatrix();
         pushConstants.color = instanceShapeComp.color;
-        pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(frameInFlight);
+        pushConstants.cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(frameInFlight);
+        pushConstants.cameraSlotIndex = (cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
         pushConstants.instanceDataSSBOIndex = instanceShapeComp.instanceSSBO->getBindlessIndex();
 
         vkCmdPushConstants(
@@ -121,9 +127,9 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(InstancedShapesPushConstants), &pushConstants);
 
         m_rc->descriptorManager->getDescriptorSet(0)->bind(commandBuffer->getCommandBufferVk(),
-                                                     instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
+                                                           instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
         m_rc->descriptorManager->getDescriptorSet(3)->bind(commandBuffer->getCommandBufferVk(),
-                                                     instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
+                                                           instanceShapeComp.useWireMode ? m_pipelineWireframe : m_pipelineFilled);
 
         auto &bufferLayout = meshComp.mesh->getVertexBuffer()->getBufferLayout();
         auto bindingDescription = bufferLayout.getBindingDescription2EXT();

@@ -2,10 +2,10 @@
 #define RAPTURE__STENCIL_BORDER_PASS_H
 
 #include "asset_manager/AssetManager.h"
+#include "buffers/UniformBuffer.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorSet.h"
-#include "buffers/UniformBuffer.h"
 #include "cameras/CameraCommon.h"
 #include "events/GameEvents.h"
 #include "pipelines/GraphicsPipeline.h"
@@ -30,7 +30,8 @@ class StencilBorderPass {
     ~StencilBorderPass();
 
     CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
-                                   std::shared_ptr<Scene> activeScene, Entity camera, const SecondaryBufferInheritance &inheritance);
+                                   std::shared_ptr<Scene> activeScene, Entity camera,
+                                   const SecondaryBufferInheritance &inheritance);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex);
     void endDynamicRendering(CommandBuffer *commandBuffer);

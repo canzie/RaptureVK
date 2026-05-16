@@ -13,7 +13,8 @@ layout(set = 3, binding = 0) uniform samplerCube u_gTextures[];
 
 // Push constant - matching C++ SkyboxPass::PushConstants
 layout(push_constant) uniform PushConstants {
-    uint frameIndex;
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
     uint skyboxTextureIndex;
 } pc;
 

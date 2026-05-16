@@ -15,16 +15,13 @@ namespace Rapture {
 
 class Viewport {
   public:
-    Viewport(const std::string& name,
-             RenderContext renderContext,
-             SceneRenderTarget::TargetType targetType,
-             uint32_t width,
+    Viewport(const std::string &name, RenderContext renderContext, SceneRenderTarget::TargetType targetType, uint32_t width,
              uint32_t height);
 
     ~Viewport();
 
-    Viewport(const Viewport&) = delete;
-    Viewport& operator=(const Viewport&) = delete;
+    Viewport(const Viewport &) = delete;
+    Viewport &operator=(const Viewport &) = delete;
 
     void setScene(std::shared_ptr<Scene> scene);
     std::shared_ptr<Scene> getScene() const { return m_scene; }
@@ -33,7 +30,7 @@ class Viewport {
     Entity getCamera() const { return m_camera; }
 
     void createRenderer(RendererType type);
-    Renderer* getRenderer() { return m_renderer.get(); }
+    Renderer *getRenderer() { return m_renderer.get(); }
     RendererType getRendererType() const { return m_rendererType; }
 
     void drawFrame();
@@ -41,8 +38,8 @@ class Viewport {
     void resize(uint32_t width, uint32_t height);
     void onSwapChainRecreated();
 
-    SceneRenderTarget* getSceneRenderTarget();
-    const std::string& getName() const { return m_name; }
+    SceneRenderTarget *getSceneRenderTarget();
+    const std::string &getName() const { return m_name; }
     uint32_t getWidth() const { return m_width; }
     uint32_t getHeight() const { return m_height; }
     bool isActive() const { return m_active; }

@@ -4,11 +4,11 @@
 #include "MaterialData.h"
 #include "MaterialParameters.h"
 
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <initializer_list>
 
 namespace Rapture {
 
@@ -37,9 +37,8 @@ class MaterialManager {
     static void shutdown();
 
     static std::shared_ptr<BaseMaterial> getMaterial(const std::string &name);
-    static std::shared_ptr<BaseMaterial> createMaterial(const std::string &name,
-                                                         std::initializer_list<ParameterID> editableParams,
-                                                         const MaterialData &defaults);
+    static std::shared_ptr<BaseMaterial> createMaterial(const std::string &name, std::initializer_list<ParameterID> editableParams,
+                                                        const MaterialData &defaults);
     static uint32_t getDefaultTextureIndex();
     static void printMaterialNames();
 

@@ -9,10 +9,10 @@ class CommandPoolManager;
 class DescriptorManager;
 
 struct RenderContext {
-    VulkanContext* vulkanContext = nullptr;
-    BufferPoolManager* bufferPoolManager = nullptr;
-    CommandPoolManager* commandPoolManager = nullptr;
-    DescriptorManager* descriptorManager = nullptr;
+    VulkanContext *vulkanContext = nullptr;
+    BufferPoolManager *bufferPoolManager = nullptr;
+    CommandPoolManager *commandPoolManager = nullptr;
+    DescriptorManager *descriptorManager = nullptr;
 };
 
 } // namespace Rapture

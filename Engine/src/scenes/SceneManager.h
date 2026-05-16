@@ -1,8 +1,8 @@
 #pragma once
-#include "events/GameEvents.h"
-#include "logging/Log.h"
 #include "Scene.h"
 #include "World.h"
+#include "events/GameEvents.h"
+#include "logging/Log.h"
 #include <functional>
 #include <memory>
 #include <string>

@@ -12,20 +12,20 @@ layout(location = 0) out vec4 outColor;
 layout(push_constant) uniform PushConstants {
     mat4 globalTransform;
     vec4 color;
-    uint cameraUBOIndex;
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
     uint instanceDataSSBOIndex;
 } pc;
 
 
-struct InstanceData {
-    mat4 transform;
-};
-
-// Camera data
-layout(set = 0, binding = 0) uniform CameraDataBuffer {
+struct CameraGPUData {
     mat4 view;
     mat4 proj;
-} u_camera[]; // each index is for a different frame, all the same camera
+};
+
+layout(set = 0, binding = 0) readonly buffer CameraDataSSBO {
+    CameraGPUData cameras[];
+} u_cameraSSBO[];
 
 // Bindless array of SSBOs
 layout(set = 3, binding = 1) readonly buffer InstanceDataSSBO {
@@ -61,5 +61,5 @@ void main() {
     outColor = pc.color;
 
     mat4 modelMatrix = pc.globalTransform * instanceTransform;
-    gl_Position = u_camera[pc.cameraUBOIndex].proj * u_camera[pc.cameraUBOIndex].view * modelMatrix * vec4(inPosition, 1.0);
+    gl_Position = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex].proj * u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex].view * modelMatrix * vec4(inPosition, 1.0);
 } 

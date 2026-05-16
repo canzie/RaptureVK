@@ -1,6 +1,6 @@
 #include "VulkanContext.h"
-#include "logging/Log.h"
 #include "VulkanContextHelpers.h"
+#include "logging/Log.h"
 
 #include "buffers/BufferPool.h"
 #include "buffers/command_buffers/CommandBuffer.h"

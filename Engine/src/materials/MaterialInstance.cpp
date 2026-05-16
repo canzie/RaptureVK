@@ -18,7 +18,8 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
 
     m_uniformBuffer = std::make_shared<UniformBuffer>(sizeof(MaterialData), BufferUsage::DYNAMIC, allocator, nullptr);
 
-    auto materialSet = Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MATERIAL_UBO);
+    auto materialSet =
+        Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MATERIAL_UBO);
     if (materialSet) {
         auto binding = materialSet->getUniformBufferBinding(DescriptorSetBindingLocation::MATERIAL_UBO);
         if (binding) {
@@ -32,7 +33,8 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
 MaterialInstance::~MaterialInstance()
 {
     if (m_bindlessIndex != UINT32_MAX) {
-        auto materialSet = Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MATERIAL_UBO);
+        auto materialSet =
+            Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MATERIAL_UBO);
         if (materialSet) {
             auto binding = materialSet->getUniformBufferBinding(DescriptorSetBindingLocation::MATERIAL_UBO);
             if (binding) {

@@ -23,7 +23,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
         RP_CORE_INFO("validation layer [INFO]: {0}", pCallbackData->pMessage);
     } else
 #endif
-    if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         RP_CORE_WARN("validation layer: {0}", pCallbackData->pMessage);
     } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         RP_CORE_ERROR("validation layer: {0}", pCallbackData->pMessage);

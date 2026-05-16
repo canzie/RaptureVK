@@ -1,11 +1,11 @@
 #include "Application.h"
 
 #include "asset_manager/AssetManager.h"
+#include "jobs/JobSystem.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "materials/Material.h"
 #include "utils/Timestep.h"
-#include "jobs/JobSystem.h"
 
 namespace Rapture {
 
@@ -41,7 +41,7 @@ Application::Application(int width, int height, const char *title) : m_running(t
         CommandPoolConfig config = {};
         config.queueFamilyIndex = vc.getGraphicsQueueIndex();
         config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Pool reset handles this now
-        auto& cmdPoolMgr = *vc.getRenderContext().commandPoolManager;
+        auto &cmdPoolMgr = *vc.getRenderContext().commandPoolManager;
         auto tracyPoolHash = cmdPoolMgr.createCommandPool(config);
         auto tracyPool = cmdPoolMgr.getCommandPool(tracyPoolHash, 0);
 
@@ -84,8 +84,8 @@ Application::Application(int width, int height, const char *title) : m_running(t
     m_viewportManager = std::make_unique<ViewportManager>(m_vulkanContext->getRenderContext());
 
     auto swapExtent = m_vulkanContext->getSwapChain()->getExtent();
-    auto *primaryViewport = m_viewportManager->createViewport(
-        "main", SceneRenderTarget::TargetType::OFFSCREEN, swapExtent.width, swapExtent.height);
+    auto *primaryViewport =
+        m_viewportManager->createViewport("main", SceneRenderTarget::TargetType::OFFSCREEN, swapExtent.width, swapExtent.height);
     primaryViewport->createRenderer(RendererType::DEFERRED);
 
     MaterialManager::init();

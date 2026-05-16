@@ -1,14 +1,17 @@
 #include "SkyboxPass.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/descriptors/DescriptorManager.h"
+#include "components/Components.h"
 #include "logging/Log.h"
+#include "renderer/SceneRenderData.h"
 #include "textures/TextureCommon.h"
 #include "window_context/Application.h"
 
 namespace Rapture {
 
 struct SkyboxPushConstants {
-    uint32_t frameIndex;
+    uint32_t cameraSSBOIndex;
+    uint32_t cameraSlotIndex;
     uint32_t skyboxTextureIndex;
 };
 
@@ -42,6 +45,7 @@ SkyboxPass::~SkyboxPass()
 }
 
 CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
+                                           std::shared_ptr<Scene> activeScene, Entity camera,
                                            const SecondaryBufferInheritance &inheritance)
 {
     if (!m_skyboxTexture || !m_skyboxTexture->isReady()) {
@@ -92,8 +96,12 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
     vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), m_skyboxIndexBuffer->getBufferVk(), 0, VK_INDEX_TYPE_UINT32);
 
+    auto &renderData = *activeScene->getRenderData();
+    auto *cameraComp = camera.isValid() ? camera.tryGetComponent<CameraComponent>() : nullptr;
+
     SkyboxPushConstants pushConstants{};
-    pushConstants.frameIndex = frameInFlightIndex;
+    pushConstants.cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(frameInFlightIndex);
+    pushConstants.cameraSlotIndex = (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
     pushConstants.skyboxTextureIndex = m_skyboxTexture->getBindlessIndex();
 
     VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -104,7 +112,7 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
                        sizeof(SkyboxPushConstants), &pushConstants);
 
-    auto cameraSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::CAMERA_UBO);
+    auto cameraSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::CAMERA_DATA_SSBO);
     if (cameraSet) {
         cameraSet->bind(commandBuffer->getCommandBufferVk(), m_pipeline);
     }

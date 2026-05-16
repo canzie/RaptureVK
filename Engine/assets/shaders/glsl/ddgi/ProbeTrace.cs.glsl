@@ -31,8 +31,10 @@ layout(set = 3, binding = 1) readonly buffer gBindlessBuffers {
 layout(push_constant) uniform PushConstants {
 
     uint skyboxTextureIndex;     // Index into bindless texture array
-    uint sunLightDataIndex;
-    uint lightCount;
+    uint lightDataSSBOIndex;
+    uint lightStaticCount;
+    uint lightDynamicOffset;
+    uint lightDynamicCount;
 
     uint prevRadianceIndex;      // Previous radiance texture bindless index
     uint prevVisibilityIndex;    // Previous visibility texture bindless index
@@ -388,7 +390,9 @@ void main() {
 
             vec3 surfaceBias = DDGIGetSurfaceBias(surface.normal, hitToProbe, u_volume);
 
-            vec3 diffuse = DirectDiffuseLighting(albedo, surface.normal, hitPosition, pc.lightCount, worldShadingNormal);
+            vec3 diffuse = DirectDiffuseLighting(albedo, surface.normal, hitPosition,
+                pc.lightDataSSBOIndex, pc.lightStaticCount, pc.lightDynamicOffset, pc.lightDynamicCount,
+                worldShadingNormal);
 
             float volumeBlendWeight = DDGIGetVolumeBlendWeight(hitPosition, u_volume);
 

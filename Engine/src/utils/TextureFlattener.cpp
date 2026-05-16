@@ -130,7 +130,7 @@ void FlattenTexture::update(CommandBuffer *commandBuffer)
 
     // Bind descriptor sets
     Application::getRenderContext().descriptorManager->bindSet(3, commandBuffer, pipeline); // Bindless textures
-    m_descriptorSet->bind(commandBuffer->getCommandBufferVk(), pipeline); // Custom output texture
+    m_descriptorSet->bind(commandBuffer->getCommandBufferVk(), pipeline);                   // Custom output texture
 
     // Set push constants with bindless indices and texture dimensions
     TextureFlattener::FlattenPushConstants pushConstants;
@@ -172,7 +172,7 @@ void FlattenTexture::update(CommandBuffer *commandBuffer)
 
 // TextureFlattener implementation
 std::unique_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shared_ptr<Texture> inputTexture,
-                                                                        const std::string &name, FlattenerDataType dataType)
+                                                                       const std::string &name, FlattenerDataType dataType)
 {
     if (!inputTexture) {
         RP_CORE_ERROR("Input texture is null");

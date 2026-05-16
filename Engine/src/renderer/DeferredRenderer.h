@@ -3,11 +3,11 @@
 
 #include "renderer/Renderer.h"
 
-#include "renderer/passes/GBufferPass.h"
-#include "renderer/passes/LightingPass.h"
-#include "renderer/gi/ddgi/DynamicDiffuseGI.h"
-#include "renderer/passes/InstancedShapesPass.h"
 #include "renderer/RtInstanceData.h"
+#include "renderer/gi/ddgi/DynamicDiffuseGI.h"
+#include "renderer/passes/GBufferPass.h"
+#include "renderer/passes/InstancedShapesPass.h"
+#include "renderer/passes/LightingPass.h"
 #include "renderer/passes/SkyboxPass.h"
 #include "renderer/passes/StencilBorderPass.h"
 

@@ -4,8 +4,8 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "render_targets/swap_chains/SwapChain.h"
-#include "window_context/vulkan_context/RenderContext.h"
 #include "scenes/entities/Entity.h"
+#include "window_context/vulkan_context/RenderContext.h"
 #include "window_context/vulkan_context/VulkanQueue.h"
 
 #include <memory>
@@ -19,14 +19,14 @@ class Renderer {
     Renderer(RenderContext renderContext, SceneRenderTarget::TargetType targetType);
     virtual ~Renderer() = default;
 
-    Renderer(const Renderer&) = delete;
-    Renderer& operator=(const Renderer&) = delete;
+    Renderer(const Renderer &) = delete;
+    Renderer &operator=(const Renderer &) = delete;
 
     virtual void drawFrame(std::shared_ptr<Scene> activeScene, Entity camera) = 0;
     virtual void onSwapChainRecreated() = 0;
 
-    SceneRenderTarget& getSceneRenderTarget() { return *m_sceneRenderTarget; }
-    const SceneRenderTarget& getSceneRenderTarget() const { return *m_sceneRenderTarget; }
+    SceneRenderTarget &getSceneRenderTarget() { return *m_sceneRenderTarget; }
+    const SceneRenderTarget &getSceneRenderTarget() const { return *m_sceneRenderTarget; }
     uint32_t getCurrentFrame() const { return m_currentFrame; }
     SceneRenderTarget::TargetType getTargetType() const { return m_targetType; }
 

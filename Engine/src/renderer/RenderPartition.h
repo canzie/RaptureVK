@@ -1,11 +1,13 @@
 #ifndef RAPTURE__RENDERPARTITION_H
 #define RAPTURE__RENDERPARTITION_H
 
+#include "buffers/descriptors/DescriptorSet.h"
 #include "components/ComponentsCommon.h"
 #include "scenes/entities/EntityCommon.h"
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -42,9 +44,29 @@ class DirtyBitfield {
      */
     bool hasAnyDirty() const;
 
+    /**
+     * @brief Invoke a callback for each dirty slot index
+     * @param fn Callable with signature void(uint32_t slotIndex)
+     */
+    template <typename Fn> void forEachDirty(Fn &&fn) const
+    {
+        for (uint32_t wordIdx = 0; wordIdx < static_cast<uint32_t>(m_words.size()); wordIdx++) {
+            uint64_t word = m_words[wordIdx];
+            while (word != 0) {
+                uint32_t bit = static_cast<uint32_t>(__builtin_ctzll(word));
+                uint32_t slot = wordIdx * 64 + bit;
+                if (slot < m_slotCount) {
+                    fn(slot);
+                }
+                word &= word - 1;
+            }
+        }
+    }
+
   private:
     std::vector<uint64_t> m_words;
     uint32_t m_slotCount = 0;
+    bool m_anyDirty = false;
 };
 
 /**
@@ -55,24 +77,27 @@ class DirtyBitfield {
  */
 template <typename T> class RenderPartition {
   public:
+    using SwapCallback = std::function<void(EntityID entityId, uint32_t newDenseIndex)>;
+
     /**
-     * @brief Initialize dirty bitfields for N frames in flight
+     * @brief Initialize dirty bitfields and swap callback
      * @param frameCount Number of frames in flight
+     * @param onSwap Called with (entityId, newDenseIndex) when swap-and-pop relocates an entity
      */
-    void init(uint32_t frameCount);
+    void init(uint32_t frameCount, SwapCallback onSwap = nullptr);
 
     /**
      * @brief Allocate a new slot for an entity
-     * @param entityId Entity to allocate for
+     * @param entityId Entity to associate with this slot
      * @return Dense index of the new slot
      */
     uint32_t allocateSlot(EntityID entityId);
 
     /**
-     * @brief Free an entity's slot via swap-and-pop
-     * @param entityId Entity to remove
+     * @brief Free a slot via swap-and-pop
+     * @param denseIndex Dense index to free
      */
-    void freeSlot(EntityID entityId);
+    void freeSlot(uint32_t denseIndex);
 
     /**
      * @brief Access slot data by dense index
@@ -81,20 +106,6 @@ template <typename T> class RenderPartition {
      */
     T &getSlotData(uint32_t denseIndex);
     const T &getSlotData(uint32_t denseIndex) const;
-
-    /**
-     * @brief Look up the dense index for an entity
-     * @param entityId Entity to look up
-     * @return Dense index, or UINT32_MAX if not found
-     */
-    uint32_t getSlotIndex(EntityID entityId) const;
-
-    /**
-     * @brief Check if an entity has a slot
-     * @param entityId Entity to check
-     * @return True if a slot is allocated
-     */
-    bool hasSlot(EntityID entityId) const;
 
     /**
      * @brief Get the entity ID stored at a dense index
@@ -130,6 +141,13 @@ template <typename T> class RenderPartition {
     bool hasDirty(uint32_t frameIndex) const;
 
     /**
+     * @brief Invoke a callback for each dirty slot in a frame's bitfield
+     * @param frameIndex Frame to query
+     * @param fn Callback invoked with each dirty slot index
+     */
+    void forEachDirty(uint32_t frameIndex, const std::function<void(uint32_t)> &fn) const;
+
+    /**
      * @brief Clear the dirty bitfield for a frame after upload
      * @param frameIndex Frame to clear
      */
@@ -149,12 +167,22 @@ template <typename T> class RenderPartition {
      */
     void setLastSeenGeneration(uint32_t denseIndex, generation_t gen);
 
+    /**
+     * @brief Fire swap callback for every entry so components can recompute their renderDataSlot
+     */
+    void notifyAllSwaps();
+
+    /**
+     * @brief Mark every slot dirty in all per-frame bitfields
+     */
+    void markAllDirtyAllFrames();
+
   private:
     std::vector<T> m_data;
     std::vector<EntityID> m_denseToEntityId;
-    std::vector<uint32_t> m_sparse;
     std::vector<DirtyBitfield> m_dirtyBitfields;
     std::vector<generation_t> m_lastSeenGenerations;
+    SwapCallback m_onSwap;
     uint32_t m_frameCount = 0;
 };
 
@@ -162,10 +190,15 @@ template <typename T> class RenderPartition {
  * @brief Bundles static + dynamic partitions with per-frame SSBOs for one data type
  *
  * Owns two RenderPartitions and a set of SSBOs (one per frame in flight).
- * Static data comes first in the unified SSBO, then dynamic.
+ * SSBO layout: [static region: staticCapacity][dynamic region: dynamicCapacity]
+ * Each region grows independently. Dynamic global slots only shift on static
+ * capacity resize (rare), not on every static add/remove.
+ *
+ * If per-mobility SSBOs are ever needed (e.g. GPU_ONLY for statics), the
+ * renderDataSlot can encode both SSBO index and slot via bit packing
+ * (upper bits = SSBO index, lower bits = slot within that SSBO)
  */
-template<typename T>
-class GPUDataStore {
+template <typename T> class GPUDataStore {
   public:
     GPUDataStore();
     ~GPUDataStore();
@@ -174,29 +207,9 @@ class GPUDataStore {
      * @brief Initialize partitions and allocate per-frame SSBOs
      * @param frameCount Number of frames in flight
      * @param renderContext Vulkan context for buffer allocation
+     * @param bindingLocation Descriptor set binding for SSBO registration
      */
-    void init(uint32_t frameCount, RenderContext* renderContext);
-
-    /**
-     * @brief Allocate a slot in either the static or dynamic partition
-     * @param entityId Entity to allocate for
-     * @param mobility MOBILITY_STATIC or MOBILITY_DYNAMIC
-     * @return Dense index within the chosen partition
-     */
-    uint32_t allocateSlot(EntityID entityId, Mobility mobility);
-
-    /**
-     * @brief Free an entity's slot from whichever partition holds it
-     * @param entityId Entity to remove
-     */
-    void freeSlot(EntityID entityId);
-
-    /**
-     * @brief Get the global SSBO index for an entity (statics first, then dynamics)
-     * @param entityId Entity to look up
-     * @return Global index, or UINT32_MAX if not found
-     */
-    uint32_t getSlotIndex(EntityID entityId) const;
+    void init(uint32_t frameCount, RenderContext *renderContext, DescriptorSetBindingLocation bindingLocation);
 
     /**
      * @brief Get the total number of active slots across both partitions
@@ -215,21 +228,52 @@ class GPUDataStore {
      * @param frameIndex Frame in flight index
      * @return Pointer to the StorageBuffer, or nullptr if not allocated
      */
-    StorageBuffer* getSSBO(uint32_t frameIndex) const;
+    StorageBuffer *getSSBO(uint32_t frameIndex) const;
 
-    RenderPartition<T>& getStaticPartition() { return m_partitions[MOBILITY_STATIC]; }
-    RenderPartition<T>& getDynamicPartition() { return m_partitions[MOBILITY_DYNAMIC]; }
-    const RenderPartition<T>& getStaticPartition() const { return m_partitions[MOBILITY_STATIC]; }
-    const RenderPartition<T>& getDynamicPartition() const { return m_partitions[MOBILITY_DYNAMIC]; }
+    /**
+     * @brief Get the descriptor index for a frame's SSBO
+     * @param frameIndex Frame in flight index
+     * @return Descriptor index in the binding, or UINT32_MAX if not registered
+     */
+    uint32_t getDescriptorIndex(uint32_t frameIndex) const;
+
+    /**
+     * @brief Get the partition for a given mobility type
+     * @param mobility MOBILITY_STATIC, MOBILITY_DYNAMIC, etc
+     * @return Reference to the partition
+     */
+    RenderPartition<T> &getPartition(Mobility mobility) { return m_partitions[mobility]; }
+    const RenderPartition<T> &getPartition(Mobility mobility) const { return m_partitions[mobility]; }
+
+    /**
+     * @brief Convert a partition-local dense index to the global SSBO index
+     * @param mobility Partition the slot belongs to
+     * @param localSlot Dense index within that partition
+     * @return Index into the unified SSBO
+     */
+    uint32_t getGlobalSlot(Mobility mobility, uint32_t localSlot) const;
+
+    /**
+     * @brief Convert a global SSBO index back to a partition-local dense index
+     * @param mobility Partition the slot belongs to
+     * @param globalSlot Index into the unified SSBO
+     * @return Dense index within that partition
+     */
+    uint32_t getLocalSlot(Mobility mobility, uint32_t globalSlot) const;
 
   private:
-    void ensureCapacity(uint32_t requiredCount);
+    void ensureCapacity(uint32_t requiredStaticCount, uint32_t requiredDynamicCount);
+    void registerSSBOs();
+    void unregisterSSBOs();
 
     std::array<RenderPartition<T>, MOBILITY_COUNT> m_partitions;
     std::vector<std::unique_ptr<StorageBuffer>> m_ssbos;
-    uint32_t m_ssboCapacity = 0;
+    std::vector<uint32_t> m_descriptorIndices;
+    uint32_t m_staticCapacity = 0;
+    uint32_t m_dynamicCapacity = 0;
     uint32_t m_frameCount = 0;
-    RenderContext* m_renderContext = nullptr;
+    RenderContext *m_renderContext = nullptr;
+    DescriptorSetBindingLocation m_bindingLocation = DescriptorSetBindingLocation::NONE;
 };
 
 } // namespace Rapture

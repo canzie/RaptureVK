@@ -12,4 +12,4 @@ enum Mobility {
     MOBILITY_COUNT
 };
 
-}
+} // namespace Rapture

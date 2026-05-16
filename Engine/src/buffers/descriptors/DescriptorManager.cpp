@@ -48,15 +48,15 @@ void DescriptorManager::initializeSet0()
 
     // Add bindings for all common resources
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::CAMERA_UBO});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::CAMERA_DATA_SSBO});
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 64, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::LIGHTS_UBO});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::LIGHT_DATA_SSBO});
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 48, TextureViewType::DEFAULT, false,
                                  DescriptorSetBindingLocation::SHADOW_MATRICES_UBO});
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16, TextureViewType::DEFAULT, false,
                                  DescriptorSetBindingLocation::CASCADE_MATRICES_UBO});
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 64, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::SHADOW_DATA_UBO});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::SHADOW_DATA_SSBO});
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, TextureViewType::DEFAULT, false,
                                  DescriptorSetBindingLocation::PROBE_VOLUME_DATA_UBO});
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, TextureViewType::DEFAULT, false,
@@ -93,9 +93,8 @@ void DescriptorManager::initializeSet2()
     // Set 2: Object/Mesh resources
     DescriptorSetBindings bindings;
 
-    // Add bindings for mesh data (using SSBO for bindless access)
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16384, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::MESH_DATA_UBO});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::MESH_DATA_SSBO});
     bindings.setNumber = 2;
 
     // Create the descriptor set

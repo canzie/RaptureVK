@@ -3,10 +3,10 @@
 
 #include <vk_mem_alloc.h>
 
+#include "window_context/WindowContext.h"
 #include "window_context/vulkan_context/RenderContext.h"
 #include "window_context/vulkan_context/VulkanQueue.h"
 #include "window_context/vulkan_context/VulkanTypes.h"
-#include "window_context/WindowContext.h"
 
 #include <map>
 #include <memory>
@@ -87,7 +87,7 @@ class VulkanContext {
     void initManagers();
     void createResources();
 
-    const RenderContext& getRenderContext() const { return m_renderContext; }
+    const RenderContext &getRenderContext() const { return m_renderContext; }
 
   private:
     void createInstance(WindowContext *windowContext);

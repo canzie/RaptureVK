@@ -73,12 +73,10 @@ struct ShaderMacro {
     std::string name;
     std::string value; // Empty string means no value (just #define NAME)
 
-    ShaderMacro(const std::string& n) : name(n), value("") {}
-    ShaderMacro(const std::string& n, const std::string& v) : name(n), value(v) {}
+    ShaderMacro(const std::string &n) : name(n), value("") {}
+    ShaderMacro(const std::string &n, const std::string &v) : name(n), value(v) {}
 
-    bool operator==(const ShaderMacro& other) const {
-        return name == other.name && value == other.value;
-    }
+    bool operator==(const ShaderMacro &other) const { return name == other.name && value == other.value; }
 };
 
 struct ShaderCompileInfo {

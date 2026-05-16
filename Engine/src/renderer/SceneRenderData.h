@@ -4,11 +4,11 @@
 #include "GPUDataStructs.h"
 #include "RenderPartition.h"
 
+#include "window_context/vulkan_context/RenderContext.h"
+
 #include <memory>
 
 namespace Rapture {
-
-struct RenderContext;
 class Scene;
 
 /**
@@ -26,11 +26,11 @@ class SceneRenderData {
      * @param scene Scene whose registry to mirror
      * @param frameCount Number of frames in flight
      */
-    SceneRenderData(RenderContext* renderContext, Scene& scene, uint32_t frameCount);
+    SceneRenderData(const RenderContext &renderContext, Scene &scene, uint32_t frameCount);
     ~SceneRenderData();
 
-    SceneRenderData(const SceneRenderData&) = delete;
-    SceneRenderData& operator=(const SceneRenderData&) = delete;
+    SceneRenderData(const SceneRenderData &) = delete;
+    SceneRenderData &operator=(const SceneRenderData &) = delete;
 
     /**
      * @brief Pack component data and upload all SSBOs
@@ -38,12 +38,14 @@ class SceneRenderData {
      */
     void onUpdate(uint32_t frameIndex);
 
-    GPUDataStore<MeshGPUData>& getMeshes() { return m_meshes; }
-    GPUDataStore<LightGPUData>& getLights() { return m_lights; }
-    GPUDataStore<CameraGPUData>& getCameras() { return m_cameras; }
-    const GPUDataStore<MeshGPUData>& getMeshes() const { return m_meshes; }
-    const GPUDataStore<LightGPUData>& getLights() const { return m_lights; }
-    const GPUDataStore<CameraGPUData>& getCameras() const { return m_cameras; }
+    GPUDataStore<MeshGPUData> &getMeshes() { return m_meshes; }
+    GPUDataStore<LightGPUData> &getLights() { return m_lights; }
+    GPUDataStore<CameraGPUData> &getCameras() { return m_cameras; }
+    GPUDataStore<ShadowGPUData> &getShadows() { return m_shadows; }
+    const GPUDataStore<MeshGPUData> &getMeshes() const { return m_meshes; }
+    const GPUDataStore<LightGPUData> &getLights() const { return m_lights; }
+    const GPUDataStore<CameraGPUData> &getCameras() const { return m_cameras; }
+    const GPUDataStore<ShadowGPUData> &getShadows() const { return m_shadows; }
 
   private:
     void onMeshAdded(EntityID entityId);
@@ -52,16 +54,23 @@ class SceneRenderData {
     void onLightRemoved(EntityID entityId);
     void onCameraAdded(EntityID entityId);
     void onCameraRemoved(EntityID entityId);
+    void onShadowAdded(EntityID entityId);
+    void onShadowRemoved(EntityID entityId);
+    void onCascadedShadowAdded(EntityID entityId);
+    void onCascadedShadowRemoved(EntityID entityId);
 
-    void updateMeshes();
-    void updateLights();
-    void updateCameras();
+    void updateMeshes(uint32_t frameIndex);
+    void updateLights(uint32_t frameIndex);
+    void updateCameras(uint32_t frameIndex);
+    void updateShadows(uint32_t frameIndex);
 
     GPUDataStore<MeshGPUData> m_meshes;
     GPUDataStore<LightGPUData> m_lights;
     GPUDataStore<CameraGPUData> m_cameras;
+    GPUDataStore<ShadowGPUData> m_shadows;
 
-    Scene* m_scene = nullptr;
+    RenderContext m_renderContext;
+    Scene *m_scene = nullptr;
     uint32_t m_frameCount = 0;
 
     struct SignalBridge;

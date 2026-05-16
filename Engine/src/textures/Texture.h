@@ -1,8 +1,8 @@
 #ifndef RAPTURE__TEXTURE_H
 #define RAPTURE__TEXTURE_H
 
-#include "buffers/descriptors/DescriptorBinding.h"
 #include "TextureCommon.h"
+#include "buffers/descriptors/DescriptorBinding.h"
 
 #include <atomic>
 #include <memory>
@@ -52,8 +52,7 @@ class Texture {
     /**
      * @brief Load texture asynchronously via job system, optionally decrements counter when done
      */
-    static std::unique_ptr<Texture> loadAsync(const std::string &path,
-                                              TextureSpecification spec = TextureSpecification(),
+    static std::unique_ptr<Texture> loadAsync(const std::string &path, TextureSpecification spec = TextureSpecification(),
                                               Counter *completionCounter = nullptr);
 
     /**
@@ -79,8 +78,8 @@ class Texture {
     VkDescriptorImageInfo getStorageImageDescriptorInfo() const;
     uint32_t getBindlessIndex();
 
-    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout,
-                                               VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask);
+    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask,
+                                               VkAccessFlags dstAccessMask);
 
     void uploadData(std::span<const uint8_t> data);
 

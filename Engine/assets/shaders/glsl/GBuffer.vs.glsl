@@ -15,33 +15,40 @@ layout(location = 4) out vec3 outBitangent;
 layout(location = 5) out flat uint outFlags;
 layout(location = 6) out flat uint outMaterialIndex;
 
-// Camera data
-layout(set = 0, binding = 0) uniform CameraDataBuffer {
+struct CameraGPUData {
     mat4 view;
     mat4 proj;
-} u_camera[]; // each index is for a different frame, all the same camera
+};
 
-// Object info structure
+struct MeshGPUData {
+    mat4 model;
+    uint materialIndex;
+    uint flags;
+    uint entityId;
+};
+
 struct ObjectInfo {
     uint meshIndex;
     uint materialIndex;
 };
 
-// Batch info buffer containing per-object data
+layout(set = 0, binding = 0) readonly buffer CameraDataSSBO {
+    CameraGPUData cameras[];
+} u_cameraSSBO[];
+
 layout(set = 0, binding = 6) readonly buffer BatchInfoBuffer {
     ObjectInfo objects[];
 } u_batchInfo[];
 
-// Mesh data buffer
-layout(set = 2, binding = 0) uniform MeshDataBuffer {
-    mat4 model;
-    uint flags; // Bit flags for vertex attribute availability
-} u_meshes[];
+layout(set = 2, binding = 0) readonly buffer MeshDataSSBO {
+    MeshGPUData meshes[];
+} u_meshSSBO[];
 
-// Push constant for per-batch data
 layout(push_constant) uniform PushConstants {
     uint batchInfoBufferIndex;
-    uint cameraBindlessIndex; 
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
+    uint meshSSBOIndex;
 } pc;
 
 // Bit flag definitions
@@ -54,12 +61,12 @@ const uint FLAG_HAS_NORMAL_MAP = 16u;
 void main() {
 
     // Get batch info for this draw call using gl_InstanceIndex
-    uint meshBufferIndex = u_batchInfo[pc.batchInfoBufferIndex].objects[gl_InstanceIndex].meshIndex;
-    
+    uint meshSlotIndex = u_batchInfo[pc.batchInfoBufferIndex].objects[gl_InstanceIndex].meshIndex;
+
     outMaterialIndex = u_batchInfo[pc.batchInfoBufferIndex].objects[gl_InstanceIndex].materialIndex;
 
-    mat4 model = u_meshes[meshBufferIndex].model;
-    uint flags = u_meshes[meshBufferIndex].flags;
+    mat4 model = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].model;
+    uint flags = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].flags;
 
     // Use flags to determine attribute availability (branchless)
     float hasNormals = float((flags & FLAG_HAS_NORMALS) != 0u);
@@ -69,17 +76,17 @@ void main() {
 
     // Transform to world space
     outFragPosDepth.xyz = vec3(model * vec4(aPosition, 1.0));
-    
+
     // Handle normals branchlessly
     vec3 defaultNormal = vec3(0.0, 1.0, 0.0);
     vec3 transformedNormal = normalize(mat3(model) * aNormal);
     outNormal = mix(defaultNormal, transformedNormal, hasNormals);
-    
+
     // Handle tangents branchlessly
     vec3 defaultTangent = vec3(1.0, 0.0, 0.0);
     vec3 transformedTangent = normalize(mat3(model) * aTangent.xyz);
     outTangent = mix(defaultTangent, transformedTangent, hasTangents);
-    
+
     // Calculate bitangent using glTF convention with handedness from tangent.w
     vec3 calculatedBitangent = cross(aNormal, aTangent.xyz) * aTangent.w;
     vec3 transformedBitangent = normalize(mat3(model) * calculatedBitangent);
@@ -89,7 +96,7 @@ void main() {
     // Re-orthogonalize tangent with respect to normal when both are available
     vec3 orthogonalizedTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
     outTangent = mix(outTangent, orthogonalizedTangent, hasNormals * hasTangents);
-    
+
     // Recalculate bitangent to ensure orthogonal basis, preserving handedness
     vec3 recalculatedBitangent = cross(outNormal, outTangent) * sign(dot(outBitangent, cross(outNormal, outTangent)));
     outBitangent = mix(outBitangent, recalculatedBitangent, hasNormals * hasTangents * hasBitangents);
@@ -97,17 +104,17 @@ void main() {
     // Handle texture coordinates branchlessly
     vec2 defaultTexCoord = vec2(0.0, 0.0);
     outTexCoord = mix(defaultTexCoord, aTexCoord, hasTexcoords);
-    
+
     // Pass flags to fragment shader
     outFlags = flags;
-    
+
     // Calculate position in view space
-    vec4 viewPos = u_camera[pc.cameraBindlessIndex].view * vec4(outFragPosDepth.xyz, 1.0);
+    vec4 viewPos = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex].view * vec4(outFragPosDepth.xyz, 1.0);
 
     // Store linear view-space depth (positive = into screen)
     // For visible objects in front of camera: viewPos.z < 0, so -viewPos.z > 0
     outFragPosDepth.w = -viewPos.z;
 
     // Final clip space position
-    gl_Position = u_camera[pc.cameraBindlessIndex].proj * viewPos; // Use viewPos directly for projection
+    gl_Position = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex].proj * viewPos;
 }

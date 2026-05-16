@@ -21,16 +21,22 @@ layout(set = 0, binding = 6) readonly buffer BatchInfoBuffer {
 } u_batchInfo[];
 
 
-// Mesh data buffer containing transform matrices
-layout(set = 2, binding = 0) uniform MeshDataBuffer {
-    mat4 modelMatrix;
+struct MeshGPUData {
+    mat4 model;
+    uint materialIndex;
     uint flags;
-} u_meshData[];
+    uint entityId;
+};
+
+layout(set = 2, binding = 0) readonly buffer MeshDataSSBO {
+    MeshGPUData meshes[];
+} u_meshSSBO[];
 
 // Push constants
 layout(push_constant) uniform PushConstants {
     uint shadowMatrixIndices;
     uint batchInfoBufferIndex;
+    uint meshDataSSBOIndex;
 } pc;
 
 // Vertex attributes
@@ -41,10 +47,10 @@ void main() {
     // It corresponds to which cascade/view we're rendering to (0, 1, 2, or 3)
     
     // Get batch info for this draw call using gl_InstanceIndex
-    uint meshBufferIndex = u_batchInfo[pc.batchInfoBufferIndex].objects[gl_InstanceIndex].meshIndex;
-    
-    // Get transform matrix from mesh data buffer
-    mat4 modelMatrix = u_meshData[meshBufferIndex].modelMatrix;
+    uint meshSlotIndex = u_batchInfo[pc.batchInfoBufferIndex].objects[gl_InstanceIndex].meshIndex;
+
+    // Get transform matrix from mesh data SSBO
+    mat4 modelMatrix = u_meshSSBO[pc.meshDataSSBOIndex].meshes[meshSlotIndex].model;
     
     // Transform vertex position to world space, then to light space for the current cascade
     vec4 worldPosition = modelMatrix * vec4(inPosition, 1.0);

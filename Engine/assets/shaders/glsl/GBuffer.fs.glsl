@@ -27,7 +27,9 @@ layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 
 layout(push_constant) uniform PushConstants {
     uint batchInfoBufferIndex;
-    uint cameraBindlessIndex;
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
+    uint meshSSBOIndex;
 } pc;
 
 void main() {

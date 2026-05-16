@@ -1,32 +1,30 @@
 #pragma once
 
 #include "acceleration_structures/cpu/bvh/BVHCommon.h"
-#include <vector>
 #include <memory>
-
+#include <vector>
 
 namespace Rapture {
 
 class BoundingBox;
 class Scene;
 
-
 class DBVH {
-public:
+  public:
     DBVH();
     DBVH(std::shared_ptr<Scene> scene);
     ~DBVH();
 
-    int insert(EntityID entity, const BoundingBox& aabb);
+    int insert(EntityID entity, const BoundingBox &aabb);
     void remove(int nodeId);
-    bool update(int nodeId, const BoundingBox& aabb);
+    bool update(int nodeId, const BoundingBox &aabb);
     void clear();
 
-    std::vector<EntityID> getIntersectingAABBs(const BoundingBox& worldAABB) const;
+    std::vector<EntityID> getIntersectingAABBs(const BoundingBox &worldAABB) const;
 
-    std::vector<BVHNode>& getNodes() { return m_nodes; }
+    std::vector<BVHNode> &getNodes() { return m_nodes; }
 
-private:
+  private:
     int allocateNode();
     void freeNode(int nodeId);
 
@@ -34,10 +32,11 @@ private:
     void removeLeaf(int leafNodeId);
 
     void balance(int nodeId);
-    
-    void getIntersectingAABBsRecursive(const BoundingBox& worldAABB, int nodeIndex, std::vector<EntityID>& intersectingEntities) const;
 
-private:
+    void getIntersectingAABBsRecursive(const BoundingBox &worldAABB, int nodeIndex,
+                                       std::vector<EntityID> &intersectingEntities) const;
+
+  private:
     std::vector<BVHNode> m_nodes;
     int m_rootNodeId;
     int m_freeList;
@@ -45,4 +44,4 @@ private:
     int m_nodeCapacity;
 };
 
-}
+} // namespace Rapture

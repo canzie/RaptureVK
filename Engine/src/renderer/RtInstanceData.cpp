@@ -1,9 +1,9 @@
 #include "RtInstanceData.h"
 
 #include "acceleration_structures/TLAS.h"
+#include "buffers/BufferLayout.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "buffers/descriptors/DescriptorSet.h"
-#include "buffers/BufferLayout.h"
 #include "components/Components.h"
 #include "events/AssetEvents.h"
 #include "logging/Log.h"

@@ -7,18 +7,17 @@
 #include "textures/Texture.h"
 #include "utils/TextureFlattener.h"
 
+#include "buffers/UniformBuffer.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorBinding.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "buffers/descriptors/DescriptorSet.h"
-#include "buffers/UniformBuffer.h"
 
 #include "generators/terrain/TerrainCuller.h"
 #include "generators/terrain/TerrainGenerator.h"
 #include "renderer/Frustum.h"
 
-#include "components/systems/object_data_buffers/ShadowDataBuffer.h"
 #include "renderer/MDIBatch.h"
 
 #include "scenes/Scene.h"
@@ -78,7 +77,6 @@ class CascadedShadowMap {
     }
 
     uint32_t getTextureHandle() { return m_shadowTextureArray->getBindlessIndex(); }
-    std::shared_ptr<ShadowDataBuffer> getShadowDataBuffer() { return m_shadowDataBuffer; }
 
     std::vector<glm::mat4> getLightViewProjections() const { return m_lightViewProjections; }
 
@@ -131,7 +129,6 @@ class CascadedShadowMap {
     std::unique_ptr<FlattenTexture> m_flattenedShadowTexture;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
-    std::shared_ptr<ShadowDataBuffer> m_shadowDataBuffer;
     std::shared_ptr<UniformBuffer> m_cascadeMatricesBuffer;
     uint32_t m_cascadeMatricesIndex;
 

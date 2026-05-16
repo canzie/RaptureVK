@@ -149,10 +149,7 @@ uint32_t MDIBatch::getBatchInfoBufferIndex() const
     return m_batchInfoBufferIndex;
 }
 
-MDIBatchMap::MDIBatchMap(RenderContext renderContext)
-    : m_rc(renderContext)
-{
-}
+MDIBatchMap::MDIBatchMap(RenderContext renderContext) : m_rc(renderContext) {}
 
 void MDIBatchMap::beginFrame()
 {

@@ -14,7 +14,7 @@ file(GLOB_RECURSE EDITOR_SOURCES
 add_executable(${EDITOR_NAME} ${EDITOR_SOURCES})
 
 # Set the desired output executable name (can contain spaces)
-set_target_properties(${EDITOR_NAME} PROPERTIES OUTPUT_NAME "Rapture Editor")
+set_target_properties(${EDITOR_NAME} PROPERTIES OUTPUT_NAME "RaptureEditor")
 
 # Set include directories
 target_include_directories(${EDITOR_NAME} PRIVATE

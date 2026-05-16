@@ -5,16 +5,9 @@
 
 namespace Rapture {
 
-Viewport::Viewport(const std::string& name,
-                   RenderContext renderContext,
-                   SceneRenderTarget::TargetType targetType,
-                   uint32_t width,
+Viewport::Viewport(const std::string &name, RenderContext renderContext, SceneRenderTarget::TargetType targetType, uint32_t width,
                    uint32_t height)
-    : m_name(name)
-    , m_renderContext(renderContext)
-    , m_targetType(targetType)
-    , m_width(width)
-    , m_height(height)
+    : m_name(name), m_renderContext(renderContext), m_targetType(targetType), m_width(width), m_height(height)
 {
 }
 
@@ -73,7 +66,7 @@ void Viewport::onSwapChainRecreated()
     }
 }
 
-SceneRenderTarget* Viewport::getSceneRenderTarget()
+SceneRenderTarget *Viewport::getSceneRenderTarget()
 {
     if (!m_renderer) {
         return nullptr;

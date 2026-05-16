@@ -8,6 +8,7 @@
 #include "buffers/descriptors/DescriptorSet.h"
 #include "components/Components.h"
 #include "components/IndirectLightingComponent.h"
+#include "renderer/SceneRenderData.h"
 #include "renderer/gi/ddgi/DDGICommon.h"
 #include "scenes/Scene.h"
 #include "textures/Texture.h"
@@ -27,8 +28,10 @@ namespace Rapture {
 // Push constants for DDGI compute shaders
 struct DDGITracePushConstants {
     uint32_t skyboxTextureIndex;
-    uint32_t sunLightDataIndex;
-    uint32_t lightCount;
+    uint32_t lightDataSSBOIndex;
+    uint32_t lightStaticCount;
+    uint32_t lightDynamicOffset;
+    uint32_t lightDynamicCount;
     uint32_t prevRadianceIndex;
     uint32_t prevVisibilityIndex;
     uint32_t tlasIndex;
@@ -170,22 +173,6 @@ void DynamicDiffuseGI::setupProbeTextures()
     }
 }
 
-uint32_t DynamicDiffuseGI::getSunLightDataIndex(std::shared_ptr<Scene> scene)
-{
-
-    auto &reg = scene->getRegistry();
-    auto lightView = reg.view<LightComponent>();
-
-    for (auto ent : lightView) {
-        auto &lightComp = lightView.get<LightComponent>(ent);
-        if (lightComp.type == LightType::Directional) {
-            return lightComp.lightDataBuffer->getDescriptorIndex();
-        }
-    }
-
-    return 0;
-}
-
 void DynamicDiffuseGI::clearTextures()
 {
     auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash);
@@ -318,7 +305,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::populateProbesCompute");
-        castRays(scene, commandBuffer);
+        castRays(scene, commandBuffer, frameIndex);
     }
 
     if (m_RayDataTextureFlattened) {
@@ -510,7 +497,7 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
     }
 }
 
-void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, CommandBuffer *commandBuffer)
+void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, CommandBuffer *commandBuffer, uint32_t frameIndex)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -577,13 +564,14 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, CommandBuffer *com
     // Set 4: DDGI specific storage images
     m_probeTraceDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline);
 
-    auto &reg = scene->getRegistry();
-    auto lightView = reg.view<LightComponent>();
+    auto &renderData = *scene->getRenderData();
+    auto &lightStore = renderData.getLights();
 
-    // Set push constants with texture and buffer indices
     DDGITracePushConstants pushConstants = {};
-    pushConstants.lightCount = static_cast<uint32_t>(lightView.size());
-    pushConstants.sunLightDataIndex = getSunLightDataIndex(scene);
+    pushConstants.lightDataSSBOIndex = lightStore.getDescriptorIndex(frameIndex);
+    pushConstants.lightStaticCount = lightStore.getPartition(MOBILITY_STATIC).getCount();
+    pushConstants.lightDynamicOffset = lightStore.getGlobalSlot(MOBILITY_DYNAMIC, 0);
+    pushConstants.lightDynamicCount = lightStore.getPartition(MOBILITY_DYNAMIC).getCount();
     pushConstants.skyboxTextureIndex = m_skyboxTexture ? m_skyboxTexture->getBindlessIndex() : 0;
     pushConstants.tlasIndex = tlas->getBindlessIndex();
     pushConstants.prevRadianceIndex = m_probeIrradianceBindlessIndex;

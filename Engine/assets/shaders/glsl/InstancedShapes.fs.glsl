@@ -7,7 +7,8 @@ layout(location = 0) out vec4 outColor;
 layout(push_constant) uniform PushConstants {
     mat4 globalTransform;
     vec4 color;
-    uint cameraUBOIndex;
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
     uint instanceDataSSBOIndex;
 } pc;
 

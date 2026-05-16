@@ -6,6 +6,7 @@
 #include "renderer/SceneRenderData.h"
 
 #include "asset_manager/AssetManager.h"
+#include "logging/TracyProfiler.h"
 #include "meshes/MeshPrimitives.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "window_context/Application.h"
@@ -19,6 +20,10 @@ namespace Rapture {
 Scene::Scene(const std::string &sceneName)
 {
     m_config.sceneName = sceneName;
+
+    auto &vc = Application::getInstance().getVulkanContext();
+    uint32_t frameCount = vc.getSwapChain()->getImageCount();
+    m_renderData = std::make_unique<SceneRenderData>(vc.getRenderContext(), *this, frameCount);
 }
 
 Scene::~Scene()
@@ -117,44 +122,29 @@ void Scene::onUpdate(float dt)
     float height = static_cast<float>(swapChain->getExtent().height);
     uint32_t frameCount = swapChain->getImageCount();
 
-    // Update mesh data buffers
-    auto meshView = m_registry.view<TransformComponent, MeshComponent, MaterialComponent, TagComponent>();
-    for (auto entity : meshView) {
-        auto [transform, mesh, material, tag] =
-            meshView.get<TransformComponent, MeshComponent, MaterialComponent, TagComponent>(entity);
+    {
+        RAPTURE_PROFILE_SCOPE("OldPerEntity::updateMeshes");
+        auto meshView = m_registry.view<TransformComponent, MeshComponent, MaterialComponent, TagComponent>();
+        for (auto entity : meshView) {
+            auto [transform, mesh, material, tag] =
+                meshView.get<TransformComponent, MeshComponent, MaterialComponent, TagComponent>(entity);
 
-        material.material->updatePendingTextures();
-
-        uint32_t vertexFlags = mesh.mesh->getVertexBuffer()->getBufferLayout().getFlags();
-        uint32_t flags = vertexFlags;
-
-        mesh.meshDataBuffer->onUpdate(transform, flags, frameCounter);
-
-        if (mesh.meshDataBuffer->transformChanged) {
-            Entity ent = Entity(entity, this);
-            AssetEvents::onMeshTransformChanged().publish(ent.getID());
+            material.material->updatePendingTextures();
         }
     }
 
-    // Update camera data buffer
-    auto cameraView = m_registry.view<TransformComponent, CameraComponent>();
-    for (auto entity : cameraView) {
-        auto [transform, camera] = cameraView.get<TransformComponent, CameraComponent>(entity);
+    {
+        RAPTURE_PROFILE_SCOPE("OldPerEntity::updateCameras");
+        auto cameraView = m_registry.view<TransformComponent, CameraComponent>();
+        for (auto entity : cameraView) {
+            auto [transform, camera] = cameraView.get<TransformComponent, CameraComponent>(entity);
 
-        // Update camera aspect ratio based on current swapchain extent
-        float aspectRatio = width / height;
-        if (camera.aspectRatio != aspectRatio) {
-            camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane, camera.farPlane);
+            // Update camera aspect ratio based on current swapchain extent
+            float aspectRatio = width / height;
+            if (camera.aspectRatio != aspectRatio) {
+                camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane, camera.farPlane);
+            }
         }
-        camera.cameraDataBuffer->onUpdate(camera, frameCounter);
-    }
-
-    // Update light data buffers
-    auto lightView = m_registry.view<LightComponent, TransformComponent>();
-    for (auto entity : lightView) {
-        auto [light, transform] = lightView.get<LightComponent, TransformComponent>(entity);
-
-        light.lightDataBuffer->onUpdate(transform, light, static_cast<uint32_t>(entity));
     }
 
     glm::vec3 cameraPosition = glm::vec3(0.0f);
@@ -185,12 +175,6 @@ void Scene::onUpdate(float dt)
 
             // Update the shadow map view matrix
             shadow.shadowMap->updateViewMatrix(light, transform, cameraPosition);
-
-            auto shadowDataBuffer = shadow.shadowMap->getShadowDataBuffer();
-            // Update the shadow data buffer if it exists
-            if (shadowDataBuffer) {
-                shadowDataBuffer->update(light, shadow, static_cast<uint32_t>(entity));
-            }
         }
     }
 
@@ -207,29 +191,16 @@ void Scene::onUpdate(float dt)
                 auto cameraComp = mainCamera.tryGetComponent<CameraComponent>();
                 if (cameraComp) {
                     shadow.cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
-
-                    auto shadowDataBuffer = shadow.cascadedShadowMap->getShadowDataBuffer();
-                    // Update the shadow data buffer if it exists
-                    if (shadowDataBuffer) {
-                        shadowDataBuffer->update(light, shadow, static_cast<uint32_t>(entity));
-                    }
                 }
             }
         }
     }
 
-    if (m_renderData) {
-        m_renderData->onUpdate(frameCounter);
-    }
+    m_renderData->onUpdate(frameCounter);
 
     frameCounter = (frameCounter + 1) % frameCount;
 
     updateTLAS();
-}
-
-void Scene::initRenderData(RenderContext* renderContext, uint32_t frameCount)
-{
-    m_renderData = std::make_unique<SceneRenderData>(renderContext, *this, frameCount);
 }
 
 SceneSettings &Scene::getSettings()

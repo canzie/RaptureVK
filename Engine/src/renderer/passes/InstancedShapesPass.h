@@ -25,8 +25,8 @@ class InstancedShapesPass {
                         std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
     ~InstancedShapesPass();
 
-    CommandBuffer *recordSecondary(const std::shared_ptr<Scene> &scene, Entity camera, SceneRenderTarget &renderTarget, uint32_t frameInFlight,
-                                   const SecondaryBufferInheritance &inheritance);
+    CommandBuffer *recordSecondary(const std::shared_ptr<Scene> &scene, Entity camera, SceneRenderTarget &renderTarget,
+                                   uint32_t frameInFlight, const SecondaryBufferInheritance &inheritance);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
                                uint32_t frameInFlightIndex);

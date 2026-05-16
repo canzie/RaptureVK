@@ -14,20 +14,16 @@ struct alignas(16) MeshGPUData {
     alignas(4) uint32_t materialIndex;
     alignas(4) uint32_t vertexBufferFlags;
     alignas(4) uint32_t entityId;
-    alignas(4) uint32_t _pad;
 };
 
 /**
  * @brief Per-light data for the light SSBO (std430 layout)
  */
 struct alignas(16) LightGPUData {
-    alignas(16) glm::vec4 positionAndRange;  ///< xyz = world position, w = attenuation range
-    alignas(16) glm::vec4 directionAndType;  ///< xyz = direction, w = LightType as float
+    alignas(16) glm::vec4 positionAndType;   ///< xyz = world position, w = LightType as float
+    alignas(16) glm::vec4 directionAndRange; ///< xyz = direction, w = attenuation range
     alignas(16) glm::vec4 colorAndIntensity; ///< xyz = RGB color, w = intensity multiplier
-    alignas(4) float innerConeCos;           ///< cos(inner cone angle), spot lights only
-    alignas(4) float outerConeCos;           ///< cos(outer cone angle), spot lights only
-    alignas(4) uint32_t entityId;
-    alignas(4) uint32_t _pad;
+    alignas(16) glm::vec4 spotAngles;        ///< x = inner cone cos, y = outer cone cos, z = entity id, w = unused
 };
 
 /**
@@ -36,9 +32,20 @@ struct alignas(16) LightGPUData {
 struct alignas(16) CameraGPUData {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 projection;
-    alignas(16) glm::mat4 viewProjection;
-    alignas(16) glm::vec4 positionAndNear; ///< xyz = world position, w = near plane
-    alignas(16) glm::vec4 forwardAndFar;   ///< xyz = forward direction, w = far plane
+};
+
+#define MAX_CASCADES 4u
+
+/**
+ * @brief Per-shadow data for the shadow SSBO (std430 layout)
+ */
+struct alignas(16) ShadowGPUData {
+    alignas(4) int type; ///< 0 = point, 1 = directional, 2 = spot
+    alignas(4) uint32_t cascadeCount;
+    alignas(4) uint32_t lightIndex;
+    alignas(4) uint32_t textureHandle;
+    alignas(16) glm::mat4 cascadeMatrices[MAX_CASCADES];
+    alignas(16) glm::vec4 cascadeSplitsViewSpace[MAX_CASCADES];
 };
 
 } // namespace Rapture

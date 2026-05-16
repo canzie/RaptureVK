@@ -1,9 +1,10 @@
 #include "renderer/passes/StencilBorderPass.h"
 
+#include "StencilBorderPass.h"
 #include "components/Components.h"
 #include "logging/Log.h"
+#include "renderer/SceneRenderData.h"
 #include "logging/TracyProfiler.h"
-#include "StencilBorderPass.h"
 #include "window_context/Application.h"
 
 namespace Rapture {
@@ -13,7 +14,8 @@ struct StencilBorderPushConstants {
     glm::vec4 color;
     float borderWidth;
     uint32_t depthStencilTextureHandle;
-    uint32_t cameraUBOIndex;
+    uint32_t cameraSSBOIndex;
+    uint32_t cameraSlotIndex;
 };
 
 StencilBorderPass::StencilBorderPass(float width, float height, uint32_t framesInFlight,
@@ -61,9 +63,9 @@ StencilBorderPass::~StencilBorderPass()
 }
 
 CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
-                                                  std::shared_ptr<Scene> activeScene, Entity camera, const SecondaryBufferInheritance &inheritance)
+                                                  std::shared_ptr<Scene> activeScene, Entity camera,
+                                                  const SecondaryBufferInheritance &inheritance)
 {
-    (void)activeScene;
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_selectedEntity == nullptr) {
@@ -122,7 +124,10 @@ CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarge
     pushConstants.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
     pushConstants.borderWidth = 0.01f;
     pushConstants.depthStencilTextureHandle = m_depthStencilTextures[currentFrameInFlight]->getBindlessIndex();
-    pushConstants.cameraUBOIndex = cameraComp->cameraDataBuffer->getDescriptorIndex(m_currentImageIndex);
+
+    auto &renderData = *activeScene->getRenderData();
+    pushConstants.cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrameInFlight);
+    pushConstants.cameraSlotIndex = (cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(StencilBorderPushConstants), &pushConstants);
