@@ -117,7 +117,7 @@ void OutlinerPanel::buildEntityTree(Rapture::Entity entity, uint32_t parentRow)
     button->textYAlignment = Amethyst::TextYAlignment::CENTER;
     button->size = Amethyst::UDim2::fromScale(1.0f, 1.0f);
     button->zIndex = 2;
-    button->onMouseButton1ClickCb = [entityId]() { s_onEntityClicked(entityId); };
+    button->onMouseButton1ClickCb = [entityId]() { s_onEntityClicked(entityId); return Amethyst::EventResult::CONSUMED; };
     button->markDirty();
 
     m_treeView->endRow();

@@ -184,7 +184,6 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         }
     }
 
-    /* Terrain disabled for debugging
     constexpr float chunkSize = 64.0f;
     constexpr int32_t chunkRadius = 6;
     constexpr uint32_t chunkGridSize = (2 * chunkRadius + 1) * (2 * chunkRadius + 1);
@@ -202,7 +201,6 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     terrainComp.isEnabled = true;
     Rapture::RP_INFO("Terrain entity created with {} chunks (radius {})", terrainComp.generator->getChunkCount(),
                      terrainConfig.getChunkRadius());
-    */
 
     // Build TLAS for ray tracing
     try {

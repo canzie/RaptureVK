@@ -1,0 +1,90 @@
+[metadata]
+name = "Blender Dark Theme"
+version = "1.0"
+
+[general]
+backgroundColor = "#282828"
+backgroundTransparency = 0.0
+borderColor = "#1a1a1a"
+borderPixelSize = 1.0
+cornerRadius = 2.0
+fontFamily = "default"
+fontSize = 14.0
+textColor = "#e5e5e5"
+labelColor = [229, 229, 229, 255]
+valueColor = [180, 180, 180, 255]
+
+[frames]
+backgroundColor = "#303030"
+borderColor = "#1a1a1a"
+cornerRadius = 0.0
+
+[buttons]
+backgroundColor = "#545454"
+cornerRadius = 4.0
+padding = 8
+textColor = "#ffffff"
+
+[textButtons]
+backgroundColor = "#545454"
+cornerRadius = 4.0
+textColor = "#D6D6D6"
+
+[labels]
+backgroundTransparency = 1.0
+borderPixelSize = 0.0
+
+[scrollingFrames]
+backgroundColor = "#1d1d1d"
+scrollbarColor = "#333333"
+scrollbarThumbColor = "#5a5a5a"
+scrollbarThickness = 10.0
+cornerRadius = 0.0
+
+[tables]
+backgroundColor = "#1d1d1d"
+rowHeight = 32.0
+cellPadding = 4
+columnSeparatorWidth = 1.0
+columnSeparatorColor = [50, 50, 50, 255]
+
+[treeViews]
+backgroundColor = "#1d1d1d"
+rowHeight = 24.0
+rowBackgroundColor = [40, 40, 40, 255]
+rowAlternateColor = [43, 43, 43, 255]
+rowHoverColor = [60, 60, 60, 255]
+rowSelectedColor = [71, 114, 179, 255]
+indentPerLevel = 20.0
+disclosureTriangleSize = 8.0
+disclosureTrianglePadding = 4.0
+disclosureTriangleColor = [140, 140, 140, 255]
+
+[sliders]
+backgroundColor = "#282828"
+sliderColor = "#3d3d3d"
+thumbColor = "#4772b3"
+trackCornerRadius = 2.0
+thumbCornerRadius = 2.0
+labelPadding = 8
+
+[checkboxes]
+backgroundColor = "#282828"
+checkColor = "#4772b3"
+checkboxSize = 18.0
+cornerRadius = 2.0
+
+[dropdowns]
+backgroundColor = "#3d3d3d"
+highlightColor = "#4772b3"
+cornerRadius = 4.0
+
+[tabBars]
+backgroundColor = "#303030"
+tabWidth = 120.0
+barThickness = 26.0
+tabColor = "#3F3F3F"
+tabActiveColor = "#303030"
+tabHoveredColor = "#303030"
+tabPressedColor = "#303030"
+tabSpacing = 3.0

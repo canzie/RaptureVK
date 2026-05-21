@@ -29,7 +29,7 @@ ViewportPanel::ViewportPanel(Amethyst::DockingLayer *dockingLayer) : m_dockingLa
     m_viewportImage->position = Amethyst::UDim2::fromScale(0.0f, 0.05f);
     m_viewportImage->scaleType = Amethyst::ScaleType::STRETCH;
     m_viewportImage->zIndex = 100;
-    m_viewportImage->cornerRadius = 20.0f;
+    m_viewportImage->cornerRadius = 2.0f;
     m_viewportImage->markDirty();
 
     m_gizmo = std::make_unique<Amethyst::Gizmo>(m_viewportImage);
@@ -63,7 +63,10 @@ void ViewportPanel::setupHeader()
     m_translateBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
     m_translateBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
     m_translateBtn->markDirty();
-    m_translateBtn->onMouseButton1ClickCb = [this]() { m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE; };
+    m_translateBtn->onMouseButton1ClickCb = [this]() {
+        m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE;
+        return Amethyst::EventResult::CONSUMED;
+    };
 
     m_rotateBtn = m_header->add<Amethyst::TextButton>();
     m_rotateBtn->text = "Rotate";
@@ -72,7 +75,10 @@ void ViewportPanel::setupHeader()
     m_rotateBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
     m_rotateBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
     m_rotateBtn->markDirty();
-    m_rotateBtn->onMouseButton1ClickCb = [this]() { m_gizmoOperation = Amethyst::GizmoOperation::ROTATE; };
+    m_rotateBtn->onMouseButton1ClickCb = [this]() {
+        m_gizmoOperation = Amethyst::GizmoOperation::ROTATE;
+        return Amethyst::EventResult::CONSUMED;
+    };
 
     m_scaleBtn = m_header->add<Amethyst::TextButton>();
     m_scaleBtn->text = "Scale";
@@ -81,7 +87,10 @@ void ViewportPanel::setupHeader()
     m_scaleBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
     m_scaleBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
     m_scaleBtn->markDirty();
-    m_scaleBtn->onMouseButton1ClickCb = [this]() { m_gizmoOperation = Amethyst::GizmoOperation::SCALE; };
+    m_scaleBtn->onMouseButton1ClickCb = [this]() {
+        m_gizmoOperation = Amethyst::GizmoOperation::SCALE;
+        return Amethyst::EventResult::CONSUMED;
+    };
 
     m_spaceBtn = m_header->add<Amethyst::TextButton>();
     m_spaceBtn->text = "World";
@@ -99,6 +108,7 @@ void ViewportPanel::setupHeader()
             m_spaceBtn->text = "World";
         }
         m_spaceBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
 }
 
@@ -108,7 +118,7 @@ void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
     m_viewportImage->markDirty();
 }
 
-void ViewportPanel::onUpdate()
+void ViewportPanel::onUpdate(float dt)
 {
     updateGizmo();
 }

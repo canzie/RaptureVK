@@ -12,9 +12,10 @@
 #include <components/tree_view.h>
 
 #include "scenes/Scene.h"
+#include "layers/panels/Panel.h"
 #include <memory>
 
-class OutlinerPanel {
+class OutlinerPanel : public Panel {
   public:
     OutlinerPanel(Amethyst::DockingLayer *dockingLayer);
     ~OutlinerPanel();

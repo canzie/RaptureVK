@@ -8,7 +8,9 @@
 #include <components/panel_layer.h>
 #include <components/text_label.h>
 
-class PropertiesPanel {
+#include "layers/panels/Panel.h"
+
+class PropertiesPanel : public Panel {
   public:
     PropertiesPanel(Amethyst::DockingLayer *dockingLayer);
     ~PropertiesPanel();

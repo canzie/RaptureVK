@@ -12,10 +12,11 @@
 #include <components/widgets/gizmo.h>
 
 #include "scenes/entities/Entity.h"
+#include "layers/panels/Panel.h"
 
 #include <memory>
 
-class ViewportPanel {
+class ViewportPanel : public Panel {
   public:
     ViewportPanel(Amethyst::DockingLayer *dockingLayer);
     ~ViewportPanel();
@@ -25,7 +26,7 @@ class ViewportPanel {
     ViewportPanel &operator=(ViewportPanel &&) = delete;
 
     void setViewportImage(Amethyst::AmTextureId imageId);
-    void onUpdate();
+    void onUpdate(float dt) override;
 
     Amethyst::GizmoOperation getGizmoOperation() const { return m_gizmoOperation; }
     void setGizmoOperation(Amethyst::GizmoOperation op) { m_gizmoOperation = op; }

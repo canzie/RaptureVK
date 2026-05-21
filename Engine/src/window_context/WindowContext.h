@@ -1,9 +1,6 @@
 #pragma once
 
-// #include "events/Events.h"
-#include "events/ApplicationEvents.h"
-
-#include <functional>
+#include <cstdint>
 
 namespace Rapture {
 

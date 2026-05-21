@@ -6,9 +6,11 @@
 #include <amethyst/Amethyst.h>
 #include <amethyst__vk13_glfw.h>
 #include <components/docking_layer.h>
+#include <components/menu_bar.h>
 
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
+#include "layers/panels/Panel.h"
 #include <memory>
 #include <vector>
 
@@ -22,6 +24,16 @@ class AmethystLayer : public Rapture::Layer {
     virtual void onUpdate(float ts) override;
 
   private:
+    struct Workspace {
+        Amethyst::Frame *container = nullptr;
+        Amethyst::Frame *hotbar = nullptr;
+        Amethyst::DockingLayer *dockingLayer = nullptr;
+        std::vector<std::unique_ptr<Panel>> panels;
+    };
+
+    void setupMenuBar(glm::vec2 screenSize);
+    void setupWorkspaces(glm::vec2 screenSize);
+    Workspace &addWorkspace(const std::string &name, glm::vec2 screenSize);
     void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView);
     void endDynamicRendering(Rapture::CommandBuffer *commandBuffer);
     void onResize();
@@ -42,13 +54,16 @@ class AmethystLayer : public Rapture::Layer {
     Amethyst::GlyphAtlas m_glyphAtlas;
     Amethyst::TextProcessor m_textProcessor;
     Amethyst::Window m_window;
-    Amethyst::DockingLayer *m_dockingLayer = nullptr;
+    Amethyst::Frame *m_backgroundFrame = nullptr;
+    Amethyst::MenuBar *m_menuBar = nullptr;
+    Amethyst::TabBar *m_workspaceTabBar = nullptr;
+    Amethyst::Frame *m_bottomBar = nullptr;
     Amethyst::DrawContext m_drawContext;
 
-    std::vector<Amethyst::AmTextureId> m_viewportTextureIds;
+    int m_activeWorkspaceIndex = 0;
+    std::vector<Workspace> m_workspaces;
 
-    struct Panels;
-    std::unique_ptr<Panels> m_panels;
+    std::vector<Amethyst::AmTextureId> m_viewportTextureIds;
 };
 
 #endif // RAPTURE__AMETHYST_LAYER_H

@@ -54,14 +54,16 @@ void ContentBrowserPanel::setupTopBar()
     m_goBackBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
     m_goBackBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
     m_goBackBtn->layoutOrder = 0;
-    m_goBackBtn->onMouseButton1ClickCb = [this]() { navigateBack(); };
+    m_goBackBtn->onMouseButton1ClickCb = [this]() { navigateBack(); return Amethyst::EventResult::CONSUMED; };
     m_goBackBtn->onMouseButton1DownCb = [this](uint32_t, uint32_t) {
         m_goBackBtn->backgroundColor = m_goBackBtn->backgroundColor * 0.7f;
         m_goBackBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_goBackBtn->onMouseButton1UpCb = [this](uint32_t, uint32_t) {
         m_goBackBtn->backgroundColor = m_goBackBtn->backgroundColor / 0.7f;
         m_goBackBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_goBackBtn->markDirty();
 
@@ -71,14 +73,16 @@ void ContentBrowserPanel::setupTopBar()
     m_goForwardBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
     m_goForwardBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
     m_goForwardBtn->layoutOrder = 1;
-    m_goForwardBtn->onMouseButton1ClickCb = [this]() { navigateForward(); };
+    m_goForwardBtn->onMouseButton1ClickCb = [this]() { navigateForward(); return Amethyst::EventResult::CONSUMED; };
     m_goForwardBtn->onMouseButton1DownCb = [this](uint32_t, uint32_t) {
         m_goForwardBtn->backgroundColor = m_goForwardBtn->backgroundColor * 0.7f;
         m_goForwardBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_goForwardBtn->onMouseButton1UpCb = [this](uint32_t, uint32_t) {
         m_goForwardBtn->backgroundColor = m_goForwardBtn->backgroundColor / 0.7f;
         m_goForwardBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_goForwardBtn->markDirty();
 
@@ -91,10 +95,12 @@ void ContentBrowserPanel::setupTopBar()
     m_addBtn->onMouseButton1DownCb = [this](uint32_t, uint32_t) {
         m_addBtn->backgroundColor = m_addBtn->backgroundColor * 0.7f;
         m_addBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_addBtn->onMouseButton1UpCb = [this](uint32_t, uint32_t) {
         m_addBtn->backgroundColor = m_addBtn->backgroundColor / 0.7f;
         m_addBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_addBtn->markDirty();
 
@@ -107,10 +113,12 @@ void ContentBrowserPanel::setupTopBar()
     m_importBtn->onMouseButton1DownCb = [this](uint32_t, uint32_t) {
         m_importBtn->backgroundColor = m_importBtn->backgroundColor * 0.7f;
         m_importBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_importBtn->onMouseButton1UpCb = [this](uint32_t, uint32_t) {
         m_importBtn->backgroundColor = m_importBtn->backgroundColor / 0.7f;
         m_importBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_importBtn->markDirty();
 }
@@ -128,14 +136,16 @@ void ContentBrowserPanel::setupSideBar()
     m_modeToggleBtn->text = "Mode: Assets";
     m_modeToggleBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
     m_modeToggleBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
-    m_modeToggleBtn->onMouseButton1ClickCb = [this]() { toggleBrowseMode(); };
+    m_modeToggleBtn->onMouseButton1ClickCb = [this]() { toggleBrowseMode(); return Amethyst::EventResult::CONSUMED; };
     m_modeToggleBtn->onMouseButton1DownCb = [this](uint32_t, uint32_t) {
         m_modeToggleBtn->backgroundColor = m_modeToggleBtn->backgroundColor * 0.7f;
         m_modeToggleBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_modeToggleBtn->onMouseButton1UpCb = [this](uint32_t, uint32_t) {
         m_modeToggleBtn->backgroundColor = m_modeToggleBtn->backgroundColor / 0.7f;
         m_modeToggleBtn->markDirty();
+        return Amethyst::EventResult::CONSUMED;
     };
     m_modeToggleBtn->markDirty();
 
@@ -188,9 +198,9 @@ void ContentBrowserPanel::setupContentArea()
     m_contentContainer->markDirty();
 }
 
-void ContentBrowserPanel::onUpdate(float deltaTime)
+void ContentBrowserPanel::onUpdate(float dt)
 {
-    m_searchInput->update(deltaTime);
+    m_searchInput->update(dt);
 }
 
 void ContentBrowserPanel::refresh()
@@ -289,7 +299,7 @@ void ContentBrowserPanel::refreshAssetBrowser()
         item.name->markDirty();
 
         std::string assetName = metadata->getName();
-        item.action->onMouseButton1ClickCb = [assetName]() { Rapture::RP_INFO("clicked asset '{0}'", assetName); };
+        item.action->onMouseButton1ClickCb = [assetName]() { Rapture::RP_INFO("clicked asset '{0}'", assetName); return Amethyst::EventResult::CONSUMED; };
         item.action->markDirty();
 
         index++;
@@ -351,9 +361,9 @@ void ContentBrowserPanel::refreshFileBrowser()
 
         if (entry.is_directory()) {
             std::filesystem::path dirPath = entry.path();
-            item.action->onMouseButton1ClickCb = [this, dirPath]() { navigateToDirectory(dirPath); };
+            item.action->onMouseButton1ClickCb = [this, dirPath]() { navigateToDirectory(dirPath); return Amethyst::EventResult::CONSUMED; };
         } else {
-            item.action->onMouseButton1ClickCb = [filename]() { Rapture::RP_INFO("clicked file '{0}'", filename); };
+            item.action->onMouseButton1ClickCb = [filename]() { Rapture::RP_INFO("clicked file '{0}'", filename); return Amethyst::EventResult::CONSUMED; };
         }
         item.action->markDirty();
 
@@ -389,7 +399,7 @@ void ContentBrowserPanel::buildDirectoryTree(const std::filesystem::path &path, 
         btn->size = Amethyst::UDim2::fromScale(1.0f, 1.0f);
 
         std::filesystem::path dirPath = entry.path();
-        btn->onMouseButton1ClickCb = [this, dirPath]() { navigateToDirectory(dirPath); };
+        btn->onMouseButton1ClickCb = [this, dirPath]() { navigateToDirectory(dirPath); return Amethyst::EventResult::CONSUMED; };
         btn->markDirty();
 
         m_directoryTree->endRow();

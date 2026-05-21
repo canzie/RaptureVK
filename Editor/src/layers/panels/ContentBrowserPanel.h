@@ -23,7 +23,9 @@ enum class BrowseMode {
     FILES
 };
 
-class ContentBrowserPanel {
+#include "layers/panels/Panel.h"
+
+class ContentBrowserPanel : public Panel {
   public:
     ContentBrowserPanel(Amethyst::DockingLayer *dockingLayer);
     ~ContentBrowserPanel();
@@ -32,7 +34,7 @@ class ContentBrowserPanel {
     ContentBrowserPanel(ContentBrowserPanel &&) = delete;
     ContentBrowserPanel &operator=(ContentBrowserPanel &&) = delete;
 
-    void onUpdate(float deltaTime);
+    void onUpdate(float dt) override;
     void refresh();
     void setBaseDirectory(const std::filesystem::path &path);
 

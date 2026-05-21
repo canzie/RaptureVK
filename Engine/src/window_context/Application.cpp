@@ -1,6 +1,7 @@
 #include "Application.h"
 
 #include "asset_manager/AssetManager.h"
+#include "events/ApplicationEvents.h"
 #include "jobs/JobSystem.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"

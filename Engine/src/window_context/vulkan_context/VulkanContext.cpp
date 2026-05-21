@@ -6,6 +6,7 @@
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorManager.h"
+#include "events/ApplicationEvents.h"
 #include "render_targets/swap_chains/SwapChain.h"
 
 #ifdef _WIN32
@@ -1064,7 +1065,8 @@ static void s_enableVulkan12Features(VkPhysicalDevice physicalDevice, VkPhysical
     s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
 }
 
-template <typename T> static bool s_loadDeviceFunction(VkDevice device, const char *name, T &outFn)
+template <typename T>
+static bool s_loadDeviceFunction(VkDevice device, const char *name, T &outFn)
 {
     outFn = reinterpret_cast<T>(vkGetDeviceProcAddr(device, name));
     return outFn != nullptr;
@@ -1291,11 +1293,6 @@ void VulkanContext::createLogicalDevice()
 
     createInfo.enabledExtensionCount = static_cast<uint32_t>(m_deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = m_deviceExtensions.data();
-
-    if (enableValidationLayers) {
-        createInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
-        createInfo.ppEnabledLayerNames = m_validationLayers.data();
-    }
 
     if (vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device) != VK_SUCCESS)
         throw std::runtime_error("Failed to create logical device");

@@ -1,5 +1,6 @@
 #include "AmethystLayer.h"
 
+#include "EditorLayout.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "events/ApplicationEvents.h"
 #include "layers/panels/ContentBrowserPanel.h"
@@ -17,6 +18,7 @@
 #include <components/docking_layer.h>
 #include <components/extensions/ui_drag_detector.h>
 #include <components/image_label.h>
+#include <modules/color.h>
 #include <modules/style.h>
 #include <parsers/config/layout_config.h>
 #include <parsers/ttf/ttf_parser.h>
@@ -25,20 +27,13 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-struct AmethystLayer::Panels {
-    std::unique_ptr<ViewportPanel> viewportPanel;
-    std::unique_ptr<PropertiesPanel> propertiesPanel;
-    std::unique_ptr<OutlinerPanel> outlinerPanel;
-    std::unique_ptr<ContentBrowserPanel> contentBrowserPanel;
-};
-
 AmethystLayer::AmethystLayer() : m_glyphAtlas(&m_fontLoader)
 {
     Amethyst::Log::Init();
 
     auto &app = Rapture::Application::getInstance();
     auto rootPath = app.getProject().getProjectRootDirectory();
-    auto themePath = rootPath / "Engine/vendor/Amethyst/libamethyst/assets/theme.toml";
+    auto themePath = rootPath / "assets/themes/theme.toml";
     Amethyst::Style::load(themePath);
 
     m_windowResizeEventListenerID = Rapture::ApplicationEvents::onWindowResize().addListener(
@@ -54,12 +49,13 @@ AmethystLayer::~AmethystLayer()
     auto &vulkanContext = app.getVulkanContext();
     vulkanContext.waitIdle();
 
-    if (m_dockingLayer && !m_dockingLayer->name.empty()) {
-        Amethyst::LayoutConfig::instance().set(m_dockingLayer->name, Amethyst::ConfigEntry(m_dockingLayer->saveConfig()));
-        Amethyst::LayoutConfig::instance().save();
+    for (auto &ws : m_workspaces) {
+        if (ws.dockingLayer != nullptr && !ws.dockingLayer->name.empty()) {
+            Amethyst::LayoutConfig::instance().set(ws.dockingLayer->name, Amethyst::ConfigEntry(ws.dockingLayer->saveConfig()));
+        }
+        ws.panels.clear();
     }
-
-    m_panels.reset();
+    Amethyst::LayoutConfig::instance().save();
 
     for (auto &texId : m_viewportTextureIds) {
         if (texId.isValid()) {
@@ -145,33 +141,30 @@ void AmethystLayer::onAttach()
     m_window.absoluteSize = screenSize;
     m_window.absoluteRotation = 0.0f;
 
-    m_dockingLayer = m_window.add<Amethyst::DockingLayer>();
-    m_dockingLayer->name = "Editor Dock";
-    m_dockingLayer->absoluteSize = screenSize;
-    m_dockingLayer->absolutePosition = {0.0f, 0.0f};
-    m_dockingLayer->markDirty();
+    m_backgroundFrame = m_window.add<Amethyst::Frame>();
+    m_backgroundFrame->size = Amethyst::UDim2::fromScale(1.0f, 1.0f);
+    m_backgroundFrame->position = Amethyst::UDim2::fromOffset(0.0f, 0.0f);
+    m_backgroundFrame->backgroundColor = Amethyst::Color3::fromHex(0x181818);
+    m_backgroundFrame->zIndex = 0;
+    m_backgroundFrame->markDirty();
 
-    m_panels = std::make_unique<Panels>();
-    m_panels->viewportPanel = std::make_unique<ViewportPanel>(m_dockingLayer);
-    m_panels->propertiesPanel = std::make_unique<PropertiesPanel>(m_dockingLayer);
-    m_panels->outlinerPanel = std::make_unique<OutlinerPanel>(m_dockingLayer);
-    m_panels->contentBrowserPanel = std::make_unique<ContentBrowserPanel>(m_dockingLayer);
+    setupMenuBar(screenSize);
+    setupWorkspaces(screenSize);
 
-    m_dockingLayer->persistLayout = true;
-    if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
-        Rapture::RP_TRACE("1");
-        if (auto *entry = Amethyst::LayoutConfig::instance().get("Editor Dock")) {
-            Rapture::RP_TRACE("2");
-            if (entry->type == Amethyst::ConfigType::DOCK_LAYOUT) {
-                Rapture::RP_TRACE("3");
-                m_dockingLayer->applyConfig(entry->dockLayout);
-            }
-        }
-    }
+    m_bottomBar = m_window.add<Amethyst::Frame>();
+    m_bottomBar->position = Amethyst::UDim2(glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, -EDITOR_BOTTOM_BAR_HEIGHT));
+    m_bottomBar->size = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, EDITOR_BOTTOM_BAR_HEIGHT));
+    m_bottomBar->markDirty();
 
     auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
-    if (activeScene) {
-        m_panels->outlinerPanel->setScene(activeScene);
+    if (activeScene != nullptr) {
+        for (auto &ws : m_workspaces) {
+            for (auto &panel : ws.panels) {
+                if (auto *outliner = dynamic_cast<OutlinerPanel *>(panel.get()); outliner != nullptr) {
+                    outliner->setScene(activeScene);
+                }
+            }
+        }
     }
 
     m_viewportTextureIds.resize(swapChain->getImageCount());
@@ -212,24 +205,34 @@ void AmethystLayer::onUpdate(float ts)
 
     m_currentImageIndex = static_cast<uint32_t>(imageIndexi);
 
-    m_panels->viewportPanel->onUpdate();
-    m_panels->contentBrowserPanel->onUpdate(ts);
+    for (auto &ws : m_workspaces) {
+        for (auto &panel : ws.panels) {
+            panel->onUpdate(ts);
+        }
+    }
 
     VkSemaphore imageAvailableSemaphore = swapChain->getImageAvailableSemaphore(m_currentFrame);
     VkSemaphore renderFinishedSemaphore = swapChain->getRenderFinishedSemaphore(m_currentImageIndex);
 
-    auto* sceneViewport = app.getViewportManager().getPrimaryViewport();
-    auto* sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
+    auto *sceneViewport = app.getViewportManager().getPrimaryViewport();
+    auto *sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
     if (sceneRenderTarget != nullptr) {
         auto texture = sceneRenderTarget->getTexture(m_currentFrame);
-        if (texture) {
+        if (texture != nullptr) {
             if (m_viewportTextureIds[m_currentFrame].isValid()) {
                 m_backend.unregisterTexture(m_viewportTextureIds[m_currentFrame]);
             }
 
             m_viewportTextureIds[m_currentFrame] =
                 m_backend.registerTexture(texture->getImageView(), texture->getSampler().getSamplerVk());
-            m_panels->viewportPanel->setViewportImage(m_viewportTextureIds[m_currentFrame]);
+
+            for (auto &ws : m_workspaces) {
+                for (auto &panel : ws.panels) {
+                    if (auto *vp = dynamic_cast<ViewportPanel *>(panel.get()); vp != nullptr) {
+                        vp->setViewportImage(m_viewportTextureIds[m_currentFrame]);
+                    }
+                }
+            }
         }
     }
 
@@ -301,6 +304,114 @@ void AmethystLayer::onUpdate(float ts)
     m_currentFrame = (m_currentFrame + 1) % m_imageCount;
 }
 
+AmethystLayer::Workspace &AmethystLayer::addWorkspace(const std::string &name, glm::vec2 screenSize)
+{
+    Workspace ws;
+
+    auto containerFrame = std::make_unique<Amethyst::Frame>();
+    containerFrame->name = name;
+    containerFrame->backgroundColor = Amethyst::Color3::fromHex(0x181818);
+    ws.container = static_cast<Amethyst::Frame *>(m_workspaceTabBar->addChild(std::move(containerFrame)));
+
+    ws.hotbar = ws.container->add<Amethyst::Frame>();
+    ws.hotbar->position = Amethyst::UDim2::fromOffset(0.0f, 0.0f);
+    ws.hotbar->size = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, EDITOR_HOTBAR_HEIGHT));
+    ws.hotbar->backgroundColor = Amethyst::Color3::fromHex(0x252525);
+    ws.hotbar->backgroundTransparency = 0.0f;
+    ws.hotbar->borderPixelSize = 0.0f;
+    ws.hotbar->markDirty();
+
+    ws.dockingLayer = ws.container->add<Amethyst::DockingLayer>();
+    ws.dockingLayer->absolutePosition = {0.0f, EDITOR_CONTENT_TOP + EDITOR_DOCK_SPACING};
+    ws.dockingLayer->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
+                                                       EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
+    ws.dockingLayer->markDirty();
+
+    m_workspaces.push_back(std::move(ws));
+    return m_workspaces.back();
+}
+
+void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
+{
+    m_menuBar = m_window.add<Amethyst::MenuBar>();
+    m_menuBar->size = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, EDITOR_MENU_BAR_HEIGHT));
+    m_menuBar->position = Amethyst::UDim2::fromOffset(0.0f, 0.0f);
+    m_menuBar->backgroundColor = Amethyst::Color3::fromHex(0x181818);
+    m_menuBar->backgroundTransparency = 0.0f;
+    m_menuBar->borderPixelSize = 0.0f;
+
+    using DI = Amethyst::DropdownItem;
+
+    m_menuBar->addMenu("File", {
+                                   DI::action("New Scene", [] {}).withShortcut("Ctrl+N"),
+                                   DI::action("Open Scene", [] {}).withShortcut("Ctrl+O"),
+                                   DI::action("Save Scene", [] {}).withShortcut("Ctrl+S"),
+                                   DI::separator(),
+                                   DI::action("New Project", [] {}),
+                                   DI::action("Open Project", [] {}),
+                                   DI::separator(),
+                                   DI::action("Exit", [] {}).withShortcut("Alt+F4"),
+                               });
+
+    m_menuBar->addMenu("Edit", {
+                                   DI::action("Undo", [] {}).withShortcut("Ctrl+Z"),
+                                   DI::action("Redo", [] {}).withShortcut("Ctrl+Y"),
+                                   DI::separator(),
+                                   DI::action("Cut", [] {}).withShortcut("Ctrl+X"),
+                                   DI::action("Copy", [] {}).withShortcut("Ctrl+C"),
+                                   DI::action("Paste", [] {}).withShortcut("Ctrl+V"),
+                                   DI::separator(),
+                                   DI::action("Editor Preferences", [] {}),
+                               });
+
+    m_menuBar->addMenu("Window", {
+                                     DI::action("Viewport", [] {}),
+                                     DI::action("Outliner", [] {}),
+                                     DI::action("Properties", [] {}),
+                                     DI::action("Content Browser", [] {}),
+                                 });
+
+    m_menuBar->addMenu("Help", {
+                                   DI::action("Documentation", [] {}),
+                                   DI::action("About", [] {}),
+                               });
+
+    m_menuBar->markDirty();
+}
+
+void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
+{
+    m_workspaceTabBar = m_window.add<Amethyst::TabBar>();
+    m_workspaceTabBar->position = Amethyst::UDim2::fromOffset(0.0f, EDITOR_MENU_BAR_HEIGHT);
+    m_workspaceTabBar->size =
+        Amethyst::UDim2(glm::vec2(1.0f, 1.0f), glm::vec2(0.0f, -(EDITOR_MENU_BAR_HEIGHT + EDITOR_BOTTOM_BAR_HEIGHT)));
+    m_workspaceTabBar->mode = Amethyst::TabBarMode::INSIDE;
+    m_workspaceTabBar->barThickness = EDITOR_WORKSPACE_TAB_HEIGHT;
+    m_workspaceTabBar->markDirty();
+
+    m_workspaces.reserve(4);
+
+    auto &levelEditor = addWorkspace("Level Editor", screenSize);
+    levelEditor.dockingLayer->name = "Editor Dock";
+    levelEditor.dockingLayer->persistLayout = true;
+    levelEditor.panels.push_back(std::make_unique<ViewportPanel>(levelEditor.dockingLayer));
+    levelEditor.panels.push_back(std::make_unique<OutlinerPanel>(levelEditor.dockingLayer));
+    levelEditor.panels.push_back(std::make_unique<PropertiesPanel>(levelEditor.dockingLayer));
+    levelEditor.panels.push_back(std::make_unique<ContentBrowserPanel>(levelEditor.dockingLayer));
+
+    if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
+        if (auto *entry = Amethyst::LayoutConfig::instance().get("Editor Dock")) {
+            if (entry->type == Amethyst::ConfigType::DOCK_LAYOUT) {
+                levelEditor.dockingLayer->applyConfig(entry->dockLayout);
+            }
+        }
+    }
+
+    addWorkspace("Material Editor", screenSize);
+    addWorkspace("Scripting", screenSize);
+    addWorkspace("Animations", screenSize);
+}
+
 void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView)
 {
     VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
@@ -319,7 +430,7 @@ void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer,
     colorAttachmentInfo.resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentInfo.clearValue.color = {{0.1f, 0.1f, 0.1f, 1.0f}};
+    colorAttachmentInfo.clearValue.color = {{1.0f, 0.0f, 1.0f, 1.0f}};
 
     VkImageMemoryBarrier toColorAttachment{};
     toColorAttachment.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -402,9 +513,16 @@ void AmethystLayer::onResize()
 
     glm::vec2 screenSize = {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)};
     m_window.absoluteSize = screenSize;
-    m_dockingLayer->absoluteSize = screenSize;
+
+    for (auto &ws : m_workspaces) {
+        if (ws.dockingLayer != nullptr) {
+            ws.dockingLayer->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
+                                                               EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
+        }
+    }
+
     m_backend.onResize(screenSize);
-    m_dockingLayer->markDirty();
+    m_window.markDirty();
 
     m_imageCount = swapChain->getImageCount();
 }
