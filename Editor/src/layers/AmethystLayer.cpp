@@ -163,6 +163,9 @@ void AmethystLayer::onAttach()
                 if (auto *outliner = dynamic_cast<OutlinerPanel *>(panel.get()); outliner != nullptr) {
                     outliner->setScene(activeScene);
                 }
+                if (auto *properties = dynamic_cast<PropertiesPanel *>(panel.get()); properties != nullptr) {
+                    properties->setScene(activeScene);
+                }
             }
         }
     }
