@@ -1,0 +1,124 @@
+/* Rapture Editor Dark Theme */
+
+ui-object {
+    background-color: #282828;
+    background-transparency: 0.0;
+    border-color: #1a1a1a;
+    border-pixel-size: 1px;
+    corner-radius: 4px;
+    font-family: "default";
+    font-size: 13px;
+    text-color: #e5e5e5;
+    label-color: rgba(229, 229, 229, 255);
+    value-color: rgba(180, 180, 180, 255);
+}
+
+frame {
+    background-color: #303030;
+    border-color: #1a1a1a;
+    corner-radius: 0px;
+}
+
+ui-button {
+    background-color: #545454;
+    corner-radius: 4px;
+    padding: 8px;
+    text-color: #ffffff;
+}
+
+text-button {
+    background-color: #545454;
+    corner-radius: 4px;
+    text-color: #ffffff;
+}
+
+ui-label {
+    background-transparency: 1.0;
+    border-pixel-size: 0px;
+}
+
+image-label {
+    background-color: #ffffff;
+    background-transparency: 0.0;
+    border-pixel-size: 0px;
+}
+
+scrolling-frame {
+    background-color: #1d1d1d;
+    scrollbar-color: #333333;
+    scrollbar-thumb-color: #5a5a5a;
+    scrollbar-thickness: 10px;
+    corner-radius: 0px;
+}
+
+table {
+    background-color: #1d1d1d;
+    row-height: 32px;
+    cell-padding: 4px;
+    column-separator-width: 1px;
+    column-separator-color: rgba(50, 50, 50, 255);
+}
+
+tree-view {
+    background-color: #1d1d1d;
+    row-height: 24px;
+    row-background-color: rgba(40, 40, 40, 255);
+    row-alternate-color: rgba(43, 43, 43, 255);
+    row-hover-color: rgba(60, 60, 60, 255);
+    row-selected-color: rgba(71, 114, 179, 255);
+    indent-per-level: 20px;
+    disclosure-triangle-size: 8px;
+    disclosure-triangle-padding: 4px;
+    disclosure-triangle-color: rgba(140, 140, 140, 255);
+}
+
+slider {
+    background-color: #282828;
+    slider-color: #3d3d3d;
+    thumb-color: #4772b3;
+    track-corner-radius: 2px;
+    thumb-corner-radius: 2px;
+    label-padding: 8px;
+}
+
+checkbox {
+    background-color: #282828;
+    check-color: #4772b3;
+    checkbox-size: 18px;
+    corner-radius: 2px;
+}
+
+dropdown {
+    background-color: #3d3d3d;
+    highlight-color: #4772b3;
+    corner-radius: 4px;
+}
+
+tab-bar {
+    background-color: #303030;
+    bar-thickness: 26px;
+    tab-color: #3f3f3f;
+    tab-active-color: #303030;
+    tab-hovered-color: #303030;
+    tab-pressed-color: #303030;
+    tab-spacing: 3px;
+}
+
+collapsible-header#header {
+    background-color: #404047;
+}
+
+.danger {
+    background-color: #cc3333;
+    text-color: #ffffff;
+}
+
+.card {
+    background-color: #3a3a3a;
+    corner-radius: 8px;
+}
+
+text-button.primary {
+    background-color: #4772b3;
+    text-color: #ffffff;
+}

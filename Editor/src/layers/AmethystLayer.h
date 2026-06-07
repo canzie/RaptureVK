@@ -5,8 +5,6 @@
 
 #include <amethyst/Amethyst.h>
 #include <amethyst__vk13_glfw.h>
-#include <components/docking_layer.h>
-#include <components/menu_bar.h>
 
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
@@ -33,7 +31,6 @@ class AmethystLayer : public Rapture::Layer {
 
     void setupMenuBar(glm::vec2 screenSize);
     void setupWorkspaces(glm::vec2 screenSize);
-    Workspace &addWorkspace(const std::string &name, glm::vec2 screenSize);
     void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView);
     void endDynamicRendering(Rapture::CommandBuffer *commandBuffer);
     void onResize();
@@ -50,15 +47,12 @@ class AmethystLayer : public Rapture::Layer {
 
     // Amethyst components
     Amethyst::VkBackend m_backend;
-    Amethyst::FontLoader m_fontLoader;
-    Amethyst::GlyphAtlas m_glyphAtlas;
-    Amethyst::TextProcessor m_textProcessor;
+    Amethyst::AmethystContext m_amCtx;
     Amethyst::Window m_window;
     Amethyst::Frame *m_backgroundFrame = nullptr;
     Amethyst::MenuBar *m_menuBar = nullptr;
     Amethyst::TabBar *m_workspaceTabBar = nullptr;
     Amethyst::Frame *m_bottomBar = nullptr;
-    Amethyst::DrawContext m_drawContext;
 
     int m_activeWorkspaceIndex = 0;
     std::vector<Workspace> m_workspaces;

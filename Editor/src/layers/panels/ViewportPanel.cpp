@@ -2,120 +2,135 @@
 
 #include "components/Components.h"
 #include "events/GameEvents.h"
-#include "logging/Log.h"
 #include "scenes/SceneManager.h"
 
-#include <components/common.h>
 #include <components/extensions/ui_list_layout.h>
+#include <components/ui_scope.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 
-ViewportPanel::ViewportPanel(Amethyst::DockingLayer *dockingLayer) : m_dockingLayer(dockingLayer)
+static const Amethyst::UDim2 HEADER_BTN_SIZE = Amethyst::UDim2::fromOffset(80, 24);
+static const Amethyst::TextStyleProperties HEADER_BTN_TEXT{
+    .fontSize = 12.0f,
+    .textXAlignment = Amethyst::TextXAlignment::CENTER,
+    .textYAlignment = Amethyst::TextYAlignment::CENTER,
+};
+
+ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
 {
-    auto root = std::make_unique<Amethyst::PanelLayer>();
+    auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_root->name = "Viewport";
-    m_root->markDirty();
 
-    m_header = m_root->add<Amethyst::Frame>();
-    m_header->size = Amethyst::UDim2::fromScale(1.0f, 0.05f);
-    m_header->backgroundColor = Amethyst::Color3(0.2f);
-    m_header->markDirty();
-
-    setupHeader();
-
-    m_viewportImage = m_root->add<Amethyst::ImageLabel>();
-    m_viewportImage->size = Amethyst::UDim2::fromScale(1.0f, 0.95f);
-    m_viewportImage->position = Amethyst::UDim2::fromScale(0.0f, 0.05f);
-    m_viewportImage->scaleType = Amethyst::ScaleType::STRETCH;
-    m_viewportImage->zIndex = 100;
-    m_viewportImage->cornerRadius = 2.0f;
-    m_viewportImage->markDirty();
+    Amethyst::UIScope(*m_root)
+        .frame(
+            {
+                .base = {.size = Amethyst::UDim2::fromScale(1.0f, 0.05f)},
+                .style = {.backgroundColor = Amethyst::Color3(0.2f)},
+            },
+            [this](Amethyst::FrameScope &f) {
+                m_header = &f.component;
+                auto *layout = f.component.addExtension<Amethyst::UIListLayout>();
+                layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+                layout->innerPadding = Amethyst::UDim(0, 4);
+                layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+                setupHeader(f);
+            })
+        .imageLabel(
+            {
+                .base =
+                    {
+                        .position = Amethyst::UDim2::fromScale(0.0f, 0.05f),
+                        .size = Amethyst::UDim2::fromScale(1.0f, 0.95f),
+                        .zIndex = 100,
+                    },
+                .style = {.cornerRadius = 2.0f},
+                .image = {.scaleType = Amethyst::ImageScaleType::STRETCH},
+            },
+            [this](Amethyst::ImageLabelScope &img) { m_viewportImage = &img.component; });
 
     m_gizmo = std::make_unique<Amethyst::Gizmo>(m_viewportImage);
 
     m_entitySelectedListenerId = Rapture::GameEvents::onEntitySelected().addListener(
         [this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
 
-    m_dockingLayer->dock(std::move(root), glm::vec2(0.0f));
+    m_hostTabBar->addTab(std::move(root), "Viewport");
 }
 
 ViewportPanel::~ViewportPanel()
 {
     Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
 
-    if (m_dockingLayer && m_root) {
-        m_dockingLayer->undock(m_root);
+    if (m_hostTabBar != nullptr && m_root != nullptr) {
+        m_hostTabBar->removeTab(m_root);
     }
 }
 
-void ViewportPanel::setupHeader()
+void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
 {
-    auto *layout = m_header->addExtension<Amethyst::UIListLayout>();
-    layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-    layout->innerPadding = Amethyst::UDim(0, 4);
-    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-
-    m_translateBtn = m_header->add<Amethyst::TextButton>();
-    m_translateBtn->text = "Translate";
-    m_translateBtn->size = Amethyst::UDim2::fromOffset(80, 24);
-    m_translateBtn->fontSize = 12.0f;
-    m_translateBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
-    m_translateBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
-    m_translateBtn->markDirty();
-    m_translateBtn->onMouseButton1ClickCb = [this]() {
-        m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE;
-        return Amethyst::EventResult::CONSUMED;
-    };
-
-    m_rotateBtn = m_header->add<Amethyst::TextButton>();
-    m_rotateBtn->text = "Rotate";
-    m_rotateBtn->size = Amethyst::UDim2::fromOffset(80, 24);
-    m_rotateBtn->fontSize = 12.0f;
-    m_rotateBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
-    m_rotateBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
-    m_rotateBtn->markDirty();
-    m_rotateBtn->onMouseButton1ClickCb = [this]() {
-        m_gizmoOperation = Amethyst::GizmoOperation::ROTATE;
-        return Amethyst::EventResult::CONSUMED;
-    };
-
-    m_scaleBtn = m_header->add<Amethyst::TextButton>();
-    m_scaleBtn->text = "Scale";
-    m_scaleBtn->size = Amethyst::UDim2::fromOffset(80, 24);
-    m_scaleBtn->fontSize = 12.0f;
-    m_scaleBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
-    m_scaleBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
-    m_scaleBtn->markDirty();
-    m_scaleBtn->onMouseButton1ClickCb = [this]() {
-        m_gizmoOperation = Amethyst::GizmoOperation::SCALE;
-        return Amethyst::EventResult::CONSUMED;
-    };
-
-    m_spaceBtn = m_header->add<Amethyst::TextButton>();
-    m_spaceBtn->text = "World";
-    m_spaceBtn->size = Amethyst::UDim2::fromOffset(80, 24);
-    m_spaceBtn->fontSize = 12.0f;
-    m_spaceBtn->textXAlignment = Amethyst::TextXAlignment::CENTER;
-    m_spaceBtn->textYAlignment = Amethyst::TextYAlignment::CENTER;
-    m_spaceBtn->markDirty();
-    m_spaceBtn->onMouseButton1ClickCb = [this]() {
-        if (m_gizmoSpace == Amethyst::GizmoSpace::WORLD) {
-            m_gizmoSpace = Amethyst::GizmoSpace::LOCAL;
-            m_spaceBtn->text = "Local";
-        } else {
-            m_gizmoSpace = Amethyst::GizmoSpace::WORLD;
-            m_spaceBtn->text = "World";
-        }
-        m_spaceBtn->markDirty();
-        return Amethyst::EventResult::CONSUMED;
-    };
+    f.textButton(
+        {
+            .base = {.size = HEADER_BTN_SIZE},
+            .text = HEADER_BTN_TEXT,
+            .label = "Translate",
+        },
+        [this](Amethyst::TextButtonScope &b) {
+            m_translateBtn = &b.component;
+            b.component.onMouseButton1ClickCb = [this]() {
+                m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE;
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
+    f.textButton(
+        {
+            .base = {.size = HEADER_BTN_SIZE},
+            .text = HEADER_BTN_TEXT,
+            .label = "Rotate",
+        },
+        [this](Amethyst::TextButtonScope &b) {
+            m_rotateBtn = &b.component;
+            b.component.onMouseButton1ClickCb = [this]() {
+                m_gizmoOperation = Amethyst::GizmoOperation::ROTATE;
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
+    f.textButton(
+        {
+            .base = {.size = HEADER_BTN_SIZE},
+            .text = HEADER_BTN_TEXT,
+            .label = "Scale",
+        },
+        [this](Amethyst::TextButtonScope &b) {
+            m_scaleBtn = &b.component;
+            b.component.onMouseButton1ClickCb = [this]() {
+                m_gizmoOperation = Amethyst::GizmoOperation::SCALE;
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
+    f.textButton(
+        {
+            .base = {.size = HEADER_BTN_SIZE},
+            .text = HEADER_BTN_TEXT,
+            .label = "World",
+        },
+        [this](Amethyst::TextButtonScope &b) {
+            m_spaceBtn = &b.component;
+            b.component.onMouseButton1ClickCb = [this]() {
+                if (m_gizmoSpace == Amethyst::GizmoSpace::WORLD) {
+                    m_gizmoSpace = Amethyst::GizmoSpace::LOCAL;
+                    m_spaceBtn->setText("Local");
+                } else {
+                    m_gizmoSpace = Amethyst::GizmoSpace::WORLD;
+                    m_spaceBtn->setText("World");
+                }
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
 }
 
 void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
 {
-    m_viewportImage->image = imageId;
-    m_viewportImage->markDirty();
+    m_viewportImage->setImage(imageId);
 }
 
 void ViewportPanel::onUpdate(float dt)
@@ -172,12 +187,16 @@ void ViewportPanel::updateGizmo()
         glm::quat rotation = transformComponent->transforms.getRotationQuat();
         glm::vec3 scale = transformComponent->transforms.getScale();
 
-        position += result.deltaPosition;
-        scale *= result.deltaScale;
+        glm::vec3 deltaPosition(result.deltaPosition.x, result.deltaPosition.y, result.deltaPosition.z);
+        glm::vec3 deltaScale(result.deltaScale.x, result.deltaScale.y, result.deltaScale.z);
+        glm::vec3 deltaRotation(result.deltaRotation.x, result.deltaRotation.y, result.deltaRotation.z);
 
-        float rotationAngle = glm::length(result.deltaRotation);
+        position += deltaPosition;
+        scale *= deltaScale;
+
+        float rotationAngle = glm::length(deltaRotation);
         if (rotationAngle > 0.0001f) {
-            glm::vec3 rotationAxis = result.deltaRotation / rotationAngle;
+            glm::vec3 rotationAxis = deltaRotation / rotationAngle;
             glm::quat deltaQuat = glm::angleAxis(rotationAngle, rotationAxis);
 
             if (m_gizmoSpace == Amethyst::GizmoSpace::WORLD) {

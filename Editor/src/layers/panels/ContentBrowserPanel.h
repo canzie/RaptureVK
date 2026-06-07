@@ -2,16 +2,6 @@
 #define RAPTURE__CONTENT_BROWSER_PANEL_H
 
 #include <amethyst/Amethyst.h>
-#include <components/common.h>
-#include <components/docking_layer.h>
-#include <components/frame.h>
-#include <components/image_label.h>
-#include <components/invisible_button.h>
-#include <components/panel_layer.h>
-#include <components/scrolling_frame.h>
-#include <components/text_button.h>
-#include <components/text_input.h>
-#include <components/text_label.h>
 #include <components/tree_view.h>
 
 #include <filesystem>
@@ -27,7 +17,7 @@ enum class BrowseMode {
 
 class ContentBrowserPanel : public Panel {
   public:
-    ContentBrowserPanel(Amethyst::DockingLayer *dockingLayer);
+    ContentBrowserPanel(Amethyst::TabBar *tabBar);
     ~ContentBrowserPanel();
     ContentBrowserPanel(const ContentBrowserPanel &) = delete;
     ContentBrowserPanel &operator=(const ContentBrowserPanel &) = delete;
@@ -65,11 +55,11 @@ class ContentBrowserPanel : public Panel {
 
     ContentItemComponents &acquirePoolItem(size_t index);
     void releasePoolItems(size_t fromIndex);
-    void buildDirectoryTree(const std::filesystem::path &path, uint32_t parentRow);
+    void buildDirectoryTree(const std::filesystem::path &path, uint16_t depth);
 
   private:
-    Amethyst::DockingLayer *m_dockingLayer = nullptr;
-    Amethyst::PanelLayer *m_root = nullptr;
+    Amethyst::TabBar *m_hostTabBar = nullptr;
+    Amethyst::Frame *m_root = nullptr;
 
     Amethyst::Frame *m_topBarPane = nullptr;
     Amethyst::TextButton *m_addBtn = nullptr;

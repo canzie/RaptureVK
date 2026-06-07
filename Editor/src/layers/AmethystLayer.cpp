@@ -15,9 +15,9 @@
 #include "window_context/Application.h"
 
 #include <components/common.h>
-#include <components/docking_layer.h>
 #include <components/extensions/ui_drag_detector.h>
 #include <components/image_label.h>
+#include <components/ui_scope.h>
 #include <modules/color.h>
 #include <modules/style.h>
 #include <parsers/config/layout_config.h>
@@ -27,13 +27,13 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-AmethystLayer::AmethystLayer() : m_glyphAtlas(&m_fontLoader)
+AmethystLayer::AmethystLayer()
 {
     Amethyst::Log::Init();
 
     auto &app = Rapture::Application::getInstance();
     auto rootPath = app.getProject().getProjectRootDirectory();
-    auto themePath = rootPath / "assets/themes/theme.toml";
+    auto themePath = rootPath / "assets/themes/theme.ams";
     Amethyst::Style::load(themePath);
 
     m_windowResizeEventListenerID = Rapture::ApplicationEvents::onWindowResize().addListener(
@@ -123,38 +123,33 @@ void AmethystLayer::onAttach()
 
     m_backend.init(initInfo, glfwInfo);
 
-    // Load font
     auto fontPath = rootPath / "assets/fonts/Roboto-Regular.ttf";
-    if (!m_fontLoader.loadFont(fontPath.string())) {
+    if (!m_amCtx.loadFont(fontPath.string())) {
         Rapture::RP_WARN("Failed to load font from: {}", fontPath.string());
     }
 
-    m_textProcessor.setGlyphAtlas(&m_glyphAtlas);
-
-    m_backend.createAtlasTexture(m_glyphAtlas.getWidth(), m_glyphAtlas.getHeight());
-    m_glyphAtlas.setTextureId(m_backend.getAtlasTextureId());
-
-    m_drawContext.textProcessor = &m_textProcessor;
-    m_drawContext.glyphAtlas = &m_glyphAtlas;
+    m_amCtx.init(m_backend);
 
     glm::vec2 screenSize = {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)};
     m_window.absoluteSize = screenSize;
     m_window.absoluteRotation = 0.0f;
 
     m_backgroundFrame = m_window.add<Amethyst::Frame>();
-    m_backgroundFrame->size = Amethyst::UDim2::fromScale(1.0f, 1.0f);
-    m_backgroundFrame->position = Amethyst::UDim2::fromOffset(0.0f, 0.0f);
-    m_backgroundFrame->backgroundColor = Amethyst::Color3::fromHex(0x181818);
-    m_backgroundFrame->zIndex = 0;
-    m_backgroundFrame->markDirty();
+    m_backgroundFrame->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
+        .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
+        .zIndex = 0,
+    });
+    m_backgroundFrame->setBaseStyleProperties({.backgroundColor = Amethyst::Color3::fromHex(0x181818)});
 
     setupMenuBar(screenSize);
     setupWorkspaces(screenSize);
 
     m_bottomBar = m_window.add<Amethyst::Frame>();
-    m_bottomBar->position = Amethyst::UDim2(glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, -EDITOR_BOTTOM_BAR_HEIGHT));
-    m_bottomBar->size = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, EDITOR_BOTTOM_BAR_HEIGHT));
-    m_bottomBar->markDirty();
+    m_bottomBar->setBaseProperties({
+        .position = Amethyst::UDim2(0.0f, 0.0f, 1.0f, -EDITOR_BOTTOM_BAR_HEIGHT),
+        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_BOTTOM_BAR_HEIGHT),
+    });
 
     auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
     if (activeScene != nullptr) {
@@ -239,11 +234,6 @@ void AmethystLayer::onUpdate(float ts)
         }
     }
 
-    {
-        RAPTURE_PROFILE_SCOPE("Amethyst::Draw");
-        m_window.draw(m_drawContext);
-    }
-
     auto pool = vulkanContext.getRenderContext().commandPoolManager->getCommandPool(m_commandPoolHash, m_currentFrame);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
@@ -254,10 +244,8 @@ void AmethystLayer::onUpdate(float ts)
 
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
 
-    if (m_glyphAtlas.isDirty()) {
-        m_backend.uploadAtlasData(cmd, m_glyphAtlas.getPixels(), m_glyphAtlas.getWidth(), m_glyphAtlas.getHeight());
-        m_glyphAtlas.clearDirty();
-    }
+    m_amCtx.sync(cmd);
+    m_amCtx.draw(m_window);
 
     auto targetImageView = swapChain->getImageViews()[m_currentImageIndex];
 
@@ -307,100 +295,150 @@ void AmethystLayer::onUpdate(float ts)
     m_currentFrame = (m_currentFrame + 1) % m_imageCount;
 }
 
-AmethystLayer::Workspace &AmethystLayer::addWorkspace(const std::string &name, glm::vec2 screenSize)
-{
-    Workspace ws;
-
-    auto containerFrame = std::make_unique<Amethyst::Frame>();
-    containerFrame->name = name;
-    containerFrame->backgroundColor = Amethyst::Color3::fromHex(0x181818);
-    ws.container = static_cast<Amethyst::Frame *>(m_workspaceTabBar->addChild(std::move(containerFrame)));
-
-    ws.hotbar = ws.container->add<Amethyst::Frame>();
-    ws.hotbar->position = Amethyst::UDim2::fromOffset(0.0f, 0.0f);
-    ws.hotbar->size = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, EDITOR_HOTBAR_HEIGHT));
-    ws.hotbar->backgroundColor = Amethyst::Color3::fromHex(0x252525);
-    ws.hotbar->backgroundTransparency = 0.0f;
-    ws.hotbar->borderPixelSize = 0.0f;
-    ws.hotbar->markDirty();
-
-    ws.dockingLayer = ws.container->add<Amethyst::DockingLayer>();
-    ws.dockingLayer->absolutePosition = {0.0f, EDITOR_CONTENT_TOP + EDITOR_DOCK_SPACING};
-    ws.dockingLayer->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
-                                                       EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
-    ws.dockingLayer->markDirty();
-
-    m_workspaces.push_back(std::move(ws));
-    return m_workspaces.back();
-}
-
 void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
 {
-    m_menuBar = m_window.add<Amethyst::MenuBar>();
-    m_menuBar->size = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, EDITOR_MENU_BAR_HEIGHT));
-    m_menuBar->position = Amethyst::UDim2::fromOffset(0.0f, 0.0f);
-    m_menuBar->backgroundColor = Amethyst::Color3::fromHex(0x181818);
-    m_menuBar->backgroundTransparency = 0.0f;
-    m_menuBar->borderPixelSize = 0.0f;
-
-    using DI = Amethyst::DropdownItem;
-
-    m_menuBar->addMenu("File", {
-                                   DI::action("New Scene", [] {}).withShortcut("Ctrl+N"),
-                                   DI::action("Open Scene", [] {}).withShortcut("Ctrl+O"),
-                                   DI::action("Save Scene", [] {}).withShortcut("Ctrl+S"),
-                                   DI::separator(),
-                                   DI::action("New Project", [] {}),
-                                   DI::action("Open Project", [] {}),
-                                   DI::separator(),
-                                   DI::action("Exit", [] {}).withShortcut("Alt+F4"),
-                               });
-
-    m_menuBar->addMenu("Edit", {
-                                   DI::action("Undo", [] {}).withShortcut("Ctrl+Z"),
-                                   DI::action("Redo", [] {}).withShortcut("Ctrl+Y"),
-                                   DI::separator(),
-                                   DI::action("Cut", [] {}).withShortcut("Ctrl+X"),
-                                   DI::action("Copy", [] {}).withShortcut("Ctrl+C"),
-                                   DI::action("Paste", [] {}).withShortcut("Ctrl+V"),
-                                   DI::separator(),
-                                   DI::action("Editor Preferences", [] {}),
-                               });
-
-    m_menuBar->addMenu("Window", {
-                                     DI::action("Viewport", [] {}),
-                                     DI::action("Outliner", [] {}),
-                                     DI::action("Properties", [] {}),
-                                     DI::action("Content Browser", [] {}),
-                                 });
-
-    m_menuBar->addMenu("Help", {
-                                   DI::action("Documentation", [] {}),
-                                   DI::action("About", [] {}),
-                               });
-
-    m_menuBar->markDirty();
+    Amethyst::UIScope(m_window).menuBar(
+        {
+            .base =
+                {
+                    .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_MENU_BAR_HEIGHT),
+                },
+            .style =
+                {
+                    .backgroundColor = Amethyst::Color3::fromHex(0x181818),
+                    .backgroundTransparency = 0.0f,
+                    .borderPixelSize = 0.0f,
+                },
+        },
+        [this](Amethyst::MenuBarScope &mb) {
+            m_menuBar = &mb.component;
+            mb.menuItem("File", [](Amethyst::DropdownScope &d) {
+                d.action("New Scene", [] {});
+                d.action("Open Scene", [] {});
+                d.action("Save Scene", [] {});
+                d.separator();
+                d.action("New Project", [] {});
+                d.action("Open Project", [] {});
+                d.separator();
+                d.action("Exit", [] {});
+            });
+            mb.menuItem("Edit", [](Amethyst::DropdownScope &d) {
+                d.action("Undo", [] {});
+                d.action("Redo", [] {});
+                d.separator();
+                d.action("Cut", [] {});
+                d.action("Copy", [] {});
+                d.action("Paste", [] {});
+                d.separator();
+                d.action("Editor Preferences", [] {});
+            });
+            mb.menuItem("Window", [](Amethyst::DropdownScope &d) {
+                d.action("Viewport", [] {});
+                d.action("Outliner", [] {});
+                d.action("Properties", [] {});
+                d.action("Content Browser", [] {});
+            });
+            mb.menuItem("Help", [](Amethyst::DropdownScope &d) {
+                d.action("Documentation", [] {});
+                d.action("About", [] {});
+            });
+        });
 }
 
 void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
 {
-    m_workspaceTabBar = m_window.add<Amethyst::TabBar>();
-    m_workspaceTabBar->position = Amethyst::UDim2::fromOffset(0.0f, EDITOR_MENU_BAR_HEIGHT);
-    m_workspaceTabBar->size =
-        Amethyst::UDim2(glm::vec2(1.0f, 1.0f), glm::vec2(0.0f, -(EDITOR_MENU_BAR_HEIGHT + EDITOR_BOTTOM_BAR_HEIGHT)));
-    m_workspaceTabBar->mode = Amethyst::TabBarMode::INSIDE;
-    m_workspaceTabBar->barThickness = EDITOR_WORKSPACE_TAB_HEIGHT;
-    m_workspaceTabBar->markDirty();
-
     m_workspaces.reserve(4);
 
-    auto &levelEditor = addWorkspace("Level Editor", screenSize);
+    Amethyst::UIScope(m_window).tabBar(
+        {
+            .base =
+                {
+                    .position = Amethyst::UDim2::fromOffset(0.0f, EDITOR_MENU_BAR_HEIGHT),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(EDITOR_MENU_BAR_HEIGHT + EDITOR_BOTTOM_BAR_HEIGHT)),
+                },
+            .style =
+                {
+                    .backgroundColor = Amethyst::Color3::fromHex(0x181818),
+                },
+            .tabBar =
+                {
+                    .mode = Amethyst::TabBarMode::INSIDE,
+                    .barThickness = EDITOR_WORKSPACE_TAB_HEIGHT,
+                },
+        },
+        [this, screenSize](Amethyst::TabBarScope &tabs) {
+            m_workspaceTabBar = &tabs.component;
+
+            auto setupTab = [this, screenSize](Amethyst::FrameScope &f) {
+                Workspace ws;
+                ws.container = &f.component;
+                ws.container->setBaseStyleProperties({.backgroundColor = Amethyst::Color3::fromHex(0x181818)});
+
+                ws.hotbar = ws.container->add<Amethyst::Frame>();
+                ws.hotbar->setBaseProperties({
+                    .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
+                });
+                ws.hotbar->setBaseStyleProperties({
+                    .backgroundColor = Amethyst::Color3::fromHex(0x252525),
+                    .backgroundTransparency = 0.0f,
+                    .borderPixelSize = 0.0f,
+                });
+
+                ws.dockingLayer = ws.container->add<Amethyst::DockingLayer>();
+                ws.dockingLayer->setDisplayOrder(1);
+                ws.dockingLayer->absolutePosition = {0.0f, EDITOR_CONTENT_TOP + EDITOR_DOCK_SPACING};
+                ws.dockingLayer->absoluteSize = {
+                    screenSize.x,
+                    screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING - EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING,
+                };
+                ws.dockingLayer->markDirty();
+
+                m_workspaces.push_back(std::move(ws));
+            };
+
+            tabs.tab("Level Editor", setupTab);
+            tabs.tab("Material Editor", setupTab);
+            tabs.tab("Scripting", setupTab);
+            tabs.tab("Animations", setupTab);
+        });
+
+    auto &levelEditor = m_workspaces[0];
     levelEditor.dockingLayer->name = "Editor Dock";
     levelEditor.dockingLayer->persistLayout = true;
-    levelEditor.panels.push_back(std::make_unique<ViewportPanel>(levelEditor.dockingLayer));
-    levelEditor.panels.push_back(std::make_unique<OutlinerPanel>(levelEditor.dockingLayer));
-    levelEditor.panels.push_back(std::make_unique<PropertiesPanel>(levelEditor.dockingLayer));
-    levelEditor.panels.push_back(std::make_unique<ContentBrowserPanel>(levelEditor.dockingLayer));
+
+    Amethyst::TabBar *viewportTabBar = nullptr;
+    Amethyst::TabBar *outlinerTabBar = nullptr;
+    Amethyst::TabBar *propertiesTabBar = nullptr;
+    Amethyst::TabBar *contentBrowserTabBar = nullptr;
+
+    Amethyst::DockScope(*levelEditor.dockingLayer)
+        .split(
+            Amethyst::SplitAxis::VERTICAL, 0.25f,
+            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { outlinerTabBar = &tb.component; }); },
+            [&](Amethyst::DockScope &r) {
+                r.split(
+                    Amethyst::SplitAxis::HORIZONTAL, 0.65f,
+                    [&](Amethyst::DockScope &t) {
+                        t.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; });
+                    },
+                    [&](Amethyst::DockScope &b) {
+                        b.split(
+                            Amethyst::SplitAxis::VERTICAL, 0.5f,
+                            [&](Amethyst::DockScope &bl) {
+                                bl.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; });
+                            },
+                            [&](Amethyst::DockScope &br) {
+                                br.panel([&](Amethyst::TabBarScope &tb) { contentBrowserTabBar = &tb.component; });
+                            });
+                    });
+            });
+
+    levelEditor.panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar));
+    levelEditor.panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar));
+    levelEditor.panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar));
+    levelEditor.panels.push_back(std::make_unique<ContentBrowserPanel>(contentBrowserTabBar));
 
     if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
         if (auto *entry = Amethyst::LayoutConfig::instance().get("Editor Dock")) {
@@ -409,10 +447,6 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
             }
         }
     }
-
-    addWorkspace("Material Editor", screenSize);
-    addWorkspace("Scripting", screenSize);
-    addWorkspace("Animations", screenSize);
 }
 
 void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView)
@@ -516,16 +550,17 @@ void AmethystLayer::onResize()
 
     glm::vec2 screenSize = {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)};
     m_window.absoluteSize = screenSize;
+    m_window.markDirty();
 
     for (auto &ws : m_workspaces) {
         if (ws.dockingLayer != nullptr) {
             ws.dockingLayer->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
                                                                EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
+            ws.dockingLayer->markDirty();
         }
     }
 
     m_backend.onResize(screenSize);
-    m_window.markDirty();
 
     m_imageCount = swapChain->getImageCount();
 }

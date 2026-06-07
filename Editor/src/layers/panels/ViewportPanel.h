@@ -3,22 +3,17 @@
 
 #include <amethyst/Amethyst.h>
 #include <amethyst__vk13_glfw.h>
-#include <components/common.h>
-#include <components/docking_layer.h>
-#include <components/frame.h>
-#include <components/image_label.h>
-#include <components/panel_layer.h>
-#include <components/text_button.h>
+#include <components/ui_scope.h>
 #include <components/widgets/gizmo.h>
 
-#include "scenes/entities/Entity.h"
 #include "layers/panels/Panel.h"
+#include "scenes/entities/Entity.h"
 
 #include <memory>
 
 class ViewportPanel : public Panel {
   public:
-    ViewportPanel(Amethyst::DockingLayer *dockingLayer);
+    ViewportPanel(Amethyst::TabBar *tabBar);
     ~ViewportPanel();
     ViewportPanel(const ViewportPanel &) = delete;
     ViewportPanel &operator=(const ViewportPanel &) = delete;
@@ -35,11 +30,11 @@ class ViewportPanel : public Panel {
 
   private:
     void updateGizmo();
-    void setupHeader();
+    void setupHeader(Amethyst::FrameScope &f);
 
   private:
-    Amethyst::DockingLayer *m_dockingLayer = nullptr;
-    Amethyst::PanelLayer *m_root = nullptr;
+    Amethyst::TabBar *m_hostTabBar = nullptr;
+    Amethyst::Frame *m_root = nullptr;
     Amethyst::ImageLabel *m_viewportImage = nullptr;
     Amethyst::Frame *m_header = nullptr;
 

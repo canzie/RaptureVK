@@ -1,0 +1,5 @@
+# invalid_consteval_call is a clangd-only false positive from fmt's compile-time
+# format-string checks (bundled via spdlog); the real build compiles cleanly.
+Diagnostics:
+  Suppress:
+    - invalid_consteval_call
