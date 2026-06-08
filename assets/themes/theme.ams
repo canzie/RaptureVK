@@ -62,14 +62,20 @@ table {
 tree-view {
     background-color: #1d1d1d;
     row-height: 24px;
-    row-background-color: rgba(40, 40, 40, 255);
-    row-alternate-color: rgba(43, 43, 43, 255);
+    row-background-color: #2B2B2B;
+    row-alternate-color: #303030;
     row-hover-color: rgba(60, 60, 60, 255);
     row-selected-color: rgba(71, 114, 179, 255);
     indent-per-level: 20px;
     disclosure-triangle-size: 8px;
     disclosure-triangle-padding: 4px;
     disclosure-triangle-color: rgba(140, 140, 140, 255);
+}
+
+text-input {
+    background-color: #181818;
+    background-transparency: 0.0;
+    corner-radius: 4px;
 }
 
 slider {
@@ -95,8 +101,8 @@ dropdown {
 }
 
 tab-bar {
-    background-color: #303030;
-    bar-thickness: 26px;
+    background-color: #181818;
+    bar-thickness: 30px;
     tab-color: #3f3f3f;
     tab-active-color: #303030;
     tab-hovered-color: #303030;
@@ -108,17 +114,20 @@ collapsible-header#header {
     background-color: #404047;
 }
 
-.danger {
-    background-color: #cc3333;
-    text-color: #ffffff;
-}
-
-.card {
-    background-color: #3a3a3a;
-    corner-radius: 8px;
-}
-
 text-button.primary {
     background-color: #4772b3;
     text-color: #ffffff;
+}
+
+.panel {
+    corner-radius: 2px;
+    background-color: #303030;
+}
+
+tab-bar.panel-tab-bar {
+    background-color: #181818;
+    tab-color: #3f3f3f;
+    tab-active-color: #303030;
+    tab-hovered-color: #303030;
+    tab-pressed-color: #303030;
 }

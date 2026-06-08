@@ -3,11 +3,14 @@
 
 #include <amethyst/Amethyst.h>
 #include <components/table.h>
+#include <components/ui_scope.h>
 
 #include "layers/panels/Panel.h"
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
+#include <functional>
 #include <memory>
+#include <vector>
 
 class PropertiesPanel : public Panel {
   public:
@@ -22,9 +25,42 @@ class PropertiesPanel : public Panel {
     void onUpdate(float dt) override;
 
   private:
+    /**
+     * @brief Pairs a collapsible header with the component it represents.
+     *
+     * A section is only shown when the selected entity owns the matching
+     * component. The body height is used to stack visible sections.
+     */
+    struct ComponentSection {
+        Amethyst::CollapsibleHeader *header = nullptr;
+        float bodyHeight = 0.0f;
+        std::function<bool(const Rapture::Entity &)> matches;
+    };
+
     void setupSearchBar();
     void setupPlaceholder();
     void setupEntityView();
+
+    void setupTransformHeader(Amethyst::ScrollingFrameScope &sf);
+    void setupMeshHeader(Amethyst::ScrollingFrameScope &sf);
+    void setupMaterialHeader(Amethyst::ScrollingFrameScope &sf);
+    void setupLightHeader(Amethyst::ScrollingFrameScope &sf);
+    void setupCameraHeader(Amethyst::ScrollingFrameScope &sf);
+    void setupShadowHeader(Amethyst::ScrollingFrameScope &sf);
+    void setupCascadedShadowHeader(Amethyst::ScrollingFrameScope &sf);
+    void setupSkyboxHeader(Amethyst::ScrollingFrameScope &sf);
+    void setupTerrainHeader(Amethyst::ScrollingFrameScope &sf);
+
+    /**
+     * @brief Creates a collapsible header, registers it as a section and wires
+     * up relayout on toggle. The body callback fills the expanded content.
+     */
+    Amethyst::CollapsibleHeader *beginSection(Amethyst::ScrollingFrameScope &sf, const char *title, float bodyHeight,
+                                              std::function<bool(const Rapture::Entity &)> matches,
+                                              std::function<void(Amethyst::CollapsibleHeaderScope &)> body);
+    void addStubBody(Amethyst::CollapsibleHeaderScope &ch);
+
+    void relayout();
     void showEntity(const Rapture::Entity &entity);
     void showPlaceholder();
 
@@ -38,6 +74,8 @@ class PropertiesPanel : public Panel {
     Amethyst::Table *m_transformTable = nullptr;
     Amethyst::SliderVec3 *m_transformSliders[3] = {};
     Amethyst::vec3 m_transformValues[3] = {};
+
+    std::vector<ComponentSection> m_sections;
 
     std::shared_ptr<Rapture::Scene> m_scene;
     Rapture::Entity m_selectedEntity;

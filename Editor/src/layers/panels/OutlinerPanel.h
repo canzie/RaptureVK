@@ -3,6 +3,7 @@
 
 #include <amethyst/Amethyst.h>
 #include <components/tree_view.h>
+#include <components/ui_scope.h>
 
 #include "layers/panels/Panel.h"
 #include "scenes/Scene.h"
@@ -28,7 +29,7 @@ class OutlinerPanel : public Panel {
     void refresh();
 
   private:
-    void buildEntityTree(Rapture::Entity entity, uint16_t depth);
+    void buildEntityTree(Rapture::Entity entity, Amethyst::TreeRowScope &rowScope);
 
   private:
     Amethyst::TabBar *m_hostTabBar = nullptr;

@@ -25,6 +25,8 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_root->name = "Outliner";
+    m_root->addClass("panel");
+    m_root->setBaseProperties({.clipsDescendants = true});
 
     Amethyst::UIScope(*m_root)
         .frame({
@@ -49,11 +51,13 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
                 sf.treeView(
                     {
                         .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                        .treeView = {.showColumnSeparators = false},
+                        .treeView = {.showColumnSeparators = false, .showHeader = true},
                     },
                     [this](Amethyst::TreeViewScope &tv) {
                         m_treeView = &tv.component;
-                        tv.column("", 1.0f);
+                        tv.column("Name", 3.0f);
+                        tv.column("Type", 1.0f);
+                        tv.column("", 0.5f);
                     });
             });
 
@@ -89,27 +93,27 @@ void OutlinerPanel::refresh()
 
     m_treeView->clear();
 
-    m_scene->getRegistry().view<Rapture::TagComponent>().each([this](auto entityHandle, auto &tag) {
+    Amethyst::TreeViewScope tvScope(*m_treeView);
+    tvScope.columnsExplicit = true;
+
+    m_scene->getRegistry().view<Rapture::TagComponent>().each([this, &tvScope](auto entityHandle, auto &tag) {
         Rapture::Entity entity(entityHandle, m_scene.get());
 
-        if (!entity.hasComponent<Rapture::HierarchyComponent>()) {
-            buildEntityTree(entity, 0);
-        } else {
-            const auto &hierarchy = entity.getComponent<Rapture::HierarchyComponent>();
-            if (!hierarchy.parent.isValid()) {
-                buildEntityTree(entity, 0);
-            }
+        bool isRoot = !entity.hasComponent<Rapture::HierarchyComponent>() ||
+                      !entity.getComponent<Rapture::HierarchyComponent>().parent.isValid();
+        if (!isRoot) {
+            return;
         }
+
+        tvScope.row([this, entity](Amethyst::TreeRowScope &row) { buildEntityTree(entity, row); });
     });
 }
 
-void OutlinerPanel::buildEntityTree(Rapture::Entity entity, uint16_t depth)
+void OutlinerPanel::buildEntityTree(Rapture::Entity entity, Amethyst::TreeRowScope &rowScope)
 {
     if (!entity.isValid()) {
         return;
     }
-
-    m_treeView->addRow(depth);
 
     std::string entityName = "Unnamed Entity";
     if (entity.hasComponent<Rapture::TagComponent>()) {
@@ -118,23 +122,36 @@ void OutlinerPanel::buildEntityTree(Rapture::Entity entity, uint16_t depth)
 
     uint32_t entityId = entity.getID();
 
-    auto btn = std::make_unique<Amethyst::TextButton>();
-    btn->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f), .zIndex = 2});
-    btn->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-    btn->setTextStyleProperties({.textYAlignment = Amethyst::TextYAlignment::CENTER});
-    btn->setText(entityName);
-    btn->name = std::to_string(entityId);
-    btn->onMouseButton1ClickCb = [entityId]() {
-        s_onEntityClicked(entityId);
-        return Amethyst::EventResult::CONSUMED;
-    };
-    m_treeView->nextCell(std::move(btn));
+    rowScope.cell([entityName, entityId](Amethyst::UIScope &s) {
+        s.textButton(
+            {
+                .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f), .zIndex = 2},
+                .style = {.backgroundTransparency = 1.0f},
+                .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
+                .label = entityName,
+            },
+            [entityId](Amethyst::TextButtonScope &tb) {
+                tb.component.onMouseButton1ClickCb = [entityId]() {
+                    s_onEntityClicked(entityId);
+                    return Amethyst::EventResult::CONSUMED;
+                };
+            });
+    });
+
+    rowScope.cell([](Amethyst::UIScope &s) {
+        s.textLabel({
+            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            .style = {.backgroundTransparency = 1.0f},
+            .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
+            .label = "Entity",
+        });
+    });
 
     if (entity.hasComponent<Rapture::HierarchyComponent>()) {
         const auto &hierarchy = entity.getComponent<Rapture::HierarchyComponent>();
         for (const auto &child : hierarchy.children) {
             if (child.isValid()) {
-                buildEntityTree(child, static_cast<uint16_t>(depth + 1));
+                rowScope.row([this, child](Amethyst::TreeRowScope &childRow) { buildEntityTree(child, childRow); });
             }
         }
     }

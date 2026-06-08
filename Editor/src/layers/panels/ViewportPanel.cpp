@@ -21,6 +21,8 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_root->name = "Viewport";
+    m_root->addClass("panel");
+    m_root->setBaseProperties({.clipsDescendants = true});
 
     Amethyst::UIScope(*m_root)
         .frame(

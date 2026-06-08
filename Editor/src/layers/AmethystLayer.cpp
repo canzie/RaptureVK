@@ -216,11 +216,7 @@ void AmethystLayer::onUpdate(float ts)
     auto *sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
     if (sceneRenderTarget != nullptr) {
         auto texture = sceneRenderTarget->getTexture(m_currentFrame);
-        if (texture != nullptr) {
-            if (m_viewportTextureIds[m_currentFrame].isValid()) {
-                m_backend.unregisterTexture(m_viewportTextureIds[m_currentFrame]);
-            }
-
+        if (texture != nullptr && !m_viewportTextureIds[m_currentFrame].isValid()) {
             m_viewportTextureIds[m_currentFrame] =
                 m_backend.registerTexture(texture->getImageView(), texture->getSampler().getSamplerVk());
 
@@ -381,13 +377,14 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
                     .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
                 });
                 ws.hotbar->setBaseStyleProperties({
-                    .backgroundColor = Amethyst::Color3::fromHex(0x252525),
+                    .backgroundColor = Amethyst::Color3::fromHex(0x303030),
                     .backgroundTransparency = 0.0f,
                     .borderPixelSize = 0.0f,
                 });
 
                 ws.dockingLayer = ws.container->add<Amethyst::DockingLayer>();
                 ws.dockingLayer->setDisplayOrder(1);
+                ws.dockingLayer->innerSpacing = 3.0f;
                 ws.dockingLayer->absolutePosition = {0.0f, EDITOR_CONTENT_TOP + EDITOR_DOCK_SPACING};
                 ws.dockingLayer->absoluteSize = {
                     screenSize.x,
@@ -420,9 +417,7 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
             [&](Amethyst::DockScope &r) {
                 r.split(
                     Amethyst::SplitAxis::HORIZONTAL, 0.65f,
-                    [&](Amethyst::DockScope &t) {
-                        t.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; });
-                    },
+                    [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
                     [&](Amethyst::DockScope &b) {
                         b.split(
                             Amethyst::SplitAxis::VERTICAL, 0.5f,
@@ -434,6 +429,11 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
                             });
                     });
             });
+
+    if (viewportTabBar != nullptr) viewportTabBar->addClass("panel-tab-bar");
+    if (outlinerTabBar != nullptr) outlinerTabBar->addClass("panel-tab-bar");
+    if (propertiesTabBar != nullptr) propertiesTabBar->addClass("panel-tab-bar");
+    if (contentBrowserTabBar != nullptr) contentBrowserTabBar->addClass("panel-tab-bar");
 
     levelEditor.panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar));
     levelEditor.panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar));
