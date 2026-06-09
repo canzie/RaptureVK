@@ -43,7 +43,7 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
                     {
                         .scrollAxis = Amethyst::ScrollAxis::Y,
                         .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
-                        .canvasSize = Amethyst::UDim2::fromScale(1.0f, 3.0f),
+                        .automaticCanvasSize = Amethyst::AutomaticSize::Y,
                     },
             },
             [this](Amethyst::ScrollingFrameScope &sf) {
