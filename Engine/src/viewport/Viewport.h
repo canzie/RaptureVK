@@ -39,6 +39,17 @@ class Viewport {
     void onSwapChainRecreated();
 
     SceneRenderTarget *getSceneRenderTarget();
+
+    /**
+     * @brief Index of the render target slot most recently rendered by this viewport.
+     *
+     * Consumers that sample the viewport output should bind this slot so they
+     * stay aligned with the renderer even across skipped frames.
+     *
+     * @return The slot index of the most recently rendered frame, or UINT32_MAX if no renderer exists.
+     */
+    uint32_t getLastRenderedFrameIndex() const;
+
     const std::string &getName() const { return m_name; }
     uint32_t getWidth() const { return m_width; }
     uint32_t getHeight() const { return m_height; }

@@ -74,4 +74,12 @@ SceneRenderTarget *Viewport::getSceneRenderTarget()
     return &m_renderer->getSceneRenderTarget();
 }
 
+uint32_t Viewport::getLastRenderedFrameIndex() const
+{
+    if (m_renderer == nullptr) {
+        return UINT32_MAX;
+    }
+    return m_renderer->getLastRenderedFrameIndex();
+}
+
 } // namespace Rapture

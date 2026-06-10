@@ -215,15 +215,22 @@ void AmethystLayer::onUpdate(float ts)
     auto *sceneViewport = app.getViewportManager().getPrimaryViewport();
     auto *sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
     if (sceneRenderTarget != nullptr) {
-        auto texture = sceneRenderTarget->getTexture(m_currentFrame);
-        if (texture != nullptr && !m_viewportTextureIds[m_currentFrame].isValid()) {
-            m_viewportTextureIds[m_currentFrame] =
-                m_backend.registerTexture(texture->getImageView(), texture->getSampler().getSamplerVk());
+        uint32_t renderedSlot = sceneViewport->getLastRenderedFrameIndex();
+        if (renderedSlot < m_viewportTextureIds.size()) {
+            if (!m_viewportTextureIds[renderedSlot].isValid()) {
+                auto texture = sceneRenderTarget->getTexture(renderedSlot);
+                if (texture != nullptr) {
+                    m_viewportTextureIds[renderedSlot] =
+                        m_backend.registerTexture(texture->getImageView(), texture->getSampler().getSamplerVk());
+                }
+            }
 
-            for (auto &ws : m_workspaces) {
-                for (auto &panel : ws.panels) {
-                    if (auto *vp = dynamic_cast<ViewportPanel *>(panel.get()); vp != nullptr) {
-                        vp->setViewportImage(m_viewportTextureIds[m_currentFrame]);
+            if (m_viewportTextureIds[renderedSlot].isValid()) {
+                for (auto &ws : m_workspaces) {
+                    for (auto &panel : ws.panels) {
+                        if (auto *vp = dynamic_cast<ViewportPanel *>(panel.get()); vp != nullptr) {
+                            vp->setViewportImage(m_viewportTextureIds[renderedSlot]);
+                        }
                     }
                 }
             }

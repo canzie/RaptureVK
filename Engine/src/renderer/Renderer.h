@@ -28,6 +28,16 @@ class Renderer {
     SceneRenderTarget &getSceneRenderTarget() { return *m_sceneRenderTarget; }
     const SceneRenderTarget &getSceneRenderTarget() const { return *m_sceneRenderTarget; }
     uint32_t getCurrentFrame() const { return m_currentFrame; }
+
+    /**
+     * @brief Index of the render target slot most recently fully rendered.
+     *
+     * Only advances on an actual render, so consumers that sample the output
+     * stay aligned even on frames where drawFrame early-returns.
+     *
+     * @return The slot index of the most recently rendered frame.
+     */
+    uint32_t getLastRenderedFrameIndex() const { return m_lastRenderedFrame; }
     SceneRenderTarget::TargetType getTargetType() const { return m_targetType; }
 
   protected:
@@ -42,6 +52,7 @@ class Renderer {
 
     CommandPoolHash m_commandPoolHash = 0;
     uint32_t m_currentFrame = 0;
+    uint32_t m_lastRenderedFrame = 0;
 
     float m_width = 0.0f;
     float m_height = 0.0f;

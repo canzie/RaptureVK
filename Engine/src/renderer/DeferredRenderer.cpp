@@ -176,6 +176,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene, Entity came
         // ImguiLayer will submit it with proper semaphore synchronization.
     }
 
+    m_lastRenderedFrame = imageIndex;
     m_currentFrame = (m_currentFrame + 1) % m_swapChain->getImageCount();
 }
 
