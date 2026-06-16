@@ -48,6 +48,10 @@ release/
 # vscode
 .vscode/
 
+# local dev tooling configs
+.cursor/
+CLAUDE.md
+
 # git
 .git
 
