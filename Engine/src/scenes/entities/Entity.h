@@ -179,6 +179,11 @@ class Entity {
         }
     }
 
+    /**
+     * @brief Mark this entity's render slots dirty so they re-upload next frame
+     */
+    void markDirty();
+
     // Static utility function
     static EntityID enttHandleToEntityID(const entt::entity &handle) { return static_cast<EntityID>(handle); }
 

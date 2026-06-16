@@ -212,5 +212,7 @@ void ViewportPanel::updateGizmo()
         transformComponent->transforms.setRotation(rotation);
         transformComponent->transforms.setScale(scale);
         transformComponent->transforms.recalculateTransform();
+
+        m_selectedEntity->markDirty();
     }
 }

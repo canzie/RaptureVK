@@ -24,7 +24,6 @@ class ContentBrowserPanel : public Panel {
     ContentBrowserPanel(ContentBrowserPanel &&) = delete;
     ContentBrowserPanel &operator=(ContentBrowserPanel &&) = delete;
 
-    void onUpdate(float dt) override;
     void refresh();
     void setBaseDirectory(const std::filesystem::path &path);
 

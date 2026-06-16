@@ -112,6 +112,7 @@ tab-bar {
 
 collapsible-header#header {
     background-color: #404047;
+    indicator-size: 24px;
 }
 
 text-button.primary {

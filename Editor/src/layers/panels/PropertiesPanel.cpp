@@ -296,8 +296,8 @@ void PropertiesPanel::setupTransformHeader(Amethyst::ScrollingFrameScope &sf)
                 },
                 [this](Amethyst::TableScope &t) {
                     m_transformTable = &t.component;
-                    t.column("", 72.0f, Amethyst::TableColumnSizing::FIXED);
-                    t.column("", 1.0f);
+                    t.column("", 0.28f, Amethyst::TableColumnSizing::FIXED);
+                    t.column("", 0.72f);
 
                     for (int row = 0; row < 3; ++row) {
                         t.row([this, row](Amethyst::TableRowScope &tr) {
@@ -316,35 +316,43 @@ void PropertiesPanel::setupTransformHeader(Amethyst::ScrollingFrameScope &sf)
                                 });
                             });
                             tr.cell([this, row](Amethyst::UIScope &cell) {
-                                cell.sliderVec3(
-                                    {
-                                        .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                                        .label = "",
-                                    },
-                                    [this, row](Amethyst::SliderVec3Scope &s) {
-                                        m_transformSliders[row] = &s.component;
-                                        s.component.min = configs[row].min;
-                                        s.component.max = configs[row].max;
-                                        s.component.speed = configs[row].speed;
-                                        s.component.valueRef = &m_transformValues[row];
-                                        s.component.onValueChanged = [this, row](Amethyst::vec3 val) {
-                                            if (!m_selectedEntity.isValid()) {
-                                                return;
-                                            }
-                                            if (!m_selectedEntity.hasComponent<Rapture::TransformComponent>()) {
-                                                return;
-                                            }
-                                            auto &tc = m_selectedEntity.getComponent<Rapture::TransformComponent>();
-                                            glm::vec3 v(val.x, val.y, val.z);
-                                            if (row == 0) {
-                                                tc.transforms.setTranslation(v);
-                                            } else if (row == 1) {
-                                                tc.transforms.setRotation(v);
-                                            } else {
-                                                tc.transforms.setScale(v);
-                                            }
-                                        };
-                                    });
+                                for (int axis = 0; axis < 3; ++axis) {
+                                    cell.dragFloat(
+                                        {
+                                            .base =
+                                                {
+                                                    .position = Amethyst::UDim2(axis / 3.0f, axis == 0 ? 0.0f : 2.0f, 0.0f, 0.0f),
+                                                    .size = Amethyst::UDim2(1.0f / 3.0f, -2.0f, 1.0f, 0.0f),
+                                                },
+                                            .speed = configs[row].speed,
+                                            .min = configs[row].min[axis],
+                                            .max = configs[row].max[axis],
+                                            .value = &m_transformValues[row][axis],
+                                        },
+                                        [this, row, axis](Amethyst::DragFloatScope &d) {
+                                            m_transformDrags[row][axis] = &d.component;
+                                            d.component.onValueChanged = [this, row](double) {
+                                                if (!m_selectedEntity.isValid()) {
+                                                    return;
+                                                }
+                                                if (!m_selectedEntity.hasComponent<Rapture::TransformComponent>()) {
+                                                    return;
+                                                }
+                                                auto &tc = m_selectedEntity.getComponent<Rapture::TransformComponent>();
+                                                glm::vec3 v(static_cast<float>(m_transformValues[row][0]),
+                                                            static_cast<float>(m_transformValues[row][1]),
+                                                            static_cast<float>(m_transformValues[row][2]));
+                                                if (row == 0) {
+                                                    tc.transforms.setTranslation(v);
+                                                } else if (row == 1) {
+                                                    tc.transforms.setRotation(v);
+                                                } else {
+                                                    tc.transforms.setScale(v);
+                                                }
+                                                m_selectedEntity.markDirty();
+                                            };
+                                        });
+                                }
                             });
                         });
                     }
@@ -444,8 +452,6 @@ void PropertiesPanel::setScene(std::shared_ptr<Rapture::Scene> scene)
 
 void PropertiesPanel::onUpdate(float dt)
 {
-    m_searchInput->update(dt);
-
     if (!m_selectedEntity.isValid()) {
         return;
     }
@@ -457,9 +463,15 @@ void PropertiesPanel::onUpdate(float dt)
     auto t = transform.translation();
     auto r = transform.rotation();
     auto sc = transform.scale();
-    m_transformValues[0] = Amethyst::vec3(t.x, t.y, t.z);
-    m_transformValues[1] = Amethyst::vec3(r.x, r.y, r.z);
-    m_transformValues[2] = Amethyst::vec3(sc.x, sc.y, sc.z);
+    m_transformValues[0][0] = t.x;
+    m_transformValues[0][1] = t.y;
+    m_transformValues[0][2] = t.z;
+    m_transformValues[1][0] = r.x;
+    m_transformValues[1][1] = r.y;
+    m_transformValues[1][2] = r.z;
+    m_transformValues[2][0] = sc.x;
+    m_transformValues[2][1] = sc.y;
+    m_transformValues[2][2] = sc.z;
 }
 
 void PropertiesPanel::showEntity(const Rapture::Entity &entity)

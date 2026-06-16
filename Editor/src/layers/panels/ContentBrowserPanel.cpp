@@ -244,11 +244,6 @@ void ContentBrowserPanel::setupContentArea()
         });
 }
 
-void ContentBrowserPanel::onUpdate(float dt)
-{
-    m_searchInput->update(dt);
-}
-
 void ContentBrowserPanel::refresh()
 {
     if (m_browseMode == BrowseMode::ASSETS) {

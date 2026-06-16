@@ -46,7 +46,7 @@ class AmethystLayer : public Rapture::Layer {
     uint32_t m_imageCount = 0;
 
     // Amethyst components
-    Amethyst::VkBackend m_backend;
+    Amethyst::AmVulkanBackend m_backend;
     Amethyst::AmethystContext m_amCtx;
     Amethyst::Window m_window;
     Amethyst::Frame *m_backgroundFrame = nullptr;

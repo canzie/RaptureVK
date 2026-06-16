@@ -104,7 +104,7 @@ void AmethystLayer::onAttach()
     auto vertShaderPath = (rootPath / "Engine/vendor/Amethyst/backends/shaders/spirv/ui.vs.spv").string();
     auto fragShaderPath = (rootPath / "Engine/vendor/Amethyst/backends/shaders/spirv/ui.fs.spv").string();
 
-    Amethyst::VulkanInitInfo initInfo{};
+    Amethyst::AmVulkanInitInfo initInfo{};
     initInfo.device = vulkanContext.getLogicalDevice();
     initInfo.instance = vulkanContext.getInstance();
     initInfo.physicalDevice = vulkanContext.getPhysicalDevice();
@@ -118,7 +118,7 @@ void AmethystLayer::onAttach()
     initInfo.vertexShaderPath = vertShaderPath.c_str();
     initInfo.fragmentShaderPath = fragShaderPath.c_str();
 
-    Amethyst::GLFWInitInfo glfwInfo{};
+    Amethyst::AmGlfwInitInfo glfwInfo{};
     glfwInfo.window = static_cast<GLFWwindow *>(window.getNativeWindowContext());
 
     m_backend.init(initInfo, glfwInfo);
@@ -209,6 +209,8 @@ void AmethystLayer::onUpdate(float ts)
         }
     }
 
+    m_window.tick(ts);
+
     VkSemaphore imageAvailableSemaphore = swapChain->getImageAvailableSemaphore(m_currentFrame);
     VkSemaphore renderFinishedSemaphore = swapChain->getRenderFinishedSemaphore(m_currentImageIndex);
 
@@ -247,14 +249,14 @@ void AmethystLayer::onUpdate(float ts)
 
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
 
-    m_amCtx.sync(cmd);
     m_amCtx.draw(m_window);
+    m_amCtx.sync(static_cast<void *>(cmd));
 
     auto targetImageView = swapChain->getImageViews()[m_currentImageIndex];
 
     beginDynamicRendering(commandBuffer, targetImageView);
 
-    m_backend.record(cmd);
+    m_backend.record(cmd, m_amCtx.getDrawList());
 
     endDynamicRendering(commandBuffer);
 

@@ -72,8 +72,8 @@ class PropertiesPanel : public Panel {
     Amethyst::TextInput *m_searchInput = nullptr;
     Amethyst::CollapsibleHeader *m_transformHeader = nullptr;
     Amethyst::Table *m_transformTable = nullptr;
-    Amethyst::SliderVec3 *m_transformSliders[3] = {};
-    Amethyst::vec3 m_transformValues[3] = {};
+    Amethyst::DragFloat *m_transformDrags[3][3] = {};
+    double m_transformValues[3][3] = {};
 
     std::vector<ComponentSection> m_sections;
 

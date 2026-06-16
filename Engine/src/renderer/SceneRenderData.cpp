@@ -300,6 +300,35 @@ void SceneRenderData::onCascadedShadowRemoved(EntityID entityId)
     shadow->renderDataSlot = UINT32_MAX;
 }
 
+void SceneRenderData::markDirty(EntityID entityId)
+{
+    Entity entity(entityId, m_scene);
+
+    auto *mesh = entity.tryGetComponent<MeshComponent>();
+    if (mesh != nullptr && mesh->renderDataSlot != UINT32_MAX) {
+        uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, mesh->renderDataSlot);
+        m_meshes.getPartition(mesh->mobility).markDirtyAllFrames(localSlot);
+    }
+
+    auto *light = entity.tryGetComponent<LightComponent>();
+    if (light != nullptr && light->renderDataSlot != UINT32_MAX) {
+        uint32_t localSlot = m_lights.getLocalSlot(light->mobility, light->renderDataSlot);
+        m_lights.getPartition(light->mobility).markDirtyAllFrames(localSlot);
+    }
+
+    auto *shadow = entity.tryGetComponent<ShadowComponent>();
+    if (shadow != nullptr && shadow->renderDataSlot != UINT32_MAX) {
+        uint32_t localSlot = m_shadows.getLocalSlot(shadow->mobility, shadow->renderDataSlot);
+        m_shadows.getPartition(shadow->mobility).markDirtyAllFrames(localSlot);
+    }
+
+    auto *cascaded = entity.tryGetComponent<CascadedShadowComponent>();
+    if (cascaded != nullptr && cascaded->renderDataSlot != UINT32_MAX) {
+        uint32_t localSlot = m_shadows.getLocalSlot(cascaded->mobility, cascaded->renderDataSlot);
+        m_shadows.getPartition(cascaded->mobility).markDirtyAllFrames(localSlot);
+    }
+}
+
 void SceneRenderData::onUpdate(uint32_t frameIndex)
 {
     RAPTURE_PROFILE_SCOPE("SceneRenderData::onUpdate");

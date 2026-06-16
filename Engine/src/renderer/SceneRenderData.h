@@ -38,6 +38,12 @@ class SceneRenderData {
      */
     void onUpdate(uint32_t frameIndex);
 
+    /**
+     * @brief Mark an entity's render slots dirty so they re-upload next frame
+     * @param entityId Entity whose mesh/light/shadow slots should be re-uploaded
+     */
+    void markDirty(EntityID entityId);
+
     GPUDataStore<MeshGPUData> &getMeshes() { return m_meshes; }
     GPUDataStore<LightGPUData> &getLights() { return m_lights; }
     GPUDataStore<CameraGPUData> &getCameras() { return m_cameras; }
