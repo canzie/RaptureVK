@@ -1,5 +1,7 @@
 #include "ContentBrowserPanel.h"
+#include "Icons.h"
 #include "asset_manager/AssetManager.h"
+#include "layers/panels/components/tab_layouts.h"
 #include "logging/Log.h"
 
 #include <algorithm>
@@ -38,7 +40,7 @@ ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar) : m_hostTabBa
     setupSideBar();
     setupContentArea();
 
-    m_hostTabBar->addTab(std::move(root), "Content Browser");
+    m_hostTabBar->addTab(std::move(root), iconTabLayout("Content Browser", Icons::SVG_FOLDER));
 }
 
 ContentBrowserPanel::~ContentBrowserPanel()

@@ -54,9 +54,10 @@ class PropertiesPanel : public Panel {
     /**
      * @brief Creates a collapsible header, registers it as a section and wires
      * up relayout on toggle. The body callback fills the expanded content.
+     * @param iconSvg Icon shown next to the title, or empty for none.
      */
-    Amethyst::CollapsibleHeader *beginSection(Amethyst::ScrollingFrameScope &sf, const char *title, float bodyHeight,
-                                              std::function<bool(const Rapture::Entity &)> matches,
+    Amethyst::CollapsibleHeader *beginSection(Amethyst::ScrollingFrameScope &sf, const char *title, const char *iconSvg,
+                                              float bodyHeight, std::function<bool(const Rapture::Entity &)> matches,
                                               std::function<void(Amethyst::CollapsibleHeaderScope &)> body);
     void addStubBody(Amethyst::CollapsibleHeaderScope &ch);
 

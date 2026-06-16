@@ -1,7 +1,9 @@
 #include "OutlinerPanel.h"
+#include "Icons.h"
 #include "components/Components.h"
 #include "components/HierarchyComponent.h"
 #include "events/GameEvents.h"
+#include "layers/panels/components/tab_layouts.h"
 #include "scenes/SceneManager.h"
 #include "scenes/entities/Entity.h"
 
@@ -61,7 +63,7 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
                     });
             });
 
-    m_hostTabBar->addTab(std::move(root), "Outliner");
+    m_hostTabBar->addTab(std::move(root), iconTabLayout("Outliner", Icons::SVG_LAYERS));
 }
 
 OutlinerPanel::~OutlinerPanel()

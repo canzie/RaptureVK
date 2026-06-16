@@ -1,7 +1,9 @@
 #include "ViewportPanel.h"
 
+#include "Icons.h"
 #include "components/Components.h"
 #include "events/GameEvents.h"
+#include "layers/panels/components/tab_layouts.h"
 #include "scenes/SceneManager.h"
 
 #include <components/extensions/ui_list_layout.h>
@@ -56,7 +58,7 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
     m_entitySelectedListenerId = Rapture::GameEvents::onEntitySelected().addListener(
         [this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
 
-    m_hostTabBar->addTab(std::move(root), "Viewport");
+    m_hostTabBar->addTab(std::move(root), iconTabLayout("Viewport", Icons::SVG_VIEWPORT));
 }
 
 ViewportPanel::~ViewportPanel()

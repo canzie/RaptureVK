@@ -4,7 +4,7 @@
 // All icons share viewBox="0 0 16 16", stroke-width=1.5, stroke-linecap/linejoin=round.
 // Filled shapes override fill/stroke per-element.
 #define ICON_SVG(body)                                                                                                       \
-    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"#aaaaaa\" stroke-width=\"1.5\" " \
+    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"1.5\" " \
     "stroke-linecap=\"round\" stroke-linejoin=\"round\">" body "</svg>"
 
 namespace Icons {
@@ -18,7 +18,7 @@ inline constexpr const char *SVG_MINUS = ICON_SVG("<path d=\"M3 8h10\"/>");
 
 inline constexpr const char *SVG_X = ICON_SVG("<path d=\"M4 4l8 8M12 4l-8 8\"/>");
 
-inline constexpr const char *SVG_MORE = ICON_SVG("<g fill=\"#aaaaaa\" stroke=\"none\">"
+inline constexpr const char *SVG_MORE = ICON_SVG("<g fill=\"#ffffff\" stroke=\"none\">"
                                                  "<circle cx=\"3.5\" cy=\"8\" r=\"1\"/>"
                                                  "<circle cx=\"8\" cy=\"8\" r=\"1\"/>"
                                                  "<circle cx=\"12.5\" cy=\"8\" r=\"1\"/>"
@@ -26,7 +26,7 @@ inline constexpr const char *SVG_MORE = ICON_SVG("<g fill=\"#aaaaaa\" stroke=\"n
 
 inline constexpr const char *SVG_FILTER = ICON_SVG("<path d=\"M2 3h12l-4.5 6V13l-3 1V9L2 3z\"/>");
 
-inline constexpr const char *SVG_GRIP = ICON_SVG("<g fill=\"#aaaaaa\" stroke=\"none\">"
+inline constexpr const char *SVG_GRIP = ICON_SVG("<g fill=\"#ffffff\" stroke=\"none\">"
                                                  "<circle cx=\"6\" cy=\"4\" r=\"1\"/>"
                                                  "<circle cx=\"10\" cy=\"4\" r=\"1\"/>"
                                                  "<circle cx=\"6\" cy=\"8\" r=\"1\"/>"
@@ -64,17 +64,17 @@ inline constexpr const char *SVG_LOCK = ICON_SVG("<rect x=\"3.5\" y=\"7\" width=
 inline constexpr const char *SVG_UNLOCK = ICON_SVG("<rect x=\"3.5\" y=\"7\" width=\"9\" height=\"6\" rx=\"1\"/>"
                                                    "<path d=\"M5.5 7V5a2.5 2.5 0 014.7-1.2\"/>");
 
-inline constexpr const char *SVG_PLAY = ICON_SVG("<path d=\"M5 3.5v9l7-4.5-7-4.5z\" fill=\"#aaaaaa\" stroke=\"none\"/>");
+inline constexpr const char *SVG_PLAY = ICON_SVG("<path d=\"M5 3.5v9l7-4.5-7-4.5z\" fill=\"#ffffff\" stroke=\"none\"/>");
 
-inline constexpr const char *SVG_PAUSE = ICON_SVG("<g fill=\"#aaaaaa\" stroke=\"none\">"
+inline constexpr const char *SVG_PAUSE = ICON_SVG("<g fill=\"#ffffff\" stroke=\"none\">"
                                                   "<rect x=\"4\" y=\"3.5\" width=\"2.5\" height=\"9\" rx=\".5\"/>"
                                                   "<rect x=\"9.5\" y=\"3.5\" width=\"2.5\" height=\"9\" rx=\".5\"/>"
                                                   "</g>");
 
 inline constexpr const char *SVG_STOP =
-    ICON_SVG("<rect x=\"4\" y=\"4\" width=\"8\" height=\"8\" rx=\"1\" fill=\"#aaaaaa\" stroke=\"none\"/>");
+    ICON_SVG("<rect x=\"4\" y=\"4\" width=\"8\" height=\"8\" rx=\"1\" fill=\"#ffffff\" stroke=\"none\"/>");
 
-inline constexpr const char *SVG_STEP = ICON_SVG("<path d=\"M5 3.5v9l5-4.5-5-4.5z\" fill=\"#aaaaaa\" stroke=\"none\"/>"
+inline constexpr const char *SVG_STEP = ICON_SVG("<path d=\"M5 3.5v9l5-4.5-5-4.5z\" fill=\"#ffffff\" stroke=\"none\"/>"
                                                  "<path d=\"M11 3.5v9\"/>");
 
 inline constexpr const char *SVG_CARET_DOWN = ICON_SVG("<path d=\"M4 6l4 4 4-4\"/>");
@@ -85,7 +85,7 @@ inline constexpr const char *SVG_CHEVRON_DOWN = ICON_SVG("<path d=\"M3.5 6L8 10l
 
 inline constexpr const char *SVG_CHEVRON_UP = ICON_SVG("<path d=\"M3.5 10L8 6l4.5 4\"/>");
 
-inline constexpr const char *SVG_CARET_SMALL = ICON_SVG("<path d=\"M4 6.5l4 3 4-3\" fill=\"#aaaaaa\" stroke=\"none\"/>");
+inline constexpr const char *SVG_CARET_SMALL = ICON_SVG("<path d=\"M4 6.5l4 3 4-3\" fill=\"#ffffff\" stroke=\"none\"/>");
 
 inline constexpr const char *SVG_SCENE = ICON_SVG("<path d=\"M2 5l6-3 6 3-6 3-6-3z\"/>"
                                                   "<path d=\"M2 8l6 3 6-3\"/>"
@@ -111,7 +111,7 @@ inline constexpr const char *SVG_CAMERA =
 inline constexpr const char *SVG_AUDIO = ICON_SVG("<path d=\"M3 6h2l3-2.5v9L5 10H3a1 1 0 01-1-1V7a1 1 0 011-1z\"/>"
                                                   "<path d=\"M11 5.5a3.5 3.5 0 010 5\"/>");
 
-inline constexpr const char *SVG_PARTICLE = ICON_SVG("<g fill=\"#aaaaaa\" stroke=\"none\">"
+inline constexpr const char *SVG_PARTICLE = ICON_SVG("<g fill=\"#ffffff\" stroke=\"none\">"
                                                      "<circle cx=\"4\" cy=\"5\" r=\"1.2\"/>"
                                                      "<circle cx=\"10\" cy=\"4\" r=\"1.2\"/>"
                                                      "<circle cx=\"8\" cy=\"9\" r=\"1.5\"/>"
@@ -142,7 +142,7 @@ inline constexpr const char *SVG_MATERIAL = ICON_SVG("<circle cx=\"8\" cy=\"8\" 
                                                      "<path d=\"M3 8c0-2 2-3 5-3s5 1 5 3\"/>");
 
 inline constexpr const char *SVG_TAG = ICON_SVG("<path d=\"M3 8l5-5h5v5l-5 5-5-5z\"/>"
-                                                "<circle cx=\"10\" cy=\"6\" r=\".8\" fill=\"#aaaaaa\"/>");
+                                                "<circle cx=\"10\" cy=\"6\" r=\".8\" fill=\"#ffffff\"/>");
 
 inline constexpr const char *SVG_SAVE = ICON_SVG("<path d=\"M3 3h7l3 3v7a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1z\"/>"
                                                  "<path d=\"M5 3v4h6V4M5 14v-4h6v4\"/>");
@@ -155,8 +155,19 @@ inline constexpr const char *SVG_SETTINGS = ICON_SVG(
     "<circle cx=\"8\" cy=\"8\" r=\"2\"/>"
     "<path d=\"M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4\"/>");
 
+inline constexpr const char *SVG_PROPERTIES = ICON_SVG("<path d=\"M2 5h12M2 8h12M2 11h12\"/>"
+                                                       "<g fill=\"#ffffff\" stroke=\"none\">"
+                                                       "<circle cx=\"6\" cy=\"5\" r=\"1.3\"/>"
+                                                       "<circle cx=\"10\" cy=\"8\" r=\"1.3\"/>"
+                                                       "<circle cx=\"5\" cy=\"11\" r=\"1.3\"/>"
+                                                       "</g>");
+
 inline constexpr const char *SVG_PERSPECTIVE = ICON_SVG("<path d=\"M2 5l4-2 4 2v8l-4 2-4-2V5z\"/>"
                                                         "<path d=\"M10 5l4 2v6l-4 2\"/>");
+
+inline constexpr const char *SVG_VIEWPORT = ICON_SVG("<rect x=\"2\" y=\"3\" width=\"12\" height=\"10\" rx=\"1\"/>"
+                                                     "<path d=\"M2 6.3h12\"/>"
+                                                     "<path d=\"M3 11l2.2-3.5 1.8 2 2.3-3 2.7 4.5\"/>");
 
 inline constexpr const char *SVG_GRID = ICON_SVG("<path d=\"M2 6h12M2 10h12M6 2v12M10 2v12\"/>");
 

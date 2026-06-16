@@ -3,6 +3,8 @@
 #include "components/Components.h"
 #include "components/TerrainComponent.h"
 #include "events/GameEvents.h"
+#include "layers/panels/components/header_layouts.h"
+#include "layers/panels/components/tab_layouts.h"
 
 #include <components/common.h>
 #include <components/ui_scope.h>
@@ -29,7 +31,7 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar
     setupPlaceholder();
     setupEntityView();
 
-    m_hostTabBar->addTab(std::move(root), "Properties");
+    m_hostTabBar->addTab(std::move(root), iconTabLayout("Properties", Icons::SVG_PROPERTIES));
 
     m_entitySelectedListenerID =
         Rapture::GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) {
@@ -203,7 +205,8 @@ void PropertiesPanel::setupEntityView()
         });
 }
 
-Amethyst::CollapsibleHeader *PropertiesPanel::beginSection(Amethyst::ScrollingFrameScope &sf, const char *title, float bodyHeight,
+Amethyst::CollapsibleHeader *PropertiesPanel::beginSection(Amethyst::ScrollingFrameScope &sf, const char *title,
+                                                           const char *iconSvg, float bodyHeight,
                                                            std::function<bool(const Rapture::Entity &)> matches,
                                                            std::function<void(Amethyst::CollapsibleHeaderScope &)> body)
 {
@@ -221,10 +224,10 @@ Amethyst::CollapsibleHeader *PropertiesPanel::beginSection(Amethyst::ScrollingFr
                     .titleStyle = {.fontSize = 13.0f},
                     .headerHeight = k_headerHeight,
                 },
-            .title = title,
         },
         [&](Amethyst::CollapsibleHeaderScope &ch) {
             header = &ch.component;
+            ch.header(componentHeaderLayout(title, iconSvg));
             if (body) {
                 body(ch);
             }
@@ -270,7 +273,7 @@ void PropertiesPanel::setupTransformHeader(Amethyst::ScrollingFrameScope &sf)
     };
 
     m_transformHeader = beginSection(
-        sf, "Transform", k_transformBodyHeight,
+        sf, "Transform", Icons::SVG_TRANSFORM, k_transformBodyHeight,
         [](const Rapture::Entity &e) { return e.hasComponent<Rapture::TransformComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) {
             ch.table(
@@ -363,14 +366,15 @@ void PropertiesPanel::setupTransformHeader(Amethyst::ScrollingFrameScope &sf)
 void PropertiesPanel::setupMeshHeader(Amethyst::ScrollingFrameScope &sf)
 {
     beginSection(
-        sf, "Mesh", k_stubBodyHeight + 8.0f, [](const Rapture::Entity &e) { return e.hasComponent<Rapture::MeshComponent>(); },
+        sf, "Mesh", Icons::SVG_MESH, k_stubBodyHeight + 8.0f,
+        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::MeshComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
 }
 
 void PropertiesPanel::setupMaterialHeader(Amethyst::ScrollingFrameScope &sf)
 {
     beginSection(
-        sf, "Material", k_stubBodyHeight + 8.0f,
+        sf, "Material", Icons::SVG_MATERIAL, k_stubBodyHeight + 8.0f,
         [](const Rapture::Entity &e) { return e.hasComponent<Rapture::MaterialComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
 }
@@ -378,28 +382,31 @@ void PropertiesPanel::setupMaterialHeader(Amethyst::ScrollingFrameScope &sf)
 void PropertiesPanel::setupLightHeader(Amethyst::ScrollingFrameScope &sf)
 {
     beginSection(
-        sf, "Light", k_stubBodyHeight + 8.0f, [](const Rapture::Entity &e) { return e.hasComponent<Rapture::LightComponent>(); },
+        sf, "Light", Icons::SVG_LIGHT, k_stubBodyHeight + 8.0f,
+        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::LightComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
 }
 
 void PropertiesPanel::setupCameraHeader(Amethyst::ScrollingFrameScope &sf)
 {
     beginSection(
-        sf, "Camera", k_stubBodyHeight + 8.0f, [](const Rapture::Entity &e) { return e.hasComponent<Rapture::CameraComponent>(); },
+        sf, "Camera", Icons::SVG_CAMERA, k_stubBodyHeight + 8.0f,
+        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::CameraComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
 }
 
 void PropertiesPanel::setupShadowHeader(Amethyst::ScrollingFrameScope &sf)
 {
     beginSection(
-        sf, "Shadow", k_stubBodyHeight + 8.0f, [](const Rapture::Entity &e) { return e.hasComponent<Rapture::ShadowComponent>(); },
+        sf, "Shadow", "", k_stubBodyHeight + 8.0f,
+        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::ShadowComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
 }
 
 void PropertiesPanel::setupCascadedShadowHeader(Amethyst::ScrollingFrameScope &sf)
 {
     beginSection(
-        sf, "Cascaded Shadow", k_stubBodyHeight + 8.0f,
+        sf, "Cascaded Shadow", "", k_stubBodyHeight + 8.0f,
         [](const Rapture::Entity &e) { return e.hasComponent<Rapture::CascadedShadowComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
 }
@@ -407,14 +414,15 @@ void PropertiesPanel::setupCascadedShadowHeader(Amethyst::ScrollingFrameScope &s
 void PropertiesPanel::setupSkyboxHeader(Amethyst::ScrollingFrameScope &sf)
 {
     beginSection(
-        sf, "Skybox", k_stubBodyHeight + 8.0f, [](const Rapture::Entity &e) { return e.hasComponent<Rapture::SkyboxComponent>(); },
+        sf, "Skybox", "", k_stubBodyHeight + 8.0f,
+        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::SkyboxComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
 }
 
 void PropertiesPanel::setupTerrainHeader(Amethyst::ScrollingFrameScope &sf)
 {
     beginSection(
-        sf, "Terrain", k_stubBodyHeight + 8.0f,
+        sf, "Terrain", "", k_stubBodyHeight + 8.0f,
         [](const Rapture::Entity &e) { return e.hasComponent<Rapture::TerrainComponent>(); },
         [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
 }

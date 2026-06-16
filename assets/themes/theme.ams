@@ -108,6 +108,7 @@ tab-bar {
     tab-hovered-color: #303030;
     tab-pressed-color: #303030;
     tab-spacing: 3px;
+    tab-width: 120px;
 }
 
 collapsible-header#header {
