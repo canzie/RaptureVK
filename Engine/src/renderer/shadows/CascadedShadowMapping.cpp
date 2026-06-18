@@ -2,17 +2,15 @@
 
 #include "components/Components.h"
 #include "generators/terrain/TerrainTypes.h"
-#include "renderer/SceneRenderData.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
-#include "render_targets/swap_chains/SwapChain.h"
+#include "renderer/SceneRenderData.h"
 #include "renderer/shadows/ShadowCommon.h"
 #include "window_context/Application.h"
 
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 #include <limits>
-#include <unordered_map>
 
 namespace Rapture {
 
@@ -181,40 +179,38 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
             maxZ = std::max(maxZ, trf.z);
         }
 
-        // --- Stabilize the cascade to the shadow-map texel grid to avoid shimmering ---
-        float orthoWidth = maxX - minX;
-        float orthoHeight = maxY - minY;
-
-        // Calculate world-space size of a texel for this cascade
-        float texelSizeX = orthoWidth / m_width;   // m_width == shadow map resolution in X
-        float texelSizeY = orthoHeight / m_height; // m_height == shadow map resolution in Y
-
-        // Snap the light-space frustum center to the texel grid
-        glm::vec3 frustumCenterLS = glm::vec3(lightViewMatrix * glm::vec4(frustumCenter, 1.0f));
-        frustumCenterLS.x = std::floor(frustumCenterLS.x / texelSizeX) * texelSizeX;
-        frustumCenterLS.y = std::floor(frustumCenterLS.y / texelSizeY) * texelSizeY;
-
-        // Add padding to X/Y to ensure coverage at all angles
-        float xPadding = orthoWidth * 0.1f;
-        float yPadding = orthoHeight * 0.1f;
-
-        minX = frustumCenterLS.x - (orthoWidth * 0.5f + xPadding);
-        maxX = frustumCenterLS.x + (orthoWidth * 0.5f + xPadding);
-        minY = frustumCenterLS.y - (orthoHeight * 0.5f + yPadding);
-        maxY = frustumCenterLS.y + (orthoHeight * 0.5f + yPadding);
+        // Constant extent from a rotation-invariant bounding sphere so the texel
+        // size stays fixed frame to frame, which the snap below relies on.
+        float radius = 0.0f;
+        for (const auto &corner : frustumCorners) {
+            radius = std::max(radius, glm::length(corner - frustumCenter));
+        }
+        // Quantize so tiny per-frame float wobble in the radius doesn't change the
+        // texel size, which would make the snap grid jitter.
+        radius = std::ceil(radius * 16.0f) / 16.0f;
+        minX = -radius;
+        maxX = radius;
+        minY = -radius;
+        maxY = radius;
 
         float zRange = maxZ - minZ;
         float zPadding = zRange * 2.0f;
         minZ = minZ - zPadding;
         maxZ = maxZ + zPadding;
 
-        // 5. Create the orthographic projection for this cascade (now stabilized)
         glm::mat4 lightProjectionMatrix = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
-
-        // Vulkan Y-flip for correct coordinate system
         lightProjectionMatrix[1][1] *= -1;
 
-        // 6. Store Final Matrix
+        // Round the projection of a fixed world point (origin) to the shadow texel
+        // grid so the cascade shifts in whole texels instead of swimming.
+        glm::mat4 lightViewProj = lightProjectionMatrix * lightViewMatrix;
+        glm::vec4 shadowOrigin = lightViewProj * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        shadowOrigin *= (m_width * 0.5f);
+        glm::vec2 roundedOrigin = glm::round(glm::vec2(shadowOrigin));
+        glm::vec2 roundOffset = (roundedOrigin - glm::vec2(shadowOrigin)) * (2.0f / m_width);
+        lightProjectionMatrix[3][0] += roundOffset.x;
+        lightProjectionMatrix[3][1] += roundOffset.y;
+
         cascadeData[cascadeIdx].lightViewProj = lightProjectionMatrix * lightViewMatrix;
         m_lightViewProjections[cascadeIdx] = cascadeData[cascadeIdx].lightViewProj;
     }
@@ -268,6 +264,18 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
 
     m_currentFrame = currentFrame;
 
+    CSMData csmData;
+    for (size_t i = 0; i < MAX_CASCADES; i++) {
+        if (i < m_NumCascades && i < m_lightViewProjections.size()) {
+            csmData.lightViewProjection[i] = m_lightViewProjections[i];
+        } else {
+            csmData.lightViewProjection[i] = glm::mat4(1.0f);
+        }
+    }
+    if (m_currentFrame < m_cascadeMatricesBuffers.size() && m_cascadeMatricesBuffers[m_currentFrame]) {
+        m_cascadeMatricesBuffers[m_currentFrame]->addData(&csmData, sizeof(CSMData), 0);
+    }
+
     auto &registry = activeScene->getRegistry();
 
     auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash, currentFrame);
@@ -277,9 +285,6 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
     inheritance.depthFormat = m_shadowTextureArray->getFormat();
     inheritance.viewMask = (1u << m_NumCascades) - 1;
     commandBuffer->beginSecondary(inheritance);
-
-    m_writeIndex = (m_writeIndex + 1) % 2;
-    m_readIndex = (m_readIndex + 1) % 2;
 
     m_mdiBatchMaps[m_currentFrame]->beginFrame();
 
@@ -366,7 +371,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
         auto &renderData = *activeScene->getRenderData();
 
         PushConstantsCSM pushConstants{};
-        pushConstants.shadowMatrixIndices = m_cascadeMatricesIndex;
+        pushConstants.shadowMatrixIndices = m_cascadeMatricesIndices[m_currentFrame];
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
         pushConstants.meshDataSSBOIndex = renderData.getMeshes().getDescriptorIndex(currentFrame);
 
@@ -426,21 +431,6 @@ std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponen
                                          cameraComp.nearPlane, cameraComp.farPlane,
                                          ProjectionType::Perspective // Assuming perspective camera
     );
-
-    // Update all uniform buffers with the new cascade matrices
-    CSMData csmData;
-    for (size_t i = 0; i < MAX_CASCADES; i++) {
-        if (i < m_NumCascades && i < m_lightViewProjections.size()) {
-            csmData.lightViewProjection[i] = m_lightViewProjections[i];
-        } else {
-            // Fill unused cascades with identity matrices
-            csmData.lightViewProjection[i] = glm::mat4(1.0f);
-        }
-    }
-
-    if (m_cascadeMatricesBuffer) {
-        m_cascadeMatricesBuffer->addData(&csmData, sizeof(CSMData), 0);
-    }
 
     return cascadeData;
 }
@@ -881,7 +871,7 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, Terr
         vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain->getIndexBuffer(lod), 0, VK_INDEX_TYPE_UINT32);
 
         TerrainCSMPushConstants pc{};
-        pc.cascadeMatricesIndex = m_cascadeMatricesIndex;
+        pc.cascadeMatricesIndex = m_cascadeMatricesIndices[m_currentFrame];
         pc.chunkDataBufferIndex = chunkDataBufferIndex;
         pc.continentalnessIndex = continentalnessIndex;
         pc.erosionIndex = erosionIndex;
@@ -928,14 +918,15 @@ void CascadedShadowMap::createShadowTexture()
 }
 void CascadedShadowMap::createUniformBuffers()
 {
-    m_cascadeMatricesBuffer = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::STREAM, m_allocator, nullptr);
-
-    // Add to descriptor set
     auto cascadeSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
-    if (cascadeSet) {
-        auto binding = cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
+    auto binding = cascadeSet ? cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO) : nullptr;
+
+    m_cascadeMatricesBuffers.resize(m_framesInFlight);
+    m_cascadeMatricesIndices.resize(m_framesInFlight, 0);
+    for (uint32_t i = 0; i < m_framesInFlight; i++) {
+        m_cascadeMatricesBuffers[i] = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::STREAM, m_allocator, nullptr);
         if (binding) {
-            m_cascadeMatricesIndex = binding->add(*m_cascadeMatricesBuffer);
+            m_cascadeMatricesIndices[i] = binding->add(*m_cascadeMatricesBuffers[i]);
         }
     }
 }

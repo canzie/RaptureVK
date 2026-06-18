@@ -115,22 +115,18 @@ class CascadedShadowMap {
     bool m_firstFrame = true;
 
     uint32_t m_currentFrame = 0;
-    uint32_t m_framesInFlight = 3; // Default, will be updated
+    uint32_t m_framesInFlight = 1;
 
     std::vector<glm::mat4> m_lightViewProjections;
     std::vector<float> m_cascadeSplits;
 
-    // ping pong textures
     std::shared_ptr<Texture> m_shadowTextureArray;
-
-    uint32_t m_writeIndex = 0;
-    uint32_t m_readIndex = 1;
 
     std::unique_ptr<FlattenTexture> m_flattenedShadowTexture;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
-    std::shared_ptr<UniformBuffer> m_cascadeMatricesBuffer;
-    uint32_t m_cascadeMatricesIndex;
+    std::vector<std::shared_ptr<UniformBuffer>> m_cascadeMatricesBuffers;
+    std::vector<uint32_t> m_cascadeMatricesIndices;
 
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};

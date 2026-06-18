@@ -513,7 +513,7 @@ void main() {
             if (shadowInfo.lightIndex == light.spotAngles.z && shadowInfo.type >= 0) {
                
                shadowFactor = calculateShadow(fragPos, positionDepth.a, N, lightDirWorld, shadowInfo, currentCascadeIndex);
-                if (debugCascadeIndex == -1 && shadowFactor < 1.0) {
+                if (debugCascadeIndex == -1) {
                    debugCascadeIndex = currentCascadeIndex;
                 }
                 break; 

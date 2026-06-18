@@ -6,7 +6,6 @@
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
 
-#include "buffers/UniformBuffer.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorBinding.h"
@@ -51,7 +50,6 @@ class ShadowMap {
 
     void createPipeline();
     void createShadowTexture();
-    void createUniformBuffers();
     void setupCommandResources();
 
   private:
@@ -59,7 +57,6 @@ class ShadowMap {
     float m_width;
     float m_height;
     uint32_t m_currentFrame = 0;
-    uint32_t m_framesInFlight = 3; // Default, will be updated
 
     glm::mat4 m_lightViewProjection;
 
@@ -74,7 +71,6 @@ class ShadowMap {
     std::vector<AssetRef> m_shaderAssets;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
-    VmaAllocator m_allocator;
 
     CommandPoolHash m_commandPoolHash = 0;
 };

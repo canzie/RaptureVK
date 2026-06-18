@@ -3,7 +3,6 @@
 #include "components/Components.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
-#include "render_targets/swap_chains/SwapChain.h"
 #include "renderer/shadows/ShadowCommon.h"
 #include "window_context/Application.h"
 
@@ -20,15 +19,8 @@ ShadowMap::ShadowMap(float width, float height) : m_width(width), m_height(heigh
     createShadowTexture();
     createPipeline();
 
-    // Get the frame count from the application
-    auto &app = Application::getInstance();
-    auto &vulkanContext = app.getVulkanContext();
-    m_rc = &vulkanContext.getRenderContext();
-    auto swapchain = vulkanContext.getSwapChain();
-    m_framesInFlight = swapchain->getImageCount();
-    m_allocator = vulkanContext.getVmaAllocator();
+    m_rc = &Application::getInstance().getVulkanContext().getRenderContext();
 
-    createUniformBuffers();
     setupCommandResources();
 }
 
@@ -44,14 +36,8 @@ void ShadowMap::setupCommandResources()
 
 ShadowMap::~ShadowMap() {}
 
-void ShadowMap::createUniformBuffers()
-{
-    RAPTURE_PROFILE_FUNCTION();
-}
-
 void ShadowMap::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer)
 {
-    RAPTURE_PROFILE_FUNCTION();
 
     // Transition shadow map to depth attachment layout
     VkImageMemoryBarrier barrier =
