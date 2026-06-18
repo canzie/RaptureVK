@@ -1,6 +1,7 @@
 #pragma once
 
 #include "shaders/Shader.h"
+#include "textures/TextureCommon.h"
 
 #include <variant>
 
@@ -17,9 +18,10 @@ struct ShaderImportConfig {
 };
 
 struct TextureImportConfig {
+    TextureFormat format = TextureFormat::RGBA8; // Format to decode/compress source data into
     bool srgb = false;
 
-    bool operator==(const TextureImportConfig &other) const { return srgb == other.srgb; }
+    bool operator==(const TextureImportConfig &other) const { return format == other.format && srgb == other.srgb; }
 };
 
 using AssetImportConfigVariant = std::variant<std::monostate, ShaderImportConfig, TextureImportConfig>;

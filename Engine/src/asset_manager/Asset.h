@@ -66,7 +66,8 @@ class Asset {
 
     ~Asset() = default;
 
-    template <typename T> T *getUnderlyingAsset() const
+    template <typename T>
+    T *getUnderlyingAsset() const
     {
         if (std::holds_alternative<std::unique_ptr<T>>(m_asset)) {
             return std::get<std::unique_ptr<T>>(m_asset).get();

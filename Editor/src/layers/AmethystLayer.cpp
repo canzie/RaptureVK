@@ -7,6 +7,7 @@
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
+#include "layers/panels/components/tab_layouts.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "render_targets/swap_chains/SwapChain.h"
@@ -168,6 +169,7 @@ void AmethystLayer::onAttach()
     m_viewportTextureIds.resize(swapChain->getImageCount());
 
     Rapture::CommandPoolConfig config;
+    config.isVendorQueue = true;
     config.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
     config.flags = 0;
     config.threadId = 0;

@@ -245,7 +245,7 @@ struct SkyboxComponent {
 
 struct LightComponent {
 
-    LightType type = LightType::Point;
+    LightType type = LightType::POINT;
     glm::vec3 color = glm::vec3(1.0f, 0.8f, 0.6f); // Light color (default: warm white?) #FFDDAA
     float intensity = 1.0f;                        // Light intensity multiplier
 
@@ -267,14 +267,14 @@ struct LightComponent {
     LightComponent() = default;
 
     LightComponent(const glm::vec3 &color, float intensity, float range)
-        : type(LightType::Point), color(color), intensity(intensity), range(range)
+        : type(LightType::POINT), color(color), intensity(intensity), range(range)
     {
     }
 
-    LightComponent(const glm::vec3 &color, float intensity) : type(LightType::Directional), color(color), intensity(intensity) {}
+    LightComponent(const glm::vec3 &color, float intensity) : type(LightType::DIRECTIONAL), color(color), intensity(intensity) {}
 
     LightComponent(const glm::vec3 &color, float intensity, float range, float innerAngleDegrees, float outerAngleDegrees)
-        : type(LightType::Spot), color(color), intensity(intensity), range(range), innerConeAngle(glm::radians(innerAngleDegrees)),
+        : type(LightType::SPOT), color(color), intensity(intensity), range(range), innerConeAngle(glm::radians(innerAngleDegrees)),
           outerConeAngle(glm::radians(outerAngleDegrees))
     {
     }

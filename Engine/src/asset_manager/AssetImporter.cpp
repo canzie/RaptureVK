@@ -2,6 +2,9 @@
 
 #include "AssetHelpers.h"
 #include "events/AssetEvents.h"
+#include "jobs/Counter.h"
+#include "jobs/Job.h"
+#include "jobs/JobSystem.h"
 #include "loaders/gltf/glTFCommon.h"
 #include "logging/Log.h"
 #include "shaders/Shader.h"
@@ -10,6 +13,7 @@
 #include <filesystem>
 #include <memory>
 #include <regex>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -142,22 +146,70 @@ bool AssetImporter::loadMaterial(Asset &asset, AssetMetadata &metadata)
 
 bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
 {
-
     TextureSpecification texSpec = TextureSpecification();
     texSpec.mipLevels = 0; // 0 is auto
+    texSpec.type = TextureType::TEXTURE2D;
+    texSpec.format = TextureFormat::RGBA8; // source decoder always produces 4-channel RGBA8 data
+
     if (std::holds_alternative<TextureImportConfig>(metadata.importConfig)) {
         auto importConfig = std::get<TextureImportConfig>(metadata.importConfig);
+        texSpec.format = importConfig.format;
         texSpec.srgb = importConfig.srgb;
     }
 
-    auto tex = Texture::loadAsync(metadata.filePath.string(), texSpec);
+    if (!getImageDimensions(metadata.filePath, texSpec.width, texSpec.height)) {
+        RP_CORE_ERROR("Failed to read texture dimensions: {}", metadata.filePath.string());
+        asset.status = AssetStatus::FAILED;
+        return false;
+    }
 
-    // auto tex = std::make_unique<Texture>(metadata.filePath.string(), texSpec);
+    auto tex = Texture::createPlaceholder(texSpec);
+    Texture *texPtr = tex.get();
+    Asset *assetPtr = &asset;
+    std::filesystem::path path = metadata.filePath;
 
-    asset.status = AssetStatus::LOADED;
+    asset.status = AssetStatus::LOADING;
     asset.setAssetVariant(std::move(tex));
 
-    AssetEvents::onAssetLoaded().publish(asset.getHandle());
+    jobs().run(JobDeclaration(
+        [texPtr, assetPtr, path](JobContext &jctx) {
+            Counter ioCounter{};
+            ioCounter.increment();
+
+            auto ioData = std::make_shared<std::pair<std::vector<uint8_t>, bool>>();
+
+            jobs().requestIo(
+                path,
+                [ioData, &ioCounter](std::vector<uint8_t> &&data, bool success) {
+                    ioData->first = std::move(data);
+                    ioData->second = success;
+                    ioCounter.decrement();
+                },
+                JobPriority::LOW);
+
+            jctx.waitFor(ioCounter, 0);
+
+            if (!ioData->second) {
+                RP_CORE_ERROR("Failed to load texture file: {}", path.string());
+                texPtr->markFailed();
+                assetPtr->status = AssetStatus::FAILED;
+                return;
+            }
+
+            DecodedImageData decoded = decodeImageMemory(ioData->first);
+            if (!decoded.success) {
+                RP_CORE_ERROR("Failed to decode texture: {}", path.string());
+                texPtr->markFailed();
+                assetPtr->status = AssetStatus::FAILED;
+                return;
+            }
+
+            texPtr->uploadDataAsync(std::move(decoded.pixels));
+
+            assetPtr->status = AssetStatus::LOADED;
+            AssetEvents::onAssetLoaded().publish(assetPtr->getHandle());
+        },
+        JobPriority::NORMAL, QueueAffinity::ANY, nullptr, "Texture decode"));
 
     return true;
 }
@@ -171,7 +223,38 @@ bool AssetImporter::loadCubemap(Asset &asset, AssetMetadata &metadata)
         return false;
     }
 
-    auto tex = std::make_unique<Texture>(cubemapPaths, TextureSpecification());
+    std::vector<DecodedImageData> decodedFaces;
+    decodedFaces.reserve(cubemapPaths.size());
+
+    uint32_t width = 0, height = 0;
+    for (size_t i = 0; i < cubemapPaths.size(); ++i) {
+        DecodedImageData decoded = decodeImageFile(cubemapPaths[i]);
+        if (!decoded.success) {
+            RP_CORE_ERROR("Failed to decode cubemap face: {}", cubemapPaths[i]);
+            asset.status = AssetStatus::FAILED;
+            return false;
+        }
+        if (i == 0) {
+            width = decoded.width;
+            height = decoded.height;
+        }
+        decodedFaces.push_back(std::move(decoded));
+    }
+
+    TextureSpecification texSpec{};
+    texSpec.type = TextureType::TEXTURECUBE;
+    texSpec.width = width;
+    texSpec.height = height;
+    texSpec.format = TextureFormat::RGBA8;
+    texSpec.mipLevels = 0;
+
+    std::vector<std::span<const uint8_t>> layerData;
+    layerData.reserve(decodedFaces.size());
+    for (const auto &face : decodedFaces) {
+        layerData.emplace_back(face.pixels);
+    }
+
+    auto tex = std::make_unique<Texture>(texSpec, layerData);
 
     asset.status = AssetStatus::LOADED;
     asset.setAssetVariant(std::move(tex));

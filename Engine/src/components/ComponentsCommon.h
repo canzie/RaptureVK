@@ -14,10 +14,23 @@ struct InstanceData {
 
 // Light types for the LightComponent
 enum class LightType {
-    Point = 0,
-    Directional = 1,
-    Spot = 2
+    POINT = 0,
+    DIRECTIONAL = 1,
+    SPOT = 2
 };
+
+inline const char *lightTypeToString(LightType type)
+{
+    switch (type) {
+    case LightType::POINT:
+        return "Point";
+    case LightType::DIRECTIONAL:
+        return "Directional";
+    case LightType::SPOT:
+        return "Spot";
+    }
+    return "Point";
+}
 
 // Light data structure for shader
 struct LightData {

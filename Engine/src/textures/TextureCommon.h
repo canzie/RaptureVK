@@ -39,6 +39,13 @@ enum class TextureFormat : uint16_t {
     R16F,       // VK_FORMAT_R16_SFLOAT
     R8UI,       // VK_FORMAT_R8_UINT
     R8U,        // VK_FORMAT_R8_SINT
+    BC1_RGB,    // VK_FORMAT_BC1_RGB_UNORM_BLOCK or _SRGB_BLOCK, 4x4 block, 8 bytes/block, opaque color
+    BC1_RGBA,   // VK_FORMAT_BC1_RGBA_UNORM_BLOCK or _SRGB_BLOCK, 4x4 block, 8 bytes/block, 1-bit alpha
+    BC3,        // VK_FORMAT_BC3_UNORM_BLOCK or _SRGB_BLOCK, 4x4 block, 16 bytes/block, full alpha
+    BC4,        // VK_FORMAT_BC4_UNORM_BLOCK, 4x4 block, 8 bytes/block, single channel (masks)
+    BC5,        // VK_FORMAT_BC5_UNORM_BLOCK, 4x4 block, 16 bytes/block, two channel (normal maps)
+    BC7,        // VK_FORMAT_BC7_UNORM_BLOCK or _SRGB_BLOCK, 4x4 block, 16 bytes/block, high quality color+alpha
+    BC6H,       // VK_FORMAT_BC6H_UFLOAT_BLOCK, 4x4 block, 16 bytes/block, HDR RGB (no alpha, no sRGB)
     D32F,       // VK_FORMAT_D32_SFLOAT
     D24S8       // VK_FORMAT_D24_UNORM_S8_UINT
 };
@@ -145,6 +152,20 @@ inline VkFormat toVkFormat(TextureFormat format, bool srgb = true)
         return VK_FORMAT_R8_UINT;
     case TextureFormat::R8U:
         return VK_FORMAT_R8_SINT;
+    case TextureFormat::BC1_RGB:
+        return srgb ? VK_FORMAT_BC1_RGB_SRGB_BLOCK : VK_FORMAT_BC1_RGB_UNORM_BLOCK;
+    case TextureFormat::BC1_RGBA:
+        return srgb ? VK_FORMAT_BC1_RGBA_SRGB_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    case TextureFormat::BC3:
+        return srgb ? VK_FORMAT_BC3_SRGB_BLOCK : VK_FORMAT_BC3_UNORM_BLOCK;
+    case TextureFormat::BC4:
+        return VK_FORMAT_BC4_UNORM_BLOCK; // Single channel, no sRGB variant
+    case TextureFormat::BC5:
+        return VK_FORMAT_BC5_UNORM_BLOCK; // Two channel (normal maps), no sRGB variant
+    case TextureFormat::BC7:
+        return srgb ? VK_FORMAT_BC7_SRGB_BLOCK : VK_FORMAT_BC7_UNORM_BLOCK;
+    case TextureFormat::BC6H:
+        return VK_FORMAT_BC6H_UFLOAT_BLOCK; // HDR float data, no sRGB variant
 
     case TextureFormat::D32F:
         return VK_FORMAT_D32_SFLOAT;
@@ -239,6 +260,51 @@ inline bool hasStencilComponent(TextureFormat format)
     }
 }
 
+/**
+ * @brief Check if a texture format is GPU block-compressed (BC1-BC7)
+ * @param format Texture format to check
+ * @return true if the format is block-compressed
+ */
+inline bool isCompressedFormat(TextureFormat format)
+{
+    switch (format) {
+    case TextureFormat::BC1_RGB:
+    case TextureFormat::BC1_RGBA:
+    case TextureFormat::BC3:
+    case TextureFormat::BC4:
+    case TextureFormat::BC5:
+    case TextureFormat::BC7:
+    case TextureFormat::BC6H:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/**
+ * @brief Get bytes per 4x4 block for block-compressed formats
+ * @note Use getBytesPerPixel() for uncompressed formats instead
+ * @param format Block-compressed texture format
+ * @return Number of bytes per 4x4 block
+ */
+inline uint32_t getBytesPerBlock(TextureFormat format)
+{
+    switch (format) {
+    case TextureFormat::BC1_RGB:
+    case TextureFormat::BC1_RGBA:
+    case TextureFormat::BC4:
+        return 8;
+    case TextureFormat::BC3:
+    case TextureFormat::BC5:
+    case TextureFormat::BC7:
+    case TextureFormat::BC6H:
+        return 16;
+    default:
+        RP_CORE_ERROR("Format is not block-compressed!");
+        return 0;
+    }
+}
+
 inline VkImageAspectFlags getImageAspectFlags(TextureFormat format)
 {
     if (isDepthFormat(format)) {
@@ -282,6 +348,15 @@ inline uint32_t getBytesPerPixel(TextureFormat format)
         return 4; // 1 channel × 4 bytes
     case TextureFormat::D24S8:
         return 4; // Packed format
+    case TextureFormat::BC1_RGB:
+    case TextureFormat::BC1_RGBA:
+    case TextureFormat::BC3:
+    case TextureFormat::BC4:
+    case TextureFormat::BC5:
+    case TextureFormat::BC7:
+    case TextureFormat::BC6H:
+        RP_CORE_ERROR("getBytesPerPixel() does not apply to block-compressed formats, use getBytesPerBlock() instead!");
+        return 0;
     default:
         RP_CORE_ERROR("Unsupported format!");
         return 4; // Default fallback

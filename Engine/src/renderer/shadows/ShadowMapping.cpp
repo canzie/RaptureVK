@@ -109,7 +109,7 @@ void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const Transfor
     glm::mat4 lightProj = glm::mat4(1.0f);
 
     // Calculate light direction based on light type
-    if (lightComp.type == LightType::Directional || lightComp.type == LightType::Spot) {
+    if (lightComp.type == LightType::DIRECTIONAL || lightComp.type == LightType::SPOT) {
         // Calculate light direction from rotation
         glm::quat rotationQuat = transformComp.transforms.getRotationQuat();
         lightDirection = glm::normalize(rotationQuat * glm::vec3(0, 0, -1)); // Forward vector
@@ -127,7 +127,7 @@ void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const Transfor
 
     glm::mat4 viewMatrix;
 
-    if (lightComp.type == LightType::Directional) {
+    if (lightComp.type == LightType::DIRECTIONAL) {
         // For directional lights, position the shadow camera to cover the scene properly
         // Use camera position as scene center for better shadow coverage
         glm::vec3 sceneCenter = cameraPosition;
@@ -162,7 +162,7 @@ void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const Transfor
         // Perspective projection for spot/point light
         float aspect = 1.0f; // Shadow map is square
 
-        if (lightComp.type == LightType::Spot) {
+        if (lightComp.type == LightType::SPOT) {
             // For spotlights, use more aggressive near plane scaling
             float nearPlane = glm::max(0.1f, lightComp.range * 0.001f); // Much closer near plane
             float farPlane = lightComp.range * 1.2f;                    // Extend beyond light range for better coverage

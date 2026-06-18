@@ -2,14 +2,17 @@
 #define RAPTURE__PROPERTIES_PANEL_H
 
 #include <amethyst/Amethyst.h>
-#include <components/table.h>
 #include <components/ui_scope.h>
 
 #include "layers/panels/Panel.h"
+#include "layers/panels/component_editors/ComponentEditorBase.h"
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
-#include <functional>
+
+#include <concepts>
 #include <memory>
+#include <typeindex>
+#include <unordered_map>
 #include <vector>
 
 class PropertiesPanel : public Panel {
@@ -25,58 +28,55 @@ class PropertiesPanel : public Panel {
     void onUpdate(float dt) override;
 
   private:
-    /**
-     * @brief Pairs a collapsible header with the component it represents.
-     *
-     * A section is only shown when the selected entity owns the matching
-     * component. The body height is used to stack visible sections.
-     */
-    struct ComponentSection {
-        Amethyst::CollapsibleHeader *header = nullptr;
-        float bodyHeight = 0.0f;
-        std::function<bool(const Rapture::Entity &)> matches;
-    };
-
     void setupSearchBar();
     void setupPlaceholder();
     void setupEntityView();
 
-    void setupTransformHeader(Amethyst::ScrollingFrameScope &sf);
-    void setupMeshHeader(Amethyst::ScrollingFrameScope &sf);
-    void setupMaterialHeader(Amethyst::ScrollingFrameScope &sf);
-    void setupLightHeader(Amethyst::ScrollingFrameScope &sf);
-    void setupCameraHeader(Amethyst::ScrollingFrameScope &sf);
-    void setupShadowHeader(Amethyst::ScrollingFrameScope &sf);
-    void setupCascadedShadowHeader(Amethyst::ScrollingFrameScope &sf);
-    void setupSkyboxHeader(Amethyst::ScrollingFrameScope &sf);
-    void setupTerrainHeader(Amethyst::ScrollingFrameScope &sf);
+    /**
+     * @brief Creates the editor for T if its component is present and missing, reuses it if it
+     * already exists, or destroys it if present is false. Active editors are collected for layout.
+     * @tparam T A ComponentEditorBase-derived editor type.
+     * @param present Whether the selected entity has the component this editor edits.
+     */
+    template <std::derived_from<ComponentEditorBase> T>
+    void ensure(bool present)
+    {
+        std::type_index key(typeid(T));
+        auto it = m_editors.find(key);
+
+        if (present) {
+            if (it == m_editors.end()) {
+                auto editor = std::make_unique<T>();
+                buildSection(*editor);
+                it = m_editors.emplace(key, std::move(editor)).first;
+            }
+            m_active.push_back(it->second.get());
+        } else if (it != m_editors.end()) {
+            if (it->second->header != nullptr) {
+                m_entityView->removeChild(it->second->header);
+            }
+            m_editors.erase(it);
+        }
+    }
 
     /**
-     * @brief Creates a collapsible header, registers it as a section and wires
-     * up relayout on toggle. The body callback fills the expanded content.
-     * @param iconSvg Icon shown next to the title, or empty for none.
+     * @brief Builds an editor's collapsible header under the entity view and fills its body.
      */
-    Amethyst::CollapsibleHeader *beginSection(Amethyst::ScrollingFrameScope &sf, const char *title, const char *iconSvg,
-                                              float bodyHeight, std::function<bool(const Rapture::Entity &)> matches,
-                                              std::function<void(Amethyst::CollapsibleHeaderScope &)> body);
-    void addStubBody(Amethyst::CollapsibleHeaderScope &ch);
+    void buildSection(ComponentEditorBase &editor);
 
+    void refresh();
     void relayout();
     void showEntity(const Rapture::Entity &entity);
     void showPlaceholder();
 
-  private:
     Amethyst::TabBar *m_hostTabBar = nullptr;
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextLabel *m_placeholderText = nullptr;
     Amethyst::ScrollingFrame *m_entityView = nullptr;
     Amethyst::TextInput *m_searchInput = nullptr;
-    Amethyst::CollapsibleHeader *m_transformHeader = nullptr;
-    Amethyst::Table *m_transformTable = nullptr;
-    Amethyst::DragFloat *m_transformDrags[3][3] = {};
-    double m_transformValues[3][3] = {};
 
-    std::vector<ComponentSection> m_sections;
+    std::unordered_map<std::type_index, std::unique_ptr<ComponentEditorBase>> m_editors;
+    std::vector<ComponentEditorBase *> m_active;
 
     std::shared_ptr<Rapture::Scene> m_scene;
     Rapture::Entity m_selectedEntity;

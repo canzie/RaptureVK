@@ -329,7 +329,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 auto &shadowComp = lightView.get<ShadowComponent>(entity);
 
                 bool shouldUpdateShadow =
-                    shadowComp.needsUpdate(lightComp, transformComp) || lightComp.type == LightType::Directional;
+                    shadowComp.needsUpdate(lightComp, transformComp) || lightComp.type == LightType::DIRECTIONAL;
 
                 if (shadowComp.shadowMap && shouldUpdateShadow) {
                     auto shadowBuffer = shadowComp.shadowMap->recordSecondary(activeScene, m_currentFrame);
@@ -347,7 +347,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
                 auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
 
                 bool shouldUpdateShadow =
-                    shadowComp.needsUpdate(lightComp, transformComp) || lightComp.type == LightType::Directional;
+                    shadowComp.needsUpdate(lightComp, transformComp) || lightComp.type == LightType::DIRECTIONAL;
 
                 if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
                     auto shadowBuffer = shadowComp.cascadedShadowMap->recordSecondary(activeScene, m_currentFrame, terrain);

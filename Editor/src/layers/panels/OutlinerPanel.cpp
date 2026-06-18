@@ -53,7 +53,10 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
                 sf.treeView(
                     {
                         .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                        .treeView = {.showColumnSeparators = false, .showHeader = true},
+                        .treeView = {.cellPadding = {0},
+                                     .showColumnSeparators = false,
+                                     .disclosureTriangleSize = 24.0f,
+                                     .showHeader = true},
                     },
                     [this](Amethyst::TreeViewScope &tv) {
                         m_treeView = &tv.component;
@@ -128,7 +131,7 @@ void OutlinerPanel::buildEntityTree(Rapture::Entity entity, Amethyst::TreeRowSco
         s.textButton(
             {
                 .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f), .zIndex = 2},
-                .style = {.backgroundTransparency = 1.0f},
+                .style = {.backgroundTransparency = 1.0f, .borderTransparency = 1.0},
                 .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
                 .label = entityName,
             },

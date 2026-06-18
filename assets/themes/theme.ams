@@ -4,7 +4,6 @@ ui-object {
     background-color: #282828;
     background-transparency: 0.0;
     border-color: #1a1a1a;
-    border-pixel-size: 1px;
     corner-radius: 4px;
     font-family: "default";
     font-size: 13px;
@@ -112,7 +111,7 @@ tab-bar {
 }
 
 collapsible-header#header {
-    background-color: #404047;
+    background-color: #383838;
     indicator-size: 24px;
 }
 
@@ -127,9 +126,19 @@ text-button.primary {
 }
 
 tab-bar.panel-tab-bar {
-    background-color: #181818;
+    background-color: #303030;
     tab-color: #3f3f3f;
     tab-active-color: #303030;
     tab-hovered-color: #303030;
     tab-pressed-color: #303030;
+}
+
+.property-field {
+    font-size: 12px;
+    label-color: #ffffff9e;
+    text-color: #ffffff9e;
+    background-color: #181818;
+    corner-radius: 2px;
+    slider-color: #3d3d3d;
+    thumb-color: #4772b3;
 }

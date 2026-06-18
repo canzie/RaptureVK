@@ -23,12 +23,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Editor Layout Design.md",
+                "file": "Editor Component Fields.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Editor Layout Design"
+              "title": "Editor Component Fields"
             }
           }
         ],
@@ -196,8 +196,8 @@
   },
   "active": "af05d3e544519b29",
   "lastOpenFiles": [
-    "The Rapture Editor.md",
     "Editor Layout Design.md",
+    "The Rapture Editor.md",
     "Editor Layout Design.md.tmp.3259.2d61ac9f9b47",
     "Pasted image 20260517113657.png",
     "SceneRenderData.md",

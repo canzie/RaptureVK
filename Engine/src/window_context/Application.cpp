@@ -40,6 +40,7 @@ Application::Application(int width, int height, const char *title) : m_running(t
         auto vendorQueue = vc.getVendorQueue();
 
         CommandPoolConfig config = {};
+        config.isVendorQueue = true;
         config.queueFamilyIndex = vc.getGraphicsQueueIndex();
         config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Pool reset handles this now
         auto &cmdPoolMgr = *vc.getRenderContext().commandPoolManager;

@@ -1,18 +1,57 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <optional>
 #include <regex>
+#include <span>
 #include <string>
+#include <vector>
 
 #include "logging/Log.h"
 
 #include <toml++/toml.hpp>
 
 namespace Rapture {
+
+struct DecodedImageData {
+    std::vector<uint8_t> pixels;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    bool success = false;
+
+    DecodedImageData() = default;
+    DecodedImageData(const DecodedImageData &) = delete;
+    DecodedImageData &operator=(const DecodedImageData &) = delete;
+    DecodedImageData(DecodedImageData &&) noexcept = default;
+    DecodedImageData &operator=(DecodedImageData &&) noexcept = default;
+};
+
+/**
+ * @brief Read width/height from an image file header without decoding pixel data
+ * @param path Path to the image file
+ * @param width Output image width
+ * @param height Output image height
+ * @return true if the header was read successfully
+ */
+bool getImageDimensions(const std::filesystem::path &path, uint32_t &width, uint32_t &height);
+
+/**
+ * @brief Decode an image file from disk into raw RGBA8 pixel data
+ * @param path Path to the image file
+ * @return Decoded pixel data; success=false if decoding failed
+ */
+DecodedImageData decodeImageFile(const std::filesystem::path &path);
+
+/**
+ * @brief Decode an image already loaded into memory into raw RGBA8 pixel data
+ * @param data Encoded image bytes (e.g. a PNG/JPG file read into memory)
+ * @return Decoded pixel data; success=false if decoding failed
+ */
+DecodedImageData decodeImageMemory(std::span<const uint8_t> data);
 
 // Helper function to find related shader file paths
 inline std::optional<std::filesystem::path> getRelatedShaderPath(const std::filesystem::path &basePath,

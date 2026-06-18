@@ -7,7 +7,6 @@
 #include <atomic>
 #include <memory>
 #include <span>
-#include <string>
 #include <vector>
 #include <vk_mem_alloc.h>
 
@@ -30,19 +29,19 @@ class Sampler {
 class Texture {
   public:
     /**
-     * @brief Create texture from specification only (no file loading)
+     * @brief Create texture from specification only (no pixel data)
      */
     explicit Texture(TextureSpecification spec);
 
     /**
-     * @brief Create texture from file path (synchronous)
+     * @brief Create texture from already-decoded pixel data (synchronous upload)
      */
-    explicit Texture(const std::string &path, TextureSpecification spec = TextureSpecification());
+    explicit Texture(TextureSpecification spec, std::span<const uint8_t> data);
 
     /**
-     * @brief Create cubemap from 6 file paths (synchronous)
+     * @brief Create array/cubemap texture from already-decoded per-layer pixel data (synchronous upload)
      */
-    explicit Texture(const std::vector<std::string> &paths, TextureSpecification spec = TextureSpecification());
+    explicit Texture(TextureSpecification spec, const std::vector<std::span<const uint8_t>> &layerData);
 
     ~Texture();
 
@@ -50,17 +49,19 @@ class Texture {
     Texture &operator=(const Texture &) = delete;
 
     /**
-     * @brief Load texture asynchronously via job system, optionally decrements counter when done
+     * @brief Create an image/view immediately, with upload deferred to a later uploadDataAsync() call
      */
-    static std::unique_ptr<Texture> loadAsync(const std::string &path, TextureSpecification spec = TextureSpecification(),
-                                              Counter *completionCounter = nullptr);
+    static std::unique_ptr<Texture> createPlaceholder(TextureSpecification spec);
 
     /**
-     * @brief Load cubemap asynchronously via job system, optionally decrements counter when done
+     * @brief Upload already-decoded pixel data via the job system, optionally decrements counter when done
      */
-    static std::unique_ptr<Texture> loadAsync(const std::vector<std::string> &paths,
-                                              TextureSpecification spec = TextureSpecification(),
-                                              Counter *completionCounter = nullptr);
+    void uploadDataAsync(std::vector<uint8_t> data, Counter *completionCounter = nullptr);
+
+    /**
+     * @brief Mark the texture load as failed (e.g. source decode failed upstream)
+     */
+    void markFailed() { m_status.store(TextureStatus::FAILED, std::memory_order_release); }
 
     TextureStatus getStatus() const { return m_status.load(std::memory_order_acquire); }
     bool isReady() const { return getStatus() == TextureStatus::READY; }
@@ -106,12 +107,11 @@ class Texture {
     static std::unique_ptr<Texture> createDefaultWhiteCubemapTexture();
 
   private:
-    Texture(const std::vector<std::string> &paths, TextureSpecification spec, bool deferLoading);
+    Texture(TextureSpecification spec, bool deferLoading);
 
     void createImage();
     void createImageView();
-    void createSpecificationFromImageFile(const std::vector<std::string> &paths);
-    bool validateSpecificationAgainstImageData(int width, int height, int channels);
+    void uploadInitialData(const std::vector<std::span<const uint8_t>> &layerData);
 
     void recordTransitionImageLayout(VkCommandBuffer cmd, VkImageLayout oldLayout, VkImageLayout newLayout);
     void recordCopyBufferToImage(VkCommandBuffer cmd, VkBuffer buffer, uint32_t width, uint32_t height);
@@ -120,11 +120,6 @@ class Texture {
     void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout);
     void copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height);
     void generateMipmaps();
-    void loadImageFromFileSync();
-
-    void startAsyncLoad(Counter *completionCounter);
-
-    std::vector<std::string> m_paths;
 
     std::unique_ptr<Sampler> m_sampler;
     VkImage m_image = VK_NULL_HANDLE;

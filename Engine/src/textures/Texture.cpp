@@ -10,8 +10,6 @@
 #include "window_context/Application.h"
 #include "window_context/vulkan_context/TimelineSemaphore.h"
 
-#include "stb_image.h"
-
 #include <cstring>
 #include <memory>
 
@@ -117,27 +115,29 @@ Texture::Texture(TextureSpecification spec) : m_spec(spec)
     m_status.store(TextureStatus::READY, std::memory_order_release);
 }
 
-Texture::Texture(const std::string &path, TextureSpecification spec) : m_paths({path}), m_spec(spec)
+Texture::Texture(TextureSpecification spec, std::span<const uint8_t> data)
+    : Texture(spec, std::vector<std::span<const uint8_t>>{data})
 {
-    createSpecificationFromImageFile(m_paths);
+}
+
+Texture::Texture(TextureSpecification spec, const std::vector<std::span<const uint8_t>> &layerData) : m_spec(spec)
+{
+    if (m_spec.mipLevels == 0) {
+        m_spec.mipLevels = calculateMaxMipLevels(m_spec.width, m_spec.height);
+    }
+
     m_sampler = std::make_unique<Sampler>(m_spec);
     createImage();
     createImageView();
-    loadImageFromFileSync();
+    uploadInitialData(layerData);
 }
 
-Texture::Texture(const std::vector<std::string> &paths, TextureSpecification spec) : m_paths(paths), m_spec(spec)
+Texture::Texture(TextureSpecification spec, bool) : m_spec(spec)
 {
-    createSpecificationFromImageFile(m_paths);
-    m_sampler = std::make_unique<Sampler>(m_spec);
-    createImage();
-    createImageView();
-    loadImageFromFileSync();
-}
+    if (m_spec.mipLevels == 0) {
+        m_spec.mipLevels = calculateMaxMipLevels(m_spec.width, m_spec.height);
+    }
 
-Texture::Texture(const std::vector<std::string> &paths, TextureSpecification spec, bool) : m_paths(paths), m_spec(spec)
-{
-    createSpecificationFromImageFile(m_paths);
     m_sampler = std::make_unique<Sampler>(m_spec);
     createImage();
     createImageView();
@@ -171,84 +171,27 @@ Texture::~Texture()
     }
 }
 
-std::unique_ptr<Texture> Texture::loadAsync(const std::string &path, TextureSpecification spec, Counter *completionCounter)
+std::unique_ptr<Texture> Texture::createPlaceholder(TextureSpecification spec)
 {
-    return loadAsync(std::vector<std::string>{path}, spec, completionCounter);
-}
-
-std::unique_ptr<Texture> Texture::loadAsync(const std::vector<std::string> &paths, TextureSpecification spec,
-                                            Counter *completionCounter)
-{
-    if (paths.size() > 1) {
-        RP_CORE_WARN("Async loading for cubemaps/arrays not supported, falling back to sync");
-        auto texture = std::make_unique<Texture>(paths, spec);
-        if (completionCounter) {
-            completionCounter->decrement();
-        }
-        return texture;
-    }
-
-    auto texture = std::unique_ptr<Texture>(new Texture(paths, spec, true));
-    texture->startAsyncLoad(completionCounter);
+    auto texture = std::unique_ptr<Texture>(new Texture(spec, true));
+    texture->m_status.store(TextureStatus::LOADING, std::memory_order_release);
     return texture;
 }
 
-void Texture::startAsyncLoad(Counter *completionCounter)
+void Texture::uploadDataAsync(std::vector<uint8_t> data, Counter *completionCounter)
 {
-    m_status.store(TextureStatus::LOADING, std::memory_order_release);
+    m_status.store(TextureStatus::UPLOADING, std::memory_order_release);
 
     Texture *texturePtr = this;
-    std::string path = m_paths[0];
-
-    auto ioData = std::make_shared<std::pair<std::vector<uint8_t>, bool>>();
+    auto pixelData = std::make_shared<std::vector<uint8_t>>(std::move(data));
 
     jobs().run(JobDeclaration(
-        [texturePtr, completionCounter, path, ioData](JobContext &jctx) {
-            Counter ioCounter{};
-            ioCounter.increment();
-
-            jobs().requestIo(
-                path,
-                [ioData, &ioCounter](std::vector<uint8_t> &&data, bool success) {
-                    ioData->first = std::move(data);
-                    ioData->second = success;
-                    ioCounter.decrement();
-                },
-                JobPriority::LOW);
-
-            jctx.waitFor(ioCounter, 0);
-
-            if (!ioData->second) {
-                RP_CORE_ERROR("Failed to load texture file: {}", path);
-                texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
-                if (completionCounter) {
-                    completionCounter->decrement();
-                }
-                return;
-            }
-
-            auto &fileData = ioData->first;
-            int width, height, channels;
-            int desiredChannels = 4;
-
-            stbi_uc *pixels = stbi_load_from_memory(fileData.data(), static_cast<int>(fileData.size()), &width, &height, &channels,
-                                                    desiredChannels);
-            if (!pixels) {
-                RP_CORE_ERROR("Failed to decode texture: {}", path);
-                texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
-                if (completionCounter) {
-                    completionCounter->decrement();
-                }
-                return;
-            }
-
-            texturePtr->m_status.store(TextureStatus::UPLOADING, std::memory_order_release);
-
+        [texturePtr, completionCounter, pixelData](JobContext &jctx) {
             auto &app = Application::getInstance();
             VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
             auto transferQueue = app.getVulkanContext().getTransferQueue();
 
-            VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * desiredChannels;
+            VkDeviceSize imageSize = static_cast<VkDeviceSize>(pixelData->size());
 
             VkBuffer stagingBuffer;
             VmaAllocation stagingAllocation;
@@ -264,7 +207,6 @@ void Texture::startAsyncLoad(Counter *completionCounter)
 
             if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
                 RP_CORE_ERROR("Failed to create staging buffer for texture!");
-                stbi_image_free(pixels);
                 texturePtr->m_status.store(TextureStatus::FAILED, std::memory_order_release);
                 if (completionCounter) {
                     completionCounter->decrement();
@@ -272,12 +214,10 @@ void Texture::startAsyncLoad(Counter *completionCounter)
                 return;
             }
 
-            void *data;
-            vmaMapMemory(allocator, stagingAllocation, &data);
-            memcpy(data, pixels, static_cast<size_t>(imageSize));
+            void *mapped;
+            vmaMapMemory(allocator, stagingAllocation, &mapped);
+            memcpy(mapped, pixelData->data(), static_cast<size_t>(imageSize));
             vmaUnmapMemory(allocator, stagingAllocation);
-
-            stbi_image_free(pixels);
 
             size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
 
@@ -295,8 +235,8 @@ void Texture::startAsyncLoad(Counter *completionCounter)
 
             texturePtr->recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_UNDEFINED,
                                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            texturePtr->recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), stagingBuffer, static_cast<uint32_t>(width),
-                                                static_cast<uint32_t>(height));
+            texturePtr->recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), stagingBuffer, texturePtr->m_spec.width,
+                                                texturePtr->m_spec.height);
 
             if (texturePtr->m_spec.mipLevels > 1) {
                 texturePtr->recordGenerateMipmaps(commandBuffer->getCommandBufferVk());
@@ -323,120 +263,22 @@ void Texture::startAsyncLoad(Counter *completionCounter)
                 completionCounter->decrement();
             }
         },
-        JobPriority::NORMAL, QueueAffinity::ANY, nullptr, "Texture async load"));
+        JobPriority::NORMAL, QueueAffinity::ANY, nullptr, "Texture async upload"));
 }
 
-void Texture::createSpecificationFromImageFile(const std::vector<std::string> &paths)
+void Texture::uploadInitialData(const std::vector<std::span<const uint8_t>> &layerData)
 {
-    if (paths.empty()) {
-        RP_CORE_ERROR("Cannot create texture specification from empty path list.");
-        return;
-    }
-
-    int width, height, channels;
-
-    if (!stbi_info(paths[0].c_str(), &width, &height, &channels)) {
-        RP_CORE_ERROR("Failed to get image info for: {}", paths[0]);
-        return;
-    }
-
-    m_spec.width = static_cast<uint32_t>(width);
-    m_spec.height = static_cast<uint32_t>(height);
-    m_spec.depth = 1;
-    m_spec.format = TextureFormat::RGBA8;
-
-    if (paths.size() == 6) {
-        m_spec.type = TextureType::TEXTURECUBE;
-        // m_spec.format = TextureFormat::RGBA16F;
-    } else if (paths.size() > 1) {
-        m_spec.type = TextureType::TEXTURE2D_ARRAY;
-        m_spec.depth = paths.size();
-    } else {
-        m_spec.type = TextureType::TEXTURE2D;
-    }
-
-    // Auto-calculate mip levels if mipLevels is 0
-    if (m_spec.mipLevels == 0) {
-        m_spec.mipLevels = calculateMaxMipLevels(m_spec.width, m_spec.height);
-    }
-}
-
-bool Texture::validateSpecificationAgainstImageData(int width, int height, int channels)
-{
-    bool valid = true;
-
-    if (m_spec.width != static_cast<uint32_t>(width)) {
-        RP_CORE_ERROR("Width mismatch: spec={}, image={}", m_spec.width, width);
-        valid = false;
-    }
-
-    if (m_spec.height != static_cast<uint32_t>(height)) {
-        RP_CORE_ERROR("Height mismatch: spec={}, image={}", m_spec.height, height);
-        valid = false;
-    }
-
-    // Check if format matches channels (basic validation)
-    uint32_t expectedChannels = 0;
-    switch (m_spec.format) {
-    case TextureFormat::RGB8:
-    case TextureFormat::RGB16F:
-    case TextureFormat::RGB32F:
-        expectedChannels = 3;
-        break;
-    case TextureFormat::RGBA8:
-    case TextureFormat::RGBA16F:
-    case TextureFormat::RGBA32F:
-        expectedChannels = 4;
-        break;
-    default:
-        expectedChannels = channels; // Accept whatever for other formats
-        break;
-    }
-
-    if (expectedChannels != 0 && expectedChannels != static_cast<uint32_t>(channels)) {
-        RP_CORE_WARN("Channel count mismatch: expected={}, image={}", expectedChannels, channels);
-        // This is a warning, not an error, as we can convert
-    }
-
-    return valid;
-}
-
-void Texture::loadImageFromFileSync()
-{
-    if (m_paths.empty()) {
-        RP_CORE_WARN("No paths provided to load image from file.");
+    if (layerData.empty()) {
+        RP_CORE_WARN("No data provided to upload to texture.");
+        m_status.store(TextureStatus::FAILED, std::memory_order_release);
         return;
     }
 
     auto &app = Application::getInstance();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
 
-    int width, height, channels;
-    int desiredChannels = 4;
-    VkDeviceSize layerSize = 0;
-
-    std::vector<stbi_uc *> pixelData;
-    pixelData.reserve(m_paths.size());
-
-    for (const auto &path : m_paths) {
-        stbi_uc *pixels = stbi_load(path.c_str(), &width, &height, &channels, desiredChannels);
-        if (!pixels) {
-            RP_CORE_ERROR("Failed to load texture image: {}", path);
-            for (stbi_uc *p : pixelData) {
-                stbi_image_free(p);
-            }
-            m_status.store(TextureStatus::FAILED, std::memory_order_release);
-            return;
-        }
-
-        if (pixelData.empty()) {
-            validateSpecificationAgainstImageData(width, height, desiredChannels);
-            layerSize = static_cast<VkDeviceSize>(width) * height * desiredChannels;
-        }
-        pixelData.push_back(pixels);
-    }
-
-    VkDeviceSize imageSize = layerSize * m_paths.size();
+    VkDeviceSize layerSize = layerData[0].size_bytes();
+    VkDeviceSize imageSize = layerSize * layerData.size();
 
     VkBuffer stagingBuffer;
     VmaAllocation stagingAllocation;
@@ -451,7 +293,6 @@ void Texture::loadImageFromFileSync()
     allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 
     if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
-        for (stbi_uc *p : pixelData) stbi_image_free(p);
         RP_CORE_ERROR("Failed to create staging buffer for texture!");
         m_status.store(TextureStatus::FAILED, std::memory_order_release);
         return;
@@ -459,15 +300,13 @@ void Texture::loadImageFromFileSync()
 
     void *data;
     vmaMapMemory(allocator, stagingAllocation, &data);
-    for (size_t i = 0; i < pixelData.size(); ++i) {
-        memcpy(static_cast<char *>(data) + (i * layerSize), pixelData[i], static_cast<size_t>(layerSize));
+    for (size_t i = 0; i < layerData.size(); ++i) {
+        memcpy(static_cast<char *>(data) + (i * layerSize), layerData[i].data(), layerData[i].size_bytes());
     }
     vmaUnmapMemory(allocator, stagingAllocation);
 
-    for (stbi_uc *p : pixelData) stbi_image_free(p);
-
     transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(stagingBuffer, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+    copyBufferToImage(stagingBuffer, m_spec.width, m_spec.height);
 
     if (m_spec.mipLevels > 1) {
         generateMipmaps();

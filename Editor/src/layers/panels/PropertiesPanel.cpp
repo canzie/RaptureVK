@@ -1,23 +1,26 @@
 #include "PropertiesPanel.h"
 #include "Icons.h"
-#include "components/Components.h"
-#include "components/TerrainComponent.h"
 #include "events/GameEvents.h"
+#include "layers/panels/component_editors/ComponentEditors.h"
 #include "layers/panels/components/header_layouts.h"
 #include "layers/panels/components/tab_layouts.h"
+
+#include "components/Components.h"
+#include "components/TerrainComponent.h"
 
 #include <components/common.h>
 #include <components/ui_scope.h>
 
-static constexpr float k_searchBarHeight = 28.0f;
-static constexpr float k_searchBarTopPad = 8.0f;
-static constexpr float k_contentOffset = k_searchBarTopPad + k_searchBarHeight + 8.0f;
+static constexpr float SEARCH_BAR_HEIGHT = 28.0f;
+static constexpr float SEARCH_BAR_TOP_PAD = 8.0f;
+static constexpr float CONTENT_OFFSET = SEARCH_BAR_TOP_PAD + SEARCH_BAR_HEIGHT + 8.0f;
 
-static constexpr float k_headerHeight = 28.0f;
-static constexpr float k_sectionSpacing = 6.0f;
-static constexpr float k_sectionTopPad = 4.0f;
-static constexpr float k_stubBodyHeight = 36.0f;
-static constexpr float k_transformBodyHeight = 96.0f;
+static constexpr float HEADER_HEIGHT = 28.0f;
+static constexpr float SECTION_SPACING = 6.0f;
+static constexpr float SECTION_TOP_PAD = 4.0f;
+
+#define CONTENT_BG_COLOR     Amethyst::Color3::fromHex(0x303030)
+#define SECTION_HEADER_COLOR Amethyst::Color3::fromHex(0x2B2B2B)
 
 PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
 {
@@ -59,8 +62,8 @@ void PropertiesPanel::setupSearchBar()
         {
             .base =
                 {
-                    .position = Amethyst::UDim2(0.02f, 0.0f, 0.0f, k_searchBarTopPad),
-                    .size = Amethyst::UDim2(0.96f, 0.0f, 0.0f, k_searchBarHeight),
+                    .position = Amethyst::UDim2(0.02f, 0.0f, 0.0f, SEARCH_BAR_TOP_PAD),
+                    .size = Amethyst::UDim2(0.96f, 0.0f, 0.0f, SEARCH_BAR_HEIGHT),
                 },
             .style = {.backgroundTransparency = 1.0f},
         },
@@ -158,8 +161,8 @@ void PropertiesPanel::setupPlaceholder()
         {
             .base =
                 {
-                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, k_contentOffset),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -k_contentOffset),
+                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, CONTENT_OFFSET),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -CONTENT_OFFSET),
                 },
             .style = {.backgroundTransparency = 1.0f},
             .text =
@@ -180,10 +183,11 @@ void PropertiesPanel::setupEntityView()
             .base =
                 {
                     .clipsDescendants = true,
-                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, k_contentOffset),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -k_contentOffset),
+                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, CONTENT_OFFSET),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -CONTENT_OFFSET),
                     .visible = false,
                 },
+            .style = {.backgroundColor = CONTENT_BG_COLOR},
             .scroll =
                 {
                     .scrollAxis = Amethyst::ScrollAxis::Y,
@@ -191,240 +195,54 @@ void PropertiesPanel::setupEntityView()
                     .canvasSize = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, 0.0f)),
                 },
         },
-        [this](Amethyst::ScrollingFrameScope &sf) {
-            m_entityView = &sf.component;
-            setupTransformHeader(sf);
-            setupMeshHeader(sf);
-            setupMaterialHeader(sf);
-            setupLightHeader(sf);
-            setupCameraHeader(sf);
-            setupShadowHeader(sf);
-            setupCascadedShadowHeader(sf);
-            setupSkyboxHeader(sf);
-            setupTerrainHeader(sf);
-        });
+        [this](Amethyst::ScrollingFrameScope &sf) { m_entityView = &sf.component; });
 }
 
-Amethyst::CollapsibleHeader *PropertiesPanel::beginSection(Amethyst::ScrollingFrameScope &sf, const char *title,
-                                                           const char *iconSvg, float bodyHeight,
-                                                           std::function<bool(const Rapture::Entity &)> matches,
-                                                           std::function<void(Amethyst::CollapsibleHeaderScope &)> body)
+void PropertiesPanel::buildSection(ComponentEditorBase &editor)
 {
-    Amethyst::CollapsibleHeader *header = nullptr;
-    sf.collapsibleHeader(
-        {
-            .base =
-                {
-                    .position = Amethyst::UDim2::fromOffset(0.0f, k_sectionTopPad),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, k_headerHeight + bodyHeight),
-                    .visible = false,
-                },
-            .header =
-                {
-                    .titleStyle = {.fontSize = 13.0f},
-                    .headerHeight = k_headerHeight,
-                },
-        },
-        [&](Amethyst::CollapsibleHeaderScope &ch) {
-            header = &ch.component;
-            ch.header(componentHeaderLayout(title, iconSvg));
-            if (body) {
-                body(ch);
-            }
-        });
-
-    header->onToggled = [this](bool) { relayout(); };
-    m_sections.push_back({header, bodyHeight, std::move(matches)});
-    return header;
-}
-
-void PropertiesPanel::addStubBody(Amethyst::CollapsibleHeaderScope &ch)
-{
-    ch.textLabel({
-        .base =
+    Amethyst::UIScope(*m_entityView)
+        .collapsibleHeader(
             {
-                .position = Amethyst::UDim2::fromOffset(4.0f, 4.0f),
-                .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, k_stubBodyHeight),
+                .base =
+                    {
+                        .position = Amethyst::UDim2::fromOffset(0.0f, SECTION_TOP_PAD),
+                        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT + editor.bodyHeight()),
+                    },
+                .style = {.backgroundTransparency = 1.0f},
+                .header =
+                    {
+                        .titleStyle = {.fontSize = 13.0f},
+                        .headerHeight = HEADER_HEIGHT,
+                        .headerColor = SECTION_HEADER_COLOR,
+                    },
             },
-        .style = {.backgroundTransparency = 1.0f},
-        .text =
-            {
-                .fontSize = 12.0f,
-                .textColor = Amethyst::Color4(0.5f, 0.5f, 0.5f, 1.0f),
-                .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                .textYAlignment = Amethyst::TextYAlignment::CENTER,
-            },
-        .label = "Not yet implemented",
-    });
+            [&](Amethyst::CollapsibleHeaderScope &ch) {
+                editor.header = &ch.component;
+                ch.header(componentHeaderLayout(editor.title(), editor.icon()));
+                editor.buildBody(ch);
+            });
+
+    editor.header->onToggled = [this](bool) { relayout(); };
 }
 
-void PropertiesPanel::setupTransformHeader(Amethyst::ScrollingFrameScope &sf)
+void PropertiesPanel::refresh()
 {
-    struct SliderConfig {
-        const char *label;
-        glm::vec3 min;
-        glm::vec3 max;
-        float speed;
-    };
-    static const SliderConfig configs[3] = {
-        {"Translation", glm::vec3(-1000.0f), glm::vec3(1000.0f), 0.1f},
-        {"Rotation", glm::vec3(-360.0f), glm::vec3(360.0f), 0.5f},
-        {"Scale", glm::vec3(-100.0f), glm::vec3(100.0f), 0.01f},
-    };
+    m_active.clear();
 
-    m_transformHeader = beginSection(
-        sf, "Transform", Icons::SVG_TRANSFORM, k_transformBodyHeight,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::TransformComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) {
-            ch.table(
-                {
-                    .base =
-                        {
-                            .position = Amethyst::UDim2::fromOffset(4.0f, 4.0f),
-                            .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 88.0f),
-                        },
-                    .table =
-                        {
-                            .rowHeight = 28.0f,
-                            .cellPadding =
-                                {
-                                    Amethyst::UDim::fromOffset(0.0f),
-                                    Amethyst::UDim::fromOffset(4.0f),
-                                    Amethyst::UDim::fromOffset(0.0f),
-                                    Amethyst::UDim::fromOffset(4.0f),
-                                },
-                            .showColumnSeparators = false,
-                            .showHeader = false,
-                        },
-                },
-                [this](Amethyst::TableScope &t) {
-                    m_transformTable = &t.component;
-                    t.column("", 0.28f, Amethyst::TableColumnSizing::FIXED);
-                    t.column("", 0.72f);
+    if (m_selectedEntity.isValid()) {
+        const Rapture::Entity &e = m_selectedEntity;
+        ensure<TransformEditor>(e.hasComponent<Rapture::TransformComponent>());
+        ensure<MeshEditor>(e.hasComponent<Rapture::MeshComponent>());
+        ensure<MaterialEditor>(e.hasComponent<Rapture::MaterialComponent>());
+        ensure<LightEditor>(e.hasComponent<Rapture::LightComponent>());
+        ensure<CameraEditor>(e.hasComponent<Rapture::CameraComponent>());
+        ensure<ShadowEditor>(e.hasComponent<Rapture::ShadowComponent>());
+        ensure<CascadedShadowEditor>(e.hasComponent<Rapture::CascadedShadowComponent>());
+        ensure<SkyboxEditor>(e.hasComponent<Rapture::SkyboxComponent>());
+        ensure<TerrainEditor>(e.hasComponent<Rapture::TerrainComponent>());
+    }
 
-                    for (int row = 0; row < 3; ++row) {
-                        t.row([this, row](Amethyst::TableRowScope &tr) {
-                            tr.cell([row](Amethyst::UIScope &cell) {
-                                cell.textLabel({
-                                    .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                                    .style = {.backgroundTransparency = 1.0f},
-                                    .text =
-                                        {
-                                            .fontSize = 12.0f,
-                                            .textColor = Amethyst::Color4(0.7f, 0.7f, 0.7f, 1.0f),
-                                            .textXAlignment = Amethyst::TextXAlignment::CENTER,
-                                            .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                                        },
-                                    .label = configs[row].label,
-                                });
-                            });
-                            tr.cell([this, row](Amethyst::UIScope &cell) {
-                                for (int axis = 0; axis < 3; ++axis) {
-                                    cell.dragFloat(
-                                        {
-                                            .base =
-                                                {
-                                                    .position = Amethyst::UDim2(axis / 3.0f, axis == 0 ? 0.0f : 2.0f, 0.0f, 0.0f),
-                                                    .size = Amethyst::UDim2(1.0f / 3.0f, -2.0f, 1.0f, 0.0f),
-                                                },
-                                            .speed = configs[row].speed,
-                                            .min = configs[row].min[axis],
-                                            .max = configs[row].max[axis],
-                                            .value = &m_transformValues[row][axis],
-                                        },
-                                        [this, row, axis](Amethyst::DragFloatScope &d) {
-                                            m_transformDrags[row][axis] = &d.component;
-                                            d.component.onValueChanged = [this, row](double) {
-                                                if (!m_selectedEntity.isValid()) {
-                                                    return;
-                                                }
-                                                if (!m_selectedEntity.hasComponent<Rapture::TransformComponent>()) {
-                                                    return;
-                                                }
-                                                auto &tc = m_selectedEntity.getComponent<Rapture::TransformComponent>();
-                                                glm::vec3 v(static_cast<float>(m_transformValues[row][0]),
-                                                            static_cast<float>(m_transformValues[row][1]),
-                                                            static_cast<float>(m_transformValues[row][2]));
-                                                if (row == 0) {
-                                                    tc.transforms.setTranslation(v);
-                                                } else if (row == 1) {
-                                                    tc.transforms.setRotation(v);
-                                                } else {
-                                                    tc.transforms.setScale(v);
-                                                }
-                                                m_selectedEntity.markDirty();
-                                            };
-                                        });
-                                }
-                            });
-                        });
-                    }
-                });
-        });
-}
-
-void PropertiesPanel::setupMeshHeader(Amethyst::ScrollingFrameScope &sf)
-{
-    beginSection(
-        sf, "Mesh", Icons::SVG_MESH, k_stubBodyHeight + 8.0f,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::MeshComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
-}
-
-void PropertiesPanel::setupMaterialHeader(Amethyst::ScrollingFrameScope &sf)
-{
-    beginSection(
-        sf, "Material", Icons::SVG_MATERIAL, k_stubBodyHeight + 8.0f,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::MaterialComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
-}
-
-void PropertiesPanel::setupLightHeader(Amethyst::ScrollingFrameScope &sf)
-{
-    beginSection(
-        sf, "Light", Icons::SVG_LIGHT, k_stubBodyHeight + 8.0f,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::LightComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
-}
-
-void PropertiesPanel::setupCameraHeader(Amethyst::ScrollingFrameScope &sf)
-{
-    beginSection(
-        sf, "Camera", Icons::SVG_CAMERA, k_stubBodyHeight + 8.0f,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::CameraComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
-}
-
-void PropertiesPanel::setupShadowHeader(Amethyst::ScrollingFrameScope &sf)
-{
-    beginSection(
-        sf, "Shadow", "", k_stubBodyHeight + 8.0f,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::ShadowComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
-}
-
-void PropertiesPanel::setupCascadedShadowHeader(Amethyst::ScrollingFrameScope &sf)
-{
-    beginSection(
-        sf, "Cascaded Shadow", "", k_stubBodyHeight + 8.0f,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::CascadedShadowComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
-}
-
-void PropertiesPanel::setupSkyboxHeader(Amethyst::ScrollingFrameScope &sf)
-{
-    beginSection(
-        sf, "Skybox", "", k_stubBodyHeight + 8.0f,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::SkyboxComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
-}
-
-void PropertiesPanel::setupTerrainHeader(Amethyst::ScrollingFrameScope &sf)
-{
-    beginSection(
-        sf, "Terrain", "", k_stubBodyHeight + 8.0f,
-        [](const Rapture::Entity &e) { return e.hasComponent<Rapture::TerrainComponent>(); },
-        [this](Amethyst::CollapsibleHeaderScope &ch) { addStubBody(ch); });
+    relayout();
 }
 
 void PropertiesPanel::relayout()
@@ -433,17 +251,11 @@ void PropertiesPanel::relayout()
         return;
     }
 
-    float y = k_sectionTopPad;
-    for (auto &section : m_sections) {
-        bool visible = m_selectedEntity.isValid() && section.matches(m_selectedEntity);
-        section.header->setBaseProperties({
-            .position = Amethyst::UDim2::fromOffset(0.0f, y),
-            .visible = visible,
-        });
-        if (visible) {
-            bool expanded = static_cast<bool>(section.header->getCollapsibleHeaderProperties().expanded);
-            y += k_headerHeight + (expanded ? section.bodyHeight : 0.0f) + k_sectionSpacing;
-        }
+    float y = SECTION_TOP_PAD;
+    for (auto *editor : m_active) {
+        editor->header->setBaseProperties({.position = Amethyst::UDim2::fromOffset(0.0f, y)});
+        bool expanded = static_cast<bool>(editor->header->getCollapsibleHeaderProperties().expanded);
+        y += HEADER_HEIGHT + (expanded ? editor->bodyHeight() : 0.0f) + SECTION_SPACING;
     }
 
     m_entityView->setScrollingFrameProperties({.canvasSize = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, y))});
@@ -460,26 +272,13 @@ void PropertiesPanel::setScene(std::shared_ptr<Rapture::Scene> scene)
 
 void PropertiesPanel::onUpdate(float dt)
 {
+    (void)dt;
     if (!m_selectedEntity.isValid()) {
         return;
     }
-    if (!m_selectedEntity.hasComponent<Rapture::TransformComponent>()) {
-        return;
+    for (auto *editor : m_active) {
+        editor->sync(m_selectedEntity);
     }
-
-    const auto &transform = m_selectedEntity.getComponent<Rapture::TransformComponent>();
-    auto t = transform.translation();
-    auto r = transform.rotation();
-    auto sc = transform.scale();
-    m_transformValues[0][0] = t.x;
-    m_transformValues[0][1] = t.y;
-    m_transformValues[0][2] = t.z;
-    m_transformValues[1][0] = r.x;
-    m_transformValues[1][1] = r.y;
-    m_transformValues[1][2] = r.z;
-    m_transformValues[2][0] = sc.x;
-    m_transformValues[2][1] = sc.y;
-    m_transformValues[2][2] = sc.z;
 }
 
 void PropertiesPanel::showEntity(const Rapture::Entity &entity)
@@ -487,7 +286,7 @@ void PropertiesPanel::showEntity(const Rapture::Entity &entity)
     m_selectedEntity = entity;
     m_placeholderText->setBaseProperties({.visible = false});
     m_entityView->setBaseProperties({.visible = true});
-    relayout();
+    refresh();
 }
 
 void PropertiesPanel::showPlaceholder()

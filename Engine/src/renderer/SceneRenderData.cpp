@@ -407,13 +407,13 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
         auto &data = partition.getSlotData(i);
 
         glm::vec3 position = transform->translation();
-        if (light->type == LightType::Directional) {
+        if (light->type == LightType::DIRECTIONAL) {
             position = glm::vec3(0.0f);
         }
         data.positionAndType = glm::vec4(position, static_cast<float>(light->type));
 
         glm::vec3 direction = glm::vec3(0.0f, 0.0f, -1.0f);
-        if (light->type == LightType::Directional || light->type == LightType::Spot) {
+        if (light->type == LightType::DIRECTIONAL || light->type == LightType::SPOT) {
             glm::quat rotationQuat = transform->transforms.getRotationQuat();
             direction = glm::normalize(rotationQuat * glm::vec3(0, 0, -1));
         }
@@ -423,7 +423,7 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
 
         float innerCos = 0.0f;
         float outerCos = 0.0f;
-        if (light->type == LightType::Spot) {
+        if (light->type == LightType::SPOT) {
             innerCos = std::cos(light->innerConeAngle);
             outerCos = std::cos(light->outerConeAngle);
         }

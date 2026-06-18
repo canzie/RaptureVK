@@ -8,7 +8,9 @@
 
 // CollapsibleHeader's default disclosure triangle uses indicatorPadding=6, indicatorSize=10, so its
 // content starts at 6 + 10 + 6 = 22px; this mirrors that so icon/label line up with the triangle.
-static constexpr float HEADER_CONTENT_OFFSET = 22.0f;
+#define HEADER_TEXT_COLOR Amethyst::Color4::fromHex(0xe8e8e8ff, true)
+
+static constexpr float HEADER_CONTENT_OFFSET = 30.0f;
 static constexpr float HEADER_ICON_SIZE = 16.0f;
 static constexpr float HEADER_ICON_LABEL_GAP = 6.0f;
 static constexpr float HEADER_MENU_BUTTON_SIZE = 20.0f;
@@ -16,7 +18,7 @@ static constexpr float HEADER_MENU_BUTTON_RIGHT_PAD = 6.0f;
 static constexpr float HEADER_LABEL_RIGHT_RESERVED = HEADER_MENU_BUTTON_RIGHT_PAD + HEADER_MENU_BUTTON_SIZE + 4.0f;
 
 std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_view label, std::string_view iconSvg,
-                                                                   std::function<void()> onMenuClicked)
+                                                                  std::function<void()> onMenuClicked)
 {
     return [label = std::string(label), iconSvg = std::string(iconSvg), onMenuClicked](Amethyst::FrameScope &scope) {
         float textOffset = HEADER_CONTENT_OFFSET;
@@ -48,7 +50,7 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
             .text =
                 {
                     .fontSize = 13.0f,
-                    .textColor = Amethyst::Color4(1.0f, 1.0f, 1.0f, 1.0f),
+                    .textColor = HEADER_TEXT_COLOR,
                     .textXAlignment = Amethyst::TextXAlignment::LEFT,
                     .textYAlignment = Amethyst::TextYAlignment::CENTER,
                 },
@@ -72,7 +74,7 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
                 auto *b = &btn.component;
                 b->onHoverChanged = [b](bool hovered) {
                     b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
-                                                                       : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
+                                                                      : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
                     b->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.85f : 1.0f});
                 };
                 b->onMouseButton1ClickCb = [label, onMenuClicked]() {
