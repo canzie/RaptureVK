@@ -141,7 +141,7 @@ void AmethystLayer::onAttach()
         .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
         .zIndex = 0,
     });
-    m_backgroundFrame->setBaseStyleProperties({.backgroundColor = Amethyst::Color3::fromHex(0x181818)});
+    m_backgroundFrame->addClass("background-primary");
 
     setupMenuBar(screenSize);
     setupWorkspaces(screenSize);
@@ -305,6 +305,7 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
 {
     Amethyst::UIScope(m_window).menuBar(
         {
+            .classes = {"background-primary"},
             .base =
                 {
                     .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
@@ -312,7 +313,6 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
                 },
             .style =
                 {
-                    .backgroundColor = Amethyst::Color3::fromHex(0x181818),
                     .backgroundTransparency = 0.0f,
                     .borderPixelSize = 0.0f,
                 },
@@ -358,14 +358,11 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
 
     Amethyst::UIScope(m_window).tabBar(
         {
+            .classes = {"background-primary"},
             .base =
                 {
                     .position = Amethyst::UDim2::fromOffset(0.0f, EDITOR_MENU_BAR_HEIGHT),
                     .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(EDITOR_MENU_BAR_HEIGHT + EDITOR_BOTTOM_BAR_HEIGHT)),
-                },
-            .style =
-                {
-                    .backgroundColor = Amethyst::Color3::fromHex(0x181818),
                 },
             .tabBar =
                 {
@@ -379,18 +376,14 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
             auto setupTab = [this, screenSize](Amethyst::FrameScope &f) {
                 Workspace ws;
                 ws.container = &f.component;
-                ws.container->setBaseStyleProperties({.backgroundColor = Amethyst::Color3::fromHex(0x181818)});
+                ws.container->addClass("background-primary");
 
                 ws.hotbar = ws.container->add<Amethyst::Frame>();
                 ws.hotbar->setBaseProperties({
                     .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
                     .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
                 });
-                ws.hotbar->setBaseStyleProperties({
-                    .backgroundColor = Amethyst::Color3::fromHex(0x303030),
-                    .backgroundTransparency = 0.0f,
-                    .borderPixelSize = 0.0f,
-                });
+                ws.hotbar->addClass("background-tertiary");
 
                 ws.dockingLayer = ws.container->add<Amethyst::DockingLayer>();
                 ws.dockingLayer->setDisplayOrder(1);

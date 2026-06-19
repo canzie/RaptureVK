@@ -23,14 +23,14 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_root->name = "Viewport";
-    m_root->addClass("panel");
+    m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
 
     Amethyst::UIScope(*m_root)
         .frame(
             {
+                .classes = {"background-tertiary"},
                 .base = {.size = Amethyst::UDim2::fromScale(1.0f, 0.05f)},
-                .style = {.backgroundColor = Amethyst::Color3(0.2f)},
             },
             [this](Amethyst::FrameScope &f) {
                 m_header = &f.component;

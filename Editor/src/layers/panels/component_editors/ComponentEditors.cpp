@@ -13,10 +13,10 @@
 #include <vector>
 
 static constexpr float ROW_HEIGHT = 32.0f;
-static constexpr float BODY_PAD = 6.0f;
 static constexpr float LABEL_FRAC = 0.4f;
 static constexpr float LABEL_PAD = 12.0f;
 static constexpr float CONTROL_VPAD = 4.0f;
+static constexpr float CONTROL_HPAD = 8.0f;
 
 static float s_tableHeight(int rows)
 {
@@ -41,20 +41,24 @@ static void s_fieldTable(Amethyst::CollapsibleHeaderScope &ch, int rows, const s
         {
             .base =
                 {
-                    .position = Amethyst::UDim2::fromOffset(0.0f, BODY_PAD),
                     .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, s_tableHeight(rows)),
                 },
             .table =
                 {
                     .rowHeight = ROW_HEIGHT,
-                    .showColumnSeparators = true,
-                    .columnSeparatorColor = Amethyst::Color4(1.0f),
+                    .separatorMode = Amethyst::TableSeparatorMode::BOTH,
+                    .separatorColor = Amethyst::Color4::fromHex(0x181818),
                     .showHeader = false,
                     .rowBackgroundColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
                     .rowAlternateColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
                 },
         },
         [&fn](Amethyst::TableScope &t) {
+            t.component.setBaseStyleProperties({
+                .backgroundTransparency = 1.0f,
+                .borderPixelSize = 1.0f,
+                .borderColor = Amethyst::Color3::fromHex(0x181818),
+            });
             t.column("", LABEL_FRAC, Amethyst::TableColumnSizing::FIXED);
             t.column("", 1.0f - LABEL_FRAC);
             fn(t);
@@ -71,10 +75,10 @@ static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&
             for (int axis = 0; axis < 3; ++axis) {
                 cell.dragFloat(
                     {
-                        .classes = {"property-field"},
+                        .classes = {"generic-input-field"},
                         .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                                 .position = Amethyst::UDim2(axis * w, axis == 0 ? 0.0f : 2.0f, 0.5f, 0.0f),
-                                 .size = Amethyst::UDim2(w, -2.0f, 1.0f, -2.0f * CONTROL_VPAD)},
+                                 .position = Amethyst::UDim2(axis * w, axis == 0 ? CONTROL_HPAD : 2.0f, 0.5f, 0.0f),
+                                 .size = Amethyst::UDim2(w, axis == 2 ? -2.0f - CONTROL_HPAD : -2.0f, 1.0f, -2.0f * CONTROL_VPAD)},
                         .speed = speed,
                         .min = min,
                         .max = max,
@@ -100,9 +104,10 @@ static void s_rowSlider(Amethyst::TableScope &t, std::string_view label, float *
         tr.cell([value, min, max, onChanged](Amethyst::UIScope &cell) {
             cell.sliderFloat(
                 {
+                    .classes = {"generic-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, 0.0f, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -2.0f * CONTROL_VPAD)},
+                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
                     .min = min,
                     .max = max,
                     .value = value,
@@ -125,8 +130,9 @@ static void s_rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool 
         tr.cell([value, onChanged](Amethyst::UIScope &cell) {
             cell.checkbox(
                 {
+                    .classes = {"generic-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, 0.0f, 0.5f, 0.0f),
+                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
                 },
                 [value, onChanged](Amethyst::CheckboxScope &c) {
@@ -150,9 +156,10 @@ static Amethyst::Dropdown *s_rowDropdown(Amethyst::TableScope &t, std::string_vi
         tr.cell([&](Amethyst::UIScope &cell) {
             cell.dropdown(
                 {
+                    .classes = {"generic-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, 0.0f, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -2.0f * CONTROL_VPAD)},
+                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
                     .label = std::string(current),
                 },
                 [&](Amethyst::DropdownScope &d) {
@@ -172,7 +179,7 @@ static Amethyst::Dropdown *s_rowDropdown(Amethyst::TableScope &t, std::string_vi
 
 float TransformEditor::bodyHeight() const
 {
-    return s_tableHeight(3) + 2.0f * BODY_PAD;
+    return s_tableHeight(3);
 }
 
 void TransformEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
@@ -224,7 +231,7 @@ void TransformEditor::sync(const Rapture::Entity &entity)
 
 float LightEditor::bodyHeight() const
 {
-    return s_tableHeight(4) + 2.0f * BODY_PAD;
+    return s_tableHeight(4);
 }
 
 void LightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

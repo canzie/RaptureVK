@@ -111,7 +111,7 @@ tab-bar {
 }
 
 collapsible-header#header {
-    background-color: #383838;
+    background-color: #303030;
     indicator-size: 24px;
 }
 
@@ -120,9 +120,30 @@ text-button.primary {
     text-color: #ffffff;
 }
 
-.panel {
+.background-primary {
+    background-color: #181818;
+}
+
+.background-secondary {
     corner-radius: 2px;
+    background-color: #2B2B2B;
+}
+
+.background-tertiary {
     background-color: #303030;
+    header-color: #303030;
+}
+
+.generic-input-field {
+    font-size: 12px;
+    text-color: #ffffff9e;
+    background-color: #0F0F0F;
+    corner-radius: 2px;
+    border-pixel-size: 1px;
+    border-color: #303030;
+    thumb-color: #575757;
+    scrollbar-color: #0F0F0F;
+    scrollbar-thumb-color: #575757;
 }
 
 tab-bar.panel-tab-bar {
@@ -137,8 +158,5 @@ tab-bar.panel-tab-bar {
     font-size: 12px;
     label-color: #ffffff9e;
     text-color: #ffffff9e;
-    background-color: #181818;
     corner-radius: 2px;
-    slider-color: #3d3d3d;
-    thumb-color: #4772b3;
 }

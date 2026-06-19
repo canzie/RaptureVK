@@ -27,7 +27,7 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_root->name = "Outliner";
-    m_root->addClass("panel");
+    m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
 
     Amethyst::UIScope(*m_root)

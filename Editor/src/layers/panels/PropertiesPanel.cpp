@@ -19,15 +19,12 @@ static constexpr float HEADER_HEIGHT = 28.0f;
 static constexpr float SECTION_SPACING = 6.0f;
 static constexpr float SECTION_TOP_PAD = 4.0f;
 
-#define CONTENT_BG_COLOR     Amethyst::Color3::fromHex(0x303030)
-#define SECTION_HEADER_COLOR Amethyst::Color3::fromHex(0x2B2B2B)
-
 PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_root->name = "Properties";
-    m_root->addClass("panel");
+    m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
 
     setupSearchBar();
@@ -70,6 +67,7 @@ void PropertiesPanel::setupSearchBar()
         [this](Amethyst::FrameScope &bar) {
             bar.frame(
                 {
+                    .classes = {"generic-input-field"},
                     .base =
                         {
                             .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
@@ -77,7 +75,6 @@ void PropertiesPanel::setupSearchBar()
                         },
                     .style =
                         {
-                            .backgroundColor = Amethyst::Color3::fromHex(0x181818),
                             .borderColor = Amethyst::Color3(0.4f, 0.4f, 0.4f),
                             .cornerRadius = 4.0f,
                         },
@@ -180,6 +177,7 @@ void PropertiesPanel::setupEntityView()
 {
     Amethyst::UIScope(*m_root).scrollingFrame(
         {
+            .classes = {"background-secondary"},
             .base =
                 {
                     .clipsDescendants = true,
@@ -187,7 +185,6 @@ void PropertiesPanel::setupEntityView()
                     .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -CONTENT_OFFSET),
                     .visible = false,
                 },
-            .style = {.backgroundColor = CONTENT_BG_COLOR},
             .scroll =
                 {
                     .scrollAxis = Amethyst::ScrollAxis::Y,
@@ -203,6 +200,7 @@ void PropertiesPanel::buildSection(ComponentEditorBase &editor)
     Amethyst::UIScope(*m_entityView)
         .collapsibleHeader(
             {
+                .classes = {"background-tertiary"},
                 .base =
                     {
                         .position = Amethyst::UDim2::fromOffset(0.0f, SECTION_TOP_PAD),
@@ -213,7 +211,6 @@ void PropertiesPanel::buildSection(ComponentEditorBase &editor)
                     {
                         .titleStyle = {.fontSize = 13.0f},
                         .headerHeight = HEADER_HEIGHT,
-                        .headerColor = SECTION_HEADER_COLOR,
                     },
             },
             [&](Amethyst::CollapsibleHeaderScope &ch) {
