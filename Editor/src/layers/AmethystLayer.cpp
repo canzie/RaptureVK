@@ -169,7 +169,6 @@ void AmethystLayer::onAttach()
     m_viewportTextureIds.resize(swapChain->getImageCount());
 
     Rapture::CommandPoolConfig config;
-    config.isVendorQueue = true;
     config.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
     config.flags = 0;
     config.threadId = 0;

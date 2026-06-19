@@ -30,7 +30,6 @@ struct CommandPoolConfig {
     uint32_t queueFamilyIndex;
     VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     VkCommandPoolResetFlags resetFlags = 0;
-    bool isVendorQueue = false;
 
     CommandPoolHash hash() const
     {
@@ -39,7 +38,6 @@ struct CommandPoolConfig {
         hash_combine(seed, std::hash<uint32_t>{}(queueFamilyIndex));
         hash_combine(seed, std::hash<VkCommandPoolCreateFlags>{}(flags));
         hash_combine(seed, std::hash<VkCommandPoolResetFlags>{}(resetFlags));
-        hash_combine(seed, std::hash<bool>{}(isVendorQueue));
         return static_cast<CommandPoolHash>(seed);
     }
 };
@@ -57,10 +55,11 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     CommandBuffer *getSecondaryCommandBuffer();
 
     void markPendingSignal(VkSemaphore timelineSemaphore, uint64_t signalValue);
-    void resetIfNeeded();
+    void markResetPending();
 
   private:
     void allocateCommandBuffer(CmdBufferLevel level);
+    void resetIfNeeded();
 
   private:
     VkCommandPoolCreateInfo m_createInfo;
@@ -79,9 +78,7 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     std::unordered_map<VkSemaphore, uint64_t> m_pendingSignals;
     bool m_needsReset = false;
 
-    std::atomic<bool> m_inUse{false};
-    uint32_t m_resetSkipCount = 0;
-    bool m_isVendorPool = false;
+    std::atomic<bool> m_resetPending{false};
 };
 
 class CommandPoolManager {

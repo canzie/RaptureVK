@@ -3,7 +3,6 @@
 #include "CommandBuffer.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
-#include "utils/rp_assert.h"
 #include "window_context/Application.h"
 
 namespace Rapture {
@@ -13,11 +12,9 @@ namespace Rapture {
 // Command buffers reset implicitly on vkBeginCommandBuffer instead.
 #define RAPTURE_SKIP_COMMAND_POOL_RESET 0
 
-static constexpr uint32_t MAX_RESET_SKIPS = 30;
-
 CommandPool::CommandPool(const CommandPoolConfig &config)
     : m_createInfo{}, m_commandPool(VK_NULL_HANDLE), m_hash(config.hash()), m_device(VK_NULL_HANDLE),
-      m_resetFlags(config.resetFlags), m_isVendorPool(config.isVendorQueue)
+      m_resetFlags(config.resetFlags)
 {
 
     auto &app = Application::getInstance();
@@ -49,21 +46,21 @@ CommandPool::~CommandPool()
 
 CommandBuffer *CommandPool::getPrimaryCommandBuffer()
 {
+    resetIfNeeded();
     if (m_primaryCommandBufferIndex >= m_primaryCommandBuffers.size()) {
         allocateCommandBuffer(CmdBufferLevel::PRIMARY);
     }
     m_needsReset = true;
-    m_inUse.store(true && !m_isVendorPool, std::memory_order_release);
     return m_primaryCommandBuffers[m_primaryCommandBufferIndex++].get();
 }
 
 CommandBuffer *CommandPool::getSecondaryCommandBuffer()
 {
+    resetIfNeeded();
     if (m_secondaryCommandBufferIndex >= m_secondaryCommandBuffers.size()) {
         allocateCommandBuffer(CmdBufferLevel::SECONDARY);
     }
     m_needsReset = true;
-    m_inUse.store(true && !m_isVendorPool, std::memory_order_release);
     return m_secondaryCommandBuffers[m_secondaryCommandBufferIndex++].get();
 }
 
@@ -76,25 +73,24 @@ void CommandPool::markPendingSignal(VkSemaphore timelineSemaphore, uint64_t sign
         m_pendingSignals[timelineSemaphore] = signalValue;
     }
     m_needsReset = true;
-    m_inUse.store(false, std::memory_order_release);
+}
+
+void CommandPool::markResetPending()
+{
+    m_resetPending.store(true, std::memory_order_release);
 }
 
 void CommandPool::resetIfNeeded()
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_needsReset) {
-        m_resetSkipCount = 0;
+    if (!m_resetPending.exchange(false, std::memory_order_acquire)) {
         return;
     }
 
-    if (m_inUse.load(std::memory_order_acquire)) {
-        m_resetSkipCount++;
-        RP_ASSERT(m_resetSkipCount < MAX_RESET_SKIPS, "CommandPool stuck in use, skipping reset");
-        RP_CORE_TRACE("reset skips: {}", m_resetSkipCount);
+    if (!m_needsReset) {
         return;
     }
-    m_resetSkipCount = 0;
 
     if (!m_pendingSignals.empty()) {
         std::vector<VkSemaphore> semaphores;
@@ -204,7 +200,7 @@ void CommandPoolManager::beginFrame()
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto &[hash, pools] : m_commandPools) {
         if (m_currentFrameIndex < pools.size()) {
-            pools[m_currentFrameIndex]->resetIfNeeded();
+            pools[m_currentFrameIndex]->markResetPending();
         }
     }
 }
