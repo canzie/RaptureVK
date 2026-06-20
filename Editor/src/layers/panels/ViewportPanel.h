@@ -33,7 +33,6 @@ class ViewportPanel : public Panel {
     void setupHeader(Amethyst::FrameScope &f);
 
   private:
-    Amethyst::TabBar *m_hostTabBar = nullptr;
     Amethyst::Frame *m_root = nullptr;
     Amethyst::ImageLabel *m_viewportImage = nullptr;
     Amethyst::Frame *m_header = nullptr;

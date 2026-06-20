@@ -152,8 +152,18 @@ inline constexpr const char *SVG_BUILD = ICON_SVG("<path d=\"M3 13L13 3\"/>"
                                                   "<path d=\"M3 6.5V3h3.5\"/>");
 
 inline constexpr const char *SVG_SETTINGS = ICON_SVG(
-    "<circle cx=\"8\" cy=\"8\" r=\"2\"/>"
-    "<path d=\"M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4\"/>");
+    "<g fill=\"#ffffff\" stroke=\"none\">"
+    "<path fill-rule=\"evenodd\" d=\"M8 3.6A4.4 4.4 0 108 12.4 4.4 4.4 0 008 3.6Zm0 2.2A2.2 2.2 0 118 10.2 2.2 2.2 0 018 5.8Z\"/>"
+    "<g>"
+    "<rect x=\"7.1\" y=\"0.8\" width=\"1.8\" height=\"2.8\" rx=\"0.4\"/>"
+    "<rect x=\"7.1\" y=\"12.4\" width=\"1.8\" height=\"2.8\" rx=\"0.4\"/>"
+    "<rect x=\"0.8\" y=\"7.1\" width=\"2.8\" height=\"1.8\" rx=\"0.4\"/>"
+    "<rect x=\"12.4\" y=\"7.1\" width=\"2.8\" height=\"1.8\" rx=\"0.4\"/>"
+    "<rect x=\"7.1\" y=\"0.8\" width=\"1.8\" height=\"2.8\" rx=\"0.4\" transform=\"rotate(45 8 8)\"/>"
+    "<rect x=\"7.1\" y=\"0.8\" width=\"1.8\" height=\"2.8\" rx=\"0.4\" transform=\"rotate(-45 8 8)\"/>"
+    "<rect x=\"7.1\" y=\"12.4\" width=\"1.8\" height=\"2.8\" rx=\"0.4\" transform=\"rotate(45 8 8)\"/>"
+    "<rect x=\"7.1\" y=\"12.4\" width=\"1.8\" height=\"2.8\" rx=\"0.4\" transform=\"rotate(-45 8 8)\"/>"
+    "</g></g>");
 
 inline constexpr const char *SVG_PROPERTIES = ICON_SVG("<path d=\"M2 5h12M2 8h12M2 11h12\"/>"
                                                        "<g fill=\"#ffffff\" stroke=\"none\">"

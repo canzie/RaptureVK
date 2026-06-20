@@ -3,7 +3,6 @@
 #include "EditorLayout.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "events/ApplicationEvents.h"
-#include "layers/panels/ContentBrowserPanel.h"
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
@@ -146,11 +145,7 @@ void AmethystLayer::onAttach()
     setupMenuBar(screenSize);
     setupWorkspaces(screenSize);
 
-    m_bottomBar = m_window.add<Amethyst::Frame>();
-    m_bottomBar->setBaseProperties({
-        .position = Amethyst::UDim2(0.0f, 0.0f, 1.0f, -EDITOR_BOTTOM_BAR_HEIGHT),
-        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_BOTTOM_BAR_HEIGHT),
-    });
+    m_bottomBar = std::make_unique<BottomBar>(&m_window);
 
     auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
     if (activeScene != nullptr) {
@@ -411,7 +406,6 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
     Amethyst::TabBar *viewportTabBar = nullptr;
     Amethyst::TabBar *outlinerTabBar = nullptr;
     Amethyst::TabBar *propertiesTabBar = nullptr;
-    Amethyst::TabBar *contentBrowserTabBar = nullptr;
 
     Amethyst::DockScope(*levelEditor.dockingLayer)
         .split(
@@ -422,26 +416,17 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
                     Amethyst::SplitAxis::HORIZONTAL, 0.65f,
                     [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
                     [&](Amethyst::DockScope &b) {
-                        b.split(
-                            Amethyst::SplitAxis::VERTICAL, 0.5f,
-                            [&](Amethyst::DockScope &bl) {
-                                bl.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; });
-                            },
-                            [&](Amethyst::DockScope &br) {
-                                br.panel([&](Amethyst::TabBarScope &tb) { contentBrowserTabBar = &tb.component; });
-                            });
+                        b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; });
                     });
             });
 
     if (viewportTabBar != nullptr) viewportTabBar->addClass("panel-tab-bar");
     if (outlinerTabBar != nullptr) outlinerTabBar->addClass("panel-tab-bar");
     if (propertiesTabBar != nullptr) propertiesTabBar->addClass("panel-tab-bar");
-    if (contentBrowserTabBar != nullptr) contentBrowserTabBar->addClass("panel-tab-bar");
 
     levelEditor.panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar));
     levelEditor.panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar));
     levelEditor.panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar));
-    levelEditor.panels.push_back(std::make_unique<ContentBrowserPanel>(contentBrowserTabBar));
 
     if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
         if (auto *entry = Amethyst::LayoutConfig::instance().get("Editor Dock")) {

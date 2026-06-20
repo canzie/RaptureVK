@@ -3,6 +3,7 @@
 #include "components/Components.h"
 
 #include <components/checkbox.h>
+#include <components/common.h>
 #include <components/table.h>
 
 #include <functional>
@@ -18,7 +19,7 @@ static constexpr float LABEL_PAD = 12.0f;
 static constexpr float CONTROL_VPAD = 4.0f;
 static constexpr float CONTROL_HPAD = 8.0f;
 
-static float s_tableHeight(int rows)
+static float s_tableHeight(uint32_t rows)
 {
     return static_cast<float>(rows) * ROW_HEIGHT;
 }
@@ -35,13 +36,17 @@ static void s_labelCell(Amethyst::UIScope &cell, std::string_view label)
     });
 }
 
-static void s_fieldTable(Amethyst::CollapsibleHeaderScope &ch, int rows, const std::function<void(Amethyst::TableScope &)> &fn)
+static float s_fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std::function<void(Amethyst::TableScope &)> &fn)
 {
+    float height = 0.0f;
     ch.table(
         {
-            .base =
+            .style =
                 {
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, s_tableHeight(rows)),
+                    .backgroundTransparency = 1.0f,
+                    .borderMode = Amethyst::BorderMode::OUTLINE,
+                    .borderPixelSize = 1.0f,
+                    .borderColor = Amethyst::Color3::fromHex(0x181818),
                 },
             .table =
                 {
@@ -53,16 +58,14 @@ static void s_fieldTable(Amethyst::CollapsibleHeaderScope &ch, int rows, const s
                     .rowAlternateColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
                 },
         },
-        [&fn](Amethyst::TableScope &t) {
-            t.component.setBaseStyleProperties({
-                .backgroundTransparency = 1.0f,
-                .borderPixelSize = 1.0f,
-                .borderColor = Amethyst::Color3::fromHex(0x181818),
-            });
+        [&](Amethyst::TableScope &t) {
             t.column("", LABEL_FRAC, Amethyst::TableColumnSizing::FIXED);
             t.column("", 1.0f - LABEL_FRAC);
             fn(t);
+            height = s_tableHeight(t.component.rowCount());
+            t.component.setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, height)});
         });
+    return height;
 }
 
 static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min, double max,
@@ -128,21 +131,18 @@ static void s_rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool 
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
         tr.cell([value, onChanged](Amethyst::UIScope &cell) {
-            cell.checkbox(
-                {
-                    .classes = {"generic-input-field"},
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
-                },
-                [value, onChanged](Amethyst::CheckboxScope &c) {
-                    c.component.valueRef = value;
-                    c.component.onValueChanged = [onChanged](bool b) {
-                        if (onChanged) {
-                            onChanged(b);
-                        }
-                    };
-                });
+            cell.checkbox({.classes = {"generic-input-field"},
+                           .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                                    .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                                    .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
+                           .value = value},
+                          [value, onChanged](Amethyst::CheckboxScope &c) {
+                              c.component.onValueChanged = [onChanged](bool b) {
+                                  if (onChanged) {
+                                      onChanged(b);
+                                  }
+                              };
+                          });
         });
     });
 }
@@ -160,6 +160,7 @@ static Amethyst::Dropdown *s_rowDropdown(Amethyst::TableScope &t, std::string_vi
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                    .text = {.textXAlignment = Amethyst::TextXAlignment::LEFT, .textYAlignment = Amethyst::TextYAlignment::CENTER},
                     .label = std::string(current),
                 },
                 [&](Amethyst::DropdownScope &d) {
@@ -177,14 +178,47 @@ static Amethyst::Dropdown *s_rowDropdown(Amethyst::TableScope &t, std::string_vi
     return dropdown;
 }
 
-float TransformEditor::bodyHeight() const
+static void s_rowDragFloat(Amethyst::TableScope &t, std::string_view label, double *value, double speed, double min, double max,
+                           const std::function<void(double)> &onChanged)
 {
-    return s_tableHeight(3);
+    t.row([&](Amethyst::TableRowScope &tr) {
+        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
+        tr.cell([value, speed, min, max, onChanged](Amethyst::UIScope &cell) {
+            cell.dragFloat(
+                {
+                    .classes = {"generic-input-field"},
+                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                    .speed = speed,
+                    .min = min,
+                    .max = max,
+                    .value = value,
+                },
+                [onChanged](Amethyst::DragFloatScope &d) {
+                    d.component.onValueChanged = [onChanged](double v) {
+                        if (onChanged) {
+                            onChanged(v);
+                        }
+                    };
+                });
+        });
+    });
+}
+
+static Amethyst::Dropdown *s_rowMobility(Amethyst::TableScope &t, Rapture::Mobility current,
+                                         const std::function<void(Rapture::Mobility)> &onSelect)
+{
+    return s_rowDropdown(t, "Mobility", Rapture::mobilityToString(current), {"Static", "Dynamic"}, [onSelect](int index) {
+        if (onSelect) {
+            onSelect(static_cast<Rapture::Mobility>(index));
+        }
+    });
 }
 
 void TransformEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    s_fieldTable(ch, 3, [this](Amethyst::TableScope &t) {
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
         s_rowVec3(t, "Translation", m_values[0], 0.1, -100000.0, 100000.0, [this]() { apply(0); });
         s_rowVec3(t, "Rotation", m_values[1], 0.5, -360.0, 360.0, [this]() { apply(1); });
         s_rowVec3(t, "Scale", m_values[2], 0.01, -1000.0, 1000.0, [this]() { apply(2); });
@@ -229,11 +263,6 @@ void TransformEditor::sync(const Rapture::Entity &entity)
     m_values[2][2] = s.z;
 }
 
-float LightEditor::bodyHeight() const
-{
-    return s_tableHeight(4);
-}
-
 void LightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     std::vector<std::string> typeOptions;
@@ -241,7 +270,7 @@ void LightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
         typeOptions.push_back(Rapture::lightTypeToString(static_cast<Rapture::LightType>(i)));
     }
 
-    s_fieldTable(ch, 4, [this, typeOptions](Amethyst::TableScope &t) {
+    m_bodyHeight = s_fieldTable(ch, [this, typeOptions](Amethyst::TableScope &t) {
         m_typeDropdown =
             s_rowDropdown(t, "Type", Rapture::lightTypeToString(Rapture::LightType::POINT), typeOptions, [this](int index) {
                 if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
@@ -293,6 +322,220 @@ void LightEditor::sync(const Rapture::Entity &entity)
     if (entityChanged && m_typeDropdown != nullptr) {
         m_typeDropdown->setText(Rapture::lightTypeToString(lc.type));
     }
+}
+
+void MeshEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::MeshComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::MeshComponent>().mobility = m;
+            if (m_mobilityDropdown != nullptr) {
+                m_mobilityDropdown->setText(Rapture::mobilityToString(m));
+            }
+            m_entity.markDirty();
+        });
+        s_rowCheckbox(t, "Enabled", &m_isEnabled, [this](bool b) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::MeshComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::MeshComponent>().isEnabled = b;
+            m_entity.markDirty();
+        });
+    });
+}
+
+void MeshEditor::sync(const Rapture::Entity &entity)
+{
+    bool entityChanged = !(entity == m_entity);
+    m_entity = entity;
+    if (!entity.hasComponent<Rapture::MeshComponent>()) {
+        return;
+    }
+    const auto &mc = entity.getComponent<Rapture::MeshComponent>();
+    m_isEnabled = mc.isEnabled;
+
+    if (entityChanged && m_mobilityDropdown != nullptr) {
+        m_mobilityDropdown->setText(Rapture::mobilityToString(mc.mobility));
+    }
+}
+
+void CameraEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowSlider(t, "FOV", &m_fov, 1.0f, 179.0f, [this](float v) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
+                return;
+            }
+            auto &cc = m_entity.getComponent<Rapture::CameraComponent>();
+            cc.updateProjectionMatrix(v, cc.aspectRatio, cc.nearPlane, cc.farPlane);
+            m_entity.markDirty();
+        });
+        s_rowDragFloat(t, "Near Plane", &m_nearPlane, 0.01, 0.001, 10000.0, [this](double v) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
+                return;
+            }
+            auto &cc = m_entity.getComponent<Rapture::CameraComponent>();
+            cc.updateProjectionMatrix(cc.fov, cc.aspectRatio, static_cast<float>(v), cc.farPlane);
+            m_entity.markDirty();
+        });
+        s_rowDragFloat(t, "Far Plane", &m_farPlane, 1.0, 0.001, 1000000.0, [this](double v) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
+                return;
+            }
+            auto &cc = m_entity.getComponent<Rapture::CameraComponent>();
+            cc.updateProjectionMatrix(cc.fov, cc.aspectRatio, cc.nearPlane, static_cast<float>(v));
+            m_entity.markDirty();
+        });
+        s_rowCheckbox(t, "Main Camera", &m_isMainCamera, [this](bool b) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
+                return;
+            }
+            if (b) {
+                if (m_entity.getScene() != nullptr) {
+                    m_entity.getScene()->setMainCamera(m_entity);
+                }
+            } else {
+                m_entity.getComponent<Rapture::CameraComponent>().isMainCamera = false;
+            }
+            m_entity.markDirty();
+        });
+    });
+}
+
+void CameraEditor::sync(const Rapture::Entity &entity)
+{
+    m_entity = entity;
+    if (!entity.hasComponent<Rapture::CameraComponent>()) {
+        return;
+    }
+    const auto &cc = entity.getComponent<Rapture::CameraComponent>();
+    m_fov = cc.fov;
+    m_nearPlane = cc.nearPlane;
+    m_farPlane = cc.farPlane;
+    m_isMainCamera = cc.isMainCamera;
+}
+
+void ShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::ShadowComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::ShadowComponent>().isActive = b;
+            m_entity.markDirty();
+        });
+        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::ShadowComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::ShadowComponent>().mobility = m;
+            if (m_mobilityDropdown != nullptr) {
+                m_mobilityDropdown->setText(Rapture::mobilityToString(m));
+            }
+            m_entity.markDirty();
+        });
+    });
+}
+
+void ShadowEditor::sync(const Rapture::Entity &entity)
+{
+    bool entityChanged = !(entity == m_entity);
+    m_entity = entity;
+    if (!entity.hasComponent<Rapture::ShadowComponent>()) {
+        return;
+    }
+    const auto &sc = entity.getComponent<Rapture::ShadowComponent>();
+    m_isActive = sc.isActive;
+
+    if (entityChanged && m_mobilityDropdown != nullptr) {
+        m_mobilityDropdown->setText(Rapture::mobilityToString(sc.mobility));
+    }
+}
+
+void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::CascadedShadowComponent>().isActive = b;
+            m_entity.markDirty();
+        });
+        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::CascadedShadowComponent>().mobility = m;
+            if (m_mobilityDropdown != nullptr) {
+                m_mobilityDropdown->setText(Rapture::mobilityToString(m));
+            }
+            m_entity.markDirty();
+        });
+        s_rowSlider(t, "Lambda", &m_lambda, 0.0f, 1.0f, [this](float v) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
+                return;
+            }
+            auto &csc = m_entity.getComponent<Rapture::CascadedShadowComponent>();
+            if (csc.cascadedShadowMap != nullptr) {
+                csc.cascadedShadowMap->setLambda(v);
+            }
+            m_entity.markDirty();
+        });
+    });
+}
+
+void CascadedShadowEditor::sync(const Rapture::Entity &entity)
+{
+    bool entityChanged = !(entity == m_entity);
+    m_entity = entity;
+    if (!entity.hasComponent<Rapture::CascadedShadowComponent>()) {
+        return;
+    }
+    const auto &csc = entity.getComponent<Rapture::CascadedShadowComponent>();
+    m_isActive = csc.isActive;
+    if (csc.cascadedShadowMap != nullptr) {
+        m_lambda = csc.cascadedShadowMap->getLambda();
+    }
+
+    if (entityChanged && m_mobilityDropdown != nullptr) {
+        m_mobilityDropdown->setText(Rapture::mobilityToString(csc.mobility));
+    }
+}
+
+void SkyboxEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 10.0f, [this](float v) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::SkyboxComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::SkyboxComponent>().skyIntensity = v;
+            m_entity.markDirty();
+        });
+        s_rowCheckbox(t, "Enabled", &m_isEnabled, [this](bool b) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::SkyboxComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::SkyboxComponent>().isEnabled = b;
+            m_entity.markDirty();
+        });
+    });
+}
+
+void SkyboxEditor::sync(const Rapture::Entity &entity)
+{
+    m_entity = entity;
+    if (!entity.hasComponent<Rapture::SkyboxComponent>()) {
+        return;
+    }
+    const auto &sc = entity.getComponent<Rapture::SkyboxComponent>();
+    m_intensity = sc.skyIntensity;
+    m_isEnabled = sc.isEnabled;
 }
 
 void StubEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

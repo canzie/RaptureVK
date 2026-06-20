@@ -22,10 +22,11 @@ static void s_onEntityClicked(uint32_t entityId)
     }
 }
 
-OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
+OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
+    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
     m_root->name = "Outliner";
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
@@ -66,13 +67,15 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
                     });
             });
 
-    m_hostTabBar->addTab(std::move(root), iconTabLayout("Outliner", Icons::SVG_LAYERS));
+    tabBar->addTab(std::move(root), iconTabLayout("Outliner", Icons::SVG_LAYERS));
 }
 
 OutlinerPanel::~OutlinerPanel()
 {
-    if (m_hostTabBar != nullptr && m_root != nullptr) {
-        m_hostTabBar->removeTab(m_root);
+    if (m_root != nullptr && m_root->parent != nullptr) {
+        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
+            tabBar->removeTab(m_root);
+        }
     }
 }
 

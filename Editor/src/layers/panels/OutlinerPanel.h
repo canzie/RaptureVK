@@ -32,7 +32,6 @@ class OutlinerPanel : public Panel {
     void buildEntityTree(Rapture::Entity entity, Amethyst::TreeRowScope &rowScope);
 
   private:
-    Amethyst::TabBar *m_hostTabBar = nullptr;
     Amethyst::Frame *m_root = nullptr;
     Amethyst::ScrollingFrame *m_scrollingFrame = nullptr;
     Amethyst::TreeView *m_treeView = nullptr;

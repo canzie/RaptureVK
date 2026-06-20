@@ -69,7 +69,6 @@ class PropertiesPanel : public Panel {
     void showEntity(const Rapture::Entity &entity);
     void showPlaceholder();
 
-    Amethyst::TabBar *m_hostTabBar = nullptr;
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextLabel *m_placeholderText = nullptr;
     Amethyst::ScrollingFrame *m_entityView = nullptr;

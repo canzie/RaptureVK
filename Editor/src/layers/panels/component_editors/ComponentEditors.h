@@ -8,7 +8,6 @@ class TransformEditor : public ComponentEditorBase {
   public:
     const char *title() const override { return "Transform"; }
     const char *icon() const override { return Icons::SVG_TRANSFORM; }
-    float bodyHeight() const override;
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
     void sync(const Rapture::Entity &entity) override;
 
@@ -23,7 +22,6 @@ class LightEditor : public ComponentEditorBase {
   public:
     const char *title() const override { return "Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
-    float bodyHeight() const override;
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
     void sync(const Rapture::Entity &entity) override;
 
@@ -53,26 +51,76 @@ class StubEditor : public ComponentEditorBase {
     const char *m_icon;
 };
 
-struct MeshEditor : StubEditor {
-    MeshEditor() : StubEditor("Mesh", Icons::SVG_MESH) {}
+class MeshEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Mesh"; }
+    const char *icon() const override { return Icons::SVG_MESH; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    bool m_isEnabled = true;
+    Amethyst::Dropdown *m_mobilityDropdown = nullptr;
+    Rapture::Entity m_entity;
 };
+
 struct MaterialEditor : StubEditor {
     MaterialEditor() : StubEditor("Material", Icons::SVG_MATERIAL) {}
 };
-struct CameraEditor : StubEditor {
-    CameraEditor() : StubEditor("Camera", Icons::SVG_CAMERA) {}
+
+class CameraEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Camera"; }
+    const char *icon() const override { return Icons::SVG_CAMERA; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    float m_fov = 45.0f;
+    double m_nearPlane = 0.1;
+    double m_farPlane = 100.0;
+    bool m_isMainCamera = false;
+    Rapture::Entity m_entity;
 };
-struct ShadowEditor : StubEditor {
-    ShadowEditor() : StubEditor("Shadow", "") {}
+
+class ShadowEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Shadow"; }
+    const char *icon() const override { return ""; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    bool m_isActive = true;
+    Amethyst::Dropdown *m_mobilityDropdown = nullptr;
+    Rapture::Entity m_entity;
 };
-struct CascadedShadowEditor : StubEditor {
-    CascadedShadowEditor() : StubEditor("Cascaded Shadow", "") {}
+
+class CascadedShadowEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Cascaded Shadow"; }
+    const char *icon() const override { return ""; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    bool m_isActive = true;
+    float m_lambda = 0.5f;
+    Amethyst::Dropdown *m_mobilityDropdown = nullptr;
+    Rapture::Entity m_entity;
 };
-struct SkyboxEditor : StubEditor {
-    SkyboxEditor() : StubEditor("Skybox", "") {}
-};
-struct TerrainEditor : StubEditor {
-    TerrainEditor() : StubEditor("Terrain", "") {}
+
+class SkyboxEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Skybox"; }
+    const char *icon() const override { return ""; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    float m_intensity = 1.0f;
+    bool m_isEnabled = true;
+    Rapture::Entity m_entity;
 };
 
 #endif // RAPTURE__COMPONENT_EDITORS_H

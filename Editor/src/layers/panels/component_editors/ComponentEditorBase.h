@@ -30,7 +30,7 @@ class ComponentEditorBase {
     /**
      * @brief Current expanded body height in pixels, may vary with state.
      */
-    virtual float bodyHeight() const = 0;
+    virtual float bodyHeight() const { return m_bodyHeight; }
 
     /**
      * @brief Builds the widgets into the section body once, on creation.
@@ -43,6 +43,9 @@ class ComponentEditorBase {
     virtual void sync(const Rapture::Entity &entity) = 0;
 
     Amethyst::CollapsibleHeader *header = nullptr;
+
+  protected:
+    float m_bodyHeight = 0.0f;
 };
 
 #endif // RAPTURE__COMPONENT_EDITOR_BASE_H

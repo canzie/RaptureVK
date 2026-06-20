@@ -6,7 +6,6 @@
 #include "layers/panels/components/tab_layouts.h"
 
 #include "components/Components.h"
-#include "components/TerrainComponent.h"
 
 #include <components/common.h>
 #include <components/ui_scope.h>
@@ -19,10 +18,11 @@ static constexpr float HEADER_HEIGHT = 28.0f;
 static constexpr float SECTION_SPACING = 6.0f;
 static constexpr float SECTION_TOP_PAD = 4.0f;
 
-PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar)
+PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
+    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
     m_root->name = "Properties";
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
@@ -31,7 +31,7 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar
     setupPlaceholder();
     setupEntityView();
 
-    m_hostTabBar->addTab(std::move(root), iconTabLayout("Properties", Icons::SVG_PROPERTIES));
+    tabBar->addTab(std::move(root), iconTabLayout("Properties", Icons::SVG_PROPERTIES));
 
     m_entitySelectedListenerID =
         Rapture::GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) {
@@ -48,8 +48,10 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar) : m_hostTabBar(tabBar
 PropertiesPanel::~PropertiesPanel()
 {
     Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerID);
-    if (m_hostTabBar != nullptr && m_root != nullptr) {
-        m_hostTabBar->removeTab(m_root);
+    if (m_root != nullptr && m_root->parent != nullptr) {
+        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
+            tabBar->removeTab(m_root);
+        }
     }
 }
 
@@ -204,7 +206,7 @@ void PropertiesPanel::buildSection(ComponentEditorBase &editor)
                 .base =
                     {
                         .position = Amethyst::UDim2::fromOffset(0.0f, SECTION_TOP_PAD),
-                        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT + editor.bodyHeight()),
+                        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT),
                     },
                 .style = {.backgroundTransparency = 1.0f},
                 .header =
@@ -217,6 +219,7 @@ void PropertiesPanel::buildSection(ComponentEditorBase &editor)
                 editor.header = &ch.component;
                 ch.header(componentHeaderLayout(editor.title(), editor.icon()));
                 editor.buildBody(ch);
+                editor.header->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT + editor.bodyHeight())});
             });
 
     editor.header->onToggled = [this](bool) { relayout(); };
@@ -236,7 +239,6 @@ void PropertiesPanel::refresh()
         ensure<ShadowEditor>(e.hasComponent<Rapture::ShadowComponent>());
         ensure<CascadedShadowEditor>(e.hasComponent<Rapture::CascadedShadowComponent>());
         ensure<SkyboxEditor>(e.hasComponent<Rapture::SkyboxComponent>());
-        ensure<TerrainEditor>(e.hasComponent<Rapture::TerrainComponent>());
     }
 
     relayout();

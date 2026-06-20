@@ -8,6 +8,7 @@
 
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
+#include "layers/BottomBar.h"
 #include "layers/panels/Panel.h"
 #include <memory>
 #include <vector>
@@ -52,7 +53,7 @@ class AmethystLayer : public Rapture::Layer {
     Amethyst::Frame *m_backgroundFrame = nullptr;
     Amethyst::MenuBar *m_menuBar = nullptr;
     Amethyst::TabBar *m_workspaceTabBar = nullptr;
-    Amethyst::Frame *m_bottomBar = nullptr;
+    std::unique_ptr<BottomBar> m_bottomBar;
 
     int m_activeWorkspaceIndex = 0;
     std::vector<Workspace> m_workspaces;
