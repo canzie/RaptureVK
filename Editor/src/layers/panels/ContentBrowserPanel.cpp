@@ -23,20 +23,20 @@ static constexpr float TILE_FOOTER_HEIGHT = 26.0f;
 static constexpr float TILE_TYPEBAR_HEIGHT = 3.0f;
 static constexpr float TILE_ICON_SIZE = 42.0f;
 
-#define COL_TOP_BAR    Amethyst::Color3::fromHex(0x252525)
-#define COL_SIDE_BAR   Amethyst::Color3::fromHex(0x2b2b2b)
-#define COL_GRID_BG    Amethyst::Color3::fromHex(0x1b1b1b)
-#define COL_TILE       Amethyst::Color3::fromHex(0x303030)
-#define COL_TILE_WELL  Amethyst::Color3::fromHex(0x3c3c3c)
-#define COL_TILE_FOOT  Amethyst::Color3::fromHex(0x232323)
-#define COL_SELECTION  Amethyst::Color3(0.13f, 0.45f, 0.85f)
-#define COL_SEPARATOR  Amethyst::Color3::fromHex(0x181818)
-#define COL_TEXT       Amethyst::Color4(0.85f, 0.85f, 0.85f, 1.0f)
-#define COL_TEXT_DIM   Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)
-#define COL_ICON       Amethyst::Color4(0.8f, 0.8f, 0.8f, 1.0f)
-#define COL_BTN        Amethyst::Color3::fromHex(0x3a3a3a)
-#define COL_BTN_HOVER  Amethyst::Color3::fromHex(0x4d4d4d)
-#define COL_HOVER      Amethyst::Color3::fromHex(0x4d4d4d)
+#define COL_TOP_BAR   Amethyst::Color3::fromHex(0x252525)
+#define COL_SIDE_BAR  Amethyst::Color3::fromHex(0x2b2b2b)
+#define COL_GRID_BG   Amethyst::Color3::fromHex(0x1b1b1b)
+#define COL_TILE      Amethyst::Color3::fromHex(0x303030)
+#define COL_TILE_WELL Amethyst::Color3::fromHex(0x3c3c3c)
+#define COL_TILE_FOOT Amethyst::Color3::fromHex(0x232323)
+#define COL_SELECTION Amethyst::Color3(0.13f, 0.45f, 0.85f)
+#define COL_SEPARATOR Amethyst::Color3::fromHex(0x181818)
+#define COL_TEXT      Amethyst::Color4(0.85f, 0.85f, 0.85f, 1.0f)
+#define COL_TEXT_DIM  Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)
+#define COL_ICON      Amethyst::Color4(0.8f, 0.8f, 0.8f, 1.0f)
+#define COL_BTN       Amethyst::Color3::fromHex(0x3a3a3a)
+#define COL_BTN_HOVER Amethyst::Color3::fromHex(0x4d4d4d)
+#define COL_HOVER     Amethyst::Color3::fromHex(0x4d4d4d)
 
 static constexpr float CONTENT_PADDING = 10.0f;
 
@@ -103,25 +103,24 @@ static float s_estimateTextWidth(const std::string &text, float fontSize)
 
 static void s_wireIconHover(Amethyst::ImageButton *btn)
 {
-    btn->onHoverChanged = [btn](bool hovered) {
+    btn->track(btn->onHoverChanged.connect([btn](bool hovered) {
         btn->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4(0.95f, 0.95f, 0.95f, 1.0f) : COL_ICON});
         btn->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.8f : 1.0f});
-    };
+    }));
 }
 
 static void s_wireButtonHover(Amethyst::TextButton *btn)
 {
     btn->setBaseStyleProperties({.backgroundColor = COL_BTN});
-    btn->onHoverChanged = [btn](bool hovered) {
-        btn->setBaseStyleProperties({.backgroundColor = hovered ? COL_BTN_HOVER : COL_BTN});
-    };
+    btn->track(btn->onHoverChanged.connect(
+        [btn](bool hovered) { btn->setBaseStyleProperties({.backgroundColor = hovered ? COL_BTN_HOVER : COL_BTN}); }));
 }
 
 static void s_wireGhostHover(Amethyst::TextButton *btn)
 {
-    btn->onHoverChanged = [btn](bool hovered) {
+    btn->track(btn->onHoverChanged.connect([btn](bool hovered) {
         btn->setBaseStyleProperties({.backgroundColor = COL_BTN_HOVER, .backgroundTransparency = hovered ? 0.0f : 1.0f});
-    };
+    }));
 }
 
 ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar)
@@ -359,7 +358,9 @@ void ContentBrowserPanel::setupSideBar()
                             .base =
                                 {
                                     .clipsDescendants = true,
-                                    .padding = {{}, {}, Amethyst::UDim::fromOffset(CONTENT_PADDING),
+                                    .padding = {{},
+                                                {},
+                                                Amethyst::UDim::fromOffset(CONTENT_PADDING),
                                                 Amethyst::UDim::fromOffset(CONTENT_PADDING)},
                                     .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, SECTION_HEADER_HEIGHT),
                                     .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -SECTION_HEADER_HEIGHT),
@@ -449,9 +450,7 @@ void ContentBrowserPanel::setupContentArea()
                                 },
                                 [this](Amethyst::TextInputScope &ti) {
                                     m_searchInput = &ti.component;
-                                    ti.component.onTextChanged = [this](const std::string &text) {
-                                        onSearchTextChanged(text);
-                                    };
+                                    ti.component.onTextChanged = [this](const std::string &text) { onSearchTextChanged(text); };
                                 });
                         });
                 });
@@ -684,8 +683,7 @@ void ContentBrowserPanel::refreshFileBrowser()
 
         bool isDir = entry.is_directory();
         item.icon->setSvg(isDir ? Icons::SVG_FOLDER : Icons::SVG_SCRIPT);
-        item.icon->setImageStyleProperties(
-            {.imageColor = isDir ? Amethyst::Color4(0.85f, 0.72f, 0.4f, 1.0f) : COL_ICON});
+        item.icon->setImageStyleProperties({.imageColor = isDir ? Amethyst::Color4(0.85f, 0.72f, 0.4f, 1.0f) : COL_ICON});
 
         item.typeBar->setBaseProperties({.visible = false});
         item.name->setText(filename);
@@ -730,9 +728,8 @@ static std::unique_ptr<Amethyst::TextButton> s_makeTreeCell(const std::string &l
     btn->setTextStyleProperties({.fontSize = 13.0f, .textColor = COL_TEXT});
     btn->setText(label);
     auto *raw = btn.get();
-    raw->onHoverChanged = [raw](bool hovered) {
-        raw->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.0f : 1.0f});
-    };
+    raw->track(raw->onHoverChanged.connect(
+        [raw](bool hovered) { raw->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.0f : 1.0f}); }));
     return btn;
 }
 
@@ -883,12 +880,12 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
 
         item.action = item.container->add<Amethyst::InvisibleButton>();
         item.action->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
-        item.action->onHoverChanged = [this, slot](bool hovered) {
+        item.action->track(item.action->onHoverChanged.connect([this, slot](bool hovered) {
             if (slot >= m_contentItemPool.size() || m_selectedItem == slot) {
                 return;
             }
             applyItemHover(m_contentItemPool[slot], hovered);
-        };
+        }));
 
         item.thumbWell = item.action->add<Amethyst::Frame>();
         item.thumbWell->setBaseProperties({

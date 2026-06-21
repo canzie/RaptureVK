@@ -72,11 +72,11 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
             },
             [label, onMenuClicked](Amethyst::ImageButtonScope &btn) {
                 auto *b = &btn.component;
-                b->onHoverChanged = [b](bool hovered) {
+                b->track(b->onHoverChanged.connect([b](bool hovered) {
                     b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
                                                                       : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
                     b->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.85f : 1.0f});
-                };
+                }));
                 b->onMouseButton1ClickCb = [label, onMenuClicked]() {
                     if (onMenuClicked) {
                         onMenuClicked();

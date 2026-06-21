@@ -57,9 +57,6 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
         m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>(*m_rc);
     }
 
-    // Create flattened texture for debugging/visualization
-    m_flattenedShadowTexture = TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
-
     setupCommandResources();
 }
 
@@ -74,6 +71,16 @@ void CascadedShadowMap::setupCommandResources()
 }
 
 CascadedShadowMap::~CascadedShadowMap() {}
+
+void CascadedShadowMap::enableDebugTexture(bool enabled)
+{
+    m_debugFlattenEnabled = enabled;
+
+    if (enabled && m_flattenedShadowTexture == nullptr) {
+        m_flattenedShadowTexture =
+            TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
+    }
+}
 
 std::vector<float> CascadedShadowMap::calculateCascadeSplits(float nearPlane, float farPlane, float lambda)
 {
@@ -992,7 +999,7 @@ void CascadedShadowMap::transitionToShaderReadableLayout(CommandBuffer *commandB
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
     // Update flattened texture for debugging/visualization
-    if (m_flattenedShadowTexture) {
+    if (m_debugFlattenEnabled && m_flattenedShadowTexture != nullptr) {
         m_flattenedShadowTexture->update(commandBuffer);
     }
 }

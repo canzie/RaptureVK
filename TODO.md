@@ -25,7 +25,8 @@
 
 - optimise the shadow passes
 - make it run on windows???
-- texture compression
+- texture compression DONE (BC1/BC3/BC4/BC5 via compute)
+  - TODO later: BC7 (high quality RGBA) and BC6H (HDR) encoders
 - fix stencil buffer
 - shader hot reloading
 - jolt???

@@ -740,13 +740,14 @@ void DynamicDiffuseGI::initTextures()
     m_ProbeClassificationTexture = std::make_shared<Texture>(probeClassificationSpec);
     m_ProbeOffsetTexture = std::make_shared<Texture>(probeOffsetSpec);
 
-    // Create flattened textures using TextureFlattener
-    m_RayDataTextureFlattened = TextureFlattener::createFlattenTexture(m_RayDataTexture, "[DDGI] Flattened Ray Data");
-    m_IrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_RadianceTexture, "[DDGI] Irradiance Flattened");
-    m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened");
-    m_ProbeClassificationTextureFlattened = TextureFlattener::createFlattenTexture(
-        m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened", FlattenerDataType::UINT);
-    m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened");
+    // Debug flatten textures disabled for now - skipping creation leaves the pointers null
+    // so the per-frame update() dispatches are skipped by the guards in onUpdate
+    // m_RayDataTextureFlattened = TextureFlattener::createFlattenTexture(m_RayDataTexture, "[DDGI] Flattened Ray Data");
+    // m_IrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_RadianceTexture, "[DDGI] Irradiance Flattened");
+    // m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened");
+    // m_ProbeClassificationTextureFlattened = TextureFlattener::createFlattenTexture(
+    //     m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened", FlattenerDataType::UINT);
+    // m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened");
 
     clearTextures();
 

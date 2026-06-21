@@ -76,6 +76,12 @@ class CascadedShadowMap {
         return m_flattenedShadowTexture ? m_flattenedShadowTexture->getFlattenedTexture() : nullptr;
     }
 
+    /**
+     * @brief Toggle the per-frame flatten of the cascade array into a debug texture
+     * @param enabled Whether to flatten the cascade array each frame
+     */
+    void enableDebugTexture(bool enabled);
+
     uint32_t getTextureHandle() { return m_shadowTextureArray->getBindlessIndex(); }
 
     std::vector<glm::mat4> getLightViewProjections() const { return m_lightViewProjections; }
@@ -113,6 +119,7 @@ class CascadedShadowMap {
     uint8_t m_NumCascades;
 
     bool m_firstFrame = true;
+    bool m_debugFlattenEnabled = false;
 
     uint32_t m_currentFrame = 0;
     uint32_t m_framesInFlight = 1;

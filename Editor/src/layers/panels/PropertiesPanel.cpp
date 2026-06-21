@@ -83,9 +83,9 @@ void PropertiesPanel::setupSearchBar()
                 },
                 [this](Amethyst::FrameScope &sf) {
                     auto *searchFrame = &sf.component;
-                    sf.component.onHoverChanged = [searchFrame](bool hovered) {
+                    sf.track(sf.component.onHoverChanged.connect([searchFrame](bool hovered) {
                         searchFrame->setBaseStyleProperties({.borderPixelSize = hovered ? 2.0f : 0.0f});
-                    };
+                    }));
                     sf.imageLabel({
                         .base =
                             {
@@ -125,11 +125,11 @@ void PropertiesPanel::setupSearchBar()
                 [](Amethyst::ImageButtonScope &btn) {
                     btn.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
                     auto *b = &btn.component;
-                    btn.component.onHoverChanged = [b](bool hovered) {
+                    b->track(b->onHoverChanged.connect([b](bool hovered) {
                         b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
                                                                           : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
                         b->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.85f : 1.0f});
-                    };
+                    }));
                 });
             bar.imageButton(
                 {
@@ -145,11 +145,11 @@ void PropertiesPanel::setupSearchBar()
                 [](Amethyst::ImageButtonScope &btn) {
                     btn.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
                     auto *b = &btn.component;
-                    btn.component.onHoverChanged = [b](bool hovered) {
+                    b->track(b->onHoverChanged.connect([b](bool hovered) {
                         b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
                                                                           : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
                         b->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.85f : 1.0f});
-                    };
+                    }));
                 });
         });
 }
