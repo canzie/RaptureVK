@@ -61,6 +61,7 @@ class MaterialInstance {
 
   private:
     void syncToGPU();
+    void applyTextureEncodingFlags(ParameterID id, Texture *texture);
 
     std::string m_name;
     std::shared_ptr<BaseMaterial> m_baseMaterial;

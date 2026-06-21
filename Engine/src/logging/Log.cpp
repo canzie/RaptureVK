@@ -77,11 +77,7 @@ void Log::Init()
     // Set custom colors for each logger
     spdlog::set_pattern("%^[%T] %n: %v%$");
 
-#ifdef NDEBUG
     SetLogLevel(spdlog::level::info);
-#else
-    SetLogLevel(spdlog::level::trace);
-#endif
 
     // Set up default file sink categories
     std::set<LogCategory> allCategories = {LogCategory::Core, LogCategory::Client, LogCategory::Render, LogCategory::Physics,

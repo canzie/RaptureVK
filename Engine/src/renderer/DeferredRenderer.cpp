@@ -366,7 +366,6 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         CommandBuffer *instancedShapesBuffer = nullptr;
         CommandBuffer *stencilBorderBuffer = nullptr;
 
-        // mainCounter = Counter();
         s_cmdCounter.increment(4); // GBuffer, Lighting, Skybox, Instanced Shapes
 
         JobSystem &system = jobs();

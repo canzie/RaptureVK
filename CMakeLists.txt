@@ -45,6 +45,15 @@ else()
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -flto=auto")
 endif()
 
+# Optional sanitizer build (none, address, thread). Use thread to chase data races,
+# address to chase heap corruption. cmake -DRAPTURE_SANITIZER=thread ..
+set(RAPTURE_SANITIZER "none" CACHE STRING "Sanitizer to build with: none, address, thread")
+if(NOT MSVC AND NOT RAPTURE_SANITIZER STREQUAL "none")
+    message(STATUS "Building with ${RAPTURE_SANITIZER} sanitizer")
+    add_compile_options(-fsanitize=${RAPTURE_SANITIZER} -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=${RAPTURE_SANITIZER})
+endif()
+
 # Add subdirectories
 add_subdirectory(Engine)
 add_subdirectory(Editor) 

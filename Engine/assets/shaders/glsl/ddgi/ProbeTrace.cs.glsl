@@ -52,10 +52,14 @@ precision highp float;
 // Added constant to represent an invalid index/offset (all bits set)
 const uint UINT32_MAX = 0xFFFFFFFFu;
 
+// Mirror of MaterialData.h: normal map is BC5-compressed (reconstruct Z from RG)
+const uint MAT_FLAG_NORMAL_BC5 = 1u << 14;
+
 // Simplified MeshInfo structure matching our C++ version
 struct MeshInfo {
     uint AlbedoTextureIndex;
     uint NormalTextureIndex;
+    uint flags;
     vec3 albedo;
     vec3 emissiveColor;
     uint EmissiveFactorTextureIndex;
@@ -291,8 +295,13 @@ vec3 calculateShadingNormal(
     }
 
     // Apply normal map only if a valid texture index is provided
-    vec3 tangentNormal = textureLod(gTextures[meshInfo.NormalTextureIndex], uv, 0.0).xyz;
-    tangentNormal = (tangentNormal * 2.0) - 1.0;
+    vec3 tangentNormal;
+    if ((meshInfo.flags & MAT_FLAG_NORMAL_BC5) != 0u) {
+        vec2 xy = textureLod(gTextures[meshInfo.NormalTextureIndex], uv, 0.0).rg * 2.0 - 1.0;
+        tangentNormal = vec3(xy, sqrt(max(0.0, 1.0 - dot(xy, xy))));
+    } else {
+        tangentNormal = textureLod(gTextures[meshInfo.NormalTextureIndex], uv, 0.0).xyz * 2.0 - 1.0;
+    }
 
     // Use the pre-computed tangent, bitangent, and normal directly
     vec3 N = normalize(N_geom);

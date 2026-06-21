@@ -22,6 +22,7 @@ const uint MAT_FLAG_HAS_ROUGHNESS_MAP          = 1u << 10;
 const uint MAT_FLAG_HAS_EMISSIVE_MAP           = 1u << 11;
 const uint MAT_FLAG_HAS_SPECULAR_MAP           = 1u << 12;
 const uint MAT_FLAG_HAS_HEIGHT_MAP             = 1u << 13;
+const uint MAT_FLAG_NORMAL_BC5                 = 1u << 14;
 
 const uint MAT_FLAG_IS_TERRAIN     = 1u << 16;
 const uint MAT_FLAG_HAS_SPLAT_MAP  = 1u << 17;
@@ -63,6 +64,13 @@ float matFlagMul(uint flags, uint flag) {
     return float((flags & flag) != 0u);
 }
 
+// Reconstruct a tangent-space normal's Z from its XY (unit-length assumption), for BC5 normal maps
+vec3 reconstructNormalZ(vec2 xy) {
+    vec2 n = xy * 2.0 - 1.0;
+    float z = sqrt(max(0.0, 1.0 - dot(n, n)));
+    return vec3(n, z);
+}
+
 // Sampling macros - TEXTURES must be the bindless sampler2D array declared in the shader
 #define SAMPLE_ALBEDO(mat, TEXTURES, uv) \
     (mat.albedo.rgb * mix(vec3(1.0), texture(TEXTURES[mat.texIndices0.x], uv).rgb, matFlagMul(mat.flags, MAT_FLAG_HAS_ALBEDO_MAP)))
@@ -76,8 +84,10 @@ float matFlagMul(uint flags, uint flag) {
 #define SAMPLE_AO(mat, TEXTURES, uv) \
     (mat.ao * mix(1.0, texture(TEXTURES[mat.texIndices0.w], uv).r, matFlagMul(mat.flags, MAT_FLAG_HAS_AO_MAP)))
 
-#define SAMPLE_NORMAL_MAP(mat, TEXTURES, uv) \
-    mix(vec3(0.0, 0.0, 1.0), texture(TEXTURES[mat.texIndices0.y], uv).xyz * 2.0 - 1.0, matFlagMul(mat.flags, MAT_FLAG_HAS_NORMAL_MAP))
+#define SAMPLE_NORMAL_MAP(mat, TEXTURES, uv) ( \
+    matHasFlag(mat.flags, MAT_FLAG_NORMAL_BC5) \
+        ? reconstructNormalZ(texture(TEXTURES[mat.texIndices0.y], uv).rg) \
+        : mix(vec3(0.0, 0.0, 1.0), texture(TEXTURES[mat.texIndices0.y], uv).xyz * 2.0 - 1.0, matFlagMul(mat.flags, MAT_FLAG_HAS_NORMAL_MAP)))
 
 #define SAMPLE_EMISSIVE(mat, TEXTURES, uv) \
     (mat.emissive.rgb * mat.emissive.a * mix(vec3(1.0), texture(TEXTURES[mat.texIndices1.x], uv).rgb, matFlagMul(mat.flags, MAT_FLAG_HAS_EMISSIVE_MAP)))

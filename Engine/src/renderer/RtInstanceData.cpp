@@ -85,6 +85,7 @@ void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
                 auto &mat = materialComp.material;
                 info.AlbedoTextureIndex = mat->getParameter<uint32_t>(ParameterID::ALBEDO_MAP);
                 info.NormalTextureIndex = mat->getParameter<uint32_t>(ParameterID::NORMAL_MAP);
+                info.flags = mat->getFlags();
                 info.EmissiveFactorTextureIndex = mat->getParameter<uint32_t>(ParameterID::EMISSIVE_MAP);
                 glm::vec4 albedo4 = mat->getParameter<glm::vec4>(ParameterID::ALBEDO);
                 glm::vec4 emissive4 = mat->getParameter<glm::vec4>(ParameterID::EMISSIVE);
@@ -170,6 +171,7 @@ void RtInstanceData::patchDirty(std::shared_ptr<Scene> scene)
     struct PackedMat {
         uint32_t AlbedoTextureIndex;
         uint32_t NormalTextureIndex;
+        uint32_t flags;
         alignas(16) glm::vec3 albedo;
         alignas(16) glm::vec3 emissiveColor;
         uint32_t EmissiveFactorTextureIndex;
@@ -184,6 +186,7 @@ void RtInstanceData::patchDirty(std::shared_ptr<Scene> scene)
         PackedMat packed = {};
         packed.AlbedoTextureIndex = mat->getParameter<uint32_t>(ParameterID::ALBEDO_MAP);
         packed.NormalTextureIndex = mat->getParameter<uint32_t>(ParameterID::NORMAL_MAP);
+        packed.flags = mat->getFlags();
         glm::vec4 albedo4 = mat->getParameter<glm::vec4>(ParameterID::ALBEDO);
         glm::vec4 emissive4 = mat->getParameter<glm::vec4>(ParameterID::EMISSIVE);
         packed.albedo = glm::vec3(albedo4.x, albedo4.y, albedo4.z);

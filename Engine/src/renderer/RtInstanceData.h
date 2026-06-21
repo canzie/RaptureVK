@@ -19,6 +19,7 @@ class MaterialInstance;
 struct RtInstanceInfo {
     alignas(4) uint32_t AlbedoTextureIndex;
     alignas(4) uint32_t NormalTextureIndex;
+    alignas(4) uint32_t flags; // material flags (see MaterialData.h MaterialFlags)
 
     alignas(16) glm::vec3 albedo;
 

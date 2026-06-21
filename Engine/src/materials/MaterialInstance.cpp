@@ -57,6 +57,7 @@ void MaterialInstance::setParameter(ParameterID id, Texture *texture)
         if (info->flag) {
             m_data.flags |= info->flag;
         }
+        applyTextureEncodingFlags(id, texture);
         syncToGPU();
         AssetEvents::onMaterialInstanceChanged().publish(this);
     } else if (texture) {
@@ -89,11 +90,25 @@ void MaterialInstance::updatePendingTextures()
                                                if (info->flag) {
                                                    m_data.flags |= info->flag;
                                                }
+                                               applyTextureEncodingFlags(pending.parameterId, pending.texture);
                                                syncToGPU();
                                                AssetEvents::onMaterialInstanceChanged().publish(this);
                                                return true;
                                            }),
                             m_pendingTextures.end());
+}
+
+void MaterialInstance::applyTextureEncodingFlags(ParameterID id, Texture *texture)
+{
+    if (id != ParameterID::NORMAL_MAP) {
+        return;
+    }
+
+    if (texture->getSpecification().format == TextureFormat::BC5) {
+        m_data.flags |= MAT_FLAG_NORMAL_BC5;
+    } else {
+        m_data.flags &= ~MAT_FLAG_NORMAL_BC5;
+    }
 }
 
 void MaterialInstance::syncToGPU()

@@ -1,17 +1,31 @@
+### UI/Editor
+    - Create some widgets for the color picker
+    - create a proper material editor workspace
+    - create a nice terrain panel
+    - set up a good way for settings, these need to then be serialised
+        - color mapping/palette
+        - hsv/hsl preference
+        - couple sizings like gaps/borders/corners
+        - an actual settings/preferences panel to open
+    - file explorer
+    - wire up the content browser with the asset manager to load assets
+    - drag/drop assets into the viewport
+        - maybe just "rightclick->import into scene" for now
+    - mesh property thing needs its asset ref, same for material thing.
+    - think about how to actually do scene components like global illumination options -> component on a scene object?, a scene panel?, check how other engines do this
+    
 
-- i cant use imgui anymore, its just too shit for an actual application....... custom ui lib?
-  - zenith / zenith UI
-  - amethyst https://github.com/canzie/Amethyst
-  - Nimbus
-
-- Standardise and map all inputs, use macros for each input key
-  - generate a mapping from action to key, this can be (de)serialised from/in a config file
+    - !!! get the editor to a point where we can actually delete entityies, easily add some, even if just cubes/spheres for now. 
+    - FIX THE STENCIL BUFFER FOR RENDERING THE OUTLINE OF SELECTED OBJECTS
 
 
 - Make rendering things like bounds easier
   - current method is creating an instancedshapes component and providing the transformmatrix
   - this is akward as it cannot be used from inside the editor, only in code, we should be able to add it to certain things, like a mesh, terrain, etc, and depending on if we only need 1 or more to visualise debug use a simple mesh or instancing, like if the user selects aabb of a mesh, just a mesh, but if they select aabbs of the terrain we use instanced meshes, we can do this by seeing if the get aabb method returns 1 or multiple aabbs. , so it becomes a specific thing per mesh, per terrain comp etc. the thing to decide is how we enable/disable it while not storing the instanced data like the buffers in the same component.... 
 
+- optimise the shadow passes
+- make it run on windows???
+- texture compression
 - fix stencil buffer
 - shader hot reloading
 - jolt???
@@ -43,11 +57,19 @@
 
 
 
+### Render passes
+    - defined as what is now a gbuffer pass, shadow pass, skybox pass etc etc, needs to become more generic so we can easily add them
+    - this means:
+        - a more uniform interface
+        - some kind of exec order
+    - this would clean up the unfloded stuff at the bottom of the file where we record all passes
+    - makes it easier to add things like a post process step or even a user defined pass. if we ever decide to allow users to insert into the rendering pipeline a nicer interface will be provided, not the raw vulkan one used by something like the gbuffer pass, but thats for later. for now we just allow providing an exec order and a nicer way to record commands
+
+
 --------------------------------
 
 # features / stuff to add
 
-- static meshes
 - ssao
 - ss reflections
 - animations

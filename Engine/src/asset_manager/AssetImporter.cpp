@@ -2,6 +2,7 @@
 
 #include "AssetHelpers.h"
 #include "events/AssetEvents.h"
+#include "generators/textures/TextureCompressor.h"
 #include "jobs/Counter.h"
 #include "jobs/Job.h"
 #include "jobs/JobSystem.h"
@@ -204,7 +205,39 @@ bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
                 return;
             }
 
-            texPtr->uploadDataAsync(std::move(decoded.pixels));
+            TextureFormat targetFormat = texPtr->getSpecification().format;
+            if (isCompressedFormat(targetFormat)) {
+                TextureCompressor compressor(std::move(decoded.pixels), decoded.width, decoded.height);
+                bool compressed = false;
+                if (compressor.isValid()) {
+                    switch (targetFormat) {
+                    case TextureFormat::BC1_RGB:
+                    case TextureFormat::BC1_RGBA:
+                        compressed = compressor.compressToBC1(jctx, *texPtr);
+                        break;
+                    case TextureFormat::BC3:
+                        compressed = compressor.compressToBC3(jctx, *texPtr);
+                        break;
+                    case TextureFormat::BC4:
+                        compressed = compressor.compressToBC4(jctx, *texPtr);
+                        break;
+                    case TextureFormat::BC5:
+                        compressed = compressor.compressToBC5(jctx, *texPtr);
+                        break;
+                    default:
+                        break;
+                    }
+                }
+
+                if (!compressed) {
+                    RP_CORE_ERROR("Failed to compress texture: {}", path.string());
+                    texPtr->markFailed();
+                    assetPtr->status = AssetStatus::FAILED;
+                    return;
+                }
+            } else {
+                texPtr->uploadDataAsync(std::move(decoded.pixels));
+            }
 
             assetPtr->status = AssetStatus::LOADED;
             AssetEvents::onAssetLoaded().publish(assetPtr->getHandle());

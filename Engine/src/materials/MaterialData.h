@@ -10,7 +10,7 @@ namespace Rapture {
 // Material Flags - must match MaterialCommon.glsl
 // ============================================================================
 
-enum MaterialFlags : uint32_t {
+enum MaterialFlags {
     // Vertex attribute flags (bits 0-4)
     MAT_FLAG_HAS_NORMALS = 1u << 0,
     MAT_FLAG_HAS_TANGENTS = 1u << 1,
@@ -27,6 +27,9 @@ enum MaterialFlags : uint32_t {
     MAT_FLAG_HAS_EMISSIVE_MAP = 1u << 11,
     MAT_FLAG_HAS_SPECULAR_MAP = 1u << 12,
     MAT_FLAG_HAS_HEIGHT_MAP = 1u << 13,
+
+    // Normal map is BC5-compressed (RG only), reconstruct Z in the shader
+    MAT_FLAG_NORMAL_BC5 = 1u << 14,
 
     // Material type flags (bits 16-19)
     MAT_FLAG_IS_TERRAIN = 1u << 16,

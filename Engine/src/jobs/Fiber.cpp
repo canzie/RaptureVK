@@ -1,11 +1,26 @@
 #include "Fiber.h"
 #include "JobSystem.h"
 #include "logging/TracyProfiler.h"
+#include "utils/rp_assert.h"
 #include <cstdlib>
 #include <cstring>
 #include <thread>
 
+#if !defined(NDEBUG) && defined(__linux__)
+#define RAPTURE_FIBER_GUARD_PAGE 1
+#include <sys/mman.h>
+#include <unistd.h>
+#endif // RAPTURE_FIBER_GUARD_PAGE
+
 namespace Rapture {
+
+#ifdef RAPTURE_FIBER_GUARD_PAGE
+static size_t s_fiberGuardSize()
+{
+    static const size_t pageSize = static_cast<size_t>(sysconf(_SC_PAGESIZE));
+    return pageSize;
+}
+#endif // RAPTURE_FIBER_GUARD_PAGE
 
 // Thread-local scheduler fiber (runs on native thread stack)
 thread_local Fiber t_schedulerFiber{};
@@ -116,7 +131,12 @@ FiberPool::~FiberPool()
 {
     for (size_t i = 0; i < MAX_FIBERS; ++i) {
         if (m_fibers[i].fiber.stackBase != nullptr) {
+#ifdef RAPTURE_FIBER_GUARD_PAGE
+            size_t guardSize = s_fiberGuardSize();
+            munmap(static_cast<char *>(m_fibers[i].fiber.stackBase) - guardSize, FIBER_STACK_SIZE + guardSize);
+#else
             std::free(m_fibers[i].fiber.stackBase);
+#endif // RAPTURE_FIBER_GUARD_PAGE
         }
     }
 }
@@ -169,10 +189,20 @@ void FiberPool::initializeFiberStacks()
     for (size_t i = 0; i < MAX_FIBERS; ++i) {
         Fiber &fiber = m_fibers[i].fiber;
 
+#ifdef RAPTURE_FIBER_GUARD_PAGE
+        size_t guardSize = s_fiberGuardSize();
+        void *mapping =
+            mmap(nullptr, FIBER_STACK_SIZE + guardSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        RP_ASSERT(mapping != MAP_FAILED, "Failed to mmap fiber stack");
+        int guardResult = mprotect(mapping, guardSize, PROT_NONE);
+        RP_ASSERT(guardResult == 0, "Failed to protect fiber guard page");
+        fiber.stackBase = static_cast<char *>(mapping) + guardSize;
+#else
         fiber.stackBase = std::aligned_alloc(16, FIBER_STACK_SIZE);
         if (!fiber.stackBase) {
             std::abort();
         }
+#endif // RAPTURE_FIBER_GUARD_PAGE
 
         initializeFiber(&fiber);
         m_fibers[i].inUse.store(false, std::memory_order_relaxed);

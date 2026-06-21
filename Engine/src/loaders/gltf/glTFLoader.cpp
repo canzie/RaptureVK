@@ -127,14 +127,19 @@ void glTF2Loader::loadAndSetTexture(MaterialInstance *material, ParameterID id, 
     TextureImportConfig texImportConfig;
     if (id == ParameterID::ALBEDO_MAP) {
         texImportConfig.srgb = true;
+        texImportConfig.format = TextureFormat::BC3; // keep base color alpha for cutout/blend
     } else if (id == ParameterID::METALLIC_ROUGHNESS_MAP) {
         texImportConfig.srgb = false;
+        texImportConfig.format = TextureFormat::BC1_RGB; // roughness in G, metallic in B
     } else if (id == ParameterID::NORMAL_MAP) {
         texImportConfig.srgb = false;
+        texImportConfig.format = TextureFormat::BC5; // Z reconstructed in shader via MAT_FLAG_NORMAL_BC5
     } else if (id == ParameterID::AO_MAP) {
         texImportConfig.srgb = false;
+        texImportConfig.format = TextureFormat::BC4; // occlusion in R
     } else if (id == ParameterID::EMISSIVE_MAP) {
         texImportConfig.srgb = true;
+        texImportConfig.format = TextureFormat::BC1_RGB;
     }
 
     auto asset = AssetManager::importAsset(texturePathFS, texImportConfig);

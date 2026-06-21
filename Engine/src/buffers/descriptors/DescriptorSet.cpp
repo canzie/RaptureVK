@@ -33,12 +33,19 @@ const uint32_t DescriptorSet::s_maxStorageImages;
 const uint32_t DescriptorSet::s_maxInputAttachments;
 const uint32_t DescriptorSet::s_maxAccelerationStructures;
 
+// Guards the shared descriptor pool and its usage counters, which are allocated from / freed on
+// multiple threads (texture compression on job workers vs material setup on the main thread)
+// HACK global lock, prefixed g to make the workaround stand out
+static std::mutex gPoolLock;
+
 DescriptorSet::DescriptorSet(const DescriptorSetBindings &bindings)
     : m_layout(VK_NULL_HANDLE), m_set(VK_NULL_HANDLE), m_setNumber(bindings.setNumber)
 {
 
     auto &app = Application::getInstance();
     m_device = app.getVulkanContext().getLogicalDevice();
+
+    std::lock_guard<std::mutex> poolLock(gPoolLock);
 
     // Increment reference count and create pool if needed
     s_poolRefCount++;
@@ -74,6 +81,8 @@ DescriptorSet::~DescriptorSet()
         vkDestroyDescriptorSetLayout(m_device, m_layout, nullptr);
         m_layout = VK_NULL_HANDLE;
     }
+
+    std::lock_guard<std::mutex> poolLock(gPoolLock);
 
     // Decrement counters
     s_poolBufferCount -= m_usedBuffers;
@@ -353,12 +362,12 @@ void DescriptorSet::updateUsedCounts(const DescriptorSetBindings &bindings)
     m_usedInputAttachments = newInputAttachments;
     m_usedAccelerationStructures = newAccelerationStructures;
 
-    RP_CORE_INFO("DescriptorSet: Successfully allocated resources for set {} - "
-                 "Pool usage: Sets {}/{}, Buffers {}/{}, Textures {}/{}, "
-                 "StorageBuffers {}/{}, StorageImages {}/{}, AccelStructs {}/{}",
-                 bindings.setNumber, s_poolRefCount, s_maxSets, s_poolBufferCount, s_maxBuffers, s_poolTextureCount, s_maxTextures,
-                 s_poolStorageBufferCount, s_maxStorageBuffers, s_poolStorageImageCount, s_maxStorageImages,
-                 s_poolAccelerationStructureCount, s_maxAccelerationStructures);
+    RP_CORE_TRACE("DescriptorSet: Successfully allocated resources for set {} - "
+                  "Pool usage: Sets {}/{}, Buffers {}/{}, Textures {}/{}, "
+                  "StorageBuffers {}/{}, StorageImages {}/{}, AccelStructs {}/{}",
+                  bindings.setNumber, s_poolRefCount, s_maxSets, s_poolBufferCount, s_maxBuffers, s_poolTextureCount, s_maxTextures,
+                  s_poolStorageBufferCount, s_maxStorageBuffers, s_poolStorageImageCount, s_maxStorageImages,
+                  s_poolAccelerationStructureCount, s_maxAccelerationStructures);
 }
 
 void DescriptorSet::destroyDescriptorPool()

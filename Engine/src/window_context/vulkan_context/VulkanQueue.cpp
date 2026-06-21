@@ -102,6 +102,8 @@ bool VulkanQueue::flush()
 
 uint64_t VulkanQueue::addToBatch(CommandBuffer *commandBuffer)
 {
+    std::lock_guard<std::mutex> lock(m_cmdBatchMutex);
+
     uint64_t signalValue = m_nextTimelineValue.fetch_add(1);
 
     if (commandBuffer->getCommandPool()) {
@@ -114,7 +116,6 @@ uint64_t VulkanQueue::addToBatch(CommandBuffer *commandBuffer)
         }
     }
 
-    std::lock_guard<std::mutex> lock(m_cmdBatchMutex);
     m_cmdBufferBatch.push_back(commandBuffer);
 
     return signalValue;

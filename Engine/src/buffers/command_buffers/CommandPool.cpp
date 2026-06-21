@@ -173,6 +173,8 @@ CommandPool *CommandPoolManager::getCommandPool(CommandPoolHash cpHash, uint32_t
 
     (void)frameIndex;
 
+    std::lock_guard<std::mutex> lock(m_mutex);
+
     auto it = m_commandPools.find(cpHash);
     if (it == m_commandPools.end()) {
         RP_CORE_ERROR("Command pool not found for hash {}!", cpHash);

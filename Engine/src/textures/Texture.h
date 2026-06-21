@@ -63,6 +63,11 @@ class Texture {
      */
     void markFailed() { m_status.store(TextureStatus::FAILED, std::memory_order_release); }
 
+    /**
+     * @brief Mark the texture as ready
+     */
+    void markReady() { m_status.store(TextureStatus::READY, std::memory_order_release); }
+
     TextureStatus getStatus() const { return m_status.load(std::memory_order_acquire); }
     bool isReady() const { return getStatus() == TextureStatus::READY; }
 
