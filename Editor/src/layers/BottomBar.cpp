@@ -49,7 +49,7 @@ void BottomBar::setupContentBrowserToggle()
             };
         });
 
-    Amethyst::UIScope(*m_window->getOverlayLayer())
+    Amethyst::UIScope(*m_root)
         .popup(
             {
                 .base = {.size = Amethyst::UDim2::fromScale(0.7f, 0.45f)},

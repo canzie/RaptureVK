@@ -147,6 +147,32 @@ static void s_rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool 
     });
 }
 
+static void s_rowColor(Amethyst::TableScope &t, std::string_view label, std::optional<ColorField> &out, const glm::vec3 &initial,
+                       const std::function<void(const glm::vec3 &)> &onChanged)
+{
+    t.row([&](Amethyst::TableRowScope &tr) {
+        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
+        tr.cell([&](Amethyst::UIScope &cell) {
+            cell.frame(
+                {
+                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                    .style = {.backgroundTransparency = 1.0f},
+                },
+                [&](Amethyst::FrameScope &wrap) {
+                    out.emplace(wrap, Amethyst::Color3(initial.x, initial.y, initial.z),
+                                std::vector<std::string>{"generic-input-field"});
+                    out->onColorChanged = [onChanged](const Amethyst::Color4 &c) {
+                        if (onChanged) {
+                            onChanged(glm::vec3(c.r, c.g, c.b));
+                        }
+                    };
+                });
+        });
+    });
+}
+
 static Amethyst::Dropdown *s_rowDropdown(Amethyst::TableScope &t, std::string_view label, std::string_view current,
                                          const std::vector<std::string> &options, const std::function<void(int)> &onSelect)
 {
@@ -283,6 +309,13 @@ void LightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 }
                 m_entity.markDirty();
             });
+        s_rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::LightComponent>().setColor(c);
+            m_entity.markDirty();
+        });
         s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
                 return;
@@ -315,9 +348,13 @@ void LightEditor::sync(const Rapture::Entity &entity)
         return;
     }
     const auto &lc = entity.getComponent<Rapture::LightComponent>();
+    m_color = lc.color;
     m_intensity = lc.intensity;
     m_range = lc.range;
     m_castsShadow = lc.castsShadow;
+    if (m_colorField) {
+        m_colorField->setColor3(Amethyst::Color3(lc.color.x, lc.color.y, lc.color.z));
+    }
 
     if (entityChanged && m_typeDropdown != nullptr) {
         m_typeDropdown->setText(Rapture::lightTypeToString(lc.type));

@@ -12,6 +12,12 @@ enum class SwapMode {
     TripleBuffering // Triple buffering without VSync (uncapped framerate)
 };
 
+enum class CursorMode {
+    NORMAL,   // Cursor visible and free to move
+    HIDDEN,   // Cursor hidden but still free to move within the window
+    DISABLED  // Cursor hidden and locked to the window, reports unbounded relative motion
+};
+
 class WindowContext {
 
   public:

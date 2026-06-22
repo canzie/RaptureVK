@@ -3,6 +3,10 @@
 
 #include "ComponentEditorBase.h"
 #include "Icons.h"
+#include "layers/panels/components/color_field.h"
+
+#include <glm/glm.hpp>
+#include <optional>
 
 class TransformEditor : public ComponentEditorBase {
   public:
@@ -26,11 +30,13 @@ class LightEditor : public ComponentEditorBase {
     void sync(const Rapture::Entity &entity) override;
 
   private:
+    glm::vec3 m_color = glm::vec3(1.0f);
     float m_intensity = 1.0f;
     float m_range = 10.0f;
     bool m_castsShadow = false;
 
     Amethyst::Dropdown *m_typeDropdown = nullptr;
+    std::optional<ColorField> m_colorField;
     Rapture::Entity m_entity;
 };
 
