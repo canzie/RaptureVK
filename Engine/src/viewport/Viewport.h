@@ -31,8 +31,16 @@ class Viewport {
     void setCamera(Entity camera);
     Entity getCamera() const { return m_camera; }
 
-    void setCameraController(CameraController *controller) { m_cameraController = controller; }
-    CameraController *getCameraController() const { return m_cameraController; }
+    /**
+     * @brief Editor-only conveniences attached to this viewport, not required for rendering
+     */
+    struct EditorBinding {
+        CameraController *controller = nullptr; ///< Non-owning controller driving this viewport's camera
+        bool hovered = false;                   ///< Cursor is over this viewport's on-screen display
+    };
+
+    EditorBinding &editorBinding() { return m_editorBinding; }
+    const EditorBinding &editorBinding() const { return m_editorBinding; }
 
     void createRenderer(RendererType type);
     Renderer *getRenderer() { return m_renderer.get(); }
@@ -71,7 +79,7 @@ class Viewport {
 
     std::shared_ptr<Scene> m_scene;
     Entity m_camera;
-    CameraController *m_cameraController = nullptr;
+    EditorBinding m_editorBinding;
 
     uint32_t m_width;
     uint32_t m_height;

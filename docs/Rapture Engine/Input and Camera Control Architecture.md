@@ -133,3 +133,7 @@ This whole behavior/scripting system is **game-runtime and deferred** — the ed
 6. Viewport hotbar toggle for Fly ↔ Orbit.
 
 Deferred: `PlayerInput` sugar, gamepad `Input` subclass, the full Player→Controller→Pawn→Character tower + GameMode-style spawning/possession, multi-viewport editing beyond one viewport.
+
+## Note: single-viewport assumption (revisit with multi-viewport)
+
+`EditorLayer` and `ViewportPanel` currently hardcode `ViewportManager::getPrimaryViewport()` — there's one editor camera + controller, registered on the primary viewport, and `EditorBinding.hovered` is pushed/read on it. The intended multi-viewport model: creating a viewport spawns its own camera + controller, and the hovered viewport becomes the active input target (the focus router decides which viewport's controller the one editor `Input` drives). The `EditorBinding` struct on the viewport and the `hovered` flag are the seeds of that; the router is the missing piece. Until then, primary-viewport-only is the simplification.

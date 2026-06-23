@@ -71,15 +71,25 @@ void EditorLayer::onUpdate(float dt)
         return;
     }
 
+    bool hovered = false;
     auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
-    if (viewport != nullptr && !m_registeredOnViewport) {
-        viewport->setCamera(m_cameraEntity);
-        viewport->setCameraController(m_controller.get());
-        m_registeredOnViewport = true;
+    if (viewport != nullptr) {
+        if (!m_registeredOnViewport) {
+            viewport->setCamera(m_cameraEntity);
+            viewport->editorBinding().controller = m_controller.get();
+            m_registeredOnViewport = true;
+        }
+        hovered = viewport->editorBinding().hovered;
     }
 
     m_input->onUpdate();
-    Rapture::ControlInput intent = s_mapEditorCameraInput(*m_input);
+
+    // Active while hovering, or while an interaction already holds the cursor captured
+    bool active = hovered || m_controller->desiresCursorCapture();
+    Rapture::ControlInput intent;
+    if (active) {
+        intent = s_mapEditorCameraInput(*m_input);
+    }
     m_controller->update(dt, intent);
     m_input->setCursorMode(m_controller->desiresCursorCapture() ? Rapture::CursorMode::DISABLED : Rapture::CursorMode::NORMAL);
 }

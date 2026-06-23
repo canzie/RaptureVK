@@ -55,7 +55,11 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar)
                 .style = {.cornerRadius = 2.0f},
                 .image = {.scaleType = Amethyst::ImageScaleType::STRETCH},
             },
-            [this](Amethyst::ImageLabelScope &img) { m_viewportImage = &img.component; });
+            [this](Amethyst::ImageLabelScope &img) {
+                m_viewportImage = &img.component;
+                m_viewportImage->track(
+                    m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
+            });
 
     m_gizmo = std::make_unique<Amethyst::Gizmo>(m_viewportImage);
 
@@ -165,7 +169,7 @@ Rapture::CameraController *ViewportPanel::cameraController() const
     if (viewport == nullptr) {
         return nullptr;
     }
-    return viewport->getCameraController();
+    return viewport->editorBinding().controller;
 }
 
 void ViewportPanel::syncCameraModeButton()
@@ -186,6 +190,11 @@ void ViewportPanel::onUpdate(float dt)
 {
     updateGizmo();
     syncCameraModeButton();
+
+    auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+    if (viewport != nullptr) {
+        viewport->editorBinding().hovered = m_viewportHovered;
+    }
 }
 
 void ViewportPanel::updateGizmo()
