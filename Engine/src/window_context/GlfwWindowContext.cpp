@@ -94,6 +94,52 @@ void GlfwWindowContext::waitEvents() const
     glfwWaitEvents();
 }
 
+void GlfwWindowContext::setCursorMode(CursorMode mode)
+{
+    m_cursorMode = mode;
+
+    int glfwMode = GLFW_CURSOR_NORMAL;
+    switch (mode) {
+    case CursorMode::NORMAL:
+        glfwMode = GLFW_CURSOR_NORMAL;
+        break;
+    case CursorMode::HIDDEN:
+        glfwMode = GLFW_CURSOR_HIDDEN;
+        break;
+    case CursorMode::DISABLED:
+        glfwMode = GLFW_CURSOR_DISABLED;
+        break;
+    }
+    glfwSetInputMode(m_glfwWindow, GLFW_CURSOR, glfwMode);
+
+    if (glfwRawMouseMotionSupported()) {
+        glfwSetInputMode(m_glfwWindow, GLFW_RAW_MOUSE_MOTION, mode == CursorMode::DISABLED ? GLFW_TRUE : GLFW_FALSE);
+    }
+}
+
+CursorMode GlfwWindowContext::getCursorMode() const
+{
+    return m_cursorMode;
+}
+
+bool GlfwWindowContext::isKeyPressed(KeyCode key) const
+{
+    return glfwGetKey(m_glfwWindow, key) == GLFW_PRESS;
+}
+
+bool GlfwWindowContext::isMouseButtonPressed(MouseButton button) const
+{
+    return glfwGetMouseButton(m_glfwWindow, button) == GLFW_PRESS;
+}
+
+glm::vec2 GlfwWindowContext::getCursorPosition() const
+{
+    double x = 0.0;
+    double y = 0.0;
+    glfwGetCursorPos(m_glfwWindow, &x, &y);
+    return glm::vec2(static_cast<float>(x), static_cast<float>(y));
+}
+
 const char **GlfwWindowContext::getExtensions()
 {
     uint32_t glfwExtensionCount = 0;

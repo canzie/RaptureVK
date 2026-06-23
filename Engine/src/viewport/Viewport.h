@@ -13,6 +13,8 @@
 
 namespace Rapture {
 
+class CameraController;
+
 class Viewport {
   public:
     Viewport(const std::string &name, RenderContext renderContext, SceneRenderTarget::TargetType targetType, uint32_t width,
@@ -28,6 +30,9 @@ class Viewport {
 
     void setCamera(Entity camera);
     Entity getCamera() const { return m_camera; }
+
+    void setCameraController(CameraController *controller) { m_cameraController = controller; }
+    CameraController *getCameraController() const { return m_cameraController; }
 
     void createRenderer(RendererType type);
     Renderer *getRenderer() { return m_renderer.get(); }
@@ -66,6 +71,7 @@ class Viewport {
 
     std::shared_ptr<Scene> m_scene;
     Entity m_camera;
+    CameraController *m_cameraController = nullptr;
 
     uint32_t m_width;
     uint32_t m_height;

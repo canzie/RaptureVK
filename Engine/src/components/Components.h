@@ -12,7 +12,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "components/systems/BoundingBox.h"
-#include "components/systems/CameraController.h"
 #include "components/systems/Transforms.h"
 
 #include "renderer/Frustum.h"
@@ -120,20 +119,6 @@ struct CameraComponent {
         glm::vec3 position = transform.translation();
         camera.updateViewMatrix(position, front);
         frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
-    }
-};
-
-// Controller component - now only holds data, logic is in CameraController class
-struct CameraControllerComponent {
-    // Use the controller class for logic
-    CameraController controller;
-
-    CameraControllerComponent() : controller() {}
-
-    // Simple wrapper that delegates to the controller update
-    void update(float deltaTime, TransformComponent &transform, CameraComponent &camera)
-    {
-        controller.update(deltaTime, transform, camera);
     }
 };
 

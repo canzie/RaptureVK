@@ -2,9 +2,12 @@
 
 #include "Icons.h"
 #include "components/Components.h"
+#include "components/systems/CameraController.h"
 #include "events/GameEvents.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/SceneManager.h"
+#include "viewport/Viewport.h"
+#include "window_context/Application.h"
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
@@ -133,6 +136,45 @@ void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
                 return Amethyst::EventResult::CONSUMED;
             };
         });
+    f.textButton(
+        {
+            .base = {.size = HEADER_BTN_SIZE},
+            .text = HEADER_BTN_TEXT,
+            .label = "Orbit",
+        },
+        [this](Amethyst::TextButtonScope &b) {
+            m_cameraModeBtn = &b.component;
+            b.component.onMouseButton1ClickCb = [this]() {
+                auto *controller = cameraController();
+                if (controller == nullptr) {
+                    return Amethyst::EventResult::CONSUMED;
+                }
+                if (controller->getMode() == Rapture::CameraControlMode::FLY) {
+                    controller->setMode(Rapture::CameraControlMode::ORBIT);
+                } else {
+                    controller->setMode(Rapture::CameraControlMode::FLY);
+                }
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
+}
+
+Rapture::CameraController *ViewportPanel::cameraController() const
+{
+    auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+    if (viewport == nullptr) {
+        return nullptr;
+    }
+    return viewport->getCameraController();
+}
+
+void ViewportPanel::syncCameraModeButton()
+{
+    auto *controller = cameraController();
+    if (controller == nullptr || m_cameraModeBtn == nullptr) {
+        return;
+    }
+    m_cameraModeBtn->setText(controller->getMode() == Rapture::CameraControlMode::FLY ? "Fly" : "Orbit");
 }
 
 void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
@@ -143,6 +185,7 @@ void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
 void ViewportPanel::onUpdate(float dt)
 {
     updateGizmo();
+    syncCameraModeButton();
 }
 
 void ViewportPanel::updateGizmo()

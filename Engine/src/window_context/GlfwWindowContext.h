@@ -29,6 +29,13 @@ class GlfwWindowContext : public WindowContext {
     void getFramebufferSize(int *width, int *height) const override;
     void waitEvents() const override;
 
+    void setCursorMode(CursorMode mode) override;
+    CursorMode getCursorMode() const override;
+
+    bool isKeyPressed(KeyCode key) const override;
+    bool isMouseButtonPressed(MouseButton button) const override;
+    glm::vec2 getCursorPosition() const override;
+
     const char **getExtensions() override;
     uint32_t getExtensionCount() override;
 
@@ -52,6 +59,7 @@ class GlfwWindowContext : public WindowContext {
   private:
     GLFWwindow *m_glfwWindow;
     const char *m_title;
+    CursorMode m_cursorMode = CursorMode::NORMAL;
 };
 
 } // namespace Rapture

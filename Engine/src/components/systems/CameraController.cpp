@@ -1,119 +1,114 @@
 #include "CameraController.h"
+
 #include "components/Components.h"
+
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
 
-#include "events/InputEvents.h"
-#include "input/Keybinds.h"
+#include <cmath>
 
-Rapture::CameraController::CameraController()
+namespace Rapture {
+
+static const glm::vec3 WORLD_UP = glm::vec3(0.0f, 1.0f, 0.0f);
+
+CameraController::CameraController(Entity camera) : m_camera(camera)
 {
-    mouseListenerID = InputEvents::onMouseMoved().addListener([this](float x, float y) {
-        m_mouseOffset = glm::vec2(x - m_lastMousePos.x, m_lastMousePos.y - y);
-        m_lastMousePos = glm::vec2(x, y);
-    });
-
-    keyboardPressedListenerID = InputEvents::onKeyPressed().addListener([this](int key, int repeat) {
-        (void)repeat;
-        m_keysPressed[key] = true;
-    });
-
-    keyboardReleasedListenerID = InputEvents::onKeyReleased().addListener([this](int key) { m_keysPressed[key] = false; });
+    recalcFront();
 }
 
-Rapture::CameraController::~CameraController()
+void CameraController::setMode(CameraControlMode mode)
 {
-    InputEvents::onMouseMoved().removeListener(mouseListenerID);
-    InputEvents::onKeyPressed().removeListener(keyboardPressedListenerID);
-    InputEvents::onKeyReleased().removeListener(keyboardReleasedListenerID);
+    if (mode == m_mode) {
+        return;
+    }
+    m_mode = mode;
+    if (mode == CameraControlMode::ORBIT) {
+        m_recenterFocus = true;
+    }
 }
 
-void Rapture::CameraController::update(float ts, TransformComponent &transform, CameraComponent &camera)
+void CameraController::update(float dt, const ControlInput &input)
 {
-    // Ensure time is in seconds
-    float deltaTime = ts;
-    if (deltaTime > 0.1f) {  // Likely in milliseconds
-        deltaTime *= 0.001f; // Convert to seconds
+    if (!m_camera.isValid()) {
+        return;
     }
 
-    // Clamp delta time to avoid huge jumps when framerate drops very low
-    if (deltaTime > 0.1f) {
-        deltaTime = 0.1f;
+    auto [transform, camera] = m_camera.tryGetComponents<TransformComponent, CameraComponent>();
+    if (transform == nullptr || camera == nullptr) {
+        return;
     }
 
-    if (!s_isMouseLocked) {
-        handleMouseInput(deltaTime);
+    if (input.releaseControl) {
+        setMode(CameraControlMode::ORBIT);
     }
 
-    handleKeyboardInput(deltaTime, transform);
+    if (m_mode == CameraControlMode::FLY) {
+        updateFly(dt, input, *transform);
+    } else {
+        updateOrbit(input, *transform);
+    }
 
-    // Update camera view matrix
-    camera.updateViewMatrix(transform, cameraFront);
+    camera->updateViewMatrix(*transform, m_front);
 }
 
-void Rapture::CameraController::handleMouseInput(float deltaTime)
+void CameraController::updateFly(float dt, const ControlInput &input, TransformComponent &transform)
 {
-    (void)deltaTime;
+    m_desiresCapture = true;
 
-    // Mouse sensitivity is now in degrees per second
-    m_mouseOffset *= mouseSensitivity;
+    m_yaw += input.look.x * mouseSensitivity;
+    m_pitch -= input.look.y * mouseSensitivity;
+    m_pitch = glm::clamp(m_pitch, -maxPitch, maxPitch);
+    recalcFront();
 
-    yaw += m_mouseOffset.x;
-    pitch += m_mouseOffset.y;
+    glm::vec3 right = glm::normalize(glm::cross(m_front, WORLD_UP));
+    float distance = movementSpeed * dt;
 
-    // Clamp pitch to avoid flipping
-    if (pitch > 89.0f) pitch = 89.0f;
-    if (pitch < -89.0f) pitch = -89.0f;
+    glm::vec3 position = transform.translation();
+    position += right * input.move.x * distance;
+    position += WORLD_UP * input.move.y * distance;
+    position += m_front * input.move.z * distance;
+    transform.transforms.setTranslation(position);
+}
 
-    // Update camera front direction
+void CameraController::updateOrbit(const ControlInput &input, TransformComponent &transform)
+{
+    if (m_recenterFocus) {
+        m_focusPoint = transform.translation() + m_front * m_focusDistance;
+        m_recenterFocus = false;
+    }
+
+    m_desiresCapture = input.orbit;
+
+    if (input.orbit) {
+        glm::vec3 right = glm::normalize(glm::cross(m_front, WORLD_UP));
+        glm::vec3 up = glm::normalize(glm::cross(right, m_front));
+        if (input.pan) {
+            float scale = panSpeed * m_focusDistance;
+            m_focusPoint += (-right * input.look.x + up * input.look.y) * scale;
+        } else {
+            m_yaw += input.look.x * orbitSensitivity;
+            m_pitch -= input.look.y * orbitSensitivity;
+            m_pitch = glm::clamp(m_pitch, -maxPitch, maxPitch);
+            recalcFront();
+        }
+    }
+
+    if (input.zoom != 0.0f) {
+        m_focusDistance *= (1.0f - input.zoom * zoomSpeed);
+        if (m_focusDistance < 0.1f) {
+            m_focusDistance = 0.1f;
+        }
+    }
+
+    transform.transforms.setTranslation(m_focusPoint - m_front * m_focusDistance);
+}
+
+void CameraController::recalcFront()
+{
     glm::vec3 front;
-    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    front.y = sin(glm::radians(pitch));
-    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    cameraFront = glm::normalize(front);
+    front.x = std::cos(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
+    front.y = std::sin(glm::radians(m_pitch));
+    front.z = std::sin(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
+    m_front = glm::normalize(front);
 }
 
-void Rapture::CameraController::handleKeyboardInput(float deltaTime, TransformComponent &transform)
-{
-
-    // Calculate right vector for strafing
-    glm::vec3 right = glm::normalize(glm::vec3(cameraFront.z, 0.0f, -cameraFront.x));
-
-    // Calculate actual movement distance based on speed and delta time
-    float moveDistance = movementSpeed * deltaTime;
-    glm::vec3 currentTranslation = transform.translation();
-    // Handle movement keys - using separate if statements allows for diagonal movement
-    if (m_keysPressed[static_cast<int>(Rapture::KeyAction::MoveLeft)]) {
-        currentTranslation += moveDistance * right;
-    }
-
-    if (m_keysPressed[static_cast<int>(Rapture::KeyAction::MoveRight)]) {
-        currentTranslation -= moveDistance * right;
-    }
-
-    if (m_keysPressed[static_cast<int>(Rapture::KeyAction::MoveForward)]) {
-        currentTranslation += moveDistance * cameraFront;
-    }
-
-    if (m_keysPressed[static_cast<int>(Rapture::KeyAction::MoveBackward)]) {
-        currentTranslation -= moveDistance * cameraFront;
-    }
-
-    if (m_keysPressed[static_cast<int>(Rapture::KeyAction::MoveUp)]) {
-        currentTranslation.y += moveDistance;
-    }
-
-    if (m_keysPressed[static_cast<int>(Rapture::KeyAction::MoveDown)]) {
-        currentTranslation.y -= moveDistance;
-    }
-
-    if (m_keysPressed[static_cast<int>(Rapture::KeyAction::MouseLock)]) {
-        s_isMouseLocked = true;
-    }
-
-    if (m_keysPressed[static_cast<int>(Rapture::KeyAction::MouseUnlock)]) {
-        s_isMouseLocked = false;
-    }
-
-    transform.transforms.setTranslation(currentTranslation);
-}
+} // namespace Rapture

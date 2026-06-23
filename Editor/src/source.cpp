@@ -1,4 +1,5 @@
 #include "layers/TestLayer.h"
+#include "layers/EditorLayer.h"
 #include "layers/AmethystLayer.h"
 #include "logging/Log.h"
 #include "window_context/Application.h"
@@ -20,8 +21,11 @@ class EditorApp : public Rapture::Application {
         // Initialize event listeners
         setupEventHandlers();
 
-        // Push main editor layer
+        // Push scene bootstrap layer
         pushLayer(new TestLayer());
+
+        // Push editor view layer (camera, controller, input)
+        pushLayer(new EditorLayer());
 
         // Push Amethyst UI layer as an overlay so it renders on top
 

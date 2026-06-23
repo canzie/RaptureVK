@@ -11,6 +11,10 @@
 
 #include <memory>
 
+namespace Rapture {
+class CameraController;
+}
+
 class ViewportPanel : public Panel {
   public:
     ViewportPanel(Amethyst::TabBar *tabBar);
@@ -31,6 +35,8 @@ class ViewportPanel : public Panel {
   private:
     void updateGizmo();
     void setupHeader(Amethyst::FrameScope &f);
+    void syncCameraModeButton();
+    Rapture::CameraController *cameraController() const;
 
   private:
     Amethyst::Frame *m_root = nullptr;
@@ -41,6 +47,7 @@ class ViewportPanel : public Panel {
     Amethyst::TextButton *m_rotateBtn = nullptr;
     Amethyst::TextButton *m_scaleBtn = nullptr;
     Amethyst::TextButton *m_spaceBtn = nullptr;
+    Amethyst::TextButton *m_cameraModeBtn = nullptr;
 
     std::unique_ptr<Amethyst::Gizmo> m_gizmo;
     Amethyst::GizmoOperation m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE;

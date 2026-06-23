@@ -36,8 +36,6 @@ class TestLayer : public Rapture::Layer {
     void notifyCameraChange();
 
   private:
-    // Camera references
-    Rapture::Entity m_cameraEntity;
     size_t m_sceneActivatedListenerId;
 
     // FPS counter variables

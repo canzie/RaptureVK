@@ -60,25 +60,6 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
         return;
     }
 
-    // Create camera entity
-    m_cameraEntity = activeScene->createEntity("Main Camera");
-    activeScene->setMainCamera(m_cameraEntity);
-
-    // Add transform component - position for Sponza scene
-    auto &transform = m_cameraEntity.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f, 0.0f, 5.0f), // Position
-                                                                               glm::vec3(0.0f, 0.0f, 0.0f), // Rotation
-                                                                               glm::vec3(1.0f, 1.0f, 1.0f)  // Scale
-    );
-
-    // Add camera component with extended far plane for Sponza
-    auto &camera = m_cameraEntity.addComponent<Rapture::CameraComponent>(90.0f, 16.0f / 9.0f, 0.1f, 200.0f);
-    camera.isMainCamera = true;
-
-    // Add camera controller component
-    auto &controller = m_cameraEntity.addComponent<Rapture::CameraControllerComponent>();
-    controller.controller.mouseSensitivity = 0.1f;
-    controller.controller.movementSpeed = 5.0f;
-
     // Get project paths
     auto &app = Rapture::Application::getInstance();
     auto &project = app.getProject();
@@ -229,16 +210,6 @@ void TestLayer::onUpdate(float ts)
     // Get the active scene from SceneManager
     auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
     if (!activeScene) return;
-
-    // Update camera if it exists
-    if (m_cameraEntity.isValid() && m_cameraEntity.hasComponent<Rapture::CameraControllerComponent>()) {
-        auto &controller = m_cameraEntity.getComponent<Rapture::CameraControllerComponent>();
-        auto &transform = m_cameraEntity.getComponent<Rapture::TransformComponent>();
-        auto &camera = m_cameraEntity.getComponent<Rapture::CameraComponent>();
-
-        // Update camera using the simplified controller method
-        controller.update(ts, transform, camera);
-    }
 
     // Update FPS counter
     m_fpsCounter++;

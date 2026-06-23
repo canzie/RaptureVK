@@ -23,12 +23,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Editor Component Fields.md",
+                "file": "Input and Camera Control Architecture.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Editor Component Fields"
+              "title": "Input and Camera Control Architecture"
             }
           }
         ],
@@ -196,6 +196,7 @@
   },
   "active": "af05d3e544519b29",
   "lastOpenFiles": [
+    "Editor Component Fields.md",
     "Editor Layout Design.md",
     "The Rapture Editor.md",
     "Editor Layout Design.md.tmp.3259.2d61ac9f9b47",

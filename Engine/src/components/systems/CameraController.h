@@ -1,50 +1,82 @@
-#pragma once
+#ifndef RAPTURE__CAMERA_CONTROLLER_H
+#define RAPTURE__CAMERA_CONTROLLER_H
 
-#include <functional>
+#include "input/ControlInput.h"
+#include "scenes/entities/Entity.h"
+
 #include <glm/glm.hpp>
-#include <map>
 
 namespace Rapture {
 
-// Forward declaration
 struct TransformComponent;
-struct CameraComponent;
 
+enum class CameraControlMode {
+    FLY,  // WASD movement with mouse-look, cursor captured
+    ORBIT // orbit / pan / zoom around a focus point
+};
+
+/**
+ * @brief Drives a free (spectator/editor) camera entity from ControlInput.
+ */
 class CameraController {
   public:
-    CameraController();
-    ~CameraController();
+    /**
+     * @brief Construct a controller that possesses a camera entity.
+     * @param camera Camera entity to drive; needs a Transform and a Camera component.
+     */
+    explicit CameraController(Entity camera);
 
-    // Main update method - handles input and updates camera
-    void update(float deltaTime, TransformComponent &transform, CameraComponent &camera);
+    /**
+     * @brief Advance the possessed camera from this frame's intent.
+     * @param dt Delta time in seconds.
+     * @param input Device-agnostic input for this frame.
+     */
+    void update(float dt, const ControlInput &input);
 
-    // Input sensitivity settings
+    /**
+     * @brief Get the active control mode.
+     * @return The current mode.
+     */
+    CameraControlMode getMode() const { return m_mode; }
+
+    /**
+     * @brief Switch control mode.
+     * @param mode Mode to switch to.
+     */
+    void setMode(CameraControlMode mode);
+
+    /**
+     * @brief Whether the camera wants the cursor captured this frame.
+     * @return True if the cursor should be locked (DISABLED).
+     */
+    bool desiresCursorCapture() const { return m_desiresCapture; }
+
     float mouseSensitivity = 0.1f;
     float movementSpeed = 5.0f;
-
-    // Controller state
-    float yaw = -90.0f;
-    float pitch = 0.0f;
-    bool constrainPitch = true;
+    float orbitSensitivity = 0.3f;
+    float panSpeed = 0.0015f;
+    float zoomSpeed = 0.15f;
     float maxPitch = 89.0f;
 
-    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-
   private:
-    glm::vec2 m_lastMousePos = {0.0f, 0.0f};
-    glm::vec2 m_mouseOffset = {0.0f, 0.0f};
+    void updateFly(float dt, const ControlInput &input, TransformComponent &transform);
+    void updateOrbit(const ControlInput &input, TransformComponent &transform);
+    void recalcFront();
 
-    bool s_isMouseLocked = true;
+    Entity m_camera;
+    CameraControlMode m_mode = CameraControlMode::ORBIT;
 
-    // Input handling methods
-    void handleKeyboardInput(float ts, TransformComponent &transform);
-    void handleMouseInput(float ts);
+    float m_yaw = -90.0f;
+    float m_pitch = 0.0f;
+    glm::vec3 m_front = {0.0f, 0.0f, -1.0f};
 
-    size_t mouseListenerID;
-    size_t keyboardPressedListenerID;
-    size_t keyboardReleasedListenerID;
+    glm::vec3 m_focusPoint = {0.0f, 0.0f, 0.0f};
+    float m_focusDistance = 5.0f;
+    bool m_recenterFocus = true;
 
-    std::map<int, bool> m_keysPressed;
+    bool m_desiresCapture = false;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__CAMERA_CONTROLLER_H
