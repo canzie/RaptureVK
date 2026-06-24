@@ -23,9 +23,11 @@ Every statement below is taken from the current source; file:line references are
 - `AmethystLayer::onUpdate` is now record-only: `beginFrame` → tick UI + register viewport texture → `m_backend.record` into `frame.imageView` → `endFrame`. All acquire/semaphore/submit/present/frame-index state moved out of the editor; `beginDynamicRendering/endDynamicRendering` take the image index as a param.
 - Minimized skip is now push-based: GLFW iconify callback sets `WindowContext::isMinimized()`; `beginFrame` early-returns on it (no per-frame `getFramebufferSize` poll). The per-window resize→recreate flag also moved onto `RenderWindow`.
 
-**Phase 2 — remaining / Phase 3+:**
+**Phase 2 — remaining:**
 - **DONE:** `onSwapChainRecreated` now carries a `uint32_t` swapchain id; `DeferredRenderer` and `AmethystLayer` filter to their own swapchain (`getMainWindow().getSwapChain()->getID()`).
 - The `DeferredRenderer` `TargetType::SWAPCHAIN` path still has its own inline acquire/submit/present (runtime/no-editor mode, not active in editor) — unify it onto `RenderWindow::beginFrame/endFrame` once runtime mode is actually exercised.
+
+**Phase 3 — DONE (per-window input):** smaller than first scoped, because `Input` (`input/Input.{h,cpp}`) already *polls* a specific `WindowContext` for keys/buttons/cursor, and the global key/mouse-button/mouse-move `InputEvents` have **no Rapture consumers** (Amethyst reads input via its own chained GLFW callbacks). The only global-event leak was scroll — now per-window: GLFW `scrollCallback` routes through the window user pointer and accumulates onto `WindowContext::m_scrollAccumulator`; `Input::onUpdate` reads `WindowContext::consumeScrollDelta()`. The minimized flag was already pushed the same way (iconify callback). The vestigial key/mouse `InputEvents` publishes are left in place (harmless, no consumers). Per-window window-close attribution stays with Phase 4 (no secondary windows exist yet).
 - `Application::run()` still drives the present indirectly through the `AmethystLayer` overlay; moving orchestration to a per-window loop in `run()` comes with Phase 4 (multiple windows).
 - Per-window input routing (Phase 3) and detach-on-the-fly + Amethyst per-window root (Phase 4).
 
@@ -138,3 +140,13 @@ Owns `{ WindowContext, VkSurfaceKHR, SwapChain }`. API roughly: `create(VulkanCo
 The UI library is already decoupled from the swapchain: `AmVulkanInitInfo` takes `device/colorFormat/imageCount/extent` (`AmethystLayer.cpp:107-119`) and `m_backend.record(cmd, drawList)` renders into whatever image view is handed to it (`AmethystLayer.cpp:251-255`). It never touches surface/swapchain/present. Its only OS coupling is `AmGlfwInitInfo.window` (one `GLFWwindow*`, `:122`) and the per-window UI root `Amethyst::Window` (`m_window`).
 
 So per detached `RenderWindow` the editor needs: a new `Amethyst::Window` root (already standalone), the moved panel subtree reparented into it, a UI backend instance pointed at that window's swapchain format/extent (one per window is simplest) with its own glfw input hookup, and per-window texture registration for any viewport shown there. Full Amethyst-side design to follow once `RenderWindow` lands.
+
+### Amethyst per-window input — DONE
+
+An `Amethyst::Window` is a UI root, **not** an OS window; each OS window (`RenderWindow`) pairs one `GLFWwindow` + one `AmVulkanBackend` + one `Amethyst::Window`.
+
+- **Core (`libamethyst`) stays glfw-free.** `InputInterface`'s mouse methods now take a target `Amethyst::Window *` and route to that one window instead of broadcasting to all (`onMouseMove/onMouseButton/onMouseScroll(Window*, …, x, y)`). Removed the global `s_mouseX/Y`. Double-click stays a single global state plus an `s_lastClickWindow` guard (a click can't span windows). Keyboard/char/clipboard/cursor-shape/lock remain **global** (focus-delivered) — shortcuts unaffected.
+- **Backend (glfw, the only glfw-aware layer) owns the native↔window mapping.** Removed the global `g_glfwData`; prev-callback chain + content scale are per-instance members, keyed by a `static unordered_map<GLFWwindow*, AmVulkanBackend*>`. Mouse callbacks resolve the backend, scale by that window's content scale, fetch cursor pos via `glfwGetCursorPos` for button/scroll, and call `InputInterface::onMouse*(m_glfwInfo.uiWindow, …)`.
+- **Registration**: `AmGlfwInitInfo` gains `Amethyst::Window *uiWindow`; the integrator pairs them at `backend.init` (`AmethystLayer` sets `glfwInfo.uiWindow = &m_window`). Core never sees a native handle.
+- **Decision**: only **mouse position** is per-window (buttons/keys filter by position anyway). Verifiable single-window — behaviour identical with one window.
+- **Phase-4 follow-up**: the cursor-shape/lock/clipboard callbacks are global single-assignment capturing the last-init'd window; with multiple windows they should target the **focused** window. Keyboard/text per-window only needed if a detached window ever hosts text input.

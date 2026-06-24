@@ -14,7 +14,6 @@ using KeyTypedEvent = EventBus<unsigned int /*characterCode*/>; // Or char, depe
 using MouseButtonPressedEvent = EventBus<int /*button*/>;
 using MouseButtonReleasedEvent = EventBus<int /*button*/>;
 using MouseMovedEvent = EventBus<float /*xPos*/, float /*yPos*/>;
-using MouseScrolledEvent = EventBus<float /*xOffset*/, float /*yOffset*/>;
 
 // Accessors for Input: Keyboard Events
 inline KeyPressedEvent &onKeyPressed()
@@ -42,10 +41,6 @@ inline MouseButtonReleasedEvent &onMouseButtonReleased()
 inline MouseMovedEvent &onMouseMoved()
 {
     return EventRegistry::getInstance().getEventBus<float, float>("MouseMoved");
-}
-inline MouseScrolledEvent &onMouseScrolled()
-{
-    return EventRegistry::getInstance().getEventBus<float, float>("MouseScrolled");
 }
 
 } // namespace InputEvents

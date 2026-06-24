@@ -39,6 +39,17 @@ class WindowContext {
 
     bool isMinimized() const { return m_minimized; }
 
+    /**
+     * @brief Return scroll accumulated since the last call and reset it.
+     * @return Vertical scroll delta.
+     */
+    float consumeScrollDelta()
+    {
+        float delta = m_scrollAccumulator;
+        m_scrollAccumulator = 0.0f;
+        return delta;
+    }
+
     virtual void waitEvents() const = 0;
 
     virtual const char **getExtensions() = 0;
@@ -90,6 +101,7 @@ class WindowContext {
     } m_context_data;
 
     bool m_minimized = false;
+    float m_scrollAccumulator = 0.0f;
 
   private:
     SwapMode m_swapMode = SwapMode::Immediate;

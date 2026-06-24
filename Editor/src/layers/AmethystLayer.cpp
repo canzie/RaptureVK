@@ -121,6 +121,7 @@ void AmethystLayer::onAttach()
 
     Amethyst::AmGlfwInitInfo glfwInfo{};
     glfwInfo.window = static_cast<GLFWwindow *>(window.getNativeWindowContext());
+    glfwInfo.uiWindow = &m_window;
 
     m_backend.init(initInfo, glfwInfo);
 

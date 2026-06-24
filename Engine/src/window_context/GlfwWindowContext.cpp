@@ -227,9 +227,11 @@ void GlfwWindowContext::cursorPosCallback(GLFWwindow *window, double xpos, doubl
 
 void GlfwWindowContext::scrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
-    (void)window;
-    // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
-    InputEvents::onMouseScrolled().publish(static_cast<float>(xoffset), static_cast<float>(yoffset));
+    (void)xoffset;
+    GlfwWindowContext *context = static_cast<GlfwWindowContext *>(glfwGetWindowUserPointer(window));
+    if (context != nullptr) {
+        context->m_scrollAccumulator += static_cast<float>(yoffset);
+    }
 }
 
 void GlfwWindowContext::windowFocusCallback(GLFWwindow *window, int focused)
@@ -246,7 +248,7 @@ void GlfwWindowContext::windowFocusCallback(GLFWwindow *window, int focused)
 void GlfwWindowContext::windowIconifyCallback(GLFWwindow *window, int iconified)
 {
     GlfwWindowContext *context = static_cast<GlfwWindowContext *>(glfwGetWindowUserPointer(window));
-    if (context) {
+    if (context != nullptr) {
         context->m_minimized = (iconified != 0);
     }
 }

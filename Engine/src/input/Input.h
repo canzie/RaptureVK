@@ -6,8 +6,6 @@
 
 #include <glm/glm.hpp>
 
-#include <cstddef>
-
 namespace Rapture {
 
 /**
@@ -75,10 +73,8 @@ class Input {
     WindowContext *m_window = nullptr;
     glm::vec2 m_lastMousePos = {0.0f, 0.0f};
     glm::vec2 m_mouseDelta = {0.0f, 0.0f};
-    float m_scrollAccumulator = 0.0f;
     float m_scrollDelta = 0.0f;
     bool m_skipNextDelta = true;
-    std::size_t m_scrollListenerId = 0;
 };
 
 } // namespace Rapture

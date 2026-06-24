@@ -1,20 +1,13 @@
 #include "Input.h"
 
-#include "events/InputEvents.h"
-
 namespace Rapture {
 
 Input::Input(WindowContext *window) : m_window(window)
 {
-    m_scrollListenerId = InputEvents::onMouseScrolled().addListener([this](float xOffset, float yOffset) {
-        (void)xOffset;
-        m_scrollAccumulator += yOffset;
-    });
 }
 
 Input::~Input()
 {
-    InputEvents::onMouseScrolled().removeListener(m_scrollListenerId);
 }
 
 bool Input::isKeyPressed(KeyCode key) const
@@ -69,8 +62,7 @@ void Input::onUpdate()
     }
     m_lastMousePos = position;
 
-    m_scrollDelta = m_scrollAccumulator;
-    m_scrollAccumulator = 0.0f;
+    m_scrollDelta = (m_window != nullptr) ? m_window->consumeScrollDelta() : 0.0f;
 }
 
 } // namespace Rapture
