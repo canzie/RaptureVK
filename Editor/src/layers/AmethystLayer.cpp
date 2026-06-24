@@ -36,8 +36,12 @@ AmethystLayer::AmethystLayer()
     auto themePath = rootPath / "assets/themes/theme.ams";
     Amethyst::Style::load(themePath);
 
-    Rapture::ApplicationEvents::onSwapChainRecreated().addListener(
-        [this](std::shared_ptr<Rapture::SwapChain> swapChain) { onResize(); });
+    Rapture::ApplicationEvents::onSwapChainRecreated().addListener([this](uint32_t swapChainID) {
+        if (swapChainID != Rapture::Application::getInstance().getMainWindow().getSwapChain()->getID()) {
+            return;
+        }
+        onResize();
+    });
 }
 
 AmethystLayer::~AmethystLayer()

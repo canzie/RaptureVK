@@ -14,7 +14,7 @@ using WindowResizeEvent = EventBus<unsigned int /*width*/, unsigned int /*height
 using WindowFocusEvent = EventBus<>;
 using WindowLostFocusEvent = EventBus<>;
 using WindowMovedEvent = EventBus<unsigned int /*xPos*/, unsigned int /*yPos*/>;
-using SwapChainRecreatedEvent = EventBus<std::shared_ptr<SwapChain>>;
+using SwapChainRecreatedEvent = EventBus<uint32_t /*swapChainID*/>;
 using RequestSwapChainRecreationEvent = EventBus<uint32_t /*swapChainID*/>;
 
 // Viewport Events (for Editor)
@@ -44,7 +44,7 @@ inline WindowMovedEvent &onWindowMoved()
 }
 inline SwapChainRecreatedEvent &onSwapChainRecreated()
 {
-    return EventRegistry::getInstance().getEventBus<std::shared_ptr<SwapChain>>("SwapChainRecreated");
+    return EventRegistry::getInstance().getEventBus<uint32_t>("SwapChainRecreated");
 }
 
 inline RequestSwapChainRecreationEvent &onRequestSwapChainRecreation()

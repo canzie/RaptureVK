@@ -63,7 +63,7 @@ void RenderWindow::createSwapChain(VulkanContext &context)
         m_context->waitIdle();
 
         m_swapChain->recreate();
-        ApplicationEvents::onSwapChainRecreated().publish(m_swapChain);
+        ApplicationEvents::onSwapChainRecreated().publish(m_swapChain->getID());
     });
 
     m_resizeListenerID = ApplicationEvents::onWindowResize().addListener(

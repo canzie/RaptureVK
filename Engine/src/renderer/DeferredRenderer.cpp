@@ -52,8 +52,10 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarge
         m_framebufferNeedsResize = true;
     });
 
-    ApplicationEvents::onSwapChainRecreated().addListener([this](std::shared_ptr<SwapChain> swapChain) {
-        (void)swapChain;
+    ApplicationEvents::onSwapChainRecreated().addListener([this](uint32_t swapChainID) {
+        if (swapChainID != m_swapChain->getID()) {
+            return;
+        }
         onSwapChainRecreated();
     });
 

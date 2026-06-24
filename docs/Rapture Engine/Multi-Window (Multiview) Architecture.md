@@ -24,8 +24,8 @@ Every statement below is taken from the current source; file:line references are
 - Minimized skip is now push-based: GLFW iconify callback sets `WindowContext::isMinimized()`; `beginFrame` early-returns on it (no per-frame `getFramebufferSize` poll). The per-window resize→recreate flag also moved onto `RenderWindow`.
 
 **Phase 2 — remaining / Phase 3+:**
-- `onSwapChainRecreated` is still a global event (consumed by `DeferredRenderer`/`AmethystLayer`); scope it per window.
-- The `DeferredRenderer` `TargetType::SWAPCHAIN` path still has its own inline acquire/submit/present (runtime/no-editor mode) — unify it onto `RenderWindow::beginFrame/endFrame`.
+- **DONE:** `onSwapChainRecreated` now carries a `uint32_t` swapchain id; `DeferredRenderer` and `AmethystLayer` filter to their own swapchain (`getMainWindow().getSwapChain()->getID()`).
+- The `DeferredRenderer` `TargetType::SWAPCHAIN` path still has its own inline acquire/submit/present (runtime/no-editor mode, not active in editor) — unify it onto `RenderWindow::beginFrame/endFrame` once runtime mode is actually exercised.
 - `Application::run()` still drives the present indirectly through the `AmethystLayer` overlay; moving orchestration to a per-window loop in `run()` comes with Phase 4 (multiple windows).
 - Per-window input routing (Phase 3) and detach-on-the-fly + Amethyst per-window root (Phase 4).
 
