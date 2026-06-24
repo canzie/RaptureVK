@@ -23,12 +23,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Input and Camera Control Architecture.md",
+                "file": "Multi-Window (Multiview) Architecture.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Input and Camera Control Architecture"
+              "title": "Multi-Window (Multiview) Architecture"
             }
           }
         ],
@@ -196,6 +196,7 @@
   },
   "active": "af05d3e544519b29",
   "lastOpenFiles": [
+    "Input and Camera Control Architecture.md",
     "Editor Component Fields.md",
     "Editor Layout Design.md",
     "The Rapture Editor.md",

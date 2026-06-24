@@ -2,6 +2,7 @@
 #define RAPTURE__CONTENT_BROWSER_PANEL_H
 
 #include <amethyst/Amethyst.h>
+#include <components/context_menu.h>
 #include <components/tree_view.h>
 #include <components/ui_scope.h>
 
@@ -35,6 +36,9 @@ class ContentBrowserPanel : public Panel {
     void setupTopBar();
     void setupSideBar();
     void setupContentArea();
+    void setupContextMenu();
+
+    void showContextMenu(Amethyst::vec2 pos, std::vector<Amethyst::ContextMenuItem> items);
 
     void refreshAssetBrowser();
     void refreshFileBrowser();
@@ -79,6 +83,8 @@ class ContentBrowserPanel : public Panel {
     Amethyst::ImageButton *m_goForwardBtn = nullptr;
     Amethyst::ImageButton *m_settingsBtn = nullptr;
     Amethyst::Frame *m_breadcrumbBar = nullptr;
+
+    Amethyst::ContextMenu *m_contextMenu = nullptr;
 
     Amethyst::Frame *m_sideBarPane = nullptr;
     Amethyst::CollapsibleHeader *m_projectHeader = nullptr;

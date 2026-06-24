@@ -163,6 +163,7 @@ void ContentBrowserPanel::buildContent()
     setupTopBar();
     setupSideBar();
     setupContentArea();
+    setupContextMenu();
 
     buildDirectoryTree();
     refresh();
@@ -519,6 +520,20 @@ void ContentBrowserPanel::setupContentArea()
         });
 }
 
+void ContentBrowserPanel::setupContextMenu()
+{
+    m_contextMenu = m_root->add<Amethyst::ContextMenu>();
+}
+
+void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<Amethyst::ContextMenuItem> items)
+{
+    if (m_contextMenu == nullptr) {
+        return;
+    }
+    m_contextMenu->setItems(std::move(items));
+    m_contextMenu->showAt(pos);
+}
+
 void ContentBrowserPanel::rebuildBreadcrumb()
 {
     if (m_breadcrumbBar == nullptr) {
@@ -643,6 +658,16 @@ void ContentBrowserPanel::refreshAssetBrowser()
             return Amethyst::EventResult::CONSUMED;
         };
 
+        item.action->onMouseButton2DownCb = [this](int32_t x, int32_t y) {
+            showContextMenu(Amethyst::vec2(static_cast<float>(x), static_cast<float>(y)),
+                            {
+                                Amethyst::ContextMenuItem::action("Open", [] {}),
+                                Amethyst::ContextMenuItem::action("Rename", [] {}),
+                                Amethyst::ContextMenuItem::action("Delete", [] {}),
+                            });
+            return Amethyst::EventResult::CONSUMED;
+        };
+
         index++;
     }
 
@@ -702,6 +727,17 @@ void ContentBrowserPanel::refreshFileBrowser()
                 return Amethyst::EventResult::CONSUMED;
             };
         }
+
+        item.action->onMouseButton2DownCb = [this, isDir](int32_t x, int32_t y) {
+            std::vector<Amethyst::ContextMenuItem> items;
+            if (!isDir) {
+                items.push_back(Amethyst::ContextMenuItem::action("Import", [] {}));
+            }
+            items.push_back(Amethyst::ContextMenuItem::action("Rename", [] {}));
+            items.push_back(Amethyst::ContextMenuItem::action("Delete", [] {}));
+            showContextMenu(Amethyst::vec2(static_cast<float>(x), static_cast<float>(y)), std::move(items));
+            return Amethyst::EventResult::CONSUMED;
+        };
 
         index++;
     }

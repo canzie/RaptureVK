@@ -1,5 +1,8 @@
-### UI/Editor
-    - Create some widgets for the color picker
+uncouple the engines core
+    - allow running headless (decoupling of graphics/window related stuff from the core), is a must for future headless servers
+    - allow multiview (a main window may be assumed, editor NEEDS support for multiple)
+
+### ui/editor
     - create a proper material editor workspace
     - create a nice terrain panel
     - set up a good way for settings, these need to then be serialised
@@ -16,7 +19,7 @@
     
 
     - !!! get the editor to a point where we can actually delete entityies, easily add some, even if just cubes/spheres for now. 
-    - FIX THE STENCIL BUFFER FOR RENDERING THE OUTLINE OF SELECTED OBJECTS
+    - fix the stencil buffer for rendering the outline of selected objects
 
 
 - Make rendering things like bounds easier
@@ -30,7 +33,7 @@
 - fix stencil buffer
 - shader hot reloading
 - jolt???
-- parallise/jobify shader compilation
+- parallise/jobify shader compilation (note, current stack size is too small for this, maybe spawn another process and use gslang exec???)
 - add model to the asset manager
   - ditinction between static and dynamic meshes here
   - the asset importer in the editor will be able to set these options and they can be either metadata or ...
