@@ -37,6 +37,8 @@ class WindowContext {
 
     virtual void getFramebufferSize(int *width, int *height) const = 0;
 
+    bool isMinimized() const { return m_minimized; }
+
     virtual void waitEvents() const = 0;
 
     virtual const char **getExtensions() = 0;
@@ -86,6 +88,8 @@ class WindowContext {
         int height;
         int width;
     } m_context_data;
+
+    bool m_minimized = false;
 
   private:
     SwapMode m_swapMode = SwapMode::Immediate;

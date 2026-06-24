@@ -32,19 +32,12 @@ class AmethystLayer : public Rapture::Layer {
 
     void setupMenuBar(glm::vec2 screenSize);
     void setupWorkspaces(glm::vec2 screenSize);
-    void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView);
-    void endDynamicRendering(Rapture::CommandBuffer *commandBuffer);
+    void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex);
+    void endDynamicRendering(Rapture::CommandBuffer *commandBuffer, uint32_t imageIndex);
     void onResize();
 
   private:
     float m_Time = 0.0f;
-    bool m_framebufferNeedsResize = false;
-    size_t m_windowResizeEventListenerID = 0;
-
-    Rapture::CommandPoolHash m_commandPoolHash = 0;
-    uint32_t m_currentFrame = 0;
-    uint32_t m_currentImageIndex = 0;
-    uint32_t m_imageCount = 0;
 
     // Amethyst components
     Amethyst::AmVulkanBackend m_backend;

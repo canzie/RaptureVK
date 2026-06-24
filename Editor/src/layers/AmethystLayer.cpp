@@ -36,9 +36,6 @@ AmethystLayer::AmethystLayer()
     auto themePath = rootPath / "assets/themes/theme.ams";
     Amethyst::Style::load(themePath);
 
-    m_windowResizeEventListenerID = Rapture::ApplicationEvents::onWindowResize().addListener(
-        [this](unsigned int width, unsigned int height) { m_framebufferNeedsResize = true; });
-
     Rapture::ApplicationEvents::onSwapChainRecreated().addListener(
         [this](std::shared_ptr<Rapture::SwapChain> swapChain) { onResize(); });
 }
@@ -162,15 +159,6 @@ void AmethystLayer::onAttach()
     }
 
     m_viewportTextureIds.resize(swapChain->getImageCount());
-
-    Rapture::CommandPoolConfig config;
-    config.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
-    config.flags = 0;
-    config.threadId = 0;
-
-    m_commandPoolHash = vulkanContext.getRenderContext().commandPoolManager->createCommandPool(config);
-    m_imageCount = swapChain->getImageCount();
-    m_currentFrame = 0;
 }
 
 void AmethystLayer::onDetach()
@@ -183,27 +171,12 @@ void AmethystLayer::onUpdate(float ts)
     RAPTURE_PROFILE_FUNCTION();
 
     auto &app = Rapture::Application::getInstance();
-    auto &vulkanContext = app.getVulkanContext();
-    auto swapChain = app.getMainWindow().getSwapChain();
-    auto graphicsQueue = vulkanContext.getGraphicsQueue();
+    auto &mainWindow = app.getMainWindow();
 
-    int fbWidth = 0, fbHeight = 0;
-    app.getMainWindow().getWindowContext()->getFramebufferSize(&fbWidth, &fbHeight);
-    if (fbWidth == 0 || fbHeight == 0) {
+    auto frame = mainWindow.beginFrame();
+    if (!frame.acquired) {
         return;
     }
-
-    int imageIndexi = swapChain->acquireImage(m_currentFrame);
-
-    if (imageIndexi == -1) {
-        m_currentFrame = 0;
-        graphicsQueue->clear();
-        onResize();
-        m_framebufferNeedsResize = false;
-        return;
-    }
-
-    m_currentImageIndex = static_cast<uint32_t>(imageIndexi);
 
     for (auto &ws : m_workspaces) {
         for (auto &panel : ws.panels) {
@@ -212,9 +185,6 @@ void AmethystLayer::onUpdate(float ts)
     }
 
     m_window.tick(ts);
-
-    VkSemaphore imageAvailableSemaphore = swapChain->getImageAvailableSemaphore(m_currentFrame);
-    VkSemaphore renderFinishedSemaphore = swapChain->getRenderFinishedSemaphore(m_currentImageIndex);
 
     auto *sceneViewport = app.getViewportManager().getPrimaryViewport();
     auto *sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
@@ -241,65 +211,18 @@ void AmethystLayer::onUpdate(float ts)
         }
     }
 
-    auto pool = vulkanContext.getRenderContext().commandPoolManager->getCommandPool(m_commandPoolHash, m_currentFrame);
-    auto commandBuffer = pool->getPrimaryCommandBuffer();
-
-    if (commandBuffer->begin(0) != VK_SUCCESS) {
-        Rapture::RP_ERROR("failed to begin recording command buffer for Amethyst!");
-        return;
-    }
-
-    VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
+    VkCommandBuffer cmd = frame.commandBuffer->getCommandBufferVk();
 
     m_amCtx.draw(m_window);
     m_amCtx.sync(static_cast<void *>(cmd));
 
-    auto targetImageView = swapChain->getImageViews()[m_currentImageIndex];
-
-    beginDynamicRendering(commandBuffer, targetImageView);
+    beginDynamicRendering(frame.commandBuffer, frame.imageView, frame.imageIndex);
 
     m_backend.record(cmd, m_amCtx.getDrawList());
 
-    endDynamicRendering(commandBuffer);
+    endDynamicRendering(frame.commandBuffer, frame.imageIndex);
 
-    if (commandBuffer->end() != VK_SUCCESS) {
-        Rapture::RP_ERROR("failed to record command buffer for Amethyst!");
-        return;
-    }
-
-    std::span<VkSemaphore> waitSemaphoresSpan(&imageAvailableSemaphore, 1);
-    std::span<VkSemaphore> signalSemaphoresSpan(&renderFinishedSemaphore, 1);
-    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-    graphicsQueue->submitAndFlushQueue(commandBuffer, &signalSemaphoresSpan, &waitSemaphoresSpan, &waitStage,
-                                       swapChain->getInFlightFence(m_currentFrame));
-
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &renderFinishedSemaphore;
-
-    VkSwapchainKHR swapChains[] = {swapChain->getSwapChainVk()};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &m_currentImageIndex;
-    presentInfo.pResults = nullptr;
-
-    VkResult result = vulkanContext.getPresentQueue()->presentQueue(presentInfo);
-    swapChain->signalImageAvailability(m_currentImageIndex);
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
-        Rapture::ApplicationEvents::onRequestSwapChainRecreation().publish(swapChain->getID());
-        m_framebufferNeedsResize = false;
-        m_currentFrame = 0;
-        onResize();
-        return;
-    } else if (result != VK_SUCCESS) {
-        Rapture::RP_ERROR("failed to present swap chain image!");
-        return;
-    }
-
-    m_currentFrame = (m_currentFrame + 1) % m_imageCount;
+    mainWindow.endFrame();
 }
 
 void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
@@ -443,7 +366,7 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
     }
 }
 
-void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView)
+void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex)
 {
     VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
@@ -469,7 +392,7 @@ void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer,
     toColorAttachment.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     toColorAttachment.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     toColorAttachment.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    toColorAttachment.image = swapChain->getImages()[m_currentImageIndex];
+    toColorAttachment.image = swapChain->getImages()[imageIndex];
     toColorAttachment.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     toColorAttachment.subresourceRange.baseMipLevel = 0;
     toColorAttachment.subresourceRange.levelCount = 1;
@@ -496,7 +419,7 @@ void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer,
     vkCmdBeginRendering(commandBufferVk, &renderingInfo);
 }
 
-void AmethystLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer)
+void AmethystLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer, uint32_t imageIndex)
 {
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
@@ -512,7 +435,7 @@ void AmethystLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer)
     presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    presentBarrier.image = swapChain->getImages()[m_currentImageIndex];
+    presentBarrier.image = swapChain->getImages()[imageIndex];
     presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     presentBarrier.subresourceRange.baseMipLevel = 0;
     presentBarrier.subresourceRange.levelCount = 1;
@@ -555,6 +478,4 @@ void AmethystLayer::onResize()
     }
 
     m_backend.onResize(screenSize);
-
-    m_imageCount = swapChain->getImageCount();
 }

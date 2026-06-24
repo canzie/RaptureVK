@@ -18,7 +18,16 @@ Every statement below is taken from the current source; file:line references are
 - Minimized handling: the old blocking `waitEvents` loop in the recreate path is gone (it would stall every window). The recreate listener early-returns on zero framebuffer, and the present loop (`AmethystLayer::onUpdate`) now skips the frame when the framebuffer is zero-sized.
 - Platform note: no Linux/Wayland/X11 functional code was removed — the runtime detection and surface **instance-extension** selection stay in `VulkanContext::createInstance`/`getRequiredExtensions`. Only the cosmetic per-platform log lines at surface-creation time were dropped (`glfwCreateWindowSurface` is platform-agnostic).
 
-**Phase 2 — NEXT:** lift acquire→submit→present out of `AmethystLayer` into `RenderWindow`, driven per-window by `Application::run()`; scope `onSwapChainRecreated` per window; verify `Renderer`/frames-in-flight don't assume a single global swapchain.
+**Phase 2 — DONE (present loop lifted):**
+- `RenderWindow::beginFrame()` acquires the next image and hands back an `AcquiredFrame { acquired, imageIndex, imageView, commandBuffer }` with the command buffer already begun (from a per-window present command pool, created lazily on first frame since managers don't exist at `createSwapChain` time). `RenderWindow::endFrame()` ends + submits + presents + advances, and on `OUT_OF_DATE`/`SUBOPTIMAL`/resize publishes the id-scoped recreation request.
+- `AmethystLayer::onUpdate` is now record-only: `beginFrame` → tick UI + register viewport texture → `m_backend.record` into `frame.imageView` → `endFrame`. All acquire/semaphore/submit/present/frame-index state moved out of the editor; `beginDynamicRendering/endDynamicRendering` take the image index as a param.
+- Minimized skip is now push-based: GLFW iconify callback sets `WindowContext::isMinimized()`; `beginFrame` early-returns on it (no per-frame `getFramebufferSize` poll). The per-window resize→recreate flag also moved onto `RenderWindow`.
+
+**Phase 2 — remaining / Phase 3+:**
+- `onSwapChainRecreated` is still a global event (consumed by `DeferredRenderer`/`AmethystLayer`); scope it per window.
+- The `DeferredRenderer` `TargetType::SWAPCHAIN` path still has its own inline acquire/submit/present (runtime/no-editor mode) — unify it onto `RenderWindow::beginFrame/endFrame`.
+- `Application::run()` still drives the present indirectly through the `AmethystLayer` overlay; moving orchestration to a per-window loop in `run()` comes with Phase 4 (multiple windows).
+- Per-window input routing (Phase 3) and detach-on-the-fly + Amethyst per-window root (Phase 4).
 
 ## Run modes
 

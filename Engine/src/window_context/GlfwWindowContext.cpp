@@ -57,7 +57,7 @@ void GlfwWindowContext::initWindow()
     glfwSetCursorPosCallback(m_glfwWindow, GlfwWindowContext::cursorPosCallback);
     glfwSetScrollCallback(m_glfwWindow, GlfwWindowContext::scrollCallback);
     glfwSetWindowFocusCallback(m_glfwWindow, GlfwWindowContext::windowFocusCallback);
-    // glfwSetWindowIconifyCallback(m_glfwWindow, GlfwWindowContext::windowIconifyCallback);
+    glfwSetWindowIconifyCallback(m_glfwWindow, GlfwWindowContext::windowIconifyCallback);
     // glfwSetWindowMaximizeCallback(m_glfwWindow, GlfwWindowContext::windowMaximizeCallback);
 
     RP_CORE_INFO("========== GLFW Window Context Initialized Successfully. ==========");
@@ -243,8 +243,15 @@ void GlfwWindowContext::windowFocusCallback(GLFWwindow *window, int focused)
     }
 }
 
-// Implement windowIconifyCallback and windowMaximizeCallback if needed
-// void GlfwWindowContext::windowIconifyCallback(GLFWwindow* window, int iconified) { ... }
+void GlfwWindowContext::windowIconifyCallback(GLFWwindow *window, int iconified)
+{
+    GlfwWindowContext *context = static_cast<GlfwWindowContext *>(glfwGetWindowUserPointer(window));
+    if (context) {
+        context->m_minimized = (iconified != 0);
+    }
+}
+
+// Implement windowMaximizeCallback if needed
 // void GlfwWindowContext::windowMaximizeCallback(GLFWwindow* window, int maximized) { ... }
 
 WindowContext *WindowContext::createWindow(int width, int height, const char *title)
