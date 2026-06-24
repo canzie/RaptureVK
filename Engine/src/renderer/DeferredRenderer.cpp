@@ -162,7 +162,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene, Entity came
         m_swapChain->signalImageAvailability(imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
-            ApplicationEvents::onRequestSwapChainRecreation().publish();
+            ApplicationEvents::onRequestSwapChainRecreation().publish(m_swapChain->getID());
             return;
         } else if (result != VK_SUCCESS) {
             RP_CORE_ERROR("failed to present swap chain image!");

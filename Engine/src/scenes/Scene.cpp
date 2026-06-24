@@ -21,9 +21,9 @@ Scene::Scene(const std::string &sceneName)
 {
     m_config.sceneName = sceneName;
 
-    auto &vc = Application::getInstance().getVulkanContext();
-    uint32_t frameCount = vc.getSwapChain()->getImageCount();
-    m_renderData = std::make_unique<SceneRenderData>(vc.getRenderContext(), *this, frameCount);
+    auto &app = Application::getInstance();
+    uint32_t frameCount = app.getMainWindow().getSwapChain()->getImageCount();
+    m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, frameCount);
 }
 
 Scene::~Scene()
@@ -117,7 +117,7 @@ void Scene::onUpdate(float dt)
 
     // Get current frame dimensions for camera updates
     auto &app = Application::getInstance();
-    auto swapChain = app.getVulkanContext().getSwapChain();
+    auto swapChain = app.getMainWindow().getSwapChain();
     float width = static_cast<float>(swapChain->getExtent().width);
     float height = static_cast<float>(swapChain->getExtent().height);
     uint32_t frameCount = swapChain->getImageCount();

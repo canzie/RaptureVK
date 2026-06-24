@@ -3,6 +3,8 @@
 
 #include "Events.h" // For EventBus and EventRegistry
 
+#include <cstdint>
+
 namespace Rapture {
 namespace ApplicationEvents {
 
@@ -13,7 +15,7 @@ using WindowFocusEvent = EventBus<>;
 using WindowLostFocusEvent = EventBus<>;
 using WindowMovedEvent = EventBus<unsigned int /*xPos*/, unsigned int /*yPos*/>;
 using SwapChainRecreatedEvent = EventBus<std::shared_ptr<SwapChain>>;
-using RequestSwapChainRecreationEvent = EventBus<>;
+using RequestSwapChainRecreationEvent = EventBus<uint32_t /*swapChainID*/>;
 
 // Viewport Events (for Editor)
 // Triggered when the viewport panel size changes (independent of window size)
@@ -47,7 +49,7 @@ inline SwapChainRecreatedEvent &onSwapChainRecreated()
 
 inline RequestSwapChainRecreationEvent &onRequestSwapChainRecreation()
 {
-    return EventRegistry::getInstance().getEventBus<>("RequestSwapChainRecreation");
+    return EventRegistry::getInstance().getEventBus<uint32_t>("RequestSwapChainRecreation");
 }
 
 // Accessor for Viewport Resize Event

@@ -23,14 +23,14 @@ class VulkanContext {
     VulkanContext(WindowContext *windowContext);
     ~VulkanContext();
 
+    void initDevice(VkSurfaceKHR surface);
+
     void waitIdle();
 
     VkDevice getLogicalDevice() const { return m_device; }
-    VkSurfaceKHR getSurface() const { return m_surface; }
     VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
     VkInstance getInstance() const { return m_instance; }
     QueueFamilyIndices getQueueFamilyIndices() const { return m_queueFamilyIndices; }
-    std::shared_ptr<SwapChain> getSwapChain() const { return m_swapChain; }
 
     VmaAllocator getVmaAllocator() const { return m_vmaAllocator; }
     uint32_t getApiVersion() const { return m_applicationInfo.apiVersion; }
@@ -84,8 +84,7 @@ class VulkanContext {
     PFN_vkCmdDrawMeshTasksIndirectEXT vkCmdDrawMeshTasksIndirectEXT = nullptr;
     PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT = nullptr;
 
-    void initManagers();
-    void createResources();
+    void initManagers(uint32_t framesInFlight);
 
     const RenderContext &getRenderContext() const { return m_renderContext; }
 
@@ -101,18 +100,17 @@ class VulkanContext {
     void setupDebugMessenger();
 
     // setting up physical device
-    void pickPhysicalDevice();
-    bool isDeviceSuitable(VkPhysicalDevice device);
+    void pickPhysicalDevice(VkSurfaceKHR surface);
+    bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
 
     // queue families
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const;
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const;
 
     // logical device
-    void createLogicalDevice();
-    void createWindowsSurface(WindowContext *windowContext);
+    void createLogicalDevice(VkSurfaceKHR surface);
 
     // swapchain
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 
     void createVmaAllocator();
 
@@ -123,12 +121,8 @@ class VulkanContext {
     VkPhysicalDevice m_physicalDevice;
     VkDevice m_device;
 
-    std::shared_ptr<SwapChain> m_swapChain;
-
     std::map<uint32_t, std::shared_ptr<VulkanQueue>> m_queues;
     std::shared_ptr<VulkanQueue> m_vendorQueue;
-
-    VkSurfaceKHR m_surface;
 
     VkDebugUtilsMessengerEXT m_debugMessenger;
 

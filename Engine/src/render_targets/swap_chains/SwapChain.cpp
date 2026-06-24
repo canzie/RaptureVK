@@ -15,9 +15,11 @@ namespace Rapture {
 
 RenderMode SwapChain::renderMode = RenderMode::PRESENTATION;
 
+uint32_t SwapChain::s_nextID = 1;
+
 SwapChain::SwapChain(VkDevice device, VkSurfaceKHR surface, VkPhysicalDevice physicalDevice, QueueFamilyIndices queueFamilyIndices,
                      WindowContext *windowContext)
-    : m_framebufferNeedsResize(false), m_device(device), m_surface(surface), m_physicalDevice(physicalDevice),
+    : m_id(s_nextID++), m_framebufferNeedsResize(false), m_device(device), m_surface(surface), m_physicalDevice(physicalDevice),
       m_queueFamilyIndices(queueFamilyIndices), m_windowContext(windowContext)
 {
     SwapChainSupportDetails2 swapChainSupport = querySwapChainSupport();
@@ -294,7 +296,7 @@ int SwapChain::acquireImage(uint32_t semaphoreIndex)
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || m_framebufferNeedsResize) {
             // resize
-            ApplicationEvents::onRequestSwapChainRecreation().publish();
+            ApplicationEvents::onRequestSwapChainRecreation().publish(m_id);
 
             return -1;
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {

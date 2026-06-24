@@ -42,7 +42,7 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
     m_rc = &vulkanContext.getRenderContext();
-    auto swapchain = vulkanContext.getSwapChain();
+    auto swapchain = app.getMainWindow().getSwapChain();
     m_framesInFlight = swapchain->getImageCount();
     m_allocator = vulkanContext.getVmaAllocator();
 

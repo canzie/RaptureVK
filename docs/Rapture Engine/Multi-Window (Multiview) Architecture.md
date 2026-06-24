@@ -8,6 +8,18 @@ Process-wide rule: one `VkInstance` / `VkDevice` / VMA allocator / queue set for
 
 Every statement below is taken from the current source; file:line references are given so the plan can be re-checked.
 
+## Status
+
+**Phase 1 — DONE** (`RenderWindow` extraction + device/window split, still single window, no behaviour change):
+- New `window_context/RenderWindow.{h,cpp}` owns `{WindowContext, VkSurfaceKHR, SwapChain}`, creates its surface from the shared instance at construction, builds the swapchain via `createSwapChain()` once the device exists, and owns its resize→recreate listener.
+- `VulkanContext` is now device-only: ctor does instance + debug messenger; new `initDevice(VkSurfaceKHR)` does physical/logical device + VMA with the surface **threaded as a parameter** through `pickPhysicalDevice`/`isDeviceSuitable`/`findQueueFamilies`/`querySwapChainSupport`/`createLogicalDevice` (no stored `m_surface`). Removed `m_surface`, `m_swapChain`, `getSurface()`, `getSwapChain()`, `createWindowsSurface()`, `createResources()`. `initManagers(uint32_t framesInFlight)` takes the count instead of reaching into the swapchain.
+- `onRequestSwapChainRecreation` now carries a `uint32_t` swapchain id (`SwapChain::getID()`, ids from 1; 0 = invalid). The 3 publishers pass their swapchain id; each `RenderWindow` ignores ids that aren't its own — no cross-window recreation. No raw `SwapChain*` handed through the event.
+- `Application` holds `m_mainWindow` (declared after `m_vulkanContext` so surface/swapchain tear down before device/instance). `getMainWindow()` added; `getWindowContext()` delegates to it. Callers in `Scene`/`Renderer`/`CascadedShadowMapping`/`AmethystLayer` route through `getMainWindow().getSwapChain()`.
+- Minimized handling: the old blocking `waitEvents` loop in the recreate path is gone (it would stall every window). The recreate listener early-returns on zero framebuffer, and the present loop (`AmethystLayer::onUpdate`) now skips the frame when the framebuffer is zero-sized.
+- Platform note: no Linux/Wayland/X11 functional code was removed — the runtime detection and surface **instance-extension** selection stay in `VulkanContext::createInstance`/`getRequiredExtensions`. Only the cosmetic per-platform log lines at surface-creation time were dropped (`glfwCreateWindowSurface` is platform-agnostic).
+
+**Phase 2 — NEXT:** lift acquire→submit→present out of `AmethystLayer` into `RenderWindow`, driven per-window by `Application::run()`; scope `onSwapChainRecreated` per window; verify `Renderer`/frames-in-flight don't assume a single global swapchain.
+
 ## Run modes
 
 There are two run modes, and the window/present layer must be **optional** so the engine spans both:
@@ -79,7 +91,8 @@ Owns `{ WindowContext, VkSurfaceKHR, SwapChain }`. API roughly: `create(VulkanCo
 - Window-close: today `windowCloseCallback` fires a single global `ApplicationEvents::onWindowClose()` (`GlfwWindowContext.cpp:165`). Make it identify the window — closing a detached window destroys that `RenderWindow`; closing the main window exits.
 
 ### `events/ApplicationEvents`
-- `onWindowResize`, `onWindowClose`, `onSwapChainRecreated`, `onRequestSwapChainRecreation`, `onWindowFocus/LostFocus` are global with no window id (publish sites: `GlfwWindowContext.cpp:165,180,234`; `SwapChain.cpp:297`; consumed `AmethystLayer.cpp:39,42`). Add a window identifier (or move to per-`RenderWindow` signals).
+- **DONE:** `onRequestSwapChainRecreation` now carries a `uint32_t` swapchain id; each `RenderWindow` filters to its own.
+- **Phase 2:** `onWindowResize`, `onWindowClose`, `onSwapChainRecreated`, `onWindowFocus/LostFocus` are still global with no window id (publish sites: `GlfwWindowContext.cpp:165,180,234`). Add a window identifier (or move to per-`RenderWindow` signals).
 
 ### `GlfwWindowContext.cpp` + `Input`
 - `glfwSetWindowUserPointer(m_glfwWindow, this)` is already set (`:49`), but **input callbacks ignore it**: `keyCallback`, `charCallback`, `mouseButtonCallback`, `cursorPosCallback`, `scrollCallback` all do `(void)window;` and publish to global `InputEvents::onX()` singletons (`:183-238`); only `windowSizeCallback` reads the user pointer (`:175`). For per-window input, route each callback through `glfwGetWindowUserPointer` to its `WindowContext`, and have `InputEvents` carry a window id (or `Input` poll a specific context). `Input` already takes a `WindowContext*` so it is per-window-ready (`EditorLayer.cpp:35`). The focus router decides the active window each frame (extends [[Input and Camera Control Architecture]]).

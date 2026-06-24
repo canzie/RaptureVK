@@ -76,7 +76,7 @@ void AmethystLayer::onAttach()
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
     auto &window = app.getWindowContext();
-    auto swapChain = vulkanContext.getSwapChain();
+    auto swapChain = app.getMainWindow().getSwapChain();
 
     VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
                                          {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024},
@@ -184,8 +184,14 @@ void AmethystLayer::onUpdate(float ts)
 
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
-    auto swapChain = vulkanContext.getSwapChain();
+    auto swapChain = app.getMainWindow().getSwapChain();
     auto graphicsQueue = vulkanContext.getGraphicsQueue();
+
+    int fbWidth = 0, fbHeight = 0;
+    app.getMainWindow().getWindowContext()->getFramebufferSize(&fbWidth, &fbHeight);
+    if (fbWidth == 0 || fbHeight == 0) {
+        return;
+    }
 
     int imageIndexi = swapChain->acquireImage(m_currentFrame);
 
@@ -283,7 +289,7 @@ void AmethystLayer::onUpdate(float ts)
     swapChain->signalImageAvailability(m_currentImageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
-        Rapture::ApplicationEvents::onRequestSwapChainRecreation().publish();
+        Rapture::ApplicationEvents::onRequestSwapChainRecreation().publish(swapChain->getID());
         m_framebufferNeedsResize = false;
         m_currentFrame = 0;
         onResize();
@@ -443,7 +449,7 @@ void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer,
 
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
-    auto swapChain = vulkanContext.getSwapChain();
+    auto swapChain = app.getMainWindow().getSwapChain();
 
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -494,7 +500,7 @@ void AmethystLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer)
 {
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
-    auto swapChain = vulkanContext.getSwapChain();
+    auto swapChain = app.getMainWindow().getSwapChain();
 
     VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
@@ -523,7 +529,7 @@ void AmethystLayer::onResize()
 {
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
-    auto swapChain = vulkanContext.getSwapChain();
+    auto swapChain = app.getMainWindow().getSwapChain();
 
     vulkanContext.waitIdle();
 

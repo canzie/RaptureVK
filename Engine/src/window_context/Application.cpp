@@ -22,15 +22,19 @@ Application::Application(int width, int height, const char *title) : m_running(t
     s_instance = this;
 
     RP_CORE_INFO("Creating window...");
-    m_window = std::unique_ptr<WindowContext>(WindowContext::createWindow(width, height, title));
+    auto window = std::unique_ptr<WindowContext>(WindowContext::createWindow(width, height, title));
 
     RP_CORE_INFO("Creating Vulkan context...");
-    m_vulkanContext = std::unique_ptr<VulkanContext>(new VulkanContext(m_window.get()));
+    m_vulkanContext = std::make_unique<VulkanContext>(window.get());
+
+    m_mainWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
+    m_vulkanContext->initDevice(m_mainWindow->getSurface());
 
     AssetManager::init();
 
-    m_vulkanContext->initManagers();
-    m_vulkanContext->createResources();
+    m_mainWindow->createSwapChain(*m_vulkanContext);
+    m_vulkanContext->initManagers(m_mainWindow->getSwapChain()->getImageCount());
+    m_mainWindow->getSwapChain()->invalidate();
 
     TracyProfiler::init();
 
@@ -84,7 +88,7 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     m_viewportManager = std::make_unique<ViewportManager>(m_vulkanContext->getRenderContext());
 
-    auto swapExtent = m_vulkanContext->getSwapChain()->getExtent();
+    auto swapExtent = m_mainWindow->getSwapChain()->getExtent();
     auto *primaryViewport =
         m_viewportManager->createViewport("main", SceneRenderTarget::TargetType::OFFSCREEN, swapExtent.width, swapExtent.height);
     primaryViewport->createRenderer(RendererType::DEFERRED);
@@ -162,7 +166,7 @@ void Application::run()
             (*it)->onUpdate(Timestep::deltaTime());
         }
 
-        m_window->onUpdate();
+        m_mainWindow->onUpdate();
 
         m_vulkanContext->getRenderContext().commandPoolManager->endFrame();
 

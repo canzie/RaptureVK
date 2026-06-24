@@ -6,8 +6,6 @@
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorManager.h"
-#include "events/ApplicationEvents.h"
-#include "render_targets/swap_chains/SwapChain.h"
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -82,10 +80,8 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     m_instance = VK_NULL_HANDLE;
     m_device = VK_NULL_HANDLE;
     m_physicalDevice = VK_NULL_HANDLE;
-    m_surface = VK_NULL_HANDLE;
     m_vmaAllocator = VK_NULL_HANDLE;
     m_debugMessenger = VK_NULL_HANDLE;
-    m_swapChain = nullptr;
     m_vendorQueue = nullptr;
     m_isVertexInputDynamicStateEnabled = false;
     m_isVertexAttributeRobustnessEnabled = false;
@@ -133,27 +129,13 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     checkExtensionSupport();
     createInstance(windowContext);
     setupDebugMessenger();
-    createWindowsSurface(windowContext);
+}
 
-    pickPhysicalDevice();
-    createLogicalDevice();
+void VulkanContext::initDevice(VkSurfaceKHR surface)
+{
+    pickPhysicalDevice(surface);
+    createLogicalDevice(surface);
     createVmaAllocator();
-
-    m_swapChain = std::make_shared<SwapChain>(m_device, m_surface, m_physicalDevice, m_queueFamilyIndices, windowContext);
-
-    ApplicationEvents::onRequestSwapChainRecreation().addListener([this, windowContext]() {
-        int width = 0, height = 0;
-        windowContext->getFramebufferSize(&width, &height);
-        while (width == 0 || height == 0) {
-            windowContext->getFramebufferSize(&width, &height);
-            windowContext->waitEvents();
-        }
-
-        waitIdle();
-
-        m_swapChain->recreate();
-        ApplicationEvents::onSwapChainRecreated().publish(m_swapChain);
-    });
 }
 
 VulkanContext::~VulkanContext()
@@ -165,8 +147,6 @@ VulkanContext::~VulkanContext()
     m_descriptorManager.reset();
     m_bufferPoolManager.reset();
     m_commandPoolManager.reset();
-
-    m_swapChain.reset();
 
     if (m_vmaAllocator) {
         vmaDestroyAllocator(m_vmaAllocator);
@@ -182,9 +162,6 @@ VulkanContext::~VulkanContext()
         DestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
     }
 
-    if (m_surface) {
-        vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
-    }
     if (m_instance) {
         vkDestroyInstance(m_instance, nullptr);
     }
@@ -264,16 +241,11 @@ std::shared_ptr<VulkanQueue> VulkanContext::getVendorQueue() const
     return m_vendorQueue != nullptr ? m_vendorQueue : getGraphicsQueue();
 }
 
-void VulkanContext::createResources()
-{
-    m_swapChain->invalidate();
-}
-
-void VulkanContext::initManagers()
+void VulkanContext::initManagers(uint32_t framesInFlight)
 {
     m_renderContext.vulkanContext = this;
 
-    m_commandPoolManager = std::make_unique<CommandPoolManager>(m_swapChain->getImageCount());
+    m_commandPoolManager = std::make_unique<CommandPoolManager>(framesInFlight);
     m_renderContext.commandPoolManager = m_commandPoolManager.get();
 
     m_bufferPoolManager = std::make_unique<BufferPoolManager>(m_vmaAllocator);
@@ -493,7 +465,7 @@ void VulkanContext::setupDebugMessenger()
     }
 }
 
-void VulkanContext::pickPhysicalDevice()
+void VulkanContext::pickPhysicalDevice(VkSurfaceKHR surface)
 {
     m_physicalDevice = VK_NULL_HANDLE;
 
@@ -509,7 +481,7 @@ void VulkanContext::pickPhysicalDevice()
     vkEnumeratePhysicalDevices(m_instance, &deviceCount, devices.data());
 
     for (const auto &device : devices) {
-        if (isDeviceSuitable(device)) {
+        if (isDeviceSuitable(device, surface)) {
             m_physicalDevice = device;
             break;
         }
@@ -521,7 +493,7 @@ void VulkanContext::pickPhysicalDevice()
     }
 }
 
-bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device)
+bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
 
     VkPhysicalDeviceProperties deviceProperties;
@@ -534,7 +506,7 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device)
     bool isDeviceSuitable = true;
 
     // Check queue family indices
-    QueueFamilyIndices indices = findQueueFamilies(device);
+    QueueFamilyIndices indices = findQueueFamilies(device, surface);
     if (!indices.isComplete()) {
         RP_CORE_WARN("GPU {0}: Queue families incomplete:", deviceProperties.deviceName);
         if (indices.familyIndices[GRAPHICS] == UINT32_MAX) {
@@ -583,7 +555,7 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device)
     // Check swap chain support
     bool swapChainAdequate = false;
     if (extensionsSupported) {
-        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, surface);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
 
         if (!swapChainAdequate) {
@@ -618,7 +590,7 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device)
     (queueIndicesUses[indices.familyIndices[type]] < queueFamily.queueCount || \
      queueIndicesUses[i] < queueIndicesUses[indices.familyIndices[type]])
 
-QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) const
+QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const
 {
     QueueFamilyIndices indices;
 
@@ -674,7 +646,7 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device) con
         }
 
         VkBool32 presentSupport = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &presentSupport);
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
 
         if (presentSupport) {
             if (indices.familyIndices[PRESENT] == UINT32_MAX) {
@@ -1197,10 +1169,10 @@ static void s_createQueues(VkDevice device, const QueueFamilyIndices &indices,
     }
 }
 
-void VulkanContext::createLogicalDevice()
+void VulkanContext::createLogicalDevice(VkSurfaceKHR surface)
 {
 
-    m_queueFamilyIndices = findQueueFamilies(m_physicalDevice);
+    m_queueFamilyIndices = findQueueFamilies(m_physicalDevice, surface);
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
         m_queueFamilyIndices.familyIndices[GRAPHICS], m_queueFamilyIndices.familyIndices[PRESENT],
@@ -1318,64 +1290,26 @@ void VulkanContext::createLogicalDevice()
     RP_CORE_INFO("Logical device created successfully!");
 }
 
-void VulkanContext::createWindowsSurface(WindowContext *windowContext)
-{
-#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
-    bool usingWayland = isWaylandSession();
-    if (usingWayland) {
-        RP_CORE_INFO("Creating Wayland surface...");
-    } else {
-        RP_CORE_INFO("Creating X11 surface...");
-    }
-#endif
-
-    if (glfwCreateWindowSurface(m_instance, (GLFWwindow *)windowContext->getNativeWindowContext(), nullptr, &m_surface) !=
-        VK_SUCCESS) {
-#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
-        if (usingWayland) {
-            RP_CORE_ERROR("Failed to create Wayland window surface!");
-            throw std::runtime_error("Failed to create Wayland window surface!");
-        } else {
-            RP_CORE_ERROR("Failed to create X11 window surface!");
-            throw std::runtime_error("Failed to create X11 window surface!");
-        }
-#else
-        RP_CORE_ERROR("Failed to create window surface!");
-        throw std::runtime_error("Failed to create window surface!");
-#endif
-    }
-
-#ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
-    if (usingWayland) {
-        RP_CORE_INFO("Wayland surface created successfully!");
-    } else {
-        RP_CORE_INFO("X11 surface created successfully!");
-    }
-#else
-    RP_CORE_INFO("Window surface created successfully!");
-#endif
-}
-
-SwapChainSupportDetails VulkanContext::querySwapChainSupport(VkPhysicalDevice device)
+SwapChainSupportDetails VulkanContext::querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
     SwapChainSupportDetails details;
 
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_surface, &details.capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
 
     uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_surface, &formatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
 
     if (formatCount != 0) {
         details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_surface, &formatCount, details.formats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
     }
 
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_surface, &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
 
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_surface, &presentModeCount, details.presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
     }
 
     return details;

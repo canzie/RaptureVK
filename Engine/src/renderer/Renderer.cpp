@@ -1,5 +1,6 @@
 #include "Renderer.h"
 
+#include "window_context/Application.h"
 #include "window_context/vulkan_context/VulkanContext.h"
 
 namespace Rapture {
@@ -9,7 +10,7 @@ Renderer::Renderer(RenderContext renderContext, SceneRenderTarget::TargetType ta
 {
     auto &vc = *m_renderContext.vulkanContext;
 
-    m_swapChain = vc.getSwapChain();
+    m_swapChain = Application::getInstance().getMainWindow().getSwapChain();
     m_graphicsQueue = vc.getGraphicsQueue();
     m_presentQueue = vc.getPresentQueue();
 

@@ -1,6 +1,7 @@
 #ifndef RAPTURE__APPLICATION_H
 #define RAPTURE__APPLICATION_H
 
+#include "RenderWindow.h"
 #include "WindowContext.h"
 #include "layers/LayerStack.h"
 #include "scenes/Project.h"
@@ -25,8 +26,10 @@ class Application {
 
     const VulkanContext &getVulkanContext() const { return *m_vulkanContext; }
     VulkanContext &getVulkanContext() { return *m_vulkanContext; }
-    const WindowContext &getWindowContext() const { return *m_window; }
-    WindowContext &getWindowContext() { return *m_window; }
+    const RenderWindow &getMainWindow() const { return *m_mainWindow; }
+    RenderWindow &getMainWindow() { return *m_mainWindow; }
+    const WindowContext &getWindowContext() const { return *m_mainWindow->getWindowContext(); }
+    WindowContext &getWindowContext() { return *m_mainWindow->getWindowContext(); }
     const Project &getProject() const { return *m_project; }
     ViewportManager &getViewportManager() { return *m_viewportManager; }
     const ViewportManager &getViewportManager() const { return *m_viewportManager; }
@@ -42,9 +45,9 @@ class Application {
 
     std::unique_ptr<Project> m_project;
 
-    std::unique_ptr<WindowContext> m_window;
-
     std::unique_ptr<VulkanContext> m_vulkanContext;
+
+    std::unique_ptr<RenderWindow> m_mainWindow;
 
     std::unique_ptr<ViewportManager> m_viewportManager;
 

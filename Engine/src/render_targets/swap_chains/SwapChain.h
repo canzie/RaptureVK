@@ -34,6 +34,8 @@ class SwapChain {
     void recreate();
     void destroy();
 
+    uint32_t getID() const { return m_id; }
+
     VkExtent2D getExtent() const { return m_swapChainExtent; }
     VkFormat getImageFormat() const { return m_swapChainImageFormat; }
     std::vector<VkImageView> getImageViews() const { return m_swapChainImageViews; }
@@ -68,6 +70,10 @@ class SwapChain {
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
   private:
+    static uint32_t s_nextID;
+
+    uint32_t m_id;
+
     VkSwapchainKHR m_swapChain = VK_NULL_HANDLE;
     std::vector<VkImage> m_swapChainImages;
     std::vector<VkImageView> m_swapChainImageViews;
