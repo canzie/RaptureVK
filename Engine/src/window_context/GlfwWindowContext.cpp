@@ -2,17 +2,16 @@
 #include "events/ApplicationEvents.h"
 #include "events/InputEvents.h"
 #include "logging/Log.h"
-
-#include <stdexcept> // For std::runtime_error
-
-// It's good practice to ensure Events.h is included if it defines EventBus/EventRegistry
-// For example, if ApplicationEvents.h or InputEvents.h don't pull it in transitively for some reason.
-// #include "../events/Events.h"
+#include "utils/rp_assert.h"
 
 namespace Rapture {
 
-GlfwWindowContext::GlfwWindowContext(int width, int height, const char *title) : m_glfwWindow(nullptr), m_title(title)
+uint32_t WindowContext::s_nextId = 1;
+
+GlfwWindowContext::GlfwWindowContext(PlatformContext &platform, int width, int height, const char *title)
+    : m_glfwWindow(nullptr), m_title(title)
 {
+    (void)platform; // GLFW is already initialized by the time any window is constructed
     m_context_data.width = width;
     m_context_data.height = height;
     initWindow();
@@ -27,11 +26,6 @@ void GlfwWindowContext::initWindow()
 {
     RP_CORE_INFO("========== Initializing GLFW Window Context ==========");
 
-    if (!glfwInit()) {
-        RP_CORE_CRITICAL("========== Failed to initialize GLFW! ==========");
-        throw std::runtime_error("Failed to initialize GLFW!");
-    }
-
     glfwSetErrorCallback(GlfwWindowContext::errorCallback);
 
     // For Vulkan, you'll need to tell GLFW not to create an OpenGL context
@@ -40,10 +34,9 @@ void GlfwWindowContext::initWindow()
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
     m_glfwWindow = glfwCreateWindow(m_context_data.width, m_context_data.height, m_title, nullptr, nullptr);
+    RP_ASSERT(m_glfwWindow != nullptr, "Failed to create GLFW window!");
     if (!m_glfwWindow) {
-        RP_CORE_CRITICAL("========== Failed to create GLFW window! ==========");
-        glfwTerminate();
-        throw std::runtime_error("Failed to create GLFW window!");
+        return;
     }
 
     glfwSetWindowUserPointer(m_glfwWindow, this);
@@ -69,7 +62,6 @@ void GlfwWindowContext::closeWindow()
         glfwDestroyWindow(m_glfwWindow);
         m_glfwWindow = nullptr;
     }
-    glfwTerminate(); // Terminate GLFW when the last window is closed or explicitly
     RP_CORE_INFO("========== GLFW Window Context Closed. ==========");
 }
 
@@ -87,6 +79,11 @@ void *GlfwWindowContext::getNativeWindowContext()
 void GlfwWindowContext::getFramebufferSize(int *width, int *height) const
 {
     glfwGetFramebufferSize(m_glfwWindow, width, height);
+}
+
+bool GlfwWindowContext::shouldClose() const
+{
+    return glfwWindowShouldClose(m_glfwWindow) != 0;
 }
 
 void GlfwWindowContext::waitEvents() const
@@ -173,11 +170,12 @@ void GlfwWindowContext::windowCloseCallback(GLFWwindow *window)
 void GlfwWindowContext::windowSizeCallback(GLFWwindow *window, int width, int height)
 {
     GlfwWindowContext *context = static_cast<GlfwWindowContext *>(glfwGetWindowUserPointer(window));
-    if (context) {
-        context->m_context_data.width = width;
-        context->m_context_data.height = height;
+    if (context == nullptr || context->getId() == WINDOW_CTX_ID_INVALID) {
+        return;
     }
-    ApplicationEvents::onWindowResize().publish(width, height);
+    context->m_context_data.width = width;
+    context->m_context_data.height = height;
+    ApplicationEvents::onWindowResize().publish(context->getId(), width, height);
 }
 
 void GlfwWindowContext::keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int /*mods*/)
@@ -256,9 +254,9 @@ void GlfwWindowContext::windowIconifyCallback(GLFWwindow *window, int iconified)
 // Implement windowMaximizeCallback if needed
 // void GlfwWindowContext::windowMaximizeCallback(GLFWwindow* window, int maximized) { ... }
 
-WindowContext *WindowContext::createWindow(int width, int height, const char *title)
+WindowContext *WindowContext::createWindow(PlatformContext &platform, int width, int height, const char *title)
 {
-    return new GlfwWindowContext(width, height, title);
+    return new GlfwWindowContext(platform, width, height, title);
 }
 
 } // namespace Rapture

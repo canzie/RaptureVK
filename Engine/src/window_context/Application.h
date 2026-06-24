@@ -1,6 +1,7 @@
 #ifndef RAPTURE__APPLICATION_H
 #define RAPTURE__APPLICATION_H
 
+#include "PlatformContext.h"
 #include "RenderWindow.h"
 #include "WindowContext.h"
 #include "layers/LayerStack.h"
@@ -10,6 +11,7 @@
 #include "vulkan_context/VulkanContext.h"
 
 #include <memory>
+#include <vector>
 
 namespace Rapture {
 
@@ -23,6 +25,15 @@ class Application {
 
     void pushLayer(Layer *layer);
     void pushOverlay(Layer *overlay);
+
+    /**
+     * @brief Create and register an additional OS window, sharing the existing device/queues.
+     * @param width Initial window width.
+     * @param height Initial window height.
+     * @param title Window title.
+     * @return Reference to the new window, valid until it is closed.
+     */
+    RenderWindow &createSecondaryWindow(int width, int height, const char *title);
 
     const VulkanContext &getVulkanContext() const { return *m_vulkanContext; }
     VulkanContext &getVulkanContext() { return *m_vulkanContext; }
@@ -45,9 +56,12 @@ class Application {
 
     std::unique_ptr<Project> m_project;
 
+    std::unique_ptr<PlatformContext> m_platformContext;
+
     std::unique_ptr<VulkanContext> m_vulkanContext;
 
     std::unique_ptr<RenderWindow> m_mainWindow;
+    std::vector<std::unique_ptr<RenderWindow>> m_secondaryWindows;
 
     std::unique_ptr<ViewportManager> m_viewportManager;
 

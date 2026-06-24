@@ -13,6 +13,11 @@
 #include <memory>
 #include <vector>
 
+namespace Rapture {
+class SwapChain;
+class RenderWindow;
+}
+
 class AmethystLayer : public Rapture::Layer {
   public:
     AmethystLayer();
@@ -32,14 +37,26 @@ class AmethystLayer : public Rapture::Layer {
 
     void setupMenuBar(glm::vec2 screenSize);
     void setupWorkspaces(glm::vec2 screenSize);
-    void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex);
-    void endDynamicRendering(Rapture::CommandBuffer *commandBuffer, uint32_t imageIndex);
-    void onResize();
+    VkDescriptorPool createUiDescriptorPool();
+    void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex,
+                               const Rapture::SwapChain &swapChain);
+    void endDynamicRendering(Rapture::CommandBuffer *commandBuffer, uint32_t imageIndex, const Rapture::SwapChain &swapChain);
+    void onResize(const Rapture::SwapChain &swapChain);
+
+    struct SecondaryWindowContext {
+        Rapture::RenderWindow *renderWindow = nullptr;
+        Amethyst::Window window;
+    };
+
+    void openDemoWindow();
+    void drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window);
+    void closeSecondaryWindow(SecondaryWindowContext *context);
 
   private:
     float m_Time = 0.0f;
 
     // Amethyst components
+    VkDescriptorPool m_uiDescriptorPool = VK_NULL_HANDLE;
     Amethyst::AmVulkanBackend m_backend;
     Amethyst::AmethystContext m_amCtx;
     Amethyst::Window m_window;
@@ -52,6 +69,8 @@ class AmethystLayer : public Rapture::Layer {
     std::vector<Workspace> m_workspaces;
 
     std::vector<Amethyst::AmTextureId> m_viewportTextureIds;
+
+    std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
 };
 
 #endif // RAPTURE__AMETHYST_LAYER_H

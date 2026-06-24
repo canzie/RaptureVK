@@ -11,6 +11,7 @@
 #include "logging/TracyProfiler.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "scenes/SceneManager.h"
+#include "utils/Timestep.h"
 #include "viewport/ViewportManager.h"
 #include "window_context/Application.h"
 
@@ -27,6 +28,27 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+VkDescriptorPool AmethystLayer::createUiDescriptorPool()
+{
+    auto &vulkanContext = Rapture::Application::getInstance().getVulkanContext();
+
+    VkDescriptorPoolSize poolSizes[] = {
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_BINDLESS_TEXTURES},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 8},
+    };
+
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+    poolInfo.maxSets = 1;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(std::size(poolSizes));
+    poolInfo.pPoolSizes = poolSizes;
+
+    VkDescriptorPool pool = VK_NULL_HANDLE;
+    vkCreateDescriptorPool(vulkanContext.getLogicalDevice(), &poolInfo, nullptr, &pool);
+    return pool;
+}
+
 AmethystLayer::AmethystLayer()
 {
     Amethyst::Log::Init();
@@ -37,10 +59,18 @@ AmethystLayer::AmethystLayer()
     Amethyst::Style::load(themePath);
 
     Rapture::ApplicationEvents::onSwapChainRecreated().addListener([this](uint32_t swapChainID) {
-        if (swapChainID != Rapture::Application::getInstance().getMainWindow().getSwapChain()->getID()) {
+        auto &app = Rapture::Application::getInstance();
+        if (swapChainID == app.getMainWindow().getSwapChain()->getId()) {
+            onResize(*app.getMainWindow().getSwapChain());
             return;
         }
-        onResize();
+
+        for (auto &context : m_secondaryWindows) {
+            if (context->renderWindow->getSwapChain()->getId() == swapChainID) {
+                onResize(*context->renderWindow->getSwapChain());
+                return;
+            }
+        }
     });
 }
 
@@ -64,7 +94,10 @@ AmethystLayer::~AmethystLayer()
         }
     }
 
+    m_secondaryWindows.clear();
+
     m_backend.shutdown();
+    vkDestroyDescriptorPool(vulkanContext.getLogicalDevice(), m_uiDescriptorPool, nullptr);
     Amethyst::Log::Shutdown();
 
     Rapture::RP_INFO("---Closing AmethystLayer---");
@@ -79,27 +112,7 @@ void AmethystLayer::onAttach()
     auto &window = app.getWindowContext();
     auto swapChain = app.getMainWindow().getSwapChain();
 
-    VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024},
-                                         {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-                                         {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-                                         {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
-
-    VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-    pool_info.maxSets = 1000;
-    pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
-    pool_info.pPoolSizes = pool_sizes;
-
-    VkDescriptorPool descriptorPool;
-    vkCreateDescriptorPool(vulkanContext.getLogicalDevice(), &pool_info, nullptr, &descriptorPool);
+    m_uiDescriptorPool = createUiDescriptorPool();
 
     auto rootPath = app.getProject().getProjectRootDirectory();
     auto vertShaderPath = (rootPath / "Engine/vendor/Amethyst/backends/shaders/spirv/ui.vs.spv").string();
@@ -111,7 +124,7 @@ void AmethystLayer::onAttach()
     initInfo.physicalDevice = vulkanContext.getPhysicalDevice();
     initInfo.queue = vulkanContext.getVendorQueue()->getQueueVk();
     initInfo.queueFamiliy = vulkanContext.getGraphicsQueueIndex();
-    initInfo.pool = descriptorPool;
+    initInfo.pool = m_uiDescriptorPool;
     initInfo.minImageCount = swapChain->getImageCount();
     initInfo.imageCount = swapChain->getImageCount();
     initInfo.colorFormat = swapChain->getImageFormat();
@@ -219,13 +232,14 @@ void AmethystLayer::onUpdate(float ts)
     VkCommandBuffer cmd = frame.commandBuffer->getCommandBufferVk();
 
     m_amCtx.draw(m_window);
-    m_amCtx.sync(static_cast<void *>(cmd));
+    m_amCtx.syncShared(static_cast<void *>(cmd));
+    m_amCtx.syncWindow(static_cast<void *>(cmd), m_window);
 
-    beginDynamicRendering(frame.commandBuffer, frame.imageView, frame.imageIndex);
+    beginDynamicRendering(frame.commandBuffer, frame.imageView, frame.imageIndex, *mainWindow.getSwapChain());
 
-    m_backend.record(cmd, m_amCtx.getDrawList());
+    m_backend.record(cmd, m_amCtx.getDrawList(m_window), mainWindow.getSwapChain()->getExtent());
 
-    endDynamicRendering(frame.commandBuffer, frame.imageIndex);
+    endDynamicRendering(frame.commandBuffer, frame.imageIndex, *mainWindow.getSwapChain());
 
     mainWindow.endFrame();
 }
@@ -268,11 +282,13 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
                 d.separator();
                 d.action("Editor Preferences", [] {});
             });
-            mb.menuItem("Window", [](Amethyst::DropdownScope &d) {
+            mb.menuItem("Window", [this](Amethyst::DropdownScope &d) {
                 d.action("Viewport", [] {});
                 d.action("Outliner", [] {});
                 d.action("Properties", [] {});
                 d.action("Content Browser", [] {});
+                d.separator();
+                d.action("New Window", [this] { openDemoWindow(); });
             });
             mb.menuItem("Help", [](Amethyst::DropdownScope &d) {
                 d.action("Documentation", [] {});
@@ -349,9 +365,7 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
                 r.split(
                     Amethyst::SplitAxis::HORIZONTAL, 0.65f,
                     [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
-                    [&](Amethyst::DockScope &b) {
-                        b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; });
-                    });
+                    [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
             });
 
     if (viewportTabBar != nullptr) viewportTabBar->addClass("panel-tab-bar");
@@ -371,13 +385,10 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
     }
 }
 
-void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex)
+void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex,
+                                          const Rapture::SwapChain &swapChain)
 {
     VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
-
-    auto &app = Rapture::Application::getInstance();
-    auto &vulkanContext = app.getVulkanContext();
-    auto swapChain = app.getMainWindow().getSwapChain();
 
     VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -397,7 +408,7 @@ void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer,
     toColorAttachment.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     toColorAttachment.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     toColorAttachment.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    toColorAttachment.image = swapChain->getImages()[imageIndex];
+    toColorAttachment.image = swapChain.getImages()[imageIndex];
     toColorAttachment.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     toColorAttachment.subresourceRange.baseMipLevel = 0;
     toColorAttachment.subresourceRange.levelCount = 1;
@@ -413,7 +424,7 @@ void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer,
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.pNext = nullptr;
     renderingInfo.flags = 0;
-    renderingInfo.renderArea = {{0, 0}, {swapChain->getExtent().width, swapChain->getExtent().height}};
+    renderingInfo.renderArea = {{0, 0}, {swapChain.getExtent().width, swapChain.getExtent().height}};
     renderingInfo.layerCount = 1;
     renderingInfo.viewMask = 0;
     renderingInfo.colorAttachmentCount = 1;
@@ -424,12 +435,9 @@ void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer,
     vkCmdBeginRendering(commandBufferVk, &renderingInfo);
 }
 
-void AmethystLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer, uint32_t imageIndex)
+void AmethystLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer, uint32_t imageIndex,
+                                        const Rapture::SwapChain &swapChain)
 {
-    auto &app = Rapture::Application::getInstance();
-    auto &vulkanContext = app.getVulkanContext();
-    auto swapChain = app.getMainWindow().getSwapChain();
-
     VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
 
     vkCmdEndRendering(commandBufferVk);
@@ -440,7 +448,7 @@ void AmethystLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer, u
     presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     presentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     presentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    presentBarrier.image = swapChain->getImages()[imageIndex];
+    presentBarrier.image = swapChain.getImages()[imageIndex];
     presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     presentBarrier.subresourceRange.baseMipLevel = 0;
     presentBarrier.subresourceRange.levelCount = 1;
@@ -453,34 +461,114 @@ void AmethystLayer::endDynamicRendering(Rapture::CommandBuffer *commandBuffer, u
                          nullptr, 0, nullptr, 1, &presentBarrier);
 }
 
-void AmethystLayer::onResize()
+void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
 {
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
-    auto swapChain = app.getMainWindow().getSwapChain();
 
     vulkanContext.waitIdle();
 
-    for (auto &texId : m_viewportTextureIds) {
-        if (texId.isValid()) {
-            m_backend.unregisterTexture(texId);
+    glm::vec2 screenSize = {static_cast<float>(swapChain.getExtent().width), static_cast<float>(swapChain.getExtent().height)};
+
+    if (&swapChain == app.getMainWindow().getSwapChain().get()) {
+        // TODO: viewport textures should track the viewport panel's own size, not the
+        // window's, and only need to change when that panel actually resizes.
+        for (auto &texId : m_viewportTextureIds) {
+            if (texId.isValid()) {
+                m_backend.unregisterTexture(texId);
+            }
+        }
+
+        m_viewportTextureIds.clear();
+        m_viewportTextureIds.resize(swapChain.getImageCount());
+
+        m_window.absoluteSize = screenSize;
+        m_window.markDirty();
+
+        for (auto &ws : m_workspaces) {
+            if (ws.dockingLayer != nullptr) {
+                ws.dockingLayer->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
+                                                                   EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
+                ws.dockingLayer->markDirty();
+            }
+        }
+    } else {
+        for (auto &context : m_secondaryWindows) {
+            if (context->renderWindow->getSwapChain().get() == &swapChain) {
+                context->window.absoluteSize = screenSize;
+                context->window.markDirty();
+                break;
+            }
         }
     }
+}
 
-    m_viewportTextureIds.clear();
-    m_viewportTextureIds.resize(swapChain->getImageCount());
+void AmethystLayer::openDemoWindow()
+{
+    auto &app = Rapture::Application::getInstance();
+
+    Rapture::RenderWindow &renderWindow = app.createSecondaryWindow(480, 270, "Demo Window");
+    auto swapChain = renderWindow.getSwapChain();
+
+    auto context = std::make_unique<SecondaryWindowContext>();
+    context->renderWindow = &renderWindow;
 
     glm::vec2 screenSize = {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)};
-    m_window.absoluteSize = screenSize;
-    m_window.markDirty();
+    context->window.absoluteSize = screenSize;
+    context->window.absoluteRotation = 0.0f;
 
-    for (auto &ws : m_workspaces) {
-        if (ws.dockingLayer != nullptr) {
-            ws.dockingLayer->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
-                                                               EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
-            ws.dockingLayer->markDirty();
-        }
+    auto *background = context->window.add<Amethyst::Frame>();
+    background->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
+        .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
+        .zIndex = 0,
+    });
+    background->addClass("background-primary");
+
+    Amethyst::UIScope(context->window)
+        .textLabel({
+            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            .style = {.backgroundTransparency = 1.0f},
+            .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+            .label = "Hello from a second window!",
+        });
+
+    SecondaryWindowContext *contextPtr = context.get();
+    m_secondaryWindows.push_back(std::move(context));
+
+    renderWindow.onFrame = [this, contextPtr](Rapture::RenderWindow &window) { drawSecondaryWindow(*contextPtr, window); };
+    renderWindow.onClose = [this, contextPtr]() { closeSecondaryWindow(contextPtr); };
+}
+
+void AmethystLayer::drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window)
+{
+    auto frame = window.beginFrame();
+    if (!frame.acquired) {
+        return;
     }
 
-    m_backend.onResize(screenSize);
+    context.window.tick(Rapture::Timestep::deltaTime());
+
+    VkCommandBuffer cmd = frame.commandBuffer->getCommandBufferVk();
+
+    m_amCtx.draw(context.window);
+    m_amCtx.syncWindow(static_cast<void *>(cmd), context.window);
+
+    beginDynamicRendering(frame.commandBuffer, frame.imageView, frame.imageIndex, *window.getSwapChain());
+
+    m_backend.record(cmd, m_amCtx.getDrawList(context.window), window.getSwapChain()->getExtent());
+
+    endDynamicRendering(frame.commandBuffer, frame.imageIndex, *window.getSwapChain());
+
+    window.endFrame();
+}
+
+void AmethystLayer::closeSecondaryWindow(SecondaryWindowContext *context)
+{
+    for (auto it = m_secondaryWindows.begin(); it != m_secondaryWindows.end(); ++it) {
+        if (it->get() == context) {
+            m_secondaryWindows.erase(it);
+            return;
+        }
+    }
 }

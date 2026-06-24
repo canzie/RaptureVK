@@ -1,12 +1,15 @@
 #pragma once
 
 #include "input/InputCodes.h"
+#include "window_context/PlatformContext.h"
 
 #include <glm/glm.hpp>
 
 #include <cstdint>
 
 namespace Rapture {
+
+constexpr uint32_t WINDOW_CTX_ID_INVALID = 0;
 
 // Buffer swap mode enumeration
 enum class SwapMode {
@@ -25,6 +28,7 @@ enum class CursorMode {
 class WindowContext {
 
   public:
+    WindowContext() : m_id(s_nextId++) {}
     virtual ~WindowContext() {};
 
     // create context and set the callbacks
@@ -36,6 +40,14 @@ class WindowContext {
     virtual void *getNativeWindowContext() = 0;
 
     virtual void getFramebufferSize(int *width, int *height) const = 0;
+
+    /**
+     * @brief Check whether the native window has received a close request.
+     * @return True if the window should be closed.
+     */
+    virtual bool shouldClose() const = 0;
+
+    uint32_t getId() const { return m_id; }
 
     bool isMinimized() const { return m_minimized; }
 
@@ -92,7 +104,7 @@ class WindowContext {
      */
     virtual glm::vec2 getCursorPosition() const = 0;
 
-    static WindowContext *createWindow(int width, int height, const char *title);
+    static WindowContext *createWindow(PlatformContext &platform, int width, int height, const char *title);
 
   protected:
     struct ContextData {
@@ -104,6 +116,9 @@ class WindowContext {
     float m_scrollAccumulator = 0.0f;
 
   private:
+    static uint32_t s_nextId;
+
+    uint32_t m_id;
     SwapMode m_swapMode = SwapMode::Immediate;
 };
 

@@ -7,6 +7,7 @@
 #include <vulkan/vulkan.h>
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 
 namespace Rapture {
@@ -56,6 +57,19 @@ class RenderWindow {
     void endFrame();
 
     void onUpdate();
+
+    using FrameCallback = std::function<void(RenderWindow &)>;
+    using CloseCallback = std::function<void()>;
+
+    /**
+     * @brief Callback invoked once per frame to record and present a secondary window.
+     */
+    FrameCallback onFrame;
+
+    /**
+     * @brief Callback invoked once before a secondary window is destroyed.
+     */
+    CloseCallback onClose;
 
   private:
     void createSurface();

@@ -15,8 +15,8 @@
 namespace Rapture {
 
 RenderWindow::RenderWindow(std::unique_ptr<WindowContext> windowContext, VulkanContext &context)
-    : m_windowContext(std::move(windowContext)), m_context(&context), m_instance(context.getInstance()),
-      m_surface(VK_NULL_HANDLE), m_swapChain(nullptr), m_recreateListenerID(0)
+    : m_windowContext(std::move(windowContext)), m_context(&context), m_instance(context.getInstance()), m_surface(VK_NULL_HANDLE),
+      m_swapChain(nullptr), m_recreateListenerID(0)
 {
     createSurface();
 }
@@ -39,8 +39,8 @@ RenderWindow::~RenderWindow()
 
 void RenderWindow::createSurface()
 {
-    VkResult result = glfwCreateWindowSurface(
-        m_instance, static_cast<GLFWwindow *>(m_windowContext->getNativeWindowContext()), nullptr, &m_surface);
+    VkResult result = glfwCreateWindowSurface(m_instance, static_cast<GLFWwindow *>(m_windowContext->getNativeWindowContext()),
+                                              nullptr, &m_surface);
     RP_ASSERT(result == VK_SUCCESS, "Failed to create window surface!");
 }
 
@@ -50,7 +50,7 @@ void RenderWindow::createSwapChain(VulkanContext &context)
                                               context.getQueueFamilyIndices(), m_windowContext.get());
 
     m_recreateListenerID = ApplicationEvents::onRequestSwapChainRecreation().addListener([this](uint32_t swapChainID) {
-        if (swapChainID != m_swapChain->getID()) {
+        if (swapChainID != m_swapChain->getId()) {
             return;
         }
 
@@ -63,13 +63,16 @@ void RenderWindow::createSwapChain(VulkanContext &context)
         m_context->waitIdle();
 
         m_swapChain->recreate();
-        ApplicationEvents::onSwapChainRecreated().publish(m_swapChain->getID());
+        ApplicationEvents::onSwapChainRecreated().publish(m_swapChain->getId());
     });
 
     m_resizeListenerID = ApplicationEvents::onWindowResize().addListener(
-        [this](unsigned int width, unsigned int height) {
+        [this](uint32_t windowId, unsigned int width, unsigned int height) {
             (void)width;
             (void)height;
+            if (windowId != m_windowContext->getId()) {
+                return;
+            }
             m_framebufferResized = true;
         });
 }
@@ -147,7 +150,7 @@ void RenderWindow::endFrame()
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferResized) {
         m_framebufferResized = false;
         m_currentFrame = 0;
-        ApplicationEvents::onRequestSwapChainRecreation().publish(m_swapChain->getID());
+        ApplicationEvents::onRequestSwapChainRecreation().publish(m_swapChain->getId());
         return;
     } else if (result != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to present swap chain image!");

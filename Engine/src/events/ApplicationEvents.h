@@ -10,7 +10,7 @@ namespace ApplicationEvents {
 
 // Application Window Events
 using WindowCloseEvent = EventBus<>;
-using WindowResizeEvent = EventBus<unsigned int /*width*/, unsigned int /*height*/>;
+using WindowResizeEvent = EventBus<uint32_t /*windowId*/, unsigned int /*width*/, unsigned int /*height*/>;
 using WindowFocusEvent = EventBus<>;
 using WindowLostFocusEvent = EventBus<>;
 using WindowMovedEvent = EventBus<unsigned int /*xPos*/, unsigned int /*yPos*/>;
@@ -28,7 +28,7 @@ inline WindowCloseEvent &onWindowClose()
 }
 inline WindowResizeEvent &onWindowResize()
 {
-    return EventRegistry::getInstance().getEventBus<unsigned int, unsigned int>("WindowResize");
+    return EventRegistry::getInstance().getEventBus<uint32_t, unsigned int, unsigned int>("WindowResize");
 }
 inline WindowFocusEvent &onWindowFocus()
 {

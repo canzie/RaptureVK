@@ -34,7 +34,8 @@ class SwapChain {
     void recreate();
     void destroy();
 
-    uint32_t getID() const { return m_id; }
+    uint32_t getId() const { return m_id; }
+    WindowContext *getWindowContext() const { return m_windowContext; }
 
     VkExtent2D getExtent() const { return m_swapChainExtent; }
     VkFormat getImageFormat() const { return m_swapChainImageFormat; }
@@ -81,7 +82,6 @@ class SwapChain {
     VkExtent2D m_swapChainExtent{};
 
     uint32_t m_imageCount = 0;
-    size_t m_windowResizeEventListenerID = 0;
     bool m_framebufferNeedsResize;
 
     std::shared_ptr<Texture> m_depthTexture;

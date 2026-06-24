@@ -21,8 +21,10 @@ Application::Application(int width, int height, const char *title) : m_running(t
     }
     s_instance = this;
 
+    m_platformContext = PlatformContext::create();
+
     RP_CORE_INFO("Creating window...");
-    auto window = std::unique_ptr<WindowContext>(WindowContext::createWindow(width, height, title));
+    auto window = std::unique_ptr<WindowContext>(WindowContext::createWindow(*m_platformContext, width, height, title));
 
     RP_CORE_INFO("Creating Vulkan context...");
     m_vulkanContext = std::make_unique<VulkanContext>(window.get());
@@ -95,14 +97,13 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     MaterialManager::init();
 
-    ApplicationEvents::onWindowClose().addListener([this]() { m_running = false; });
-
     ApplicationEvents::onWindowFocus().addListener([]() { RP_CORE_INFO("Window focused"); });
 
     ApplicationEvents::onWindowLostFocus().addListener([]() { RP_CORE_INFO("Window lost focus"); });
 
-    ApplicationEvents::onWindowResize().addListener(
-        [](unsigned int width, unsigned int height) { RP_CORE_INFO("Window resized to {0}x{1}", width, height); });
+    ApplicationEvents::onWindowResize().addListener([](uint32_t windowId, unsigned int width, unsigned int height) {
+        RP_CORE_INFO("Window {0} resized to {1}x{2}", windowId, width, height);
+    });
 
     RP_CORE_INFO("========== Application created ==========");
 }
@@ -168,12 +169,43 @@ void Application::run()
 
         m_mainWindow->onUpdate();
 
+        if (m_mainWindow->getWindowContext()->shouldClose()) {
+            m_running = false;
+        }
+
+        for (auto it = m_secondaryWindows.begin(); it != m_secondaryWindows.end();) {
+            if (!m_running || (*it)->getWindowContext()->shouldClose()) {
+                m_vulkanContext->waitIdle();
+                if ((*it)->onClose != nullptr) {
+                    (*it)->onClose();
+                }
+                it = m_secondaryWindows.erase(it);
+            } else {
+                if ((*it)->onFrame != nullptr) {
+                    (*it)->onFrame(**it);
+                }
+                ++it;
+            }
+        }
+
         m_vulkanContext->getRenderContext().commandPoolManager->endFrame();
 
         TracyProfiler::endFrame();
     }
 
     m_vulkanContext->waitIdle();
+}
+
+RenderWindow &Application::createSecondaryWindow(int width, int height, const char *title)
+{
+    auto window = std::unique_ptr<WindowContext>(WindowContext::createWindow(*m_platformContext, width, height, title));
+    auto renderWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
+    renderWindow->createSwapChain(*m_vulkanContext);
+    renderWindow->getSwapChain()->invalidate();
+
+    RenderWindow &ref = *renderWindow;
+    m_secondaryWindows.push_back(std::move(renderWindow));
+    return ref;
 }
 
 void Application::pushLayer(Layer *layer)

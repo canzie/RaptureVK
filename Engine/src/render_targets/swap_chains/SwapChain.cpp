@@ -26,21 +26,11 @@ SwapChain::SwapChain(VkDevice device, VkSurfaceKHR surface, VkPhysicalDevice phy
 
     uint32_t desiredImageCount = swapChainSupport.capabilities.minImageCount + 1;
     m_imageCount = std::min<uint32_t>(desiredImageCount, swapChainSupport.capabilities.maxImageCount);
-
-    m_windowResizeEventListenerID = ApplicationEvents::onWindowResize().addListener(
-        [this](unsigned int width,
-               unsigned int height) { // issue with this uncommented, validation layer complains about undifined layout on resize :(
-            (void)width;
-            (void)height;
-            // m_framebufferNeedsResize = true;
-        });
 }
 
 SwapChain::~SwapChain()
 {
     destroy();
-
-    if (m_windowResizeEventListenerID != 0) ApplicationEvents::WindowResizeEvent().removeListener(m_windowResizeEventListenerID);
 }
 
 void SwapChain::recreate()

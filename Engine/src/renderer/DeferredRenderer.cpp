@@ -46,14 +46,17 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarge
 
     m_skyboxPass = std::make_shared<SkyboxPass>(m_gbufferPass->getDepthTextures(), colorFormat);
 
-    ApplicationEvents::onWindowResize().addListener([this](unsigned int width, unsigned int height) {
+    ApplicationEvents::onWindowResize().addListener([this](uint32_t windowId, unsigned int width, unsigned int height) {
         (void)width;
         (void)height;
-        m_framebufferNeedsResize = true;
+        WindowContext *windowContext = m_swapChain->getWindowContext();
+        if (windowContext != nullptr && windowId == windowContext->getId()) {
+            m_framebufferNeedsResize = true;
+        }
     });
 
     ApplicationEvents::onSwapChainRecreated().addListener([this](uint32_t swapChainID) {
-        if (swapChainID != m_swapChain->getID()) {
+        if (swapChainID != m_swapChain->getId()) {
             return;
         }
         onSwapChainRecreated();
@@ -164,7 +167,7 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene, Entity came
         m_swapChain->signalImageAvailability(imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
-            ApplicationEvents::onRequestSwapChainRecreation().publish(m_swapChain->getID());
+            ApplicationEvents::onRequestSwapChainRecreation().publish(m_swapChain->getId());
             return;
         } else if (result != VK_SUCCESS) {
             RP_CORE_ERROR("failed to present swap chain image!");

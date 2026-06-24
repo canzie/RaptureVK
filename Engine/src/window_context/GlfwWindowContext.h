@@ -1,5 +1,6 @@
 #pragma once
 
+#include "PlatformContext.h"
 #include "WindowContext.h"
 
 #include <GLFW/glfw3.h>
@@ -18,7 +19,7 @@ namespace Rapture {
 
 class GlfwWindowContext : public WindowContext {
   public:
-    GlfwWindowContext(int width, int height, const char *title);
+    GlfwWindowContext(PlatformContext &platform, int width, int height, const char *title);
     ~GlfwWindowContext();
 
     void initWindow() override;
@@ -27,6 +28,7 @@ class GlfwWindowContext : public WindowContext {
 
     void *getNativeWindowContext() override;
     void getFramebufferSize(int *width, int *height) const override;
+    bool shouldClose() const override;
     void waitEvents() const override;
 
     void setCursorMode(CursorMode mode) override;
