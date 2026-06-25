@@ -63,7 +63,7 @@ StencilBorderPass::~StencilBorderPass()
 }
 
 CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
-                                                  std::shared_ptr<Scene> activeScene, Entity camera,
+                                                  Scene &activeScene, Entity camera,
                                                   const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -125,7 +125,7 @@ CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarge
     pushConstants.borderWidth = 0.01f;
     pushConstants.depthStencilTextureHandle = m_depthStencilTextures[currentFrameInFlight]->getBindlessIndex();
 
-    auto &renderData = *activeScene->getRenderData();
+    auto &renderData = *(activeScene.getRenderData());
     pushConstants.cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrameInFlight);
     pushConstants.cameraSlotIndex = (cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
 

@@ -24,7 +24,7 @@ class PropertiesPanel : public Panel {
     PropertiesPanel(PropertiesPanel &&) = delete;
     PropertiesPanel &operator=(PropertiesPanel &&) = delete;
 
-    void setScene(std::shared_ptr<Rapture::Scene> scene);
+    void setScene(Rapture::Scene *scene);
     void onUpdate(float dt) override;
 
   private:
@@ -77,7 +77,7 @@ class PropertiesPanel : public Panel {
     std::unordered_map<std::type_index, std::unique_ptr<ComponentEditorBase>> m_editors;
     std::vector<ComponentEditorBase *> m_active;
 
-    std::shared_ptr<Rapture::Scene> m_scene;
+    Rapture::Scene *m_scene = nullptr;
     Rapture::Entity m_selectedEntity;
     size_t m_entitySelectedListenerID = 0;
 };

@@ -5,7 +5,6 @@
 #include "events/GameEvents.h"
 #include "input/Input.h"
 #include "scenes/Scene.h"
-#include "scenes/SceneManager.h"
 #include "viewport/Viewport.h"
 #include "window_context/Application.h"
 
@@ -35,9 +34,9 @@ void EditorLayer::onAttach()
     m_input = std::make_unique<Rapture::Input>(&Rapture::Application::getInstance().getWindowContext());
 
     m_sceneActivatedListenerId = Rapture::GameEvents::onSceneActivated().addListener(
-        [this](std::shared_ptr<Rapture::Scene> scene) { onNewActiveScene(scene); });
+        [this](Rapture::Scene& scene) { onNewActiveScene(&scene); });
 
-    auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
+    auto activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (activeScene != nullptr) {
         onNewActiveScene(activeScene);
     }
@@ -48,7 +47,7 @@ void EditorLayer::onDetach()
     Rapture::GameEvents::onSceneActivated().removeListener(m_sceneActivatedListenerId);
 }
 
-void EditorLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
+void EditorLayer::onNewActiveScene(Rapture::Scene* scene)
 {
     if (scene == nullptr) {
         return;

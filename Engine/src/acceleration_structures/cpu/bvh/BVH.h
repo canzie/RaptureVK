@@ -29,7 +29,7 @@ class BVH {
     BVH(LeafType leafType);
     ~BVH();
 
-    void build(std::shared_ptr<Scene> scene);
+    void build(Scene &scene);
 
     // given an aabb, return every entity intersecting with it
     std::vector<EntityID> getIntersectingAABBs(const BoundingBox &worldAABB) const;

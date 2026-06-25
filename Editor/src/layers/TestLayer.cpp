@@ -33,17 +33,17 @@ void TestLayer::onAttach()
     Rapture::RP_INFO("TestLayer attached");
 
     // Register for scene activation events - store the ID for cleanup
-    m_sceneActivatedListenerId = Rapture::GameEvents::onSceneActivated().addListener([this](std::shared_ptr<Rapture::Scene> scene) {
-        Rapture::RP_INFO("TestLayer::onSceneActivated - New active scene: {0}", scene->getSceneName());
+    m_sceneActivatedListenerId = Rapture::GameEvents::onSceneActivated().addListener([this](Rapture::Scene &scene) {
+        Rapture::RP_INFO("TestLayer::onSceneActivated - New active scene: {0}", scene.getSceneName());
         onNewActiveScene(scene);
     });
 
     // Check if a scene is already active when the layer is attached
     // This handles the case where the initial scene is set before this layer's listener is registered
-    auto currentActiveScene = Rapture::SceneManager::getInstance().getActiveScene();
+    auto currentActiveScene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (currentActiveScene) {
         Rapture::RP_INFO("TestLayer::onAttach - Initial scene already active: {0}", currentActiveScene->getSceneName());
-        onNewActiveScene(currentActiveScene);
+        onNewActiveScene(*currentActiveScene);
     }
 
     // Initialize FPS counter variables
@@ -51,14 +51,9 @@ void TestLayer::onAttach()
     m_fpsTimer = 0.0f;
 }
 
-void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
+void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 {
-    auto activeScene = scene;
-
-    if (!activeScene) {
-        Rapture::RP_ERROR("No active scene found");
-        return;
-    }
+    auto &activeScene = scene;
 
     // Get project paths
     auto &app = Rapture::Application::getInstance();
@@ -70,27 +65,27 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     if (std::filesystem::exists(sponzaPath)) {
         Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
         auto loader = Rapture::glTF2Loader(sponzaPath);
-        loader.load(activeScene.get());
+        loader.load(&activeScene);
     } else {
         Rapture::RP_WARN("Sponza model not found at: {}", sponzaPath.string());
 
         // Fallback: Create a simple test cube if Sponza not found
-        auto cube = activeScene->createCube("Test Cube");
+        auto cube = activeScene.createCube("Test Cube");
         cube.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
         cube.addComponent<Rapture::BLASComponent>(cube.getComponent<Rapture::MeshComponent>().mesh);
-        activeScene->registerBLAS(cube);
+        activeScene.registerBLAS(cube);
 
         // Create a floor
-        auto floor = activeScene->createCube("Floor");
+        auto floor = activeScene.createCube("Floor");
         floor.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, -1.5f, 0.0f));
         floor.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 0.1f, 10.0f));
         floor.addComponent<Rapture::BLASComponent>(floor.getComponent<Rapture::MeshComponent>().mesh);
-        activeScene->registerBLAS(floor);
+        activeScene.registerBLAS(floor);
     }
 
     // Create a spot light with shadow mapping (inside Sponza courtyard)
     // Note: Rotation is in RADIANS
-    Rapture::Entity spotLight = activeScene->createSphere("Spot Light");
+    Rapture::Entity spotLight = activeScene.createSphere("Spot Light");
     spotLight.setComponent<Rapture::TransformComponent>(glm::vec3(2.0f, 2.0f, -3.0f),   // Position in Sponza
                                                         glm::vec3(-2.243f, 0.0f, 0.0f), // Point downward (radians, ~-128 degrees)
                                                         glm::vec3(0.2f)                 // Small visual scale
@@ -106,7 +101,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Create a directional light with CSM (sun) - pointing down into Sponza
     // Note: Rotation is in RADIANS
-    Rapture::Entity sunLight = activeScene->createEntity("Sun");
+    Rapture::Entity sunLight = activeScene.createEntity("Sun");
     sunLight.addComponent<Rapture::TransformComponent>(glm::vec3(-2.0f, 5.0f, -3.0f),  // Position
                                                        glm::vec3(-1.874f, 0.0f, 0.0f), // Point downwards
                                                        glm::vec3(0.2f));
@@ -119,7 +114,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     // Create environment entity with skybox
     auto skyboxPath = rootPath / "assets/textures/cubemaps/default.cubemap";
     if (std::filesystem::exists(skyboxPath)) {
-        auto envEntity = activeScene->createEnvironmentEntity();
+        auto envEntity = activeScene.createEnvironmentEntity();
         envEntity.addComponent<Rapture::SkyboxComponent>(skyboxPath, 0.1f);
         // Renderer will query for SkyboxComponent directly
     }
@@ -177,7 +172,7 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
     terrainConfig.chunkGridSize = chunkGridSize;
     terrainConfig.hmType = Rapture::HM_CEPV;
 
-    auto terrainEntity = activeScene->createEntity("Terrain");
+    auto terrainEntity = activeScene.createEntity("Terrain");
     auto &terrainComp = terrainEntity.addComponent<Rapture::TerrainComponent>(terrainConfig);
     terrainComp.isEnabled = true;
     Rapture::RP_INFO("Terrain entity created with {} chunks (radius {})", terrainComp.generator->getChunkCount(),
@@ -185,12 +180,12 @@ void TestLayer::onNewActiveScene(std::shared_ptr<Rapture::Scene> scene)
 
     // Build TLAS for ray tracing
     try {
-        activeScene->buildTLAS();
+        activeScene.buildTLAS();
     } catch (const std::runtime_error &e) {
         Rapture::RP_ERROR("TestLayer: Failed to build TLAS: {}", e.what());
     }
 
-    Rapture::RP_INFO("Scene setup complete for: {}", activeScene->getSceneName());
+    Rapture::RP_INFO("Scene setup complete for: {}", activeScene.getSceneName());
 }
 
 void TestLayer::onDetach()
@@ -207,8 +202,8 @@ void TestLayer::onUpdate(float ts)
 {
 
     RAPTURE_PROFILE_SCOPE("TestLayer::onUpdate");
-    // Get the active scene from SceneManager
-    auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
+    // Get the active scene from the project
+    auto activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (!activeScene) return;
 
     // Update FPS counter

@@ -190,7 +190,7 @@ void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const Transfor
     m_lightViewProjection = shadowMapData.lightViewProjection;
 }
 
-CommandBuffer *ShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame)
+CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -226,7 +226,7 @@ CommandBuffer *ShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, ui
     // m_rc->descriptorManager->bindSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
-    auto &registry = activeScene->getRegistry();
+    auto &registry = activeScene.getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
 
     for (auto entity : view) {

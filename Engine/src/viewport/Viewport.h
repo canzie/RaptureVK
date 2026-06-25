@@ -25,8 +25,8 @@ class Viewport {
     Viewport(const Viewport &) = delete;
     Viewport &operator=(const Viewport &) = delete;
 
-    void setScene(std::shared_ptr<Scene> scene);
-    std::shared_ptr<Scene> getScene() const { return m_scene; }
+    void setScene(Scene *scene);
+    Scene *getScene() const { return m_scene; }
 
     void setCamera(Entity camera);
     Entity getCamera() const { return m_camera; }
@@ -77,7 +77,7 @@ class Viewport {
     std::unique_ptr<Renderer> m_renderer;
     RendererType m_rendererType = RendererType::DEFERRED;
 
-    std::shared_ptr<Scene> m_scene;
+    Scene *m_scene = nullptr;
     Entity m_camera;
     EditorBinding m_editorBinding;
 

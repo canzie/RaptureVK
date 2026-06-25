@@ -4,19 +4,19 @@
 #include "components/HierarchyComponent.h"
 #include "events/GameEvents.h"
 #include "layers/panels/components/tab_layouts.h"
-#include "scenes/SceneManager.h"
 #include "scenes/entities/Entity.h"
+#include "window_context/Application.h"
 
 #include <components/ui_scope.h>
 
 static void s_onEntityClicked(uint32_t entityId)
 {
-    auto scene = Rapture::SceneManager::getInstance().getActiveScene();
+    auto scene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (!scene) {
         return;
     }
 
-    Rapture::Entity entity(entityId, scene.get());
+    Rapture::Entity entity(entityId, scene);
     if (entity.isValid()) {
         Rapture::GameEvents::onEntitySelected().publish(std::make_shared<Rapture::Entity>(entity));
     }
@@ -79,7 +79,7 @@ OutlinerPanel::~OutlinerPanel()
     }
 }
 
-void OutlinerPanel::setScene(std::shared_ptr<Rapture::Scene> scene)
+void OutlinerPanel::setScene(Rapture::Scene *scene)
 {
     m_scene = scene;
     m_hasScene = (scene != nullptr);
@@ -105,7 +105,7 @@ void OutlinerPanel::refresh()
     tvScope.columnsExplicit = true;
 
     m_scene->getRegistry().view<Rapture::TagComponent>().each([this, &tvScope](auto entityHandle, auto &tag) {
-        Rapture::Entity entity(entityHandle, m_scene.get());
+        Rapture::Entity entity(entityHandle, m_scene);
 
         bool isRoot = !entity.hasComponent<Rapture::HierarchyComponent>() ||
                       !entity.getComponent<Rapture::HierarchyComponent>().parent.isValid();

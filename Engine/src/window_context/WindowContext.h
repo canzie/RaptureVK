@@ -104,7 +104,17 @@ class WindowContext {
      */
     virtual glm::vec2 getCursorPosition() const = 0;
 
-    static WindowContext *createWindow(PlatformContext &platform, int width, int height, const char *title);
+    /**
+     * @brief Create a new platform window.
+     * @param platform Shared platform context; must outlive this window.
+     * @param width Initial width.
+     * @param height Initial height.
+     * @param title Window title.
+     * @param preferFloating Hint to tiling window managers that this window should float
+     * rather than tile. No effect on non-tiling platforms.
+     */
+    static WindowContext *createWindow(PlatformContext &platform, int width, int height, const char *title,
+                                       bool preferFloating = false);
 
   protected:
     struct ContextData {

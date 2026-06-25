@@ -41,7 +41,7 @@ class DynamicDiffuseGI {
     DynamicDiffuseGI(uint32_t framesInFlight);
     ~DynamicDiffuseGI();
 
-    void populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex);
+    void populateProbesCompute(Scene &scene, uint32_t frameIndex);
 
     std::shared_ptr<Texture> getRadianceTexture() { return m_RadianceTexture; }
     std::shared_ptr<Texture> getVisibilityTexture() { return m_VisibilityTexture; }
@@ -63,9 +63,9 @@ class DynamicDiffuseGI {
 
     const ProbeVolume &getProbeVolume() const { return m_ProbeVolume; }
 
-    void updateSkybox(std::shared_ptr<Scene> scene);
+    void updateSkybox(Scene &scene);
     void updateProbeVolume();
-    void updateFromIndirectLightingComponent(std::shared_ptr<Scene> scene);
+    void updateFromIndirectLightingComponent(Scene &scene);
 
     // Get bindless indices for probe textures
     uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
@@ -74,7 +74,7 @@ class DynamicDiffuseGI {
     uint32_t getProbeClassificationBindlessIndex() const { return m_probeClassificationBindlessIndex; }
 
   private:
-    void castRays(std::shared_ptr<Scene> scene, CommandBuffer *commandBuffer, uint32_t frameIndex);
+    void castRays(Scene &scene, CommandBuffer *commandBuffer, uint32_t frameIndex);
     void blendTextures(CommandBuffer *commandBuffer);
     void classifyProbes(CommandBuffer *commandBuffer);
     void relocateProbes(CommandBuffer *commandBuffer);

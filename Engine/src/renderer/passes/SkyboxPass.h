@@ -30,7 +30,7 @@ class SkyboxPass {
     ~SkyboxPass();
 
     CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
-                                   std::shared_ptr<Scene> activeScene, Entity camera,
+                                   Scene &activeScene, Entity camera,
                                    const SecondaryBufferInheritance &inheritance);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,

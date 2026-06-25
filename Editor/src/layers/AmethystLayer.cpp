@@ -3,6 +3,7 @@
 #include "EditorLayout.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "events/ApplicationEvents.h"
+#include "layers/panels/FileBrowser.h"
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
@@ -162,7 +163,7 @@ void AmethystLayer::onAttach()
 
     m_bottomBar = std::make_unique<BottomBar>(&m_window);
 
-    auto activeScene = Rapture::SceneManager::getInstance().getActiveScene();
+    auto activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (activeScene != nullptr) {
         for (auto &ws : m_workspaces) {
             for (auto &panel : ws.panels) {
@@ -329,6 +330,28 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
                     .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
                 });
                 ws.hotbar->addClass("background-tertiary");
+
+                Amethyst::UIScope(*ws.hotbar)
+                    .textButton(
+                        {
+                            .base =
+                                {
+                                    .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+                                    .position = Amethyst::UDim2(0.0f, 8.0f, 0.5f, 0.0f),
+                                    .size = Amethyst::UDim2(0.0f, 150.0f, 1.0f, -10.0f),
+                                },
+                            .style = {.cornerRadius = 3.0f},
+                            .text = {.fontSize = 12.0f,
+                                     .textXAlignment = Amethyst::TextXAlignment::CENTER,
+                                     .textYAlignment = Amethyst::TextYAlignment::CENTER},
+                            .label = "Open File Explorer",
+                        },
+                        [this](Amethyst::TextButtonScope &b) {
+                            b.component.onMouseButton1ClickCb = [this]() {
+                                openFileExplorer();
+                                return Amethyst::EventResult::CONSUMED;
+                            };
+                        });
 
                 ws.dockingLayer = ws.container->add<Amethyst::DockingLayer>();
                 ws.dockingLayer->setDisplayOrder(1);
@@ -540,6 +563,31 @@ void AmethystLayer::openDemoWindow()
     renderWindow.onClose = [this, contextPtr]() { closeSecondaryWindow(contextPtr); };
 }
 
+void AmethystLayer::openFileExplorer()
+{
+    auto &app = Rapture::Application::getInstance();
+
+    Rapture::RenderWindow &renderWindow = app.createSecondaryWindow(880, 560, "Open File");
+    auto swapChain = renderWindow.getSwapChain();
+
+    auto context = std::make_unique<SecondaryWindowContext>();
+    context->renderWindow = &renderWindow;
+
+    glm::vec2 screenSize = {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)};
+    context->window.absoluteSize = screenSize;
+    context->window.absoluteRotation = 0.0f;
+
+    m_fileBrowser = std::make_unique<FileBrowser>(context->window);
+
+    m_backend.registerWindow(context->renderWindow->getWindowContext()->getNativeWindowContext(), &context->window);
+
+    SecondaryWindowContext *contextPtr = context.get();
+    m_secondaryWindows.push_back(std::move(context));
+
+    renderWindow.onFrame = [this, contextPtr](Rapture::RenderWindow &window) { drawSecondaryWindow(*contextPtr, window); };
+    renderWindow.onClose = [this, contextPtr]() { closeSecondaryWindow(contextPtr); };
+}
+
 void AmethystLayer::drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window)
 {
     auto frame = window.beginFrame();
@@ -565,6 +613,7 @@ void AmethystLayer::drawSecondaryWindow(SecondaryWindowContext &context, Rapture
 
 void AmethystLayer::closeSecondaryWindow(SecondaryWindowContext *context)
 {
+    m_backend.unregisterWindow(context->renderWindow->getWindowContext()->getNativeWindowContext());
     for (auto it = m_secondaryWindows.begin(); it != m_secondaryWindows.end(); ++it) {
         if (it->get() == context) {
             m_secondaryWindows.erase(it);

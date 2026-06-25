@@ -5,8 +5,8 @@ namespace Rapture {
 namespace GameEvents {
 // Scene events
 using SceneLoadRequestedEvent = EventBus<std::string>;
-using SceneActivatedEvent = EventBus<std::shared_ptr<Scene>>;
-using SceneDeactivatedEvent = EventBus<std::shared_ptr<Scene>>;
+using SceneActivatedEvent = EventBus<Scene &>;
+using SceneDeactivatedEvent = EventBus<Scene &>;
 
 // World events
 using WorldTransitionRequestedEvent = EventBus<std::string>;
@@ -29,12 +29,12 @@ inline SceneLoadRequestedEvent &onSceneLoadRequested()
 
 inline SceneActivatedEvent &onSceneActivated()
 {
-    return EventRegistry::getInstance().getEventBus<std::shared_ptr<Scene>>("SceneActivated");
+    return EventRegistry::getInstance().getEventBus<Scene &>("SceneActivated");
 }
 
 inline SceneDeactivatedEvent &onSceneDeactivated()
 {
-    return EventRegistry::getInstance().getEventBus<std::shared_ptr<Scene>>("SceneDeactivated");
+    return EventRegistry::getInstance().getEventBus<Scene &>("SceneDeactivated");
 }
 
 inline WorldTransitionRequestedEvent &onWorldTransitionRequested()

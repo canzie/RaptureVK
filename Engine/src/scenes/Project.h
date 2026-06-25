@@ -26,39 +26,35 @@ class Project {
 
         // Create a default world with a default scene
         auto defaultWorld = std::make_shared<World>("DefaultWorld");
-        auto defaultScene = SceneManager::getInstance().createScene("DefaultScene");
-        SceneManager::getInstance().setActiveScene("DefaultScene");
+        auto defaultScene = m_sceneManager.createScene("DefaultScene");
+        m_sceneManager.setActiveScene("DefaultScene");
 
         // Add scene to world and set as main
         defaultWorld->addScene("DefaultScene", defaultScene);
         defaultWorld->setMainScene("DefaultScene");
 
-        // Register world with SceneManager
-        SceneManager::getInstance().registerWorld(defaultWorld);
+        // Register world with the scene manager
+        m_sceneManager.registerWorld(defaultWorld);
 
         // Set as active
-        SceneManager::getInstance().setActiveWorld("DefaultWorld");
+        m_sceneManager.setActiveWorld("DefaultWorld");
     }
 
-    ~Project()
-    {
-        // Clear all worlds and scenes
-        m_worlds.clear();
-        SceneManager::getInstance().reset();
-    }
+    SceneManager &getSceneManager() { return m_sceneManager; }
+    const SceneManager &getSceneManager() const { return m_sceneManager; }
 
-    // Get the active scene from the SceneManager
-    std::shared_ptr<Scene> getActiveScene() const { return SceneManager::getInstance().getActiveScene(); }
+    // Get the active scene from the scene manager
+    Scene *getActiveScene() const { return m_sceneManager.getActiveScene(); }
 
-    // Set the active scene via SceneManager
-    void setActiveScene(std::shared_ptr<Scene> scene) { SceneManager::getInstance().setActiveScene(scene); }
+    // Set the active scene via the scene manager
+    void setActiveScene(Scene *scene) { m_sceneManager.setActiveScene(scene); }
 
     // World management
     std::shared_ptr<World> createWorld(const std::string &name)
     {
         auto world = std::make_shared<World>(name);
         m_worlds[name] = world;
-        SceneManager::getInstance().registerWorld(world);
+        m_sceneManager.registerWorld(world);
         return world;
     }
 
@@ -71,9 +67,9 @@ class Project {
         return nullptr;
     }
 
-    void setActiveWorld(const std::string &name) { SceneManager::getInstance().setActiveWorld(name); }
+    void setActiveWorld(const std::string &name) { m_sceneManager.setActiveWorld(name); }
 
-    std::shared_ptr<World> getActiveWorld() const { return SceneManager::getInstance().getActiveWorld(); }
+    std::shared_ptr<World> getActiveWorld() const { return m_sceneManager.getActiveWorld(); }
 
     // Project file operations
     static void saveProject(std::filesystem::path path)
@@ -109,6 +105,7 @@ class Project {
 
   private:
     ProjectConfig m_config;
+    SceneManager m_sceneManager;
     std::unordered_map<std::string, std::shared_ptr<World>> m_worlds;
 };
 } // namespace Rapture

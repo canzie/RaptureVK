@@ -22,7 +22,7 @@ class Renderer {
     Renderer(const Renderer &) = delete;
     Renderer &operator=(const Renderer &) = delete;
 
-    virtual void drawFrame(std::shared_ptr<Scene> activeScene, Entity camera) = 0;
+    virtual void drawFrame(Scene &activeScene, Entity camera) = 0;
     virtual void onSwapChainRecreated() = 0;
 
     SceneRenderTarget &getSceneRenderTarget() { return *m_sceneRenderTarget; }

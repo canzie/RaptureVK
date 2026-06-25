@@ -38,7 +38,7 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar)
             if (!entity->isValid()) {
                 return;
             }
-            if (m_scene != nullptr && entity->getScene() != m_scene.get()) {
+            if (m_scene != nullptr && entity->getScene() != m_scene) {
                 return;
             }
             showEntity(*entity);
@@ -260,7 +260,7 @@ void PropertiesPanel::relayout()
     m_entityView->setScrollingFrameProperties({.canvasSize = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, y))});
 }
 
-void PropertiesPanel::setScene(std::shared_ptr<Rapture::Scene> scene)
+void PropertiesPanel::setScene(Rapture::Scene *scene)
 {
     m_scene = scene;
     if (m_scene == nullptr) {

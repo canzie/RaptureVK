@@ -97,7 +97,7 @@ DeferredRenderer::~DeferredRenderer()
     m_swapChain.reset();
 }
 
-void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene, Entity camera)
+void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -122,9 +122,9 @@ void DeferredRenderer::drawFrame(std::shared_ptr<Scene> activeScene, Entity came
 
     JobSystem &system = jobs();
     system.run(JobDeclaration(
-        [m_dynamicDiffuseGI = m_dynamicDiffuseGI, activeScene, m_currentFrame = m_currentFrame](JobContext &ctx) {
+        [m_dynamicDiffuseGI = m_dynamicDiffuseGI, scenePtr = &activeScene, m_currentFrame = m_currentFrame](JobContext &ctx) {
             (void)ctx;
-            m_dynamicDiffuseGI->populateProbesCompute(activeScene, m_currentFrame);
+            m_dynamicDiffuseGI->populateProbesCompute(*scenePtr, m_currentFrame);
         },
         JobPriority::NORMAL, QueueAffinity::COMPUTE, nullptr, "DDGI POPULATE"));
 
@@ -289,7 +289,7 @@ void DeferredRenderer::setupCommandResources()
     m_commandPoolHash = m_renderContext.commandPoolManager->createCommandPool(config);
 }
 
-void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, Entity camera,
+void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera,
                                            uint32_t imageIndex)
 {
 
@@ -297,7 +297,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
 
     // Query for SkyboxComponent - could be on any entity (typically environment entity)
     if (!m_skyboxPass->hasActiveSkybox()) {
-        auto view = activeScene->getRegistry().view<SkyboxComponent>();
+        auto view = activeScene.getRegistry().view<SkyboxComponent>();
         if (!view.empty()) {
             auto &skyboxComp = view.get<SkyboxComponent>(*view.begin());
             m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture);
@@ -312,7 +312,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DeferredRenderer Frame");
 
-        auto &registry = activeScene->getRegistry();
+        auto &registry = activeScene.getRegistry();
         auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
         auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
 
@@ -384,10 +384,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         gbufferInheritance.stencilFormat = fbSpec.stencilAttachment;
 
         system.run(JobDeclaration(
-            [&gbufferBuffer, activeScene, camera, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
+            [&gbufferBuffer, scenePtr = &activeScene, camera, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
              m_gbufferPass = m_gbufferPass](JobContext &ctx) {
                 (void)ctx;
-                gbufferBuffer = m_gbufferPass->recordSecondary(activeScene, camera, m_currentFrame, gbufferInheritance, terrain);
+                gbufferBuffer = m_gbufferPass->recordSecondary(*scenePtr, camera, m_currentFrame, gbufferInheritance, terrain);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "GBUFFER"));
 
@@ -395,11 +395,11 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         lightingInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
 
         system.run(JobDeclaration(
-            [&lightingBuffer, activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
+            [&lightingBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
              lightingInheritance, m_lightingPass = m_lightingPass](JobContext &ctx) {
                 (void)ctx;
                 lightingBuffer =
-                    m_lightingPass->recordSecondary(activeScene, camera, *sceneRT, m_currentFrame, lightingInheritance);
+                    m_lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, lightingInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 
@@ -408,10 +408,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         skyboxInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
 
         system.run(JobDeclaration(
-            [&skyboxBuffer, activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
+            [&skyboxBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
              skyboxInheritance, m_skyboxPass = m_skyboxPass](JobContext &ctx) {
                 (void)ctx;
-                skyboxBuffer = m_skyboxPass->recordSecondary(*sceneRT, m_currentFrame, activeScene, camera, skyboxInheritance);
+                skyboxBuffer = m_skyboxPass->recordSecondary(*sceneRT, m_currentFrame, *scenePtr, camera, skyboxInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SKYBOX"));
 
@@ -420,11 +420,11 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, std::sh
         instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
 
         system.run(JobDeclaration(
-            [&instancedShapesBuffer, activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
+            [&instancedShapesBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
              instancedInheritance, m_instancedShapesPass = m_instancedShapesPass](JobContext &ctx) {
                 (void)ctx;
                 instancedShapesBuffer =
-                    m_instancedShapesPass->recordSecondary(activeScene, camera, *sceneRT, m_currentFrame, instancedInheritance);
+                    m_instancedShapesPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, instancedInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "INSTANCED_SHAPES"));
 

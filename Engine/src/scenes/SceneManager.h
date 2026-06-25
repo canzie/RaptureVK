@@ -13,39 +13,43 @@ namespace Rapture {
 
 class SceneManager {
   public:
-    // Singleton pattern
-    static SceneManager &getInstance()
-    {
-        static SceneManager instance;
-        return instance;
-    }
+    SceneManager() = default;
+    ~SceneManager() = default;
+
+    SceneManager(const SceneManager &) = delete;
+    SceneManager &operator=(const SceneManager &) = delete;
 
     // Scene operations
-    std::shared_ptr<Scene> createScene(const std::string &name)
+    Scene *createScene(const std::string &name)
     {
-        auto scene = std::make_shared<Scene>();
-        m_scenes[name] = scene;
-        return scene;
+        auto scene = std::make_unique<Scene>();
+        Scene *scenePtr = scene.get();
+        m_scenes[name] = std::move(scene);
+        return scenePtr;
     }
 
     void destroyScene(const std::string &name)
     {
-        if (m_activeScene == m_scenes[name]) {
+        auto it = m_scenes.find(name);
+        if (it == m_scenes.end()) {
+            return;
+        }
+        if (m_activeScene == it->second.get()) {
             m_activeScene = nullptr;
         }
-        m_scenes.erase(name);
+        m_scenes.erase(it);
     }
 
-    std::shared_ptr<Scene> getScene(const std::string &name)
+    Scene *getScene(const std::string &name)
     {
         auto it = m_scenes.find(name);
         if (it != m_scenes.end()) {
-            return it->second;
+            return it->second.get();
         }
         return nullptr;
     }
 
-    std::shared_ptr<Scene> getActiveScene() { return m_activeScene; }
+    Scene *getActiveScene() const { return m_activeScene; }
 
     // Activation
     void setActiveScene(const std::string &name)
@@ -54,25 +58,25 @@ class SceneManager {
 
         auto it = m_scenes.find(name);
         if (it != m_scenes.end()) {
-            std::shared_ptr<Scene> oldScene = m_activeScene;
-            m_activeScene = it->second;
+            Scene *oldScene = m_activeScene;
+            m_activeScene = it->second.get();
 
             // Notify listeners about scene deactivation
-            if (oldScene) {
-                GameEvents::onSceneDeactivated().publish(oldScene);
+            if (oldScene != nullptr) {
+                GameEvents::onSceneDeactivated().publish(*oldScene);
             }
 
             // Notify listeners about scene activation
-            GameEvents::onSceneActivated().publish(m_activeScene);
+            GameEvents::onSceneActivated().publish(*m_activeScene);
         }
     }
 
-    void setActiveScene(std::shared_ptr<Scene> scene)
+    void setActiveScene(Scene *scene)
     {
         // Find the scene name first
         std::string sceneName;
         for (auto &[name, s] : m_scenes) {
-            if (s == scene) {
+            if (s.get() == scene) {
                 sceneName = name;
                 break;
             }
@@ -119,22 +123,19 @@ class SceneManager {
         }
     }
 
-    std::shared_ptr<World> getActiveWorld() { return m_activeWorld; }
+    std::shared_ptr<World> getActiveWorld() const { return m_activeWorld; }
 
     void reset()
     {
-        m_scenes.clear();
-        m_worlds.clear();
-        m_activeScene.reset();
+        m_activeScene = nullptr;
         m_activeWorld.reset();
+        m_worlds.clear();
+        m_scenes.clear();
     }
 
   private:
-    SceneManager() = default;
-    ~SceneManager() = default;
-
-    std::unordered_map<std::string, std::shared_ptr<Scene>> m_scenes;
-    std::shared_ptr<Scene> m_activeScene;
+    std::unordered_map<std::string, std::unique_ptr<Scene>> m_scenes;
+    Scene *m_activeScene = nullptr;
 
     std::unordered_map<std::string, std::shared_ptr<World>> m_worlds;
     std::shared_ptr<World> m_activeWorld;

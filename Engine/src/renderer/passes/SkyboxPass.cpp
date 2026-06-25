@@ -45,7 +45,7 @@ SkyboxPass::~SkyboxPass()
 }
 
 CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
-                                           std::shared_ptr<Scene> activeScene, Entity camera,
+                                           Scene &activeScene, Entity camera,
                                            const SecondaryBufferInheritance &inheritance)
 {
     if (!m_skyboxTexture || !m_skyboxTexture->isReady()) {
@@ -96,7 +96,7 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
     vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), m_skyboxIndexBuffer->getBufferVk(), 0, VK_INDEX_TYPE_UINT32);
 
-    auto &renderData = *activeScene->getRenderData();
+    auto &renderData = *(activeScene.getRenderData());
     auto *cameraComp = camera.isValid() ? camera.tryGetComponent<CameraComponent>() : nullptr;
 
     SkyboxPushConstants pushConstants{};

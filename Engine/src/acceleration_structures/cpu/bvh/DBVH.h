@@ -12,7 +12,7 @@ class Scene;
 class DBVH {
   public:
     DBVH();
-    DBVH(std::shared_ptr<Scene> scene);
+    DBVH(Scene &scene);
     ~DBVH();
 
     int insert(EntityID entity, const BoundingBox &aabb);

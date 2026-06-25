@@ -18,6 +18,8 @@ class SwapChain;
 class RenderWindow;
 }
 
+class FileBrowser;
+
 class AmethystLayer : public Rapture::Layer {
   public:
     AmethystLayer();
@@ -49,6 +51,7 @@ class AmethystLayer : public Rapture::Layer {
     };
 
     void openDemoWindow();
+    void openFileExplorer();
     void drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window);
     void closeSecondaryWindow(SecondaryWindowContext *context);
 
@@ -71,6 +74,8 @@ class AmethystLayer : public Rapture::Layer {
     std::vector<Amethyst::AmTextureId> m_viewportTextureIds;
 
     std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
+
+    std::unique_ptr<FileBrowser> m_fileBrowser;
 };
 
 #endif // RAPTURE__AMETHYST_LAYER_H

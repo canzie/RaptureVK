@@ -19,7 +19,7 @@ namespace Rapture {
 
 class GlfwWindowContext : public WindowContext {
   public:
-    GlfwWindowContext(PlatformContext &platform, int width, int height, const char *title);
+    GlfwWindowContext(PlatformContext &platform, int width, int height, const char *title, bool preferFloating = false);
     ~GlfwWindowContext();
 
     void initWindow() override;
@@ -61,6 +61,7 @@ class GlfwWindowContext : public WindowContext {
   private:
     GLFWwindow *m_glfwWindow;
     const char *m_title;
+    bool m_preferFloating;
     CursorMode m_cursorMode = CursorMode::NORMAL;
 };
 

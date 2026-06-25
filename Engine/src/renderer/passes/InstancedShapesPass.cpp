@@ -48,7 +48,7 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
 
 InstancedShapesPass::~InstancedShapesPass() {}
 
-CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene> &scene, Entity camera,
+CommandBuffer *InstancedShapesPass::recordSecondary(Scene &scene, Entity camera,
                                                     SceneRenderTarget &renderTarget, uint32_t frameInFlight,
                                                     const SecondaryBufferInheritance &inheritance)
 {
@@ -95,7 +95,7 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
     scissor.extent = targetExtent;
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
-    auto &registry = scene->getRegistry();
+    auto &registry = scene.getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, InstanceShapeComponent>();
 
     for (auto entity : view) {
@@ -112,7 +112,7 @@ CommandBuffer *InstancedShapesPass::recordSecondary(const std::shared_ptr<Scene>
             m_pipelineFilled->bind(commandBuffer->getCommandBufferVk());
         }
 
-        auto &renderData = *scene->getRenderData();
+        auto &renderData = *(scene.getRenderData());
 
         InstancedShapesPushConstants pushConstants;
         pushConstants.globalTransform = transformComp.transformMatrix();

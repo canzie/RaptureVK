@@ -30,7 +30,7 @@ class LightingPass {
 
     FramebufferSpecification getFramebufferSpecification();
 
-    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, SceneRenderTarget &renderTarget,
+    CommandBuffer *recordSecondary(Scene &activeScene, Entity camera, SceneRenderTarget &renderTarget,
                                    uint32_t frameIndex, const SecondaryBufferInheritance &inheritance);
 
   private:

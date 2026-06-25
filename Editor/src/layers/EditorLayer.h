@@ -24,7 +24,7 @@ class EditorLayer : public Rapture::Layer {
     void onUpdate(float dt) override;
 
   private:
-    void onNewActiveScene(std::shared_ptr<Rapture::Scene> scene);
+    void onNewActiveScene(Rapture::Scene* scene);
 
     Rapture::Entity m_cameraEntity;
     std::unique_ptr<Rapture::Input> m_input;

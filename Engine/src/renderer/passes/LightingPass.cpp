@@ -91,7 +91,7 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
     return spec;
 }
 
-CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, SceneRenderTarget &renderTarget,
+CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, SceneRenderTarget &renderTarget,
                                              uint32_t frameIndex, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -152,7 +152,7 @@ CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene,
     pushConstants.useDDGI = m_ddgi ? 1 : 0;
 
     // Query FogComponent from scene
-    auto fogView = activeScene->getRegistry().view<FogComponent>();
+    auto fogView = activeScene.getRegistry().view<FogComponent>();
     if (!fogView.empty()) {
         auto &fogComp = fogView.get<FogComponent>(*fogView.begin());
         pushConstants.fogColor = glm::vec4(fogComp.color, fogComp.enabled ? 1.0f : 0.0f);
@@ -163,7 +163,7 @@ CommandBuffer *LightingPass::recordSecondary(std::shared_ptr<Scene> activeScene,
         pushConstants.fogDistances = glm::vec2(0.0f, 0.0f);
     }
 
-    auto &renderData = *activeScene->getRenderData();
+    auto &renderData = *(activeScene.getRenderData());
     auto &lightStore = renderData.getLights();
     pushConstants.lightDataSSBOIndex = lightStore.getDescriptorIndex(frameIndex);
     pushConstants.lightStaticCount = lightStore.getPartition(MOBILITY_STATIC).getCount();

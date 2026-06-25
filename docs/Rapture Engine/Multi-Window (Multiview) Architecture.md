@@ -28,8 +28,16 @@ Every statement below is taken from the current source; file:line references are
 - The `DeferredRenderer` `TargetType::SWAPCHAIN` path still has its own inline acquire/submit/present (runtime/no-editor mode, not active in editor) — unify it onto `RenderWindow::beginFrame/endFrame` once runtime mode is actually exercised.
 
 **Phase 3 — DONE (per-window input):** smaller than first scoped, because `Input` (`input/Input.{h,cpp}`) already *polls* a specific `WindowContext` for keys/buttons/cursor, and the global key/mouse-button/mouse-move `InputEvents` have **no Rapture consumers** (Amethyst reads input via its own chained GLFW callbacks). The only global-event leak was scroll — now per-window: GLFW `scrollCallback` routes through the window user pointer and accumulates onto `WindowContext::m_scrollAccumulator`; `Input::onUpdate` reads `WindowContext::consumeScrollDelta()`. The minimized flag was already pushed the same way (iconify callback). The vestigial key/mouse `InputEvents` publishes are left in place (harmless, no consumers). Per-window window-close attribution stays with Phase 4 (no secondary windows exist yet).
-- `Application::run()` still drives the present indirectly through the `AmethystLayer` overlay; moving orchestration to a per-window loop in `run()` comes with Phase 4 (multiple windows).
-- Per-window input routing (Phase 3) and detach-on-the-fly + Amethyst per-window root (Phase 4).
+**Phase 4 — DONE (window list + detach-on-the-fly + demo):**
+- **GLFW platform lifetime split out**: new `window_context/PlatformContext.h` (abstract) / `GlfwContext.h/.cpp` (concrete: `glfwInit` in ctor, `glfwTerminate` in dtor), owned by `Application` as `std::unique_ptr<PlatformContext>`, declared before `m_vulkanContext`/`m_mainWindow`/`m_secondaryWindows` so it outlives every window. `WindowContext::createWindow` now takes a `PlatformContext&` and threads it into `GlfwWindowContext`. This replaced a real bug: every `GlfwWindowContext::closeWindow()` used to call `glfwTerminate()` unconditionally (fine with one window; closing *any* window while another was alive killed GLFW process-wide).
+- `WindowContext` gained `getId()` (static counter, ids from 1, same pattern as `SwapChain::getId()`) and `shouldClose()` (wraps `glfwWindowShouldClose`).
+- `onWindowResize` now carries a `windowId` (same shape as the swapchain-id events); `RenderWindow` and `DeferredRenderer` filter to their own window so resizing one window can't flip another's resize flag. `SwapChain`'s own resize listener was dead code (body fully commented out) and got removed outright rather than updated.
+- `Application` holds `m_secondaryWindows` (`std::vector<std::unique_ptr<RenderWindow>>`) and exposes `createSecondaryWindow(w, h, title)`. `RenderWindow` gained public `onFrame(RenderWindow&)`/`onClose()` `std::function` members — generic hooks so Engine never has to know about Amethyst/UI types. `run()` invokes `onFrame` per secondary window per frame, and on close calls `onClose()` immediately before erasing the entry.
+- **Lifecycle model is intentionally not per-window-refcounted**: the main window is authoritative. If it closes, every secondary window closes in the *same* loop iteration (`!m_running` is itself a close condition alongside that window's own `shouldClose()`), then the GLFW platform is torn down exactly once, after every window is already gone.
+- `m_vulkanContext->waitIdle()` runs before any closing window's swapchain/sync objects are destroyed — skipping this crashes validation (`vkDestroySemaphore`/`Fence`/`vkDestroySwapchainKHR` "currently in use by VkQueue"), since `submitAndFlushQueue` doesn't block and that window's last frame may still be in flight.
+- **Footgun found during testing**: `RenderWindow::createSwapChain()` constructs the `SwapChain` object but does **not** build the actual `VkSwapchainKHR`/sync objects — the caller must also call `swapChain->invalidate()` (the main window's path buries this one call inside `Application`'s constructor, easy to forget for a second window; doing so was the cause of an out-of-bounds crash on `m_semaphoreIndexToFrameIndexMap`).
+- Dropped a present-support assertion that was originally planned for new surfaces: `vkGetPhysicalDeviceSurfaceSupportKHR` for a physical device tests "can this GPU present via this display server at all," not "to this specific monitor" — since every detached window shares the main window's GLFW/display-server session, the answer is already proven by the main window working. Not a meaningful per-window check for the same-session multi-monitor case this feature targets.
+- Demo: a "New Window" action under the editor's Window menu opens a real second OS window with a centered label, via `AmethystLayer::openDemoWindow()`. See the Amethyst section below — it required real (and different-than-planned) library work, not just an editor-side wiring.
 
 ## Run modes
 
@@ -113,37 +121,64 @@ Owns `{ WindowContext, VkSurfaceKHR, SwapChain }`. API roughly: `create(VulkanCo
 
 ## Lifecycle
 
-**Create on the fly** (panel dragged out):
-1. `glfwCreateWindow(...)` → new `WindowContext`.
-2. `glfwCreateWindowSurface(sharedInstance, window, …)` → surface (same call as `VulkanContext.cpp:1332`).
-3. `SwapChain(device, surface, physicalDevice, queueFamilyIndices, windowContext)` — assert `vkGetPhysicalDeviceSurfaceSupportKHR` for the present family.
-4. Build the window's UI root + backend (Amethyst section).
-5. Push the `RenderWindow` into `Application`'s list.
+**Create on the fly** (`Application::createSecondaryWindow`, actual implemented flow):
+1. `WindowContext::createWindow(platformContext, w, h, title)` → new `GlfwWindowContext`, sharing the process-wide `PlatformContext` — no `glfwInit`/`glfwTerminate` here.
+2. `RenderWindow` ctor creates the surface from the shared `VkInstance`.
+3. `RenderWindow::createSwapChain()` **followed by an explicit `swapChain->invalidate()`** — see the footgun note above; the swapchain doesn't actually exist until `invalidate()` runs.
+4. Caller (e.g. `AmethystLayer::openDemoWindow`) builds the window's UI root and sets `RenderWindow::onFrame`/`onClose`.
+5. `createSecondaryWindow` pushes the new `RenderWindow` into `m_secondaryWindows` and returns a reference.
 
-**Destroy on the fly** (drag back / close):
-1. Gate on that window's in-flight fences (or `vkDeviceWaitIdle` for v1 — note `AmethystLayer::onResize` already does `waitIdle` before swapchain churn, `AmethystLayer.cpp:528`).
-2. Tear down swapchain → surface (`vkDestroySurfaceKHR`, cf. `VulkanContext.cpp:186`) → UI → `glfwDestroyWindow`.
-3. Erase from the list.
+**Destroy on the fly** (window closes, or the main window closes and cascades):
+1. `Application::run()` waits for the device to be idle (`m_vulkanContext->waitIdle()`) before touching anything.
+2. Calls that window's `onClose()` — lets the owner (e.g. `AmethystLayer`) release its Amethyst-side state while the `RenderWindow` is still valid.
+3. Erases the entry from `m_secondaryWindows` — `RenderWindow`'s destructor tears down swapchain → surface → `GlfwWindowContext` (→ `glfwDestroyWindow`, no `glfwTerminate`) in that order.
+4. If this is the main window closing, every secondary window goes through 1-3 in the same loop iteration, then `PlatformContext` (and its owned `GlfwContext`) destructs once, after every window is already gone.
+
+## Floating placement on tiling Wayland compositors (investigated, deferred)
+
+Goal: on tiling Wayland compositors (Hyprland confirmed), a detached window should open floating rather than getting tiled into the layout, the way Blender's file-browser/render windows do — without requiring the user to hand-write a compositor window rule.
+
+Verified directly from Hyprland's source (`src/managers/XWaylandManager.cpp`, `CHyprXWaylandManager::shouldBeFloated`) — for native Wayland clients it auto-floats a window if **either**:
+- its `xdg_toplevel` has a parent set (`xdg_toplevel_set_parent`), or
+- its min/max size are equal on an axis (non-resizable on that axis).
+
+The parent-relationship path is how Blender does it (GHOST talks to Wayland directly, not through a windowing library) and is independent of resizability — the "right" mechanism. It requires holding the actual `xdg_toplevel` proxy object for *both* the child and parent window. GLFW creates and owns both internally for every window it makes and never exposes either, not via `glfw3native.h`, not via any wrapper (`grep`-verified in the vendored GLFW 3.4 source: `wl_window.c` never calls `set_parent`, and the toplevel pointer doesn't appear in the native-access header at all). There is no Wayland-protocol way to retrieve an object's existing role-proxy from outside the library that created it. So this is achievable only by:
+1. Patching GLFW (vendored or otherwise) to expose a `set_parent` call, or
+2. Bypassing GLFW's window management for the windows that need parenting — which hits the same wall for the *main* window's toplevel, so it would mean moving main-window creation off GLFW too.
+
+Both are bigger than this feature warrants today. **Decision: defer, build a custom (non-GLFW) Wayland windowing path later** — `WindowContext`/`GlfwWindowContext` already isolate all GLFW specifics behind an abstract interface (see Phase 1-4 above), so swapping in a Wayland-native implementation for Linux later should be comparatively low-risk; it would own its surfaces/toplevels directly and could set the parent relationship for real.
+
+**Fallback that does work today, kept as inert code**: a window hinted non-resizable at creation (`glfwWindowHint(GLFW_RESIZABLE, false)`) reports `min == max` on first map, which trips Hyprland's size-based heuristic and floats it; calling `glfwSetWindowAttrib(window, GLFW_RESIZABLE, true)` *after the window's first actual present* (not right after `glfwCreateWindow` — the role-assignment commit during creation has no buffer attached yet and isn't what the compositor uses to decide floating vs. tiled) restores genuine resizability while the floating placement sticks (it's a one-time decision at first map, not continuously re-evaluated). Confirmed working in practice. Side effect: the window didn't respect its requested size (480×270) and landed at roughly half the screen — Hyprland's default-floating-size fallback for a window it saw as fixed-size at map time, presumably. `WindowContext::createWindow`'s `preferFloating` parameter is kept threaded through (`GlfwWindowContext::m_preferFloating`) but currently does nothing — reimplement by re-adding a `WindowContext::onFramePresented()` hook (called from `RenderWindow::endFrame()` after `presentQueue`) that does the deferred `glfwSetWindowAttrib` restore, if the custom-Wayland-path effort stalls or gets deprioritized.
 
 ## Open questions (not yet investigated)
-- Whether `Renderer::onSwapChainRecreated()` assumes a single global swapchain's image count (affects per-window frames-in-flight). Needs a read of the renderer before implementing.
-- Policy for one viewport shown in two windows simultaneously (share one texture vs. one viewport per window).
-- Minimized / zero-size detached windows: the loop must skip their frame (generalize whatever single-window minimize handling exists in `Application::run`).
+- Whether `Renderer::onSwapChainRecreated()` assumes a single global swapchain's image count (affects per-window frames-in-flight). Still untested — the demo window is pure Amethyst UI with no 3D viewport, so `DeferredRenderer` never runs against a secondary window in this work.
+- Policy for one viewport shown in two windows simultaneously (share one texture vs. one viewport per window). Still open.
+- ~~Minimized / zero-size detached windows~~ — **resolved**: `RenderWindow::beginFrame()`'s existing `m_windowContext->isMinimized()` early-return already generalizes correctly; `drawSecondaryWindow` uses it as-is, no special-casing needed.
+- Viewport textures are currently sized/cleared off the *window's* swapchain image count on every resize, but they should track the viewport panel's own size and only change when that panel actually resizes — flagged with a `TODO` in `AmethystLayer::onResize()` rather than fixed now.
+- GLFW input routing for secondary windows isn't wired up (the demo window has nothing interactive). `AmVulkanBackend`'s single `m_glfwInfo.uiWindow`/content-scale fields would need to become a per-`GLFWwindow*` map — same shape as the per-window draw-list fix below — before a detached window could host real interactive widgets.
 
 ## Out of scope
 - In-app floating frames already exist via Amethyst's `DockingLayer` and need none of the above. This doc is strictly the separate-OS-window path.
+- Drag-to-split (tear a panel out into a new OS window by dragging) and drag-to-join/auto-merge (drag a detached window's content back into the main docking layout). The current demo only has a static "New Window" menu action with no docking integration at either end.
 
 ---
 
-## Amethyst side (deferred — sketch only)
+## Amethyst side — DONE (shared backend/context, not per-window)
 
-The UI library is already decoupled from the swapchain: `AmVulkanInitInfo` takes `device/colorFormat/imageCount/extent` (`AmethystLayer.cpp:107-119`) and `m_backend.record(cmd, drawList)` renders into whatever image view is handed to it (`AmethystLayer.cpp:251-255`). It never touches surface/swapchain/present. Its only OS coupling is `AmGlfwInitInfo.window` (one `GLFWwindow*`, `:122`) and the per-window UI root `Amethyst::Window` (`m_window`).
+The original sketch above assumed each detached window would need its own `AmVulkanBackend` + `AmethystContext` ("one per window is simplest"). That turned out to be wrong, and the actual fix was smaller: per detached `RenderWindow` the editor only needs a new `Amethyst::Window` UI root. The pipeline, descriptor pool/set, font, glyph/SVG atlas, and vertex/index buffers are all **shared** through the *same* `AmVulkanBackend`/`AmethystContext` the main window already owns.
 
-So per detached `RenderWindow` the editor needs: a new `Amethyst::Window` root (already standalone), the moved panel subtree reparented into it, a UI backend instance pointed at that window's swapchain format/extent (one per window is simplest) with its own glfw input hookup, and per-window texture registration for any viewport shown there. Full Amethyst-side design to follow once `RenderWindow` lands.
+Why sharing is correct: nothing in Amethyst or this present path is multithreaded, and every window's frame is drawn → recorded → submitted sequentially, one window fully done before the next starts. There's no concurrency hazard in sharing GPU state across windows; the question was only ever which *mutable per-frame* state would get clobbered by a second window reusing it, and that turned out to be exactly two things:
 
-### Amethyst per-window input — DONE
+1. **The draw list.** `GpuResourceHub`/`AmethystContext::sync()` split into `syncShared()` (atlas texture uploads + the shared gradient buffer — call once per frame) and `syncWindow()` (per-window registry sync + draw list build — call once per window). The per-window filter walks each `GeometryRegistry`'s owning `UILayer` up the existing `Instance::parent` chain to its root `Window` — no new bookkeeping needed, since every registry already gets its own non-overlapping suballocated block in the shared arenas (`GpuResourceHub::obtainGeometryBlocks`, keyed by registry pointer already). `GpuResourceHub::m_drawLists` is now a `std::unordered_map<Window*, FrameDrawList>` instead of one shared list.
+2. **The record-time viewport extent.** `AmVulkanBackend::record()` now takes the target window's `VkExtent2D` as a parameter instead of reading a single shared `m_info.extent` that used to be set by an `onResize()` method (now removed). The old design silently corrupted whichever window *didn't* most recently resize — one mutable member can't hold two windows' sizes at once. All call sites (the editor and all 6 `amethyst_testapp` demos) updated to pass their own extent.
 
-An `Amethyst::Window` is a UI root, **not** an OS window; each OS window (`RenderWindow`) pairs one `GLFWwindow` + one `AmVulkanBackend` + one `Amethyst::Window`.
+`AmethystLayer::SecondaryWindowContext` ended up as just `{RenderWindow*, Amethyst::Window}`. `openDemoWindow()` builds a small UI tree (background frame + centered label) under a fresh `Amethyst::Window` and draws/records it through the *existing* `m_backend`/`m_amCtx`, with no separate descriptor pool, font load, or backend init.
+
+**Not done**: GLFW input routing for secondary windows. `AmVulkanBackend`'s single `m_glfwInfo.uiWindow` field and the `s_backendForWindow` dispatch map only ever register one `GLFWwindow*`; a second window's input would either go nowhere (if never registered, today's behavior — the demo window has nothing interactive) or get misrouted (if naively registered without also making `uiWindow`/content-scale per-`GLFWwindow*`). Needed before any detached window can host real interactive widgets.
+
+### Amethyst per-window input — DONE (at the core level; not wired end-to-end)
+
+Written before the backend became shared across windows. Still accurate for what it covers — `InputInterface` already routes to a specific target `Amethyst::Window*` — but on its own this doesn't deliver input to a second window, since that requires a `GLFWwindow*` to actually be registered against a backend (see "Not done" above). An `Amethyst::Window` is a UI root, **not** an OS window; the original design assumed each OS window (`RenderWindow`) would pair one `GLFWwindow` + one `AmVulkanBackend` + one `Amethyst::Window` — true for the main window, not extended to secondaries.
 
 - **Core (`libamethyst`) stays glfw-free.** `InputInterface`'s mouse methods now take a target `Amethyst::Window *` and route to that one window instead of broadcasting to all (`onMouseMove/onMouseButton/onMouseScroll(Window*, …, x, y)`). Removed the global `s_mouseX/Y`. Double-click stays a single global state plus an `s_lastClickWindow` guard (a click can't span windows). Keyboard/char/clipboard/cursor-shape/lock remain **global** (focus-delivered) — shortcuts unaffected.
 - **Backend (glfw, the only glfw-aware layer) owns the native↔window mapping.** Removed the global `g_glfwData`; prev-callback chain + content scale are per-instance members, keyed by a `static unordered_map<GLFWwindow*, AmVulkanBackend*>`. Mouse callbacks resolve the backend, scale by that window's content scale, fetch cursor pos via `glfwGetCursorPos` for button/scroll, and call `InputInterface::onMouse*(m_glfwInfo.uiWindow, …)`.

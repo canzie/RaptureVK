@@ -16,10 +16,9 @@
 
 namespace Rapture::Entropy {
 
-std::vector<std::pair<Entity, Entity>> &EntropyCollisions::broadPhase(std::shared_ptr<Scene> scene)
+std::vector<std::pair<Entity, Entity>> &EntropyCollisions::broadPhase(Scene &scene)
 {
     m_potentialPairs.clear();
-    if (!scene) return m_potentialPairs;
 
     if (!m_staticBVH) {
         m_staticBVH = std::make_shared<BVH>(Rapture::LeafType::AABB);
@@ -46,7 +45,7 @@ std::vector<std::pair<Entity, Entity>> &EntropyCollisions::broadPhase(std::share
         if (!node.isLeaf()) continue; // skip internal or free nodes
 
         auto entityHandle = node.entityID;
-        Entity entity(entityHandle, scene.get());
+        Entity entity(entityHandle, &scene);
         auto boundingBox = BoundingBox(node.min, node.max);
 
         // check against static BVH
@@ -54,7 +53,7 @@ std::vector<std::pair<Entity, Entity>> &EntropyCollisions::broadPhase(std::share
 
         for (auto otherEntityHandle : result) {
             if (otherEntityHandle == entityHandle) continue;
-            Entity otherEntity(otherEntityHandle, scene.get());
+            Entity otherEntity(otherEntityHandle, &scene);
 
             if (!otherEntity.isValid()) {
                 m_isSBVHDirty = true;
@@ -73,7 +72,7 @@ std::vector<std::pair<Entity, Entity>> &EntropyCollisions::broadPhase(std::share
 
         for (auto otherEntityHandle : dynamicResult) {
             if (otherEntityHandle == entityHandle) continue;
-            Entity otherEntity(otherEntityHandle, scene.get());
+            Entity otherEntity(otherEntityHandle, &scene);
 
             if (!otherEntity.isValid()) {
                 m_dynamicBVH->remove(otherEntityHandle);
@@ -90,10 +89,10 @@ std::vector<std::pair<Entity, Entity>> &EntropyCollisions::broadPhase(std::share
     return m_potentialPairs;
 }
 
-void EntropyCollisions::narrowPhase(std::shared_ptr<Scene> scene, std::vector<ContactManifold> &manifolds)
+void EntropyCollisions::narrowPhase(Scene &scene, std::vector<ContactManifold> &manifolds)
 {
 
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
     auto view = reg.view<RigidBodyComponent, TransformComponent>();
 
     uint32_t contactPoints = 0;
@@ -161,7 +160,7 @@ void EntropyCollisions::updateVisualization(const std::vector<Rapture::BVHNode> 
     }
 }
 
-std::vector<ContactManifold> EntropyCollisions::detectCollisions(std::shared_ptr<Scene> scene, float dt)
+std::vector<ContactManifold> EntropyCollisions::detectCollisions(Scene &scene, float dt)
 {
     (void)dt;
 
@@ -175,7 +174,7 @@ std::vector<ContactManifold> EntropyCollisions::detectCollisions(std::shared_ptr
     return manifolds;
 }
 
-void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene)
+void EntropyCollisions::updateDynamicBVH(Scene &scene)
 {
 
     if (!m_dynamicBVH) {
@@ -183,7 +182,7 @@ void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene)
         m_entityNodeMap.clear();
     }
 
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
     auto view = reg.view<RigidBodyComponent, MeshComponent, TransformComponent, BoundingBoxComponent>();
 
     // We need direct access to the node list to look up node indices by entity ID.
@@ -222,7 +221,7 @@ void EntropyCollisions::updateDynamicBVH(std::shared_ptr<Scene> scene)
     }
 }
 
-void EntropyCollisions::debugVisualize(std::shared_ptr<Scene> scene)
+void EntropyCollisions::debugVisualize(Scene &scene)
 {
 
     auto &app = Rapture::Application::getInstance();
@@ -232,7 +231,7 @@ void EntropyCollisions::debugVisualize(std::shared_ptr<Scene> scene)
         auto cube = std::make_unique<Rapture::Mesh>(Rapture::Primitives::CreateCube());
         auto meshRef = AssetManager::registerVirtualAsset(std::move(cube), "BVH_Viz_Static_Cube", AssetType::MESH);
 
-        m_staticVizEntity = std::make_shared<Entity>(scene->createEntity("Static BVH Visualization"));
+        m_staticVizEntity = std::make_shared<Entity>(scene.createEntity("Static BVH Visualization"));
         m_staticVizEntity->addComponent<TransformComponent>();
         m_staticVizEntity->addComponent<InstanceShapeComponent>(std::vector<InstanceData>(), vulkanContext.getVmaAllocator());
         m_staticVizEntity->addComponent<MeshComponent>(meshRef);
@@ -244,7 +243,7 @@ void EntropyCollisions::debugVisualize(std::shared_ptr<Scene> scene)
         auto cube = std::make_unique<Rapture::Mesh>(Rapture::Primitives::CreateCube());
         auto meshRef = AssetManager::registerVirtualAsset(std::move(cube), "BVH_Viz_Dynamic_Cube", AssetType::MESH);
 
-        m_dynamicVizEntity = std::make_shared<Entity>(scene->createEntity("Dynamic BVH Visualization"));
+        m_dynamicVizEntity = std::make_shared<Entity>(scene.createEntity("Dynamic BVH Visualization"));
         m_dynamicVizEntity->addComponent<TransformComponent>();
         m_dynamicVizEntity->addComponent<InstanceShapeComponent>(std::vector<InstanceData>(), vulkanContext.getVmaAllocator());
         m_dynamicVizEntity->addComponent<MeshComponent>(meshRef);
@@ -270,11 +269,9 @@ void EntropyDynamics::addBodyForceGenerator(Entity entity, const std::shared_ptr
     m_bodyGenerators[entity.getID()].push_back(gen);
 }
 
-void EntropyDynamics::step(std::shared_ptr<Scene> scene, float dt)
+void EntropyDynamics::step(Scene &scene, float dt)
 {
-    if (!scene) return;
-
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
     auto view = reg.view<RigidBodyComponent, TransformComponent>();
 
     // 1) Apply global forces to every body.
@@ -287,7 +284,7 @@ void EntropyDynamics::step(std::shared_ptr<Scene> scene, float dt)
 
     // 2) Apply per-body forces.
     for (auto &[id, gens] : m_bodyGenerators) {
-        Entity e = Entity(id, scene.get());
+        Entity e = Entity(id, &scene);
         if (!e.isValid() || !view.contains(e)) continue;
         auto &rb = view.get<RigidBodyComponent>(e);
         for (auto &gen : gens) {
@@ -299,10 +296,10 @@ void EntropyDynamics::step(std::shared_ptr<Scene> scene, float dt)
     integrate(scene, dt);
 }
 
-void EntropyDynamics::integrate(std::shared_ptr<Scene> scene, float dt)
+void EntropyDynamics::integrate(Scene &scene, float dt)
 {
 
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
     auto view = reg.view<RigidBodyComponent, TransformComponent>();
 
     for (auto entityHandle : view) {
@@ -361,7 +358,7 @@ void EntropyPhysics::addBodyForceGenerator(Entity entity, const std::shared_ptr<
     m_dynamics.addBodyForceGenerator(entity, gen);
 }
 
-std::vector<ContactManifold> EntropyPhysics::step(std::shared_ptr<Scene> scene, float dt)
+std::vector<ContactManifold> EntropyPhysics::step(Scene &scene, float dt)
 {
     // 1. Apply forces & integrate velocities
     m_dynamics.step(scene, dt);
@@ -381,12 +378,11 @@ std::vector<ContactManifold> EntropyPhysics::step(std::shared_ptr<Scene> scene, 
 // -------------------------------------------------------------
 using Constraint = ConstraintSolver::ContactConstraint;
 
-void ConstraintSolver::buildConstraints(std::shared_ptr<Scene> scene, const std::vector<ContactManifold> &manifolds)
+void ConstraintSolver::buildConstraints(Scene &scene, const std::vector<ContactManifold> &manifolds)
 {
     m_constraints.clear();
-    if (!scene) return;
 
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
 
     for (const auto &manifold : manifolds) {
         if (manifold.contactPoints.empty()) continue;
@@ -565,10 +561,10 @@ void ConstraintSolver::resolveVelocities(float dt, uint32_t iterations)
     }
 }
 
-void ConstraintSolver::solve(std::shared_ptr<Scene> scene, const std::vector<ContactManifold> &manifolds, float dt,
+void ConstraintSolver::solve(Scene &scene, const std::vector<ContactManifold> &manifolds, float dt,
                              uint32_t iterations)
 {
-    if (!scene || manifolds.empty()) return;
+    if (manifolds.empty()) return;
 
     // 1. Build constraints from the current contacts
     buildConstraints(scene, manifolds);

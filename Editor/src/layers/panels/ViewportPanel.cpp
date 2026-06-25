@@ -5,7 +5,6 @@
 #include "components/systems/CameraController.h"
 #include "events/GameEvents.h"
 #include "layers/panels/components/tab_layouts.h"
-#include "scenes/SceneManager.h"
 #include "viewport/Viewport.h"
 #include "window_context/Application.h"
 
@@ -215,7 +214,7 @@ void ViewportPanel::updateGizmo()
         return;
     }
 
-    auto scene = Rapture::SceneManager::getInstance().getActiveScene();
+    auto scene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (!scene) {
         return;
     }

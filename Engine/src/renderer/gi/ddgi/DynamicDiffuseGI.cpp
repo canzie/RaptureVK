@@ -225,7 +225,7 @@ void DynamicDiffuseGI::clearTextures()
     m_computeQueue->submitQueue(commandBuffer, nullptr, nullptr);
 }
 
-void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint32_t frameIndex)
+void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -279,7 +279,7 @@ void DynamicDiffuseGI::populateProbesCompute(std::shared_ptr<Scene> scene, uint3
     }
     updateSkybox(scene);
 
-    auto tlas = scene->getTLAS();
+    auto tlas = scene.getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
         RP_CORE_WARN("Scene TLAS is not built");
         return;
@@ -432,10 +432,10 @@ void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer)
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &offsetReadBarrier);
 }
 
-void DynamicDiffuseGI::updateFromIndirectLightingComponent(std::shared_ptr<Scene> scene)
+void DynamicDiffuseGI::updateFromIndirectLightingComponent(Scene &scene)
 {
     // Query for IndirectLightingComponent
-    auto view = scene->getRegistry().view<IndirectLightingComponent>();
+    auto view = scene.getRegistry().view<IndirectLightingComponent>();
     if (view.empty()) {
         return; // No indirect lighting component - use current settings
     }
@@ -475,11 +475,11 @@ void DynamicDiffuseGI::updateFromIndirectLightingComponent(std::shared_ptr<Scene
     // Note: intensity and visualizeProbes can be used by renderer, not stored in ProbeVolume
 }
 
-void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
+void DynamicDiffuseGI::updateSkybox(Scene &scene)
 {
     // Query for SkyboxComponent from registry
     SkyboxComponent *skyboxComp = nullptr;
-    auto view = scene->getRegistry().view<SkyboxComponent>();
+    auto view = scene.getRegistry().view<SkyboxComponent>();
     if (!view.empty()) {
         skyboxComp = &view.get<SkyboxComponent>(*view.begin());
     }
@@ -497,13 +497,13 @@ void DynamicDiffuseGI::updateSkybox(std::shared_ptr<Scene> scene)
     }
 }
 
-void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, CommandBuffer *commandBuffer, uint32_t frameIndex)
+void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint32_t frameIndex)
 {
 
     RAPTURE_PROFILE_FUNCTION();
 
     // Get TLAS from scene
-    auto tlas = scene->getTLAS();
+    auto tlas = scene.getTLAS();
     if (!tlas || !tlas->isBuilt()) {
         // RP_CORE_WARN("DynamicDiffuseGI::castRays - Scene TLAS is not built");
         return;
@@ -564,7 +564,7 @@ void DynamicDiffuseGI::castRays(std::shared_ptr<Scene> scene, CommandBuffer *com
     // Set 4: DDGI specific storage images
     m_probeTraceDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline);
 
-    auto &renderData = *scene->getRenderData();
+    auto &renderData = *(scene.getRenderData());
     auto &lightStore = renderData.getLights();
 
     DDGITracePushConstants pushConstants = {};

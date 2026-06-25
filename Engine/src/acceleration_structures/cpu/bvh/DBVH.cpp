@@ -30,9 +30,9 @@ DBVH::DBVH()
     m_freeList = 0;
 }
 
-DBVH::DBVH(std::shared_ptr<Scene> scene) : DBVH()
+DBVH::DBVH(Scene &scene) : DBVH()
 {
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
     auto view = reg.view<Entropy::RigidBodyComponent, MeshComponent, TransformComponent, BoundingBoxComponent>();
     for (auto entityHandle : view) {
         auto [rigidBody, mesh, transform, boundingBox] = view.get(entityHandle);

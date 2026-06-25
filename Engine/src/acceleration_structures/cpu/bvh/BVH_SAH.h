@@ -14,7 +14,7 @@ class BVH_SAH {
     BVH_SAH(LeafType leafType);
     ~BVH_SAH();
 
-    void build(std::shared_ptr<Scene> scene);
+    void build(Scene &scene);
     std::vector<EntityID> getIntersectingAABBs(const BoundingBox &worldAABB) const;
 
     const std::vector<BVHNode> &getNodes() const { return m_nodes; }

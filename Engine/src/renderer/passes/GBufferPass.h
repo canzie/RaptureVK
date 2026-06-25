@@ -53,7 +53,7 @@ class GBufferPass {
 
     // Main entry point: records to internal secondary command buffer
     // Returns the secondary command buffer for the caller to execute
-    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, uint32_t currentFrame,
+    CommandBuffer *recordSecondary(Scene &activeScene, Entity camera, uint32_t currentFrame,
                                    const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain = nullptr);
 
     void beginDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
@@ -94,11 +94,11 @@ class GBufferPass {
     void setupCommandResources();
 
     // Record terrain rendering only
-    void recordTerrainCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, Entity camera,
+    void recordTerrainCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera,
                                TerrainGenerator &terrain, uint32_t currentFrame);
 
     // Record entity rendering only
-    void recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, Entity camera, uint32_t currentFrame);
+    void recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera, uint32_t currentFrame);
 
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb, uint32_t currentFrame);
 

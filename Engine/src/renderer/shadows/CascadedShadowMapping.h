@@ -52,7 +52,7 @@ class CascadedShadowMap {
     CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda);
     ~CascadedShadowMap();
 
-    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame, TerrainGenerator *terrain);
+    CommandBuffer *recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);

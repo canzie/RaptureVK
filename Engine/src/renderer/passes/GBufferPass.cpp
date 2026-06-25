@@ -118,7 +118,7 @@ FramebufferSpecification GBufferPass::getFramebufferSpecification()
     return spec;
 }
 
-CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, Entity camera, uint32_t currentFrame,
+CommandBuffer *GBufferPass::recordSecondary(Scene &activeScene, Entity camera, uint32_t currentFrame,
                                             const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -152,7 +152,7 @@ CommandBuffer *GBufferPass::recordSecondary(std::shared_ptr<Scene> activeScene, 
     return commandBuffer;
 }
 
-void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_ptr<Scene> activeScene, Entity camera,
+void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera,
                                        uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -177,7 +177,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     vkCmdSetScissor(secondaryCb->getCommandBufferVk(), 0, 1, &scissor);
 
     // Get entities with TransformComponent and MeshComponent
-    auto &registry = activeScene->getRegistry();
+    auto &registry = activeScene.getRegistry();
     auto view = registry.view<TransformComponent, MeshComponent, MaterialComponent, BoundingBoxComponent>();
     CameraComponent *cameraComp = nullptr;
 
@@ -195,7 +195,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
     m_rc->descriptorManager->bindSet(2, secondaryCb, m_pipeline); // model data
     m_rc->descriptorManager->bindSet(3, secondaryCb, m_pipeline); // bindless textures for the material stuff
 
-    auto &renderData = *activeScene->getRenderData();
+    auto &renderData = *(activeScene.getRenderData());
     uint32_t meshSSBOIndex = renderData.getMeshes().getDescriptorIndex(currentFrame);
     uint32_t cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrame);
     uint32_t cameraSlotIndex = (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
@@ -223,7 +223,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, std::shared_p
 
         boundingBoxComp.updateWorldBoundingBox(transform);
 
-        if (cameraComp && activeScene->getSettings().frustumCullingEnabled) {
+        if (cameraComp && activeScene.getSettings().frustumCullingEnabled) {
             if (cameraComp->frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside) {
                 continue;
             }
@@ -812,7 +812,7 @@ void GBufferPass::createTerrainPipeline()
     RP_CORE_TRACE("GBufferPass: Terrain pipeline created");
 }
 
-void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::shared_ptr<Scene> activeScene, Entity camera,
+void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera,
                                         TerrainGenerator &terrain, uint32_t currentFrame)
 {
     (void)activeScene;
@@ -886,7 +886,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, std::share
         vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), terrain.getIndexBuffer(lod), 0, VK_INDEX_TYPE_UINT32);
 
         TerrainGBufferPushConstants pc{};
-        auto &terrainRenderData = *activeScene->getRenderData();
+        auto &terrainRenderData = *(activeScene.getRenderData());
         pc.cameraSSBOIndex = terrainRenderData.getCameras().getDescriptorIndex(currentFrame);
         pc.cameraSlotIndex = (cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
         pc.chunkDataBufferIndex = chunkDataBufferIndex;

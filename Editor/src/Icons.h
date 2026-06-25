@@ -81,6 +81,20 @@ inline constexpr const char *SVG_CARET_DOWN = ICON_SVG("<path d=\"M4 6l4 4 4-4\"
 
 inline constexpr const char *SVG_CARET_RIGHT = ICON_SVG("<path d=\"M6 4l4 4-4 4\"/>");
 
+inline constexpr const char *SVG_NAV_BACK = ICON_SVG("<path d=\"M7 4L3 8l4 4\"/>"
+                                                     "<path d=\"M3 8h9a1 1 0 011 1v2\"/>");
+
+inline constexpr const char *SVG_NAV_FORWARD = ICON_SVG("<path d=\"M9 4l4 4-4 4\"/>"
+                                                        "<path d=\"M13 8H4a1 1 0 00-1 1v2\"/>");
+
+inline constexpr const char *SVG_NAV_UP = ICON_SVG("<path d=\"M8 12.5V4M4.5 7.5L8 4l3.5 3.5\"/>"
+                                                   "<path d=\"M3 3.5h10\"/>");
+
+inline constexpr const char *SVG_REFRESH = ICON_SVG("<path d=\"M3.2 8a4.8 4.8 0 018.2-3.3L13 6\"/>"
+                                                    "<path d=\"M13 2.5V6h-3.5\"/>"
+                                                    "<path d=\"M12.8 8a4.8 4.8 0 01-8.2 3.3L3 10\"/>"
+                                                    "<path d=\"M3 13.5V10h3.5\"/>");
+
 inline constexpr const char *SVG_CHEVRON_DOWN = ICON_SVG("<path d=\"M3.5 6L8 10l4.5-4\"/>");
 
 inline constexpr const char *SVG_CHEVRON_UP = ICON_SVG("<path d=\"M3.5 10L8 6l4.5 4\"/>");
@@ -93,6 +107,10 @@ inline constexpr const char *SVG_SCENE = ICON_SVG("<path d=\"M2 5l6-3 6 3-6 3-6-
 
 inline constexpr const char *SVG_FOLDER =
     ICON_SVG("<path d=\"M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V5z\"/>");
+
+inline constexpr const char *SVG_FOLDER_PLUS =
+    ICON_SVG("<path d=\"M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V5z\"/>"
+             "<path d=\"M8 7.5v3M6.5 9h3\"/>");
 
 inline constexpr const char *SVG_CUBE = ICON_SVG("<path d=\"M8 2l5.5 3v6L8 14 2.5 11V5L8 2z\"/>"
                                                  "<path d=\"M2.5 5L8 8l5.5-3\"/>"

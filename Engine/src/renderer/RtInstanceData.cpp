@@ -41,9 +41,9 @@ void RtInstanceData::markTransformDirty(uint32_t entityID)
     m_dirtyTransforms.insert(entityID);
 }
 
-void RtInstanceData::update(std::shared_ptr<Scene> scene)
+void RtInstanceData::update(Scene &scene)
 {
-    auto tlas = scene->getTLAS();
+    auto tlas = scene.getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
         return;
     }
@@ -55,18 +55,18 @@ void RtInstanceData::update(std::shared_ptr<Scene> scene)
     }
 }
 
-void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
+void RtInstanceData::rebuild(Scene &scene)
 {
-    auto tlas = scene->getTLAS();
+    auto tlas = scene.getTLAS();
     auto &tlasInstances = tlas->getInstances();
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
     auto view = reg.view<MaterialComponent, MeshComponent, TransformComponent>(entt::exclude<LightComponent>);
 
     std::vector<RtInstanceInfo> infos(tlas->getInstanceCount());
 
     for (uint32_t i = 0; i < tlasInstances.size(); ++i) {
         auto &inst = tlasInstances[i];
-        Entity ent = Entity(inst.entityID, scene.get());
+        Entity ent = Entity(inst.entityID, &scene);
 
         RtInstanceInfo &info = infos[i];
         info = {};
@@ -131,7 +131,7 @@ void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
     m_entityToOffset.clear();
 
     for (uint32_t idx = 0; idx < infos.size(); ++idx) {
-        Entity ent = Entity(tlasInstances[idx].entityID, scene.get());
+        Entity ent = Entity(tlasInstances[idx].entityID, &scene);
         if (view.contains(ent)) {
             auto &materialComp = view.get<MaterialComponent>(ent);
             if (materialComp.material) {
@@ -155,7 +155,7 @@ void RtInstanceData::rebuild(std::shared_ptr<Scene> scene)
     RP_CORE_INFO("RtInstanceData: rebuilt {} instances", infos.size());
 }
 
-void RtInstanceData::patchDirty(std::shared_ptr<Scene> scene)
+void RtInstanceData::patchDirty(Scene &scene)
 {
     if (m_dirtyMaterials.empty() && m_dirtyTransforms.empty()) {
         return;
@@ -204,7 +204,7 @@ void RtInstanceData::patchDirty(std::shared_ptr<Scene> scene)
         auto it = m_entityToOffset.find(entID);
         if (it == m_entityToOffset.end()) continue;
 
-        Entity ent = Entity(entID, scene.get());
+        Entity ent = Entity(entID, &scene);
         if (!ent.hasComponent<TransformComponent>()) continue;
 
         uint32_t dst = it->second + static_cast<uint32_t>(TRANSFORM_OFFSET);

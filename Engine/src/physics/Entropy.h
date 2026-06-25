@@ -37,18 +37,18 @@ class EntropyCollisions;
 // Should deal with collisions between colliders
 class EntropyCollisions {
   public:
-    std::vector<ContactManifold> detectCollisions(std::shared_ptr<Scene> scene, float dt);
+    std::vector<ContactManifold> detectCollisions(Scene &scene, float dt);
 
     // Visualise current BVHs (static + dynamic) using InstanceShapeComponents
-    void debugVisualize(std::shared_ptr<Scene> scene);
+    void debugVisualize(Scene &scene);
 
   private:
-    std::vector<std::pair<Entity, Entity>> &broadPhase(std::shared_ptr<Scene> scene);
-    void narrowPhase(std::shared_ptr<Scene> scene, std::vector<ContactManifold> &manifolds);
+    std::vector<std::pair<Entity, Entity>> &broadPhase(Scene &scene);
+    void narrowPhase(Scene &scene, std::vector<ContactManifold> &manifolds);
 
     void updateVisualization(const std::vector<Rapture::BVHNode> &nodes, std::shared_ptr<Entity> vizEntity, const glm::vec4 &color);
 
-    void updateDynamicBVH(std::shared_ptr<Scene> scene);
+    void updateDynamicBVH(Scene &scene);
 
   private:
     std::vector<std::pair<Entity, Entity>> m_potentialPairs;
@@ -125,10 +125,10 @@ class EntropyDynamics {
     void addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen);
 
     // Executes force application and velocity integration for all rigid bodies in the scene.
-    void step(std::shared_ptr<Scene> scene, float dt);
+    void step(Scene &scene, float dt);
 
   private:
-    void integrate(std::shared_ptr<Scene> scene, float dt);
+    void integrate(Scene &scene, float dt);
 
   private:
     std::vector<std::shared_ptr<ForceGenerator>> m_globalGenerators;
@@ -146,7 +146,7 @@ class EntropyPhysics {
     void addBodyForceGenerator(Entity entity, const std::shared_ptr<ForceGenerator> &gen);
 
     // Run full physics pipeline
-    std::vector<ContactManifold> step(std::shared_ptr<Scene> scene, float dt);
+    std::vector<ContactManifold> step(Scene &scene, float dt);
 
     EntropyCollisions *getCollisions() { return &m_collisions; }
     EntropyDynamics *getDynamics() { return &m_dynamics; }
@@ -162,7 +162,7 @@ class ConstraintSolver {
   public:
     ConstraintSolver() = default;
 
-    void solve(std::shared_ptr<Scene> scene, const std::vector<ContactManifold> &manifolds, float dt, uint32_t iterations = 8);
+    void solve(Scene &scene, const std::vector<ContactManifold> &manifolds, float dt, uint32_t iterations = 8);
 
     struct ContactConstraint {
         Entity a;
@@ -219,7 +219,7 @@ class ConstraintSolver {
 
   private:
     // Build internal constraints from manifolds for the current frame
-    void buildConstraints(std::shared_ptr<Scene> scene, const std::vector<ContactManifold> &manifolds);
+    void buildConstraints(Scene &scene, const std::vector<ContactManifold> &manifolds);
 
     // Positional correction (interpenetration) phase
     void resolveInterpenetration(uint32_t iterations);

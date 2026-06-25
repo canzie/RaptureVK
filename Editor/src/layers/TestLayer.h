@@ -30,7 +30,7 @@ class TestLayer : public Rapture::Layer {
 
     void onUpdate(float ts) override;
 
-    void onNewActiveScene(std::shared_ptr<Rapture::Scene> scene);
+    void onNewActiveScene(Rapture::Scene &scene);
 
     // Call to notify about camera changes
     void notifyCameraChange();

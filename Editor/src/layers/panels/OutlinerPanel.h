@@ -21,7 +21,7 @@ class OutlinerPanel : public Panel {
     /**
      * @brief Update the outliner with the current scene
      */
-    void setScene(std::shared_ptr<Rapture::Scene> scene);
+    void setScene(Rapture::Scene *scene);
 
     /**
      * @brief Refresh the tree view with current scene hierarchy
@@ -36,7 +36,7 @@ class OutlinerPanel : public Panel {
     Amethyst::ScrollingFrame *m_scrollingFrame = nullptr;
     Amethyst::TreeView *m_treeView = nullptr;
 
-    std::shared_ptr<Rapture::Scene> m_scene;
+    Rapture::Scene *m_scene = nullptr;
     bool m_hasScene = false;
 };
 

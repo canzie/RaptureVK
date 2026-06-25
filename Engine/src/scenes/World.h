@@ -38,19 +38,12 @@ class World {
         }
     }
 
-    // Scene management within a world
-    std::shared_ptr<Scene> createScene(const std::string &sceneName)
-    {
-        auto scene = std::make_shared<Scene>();
-        m_scenes[sceneName] = scene;
-        return scene;
-    }
-
-    void addScene(const std::string &sceneName, std::shared_ptr<Scene> scene) { m_scenes[sceneName] = scene; }
+    // Scene management within a world (scenes are owned by SceneManager, World only references them)
+    void addScene(const std::string &sceneName, Scene *scene) { m_scenes[sceneName] = scene; }
 
     void removeScene(const std::string &sceneName) { m_scenes.erase(sceneName); }
 
-    std::shared_ptr<Scene> getScene(const std::string &sceneName)
+    Scene *getScene(const std::string &sceneName)
     {
         auto it = m_scenes.find(sceneName);
         if (it != m_scenes.end()) {
@@ -78,7 +71,7 @@ class World {
         }
     }
 
-    std::shared_ptr<Scene> getMainScene() const { return m_mainScene; }
+    Scene *getMainScene() const { return m_mainScene; }
 
     // World state
     bool isActive() const { return m_isActive; }
@@ -88,8 +81,8 @@ class World {
   private:
     std::string m_name;
     bool m_isActive = false;
-    std::unordered_map<std::string, std::shared_ptr<Scene>> m_scenes;
-    std::shared_ptr<Scene> m_mainScene;
+    std::unordered_map<std::string, Scene *> m_scenes;
+    Scene *m_mainScene = nullptr;
     std::string m_mainSceneName;
 };
 

@@ -264,7 +264,7 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     return cascadeData;
 }
 
-CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame,
+CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame,
                                                   TerrainGenerator *terrain)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -283,7 +283,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
         m_cascadeMatricesBuffers[m_currentFrame]->addData(&csmData, sizeof(CSMData), 0);
     }
 
-    auto &registry = activeScene->getRegistry();
+    auto &registry = activeScene.getRegistry();
 
     auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash, currentFrame);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
@@ -375,7 +375,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(std::shared_ptr<Scene> activeS
                                   static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
 
         // Set push constants for this batch
-        auto &renderData = *activeScene->getRenderData();
+        auto &renderData = *(activeScene.getRenderData());
 
         PushConstantsCSM pushConstants{};
         pushConstants.shadowMatrixIndices = m_cascadeMatricesIndices[m_currentFrame];

@@ -8,8 +8,8 @@ namespace Rapture {
 
 uint32_t WindowContext::s_nextId = 1;
 
-GlfwWindowContext::GlfwWindowContext(PlatformContext &platform, int width, int height, const char *title)
-    : m_glfwWindow(nullptr), m_title(title)
+GlfwWindowContext::GlfwWindowContext(PlatformContext &platform, int width, int height, const char *title, bool preferFloating)
+    : m_glfwWindow(nullptr), m_title(title), m_preferFloating(preferFloating)
 {
     (void)platform; // GLFW is already initialized by the time any window is constructed
     m_context_data.width = width;
@@ -254,9 +254,9 @@ void GlfwWindowContext::windowIconifyCallback(GLFWwindow *window, int iconified)
 // Implement windowMaximizeCallback if needed
 // void GlfwWindowContext::windowMaximizeCallback(GLFWwindow* window, int maximized) { ... }
 
-WindowContext *WindowContext::createWindow(PlatformContext &platform, int width, int height, const char *title)
+WindowContext *WindowContext::createWindow(PlatformContext &platform, int width, int height, const char *title, bool preferFloating)
 {
-    return new GlfwWindowContext(platform, width, height, title);
+    return new GlfwWindowContext(platform, width, height, title, preferFloating);
 }
 
 } // namespace Rapture

@@ -149,6 +149,21 @@ VulkanContext::~VulkanContext()
     m_commandPoolManager.reset();
 
     if (m_vmaAllocator) {
+#ifndef NDEBUG
+        VmaTotalStatistics stats{};
+        vmaCalculateStatistics(m_vmaAllocator, &stats);
+        if (stats.total.statistics.allocationCount > 0) {
+            RP_CORE_ERROR("VMA leak at shutdown: {0} allocation(s), {1} block(s), {2} bytes still alive before vmaDestroyAllocator",
+                          stats.total.statistics.allocationCount, stats.total.statistics.blockCount,
+                          stats.total.statistics.allocationBytes);
+            char *statsString = nullptr;
+            vmaBuildStatsString(m_vmaAllocator, &statsString, VK_TRUE);
+            if (statsString != nullptr) {
+                RP_CORE_ERROR("VMA detailed stats:\n{0}", statsString);
+                vmaFreeStatsString(m_vmaAllocator, statsString);
+            }
+        }
+#endif
         vmaDestroyAllocator(m_vmaAllocator);
     }
 

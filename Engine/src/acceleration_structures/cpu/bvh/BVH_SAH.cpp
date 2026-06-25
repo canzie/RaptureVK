@@ -23,9 +23,9 @@ BVH_SAH::~BVH_SAH()
     m_nodes.clear();
 }
 
-void BVH_SAH::build(std::shared_ptr<Scene> scene)
+void BVH_SAH::build(Scene &scene)
 {
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
     std::vector<BVHNode> primitives;
     auto bbView = reg.view<BoundingBoxComponent, TransformComponent>();
 

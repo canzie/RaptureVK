@@ -16,7 +16,7 @@ Viewport::~Viewport()
     m_renderer.reset();
 }
 
-void Viewport::setScene(std::shared_ptr<Scene> scene)
+void Viewport::setScene(Scene *scene)
 {
     m_scene = scene;
 }
@@ -47,7 +47,7 @@ void Viewport::drawFrame()
     }
 
     Entity camera = m_camera.isValid() ? m_camera : m_scene->getMainCamera();
-    m_renderer->drawFrame(m_scene, camera);
+    m_renderer->drawFrame(*m_scene, camera);
 }
 
 void Viewport::resize(uint32_t width, uint32_t height)

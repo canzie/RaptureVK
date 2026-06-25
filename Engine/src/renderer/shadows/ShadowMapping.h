@@ -31,7 +31,7 @@ class ShadowMap {
     ShadowMap(float width, float height);
     ~ShadowMap();
 
-    CommandBuffer *recordSecondary(std::shared_ptr<Scene> activeScene, uint32_t currentFrame);
+    CommandBuffer *recordSecondary(Scene &activeScene, uint32_t currentFrame);
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 

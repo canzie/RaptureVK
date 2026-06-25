@@ -48,7 +48,7 @@ class RtInstanceData {
     RtInstanceData(const RenderContext &renderContext);
     ~RtInstanceData();
 
-    void update(std::shared_ptr<Scene> scene);
+    void update(Scene& scene);
 
     std::shared_ptr<StorageBuffer> getBuffer() { return m_buffer; }
     uint32_t getInstanceCount() const { return m_instanceCount; }
@@ -57,8 +57,8 @@ class RtInstanceData {
     void markTransformDirty(uint32_t entityID);
 
   private:
-    void rebuild(std::shared_ptr<Scene> scene);
-    void patchDirty(std::shared_ptr<Scene> scene);
+    void rebuild(Scene& scene);
+    void patchDirty(Scene& scene);
 
     RenderContext m_rc;
 

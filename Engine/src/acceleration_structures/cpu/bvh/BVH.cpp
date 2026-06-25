@@ -18,12 +18,12 @@ BVH::~BVH()
     m_nodes.clear();
 }
 
-void BVH::build(std::shared_ptr<Scene> scene)
+void BVH::build(Scene &scene)
 {
 
     m_nodes.clear();
 
-    auto &reg = scene->getRegistry();
+    auto &reg = scene.getRegistry();
 
     std::vector<BVHNode> primitives;
     auto bbView = reg.view<BoundingBoxComponent, Entropy::RigidBodyComponent, TransformComponent, MeshComponent>();
