@@ -60,27 +60,23 @@ class GBufferPass {
     void endDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
 
     // Getters for current frame's GBuffer textures
-    std::shared_ptr<Texture> getPositionTexture() const { return m_positionDepthTextures[m_currentFrame]; }
     std::shared_ptr<Texture> getNormalTexture() const { return m_normalTextures[m_currentFrame]; }
     std::shared_ptr<Texture> getAlbedoTexture() const { return m_albedoSpecTextures[m_currentFrame]; }
     std::shared_ptr<Texture> getMaterialTexture() const { return m_materialTextures[m_currentFrame]; }
     std::shared_ptr<Texture> getDepthTexture() const { return m_depthStencilTextures[m_currentFrame]; }
 
-    std::vector<std::shared_ptr<Texture>> getPositionDepthTextures() const { return m_positionDepthTextures; }
     std::vector<std::shared_ptr<Texture>> getNormalTextures() const { return m_normalTextures; }
     std::vector<std::shared_ptr<Texture>> getAlbedoSpecTextures() const { return m_albedoSpecTextures; }
     std::vector<std::shared_ptr<Texture>> getMaterialTextures() const { return m_materialTextures; }
     std::vector<std::shared_ptr<Texture>> getDepthTextures() const { return m_depthStencilTextures; }
 
     // Getters for bindless texture indices for current frame
-    uint32_t getPositionTextureIndex() const { return m_positionTextureIndices[m_currentFrame]; }
     uint32_t getNormalTextureIndex() const { return m_normalTextureIndices[m_currentFrame]; }
     uint32_t getAlbedoTextureIndex() const { return m_albedoTextureIndices[m_currentFrame]; }
     uint32_t getMaterialTextureIndex() const { return m_materialTextureIndices[m_currentFrame]; }
     uint32_t getDepthTextureIndex() const { return m_depthTextureIndices[m_currentFrame]; }
 
     // Getters for all bindless texture indices
-    const std::vector<uint32_t> &getPositionTextureIndices() const { return m_positionTextureIndices; }
     const std::vector<uint32_t> &getNormalTextureIndices() const { return m_normalTextureIndices; }
     const std::vector<uint32_t> &getAlbedoTextureIndices() const { return m_albedoTextureIndices; }
     const std::vector<uint32_t> &getMaterialTextureIndices() const { return m_materialTextureIndices; }
@@ -116,14 +112,12 @@ class GBufferPass {
     VkDevice m_device;
 
     // Multiple textures for each frame in flight
-    std::vector<std::shared_ptr<Texture>> m_positionDepthTextures;
     std::vector<std::shared_ptr<Texture>> m_normalTextures;
     std::vector<std::shared_ptr<Texture>> m_albedoSpecTextures;
     std::vector<std::shared_ptr<Texture>> m_materialTextures;
     std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
 
     // Bindless texture indices for each frame in flight
-    std::vector<uint32_t> m_positionTextureIndices;
     std::vector<uint32_t> m_normalTextureIndices;
     std::vector<uint32_t> m_albedoTextureIndices;
     std::vector<uint32_t> m_materialTextureIndices;
@@ -141,7 +135,7 @@ class GBufferPass {
     std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
     std::vector<std::unique_ptr<MDIBatchMap>> m_selectedEntityBatchMaps; // Separate batches for selected entities
 
-    VkRenderingAttachmentInfo m_colorAttachmentInfo[4];
+    VkRenderingAttachmentInfo m_colorAttachmentInfo[3];
     VkRenderingAttachmentInfo m_depthAttachmentInfo;
 
     std::shared_ptr<Entity> m_selectedEntity;

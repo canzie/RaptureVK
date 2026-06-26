@@ -459,6 +459,7 @@ void SceneRenderData::updateCameras(uint32_t frameIndex)
         data.view = camera->camera.getViewMatrix();
         data.projection = camera->camera.getProjectionMatrix();
         data.projection[1][1] *= -1;
+        data.invViewProj = glm::inverse(data.projection * data.view);
     }
 }
 

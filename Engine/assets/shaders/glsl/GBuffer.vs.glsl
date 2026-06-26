@@ -18,6 +18,7 @@ layout(location = 6) out flat uint outMaterialIndex;
 struct CameraGPUData {
     mat4 view;
     mat4 proj;
+    mat4 invViewProj;
 };
 
 struct MeshGPUData {

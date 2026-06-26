@@ -4,10 +4,9 @@
 
 #include "common/MaterialCommon.glsl"
 
-layout(location = 0) out vec4 gPositionDepth;
-layout(location = 1) out vec4 gNormal;
-layout(location = 2) out vec4 gAlbedoSpec;
-layout(location = 3) out vec4 gMaterial;
+layout(location = 0) out vec2 gNormal;
+layout(location = 1) out vec4 gAlbedoSpec;
+layout(location = 2) out vec4 gMaterial;
 
 layout(location = 0) in vec4 inFragPosDepth;
 layout(location = 1) in vec3 inNormal;
@@ -45,8 +44,6 @@ void main() {
     float metallic = SAMPLE_METALLIC(mat, u_textures, texCoord);
     float ao = SAMPLE_AO(mat, u_textures, texCoord);
 
-    gPositionDepth = inFragPosDepth;
-
     vec3 normal;
     if (matHasFlag(flags, MAT_FLAG_HAS_NORMAL_MAP) && matHasFlag(flags, MAT_FLAG_HAS_TEXCOORDS)) {
         vec3 tangentNormal = SAMPLE_NORMAL_MAP(mat, u_textures, texCoord);
@@ -74,7 +71,7 @@ void main() {
         normal = normalize(inNormal);
     }
 
-    gNormal = vec4(normal, 1.0);
+    gNormal = octEncodeNormal(normalize(normal));
     gAlbedoSpec = vec4(albedo, 1.0);
     gMaterial = vec4(metallic, roughness, ao, 1.0);
 }

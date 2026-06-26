@@ -64,6 +64,26 @@ float matFlagMul(uint flags, uint flag) {
     return float((flags & flag) != 0u);
 }
 
+vec2 signNotZero(vec2 v) {
+    return vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
+}
+
+// Octahedral encode a unit normal into a 2-component value in [-1, 1]
+vec2 octEncodeNormal(vec3 n) {
+    n /= (abs(n.x) + abs(n.y) + abs(n.z));
+    vec2 enc = (n.z >= 0.0) ? n.xy : (1.0 - abs(n.yx)) * signNotZero(n.xy);
+    return enc;
+}
+
+// Decode an octahedral-encoded normal back to a unit vector
+vec3 octDecodeNormal(vec2 enc) {
+    vec3 n = vec3(enc.xy, 1.0 - abs(enc.x) - abs(enc.y));
+    if (n.z < 0.0) {
+        n.xy = (1.0 - abs(n.yx)) * signNotZero(n.xy);
+    }
+    return normalize(n);
+}
+
 // Reconstruct a tangent-space normal's Z from its XY (unit-length assumption), for BC5 normal maps
 vec3 reconstructNormalZ(vec2 xy) {
     vec2 n = xy * 2.0 - 1.0;

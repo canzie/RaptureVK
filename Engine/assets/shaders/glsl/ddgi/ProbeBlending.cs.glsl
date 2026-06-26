@@ -241,11 +241,11 @@ void main() {
         vec3 diff = probeIrradianceMean.rgb - result.rgb;
         float maxComponent = max(max(abs(diff.r), abs(diff.g)), abs(diff.b));
         
-        float probeIrradianceThreshold = 0.25;
+        float probeIrradianceThreshold = 0.5;
         if (maxComponent > probeIrradianceThreshold)
         {
             // Lower the hysteresis when a large lighting change is detected
-            hysteresis = max(0.0, hysteresis - 0.75);
+            hysteresis = max(0.0, hysteresis - 0.5);
         }
 
         if (LinearRGBToLuminance(delta) > u_volume.probeBrightnessThreshold)

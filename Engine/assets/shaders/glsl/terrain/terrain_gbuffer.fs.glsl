@@ -5,10 +5,9 @@
 #include "common/MaterialCommon.glsl"
 #include "terrain/terrain_common.glsl"
 
-layout(location = 0) out vec4 gPositionDepth;
-layout(location = 1) out vec4 gNormal;
-layout(location = 2) out vec4 gAlbedoSpec;
-layout(location = 3) out vec4 gMaterial;
+layout(location = 0) out vec2 gNormal;
+layout(location = 1) out vec4 gAlbedoSpec;
+layout(location = 2) out vec4 gMaterial;
 
 layout(location = 0) in vec4 inFragPosDepth;
 layout(location = 3) in flat uint inChunkIndex;
@@ -109,10 +108,8 @@ TerrainSample blendSamples(TerrainSample a, TerrainSample b, float t) {
 }
 
 void main() {
-    gPositionDepth = inFragPosDepth;
-
     vec3 normalWS = computeTerrainNormal(inFragPosDepth.xyz);
-    gNormal = vec4(normalWS, 1.0);
+    gNormal = octEncodeNormal(normalize(normalWS));
 
     MaterialData grassMat = u_materials[pc.grassMaterialIndex].data;
     float slopeThreshold = grassMat.slopeThreshold > 0.0 ? grassMat.slopeThreshold : 0.7;

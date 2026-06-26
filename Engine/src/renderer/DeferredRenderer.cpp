@@ -446,21 +446,25 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         // Here we wait for all of them to be finished (if in parallel)
 
         if (gbufferBuffer) {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
             m_gbufferPass->beginDynamicRendering(commandBuffer, m_currentFrame);
             commandBuffer->executeSecondary(*gbufferBuffer);
             m_gbufferPass->endDynamicRendering(commandBuffer, m_currentFrame);
         }
         if (lightingBuffer) {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
             m_lightingPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
             commandBuffer->executeSecondary(*lightingBuffer);
             m_lightingPass->endDynamicRendering(commandBuffer);
         }
         if (skyboxBuffer) {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
             m_skyboxPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame);
             commandBuffer->executeSecondary(*skyboxBuffer);
             m_skyboxPass->endDynamicRendering(commandBuffer);
         }
         if (instancedShapesBuffer) {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
             m_instancedShapesPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame);
             commandBuffer->executeSecondary(*instancedShapesBuffer);
             m_instancedShapesPass->endDynamicRendering(commandBuffer);

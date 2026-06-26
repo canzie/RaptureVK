@@ -25,7 +25,8 @@ struct LightingPushConstants {
 
     uint32_t GBufferAlbedoHandle;
     uint32_t GBufferNormalHandle;
-    uint32_t GBufferPositionHandle;
+    uint32_t cameraSSBOIndex;
+    uint32_t cameraSlotIndex;
     uint32_t GBufferMaterialHandle;
     uint32_t GBufferDepthHandle;
 
@@ -132,9 +133,14 @@ CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, 
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
     glm::vec3 cameraPos = glm::vec3(0.0f);
+    uint32_t cameraSlotIndex = 0;
 
     if (camera.isValid()) {
         cameraPos = camera.tryGetComponent<TransformComponent>()->translation();
+        auto *cameraComp = camera.tryGetComponent<CameraComponent>();
+        if (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) {
+            cameraSlotIndex = cameraComp->renderDataSlot;
+        }
     } else {
         RP_CORE_WARN("No main camera found!");
     }
@@ -144,7 +150,8 @@ CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, 
 
     pushConstants.GBufferAlbedoHandle = m_gBufferPass->getAlbedoTextureIndex();
     pushConstants.GBufferNormalHandle = m_gBufferPass->getNormalTextureIndex();
-    pushConstants.GBufferPositionHandle = m_gBufferPass->getPositionTextureIndex();
+    pushConstants.cameraSSBOIndex = activeScene.getRenderData()->getCameras().getDescriptorIndex(frameIndex);
+    pushConstants.cameraSlotIndex = cameraSlotIndex;
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 

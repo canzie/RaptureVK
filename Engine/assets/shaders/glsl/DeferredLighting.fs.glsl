@@ -71,6 +71,28 @@ layout(std140, set = 0, binding = 5) uniform ProbeInfo {
     ProbeVolume u_DDGI_Volume;
 };
 
+struct CameraGPUData {
+    mat4 view;
+    mat4 proj;
+    mat4 invViewProj;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer CameraDataSSBO {
+    CameraGPUData cameras[];
+} u_cameraSSBO[];
+
+vec2 signNotZero(vec2 v) {
+    return vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
+}
+
+vec3 octDecodeNormal(vec2 enc) {
+    vec3 n = vec3(enc.xy, 1.0 - abs(enc.x) - abs(enc.y));
+    if (n.z < 0.0) {
+        n.xy = (1.0 - abs(n.yx)) * signNotZero(n.xy);
+    }
+    return normalize(n);
+}
+
 
 layout(push_constant) uniform PushConstants {
     vec4 cameraPos;
@@ -85,7 +107,8 @@ layout(push_constant) uniform PushConstants {
 
     uint GBufferAlbedoHandle;
     uint GBufferNormalHandle;
-    uint GBufferPositionHandle;
+    uint cameraSSBOIndex;
+    uint cameraSlotIndex;
     uint GBufferMaterialHandle;
     uint GBufferDepthHandle;
 
@@ -443,14 +466,28 @@ vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume
 void main() {
 
 
-    vec4 positionDepth = texture(gTextures[pc.GBufferPositionHandle], fragTexCoord);
-    vec3 fragPos = positionDepth.xyz;
-    vec3 N = texture(gTextures[pc.GBufferNormalHandle], fragTexCoord).rgb;
+    float depth = texture(gTextures[pc.GBufferDepthHandle], fragTexCoord).r;
+
+    // Background pixel (no geometry written) - nothing to light
+    if (depth >= 1.0) {
+        outColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
+    CameraGPUData cam = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex];
+
+    // Reconstruct world position from depth + screen UV using the inverse view-projection
+    vec3 ndc = vec3(fragTexCoord * 2.0 - 1.0, depth);
+    vec4 worldH = cam.invViewProj * vec4(ndc, 1.0);
+    vec3 fragPos = worldH.xyz / worldH.w;
+
+    // View-space linear depth (positive into screen), matches the old gPositionDepth.a
+    float viewDepth = -(cam.view * vec4(fragPos, 1.0)).z;
+
+    vec3 N = octDecodeNormal(texture(gTextures[pc.GBufferNormalHandle], fragTexCoord).rg);
     vec4 albedoSpec = texture(gTextures[pc.GBufferAlbedoHandle], fragTexCoord);
     vec4 metallicRoughnessAO = texture(gTextures[pc.GBufferMaterialHandle], fragTexCoord);
-    
-    N = normalize(N);
-    
+
     vec3 albedo = albedoSpec.rgb;
     float metallic = metallicRoughnessAO.r;
     float roughness = metallicRoughnessAO.g;
@@ -512,7 +549,7 @@ void main() {
             ShadowGPUData shadowInfo = u_shadowSSBO[pc.shadowDataSSBOIndex].shadows[shadowSlot];
             if (shadowInfo.lightIndex == light.spotAngles.z && shadowInfo.type >= 0) {
                
-               shadowFactor = calculateShadow(fragPos, positionDepth.a, N, lightDirWorld, shadowInfo, currentCascadeIndex);
+               shadowFactor = calculateShadow(fragPos, viewDepth, N, lightDirWorld, shadowInfo, currentCascadeIndex);
                 if (debugCascadeIndex == -1) {
                    debugCascadeIndex = currentCascadeIndex;
                 }
@@ -542,7 +579,7 @@ void main() {
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {
-        float fragDepthView = abs(positionDepth.a); // Using view-space depth from G-Buffer
+        float fragDepthView = abs(viewDepth); // Reconstructed view-space depth
         float fogFactor = smoothstep(pc.fogDistances.x, pc.fogDistances.y, fragDepthView);
         color = mix(color, pc.fogColor.rgb, fogFactor);
     }

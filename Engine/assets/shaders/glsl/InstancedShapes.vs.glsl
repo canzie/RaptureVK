@@ -21,6 +21,7 @@ layout(push_constant) uniform PushConstants {
 struct CameraGPUData {
     mat4 view;
     mat4 proj;
+    mat4 invViewProj;
 };
 
 layout(set = 0, binding = 0) readonly buffer CameraDataSSBO {
