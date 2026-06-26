@@ -22,7 +22,12 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
+    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
+        m_root = nullptr;
+        m_placeholderText = nullptr;
+        m_entityView = nullptr;
+        m_searchInput = nullptr;
+    });
     m_root->name = "Properties";
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
@@ -290,6 +295,9 @@ void PropertiesPanel::showEntity(const Rapture::Entity &entity)
 
 void PropertiesPanel::showPlaceholder()
 {
+    if (m_placeholderText == nullptr || m_entityView == nullptr) {
+        return;
+    }
     m_placeholderText->setBaseProperties({.visible = true});
     m_entityView->setBaseProperties({.visible = false});
 }

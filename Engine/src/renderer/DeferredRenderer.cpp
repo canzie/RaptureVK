@@ -28,23 +28,24 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarge
     setupCommandResources();
     createRenderTarget();
 
-    m_rtInstanceData = std::make_shared<RtInstanceData>(m_renderContext);
-    m_dynamicDiffuseGI = std::make_shared<DynamicDiffuseGI>(m_swapChain->getImageCount());
+    m_rtInstanceData = std::make_unique<RtInstanceData>(m_renderContext);
+    m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(m_swapChain->getImageCount());
 
     // Get the render target format for pipeline creation
     VkFormat colorFormat = m_sceneRenderTarget->getFormat();
 
-    m_gbufferPass = std::make_shared<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
+    m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
 
-    m_lightingPass = std::make_shared<LightingPass>(m_width, m_height, m_gbufferPass, m_dynamicDiffuseGI, colorFormat);
+    m_lightingPass =
+        std::make_unique<LightingPass>(m_width, m_height, m_gbufferPass.get(), m_dynamicDiffuseGI.get(), colorFormat);
 
-    m_stencilBorderPass = std::make_shared<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
+    m_stencilBorderPass = std::make_unique<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
                                                               m_gbufferPass->getDepthTextures(), colorFormat);
 
-    m_instancedShapesPass = std::make_shared<InstancedShapesPass>(m_width, m_height, m_swapChain->getImageCount(),
+    m_instancedShapesPass = std::make_unique<InstancedShapesPass>(m_width, m_height, m_swapChain->getImageCount(),
                                                                   m_gbufferPass->getDepthTextures(), colorFormat);
 
-    m_skyboxPass = std::make_shared<SkyboxPass>(m_gbufferPass->getDepthTextures(), colorFormat);
+    m_skyboxPass = std::make_unique<SkyboxPass>(m_gbufferPass->getDepthTextures(), colorFormat);
 
     ApplicationEvents::onWindowResize().addListener([this](uint32_t windowId, unsigned int width, unsigned int height) {
         (void)width;
@@ -76,6 +77,7 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarge
 
 DeferredRenderer::~DeferredRenderer()
 {
+    RP_CORE_INFO("Renderer destroyed");
     m_renderContext.vulkanContext->waitIdle();
 
     m_skyboxPass.reset();
@@ -122,9 +124,9 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera)
 
     JobSystem &system = jobs();
     system.run(JobDeclaration(
-        [m_dynamicDiffuseGI = m_dynamicDiffuseGI, scenePtr = &activeScene, m_currentFrame = m_currentFrame](JobContext &ctx) {
+        [ddgi = m_dynamicDiffuseGI.get(), scenePtr = &activeScene, m_currentFrame = m_currentFrame](JobContext &ctx) {
             (void)ctx;
-            m_dynamicDiffuseGI->populateProbesCompute(*scenePtr, m_currentFrame);
+            ddgi->populateProbesCompute(*scenePtr, m_currentFrame);
         },
         JobPriority::NORMAL, QueueAffinity::COMPUTE, nullptr, "DDGI POPULATE"));
 
@@ -241,17 +243,18 @@ void DeferredRenderer::recreateRenderPasses()
 
     VkFormat colorFormat = m_sceneRenderTarget->getFormat();
 
-    m_gbufferPass = std::make_shared<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
+    m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
 
-    m_lightingPass = std::make_shared<LightingPass>(m_width, m_height, m_gbufferPass, m_dynamicDiffuseGI, colorFormat);
+    m_lightingPass =
+        std::make_unique<LightingPass>(m_width, m_height, m_gbufferPass.get(), m_dynamicDiffuseGI.get(), colorFormat);
 
-    m_stencilBorderPass = std::make_shared<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
+    m_stencilBorderPass = std::make_unique<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
                                                               m_gbufferPass->getDepthTextures(), colorFormat);
 
-    m_instancedShapesPass = std::make_shared<InstancedShapesPass>(m_width, m_height, m_swapChain->getImageCount(),
+    m_instancedShapesPass = std::make_unique<InstancedShapesPass>(m_width, m_height, m_swapChain->getImageCount(),
                                                                   m_gbufferPass->getDepthTextures(), colorFormat);
 
-    m_skyboxPass = std::make_shared<SkyboxPass>(m_gbufferPass->getDepthTextures(), colorFormat);
+    m_skyboxPass = std::make_unique<SkyboxPass>(m_gbufferPass->getDepthTextures(), colorFormat);
 }
 
 void DeferredRenderer::processPendingViewportResize()
@@ -385,9 +388,9 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         system.run(JobDeclaration(
             [&gbufferBuffer, scenePtr = &activeScene, camera, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
-             m_gbufferPass = m_gbufferPass](JobContext &ctx) {
+             gbufferPass = m_gbufferPass.get()](JobContext &ctx) {
                 (void)ctx;
-                gbufferBuffer = m_gbufferPass->recordSecondary(*scenePtr, camera, m_currentFrame, gbufferInheritance, terrain);
+                gbufferBuffer = gbufferPass->recordSecondary(*scenePtr, camera, m_currentFrame, gbufferInheritance, terrain);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "GBUFFER"));
 
@@ -396,10 +399,9 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         system.run(JobDeclaration(
             [&lightingBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
-             lightingInheritance, m_lightingPass = m_lightingPass](JobContext &ctx) {
+             lightingInheritance, lightingPass = m_lightingPass.get()](JobContext &ctx) {
                 (void)ctx;
-                lightingBuffer =
-                    m_lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, lightingInheritance);
+                lightingBuffer = lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, lightingInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 
@@ -409,9 +411,9 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         system.run(JobDeclaration(
             [&skyboxBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
-             skyboxInheritance, m_skyboxPass = m_skyboxPass](JobContext &ctx) {
+             skyboxInheritance, skyboxPass = m_skyboxPass.get()](JobContext &ctx) {
                 (void)ctx;
-                skyboxBuffer = m_skyboxPass->recordSecondary(*sceneRT, m_currentFrame, *scenePtr, camera, skyboxInheritance);
+                skyboxBuffer = skyboxPass->recordSecondary(*sceneRT, m_currentFrame, *scenePtr, camera, skyboxInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SKYBOX"));
 
@@ -421,10 +423,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         system.run(JobDeclaration(
             [&instancedShapesBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
-             instancedInheritance, m_instancedShapesPass = m_instancedShapesPass](JobContext &ctx) {
+             instancedInheritance, instancedShapesPass = m_instancedShapesPass.get()](JobContext &ctx) {
                 (void)ctx;
                 instancedShapesBuffer =
-                    m_instancedShapesPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, instancedInheritance);
+                    instancedShapesPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, instancedInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "INSTANCED_SHAPES"));
 

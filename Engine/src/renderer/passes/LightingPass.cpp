@@ -41,8 +41,7 @@ struct LightingPushConstants {
     glm::vec2 fogDistances; // .x = near, .y = far
 };
 
-LightingPass::LightingPass(float width, float height, std::shared_ptr<GBufferPass> gBufferPass,
-                           std::shared_ptr<DynamicDiffuseGI> ddgi, VkFormat colorFormat)
+LightingPass::LightingPass(float width, float height, GBufferPass *gBufferPass, DynamicDiffuseGI *ddgi, VkFormat colorFormat)
     : m_colorFormat(colorFormat), m_gBufferPass(gBufferPass), m_ddgi(ddgi), m_width(width), m_height(height)
 {
 

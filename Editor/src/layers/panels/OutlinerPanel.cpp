@@ -26,7 +26,11 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
+    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
+        m_root = nullptr;
+        m_scrollingFrame = nullptr;
+        m_treeView = nullptr;
+    });
     m_root->name = "Outliner";
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
@@ -83,6 +87,10 @@ void OutlinerPanel::setScene(Rapture::Scene *scene)
 {
     m_scene = scene;
     m_hasScene = (scene != nullptr);
+
+    if (m_treeView == nullptr) {
+        return;
+    }
 
     if (m_hasScene) {
         m_treeView->setBaseProperties({.visible = true});

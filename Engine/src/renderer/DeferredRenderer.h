@@ -28,7 +28,7 @@ class DeferredRenderer : public Renderer {
     void drawFrame(Scene &activeScene, Entity camera) override;
     void onSwapChainRecreated() override;
 
-    std::shared_ptr<GBufferPass> getGBufferPass() { return m_gbufferPass; }
+    GBufferPass *getGBufferPass() { return m_gbufferPass.get(); }
 
   private:
     void setupCommandResources();
@@ -39,19 +39,19 @@ class DeferredRenderer : public Renderer {
     void recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, uint32_t imageIndex);
 
   private:
-    std::shared_ptr<GBufferPass> m_gbufferPass;
-    std::shared_ptr<LightingPass> m_lightingPass;
-    std::shared_ptr<StencilBorderPass> m_stencilBorderPass;
-    std::shared_ptr<SkyboxPass> m_skyboxPass;
-    std::shared_ptr<InstancedShapesPass> m_instancedShapesPass;
+    std::unique_ptr<GBufferPass> m_gbufferPass;
+    std::unique_ptr<LightingPass> m_lightingPass;
+    std::unique_ptr<StencilBorderPass> m_stencilBorderPass;
+    std::unique_ptr<SkyboxPass> m_skyboxPass;
+    std::unique_ptr<InstancedShapesPass> m_instancedShapesPass;
 
     // Pending viewport resize (deferred to start of next frame)
     uint32_t m_pendingViewportWidth = 0;
     uint32_t m_pendingViewportHeight = 0;
     bool m_viewportResizePending = false;
 
-    std::shared_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
-    std::shared_ptr<RtInstanceData> m_rtInstanceData;
+    std::unique_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
+    std::unique_ptr<RtInstanceData> m_rtInstanceData;
 };
 
 } // namespace Rapture

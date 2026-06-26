@@ -22,6 +22,16 @@ std::shared_ptr<ComputePipeline> TextureFlattener::s_flattenDepthPipeline = null
 std::vector<AssetRef> TextureFlattener::s_shaderAssets;
 bool TextureFlattener::s_initialized = false;
 
+void TextureFlattener::shutdown()
+{
+    s_flattenPipelines.clear();
+    s_flattenDepthPipeline.reset();
+    s_flattenShaders.clear();
+    s_flattenDepthShader = nullptr;
+    s_shaderAssets.clear();
+    s_initialized = false;
+}
+
 // FlattenTexture implementation
 FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::unique_ptr<Texture> &&flattenedTexture,
                                const std::string &name, FlattenerDataType dataType)

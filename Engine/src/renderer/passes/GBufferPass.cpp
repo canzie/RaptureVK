@@ -85,6 +85,7 @@ void GBufferPass::setupCommandResources()
 
 GBufferPass::~GBufferPass()
 {
+    RP_CORE_INFO("GBufferPass destroyed");
     // Wait for device to finish operations
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();

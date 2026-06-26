@@ -26,15 +26,7 @@ class AssetManager {
         s_isInitialized = true;
     }
 
-    static void shutdown()
-    {
-        if (!s_isInitialized) {
-            RP_CORE_WARN("AssetManager not initialized");
-            return;
-        }
-        delete s_activeAssetManager;
-        s_isInitialized = false;
-    }
+    static void shutdown();
 
     static AssetRef getAsset(AssetHandle handle)
     {

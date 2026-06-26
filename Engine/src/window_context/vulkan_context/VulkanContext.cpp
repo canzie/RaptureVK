@@ -167,6 +167,7 @@ VulkanContext::~VulkanContext()
         vmaDestroyAllocator(m_vmaAllocator);
     }
 
+    m_vendorQueue.reset();
     m_queues.clear();
 
     if (m_device) {

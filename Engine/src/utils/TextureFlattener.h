@@ -76,6 +76,14 @@ class TextureFlattener {
     static std::unique_ptr<FlattenTexture> createFlattenTexture(std::shared_ptr<Texture> inputTexture, const std::string &name,
                                                                 FlattenerDataType dataType = FlattenerDataType::FLOAT);
 
+    /**
+     * @brief Release the shared compute pipelines and shaders held in static storage
+     *
+     * Must be called while the Vulkan device is still alive so the owned pipeline,
+     * pipeline layout and descriptor set layout objects are destroyed in time.
+     */
+    static void shutdown();
+
   private:
     struct FlattenPushConstants {
         uint32_t inputTextureIndex;

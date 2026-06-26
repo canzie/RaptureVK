@@ -48,15 +48,17 @@ static const char *s_spvForFormat(TextureFormat format)
 
 // Loads precompiled SPIR-V so glslang never runs on a job worker fiber (its parser overflows the stack).
 // TODO move this back to the AssetManager once it is thread-safe
+// Encoder shaders are created with new and owned here for the lifetime of the program.
+// Released by TextureCompressor::shutdown() while the device is still alive.
+static std::mutex s_encoderShaderMutex;
+static std::unordered_map<TextureFormat, Shader *> s_encoderShaders;
+
 static Shader *s_getEncoderShader(TextureFormat format)
 {
-    static std::mutex s_mutex;
-    static std::unordered_map<TextureFormat, Shader *> s_shaders;
+    std::lock_guard<std::mutex> lock(s_encoderShaderMutex);
 
-    std::lock_guard<std::mutex> lock(s_mutex);
-
-    auto it = s_shaders.find(format);
-    if (it != s_shaders.end()) {
+    auto it = s_encoderShaders.find(format);
+    if (it != s_encoderShaders.end()) {
         return it->second;
     }
 
@@ -74,8 +76,17 @@ static Shader *s_getEncoderShader(TextureFormat format)
         return nullptr;
     }
 
-    s_shaders[format] = shader;
+    s_encoderShaders[format] = shader;
     return shader;
+}
+
+void TextureCompressor::shutdown()
+{
+    std::lock_guard<std::mutex> lock(s_encoderShaderMutex);
+    for (auto &[format, shader] : s_encoderShaders) {
+        delete shader;
+    }
+    s_encoderShaders.clear();
 }
 
 TextureCompressor::TextureCompressor(std::vector<uint8_t> rgba8, uint32_t width, uint32_t height) : m_width(width), m_height(height)

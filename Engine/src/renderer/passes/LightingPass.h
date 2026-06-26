@@ -21,7 +21,7 @@ namespace Rapture {
 
 class LightingPass {
   public:
-    LightingPass(float width, float height, std::shared_ptr<GBufferPass> gBufferPass, std::shared_ptr<DynamicDiffuseGI> ddgi,
+    LightingPass(float width, float height, GBufferPass *gBufferPass, DynamicDiffuseGI *ddgi,
                  VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
     ~LightingPass();
 
@@ -53,9 +53,9 @@ class LightingPass {
     std::vector<std::shared_ptr<UniformBuffer>> m_shadowDataUBOs;
     std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets; // all sets are in set 0
 
-    std::shared_ptr<GBufferPass> m_gBufferPass;
+    GBufferPass *m_gBufferPass = nullptr;
 
-    std::shared_ptr<DynamicDiffuseGI> m_ddgi;
+    DynamicDiffuseGI *m_ddgi = nullptr;
 
     float m_width;
     float m_height;

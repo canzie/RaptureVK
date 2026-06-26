@@ -34,6 +34,14 @@ class TextureCompressor {
     bool compressToBC4(JobContext &jctx, Texture &dst);
     bool compressToBC5(JobContext &jctx, Texture &dst);
 
+    /**
+     * @brief Destroy the cached block-compression encoder shaders
+     *
+     * Must be called while the Vulkan device is still alive so each shader's
+     * shader module and descriptor set layouts are destroyed in time.
+     */
+    static void shutdown();
+
   private:
     bool encode(JobContext &jctx, Texture &dst, TextureFormat format);
 
