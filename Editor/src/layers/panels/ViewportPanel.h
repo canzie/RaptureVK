@@ -43,6 +43,8 @@ class ViewportPanel : public Panel {
     Amethyst::ImageLabel *m_viewportImage = nullptr;
     Amethyst::Frame *m_header = nullptr;
 
+    Amethyst::EventConnection m_viewportImageDestroyConn;
+
     Amethyst::TextButton *m_translateBtn = nullptr;
     Amethyst::TextButton *m_rotateBtn = nullptr;
     Amethyst::TextButton *m_scaleBtn = nullptr;

@@ -77,17 +77,16 @@ AmethystLayer::AmethystLayer()
 
 AmethystLayer::~AmethystLayer()
 {
+    for (auto &ws : m_workspaces) {
+        if (ws.dockingLayer != nullptr && ws.dockingLayer->persistLayout && !ws.dockingLayer->name.empty()) {
+            Amethyst::LayoutConfig::instance().set(ws.dockingLayer->name, Amethyst::ConfigEntry(ws.dockingLayer->saveConfig()));
+            ws.dockingLayer->persistLayout = false;
+        }
+    }
+
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
     vulkanContext.waitIdle();
-
-    for (auto &ws : m_workspaces) {
-        if (ws.dockingLayer != nullptr && !ws.dockingLayer->name.empty()) {
-            Amethyst::LayoutConfig::instance().set(ws.dockingLayer->name, Amethyst::ConfigEntry(ws.dockingLayer->saveConfig()));
-        }
-        ws.panels.clear();
-    }
-    Amethyst::LayoutConfig::instance().save();
 
     for (auto &texId : m_viewportTextureIds) {
         if (texId.isValid()) {
@@ -183,6 +182,12 @@ void AmethystLayer::onAttach()
 void AmethystLayer::onDetach()
 {
     Rapture::RP_INFO("Detaching AmethystLayer...");
+
+    for (auto &ws : m_workspaces) {
+        if (ws.dockingLayer != nullptr && ws.dockingLayer->persistLayout && !ws.dockingLayer->name.empty()) {
+            Amethyst::LayoutConfig::instance().set(ws.dockingLayer->name, Amethyst::ConfigEntry(ws.dockingLayer->saveConfig()));
+        }
+    }
 }
 
 void AmethystLayer::onUpdate(float ts)

@@ -56,6 +56,8 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar)
             },
             [this](Amethyst::ImageLabelScope &img) {
                 m_viewportImage = &img.component;
+                m_viewportImageDestroyConn = m_viewportImage->onDestroy.connect(
+                    [this](Amethyst::Instance *) { m_viewportImage = nullptr; });
                 m_viewportImage->track(
                     m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
             });
@@ -71,7 +73,6 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar)
 ViewportPanel::~ViewportPanel()
 {
     Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
-
     if (m_root != nullptr && m_root->parent != nullptr) {
         if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
             tabBar->removeTab(m_root);
@@ -182,11 +183,17 @@ void ViewportPanel::syncCameraModeButton()
 
 void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
 {
-    m_viewportImage->setImage(imageId);
+    if (m_viewportImage != nullptr) {
+        m_viewportImage->setImage(imageId);
+    }
 }
 
 void ViewportPanel::onUpdate(float dt)
 {
+    if (m_root == nullptr) {
+        return;
+    }
+
     updateGizmo();
     syncCameraModeButton();
 
