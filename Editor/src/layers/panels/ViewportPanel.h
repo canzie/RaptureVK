@@ -9,6 +9,7 @@
 #include "layers/panels/Panel.h"
 #include "scenes/entities/Entity.h"
 
+#include <math/math.h>
 #include <memory>
 
 namespace Rapture {
@@ -59,6 +60,10 @@ class ViewportPanel : public Panel {
     std::shared_ptr<Rapture::Entity> m_selectedEntity;
     std::shared_ptr<Rapture::Entity> m_previousSelectedEntity;
     size_t m_entitySelectedListenerId = 0;
+    Amethyst::vec2 m_lastViewportSize = {};
+    Amethyst::vec2 m_pendingViewportSize = {};
+    float m_resizeStableTime = 0.0f;
+    bool m_resizePending = false;
 };
 
 #endif // RAPTURE__VIEWPORT_PANEL_H

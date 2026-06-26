@@ -19,6 +19,7 @@ class RenderWindow;
 }
 
 class FileBrowser;
+class ImportPanel;
 
 class AmethystLayer : public Rapture::Layer {
   public:
@@ -72,10 +73,13 @@ class AmethystLayer : public Rapture::Layer {
     std::vector<Workspace> m_workspaces;
 
     std::vector<Amethyst::AmTextureId> m_viewportTextureIds;
+    std::vector<VkImageView> m_viewportTextureViews;
 
     std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
 
     std::unique_ptr<FileBrowser> m_fileBrowser;
+    std::unique_ptr<ImportPanel> m_importPanel;
+    bool m_reapImportPanel = false;
 };
 
 #endif // RAPTURE__AMETHYST_LAYER_H

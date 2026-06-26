@@ -61,6 +61,8 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     auto rootPath = project.getProjectRootDirectory();
 
     // Load Sponza model
+    // Disabled: models are now imported from the UI via the file browser / import panel.
+
     auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
     if (std::filesystem::exists(sponzaPath)) {
         Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());

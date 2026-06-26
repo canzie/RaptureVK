@@ -47,6 +47,11 @@ class WindowContext {
      */
     virtual bool shouldClose() const = 0;
 
+    /**
+     * @brief Ask the native window to close, as if the user clicked its close button.
+     */
+    virtual void requestClose() = 0;
+
     uint32_t getId() const { return m_id; }
 
     bool isMinimized() const { return m_minimized; }

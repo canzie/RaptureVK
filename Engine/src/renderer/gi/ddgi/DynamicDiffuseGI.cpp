@@ -281,7 +281,6 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 
     auto tlas = scene.getTLAS();
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
-        RP_CORE_WARN("Scene TLAS is not built");
         return;
     }
     auto &vc = Application::getInstance().getVulkanContext();
@@ -747,7 +746,8 @@ void DynamicDiffuseGI::initTextures()
     // m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened");
     // m_ProbeClassificationTextureFlattened = TextureFlattener::createFlattenTexture(
     //     m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened", FlattenerDataType::UINT);
-    // m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened");
+    // m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset
+    // Flattened");
 
     clearTextures();
 

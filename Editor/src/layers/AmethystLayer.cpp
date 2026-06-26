@@ -4,6 +4,7 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "events/ApplicationEvents.h"
 #include "layers/panels/FileBrowser.h"
+#include "layers/panels/ImportPanel.h"
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
@@ -177,6 +178,7 @@ void AmethystLayer::onAttach()
     }
 
     m_viewportTextureIds.resize(swapChain->getImageCount());
+    m_viewportTextureViews.resize(swapChain->getImageCount(), VK_NULL_HANDLE);
 }
 
 void AmethystLayer::onDetach()
@@ -210,16 +212,26 @@ void AmethystLayer::onUpdate(float ts)
 
     m_window.tick(ts);
 
+    if (m_reapImportPanel) {
+        m_reapImportPanel = false;
+        m_importPanel.reset();
+    }
+
     auto *sceneViewport = app.getViewportManager().getPrimaryViewport();
     auto *sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
     if (sceneRenderTarget != nullptr) {
         uint32_t renderedSlot = sceneViewport->getLastRenderedFrameIndex();
         if (renderedSlot < m_viewportTextureIds.size()) {
-            if (!m_viewportTextureIds[renderedSlot].isValid()) {
-                auto texture = sceneRenderTarget->getTexture(renderedSlot);
-                if (texture != nullptr) {
+            auto texture = sceneRenderTarget->getTexture(renderedSlot);
+            if (texture != nullptr) {
+                VkImageView view = texture->getImageView();
+                if (!m_viewportTextureIds[renderedSlot].isValid() || m_viewportTextureViews[renderedSlot] != view) {
+                    if (m_viewportTextureIds[renderedSlot].isValid()) {
+                        m_backend.unregisterTexture(m_viewportTextureIds[renderedSlot]);
+                    }
                     m_viewportTextureIds[renderedSlot] =
-                        m_backend.registerTexture(texture->getImageView(), texture->getSampler().getSamplerVk());
+                        m_backend.registerTexture(view, texture->getSampler().getSamplerVk());
+                    m_viewportTextureViews[renderedSlot] = view;
                 }
             }
 
@@ -509,6 +521,8 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
 
         m_viewportTextureIds.clear();
         m_viewportTextureIds.resize(swapChain.getImageCount());
+        m_viewportTextureViews.clear();
+        m_viewportTextureViews.resize(swapChain.getImageCount(), VK_NULL_HANDLE);
 
         m_window.absoluteSize = screenSize;
         m_window.markDirty();
@@ -589,8 +603,18 @@ void AmethystLayer::openFileExplorer()
     SecondaryWindowContext *contextPtr = context.get();
     m_secondaryWindows.push_back(std::move(context));
 
+    m_fileBrowser->onClose = [contextPtr]() { contextPtr->renderWindow->getWindowContext()->requestClose(); };
+    m_fileBrowser->onConfirm = [this](const std::filesystem::path &path) {
+        m_importPanel = std::make_unique<ImportPanel>(m_window, path);
+        m_importPanel->onClose = [this]() { m_reapImportPanel = true; };
+    };
+
     renderWindow.onFrame = [this, contextPtr](Rapture::RenderWindow &window) { drawSecondaryWindow(*contextPtr, window); };
-    renderWindow.onClose = [this, contextPtr]() { closeSecondaryWindow(contextPtr); };
+    renderWindow.onClose = [this, contextPtr]() {
+        // Destroy the browser (and its window tick) while its Window is still alive.
+        m_fileBrowser.reset();
+        closeSecondaryWindow(contextPtr);
+    };
 }
 
 void AmethystLayer::drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window)

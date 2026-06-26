@@ -36,8 +36,7 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarge
 
     m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
 
-    m_lightingPass =
-        std::make_unique<LightingPass>(m_width, m_height, m_gbufferPass.get(), m_dynamicDiffuseGI.get(), colorFormat);
+    m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_gbufferPass.get(), m_dynamicDiffuseGI.get(), colorFormat);
 
     m_stencilBorderPass = std::make_unique<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
                                                               m_gbufferPass->getDepthTextures(), colorFormat);
@@ -244,8 +243,7 @@ void DeferredRenderer::recreateRenderPasses()
 
     m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
 
-    m_lightingPass =
-        std::make_unique<LightingPass>(m_width, m_height, m_gbufferPass.get(), m_dynamicDiffuseGI.get(), colorFormat);
+    m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_gbufferPass.get(), m_dynamicDiffuseGI.get(), colorFormat);
 
     m_stencilBorderPass = std::make_unique<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
                                                               m_gbufferPass->getDepthTextures(), colorFormat);
@@ -291,8 +289,7 @@ void DeferredRenderer::setupCommandResources()
     m_commandPoolHash = m_renderContext.commandPoolManager->createCommandPool(config);
 }
 
-void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera,
-                                           uint32_t imageIndex)
+void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, uint32_t imageIndex)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -421,8 +418,9 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
 
         system.run(JobDeclaration(
-            [&instancedShapesBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
-             instancedInheritance, instancedShapesPass = m_instancedShapesPass.get()](JobContext &ctx) {
+            [&instancedShapesBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(),
+             m_currentFrame = m_currentFrame, instancedInheritance,
+             instancedShapesPass = m_instancedShapesPass.get()](JobContext &ctx) {
                 (void)ctx;
                 instancedShapesBuffer =
                     instancedShapesPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, instancedInheritance);

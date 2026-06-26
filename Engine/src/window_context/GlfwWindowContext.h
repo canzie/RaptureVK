@@ -29,6 +29,7 @@ class GlfwWindowContext : public WindowContext {
     void *getNativeWindowContext() override;
     void getFramebufferSize(int *width, int *height) const override;
     bool shouldClose() const override;
+    void requestClose() override;
     void waitEvents() const override;
 
     void setCursorMode(CursorMode mode) override;

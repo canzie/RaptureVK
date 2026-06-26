@@ -86,6 +86,11 @@ bool GlfwWindowContext::shouldClose() const
     return glfwWindowShouldClose(m_glfwWindow) != 0;
 }
 
+void GlfwWindowContext::requestClose()
+{
+    glfwSetWindowShouldClose(m_glfwWindow, GLFW_TRUE);
+}
+
 void GlfwWindowContext::waitEvents() const
 {
     glfwWaitEvents();

@@ -3,6 +3,7 @@
 #include "Icons.h"
 #include "components/Components.h"
 #include "components/systems/CameraController.h"
+#include "events/ApplicationEvents.h"
 #include "events/GameEvents.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "viewport/Viewport.h"
@@ -12,6 +13,9 @@
 #include <components/ui_scope.h>
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <math/math.h>
+
+static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.2f;
 
 static const Amethyst::UDim2 HEADER_BTN_SIZE = Amethyst::UDim2::fromOffset(80, 24);
 static const Amethyst::TextStyleProperties HEADER_BTN_TEXT{
@@ -56,8 +60,8 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar)
             },
             [this](Amethyst::ImageLabelScope &img) {
                 m_viewportImage = &img.component;
-                m_viewportImageDestroyConn = m_viewportImage->onDestroy.connect(
-                    [this](Amethyst::Instance *) { m_viewportImage = nullptr; });
+                m_viewportImageDestroyConn =
+                    m_viewportImage->onDestroy.connect([this](Amethyst::Instance *) { m_viewportImage = nullptr; });
                 m_viewportImage->track(
                     m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
             });
@@ -200,6 +204,25 @@ void ViewportPanel::onUpdate(float dt)
     auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
     if (viewport != nullptr) {
         viewport->editorBinding().hovered = m_viewportHovered;
+    }
+
+    Amethyst::vec2 size = m_viewportImage->absoluteContentSize;
+    if (size.x > 0.0f && size.y > 0.0f) {
+        if (size != m_pendingViewportSize) {
+            m_pendingViewportSize = size;
+            m_resizeStableTime = 0.0f;
+            m_resizePending = true;
+        } else if (m_resizePending) {
+            m_resizeStableTime += dt;
+            if (m_resizeStableTime >= VIEWPORT_RESIZE_DEBOUNCE) {
+                m_resizePending = false;
+                if (size != m_lastViewportSize) {
+                    m_lastViewportSize = size;
+                    Rapture::ApplicationEvents::onViewportResize().publish(static_cast<unsigned int>(size.x),
+                                                                           static_cast<unsigned int>(size.y));
+                }
+            }
+        }
     }
 }
 
