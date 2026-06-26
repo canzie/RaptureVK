@@ -25,9 +25,11 @@ VulkanQueue::VulkanQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t qu
 
 VulkanQueue::~VulkanQueue()
 {
-    RP_CORE_INFO("VulkanQueue destroyed (familyIndex {0})", m_queueFamilyIndex);
     if (m_timelineSemaphore != VK_NULL_HANDLE) {
         vkDestroySemaphore(m_device, m_timelineSemaphore, nullptr);
+    }
+    if (m_immediateTimeSema != VK_NULL_HANDLE) {
+        vkDestroySemaphore(m_device, m_immediateTimeSema, nullptr);
     }
 }
 

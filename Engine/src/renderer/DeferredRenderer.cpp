@@ -77,7 +77,6 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarge
 
 DeferredRenderer::~DeferredRenderer()
 {
-    RP_CORE_INFO("Renderer destroyed");
     m_renderContext.vulkanContext->waitIdle();
 
     m_skyboxPass.reset();

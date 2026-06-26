@@ -113,39 +113,18 @@ Application::~Application()
 
     m_vulkanContext->waitIdle();
 
-#ifndef NDEBUG
-    auto probeVma = [this](const char *step) {
-        VmaTotalStatistics stats{};
-        vmaCalculateStatistics(m_vulkanContext->getVmaAllocator(), &stats);
-        RP_CORE_INFO("[VMA probe] after {0}: {1} allocation(s), {2} bytes", step, stats.total.statistics.allocationCount,
-                     stats.total.statistics.allocationBytes);
-    };
-#else
-    auto probeVma = [](const char *) {};
-#endif
-
-    probeVma("waitIdle");
-
     TracyProfiler::shutdown();
 
     m_layerStack.clear();
-    probeVma("layerStack.clear");
-
     m_project.reset();
-    probeVma("project.reset");
 
     m_viewportManager.reset();
-    probeVma("viewportManager.reset");
 
     MaterialManager::shutdown();
-    probeVma("MaterialManager::shutdown");
-
     AssetManager::shutdown();
-    probeVma("AssetManager::shutdown");
 
     // Shutdown the event system and clear all listeners
     EventRegistry::getInstance().shutdown();
-    probeVma("EventRegistry::shutdown");
 
     JobSystem::shutdown();
 
