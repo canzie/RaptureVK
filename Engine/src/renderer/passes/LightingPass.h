@@ -31,7 +31,7 @@ class LightingPass {
     FramebufferSpecification getFramebufferSpecification();
 
     CommandBuffer *recordSecondary(Scene &activeScene, Entity camera, SceneRenderTarget &renderTarget,
-                                   uint32_t frameIndex, const SecondaryBufferInheritance &inheritance);
+                                   uint32_t frameIndex, const SecondaryBufferInheritance &inheritance, bool useGI);
 
   private:
     void createPipeline();

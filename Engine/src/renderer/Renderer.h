@@ -2,6 +2,7 @@
 #define RAPTURE__RENDERER_H
 
 #include "buffers/command_buffers/CommandPool.h"
+#include "renderer/RenderSettings.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "scenes/entities/Entity.h"
@@ -22,7 +23,7 @@ class Renderer {
     Renderer(const Renderer &) = delete;
     Renderer &operator=(const Renderer &) = delete;
 
-    virtual void drawFrame(Scene &activeScene, Entity camera) = 0;
+    virtual void drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings) = 0;
     virtual void onSwapChainRecreated() = 0;
 
     SceneRenderTarget &getSceneRenderTarget() { return *m_sceneRenderTarget; }

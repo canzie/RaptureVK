@@ -51,7 +51,7 @@ class TerrainGenerator {
     Texture *getSingleHeightmap() const { return m_noiseTextures[CONTINENTALNESS]; }
 
     // Per-frame update: computes chunk data on GPU, runs culling
-    void update(const glm::vec3 &cameraPos, Frustum &frustum);
+    void update(const glm::vec3 &cameraPos, Frustum &frustum, uint32_t frameIndex);
 
     // Rendering resources
     std::shared_ptr<StorageBuffer> getChunkDataBuffer() const { return m_chunkDataBuffer; }
@@ -59,7 +59,10 @@ class TerrainGenerator {
     uint32_t getIndexCount(uint32_t lod) const { return getTerrainLODIndexCount(lod); }
 
     TerrainCuller *getTerrainCuller() { return m_culler.get(); }
-    TerrainCullBuffers *getCullBuffers() { return &m_cullBuffers; }
+    TerrainCullBuffers *getCullBuffers(uint32_t frameIndex)
+    {
+        return frameIndex < m_cullBuffers.size() ? &m_cullBuffers[frameIndex] : nullptr;
+    }
 
     // Accessors
     const TerrainConfig &getConfig() const { return m_config; }
@@ -100,7 +103,7 @@ class TerrainGenerator {
     std::shared_ptr<StorageBuffer> m_chunkDataBuffer;
 
     std::unique_ptr<TerrainCuller> m_culler;
-    TerrainCullBuffers m_cullBuffers;
+    std::vector<TerrainCullBuffers> m_cullBuffers;
 
     Shader *m_chunkComputeShader;
     std::shared_ptr<ComputePipeline> m_chunkComputePipeline;

@@ -33,6 +33,11 @@ struct TerrainCSMPushConstants {
     float terrainWorldSize;
 };
 
+static constexpr float SHADOW_DEPTH_BIAS_CONSTANT = 1.0f;
+static constexpr float SHADOW_DEPTH_BIAS_CLAMP = 0.005f;
+static constexpr float SHADOW_DEPTH_BIAS_SLOPE = 1.75f;
+static constexpr float SHADOW_SPLIT_NEAR = 0.5f;
+
 CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda)
     : m_width(width), m_height(height), m_lambda(lambda),
       m_NumCascades(static_cast<uint8_t>(std::clamp(numCascades, 1u, MAX_CASCADES))), m_shadowTextureArray(nullptr)
@@ -103,18 +108,21 @@ std::vector<float> CascadedShadowMap::calculateCascadeSplits(float nearPlane, fl
     // First split is always at near plane
     splitDepths[0] = nearPlane;
 
+    // Clamp the near used for the log distribution so a tiny near plane doesn't cluster splits
+    float splitNear = std::max(nearPlane, SHADOW_SPLIT_NEAR);
+
     // Calculate splits using hybrid approach
     for (uint8_t i = 1; i < m_NumCascades; i++) {
         float p = static_cast<float>(i) / m_NumCascades;
 
         // Logarithmic split calculation
-        float log = nearPlane * std::pow(farPlane / nearPlane, p);
+        float logSplit = splitNear * std::pow(farPlane / splitNear, p);
 
         // Linear split calculation
-        float linear = nearPlane + (farPlane - nearPlane) * p;
+        float linearSplit = splitNear + (farPlane - splitNear) * p;
 
         // Blend between logarithmic and linear based on lambda
-        splitDepths[i] = lambda * log + (1.0f - lambda) * linear;
+        splitDepths[i] = lambda * logSplit + (1.0f - lambda) * linearSplit;
     }
 
     // Last split is always at far plane
@@ -129,7 +137,8 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
 {
 
     // Calculate cascade splits
-    std::vector<float> cascadeSplits = calculateCascadeSplits(nearPlane, farPlane, m_lambda);
+    float effectiveFar = std::min(farPlane, m_shadowDistance);
+    std::vector<float> cascadeSplits = calculateCascadeSplits(nearPlane, effectiveFar, m_lambda);
     m_cascadeSplits = cascadeSplits;
 
     std::vector<CascadeData> cascadeData(m_NumCascades);
@@ -250,15 +259,14 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     }
 
     // Add padding for shadow casters outside camera frustum
-    float xPad = (combinedMaxX - combinedMinX) * 0.1f;
-    float yPad = (combinedMaxY - combinedMinY) * 0.1f;
+    float xPad = (combinedMaxX - combinedMinX) * 0.5f;
+    float yPad = (combinedMaxY - combinedMinY) * 0.5f;
     float zPad = (combinedMaxZ - combinedMinZ) * 2.0f;
 
     // Z values in light view space are negative (objects in front of light)
     // glm::ortho expects zNear < zFar, so use -max as near and -min as far
     glm::mat4 combinedLightProj = glm::ortho(combinedMinX - xPad, combinedMaxX + xPad, combinedMinY - yPad, combinedMaxY + yPad,
                                              -combinedMaxZ - zPad, -combinedMinZ + zPad);
-    combinedLightProj[1][1] *= -1;
     m_shadowFrustum.update(combinedLightProj, combinedLightView);
 
     return cascadeData;
@@ -407,7 +415,15 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
         }
     }
 
-    recordTerrainCommands(commandBuffer, terrain);
+    glm::vec3 cameraPos(0.0f);
+    Entity mainCamera = activeScene.getMainCamera();
+    if (mainCamera.isValid()) {
+        if (auto *cameraTransform = mainCamera.tryGetComponent<TransformComponent>()) {
+            cameraPos = cameraTransform->translation();
+        }
+    }
+
+    recordTerrainCommands(commandBuffer, terrain, cameraPos);
 
     commandBuffer->end();
 
@@ -644,9 +660,9 @@ void CascadedShadowMap::createPipeline()
     rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT; // Use front face culling for shadow mapping
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_TRUE;
-    rasterizer.depthBiasConstantFactor = 2.0f;
-    rasterizer.depthBiasClamp = 0.0f;
-    rasterizer.depthBiasSlopeFactor = 2.0f;
+    rasterizer.depthBiasConstantFactor = SHADOW_DEPTH_BIAS_CONSTANT;
+    rasterizer.depthBiasClamp = SHADOW_DEPTH_BIAS_CLAMP;
+    rasterizer.depthBiasSlopeFactor = SHADOW_DEPTH_BIAS_SLOPE;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -755,12 +771,12 @@ void CascadedShadowMap::createTerrainPipeline()
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_TRUE;
-    rasterizer.depthBiasConstantFactor = 2.0f;
-    rasterizer.depthBiasClamp = 0.0f;
-    rasterizer.depthBiasSlopeFactor = 2.0f;
+    rasterizer.depthBiasConstantFactor = SHADOW_DEPTH_BIAS_CONSTANT;
+    rasterizer.depthBiasClamp = SHADOW_DEPTH_BIAS_CLAMP;
+    rasterizer.depthBiasSlopeFactor = SHADOW_DEPTH_BIAS_SLOPE;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -818,19 +834,25 @@ void CascadedShadowMap::createTerrainPipeline()
     RP_CORE_INFO("Terrain CSM pipeline created");
 }
 
-void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain)
+void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain, const glm::vec3 &cameraPos)
 {
     if (!m_terrainPipeline || !terrain || !terrain->isInitialized()) {
         return;
     }
 
+    if (m_terrainShadowBuffers.empty()) {
+        m_terrainShadowBuffers.resize(m_framesInFlight);
+    }
+    TerrainCullBuffers &shadowBuffers = m_terrainShadowBuffers[m_currentFrame];
+
     if (auto *culler = terrain->getTerrainCuller(); culler) {
-        if (m_terrainShadowBuffers.indirectBuffers.empty()) {
-            std::vector<uint32_t> highestLOD = {0};
-            m_terrainShadowBuffers = culler->createBuffers(highestLOD);
+        if (shadowBuffers.indirectBuffers.empty()) {
+            std::vector<uint32_t> allLODs = {0, 1, 2, 3};
+            shadowBuffers = culler->createBuffers(allLODs);
         }
 
-        culler->runCull(m_terrainShadowBuffers, m_shadowFrustum.getBindlessIndex(), glm::vec3(0.0f));
+        m_shadowFrustum.uploadFrustum(m_currentFrame);
+        culler->runCull(shadowBuffers, m_shadowFrustum.getBindlessIndex(m_currentFrame), cameraPos);
     }
 
     m_terrainPipeline->bind(commandBuffer->getCommandBufferVk());
@@ -852,7 +874,7 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, Terr
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_terrainPipeline);
     m_rc->descriptorManager->bindSet(3, commandBuffer, m_terrainPipeline);
 
-    if (m_terrainShadowBuffers.indirectBuffers.empty() || !m_terrainShadowBuffers.drawCountBuffer) {
+    if (shadowBuffers.indirectBuffers.empty() || !shadowBuffers.drawCountBuffer) {
         return;
     }
 
@@ -868,10 +890,10 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, Terr
         peaksValleysIndex = terrain->getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
         noiseLUTIndex = terrain->getNoiseLUT()->getBindlessIndex();
     }
-    VkBuffer countBuffer = m_terrainShadowBuffers.drawCountBuffer->getBufferVk();
+    VkBuffer countBuffer = shadowBuffers.drawCountBuffer->getBufferVk();
 
     for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
-        if (!m_terrainShadowBuffers.indirectBuffers[lod]) {
+        if (!shadowBuffers.indirectBuffers[lod]) {
             continue;
         }
 
@@ -897,9 +919,9 @@ void CascadedShadowMap::recordTerrainCommands(CommandBuffer *commandBuffer, Terr
         vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_terrainPipeline->getPipelineLayoutVk(), stageFlags, 0,
                            sizeof(TerrainCSMPushConstants), &pc);
 
-        VkBuffer indirectBuffer = m_terrainShadowBuffers.indirectBuffers[lod]->getBufferVk();
+        VkBuffer indirectBuffer = shadowBuffers.indirectBuffers[lod]->getBufferVk();
         VkDeviceSize countOffset = lod * sizeof(uint32_t);
-        uint32_t maxDrawCount = m_terrainShadowBuffers.indirectCapacities[lod];
+        uint32_t maxDrawCount = shadowBuffers.indirectCapacities[lod];
 
         vkCmdDrawIndexedIndirectCount(commandBuffer->getCommandBufferVk(), indirectBuffer, 0, countBuffer, countOffset,
                                       maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));

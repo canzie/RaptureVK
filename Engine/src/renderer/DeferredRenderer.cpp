@@ -97,7 +97,7 @@ DeferredRenderer::~DeferredRenderer()
     m_swapChain.reset();
 }
 
-void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera)
+void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -105,6 +105,8 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera)
     if (m_viewportResizePending) {
         processPendingViewportResize();
     }
+
+    m_giActive = settings.useGI;
 
     // For PRESENTATION mode, we need to acquire a swapchain image
     // For OFFSCREEN mode, we just use m_currentFrame as the target index
@@ -120,13 +122,15 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera)
 
     m_rtInstanceData->update(activeScene);
 
-    JobSystem &system = jobs();
-    system.run(JobDeclaration(
-        [ddgi = m_dynamicDiffuseGI.get(), scenePtr = &activeScene, m_currentFrame = m_currentFrame](JobContext &ctx) {
-            (void)ctx;
-            ddgi->populateProbesCompute(*scenePtr, m_currentFrame);
-        },
-        JobPriority::NORMAL, QueueAffinity::COMPUTE, nullptr, "DDGI POPULATE"));
+    if (m_giActive) {
+        JobSystem &system = jobs();
+        system.run(JobDeclaration(
+            [ddgi = m_dynamicDiffuseGI.get(), scenePtr = &activeScene, m_currentFrame = m_currentFrame](JobContext &ctx) {
+                (void)ctx;
+                ddgi->populateProbesCompute(*scenePtr, m_currentFrame);
+            },
+            JobPriority::NORMAL, QueueAffinity::COMPUTE, nullptr, "DDGI POPULATE"));
+    }
 
     auto pool = m_renderContext.commandPoolManager->getCommandPool(m_commandPoolHash, m_currentFrame);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
@@ -395,9 +399,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         system.run(JobDeclaration(
             [&lightingBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
-             lightingInheritance, lightingPass = m_lightingPass.get()](JobContext &ctx) {
+             lightingInheritance, lightingPass = m_lightingPass.get(), giActive = m_giActive](JobContext &ctx) {
                 (void)ctx;
-                lightingBuffer = lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, lightingInheritance);
+                lightingBuffer =
+                    lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, lightingInheritance, giActive);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 

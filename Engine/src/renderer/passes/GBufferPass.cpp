@@ -845,7 +845,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &act
         peaksValleysIndex = terrain.getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
         noiseLUTIndex = terrain.getNoiseLUT()->getBindlessIndex();
     }
-    auto *cullBuffers = terrain.getCullBuffers();
+    auto *cullBuffers = terrain.getCullBuffers(currentFrame);
     if (!cullBuffers || !cullBuffers->drawCountBuffer) {
         return;
     }

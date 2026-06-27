@@ -162,7 +162,7 @@ void Scene::onUpdate(float dt)
     for (auto entity : terrainView) {
         auto &terrain = terrainView.get<TerrainComponent>(entity);
         if (terrain.generator && terrain.isEnabled && terrain.generator->isInitialized()) {
-            terrain.generator->update(cameraPosition, *frustum);
+            terrain.generator->update(cameraPosition, *frustum, frameCounter);
         }
     }
 

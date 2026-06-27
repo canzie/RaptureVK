@@ -81,6 +81,8 @@ Worst in the **indirect-only center** (no direct sun) and **near light/dark boun
 ### "probe variability" (the thing intuited)
 RTXGI's real feature: a per-probe / whole-volume measure of how much irradiance is still changing frame-to-frame (coefficient of variation). It doesn't *remove* dancing — it tells you which probes are unconverged, so you can freeze settled probes (perf) and drive adaptive logic. Future option if DDGI stays.
 
+**Deep dive:** see [[DDGI Noise and Convergence]] for the convergence math (residual ≈ 12% at h=0.97), why freezing locks in an unbiased ±12% snapshot, the resources probe variability needs, and the ranked "own route" options (probe-atlas spatial filter, blue-noise rays, screen-space denoise).
+
 ---
 
 ## 6. Forward Roadmap (options + detours)

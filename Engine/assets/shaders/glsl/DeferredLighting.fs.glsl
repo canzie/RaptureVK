@@ -26,6 +26,7 @@ layout(location = 0) in vec2 fragTexCoord;
 #define DEBUG_DIRECTIONAL_SHADOWS 0  // Set to 1 to enable debugging
 #define DEBUG_SHADOW_COORDS 0
 #define USE_PCF 0
+#define USE_SHADER_BIAS 0  // 0 = rely on hardware depth bias from the shadow pass
 
 #define CASCADE_BLEND_WIDTH_PERCENT 0.15
 
@@ -284,13 +285,13 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
     
     float shadowFactor = 0.0;
     vec2 texelSize;
-    float bias;
     float samples;
 
     if (shadowInfo.cascadeCount > 1) {
 
         texelSize = 1.0 / vec2(textureSize(gShadowArrays[shadowInfo.textureHandle], 0));
 
+#if USE_SHADER_BIAS
         // Apply bias to avoid shadow acne
         float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
         // Progressively reduce bias for farther cascades to reduce light leaking
@@ -304,9 +305,11 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
             distanceScale = 0.5;
         }
 
-
-        bias = max(0.005 * (1.0 - cosTheta) * distanceScale * cascadeBiasMultiplier, 0.0005);
+        float bias = max(0.005 * (1.0 - cosTheta) * distanceScale * cascadeBiasMultiplier, 0.0005);
         float comparisonDepth = projCoords.z - bias;
+#else
+        float comparisonDepth = projCoords.z;
+#endif
 
 #if USE_PCF
         const int kernelRadius = 3; // 7x7 kernel → radius = (7-1)/2 = 3
@@ -335,6 +338,7 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
     } else {
         texelSize = 1.0 / textureSize(gShadowTextures[shadowInfo.textureHandle], 0);
 
+#if USE_SHADER_BIAS
         float cosTheta = clamp(dot(normal, lightDir), 0.0, 1.0);
 
         float distanceScale = 1.0;
@@ -345,8 +349,11 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
             distanceScale = 0.5;
         }
 
-        bias = max(0.005 * (1.0 - cosTheta) * distanceScale, 0.001);
+        float bias = max(0.005 * (1.0 - cosTheta) * distanceScale, 0.001);
         float comparisonDepth = projCoords.z - bias;
+#else
+        float comparisonDepth = projCoords.z;
+#endif
 
 #if USE_PCF
         const int kernelRadius = 1; // 3x3 kernel → radius = (3-1)/2 = 1

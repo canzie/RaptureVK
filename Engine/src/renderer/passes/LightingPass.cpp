@@ -92,7 +92,7 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
 }
 
 CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, SceneRenderTarget &renderTarget,
-                                             uint32_t frameIndex, const SecondaryBufferInheritance &inheritance)
+                                             uint32_t frameIndex, const SecondaryBufferInheritance &inheritance, bool useGI)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -155,7 +155,7 @@ CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, 
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 
-    pushConstants.useDDGI = m_ddgi ? 1 : 0;
+    pushConstants.useDDGI = (m_ddgi && useGI) ? 1 : 0;
 
     // Query FogComponent from scene
     auto fogView = activeScene.getRegistry().view<FogComponent>();

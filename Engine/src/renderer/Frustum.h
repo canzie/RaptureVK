@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <memory>
+#include <vector>
 
 namespace Rapture {
 
@@ -33,13 +34,14 @@ class Frustum {
 
     const std::array<glm::vec4, 6> &getPlanes() const { return m_planes; }
 
-    uint32_t getBindlessIndex();
+    void uploadFrustum(uint32_t frameIndex);
+
+    uint32_t getBindlessIndex(uint32_t frameIndex) const;
 
   private:
     std::array<glm::vec4, 6> m_planes;
-    std::shared_ptr<StorageBuffer> m_gpuBuffer;
-    uint32_t m_bindlessIndex = UINT32_MAX;
-    bool m_gpuDirty = true;
+    std::vector<std::shared_ptr<StorageBuffer>> m_gpuBuffers;
+    std::vector<uint32_t> m_bindlessIndices;
 };
 
 } // namespace Rapture

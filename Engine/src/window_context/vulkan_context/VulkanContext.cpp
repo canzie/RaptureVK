@@ -733,6 +733,12 @@ static void s_enableCoreFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDevi
     } else {
         RP_CORE_WARN("Sampler anisotropy not supported; disabling anisotropy in samplers");
     }
+
+    if (supported.features.depthBiasClamp) {
+        featuresToEnable.features.depthBiasClamp = VK_TRUE;
+    } else {
+        RP_CORE_WARN("depthBiasClamp NOT supported.");
+    }
 }
 
 static bool s_enableVertexInputDynamicState(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,

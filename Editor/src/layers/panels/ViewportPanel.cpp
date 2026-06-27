@@ -165,6 +165,25 @@ void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
                 return Amethyst::EventResult::CONSUMED;
             };
         });
+    f.textButton(
+        {
+            .base = {.size = HEADER_BTN_SIZE},
+            .text = HEADER_BTN_TEXT,
+            .label = "GI",
+        },
+        [this](Amethyst::TextButtonScope &b) {
+            m_giBtn = &b.component;
+            b.component.onMouseButton1ClickCb = [this]() {
+                auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+                if (viewport == nullptr) {
+                    return Amethyst::EventResult::CONSUMED;
+                }
+                bool useGI = !viewport->renderSettings().useGI;
+                viewport->renderSettings().useGI = useGI;
+                m_giBtn->setText(useGI ? "GI" : "Direct");
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
 }
 
 Rapture::CameraController *ViewportPanel::cameraController() const

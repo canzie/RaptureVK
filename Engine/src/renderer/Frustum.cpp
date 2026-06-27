@@ -12,7 +12,7 @@ namespace Rapture {
 
 Frustum::~Frustum()
 {
-    m_gpuBuffer.reset();
+    m_gpuBuffers.clear();
 }
 
 void Frustum::update(const glm::mat4 &projection, const glm::mat4 &view)
@@ -84,25 +84,31 @@ void Frustum::update(const glm::mat4 &projection, const glm::mat4 &view)
             RP_CORE_WARN("Plane normalization failed: near-zero length");
         }
     }
-
-    m_gpuDirty = true;
 }
 
-uint32_t Frustum::getBindlessIndex()
+void Frustum::uploadFrustum(uint32_t frameIndex)
 {
-    if (!m_gpuBuffer) {
+    if (frameIndex >= m_gpuBuffers.size()) {
         auto &vc = Application::getInstance().getVulkanContext();
         VkDeviceSize bufferSize = 6 * sizeof(glm::vec4);
-        m_gpuBuffer = std::make_shared<StorageBuffer>(bufferSize, BufferUsage::DYNAMIC, vc.getVmaAllocator());
-        m_bindlessIndex = m_gpuBuffer->getBindlessIndex();
+        uint32_t oldSize = static_cast<uint32_t>(m_gpuBuffers.size());
+        m_gpuBuffers.resize(frameIndex + 1);
+        m_bindlessIndices.resize(frameIndex + 1);
+        for (uint32_t i = oldSize; i <= frameIndex; ++i) {
+            m_gpuBuffers[i] = std::make_shared<StorageBuffer>(bufferSize, BufferUsage::DYNAMIC, vc.getVmaAllocator());
+            m_bindlessIndices[i] = m_gpuBuffers[i]->getBindlessIndex();
+        }
     }
 
-    if (m_gpuDirty) {
-        m_gpuBuffer->addData(m_planes.data(), m_planes.size() * sizeof(glm::vec4), 0);
-        m_gpuDirty = false;
-    }
+    m_gpuBuffers[frameIndex]->addData(m_planes.data(), m_planes.size() * sizeof(glm::vec4), 0);
+}
 
-    return m_bindlessIndex;
+uint32_t Frustum::getBindlessIndex(uint32_t frameIndex) const
+{
+    if (frameIndex >= m_bindlessIndices.size()) {
+        return UINT32_MAX;
+    }
+    return m_bindlessIndices[frameIndex];
 }
 
 FrustumResult Frustum::testBoundingBox(const BoundingBox &boundingBox) const

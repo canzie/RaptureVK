@@ -240,7 +240,7 @@ void main() {
 
         vec3 diff = probeIrradianceMean.rgb - result.rgb;
         float maxComponent = max(max(abs(diff.r), abs(diff.g)), abs(diff.b));
-        
+
         float probeIrradianceThreshold = 0.5;
         if (maxComponent > probeIrradianceThreshold)
         {

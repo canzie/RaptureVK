@@ -58,7 +58,11 @@ void TerrainGenerator::init(const TerrainConfig &config)
     m_culler = std::make_unique<TerrainCuller>(m_chunkDataBuffer, m_chunkCount, m_config.heightScale, 64, vc.getVmaAllocator());
 
     std::vector<uint32_t> allLODs = {0, 1, 2, 3};
-    m_cullBuffers = m_culler->createBuffers(allLODs);
+    uint32_t framesInFlight = Application::getInstance().getMainWindow().getSwapChain()->getImageCount();
+    m_cullBuffers.resize(framesInFlight);
+    for (auto &buffers : m_cullBuffers) {
+        buffers = m_culler->createBuffers(allLODs);
+    }
 
     createTerrainMaterials();
 
@@ -250,7 +254,7 @@ void TerrainGenerator::generateDefaultNoiseTextures()
     bakeNoiseLUT();
 }
 
-void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum)
+void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum, uint32_t frameIndex)
 {
     RAPTURE_PROFILE_FUNCTION();
     if (!m_initialized) {
@@ -260,8 +264,9 @@ void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum)
     dispatchChunkUpdate(cameraPos);
 
     // GPU compute: frustum cull chunks, write indirect draw commands
-    if (m_culler) {
-        m_culler->runCull(m_cullBuffers, frustum.getBindlessIndex(), cameraPos);
+    if (m_culler && frameIndex < m_cullBuffers.size()) {
+        frustum.uploadFrustum(frameIndex);
+        m_culler->runCull(m_cullBuffers[frameIndex], frustum.getBindlessIndex(frameIndex), cameraPos);
     }
 }
 

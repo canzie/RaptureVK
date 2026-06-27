@@ -1,6 +1,7 @@
 #ifndef RAPTURE__VIEWPORT_H
 #define RAPTURE__VIEWPORT_H
 
+#include "renderer/RenderSettings.h"
 #include "renderer/Renderer.h"
 #include "renderer/common.h"
 #include "scenes/Scene.h"
@@ -42,6 +43,9 @@ class Viewport {
     EditorBinding &editorBinding() { return m_editorBinding; }
     const EditorBinding &editorBinding() const { return m_editorBinding; }
 
+    RenderSettings &renderSettings() { return m_renderSettings; }
+    const RenderSettings &renderSettings() const { return m_renderSettings; }
+
     void createRenderer(RendererType type);
     Renderer *getRenderer() { return m_renderer.get(); }
     RendererType getRendererType() const { return m_rendererType; }
@@ -80,6 +84,7 @@ class Viewport {
     Scene *m_scene = nullptr;
     Entity m_camera;
     EditorBinding m_editorBinding;
+    RenderSettings m_renderSettings;
 
     uint32_t m_width;
     uint32_t m_height;

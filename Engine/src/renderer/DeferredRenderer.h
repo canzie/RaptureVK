@@ -25,7 +25,7 @@ class DeferredRenderer : public Renderer {
     DeferredRenderer(RenderContext renderContext, SceneRenderTarget::TargetType targetType);
     ~DeferredRenderer() override;
 
-    void drawFrame(Scene &activeScene, Entity camera) override;
+    void drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings) override;
     void onSwapChainRecreated() override;
 
     GBufferPass *getGBufferPass() { return m_gbufferPass.get(); }
@@ -52,6 +52,8 @@ class DeferredRenderer : public Renderer {
 
     std::unique_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
     std::unique_ptr<RtInstanceData> m_rtInstanceData;
+
+    bool m_giActive = true;
 };
 
 } // namespace Rapture

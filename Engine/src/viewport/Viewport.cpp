@@ -47,7 +47,7 @@ void Viewport::drawFrame()
     }
 
     Entity camera = m_camera.isValid() ? m_camera : m_scene->getMainCamera();
-    m_renderer->drawFrame(*m_scene, camera);
+    m_renderer->drawFrame(*m_scene, camera, m_renderSettings);
 }
 
 void Viewport::resize(uint32_t width, uint32_t height)

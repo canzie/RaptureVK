@@ -51,6 +51,7 @@ class ViewportPanel : public Panel {
     Amethyst::TextButton *m_scaleBtn = nullptr;
     Amethyst::TextButton *m_spaceBtn = nullptr;
     Amethyst::TextButton *m_cameraModeBtn = nullptr;
+    Amethyst::TextButton *m_giBtn = nullptr;
     bool m_viewportHovered = false;
 
     std::unique_ptr<Amethyst::Gizmo> m_gizmo;

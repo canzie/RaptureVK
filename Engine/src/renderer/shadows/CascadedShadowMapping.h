@@ -89,6 +89,9 @@ class CascadedShadowMap {
     float getLambda() const { return m_lambda; }
     void setLambda(float lambda) { m_lambda = std::clamp(lambda, 0.0f, 1.0f); }
 
+    float getShadowDistance() const { return m_shadowDistance; }
+    void setShadowDistance(float distance) { m_shadowDistance = std::max(distance, 1.0f); }
+
     std::vector<float> getCascadeSplits() const { return m_cascadeSplits; }
 
   private:
@@ -98,7 +101,7 @@ class CascadedShadowMap {
     void createUniformBuffers();
     void setupCommandResources();
 
-    void recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain);
+    void recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain, const glm::vec3 &cameraPos);
 
     void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer);
     void transitionToShaderReadableLayout(CommandBuffer *commandBuffer);
@@ -116,6 +119,7 @@ class CascadedShadowMap {
     float m_width;
     float m_height;
     float m_lambda;
+    float m_shadowDistance = 80.0f;
     uint8_t m_NumCascades;
 
     bool m_firstFrame = true;
@@ -146,7 +150,7 @@ class CascadedShadowMap {
 
     std::vector<AssetRef> m_shaderAssets;
     Frustum m_shadowFrustum;
-    TerrainCullBuffers m_terrainShadowBuffers;
+    std::vector<TerrainCullBuffers> m_terrainShadowBuffers;
 
     VmaAllocator m_allocator;
 

@@ -1,6 +1,5 @@
 uncouple the engines core
     - allow running headless (decoupling of graphics/window related stuff from the core), is a must for future headless servers
-    - allow multiview (a main window may be assumed, editor NEEDS support for multiple)
 
 ### ui/editor
     - create a proper material editor workspace
@@ -10,12 +9,10 @@ uncouple the engines core
         - hsv/hsl preference
         - couple sizings like gaps/borders/corners
         - an actual settings/preferences panel to open
-    - file explorer
     - wire up the content browser with the asset manager to load assets
     - drag/drop assets into the viewport
         - maybe just "rightclick->import into scene" for now
     - mesh property thing needs its asset ref, same for material thing.
-    - think about how to actually do scene components like global illumination options -> component on a scene object?, a scene panel?, check how other engines do this
     
 
     - !!! get the editor to a point where we can actually delete entityies, easily add some, even if just cubes/spheres for now. 
@@ -42,7 +39,7 @@ uncouple the engines core
     - checkox for importing material from gltf and auto making the materials and applying them
 - pre generated normals?
 - virtual texturing??? like decima i guess
-- phyics -> raypicking -> custom gizmo and terrain editor and mesh placer
+- phyics -> raypicking -> terrain editor and mesh placer
 
 ### PHYSICS
     - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)

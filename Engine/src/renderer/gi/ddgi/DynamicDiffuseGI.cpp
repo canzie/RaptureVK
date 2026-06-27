@@ -508,10 +508,9 @@ void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint
         return;
     }
 
-    // NOTE: Ray rotation/jitter has been disabled in the shader because any per-frame
-    // variation causes severe flickering. The probeRayRotation quaternion is no longer
-    // updated here. Investigation needed to understand why hysteresis isn't stabilizing
-    // the results when rotation is enabled.
+    // NOTE: probeRayRotation is regenerated every frame in populateProbesCompute
+    // (fresh uniform-random rotation, Arvo's method). Convergence relies on the
+    // hysteresis blend averaging these stochastic estimates over time.
 
     // === BARRIER PHASE 1: Prepare for trace shader (3 dependencies) ===
     std::vector<VkImageMemoryBarrier> preTraceBarriers;
