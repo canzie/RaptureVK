@@ -124,54 +124,15 @@ FetchContent_Declare(
     GIT_PROGRESS TRUE
 )
 
-# --- Shaderc Dependencies ---
-set(SHADERC_SKIP_INSTALL ON CACHE BOOL "" FORCE)
-set(SHADERC_SKIP_TESTS ON CACHE BOOL "" FORCE)
-set(SHADERC_SKIP_EXAMPLES ON CACHE BOOL "" FORCE)
-set(SHADERC_ENABLE_SPVC OFF CACHE BOOL "" FORCE)
-set(SHADERC_ENABLE_WGSL_OUTPUT OFF CACHE BOOL "" FORCE)
-set(SHADERC_ENABLE_SHARED_CRT OFF CACHE BOOL "" FORCE)
-set(SPIRV_SKIP_TESTS ON CACHE BOOL "" FORCE)
-set(SPIRV_WERROR OFF CACHE BOOL "" FORCE)
+# --- glslang ---
 set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
 set(ENABLE_SPVREMAPPER OFF CACHE BOOL "" FORCE)
 set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE)
-set(ENABLE_OPT ON CACHE BOOL "" FORCE)
-set(ALLOW_EXTERNAL_SPIRV_TOOLS ON CACHE BOOL "" FORCE)
+set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
 
-# Critical: Force glslang to use external SPIRV-Headers to avoid ODR violations
-set(USE_EXTERNAL_SPIRV_HEADERS ON CACHE BOOL "" FORCE)
-
-# Disable warnings and treat vendor code as system headers
-set(SPIRV_SKIP_EXECUTABLES ON CACHE BOOL "" FORCE)
-set(SPIRV_TOOLS_BUILD_STATIC ON CACHE BOOL "" FORCE)
-
-FetchContent_Declare(
-  spirv_headers
-  GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
-  GIT_TAG main
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-)
-FetchContent_MakeAvailable(spirv_headers)
-
-FetchContent_Declare(
-  spirv_tools
-  GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
-  GIT_TAG main
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-)
 FetchContent_Declare(
   glslang
   GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
-  GIT_TAG main
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-)
-FetchContent_Declare(
-  shaderc
-  GIT_REPOSITORY https://github.com/google/shaderc.git
   GIT_TAG main
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
@@ -211,12 +172,8 @@ FetchContent_MakeAvailable(spirv_reflect)
 FetchContent_MakeAvailable(yyjson)
 FetchContent_MakeAvailable(tracy)
 
-# Heavy shader compilation dependencies - built once and cached
-message(STATUS "Fetching shader compilation dependencies (this may take a while on first build)...")
-# Note: spirv_headers already made available earlier to avoid ODR violations
-FetchContent_MakeAvailable(spirv_tools)
+message(STATUS "Fetching glslang...")
 FetchContent_MakeAvailable(glslang)
-FetchContent_MakeAvailable(shaderc)
 
 FetchContent_MakeAvailable(tomlplusplus)
 target_compile_definitions(tomlplusplus_tomlplusplus INTERFACE TOML_EXCEPTIONS=0)
@@ -268,13 +225,8 @@ function(mark_as_system_includes target)
     endif()
 endfunction()
 
-# Suppress warnings from shader compilation libraries
-mark_as_system_includes(SPIRV-Tools)
-mark_as_system_includes(SPIRV-Tools-opt)
 mark_as_system_includes(glslang)
 mark_as_system_includes(SPIRV)
-mark_as_system_includes(shaderc)
-mark_as_system_includes(shaderc_combined)
 mark_as_system_includes(glslang-default-resource-limits)
 
 # Suppress warnings from other vendor libraries
@@ -365,7 +317,9 @@ target_link_libraries(vendor_libraries INTERFACE
     yyjson_static
     Vulkan::Vulkan
     tracy::client
-    shaderc_combined
+    glslang
+    SPIRV
+    glslang-default-resource-limits
     tomlplusplus::tomlplusplus
     concurrentqueue
 )
