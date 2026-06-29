@@ -2,6 +2,7 @@
 
 #include "renderer/DeferredRenderer.h"
 #include "utils/rp_assert.h"
+#include "window_context/Application.h"
 
 namespace Rapture {
 
@@ -38,6 +39,11 @@ void Viewport::createRenderer(RendererType type)
     }
 
     RP_ASSERT(m_renderer, "Failed to create renderer");
+
+    if (m_targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
+        m_windowResizeConn = Application::getInstance().getMainWindow().getWindowContext()->onResize.connect(
+            [this](uint32_t width, uint32_t height) { resize(width, height); });
+    }
 }
 
 void Viewport::drawFrame()
@@ -57,6 +63,7 @@ void Viewport::resize(uint32_t width, uint32_t height)
     }
     m_width = width;
     m_height = height;
+    m_renderer->resizeRenderTarget(width, height);
 }
 
 void Viewport::onSwapChainRecreated()

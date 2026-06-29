@@ -1,6 +1,7 @@
 #ifndef RAPTURE__VIEWPORT_H
 #define RAPTURE__VIEWPORT_H
 
+#include "events/EventSignal.h"
 #include "renderer/RenderSettings.h"
 #include "renderer/Renderer.h"
 #include "renderer/common.h"
@@ -89,6 +90,8 @@ class Viewport {
     uint32_t m_width;
     uint32_t m_height;
     bool m_active = true;
+
+    EventConnection m_windowResizeConn;
 };
 
 } // namespace Rapture

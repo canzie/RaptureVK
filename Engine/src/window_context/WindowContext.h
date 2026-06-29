@@ -1,5 +1,6 @@
 #pragma once
 
+#include "events/EventSignal.h"
 #include "input/InputCodes.h"
 #include "window_context/PlatformContext.h"
 
@@ -53,6 +54,22 @@ class WindowContext {
     virtual void requestClose() = 0;
 
     uint32_t getId() const { return m_id; }
+
+    /**
+     * @brief Fired when this window's framebuffer is resized.
+     */
+    EventSignal<void(uint32_t, uint32_t)> onResize;
+
+    /**
+     * @brief Fired when this window receives a close request.
+     */
+    EventSignal<void()> onClose;
+
+    /**
+     * @brief Fired when this window's input focus changes. True if focus was
+     * gained, false if lost.
+     */
+    EventSignal<void(bool)> onFocus;
 
     bool isMinimized() const { return m_minimized; }
 

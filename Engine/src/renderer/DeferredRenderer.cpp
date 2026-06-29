@@ -7,7 +7,6 @@
 #include "logging/TracyProfiler.h"
 
 #include "components/TerrainComponent.h"
-#include "events/ApplicationEvents.h"
 #include "jobs/InplaceFunction.h"
 #include "jobs/Job.h"
 #include "jobs/JobCommon.h"
@@ -46,32 +45,7 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarge
 
     m_skyboxPass = std::make_unique<SkyboxPass>(m_gbufferPass->getDepthTextures(), colorFormat);
 
-    ApplicationEvents::onWindowResize().addListener([this](uint32_t windowId, unsigned int width, unsigned int height) {
-        (void)width;
-        (void)height;
-        WindowContext *windowContext = m_swapChain->getWindowContext();
-        if (windowContext != nullptr && windowId == windowContext->getId()) {
-            m_framebufferNeedsResize = true;
-        }
-    });
-
-    ApplicationEvents::onSwapChainRecreated().addListener([this](uint32_t swapChainID) {
-        if (swapChainID != m_swapChain->getId()) {
-            return;
-        }
-        onSwapChainRecreated();
-    });
-
-    // Listen for viewport resize events (Editor mode only)
-    // We defer the actual resize to the start of the next frame to avoid
-    // mid-frame resource destruction issues
-    if (m_targetType == SceneRenderTarget::TargetType::OFFSCREEN) {
-        ApplicationEvents::onViewportResize().addListener([this](unsigned int width, unsigned int height) {
-            m_pendingViewportWidth = width;
-            m_pendingViewportHeight = height;
-            m_viewportResizePending = true;
-        });
-    }
+    m_swapchainRecreatedConn = m_swapChain->onRecreated.connect([this]() { onSwapChainRecreated(); });
 }
 
 DeferredRenderer::~DeferredRenderer()
@@ -171,7 +145,7 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
         m_swapChain->signalImageAvailability(imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferNeedsResize) {
-            ApplicationEvents::onRequestSwapChainRecreation().publish(m_swapChain->getId());
+            m_swapChain->onRecreationRequested.fire();
             return;
         } else if (result != VK_SUCCESS) {
             RP_CORE_ERROR("failed to present swap chain image!");
@@ -216,6 +190,18 @@ void DeferredRenderer::onSwapChainRecreated()
 
     m_currentFrame = 0;
     m_framebufferNeedsResize = false;
+}
+
+void DeferredRenderer::resizeRenderTarget(uint32_t width, uint32_t height)
+{
+    if (m_targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
+        m_framebufferNeedsResize = true;
+        return;
+    }
+
+    m_pendingViewportWidth = width;
+    m_pendingViewportHeight = height;
+    m_viewportResizePending = true;
 }
 
 void DeferredRenderer::createRenderTarget()

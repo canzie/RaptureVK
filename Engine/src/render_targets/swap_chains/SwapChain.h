@@ -1,5 +1,6 @@
 #pragma once
 
+#include "events/EventSignal.h"
 #include "textures/Texture.h"
 #include "vulkan/vulkan.h"
 #include "window_context/WindowContext.h"
@@ -33,6 +34,16 @@ class SwapChain {
 
     void recreate();
     void destroy();
+
+    /**
+     * @brief Fired when this swapchain needs recreation.
+     */
+    EventSignal<void()> onRecreationRequested;
+
+    /**
+     * @brief Fired after this swapchain has been recreated.
+     */
+    EventSignal<void()> onRecreated;
 
     uint32_t getId() const { return m_id; }
     WindowContext *getWindowContext() const { return m_windowContext; }

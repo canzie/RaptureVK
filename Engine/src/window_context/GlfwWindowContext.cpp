@@ -1,5 +1,4 @@
 #include "GlfwWindowContext.h"
-#include "events/ApplicationEvents.h"
 #include "events/InputEvents.h"
 #include "logging/Log.h"
 #include "utils/rp_assert.h"
@@ -166,10 +165,11 @@ void GlfwWindowContext::errorCallback(int error, const char *description)
 
 void GlfwWindowContext::windowCloseCallback(GLFWwindow *window)
 {
-    (void)window;
-    // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
-    // if (context) { // Check if context is valid if necessary }
-    ApplicationEvents::onWindowClose().publish();
+    GlfwWindowContext *context = static_cast<GlfwWindowContext *>(glfwGetWindowUserPointer(window));
+    if (context == nullptr) {
+        return;
+    }
+    context->onClose.fire();
 }
 
 void GlfwWindowContext::windowSizeCallback(GLFWwindow *window, int width, int height)
@@ -180,7 +180,7 @@ void GlfwWindowContext::windowSizeCallback(GLFWwindow *window, int width, int he
     }
     context->m_context_data.width = width;
     context->m_context_data.height = height;
-    ApplicationEvents::onWindowResize().publish(context->getId(), width, height);
+    context->onResize.fire(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 }
 
 void GlfwWindowContext::keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int /*mods*/)
@@ -239,13 +239,11 @@ void GlfwWindowContext::scrollCallback(GLFWwindow *window, double xoffset, doubl
 
 void GlfwWindowContext::windowFocusCallback(GLFWwindow *window, int focused)
 {
-    (void)window;
-    // GlfwWindowContext* context = static_cast<GlfwWindowContext*>(glfwGetWindowUserPointer(window));
-    if (focused) {
-        ApplicationEvents::onWindowFocus().publish();
-    } else {
-        ApplicationEvents::onWindowLostFocus().publish();
+    GlfwWindowContext *context = static_cast<GlfwWindowContext *>(glfwGetWindowUserPointer(window));
+    if (context == nullptr) {
+        return;
     }
+    context->onFocus.fire(focused != 0);
 }
 
 void GlfwWindowContext::windowIconifyCallback(GLFWwindow *window, int iconified)

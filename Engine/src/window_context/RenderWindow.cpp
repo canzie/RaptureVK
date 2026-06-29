@@ -1,7 +1,6 @@
 #include "RenderWindow.h"
 
 #include "buffers/command_buffers/CommandBuffer.h"
-#include "events/ApplicationEvents.h"
 #include "logging/Log.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "utils/rp_assert.h"
@@ -16,20 +15,13 @@ namespace Rapture {
 
 RenderWindow::RenderWindow(std::unique_ptr<WindowContext> windowContext, VulkanContext &context)
     : m_windowContext(std::move(windowContext)), m_context(&context), m_instance(context.getInstance()), m_surface(VK_NULL_HANDLE),
-      m_swapChain(nullptr), m_recreateListenerID(0)
+      m_swapChain(nullptr)
 {
     createSurface();
 }
 
 RenderWindow::~RenderWindow()
 {
-    if (m_recreateListenerID != 0) {
-        ApplicationEvents::onRequestSwapChainRecreation().removeListener(m_recreateListenerID);
-    }
-    if (m_resizeListenerID != 0) {
-        ApplicationEvents::onWindowResize().removeListener(m_resizeListenerID);
-    }
-
     m_swapChain.reset();
 
     if (m_surface != VK_NULL_HANDLE) {
@@ -49,11 +41,7 @@ void RenderWindow::createSwapChain(VulkanContext &context)
     m_swapChain = std::make_shared<SwapChain>(context.getLogicalDevice(), m_surface, context.getPhysicalDevice(),
                                               context.getQueueFamilyIndices(), m_windowContext.get());
 
-    m_recreateListenerID = ApplicationEvents::onRequestSwapChainRecreation().addListener([this](uint32_t swapChainID) {
-        if (swapChainID != m_swapChain->getId()) {
-            return;
-        }
-
+    m_swapchainRecreateConn = m_swapChain->onRecreationRequested.connect([this]() {
         int width = 0, height = 0;
         m_windowContext->getFramebufferSize(&width, &height);
         if (width == 0 || height == 0) {
@@ -63,18 +51,14 @@ void RenderWindow::createSwapChain(VulkanContext &context)
         m_context->waitIdle();
 
         m_swapChain->recreate();
-        ApplicationEvents::onSwapChainRecreated().publish(m_swapChain->getId());
+        m_swapChain->onRecreated.fire();
     });
 
-    m_resizeListenerID = ApplicationEvents::onWindowResize().addListener(
-        [this](uint32_t windowId, unsigned int width, unsigned int height) {
-            (void)width;
-            (void)height;
-            if (windowId != m_windowContext->getId()) {
-                return;
-            }
-            m_framebufferResized = true;
-        });
+    m_windowResizeConn = m_windowContext->onResize.connect([this](uint32_t width, uint32_t height) {
+        (void)width;
+        (void)height;
+        m_framebufferResized = true;
+    });
 }
 
 AcquiredFrame RenderWindow::beginFrame()
@@ -150,7 +134,7 @@ void RenderWindow::endFrame()
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_framebufferResized) {
         m_framebufferResized = false;
         m_currentFrame = 0;
-        ApplicationEvents::onRequestSwapChainRecreation().publish(m_swapChain->getId());
+        m_swapChain->onRecreationRequested.fire();
         return;
     } else if (result != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to present swap chain image!");

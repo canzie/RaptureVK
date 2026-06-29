@@ -3,6 +3,7 @@
 
 #include "renderer/Renderer.h"
 
+#include "events/EventSignal.h"
 #include "renderer/RtInstanceData.h"
 #include "renderer/gi/ddgi/DynamicDiffuseGI.h"
 #include "renderer/passes/GBufferPass.h"
@@ -27,6 +28,7 @@ class DeferredRenderer : public Renderer {
 
     void drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings) override;
     void onSwapChainRecreated() override;
+    void resizeRenderTarget(uint32_t width, uint32_t height) override;
 
     GBufferPass *getGBufferPass() { return m_gbufferPass.get(); }
 
@@ -52,6 +54,8 @@ class DeferredRenderer : public Renderer {
 
     std::unique_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
     std::unique_ptr<RtInstanceData> m_rtInstanceData;
+
+    EventConnection m_swapchainRecreatedConn;
 
     bool m_giActive = true;
 };

@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <stdexcept>
 
-#include "events/ApplicationEvents.h"
 #include "textures/TextureCommon.h"
 
 namespace Rapture {
@@ -286,7 +285,7 @@ int SwapChain::acquireImage(uint32_t semaphoreIndex)
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || m_framebufferNeedsResize) {
             // resize
-            ApplicationEvents::onRequestSwapChainRecreation().publish(m_id);
+            onRecreationRequested.fire();
 
             return -1;
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {

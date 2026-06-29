@@ -2,7 +2,6 @@
 
 #include "EditorLayout.h"
 #include "buffers/command_buffers/CommandPool.h"
-#include "events/ApplicationEvents.h"
 #include "layers/panels/FileBrowser.h"
 #include "layers/panels/ImportPanel.h"
 #include "layers/panels/OutlinerPanel.h"
@@ -60,20 +59,8 @@ AmethystLayer::AmethystLayer()
     auto themePath = rootPath / "assets/themes/theme.ams";
     Amethyst::Style::load(themePath);
 
-    Rapture::ApplicationEvents::onSwapChainRecreated().addListener([this](uint32_t swapChainID) {
-        auto &app = Rapture::Application::getInstance();
-        if (swapChainID == app.getMainWindow().getSwapChain()->getId()) {
-            onResize(*app.getMainWindow().getSwapChain());
-            return;
-        }
-
-        for (auto &context : m_secondaryWindows) {
-            if (context->renderWindow->getSwapChain()->getId() == swapChainID) {
-                onResize(*context->renderWindow->getSwapChain());
-                return;
-            }
-        }
-    });
+    m_mainSwapchainRecreatedConn = app.getMainWindow().getSwapChain()->onRecreated.connect(
+        [this]() { onResize(*Rapture::Application::getInstance().getMainWindow().getSwapChain()); });
 }
 
 AmethystLayer::~AmethystLayer()
@@ -578,6 +565,9 @@ void AmethystLayer::openDemoWindow()
     SecondaryWindowContext *contextPtr = context.get();
     m_secondaryWindows.push_back(std::move(context));
 
+    contextPtr->swapchainRecreatedConn = renderWindow.getSwapChain()->onRecreated.connect(
+        [this, contextPtr]() { onResize(*contextPtr->renderWindow->getSwapChain()); });
+
     renderWindow.onFrame = [this, contextPtr](Rapture::RenderWindow &window) { drawSecondaryWindow(*contextPtr, window); };
     renderWindow.onClose = [this, contextPtr]() { closeSecondaryWindow(contextPtr); };
 }
@@ -602,6 +592,9 @@ void AmethystLayer::openFileExplorer()
 
     SecondaryWindowContext *contextPtr = context.get();
     m_secondaryWindows.push_back(std::move(context));
+
+    contextPtr->swapchainRecreatedConn = renderWindow.getSwapChain()->onRecreated.connect(
+        [this, contextPtr]() { onResize(*contextPtr->renderWindow->getSwapChain()); });
 
     m_fileBrowser->onClose = [contextPtr]() { contextPtr->renderWindow->getWindowContext()->requestClose(); };
     m_fileBrowser->onConfirm = [this](const std::filesystem::path &path) {

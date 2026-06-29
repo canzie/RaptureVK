@@ -26,6 +26,13 @@ class Renderer {
     virtual void drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings) = 0;
     virtual void onSwapChainRecreated() = 0;
 
+    /**
+     * @brief Resize this renderer's render target to match its viewport.
+     * @param width New target width in pixels.
+     * @param height New target height in pixels.
+     */
+    virtual void resizeRenderTarget(uint32_t width, uint32_t height) = 0;
+
     SceneRenderTarget &getSceneRenderTarget() { return *m_sceneRenderTarget; }
     const SceneRenderTarget &getSceneRenderTarget() const { return *m_sceneRenderTarget; }
     uint32_t getCurrentFrame() const { return m_currentFrame; }

@@ -3,7 +3,6 @@
 #include "Icons.h"
 #include "components/Components.h"
 #include "components/systems/CameraController.h"
-#include "events/ApplicationEvents.h"
 #include "events/GameEvents.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "viewport/Viewport.h"
@@ -237,8 +236,9 @@ void ViewportPanel::onUpdate(float dt)
                 m_resizePending = false;
                 if (size != m_lastViewportSize) {
                     m_lastViewportSize = size;
-                    Rapture::ApplicationEvents::onViewportResize().publish(static_cast<unsigned int>(size.x),
-                                                                           static_cast<unsigned int>(size.y));
+                    if (viewport != nullptr) {
+                        viewport->resize(static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y));
+                    }
                 }
             }
         }

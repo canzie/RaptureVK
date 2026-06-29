@@ -2,6 +2,7 @@
 #define RAPTURE__RENDER_WINDOW_H
 
 #include "buffers/command_buffers/CommandPool.h"
+#include "events/EventSignal.h"
 #include "window_context/WindowContext.h"
 
 #include <vulkan/vulkan.h>
@@ -79,8 +80,8 @@ class RenderWindow {
     VkInstance m_instance;
     VkSurfaceKHR m_surface;
     std::shared_ptr<SwapChain> m_swapChain;
-    size_t m_recreateListenerID;
-    size_t m_resizeListenerID = 0;
+    EventConnection m_swapchainRecreateConn;
+    EventConnection m_windowResizeConn;
 
     CommandPoolHash m_presentCommandPoolHash = 0;
     CommandBuffer *m_currentCommandBuffer = nullptr;

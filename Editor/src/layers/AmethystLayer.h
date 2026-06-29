@@ -8,6 +8,7 @@
 
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
+#include "events/EventSignal.h"
 #include "layers/BottomBar.h"
 #include "layers/panels/Panel.h"
 #include <memory>
@@ -49,6 +50,7 @@ class AmethystLayer : public Rapture::Layer {
     struct SecondaryWindowContext {
         Rapture::RenderWindow *renderWindow = nullptr;
         Amethyst::Window window;
+        Rapture::EventConnection swapchainRecreatedConn;
     };
 
     void openDemoWindow();
@@ -76,6 +78,8 @@ class AmethystLayer : public Rapture::Layer {
     std::vector<VkImageView> m_viewportTextureViews;
 
     std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
+
+    Rapture::EventConnection m_mainSwapchainRecreatedConn;
 
     std::unique_ptr<FileBrowser> m_fileBrowser;
     std::unique_ptr<ImportPanel> m_importPanel;

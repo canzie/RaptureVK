@@ -1,7 +1,7 @@
 #include "Application.h"
 
 #include "asset_manager/AssetManager.h"
-#include "events/ApplicationEvents.h"
+#include "events/Events.h"
 #include "jobs/JobSystem.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
@@ -96,14 +96,6 @@ Application::Application(int width, int height, const char *title) : m_running(t
     primaryViewport->createRenderer(RendererType::DEFERRED);
 
     MaterialManager::init();
-
-    ApplicationEvents::onWindowFocus().addListener([]() { RP_CORE_INFO("Window focused"); });
-
-    ApplicationEvents::onWindowLostFocus().addListener([]() { RP_CORE_INFO("Window lost focus"); });
-
-    ApplicationEvents::onWindowResize().addListener([](uint32_t windowId, unsigned int width, unsigned int height) {
-        RP_CORE_INFO("Window {0} resized to {1}x{2}", windowId, width, height);
-    });
 
     RP_CORE_INFO("========== Application created ==========");
 }
