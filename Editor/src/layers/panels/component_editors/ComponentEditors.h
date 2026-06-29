@@ -34,6 +34,8 @@ class LightEditor : public ComponentEditorBase {
     float m_intensity = 1.0f;
     float m_range = 10.0f;
     bool m_castsShadow = false;
+    bool m_useTemperature = false;
+    double m_temperature = 6500.0;
 
     Amethyst::Dropdown *m_typeDropdown = nullptr;
     std::optional<ColorField> m_colorField;

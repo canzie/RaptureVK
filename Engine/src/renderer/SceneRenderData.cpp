@@ -419,7 +419,7 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
         }
         data.directionAndRange = glm::vec4(direction, light->range);
 
-        data.colorAndIntensity = glm::vec4(light->color, light->intensity);
+        data.colorAndIntensity = glm::vec4(light->getFinalColor(), light->intensity);
 
         float innerCos = 0.0f;
         float outerCos = 0.0f;

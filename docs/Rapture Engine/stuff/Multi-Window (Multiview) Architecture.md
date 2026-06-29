@@ -1,4 +1,4 @@
-# Multi-Window (Multiview) Architecture
+
 
 ## Purpose
 

@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "f5aed0fd51569cf9",
+        "id": "5002038ecca66529",
         "type": "tabs",
         "children": [
           {
-            "id": "0eac129269eeca3a",
+            "id": "c449760cf1be845f",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -16,23 +16,8 @@
               "icon": "lucide-git-fork",
               "title": "Graph view"
             }
-          },
-          {
-            "id": "af05d3e544519b29",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Multi-Window (Multiview) Architecture.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Multi-Window (Multiview) Architecture"
-            }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -194,23 +179,44 @@
       "bases:Create new base": false
     }
   },
-  "active": "af05d3e544519b29",
+  "active": "c449760cf1be845f",
   "lastOpenFiles": [
-    "Input and Camera Control Architecture.md",
-    "Editor Component Fields.md",
-    "Editor Layout Design.md",
-    "The Rapture Editor.md",
+    "stuff/Multi-Window (Multiview) Architecture.md",
+    "systems/GBufferPass.md",
+    "systems/MaterialInstance.md",
+    "systems/MDI Batching.md",
+    "systems/MaterialData.md",
+    "systems/LightingPass.md",
+    "systems/JobSystem.md",
+    "systems/Material.md",
+    "systems/InstancedShapesPass.md",
+    "systems/Input.md",
+    "systems/Entity.md",
+    "systems/DescriptorManager.md",
+    "systems/DDGI.md",
+    "systems/CommandPool.md",
+    "systems/CommandBuffer.md",
+    "systems/CascadedShadowMapping.md",
+    "systems/AssetRef.md",
+    "systems/AssetManager.md",
+    "systems/Asset.md",
+    "systems/Buffer Pool System.md",
+    "systems/Acceleration Structures.md",
+    "systems/StencilBorderPass.md",
+    "systems/SkyboxPass.md",
+    "systems/ShadowMapping.md",
+    "systems/Viewport.md",
+    "systems/Scene.md",
+    "stuff",
+    "ideas",
+    "plans",
+    "amethyst",
+    "editor",
+    "systems",
+    "{systems,editor,amethyst,plans,ideas}",
     "Editor Layout Design.md.tmp.3259.2d61ac9f9b47",
     "Pasted image 20260517113657.png",
-    "SceneRenderData.md",
-    "Shadow Maps to SceneRenderData.md",
-    "SceneRenderData Implementation.md",
-    "Improvements.md",
-    "Amethyst UI Library.md",
-    "Welcome.md",
     "SceneRenderData.md.tmp.2890.602d0c3fe6c6",
-    "SceneRenderData.md.tmp.2890.f92111396f8f",
-    "SceneRenderData.md.tmp.2890.965b68b2e9e5",
-    "Improvements.md.tmp.2890.3cf98c2543a5"
+    "SceneRenderData.md.tmp.2890.f92111396f8f"
   ]
 }

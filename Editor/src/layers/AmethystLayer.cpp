@@ -8,6 +8,10 @@
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
 #include "layers/panels/components/tab_layouts.h"
+#include "layers/workspaces/AnimationsWorkspace.h"
+#include "layers/workspaces/LevelEditorWorkspace.h"
+#include "layers/workspaces/MaterialEditorWorkspace.h"
+#include "layers/workspaces/ScriptingWorkspace.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "render_targets/swap_chains/SwapChain.h"
@@ -66,10 +70,7 @@ AmethystLayer::AmethystLayer()
 AmethystLayer::~AmethystLayer()
 {
     for (auto &ws : m_workspaces) {
-        if (ws.dockingLayer != nullptr && ws.dockingLayer->persistLayout && !ws.dockingLayer->name.empty()) {
-            Amethyst::LayoutConfig::instance().set(ws.dockingLayer->name, Amethyst::ConfigEntry(ws.dockingLayer->saveConfig()));
-            ws.dockingLayer->persistLayout = false;
-        }
+        ws->saveLayout();
     }
 
     auto &app = Rapture::Application::getInstance();
@@ -153,7 +154,7 @@ void AmethystLayer::onAttach()
     auto activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (activeScene != nullptr) {
         for (auto &ws : m_workspaces) {
-            for (auto &panel : ws.panels) {
+            for (auto &panel : ws->getPanels()) {
                 if (auto *outliner = dynamic_cast<OutlinerPanel *>(panel.get()); outliner != nullptr) {
                     outliner->setScene(activeScene);
                 }
@@ -173,13 +174,11 @@ void AmethystLayer::onDetach()
     Rapture::RP_INFO("Detaching AmethystLayer...");
 
     for (auto &ws : m_workspaces) {
-        if (ws.dockingLayer != nullptr && ws.dockingLayer->persistLayout && !ws.dockingLayer->name.empty()) {
-            Amethyst::LayoutConfig::instance().set(ws.dockingLayer->name, Amethyst::ConfigEntry(ws.dockingLayer->saveConfig()));
-        }
+        ws->saveLayout();
     }
 }
 
-void AmethystLayer::onUpdate(float ts)
+void AmethystLayer::onUpdate(float dt)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -192,12 +191,10 @@ void AmethystLayer::onUpdate(float ts)
     }
 
     for (auto &ws : m_workspaces) {
-        for (auto &panel : ws.panels) {
-            panel->onUpdate(ts);
-        }
+        ws->onUpdate(dt);
     }
 
-    m_window.tick(ts);
+    m_window.tick(dt);
 
     if (m_reapImportPanel) {
         m_reapImportPanel = false;
@@ -216,15 +213,14 @@ void AmethystLayer::onUpdate(float ts)
                     if (m_viewportTextureIds[renderedSlot].isValid()) {
                         m_backend.unregisterTexture(m_viewportTextureIds[renderedSlot]);
                     }
-                    m_viewportTextureIds[renderedSlot] =
-                        m_backend.registerTexture(view, texture->getSampler().getSamplerVk());
+                    m_viewportTextureIds[renderedSlot] = m_backend.registerTexture(view, texture->getSampler().getSamplerVk());
                     m_viewportTextureViews[renderedSlot] = view;
                 }
             }
 
             if (m_viewportTextureIds[renderedSlot].isValid()) {
                 for (auto &ws : m_workspaces) {
-                    for (auto &panel : ws.panels) {
+                    for (auto &panel : ws->getPanels()) {
                         if (auto *vp = dynamic_cast<ViewportPanel *>(panel.get()); vp != nullptr) {
                             vp->setViewportImage(m_viewportTextureIds[renderedSlot]);
                         }
@@ -320,96 +316,37 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
                     .barThickness = EDITOR_WORKSPACE_TAB_HEIGHT,
                 },
         },
-        [this, screenSize](Amethyst::TabBarScope &tabs) {
+        [this](Amethyst::TabBarScope &tabs) {
             m_workspaceTabBar = &tabs.component;
 
-            auto setupTab = [this, screenSize](Amethyst::FrameScope &f) {
-                Workspace ws;
-                ws.container = &f.component;
-                ws.container->addClass("background-primary");
-
-                ws.hotbar = ws.container->add<Amethyst::Frame>();
-                ws.hotbar->setBaseProperties({
-                    .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
-                });
-                ws.hotbar->addClass("background-tertiary");
-
-                Amethyst::UIScope(*ws.hotbar)
-                    .textButton(
-                        {
-                            .base =
-                                {
-                                    .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
-                                    .position = Amethyst::UDim2(0.0f, 8.0f, 0.5f, 0.0f),
-                                    .size = Amethyst::UDim2(0.0f, 150.0f, 1.0f, -10.0f),
-                                },
-                            .style = {.cornerRadius = 3.0f},
-                            .text = {.fontSize = 12.0f,
-                                     .textXAlignment = Amethyst::TextXAlignment::CENTER,
-                                     .textYAlignment = Amethyst::TextYAlignment::CENTER},
-                            .label = "Open File Explorer",
-                        },
-                        [this](Amethyst::TextButtonScope &b) {
-                            b.component.onMouseButton1ClickCb = [this]() {
-                                openFileExplorer();
-                                return Amethyst::EventResult::CONSUMED;
-                            };
-                        });
-
-                ws.dockingLayer = ws.container->add<Amethyst::DockingLayer>();
-                ws.dockingLayer->setDisplayOrder(1);
-                ws.dockingLayer->innerSpacing = 3.0f;
-                ws.dockingLayer->absolutePosition = {0.0f, EDITOR_CONTENT_TOP + EDITOR_DOCK_SPACING};
-                ws.dockingLayer->absoluteSize = {
-                    screenSize.x,
-                    screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING - EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING,
-                };
-                ws.dockingLayer->markDirty();
-
-                m_workspaces.push_back(std::move(ws));
-            };
-
-            tabs.tab("Level Editor", setupTab);
-            tabs.tab("Material Editor", setupTab);
-            tabs.tab("Scripting", setupTab);
-            tabs.tab("Animations", setupTab);
+            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs));
+            m_workspaces.push_back(std::make_unique<MaterialEditorWorkspace>(tabs));
+            m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs));
+            m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(tabs));
         });
 
-    auto &levelEditor = m_workspaces[0];
-    levelEditor.dockingLayer->name = "Editor Dock";
-    levelEditor.dockingLayer->persistLayout = true;
-
-    Amethyst::TabBar *viewportTabBar = nullptr;
-    Amethyst::TabBar *outlinerTabBar = nullptr;
-    Amethyst::TabBar *propertiesTabBar = nullptr;
-
-    Amethyst::DockScope(*levelEditor.dockingLayer)
-        .split(
-            Amethyst::SplitAxis::VERTICAL, 0.25f,
-            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { outlinerTabBar = &tb.component; }); },
-            [&](Amethyst::DockScope &r) {
-                r.split(
-                    Amethyst::SplitAxis::HORIZONTAL, 0.65f,
-                    [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
-                    [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
-            });
-
-    if (viewportTabBar != nullptr) viewportTabBar->addClass("panel-tab-bar");
-    if (outlinerTabBar != nullptr) outlinerTabBar->addClass("panel-tab-bar");
-    if (propertiesTabBar != nullptr) propertiesTabBar->addClass("panel-tab-bar");
-
-    levelEditor.panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar));
-    levelEditor.panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar));
-    levelEditor.panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar));
-
-    if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
-        if (auto *entry = Amethyst::LayoutConfig::instance().get("Editor Dock")) {
-            if (entry->type == Amethyst::ConfigType::DOCK_LAYOUT) {
-                levelEditor.dockingLayer->applyConfig(entry->dockLayout);
-            }
+    glm::vec2 dockSize = {
+        screenSize.x,
+        screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING - EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING,
+    };
+    for (auto &ws : m_workspaces) {
+        if (ws->getDockingLayer() != nullptr) {
+            ws->getDockingLayer()->absoluteSize = dockSize;
+            ws->getDockingLayer()->markDirty();
         }
     }
+
+    m_workspaces[0]->active = true;
+
+    m_workspaceTabBar->onSelectionChanged = [this](int32_t index) {
+        for (auto &ws : m_workspaces) {
+            ws->active = false;
+        }
+        if (index >= 0 && index < static_cast<int32_t>(m_workspaces.size())) {
+            m_workspaces[index]->active = true;
+        }
+        m_activeWorkspaceIndex = index;
+    };
 }
 
 void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex,
@@ -515,10 +452,10 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
         m_window.markDirty();
 
         for (auto &ws : m_workspaces) {
-            if (ws.dockingLayer != nullptr) {
-                ws.dockingLayer->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
-                                                                   EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
-                ws.dockingLayer->markDirty();
+            if (auto *dock = ws->getDockingLayer()) {
+                dock->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
+                                                        EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
+                dock->markDirty();
             }
         }
     } else {

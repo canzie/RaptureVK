@@ -233,17 +233,18 @@ struct LightComponent {
     LightType type = LightType::POINT;
     glm::vec3 color = glm::vec3(1.0f, 0.8f, 0.6f); // Light color (default: warm white?) #FFDDAA
     float intensity = 1.0f;                        // Light intensity multiplier
+    bool useTemperature = false;
+    float temperature = 6500.0f;
 
-    // For point and spot lights
     float range = 10.0f; // Attenuation range
 
-    // For spot lights only
     float innerConeAngle = glm::radians(30.0f); // Inner cone angle in radians
     float outerConeAngle = glm::radians(45.0f); // Outer cone angle in radians
 
     bool isActive = true;
     Mobility mobility = MOBILITY_STATIC;
     bool castsShadow = false;
+
     // slot into the SSBO where the light metadata lives
     uint32_t renderDataSlot = UINT32_MAX;
 
@@ -269,6 +270,46 @@ struct LightComponent {
         color = c;
         m_generation++;
     }
+
+    static glm::vec3 kelvinToRgb(float kelvin)
+    {
+        float t = glm::clamp(kelvin, 1000.0f, 40000.0f) / 100.0f;
+
+        float r;
+        float g;
+        float b;
+
+        if (t <= 66.0f) {
+            r = 1.0f;
+        } else {
+            r = glm::clamp(329.698727446f * std::pow(t - 60.0f, -0.1332047592f) / 255.0f, 0.0f, 1.0f);
+        }
+
+        if (t <= 66.0f) {
+            g = glm::clamp((99.4708025861f * std::log(t) - 161.1195681661f) / 255.0f, 0.0f, 1.0f);
+        } else {
+            g = glm::clamp(288.1221695283f * std::pow(t - 60.0f, -0.0755148492f) / 255.0f, 0.0f, 1.0f);
+        }
+
+        if (t >= 66.0f) {
+            b = 1.0f;
+        } else if (t <= 19.0f) {
+            b = 0.0f;
+        } else {
+            b = glm::clamp((138.5177312231f * std::log(t - 10.0f) - 305.0447927307f) / 255.0f, 0.0f, 1.0f);
+        }
+
+        return glm::vec3(r, g, b);
+    }
+
+    glm::vec3 getFinalColor() const
+    {
+        if (!useTemperature) {
+            return color;
+        }
+        return color * kelvinToRgb(temperature);
+    }
+
     void setIntensity(float i)
     {
         intensity = i;

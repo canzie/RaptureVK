@@ -205,17 +205,18 @@ static Amethyst::Dropdown *s_rowDropdown(Amethyst::TableScope &t, std::string_vi
 }
 
 static void s_rowDragFloat(Amethyst::TableScope &t, std::string_view label, double *value, double speed, double min, double max,
-                           const std::function<void(double)> &onChanged)
+                           std::string format, const std::function<void(double)> &onChanged)
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, speed, min, max, onChanged](Amethyst::UIScope &cell) {
+        tr.cell([value, speed, min, max, format, onChanged](Amethyst::UIScope &cell) {
             cell.dragFloat(
                 {
                     .classes = {"generic-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                    .format = format,
                     .speed = speed,
                     .min = min,
                     .max = max,
@@ -337,6 +338,20 @@ void LightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             m_entity.getComponent<Rapture::LightComponent>().setCastsShadow(b);
             m_entity.markDirty();
         });
+        s_rowCheckbox(t, "Use Temperature", &m_useTemperature, [this](bool b) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::LightComponent>().useTemperature = b;
+            m_entity.markDirty();
+        });
+        s_rowDragFloat(t, "Temperature", &m_temperature, 50.0, 1000.0, 40000.0, "%.1f K", [this](double v) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+                return;
+            }
+            m_entity.getComponent<Rapture::LightComponent>().temperature = static_cast<float>(v);
+            m_entity.markDirty();
+        });
     });
 }
 
@@ -352,6 +367,8 @@ void LightEditor::sync(const Rapture::Entity &entity)
     m_intensity = lc.intensity;
     m_range = lc.range;
     m_castsShadow = lc.castsShadow;
+    m_useTemperature = lc.useTemperature;
+    m_temperature = static_cast<double>(lc.temperature);
     if (m_colorField) {
         m_colorField->setColor3(Amethyst::Color3(lc.color.x, lc.color.y, lc.color.z));
     }
@@ -410,7 +427,7 @@ void CameraEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             cc.updateProjectionMatrix(v, cc.aspectRatio, cc.nearPlane, cc.farPlane);
             m_entity.markDirty();
         });
-        s_rowDragFloat(t, "Near Plane", &m_nearPlane, 0.01, 0.001, 10000.0, [this](double v) {
+        s_rowDragFloat(t, "Near Plane", &m_nearPlane, 0.01, 0.001, 10000.0, {}, [this](double v) {
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
                 return;
             }
@@ -418,7 +435,7 @@ void CameraEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             cc.updateProjectionMatrix(cc.fov, cc.aspectRatio, static_cast<float>(v), cc.farPlane);
             m_entity.markDirty();
         });
-        s_rowDragFloat(t, "Far Plane", &m_farPlane, 1.0, 0.001, 1000000.0, [this](double v) {
+        s_rowDragFloat(t, "Far Plane", &m_farPlane, 1.0, 0.001, 1000000.0, {}, [this](double v) {
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
                 return;
             }

@@ -10,7 +10,7 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "events/EventSignal.h"
 #include "layers/BottomBar.h"
-#include "layers/panels/Panel.h"
+#include "layers/workspaces/Workspace.h"
 #include <memory>
 #include <vector>
 
@@ -29,16 +29,9 @@ class AmethystLayer : public Rapture::Layer {
 
     virtual void onAttach() override;
     virtual void onDetach() override;
-    virtual void onUpdate(float ts) override;
+    virtual void onUpdate(float dt) override;
 
   private:
-    struct Workspace {
-        Amethyst::Frame *container = nullptr;
-        Amethyst::Frame *hotbar = nullptr;
-        Amethyst::DockingLayer *dockingLayer = nullptr;
-        std::vector<std::unique_ptr<Panel>> panels;
-    };
-
     void setupMenuBar(glm::vec2 screenSize);
     void setupWorkspaces(glm::vec2 screenSize);
     VkDescriptorPool createUiDescriptorPool();
@@ -72,7 +65,7 @@ class AmethystLayer : public Rapture::Layer {
     std::unique_ptr<BottomBar> m_bottomBar;
 
     int m_activeWorkspaceIndex = 0;
-    std::vector<Workspace> m_workspaces;
+    std::vector<std::unique_ptr<Workspace>> m_workspaces;
 
     std::vector<Amethyst::AmTextureId> m_viewportTextureIds;
     std::vector<VkImageView> m_viewportTextureViews;
