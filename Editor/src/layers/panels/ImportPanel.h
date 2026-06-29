@@ -21,12 +21,12 @@ class ImportPanel {
     /**
      * @brief Fired after the panel has closed, for a caller awaiting the result.
      */
-    std::function<void()> onClose;
+    std::function<void(void)> onClose;
 
   private:
-    void build();
-    void doImport();
-    void close();
+    void build(void);
+    void doImport(void);
+    void close(void);
 
     std::filesystem::path m_path;
 

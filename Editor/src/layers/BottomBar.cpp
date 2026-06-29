@@ -9,7 +9,7 @@
 static constexpr float BOTTOM_BAR_PADDING = 4.0f;
 static constexpr float CONTENT_BROWSER_BUTTON_WIDTH = 130.0f;
 
-BottomBar::BottomBar(Amethyst::Window *window) : m_window(window)
+BottomBar::BottomBar(Amethyst::Window *window, const PanelServices &services) : m_services(services), m_window(window)
 {
     m_root = window->add<Amethyst::Frame>();
     m_root->name = "Bottom Bar";
@@ -58,7 +58,7 @@ void BottomBar::setupContentBrowserToggle()
             },
             [this](Amethyst::PopupScope &p) {
                 m_contentBrowserPopup = &p.component;
-                m_contentBrowserPanel = std::make_unique<ContentBrowserPanel>(p);
+                m_contentBrowserPanel = std::make_unique<ContentBrowserPanel>(p, m_services);
             });
 }
 

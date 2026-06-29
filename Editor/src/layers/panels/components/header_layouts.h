@@ -18,6 +18,6 @@ struct FrameScope;
  * @return Callback usable with CollapsibleHeaderScope::header(std::function<void(Amethyst::FrameScope &)>).
  */
 std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_view label, std::string_view iconSvg = {},
-                                                                  std::function<void()> onMenuClicked = {});
+                                                                  std::function<void(void)> onMenuClicked = {});
 
 #endif // RAPTURE__HEADER_LAYOUTS_H

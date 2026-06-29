@@ -18,7 +18,7 @@ static constexpr float HEADER_HEIGHT = 28.0f;
 static constexpr float SECTION_SPACING = 6.0f;
 static constexpr float SECTION_TOP_PAD = 4.0f;
 
-PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar)
+PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();

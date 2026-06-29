@@ -22,7 +22,7 @@ static void s_onEntityClicked(uint32_t entityId)
     }
 }
 
-OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar)
+OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();

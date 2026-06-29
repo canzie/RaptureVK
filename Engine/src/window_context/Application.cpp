@@ -188,7 +188,7 @@ void Application::run()
     m_vulkanContext->waitIdle();
 }
 
-RenderWindow &Application::createSecondaryWindow(int width, int height, const char *title)
+RenderWindow &Application::createSecondaryWindow(int32_t width, int32_t height, const char *title)
 {
     auto window = std::unique_ptr<WindowContext>(WindowContext::createWindow(*m_platformContext, width, height, title, true));
     auto renderWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);

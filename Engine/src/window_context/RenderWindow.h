@@ -60,7 +60,7 @@ class RenderWindow {
     void onUpdate();
 
     using FrameCallback = std::function<void(RenderWindow &)>;
-    using CloseCallback = std::function<void()>;
+    using CloseCallback = std::function<void(void)>;
 
     /**
      * @brief Callback invoked once per frame to record and present a secondary window.

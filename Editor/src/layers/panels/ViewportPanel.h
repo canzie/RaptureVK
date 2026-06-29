@@ -18,7 +18,7 @@ class CameraController;
 
 class ViewportPanel : public Panel {
   public:
-    ViewportPanel(Amethyst::TabBar *tabBar);
+    ViewportPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
     ~ViewportPanel();
     ViewportPanel(const ViewportPanel &) = delete;
     ViewportPanel &operator=(const ViewportPanel &) = delete;
@@ -34,10 +34,10 @@ class ViewportPanel : public Panel {
     void setGizmoSpace(Amethyst::GizmoSpace space) { m_gizmoSpace = space; }
 
   private:
-    void updateGizmo();
+    void updateGizmo(void);
     void setupHeader(Amethyst::FrameScope &f);
-    void syncCameraModeButton();
-    Rapture::CameraController *cameraController() const;
+    void syncCameraModeButton(void);
+    Rapture::CameraController *cameraController(void) const;
 
   private:
     Amethyst::Frame *m_root = nullptr;

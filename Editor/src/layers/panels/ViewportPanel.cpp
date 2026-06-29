@@ -23,7 +23,7 @@ static const Amethyst::TextStyleProperties HEADER_BTN_TEXT{
     .textYAlignment = Amethyst::TextYAlignment::CENTER,
 };
 
-ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar)
+ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();

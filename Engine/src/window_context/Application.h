@@ -33,7 +33,7 @@ class Application {
      * @param title Window title.
      * @return Reference to the new window, valid until it is closed.
      */
-    RenderWindow &createSecondaryWindow(int width, int height, const char *title);
+    RenderWindow &createSecondaryWindow(int32_t width, int32_t height, const char *title);
 
     const VulkanContext &getVulkanContext() const { return *m_vulkanContext; }
     VulkanContext &getVulkanContext() { return *m_vulkanContext; }

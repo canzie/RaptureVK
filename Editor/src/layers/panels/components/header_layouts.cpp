@@ -18,7 +18,7 @@ static constexpr float HEADER_MENU_BUTTON_RIGHT_PAD = 6.0f;
 static constexpr float HEADER_LABEL_RIGHT_RESERVED = HEADER_MENU_BUTTON_RIGHT_PAD + HEADER_MENU_BUTTON_SIZE + 4.0f;
 
 std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_view label, std::string_view iconSvg,
-                                                                  std::function<void()> onMenuClicked)
+                                                                  std::function<void(void)> onMenuClicked)
 {
     return [label = std::string(label), iconSvg = std::string(iconSvg), onMenuClicked](Amethyst::FrameScope &scope) {
         float textOffset = HEADER_CONTENT_OFFSET;

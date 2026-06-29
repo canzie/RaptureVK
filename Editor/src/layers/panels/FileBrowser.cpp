@@ -132,7 +132,7 @@ void FileBrowser::buildContent()
     }
 }
 
-void FileBrowser::buildNavButton(Amethyst::FrameScope &slot, const char *svg, std::function<void()> onClick, NavButton *store)
+void FileBrowser::buildNavButton(Amethyst::FrameScope &slot, const char *svg, std::function<void(void)> onClick, NavButton *store)
 {
     Amethyst::Frame *surface = &slot.component;
 
@@ -221,7 +221,7 @@ void FileBrowser::setupTopBar()
 
                     struct NavDef {
                         const char *svg;
-                        std::function<void()> onClick;
+                        std::function<void(void)> onClick;
                         NavButton *store;
                     };
                     NavDef defs[] = {

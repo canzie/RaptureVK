@@ -149,7 +149,7 @@ void AmethystLayer::onAttach()
     setupMenuBar(screenSize);
     setupWorkspaces(screenSize);
 
-    m_bottomBar = std::make_unique<BottomBar>(&m_window);
+    m_bottomBar = std::make_unique<BottomBar>(&m_window, buildServices());
 
     auto activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (activeScene != nullptr) {
@@ -196,10 +196,6 @@ void AmethystLayer::onUpdate(float dt)
 
     m_window.tick(dt);
 
-    if (m_reapImportPanel) {
-        m_reapImportPanel = false;
-        m_importPanel.reset();
-    }
 
     auto *sceneViewport = app.getViewportManager().getPrimaryViewport();
     auto *sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
@@ -319,10 +315,11 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
         [this](Amethyst::TabBarScope &tabs) {
             m_workspaceTabBar = &tabs.component;
 
-            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs));
-            m_workspaces.push_back(std::make_unique<MaterialEditorWorkspace>(tabs));
-            m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs));
-            m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(tabs));
+            PanelServices services = buildServices();
+            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services));
+            m_workspaces.push_back(std::make_unique<MaterialEditorWorkspace>(tabs, services));
+            m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs, services));
+            m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(tabs, services));
         });
 
     glm::vec2 dockSize = {
@@ -469,11 +466,39 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
     }
 }
 
-void AmethystLayer::openDemoWindow()
+PanelServices AmethystLayer::buildServices(void)
+{
+    PanelServices services;
+    services.openSecondaryWindow = [this](int32_t width, int32_t height, std::string_view title, std::function<void(Amethyst::Window &)> build) {
+        openSecondaryWindow(width, height, title, std::move(build));
+    };
+    services.openFileExplorer = [this](FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm) {
+        openFileExplorer(mode, std::move(onConfirm));
+    };
+    services.openImportPanel = [this](const std::filesystem::path &path) {
+        struct Session {
+            std::unique_ptr<ImportPanel> panel;
+            Amethyst::TickHandle watchTick;
+            bool pendingDestroy = false;
+        };
+        auto session = std::make_shared<Session>();
+        session->panel = std::make_unique<ImportPanel>(m_window, path);
+        session->panel->onClose = [session](void) { session->pendingDestroy = true; };
+        session->watchTick = m_window.registerTick([session](float) {
+            if (session->pendingDestroy) {
+                session->panel.reset();
+                session->watchTick.unregister();
+            }
+        });
+    };
+    return services;
+}
+
+void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::string_view title, std::function<void(Amethyst::Window &)> build)
 {
     auto &app = Rapture::Application::getInstance();
 
-    Rapture::RenderWindow &renderWindow = app.createSecondaryWindow(480, 270, "Demo Window");
+    Rapture::RenderWindow &renderWindow = app.createSecondaryWindow(width, height, std::string(title).c_str());
     auto swapChain = renderWindow.getSwapChain();
 
     auto context = std::make_unique<SecondaryWindowContext>();
@@ -483,21 +508,9 @@ void AmethystLayer::openDemoWindow()
     context->window.absoluteSize = screenSize;
     context->window.absoluteRotation = 0.0f;
 
-    auto *background = context->window.add<Amethyst::Frame>();
-    background->setBaseProperties({
-        .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
-        .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
-        .zIndex = 0,
-    });
-    background->addClass("background-primary");
+    m_backend.registerWindow(renderWindow.getWindowContext()->getNativeWindowContext(), &context->window);
 
-    Amethyst::UIScope(context->window)
-        .textLabel({
-            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-            .style = {.backgroundTransparency = 1.0f},
-            .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
-            .label = "Hello from a second window!",
-        });
+    build(context->window);
 
     SecondaryWindowContext *contextPtr = context.get();
     m_secondaryWindows.push_back(std::move(context));
@@ -509,7 +522,7 @@ void AmethystLayer::openDemoWindow()
     renderWindow.onClose = [this, contextPtr]() { closeSecondaryWindow(contextPtr); };
 }
 
-void AmethystLayer::openFileExplorer()
+void AmethystLayer::openFileExplorer(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm)
 {
     auto &app = Rapture::Application::getInstance();
 
@@ -523,9 +536,10 @@ void AmethystLayer::openFileExplorer()
     context->window.absoluteSize = screenSize;
     context->window.absoluteRotation = 0.0f;
 
-    m_fileBrowser = std::make_unique<FileBrowser>(context->window);
+    auto fileBrowser = std::make_shared<FileBrowser>(context->window, mode);
+    fileBrowser->onConfirm = std::move(onConfirm);
 
-    m_backend.registerWindow(context->renderWindow->getWindowContext()->getNativeWindowContext(), &context->window);
+    m_backend.registerWindow(renderWindow.getWindowContext()->getNativeWindowContext(), &context->window);
 
     SecondaryWindowContext *contextPtr = context.get();
     m_secondaryWindows.push_back(std::move(context));
@@ -533,18 +547,34 @@ void AmethystLayer::openFileExplorer()
     contextPtr->swapchainRecreatedConn = renderWindow.getSwapChain()->onRecreated.connect(
         [this, contextPtr]() { onResize(*contextPtr->renderWindow->getSwapChain()); });
 
-    m_fileBrowser->onClose = [contextPtr]() { contextPtr->renderWindow->getWindowContext()->requestClose(); };
-    m_fileBrowser->onConfirm = [this](const std::filesystem::path &path) {
-        m_importPanel = std::make_unique<ImportPanel>(m_window, path);
-        m_importPanel->onClose = [this]() { m_reapImportPanel = true; };
-    };
+    fileBrowser->onClose = [contextPtr]() { contextPtr->renderWindow->getWindowContext()->requestClose(); };
 
     renderWindow.onFrame = [this, contextPtr](Rapture::RenderWindow &window) { drawSecondaryWindow(*contextPtr, window); };
-    renderWindow.onClose = [this, contextPtr]() {
+    renderWindow.onClose = [this, contextPtr, fileBrowser]() mutable {
         // Destroy the browser (and its window tick) while its Window is still alive.
-        m_fileBrowser.reset();
+        fileBrowser.reset();
         closeSecondaryWindow(contextPtr);
     };
+}
+
+void AmethystLayer::openDemoWindow(void)
+{
+    openSecondaryWindow(480, 270, "Demo Window", [](Amethyst::Window &win) {
+        auto *background = win.add<Amethyst::Frame>();
+        background->setBaseProperties({
+            .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
+            .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
+            .zIndex = 0,
+        });
+        background->addClass("background-primary");
+
+        Amethyst::UIScope(win).textLabel({
+            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            .style = {.backgroundTransparency = 1.0f},
+            .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+            .label = "Hello from a second window!",
+        });
+    });
 }
 
 void AmethystLayer::drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window)

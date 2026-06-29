@@ -1,6 +1,7 @@
 #ifndef RAPTURE__BOTTOM_BAR_H
 #define RAPTURE__BOTTOM_BAR_H
 
+#include "layers/panels/PanelServices.h"
 #include <amethyst/Amethyst.h>
 
 #include <memory>
@@ -9,7 +10,7 @@ class ContentBrowserPanel;
 
 class BottomBar {
   public:
-    explicit BottomBar(Amethyst::Window *window);
+    BottomBar(Amethyst::Window *window, const PanelServices &services);
     ~BottomBar();
     BottomBar(const BottomBar &) = delete;
     BottomBar &operator=(const BottomBar &) = delete;
@@ -17,10 +18,11 @@ class BottomBar {
     BottomBar &operator=(BottomBar &&) = delete;
 
   private:
-    void setupContentBrowserToggle();
-    void toggleContentBrowser();
+    void setupContentBrowserToggle(void);
+    void toggleContentBrowser(void);
 
   private:
+    PanelServices m_services;
     Amethyst::Window *m_window = nullptr;
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextButton *m_contentBrowserBtn = nullptr;

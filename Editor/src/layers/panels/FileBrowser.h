@@ -35,7 +35,7 @@ class FileBrowser {
     /**
      * @brief Invoked when the dialog should be dismissed (cancel, or after a confirm).
      */
-    std::function<void()> onClose;
+    std::function<void(void)> onClose;
 
     /**
      * @brief Invoked with the chosen path when the user confirms a file.
@@ -54,28 +54,28 @@ class FileBrowser {
         bool isDir = false;
     };
 
-    void buildContent();
-    void setupTopBar();
-    void setupSideBar();
-    void setupListArea();
-    void setupStatusBar();
-    void setupFooter();
+    void buildContent(void);
+    void setupTopBar(void);
+    void setupSideBar(void);
+    void setupListArea(void);
+    void setupStatusBar(void);
+    void setupFooter(void);
 
-    void buildNavButton(Amethyst::FrameScope &slot, const char *svg, std::function<void()> onClick, NavButton *store);
+    void buildNavButton(Amethyst::FrameScope &slot, const char *svg, std::function<void(void)> onClick, NavButton *store);
     void applyNavEnabled(NavButton &nav, bool enabled);
 
-    void readDirectory();
-    void populate();
-    void processDeferred();
+    void readDirectory(void);
+    void populate(void);
+    void processDeferred(void);
     void navigateTo(const std::filesystem::path &dir, bool recordHistory = true);
-    void goBack();
-    void goForward();
-    void goUp();
-    void refresh();
-    void updateNavState();
+    void goBack(void);
+    void goForward(void);
+    void goUp(void);
+    void refresh(void);
+    void updateNavState(void);
 
     void onRowClicked(uint32_t row);
-    void updateSelectionLabel();
+    void updateSelectionLabel(void);
     void confirm(const std::filesystem::path &path);
 
     Mode m_mode;

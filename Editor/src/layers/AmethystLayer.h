@@ -2,6 +2,7 @@
 #define RAPTURE__AMETHYST_LAYER_H
 
 #include "layers/Layer.h"
+#include "layers/panels/PanelServices.h"
 
 #include <amethyst/Amethyst.h>
 #include <amethyst__vk13_glfw.h>
@@ -20,21 +21,20 @@ class RenderWindow;
 }
 
 class FileBrowser;
-class ImportPanel;
 
 class AmethystLayer : public Rapture::Layer {
   public:
     AmethystLayer();
     ~AmethystLayer();
 
-    virtual void onAttach() override;
-    virtual void onDetach() override;
+    virtual void onAttach(void) override;
+    virtual void onDetach(void) override;
     virtual void onUpdate(float dt) override;
 
   private:
     void setupMenuBar(glm::vec2 screenSize);
     void setupWorkspaces(glm::vec2 screenSize);
-    VkDescriptorPool createUiDescriptorPool();
+    VkDescriptorPool createUiDescriptorPool(void);
     void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex,
                                const Rapture::SwapChain &swapChain);
     void endDynamicRendering(Rapture::CommandBuffer *commandBuffer, uint32_t imageIndex, const Rapture::SwapChain &swapChain);
@@ -46,8 +46,10 @@ class AmethystLayer : public Rapture::Layer {
         Rapture::EventConnection swapchainRecreatedConn;
     };
 
-    void openDemoWindow();
-    void openFileExplorer();
+    PanelServices buildServices(void);
+    void openSecondaryWindow(int32_t width, int32_t height, std::string_view title, std::function<void(Amethyst::Window &)> build);
+    void openFileExplorer(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm);
+    void openDemoWindow(void);
     void drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window);
     void closeSecondaryWindow(SecondaryWindowContext *context);
 
@@ -74,9 +76,6 @@ class AmethystLayer : public Rapture::Layer {
 
     Rapture::EventConnection m_mainSwapchainRecreatedConn;
 
-    std::unique_ptr<FileBrowser> m_fileBrowser;
-    std::unique_ptr<ImportPanel> m_importPanel;
-    bool m_reapImportPanel = false;
 };
 
 #endif // RAPTURE__AMETHYST_LAYER_H

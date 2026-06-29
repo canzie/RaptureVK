@@ -17,7 +17,7 @@
 
 class PropertiesPanel : public Panel {
   public:
-    PropertiesPanel(Amethyst::TabBar *tabBar);
+    PropertiesPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
     ~PropertiesPanel();
     PropertiesPanel(const PropertiesPanel &) = delete;
     PropertiesPanel &operator=(const PropertiesPanel &) = delete;
@@ -28,9 +28,9 @@ class PropertiesPanel : public Panel {
     void onUpdate(float dt) override;
 
   private:
-    void setupSearchBar();
-    void setupPlaceholder();
-    void setupEntityView();
+    void setupSearchBar(void);
+    void setupPlaceholder(void);
+    void setupEntityView(void);
 
     /**
      * @brief Creates the editor for T if its component is present and missing, reuses it if it
@@ -64,10 +64,10 @@ class PropertiesPanel : public Panel {
      */
     void buildSection(ComponentEditorBase &editor);
 
-    void refresh();
-    void relayout();
+    void refresh(void);
+    void relayout(void);
     void showEntity(const Rapture::Entity &entity);
-    void showPlaceholder();
+    void showPlaceholder(void);
 
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextLabel *m_placeholderText = nullptr;

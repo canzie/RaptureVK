@@ -11,7 +11,7 @@
 
 class OutlinerPanel : public Panel {
   public:
-    OutlinerPanel(Amethyst::TabBar *tabBar);
+    OutlinerPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
     ~OutlinerPanel();
     OutlinerPanel(const OutlinerPanel &) = delete;
     OutlinerPanel &operator=(const OutlinerPanel &) = delete;
@@ -26,7 +26,7 @@ class OutlinerPanel : public Panel {
     /**
      * @brief Refresh the tree view with current scene hierarchy
      */
-    void refresh();
+    void refresh(void);
 
   private:
     void buildEntityTree(Rapture::Entity entity, Amethyst::TreeRowScope &rowScope);

@@ -9,7 +9,6 @@ uncouple the engines core
         - hsv/hsl preference
         - couple sizings like gaps/borders/corners
         - an actual settings/preferences panel to open
-    - wire up the content browser with the asset manager to load assets
     - drag/drop assets into the viewport
         - maybe just "rightclick->import into scene" for now
     - mesh property thing needs its asset ref, same for material thing.

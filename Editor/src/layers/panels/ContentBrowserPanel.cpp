@@ -123,7 +123,7 @@ static void s_wireGhostHover(Amethyst::TextButton *btn)
     }));
 }
 
-ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar)
+ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -134,7 +134,7 @@ ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar)
     tabBar->addTab(std::move(root), iconTabLayout("Content Browser", Icons::SVG_FOLDER));
 }
 
-ContentBrowserPanel::ContentBrowserPanel(Amethyst::PopupScope &scope) : m_root(&scope.component)
+ContentBrowserPanel::ContentBrowserPanel(Amethyst::PopupScope &scope, const PanelServices &services) : Panel(services), m_root(&scope.component)
 {
     m_root->name = "Content Browser";
 
@@ -231,6 +231,12 @@ void ContentBrowserPanel::setupTopBar()
                         [this](Amethyst::TextButtonScope &b) {
                             m_importBtn = &b.component;
                             s_wireButtonHover(m_importBtn);
+                            m_importBtn->onMouseButton1ClickCb = [this]() {
+                                m_services.openFileExplorer(FileBrowser::Mode::OPEN, [this](const std::filesystem::path &path) {
+                                    m_services.openImportPanel(path);
+                                });
+                                return Amethyst::EventResult::CONSUMED;
+                            };
                         });
                     cluster.imageButton(
                         {

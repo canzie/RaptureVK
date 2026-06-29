@@ -5,7 +5,7 @@
 
 class LevelEditorWorkspace : public Workspace {
   public:
-    explicit LevelEditorWorkspace(Amethyst::TabBarScope &tabs);
+    LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services);
 
     void saveLayout() override;
 };

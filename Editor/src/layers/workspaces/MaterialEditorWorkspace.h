@@ -5,7 +5,7 @@
 
 class MaterialEditorWorkspace : public Workspace {
   public:
-    explicit MaterialEditorWorkspace(Amethyst::TabBarScope &tabs) { setupBase(tabs, "Material Editor"); }
+    MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services) { m_services = services; setupBase(tabs, "Material Editor"); }
 
     void saveLayout() override {}
 };

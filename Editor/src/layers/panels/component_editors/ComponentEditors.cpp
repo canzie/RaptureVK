@@ -69,7 +69,7 @@ static float s_fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std::funct
 }
 
 static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min, double max,
-                      const std::function<void()> &onChanged)
+                      const std::function<void(void)> &onChanged)
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });

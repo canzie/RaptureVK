@@ -19,8 +19,8 @@ enum class BrowseMode {
 
 class ContentBrowserPanel : public Panel {
   public:
-    ContentBrowserPanel(Amethyst::TabBar *tabBar);
-    explicit ContentBrowserPanel(Amethyst::PopupScope &scope);
+    ContentBrowserPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
+    ContentBrowserPanel(Amethyst::PopupScope &scope, const PanelServices &services);
     ~ContentBrowserPanel();
     ContentBrowserPanel(const ContentBrowserPanel &) = delete;
     ContentBrowserPanel &operator=(const ContentBrowserPanel &) = delete;
@@ -31,26 +31,26 @@ class ContentBrowserPanel : public Panel {
     void setBaseDirectory(const std::filesystem::path &path);
 
   private:
-    void buildContent();
+    void buildContent(void);
 
-    void setupTopBar();
-    void setupSideBar();
-    void setupContentArea();
-    void setupContextMenu();
+    void setupTopBar(void);
+    void setupSideBar(void);
+    void setupContentArea(void);
+    void setupContextMenu(void);
 
     void showContextMenu(Amethyst::vec2 pos, std::vector<Amethyst::ContextMenuItem> items);
 
-    void refreshAssetBrowser();
-    void refreshFileBrowser();
-    void buildDirectoryTree();
-    void rebuildBreadcrumb();
+    void refreshAssetBrowser(void);
+    void refreshFileBrowser(void);
+    void buildDirectoryTree(void);
+    void rebuildBreadcrumb(void);
     void updateStatus(size_t itemCount);
 
     void navigateToDirectory(const std::filesystem::path &path);
-    void navigateBack();
-    void navigateForward();
+    void navigateBack(void);
+    void navigateForward(void);
 
-    void showAssets();
+    void showAssets(void);
 
     void onSearchTextChanged(const std::string &text);
 
