@@ -60,7 +60,8 @@ void RtInstanceData::rebuild(Scene &scene)
     auto tlas = scene.getTLAS();
     auto &tlasInstances = tlas->getInstances();
     auto &reg = scene.getRegistry();
-    auto view = reg.view<MaterialComponent, MeshComponent, TransformComponent>(entt::exclude<LightComponent>);
+    auto view = reg.view<MaterialComponent, MeshComponent, TransformComponent>(
+        entt::exclude<DirectionalLightComponent, PointLightComponent, SpotLightComponent>);
 
     std::vector<RtInstanceInfo> infos(tlas->getInstanceCount());
 

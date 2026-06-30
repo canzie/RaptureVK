@@ -95,7 +95,7 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
     };
     auto lightSwapCb = [this](EntityID entityId, uint32_t newSlot) {
         Entity entity(entityId, m_scene);
-        auto *light = entity.tryGetComponent<LightComponent>();
+        auto *light = Light_tryGetLight(entity);
         if (light != nullptr) {
             light->renderDataSlot = m_lights.getGlobalSlot(light->mobility, newSlot);
         }
@@ -133,8 +133,12 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
     auto &registry = m_scene->getRegistry();
     registry.on_construct<MeshComponent>().connect<&SignalBridge::onMeshAdded>(m_signalBridge.get());
     registry.on_destroy<MeshComponent>().connect<&SignalBridge::onMeshRemoved>(m_signalBridge.get());
-    registry.on_construct<LightComponent>().connect<&SignalBridge::onLightAdded>(m_signalBridge.get());
-    registry.on_destroy<LightComponent>().connect<&SignalBridge::onLightRemoved>(m_signalBridge.get());
+    registry.on_construct<DirectionalLightComponent>().connect<&SignalBridge::onLightAdded>(m_signalBridge.get());
+    registry.on_destroy<DirectionalLightComponent>().connect<&SignalBridge::onLightRemoved>(m_signalBridge.get());
+    registry.on_construct<PointLightComponent>().connect<&SignalBridge::onLightAdded>(m_signalBridge.get());
+    registry.on_destroy<PointLightComponent>().connect<&SignalBridge::onLightRemoved>(m_signalBridge.get());
+    registry.on_construct<SpotLightComponent>().connect<&SignalBridge::onLightAdded>(m_signalBridge.get());
+    registry.on_destroy<SpotLightComponent>().connect<&SignalBridge::onLightRemoved>(m_signalBridge.get());
     registry.on_construct<CameraComponent>().connect<&SignalBridge::onCameraAdded>(m_signalBridge.get());
     registry.on_destroy<CameraComponent>().connect<&SignalBridge::onCameraRemoved>(m_signalBridge.get());
     registry.on_construct<ShadowComponent>().connect<&SignalBridge::onShadowAdded>(m_signalBridge.get());
@@ -147,8 +151,18 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
         onMeshAdded(static_cast<EntityID>(entity));
     }
 
-    auto existingLights = registry.view<LightComponent>();
-    for (auto entity : existingLights) {
+    auto existingDirectionalLights = registry.view<DirectionalLightComponent>();
+    for (auto entity : existingDirectionalLights) {
+        onLightAdded(static_cast<EntityID>(entity));
+    }
+
+    auto existingPointLights = registry.view<PointLightComponent>();
+    for (auto entity : existingPointLights) {
+        onLightAdded(static_cast<EntityID>(entity));
+    }
+
+    auto existingSpotLights = registry.view<SpotLightComponent>();
+    for (auto entity : existingSpotLights) {
         onLightAdded(static_cast<EntityID>(entity));
     }
 
@@ -174,8 +188,12 @@ SceneRenderData::~SceneRenderData()
         auto &registry = m_scene->getRegistry();
         registry.on_construct<MeshComponent>().disconnect<&SignalBridge::onMeshAdded>(m_signalBridge.get());
         registry.on_destroy<MeshComponent>().disconnect<&SignalBridge::onMeshRemoved>(m_signalBridge.get());
-        registry.on_construct<LightComponent>().disconnect<&SignalBridge::onLightAdded>(m_signalBridge.get());
-        registry.on_destroy<LightComponent>().disconnect<&SignalBridge::onLightRemoved>(m_signalBridge.get());
+        registry.on_construct<DirectionalLightComponent>().disconnect<&SignalBridge::onLightAdded>(m_signalBridge.get());
+        registry.on_destroy<DirectionalLightComponent>().disconnect<&SignalBridge::onLightRemoved>(m_signalBridge.get());
+        registry.on_construct<PointLightComponent>().disconnect<&SignalBridge::onLightAdded>(m_signalBridge.get());
+        registry.on_destroy<PointLightComponent>().disconnect<&SignalBridge::onLightRemoved>(m_signalBridge.get());
+        registry.on_construct<SpotLightComponent>().disconnect<&SignalBridge::onLightAdded>(m_signalBridge.get());
+        registry.on_destroy<SpotLightComponent>().disconnect<&SignalBridge::onLightRemoved>(m_signalBridge.get());
         registry.on_construct<CameraComponent>().disconnect<&SignalBridge::onCameraAdded>(m_signalBridge.get());
         registry.on_destroy<CameraComponent>().disconnect<&SignalBridge::onCameraRemoved>(m_signalBridge.get());
         registry.on_construct<ShadowComponent>().disconnect<&SignalBridge::onShadowAdded>(m_signalBridge.get());
@@ -211,7 +229,7 @@ void SceneRenderData::onMeshRemoved(EntityID entityId)
 void SceneRenderData::onLightAdded(EntityID entityId)
 {
     Entity entity(entityId, m_scene);
-    auto *light = entity.tryGetComponent<LightComponent>();
+    auto *light = Light_tryGetLight(entity);
     if (light == nullptr) {
         return;
     }
@@ -222,7 +240,7 @@ void SceneRenderData::onLightAdded(EntityID entityId)
 void SceneRenderData::onLightRemoved(EntityID entityId)
 {
     Entity entity(entityId, m_scene);
-    auto *light = entity.tryGetComponent<LightComponent>();
+    auto *light = Light_tryGetLight(entity);
     if (light == nullptr || light->renderDataSlot == UINT32_MAX) {
         return;
     }
@@ -310,7 +328,7 @@ void SceneRenderData::markDirty(EntityID entityId)
         m_meshes.getPartition(mesh->mobility).markDirtyAllFrames(localSlot);
     }
 
-    auto *light = entity.tryGetComponent<LightComponent>();
+    auto *light = Light_tryGetLight(entity);
     if (light != nullptr && light->renderDataSlot != UINT32_MAX) {
         uint32_t localSlot = m_lights.getLocalSlot(light->mobility, light->renderDataSlot);
         m_lights.getPartition(light->mobility).markDirtyAllFrames(localSlot);
@@ -399,34 +417,42 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
 
     auto packLight = [&](RenderPartition<LightGPUData> &partition, uint32_t i) {
         Entity entity(partition.getEntityId(i), m_scene);
-        auto [transform, light] = entity.tryGetComponents<TransformComponent, LightComponent>();
+        auto *transform = entity.tryGetComponent<TransformComponent>();
+        auto *light = Light_tryGetLight(entity);
         if (!transform || !light) {
             return;
         }
 
+        LightType type = Light_getLightType(entity);
+
         auto &data = partition.getSlotData(i);
 
         glm::vec3 position = transform->translation();
-        if (light->type == LightType::DIRECTIONAL) {
+        if (type == LightType::DIRECTIONAL) {
             position = glm::vec3(0.0f);
         }
-        data.positionAndType = glm::vec4(position, static_cast<float>(light->type));
+        data.positionAndType = glm::vec4(position, static_cast<float>(type));
 
         glm::vec3 direction = glm::vec3(0.0f, 0.0f, -1.0f);
-        if (light->type == LightType::DIRECTIONAL || light->type == LightType::SPOT) {
+        if (type == LightType::DIRECTIONAL || type == LightType::SPOT) {
             glm::quat rotationQuat = transform->transforms.getRotationQuat();
             direction = glm::normalize(rotationQuat * glm::vec3(0, 0, -1));
         }
-        data.directionAndRange = glm::vec4(direction, light->range);
+
+        float range = 0.0f;
+        float innerCos = 0.0f;
+        float outerCos = 0.0f;
+        if (auto *spot = entity.tryGetComponent<SpotLightComponent>()) {
+            range = spot->range;
+            innerCos = std::cos(spot->innerConeAngle);
+            outerCos = std::cos(spot->outerConeAngle);
+        } else if (auto *point = entity.tryGetComponent<PointLightComponent>()) {
+            range = point->range;
+        }
+        data.directionAndRange = glm::vec4(direction, range);
 
         data.colorAndIntensity = glm::vec4(light->getFinalColor(), light->intensity);
 
-        float innerCos = 0.0f;
-        float outerCos = 0.0f;
-        if (light->type == LightType::SPOT) {
-            innerCos = std::cos(light->innerConeAngle);
-            outerCos = std::cos(light->outerConeAngle);
-        }
         data.spotAngles = glm::vec4(innerCos, outerCos, static_cast<float>(entity.getID()), 0.0f);
     };
 
@@ -470,7 +496,7 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
     auto packShadow = [&](RenderPartition<ShadowGPUData> &partition, uint32_t i) {
         Entity entity(partition.getEntityId(i), m_scene);
 
-        auto *light = entity.tryGetComponent<LightComponent>();
+        auto *light = Light_tryGetLight(entity);
         if (light == nullptr) {
             return;
         }
@@ -479,7 +505,7 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
 
         auto *shadow = entity.tryGetComponent<ShadowComponent>();
         if (shadow != nullptr && shadow->shadowMap && shadow->isActive) {
-            data.type = static_cast<int>(light->type);
+            data.type = static_cast<int>(Light_getLightType(entity));
             data.cascadeCount = 1;
             data.lightIndex = entity.getID();
             data.textureHandle = shadow->shadowMap->getTextureHandle();
@@ -490,7 +516,7 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
 
         auto *cascaded = entity.tryGetComponent<CascadedShadowComponent>();
         if (cascaded != nullptr && cascaded->cascadedShadowMap && cascaded->isActive) {
-            data.type = static_cast<int>(light->type);
+            data.type = static_cast<int>(Light_getLightType(entity));
             data.cascadeCount = cascaded->cascadedShadowMap->getNumCascades();
             data.lightIndex = entity.getID();
             data.textureHandle = cascaded->cascadedShadowMap->getTextureHandle();

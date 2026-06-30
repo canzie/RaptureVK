@@ -217,9 +217,7 @@ struct SkyboxComponent {
     float timeOfDay = 12.0f;
 
     SkyboxComponent() = default;
-    SkyboxComponent(Texture *skyboxTexture, float skyIntensity = 1.0f) : skyboxTexture(skyboxTexture), skyIntensity(skyIntensity)
-    {
-    }
+    SkyboxComponent(Texture *skyboxTexture, float skyIntensity = 1.0f) : skyboxTexture(skyboxTexture), skyIntensity(skyIntensity) {}
     SkyboxComponent(std::filesystem::path skyboxTexturePath, float skyIntensity = 1.0f) : skyIntensity(skyIntensity)
     {
         asset = AssetManager::importAsset(skyboxTexturePath);
@@ -235,16 +233,10 @@ struct SkyboxComponent {
 
 struct LightComponent {
 
-    LightType type = LightType::POINT;
     glm::vec3 color = glm::vec3(1.0f, 0.8f, 0.6f); // Light color (default: warm white?) #FFDDAA
     float intensity = 1.0f;                        // Light intensity multiplier
     bool useTemperature = false;
     float temperature = 6500.0f;
-
-    float range = 10.0f; // Attenuation range
-
-    float innerConeAngle = glm::radians(30.0f); // Inner cone angle in radians
-    float outerConeAngle = glm::radians(45.0f); // Outer cone angle in radians
 
     bool isActive = true;
     Mobility mobility = MOBILITY_STATIC;
@@ -254,21 +246,6 @@ struct LightComponent {
     uint32_t renderDataSlot = UINT32_MAX;
 
     generation_t getGeneration() const { return m_generation; }
-
-    LightComponent() = default;
-
-    LightComponent(const glm::vec3 &color, float intensity, float range)
-        : type(LightType::POINT), color(color), intensity(intensity), range(range)
-    {
-    }
-
-    LightComponent(const glm::vec3 &color, float intensity) : type(LightType::DIRECTIONAL), color(color), intensity(intensity) {}
-
-    LightComponent(const glm::vec3 &color, float intensity, float range, float innerAngleDegrees, float outerAngleDegrees)
-        : type(LightType::SPOT), color(color), intensity(intensity), range(range), innerConeAngle(glm::radians(innerAngleDegrees)),
-          outerConeAngle(glm::radians(outerAngleDegrees))
-    {
-    }
 
     void setColor(const glm::vec3 &c)
     {
@@ -320,16 +297,6 @@ struct LightComponent {
         intensity = i;
         m_generation++;
     }
-    void setRange(float r)
-    {
-        range = r;
-        m_generation++;
-    }
-    void setType(LightType t)
-    {
-        type = t;
-        m_generation++;
-    }
     void setActive(bool active)
     {
         isActive = active;
@@ -340,20 +307,66 @@ struct LightComponent {
         castsShadow = casts;
         m_generation++;
     }
-    void setInnerConeAngle(float angle)
-    {
-        innerConeAngle = angle;
-        m_generation++;
-    }
-    void setOuterConeAngle(float angle)
-    {
-        outerConeAngle = angle;
-        m_generation++;
-    }
+
+  protected:
+    LightComponent() = default;
+    LightComponent(const glm::vec3 &color, float intensity) : color(color), intensity(intensity) {}
 
   private:
     generation_t m_generation = 1;
 };
+
+struct DirectionalLightComponent : public LightComponent {
+    bool atmosphereSunLight = false;
+
+    DirectionalLightComponent() = default;
+    DirectionalLightComponent(const glm::vec3 &color, float intensity) : LightComponent(color, intensity) {}
+};
+
+struct PointLightComponent : public LightComponent {
+    float range = 10.0f;
+
+    PointLightComponent() = default;
+    PointLightComponent(const glm::vec3 &color, float intensity, float range) : LightComponent(color, intensity), range(range) {}
+};
+
+struct SpotLightComponent : public LightComponent {
+    float range = 10.0f;
+    float innerConeAngle = glm::radians(30.0f);
+    float outerConeAngle = glm::radians(45.0f);
+
+    SpotLightComponent() = default;
+    SpotLightComponent(const glm::vec3 &color, float intensity, float range, float innerAngleDegrees, float outerAngleDegrees)
+        : LightComponent(color, intensity), range(range), innerConeAngle(glm::radians(innerAngleDegrees)),
+          outerConeAngle(glm::radians(outerAngleDegrees))
+    {
+    }
+};
+
+inline LightType Light_getLightType(Entity e)
+{
+    if (e.hasComponent<DirectionalLightComponent>()) {
+        return LightType::DIRECTIONAL;
+    }
+    if (e.hasComponent<SpotLightComponent>()) {
+        return LightType::SPOT;
+    }
+    return LightType::POINT;
+}
+
+inline LightComponent *Light_tryGetLight(Entity e)
+{
+    if (auto *d = e.tryGetComponent<DirectionalLightComponent>()) {
+        return d;
+    }
+    if (auto *p = e.tryGetComponent<PointLightComponent>()) {
+        return p;
+    }
+    if (auto *s = e.tryGetComponent<SpotLightComponent>()) {
+        return s;
+    }
+    return nullptr;
+}
 
 struct BLASComponent {
     std::unique_ptr<BLAS> blas;

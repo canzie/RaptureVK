@@ -301,8 +301,8 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DeferredRenderer Frame");
 
         auto &registry = activeScene.getRegistry();
-        auto lightView = registry.view<LightComponent, TransformComponent, ShadowComponent>();
-        auto cascadedShadowView = registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
+        auto lightView = registry.view<TransformComponent, ShadowComponent>();
+        auto cascadedShadowView = registry.view<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>();
 
         TerrainGenerator *terrain = nullptr;
         auto terrainView = registry.view<TerrainComponent>();
@@ -317,12 +317,16 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Shadow Maps");
 
             for (auto entity : lightView) {
-                auto &lightComp = lightView.get<LightComponent>(entity);
+                Entity lightEntity(entity, &activeScene);
+                auto *light = Light_tryGetLight(lightEntity);
+                if (light == nullptr) {
+                    continue;
+                }
                 auto &transformComp = lightView.get<TransformComponent>(entity);
                 auto &shadowComp = lightView.get<ShadowComponent>(entity);
 
                 bool shouldUpdateShadow =
-                    shadowComp.needsUpdate(lightComp, transformComp) || lightComp.type == LightType::DIRECTIONAL;
+                    shadowComp.needsUpdate(*light, transformComp) || Light_getLightType(lightEntity) == LightType::DIRECTIONAL;
 
                 if (shadowComp.shadowMap && shouldUpdateShadow) {
                     auto shadowBuffer = shadowComp.shadowMap->recordSecondary(activeScene, m_currentFrame);
@@ -335,12 +339,13 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             }
 
             for (auto entity : cascadedShadowView) {
-                auto &lightComp = cascadedShadowView.get<LightComponent>(entity);
+                Entity lightEntity(entity, &activeScene);
+                auto &lightComp = cascadedShadowView.get<DirectionalLightComponent>(entity);
                 auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
                 auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
 
                 bool shouldUpdateShadow =
-                    shadowComp.needsUpdate(lightComp, transformComp) || lightComp.type == LightType::DIRECTIONAL;
+                    shadowComp.needsUpdate(lightComp, transformComp) || Light_getLightType(lightEntity) == LightType::DIRECTIONAL;
 
                 if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
                     auto shadowBuffer = shadowComp.cascadedShadowMap->recordSecondary(activeScene, m_currentFrame, terrain);

@@ -22,9 +22,28 @@ class TransformEditor : public ComponentEditorBase {
     Rapture::Entity m_entity;
 };
 
-class LightEditor : public ComponentEditorBase {
+class DirectionalLightEditor : public ComponentEditorBase {
   public:
-    const char *title() const override { return "Light"; }
+    const char *title() const override { return "Directional Light"; }
+    const char *icon() const override { return Icons::SVG_LIGHT; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    glm::vec3 m_color = glm::vec3(1.0f);
+    float m_intensity = 1.0f;
+    bool m_castsShadow = false;
+    bool m_useTemperature = false;
+    bool m_atmosphereSunLight = false;
+    double m_temperature = 6500.0;
+
+    std::optional<ColorField> m_colorField;
+    Rapture::Entity m_entity;
+};
+
+class PointLightEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Point Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
     void sync(const Rapture::Entity &entity) override;
@@ -37,7 +56,27 @@ class LightEditor : public ComponentEditorBase {
     bool m_useTemperature = false;
     double m_temperature = 6500.0;
 
-    Amethyst::Dropdown *m_typeDropdown = nullptr;
+    std::optional<ColorField> m_colorField;
+    Rapture::Entity m_entity;
+};
+
+class SpotLightEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Spot Light"; }
+    const char *icon() const override { return Icons::SVG_LIGHT; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    glm::vec3 m_color = glm::vec3(1.0f);
+    float m_intensity = 1.0f;
+    float m_range = 10.0f;
+    double m_innerConeAngle = 30.0;
+    double m_outerConeAngle = 45.0;
+    bool m_castsShadow = false;
+    bool m_useTemperature = false;
+    double m_temperature = 6500.0;
+
     std::optional<ColorField> m_colorField;
     Rapture::Entity m_entity;
 };

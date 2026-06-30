@@ -239,7 +239,9 @@ void PropertiesPanel::refresh()
         ensure<TransformEditor>(e.hasComponent<Rapture::TransformComponent>());
         ensure<MeshEditor>(e.hasComponent<Rapture::MeshComponent>());
         ensure<MaterialEditor>(e.hasComponent<Rapture::MaterialComponent>());
-        ensure<LightEditor>(e.hasComponent<Rapture::LightComponent>());
+        ensure<DirectionalLightEditor>(e.hasComponent<Rapture::DirectionalLightComponent>());
+        ensure<PointLightEditor>(e.hasComponent<Rapture::PointLightComponent>());
+        ensure<SpotLightEditor>(e.hasComponent<Rapture::SpotLightComponent>());
         ensure<CameraEditor>(e.hasComponent<Rapture::CameraComponent>());
         ensure<ShadowEditor>(e.hasComponent<Rapture::ShadowComponent>());
         ensure<CascadedShadowEditor>(e.hasComponent<Rapture::CascadedShadowComponent>());

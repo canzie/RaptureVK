@@ -291,91 +291,237 @@ void TransformEditor::sync(const Rapture::Entity &entity)
     m_values[2][2] = s.z;
 }
 
-void LightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+void DirectionalLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    std::vector<std::string> typeOptions;
-    for (int i = 0; i <= static_cast<int>(Rapture::LightType::SPOT); ++i) {
-        typeOptions.push_back(Rapture::lightTypeToString(static_cast<Rapture::LightType>(i)));
-    }
-
-    m_bodyHeight = s_fieldTable(ch, [this, typeOptions](Amethyst::TableScope &t) {
-        m_typeDropdown =
-            s_rowDropdown(t, "Type", Rapture::lightTypeToString(Rapture::LightType::POINT), typeOptions, [this](int index) {
-                if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
-                    return;
-                }
-                auto type = static_cast<Rapture::LightType>(index);
-                m_entity.getComponent<Rapture::LightComponent>().setType(type);
-                if (m_typeDropdown != nullptr) {
-                    m_typeDropdown->setText(Rapture::lightTypeToString(type));
-                }
-                m_entity.markDirty();
-            });
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
         s_rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
+            if (light == nullptr) {
                 return;
             }
-            m_entity.getComponent<Rapture::LightComponent>().setColor(c);
+            light->setColor(c);
             m_entity.markDirty();
         });
         s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
+            if (light == nullptr) {
                 return;
             }
-            m_entity.getComponent<Rapture::LightComponent>().setIntensity(v);
+            light->setIntensity(v);
             m_entity.markDirty();
         });
-        s_rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+        s_rowCheckbox(t, "Atmosphere Sun", &m_atmosphereSunLight, [this](bool b) {
+            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
+            if (light == nullptr) {
                 return;
             }
-            m_entity.getComponent<Rapture::LightComponent>().setRange(v);
+            light->atmosphereSunLight = b;
             m_entity.markDirty();
         });
         s_rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
+            if (light == nullptr) {
                 return;
             }
-            m_entity.getComponent<Rapture::LightComponent>().setCastsShadow(b);
+            light->setCastsShadow(b);
             m_entity.markDirty();
         });
         s_rowCheckbox(t, "Use Temperature", &m_useTemperature, [this](bool b) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
+            if (light == nullptr) {
                 return;
             }
-            m_entity.getComponent<Rapture::LightComponent>().useTemperature = b;
+            light->useTemperature = b;
             m_entity.markDirty();
         });
         s_rowDragFloat(t, "Temperature", &m_temperature, 50.0, 1000.0, 40000.0, "%.1f K", [this](double v) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::LightComponent>()) {
+            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
+            if (light == nullptr) {
                 return;
             }
-            m_entity.getComponent<Rapture::LightComponent>().temperature = static_cast<float>(v);
+            light->temperature = static_cast<float>(v);
             m_entity.markDirty();
         });
     });
 }
 
-void LightEditor::sync(const Rapture::Entity &entity)
+void DirectionalLightEditor::sync(const Rapture::Entity &entity)
 {
-    bool entityChanged = !(entity == m_entity);
     m_entity = entity;
-    if (!entity.hasComponent<Rapture::LightComponent>()) {
+    auto *light = entity.tryGetComponent<Rapture::DirectionalLightComponent>();
+    if (light == nullptr) {
         return;
     }
-    const auto &lc = entity.getComponent<Rapture::LightComponent>();
-    m_color = lc.color;
-    m_intensity = lc.intensity;
-    m_range = lc.range;
-    m_castsShadow = lc.castsShadow;
-    m_useTemperature = lc.useTemperature;
-    m_temperature = static_cast<double>(lc.temperature);
+    m_color = light->color;
+    m_intensity = light->intensity;
+    m_atmosphereSunLight = light->atmosphereSunLight;
+    m_castsShadow = light->castsShadow;
+    m_useTemperature = light->useTemperature;
+    m_temperature = static_cast<double>(light->temperature);
     if (m_colorField) {
-        m_colorField->setColor3(Amethyst::Color3(lc.color.x, lc.color.y, lc.color.z));
+        m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
     }
+}
 
-    if (entityChanged && m_typeDropdown != nullptr) {
-        m_typeDropdown->setText(Rapture::lightTypeToString(lc.type));
+void PointLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
+            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->setColor(c);
+            m_entity.markDirty();
+        });
+        s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
+            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->setIntensity(v);
+            m_entity.markDirty();
+        });
+        s_rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
+            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->range = v;
+            m_entity.markDirty();
+        });
+        s_rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
+            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->setCastsShadow(b);
+            m_entity.markDirty();
+        });
+        s_rowCheckbox(t, "Use Temperature", &m_useTemperature, [this](bool b) {
+            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->useTemperature = b;
+            m_entity.markDirty();
+        });
+        s_rowDragFloat(t, "Temperature", &m_temperature, 50.0, 1000.0, 40000.0, "%.1f K", [this](double v) {
+            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->temperature = static_cast<float>(v);
+            m_entity.markDirty();
+        });
+    });
+}
+
+void PointLightEditor::sync(const Rapture::Entity &entity)
+{
+    m_entity = entity;
+    auto *light = entity.tryGetComponent<Rapture::PointLightComponent>();
+    if (light == nullptr) {
+        return;
+    }
+    m_color = light->color;
+    m_intensity = light->intensity;
+    m_range = light->range;
+    m_castsShadow = light->castsShadow;
+    m_useTemperature = light->useTemperature;
+    m_temperature = static_cast<double>(light->temperature);
+    if (m_colorField) {
+        m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
+    }
+}
+
+void SpotLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
+            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->setColor(c);
+            m_entity.markDirty();
+        });
+        s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
+            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->setIntensity(v);
+            m_entity.markDirty();
+        });
+        s_rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
+            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->range = v;
+            m_entity.markDirty();
+        });
+        s_rowDragFloat(t, "Inner Cone", &m_innerConeAngle, 0.5, 0.0, 89.0, "%.1f deg", [this](double v) {
+            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->innerConeAngle = glm::radians(static_cast<float>(v));
+            m_entity.markDirty();
+        });
+        s_rowDragFloat(t, "Outer Cone", &m_outerConeAngle, 0.5, 0.0, 90.0, "%.1f deg", [this](double v) {
+            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->outerConeAngle = glm::radians(static_cast<float>(v));
+            m_entity.markDirty();
+        });
+        s_rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
+            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->setCastsShadow(b);
+            m_entity.markDirty();
+        });
+        s_rowCheckbox(t, "Use Temperature", &m_useTemperature, [this](bool b) {
+            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->useTemperature = b;
+            m_entity.markDirty();
+        });
+        s_rowDragFloat(t, "Temperature", &m_temperature, 50.0, 1000.0, 40000.0, "%.1f K", [this](double v) {
+            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+            if (light == nullptr) {
+                return;
+            }
+            light->temperature = static_cast<float>(v);
+            m_entity.markDirty();
+        });
+    });
+}
+
+void SpotLightEditor::sync(const Rapture::Entity &entity)
+{
+    m_entity = entity;
+    auto *light = entity.tryGetComponent<Rapture::SpotLightComponent>();
+    if (light == nullptr) {
+        return;
+    }
+    m_color = light->color;
+    m_intensity = light->intensity;
+    m_range = light->range;
+    m_innerConeAngle = static_cast<double>(glm::degrees(light->innerConeAngle));
+    m_outerConeAngle = static_cast<double>(glm::degrees(light->outerConeAngle));
+    m_castsShadow = light->castsShadow;
+    m_useTemperature = light->useTemperature;
+    m_temperature = static_cast<double>(light->temperature);
+    if (m_colorField) {
+        m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
     }
 }
 

@@ -97,10 +97,19 @@ void ShadowMap::transitionToShaderReadableLayout(CommandBuffer *commandBuffer)
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp,
-                                 const glm::vec3 &cameraPosition)
+void ShadowMap::updateViewMatrix(Entity light, const TransformComponent &transformComp, const glm::vec3 &cameraPosition)
 {
     RAPTURE_PROFILE_FUNCTION();
+
+    LightType type = Light_getLightType(light);
+    float range = 0.0f;
+    float outerConeAngle = 0.0f;
+    if (auto *spot = light.tryGetComponent<SpotLightComponent>()) {
+        range = spot->range;
+        outerConeAngle = spot->outerConeAngle;
+    } else if (auto *point = light.tryGetComponent<PointLightComponent>()) {
+        range = point->range;
+    }
 
     ShadowMapData shadowMapData;
 
@@ -109,7 +118,7 @@ void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const Transfor
     glm::mat4 lightProj = glm::mat4(1.0f);
 
     // Calculate light direction based on light type
-    if (lightComp.type == LightType::DIRECTIONAL || lightComp.type == LightType::SPOT) {
+    if (type == LightType::DIRECTIONAL || type == LightType::SPOT) {
         // Calculate light direction from rotation
         glm::quat rotationQuat = transformComp.transforms.getRotationQuat();
         lightDirection = glm::normalize(rotationQuat * glm::vec3(0, 0, -1)); // Forward vector
@@ -127,7 +136,7 @@ void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const Transfor
 
     glm::mat4 viewMatrix;
 
-    if (lightComp.type == LightType::DIRECTIONAL) {
+    if (type == LightType::DIRECTIONAL) {
         // For directional lights, position the shadow camera to cover the scene properly
         // Use camera position as scene center for better shadow coverage
         glm::vec3 sceneCenter = cameraPosition;
@@ -162,20 +171,20 @@ void ShadowMap::updateViewMatrix(const LightComponent &lightComp, const Transfor
         // Perspective projection for spot/point light
         float aspect = 1.0f; // Shadow map is square
 
-        if (lightComp.type == LightType::SPOT) {
+        if (type == LightType::SPOT) {
             // For spotlights, use more aggressive near plane scaling
-            float nearPlane = glm::max(0.1f, lightComp.range * 0.001f); // Much closer near plane
-            float farPlane = lightComp.range * 1.2f;                    // Extend beyond light range for better coverage
+            float nearPlane = glm::max(0.1f, range * 0.001f); // Much closer near plane
+            float farPlane = range * 1.2f;                    // Extend beyond light range for better coverage
 
             // Use slightly wider angle for shadows to avoid edge artifacts
-            float shadowConeAngle = lightComp.outerConeAngle * 1.1f; // 10% wider angle for shadows
+            float shadowConeAngle = outerConeAngle * 1.1f; // 10% wider angle for shadows
             float fovRadians = glm::max(shadowConeAngle * 2.0f, glm::radians(5.0f));
 
             lightProj = glm::perspective(fovRadians, aspect, nearPlane, farPlane);
         } else {
             // Point light settings (default)
             float nearPlane = 0.1f;
-            lightProj = glm::perspective(glm::radians(90.0f), aspect, nearPlane, lightComp.range);
+            lightProj = glm::perspective(glm::radians(90.0f), aspect, nearPlane, range);
         }
     }
 

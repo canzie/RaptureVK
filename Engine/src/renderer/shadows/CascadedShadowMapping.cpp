@@ -437,11 +437,6 @@ std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponen
 
     RAPTURE_PROFILE_FUNCTION();
 
-    if (lightComp.type != LightType::DIRECTIONAL) {
-        RP_CORE_ERROR("Light is not a directional light");
-        return std::vector<CascadeData>();
-    }
-
     if (!lightComp.isActive) {
         return std::vector<CascadeData>();
     }

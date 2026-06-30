@@ -92,11 +92,11 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
                                                         glm::vec3(-2.243f, 0.0f, 0.0f), // Point downward (radians, ~-128 degrees)
                                                         glm::vec3(0.2f)                 // Small visual scale
     );
-    auto &spotLightComp = spotLight.addComponent<Rapture::LightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White color
-                                                                          1.2f,                        // Intensity
-                                                                          15.0f,                       // Range
-                                                                          30.0f,                       // Inner cone angle (degrees)
-                                                                          45.0f                        // Outer cone angle (degrees)
+    auto &spotLightComp = spotLight.addComponent<Rapture::SpotLightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White color
+                                                                              1.2f,                        // Intensity
+                                                                              15.0f,                       // Range
+                                                                              30.0f,                       // Inner cone angle (degrees)
+                                                                              45.0f                        // Outer cone angle (degrees)
     );
     spotLightComp.castsShadow = false;
     spotLight.addComponent<Rapture::ShadowComponent>(1028.0f, 1028.0f);
@@ -107,10 +107,11 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     sunLight.addComponent<Rapture::TransformComponent>(glm::vec3(-2.0f, 5.0f, -3.0f),  // Position
                                                        glm::vec3(-1.874f, 0.0f, 0.0f), // Point downwards
                                                        glm::vec3(0.2f));
-    auto &sunLightComp = sunLight.addComponent<Rapture::LightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White sunlight
-                                                                        3.14f                        // Intensity
+    auto &sunLightComp = sunLight.addComponent<Rapture::DirectionalLightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White sunlight
+                                                                                   3.14f                        // Intensity
     );
     sunLightComp.castsShadow = true;
+    sunLightComp.atmosphereSunLight = true;
     sunLight.addComponent<Rapture::CascadedShadowComponent>(2048.0f, 2048.0f, 4, 0.8f);
 
     // Create environment entity with a procedurally generated atmosphere skybox

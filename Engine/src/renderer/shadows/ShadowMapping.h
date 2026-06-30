@@ -23,8 +23,8 @@
 namespace Rapture {
 
 // Forward declarations
-struct LightComponent;
 struct TransformComponent;
+class Entity;
 
 class ShadowMap {
   public:
@@ -35,8 +35,7 @@ class ShadowMap {
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 
-    void updateViewMatrix(const LightComponent &lightComp, const TransformComponent &transformComp,
-                          const glm::vec3 &cameraPosition);
+    void updateViewMatrix(Entity light, const TransformComponent &transformComp, const glm::vec3 &cameraPosition);
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTexture; }
 

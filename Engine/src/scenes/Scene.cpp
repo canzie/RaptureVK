@@ -172,22 +172,27 @@ void Scene::onUpdate(float dt)
     }
 
     // Update regular shadow maps
-    auto shadowView = m_registry.view<LightComponent, TransformComponent, ShadowComponent>();
-    for (auto entity : shadowView) {
-        auto [light, transform, shadow] = shadowView.get<LightComponent, TransformComponent, ShadowComponent>(entity);
+    auto shadowView = m_registry.view<TransformComponent, ShadowComponent>();
+    for (auto entityHandle : shadowView) {
+        Entity entity(entityHandle, this);
+        auto *light = Light_tryGetLight(entity);
+        if (light == nullptr) {
+            continue;
+        }
+        auto [transform, shadow] = shadowView.get<TransformComponent, ShadowComponent>(entityHandle);
 
-        if (shadow.shadowMap && shadow.isActive && shadow.needsUpdate(light, transform)) {
+        if (shadow.shadowMap && shadow.isActive && shadow.needsUpdate(*light, transform)) {
 
             // Update the shadow map view matrix
-            shadow.shadowMap->updateViewMatrix(light, transform, cameraPosition);
+            shadow.shadowMap->updateViewMatrix(entity, transform, cameraPosition);
         }
     }
 
     // Update cascaded shadow maps
-    auto cascadedShadowView = m_registry.view<LightComponent, TransformComponent, CascadedShadowComponent>();
+    auto cascadedShadowView = m_registry.view<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>();
     for (auto entity : cascadedShadowView) {
         auto [light, transform, shadow] =
-            cascadedShadowView.get<LightComponent, TransformComponent, CascadedShadowComponent>(entity);
+            cascadedShadowView.get<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>(entity);
 
         if (shadow.cascadedShadowMap && shadow.isActive) {
             // Update the cascaded shadow map view matrices
