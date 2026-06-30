@@ -84,6 +84,12 @@ DescriptorSet::~DescriptorSet()
 
     std::lock_guard<std::mutex> poolLock(gPoolLock);
 
+    // Return the set to the pool (created with FREE_DESCRIPTOR_SET_BIT) so transient sets don't exhaust it
+    if (m_set != VK_NULL_HANDLE && s_pool != VK_NULL_HANDLE) {
+        vkFreeDescriptorSets(m_device, s_pool, 1, &m_set);
+        m_set = VK_NULL_HANDLE;
+    }
+
     // Decrement counters
     s_poolBufferCount -= m_usedBuffers;
     s_poolTextureCount -= m_usedTextures;
@@ -96,8 +102,6 @@ DescriptorSet::~DescriptorSet()
     if (s_poolRefCount == 0 && s_pool != VK_NULL_HANDLE) {
         destroyDescriptorPool();
     }
-
-    // Descriptor set is automatically freed when pool is destroyed/reset
 }
 
 void DescriptorSet::bind(VkCommandBuffer commandBuffer, std::shared_ptr<PipelineBase> pipeline)

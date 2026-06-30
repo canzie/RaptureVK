@@ -210,11 +210,16 @@ struct InstanceShapeComponent {
 };
 
 struct SkyboxComponent {
-    Texture *skyboxTexture;
+    Texture *skyboxTexture = nullptr;
     float skyIntensity = 1.0f;
     bool isEnabled = true;
+    bool proceduralSky = false;
+    float timeOfDay = 12.0f;
 
     SkyboxComponent() = default;
+    SkyboxComponent(Texture *skyboxTexture, float skyIntensity = 1.0f) : skyboxTexture(skyboxTexture), skyIntensity(skyIntensity)
+    {
+    }
     SkyboxComponent(std::filesystem::path skyboxTexturePath, float skyIntensity = 1.0f) : skyIntensity(skyIntensity)
     {
         asset = AssetManager::importAsset(skyboxTexturePath);

@@ -476,11 +476,10 @@ void DynamicDiffuseGI::updateFromIndirectLightingComponent(Scene &scene)
 
 void DynamicDiffuseGI::updateSkybox(Scene &scene)
 {
-    // Query for SkyboxComponent from registry
     SkyboxComponent *skyboxComp = nullptr;
-    auto view = scene.getRegistry().view<SkyboxComponent>();
-    if (!view.empty()) {
-        skyboxComp = &view.get<SkyboxComponent>(*view.begin());
+    Entity environment = scene.environment();
+    if (environment.hasComponent<SkyboxComponent>()) {
+        skyboxComp = &environment.getComponent<SkyboxComponent>();
     }
 
     Texture *newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReady())

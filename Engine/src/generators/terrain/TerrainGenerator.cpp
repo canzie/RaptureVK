@@ -156,58 +156,40 @@ Texture *TerrainGenerator::getNoiseTexture(TerrainNoiseCategory category) const
     return m_noiseTextures[category];
 }
 
-void TerrainGenerator::bakeNoiseLUT()
+void TerrainGenerator::bakeSplineCurves()
 {
     if (!m_initialized || m_config.hmType != HM_CEPV) {
-        RP_CORE_WARN("TerrainGenerator: Cannot bake noise LUT for single heightmap");
+        RP_CORE_WARN("TerrainGenerator: Cannot bake spline curves for single heightmap");
         return;
     }
 
-    constexpr uint32_t size = TERRAIN_NOISE_LUT_SIZE;
-    std::vector<uint16_t> lutData(size * size * size);
+    constexpr uint32_t res = TERRAIN_SPLINE_CURVE_RESOLUTION;
+    constexpr uint32_t rows = TERRAIN_NC_COUNT;
+    std::vector<uint16_t> curveData(res * rows);
 
-    for (uint32_t z = 0; z < size; ++z) {
-        float pv = (static_cast<float>(z) / (size - 1)) * 2.0f - 1.0f;
-        float pvFactor = s_evaluateSpline(m_multiNoiseConfig.splines[PEAKS_VALLEYS], pv);
-
-        for (uint32_t y = 0; y < size; ++y) {
-            float e = (static_cast<float>(y) / (size - 1)) * 2.0f - 1.0f;
-            float eFactor = s_evaluateSpline(m_multiNoiseConfig.splines[EROSION], e);
-
-            for (uint32_t x = 0; x < size; ++x) {
-                float c = (static_cast<float>(x) / (size - 1)) * 2.0f - 1.0f;
-                float cFactor = s_evaluateSpline(m_multiNoiseConfig.splines[CONTINENTALNESS], c);
-
-                float pvAmplitude = 1.0f - eFactor;
-
-                float baseHeight = (cFactor - 0.5f) * 2.0f;
-                float pvContrib = (pvFactor - 0.5f) * 2.0f * pvAmplitude;
-                float combined = baseHeight * 0.6f + pvContrib * 0.4f;
-
-                combined = combined * 0.5f + 0.5f;
-                combined = glm::clamp(combined, 0.0f, 1.0f);
-
-                uint32_t idx = z * size * size + y * size + x;
-                lutData[idx] = glm::packHalf1x16(combined);
-            }
+    for (uint32_t cat = 0; cat < rows; ++cat) {
+        const TerrainSpline &spline = m_multiNoiseConfig.splines[cat];
+        for (uint32_t i = 0; i < res; ++i) {
+            float x = (static_cast<float>(i) / (res - 1)) * 2.0f - 1.0f;
+            float y = glm::clamp(s_evaluateSpline(spline, x), 0.0f, 1.0f);
+            curveData[cat * res + i] = glm::packHalf1x16(y);
         }
     }
 
-    if (!m_noiseLUT) {
+    if (!m_splineCurveTexture) {
         TextureSpecification spec;
-        spec.type = TextureType::TEXTURE3D;
+        spec.type = TextureType::TEXTURE2D;
         spec.format = TextureFormat::R16F;
-        spec.width = size;
-        spec.height = size;
-        spec.depth = size;
+        spec.width = res;
+        spec.height = rows;
         spec.filter = TextureFilter::Linear;
         spec.wrap = TextureWrap::ClampToEdge;
         spec.srgb = false;
-        m_noiseLUT = std::make_unique<Texture>(spec);
+        m_splineCurveTexture = std::make_unique<Texture>(spec);
     }
 
-    m_noiseLUT->uploadData(
-        std::span<const uint8_t>(reinterpret_cast<const uint8_t *>(lutData.data()), lutData.size() * sizeof(uint16_t)));
+    m_splineCurveTexture->uploadData(
+        std::span<const uint8_t>(reinterpret_cast<const uint8_t *>(curveData.data()), curveData.size() * sizeof(uint16_t)));
 }
 
 void TerrainGenerator::generateDefaultNoiseTextures()
@@ -251,7 +233,7 @@ void TerrainGenerator::generateDefaultNoiseTextures()
 
     m_multiNoiseConfig.splines[PEAKS_VALLEYS].points = {{-1.0f, 0.0f}, {-0.5f, 0.3f}, {0.0f, 0.5f}, {0.5f, 0.7f}, {1.0f, 1.0f}};
 
-    bakeNoiseLUT();
+    bakeSplineCurves();
 }
 
 void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum, uint32_t frameIndex)
@@ -309,7 +291,7 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
         return;
     }
 
-    if (!m_noiseLUT || !m_noiseTextures[CONTINENTALNESS] || !m_noiseTextures[EROSION] || !m_noiseTextures[PEAKS_VALLEYS]) {
+    if (!m_splineCurveTexture || !m_noiseTextures[CONTINENTALNESS] || !m_noiseTextures[EROSION] || !m_noiseTextures[PEAKS_VALLEYS]) {
         return;
     }
 
@@ -334,7 +316,7 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
         uint32_t continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
         uint32_t erosionIndex;
         uint32_t peaksValleysIndex;
-        uint32_t noiseLUTIndex;
+        uint32_t splineCurveIndex;
         uint32_t useMultiNoise;
         float heightScale;
         float terrainWorldSize;
@@ -353,11 +335,11 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
     if (m_config.hmType == HM_CEPV) {
         pc.erosionIndex = m_noiseTextures[EROSION]->getBindlessIndex();
         pc.peaksValleysIndex = m_noiseTextures[PEAKS_VALLEYS]->getBindlessIndex();
-        pc.noiseLUTIndex = m_noiseLUT->getBindlessIndex();
+        pc.splineCurveIndex = m_splineCurveTexture->getBindlessIndex();
     } else {
         pc.erosionIndex = 0;
         pc.peaksValleysIndex = 0;
-        pc.noiseLUTIndex = 0;
+        pc.splineCurveIndex = 0;
     }
     pc.heightScale = m_config.heightScale;
     pc.terrainWorldSize = m_config.terrainWorldSize;

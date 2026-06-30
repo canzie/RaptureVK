@@ -43,8 +43,8 @@ class TerrainGenerator {
     Texture *getNoiseTexture(TerrainNoiseCategory category) const;
     MultiNoiseConfig &getMultiNoiseConfig() { return m_multiNoiseConfig; }
     const MultiNoiseConfig &getMultiNoiseConfig() const { return m_multiNoiseConfig; }
-    void bakeNoiseLUT();
-    Texture *getNoiseLUT() const { return m_noiseLUT.get(); }
+    void bakeSplineCurves();
+    Texture *getSplineCurveTexture() const { return m_splineCurveTexture.get(); }
     void generateDefaultNoiseTextures();
 
     void setSingleHeightmap(Texture *texture) { m_noiseTextures[CONTINENTALNESS] = texture; }
@@ -95,7 +95,7 @@ class TerrainGenerator {
 
     MultiNoiseConfig m_multiNoiseConfig;
     Texture *m_noiseTextures[TERRAIN_NC_COUNT];
-    std::unique_ptr<Texture> m_noiseLUT;
+    std::unique_ptr<Texture> m_splineCurveTexture;
 
     // Shared index buffers (one per LOD, grid topology)
     std::shared_ptr<IndexBuffer> m_indexBuffers[TERRAIN_LOD_COUNT];

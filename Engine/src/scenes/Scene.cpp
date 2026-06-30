@@ -15,8 +15,6 @@
 
 namespace Rapture {
 
-#define ENVIRONMENT_ENTITY_TAG "Environment"
-
 Scene::Scene(const std::string &sceneName)
 {
     m_config.sceneName = sceneName;
@@ -24,6 +22,8 @@ Scene::Scene(const std::string &sceneName)
     auto &app = Application::getInstance();
     uint32_t frameCount = app.getMainWindow().getSwapChain()->getImageCount();
     m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, frameCount);
+
+    m_environmentHandle = createEntity("Environment").getHandle();
 }
 
 Scene::~Scene()
@@ -105,6 +105,11 @@ Entity Scene::createSphere(const std::string &name)
 
 void Scene::destroyEntity(Entity entity)
 {
+    if (entity.isValid() && entity.getHandle() == m_environmentHandle) {
+        RP_CORE_WARN("The environment entity cannot be destroyed");
+        return;
+    }
+
     if (entity.isValid() && entity.getScene() == this) {
         m_registry.destroy(entity.getHandle());
     }
@@ -248,30 +253,9 @@ Entity Scene::getMainCamera() const
     return Entity::null();
 }
 
-Entity Scene::createEnvironmentEntity()
+Entity Scene::environment() const
 {
-    // Check if environment entity already exists
-    auto view = m_registry.view<TagComponent>();
-    for (auto entity : view) {
-        if (view.get<TagComponent>(entity).tag == ENVIRONMENT_ENTITY_TAG) {
-            return Entity(entity, this);
-        }
-    }
-
-    // Create new environment entity
-    return createEntity(ENVIRONMENT_ENTITY_TAG);
-}
-
-Entity Scene::getEnvironmentEntity() const
-{
-    // Query for environment entity
-    auto view = m_registry.view<TagComponent>();
-    for (auto entity : view) {
-        if (view.get<TagComponent>(entity).tag == ENVIRONMENT_ENTITY_TAG) {
-            return Entity(entity, const_cast<Scene *>(this));
-        }
-    }
-    return Entity::null();
+    return Entity(m_environmentHandle, const_cast<Scene *>(this));
 }
 
 void Scene::registerBLAS(Entity &entity)

@@ -128,6 +128,7 @@ class SkyboxEditor : public ComponentEditorBase {
   private:
     float m_intensity = 1.0f;
     bool m_isEnabled = true;
+    float m_timeOfDay = 12.0f;
     Rapture::Entity m_entity;
 };
 

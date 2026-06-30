@@ -284,11 +284,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
     RAPTURE_PROFILE_FUNCTION();
 
-    // Query for SkyboxComponent - could be on any entity (typically environment entity)
     if (!m_skyboxPass->hasActiveSkybox()) {
-        auto view = activeScene.getRegistry().view<SkyboxComponent>();
-        if (!view.empty()) {
-            auto &skyboxComp = view.get<SkyboxComponent>(*view.begin());
+        Entity environment = activeScene.environment();
+        if (environment.hasComponent<SkyboxComponent>()) {
+            auto &skyboxComp = environment.getComponent<SkyboxComponent>();
             m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture);
         }
     }

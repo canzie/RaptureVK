@@ -1,6 +1,7 @@
 #include "ComponentEditors.h"
 
 #include "components/Components.h"
+#include "generators/textures/ProceduralTextures.h"
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -578,6 +579,17 @@ void SkyboxEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             m_entity.getComponent<Rapture::SkyboxComponent>().isEnabled = b;
             m_entity.markDirty();
         });
+        s_rowSlider(t, "Time of Day", &m_timeOfDay, 0.0f, 24.0f, [this](float v) {
+            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::SkyboxComponent>()) {
+                return;
+            }
+            auto &sc = m_entity.getComponent<Rapture::SkyboxComponent>();
+            sc.timeOfDay = v;
+            if (sc.proceduralSky && sc.skyboxTexture != nullptr) {
+                Rapture::ProceduralTexture::regenerateAtmosphereCubemap(*sc.skyboxTexture, v);
+            }
+            m_entity.markDirty();
+        });
     });
 }
 
@@ -590,6 +602,7 @@ void SkyboxEditor::sync(const Rapture::Entity &entity)
     const auto &sc = entity.getComponent<Rapture::SkyboxComponent>();
     m_intensity = sc.skyIntensity;
     m_isEnabled = sc.isEnabled;
+    m_timeOfDay = sc.timeOfDay;
 }
 
 void StubEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

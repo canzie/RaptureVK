@@ -24,6 +24,7 @@ namespace Rapture {
  * By default creates an RGBA8 texture suitable for most procedural content.
  */
 struct ProceduralTextureConfig {
+    bool cubemap = false;
     TextureFormat format = TextureFormat::RGBA8;
     TextureFilter filter = TextureFilter::Linear;
     TextureWrap wrap = TextureWrap::Repeat;
@@ -159,6 +160,14 @@ class ProceduralTexture {
      */
     ProceduralTexture(const std::string &shaderPath, Texture &outputTexture);
 
+    /**
+     * @brief Creates a procedural texture generator that regenerates into an existing texture.
+     *
+     * @param shaderHandle Asset handle to a pre-loaded compute shader.
+     * @param outputTexture Existing texture to write into. Must have storageImage = true.
+     */
+    ProceduralTexture(const AssetHandle &shaderHandle, Texture &outputTexture);
+
     ~ProceduralTexture();
 
     /**
@@ -275,6 +284,33 @@ class ProceduralTexture {
      */
     static Texture *generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates an atmospheric scattering cubemap usable as a skybox.
+     *
+     * Renders all six cube faces in a single compute dispatch via the OUTPUT_CUBEMAP
+     * variant of the Atmosphere shader. cameraDir/cameraUp/fovY in the push constants
+     * are ignored; each face fixes its own 90 degree view.
+     *
+     * @param timeOfDay Time in hours (0.0 to 24.0). 6.0 = sunrise, 12.0 = noon, 18.0 = sunset.
+     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
+     * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
+     * @return Pointer to the generated TEXTURECUBE texture.
+     */
+    static Texture *generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params = nullptr,
+                                              const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Re-renders an atmosphere cubemap into an existing texture in place.
+     *
+     * Reuses cube, so no new texture is allocated. Use this to update a skybox
+     * when its time of day changes.
+     *
+     * @param cube Existing TEXTURECUBE storage texture, e.g. one returned by generateAtmosphereCubemap.
+     * @param timeOfDay Time in hours (0.0 to 24.0).
+     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
+     */
+    static void regenerateAtmosphereCubemap(Texture &cube, float timeOfDay, const AtmospherePushConstants *params = nullptr);
 
   private:
     void initFromShaderPath(const std::string &shaderPath, bool createTexture = true);

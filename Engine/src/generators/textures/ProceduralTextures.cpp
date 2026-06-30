@@ -1,6 +1,7 @@
 #include "ProceduralTextures.h"
 
 #include "asset_manager/Asset.h"
+#include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "logging/Log.h"
@@ -23,6 +24,11 @@ ProceduralTexture::ProceduralTexture(const AssetHandle &shaderHandle, const Proc
 ProceduralTexture::ProceduralTexture(const std::string &shaderPath, Texture &outputTexture) : m_texture(&outputTexture)
 {
     initFromShaderPath(shaderPath, false);
+}
+
+ProceduralTexture::ProceduralTexture(const AssetHandle &shaderHandle, Texture &outputTexture) : m_texture(&outputTexture)
+{
+    initFromShaderHandle(shaderHandle, false);
 }
 
 ProceduralTexture::~ProceduralTexture() {}
@@ -100,7 +106,7 @@ void ProceduralTexture::initTexture()
     spec.width = TEXTURE_SIZE;
     spec.height = TEXTURE_SIZE;
     spec.depth = 1;
-    spec.type = TextureType::TEXTURE2D;
+    spec.type = m_config.cubemap ? TextureType::TEXTURECUBE : TextureType::TEXTURE2D;
     spec.format = m_config.format;
     spec.filter = m_config.filter;
     spec.wrap = m_config.wrap;
@@ -180,6 +186,8 @@ void ProceduralTexture::generate()
 
     VkCommandBuffer vkCmd = commandBuffer->getCommandBufferVk();
 
+    uint32_t layerCount = isCubeType(m_texture->getSpecification().type) ? 6 : 1;
+
     VkImageMemoryBarrier preBarrier{};
     preBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     preBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -191,7 +199,7 @@ void ProceduralTexture::generate()
     preBarrier.subresourceRange.baseMipLevel = 0;
     preBarrier.subresourceRange.levelCount = 1;
     preBarrier.subresourceRange.baseArrayLayer = 0;
-    preBarrier.subresourceRange.layerCount = 1;
+    preBarrier.subresourceRange.layerCount = layerCount;
     preBarrier.srcAccessMask = 0;
     preBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
@@ -208,7 +216,7 @@ void ProceduralTexture::generate()
 
     uint32_t workGroupsX = (TEXTURE_SIZE + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
     uint32_t workGroupsY = (TEXTURE_SIZE + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
-    vkCmdDispatch(vkCmd, workGroupsX, workGroupsY, 1);
+    vkCmdDispatch(vkCmd, workGroupsX, workGroupsY, layerCount);
 
     VkImageMemoryBarrier postBarrier{};
     postBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -221,7 +229,7 @@ void ProceduralTexture::generate()
     postBarrier.subresourceRange.baseMipLevel = 0;
     postBarrier.subresourceRange.levelCount = 1;
     postBarrier.subresourceRange.baseArrayLayer = 0;
-    postBarrier.subresourceRange.layerCount = 1;
+    postBarrier.subresourceRange.layerCount = layerCount;
     postBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     postBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -362,6 +370,39 @@ Texture *ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &
     return &generator.getTexture();
 }
 
+static AtmospherePushConstants s_buildAtmospherePushConstants(float timeOfDay, const AtmospherePushConstants *params)
+{
+    if (params) {
+        return *params;
+    }
+
+    AtmospherePushConstants pc;
+    // 0 = midnight, 6 = sunrise, 12 = noon, 18 = sunset
+    // Sun must have -Z component to be in front of camera (which looks in -Z)
+    float sunAngle = (timeOfDay - 6.0f) / 12.0f * 3.14159265359f; // 0 at 6am, PI at 6pm
+    float sunY = glm::sin(sunAngle);                              // Height in sky
+    float sunHoriz = glm::cos(sunAngle);
+    // Sun orbits in front of camera (XZ plane with -Z forward)
+    glm::vec3 sunDir = glm::normalize(glm::vec3(sunHoriz * 0.3f, sunY, -0.8f));
+
+    // Earth-like atmospheric defaults (real units; the shader holds the planet/atmosphere radii)
+    pc.cameraPos = glm::vec3(0.0f);
+    pc.innerRadius = 1.0f;
+    pc.sunDirection = sunDir;
+    pc.outerRadius = 1.025f;
+    pc.cameraDir = glm::vec3(0.0f, 0.0f, -1.0f);
+    pc.scaleDepth = 0.25f;
+    pc.cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    pc.kr = 0.0025f;
+    pc.invWavelength = glm::vec3(5.8f, 13.5f, 33.1f); // Rayleigh betaR scaled by 1e-6 in the shader
+    pc.km = 21.0f;                                    // Mie betaM scaled by 1e-6 in the shader
+    pc.eSun = 20.0f;
+    pc.g = 0.76f;
+    pc.fovY = 1.5708f;
+    pc.cameraAltitude = 1.0f; // meters above ground
+    return pc;
+}
+
 Texture *ProceduralTexture::generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params,
                                                const ProceduralTextureConfig &config)
 {
@@ -394,41 +435,81 @@ Texture *ProceduralTexture::generateAtmosphere(float timeOfDay, const Atmosphere
         return nullptr;
     }
 
-    AtmospherePushConstants pc;
-    if (params) {
-        pc = *params;
-    } else {
-        // 0 = midnight, 6 = sunrise, 12 = noon, 18 = sunset
-        // Sun must have -Z component to be in front of camera (which looks in -Z)
-        float sunAngle = (timeOfDay - 6.0f) / 12.0f * 3.14159265359f; // 0 at 6am, PI at 6pm
-        float sunY = glm::sin(sunAngle);                              // Height in sky
-        float sunHoriz = glm::cos(sunAngle);
-        // Sun orbits in front of camera (XZ plane with -Z forward)
-        glm::vec3 sunDir = glm::normalize(glm::vec3(sunHoriz * 0.3f, sunY, -0.8f));
-
-        // Earth-like atmospheric defaults based on GPU Gems 2 Chapter 16
-        // Using NORMALIZED space: planet radius = 1.0, atmosphere extends to ~1.025
-        pc.cameraPos = glm::vec3(0.0f, 1.001f, 0.0f);
-        pc.innerRadius = 1.0f;
-        pc.sunDirection = sunDir;
-        pc.outerRadius = 1.025f;
-        pc.cameraDir = glm::vec3(0.0f, 0.0f, -1.0f);
-        pc.scaleDepth = 0.25f;
-        pc.cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-        pc.kr = 0.0025f;
-        // Precomputed 1/pow(wavelength, 4) for RGB (650nm, 570nm, 475nm)
-        pc.invWavelength = glm::vec3(1.0f / glm::pow(0.650f, 4.0f), 1.0f / glm::pow(0.570f, 4.0f), 1.0f / glm::pow(0.475f, 4.0f));
-        pc.km = 0.001f;
-        pc.eSun = 20.0f;
-        pc.g = 0.76f;
-        pc.fovY = 1.5708f;
-        pc.cameraAltitude = 0.0003f;
-    }
-
+    AtmospherePushConstants pc = s_buildAtmospherePushConstants(timeOfDay, params);
     generator.setPushConstants(pc);
     generator.generate();
 
     return &generator.getTexture();
+}
+
+static AssetHandle s_getAtmosphereCubemapShaderHandle()
+{
+    static AssetHandle s_shaderHandle = 0;
+
+    if (s_shaderHandle == 0) {
+        auto &app = Application::getInstance();
+        auto &proj = app.getProject();
+        auto shaderDir = proj.getProjectShaderDirectory();
+
+        ShaderImportConfig importConfig;
+        importConfig.compileInfo.macros.push_back(ShaderMacro("OUTPUT_CUBEMAP"));
+
+        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/Atmosphere.cs.glsl", importConfig);
+        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+        if (!shader) {
+            RP_CORE_ERROR("Failed to load Atmosphere cubemap shader");
+            return 0;
+        }
+        s_shaderHandle = asset.get()->getHandle();
+    }
+
+    return s_shaderHandle;
+}
+
+Texture *ProceduralTexture::generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params,
+                                                      const ProceduralTextureConfig &config)
+{
+    AssetHandle shaderHandle = s_getAtmosphereCubemapShaderHandle();
+    if (shaderHandle == 0) {
+        return nullptr;
+    }
+
+    ProceduralTextureConfig cubemapConfig = config;
+    cubemapConfig.cubemap = true;
+    cubemapConfig.wrap = TextureWrap::ClampToEdge;
+    if (cubemapConfig.format == TextureFormat::RGBA8) {
+        cubemapConfig.format = TextureFormat::RGBA16F;
+    }
+
+    ProceduralTexture generator(shaderHandle, cubemapConfig);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create atmosphere cubemap generator");
+        return nullptr;
+    }
+
+    AtmospherePushConstants pc = s_buildAtmospherePushConstants(timeOfDay, params);
+    generator.setPushConstants(pc);
+    generator.generate();
+
+    return &generator.getTexture();
+}
+
+void ProceduralTexture::regenerateAtmosphereCubemap(Texture &cube, float timeOfDay, const AtmospherePushConstants *params)
+{
+    AssetHandle shaderHandle = s_getAtmosphereCubemapShaderHandle();
+    if (shaderHandle == 0) {
+        return;
+    }
+
+    ProceduralTexture generator(shaderHandle, cube);
+    if (!generator.isValid()) {
+        RP_CORE_ERROR("Failed to create atmosphere cubemap regenerator");
+        return;
+    }
+
+    AtmospherePushConstants pc = s_buildAtmospherePushConstants(timeOfDay, params);
+    generator.setPushConstants(pc);
+    generator.generate();
 }
 
 } // namespace Rapture

@@ -40,8 +40,11 @@ class Scene {
     void setMainCamera(Entity camera);
     Entity getMainCamera() const;
 
-    Entity createEnvironmentEntity();
-    Entity getEnvironmentEntity() const;
+    /**
+     * @brief The scene's single environment entity, always present and not destroyable.
+     * @return The environment entity.
+     */
+    Entity environment() const;
 
     void registerBLAS(Entity &entity);
 
@@ -65,6 +68,7 @@ class Scene {
 
   private:
     entt::registry m_registry;
+    entt::entity m_environmentHandle = entt::null;
     std::unique_ptr<SceneRenderData> m_renderData;
     SceneSettings m_config;
 

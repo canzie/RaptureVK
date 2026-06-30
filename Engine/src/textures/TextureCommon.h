@@ -62,7 +62,8 @@ enum class TextureViewType : uint8_t {
     DEFAULT,
     STENCIL,
     DEPTH,
-    COLOR
+    COLOR,
+    STORAGE
 };
 
 enum class TextureStatus {

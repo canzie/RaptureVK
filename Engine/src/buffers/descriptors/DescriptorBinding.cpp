@@ -135,12 +135,7 @@ uint32_t DescriptorBindingTexture::add(Texture &resource)
         m_isAllocated[index] = true;
     }
 
-    VkDescriptorImageInfo imageInfo;
-    if (m_isStorageImage) {
-        imageInfo = resource.getStorageImageDescriptorInfo();
-    } else {
-        imageInfo = resource.getDescriptorImageInfo(m_viewType);
-    }
+    VkDescriptorImageInfo imageInfo = resource.getDescriptorImageInfo(m_isStorageImage ? TextureViewType::STORAGE : m_viewType);
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -277,12 +272,7 @@ void DescriptorBindingTexture::update(Texture &resource, uint32_t index)
         return;
     }
 
-    VkDescriptorImageInfo imageInfo;
-    if (m_isStorageImage) {
-        imageInfo = resource.getStorageImageDescriptorInfo();
-    } else {
-        imageInfo = resource.getDescriptorImageInfo(m_viewType);
-    }
+    VkDescriptorImageInfo imageInfo = resource.getDescriptorImageInfo(m_isStorageImage ? TextureViewType::STORAGE : m_viewType);
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

@@ -10,7 +10,7 @@
 
 namespace Rapture {
 
-constexpr uint32_t TERRAIN_NOISE_LUT_SIZE = 16;
+constexpr uint32_t TERRAIN_SPLINE_CURVE_RESOLUTION = 256;
 
 enum TerrainNoiseCategory : uint8_t {
     CONTINENTALNESS = 0,

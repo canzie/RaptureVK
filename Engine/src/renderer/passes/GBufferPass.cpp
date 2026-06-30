@@ -28,7 +28,7 @@ struct TerrainGBufferPushConstants {
     uint32_t continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint32_t erosionIndex;
     uint32_t peaksValleysIndex;
-    uint32_t noiseLUTIndex;
+    uint32_t splineCurveIndex;
     uint32_t useMultiNoise;
     uint32_t lodResolution;
     float heightScale;
@@ -838,12 +838,12 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &act
     uint32_t continentalnessIndex = terrain.getNoiseTexture(CONTINENTALNESS)->getBindlessIndex();
     uint32_t erosionIndex = 0;
     uint32_t peaksValleysIndex = 0;
-    uint32_t noiseLUTIndex = 0;
+    uint32_t splineCurveIndex = 0;
 
     if (terrainConfig.hmType == HM_CEPV) {
         erosionIndex = terrain.getNoiseTexture(EROSION)->getBindlessIndex();
         peaksValleysIndex = terrain.getNoiseTexture(PEAKS_VALLEYS)->getBindlessIndex();
-        noiseLUTIndex = terrain.getNoiseLUT()->getBindlessIndex();
+        splineCurveIndex = terrain.getSplineCurveTexture()->getBindlessIndex();
     }
     auto *cullBuffers = terrain.getCullBuffers(currentFrame);
     if (!cullBuffers || !cullBuffers->drawCountBuffer) {
@@ -867,7 +867,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &act
         pc.continentalnessIndex = continentalnessIndex;
         pc.erosionIndex = erosionIndex;
         pc.peaksValleysIndex = peaksValleysIndex;
-        pc.noiseLUTIndex = noiseLUTIndex;
+        pc.splineCurveIndex = splineCurveIndex;
         pc.useMultiNoise = terrainConfig.hmType == HM_CEPV ? 1u : 0u;
         pc.lodResolution = getTerrainLODResolution(lod);
         pc.heightScale = terrainConfig.heightScale;

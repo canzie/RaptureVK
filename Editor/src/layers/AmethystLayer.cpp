@@ -12,9 +12,11 @@
 #include "layers/workspaces/LevelEditorWorkspace.h"
 #include "layers/workspaces/MaterialEditorWorkspace.h"
 #include "layers/workspaces/ScriptingWorkspace.h"
+#include "layers/workspaces/TextureGeneratorWorkspace.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "render_targets/swap_chains/SwapChain.h"
+#include "textures/Texture.h"
 #include "scenes/SceneManager.h"
 #include "utils/Timestep.h"
 #include "viewport/ViewportManager.h"
@@ -296,7 +298,7 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
 
 void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
 {
-    m_workspaces.reserve(4);
+    m_workspaces.reserve(5);
 
     Amethyst::UIScope(m_window).tabBar(
         {
@@ -317,6 +319,7 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
 
             PanelServices services = buildServices();
             m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services));
+            m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<MaterialEditorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(tabs, services));
@@ -474,6 +477,10 @@ PanelServices AmethystLayer::buildServices(void)
     };
     services.openFileExplorer = [this](FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm) {
         openFileExplorer(mode, std::move(onConfirm));
+    };
+    services.registerTexture = [this](Rapture::Texture *tex) -> Amethyst::AmTextureId {
+        if (tex == nullptr) return Amethyst::AM_INVALID_TEXTURE;
+        return m_backend.registerTexture(tex->getImageView(), tex->getSampler().getSamplerVk());
     };
     services.openImportPanel = [this](const std::filesystem::path &path) {
         struct Session {

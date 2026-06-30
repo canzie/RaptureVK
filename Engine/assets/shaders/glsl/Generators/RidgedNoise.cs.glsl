@@ -4,14 +4,15 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 4, binding = 0, rgba8) uniform writeonly image2D outImage;
 
+// Annotations: @hidden, @range(min,max), @default(val), @name("Display Name")
 layout(push_constant) uniform RidgedNoisePushConstants {
-    int octaves;
-    float persistence;
-    float lacunarity;
-    float scale;
-    float ridgeExponent;
-    float amplitudeMultiplier;
-    uint seed;
+    int octaves;            // @name("Octaves") @range(1, 8) @default(4)
+    float persistence;       // @name("Persistence") @range(0.1, 1.0) @default(0.5)
+    float lacunarity;        // @name("Lacunarity") @range(1.0, 4.0) @default(2.0)
+    float scale;             // @name("Scale") @range(0.5, 32.0) @default(4.0)
+    float ridgeExponent;     // @name("Ridge Sharpness") @range(0.1, 4.0) @default(2.0)
+    float amplitudeMultiplier; // @name("Amplitude") @range(0.1, 5.0) @default(1.0)
+    uint seed;               // @name("Seed") @range(0, 65535) @default(42)
 } pc;
 
 vec3 mod289(vec3 x) {

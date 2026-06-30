@@ -6,29 +6,33 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
+#ifdef OUTPUT_CUBEMAP
+layout(set = 4, binding = 0, rgba16f) uniform writeonly image2DArray outputTexture;
+#else
 layout(set = 4, binding = 0, rgba16f) uniform writeonly image2D outputTexture;
+#endif
 
 // Annotations: @hidden, @range(min,max), @default(val), @name("Display Name"), @color
 layout(push_constant) uniform PushConstants {
     vec3 cameraPos;       // @hidden @default(0.0, 1.0003, 0.0)
     float innerRadius;    // @hidden @default(1.0)
 
-    vec3 sunDirection;    // @name("Sun Direction") @range(-1.0, 1.0) @default(0.5, 0.05, -0.8)
-    float outerRadius;    // @name("Atmosphere Thickness") @range(1.02, 1.12) @default(1.06)
+    vec3 sunDirection;    // @name("Sun Direction") @range(-1.0, 1.0) @default(0.0, 0.3, -0.95)
+    float outerRadius;    // @hidden @default(1.025)
 
-    vec3 cameraDir;       // @hidden @default(0.0, 0.0, -1.0)
-    float scaleDepth;     // @name("Scale Depth") @range(0.15, 0.5) @default(0.25)
+    vec3 cameraDir;       // @name("Camera Direction") @range(-1.0, 1.0) @default(0.0, 0.0, -1.0)
+    float scaleDepth;     // @hidden @default(0.25)
 
-    vec3 cameraUp;        // @hidden @default(0.0, 1.0, 0.0)
-    float kr;             // @name("Rayleigh (Kr)") @range(0.0015, 0.015) @default(0.0045)
+    vec3 cameraUp;        // @name("Camera Up") @range(-1.0, 1.0) @default(0.0, 1.0, 0.0)
+    float kr;             // @hidden @default(0.0025)
 
     vec3 invWavelength;   // @name("Wavelength Scatter (RGB)") @range(0.0, 50.0) @default(5.8, 13.5, 33.1)
-    float km;             // @name("Mie (Km)") @range(0.0, 0.015) @default(0.003)
+    float km;             // @name("Mie (Km)") @range(0.0, 60.0) @default(21.0)
 
-    float eSun;           // @name("Sun Intensity") @range(1.0, 40.0) @default(18.0)
-    float g;              // @name("Mie Phase (g)") @range(0.7, 0.999) @default(0.92)
-    float fovY;           // @hidden @default(1.5708)
-    float cameraAltitude; // @name("Camera Altitude") @range(0.0001, 0.02) @default(0.0003)
+    float eSun;           // @name("Sun Intensity") @range(1.0, 40.0) @default(20.0)
+    float g;              // @name("Mie Phase (g)") @range(0.7, 0.999) @default(0.76)
+    float fovY;           // @name("Field of View") @range(0.5, 3.0) @default(1.5708)
+    float cameraAltitude; // @name("Camera Altitude") @range(0.0, 5000.0) @default(1.0)
 } pc;
 
 const float PI = 3.14159265359;
@@ -46,123 +50,70 @@ vec2 s_raySphereIntersect(vec3 rayOrigin, vec3 rayDir, float radius) {
     return vec2(-b - d, -b + d);
 }
 
-// Density at height (exponential falloff)
-float s_density(float h, float H) {
-    return exp(-max(h, 0.0) / H);
-}
+// Earth atmosphere constants (meters)
+const float Rg = 6360.0e3; // ground / planet radius
+const float Ra = 6420.0e3; // top of atmosphere
+const float Hr = 7994.0;   // Rayleigh scale height
+const float Hm = 1200.0;   // Mie scale height
 
-// Check if point is in planet's shadow (sun blocked by planet)
-bool s_inShadow(vec3 p, vec3 sunDir, float innerR) {
-    vec2 planetHit = s_raySphereIntersect(p, sunDir, innerR);
-    // If the ray toward the sun hits the planet (positive intersection), we're in shadow
-    return planetHit.x > 0.0 || planetHit.y > 0.0;
-}
-
-// Optical depth along ray from point to atmosphere edge
-// Returns negative value if in shadow (sun blocked by planet)
-float s_opticalDepth(vec3 p, vec3 dir, float H, float innerR, float outerR) {
-    // Check if sun is blocked by planet from this point
-    if (s_inShadow(p, dir, innerR)) {
-        return -1.0; // Signal that this point receives no direct sunlight
-    }
-    
-    vec2 t = s_raySphereIntersect(p, dir, outerR);
-    if (t.y < 0.0) return 0.0;
-    
-    float rayLen = t.y;
-    float stepSize = rayLen / float(NUM_LIGHT_SAMPLES);
-    float depth = 0.0;
-    
-    for (int i = 0; i < NUM_LIGHT_SAMPLES; i++) {
-        vec3 samplePos = p + dir * (float(i) + 0.5) * stepSize;
-        float h = length(samplePos) - innerR;
-        depth += s_density(h, H) * stepSize;
-    }
-    return depth;
-}
-
-// Rayleigh phase function
-float s_phaseR(float cosTheta) {
-    return 0.75 * (1.0 + cosTheta * cosTheta);
-}
-
-// Mie phase function (Henyey-Greenstein)
-float s_phaseM(float cosTheta, float g) {
-    float g2 = g * g;
-    float num = 1.0 - g2;
-    float denom = pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5);
-    return 1.5 * num / denom;
-}
-
-// Main scattering calculation
-vec3 s_scatter(vec3 origin, vec3 dir, vec3 sunDir, float innerR, float outerR,
-               float H, float Kr, float Km, float sunIntensity, float g, vec3 wavelengthInv) {
-    
-    // Find atmosphere intersection
-    vec2 atmoHit = s_raySphereIntersect(origin, dir, outerR);
+// Single-scattering integration (Nishita 1993 / scratchapixel)
+vec3 s_scatter(vec3 origin, vec3 dir, vec3 sunDir, vec3 betaR, vec3 betaM, float g, float sunIntensity) {
+    vec2 atmoHit = s_raySphereIntersect(origin, dir, Ra);
     if (atmoHit.y < 0.0) return vec3(0.0);
-    
-    // Check if we hit the planet
-    vec2 planetHit = s_raySphereIntersect(origin, dir, innerR);
-    
+
     float tMin = max(atmoHit.x, 0.0);
     float tMax = atmoHit.y;
-    if (planetHit.x > 0.0) tMax = min(tMax, planetHit.x);
-    
-    if (tMax <= tMin) return vec3(0.0);
-    
-    // Scale height for this atmosphere
-    float scaleH = H * (outerR - innerR);
-    
-    // Step through atmosphere
-    float stepSize = (tMax - tMin) / float(NUM_SAMPLES);
-    
-    vec3 rayleighAccum = vec3(0.0);
-    vec3 mieAccum = vec3(0.0);
+
+    // Clip the view ray to the ground so we don't integrate through the planet
+    vec2 groundHit = s_raySphereIntersect(origin, dir, Rg);
+    if (groundHit.x > 0.0) tMax = min(tMax, groundHit.x);
+
+    float segment = (tMax - tMin) / float(NUM_SAMPLES);
+
+    vec3 sumR = vec3(0.0);
+    vec3 sumM = vec3(0.0);
     float opticalDepthR = 0.0;
     float opticalDepthM = 0.0;
-    
+
+    float mu = dot(dir, sunDir);
+    float phaseR = 3.0 / (16.0 * PI) * (1.0 + mu * mu);
+    float g2 = g * g;
+    float phaseM = 3.0 / (8.0 * PI) * ((1.0 - g2) * (1.0 + mu * mu)) /
+                   ((2.0 + g2) * pow(1.0 + g2 - 2.0 * g * mu, 1.5));
+
     for (int i = 0; i < NUM_SAMPLES; i++) {
-        vec3 samplePos = origin + dir * (tMin + (float(i) + 0.5) * stepSize);
-        float height = length(samplePos) - innerR;
-        
-        // Local density
-        float densityR = s_density(height, scaleH);
-        float densityM = densityR; // Same for Mie in simple model
-        
-        opticalDepthR += densityR * stepSize;
-        opticalDepthM += densityM * stepSize;
-        
-        // Optical depth from sample to sun (negative means in shadow)
-        float sunDepth = s_opticalDepth(samplePos, sunDir, scaleH, innerR, outerR);
-        
-        // Skip scattering contribution if this point is in planet's shadow
-        if (sunDepth < 0.0) {
-            continue;
+        vec3 samplePos = origin + dir * (tMin + (float(i) + 0.5) * segment);
+        float height = length(samplePos) - Rg;
+        float hr = exp(-height / Hr) * segment;
+        float hm = exp(-height / Hm) * segment;
+        opticalDepthR += hr;
+        opticalDepthM += hm;
+
+        // March from this sample toward the sun
+        vec2 lightHit = s_raySphereIntersect(samplePos, sunDir, Ra);
+        float segmentLight = lightHit.y / float(NUM_LIGHT_SAMPLES);
+        float opticalDepthLightR = 0.0;
+        float opticalDepthLightM = 0.0;
+        int j;
+        for (j = 0; j < NUM_LIGHT_SAMPLES; j++) {
+            vec3 samplePosLight = samplePos + sunDir * (float(j) + 0.5) * segmentLight;
+            float heightLight = length(samplePosLight) - Rg;
+            if (heightLight < 0.0) break; // sun blocked by the planet
+            opticalDepthLightR += exp(-heightLight / Hr) * segmentLight;
+            opticalDepthLightM += exp(-heightLight / Hm) * segmentLight;
         }
-        
-        // Total optical depth (to sun + to camera so far)
-        vec3 tau = (opticalDepthR + sunDepth) * Kr * wavelengthInv +
-                   (opticalDepthM + sunDepth) * Km;
-        
-        // Transmittance
-        vec3 attenuation = exp(-tau);
-        
-        // Accumulate scattering
-        rayleighAccum += densityR * attenuation * stepSize;
-        mieAccum += densityM * attenuation * stepSize;
+
+        // Only fully lit samples contribute (soft terminator instead of a hard cutoff)
+        if (j == NUM_LIGHT_SAMPLES) {
+            vec3 tau = betaR * (opticalDepthR + opticalDepthLightR) +
+                       betaM * 1.1 * (opticalDepthM + opticalDepthLightM);
+            vec3 attenuation = exp(-tau);
+            sumR += attenuation * hr;
+            sumM += attenuation * hm;
+        }
     }
-    
-    // Phase functions
-    float cosTheta = dot(dir, sunDir);
-    float phaseR = s_phaseR(cosTheta);
-    float phaseM = s_phaseM(cosTheta, g);
-    
-    // Final color
-    vec3 rayleigh = rayleighAccum * Kr * wavelengthInv * phaseR;
-    vec3 mie = mieAccum * Km * phaseM;
-    
-    return sunIntensity * (rayleigh + mie);
+
+    return sunIntensity * (sumR * betaR * phaseR + sumM * betaM * phaseM);
 }
 
 // Convert pixel to view direction
@@ -180,14 +131,37 @@ vec3 s_getViewDir(ivec2 texel, ivec2 res, vec3 forward, vec3 up, float fov, floa
     return normalize(forward + right * uv.x * tanFov * aspect + trueUp * uv.y * tanFov);
 }
 
+// Convert a cubemap face index plus in-face UV (-1..1) to a world-space direction
+// Face order matches Vulkan cube layers: 0=+X 1=-X 2=+Y 3=-Y 4=+Z 5=-Z
+vec3 s_getCubeDir(int face, vec2 uv) {
+    vec3 dir;
+    if (face == 0)      dir = vec3( 1.0, -uv.y, -uv.x); // +X
+    else if (face == 1) dir = vec3(-1.0, -uv.y,  uv.x); // -X
+    else if (face == 2) dir = vec3( uv.x,  1.0,  uv.y); // +Y
+    else if (face == 3) dir = vec3( uv.x, -1.0, -uv.y); // -Y
+    else if (face == 4) dir = vec3( uv.x, -uv.y,  1.0); // +Z
+    else                dir = vec3(-uv.x, -uv.y, -1.0); // -Z
+    return normalize(dir);
+}
+
 void main() {
     ivec2 texel = ivec2(gl_GlobalInvocationID.xy);
+#ifdef OUTPUT_CUBEMAP
+    ivec2 res = imageSize(outputTexture).xy;
+#else
     ivec2 res = imageSize(outputTexture);
+#endif
     if (texel.x >= res.x || texel.y >= res.y) return;
-    
+
+#ifdef OUTPUT_CUBEMAP
+    // Each layer is one cube face; cameraDir/cameraUp/fovY are unused (faces fix a 90 degree view)
+    int face = int(gl_GlobalInvocationID.z);
+    vec2 uv = (vec2(texel) + 0.5) / vec2(res) * 2.0 - 1.0;
+    vec3 viewDir = s_getCubeDir(face, uv);
+#else
     // Compute aspect ratio from texture dimensions
     float aspectRatio = float(res.x) / float(res.y);
-    
+
     vec3 viewDir = s_getViewDir(
         texel, res,
         normalize(pc.cameraDir),
@@ -195,26 +169,21 @@ void main() {
         pc.fovY,
         aspectRatio
     );
-    
-    // Compute camera position from altitude (innerRadius + altitude)
-    vec3 cameraPos = vec3(0.0, pc.innerRadius + pc.cameraAltitude, 0.0);
-    
-    vec3 color = s_scatter(
-        cameraPos,
-        viewDir,
-        normalize(pc.sunDirection),
-        pc.innerRadius,
-        pc.outerRadius,
-        pc.scaleDepth,
-        pc.kr,
-        pc.km,
-        pc.eSun,
-        pc.g,
-        pc.invWavelength
-    );
-    
+#endif
+
+    // betaR from the wavelength tint, betaM scalar; both in 1/m (the 1e-6 scale is the physical unit)
+    vec3 betaR = pc.invWavelength * 1.0e-6;
+    vec3 betaM = vec3(pc.km) * 1.0e-6;
+    vec3 cameraPos = vec3(0.0, Rg + pc.cameraAltitude, 0.0);
+
+    vec3 color = s_scatter(cameraPos, viewDir, normalize(pc.sunDirection), betaR, betaM, pc.g, pc.eSun);
+
     // Tone mapping
     color = 1.0 - exp(-color);
-    
+
+#ifdef OUTPUT_CUBEMAP
+    imageStore(outputTexture, ivec3(texel, face), vec4(color, 1.0));
+#else
     imageStore(outputTexture, texel, vec4(color, 1.0));
+#endif
 }

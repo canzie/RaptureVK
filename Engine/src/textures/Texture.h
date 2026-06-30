@@ -81,7 +81,6 @@ class Texture {
     VkFormat getFormat() const { return toVkFormat(m_spec.format); }
 
     VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType = TextureViewType::DEFAULT) const;
-    VkDescriptorImageInfo getStorageImageDescriptorInfo() const;
     uint32_t getBindlessIndex();
 
     VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask,
@@ -131,6 +130,7 @@ class Texture {
     VkImageView m_imageView = VK_NULL_HANDLE;
     VkImageView m_imageViewStencilOnly = VK_NULL_HANDLE;
     VkImageView m_imageViewDepthOnly = VK_NULL_HANDLE;
+    VkImageView m_imageViewStorage = VK_NULL_HANDLE;
 
     VmaAllocation m_allocation = VK_NULL_HANDLE;
 

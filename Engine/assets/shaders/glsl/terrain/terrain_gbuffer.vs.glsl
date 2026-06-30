@@ -28,7 +28,6 @@ layout(set = 3, binding = 1) readonly buffer TerrainChunkBuffer {
 
 // Textures (bindless)
 layout(set = 3, binding = 0) uniform sampler2D u_textures[];
-layout(set = 3, binding = 0) uniform sampler3D u_textures3D[];
 
 layout(push_constant) uniform TerrainPushConstants {
     uint cameraSSBOIndex;
@@ -37,7 +36,7 @@ layout(push_constant) uniform TerrainPushConstants {
     uint continentalnessIndex; // Also used for single heightmap when useMultiNoise = 0
     uint erosionIndex;
     uint peaksValleysIndex;
-    uint noiseLUTIndex;
+    uint splineCurveIndex;
     uint useMultiNoise;
     uint lodResolution;
     float heightScale;
@@ -67,7 +66,7 @@ void main() {
     vec2 worldXZ = chunk.worldOffset + localPos;
 
     float rawHeight = pc.useMultiNoise > 0u
-        ? sampleHeightRaw_CEPV(worldXZ, pc.terrainWorldSize, u_textures[pc.continentalnessIndex], u_textures[pc.erosionIndex], u_textures[pc.peaksValleysIndex], u_textures3D[pc.noiseLUTIndex])
+        ? sampleHeightRaw_CEPV(worldXZ, pc.terrainWorldSize, u_textures[pc.continentalnessIndex], u_textures[pc.erosionIndex], u_textures[pc.peaksValleysIndex], u_textures[pc.splineCurveIndex])
         : sampleHeightRaw_Single(worldXZ, pc.terrainWorldSize, u_textures[pc.continentalnessIndex]);
     float height = rawToWorldHeight(rawHeight, pc.heightScale);
 

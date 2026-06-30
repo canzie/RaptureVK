@@ -113,12 +113,18 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     sunLightComp.castsShadow = true;
     sunLight.addComponent<Rapture::CascadedShadowComponent>(2048.0f, 2048.0f, 4, 0.8f);
 
-    // Create environment entity with skybox
-    auto skyboxPath = rootPath / "assets/textures/cubemaps/default.cubemap";
-    if (std::filesystem::exists(skyboxPath)) {
-        auto envEntity = activeScene.createEnvironmentEntity();
-        envEntity.addComponent<Rapture::SkyboxComponent>(skyboxPath, 0.1f);
-        // Renderer will query for SkyboxComponent directly
+    // Create environment entity with a procedurally generated atmosphere skybox
+    {
+        Rapture::ProceduralTextureConfig skyConfig;
+        skyConfig.name = "atmosphere_skybox";
+        constexpr float timeOfDay = 12.0f;
+        auto skyCubemap = Rapture::ProceduralTexture::generateAtmosphereCubemap(timeOfDay, nullptr, skyConfig);
+        if (skyCubemap) {
+            auto envEntity = activeScene.environment();
+            auto &sky = envEntity.addComponent<Rapture::SkyboxComponent>(skyCubemap, 0.1f);
+            sky.proceduralSky = true;
+            sky.timeOfDay = timeOfDay;
+        }
     }
 
     {
@@ -130,33 +136,14 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         }
     }
 
-    // Generate atmospheric scattering texture (GPU Gems 2 implementation)
+    // Generate a flat atmospheric scattering preview texture
     {
         Rapture::ProceduralTextureConfig config;
         config.name = "test_atmosphere";
         config.format = Rapture::TextureFormat::RGBA16F;
         config.srgb = false;
 
-        // Use normalized space: planet radius = 1.0, atmosphere to ~1.025
-        Rapture::AtmospherePushConstants atmoParams{};
-        // Sun must have -Z component to be in front of camera (which looks in -Z)
-        glm::vec3 sunDir = glm::normalize(glm::vec3(0.3f, 0.5f, -0.8f));
-        atmoParams.cameraPos = glm::vec3(0.0f, 1.001f, 0.0f);
-        atmoParams.innerRadius = 1.0f;
-        atmoParams.sunDirection = sunDir;
-        atmoParams.outerRadius = 1.025f;
-        atmoParams.cameraDir = glm::vec3(0.0f, 0.0f, -1.0f);
-        atmoParams.scaleDepth = 0.25f;
-        atmoParams.cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-        atmoParams.kr = 0.0025f;
-        atmoParams.invWavelength = glm::vec3(5.602f, 9.473f, 19.644f);
-        atmoParams.km = 0.0015f;
-        atmoParams.eSun = 20.0f;
-        atmoParams.g = 0.76f;
-        atmoParams.fovY = 1.5708f;
-        atmoParams.cameraAltitude = 0.0003f;
-
-        auto atmosphereTexture = Rapture::ProceduralTexture::generateAtmosphere(12.0f, &atmoParams, config);
+        auto atmosphereTexture = Rapture::ProceduralTexture::generateAtmosphere(12.0f, nullptr, config);
         if (atmosphereTexture) {
             Rapture::RP_INFO("Generated atmospheric scattering texture: {}", config.name);
         }

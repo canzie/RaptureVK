@@ -166,6 +166,10 @@ Texture::~Texture()
         vkDestroyImageView(device, m_imageViewStencilOnly, nullptr);
     }
 
+    if (m_imageViewStorage != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, m_imageViewStorage, nullptr);
+    }
+
     if (m_image != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE) {
         vmaDestroyImage(allocator, m_image, m_allocation);
     }
@@ -611,6 +615,16 @@ void Texture::createImageView()
         throw std::runtime_error("Failed to create texture image view!");
     }
 
+    if (isCubeType(m_spec.type) && m_spec.storageImage) {
+        VkImageViewCreateInfo storageViewInfo = viewInfo;
+        storageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        storageViewInfo.subresourceRange.layerCount = 6;
+        if (vkCreateImageView(device, &storageViewInfo, nullptr, &m_imageViewStorage) != VK_SUCCESS) {
+            RP_CORE_ERROR("Failed to create cubemap storage image view!");
+            return;
+        }
+    }
+
     // Create additional views for depth-stencil formats
     if (isDepthFormat(m_spec.format)) {
 
@@ -644,6 +658,7 @@ VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) 
 {
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.sampler = m_sampler->getSamplerVk();
     switch (viewType) {
     case TextureViewType::DEFAULT:
     case TextureViewType::COLOR:
@@ -655,6 +670,11 @@ VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) 
     case TextureViewType::DEPTH:
         imageInfo.imageView = m_imageViewDepthOnly;
         break;
+    case TextureViewType::STORAGE:
+        imageInfo.imageView = m_imageViewStorage != VK_NULL_HANDLE ? m_imageViewStorage : m_imageView;
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        imageInfo.sampler = VK_NULL_HANDLE;
+        break;
     default:
         RP_CORE_WARN("Invalid texture view type! Using default view.");
         imageInfo.imageView = m_imageView;
@@ -665,16 +685,6 @@ VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) 
         imageInfo.imageView = m_imageView;
     }
 
-    imageInfo.sampler = m_sampler->getSamplerVk();
-    return imageInfo;
-}
-
-VkDescriptorImageInfo Texture::getStorageImageDescriptorInfo() const
-{
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL; // Storage images use GENERAL layout
-    imageInfo.imageView = m_imageView;
-    imageInfo.sampler = VK_NULL_HANDLE; // Storage images don't use samplers
     return imageInfo;
 }
 

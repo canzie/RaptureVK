@@ -154,7 +154,7 @@ class DescriptorSet {
 
     VkDevice m_device;
     VkDescriptorSetLayout m_layout;
-    VkDescriptorSet m_set;
+    VkDescriptorSet m_set = VK_NULL_HANDLE;
 
     std::unordered_map<DescriptorSetBindingLocation, std::shared_ptr<DescriptorBindingUniformBuffer>> m_uniformBufferBindings;
     std::unordered_map<DescriptorSetBindingLocation, std::shared_ptr<DescriptorBindingTexture>> m_textureBindings;
