@@ -1,7 +1,7 @@
 #include "ComponentEditors.h"
 
 #include "components/Components.h"
-#include "generators/textures/ProceduralTextures.h"
+#include "components/systems/Environment.h"
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -725,17 +725,6 @@ void SkyboxEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             m_entity.getComponent<Rapture::SkyboxComponent>().isEnabled = b;
             m_entity.markDirty();
         });
-        s_rowSlider(t, "Time of Day", &m_timeOfDay, 0.0f, 24.0f, [this](float v) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::SkyboxComponent>()) {
-                return;
-            }
-            auto &sc = m_entity.getComponent<Rapture::SkyboxComponent>();
-            sc.timeOfDay = v;
-            if (sc.proceduralSky && sc.skyboxTexture != nullptr) {
-                Rapture::ProceduralTexture::regenerateAtmosphereCubemap(*sc.skyboxTexture, v);
-            }
-            m_entity.markDirty();
-        });
     });
 }
 
@@ -748,7 +737,56 @@ void SkyboxEditor::sync(const Rapture::Entity &entity)
     const auto &sc = entity.getComponent<Rapture::SkyboxComponent>();
     m_intensity = sc.skyIntensity;
     m_isEnabled = sc.isEnabled;
-    m_timeOfDay = sc.timeOfDay;
+}
+
+void AtmosphereEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowSlider(t, "Time of Day", &m_component.timeOfDay, 0.0f, 24.0f, [this](float) { pushToComponent(); });
+        s_rowSlider(t, "Latitude", &m_component.latitude, -90.0f, 90.0f, [this](float) { pushToComponent(); });
+        s_rowSlider(t, "Longitude", &m_component.longitude, -180.0f, 180.0f, [this](float) { pushToComponent(); });
+        s_rowSlider(t, "Mie", &m_component.mie, 0.0f, 60.0f, [this](float) { pushToComponent(); });
+        s_rowSlider(t, "Mie G", &m_component.mieG, 0.0f, 0.999f, [this](float) { pushToComponent(); });
+        s_rowDragFloat(t, "Sun Intensity", &m_sunIntensity, 0.1, 0.0, 1000.0, {}, [this](double v) {
+            m_component.sunIntensity = static_cast<float>(v);
+            pushToComponent();
+        });
+        s_rowDragFloat(t, "Camera Altitude", &m_cameraAltitude, 1.0, 0.0, 100000.0, {}, [this](double v) {
+            m_component.cameraAltitude = static_cast<float>(v);
+            pushToComponent();
+        });
+        s_rowVec3(t, "Wavelength (nm)", m_wavelengths, 1.0, 380.0, 740.0, [this]() {
+            m_component.rayleigh = glm::vec3(Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[0])),
+                                             Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[1])),
+                                             Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[2])));
+            pushToComponent();
+        });
+    });
+}
+
+void AtmosphereEditor::sync(const Rapture::Entity &entity)
+{
+    m_entity = entity;
+    const auto *atmo = entity.tryGetComponent<Rapture::AtmosphereComponent>();
+    if (atmo == nullptr) {
+        return;
+    }
+    m_component = *atmo;
+    m_sunIntensity = m_component.sunIntensity;
+    m_cameraAltitude = m_component.cameraAltitude;
+    m_wavelengths[0] = Rapture::Environment::wavelengthNm(m_component.rayleigh.x);
+    m_wavelengths[1] = Rapture::Environment::wavelengthNm(m_component.rayleigh.y);
+    m_wavelengths[2] = Rapture::Environment::wavelengthNm(m_component.rayleigh.z);
+}
+
+void AtmosphereEditor::pushToComponent()
+{
+    auto *atmo = m_entity.tryGetComponent<Rapture::AtmosphereComponent>();
+    if (atmo == nullptr) {
+        return;
+    }
+    *atmo = m_component;
+    m_entity.markDirty();
 }
 
 void StubEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

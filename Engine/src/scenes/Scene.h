@@ -8,6 +8,7 @@
 namespace Rapture {
 
 class Entity;
+class Environment;
 class SceneRenderData;
 struct RenderContext;
 
@@ -68,7 +69,7 @@ class Scene {
 
   private:
     entt::registry m_registry;
-    entt::entity m_environmentHandle = entt::null;
+    std::unique_ptr<Environment> m_environment;
     std::unique_ptr<SceneRenderData> m_renderData;
     SceneSettings m_config;
 

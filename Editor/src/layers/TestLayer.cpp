@@ -95,8 +95,8 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     auto &spotLightComp = spotLight.addComponent<Rapture::SpotLightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White color
                                                                               1.2f,                        // Intensity
                                                                               15.0f,                       // Range
-                                                                              30.0f,                       // Inner cone angle (degrees)
-                                                                              45.0f                        // Outer cone angle (degrees)
+                                                                              30.0f, // Inner cone angle (degrees)
+                                                                              45.0f  // Outer cone angle (degrees)
     );
     spotLightComp.castsShadow = false;
     spotLight.addComponent<Rapture::ShadowComponent>(1028.0f, 1028.0f);
@@ -116,16 +116,10 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
     // Create environment entity with a procedurally generated atmosphere skybox
     {
-        Rapture::ProceduralTextureConfig skyConfig;
-        skyConfig.name = "atmosphere_skybox";
-        constexpr float timeOfDay = 12.0f;
-        auto skyCubemap = Rapture::ProceduralTexture::generateAtmosphereCubemap(timeOfDay, nullptr, skyConfig);
-        if (skyCubemap) {
-            auto envEntity = activeScene.environment();
-            auto &sky = envEntity.addComponent<Rapture::SkyboxComponent>(skyCubemap, 0.1f);
-            sky.proceduralSky = true;
-            sky.timeOfDay = timeOfDay;
-        }
+        auto envEntity = activeScene.environment();
+        auto &sky = envEntity.addComponent<Rapture::SkyboxComponent>(nullptr, 0.1f);
+        sky.useAtmosphereSkybox = true;
+        envEntity.addComponent<Rapture::AtmosphereComponent>().timeOfDay = 12.0f;
     }
 
     {

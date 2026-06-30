@@ -209,12 +209,25 @@ struct InstanceShapeComponent {
     }
 };
 
+struct AtmosphereComponent {
+    float timeOfDay = 12.0f;
+    float latitude = 0.0f;
+    float longitude = 0.0f;
+
+    glm::vec3 rayleigh = glm::vec3(5.8f, 13.5f, 33.1f);
+    float mie = 21.0f;
+    float sunIntensity = 20.0f;
+    float mieG = 0.76f;
+    float cameraAltitude = 1.0f;
+
+    bool operator==(const AtmosphereComponent &other) const = default;
+};
+
 struct SkyboxComponent {
     Texture *skyboxTexture = nullptr;
     float skyIntensity = 1.0f;
     bool isEnabled = true;
-    bool proceduralSky = false;
-    float timeOfDay = 12.0f;
+    bool useAtmosphereSkybox = false;
 
     SkyboxComponent() = default;
     SkyboxComponent(Texture *skyboxTexture, float skyIntensity = 1.0f) : skyboxTexture(skyboxTexture), skyIntensity(skyIntensity) {}

@@ -1,5 +1,7 @@
 #include "ProceduralTextures.h"
 
+#include "components/systems/Environment.h"
+
 #include "asset_manager/Asset.h"
 #include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
@@ -377,13 +379,7 @@ static AtmospherePushConstants s_buildAtmospherePushConstants(float timeOfDay, c
     }
 
     AtmospherePushConstants pc;
-    // 0 = midnight, 6 = sunrise, 12 = noon, 18 = sunset
-    // Sun must have -Z component to be in front of camera (which looks in -Z)
-    float sunAngle = (timeOfDay - 6.0f) / 12.0f * 3.14159265359f; // 0 at 6am, PI at 6pm
-    float sunY = glm::sin(sunAngle);                              // Height in sky
-    float sunHoriz = glm::cos(sunAngle);
-    // Sun orbits in front of camera (XZ plane with -Z forward)
-    glm::vec3 sunDir = glm::normalize(glm::vec3(sunHoriz * 0.3f, sunY, -0.8f));
+    glm::vec3 sunDir = Environment::sunDirection(timeOfDay, 0.0f, 0.0f);
 
     // Earth-like atmospheric defaults (real units; the shader holds the planet/atmosphere radii)
     pc.cameraPos = glm::vec3(0.0f);

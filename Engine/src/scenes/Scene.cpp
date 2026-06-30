@@ -3,6 +3,7 @@
 
 #include "components/Components.h"
 #include "components/TerrainComponent.h"
+#include "components/systems/Environment.h"
 #include "renderer/SceneRenderData.h"
 
 #include "asset_manager/AssetManager.h"
@@ -23,7 +24,7 @@ Scene::Scene(const std::string &sceneName)
     uint32_t frameCount = app.getMainWindow().getSwapChain()->getImageCount();
     m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, frameCount);
 
-    m_environmentHandle = createEntity("Environment").getHandle();
+    m_environment = std::make_unique<Environment>(createEntity("Environment"));
 }
 
 Scene::~Scene()
@@ -105,7 +106,7 @@ Entity Scene::createSphere(const std::string &name)
 
 void Scene::destroyEntity(Entity entity)
 {
-    if (entity.isValid() && entity.getHandle() == m_environmentHandle) {
+    if (entity.isValid() && entity == m_environment->getEntity()) {
         RP_CORE_WARN("The environment entity cannot be destroyed");
         return;
     }
@@ -170,6 +171,8 @@ void Scene::onUpdate(float dt)
             terrain.generator->update(cameraPosition, *frustum, frameCounter);
         }
     }
+
+    m_environment->update();
 
     // Update regular shadow maps
     auto shadowView = m_registry.view<TransformComponent, ShadowComponent>();
@@ -260,7 +263,7 @@ Entity Scene::getMainCamera() const
 
 Entity Scene::environment() const
 {
-    return Entity(m_environmentHandle, const_cast<Scene *>(this));
+    return m_environment->getEntity();
 }
 
 void Scene::registerBLAS(Entity &entity)

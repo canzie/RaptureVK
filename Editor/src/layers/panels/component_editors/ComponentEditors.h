@@ -3,6 +3,7 @@
 
 #include "ComponentEditorBase.h"
 #include "Icons.h"
+#include "components/Components.h"
 #include "layers/panels/components/color_field.h"
 
 #include <glm/glm.hpp>
@@ -167,7 +168,23 @@ class SkyboxEditor : public ComponentEditorBase {
   private:
     float m_intensity = 1.0f;
     bool m_isEnabled = true;
-    float m_timeOfDay = 12.0f;
+    Rapture::Entity m_entity;
+};
+
+class AtmosphereEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Atmosphere"; }
+    const char *icon() const override { return ""; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    void pushToComponent();
+
+    Rapture::AtmosphereComponent m_component;
+    double m_wavelengths[3] = {680.0, 550.0, 440.0};
+    double m_sunIntensity = 20.0;
+    double m_cameraAltitude = 1.0;
     Rapture::Entity m_entity;
 };
 

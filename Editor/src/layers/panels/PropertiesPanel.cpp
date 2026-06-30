@@ -246,6 +246,7 @@ void PropertiesPanel::refresh()
         ensure<ShadowEditor>(e.hasComponent<Rapture::ShadowComponent>());
         ensure<CascadedShadowEditor>(e.hasComponent<Rapture::CascadedShadowComponent>());
         ensure<SkyboxEditor>(e.hasComponent<Rapture::SkyboxComponent>());
+        ensure<AtmosphereEditor>(e.hasComponent<Rapture::AtmosphereComponent>());
     }
 
     relayout();
