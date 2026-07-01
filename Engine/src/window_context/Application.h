@@ -45,6 +45,12 @@ class Application {
     ViewportManager &getViewportManager() { return *m_viewportManager; }
     const ViewportManager &getViewportManager() const { return *m_viewportManager; }
 
+    /**
+     * @brief App-wide frame-in-flight ring index, advanced once per main-loop iteration.
+     * @return The slot every per-frame CPU->GPU resource should be indexed by.
+     */
+    uint32_t getFrameInFlightIndex() const { return m_frameInFlightIndex; }
+
     static Application &getInstance() { return *s_instance; }
     static const RenderContext &getRenderContext() { return s_instance->m_vulkanContext->getRenderContext(); }
 
@@ -64,6 +70,8 @@ class Application {
     std::vector<std::unique_ptr<RenderWindow>> m_secondaryWindows;
 
     std::unique_ptr<ViewportManager> m_viewportManager;
+
+    uint32_t m_frameInFlightIndex = 0;
 
     static Application *s_instance;
 };

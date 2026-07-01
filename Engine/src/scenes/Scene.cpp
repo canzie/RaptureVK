@@ -119,14 +119,13 @@ void Scene::destroyEntity(Entity entity)
 void Scene::onUpdate(float dt)
 {
     (void)dt;
-    static uint32_t frameCounter = 0;
 
     // Get current frame dimensions for camera updates
     auto &app = Application::getInstance();
     auto swapChain = app.getMainWindow().getSwapChain();
     float width = static_cast<float>(swapChain->getExtent().width);
     float height = static_cast<float>(swapChain->getExtent().height);
-    uint32_t frameCount = swapChain->getImageCount();
+    uint32_t frameCounter = app.getFrameInFlightIndex();
 
     {
         RAPTURE_PROFILE_SCOPE("OldPerEntity::updateMeshes");
@@ -210,8 +209,6 @@ void Scene::onUpdate(float dt)
     }
 
     m_renderData->onUpdate(frameCounter);
-
-    frameCounter = (frameCounter + 1) % frameCount;
 
     updateTLAS();
 }

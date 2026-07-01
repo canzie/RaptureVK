@@ -182,6 +182,8 @@ void Application::run()
 
         m_vulkanContext->getRenderContext().commandPoolManager->endFrame();
 
+        m_frameInFlightIndex = (m_frameInFlightIndex + 1) % m_mainWindow->getSwapChain()->getImageCount();
+
         TracyProfiler::endFrame();
     }
 

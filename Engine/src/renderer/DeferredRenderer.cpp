@@ -80,6 +80,8 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
         processPendingViewportResize();
     }
 
+    m_currentFrame = Application::getInstance().getFrameInFlightIndex();
+
     m_giActive = settings.useGI;
 
     // For PRESENTATION mode, we need to acquire a swapchain image
@@ -160,7 +162,6 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
     }
 
     m_lastRenderedFrame = imageIndex;
-    m_currentFrame = (m_currentFrame + 1) % m_swapChain->getImageCount();
 }
 
 void DeferredRenderer::onSwapChainRecreated()
