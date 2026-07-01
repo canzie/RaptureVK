@@ -58,6 +58,7 @@ class DeferredRenderer : public Renderer {
     EventConnection m_swapchainRecreatedConn;
 
     bool m_giActive = true;
+    uint32_t m_lightingFlags = RENDER_ALL;
 };
 
 } // namespace Rapture

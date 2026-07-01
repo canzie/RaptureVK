@@ -238,7 +238,7 @@ vec3 DDGIGetVolumeIrradiance(
         uvec3 adjacentProbeTexelCoords = DDGIGetProbeTexelCoords(adjacentProbeIndex, volume);
         uint adjacentProbeState = texelFetch(probeClassificationAtlas, ivec3(adjacentProbeTexelCoords), 0).r;
         const uint PROBE_STATE_ACTIVE = 0u;
-        if (adjacentProbeState != PROBE_STATE_ACTIVE) continue;
+        if (volume.probeClassificationEnabled > 0.0 && adjacentProbeState != PROBE_STATE_ACTIVE) continue;
 
         vec3 adjacentProbeWorldPosition = DDGIGetProbeWorldPosition(adjacentProbeCoords, volume, probeOffsetAtlas);
 

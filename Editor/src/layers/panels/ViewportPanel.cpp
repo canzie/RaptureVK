@@ -8,8 +8,11 @@
 #include "viewport/Viewport.h"
 #include "window_context/Application.h"
 
+#include <components/checkbox.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
+
+#include "renderer/RenderSettings.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <math/math.h>
@@ -177,12 +180,48 @@ void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
                 if (viewport == nullptr) {
                     return Amethyst::EventResult::CONSUMED;
                 }
-                bool useGI = !viewport->renderSettings().useGI;
-                viewport->renderSettings().useGI = useGI;
+                bool useGI = !viewport->renderSettings().useGlobalIllumination();
+                viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, useGI);
                 m_giBtn->setText(useGI ? "GI" : "Direct");
                 return Amethyst::EventResult::CONSUMED;
             };
         });
+
+    f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_showDirectLighting},
+               [](Amethyst::CheckboxScope &c) {
+                   c.component.onValueChanged = [](bool on) {
+                       auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+                       if (viewport == nullptr) {
+                           return;
+                       }
+                       viewport->renderSettings().setFlag(Rapture::RENDER_SHOW_DIRECT, on);
+                   };
+               });
+    f.textLabel({.base = {.size = Amethyst::UDim2::fromOffset(56, 24)}, .text = HEADER_BTN_TEXT, .label = "Direct"});
+
+    f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_showIndirectLighting},
+               [](Amethyst::CheckboxScope &c) {
+                   c.component.onValueChanged = [](bool on) {
+                       auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+                       if (viewport == nullptr) {
+                           return;
+                       }
+                       viewport->renderSettings().setFlag(Rapture::RENDER_SHOW_INDIRECT, on);
+                   };
+               });
+    f.textLabel({.base = {.size = Amethyst::UDim2::fromOffset(56, 24)}, .text = HEADER_BTN_TEXT, .label = "Indirect"});
+
+    f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_rawIrradiance},
+               [](Amethyst::CheckboxScope &c) {
+                   c.component.onValueChanged = [](bool on) {
+                       auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+                       if (viewport == nullptr) {
+                           return;
+                       }
+                       viewport->renderSettings().setFlag(Rapture::RENDER_MODULATE_INDIRECT, !on);
+                   };
+               });
+    f.textLabel({.base = {.size = Amethyst::UDim2::fromOffset(56, 24)}, .text = HEADER_BTN_TEXT, .label = "Raw GI"});
 }
 
 Rapture::CameraController *ViewportPanel::cameraController() const

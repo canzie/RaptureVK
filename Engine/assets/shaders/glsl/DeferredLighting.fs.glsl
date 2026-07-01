@@ -113,7 +113,7 @@ layout(push_constant) uniform PushConstants {
     uint GBufferMaterialHandle;
     uint GBufferDepthHandle;
 
-    uint useDDGI;
+    uint lightingFlags;
     uint probeVolumeHandle;
     uint probeIrradianceHandle;
     uint probeVisibilityHandle;
@@ -124,6 +124,13 @@ layout(push_constant) uniform PushConstants {
     vec4 fogColor;     // .rgb = color, .a = enabled
     vec2 fogDistances; // .x = near, .y = far
 } pc;
+
+const uint RENDER_NONE = 0u;
+const uint RENDER_USE_GLOBAL_ILLUMINATION = 1u << 0;
+const uint RENDER_SHOW_DIRECT = 1u << 1;
+const uint RENDER_SHOW_INDIRECT = 1u << 2;
+const uint RENDER_MODULATE_INDIRECT = 1u << 3;
+const uint RENDER_ALL = 0xFFFFFFFFu;
 
 float exposure(float fstop) {
     return pow(2.0, fstop);
@@ -505,7 +512,7 @@ void main() {
     vec3 Lo = vec3(0.0);
     int debugCascadeIndex = -1;
 
-    uint lightCount = pc.lightStaticCount + pc.lightDynamicCount;
+    uint lightCount = ((pc.lightingFlags & RENDER_SHOW_DIRECT) != 0u) ? (pc.lightStaticCount + pc.lightDynamicCount) : 0u;
     for(uint li = 0; li < lightCount; li++) {
         uint lightSlot = (li < pc.lightStaticCount) ? li : (pc.lightDynamicOffset + li - pc.lightStaticCount);
         LightData light = u_lightSSBO[pc.lightDataSSBOIndex].lights[lightSlot];
@@ -570,16 +577,22 @@ void main() {
         Lo += contribution * attenuation * shadowFactor;
     }
 
-    vec3 indirectDiffuse = vec3(0.03) * albedo ;
+    vec3 indirectDiffuse = vec3(0.0);
 
-    if (pc.useDDGI > 0) {
-        vec3 F0 = mix(vec3(0.04), albedo, metallic);
-        vec3 kD_indirect = (vec3(1.0) - F0) * (1.0 - metallic);
-        
-        vec3 irradiance = getIrradiance(fragPos, N, V, u_DDGI_Volume);
-        indirectDiffuse = irradiance * (albedo/3.14159265359) * kD_indirect * ao;
+    if ((pc.lightingFlags & RENDER_SHOW_INDIRECT) != 0u) {
+        if ((pc.lightingFlags & RENDER_USE_GLOBAL_ILLUMINATION) != 0u) {
+            vec3 irradiance = getIrradiance(fragPos, N, V, u_DDGI_Volume);
 
-        
+            if ((pc.lightingFlags & RENDER_MODULATE_INDIRECT) != 0u) {
+                vec3 F0 = mix(vec3(0.04), albedo, metallic);
+                vec3 kD_indirect = (vec3(1.0) - F0) * (1.0 - metallic);
+                indirectDiffuse = irradiance * (albedo/3.14159265359) * kD_indirect * ao;
+            } else {
+                indirectDiffuse = irradiance;
+            }
+        } else {
+            indirectDiffuse = vec3(0.03) * albedo;
+        }
     }
 
     vec3 color = indirectDiffuse + Lo;

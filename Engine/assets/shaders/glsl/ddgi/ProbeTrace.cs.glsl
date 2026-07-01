@@ -325,9 +325,9 @@ void main() {
     uint probeState = texelFetch(gUintTextureArrays[pc.probeClassificationHandle], ivec3(probeTexelCoords), 0).r;
 
     const uint PROBE_STATE_ACTIVE = 0u;
-    if (probeState != PROBE_STATE_ACTIVE && rayIndex >= int(u_volume.probeStaticRayCount)) {
+    if (u_volume.probeClassificationEnabled > 0.0 && probeState != PROBE_STATE_ACTIVE && rayIndex >= int(u_volume.probeStaticRayCount)) {
         return;
-    } 
+    }
 
 
     // Get the probe's grid coordinates

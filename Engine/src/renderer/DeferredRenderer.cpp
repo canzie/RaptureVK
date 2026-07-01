@@ -82,7 +82,8 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
 
     m_currentFrame = Application::getInstance().getFrameInFlightIndex();
 
-    m_giActive = settings.useGI;
+    m_giActive = settings.useGlobalIllumination();
+    m_lightingFlags = settings.flags;
 
     // For PRESENTATION mode, we need to acquire a swapchain image
     // For OFFSCREEN mode, we just use m_currentFrame as the target index
@@ -390,10 +391,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         system.run(JobDeclaration(
             [&lightingBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
-             lightingInheritance, lightingPass = m_lightingPass.get(), giActive = m_giActive](JobContext &ctx) {
+             lightingInheritance, lightingPass = m_lightingPass.get(), lightingFlags = m_lightingFlags](JobContext &ctx) {
                 (void)ctx;
-                lightingBuffer =
-                    lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, lightingInheritance, giActive);
+                lightingBuffer = lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame,
+                                                               lightingInheritance, lightingFlags);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 

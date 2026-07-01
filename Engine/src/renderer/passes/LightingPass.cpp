@@ -2,6 +2,7 @@
 #include "window_context/Application.h"
 
 #include "components/FogComponent.h"
+#include "renderer/RenderSettings.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/ShadowMapping.h"
 
@@ -30,7 +31,7 @@ struct LightingPushConstants {
     uint32_t GBufferMaterialHandle;
     uint32_t GBufferDepthHandle;
 
-    uint32_t useDDGI;
+    uint32_t lightingFlags;
     uint32_t probeVolumeHandle;
     uint32_t probeIrradianceHandle;
     uint32_t probeVisibilityHandle;
@@ -92,7 +93,8 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
 }
 
 CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, SceneRenderTarget &renderTarget,
-                                             uint32_t frameIndex, const SecondaryBufferInheritance &inheritance, bool useGI)
+                                             uint32_t frameIndex, const SecondaryBufferInheritance &inheritance,
+                                             uint32_t lightingFlags)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -155,7 +157,8 @@ CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, 
     pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
     pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
 
-    pushConstants.useDDGI = (m_ddgi && useGI) ? 1 : 0;
+    // DDGI indirect requires the GI system to exist; fall back to ambient otherwise
+    pushConstants.lightingFlags = m_ddgi ? lightingFlags : (lightingFlags & ~RENDER_USE_GLOBAL_ILLUMINATION);
 
     // Query FogComponent from scene
     auto fogView = activeScene.getRegistry().view<FogComponent>();

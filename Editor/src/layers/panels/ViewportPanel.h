@@ -52,6 +52,9 @@ class ViewportPanel : public Panel {
     Amethyst::TextButton *m_spaceBtn = nullptr;
     Amethyst::TextButton *m_cameraModeBtn = nullptr;
     Amethyst::TextButton *m_giBtn = nullptr;
+    bool m_showDirectLighting = true;
+    bool m_showIndirectLighting = true;
+    bool m_rawIrradiance = false;
     bool m_viewportHovered = false;
 
     std::unique_ptr<Amethyst::Gizmo> m_gizmo;

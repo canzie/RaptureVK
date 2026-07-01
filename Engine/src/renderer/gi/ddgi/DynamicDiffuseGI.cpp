@@ -852,7 +852,7 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
     probeVolume.probeNumIrradianceInteriorTexels = probeVolume.probeNumIrradianceTexels - 2;
     probeVolume.probeNumDistanceInteriorTexels = probeVolume.probeNumDistanceTexels - 2;
 
-    probeVolume.probeHysteresis = 0.97f;
+    probeVolume.probeHysteresis = 0.99f;
     probeVolume.probeMaxRayDistance = 10000.0f;
     // Self-shadow bias scale (B). The view-bias term is no longer used with the new unified formula.
     probeVolume.probeNormalBias = 0.1f; // B parameter from the paper (works well for most scenes)
