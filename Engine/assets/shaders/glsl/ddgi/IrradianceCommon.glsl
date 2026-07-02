@@ -295,7 +295,7 @@ vec3 DDGIGetVolumeIrradiance(
         
         // Avoid visibility weights ever going all the way to zero because
         // when *no* probe has visibility we need a fallback value
-        weight *= max(0.01, chebyshevWeight);
+        weight *= max(0.05, chebyshevWeight);
 
         // Avoid a weight of zero
         weight = max(0.000001, weight);
@@ -323,16 +323,6 @@ vec3 DDGIGetVolumeIrradiance(
 
         // Sample the probe's irradiance
         vec3 probeIrradiance = textureLod(probeIrradianceAtlas, probeTextureUV, 0.0).rgb;
-
-
-
-        // Check for invalid probe data (black probes indicate probes inside geometry)
-        // Use length check instead of individual component checks to handle small but valid values
-        float probeLength = length(probeIrradiance);
-        if (probeLength < 0.001) {
-            // Reduce weight but don't completely skip to maintain smooth transitions
-            weight *= 0.1;
-        }
 
         // Decode the tone curve, but leave a gamma = 2 curve to approximate sRGB blending
         vec3 exponent = vec3(volume.probeIrradianceEncodingGamma * 0.5);

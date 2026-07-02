@@ -448,6 +448,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             commandBuffer->executeSecondary(*gbufferBuffer);
             m_gbufferPass->endDynamicRendering(commandBuffer, m_currentFrame);
         }
+
         if (lightingBuffer) {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
             m_lightingPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);

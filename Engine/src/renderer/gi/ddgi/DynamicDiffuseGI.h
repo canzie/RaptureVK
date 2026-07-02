@@ -57,14 +57,12 @@ class DynamicDiffuseGI {
 
     std::vector<glm::vec3> &getDebugProbePositions() { return m_DebugProbePositions; }
 
-    std::shared_ptr<UniformBuffer> getProbeVolumeUniformBuffer() { return m_ProbeInfoBuffer; }
-
     uint32_t getRayDataTextureBindlessIndex() const { return m_RayDataTexture ? m_RayDataTexture->getBindlessIndex() : 0; }
 
     const ProbeVolume &getProbeVolume() const { return m_ProbeVolume; }
 
     void updateSkybox(Scene &scene);
-    void updateProbeVolume();
+    void updateProbeVolume(uint32_t frameIndex);
     void updateFromIndirectLightingComponent(Scene &scene);
 
     // Get bindless indices for probe textures
@@ -73,11 +71,13 @@ class DynamicDiffuseGI {
     uint32_t getProbeOffsetBindlessIndex() const { return m_probeOffsetBindlessIndex; }
     uint32_t getProbeClassificationBindlessIndex() const { return m_probeClassificationBindlessIndex; }
 
+    const std::vector<std::shared_ptr<UniformBuffer>> &getProbeVolumeUniformBuffers() const { return m_ProbeInfoBuffers; }
+
   private:
     void castRays(Scene &scene, CommandBuffer *commandBuffer, uint32_t frameIndex);
-    void blendTextures(CommandBuffer *commandBuffer);
-    void classifyProbes(CommandBuffer *commandBuffer);
-    void relocateProbes(CommandBuffer *commandBuffer);
+    void blendTextures(CommandBuffer *commandBuffer, uint32_t frameIndex);
+    void classifyProbes(CommandBuffer *commandBuffer, uint32_t frameIndex);
+    void relocateProbes(CommandBuffer *commandBuffer, uint32_t frameIndex);
 
     void initTextures();
     void initProbeInfoBuffer();
@@ -105,7 +105,8 @@ class DynamicDiffuseGI {
 
     ProbeVolume m_ProbeVolume;
 
-    std::shared_ptr<UniformBuffer> m_ProbeInfoBuffer;
+    std::vector<std::shared_ptr<UniformBuffer>> m_ProbeInfoBuffers;
+    std::shared_ptr<DescriptorBindingUniformBuffer> m_probeInfoBinding;
 
     // is actually irradiance but iam retarted, will need to update this everywhere :(
     std::shared_ptr<Texture> m_RadianceTexture;
@@ -127,6 +128,8 @@ class DynamicDiffuseGI {
 
     VmaAllocator m_allocator;
     std::shared_ptr<VulkanQueue> m_computeQueue;
+
+    VkDevice m_device = VK_NULL_HANDLE;
 
     CommandPoolHash m_commandPoolHash = 0;
     uint32_t m_framesInFlight;

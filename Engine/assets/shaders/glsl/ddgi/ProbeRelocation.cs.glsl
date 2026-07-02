@@ -26,12 +26,15 @@ layout(set = 4, binding = 4, rgba32f) uniform restrict image2DArray ProbeOffsets
 #include "ProbeCommon.glsl"
 
 layout(std140, set = 0, binding = 5) uniform ProbeInfo {
-    ProbeVolume u_volume;
-};
+    ProbeVolume volume;
+} u_probeInfo[];
+
+ProbeVolume u_volume;
 
 // Push constants: index into bindless ray-data array
 layout(push_constant) uniform PushConstants {
     uint rayDataIndex;
+    uint volumeSlot;
 } pc;
 
 // -----------------------------------------------------------------------------
@@ -52,6 +55,7 @@ float DDGILoadProbeRayDistance_GLSL(ivec3 rayTexelCoords) {
 //  Entry point (GLSL port of DDGIProbeRelocationCS)
 // -----------------------------------------------------------------------------
 void main() {
+    u_volume = u_probeInfo[pc.volumeSlot].volume;
     // Probe index for this thread (1D dispatch: X dimension only)
     uint probeIndex = gl_GlobalInvocationID.x;
 

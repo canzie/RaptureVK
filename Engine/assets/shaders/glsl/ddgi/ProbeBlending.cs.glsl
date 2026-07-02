@@ -37,6 +37,7 @@ layout(push_constant) uniform PushConstants {
     uint prevTextureIndex; // will be irradiance or distance based on the blend type
     uint rayDataIndex;
     uint probeClassificationHandle;
+    uint volumeSlot;
 } pc;
 
 #include "ProbeCommon.glsl"
@@ -47,8 +48,10 @@ layout(push_constant) uniform PushConstants {
 // Input Uniforms / Buffers
 // Contains global information about the probe grid
 layout(std140, set=0, binding = 5) uniform ProbeInfo {
-    ProbeVolume u_volume;
-};
+    ProbeVolume volume;
+} u_probeInfo[];
+
+ProbeVolume u_volume;
 
 
 
@@ -97,6 +100,7 @@ void UpdateBorderTexelsGLSL(
 }
 
 void main() {
+    u_volume = u_probeInfo[pc.volumeSlot].volume;
 #if defined(DDGI_BLEND_RADIANCE) || defined(DDGI_BLEND_DISTANCE)
     // Determine if the current thread is processing an INTERIOR texel
     // Border texels are at local invocation 0 or (NUM_INTERIOR_TEXELS + 1) which is (NUM_TEXELS - 1)
@@ -265,10 +269,10 @@ void main() {
         // dark convergence.
         const float c_threshold = 1.0 / 1024.0;
         vec3 lerpDelta = (1.0 - hysteresis) * delta;
-        
+
         float maxResultComponent = max(result.r, max(result.g, result.b));
         float maxMeanComponent = max(probeIrradianceMean.r, max(probeIrradianceMean.g, probeIrradianceMean.b));
-        
+
         if (maxResultComponent < maxMeanComponent)
         {
             lerpDelta = min(max(vec3(c_threshold), abs(lerpDelta)), abs(delta)) * sign(lerpDelta);

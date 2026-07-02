@@ -22,6 +22,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
 #include <random>
+#include <thread>
 
 namespace Rapture {
 
@@ -38,28 +39,32 @@ struct DDGITracePushConstants {
     uint32_t probeOffsetHandle;
     uint32_t probeClassificationHandle;
     float skyIntensity;
+    uint32_t volumeSlot;
 };
 
 struct DDGIBlendPushConstants {
     uint32_t prevTextureIndex;
     uint32_t rayDataIndex;
     uint32_t probeClassificationHandle;
+    uint32_t volumeSlot;
 };
 
 struct DDGIClassifyPushConstants {
     uint32_t rayDataIndex;
     uint32_t probeOffsetHandle;
+    uint32_t volumeSlot;
 };
 
 struct DDGIRelocatePushConstants {
     uint32_t rayDataIndex;
+    uint32_t volumeSlot;
 };
 
 DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     : m_DDGI_ProbeTraceShader(nullptr), m_DDGI_ProbeIrradianceBlendingShader(nullptr), m_DDGI_ProbeDistanceBlendingShader(nullptr),
       m_DDGI_ProbeRelocationShader(nullptr), m_DDGI_ProbeClassificationShader(nullptr), m_DDGI_ProbeTracePipeline(nullptr),
       m_DDGI_ProbeIrradianceBlendingPipeline(nullptr), m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
-      m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_ProbeInfoBuffer(nullptr),
+      m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr),
       m_framesInFlight(framesInFlight), m_isFirstFrame(true), m_meshCount(0), m_probeIrradianceBindlessIndex(UINT32_MAX),
       m_probeVisibilityBindlessIndex(UINT32_MAX), m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr),
       m_skyIntensity(1.0f), m_probeTraceDescriptorSet(nullptr), m_probeIrradianceBlendingDescriptorSet(nullptr),
@@ -74,6 +79,7 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     m_rc = &vc.getRenderContext();
     m_allocator = vc.getVmaAllocator();
     m_computeQueue = vc.getComputeQueue();
+    m_device = vc.getLogicalDevice();
 
     createPipelines();
 
@@ -89,7 +95,9 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     setupProbeTextures();
 }
 
-DynamicDiffuseGI::~DynamicDiffuseGI() {}
+DynamicDiffuseGI::~DynamicDiffuseGI()
+{
+}
 
 void DynamicDiffuseGI::createPipelines()
 {
@@ -274,8 +282,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
     }
 
     if (m_isVolumeDirty) {
-        // Update the probe volume
-        updateProbeVolume();
+        updateProbeVolume(frameIndex);
     }
     updateSkybox(scene);
 
@@ -283,6 +290,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
     if (!tlas || !tlas->isBuilt() || tlas->getInstanceCount() == 0) {
         return;
     }
+
     auto &vc = Application::getInstance().getVulkanContext();
 
     CommandPoolConfig poolConfig;
@@ -313,7 +321,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::relocateProbes");
-        relocateProbes(commandBuffer);
+        relocateProbes(commandBuffer, frameIndex);
     }
 
     if (m_ProbeOffsetTextureFlattened) {
@@ -322,7 +330,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::classifyProbes");
-        classifyProbes(commandBuffer);
+        classifyProbes(commandBuffer, frameIndex);
     }
 
     if (m_ProbeClassificationTextureFlattened) {
@@ -331,7 +339,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::blendTextures");
-        blendTextures(commandBuffer);
+        blendTextures(commandBuffer, frameIndex);
     }
 
     if (m_IrradianceTextureFlattened) {
@@ -353,7 +361,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
     m_isFirstFrame = false;
 }
 
-void DynamicDiffuseGI::classifyProbes(CommandBuffer *commandBuffer)
+void DynamicDiffuseGI::classifyProbes(CommandBuffer *commandBuffer, uint32_t frameIndex)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -378,6 +386,7 @@ void DynamicDiffuseGI::classifyProbes(CommandBuffer *commandBuffer)
     DDGIClassifyPushConstants pushConstants = {};
     pushConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
     pushConstants.probeOffsetHandle = m_probeOffsetBindlessIndex;
+    pushConstants.volumeSlot = frameIndex;
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeClassificationPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIClassifyPushConstants), &pushConstants);
 
@@ -393,7 +402,7 @@ void DynamicDiffuseGI::classifyProbes(CommandBuffer *commandBuffer)
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &classificationReadBarrier);
 }
 
-void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer)
+void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer, uint32_t frameIndex)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -416,6 +425,7 @@ void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer)
     // Push constants
     DDGIRelocatePushConstants pushConstants = {};
     pushConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
+    pushConstants.volumeSlot = frameIndex;
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeRelocationPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIRelocatePushConstants), &pushConstants);
 
@@ -576,6 +586,7 @@ void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint
     pushConstants.probeOffsetHandle = m_probeOffsetBindlessIndex;
     pushConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
     pushConstants.skyIntensity = m_skyIntensity;
+    pushConstants.volumeSlot = frameIndex;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeTracePipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGITracePushConstants), &pushConstants);
@@ -596,7 +607,7 @@ void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &rayDataReadBarrier);
 }
 
-void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer)
+void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer, uint32_t frameIndex)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -636,6 +647,7 @@ void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer)
     radianceBlendConstants.prevTextureIndex = m_probeIrradianceBindlessIndex;
     radianceBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
     radianceBlendConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
+    radianceBlendConstants.volumeSlot = frameIndex;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeIrradianceBlendingPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIBlendPushConstants), &radianceBlendConstants);
@@ -655,6 +667,7 @@ void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer)
     visibilityBlendConstants.prevTextureIndex = m_probeVisibilityBindlessIndex;
     visibilityBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
     visibilityBlendConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
+    visibilityBlendConstants.volumeSlot = frameIndex;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeDistanceBlendingPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIBlendPushConstants), &visibilityBlendConstants);
@@ -737,15 +750,14 @@ void DynamicDiffuseGI::initTextures()
     m_ProbeClassificationTexture = std::make_shared<Texture>(probeClassificationSpec);
     m_ProbeOffsetTexture = std::make_shared<Texture>(probeOffsetSpec);
 
-    // Debug flatten textures disabled for now - skipping creation leaves the pointers null
-    // so the per-frame update() dispatches are skipped by the guards in onUpdate
+    // Flattened debug views disabled - the per-frame flatten passes also read the atlas (and transition it from
+    // UNDEFINED, which may discard contents) and cost fps. Re-enable only when the Texture Viewer is needed.
     // m_RayDataTextureFlattened = TextureFlattener::createFlattenTexture(m_RayDataTexture, "[DDGI] Flattened Ray Data");
     // m_IrradianceTextureFlattened = TextureFlattener::createFlattenTexture(m_RadianceTexture, "[DDGI] Irradiance Flattened");
     // m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened");
     // m_ProbeClassificationTextureFlattened = TextureFlattener::createFlattenTexture(
     //     m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened", FlattenerDataType::UINT);
-    // m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset
-    // Flattened");
+    // m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened");
 
     clearTextures();
 
@@ -813,13 +825,13 @@ void DynamicDiffuseGI::initTextures()
     RP_CORE_INFO("DDGI: Created custom descriptor sets for compute pipelines.");
 }
 
-void DynamicDiffuseGI::updateProbeVolume()
+void DynamicDiffuseGI::updateProbeVolume(uint32_t frameIndex)
 {
 
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_ProbeInfoBuffer) {
-        RP_CORE_ERROR("Probe info buffer not initialized");
+    if (m_ProbeInfoBuffers.empty()) {
+        RP_CORE_ERROR("Probe info buffers not initialized");
         return;
     }
 
@@ -827,7 +839,9 @@ void DynamicDiffuseGI::updateProbeVolume()
         return;
     }
 
-    m_ProbeInfoBuffer->addData(&m_ProbeVolume, sizeof(ProbeVolume), 0);
+    uint32_t slot = frameIndex % m_framesInFlight;
+    m_ProbeInfoBuffers[slot]->addData(&m_ProbeVolume, sizeof(ProbeVolume), 0);
+
     m_isVolumeDirty = false;
 }
 
@@ -852,10 +866,10 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
     probeVolume.probeNumIrradianceInteriorTexels = probeVolume.probeNumIrradianceTexels - 2;
     probeVolume.probeNumDistanceInteriorTexels = probeVolume.probeNumDistanceTexels - 2;
 
-    probeVolume.probeHysteresis = 0.99f;
+    probeVolume.probeHysteresis = 0.97f;
     probeVolume.probeMaxRayDistance = 10000.0f;
     // Self-shadow bias scale (B). The view-bias term is no longer used with the new unified formula.
-    probeVolume.probeNormalBias = 0.1f; // B parameter from the paper (works well for most scenes)
+    probeVolume.probeNormalBias = 1.0f; // B parameter from the paper (works well for most scenes)
     probeVolume.probeViewBias = 0.3f;   // Unused
     probeVolume.probeDistanceExponent = 50.0f;
     probeVolume.probeIrradianceEncodingGamma = 5.0f;
@@ -874,16 +888,20 @@ void DynamicDiffuseGI::initProbeInfoBuffer()
 
     m_ProbeVolume = probeVolume;
 
-    m_ProbeInfoBuffer = std::make_shared<UniformBuffer>(sizeof(ProbeVolume), BufferUsage::STREAM, m_allocator);
-    m_ProbeInfoBuffer->addData(&probeVolume, sizeof(ProbeVolume), 0);
+    m_ProbeInfoBuffers.resize(m_framesInFlight);
+    for (uint32_t i = 0; i < m_framesInFlight; i++) {
+        m_ProbeInfoBuffers[i] = std::make_shared<UniformBuffer>(sizeof(ProbeVolume), BufferUsage::STREAM, m_allocator);
+        m_ProbeInfoBuffers[i]->addData(&probeVolume, sizeof(ProbeVolume), 0);
+    }
 
-    // Add probe volume UBO to the descriptor manager immediately
     auto probeInfoSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
     if (probeInfoSet) {
-        auto binding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
-        if (binding) {
-            binding->add(*m_ProbeInfoBuffer);
-            RP_CORE_INFO("Added probe volume UBO to descriptor set 0, binding 5");
+        m_probeInfoBinding = probeInfoSet->getUniformBufferBinding(DescriptorSetBindingLocation::DDGI_PROBE_INFO);
+        if (m_probeInfoBinding) {
+            for (uint32_t i = 0; i < m_framesInFlight; i++) {
+                m_probeInfoBinding->add(*m_ProbeInfoBuffers[i]);
+            }
+            RP_CORE_INFO("Added {} probe volume UBOs to descriptor set 0, binding 5", m_framesInFlight);
         } else {
             RP_CORE_ERROR("Failed to get uniform buffer binding for probe info");
         }

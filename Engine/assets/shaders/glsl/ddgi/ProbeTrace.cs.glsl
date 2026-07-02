@@ -45,6 +45,7 @@ layout(push_constant) uniform PushConstants {
     uint probeClassificationHandle;
 
     float skyIntensity;
+    uint volumeSlot;
 } pc;
 
 precision highp float;
@@ -96,8 +97,10 @@ layout(std430, set=3, binding = 9) readonly buffer SceneInfo {
 
 // Input Uniforms / Buffers
 layout(std140, set=0, binding = 5) uniform ProbeInfo {
-    ProbeVolume u_volume;
-};
+    ProbeVolume volume;
+} u_probeInfo[];
+
+ProbeVolume u_volume;
 
 // Ray query for intersection testing
 rayQueryEXT rayQuery;
@@ -313,6 +316,7 @@ vec3 calculateShadingNormal(
 }
 
 void main() {
+    u_volume = u_probeInfo[pc.volumeSlot].volume;
     // Compute the probe index for this thread (RTXGI-style)
     int rayIndex = int(gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x);  // index of the ray to trace for this probe
     int probePlaneIndex = int(gl_WorkGroupID.x + u_volume.gridDimensions.x * gl_WorkGroupID.y); // index of this probe within the plane of probes
@@ -435,7 +439,7 @@ void main() {
         // Miss - sample skybox and store blue color for visualization
         vec3 skyboxColor = textureLod(gCubemaps[pc.skyboxTextureIndex], probeRayDirection, 0.0).rgb;
         //skyboxColor = vec3(207.0/255.0, 236.0/255.0, 247.0/255.0);
-        
+
         DDGIStoreProbeRayMiss(ivec3(outputCoords), skyboxColor * pc.skyIntensity);
     }
     

@@ -1,5 +1,6 @@
 #include "LevelEditorWorkspace.h"
 
+#include "layers/panels/ImagePreviewPanel.h"
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
@@ -37,6 +38,8 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
     if (propertiesTabBar != nullptr) {
         propertiesTabBar->addClass("panel-tab-bar");
         m_panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar, m_services));
+        m_panels.push_back(std::make_unique<ImagePreviewPanel>(propertiesTabBar, m_services, "Texture Viewer",
+                                                               ImagePreviewMode::ASSET_PICKER));
     }
 
     if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {

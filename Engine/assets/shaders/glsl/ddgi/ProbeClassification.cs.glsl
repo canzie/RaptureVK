@@ -21,12 +21,15 @@ layout(set = 4, binding = 3, r8ui) uniform restrict uimage2DArray ProbeStates;
 #include "ProbeCommon.glsl"
 
 layout(std140, set = 0, binding = 5) uniform ProbeInfo {
-    ProbeVolume u_volume;
-};
+    ProbeVolume volume;
+} u_probeInfo[];
+
+ProbeVolume u_volume;
 
 layout(push_constant) uniform PushConstants {
     uint rayDataIndex;
     uint probeOffsetHandle;
+    uint volumeSlot;
 } pc;
 
 // -----------------------------------------------------------------------------
@@ -42,6 +45,7 @@ const uint PROBE_STATE_INACTIVE_NO_GEOMETRY = 3;  // Debug: inactive due to no g
 #define RAYS_PER_PROBE  (u_volume.probeNumRays)
 
 void main() {
+    u_volume = u_probeInfo[pc.volumeSlot].volume;
 
     uint probeIndex  = gl_GlobalInvocationID.x;
     uint totalProbes = u_volume.gridDimensions.x * u_volume.gridDimensions.y * u_volume.gridDimensions.z;

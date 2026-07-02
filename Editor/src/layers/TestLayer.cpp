@@ -119,7 +119,10 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         auto envEntity = activeScene.environment();
         auto &sky = envEntity.addComponent<Rapture::SkyboxComponent>(nullptr, 0.1f);
         sky.useAtmosphereSkybox = true;
-        envEntity.addComponent<Rapture::AtmosphereComponent>().timeOfDay = 12.0f;
+        auto atmo = envEntity.addComponent<Rapture::AtmosphereComponent>();
+        atmo.timeOfDay = 11.551f;
+        atmo.latitude = -16.069f;
+        atmo.longitude = -9.273f;
     }
 
     {

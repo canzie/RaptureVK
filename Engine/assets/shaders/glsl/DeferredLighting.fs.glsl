@@ -69,8 +69,10 @@ layout(std430, set = 0, binding = 4) readonly buffer ShadowDataSSBO {
 
 
 layout(std140, set = 0, binding = 5) uniform ProbeInfo {
-    ProbeVolume u_DDGI_Volume;
-};
+    ProbeVolume volume;
+} u_probeInfo[];
+
+ProbeVolume u_DDGI_Volume;
 
 struct CameraGPUData {
     mat4 view;
@@ -478,7 +480,7 @@ vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume
 }
 
 void main() {
-
+    u_DDGI_Volume = u_probeInfo[0].volume;
 
     float depth = texture(gTextures[pc.GBufferDepthHandle], fragTexCoord).r;
 
