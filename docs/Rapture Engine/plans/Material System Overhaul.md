@@ -1,0 +1,259 @@
+# Material System Overhaul
+
+**Related: [[Material]], [[MaterialData]], [[MaterialInstance]], [[GBufferPass]], [[LightingPass]], [[OpenPBR and Deferred Materials]], [[Procedural Texture and Shader Editor]]**
+
+The plan for replacing the current static-only material system with a two-path system: an OpenPBR-superset static struct for the common case, and a codegen-based node-graph path for procedural surfaces. Supersedes the interpreter design in `Engine/src/materials/PROCEDURAL_MATERIALS_DESIGN.md` (kept for reference; its interpreter is explicitly rejected below).
+
+---
+
+## 1. Goals and non-goals
+
+**Goals**
+- Adopt OpenPBR as the shading model (layered BSDF, richer parameter set) as far as deferred allows.
+- A node-graph surface path that can express arbitrary per-pixel computation (noise, triplanar, layer blending) — the thing the current static path fundamentally cannot do.
+- Compile graphs to **GLSL** (no runtime interpreter), cached by graph hash, async-compiled so the editor never stalls.
+- Load the trivial-surface majority of MaterialX / glTF straight into the static struct; leave real MaterialX graphs to the graph compiler (parser added later).
+- Keep MDI: static materials stay one big batch; graph materials add a handful of pipelines.
+
+**Non-goals (for this overhaul)**
+- No runtime MaterialX / ShaderGen embedding. MaterialX is a *format and node-library reference*, not a runtime.
+- No transparency / transmission / SSS in deferred. Those wait for the future forward+ pass or the RT path.
+- No node-editor UI polish. The editor needs new Amethyst widgets; that is a separate, later chunk.
+
+---
+
+## 2. Locked decisions
+
+These were settled in design discussion and are the spine of the doc:
+
+1. **Codegen only, no interpreter.** Graphs compile to GLSL, stitched into the ubershader shell, cached by hash, compiled on a background thread with last-good-pipeline swap. Rationale below in [[#8. Why codegen, not the interpreter]].
+2. **Static path stays a fixed fat struct.** `MaterialData` is grown for OpenPBR but stays hand-authored. Anything it cannot express goes through the graph. No data-driven/dynamic static struct.
+3. **Two axes, kept orthogonal.**
+   - *Axis 1 — shading model* (how light interacts): lives in the deferred lighting pass, hand-written, selected per-pixel by a shading-model ID. Never graph-generated.
+   - *Axis 2 — surface generation* (how the G-buffer inputs are computed): the only thing the graph + codegen ever produce. Never touches the BRDF.
+4. **Two separate material records.** `MaterialData` (named, static) and `GraphInstanceData` (anonymous pool, graph). A material is one kind or the other, chosen by a flag. The graph pool is never overloaded with static semantics and vice-versa.
+5. **One canonical struct + a shading-model ID byte**, not a struct per shading model. Extra models (coat, sheen) reinterpret shared G-buffer channels keyed by the ID (UE's trick), not new structs.
+6. **Single ubershader with a `graphID` switch** — all generated graph functions live in one `generated/SurfaceGraphs.glsl`, the shell dispatches by `graphID`. **One pipeline for all graphs.** No per-graph pipeline explosion, so the MDI batch-by-pipeline rework is NOT needed (graphs differ only by `MaterialData`/`GraphInstanceData`). Revisit only if the mega-switch shader ever gets too heavy.
+7. **Material + graph data live in one growable SSBO arena** (not per-instance UBOs), indexed by material ID. Reuse the `BufferPool` / `SceneRenderData` infra.
+
+---
+
+## 3. Current state (verified)
+
+- **`MaterialData`** (`Engine/src/materials/MaterialData.h:50-87`): flat 96-byte std140 struct, glTF metallic-roughness. Fields: `albedo` (vec4), `roughness/metallic/ao/flags`, `emissive` (vec4), `texIndices0`/`texIndices1` (two uvec4 = **8 fixed-purpose texture slots**), `tilingScale/heightBlend/slopeThreshold/_pad`.
+- **Texture slots are named and fixed** (`MaterialData.h:96-105`): tex0 = albedo/normal/metallicRoughness/ao; tex1 = emissive/height/specular/splatMap. Each holds a bindless index into `u_textures[]`.
+- **`MaterialInstance`** (`MaterialInstance.cpp`): one `UniformBuffer` per instance, bindless-indexed into `MATERIAL_UBO` (`DescriptorSet.h:46`, = set 1 binding 0). `setParameter` writes bindless indices into the fixed slots via `PARAM_REGISTRY` offsets (`MaterialParameters.h:57-68`).
+- **`MaterialCommon.glsl`** (`Engine/assets/shaders/glsl/common/MaterialCommon.glsl`): the `SAMPLE_*` macros are the ceiling of the static path — sample one named texture at the mesh UV, multiply by a constant. No place to express computed surfaces.
+- **G-buffer** (`GBufferPass.cpp:115-125, 483-520`): **3 color targets** + depth/stencil — RT0 `RG16F` oct normal, RT1 `RGBA8_SRGB` albedo, RT2 `RGBA8_UNORM` (metallic, roughness, ao, **1 free byte**), depth `D24S8`.
+- **Lighting** (`DeferredLighting.fs.glsl:230-258`): single hardcoded GGX metallic-roughness BRDF, no shading-model branch.
+- **MDI batches by arena, not pipeline** (`GBufferPass.cpp:255-264`): `obtainBatch(vboAlloc, iboAlloc, ...)` keys batches by VBO/IBO arena only. A **single** `m_pipeline` is bound once (`GBufferPass.cpp:166`) for all entity batches (+ a separate terrain pipeline). The "batch MDI by pipeline" idea in `Engine/MDI and new material system.md` is **not implemented** — it is the main plumbing this overhaul adds.
+- Per-draw data: `ObjectInfo { meshIndex, materialIndex }` (`MDIBatch.h`), `materialIndex = material->getBindlessIndex()` (`GBufferPass.cpp:262`), surfaced to the fragment shader as `inMaterialIndex` (`GBuffer.fs.glsl:17`).
+
+---
+
+## 4. Architecture overview
+
+```
+                          ┌─────────────────────────────────────────┐
+   Axis 2: surface gen    │   Ubershader shell (GBuffer.fs.glsl)     │
+                          │                                          │
+  static material ─────►  │   if (IS_GRAPH) evalSurfaceGraph(...)    │  ──► SurfaceData
+  graph material  ─────►  │   else          evalStaticSurface(...)   │       (albedo, normal,
+                          │                                          │        roughness, metallic,
+                          │   write G-buffer + shadingModelID        │        ao, shadingModelID)
+                          └─────────────────────────────────────────┘
+                                            │  G-buffer (incl. shading-model ID)
+                                            ▼
+                          ┌─────────────────────────────────────────┐
+   Axis 1: shading model  │   Deferred lighting (DeferredLighting)   │
+                          │   switch (shadingModelID) { openpbr... } │  ──► lit HDR
+                          └─────────────────────────────────────────┘
+```
+
+Both material kinds converge on one `SurfaceData` and one G-buffer. The lighting pass only ever sees the G-buffer + the shading-model ID; it never knows or cares whether a static struct or a generated graph produced the pixel.
+
+---
+
+## 5. Axis 1 — OpenPBR shading model
+
+### 5.1 Struct growth
+Grow `MaterialData` from 96B to ~160B (still trivial: 160B x hundreds of materials = nothing). Add the OpenPBR base-layer parameters that fit deferred:
+- `base_color` (reuse `albedo.rgb`), `base_metalness` (reuse `metallic`)
+- `specular_weight`, `specular_color`, `specular_roughness` (split from base roughness), `specular_ior` (drives F0)
+- `base_diffuse_roughness` (optional; Oren-Nayar / EON diffuse)
+- `emission_luminance` + `emission_color` (reuse `emissive`)
+
+Keep `MaterialCommon.glsl`'s struct in lockstep (the `static_assert` at `MaterialData.h:89` guards size — update it).
+
+### 5.2 Shading-model ID (land from day one)
+Add a `shadingModelID` byte written into the G-buffer even while there is only one model. Cheap forward-compat: adding coat/sheen later is a new enum value + a reinterpreted channel, not a G-buffer redesign.
+
+Enum (CAPITAL_CASE per project style): `SM_UNLIT`, `SM_OPENPBR_STANDARD`, later `SM_OPENPBR_COAT`, `SM_OPENPBR_SHEEN`, ...
+
+### 5.3 BRDF rewrite
+Replace the single GGX in `DeferredLighting.fs.glsl:230-258` with an OpenPBR-standard eval (OpenPBR Fresnel, energy compensation, dielectric specular from `specular_ior`), dispatched on `shadingModelID`. Structure the lighting as `evalBRDF(SurfaceData surf, LightData light)` with a `switch` so extra models slot in cleanly.
+
+### 5.4 G-buffer change (concrete, files touched)
+Current 3 targets have one free byte in RT2. `shadingModelID` fits there for now — **OpenPBR-base needs no new target**, only the free byte. Add RT3 only when coat/anisotropy/spec-color demands it. When RT3 is needed, the touch-list is:
+- `GBufferPass.cpp:115-125` `getFramebufferSpecification()` — push RT3 format.
+- `GBufferPass.cpp:483-520` `createTextures()` — new per-frame texture.
+- `GBufferPass.cpp:378-432` `beginDynamicRendering()` — `m_colorAttachmentInfo[3]`, `colorAttachmentCount = 4`.
+- `GBufferPass.cpp:440-481` barrier arrays `[4] → [5]`, and the terrain pipeline mirror.
+- `GBufferPass.cpp:607-625, 744-756` `colorBlending.attachmentCount = 4` in **both** pipelines (main + terrain).
+- `GBuffer.fs.glsl` new `layout(location = 3) out`; `DeferredLighting.fs.glsl` new sampler handle + push-constant.
+
+Emission goes straight into the HDR lighting target (additive), not a G-buffer channel.
+
+---
+
+## 6. Axis 2 — surface graph + codegen
+
+### 6.1 Two records
+- **`MaterialData`** — named slots, static path only (Section 5). A graph material leaves the named texture slots unused; it *computes* albedo/normal/etc.
+- **`GraphInstanceData`** — anonymous pool for graph materials:
+
+```cpp
+// starter: fixed-array version
+struct GraphInstanceData {
+    uint graphID;                          // which generated evalSurface_* to call
+    uint textures[GRAPH_MAX_TEXTURES];     // compiler-assigned generic slots (start = 16)
+    glm::vec4 constants[GRAPH_MAX_CONSTS];  // constants + exposed params (start = 16)
+};
+```
+
+Slots have **no** semantics — the compiler assigns `noise → textures[1]`, `mossColor → constants[0]`, etc., and records the mapping so the editor knows where to write each node's value.
+
+### 6.2 The offset indirection
+The draw already carries `inMaterialIndex → u_materials[idx]` (a `MaterialData`). For a graph material, `MaterialData` stores where its slice lives:
+
+```
+draw → inMaterialIndex → u_materials[idx]  (MaterialData)
+                             │ if MAT_FLAG_IS_GRAPH:
+                             ├─ graphID          (which function)
+                             └─ graphDataOffset  (base into u_graphData[])
+                                      ▼
+                         u_graphData[graphDataOffset + k]   (this instance's slice)
+```
+
+- **Relative offsets (k = 0,1,2…)** are baked into the generated GLSL (compile-time, per graph *type*).
+- **Base offset `graphDataOffset`** is per-instance runtime data, stored in `MaterialData` (add explicit `uint graphID; uint graphDataOffset;` fields when growing the struct — self-documenting, avoids reusing named slots).
+
+**Fixed-array vs SSBO-slice:**
+- *Option A (start here):* fixed `GraphInstanceData[16/16]` array. No byte offset needed — a `graphInstanceIndex` indexes it by element. Limit = 16, global. Simplest.
+- *Option B (migration when hit):* variable-length slice in one shared SSBO arena (reuse `BufferPool` / `SceneRenderData` infra). Store explicit `graphDataOffset`; each graph declares its own footprint; limit ≈ buffer size (gone). Because layout is *data* decoupled from generated logic, this migration is a buffer-layout change, not a shader rewrite.
+
+Start A, treat hitting 16 as the signal to move to B.
+
+### 6.3 Graph compiler
+`Engine/src/materials/graph/` (new, snake_case folder):
+- `MaterialGraph` — typed nodes + connections + exposed params (the `PROCEDURAL_MATERIALS_DESIGN.md` data structures are a fine starting point; drop everything bytecode-related).
+- `MaterialGraphCompiler` — topo-sort → emit one `evalSurface_<name>(SurfaceInputs, GraphInstanceData, out SurfaceData)` GLSL function. First pass assigns texture/constant pool slots; second pass emits straight-line GLSL. Constant folding / DCE / CSE are free from the downstream GLSL compiler (add later if wanted).
+- Output: all functions into `generated/SurfaceGraphs.glsl` + a `evalSurfaceGraph(graphID, ...)` dispatcher `switch`. No bytecode, no register file.
+- `.matgraph` JSON serialization (format from `PROCEDURAL_MATERIALS_DESIGN.md` is fine).
+
+### 6.4 Codegen example
+Graph "MossyRock" (rock with noise-driven moss) compiles to:
+
+```glsl
+// generated/SurfaceGraphs.glsl  (DO NOT EDIT)
+void evalSurface_MossyRock(SurfaceInputs si, GraphInstanceData g, out SurfaceData surf) {
+    vec3  _n0 = texture(u_textures[g.textures[0]], si.uv).rgb;                    // rock
+    float _n1 = texture(u_textures[g.textures[1]], si.uv * g.constants[1].x).r;  // noise
+    vec3  _n2 = mix(_n0, g.constants[0].rgb, _n1);                               // moss blend
+    surf.albedo         = _n2;
+    surf.normal         = si.worldNormal;
+    surf.roughness      = mix(0.9, 0.4, _n1);
+    surf.metallic       = 0.0;
+    surf.shadingModelID = SM_OPENPBR_STANDARD;
+}
+```
+
+Inserted into the shell:
+
+```glsl
+// GBuffer.fs.glsl
+#include "common/MaterialCommon.glsl"
+#include "generated/SurfaceGraphs.glsl"
+
+void main() {
+    MaterialData mat = u_materials[inMaterialIndex].data;
+    SurfaceData surf;
+    if (matHasFlag(mat.flags, MAT_FLAG_IS_GRAPH)) {
+        GraphInstanceData g = fetchGraphInstance(mat.graphDataOffset);
+        evalSurfaceGraph(mat.graphID, buildSurfaceInputs(), g, surf);
+    } else {
+        surf = evalStaticSurface(mat, u_textures, inTexCoord);   // today's SAMPLE_* path
+    }
+    gNormal     = octEncodeNormal(surf.normal);
+    gAlbedoSpec = vec4(surf.albedo, 1.0);
+    gMaterial   = vec4(surf.metallic, surf.roughness, surf.ao, packShadingModel(surf.shadingModelID));
+}
+```
+
+### 6.5 Async compile + last-good swap
+- glslang **must not** run on a job-system fiber (overflows the 64KB fiber stack — see [[no-glslang-on-fibers]]). Compile on a dedicated background thread.
+- On graph edit: debounce → background compile the new pipeline → keep rendering the last-good pipeline until ready → atomic swap. Viewport never stalls.
+
+---
+
+## 7. MDI stays as-is (single-ubershader decision)
+
+**Decided: single ubershader with a `graphID` switch → one pipeline for all materials.** All generated graph functions live in one `generated/SurfaceGraphs.glsl`; the shell `switch`es on `graphID`. Graph materials differ from each other and from static materials **only by data** (`MaterialData` + `GraphInstanceData`), so:
+
+- The current MDI batching (by VBO/IBO arena, single pipeline bound once at `GBufferPass.cpp:166`) **is untouched.** No batch-key change, no moving the pipeline bind into the loop.
+- The "batch MDI by pipeline" idea in `Engine/MDI and new material system.md` stays unbuilt — we don't need it.
+
+The only cost is a fatter fragment shader (the mega-`switch` over all graphs). Acceptable; the driver keeps the taken case uniform per draw since `graphID` is per-material-constant. Revisit (splitting into per-graph pipelines + the batching rework) only if that shader's register pressure / compile time becomes a measured problem.
+
+---
+
+## 8. Why codegen, not the interpreter
+
+The `PROCEDURAL_MATERIALS_DESIGN.md` per-pixel bytecode interpreter is rejected:
+- Dynamic register indexing (`regs[dynIdx]` over 8 vec4, 3 reads/op, in a loop) spills to scratch or expands to cndmask ladders — a real per-pixel perf cliff.
+- Hard 16-op / 6-const / 4-tex ceiling breaks on the third serious material (triplanar + noise + layering > 16 ops).
+- Dual backends (bytecode encoder + GLSL emitter) must stay bit-identical or live preview lies.
+
+Codegen: unlimited instruction count (just GLSL lines), full driver optimization, one backend. "Live editing without recompile" is solved by async compile + last-good swap instead. This is EEVEE's model; the interpreter is Cycles' SVM (offline-only). Our bindless textures remove EEVEE-legacy's sampler-count wall, so our practical ceiling is far above any real material.
+
+---
+
+## 9. MaterialX and glTF import
+
+- **Trivial surface (90% case):** a MaterialX doc whose surface is a single `standard_surface` / `open_pbr_surface` with constant + plain-texture inputs, and all glTF — lower 1:1 into `MaterialData`. No graph.
+- **Real graph:** upstream nodes feeding the surface node → lower into `MaterialGraph` → compiler. MaterialX's surface node maps to our shading-model ID; its upstream graph maps to our surface-gen graph — the same two-axis split, which is why the cut is clean.
+- Parser is a later phase; design `MaterialGraph` node types against the MaterialX standard node library so lowering is mechanical.
+
+---
+
+## 10. Editor (node editor) — later
+
+Needs new Amethyst widgets (node canvas, pins, wires, drag-connect). Editor fluff, own chunk. See [[Procedural Texture and Shader Editor]] and `Editor/src/layers/workspaces/MaterialEditorWorkspace.h`. Depends on the `MaterialGraph` IR existing first.
+
+---
+
+## 11. Phased sequencing
+
+**Phase 0 — material-system plumbing (start here, behavior-preserving).** Do this first because both OpenPBR and codegen sit on it, and doing it now avoids growing/reworking the struct twice. Two behavior-preserving refactors (acceptance test = "renders identically"):
+- **0a — SSBO migration.** Replace the per-instance `UniformBuffer` + bindless-UBO-array (`MaterialInstance.cpp:20-31`, `u_materials[]` at `GBuffer.fs.glsl:21-23`) with one growable `MaterialData` SSBO arena indexed by material ID. `MaterialInstance` writes into an arena slot instead of owning a UBO. Fewer descriptor writes, and it's the same arena the graph pool (Option B) wants.
+- **0b — SurfaceData shell split.** Refactor the G-buffer write (`GBuffer.fs.glsl:34-77`) into `evalStaticSurface(mat, ...) → SurfaceData surf`, then write the G-buffer from `surf`. No visual change; sets up the `if (IS_GRAPH)` branch and the `SurfaceData` contract.
+
+**Phase 1 — OpenPBR-base (foundation, days).** On the SSBO struct: grow `MaterialData` + `MaterialCommon.glsl` (update the `static_assert` at `MaterialData.h:89`); add `shadingModelID` in RT2's free byte; rewrite the BRDF in `DeferredLighting.fs.glsl:230-258` dispatched on the ID. First visual payoff.
+
+**Phase 2 — surface graph, codegen only.** `MaterialGraph` + `MaterialGraphCompiler` (GLSL only); `GraphInstanceData` (fixed-array Option A, in the SSBO arena from 0a); `graphID`/`graphDataOffset` in `MaterialData`; `generated/SurfaceGraphs.glsl` + `graphID` dispatcher in the shell; async compile + last-good swap. Hand-author one `.matgraph` to validate end-to-end.
+
+**Phase 3 — node editor.** Amethyst node canvas; live compile on edit.
+
+**Phase 4 — MaterialX / glTF importer.** Trivial-surface lowering first, then graph lowering.
+
+**Phase 5 — deferred extras behind the ID.** RT3 + coat/sheen/anisotropy as new shading-model IDs + reinterpreted channels. Transmission/SSS wait for forward+ / RT.
+
+---
+
+## 12. Open questions / risks
+
+- **Mega-switch shader cost** (Section 7). Single-ubershader is decided; the thing to watch is the switch's register pressure / compile time as graph count grows. Revisit only if measured.
+- **Normal handling in graphs** — tangent-space vs world-space output, and the TBN build (`GBuffer.fs.glsl:48-72`) must be exposed to `SurfaceInputs`.
+- **Exposed-param editing without recompile** — constants live in `GraphInstanceData`, so slider drags are data writes (no recompile); only topology changes recompile. Confirm the editor distinguishes the two.
+- **Terrain path** (`terrain_gbuffer.*`) shares the G-buffer layout — any RT3 / shadingModelID change must mirror into the terrain pipeline and shaders.
+```
