@@ -68,6 +68,13 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
 
     m_entitySelectedListenerId =
         GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
+
+    m_entityDeselectedListenerId =
+        GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
+            if (m_selectedEntity && *m_selectedEntity == entity) {
+                m_selectedEntity = nullptr;
+            }
+        });
 }
 
 void GBufferPass::setupCommandResources()
@@ -91,6 +98,7 @@ GBufferPass::~GBufferPass()
     vc.waitIdle();
 
     GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
+    GameEvents::onEntityDeselected().removeListener(m_entityDeselectedListenerId);
 
     // Clean up textures
     m_normalTextures.clear();

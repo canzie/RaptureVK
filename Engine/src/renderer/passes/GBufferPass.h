@@ -140,6 +140,7 @@ class GBufferPass {
 
     std::shared_ptr<Entity> m_selectedEntity;
     size_t m_entitySelectedListenerId;
+    size_t m_entityDeselectedListenerId = 0;
 
     CommandPoolHash m_commandPoolHash = 0;
 };

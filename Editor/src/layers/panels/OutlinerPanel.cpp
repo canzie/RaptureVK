@@ -251,6 +251,7 @@ void OutlinerPanel::applyPendingDelete()
     }
 
     Rapture::GameEvents::onEntityDeselected().publish(entity);
+    m_treeView->selectedRow = Amethyst::TreeView::NO_ROW_SELECTION;
     refresh();
 }
 
