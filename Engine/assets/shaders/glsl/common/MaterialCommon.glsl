@@ -27,6 +27,7 @@ const uint MAT_FLAG_NORMAL_BC5                 = 1u << 14;
 const uint MAT_FLAG_IS_TERRAIN     = 1u << 16;
 const uint MAT_FLAG_HAS_SPLAT_MAP  = 1u << 17;
 const uint MAT_FLAG_USE_TRIPLANAR  = 1u << 18;
+const uint MAT_FLAG_IS_GRAPH       = 1u << 19;
 
 // ============================================================================
 // Material Data Struct - 96 bytes, std140 compatible
@@ -49,7 +50,64 @@ struct MaterialData {
     float tilingScale;         // 80-84
     float heightBlend;         // 84-88
     float slopeThreshold;      // 88-92
-    float _pad;                // 92-96
+    uint graphId;              // 92-96: which generated surface function (when MAT_FLAG_IS_GRAPH)
+    uint graphInstanceIndex;   // 96-100: slot into the graph data arena
+    // std430 rounds the struct out to 112 (trailing 100-112 unused)
+};
+
+// ============================================================================
+// Material Data Buffer - one SSBO arena indexed by material id (set 1, binding 0)
+// std430 layout matches the std140 struct byte-for-byte (no inner arrays)
+// ============================================================================
+
+layout(std430, set = 1, binding = 0) readonly buffer MaterialDataBuffer {
+    MaterialData materials[];
+} u_materialBuffer;
+
+MaterialData getMaterialData(uint index) {
+    return u_materialBuffer.materials[index];
+}
+
+// ============================================================================
+// Graph material data - generic per-instance pool (set 1, binding 1)
+// Slots are compiler-assigned; a generated evalSurface_* reads them
+// ============================================================================
+
+#define GRAPH_MAX_TEXTURES 16
+#define GRAPH_MAX_CONSTANTS 16
+
+struct GraphInstanceData {
+    uint textures[GRAPH_MAX_TEXTURES];
+    vec4 constants[GRAPH_MAX_CONSTANTS];
+};
+
+layout(std430, set = 1, binding = 1) readonly buffer GraphDataBuffer {
+    GraphInstanceData instances[];
+} u_graphData;
+
+#include "common/ShadingModels.glsl"
+
+// ============================================================================
+// Surface interface - what a surface eval reads (inputs) and writes (outputs)
+// A static material or a generated graph both fill a SurfaceData for the G-buffer
+// ============================================================================
+
+struct SurfaceInputs {
+    vec2 uv;
+    vec3 worldPos;
+    vec3 worldNormal;   // interpolated geometric normal, not normalized
+    vec3 tangent;
+    vec3 bitangent;
+    uint flags;
+};
+
+struct SurfaceData {
+    vec3 albedo;
+    vec3 normal;        // world space
+    float roughness;
+    float metallic;
+    float ao;
+    uint shadingModelId;
 };
 
 // ============================================================================

@@ -59,7 +59,7 @@ LightingPass::LightingPass(float width, float height, GBufferPass *gBufferPass, 
     auto shaderPath = project.getProjectShaderDirectory();
 
     ShaderImportConfig shaderConfig;
-    shaderConfig.compileInfo.includePath = shaderPath / "glsl/ddgi/";
+    shaderConfig.compileInfo.includePath = shaderPath / "glsl/";
 
     auto asset = AssetManager::importAsset(shaderPath / "glsl/DeferredLighting.fs.glsl", shaderConfig);
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;

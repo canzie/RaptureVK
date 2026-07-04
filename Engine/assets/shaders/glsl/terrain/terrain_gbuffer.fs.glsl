@@ -14,10 +14,6 @@ layout(location = 3) in flat uint inChunkIndex;
 layout(location = 4) in flat uint inLOD;
 layout(location = 5) in float inNormalizedHeight;
 
-layout(set = 1, binding = 0) uniform MaterialDataBuffer {
-    MaterialData data;
-} u_materials[];
-
 layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 
 layout(push_constant) uniform TerrainPushConstants {
@@ -85,7 +81,7 @@ struct TerrainSample {
 };
 
 TerrainSample sampleTerrainMaterial(uint matIndex, vec3 worldPos, vec3 normal) {
-    MaterialData mat = u_materials[matIndex].data;
+    MaterialData mat = getMaterialData(matIndex);
     float scale = mat.tilingScale > 0.0 ? mat.tilingScale : 1.0;
     vec2 uv = triplanarUV(worldPos, normal, scale);
 
@@ -110,7 +106,7 @@ void main() {
     vec3 normalWS = computeTerrainNormal(inFragPosDepth.xyz);
     gNormal = octEncodeNormal(normalize(normalWS));
 
-    MaterialData grassMat = u_materials[pc.grassMaterialIndex].data;
+    MaterialData grassMat = getMaterialData(pc.grassMaterialIndex);
     float slopeThreshold = grassMat.slopeThreshold > 0.0 ? grassMat.slopeThreshold : 0.7;
     float heightBlend = grassMat.heightBlend > 0.0 ? grassMat.heightBlend : 0.8;
 
@@ -142,5 +138,5 @@ void main() {
 
 
     gAlbedoSpec = vec4(finalSample.albedo, 1.0);
-    gMaterial = vec4(finalSample.metallic, finalSample.roughness, finalSample.ao, 1.0);
+    gMaterial = vec4(finalSample.metallic, finalSample.roughness, finalSample.ao, packShadingModel(SM_OPENPBR_STANDARD));
 }

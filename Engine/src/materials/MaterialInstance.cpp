@@ -1,10 +1,8 @@
 #include "MaterialInstance.h"
 
 #include "asset_manager/Asset.h"
-#include "buffers/descriptors/DescriptorManager.h"
 #include "logging/Log.h"
 #include "textures/Texture.h"
-#include "window_context/Application.h"
 
 namespace Rapture {
 
@@ -14,19 +12,7 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
     m_name = name.empty() ? material->getName() + "_instance" : name;
     m_data = material->getDefaults();
 
-    auto &app = Application::getInstance();
-    auto allocator = app.getVulkanContext().getVmaAllocator();
-
-    m_uniformBuffer = std::make_shared<UniformBuffer>(sizeof(MaterialData), BufferUsage::DYNAMIC, allocator, nullptr);
-
-    auto materialSet =
-        Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MATERIAL_UBO);
-    if (materialSet) {
-        auto binding = materialSet->getUniformBufferBinding(DescriptorSetBindingLocation::MATERIAL_UBO);
-        if (binding) {
-            m_bindlessIndex = binding->add(*m_uniformBuffer);
-        }
-    }
+    m_bindlessIndex = MaterialManager::allocateSlot();
 
     syncToGPU();
 }
@@ -34,15 +20,25 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
 MaterialInstance::~MaterialInstance()
 {
     if (m_bindlessIndex != UINT32_MAX) {
-        auto materialSet =
-            Application::getRenderContext().descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::MATERIAL_UBO);
-        if (materialSet) {
-            auto binding = materialSet->getUniformBufferBinding(DescriptorSetBindingLocation::MATERIAL_UBO);
-            if (binding) {
-                binding->free(m_bindlessIndex);
-            }
-        }
+        MaterialManager::freeSlot(m_bindlessIndex);
     }
+    if (m_graphSlot != UINT32_MAX) {
+        MaterialManager::freeGraphSlot(m_graphSlot);
+    }
+}
+
+void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data)
+{
+    if (m_graphSlot == UINT32_MAX) {
+        m_graphSlot = MaterialManager::allocateGraphSlot();
+    }
+    MaterialManager::writeGraphSlot(m_graphSlot, data);
+
+    m_data.flags |= MAT_FLAG_IS_GRAPH;
+    m_data.graphId = graphId;
+    m_data.graphInstanceIndex = m_graphSlot;
+    syncToGPU();
+    AssetEvents::onMaterialInstanceChanged().publish(this);
 }
 
 void MaterialInstance::setParameter(ParameterID id, AssetRef textureAsset)
@@ -129,7 +125,7 @@ void MaterialInstance::applyTextureEncodingFlags(ParameterID id, Texture *textur
 
 void MaterialInstance::syncToGPU()
 {
-    m_uniformBuffer->addData(&m_data, sizeof(MaterialData), 0);
+    MaterialManager::writeSlot(m_bindlessIndex, m_data);
 }
 
 } // namespace Rapture

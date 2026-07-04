@@ -1,14 +1,18 @@
 #include "Material.h"
 
 #include "asset_manager/AssetManager.h"
+#include "buffers/FreeListStorageBuffer.h"
 #include "logging/Log.h"
 #include "textures/Texture.h"
+#include "utils/rp_assert.h"
 
 namespace Rapture {
 
 bool MaterialManager::s_initialized = false;
 uint32_t MaterialManager::s_defaultTextureIndex = 0;
 std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::s_materials;
+std::unique_ptr<FreeListStorageBuffer> MaterialManager::s_materialBuffer;
+std::unique_ptr<FreeListStorageBuffer> MaterialManager::s_graphBuffer;
 
 BaseMaterial::BaseMaterial(const std::string &name, std::initializer_list<ParameterID> editableParams, const MaterialData &defaults)
     : m_name(name), m_editableParams(editableParams), m_defaults(defaults)
@@ -23,6 +27,11 @@ void MaterialManager::init()
     }
 
     s_materials.clear();
+
+    s_materialBuffer = std::make_unique<FreeListStorageBuffer>(sizeof(MaterialData), MAX_MATERIALS,
+                                                               DescriptorSetBindingLocation::MATERIAL_DATA_SSBO);
+    s_graphBuffer = std::make_unique<FreeListStorageBuffer>(sizeof(GraphInstanceData), MAX_GRAPH_MATERIALS,
+                                                            DescriptorSetBindingLocation::GRAPH_DATA_SSBO);
 
     auto asset = AssetManager::importDefaultAsset(AssetType::TEXTURE);
     auto defaultTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
@@ -40,7 +49,45 @@ void MaterialManager::init()
 void MaterialManager::shutdown()
 {
     s_materials.clear();
+    s_materialBuffer.reset();
+    s_graphBuffer.reset();
     s_initialized = false;
+}
+
+uint32_t MaterialManager::allocateSlot()
+{
+    RP_ASSERT(s_materialBuffer != nullptr, "Initialise the material manager first");
+    return s_materialBuffer->allocate();
+}
+
+void MaterialManager::freeSlot(uint32_t slot)
+{
+    RP_ASSERT(s_materialBuffer != nullptr, "Initialise the material manager first");
+    s_materialBuffer->free(slot);
+}
+
+void MaterialManager::writeSlot(uint32_t slot, const MaterialData &data)
+{
+    RP_ASSERT(s_materialBuffer != nullptr, "Initialise the material manager first");
+    s_materialBuffer->write(slot, &data);
+}
+
+uint32_t MaterialManager::allocateGraphSlot()
+{
+    RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
+    return s_graphBuffer->allocate();
+}
+
+void MaterialManager::freeGraphSlot(uint32_t slot)
+{
+    RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
+    s_graphBuffer->free(slot);
+}
+
+void MaterialManager::writeGraphSlot(uint32_t slot, const GraphInstanceData &data)
+{
+    RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
+    s_graphBuffer->write(slot, &data);
 }
 
 void MaterialManager::createDefaultMaterials()

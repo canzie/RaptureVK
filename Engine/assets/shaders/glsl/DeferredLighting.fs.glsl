@@ -37,8 +37,11 @@ layout(set = 3, binding = 0) uniform sampler2DArrayShadow gShadowArrays[];
 layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
 layout(set = 3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
 
-#include "ProbeCommon.glsl"
-#include "IrradianceCommon.glsl"
+#include "ddgi/ProbeCommon.glsl"
+#include "ddgi/IrradianceCommon.glsl"
+#include "common/ShadingModels.glsl"
+#include "common/BRDF.glsl"
+#include "common/Tonemapping.glsl"
 
 
 struct LightData {
@@ -134,68 +137,6 @@ const uint RENDER_SHOW_INDIRECT = 1u << 2;
 const uint RENDER_MODULATE_INDIRECT = 1u << 3;
 const uint RENDER_ALL = 0xFFFFFFFFu;
 
-float exposure(float fstop) {
-    return pow(2.0, fstop);
-}
-
-vec3 ACESFilm(vec3 color) {
-    float a = 2.51f;
-    float b = 0.03f;
-    float c = 2.43f;
-    float d = 0.59f;
-    float e = 0.14f;
-    return clamp((color*(a*color + b)) / (color*(c*color + d) + e), vec3(0.0), vec3(1.0));
-}
-
-vec3 LessThan(vec3 f, float value)
-{
-    return vec3(
-        (f.x < value) ? 1.0 : 0.0,
-        (f.y < value) ? 1.0 : 0.0,
-        (f.z < value) ? 1.0 : 0.0);
-}
-
-vec3 pow3(vec3 x, float y) {
-    return vec3(pow(x.x, y), pow(x.y, y), pow(x.z, y));
-}
-
-vec3 LinearToSRGB(vec3 rgb)
-{
-    rgb = clamp(rgb, 0.0, 1.0);
-    return mix(
-        pow3(rgb * 1.055, 1.0 / 2.4) - 0.055,
-        rgb * 12.92,
-        LessThan(rgb, 0.0031308)
-    );
-}
-
-vec3 fresnelSchlick(float cosTheta, vec3 F0) {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
-
-float distributionGGX(vec3 N, vec3 H, float roughness) {
-    float a = roughness * roughness;
-    float a2 = a * a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH * NdotH;
-    
-    float num = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = 3.14159265 * denom * denom;
-    
-    return num / denom;
-}
-
-float geometrySmith(float NdotV, float NdotL, float roughness) {
-    float r = roughness + 1.0;
-    float k = (r * r) / 8.0;
-    
-    float ggx1 = NdotV / (NdotV * (1.0 - k) + k);
-    float ggx2 = NdotL / (NdotL * (1.0 - k) + k);
-    
-    return ggx1 * ggx2;
-}
-
 
 float calculateAttenuation(vec3 lightPos, vec3 fragPos, float range) {
     float distance = length(lightPos - fragPos);
@@ -226,36 +167,6 @@ float LightWindowing(float distanceToLight, float maxDistance) {
 }
 
 
-
-vec3 calculateLightContribution(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float roughness, float ao, vec3 lightColor, float intensity) {
-    vec3 H = normalize(V + L);
-    
-    float NdotL = max(dot(N, L), 0.0);        
-
-
-    if (NdotL <= 0.0) return vec3(0.0);
-
-    // Calculate F0 (surface reflection at zero incidence)
-    vec3 F0 = mix(vec3(0.04), albedo, metallic);
-
-    // Specular BRDF terms
-    float NdotV = max(dot(N, V), 0.0001);
-    float NDF = distributionGGX(N, H, roughness);       
-    float G = geometrySmith(NdotV, NdotL, roughness);
-    vec3  F = fresnelSchlick(max(dot(H, V), 0.0), F0);
-
-    // Calculate specular term
-    vec3  numerator = NDF * G * F;
-    float denominator = 4.0 * NdotV * NdotL;
-    vec3  specular = numerator / max(denominator, 0.0001);
-    
-
-    vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0 - metallic;
-
-    return (kD * albedo / 3.14159265359 + specular) * lightColor * intensity * NdotL;
-}
 
 // Helper function to calculate shadow for a specific cascade - this contains the PCF shadow mapping logic
 float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, ShadowGPUData shadowInfo, 
@@ -508,6 +419,7 @@ void main() {
     float metallic = metallicRoughnessAO.r;
     float roughness = metallicRoughnessAO.g;
     float ao = metallicRoughnessAO.b;
+    uint shadingModelId = unpackShadingModel(metallicRoughnessAO.a);
     
     vec3 V = normalize(pc.cameraPos.xyz - fragPos);
     
@@ -574,9 +486,9 @@ void main() {
         }
 
 
-        vec3 contribution = calculateLightContribution(N, V, lightDirWorld, albedo, metallic, roughness, ao, lightColor, lightIntensity);
+        vec3 brdf = evalBRDF(shadingModelId, N, V, lightDirWorld, albedo, metallic, roughness);
 
-        Lo += contribution * attenuation * shadowFactor;
+        Lo += brdf * lightColor * lightIntensity * attenuation * shadowFactor;
     }
 
     vec3 indirectDiffuse = vec3(0.0);

@@ -43,7 +43,8 @@ enum class DescriptorSetBindingLocation {
     DDGI_PROBE_INFO = 5, // Alias for PROBE_VOLUME_DATA_UBO
     MDI_INDEXED_INFO_SSBOS = 6,
 
-    MATERIAL_UBO = 100,
+    MATERIAL_DATA_SSBO = 100,
+    GRAPH_DATA_SSBO = 101,
 
     MESH_DATA_SSBO = 200,
 

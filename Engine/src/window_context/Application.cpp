@@ -112,8 +112,8 @@ Application::~Application()
 
     m_viewportManager.reset();
 
-    MaterialManager::shutdown();
     AssetManager::shutdown();
+    MaterialManager::shutdown();
 
     // Shutdown the event system and clear all listeners
     EventRegistry::getInstance().shutdown();

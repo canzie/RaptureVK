@@ -2,7 +2,6 @@
 #define RAPTURE__MATERIAL_INSTANCE_H
 
 #include "asset_manager/AssetHandle.h"
-#include "buffers/UniformBuffer.h"
 #include "events/AssetEvents.h"
 #include "Material.h"
 #include "MaterialData.h"
@@ -60,14 +59,21 @@ class MaterialInstance {
     void setParameter(ParameterID id, AssetRef texture);
     void updatePendingTextures();
 
+    /**
+     * @brief Turn this instance into a graph material backed by a generated surface function
+     * @param graphId Which generated evalSurface_* to dispatch to
+     * @param data Graph instance pool (compiler-assigned textures/constants)
+     */
+    void setGraph(uint32_t graphId, const GraphInstanceData &data);
+
   private:
     void syncToGPU();
     void applyTextureEncodingFlags(ParameterID id, Texture *texture);
 
     std::string m_name;
     std::shared_ptr<BaseMaterial> m_baseMaterial;
-    std::shared_ptr<UniformBuffer> m_uniformBuffer;
     uint32_t m_bindlessIndex;
+    uint32_t m_graphSlot = UINT32_MAX;
 
     MaterialData m_data;
 

@@ -3,6 +3,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "common/MaterialCommon.glsl"
+#include "generated/SurfaceGraphs.glsl"
 
 layout(location = 0) out vec2 gNormal;
 layout(location = 1) out vec4 gAlbedoSpec;
@@ -18,10 +19,6 @@ layout(location = 6) in flat uint inMaterialIndex;
 
 precision highp float;
 
-layout(set = 1, binding = 0) uniform MaterialDataBuffer {
-    MaterialData data;
-} u_materials[];
-
 layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 
 layout(push_constant) uniform PushConstants {
@@ -31,47 +28,60 @@ layout(push_constant) uniform PushConstants {
     uint meshSSBOIndex;
 } pc;
 
-void main() {
-    uint materialIndex = inMaterialIndex;
-    MaterialData mat = u_materials[materialIndex].data;
-    uint flags = mat.flags | inFlags;
+SurfaceData evalStaticSurface(SurfaceInputs si, MaterialData mat) {
+    SurfaceData surf;
+    surf.albedo = SAMPLE_ALBEDO(mat, u_textures, si.uv);
+    surf.roughness = SAMPLE_ROUGHNESS(mat, u_textures, si.uv);
+    surf.metallic = SAMPLE_METALLIC(mat, u_textures, si.uv);
+    surf.ao = SAMPLE_AO(mat, u_textures, si.uv);
+    surf.shadingModelId = SM_OPENPBR_STANDARD;
 
-    float hasTexcoords = matFlagMul(flags, MAT_FLAG_HAS_TEXCOORDS);
-    vec2 texCoord = mix(vec2(0.0), inTexCoord, hasTexcoords);
+    if (matHasFlag(si.flags, MAT_FLAG_HAS_NORMAL_MAP) && matHasFlag(si.flags, MAT_FLAG_HAS_TEXCOORDS)) {
+        vec3 tangentNormal = SAMPLE_NORMAL_MAP(mat, u_textures, si.uv);
 
-    vec3 albedo = SAMPLE_ALBEDO(mat, u_textures, texCoord);
-    float roughness = SAMPLE_ROUGHNESS(mat, u_textures, texCoord);
-    float metallic = SAMPLE_METALLIC(mat, u_textures, texCoord);
-    float ao = SAMPLE_AO(mat, u_textures, texCoord);
-
-    vec3 normal;
-    if (matHasFlag(flags, MAT_FLAG_HAS_NORMAL_MAP) && matHasFlag(flags, MAT_FLAG_HAS_TEXCOORDS)) {
-        vec3 tangentNormal = SAMPLE_NORMAL_MAP(mat, u_textures, texCoord);
-
-        if (matHasFlag(flags, MAT_FLAG_HAS_TANGENTS) && matHasFlag(flags, MAT_FLAG_HAS_BITANGENTS)) {
-            vec3 N = normalize(inNormal);
-            vec3 T = normalize(inTangent);
-            vec3 B = normalize(inBitangent);
+        if (matHasFlag(si.flags, MAT_FLAG_HAS_TANGENTS) && matHasFlag(si.flags, MAT_FLAG_HAS_BITANGENTS)) {
+            vec3 N = normalize(si.worldNormal);
+            vec3 T = normalize(si.tangent);
+            vec3 B = normalize(si.bitangent);
             mat3 TBN = mat3(T, B, N);
-            normal = normalize(TBN * tangentNormal);
-        } else if (matHasFlag(flags, MAT_FLAG_HAS_NORMALS)) {
-            vec3 Q1 = dFdx(inFragPosDepth.xyz);
-            vec3 Q2 = dFdy(inFragPosDepth.xyz);
-            vec2 st1 = dFdx(texCoord);
-            vec2 st2 = dFdy(texCoord);
-            vec3 N = normalize(inNormal);
+            surf.normal = normalize(TBN * tangentNormal);
+        } else if (matHasFlag(si.flags, MAT_FLAG_HAS_NORMALS)) {
+            vec3 Q1 = dFdx(si.worldPos);
+            vec3 Q2 = dFdy(si.worldPos);
+            vec2 st1 = dFdx(si.uv);
+            vec2 st2 = dFdy(si.uv);
+            vec3 N = normalize(si.worldNormal);
             vec3 T = normalize(Q1 * st2.t - Q2 * st1.t);
             vec3 B = normalize(cross(N, T));
             mat3 TBN = mat3(T, B, N);
-            normal = normalize(TBN * tangentNormal);
+            surf.normal = normalize(TBN * tangentNormal);
         } else {
-            normal = vec3(0.0, 1.0, 0.0);
+            surf.normal = vec3(0.0, 1.0, 0.0);
         }
     } else {
-        normal = normalize(inNormal);
+        surf.normal = normalize(si.worldNormal);
     }
 
-    gNormal = octEncodeNormal(normalize(normal));
-    gAlbedoSpec = vec4(albedo, 1.0);
-    gMaterial = vec4(metallic, roughness, ao, 1.0);
+    return surf;
+}
+
+void main() {
+    MaterialData mat = getMaterialData(inMaterialIndex);
+    uint flags = mat.flags | inFlags;
+
+    SurfaceInputs si;
+    si.uv = mix(vec2(0.0), inTexCoord, matFlagMul(flags, MAT_FLAG_HAS_TEXCOORDS));
+    si.worldPos = inFragPosDepth.xyz;
+    si.worldNormal = inNormal;
+    si.tangent = inTangent;
+    si.bitangent = inBitangent;
+    si.flags = flags;
+
+    SurfaceData surf = matHasFlag(flags, MAT_FLAG_IS_GRAPH)
+        ? evalSurfaceGraph(mat.graphId, si, mat.graphInstanceIndex)
+        : evalStaticSurface(si, mat);
+
+    gNormal = octEncodeNormal(normalize(surf.normal));
+    gAlbedoSpec = vec4(surf.albedo, 1.0);
+    gMaterial = vec4(surf.metallic, surf.roughness, surf.ao, packShadingModel(surf.shadingModelId));
 }

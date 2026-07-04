@@ -18,8 +18,11 @@
 #include "acceleration_structures/cpu/bvh/BVH.h"
 #include "acceleration_structures/cpu/bvh/BVH_SAH.h"
 #include "acceleration_structures/cpu/bvh/DBVH.h"
+#include "asset_manager/AssetManager.h"
 #include "components/TerrainComponent.h"
 #include "generators/textures/ProceduralTextures.h"
+#include "materials/Material.h"
+#include "materials/MaterialInstance.h"
 #include "utils/Timestep.h"
 
 TestLayer::~TestLayer()
@@ -83,6 +86,25 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         floor.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 0.1f, 10.0f));
         floor.addComponent<Rapture::BLASComponent>(floor.getComponent<Rapture::MeshComponent>().mesh);
         activeScene.registerBLAS(floor);
+    }
+
+    // Graph material test sphere - renders generated surface graph 0
+    {
+        auto graphCube = activeScene.createSphere("Graph Sphere");
+        auto &cubeTransform = graphCube.getComponent<Rapture::TransformComponent>();
+        cubeTransform.transforms.setTranslation(glm::vec3(0.0f, 2.0f, 0.0f));
+        cubeTransform.transforms.setScale(glm::vec3(2.0f));
+
+        auto baseMaterial = Rapture::MaterialManager::getMaterial("PBR");
+        auto graphMat = std::make_unique<Rapture::MaterialInstance>(baseMaterial, "GraphCubeMat");
+
+        Rapture::GraphInstanceData gi = Rapture::GraphInstanceData::createDefault();
+        gi.constants[0] = glm::vec4(1.0f, 0.4f, 0.2f, 1.0f); // tint
+        graphMat->setGraph(0, gi);
+
+        auto matRef =
+            Rapture::AssetManager::registerVirtualAsset(std::move(graphMat), "GraphCubeMat", Rapture::AssetType::MATERIAL);
+        graphCube.setComponent<Rapture::MaterialComponent>(matRef);
     }
 
     // Create a spot light with shadow mapping (inside Sponza courtyard)

@@ -31,10 +31,13 @@ enum MaterialFlags {
     // Normal map is BC5-compressed (RG only), reconstruct Z in the shader
     MAT_FLAG_NORMAL_BC5 = 1u << 14,
 
-    // Material type flags (bits 16-19)
+    // Material type flags (bits 16-18)
     MAT_FLAG_IS_TERRAIN = 1u << 16,
     MAT_FLAG_HAS_SPLAT_MAP = 1u << 17,
     MAT_FLAG_USE_TRIPLANAR = 1u << 18,
+
+    // Graph material: surface computed by a generated function, not the static path
+    MAT_FLAG_IS_GRAPH = 1u << 19,
 };
 
 inline bool hasFlag(uint32_t flags, uint32_t flag)
@@ -47,7 +50,7 @@ inline bool hasFlag(uint32_t flags, uint32_t flag)
 // Must match MaterialCommon.glsl exactly
 // ============================================================================
 
-struct MaterialData {
+struct alignas(16) MaterialData {
     glm::vec4 albedo; // 0-16: rgb = albedo, a = alpha
 
     float roughness; // 16-20
@@ -63,7 +66,10 @@ struct MaterialData {
     float tilingScale;    // 80-84
     float heightBlend;    // 84-88
     float slopeThreshold; // 88-92
-    float _pad;           // 92-96
+
+    uint32_t graphId;            // 92-96: which generated surface function (when MAT_FLAG_IS_GRAPH)
+    uint32_t graphInstanceIndex; // 96-100: slot into the graph data arena
+    // alignas(16) rounds the struct out to 112 (trailing 100-112 unused)
 
     // Returns a MaterialData with sensible defaults
     // defaultTexIndex should be the bindless index of a 1x1 white texture
@@ -81,12 +87,13 @@ struct MaterialData {
         data.tilingScale = 1.0f;
         data.heightBlend = 0.5f;
         data.slopeThreshold = 0.7f;
-        data._pad = 0.0f;
+        data.graphId = 0;
+        data.graphInstanceIndex = 0;
         return data;
     }
 };
 
-static_assert(sizeof(MaterialData) == 96, "MaterialData must be 96 bytes for std140 compatibility");
+static_assert(sizeof(MaterialData) == 112, "MaterialData must be 112 bytes for std140/std430 compatibility");
 
 // ============================================================================
 // Texture Index Helpers

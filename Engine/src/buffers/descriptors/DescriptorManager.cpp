@@ -76,9 +76,12 @@ void DescriptorManager::initializeSet1()
     // Set 1: Material resources
     DescriptorSetBindings bindings;
 
-    // Add bindings for material resources
+    // Single SSBO arena holding all MaterialData, indexed by material id
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::MATERIAL_UBO});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::MATERIAL_DATA_SSBO});
+    // Single SSBO arena holding all GraphInstanceData, indexed by graphInstanceIndex
+    bindings.bindings.push_back(
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::GRAPH_DATA_SSBO});
     bindings.setNumber = 1;
 
     // Create the descriptor set
