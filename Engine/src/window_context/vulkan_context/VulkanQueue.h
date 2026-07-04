@@ -37,6 +37,7 @@ class VulkanQueue {
 
     [[nodiscard]] std::unique_lock<std::mutex> acquireQueueLock() { return std::unique_lock<std::mutex>(m_queueMutex); }
 
+    void setDeviceFaultFn(PFN_vkGetDeviceFaultInfoEXT fn) { m_vkGetDeviceFaultInfoEXT = fn; }
     void clear();
 
   private:
@@ -53,6 +54,7 @@ class VulkanQueue {
 
     VkSemaphore m_immediateTimeSema = VK_NULL_HANDLE;
     VkSemaphore m_timelineSemaphore = VK_NULL_HANDLE;
+    PFN_vkGetDeviceFaultInfoEXT m_vkGetDeviceFaultInfoEXT = nullptr;
     std::atomic<uint64_t> m_nextTimelineValue = 1;
     std::atomic<uint64_t> m_nextImmediateTimelineValue = 1;
 };

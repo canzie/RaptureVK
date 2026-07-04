@@ -1,6 +1,7 @@
 #ifndef RAPTURE__MATERIAL_INSTANCE_H
 #define RAPTURE__MATERIAL_INSTANCE_H
 
+#include "asset_manager/AssetHandle.h"
 #include "buffers/UniformBuffer.h"
 #include "events/AssetEvents.h"
 #include "Material.h"
@@ -56,7 +57,7 @@ class MaterialInstance {
         return value;
     }
 
-    void setParameter(ParameterID id, Texture *texture);
+    void setParameter(ParameterID id, AssetRef texture);
     void updatePendingTextures();
 
   private:
@@ -72,6 +73,8 @@ class MaterialInstance {
 
     std::vector<PendingTexture> m_pendingTextures;
     std::mutex m_pendingTexturesMutex;
+
+    std::vector<std::pair<ParameterID, AssetPtr<Texture>>> m_textureRefs;
 };
 
 } // namespace Rapture

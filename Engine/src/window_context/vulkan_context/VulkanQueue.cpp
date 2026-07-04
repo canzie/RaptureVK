@@ -2,6 +2,7 @@
 
 #include "buffers/command_buffers/CommandPool.h"
 #include "logging/Log.h"
+#include "window_context/Application.h"
 #include <cassert>
 #include <cstdint>
 #include <set>
@@ -90,6 +91,9 @@ bool VulkanQueue::flush()
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}]: flush failed (VkResult: {})", m_name, static_cast<int>(result));
+        if (result == VK_ERROR_DEVICE_LOST) {
+            Application::getInstance().getVulkanContext().logDeviceFaultInfo();
+        }
         m_cmdBufferBatch.clear();
         assert(result != VK_ERROR_DEVICE_LOST);
         return false;
@@ -172,6 +176,9 @@ bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, std::span<VkSemaphor
     VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
     if (result != VK_SUCCESS) {
         RP_CORE_ERROR("VulkanQueue[{}] failed (VkResult: {})", m_name, static_cast<int>(result));
+        if (result == VK_ERROR_DEVICE_LOST) {
+            Application::getInstance().getVulkanContext().logDeviceFaultInfo();
+        }
         assert(result != VK_ERROR_DEVICE_LOST);
         return false;
     }
@@ -274,6 +281,9 @@ bool VulkanQueue::submitAndFlushQueue(CommandBuffer *commandBuffer, std::span<Vk
         VkResult result = vkQueueSubmit(m_queue, static_cast<uint32_t>(submits.size()), submits.data(), fence);
         if (result != VK_SUCCESS) {
             RP_CORE_ERROR("VulkanQueue[{}](1) failed (VkResult: {})", m_name, static_cast<int>(result));
+            if (result == VK_ERROR_DEVICE_LOST) {
+                Application::getInstance().getVulkanContext().logDeviceFaultInfo();
+            }
             assert(result != VK_ERROR_DEVICE_LOST);
             return false;
         }

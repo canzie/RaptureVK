@@ -1,6 +1,8 @@
 #include "AssetManagerEditor.h"
 #include "AssetImporter.h"
 #include "asset_manager/Asset.h"
+#include "asset_manager/AssetCommon.h"
+#include "entt/meta/factory.hpp"
 #include "logging/Log.h"
 #include "materials/Material.h"
 #include "materials/MaterialInstance.h"
@@ -17,6 +19,8 @@ AssetManagerEditor::AssetManagerEditor() : AssetManagerBase() {}
 
 AssetManagerEditor::~AssetManagerEditor()
 {
+    m_shuttingDown = true;
+    m_deferredFrees.clear();
     m_loadedAssets.clear();
     m_assetRegistry.clear();
     m_defaultAssetHandles.clear();
@@ -295,6 +299,76 @@ std::vector<AssetHandle> AssetManagerEditor::getVirtualAssetsByType(AssetType ty
         }
     }
     return result;
+}
+
+void AssetManagerEditor::ensureDeferredFreeBuckets()
+{
+    uint32_t framesInFlight = Application::getInstance().getMainWindow().getSwapChain()->getImageCount();
+    size_t bucketCount = static_cast<size_t>(framesInFlight) + 1;
+    if (m_deferredFrees.size() < bucketCount) {
+        m_deferredFrees.resize(bucketCount);
+    }
+}
+
+void AssetManagerEditor::onUpdate()
+{
+    ensureDeferredFreeBuckets();
+
+    m_deferredFreeBucket = (m_deferredFreeBucket + 1) % m_deferredFrees.size();
+
+    std::vector<std::unique_ptr<Asset>> toFree = std::move(m_deferredFrees[m_deferredFreeBucket]);
+    m_deferredFrees[m_deferredFreeBucket].clear();
+
+    AssetHandle handle;
+    while (m_pendingUnloadChecks.try_dequeue(handle)) {
+        evictAsset(handle);
+    }
+
+    toFree.clear();
+}
+
+bool AssetManagerEditor::evictAsset(AssetHandle handle)
+{
+    auto it = m_loadedAssets.find(handle);
+    if (it == m_loadedAssets.end()) {
+        return false;
+    }
+
+    for (const auto &[type, defaultHandle] : m_defaultAssetHandles) {
+        if (defaultHandle == handle) {
+            return false;
+        }
+    }
+
+    const AssetMetadata &metadata = getAssetMetadata(handle);
+    uint32_t refCount = metadata.useCount.load(std::memory_order_acquire);
+    if (refCount != 0) {
+        RP_CORE_WARN("Cannot unload asset({}) still in use, {} references remain", AssetTypeToString(metadata.assetType),
+                     refCount);
+        return false;
+    }
+
+    RP_CORE_INFO("Evicting {} asset '{}'", AssetTypeToString(metadata.assetType),
+                 metadata.isDiskAsset() ? metadata.filePath.string() : metadata.virtualName);
+
+    ensureDeferredFreeBuckets();
+    m_deferredFrees[m_deferredFreeBucket].push_back(std::move(it->second));
+    m_loadedAssets.erase(it);
+
+    bool isVirtual = metadata.isVirtualAsset();
+    if (isVirtual) {
+        m_assetRegistry.erase(handle);
+    }
+
+    return true;
+}
+
+void AssetManagerEditor::requestUnload(AssetHandle handle)
+{
+    if (m_shuttingDown) {
+        return;
+    }
+    m_pendingUnloadChecks.enqueue(handle);
 }
 
 } // namespace Rapture

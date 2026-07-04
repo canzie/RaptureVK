@@ -138,6 +138,8 @@ void Application::run()
 
         m_vulkanContext->getRenderContext().commandPoolManager->beginFrame();
 
+        AssetManager::onUpdate();
+
         for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
             (*it)->onUpdate(Timestep::deltaTime());
         }

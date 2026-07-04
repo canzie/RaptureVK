@@ -290,7 +290,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         Entity environment = activeScene.environment();
         if (environment.hasComponent<SkyboxComponent>()) {
             auto &skyboxComp = environment.getComponent<SkyboxComponent>();
-            m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture);
+            m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture.get());
         }
     }
 

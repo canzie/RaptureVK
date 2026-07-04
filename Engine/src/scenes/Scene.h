@@ -4,6 +4,7 @@
 #include <entt/entt.hpp>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace Rapture {
 
@@ -68,12 +69,18 @@ class Scene {
     const SceneRenderData *getRenderData() const { return m_renderData.get(); }
 
   private:
+    void ensureBLASFreeBuckets();
+
+  private:
     entt::registry m_registry;
     std::unique_ptr<Environment> m_environment;
     std::unique_ptr<SceneRenderData> m_renderData;
     SceneSettings m_config;
 
     std::shared_ptr<TLAS> m_tlas;
+    bool m_tlasDirty = false;
+    std::vector<std::vector<std::unique_ptr<BLAS>>> m_blasFreeBuckets;
+    size_t m_blasFreeBucket = 0;
 
     friend class Entity;
 };

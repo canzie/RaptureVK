@@ -140,12 +140,12 @@ void TerrainGenerator::createChunkDataBuffer()
     RP_CORE_TRACE("TerrainGenerator: Created chunk data buffer for {} chunks", m_chunkCount);
 }
 
-void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, Texture *texture)
+void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, AssetPtr<Texture> texture)
 {
     if (category >= TERRAIN_NC_COUNT) {
         return;
     }
-    m_noiseTextures[category] = texture;
+    m_noiseTextures[category] = std::move(texture);
 }
 
 Texture *TerrainGenerator::getNoiseTexture(TerrainNoiseCategory category) const
@@ -153,7 +153,7 @@ Texture *TerrainGenerator::getNoiseTexture(TerrainNoiseCategory category) const
     if (category >= TERRAIN_NC_COUNT) {
         return nullptr;
     }
-    return m_noiseTextures[category];
+    return m_noiseTextures[category].get();
 }
 
 void TerrainGenerator::bakeSplineCurves()
@@ -269,7 +269,7 @@ void TerrainGenerator::initComputePipeline()
         return;
     }
     m_chunkComputeShader = shader;
-    m_assets.push_back(std::move(asset));
+    m_shaderAssets.push_back(std::move(asset));
 
     ComputePipelineConfiguration pipelineConfig;
     pipelineConfig.shader = m_chunkComputeShader;

@@ -5,8 +5,6 @@
 #include "meshes/Mesh.h"
 #include "window_context/Application.h"
 
-#include <stdexcept>
-
 namespace Rapture {
 static constexpr uint32_t INITIAL_BATCH_SIZE = 128;
 

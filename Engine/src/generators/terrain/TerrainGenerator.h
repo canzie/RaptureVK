@@ -39,7 +39,7 @@ class TerrainGenerator {
     void shutdown();
 
     // Noise configuration
-    void setNoiseTexture(TerrainNoiseCategory category, Texture *texture);
+    void setNoiseTexture(TerrainNoiseCategory category, AssetPtr<Texture> texture);
     Texture *getNoiseTexture(TerrainNoiseCategory category) const;
     MultiNoiseConfig &getMultiNoiseConfig() { return m_multiNoiseConfig; }
     const MultiNoiseConfig &getMultiNoiseConfig() const { return m_multiNoiseConfig; }
@@ -47,8 +47,8 @@ class TerrainGenerator {
     Texture *getSplineCurveTexture() const { return m_splineCurveTexture.get(); }
     void generateDefaultNoiseTextures();
 
-    void setSingleHeightmap(Texture *texture) { m_noiseTextures[CONTINENTALNESS] = texture; }
-    Texture *getSingleHeightmap() const { return m_noiseTextures[CONTINENTALNESS]; }
+    void setSingleHeightmap(AssetPtr<Texture> texture) { m_noiseTextures[CONTINENTALNESS] = std::move(texture); }
+    Texture *getSingleHeightmap() const { return m_noiseTextures[CONTINENTALNESS].get(); }
 
     // Per-frame update: computes chunk data on GPU, runs culling
     void update(const glm::vec3 &cameraPos, Frustum &frustum, uint32_t frameIndex);
@@ -94,7 +94,7 @@ class TerrainGenerator {
     uint32_t m_chunkCount = 0;
 
     MultiNoiseConfig m_multiNoiseConfig;
-    Texture *m_noiseTextures[TERRAIN_NC_COUNT];
+    AssetPtr<Texture> m_noiseTextures[TERRAIN_NC_COUNT];
     std::unique_ptr<Texture> m_splineCurveTexture;
 
     // Shared index buffers (one per LOD, grid topology)
@@ -112,7 +112,7 @@ class TerrainGenerator {
     bool m_initialized = false;
     bool m_wireframe = false;
 
-    std::vector<AssetRef> m_assets;
+    std::vector<AssetRef> m_shaderAssets;
 
     std::shared_ptr<MaterialInstance> m_grassMaterial;
     std::shared_ptr<MaterialInstance> m_rockMaterial;

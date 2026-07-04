@@ -75,7 +75,7 @@ CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarge
     auto [transformComp, meshComp, materialComp] =
         m_selectedEntity->tryGetComponents<TransformComponent, MeshComponent, MaterialComponent>();
 
-    if (transformComp == nullptr || meshComp == nullptr || meshComp->mesh == nullptr || materialComp == nullptr) {
+    if (transformComp == nullptr || meshComp == nullptr || !meshComp->mesh || !materialComp->material) {
         return nullptr;
     }
 

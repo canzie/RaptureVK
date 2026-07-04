@@ -98,7 +98,7 @@ void ProceduralTexture::initCommandBuffer()
     poolConfig.queueFamilyIndex = vulkanContext.getComputeQueueIndex();
     poolConfig.flags = 0;
 
-    auto& rc = vulkanContext.getRenderContext();
+    auto &rc = vulkanContext.getRenderContext();
     m_commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 }
 
@@ -126,6 +126,7 @@ void ProceduralTexture::initTexture()
 
     auto asset = AssetManager::registerVirtualAsset(std::move(texture), textureName, AssetType::TEXTURE);
     m_texture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
+    m_textureAsset = asset;
     m_assets.push_back(asset);
 }
 
@@ -180,7 +181,7 @@ void ProceduralTexture::generate()
         return;
     }
 
-    auto& rc = Application::getInstance().getVulkanContext().getRenderContext();
+    auto &rc = Application::getInstance().getVulkanContext().getRenderContext();
     auto pool = rc.commandPoolManager->getCommandPool(m_commandPoolHash);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
@@ -249,7 +250,7 @@ void ProceduralTexture::generate()
     queue->waitIdle();
 }
 
-Texture *ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTextureConfig &config)
+AssetPtr<Texture> ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTextureConfig &config)
 {
     // Function-local static for shader handle - AssetManager handles caching
     static AssetHandle s_shaderHandle = 0;
@@ -263,7 +264,7 @@ Texture *ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTe
         auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
         if (!shader) {
             RP_CORE_ERROR("Failed to load WhiteNoise shader");
-            return nullptr;
+            return AssetRef();
         }
         s_shaderHandle = asset.get()->getHandle();
     }
@@ -271,7 +272,7 @@ Texture *ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTe
     ProceduralTexture generator(s_shaderHandle, config);
     if (!generator.isValid()) {
         RP_CORE_ERROR("Failed to create white noise generator");
-        return nullptr;
+        return AssetRef();
     }
 
     WhiteNoisePushConstants pc{};
@@ -279,10 +280,11 @@ Texture *ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTe
     generator.setPushConstants(pc);
     generator.generate();
 
-    return &generator.getTexture();
+    return generator.getTextureAsset();
 }
 
-Texture *ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &params, const ProceduralTextureConfig &config)
+AssetPtr<Texture> ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &params,
+                                                         const ProceduralTextureConfig &config)
 {
     static AssetHandle s_shaderHandle;
 
@@ -295,7 +297,7 @@ Texture *ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &
         auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
         if (!shader) {
             RP_CORE_ERROR("Failed to load PerlinNoise shader");
-            return nullptr;
+            return AssetPtr<Texture>();
         }
         s_shaderHandle = asset.get()->getHandle();
     }
@@ -303,16 +305,17 @@ Texture *ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &
     ProceduralTexture generator(s_shaderHandle, config);
     if (!generator.isValid()) {
         RP_CORE_ERROR("Failed to create Perlin noise generator");
-        return nullptr;
+        return AssetRef();
     }
 
     generator.setPushConstants(params);
     generator.generate();
 
-    return &generator.getTexture();
+    return generator.getTextureAsset();
 }
 
-Texture *ProceduralTexture::generateSimplexNoise(const SimplexNoisePushConstants &params, const ProceduralTextureConfig &config)
+AssetPtr<Texture> ProceduralTexture::generateSimplexNoise(const SimplexNoisePushConstants &params,
+                                                          const ProceduralTextureConfig &config)
 {
     static AssetHandle s_shaderHandle;
 
@@ -325,7 +328,7 @@ Texture *ProceduralTexture::generateSimplexNoise(const SimplexNoisePushConstants
         auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
         if (!shader) {
             RP_CORE_ERROR("Failed to load SimplexNoise shader");
-            return nullptr;
+            return AssetRef();
         }
         s_shaderHandle = asset.get()->getHandle();
     }
@@ -333,16 +336,17 @@ Texture *ProceduralTexture::generateSimplexNoise(const SimplexNoisePushConstants
     ProceduralTexture generator(s_shaderHandle, config);
     if (!generator.isValid()) {
         RP_CORE_ERROR("Failed to create Simplex noise generator");
-        return nullptr;
+        return AssetRef();
     }
 
     generator.setPushConstants(params);
     generator.generate();
 
-    return &generator.getTexture();
+    return generator.getTextureAsset();
 }
 
-Texture *ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &params, const ProceduralTextureConfig &config)
+AssetPtr<Texture> ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &params,
+                                                         const ProceduralTextureConfig &config)
 {
     static AssetHandle s_shaderHandle;
 
@@ -355,7 +359,7 @@ Texture *ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &
         auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
         if (!shader) {
             RP_CORE_ERROR("Failed to load RidgedNoise shader");
-            return nullptr;
+            return AssetRef();
         }
         s_shaderHandle = asset.get()->getHandle();
     }
@@ -363,13 +367,13 @@ Texture *ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &
     ProceduralTexture generator(s_shaderHandle, config);
     if (!generator.isValid()) {
         RP_CORE_ERROR("Failed to create Ridged noise generator");
-        return nullptr;
+        return AssetRef();
     }
 
     generator.setPushConstants(params);
     generator.generate();
 
-    return &generator.getTexture();
+    return generator.getTextureAsset();
 }
 
 static AtmospherePushConstants s_buildAtmospherePushConstants(float timeOfDay, const AtmospherePushConstants *params)
@@ -399,8 +403,8 @@ static AtmospherePushConstants s_buildAtmospherePushConstants(float timeOfDay, c
     return pc;
 }
 
-Texture *ProceduralTexture::generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params,
-                                               const ProceduralTextureConfig &config)
+AssetPtr<Texture> ProceduralTexture::generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params,
+                                                        const ProceduralTextureConfig &config)
 {
     // Function-local static for shader handle - AssetManager handles caching
     static AssetHandle s_shaderHandle;
@@ -414,7 +418,7 @@ Texture *ProceduralTexture::generateAtmosphere(float timeOfDay, const Atmosphere
         auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
         if (!shader) {
             RP_CORE_ERROR("Failed to load Atmosphere shader");
-            return nullptr;
+            return AssetRef();
         }
         s_shaderHandle = asset.get()->getHandle();
     }
@@ -428,14 +432,14 @@ Texture *ProceduralTexture::generateAtmosphere(float timeOfDay, const Atmosphere
     ProceduralTexture generator(s_shaderHandle, atmosphereConfig);
     if (!generator.isValid()) {
         RP_CORE_ERROR("Failed to create atmosphere generator");
-        return nullptr;
+        return AssetRef();
     }
 
     AtmospherePushConstants pc = s_buildAtmospherePushConstants(timeOfDay, params);
     generator.setPushConstants(pc);
     generator.generate();
 
-    return &generator.getTexture();
+    return generator.getTextureAsset();
 }
 
 static AssetHandle s_getAtmosphereCubemapShaderHandle()
@@ -462,12 +466,12 @@ static AssetHandle s_getAtmosphereCubemapShaderHandle()
     return s_shaderHandle;
 }
 
-Texture *ProceduralTexture::generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params,
-                                                      const ProceduralTextureConfig &config)
+AssetPtr<Texture> ProceduralTexture::generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params,
+                                                               const ProceduralTextureConfig &config)
 {
     AssetHandle shaderHandle = s_getAtmosphereCubemapShaderHandle();
     if (shaderHandle == 0) {
-        return nullptr;
+        return AssetRef();
     }
 
     ProceduralTextureConfig cubemapConfig = config;
@@ -480,14 +484,14 @@ Texture *ProceduralTexture::generateAtmosphereCubemap(float timeOfDay, const Atm
     ProceduralTexture generator(shaderHandle, cubemapConfig);
     if (!generator.isValid()) {
         RP_CORE_ERROR("Failed to create atmosphere cubemap generator");
-        return nullptr;
+        return AssetRef();
     }
 
     AtmospherePushConstants pc = s_buildAtmospherePushConstants(timeOfDay, params);
     generator.setPushConstants(pc);
     generator.generate();
 
-    return &generator.getTexture();
+    return generator.getTextureAsset();
 }
 
 void ProceduralTexture::regenerateAtmosphereCubemap(Texture &cube, float timeOfDay, const AtmospherePushConstants *params)

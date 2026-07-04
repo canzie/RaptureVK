@@ -38,7 +38,7 @@ class FlattenTexture {
     /**
      * @brief Get the flattened texture
      */
-    Texture *getFlattenedTexture() const { return m_flattenedTexture; }
+    Texture *getFlattenedTexture() const { return m_flattenedTexture.get(); }
 
     /**
      * @brief Get the input texture
@@ -52,8 +52,7 @@ class FlattenTexture {
 
   private:
     std::shared_ptr<Texture> m_inputTexture;
-    Texture *m_flattenedTexture;
-    AssetRef m_assetRef;
+    AssetPtr<Texture> m_flattenedTexture;
     uint32_t m_inputTextureBindlessIndex = 0;
     std::shared_ptr<DescriptorSet> m_descriptorSet;
     FlattenerDataType m_dataType;

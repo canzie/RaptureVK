@@ -115,6 +115,7 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     m_deviceExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
 
     // Mesh shader extension
     m_deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
@@ -1307,9 +1308,84 @@ void VulkanContext::createLogicalDevice(VkSurfaceKHR surface)
                      vkGetRayTracingShaderGroupHandlesKHR, vkCmdTraceRaysKHR, m_rayTracingPipelineProperties,
                      m_accelerationStructureProperties);
 
+    s_loadDeviceFunction(m_device, "vkGetDeviceFaultInfoEXT", vkGetDeviceFaultInfoEXT);
+    if (vkGetDeviceFaultInfoEXT) {
+        RP_CORE_INFO("VK_EXT_device_fault: Device fault info query supported");
+    } else {
+        RP_CORE_WARN("VK_EXT_device_fault: Device fault info query NOT available");
+    }
+
     s_createQueues(m_device, m_queueFamilyIndices, m_queues, m_vendorQueue);
 
     RP_CORE_INFO("Logical device created successfully!");
+}
+
+void VulkanContext::logDeviceFaultInfo()
+{
+    if (!vkGetDeviceFaultInfoEXT) {
+        RP_CORE_ERROR("VK_EXT_device_fault not available, cannot query fault info");
+        return;
+    }
+
+    VkDeviceFaultCountsEXT counts{};
+    counts.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT;
+
+    VkResult result = vkGetDeviceFaultInfoEXT(m_device, &counts, nullptr);
+    if (result != VK_SUCCESS) {
+        RP_CORE_ERROR("vkGetDeviceFaultInfoEXT (counts) failed: {}", static_cast<int>(result));
+        return;
+    }
+
+    RP_CORE_ERROR("=== VK_EXT_device_fault diagnostic ===");
+    RP_CORE_ERROR("Address info count: {}, Vendor info count: {}, Vendor binary size: {}",
+                  counts.addressInfoCount, counts.vendorInfoCount,
+                  static_cast<uint64_t>(counts.vendorBinarySize));
+
+    if (counts.addressInfoCount > 0 || counts.vendorInfoCount > 0) {
+        std::vector<VkDeviceFaultAddressInfoKHR> addressInfos(counts.addressInfoCount > 0 ? counts.addressInfoCount : 1);
+        std::vector<VkDeviceFaultVendorInfoKHR> vendorInfos(counts.vendorInfoCount > 0 ? counts.vendorInfoCount : 1);
+
+        VkDeviceFaultInfoEXT faultInfo{};
+        faultInfo.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT;
+        faultInfo.pAddressInfos = counts.addressInfoCount > 0 ? addressInfos.data() : nullptr;
+        faultInfo.pVendorInfos = counts.vendorInfoCount > 0 ? vendorInfos.data() : nullptr;
+
+        result = vkGetDeviceFaultInfoEXT(m_device, &counts, &faultInfo);
+        if (result != VK_SUCCESS) {
+            RP_CORE_ERROR("vkGetDeviceFaultInfoEXT (details) failed: {}", static_cast<int>(result));
+        } else {
+            RP_CORE_ERROR("Fault description: {}", faultInfo.description);
+
+            for (uint32_t i = 0; i < counts.addressInfoCount; ++i) {
+                auto &addr = addressInfos[i];
+                const char *typeStr = "Unknown";
+                switch (addr.addressType) {
+                    case VK_DEVICE_FAULT_ADDRESS_TYPE_NONE_KHR: typeStr = "None"; break;
+                    case VK_DEVICE_FAULT_ADDRESS_TYPE_READ_INVALID_KHR: typeStr = "Read Invalid"; break;
+                    case VK_DEVICE_FAULT_ADDRESS_TYPE_WRITE_INVALID_KHR: typeStr = "Write Invalid"; break;
+                    case VK_DEVICE_FAULT_ADDRESS_TYPE_EXECUTE_INVALID_KHR: typeStr = "Execute Invalid"; break;
+                    case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_UNKNOWN_KHR: typeStr = "IP Unknown"; break;
+                    case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_INVALID_KHR: typeStr = "IP Invalid"; break;
+                    case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_FAULT_KHR: typeStr = "IP Fault"; break;
+                    default: typeStr = "Unknown"; break;
+                }
+                RP_CORE_ERROR("  Address[{}]: type={}, address=0x{:x}, precision={}",
+                              i, typeStr,
+                              static_cast<uint64_t>(addr.reportedAddress),
+                              static_cast<uint64_t>(addr.addressPrecision));
+            }
+
+            for (uint32_t i = 0; i < counts.vendorInfoCount; ++i) {
+                auto &vinfo = vendorInfos[i];
+                RP_CORE_ERROR("  Vendor[{}]: desc='{}', code={}, data={}",
+                              i, vinfo.description,
+                              static_cast<uint64_t>(vinfo.vendorFaultCode),
+                              static_cast<uint64_t>(vinfo.vendorFaultData));
+            }
+        }
+    }
+
+    RP_CORE_ERROR("========================================");
 }
 
 SwapChainSupportDetails VulkanContext::querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface)

@@ -251,7 +251,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
                                                 meshComp.mesh->getIndexBuffer()->getIndexType());
 
         uint32_t meshSlotIndex = meshComp.renderDataSlot;
-        uint32_t materialIndex = materialComp.material != nullptr ? materialComp.material->getBindlessIndex() : 0;
+        uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
 
         batch->addObject(*meshComp.mesh, meshSlotIndex, materialIndex);
     }

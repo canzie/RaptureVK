@@ -73,12 +73,20 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const PanelServices &serv
     m_entitySelectedListenerId = Rapture::GameEvents::onEntitySelected().addListener(
         [this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
 
+    m_entityDeselectedListenerId = Rapture::GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
+        if (m_selectedEntity != nullptr && *m_selectedEntity == entity) {
+            m_selectedEntity = nullptr;
+            m_gizmo->reset();
+        }
+    });
+
     tabBar->addTab(std::move(root), iconTabLayout("Viewport", Icons::SVG_VIEWPORT));
 }
 
 ViewportPanel::~ViewportPanel()
 {
     Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
+    Rapture::GameEvents::onEntityDeselected().removeListener(m_entityDeselectedListenerId);
     if (m_root != nullptr && m_root->parent != nullptr) {
         if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
             tabBar->removeTab(m_root);
@@ -286,6 +294,11 @@ void ViewportPanel::onUpdate(float dt)
 
 void ViewportPanel::updateGizmo()
 {
+    if (m_selectedEntity != nullptr && !m_selectedEntity->isValid()) {
+        m_selectedEntity = nullptr;
+        m_gizmo->reset();
+    }
+
     if (!m_selectedEntity) {
         m_previousSelectedEntity = nullptr;
         return;

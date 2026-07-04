@@ -64,6 +64,7 @@ class ViewportPanel : public Panel {
     std::shared_ptr<Rapture::Entity> m_selectedEntity;
     std::shared_ptr<Rapture::Entity> m_previousSelectedEntity;
     size_t m_entitySelectedListenerId = 0;
+    size_t m_entityDeselectedListenerId = 0;
     Amethyst::vec2 m_lastViewportSize = {};
     Amethyst::vec2 m_pendingViewportSize = {};
     float m_resizeStableTime = 0.0f;

@@ -112,6 +112,17 @@ void Scene::destroyEntity(Entity entity)
     }
 
     if (entity.isValid() && entity.getScene() == this) {
+        auto *blasComp = entity.tryGetComponent<BLASComponent>();
+        if (blasComp != nullptr) {
+            if (m_tlas != nullptr) {
+                m_tlas->removeInstance(entity.getID());
+            }
+            if (blasComp->blas != nullptr) {
+                ensureBLASFreeBuckets();
+                m_blasFreeBuckets[m_blasFreeBucket].push_back(std::move(blasComp->blas));
+            }
+            m_tlasDirty = true;
+        }
         m_registry.destroy(entity.getHandle());
     }
 }
@@ -210,6 +221,17 @@ void Scene::onUpdate(float dt)
 
     m_renderData->onUpdate(frameCounter);
 
+    ensureBLASFreeBuckets();
+    m_blasFreeBucket = (m_blasFreeBucket + 1) % m_blasFreeBuckets.size();
+    m_blasFreeBuckets[m_blasFreeBucket].clear();
+
+    if (m_tlasDirty) {
+        if (m_tlas != nullptr && m_tlas->getInstanceCount() > 0) {
+            m_tlas->build();
+        }
+        m_tlasDirty = false;
+    }
+
     updateTLAS();
 }
 
@@ -281,6 +303,7 @@ void Scene::registerBLAS(Entity &entity)
     instance.transform = transform->transformMatrix();
     instance.entityID = entity.getID();
     m_tlas->addInstance(instance);
+    m_tlasDirty = true;
 }
 
 void Scene::buildTLAS()
@@ -291,6 +314,15 @@ void Scene::buildTLAS()
     }
 
     m_tlas->build();
+}
+
+void Scene::ensureBLASFreeBuckets()
+{
+    uint32_t framesInFlight = Application::getInstance().getMainWindow().getSwapChain()->getImageCount();
+    size_t bucketCount = static_cast<size_t>(framesInFlight) + 1;
+    if (m_blasFreeBuckets.size() < bucketCount) {
+        m_blasFreeBuckets.resize(bucketCount);
+    }
 }
 
 // TODO: update this so we update the transform directly instead of sotring the change and letting the tlas go over it again

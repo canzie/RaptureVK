@@ -123,22 +123,17 @@ struct CameraComponent {
 };
 
 struct MaterialComponent {
-    MaterialInstance *material = nullptr;
+    AssetPtr<MaterialInstance> material;
 
     MaterialComponent() = default;
 
-    MaterialComponent(AssetRef ref)
+    MaterialComponent(AssetRef ref) : material(std::move(ref))
     {
-        asset = ref;
-        material = asset ? asset.get()->getUnderlyingAsset<MaterialInstance>() : nullptr;
     }
-
-  private:
-    AssetRef asset;
 };
 
 struct MeshComponent {
-    Mesh *mesh = nullptr;
+    AssetPtr<Mesh> mesh;
     bool isLoading = true;
     Mobility mobility = MOBILITY_STATIC;
     bool isEnabled = true;
@@ -147,15 +142,10 @@ struct MeshComponent {
 
     MeshComponent() = default;
 
-    MeshComponent(AssetRef ref)
+    MeshComponent(AssetRef ref) : mesh(std::move(ref))
     {
-        asset = ref;
-        mesh = asset ? asset.get()->getUnderlyingAsset<Mesh>() : nullptr;
         isLoading = false;
     }
-
-  private:
-    AssetRef asset;
 };
 
 struct InstanceComponent {
@@ -224,24 +214,24 @@ struct AtmosphereComponent {
 };
 
 struct SkyboxComponent {
-    Texture *skyboxTexture = nullptr;
+    AssetPtr<Texture> skyboxTexture;
     float skyIntensity = 1.0f;
     bool isEnabled = true;
     bool useAtmosphereSkybox = false;
 
     SkyboxComponent() = default;
-    SkyboxComponent(Texture *skyboxTexture, float skyIntensity = 1.0f) : skyboxTexture(skyboxTexture), skyIntensity(skyIntensity) {}
+    SkyboxComponent(AssetPtr<Texture> skyboxTexture, float skyIntensity = 1.0f)
+        : skyboxTexture(std::move(skyboxTexture)), skyIntensity(skyIntensity) {}
     SkyboxComponent(std::filesystem::path skyboxTexturePath, float skyIntensity = 1.0f) : skyIntensity(skyIntensity)
     {
-        asset = AssetManager::importAsset(skyboxTexturePath);
-        skyboxTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
+        auto asset = AssetManager::importAsset(skyboxTexturePath);
+        if (asset) {
+            skyboxTexture = AssetPtr<Texture>(std::move(asset));
+        }
         if (!skyboxTexture) {
             RP_CORE_ERROR("Failed to load skybox texture: {}", skyboxTexturePath.string());
         }
     }
-
-  private:
-    AssetRef asset;
 };
 
 struct LightComponent {
@@ -384,9 +374,9 @@ inline LightComponent *Light_tryGetLight(Entity e)
 struct BLASComponent {
     std::unique_ptr<BLAS> blas;
 
-    BLASComponent(Mesh *mesh)
+    BLASComponent(AssetPtr<Mesh> mesh)
     {
-        blas = std::make_unique<BLAS>(mesh);
+        blas = std::make_unique<BLAS>(std::move(mesh));
         blas->build();
     }
 };

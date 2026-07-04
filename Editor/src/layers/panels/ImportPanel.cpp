@@ -153,9 +153,6 @@ void ImportPanel::doImport()
         Rapture::RP_WARN("Failed to import: {}", m_path.string());
         return;
     }
-
-    // TODO: having to manually rebuild the TLAS here is shit, the loader should handle this.
-    scene->buildTLAS();
 }
 
 void ImportPanel::close()

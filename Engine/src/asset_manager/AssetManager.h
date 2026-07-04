@@ -11,6 +11,7 @@
 #include "utils/UUID.h"
 
 #include "logging/Log.h"
+#include "utils/rp_assert.h"
 
 namespace Rapture {
 
@@ -147,6 +148,18 @@ class AssetManager {
             return AssetMetadata::null;
         }
         return s_activeAssetManager->getAssetMetadata(handle);
+    }
+
+    static void onUpdate()
+    {
+        RP_ASSERT(s_isInitialized && s_activeAssetManager != nullptr, "AssetManager not initialized");
+        s_activeAssetManager->onUpdate();
+    }
+
+    static void requestUnload(AssetHandle handle)
+    {
+        RP_ASSERT(s_isInitialized && s_activeAssetManager != nullptr, "AssetManager not initialized");
+        s_activeAssetManager->requestUnload(handle);
     }
 
   private:

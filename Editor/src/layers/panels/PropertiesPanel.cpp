@@ -48,11 +48,18 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const PanelServices &
             }
             showEntity(*entity);
         });
+
+    m_entityDeselectedListenerID = Rapture::GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
+        if (m_selectedEntity == entity) {
+            clearSelection();
+        }
+    });
 }
 
 PropertiesPanel::~PropertiesPanel()
 {
     Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerID);
+    Rapture::GameEvents::onEntityDeselected().removeListener(m_entityDeselectedListenerID);
     if (m_root != nullptr && m_root->parent != nullptr) {
         if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
             tabBar->removeTab(m_root);
@@ -281,6 +288,9 @@ void PropertiesPanel::onUpdate(float dt)
 {
     (void)dt;
     if (!m_selectedEntity.isValid()) {
+        if (!m_active.empty()) {
+            clearSelection();
+        }
         return;
     }
     for (auto *editor : m_active) {
@@ -303,4 +313,11 @@ void PropertiesPanel::showPlaceholder()
     }
     m_placeholderText->setBaseProperties({.visible = true});
     m_entityView->setBaseProperties({.visible = false});
+}
+
+void PropertiesPanel::clearSelection()
+{
+    m_selectedEntity = Rapture::Entity{};
+    refresh();
+    showPlaceholder();
 }

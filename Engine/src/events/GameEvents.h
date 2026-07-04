@@ -20,6 +20,7 @@ using ProjectLoadRequestedEvent = EventBus<std::string>;
 using ProjectLoadedEvent = EventBus<std::string>;
 
 using EntitySelectedEvent = EventBus<std::shared_ptr<Entity>>;
+using EntityDeselectedEvent = EventBus<Entity>;
 
 // Global event accessors
 inline SceneLoadRequestedEvent &onSceneLoadRequested()
@@ -65,6 +66,11 @@ inline ProjectLoadedEvent &onProjectLoaded()
 inline EntitySelectedEvent &onEntitySelected()
 {
     return EventRegistry::getInstance().getEventBus<std::shared_ptr<Entity>>("EntitySelected");
+}
+
+inline EntityDeselectedEvent &onEntityDeselected()
+{
+    return EventRegistry::getInstance().getEventBus<Entity>("EntityDeselected");
 }
 } // namespace GameEvents
 } // namespace Rapture

@@ -43,7 +43,7 @@ class MDIBatch {
     uint32_t getDrawCount() const { return m_cpuIndirectCommands.size(); }
     uint32_t getAllocatedSize() const { return m_allocatedSize; }
 
-    BufferLayout &getBufferLayout() const { return m_bufferLayout; }
+    BufferLayout &getBufferLayout() { return m_bufferLayout; }
     VkBuffer getVertexBuffer() const { return m_vertexBuffer; }
     VkBuffer getIndexBuffer() const { return m_indexBuffer; }
     VkIndexType getIndexType() const { return m_indexType; }
@@ -67,7 +67,7 @@ class MDIBatch {
     // needs to be used for the final draw commands
     // easier to store a copy here than to always take the ones from the first element
     // this is just cleaner
-    BufferLayout &m_bufferLayout;
+    BufferLayout m_bufferLayout;
     VkBuffer m_vertexBuffer;
     VkBuffer m_indexBuffer;
     VkIndexType m_indexType;

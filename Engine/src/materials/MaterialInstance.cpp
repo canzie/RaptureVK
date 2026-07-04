@@ -1,5 +1,6 @@
 #include "MaterialInstance.h"
 
+#include "asset_manager/Asset.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "logging/Log.h"
 #include "textures/Texture.h"
@@ -44,12 +45,27 @@ MaterialInstance::~MaterialInstance()
     }
 }
 
-void MaterialInstance::setParameter(ParameterID id, Texture *texture)
+void MaterialInstance::setParameter(ParameterID id, AssetRef textureAsset)
 {
     const ParamInfo *info = getParamInfo(id);
     if (!info || info->type != ParamType::TEXTURE) return;
 
-    if (texture && texture->isReady()) {
+    AssetPtr<Texture> texturePtr(textureAsset);
+    Texture *texture = texturePtr.get();
+
+    auto it = std::find_if(m_textureRefs.begin(), m_textureRefs.end(),
+                           [id](const std::pair<ParameterID, AssetPtr<Texture>> &entry) { return entry.first == id; });
+    if (texture != nullptr) {
+        if (it != m_textureRefs.end()) {
+            it->second = std::move(texturePtr);
+        } else {
+            m_textureRefs.emplace_back(id, std::move(texturePtr));
+        }
+    } else if (it != m_textureRefs.end()) {
+        m_textureRefs.erase(it);
+    }
+
+    if (texture != nullptr && texture->isReady()) {
         uint32_t bindlessIdx = texture->getBindlessIndex();
         char *dataPtr = reinterpret_cast<char *>(&m_data);
         std::memcpy(dataPtr + info->offset, &bindlessIdx, sizeof(uint32_t));
@@ -60,7 +76,7 @@ void MaterialInstance::setParameter(ParameterID id, Texture *texture)
         applyTextureEncodingFlags(id, texture);
         syncToGPU();
         AssetEvents::onMaterialInstanceChanged().publish(this);
-    } else if (texture) {
+    } else if (texture != nullptr) {
         std::lock_guard<std::mutex> lock(m_pendingTexturesMutex);
         m_pendingTextures.push_back({id, texture});
     } else if (info->flag && (m_data.flags & info->flag)) {

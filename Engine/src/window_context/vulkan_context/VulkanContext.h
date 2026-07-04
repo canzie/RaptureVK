@@ -79,6 +79,12 @@ class VulkanContext {
     PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR = nullptr;
     PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR = nullptr;
 
+    // Device fault extension function pointers
+    PFN_vkGetDeviceFaultInfoEXT vkGetDeviceFaultInfoEXT = nullptr;
+
+    // Query and log device fault info after VK_ERROR_DEVICE_LOST
+    void logDeviceFaultInfo();
+
     // Mesh shader extension function pointers
     PFN_vkCmdDrawMeshTasksEXT vkCmdDrawMeshTasksEXT = nullptr;
     PFN_vkCmdDrawMeshTasksIndirectEXT vkCmdDrawMeshTasksIndirectEXT = nullptr;

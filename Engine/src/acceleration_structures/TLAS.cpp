@@ -4,6 +4,7 @@
 #include "logging/Log.h"
 #include "window_context/Application.h"
 
+#include <algorithm>
 #include <cstring>
 #include <stdexcept>
 
@@ -78,6 +79,16 @@ void TLAS::addInstance(const TLASInstance &instance)
 
     if (m_isBuilt) {
         RP_CORE_INFO("Instance added, rebuild required");
+    }
+}
+
+void TLAS::removeInstance(uint32_t entityID)
+{
+    auto it = std::remove_if(m_instances.begin(), m_instances.end(),
+                             [entityID](const TLASInstance &instance) { return instance.entityID == entityID; });
+    if (it != m_instances.end()) {
+        m_instances.erase(it, m_instances.end());
+        m_needsRebuild = true;
     }
 }
 
@@ -252,6 +263,9 @@ void TLAS::build()
         return;
     }
 
+    // ensure no in-flight frame is still tracing the old acceleration structure before we destroy it
+    Application::getInstance().getVulkanContext().waitIdle();
+
     // Create or recreate acceleration structure if needed
     createAccelerationStructure();
 
@@ -342,14 +356,17 @@ void TLAS::build()
 
 void TLAS::registerWithDescriptorManager()
 {
-    // Add this TLAS to the bindless acceleration structures descriptor set
     auto &app = Application::getInstance();
     auto &rc = app.getVulkanContext().getRenderContext();
     auto bindlessSet = rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
     if (bindlessSet) {
         auto binding = bindlessSet->getTLASBinding(DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES);
         if (binding) {
-            m_bindlessIndex = binding->add(*this);
+            if (m_bindlessIndex != UINT32_MAX) {
+                binding->update(*this, m_bindlessIndex);
+            } else {
+                m_bindlessIndex = binding->add(*this);
+            }
             RP_CORE_INFO("TLAS: Registered with descriptor manager at bindless index {}", m_bindlessIndex);
         } else {
             RP_CORE_ERROR("TLAS: Failed to get TLAS binding from descriptor manager");

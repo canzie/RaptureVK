@@ -1,5 +1,6 @@
 #pragma once
 
+#include "asset_manager/AssetHandle.h"
 #include "buffers/Buffers.h"
 #include "meshes/Mesh.h"
 
@@ -10,7 +11,7 @@ namespace Rapture {
 
 class BLAS {
   public:
-    BLAS(Mesh *mesh);
+    BLAS(AssetPtr<Mesh> meshPtr);
     ~BLAS();
 
     // Build the acceleration structure
@@ -30,7 +31,7 @@ class BLAS {
     void createGeometry();
 
   private:
-    Mesh *m_mesh;
+    AssetPtr<Mesh> m_meshPtr;
 
     VkAccelerationStructureKHR m_accelerationStructure;
     VkAccelerationStructureGeometryKHR m_geometry;

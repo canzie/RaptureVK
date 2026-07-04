@@ -7,8 +7,8 @@
 
 namespace Rapture {
 
-BLAS::BLAS(Mesh *mesh)
-    : m_mesh(mesh), m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE),
+BLAS::BLAS(AssetPtr<Mesh> meshPtr)
+    : m_meshPtr(std::move(meshPtr)), m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE),
       m_scratchBuffer(VK_NULL_HANDLE), m_scratchAllocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0),
       m_scratchSize(0), m_isBuilt(false)
 {
@@ -26,7 +26,7 @@ BLAS::BLAS(Mesh *mesh)
     m_device = vulkanContext.getLogicalDevice();
     m_allocator = vulkanContext.getVmaAllocator();
 
-    if (!m_mesh) {
+    if (!m_meshPtr) {
         RP_CORE_ERROR("Mesh is null!");
         throw std::runtime_error("Mesh is null!");
     }
@@ -58,16 +58,16 @@ void BLAS::createGeometry()
 
     RAPTURE_PROFILE_FUNCTION();
 
-    auto vertexAllocation = m_mesh->getVertexAllocation();
-    auto indexAllocation = m_mesh->getIndexAllocation();
+    auto vertexAllocation = m_meshPtr->getVertexAllocation();
+    auto indexAllocation = m_meshPtr->getIndexAllocation();
 
     if (!vertexAllocation || !vertexAllocation->isValid() || !indexAllocation || !indexAllocation->isValid()) {
         RP_CORE_ERROR("BLAS: Mesh vertex or index buffer allocation is invalid!");
         throw std::runtime_error("BLAS: Mesh vertex or index buffer allocation is invalid!");
     }
 
-    auto vertexBuffer = m_mesh->getVertexBuffer();
-    auto indexBuffer = m_mesh->getIndexBuffer();
+    auto vertexBuffer = m_meshPtr->getVertexBuffer();
+    auto indexBuffer = m_meshPtr->getIndexBuffer();
 
     if (!vertexBuffer || !indexBuffer) {
         RP_CORE_ERROR("BLAS: Mesh vertex or index buffer is null!");
@@ -120,7 +120,7 @@ void BLAS::createGeometry()
 
     // Build range info
     m_buildRangeInfo = {};
-    m_buildRangeInfo.primitiveCount = m_mesh->getIndexCount() / 3; // Number of triangles
+    m_buildRangeInfo.primitiveCount = m_meshPtr->getIndexCount() / 3; // Number of triangles
     m_buildRangeInfo.primitiveOffset = 0;
     m_buildRangeInfo.firstVertex = 0;
     m_buildRangeInfo.transformOffset = 0;

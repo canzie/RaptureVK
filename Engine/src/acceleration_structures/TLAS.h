@@ -32,6 +32,12 @@ class TLAS : public std::enable_shared_from_this<TLAS> {
     // Add a BLAS instance to the TLAS
     void addInstance(const TLASInstance &instance);
 
+    /**
+     * @brief Removes the instance belonging to an entity
+     * @param entityID The entity whose instance should be removed
+     */
+    void removeInstance(uint32_t entityID);
+
     // Build the acceleration structure
     void build();
 

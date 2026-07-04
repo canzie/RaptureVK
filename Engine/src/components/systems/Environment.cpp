@@ -202,7 +202,7 @@ bool Environment::ensureSkyboxGenerator(SkyboxComponent &sky)
         return false;
     }
 
-    sky.skyboxTexture = &m_skyboxGenerator->getTexture();
+    sky.skyboxTexture = m_skyboxGenerator->getTextureAsset();
     return true;
 }
 

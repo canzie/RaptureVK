@@ -102,7 +102,7 @@ CommandBuffer *InstancedShapesPass::recordSecondary(Scene &scene, Entity camera,
         auto [transformComp, meshComp, instanceShapeComp] =
             view.get<TransformComponent, MeshComponent, InstanceShapeComponent>(entity);
 
-        if (meshComp.mesh == nullptr || instanceShapeComp.instanceSSBO == nullptr) {
+        if (!meshComp.mesh || instanceShapeComp.instanceSSBO == nullptr) {
             continue;
         }
 

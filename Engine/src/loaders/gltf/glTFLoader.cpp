@@ -159,7 +159,7 @@ void glTF2Loader::loadAndSetTexture(MaterialInstance *material, ParameterID id, 
 
     // change this to use a callback?
     // Use the non-template overload which correctly converts Texture to uint32_t bindless index
-    material->setParameter(id, tex);
+    material->setParameter(id, asset);
 }
 
 bool glTF2Loader::load(Scene *scene, int32_t sceneIndex)
@@ -589,20 +589,19 @@ void glTF2Loader::finalizeToScene(Scene *scene)
         entity.addComponent<TransformComponent>(node->worldTransform);
 
         if (parentEntity.isValid()) {
-            setParent(entity, parentEntity);
+            HierarchyComponent::setParent(entity, parentEntity);
         }
 
         if (node->type == glTF_NodeType::PRIMITIVE) {
             if (node->meshRef) {
-                entity.addComponent<MeshComponent>(node->meshRef);
-                Mesh *mesh = node->meshRef.get()->getUnderlyingAsset<Mesh>();
+                auto &meshComp = entity.addComponent<MeshComponent>(node->meshRef);
 
-                if (mesh) {
+                if (meshComp.mesh) {
                     if (node->hasBoundingBox) {
                         entity.addComponent<BoundingBoxComponent>(node->boundingBoxMin, node->boundingBoxMax);
                     }
 
-                    entity.addComponent<BLASComponent>(mesh);
+                    entity.addComponent<BLASComponent>(meshComp.mesh);
                     scene->registerBLAS(entity);
                 }
             }

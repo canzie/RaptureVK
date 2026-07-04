@@ -180,7 +180,8 @@ class ProceduralTexture {
      * @param pushConstants Push constant values to use.
      * @return true if the size matches the shader's push constant layout, false otherwise.
      */
-    template <typename T> bool setPushConstants(const T &pushConstants)
+    template <typename T>
+    bool setPushConstants(const T &pushConstants)
     {
         if (!verifyPushConstantSize(sizeof(T))) {
             return false;
@@ -222,6 +223,8 @@ class ProceduralTexture {
     Texture &getTexture() const { return *m_texture; }
     Shader &getShader() const { return *m_shader; }
 
+    AssetPtr<Texture> getTextureAsset() const { return AssetPtr<Texture>(m_textureAsset); }
+
     /**
      * @brief Checks if the generator was initialized successfully.
      *
@@ -247,7 +250,8 @@ class ProceduralTexture {
      * @param config Optional texture configuration.
      * @return Shared pointer to the generated texture.
      */
-    static Texture *generateWhiteNoise(uint32_t seed = 0, const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static AssetPtr<Texture> generateWhiteNoise(uint32_t seed = 0,
+                                                const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Generates a Perlin noise texture.
@@ -256,14 +260,14 @@ class ProceduralTexture {
      * @param config Optional texture configuration.
      * @return Shared pointer to the generated texture.
      */
-    static Texture *generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
-                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static AssetPtr<Texture> generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
+                                                 const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
-    static Texture *generateSimplexNoise(const SimplexNoisePushConstants &params = SimplexNoisePushConstants(),
-                                         const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static AssetPtr<Texture> generateSimplexNoise(const SimplexNoisePushConstants &params = SimplexNoisePushConstants(),
+                                                  const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
-    static Texture *generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
-                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static AssetPtr<Texture> generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
+                                                 const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Generates an atmospheric scattering texture.
@@ -282,8 +286,8 @@ class ProceduralTexture {
      * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
      * @return Shared pointer to the generated panoramic texture.
      */
-    static Texture *generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
-                                       const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static AssetPtr<Texture> generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
+                                                const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Generates an atmospheric scattering cubemap usable as a skybox.
@@ -297,8 +301,8 @@ class ProceduralTexture {
      * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
      * @return Pointer to the generated TEXTURECUBE texture.
      */
-    static Texture *generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params = nullptr,
-                                              const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static AssetPtr<Texture> generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params = nullptr,
+                                                       const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Re-renders an atmosphere cubemap into an existing texture in place.
@@ -326,6 +330,7 @@ class ProceduralTexture {
     std::shared_ptr<ComputePipeline> m_pipeline;
     std::shared_ptr<DescriptorSet> m_descriptorSet;
     Texture *m_texture;
+    AssetRef m_textureAsset;
     CommandPoolHash m_commandPoolHash = 0;
 
     std::vector<uint8_t> m_pushConstantData;

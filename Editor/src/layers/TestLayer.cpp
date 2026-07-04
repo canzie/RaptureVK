@@ -117,7 +117,8 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     // Create environment entity with a procedurally generated atmosphere skybox
     {
         auto envEntity = activeScene.environment();
-        auto &sky = envEntity.addComponent<Rapture::SkyboxComponent>(nullptr, 0.1f);
+        auto &sky = envEntity.addComponent<Rapture::SkyboxComponent>();
+        sky.skyIntensity = 0.1f;
         sky.useAtmosphereSkybox = true;
         auto atmo = envEntity.addComponent<Rapture::AtmosphereComponent>();
         atmo.timeOfDay = 11.551f;
@@ -164,13 +165,6 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     terrainComp.isEnabled = true;
     Rapture::RP_INFO("Terrain entity created with {} chunks (radius {})", terrainComp.generator->getChunkCount(),
                      terrainConfig.getChunkRadius());
-
-    // Build TLAS for ray tracing
-    try {
-        activeScene.buildTLAS();
-    } catch (const std::runtime_error &e) {
-        Rapture::RP_ERROR("TestLayer: Failed to build TLAS: {}", e.what());
-    }
 
     Rapture::RP_INFO("Scene setup complete for: {}", activeScene.getSceneName());
 }

@@ -493,7 +493,7 @@ void DynamicDiffuseGI::updateSkybox(Scene &scene)
     }
 
     Texture *newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReady())
-                              ? skyboxComp->skyboxTexture
+                              ? skyboxComp->skyboxTexture.get()
                               : m_defaultSkyboxTexture.get();
 
     m_skyIntensity = skyboxComp ? skyboxComp->skyIntensity : 1.0f;

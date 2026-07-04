@@ -68,6 +68,7 @@ class PropertiesPanel : public Panel {
     void relayout(void);
     void showEntity(const Rapture::Entity &entity);
     void showPlaceholder(void);
+    void clearSelection(void);
 
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextLabel *m_placeholderText = nullptr;
@@ -80,6 +81,7 @@ class PropertiesPanel : public Panel {
     Rapture::Scene *m_scene = nullptr;
     Rapture::Entity m_selectedEntity;
     size_t m_entitySelectedListenerID = 0;
+    size_t m_entityDeselectedListenerID = 0;
 };
 
 #endif // RAPTURE__PROPERTIES_PANEL_H

@@ -8,7 +8,10 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <variant>
+
+#include "AssetHandle.h"
 
 #include "loaders/SceneFileCommon.h"
 #include "materials/MaterialInstance.h"
@@ -21,12 +24,15 @@ namespace Rapture {
 using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
                                   std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>, std::unique_ptr<SceneFileData>>;
 
+template <typename T, typename Variant>
+struct IsAssetType;
+template <typename T, typename... Us>
+struct IsAssetType<T, std::variant<Us...>> : std::bool_constant<(std::is_same_v<std::unique_ptr<T>, Us> || ...)> {};
+
 struct AssetMetadata {
 
     AssetMetadata(const AssetMetadata &) = delete;
     AssetMetadata &operator=(const AssetMetadata &) = delete;
-    AssetMetadata(AssetMetadata &&) noexcept = default;
-    AssetMetadata &operator=(AssetMetadata &&) noexcept = default;
     AssetMetadata() = default;
     static AssetMetadata null;
     static const AssetMetadata const_null;
@@ -38,7 +44,7 @@ struct AssetMetadata {
     AssetImportConfigVariant importConfig = std::monostate();
     std::string virtualName = "untitled";
 
-    uint32_t useCount = 0;
+    std::atomic<uint32_t> useCount{0};
 
     bool isDiskAsset() const { return storageType == AssetStorageType::DISK; }
     bool isVirtualAsset() const { return storageType == AssetStorageType::VIRTUAL; }
@@ -91,54 +97,10 @@ class Asset {
     AssetVariant m_asset;
 };
 
-/*
- @brief Wrapper for assets so the assetmanager can keep track of the amount of uses
-
-  I did not want to use a shared_ptr because the asset manager needs to own it, and overwriting the shared_ptr destructor is just a
- garbage hack.
-*/
-class AssetRef {
-  public:
-    AssetRef() noexcept : asset(nullptr), m_useCount(nullptr) {}
-    AssetRef(Asset *_asset, uint32_t *_useCount) noexcept;
-    AssetRef(const AssetRef &other) noexcept;
-    AssetRef(AssetRef &&other) noexcept;
-    ~AssetRef() noexcept;
-
-    bool operator==(const AssetRef &other) const { return asset == other.asset; }
-    explicit operator bool() const { return asset != nullptr; }
-
-    Asset *get() const { return asset; }
-
-    AssetRef &operator=(const AssetRef &other) noexcept
-    {
-        if (this == &other) return *this;
-
-        if (m_useCount) (*m_useCount)--;
-
-        asset = other.asset;
-        m_useCount = other.m_useCount;
-        if (m_useCount) (*m_useCount)++;
-        return *this;
-    }
-
-    AssetRef &operator=(AssetRef &&other) noexcept
-    {
-        if (this == &other) return *this;
-        if (m_useCount) (*m_useCount)--;
-
-        asset = other.asset;
-        m_useCount = other.m_useCount;
-
-        other.asset = nullptr;
-        other.m_useCount = nullptr;
-
-        return *this;
-    }
-
-  private:
-    Asset *asset;
-    uint32_t *m_useCount;
-};
+template <typename T>
+AssetPtr<T>::AssetPtr(AssetRef ref) noexcept : m_ref(std::move(ref)), m_ptr(m_ref ? m_ref.get()->getUnderlyingAsset<T>() : nullptr)
+{
+    RP_ASSERT(!m_ref || m_ptr != nullptr, "AssetPtr constructed from an asset that is not of type T");
+}
 
 } // namespace Rapture
