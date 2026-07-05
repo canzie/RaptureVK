@@ -1,17 +1,25 @@
-// SurfaceGraphs.glsl - GENERATED
-// Placeholder: hand-written until the graph compiler (Phase 2b) emits this file.
-// Depends on MaterialCommon.glsl (SurfaceInputs/SurfaceData, u_graphData, SM_*).
+/**
+ * @file SurfaceGraphs.glsl
+ * @brief Generated surface graph functions and their dispatcher
+ * @author Rapture Material Graph Compiler
+ * @version 1
+ * @note DO NOT EDIT, this file is regenerated from material graphs
+ */
 
 #ifndef SURFACE_GRAPHS_GLSL
 #define SURFACE_GRAPHS_GLSL
 
-// Graph 0: test - fract(worldPos) tinted by constants[0]
-SurfaceData evalSurface_Test(SurfaceInputs si, uint gii) {
+SurfaceData evalSurface_Graph0(SurfaceInputs si, uint gii) {
     SurfaceData surf;
-    vec3 tint = u_graphData.instances[gii].constants[0].rgb;
-    surf.albedo = fract(si.worldPos * 0.5) * tint;
+    vec3 _n0 = si.worldPos;
+    vec3 _n1 = u_graphData.instances[gii].constants[0].xyz;
+    vec3 _n2 = _n0 * _n1;
+    vec3 _n3 = fract(_n2);
+    vec3 _n4 = u_graphData.instances[gii].constants[1].xyz;
+    vec3 _n5 = _n3 * _n4;
+    surf.albedo = _n5;
     surf.normal = normalize(si.worldNormal);
-    surf.roughness = 0.6;
+    surf.roughness = 0.5;
     surf.metallic = 0.0;
     surf.ao = 1.0;
     surf.shadingModelId = SM_OPENPBR_STANDARD;
@@ -20,10 +28,9 @@ SurfaceData evalSurface_Test(SurfaceInputs si, uint gii) {
 
 SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint gii) {
     switch (graphId) {
-        case 0u: return evalSurface_Test(si, gii);
+        case 0u: return evalSurface_Graph0(si, gii);
     }
 
-    // Unknown graph -> magenta error surface
     SurfaceData surf;
     surf.albedo = vec3(1.0, 0.0, 1.0);
     surf.normal = normalize(si.worldNormal);

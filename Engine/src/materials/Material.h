@@ -14,6 +14,7 @@
 namespace Rapture {
 
 class FreeListStorageBuffer;
+class SurfaceGraphManager;
 
 // Maximum number of live material instances backed by the shared SSBO arena
 constexpr uint32_t MAX_MATERIALS = 4096;
@@ -89,6 +90,12 @@ class MaterialManager {
      */
     static void writeGraphSlot(uint32_t slot, const GraphInstanceData &data);
 
+    /**
+     * @brief Access the owned surface graph manager
+     * @return The manager
+     */
+    static SurfaceGraphManager &getSurfaceGraphManager();
+
   private:
     static void createDefaultMaterials();
 
@@ -97,6 +104,7 @@ class MaterialManager {
     static std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> s_materials;
     static std::unique_ptr<FreeListStorageBuffer> s_materialBuffer;
     static std::unique_ptr<FreeListStorageBuffer> s_graphBuffer;
+    static std::unique_ptr<SurfaceGraphManager> s_surfaceGraphManager;
 };
 
 } // namespace Rapture

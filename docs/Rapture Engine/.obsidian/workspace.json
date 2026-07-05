@@ -4,17 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "5002038ecca66529",
+        "id": "129455633617965b",
         "type": "tabs",
         "children": [
           {
-            "id": "c449760cf1be845f",
+            "id": "6fa67950a6ea8521",
             "type": "leaf",
             "state": {
-              "type": "graph",
+              "type": "empty",
               "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -179,8 +179,17 @@
       "bases:Create new base": false
     }
   },
-  "active": "c449760cf1be845f",
+  "active": "6fa67950a6ea8521",
   "lastOpenFiles": [
+    "Material Graph Nodes.md",
+    "Material Graph Nodes.md.tmp.1513.8fef1da2ab09",
+    "Material Graph Nodes.md.tmp.1513.9d0324ff9ef7",
+    "systems/AssetManager.md",
+    "Material Graph Nodes.md.tmp.1513.9bee6da3d7dc",
+    "systems/AssetRef.md",
+    "plans/Material Graph Compiler.md",
+    "plans/Material System Overhaul.md",
+    "systems/Asset.md",
     "Shadow Maps to SceneRenderData.md",
     "SceneRenderData.md",
     "SceneRenderData Implementation.md",
@@ -200,13 +209,6 @@
     "systems/Material.md",
     "systems/LightingPass.md",
     "systems/JobSystem.md",
-    "systems/InstancedShapesPass.md",
-    "systems/Input.md",
-    "systems/GBufferPass.md",
-    "systems/Entity.md",
-    "systems/DescriptorManager.md",
-    "systems/DDGI.md",
-    "systems/CommandPool.md",
     "systems",
     "stuff",
     "plans",
@@ -214,9 +216,6 @@
     "archive",
     "plans/Material System Overhaul.md.tmp.60032.0d9ab45083a1",
     "plans/Material System Overhaul.md.tmp.60032.9d37325de234",
-    "plans/Material System Overhaul.md.tmp.60032.644a7b689f43",
-    "plans/Material System Overhaul.md.tmp.60032.41f65937fdb8",
-    "amethyst",
     "Pasted image 20260517113657.png"
   ]
 }

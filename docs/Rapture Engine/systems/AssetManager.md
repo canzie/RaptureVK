@@ -9,3 +9,8 @@ Two manager implementations:
 - **`AssetManagerRuntime`** (planned) — production builds. Loads only pre-baked internal asset representations (no raw format support). Optimized for fast loading with no import overhead.
 
 Provides [[AssetRef]] for reference-counted access and [[AssetHandle]] (UUID) for identification.
+
+### add_int
+| Inputs           | Outputs   |
+| ---------------- | --------- |
+| `a` int, `b` int | `out` int |

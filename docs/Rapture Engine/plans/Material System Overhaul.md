@@ -145,11 +145,12 @@ draw → inMaterialIndex → u_materials[idx]  (MaterialData)
 Start A, treat hitting 16 as the signal to move to B.
 
 ### 6.3 Graph compiler
-`Engine/src/materials/graph/` (new, snake_case folder):
+**Full design: [[Material Graph Compiler]].** `Engine/src/materials/graph/` (new, snake_case folder):
 - `MaterialGraph` — typed nodes + connections + exposed params (the `PROCEDURAL_MATERIALS_DESIGN.md` data structures are a fine starting point; drop everything bytecode-related).
 - `MaterialGraphCompiler` — topo-sort → emit one `evalSurface_<name>(SurfaceInputs, GraphInstanceData, out SurfaceData)` GLSL function. First pass assigns texture/constant pool slots; second pass emits straight-line GLSL. Constant folding / DCE / CSE are free from the downstream GLSL compiler (add later if wanted).
+- Data-driven node registry (`NodeDefinition` + `glslTemplate`): adding a node is a data entry, not a compiler edit. See the compiler doc for the placeholder language and coercion rules.
 - Output: all functions into `generated/SurfaceGraphs.glsl` + a `evalSurfaceGraph(graphID, ...)` dispatcher `switch`. No bytecode, no register file.
-- `.matgraph` JSON serialization (format from `PROCEDURAL_MATERIALS_DESIGN.md` is fine).
+- Serialization: the generic Rapture asset format (`.rapt` readable JSON / `.rasset` binary), not a bespoke per-type extension.
 
 ### 6.4 Codegen example
 Graph "MossyRock" (rock with noise-driven moss) compiles to:
@@ -245,7 +246,7 @@ Needs new Amethyst widgets (node canvas, pins, wires, drag-connect). Editor fluf
 
 **Phase 2 — surface graph, codegen only.** Split into:
 - **2a — plumbing + hand-written graph. [DONE, proven on a lit sphere]** `GraphInstanceData` (16 tex / 16 const generic pool, `alignas(16)`, 320 B) in its own `FreeListStorageBuffer` at `GRAPH_DATA_SSBO` (set 1/binding 1). `MaterialData` → 112 B (`alignas(16)`) with `MAT_FLAG_IS_GRAPH` + `graphId` + `graphInstanceIndex`. `MaterialInstance::setGraph(graphId, data)` allocates a graph slot, uploads the pool, flags the material. `GBuffer.fs` branches `IS_GRAPH ? evalSurfaceGraph(graphId, si, gii) : evalStaticSurface(...)`; hand-written graph 0 + dispatcher in `generated/SurfaceGraphs.glsl`. Dispatch / index / pool upload all verified.
-- **2b — NEXT: `MaterialGraph` IR + data-driven compiler.** `NodeDefinition` (typeName, pins, `glslTemplate`, resource kind) in a registry — adding a node is a data entry, no compiler edits. Compiler: topo-sort → resource-slot pass (assign texture/constant pool slots + build `GraphInstanceData`) → emit pass (template substitution → straight-line GLSL) → wrap in `evalSurface_<name>` + add dispatcher case. Emits `generated/SurfaceGraphs.glsl`. `.matgraph` JSON serialization.
+- **2b — DONE (pending build), except JSON serialization. Full design: [[Material Graph Compiler]].** Compiler (`Engine/src/materials/graph/`): `MaterialGraphTypes` (`PinType`/`ResourceKind`/`PinDef`/`NodeDefinition`), `NodeRegistry` (data-driven, `registerBuiltins` starter set, adding a node = a `registerNode` data entry), `MaterialGraph` IR (`GraphNode`/`GraphConnection`), `MaterialGraphCompiler::compile` (topo-sort → resource-slot pass → emit pass with template substitution + type coercion → wrap + sink, split into `s_topoSort`/`s_assignResources`/`s_emitSurfaceBody`, `MATERIAL_GRAPH_COMPILER_VERSION` stamped in output). `SurfaceGraphManager` (plain instance class, **owned by `MaterialManager`** via `s_surfaceGraphManager` + `getSurfaceGraphManager()` ref, NOT a singleton) registers graphs → graphId and emits `generated/SurfaceGraphs.glsl` with a `@`-style version banner. `TestLayer` authors the `fract(position*scale)*tint` graph, registers it, writes the file, seeds the sphere from `getDefaults` — the graph-0 flip that replaces the hand-written `evalSurface_Test`. Note: the running G-buffer shader only reloads on a viewport resize for now (clean gbuffer re-eval is 2c). **Left: `.rapt`/`.rasset` JSON load/save.**
 - **2c — async compile + last-good swap** (background thread, not a fiber; debounce; keep last-good pipeline until the new one is ready).
 
 **Phase 3 — node editor.** Amethyst node canvas; live compile on edit.

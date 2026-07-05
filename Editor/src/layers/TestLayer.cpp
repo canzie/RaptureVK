@@ -23,6 +23,7 @@
 #include "generators/textures/ProceduralTextures.h"
 #include "materials/Material.h"
 #include "materials/MaterialInstance.h"
+#include "materials/graph/SurfaceGraphManager.h"
 #include "utils/Timestep.h"
 
 TestLayer::~TestLayer()
@@ -98,9 +99,32 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         auto baseMaterial = Rapture::MaterialManager::getMaterial("PBR");
         auto graphMat = std::make_unique<Rapture::MaterialInstance>(baseMaterial, "GraphCubeMat");
 
-        Rapture::GraphInstanceData gi = Rapture::GraphInstanceData::createDefault();
-        gi.constants[0] = glm::vec4(1.0f, 0.4f, 0.2f, 1.0f); // tint
-        graphMat->setGraph(0, gi);
+        // fract(position * scale) * tint -> surface_output.albedo
+        Rapture::MaterialGraph graph;
+        graph.name = "Graph0";
+        graph.nodes.push_back({.id = 1, .type = Rapture::GraphNodeType::POSITION});
+        graph.nodes.push_back(
+            {.id = 2, .type = Rapture::GraphNodeType::CONSTANT_VEC3, .constantValue = glm::vec4(0.5f, 0.5f, 0.5f, 0.0f)});
+        graph.nodes.push_back({.id = 3, .type = Rapture::GraphNodeType::MULTIPLY_VEC3});
+        graph.nodes.push_back({.id = 4, .type = Rapture::GraphNodeType::FRACT_VEC3});
+        graph.nodes.push_back(
+            {.id = 5, .type = Rapture::GraphNodeType::CONSTANT_VEC3, .constantValue = glm::vec4(1.0f, 0.4f, 0.2f, 1.0f)});
+        graph.nodes.push_back({.id = 6, .type = Rapture::GraphNodeType::MULTIPLY_VEC3});
+        graph.nodes.push_back({.id = 7, .type = Rapture::GraphNodeType::SURFACE_OUTPUT});
+        graph.connections.push_back({.srcNode = 1, .dstNode = 3, .dstPin = 0});
+        graph.connections.push_back({.srcNode = 2, .dstNode = 3, .dstPin = 1});
+        graph.connections.push_back({.srcNode = 3, .dstNode = 4, .dstPin = 0});
+        graph.connections.push_back({.srcNode = 4, .dstNode = 6, .dstPin = 0});
+        graph.connections.push_back({.srcNode = 5, .dstNode = 6, .dstPin = 1});
+        graph.connections.push_back({.srcNode = 6, .dstNode = 7, .dstPin = 0});
+        graph.outputNodeId = 7;
+
+        auto &graphManager = Rapture::MaterialManager::getSurfaceGraphManager();
+        uint32_t graphId = graphManager.registerGraph(graph);
+        graphManager.writeGeneratedFile(project.getProjectShaderDirectory() / "glsl/generated/SurfaceGraphs.glsl");
+
+        Rapture::GraphInstanceData gi = graphManager.getDefaults(graphId);
+        graphMat->setGraph(graphId, gi);
 
         auto matRef =
             Rapture::AssetManager::registerVirtualAsset(std::move(graphMat), "GraphCubeMat", Rapture::AssetType::MATERIAL);

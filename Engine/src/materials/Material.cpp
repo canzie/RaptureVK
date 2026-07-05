@@ -2,6 +2,7 @@
 
 #include "asset_manager/AssetManager.h"
 #include "buffers/FreeListStorageBuffer.h"
+#include "graph/SurfaceGraphManager.h"
 #include "logging/Log.h"
 #include "textures/Texture.h"
 #include "utils/rp_assert.h"
@@ -13,6 +14,7 @@ uint32_t MaterialManager::s_defaultTextureIndex = 0;
 std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::s_materials;
 std::unique_ptr<FreeListStorageBuffer> MaterialManager::s_materialBuffer;
 std::unique_ptr<FreeListStorageBuffer> MaterialManager::s_graphBuffer;
+std::unique_ptr<SurfaceGraphManager> MaterialManager::s_surfaceGraphManager;
 
 BaseMaterial::BaseMaterial(const std::string &name, std::initializer_list<ParameterID> editableParams, const MaterialData &defaults)
     : m_name(name), m_editableParams(editableParams), m_defaults(defaults)
@@ -33,6 +35,8 @@ void MaterialManager::init()
     s_graphBuffer = std::make_unique<FreeListStorageBuffer>(sizeof(GraphInstanceData), MAX_GRAPH_MATERIALS,
                                                             DescriptorSetBindingLocation::GRAPH_DATA_SSBO);
 
+    s_surfaceGraphManager = std::make_unique<SurfaceGraphManager>();
+
     auto asset = AssetManager::importDefaultAsset(AssetType::TEXTURE);
     auto defaultTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
     if (defaultTexture && defaultTexture->isReady()) {
@@ -51,7 +55,14 @@ void MaterialManager::shutdown()
     s_materials.clear();
     s_materialBuffer.reset();
     s_graphBuffer.reset();
+    s_surfaceGraphManager.reset();
     s_initialized = false;
+}
+
+SurfaceGraphManager &MaterialManager::getSurfaceGraphManager()
+{
+    RP_ASSERT(s_surfaceGraphManager != nullptr, "Initialise the material manager first");
+    return *s_surfaceGraphManager;
 }
 
 uint32_t MaterialManager::allocateSlot()
