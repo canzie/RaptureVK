@@ -16,7 +16,12 @@ struct EmittedVar {
     PinType type;
 };
 
-using EmittedMap = std::unordered_map<uint32_t, EmittedVar>;
+using EmittedMap = std::unordered_map<uint64_t, EmittedVar>;
+
+static uint64_t s_emitKey(uint32_t nodeId, uint32_t pin)
+{
+    return (static_cast<uint64_t>(nodeId) << 32) | pin;
+}
 
 static void s_replaceAll(std::string &str, std::string_view from, std::string_view to)
 {
@@ -38,20 +43,20 @@ static std::string s_formatFloat(float value)
     return result;
 }
 
-static std::string s_literal(const glm::vec4 &value, PinType type)
+static std::string s_literal(const PinValue &value, PinType type)
 {
     switch (type) {
     case PinType::FLOAT:
-        return s_formatFloat(value.x);
+        return s_formatFloat(value.f);
     case PinType::INT:
-        return std::to_string(static_cast<int>(value.x));
+        return std::to_string(value.i);
     case PinType::VEC2:
-        return "vec2(" + s_formatFloat(value.x) + ", " + s_formatFloat(value.y) + ")";
+        return "vec2(" + s_formatFloat(value.v2.x) + ", " + s_formatFloat(value.v2.y) + ")";
     case PinType::VEC3:
-        return "vec3(" + s_formatFloat(value.x) + ", " + s_formatFloat(value.y) + ", " + s_formatFloat(value.z) + ")";
+        return "vec3(" + s_formatFloat(value.v3.x) + ", " + s_formatFloat(value.v3.y) + ", " + s_formatFloat(value.v3.z) + ")";
     case PinType::VEC4:
-        return "vec4(" + s_formatFloat(value.x) + ", " + s_formatFloat(value.y) + ", " + s_formatFloat(value.z) + ", " +
-               s_formatFloat(value.w) + ")";
+        return "vec4(" + s_formatFloat(value.v4.x) + ", " + s_formatFloat(value.v4.y) + ", " + s_formatFloat(value.v4.z) + ", " +
+               s_formatFloat(value.v4.w) + ")";
     }
     return "vec4(0.0)";
 }
@@ -184,7 +189,7 @@ static std::string s_resolveInput(const MaterialGraph &graph, const EmittedMap &
     const GraphConnection *connection = s_findInputConnection(graph, nodeId, pinIndex);
     if (connection == nullptr) return s_literal(pin.defaultValue, pin.type);
 
-    auto it = emitted.find(connection->srcNode);
+    auto it = emitted.find(s_emitKey(connection->srcNode, connection->srcPin));
     if (it == emitted.end()) return s_literal(pin.defaultValue, pin.type);
     return s_coerce(it->second.var, it->second.type, pin.type);
 }
@@ -193,9 +198,9 @@ static std::string s_resolveInput(const MaterialGraph &graph, const EmittedMap &
  * @brief Substitute a node definition template into its concrete GLSL expression
  */
 static std::string s_emitNodeExpr(const MaterialGraph &graph, const NodeDefinition &def, const GraphNode &node,
-                                  const GraphSlotMapping &mapping, const EmittedMap &emitted)
+                                  const GraphSlotMapping &mapping, const EmittedMap &emitted, std::string_view templateStr)
 {
-    std::string expr = def.glslTemplate;
+    std::string expr(templateStr);
     if (expr.empty() && def.resourceKind == ResourceKind::CONSTANT) expr = "{const}";
 
     for (uint32_t i = 0; i < def.inputs.size(); ++i) {
@@ -220,16 +225,28 @@ static std::string s_emitSurfaceBody(const MaterialGraph &graph, const std::vect
     std::string body;
     uint32_t counter = 0;
 
+    // An output pin only needs a local if some connection consumes it
+    std::unordered_set<uint64_t> usedOutputs;
+    for (const auto &connection : graph.connections) {
+        usedOutputs.insert(s_emitKey(connection.srcNode, connection.srcPin));
+    }
+
     for (uint32_t nodeId : order) {
         if (nodeId == outputNode.id) continue;
         const GraphNode *node = graph.findNode(nodeId);
         const NodeDefinition *def = NodeRegistry::get(node->type);
-        PinType outType = def->outputs.empty() ? PinType::VEC4 : def->outputs[0].type;
-        std::string var = "_n" + std::to_string(counter++);
+        bool multiOutput = def->outputs.size() > 1;
 
-        std::string expr = s_emitNodeExpr(graph, *def, *node, mapping, emitted);
-        body += "    " + std::string(graph_pinTypeGlsl(outType)) + " " + var + " = " + expr + ";\n";
-        emitted[nodeId] = {std::move(var), outType};
+        for (uint32_t pin = 0; pin < def->outputs.size(); ++pin) {
+            if (usedOutputs.count(s_emitKey(nodeId, pin)) == 0) continue;
+            const PinDef &outPin = def->outputs[pin];
+            std::string_view exprTemplate = multiOutput ? std::string_view(outPin.glslTemplate) : std::string_view(def->glslTemplate);
+            std::string var = "_n" + std::to_string(counter++);
+
+            std::string expr = s_emitNodeExpr(graph, *def, *node, mapping, emitted, exprTemplate);
+            body += std::string(graph_pinTypeGlsl(outPin.type)) + " " + var + "=" + expr + ";\n";
+            emitted[s_emitKey(nodeId, pin)] = {std::move(var), outPin.type};
+        }
     }
 
     auto sink = [&](std::string_view pinName, PinType type, std::string_view fallback) -> std::string {
@@ -237,19 +254,19 @@ static std::string s_emitSurfaceBody(const MaterialGraph &graph, const std::vect
             if (outputDef.inputs[i].name != pinName) continue;
             const GraphConnection *connection = s_findInputConnection(graph, outputNode.id, i);
             if (connection == nullptr) break;
-            auto it = emitted.find(connection->srcNode);
+            auto it = emitted.find(s_emitKey(connection->srcNode, connection->srcPin));
             if (it == emitted.end()) break;
             return s_coerce(it->second.var, it->second.type, type);
         }
         return std::string(fallback);
     };
 
-    body += "    surf.albedo = " + sink("albedo", PinType::VEC3, "vec3(1.0)") + ";\n";
-    body += "    surf.normal = " + sink("normal", PinType::VEC3, "normalize(si.worldNormal)") + ";\n";
-    body += "    surf.roughness = " + sink("roughness", PinType::FLOAT, "0.5") + ";\n";
-    body += "    surf.metallic = " + sink("metallic", PinType::FLOAT, "0.0") + ";\n";
-    body += "    surf.ao = " + sink("ao", PinType::FLOAT, "1.0") + ";\n";
-    body += "    surf.shadingModelId = SM_OPENPBR_STANDARD;\n";
+    body += "surf.albedo=" + sink("albedo", PinType::VEC3, "vec3(1.0)") + ";\n";
+    body += "surf.normal=" + sink("normal", PinType::VEC3, "normalize(si.worldNormal)") + ";\n";
+    body += "surf.roughness=" + sink("roughness", PinType::FLOAT, "0.5") + ";\n";
+    body += "surf.metallic=" + sink("metallic", PinType::FLOAT, "0.0") + ";\n";
+    body += "surf.ao=" + sink("ao", PinType::FLOAT, "1.0") + ";\n";
+    body += "surf.shadingModelId=SM_OPENPBR_STANDARD;\n";
     return body;
 }
 
@@ -284,8 +301,8 @@ CompileResult MaterialGraphCompiler::compile(const MaterialGraph &graph)
     std::string body = s_emitSurfaceBody(graph, order, result.mapping, *outputNode, *outputDef);
 
     result.functionName = "evalSurface_" + s_sanitizeName(graph.name);
-    result.glslFunction = "SurfaceData " + result.functionName + "(SurfaceInputs si, uint gii) {\n" + "    SurfaceData surf;\n" +
-                          body + "    return surf;\n}\n";
+    result.glslFunction = "SurfaceData " + result.functionName + "(SurfaceInputs si, uint gii){\nSurfaceData surf;\n" + body +
+                          "return surf;\n}\n";
     result.success = true;
     return result;
 }

@@ -26,6 +26,81 @@
 #include "materials/graph/SurfaceGraphManager.h"
 #include "utils/Timestep.h"
 
+/**
+ * @brief Graph 0: fract(position * scale) * tint feeding albedo
+ * @return The authored graph
+ */
+static Rapture::MaterialGraph s_buildFractTintGraph()
+{
+    using GN = Rapture::GraphNodeType;
+    Rapture::MaterialGraph graph;
+    graph.name = "Graph0";
+    graph.nodes.push_back({.id = 1, .type = GN::POSITION});
+    graph.nodes.push_back({.id = 2, .type = GN::CONSTANT_VEC3, .constantValue = glm::vec4(0.5f, 0.5f, 0.5f, 0.0f)});
+    graph.nodes.push_back({.id = 3, .type = GN::MULTIPLY_VEC3});
+    graph.nodes.push_back({.id = 4, .type = GN::FRACT_VEC3});
+    graph.nodes.push_back({.id = 5, .type = GN::CONSTANT_VEC3, .constantValue = glm::vec4(1.0f, 0.4f, 0.2f, 1.0f)});
+    graph.nodes.push_back({.id = 6, .type = GN::MULTIPLY_VEC3});
+    graph.nodes.push_back({.id = 7, .type = GN::SURFACE_OUTPUT});
+    graph.connections.push_back({.srcNode = 1, .dstNode = 3, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 2, .dstNode = 3, .dstPin = 1});
+    graph.connections.push_back({.srcNode = 3, .dstNode = 4, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 4, .dstNode = 6, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 5, .dstNode = 6, .dstPin = 1});
+    graph.connections.push_back({.srcNode = 6, .dstNode = 7, .dstPin = 0});
+    graph.outputNodeId = 7;
+    return graph;
+}
+
+/**
+ * @brief Graph 1: diagonal sine bands from uv, two colors mixed, roughness from luminance
+ *
+ * sin((u + v) * freq) remapped to 0..1 drives mix(colorA, colorB). Exercises the newer nodes:
+ * SPLIT_VEC2 (multi output), REMAP_FLOAT (partly default range), MIX_VEC3 and LUMINANCE.
+ * @return The authored graph
+ */
+static Rapture::MaterialGraph s_buildSineBandGraph()
+{
+    using GN = Rapture::GraphNodeType;
+    Rapture::MaterialGraph graph;
+    graph.name = "Graph1";
+    graph.nodes.push_back({.id = 1, .type = GN::TEXCOORD});
+    graph.nodes.push_back({.id = 2, .type = GN::SPLIT_VEC2});
+    graph.nodes.push_back({.id = 3, .type = GN::CONSTANT_FLOAT, .constantValue = glm::vec4(20.0f, 0.0f, 0.0f, 0.0f)});
+    graph.nodes.push_back({.id = 4, .type = GN::MULTIPLY_FLOAT});
+    graph.nodes.push_back({.id = 5, .type = GN::MULTIPLY_FLOAT});
+    graph.nodes.push_back({.id = 6, .type = GN::ADD_FLOAT});
+    graph.nodes.push_back({.id = 7, .type = GN::SIN_FLOAT});
+    graph.nodes.push_back({.id = 8, .type = GN::CONSTANT_FLOAT, .constantValue = glm::vec4(-1.0f, 0.0f, 0.0f, 0.0f)});
+    graph.nodes.push_back({.id = 9, .type = GN::REMAP_FLOAT});
+    graph.nodes.push_back({.id = 10, .type = GN::CONSTANT_VEC3, .constantValue = glm::vec4(0.9f, 0.1f, 0.1f, 1.0f)});
+    graph.nodes.push_back({.id = 11, .type = GN::CONSTANT_VEC3, .constantValue = glm::vec4(0.1f, 0.3f, 0.9f, 1.0f)});
+    graph.nodes.push_back({.id = 12, .type = GN::MIX_VEC3});
+    graph.nodes.push_back({.id = 13, .type = GN::LUMINANCE});
+    graph.nodes.push_back({.id = 14, .type = GN::SURFACE_OUTPUT});
+    // u * freq and v * freq, then sum for the diagonal
+    graph.connections.push_back({.srcNode = 1, .dstNode = 2, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 2, .srcPin = 0, .dstNode = 4, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 3, .dstNode = 4, .dstPin = 1});
+    graph.connections.push_back({.srcNode = 2, .srcPin = 1, .dstNode = 5, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 3, .dstNode = 5, .dstPin = 1});
+    graph.connections.push_back({.srcNode = 4, .dstNode = 6, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 5, .dstNode = 6, .dstPin = 1});
+    graph.connections.push_back({.srcNode = 6, .dstNode = 7, .dstPin = 0});
+    // remap sin from -1..1 (inMin connected, inMax/outMin/outMax default) into 0..1
+    graph.connections.push_back({.srcNode = 7, .dstNode = 9, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 8, .dstNode = 9, .dstPin = 1});
+    // mix the two colors by the band, feed albedo, and derive roughness from its luminance
+    graph.connections.push_back({.srcNode = 10, .dstNode = 12, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 11, .dstNode = 12, .dstPin = 1});
+    graph.connections.push_back({.srcNode = 9, .dstNode = 12, .dstPin = 2});
+    graph.connections.push_back({.srcNode = 12, .dstNode = 13, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 12, .dstNode = 14, .dstPin = 0});
+    graph.connections.push_back({.srcNode = 13, .dstNode = 14, .dstPin = 2});
+    graph.outputNodeId = 14;
+    return graph;
+}
+
 TestLayer::~TestLayer()
 {
     onDetach();
@@ -89,46 +164,30 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         activeScene.registerBLAS(floor);
     }
 
-    // Graph material test sphere - renders generated surface graph 0
+    // Graph material test spheres - two different generated graphs, so evalSurfaceGraph dispatch is visible
     {
-        auto graphCube = activeScene.createSphere("Graph Sphere");
-        auto &cubeTransform = graphCube.getComponent<Rapture::TransformComponent>();
-        cubeTransform.transforms.setTranslation(glm::vec3(0.0f, 2.0f, 0.0f));
-        cubeTransform.transforms.setScale(glm::vec3(2.0f));
-
-        auto baseMaterial = Rapture::MaterialManager::getMaterial("PBR");
-        auto graphMat = std::make_unique<Rapture::MaterialInstance>(baseMaterial, "GraphCubeMat");
-
-        // fract(position * scale) * tint -> surface_output.albedo
-        Rapture::MaterialGraph graph;
-        graph.name = "Graph0";
-        graph.nodes.push_back({.id = 1, .type = Rapture::GraphNodeType::POSITION});
-        graph.nodes.push_back(
-            {.id = 2, .type = Rapture::GraphNodeType::CONSTANT_VEC3, .constantValue = glm::vec4(0.5f, 0.5f, 0.5f, 0.0f)});
-        graph.nodes.push_back({.id = 3, .type = Rapture::GraphNodeType::MULTIPLY_VEC3});
-        graph.nodes.push_back({.id = 4, .type = Rapture::GraphNodeType::FRACT_VEC3});
-        graph.nodes.push_back(
-            {.id = 5, .type = Rapture::GraphNodeType::CONSTANT_VEC3, .constantValue = glm::vec4(1.0f, 0.4f, 0.2f, 1.0f)});
-        graph.nodes.push_back({.id = 6, .type = Rapture::GraphNodeType::MULTIPLY_VEC3});
-        graph.nodes.push_back({.id = 7, .type = Rapture::GraphNodeType::SURFACE_OUTPUT});
-        graph.connections.push_back({.srcNode = 1, .dstNode = 3, .dstPin = 0});
-        graph.connections.push_back({.srcNode = 2, .dstNode = 3, .dstPin = 1});
-        graph.connections.push_back({.srcNode = 3, .dstNode = 4, .dstPin = 0});
-        graph.connections.push_back({.srcNode = 4, .dstNode = 6, .dstPin = 0});
-        graph.connections.push_back({.srcNode = 5, .dstNode = 6, .dstPin = 1});
-        graph.connections.push_back({.srcNode = 6, .dstNode = 7, .dstPin = 0});
-        graph.outputNodeId = 7;
-
         auto &graphManager = Rapture::MaterialManager::getSurfaceGraphManager();
-        uint32_t graphId = graphManager.registerGraph(graph);
+
+        uint32_t graph0Id = graphManager.registerGraph(s_buildFractTintGraph());
+        uint32_t graph1Id = graphManager.registerGraph(s_buildSineBandGraph());
         graphManager.writeGeneratedFile(project.getProjectShaderDirectory() / "glsl/generated/SurfaceGraphs.glsl");
 
-        Rapture::GraphInstanceData gi = graphManager.getDefaults(graphId);
-        graphMat->setGraph(graphId, gi);
+        auto spawnGraphSphere = [&](const std::string &name, const glm::vec3 &position, uint32_t graphId) {
+            auto sphere = activeScene.createSphere(name);
+            auto &transform = sphere.getComponent<Rapture::TransformComponent>();
+            transform.transforms.setTranslation(position);
+            transform.transforms.setScale(glm::vec3(2.0f));
 
-        auto matRef =
-            Rapture::AssetManager::registerVirtualAsset(std::move(graphMat), "GraphCubeMat", Rapture::AssetType::MATERIAL);
-        graphCube.setComponent<Rapture::MaterialComponent>(matRef);
+            auto baseMaterial = Rapture::MaterialManager::getMaterial("PBR");
+            auto mat = std::make_unique<Rapture::MaterialInstance>(baseMaterial, name);
+            mat->setGraph(graphId, graphManager.getDefaults(graphId));
+
+            auto matRef = Rapture::AssetManager::registerVirtualAsset(std::move(mat), name, Rapture::AssetType::MATERIAL);
+            sphere.setComponent<Rapture::MaterialComponent>(matRef);
+        };
+
+        spawnGraphSphere("Graph Sphere 0", glm::vec3(-3.0f, 2.0f, 0.0f), graph0Id);
+        spawnGraphSphere("Graph Sphere 1", glm::vec3(3.0f, 2.0f, 0.0f), graph1Id);
     }
 
     // Create a spot light with shadow mapping (inside Sponza courtyard)
