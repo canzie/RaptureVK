@@ -10,12 +10,8 @@ uncouple the engines core
         - couple sizings like gaps/borders/corners
         - an actual settings/preferences panel to open
     - drag/drop assets into the viewport
-        - maybe just "rightclick->import into scene" for now
-    - mesh property thing needs its asset ref, same for material thing.
     
 
-    - !!! get the editor to a point where we can actually delete entityies, easily add some, even if just cubes/spheres for now. 
-    - fix the stencil buffer for rendering the outline of selected objects
 
 
 - Make rendering things like bounds easier
@@ -24,10 +20,9 @@ uncouple the engines core
 
 - optimise the shadow passes
 - make it run on windows???
-- texture compression DONE (BC1/BC3/BC4/BC5 via compute)
-  - TODO later: BC7 (high quality RGBA) and BC6H (HDR) encoders
+- TODO later: BC7 (high quality RGBA) and BC6H (HDR) encoders
 - fix stencil buffer
-- shader hot reloading
+- shader/pipeline hot reloading
 - jolt???
 - parallise/jobify shader compilation (note, current stack size is too small for this, maybe spawn another process and use gslang exec???)
 - add model to the asset manager

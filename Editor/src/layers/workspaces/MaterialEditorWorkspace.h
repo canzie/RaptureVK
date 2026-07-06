@@ -5,9 +5,9 @@
 
 class MaterialEditorWorkspace : public Workspace {
   public:
-    MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services) { m_services = services; setupBase(tabs, "Material Editor"); }
+    MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services);
 
-    void saveLayout() override {}
+    void saveLayout() override;
 };
 
 #endif // RAPTURE__MATERIAL_EDITOR_WORKSPACE_H
