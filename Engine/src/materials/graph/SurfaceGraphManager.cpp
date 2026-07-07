@@ -1,11 +1,31 @@
 #include "SurfaceGraphManager.h"
 
 #include <fstream>
+#include <string_view>
 
 #include "NodeRegistry.h"
 #include "logging/Log.h"
 
 namespace Rapture {
+
+static void s_logDiagnostics(std::string_view graphName, const CompileResult &result)
+{
+    for (const auto &diagnostic : result.diagnostics) {
+        std::string where = diagnostic.nodeId == UINT32_MAX ? "" : (" (node " + std::to_string(diagnostic.nodeId) + ")");
+        switch (diagnostic.level) {
+        case MaterialCompilerDiagnosticLevel::ERROR:
+            RP_CORE_ERROR("Surface graph '{}': {}{}", graphName, diagnostic.message, where);
+            break;
+        case MaterialCompilerDiagnosticLevel::WARNING:
+            RP_CORE_WARN("Surface graph '{}': {}{}", graphName, diagnostic.message, where);
+            break;
+        case MaterialCompilerDiagnosticLevel::INFO:
+        case MaterialCompilerDiagnosticLevel::NONE:
+            RP_CORE_INFO("Surface graph '{}': {}{}", graphName, diagnostic.message, where);
+            break;
+        }
+    }
+}
 
 SurfaceGraphManager::SurfaceGraphManager()
 {
@@ -14,14 +34,12 @@ SurfaceGraphManager::SurfaceGraphManager()
 
 uint32_t SurfaceGraphManager::registerGraph(const MaterialGraph &graph)
 {
-    CompileResult result = m_compiler.compile(graph);
-    if (!result.success) {
-        RP_CORE_ERROR("Failed to compile surface graph '{}': {}", graph.name, result.error);
-        return UINT32_MAX;
-    }
-
     uint32_t graphId = static_cast<uint32_t>(m_graphs.size());
-    result.dispatcherCase = graphId;
+    CompileResult result = m_compiler.compile(graph, graphId);
+    s_logDiagnostics(graph.name, result);
+
+    if (!result.success) return UINT32_MAX;
+
     m_graphs.push_back(std::move(result));
     return graphId;
 }
@@ -47,7 +65,7 @@ bool SurfaceGraphManager::writeGeneratedFile(const std::filesystem::path &path)
     out += "SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint gii) {\n";
     out += "    switch (graphId) {\n";
     for (const auto &graph : m_graphs) {
-        out += "        case " + std::to_string(graph.dispatcherCase) + "u: return " + graph.functionName + "(si, gii);\n";
+        out += "        case " + std::to_string(graph.graphId) + "u: return " + graph.functionName + "(si, gii);\n";
     }
     out += "    }\n\n";
     out += "    SurfaceData surf;\n";

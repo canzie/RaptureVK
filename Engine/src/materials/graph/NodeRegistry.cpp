@@ -1,11 +1,45 @@
 #include "NodeRegistry.h"
 
 #include <unordered_map>
+#include <unordered_set>
+
+#include "logging/Log.h"
+#include "utils/rp_assert.h"
 
 namespace Rapture {
 
 static std::unordered_map<GraphNodeType, NodeDefinition> s_definitions;
 static bool s_builtinsRegistered = false;
+
+/**
+ * @brief Assert a node definition uses no reserved or duplicate pin names
+ *
+ * Pin names become {name} template placeholders, so they must be unique within a direction and
+ * must not collide with the built in {tex} / {const} placeholders.
+ */
+static void s_validateDefinition(const NodeDefinition &def)
+{
+    auto checkPins = [&](const std::vector<PinDef> &pins, const char *direction) {
+        std::unordered_set<std::string> names;
+        for (const auto &pin : pins) {
+            bool reserved = pin.name == "tex" || pin.name == "const";
+            if (reserved) {
+                RP_CORE_ERROR("Node type {} has a pin using the reserved template name '{}'",
+                              static_cast<int>(def.type), pin.name);
+            }
+            RP_ASSERT(!reserved, "node pin uses a reserved template name (tex or const)");
+
+            bool unique = names.insert(pin.name).second;
+            if (!unique) {
+                RP_CORE_ERROR("Node type {} has a duplicate {} pin name '{}'", static_cast<int>(def.type), direction,
+                              pin.name);
+            }
+            RP_ASSERT(unique, "node has a duplicate pin name within one direction");
+        }
+    };
+    checkPins(def.inputs, "input");
+    checkPins(def.outputs, "output");
+}
 
 const char *graph_pinTypeGlsl(PinType type)
 {
@@ -49,6 +83,7 @@ const NodeDefinition *NodeRegistry::get(GraphNodeType type)
 
 void NodeRegistry::registerNode(NodeDefinition def)
 {
+    s_validateDefinition(def);
     GraphNodeType key = def.type;
     s_definitions[key] = std::move(def);
 }
@@ -91,7 +126,7 @@ void NodeRegistry::registerBuiltins()
     registerNode({.type = GraphNodeType::TEXTURE_SAMPLE,
                   .inputs = {{"uv", PinType::VEC2}},
                   .outputs = {{"out", PinType::VEC4}},
-                  .glslTemplate = "texture(u_textures[{tex}], {uv})",
+                  .glslTemplate = "texture(u_textures[nonuniformEXT({tex})], {uv})",
                   .resourceKind = ResourceKind::TEXTURE});
 
     // Add

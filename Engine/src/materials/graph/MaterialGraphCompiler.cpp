@@ -2,7 +2,6 @@
 
 #include <cctype>
 #include <cstdio>
-#include <functional>
 #include <string_view>
 #include <unordered_set>
 
@@ -17,10 +16,17 @@ struct EmittedVar {
 };
 
 using EmittedMap = std::unordered_map<uint64_t, EmittedVar>;
+using DiagnosticList = std::vector<MaterialCompilerDiagnostic>;
 
 static uint64_t s_emitKey(uint32_t nodeId, uint32_t pin)
 {
     return (static_cast<uint64_t>(nodeId) << 32) | pin;
+}
+
+static void s_addDiagnostic(DiagnosticList &diagnostics, MaterialCompilerDiagnosticLevel level, std::string message,
+                            uint32_t nodeId)
+{
+    diagnostics.push_back({level, std::move(message), nodeId});
 }
 
 static void s_replaceAll(std::string &str, std::string_view from, std::string_view to)
@@ -117,30 +123,132 @@ static const GraphConnection *s_findInputConnection(const MaterialGraph &graph, 
  * @param graph The graph to walk
  * @param order Filled with reachable node ids in dependency order
  * @return False if the graph contains a cycle
+ *
+ * Iterative post-order DFS from the output. A node is colored gray while its dependencies are on
+ * the stack and black once emitted; meeting a gray dependency is a back edge, so a cycle.
  */
 static bool s_topoSort(const MaterialGraph &graph, std::vector<uint32_t> &order)
 {
-    std::unordered_set<uint32_t> visited;
-    std::unordered_set<uint32_t> inStack;
+    // Each node's dependencies are the sources feeding any of its inputs
+    std::unordered_map<uint32_t, std::vector<uint32_t>> dependencies;
+    for (const auto &connection : graph.connections) {
+        dependencies[connection.dstNode].push_back(connection.srcNode);
+    }
+
+    enum Color : uint8_t { WHITE = 0, GRAY, BLACK };
+    std::unordered_map<uint32_t, Color> color;
     bool acyclic = true;
 
-    std::function<void(uint32_t)> visit = [&](uint32_t nodeId) {
-        if (visited.count(nodeId) != 0) return;
-        if (inStack.count(nodeId) != 0) {
-            acyclic = false;
-            return;
+    std::vector<uint32_t> stack;
+    stack.push_back(graph.outputNodeId);
+    while (!stack.empty()) {
+        uint32_t nodeId = stack.back();
+        Color state = color[nodeId];
+        if (state == WHITE) {
+            color[nodeId] = GRAY;
+            auto it = dependencies.find(nodeId);
+            if (it != dependencies.end()) {
+                for (uint32_t dependency : it->second) {
+                    Color depState = color[dependency];
+                    if (depState == GRAY) {
+                        acyclic = false;
+                    } else if (depState == WHITE) {
+                        stack.push_back(dependency);
+                    }
+                }
+            }
+        } else if (state == GRAY) {
+            color[nodeId] = BLACK;
+            order.push_back(nodeId);
+            stack.pop_back();
+        } else {
+            stack.pop_back();
         }
-        inStack.insert(nodeId);
-        for (const auto &connection : graph.connections) {
-            if (connection.dstNode == nodeId) visit(connection.srcNode);
-        }
-        inStack.erase(nodeId);
-        visited.insert(nodeId);
-        order.push_back(nodeId);
-    };
-
-    visit(graph.outputNodeId);
+    }
     return acyclic;
+}
+
+/**
+ * @brief Emit an info diagnostic for every node that does not feed the output
+ */
+static void s_reportDeadNodes(const MaterialGraph &graph, const std::vector<uint32_t> &order, DiagnosticList &diagnostics)
+{
+    std::unordered_set<uint32_t> reachable(order.begin(), order.end());
+    for (const auto &node : graph.nodes) {
+        if (reachable.count(node.id) == 0) {
+            s_addDiagnostic(diagnostics, MaterialCompilerDiagnosticLevel::INFO,
+                            "node does not affect the output and was eliminated", node.id);
+        }
+    }
+}
+
+/**
+ * @brief Structural checks that must pass before codegen, gathering all failures as diagnostics
+ * @param graph The graph to validate
+ * @param outputNode The resolved output node, or nullptr if the id did not resolve
+ * @param diagnostics Appended with any problems found
+ */
+static void s_validateGraph(const MaterialGraph &graph, const GraphNode *outputNode, DiagnosticList &diagnostics)
+{
+    using Level = MaterialCompilerDiagnosticLevel;
+
+    if (outputNode == nullptr) {
+        s_addDiagnostic(diagnostics, Level::ERROR, "graph has no output node with id " + std::to_string(graph.outputNodeId),
+                        UINT32_MAX);
+        return; // nothing downstream is meaningful without the sink
+    }
+    if (outputNode->type != GraphNodeType::SURFACE_OUTPUT) {
+        s_addDiagnostic(diagnostics, Level::ERROR, "the output node is not a SURFACE_OUTPUT node", outputNode->id);
+    }
+
+    for (const auto &node : graph.nodes) {
+        if (NodeRegistry::get(node.type) == nullptr) {
+            s_addDiagnostic(diagnostics, Level::ERROR,
+                            "node uses an unregistered type " + std::to_string(static_cast<int>(node.type)), node.id);
+        }
+    }
+
+    std::unordered_set<uint64_t> wiredInputs;
+    for (const auto &connection : graph.connections) {
+        const GraphNode *src = graph.findNode(connection.srcNode);
+        const GraphNode *dst = graph.findNode(connection.dstNode);
+        if (src == nullptr) {
+            s_addDiagnostic(diagnostics, Level::ERROR,
+                            "connection references a missing source node " + std::to_string(connection.srcNode),
+                            connection.dstNode);
+            continue;
+        }
+        if (dst == nullptr) {
+            s_addDiagnostic(diagnostics, Level::ERROR,
+                            "connection references a missing destination node " + std::to_string(connection.dstNode),
+                            connection.srcNode);
+            continue;
+        }
+
+        const NodeDefinition *srcDef = NodeRegistry::get(src->type);
+        const NodeDefinition *dstDef = NodeRegistry::get(dst->type);
+        if (srcDef == nullptr || dstDef == nullptr) continue; // unregistered type already reported
+
+        if (connection.srcPin >= srcDef->outputs.size()) {
+            s_addDiagnostic(diagnostics, Level::ERROR,
+                            "connection uses output pin " + std::to_string(connection.srcPin) + " but the node has " +
+                                std::to_string(srcDef->outputs.size()),
+                            connection.srcNode);
+        }
+        if (connection.dstPin >= dstDef->inputs.size()) {
+            s_addDiagnostic(diagnostics, Level::ERROR,
+                            "connection uses input pin " + std::to_string(connection.dstPin) + " but the node has " +
+                                std::to_string(dstDef->inputs.size()),
+                            connection.dstNode);
+            continue;
+        }
+
+        if (!wiredInputs.insert(s_emitKey(connection.dstNode, connection.dstPin)).second) {
+            s_addDiagnostic(diagnostics, Level::ERROR,
+                            "input pin " + std::to_string(connection.dstPin) + " has more than one incoming connection",
+                            connection.dstNode);
+        }
+    }
 }
 
 /**
@@ -149,10 +257,11 @@ static bool s_topoSort(const MaterialGraph &graph, std::vector<uint32_t> &order)
  * @param order The topologically sorted node ids
  * @param defaults Pool pre-filled with each resource node's default value
  * @param mapping Node id to pool slot, for later editor writes
- * @return Empty on success, or an error message
+ * @param diagnostics Appended with an error if either pool overflows
+ * @return False if a pool overflowed, in which case an error diagnostic was added
  */
-static std::string s_assignResources(const MaterialGraph &graph, const std::vector<uint32_t> &order, GraphInstanceData &defaults,
-                                     GraphSlotMapping &mapping)
+static bool s_assignResources(const MaterialGraph &graph, const std::vector<uint32_t> &order, GraphInstanceData &defaults,
+                              GraphSlotMapping &mapping, DiagnosticList &diagnostics)
 {
     uint32_t nextConstant = 0;
     uint32_t nextTexture = 0;
@@ -163,21 +272,25 @@ static std::string s_assignResources(const MaterialGraph &graph, const std::vect
 
         if (def->resourceKind == ResourceKind::CONSTANT) {
             if (nextConstant >= GRAPH_MAX_CONSTANTS) {
-                return "graph uses more than " + std::to_string(GRAPH_MAX_CONSTANTS) + " constants";
+                s_addDiagnostic(diagnostics, MaterialCompilerDiagnosticLevel::ERROR,
+                                "graph uses more than " + std::to_string(GRAPH_MAX_CONSTANTS) + " constants", nodeId);
+                return false;
             }
             uint32_t slot = nextConstant++;
             defaults.constants[slot] = node->constantValue.v4;
             mapping.constantSlots[nodeId] = slot;
         } else if (def->resourceKind == ResourceKind::TEXTURE) {
             if (nextTexture >= GRAPH_MAX_TEXTURES) {
-                return "graph uses more than " + std::to_string(GRAPH_MAX_TEXTURES) + " textures";
+                s_addDiagnostic(diagnostics, MaterialCompilerDiagnosticLevel::ERROR,
+                                "graph uses more than " + std::to_string(GRAPH_MAX_TEXTURES) + " textures", nodeId);
+                return false;
             }
             uint32_t slot = nextTexture++;
             defaults.textures[slot] = node->texture ? node->texture->getBindlessIndex() : 0u;
             mapping.textureSlots[nodeId] = slot;
         }
     }
-    return {};
+    return true;
 }
 
 /**
@@ -270,37 +383,31 @@ static std::string s_emitSurfaceBody(const MaterialGraph &graph, const std::vect
     return body;
 }
 
-CompileResult MaterialGraphCompiler::compile(const MaterialGraph &graph)
+CompileResult MaterialGraphCompiler::compile(const MaterialGraph &graph, uint32_t graphId)
 {
     CompileResult result;
+    result.graphId = graphId;
 
     const GraphNode *outputNode = graph.findNode(graph.outputNodeId);
-    if (outputNode == nullptr) {
-        result.error = "graph has no output node";
-        return result;
-    }
-    for (const auto &node : graph.nodes) {
-        if (NodeRegistry::get(node.type) == nullptr) {
-            result.error = "unregistered node type " + std::to_string(static_cast<int>(node.type));
-            return result;
-        }
-    }
+    s_validateGraph(graph, outputNode, result.diagnostics);
+    if (result.hasErrors()) return result;
 
     std::vector<uint32_t> order;
     if (!s_topoSort(graph, order)) {
-        result.error = "graph contains a cycle";
+        s_addDiagnostic(result.diagnostics, MaterialCompilerDiagnosticLevel::ERROR, "graph contains a cycle", UINT32_MAX);
         return result;
     }
+    s_reportDeadNodes(graph, order, result.diagnostics);
 
-    if (std::string error = s_assignResources(graph, order, result.defaults, result.mapping); !error.empty()) {
-        result.error = std::move(error);
+    if (!s_assignResources(graph, order, result.defaults, result.mapping, result.diagnostics)) {
         return result;
     }
 
     const NodeDefinition *outputDef = NodeRegistry::get(outputNode->type);
     std::string body = s_emitSurfaceBody(graph, order, result.mapping, *outputNode, *outputDef);
 
-    result.functionName = "evalSurface_" + s_sanitizeName(graph.name);
+    // graphId keeps the name unique even when two graphs share a sanitized name
+    result.functionName = "evalSurface_" + s_sanitizeName(graph.name) + "_" + std::to_string(graphId);
     result.glslFunction = "SurfaceData " + result.functionName + "(SurfaceInputs si, uint gii){\nSurfaceData surf;\n" + body +
                           "return surf;\n}\n";
     result.success = true;

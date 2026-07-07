@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "MaterialGraph.h"
 #include "materials/GraphInstanceData.h"
@@ -18,6 +19,25 @@ namespace Rapture {
 constexpr uint32_t MATERIAL_GRAPH_COMPILER_VERSION = 1;
 
 /**
+ * @brief Severity of a compile diagnostic, ordered least to most severe
+ */
+enum class MaterialCompilerDiagnosticLevel {
+    NONE,    // no severity, an unset default
+    INFO,    // informational, e.g. a dead node was eliminated
+    WARNING, // suspicious but compilable
+    ERROR,   // compilation cannot proceed
+};
+
+/**
+ * @brief One compile message, optionally tied to the node that caused it
+ */
+struct MaterialCompilerDiagnostic {
+    MaterialCompilerDiagnosticLevel level = MaterialCompilerDiagnosticLevel::NONE;
+    std::string message;
+    uint32_t nodeId = UINT32_MAX; // UINT32_MAX means graph level, not a specific node
+};
+
+/**
  * @brief Where each resource node's value lives in the instance pool, for editor writes
  */
 struct GraphSlotMapping {
@@ -30,14 +50,26 @@ struct GraphSlotMapping {
  */
 struct CompileResult {
     bool success = false;
-    std::string error;
+    std::vector<MaterialCompilerDiagnostic> diagnostics;
 
     std::string functionName;
     std::string glslFunction;
-    uint32_t dispatcherCase = 0; // graphId assigned by the manager on register
+    uint32_t graphId = 0; // global identifier for the graph among all registered graphs
 
     GraphInstanceData defaults = GraphInstanceData::createDefault();
     GraphSlotMapping mapping;
+
+    /**
+     * @brief Whether any diagnostic is an error
+     * @return True if at least one ERROR diagnostic was recorded
+     */
+    bool hasErrors() const
+    {
+        for (const auto &diagnostic : diagnostics) {
+            if (diagnostic.level == MaterialCompilerDiagnosticLevel::ERROR) return true;
+        }
+        return false;
+    }
 };
 
 /**
@@ -48,9 +80,10 @@ class MaterialGraphCompiler {
     /**
      * @brief Compile a graph to GLSL and its default instance pool
      * @param graph The authored graph to compile
-     * @return The compile result; check success, and error on failure
+     * @param graphId The id the manager assigned, baked into the function name and dispatcher case
+     * @return The compile result; check success, and diagnostics for messages
      */
-    CompileResult compile(const MaterialGraph &graph);
+    CompileResult compile(const MaterialGraph &graph, uint32_t graphId);
 };
 
 } // namespace Rapture
