@@ -51,7 +51,7 @@ struct MaterialData {
     float heightBlend;         // 84-88
     float slopeThreshold;      // 88-92
     uint graphId;              // 92-96: which generated surface function (when MAT_FLAG_IS_GRAPH)
-    uint graphInstanceIndex;   // 96-100: slot into the graph data arena
+    uint graphDataOffset;      // 96-100: uint offset of this instance's slice into the graph arena
     // std430 rounds the struct out to 112 (trailing 100-112 unused)
 };
 
@@ -69,21 +69,14 @@ MaterialData getMaterialData(uint index) {
 }
 
 // ============================================================================
-// Graph material data - generic per-instance pool (set 1, binding 1)
-// Slots are compiler-assigned; a generated evalSurface_* reads them
+// Graph material data - one flat uint arena (set 1, binding 1)
+// A generated evalSurface_* reads its instance slice at MaterialData.graphDataOffset;
+// the compiler bakes each value's offset and unpacks it (uintBitsToFloat for floats, raw for uints)
 // ============================================================================
 
-#define GRAPH_MAX_TEXTURES 16
-#define GRAPH_MAX_CONSTANTS 16
-
-struct GraphInstanceData {
-    uint textures[GRAPH_MAX_TEXTURES];
-    vec4 constants[GRAPH_MAX_CONSTANTS];
-};
-
-layout(std430, set = 1, binding = 1) readonly buffer GraphDataBuffer {
-    GraphInstanceData instances[];
-} u_graphData;
+layout(std430, set = 1, binding = 1) readonly buffer GraphPoolBuffer {
+    uint data[];
+} u_graphPool;
 
 #include "common/ShadingModels.glsl"
 

@@ -37,12 +37,23 @@ struct MaterialCompilerDiagnostic {
     uint32_t nodeId = UINT32_MAX; // UINT32_MAX means graph level, not a specific node
 };
 
+using GraphNodeId = uint32_t;
+using GraphBufferOffset = uint32_t;
+
 /**
- * @brief Where each resource node's value lives in the instance pool, for editor writes
+ * @brief A constant value packed into the instance slice: where it sits and how to read it back
+ */
+struct GraphPoolConstant {
+    GraphBufferOffset offset = 0;
+    PinType type = PinType::FLOAT;
+};
+
+/**
+ * @brief Where each resource node's value lives in the instance slice, for editor writes
  */
 struct GraphSlotMapping {
-    std::unordered_map<uint32_t, uint32_t> constantSlots; // maps a node id to its constants slot
-    std::unordered_map<uint32_t, uint32_t> textureSlots;  // maps a node id to its textures slot
+    std::unordered_map<GraphNodeId, GraphPoolConstant> constantSlots;
+    std::unordered_map<GraphNodeId, GraphBufferOffset> textureSlots;
 };
 
 /**
@@ -56,7 +67,7 @@ struct CompileResult {
     std::string glslFunction;
     uint32_t graphId = 0; // global identifier for the graph among all registered graphs
 
-    GraphInstanceData defaults = GraphInstanceData::createDefault();
+    GraphInstanceData defaults; // packed default slice, one uint per texture index and per constant component
     GraphSlotMapping mapping;
 
     /**

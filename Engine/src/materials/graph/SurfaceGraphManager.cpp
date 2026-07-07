@@ -62,10 +62,10 @@ bool SurfaceGraphManager::writeGeneratedFile(const std::filesystem::path &path)
         out += "\n";
     }
 
-    out += "SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint gii) {\n";
+    out += "SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint base) {\n";
     out += "    switch (graphId) {\n";
     for (const auto &graph : m_graphs) {
-        out += "        case " + std::to_string(graph.graphId) + "u: return " + graph.functionName + "(si, gii);\n";
+        out += "        case " + std::to_string(graph.graphId) + "u: return " + graph.functionName + "(si, base);\n";
     }
     out += "    }\n\n";
     out += "    SurfaceData surf;\n";
@@ -90,7 +90,7 @@ bool SurfaceGraphManager::writeGeneratedFile(const std::filesystem::path &path)
 
 GraphInstanceData SurfaceGraphManager::getDefaults(uint32_t graphId) const
 {
-    if (graphId >= m_graphs.size()) return GraphInstanceData::createDefault();
+    if (graphId >= m_graphs.size()) return {};
     return m_graphs[graphId].defaults;
 }
 

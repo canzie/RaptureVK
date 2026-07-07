@@ -67,8 +67,8 @@ struct alignas(16) MaterialData {
     float heightBlend;    // 84-88
     float slopeThreshold; // 88-92
 
-    uint32_t graphId;            // 92-96: which generated surface function (when MAT_FLAG_IS_GRAPH)
-    uint32_t graphInstanceIndex; // 96-100: slot into the graph data arena
+    uint32_t graphId;         // 92-96: which generated surface function (when MAT_FLAG_IS_GRAPH)
+    uint32_t graphDataOffset; // 96-100: uint offset of this instance's slice into the graph arena
     // alignas(16) rounds the struct out to 112 (trailing 100-112 unused)
 
     // Returns a MaterialData with sensible defaults
@@ -88,7 +88,7 @@ struct alignas(16) MaterialData {
         data.heightBlend = 0.5f;
         data.slopeThreshold = 0.7f;
         data.graphId = 0;
-        data.graphInstanceIndex = 0;
+        data.graphDataOffset = 0;
         return data;
     }
 };

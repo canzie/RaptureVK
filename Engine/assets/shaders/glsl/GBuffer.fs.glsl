@@ -78,7 +78,7 @@ void main() {
     si.flags = flags;
 
     SurfaceData surf = matHasFlag(flags, MAT_FLAG_IS_GRAPH)
-        ? evalSurfaceGraph(mat.graphId, si, mat.graphInstanceIndex)
+        ? evalSurfaceGraph(mat.graphId, si, mat.graphDataOffset)
         : evalStaticSurface(si, mat);
 
     gNormal = octEncodeNormal(normalize(surf.normal));

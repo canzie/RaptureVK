@@ -3,6 +3,7 @@
 
 #include "asset_manager/AssetHandle.h"
 #include "events/AssetEvents.h"
+#include "GraphInstanceData.h"
 #include "Material.h"
 #include "MaterialData.h"
 #include "MaterialParameters.h"
@@ -73,7 +74,7 @@ class MaterialInstance {
     std::string m_name;
     std::shared_ptr<BaseMaterial> m_baseMaterial;
     uint32_t m_bindlessIndex;
-    uint32_t m_graphSlot = UINT32_MAX;
+    uint32_t m_graphDataOffset = UINT32_MAX;
 
     MaterialData m_data;
 

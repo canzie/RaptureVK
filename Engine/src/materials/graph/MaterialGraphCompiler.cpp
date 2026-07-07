@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <cstdio>
+#include <cstring>
 #include <string_view>
 #include <unordered_set>
 
@@ -105,9 +106,46 @@ static std::string s_sanitizeName(std::string_view name)
     return result;
 }
 
-static std::string s_poolRef(std::string_view field, uint32_t slot)
+// A single raw uint of the instance slice, read as u_graphPool.data[base + offset]
+static std::string s_poolElem(GraphBufferOffset offset)
 {
-    return "u_graphData.instances[gii]." + std::string(field) + "[" + std::to_string(slot) + "]";
+    return "u_graphPool.data[base + " + std::to_string(offset) + "]";
+}
+
+// The instance slice value at offset, reconstructed at its pin type from the packed uints
+static std::string s_poolRead(GraphBufferOffset offset, PinType type)
+{
+    switch (type) {
+    case PinType::FLOAT:
+        return "uintBitsToFloat(" + s_poolElem(offset) + ")";
+    case PinType::INT:
+        return "int(" + s_poolElem(offset) + ")";
+    case PinType::VEC2:
+        return "vec2(uintBitsToFloat(" + s_poolElem(offset) + "), uintBitsToFloat(" + s_poolElem(offset + 1) + "))";
+    case PinType::VEC3:
+        return "vec3(uintBitsToFloat(" + s_poolElem(offset) + "), uintBitsToFloat(" + s_poolElem(offset + 1) +
+               "), uintBitsToFloat(" + s_poolElem(offset + 2) + "))";
+    case PinType::VEC4:
+        return "vec4(uintBitsToFloat(" + s_poolElem(offset) + "), uintBitsToFloat(" + s_poolElem(offset + 1) +
+               "), uintBitsToFloat(" + s_poolElem(offset + 2) + "), uintBitsToFloat(" + s_poolElem(offset + 3) + "))";
+    }
+    return "0.0";
+}
+
+// Write a value's component bit patterns into the slice, growing it to fit
+static void s_packValue(GraphInstanceData &slice, GraphBufferOffset offset, const PinValue &value, PinType type)
+{
+    uint32_t components = graph_pinTypeComponents(type);
+    if (slice.size() < offset + components) slice.resize(offset + components, 0u);
+
+    if (type == PinType::INT) {
+        slice[offset] = static_cast<uint32_t>(value.i);
+        return;
+    }
+    for (uint32_t component = 0; component < components; ++component) {
+        float scalar = (&value.v4.x)[component];
+        std::memcpy(&slice[offset + component], &scalar, sizeof(float));
+    }
 }
 
 static const GraphConnection *s_findInputConnection(const MaterialGraph &graph, uint32_t dstNode, uint32_t dstPin)
@@ -252,45 +290,35 @@ static void s_validateGraph(const MaterialGraph &graph, const GraphNode *outputN
 }
 
 /**
- * @brief Assign pool slots to resource nodes and pre-fill the instance defaults
+ * @brief Pack each resource node's value into the instance slice and record where it landed
  * @param graph The graph being compiled
  * @param order The topologically sorted node ids
- * @param defaults Pool pre-filled with each resource node's default value
- * @param mapping Node id to pool slot, for later editor writes
- * @param diagnostics Appended with an error if either pool overflows
- * @return False if a pool overflowed, in which case an error diagnostic was added
+ * @param defaults The slice, grown and pre-filled with each resource node's default value
+ * @param mapping Node id to its slice offset, for later editor writes
  */
-static bool s_assignResources(const MaterialGraph &graph, const std::vector<uint32_t> &order, GraphInstanceData &defaults,
-                              GraphSlotMapping &mapping, DiagnosticList &diagnostics)
+static void s_assignResources(const MaterialGraph &graph, const std::vector<uint32_t> &order, GraphInstanceData &defaults,
+                              GraphSlotMapping &mapping)
 {
-    uint32_t nextConstant = 0;
-    uint32_t nextTexture = 0;
+    GraphBufferOffset next = 0;
     for (uint32_t nodeId : order) {
         if (nodeId == graph.outputNodeId) continue;
         const GraphNode *node = graph.findNode(nodeId);
         const NodeDefinition *def = NodeRegistry::get(node->type);
 
         if (def->resourceKind == ResourceKind::CONSTANT) {
-            if (nextConstant >= GRAPH_MAX_CONSTANTS) {
-                s_addDiagnostic(diagnostics, MaterialCompilerDiagnosticLevel::ERROR,
-                                "graph uses more than " + std::to_string(GRAPH_MAX_CONSTANTS) + " constants", nodeId);
-                return false;
-            }
-            uint32_t slot = nextConstant++;
-            defaults.constants[slot] = node->constantValue.v4;
-            mapping.constantSlots[nodeId] = slot;
+            PinType type = def->outputs.empty() ? PinType::VEC4 : def->outputs[0].type;
+            GraphBufferOffset offset = next;
+            next += graph_pinTypeComponents(type);
+            s_packValue(defaults, offset, node->constantValue, type);
+            mapping.constantSlots[nodeId] = {offset, type};
         } else if (def->resourceKind == ResourceKind::TEXTURE) {
-            if (nextTexture >= GRAPH_MAX_TEXTURES) {
-                s_addDiagnostic(diagnostics, MaterialCompilerDiagnosticLevel::ERROR,
-                                "graph uses more than " + std::to_string(GRAPH_MAX_TEXTURES) + " textures", nodeId);
-                return false;
-            }
-            uint32_t slot = nextTexture++;
-            defaults.textures[slot] = node->texture ? node->texture->getBindlessIndex() : 0u;
-            mapping.textureSlots[nodeId] = slot;
+            GraphBufferOffset offset = next++;
+            uint32_t textureIndex = node->texture ? node->texture->getBindlessIndex() : 0u;
+            if (defaults.size() <= offset) defaults.resize(offset + 1, 0u);
+            defaults[offset] = textureIndex;
+            mapping.textureSlots[nodeId] = offset;
         }
     }
-    return true;
 }
 
 /**
@@ -320,10 +348,10 @@ static std::string s_emitNodeExpr(const MaterialGraph &graph, const NodeDefiniti
         s_replaceAll(expr, "{" + def.inputs[i].name + "}", s_resolveInput(graph, emitted, node.id, def.inputs[i], i));
     }
     if (auto it = mapping.textureSlots.find(node.id); it != mapping.textureSlots.end()) {
-        s_replaceAll(expr, "{tex}", s_poolRef("textures", it->second));
+        s_replaceAll(expr, "{tex}", s_poolElem(it->second));
     }
     if (auto it = mapping.constantSlots.find(node.id); it != mapping.constantSlots.end()) {
-        s_replaceAll(expr, "{const}", s_poolRef("constants", it->second));
+        s_replaceAll(expr, "{const}", s_poolRead(it->second.offset, it->second.type));
     }
     return expr;
 }
@@ -399,16 +427,14 @@ CompileResult MaterialGraphCompiler::compile(const MaterialGraph &graph, uint32_
     }
     s_reportDeadNodes(graph, order, result.diagnostics);
 
-    if (!s_assignResources(graph, order, result.defaults, result.mapping, result.diagnostics)) {
-        return result;
-    }
+    s_assignResources(graph, order, result.defaults, result.mapping);
 
     const NodeDefinition *outputDef = NodeRegistry::get(outputNode->type);
     std::string body = s_emitSurfaceBody(graph, order, result.mapping, *outputNode, *outputDef);
 
     // graphId keeps the name unique even when two graphs share a sanitized name
     result.functionName = "evalSurface_" + s_sanitizeName(graph.name) + "_" + std::to_string(graphId);
-    result.glslFunction = "SurfaceData " + result.functionName + "(SurfaceInputs si, uint gii){\nSurfaceData surf;\n" + body +
+    result.glslFunction = "SurfaceData " + result.functionName + "(SurfaceInputs si, uint base){\nSurfaceData surf;\n" + body +
                           "return surf;\n}\n";
     result.success = true;
     return result;

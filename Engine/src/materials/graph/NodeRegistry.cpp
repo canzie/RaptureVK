@@ -100,22 +100,22 @@ void NodeRegistry::registerBuiltins()
     registerNode({.type = GraphNodeType::TANGENT, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.tangent"});
     registerNode({.type = GraphNodeType::BITANGENT, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.bitangent"});
 
-    // Slot-backed values, each reads its constant slot at the node's type
+    // Slot-backed values, {const} expands to the packed slice value read at the node's type
     registerNode({.type = GraphNodeType::CONSTANT_FLOAT,
                   .outputs = {{"out", PinType::FLOAT}},
-                  .glslTemplate = "{const}.x",
+                  .glslTemplate = "{const}",
                   .resourceKind = ResourceKind::CONSTANT});
     registerNode({.type = GraphNodeType::CONSTANT_INT,
                   .outputs = {{"out", PinType::INT}},
-                  .glslTemplate = "int({const}.x)",
+                  .glslTemplate = "{const}",
                   .resourceKind = ResourceKind::CONSTANT});
     registerNode({.type = GraphNodeType::CONSTANT_VEC2,
                   .outputs = {{"out", PinType::VEC2}},
-                  .glslTemplate = "{const}.xy",
+                  .glslTemplate = "{const}",
                   .resourceKind = ResourceKind::CONSTANT});
     registerNode({.type = GraphNodeType::CONSTANT_VEC3,
                   .outputs = {{"out", PinType::VEC3}},
-                  .glslTemplate = "{const}.xyz",
+                  .glslTemplate = "{const}",
                   .resourceKind = ResourceKind::CONSTANT});
     registerNode({.type = GraphNodeType::CONSTANT_VEC4,
                   .outputs = {{"out", PinType::VEC4}},

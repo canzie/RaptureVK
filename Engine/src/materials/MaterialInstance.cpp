@@ -22,21 +22,30 @@ MaterialInstance::~MaterialInstance()
     if (m_bindlessIndex != UINT32_MAX) {
         MaterialManager::freeSlot(m_bindlessIndex);
     }
-    if (m_graphSlot != UINT32_MAX) {
-        MaterialManager::freeGraphSlot(m_graphSlot);
+    if (m_graphDataOffset != UINT32_MAX) {
+        MaterialManager::freeGraphData(m_graphDataOffset);
     }
 }
 
 void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data)
 {
-    if (m_graphSlot == UINT32_MAX) {
-        m_graphSlot = MaterialManager::allocateGraphSlot();
+    // The slice size is graph specific, so a structural change reallocates from scratch
+    if (m_graphDataOffset != UINT32_MAX) {
+        MaterialManager::freeGraphData(m_graphDataOffset);
+        m_graphDataOffset = UINT32_MAX;
     }
-    MaterialManager::writeGraphSlot(m_graphSlot, data);
+
+    uint32_t sizeBytes = static_cast<uint32_t>(data.size() * sizeof(uint32_t));
+    if (sizeBytes > 0) {
+        m_graphDataOffset = MaterialManager::allocateGraphData(sizeBytes);
+        if (m_graphDataOffset != UINT32_MAX) {
+            MaterialManager::writeGraphData(m_graphDataOffset, data.data(), sizeBytes);
+        }
+    }
 
     m_data.flags |= MAT_FLAG_IS_GRAPH;
     m_data.graphId = graphId;
-    m_data.graphInstanceIndex = m_graphSlot;
+    m_data.graphDataOffset = m_graphDataOffset == UINT32_MAX ? 0u : m_graphDataOffset;
     syncToGPU();
     AssetEvents::onMaterialInstanceChanged().publish(this);
 }

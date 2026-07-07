@@ -2,6 +2,7 @@
 
 #include "asset_manager/AssetManager.h"
 #include "buffers/FreeListStorageBuffer.h"
+#include "buffers/VirtualStorageBuffer.h"
 #include "graph/SurfaceGraphManager.h"
 #include "logging/Log.h"
 #include "textures/Texture.h"
@@ -9,11 +10,16 @@
 
 namespace Rapture {
 
+// The graph data arena is a byte pool sub-allocated in fixed blocks; a graph instance takes as
+// many blocks as its packed slice needs
+static constexpr uint32_t GRAPH_ARENA_BLOCKS = 512;
+static constexpr uint32_t GRAPH_BLOCK_BYTES = 32;
+
 bool MaterialManager::s_initialized = false;
 uint32_t MaterialManager::s_defaultTextureIndex = 0;
 std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::s_materials;
 std::unique_ptr<FreeListStorageBuffer> MaterialManager::s_materialBuffer;
-std::unique_ptr<FreeListStorageBuffer> MaterialManager::s_graphBuffer;
+std::unique_ptr<VirtualStorageBuffer> MaterialManager::s_graphBuffer;
 std::unique_ptr<SurfaceGraphManager> MaterialManager::s_surfaceGraphManager;
 
 BaseMaterial::BaseMaterial(const std::string &name, std::initializer_list<ParameterID> editableParams, const MaterialData &defaults)
@@ -32,8 +38,8 @@ void MaterialManager::init()
 
     s_materialBuffer = std::make_unique<FreeListStorageBuffer>(sizeof(MaterialData), MAX_MATERIALS,
                                                                DescriptorSetBindingLocation::MATERIAL_DATA_SSBO);
-    s_graphBuffer = std::make_unique<FreeListStorageBuffer>(sizeof(GraphInstanceData), MAX_GRAPH_MATERIALS,
-                                                            DescriptorSetBindingLocation::GRAPH_DATA_SSBO);
+    s_graphBuffer = std::make_unique<VirtualStorageBuffer>(static_cast<VkDeviceSize>(GRAPH_ARENA_BLOCKS) * GRAPH_BLOCK_BYTES,
+                                                           GRAPH_BLOCK_BYTES, DescriptorSetBindingLocation::GRAPH_DATA_SSBO);
 
     s_surfaceGraphManager = std::make_unique<SurfaceGraphManager>();
 
@@ -83,22 +89,24 @@ void MaterialManager::writeSlot(uint32_t slot, const MaterialData &data)
     s_materialBuffer->write(slot, &data);
 }
 
-uint32_t MaterialManager::allocateGraphSlot()
+uint32_t MaterialManager::allocateGraphData(uint32_t sizeBytes)
 {
     RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
-    return s_graphBuffer->allocate();
+    VkDeviceSize offsetBytes = 0;
+    if (!s_graphBuffer->allocate(sizeBytes, offsetBytes)) return UINT32_MAX;
+    return static_cast<uint32_t>(offsetBytes / sizeof(uint32_t));
 }
 
-void MaterialManager::freeGraphSlot(uint32_t slot)
+void MaterialManager::freeGraphData(uint32_t uintOffset)
 {
     RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
-    s_graphBuffer->free(slot);
+    s_graphBuffer->free(static_cast<VkDeviceSize>(uintOffset) * sizeof(uint32_t));
 }
 
-void MaterialManager::writeGraphSlot(uint32_t slot, const GraphInstanceData &data)
+void MaterialManager::writeGraphData(uint32_t uintOffset, const void *data, uint32_t sizeBytes)
 {
     RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
-    s_graphBuffer->write(slot, &data);
+    s_graphBuffer->write(static_cast<VkDeviceSize>(uintOffset) * sizeof(uint32_t), data, sizeBytes);
 }
 
 void MaterialManager::createDefaultMaterials()
