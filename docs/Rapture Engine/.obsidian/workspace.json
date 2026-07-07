@@ -11,10 +11,14 @@
             "id": "6fa67950a6ea8521",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "plans/Per-node Graph Values.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "Per-node Graph Values"
             }
           }
         ]

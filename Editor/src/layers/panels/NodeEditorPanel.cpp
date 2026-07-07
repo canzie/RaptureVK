@@ -5,16 +5,21 @@
 
 #include "materials/graph/NodeRegistry.h"
 
+#include <components/drag.h>
+#include <components/dropdown.h>
 #include <components/extensions/ui_drag_detector.h>
 #include <components/shape.h>
 #include <components/text_label.h>
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <string>
 
-#define COL_NODE_BODY  Amethyst::Color3::fromHex(0x21262e)
+#define COL_NODE_BODY  Amethyst::Color3::fromHex(0x303030)
 #define COL_MENU_HOVER Amethyst::Color3::fromHex(0x4772b3)
+
+#define COL_BG Amethyst::Color3::fromHex(0x1a1a1a)
 
 #define COL_CAT_INPUT     Amethyst::Color3::fromHex(0x3a6ea5)
 #define COL_CAT_UTILITIES Amethyst::Color3::fromHex(0x555b66)
@@ -23,13 +28,13 @@
 #define COL_CAT_OUTPUT    Amethyst::Color3::fromHex(0x3a8a4f)
 #define COL_CAT_DEFAULT   Amethyst::Color3::fromHex(0x394150)
 
-#define COL_PIN_FLOAT Amethyst::Color3::fromHex(0xa1a1a1)
-#define COL_PIN_INT   Amethyst::Color3::fromHex(0x4f9d55)
-#define COL_PIN_VEC2  Amethyst::Color3::fromHex(0x5fb0c9)
-#define COL_PIN_VEC3  Amethyst::Color3::fromHex(0x6b6bd6)
-#define COL_PIN_VEC4  Amethyst::Color3::fromHex(0xd0b24a)
+#define COL_PIN_FLOAT  Amethyst::Color3::fromHex(0xa1a1a1)
+#define COL_PIN_INT    Amethyst::Color3::fromHex(0x4f9d55)
+#define COL_PIN_VEC2   Amethyst::Color3::fromHex(0x5fb0c9)
+#define COL_PIN_VEC3   Amethyst::Color3::fromHex(0x6b6bd6)
+#define COL_PIN_VEC4   Amethyst::Color3::fromHex(0xd0b24a)
 #define COL_PIN_HOVER  Amethyst::Color3::fromHex(0xffffff)
-#define COL_PIN_BORDER Amethyst::Color3::fromHex(0x1a1d21)
+#define COL_PIN_BORDER Amethyst::Color3::fromHex(0x2b2b2b)
 
 static constexpr float NODE_WIDTH = 168.0f;
 static constexpr float NODE_HEADER_HEIGHT = 26.0f;
@@ -37,7 +42,7 @@ static constexpr float NODE_ROW_HEIGHT = 22.0f;
 static constexpr float NODE_PADDING = 8.0f;
 static constexpr float NODE_PIN_SIZE = 12.0f;
 static constexpr float NODE_PIN_BORDER = 1.5f;
-static constexpr float NODE_BORDER = 2.0f;
+static constexpr float NODE_BORDER = 1.5f;
 static constexpr float WIRE_THICKNESS = 3.5f;
 static constexpr float PIN_HIT_RADIUS = 11.0f;
 
@@ -87,7 +92,6 @@ static Amethyst::Color3 s_pinColor(Rapture::PinType type)
     }
     return COL_PIN_FLOAT;
 }
-
 
 /**
  * @brief A node type the catalog can spawn, paired with its menu label
@@ -206,6 +210,98 @@ static const std::vector<NodeCatalogCategory> &s_nodeCatalog()
     return catalog;
 }
 
+/**
+ * @brief One typed variant of an operation, paired with its dropdown label
+ */
+struct NodeVariant {
+    const char *label;
+    Rapture::GraphNodeType type;
+};
+
+/**
+ * @brief An operation and its typed variants, swapped in place with a node's dropdown
+ */
+struct NodeVariantGroup {
+    const char *groupLabel;
+    std::vector<NodeVariant> variants;
+};
+
+static const std::vector<NodeVariantGroup> &s_variantGroups()
+{
+    static const std::vector<NodeVariantGroup> groups = {
+        {"Add", {{"Float", GNT::ADD_FLOAT}, {"Integer", GNT::ADD_INT}, {"Vector", GNT::ADD_VEC3}}},
+        {"Subtract", {{"Float", GNT::SUBTRACT_FLOAT}, {"Integer", GNT::SUBTRACT_INT}, {"Vector", GNT::SUBTRACT_VEC3}}},
+        {"Multiply", {{"Float", GNT::MULTIPLY_FLOAT}, {"Integer", GNT::MULTIPLY_INT}, {"Vector", GNT::MULTIPLY_VEC3}}},
+        {"Divide", {{"Float", GNT::DIVIDE_FLOAT}, {"Integer", GNT::DIVIDE_INT}, {"Vector", GNT::DIVIDE_VEC3}}},
+        {"Absolute", {{"Float", GNT::ABS_FLOAT}, {"Integer", GNT::ABS_INT}, {"Vector", GNT::ABS_VEC3}}},
+        {"Minimum", {{"Float", GNT::MIN_FLOAT}, {"Integer", GNT::MIN_INT}, {"Vector", GNT::MIN_VEC3}}},
+        {"Maximum", {{"Float", GNT::MAX_FLOAT}, {"Integer", GNT::MAX_INT}, {"Vector", GNT::MAX_VEC3}}},
+        {"Clamp", {{"Float", GNT::CLAMP_FLOAT}, {"Integer", GNT::CLAMP_INT}, {"Vector", GNT::CLAMP_VEC3}}},
+        {"Saturate", {{"Float", GNT::SATURATE_FLOAT}, {"Vector", GNT::SATURATE_VEC3}}},
+        {"Mix", {{"Float", GNT::MIX_FLOAT}, {"Vector", GNT::MIX_VEC3}}},
+        {"Step", {{"Float", GNT::STEP_FLOAT}, {"Vector", GNT::STEP_VEC3}}},
+        {"Smoothstep", {{"Float", GNT::SMOOTHSTEP_FLOAT}, {"Vector", GNT::SMOOTHSTEP_VEC3}}},
+        {"Fract", {{"Float", GNT::FRACT_FLOAT}, {"Vector", GNT::FRACT_VEC3}}},
+        {"Power", {{"Float", GNT::POWER_FLOAT}, {"Vector", GNT::POWER_VEC3}}},
+        {"Square Root", {{"Float", GNT::SQRT_FLOAT}, {"Vector", GNT::SQRT_VEC3}}},
+        {"Sine", {{"Float", GNT::SIN_FLOAT}, {"Vector", GNT::SIN_VEC3}}},
+        {"Cosine", {{"Float", GNT::COS_FLOAT}, {"Vector", GNT::COS_VEC3}}},
+    };
+    return groups;
+}
+
+/**
+ * @brief The variant group a node type belongs to
+ * @param type The node type
+ * @return The owning group, or nullptr if the type has no typed siblings
+ */
+static const NodeVariantGroup *s_variantGroupFor(Rapture::GraphNodeType type)
+{
+    for (const auto &group : s_variantGroups()) {
+        for (const auto &variant : group.variants) {
+            if (variant.type == type) {
+                return &group;
+            }
+        }
+    }
+    return nullptr;
+}
+
+/**
+ * @brief The dropdown label for a type within its group
+ * @param group The variant group
+ * @param type The node type
+ * @return The variant's label, or empty if the type is not in the group
+ */
+static std::string_view s_variantLabel(const NodeVariantGroup &group, Rapture::GraphNodeType type)
+{
+    for (const auto &variant : group.variants) {
+        if (variant.type == type) {
+            return variant.label;
+        }
+    }
+    return {};
+}
+
+/**
+ * @brief Whether a node type is a constant value source
+ * @param type The node type
+ * @return True for the CONSTANT_* family
+ */
+static bool s_isConstantType(Rapture::GraphNodeType type)
+{
+    switch (type) {
+    case GNT::CONSTANT_FLOAT:
+    case GNT::CONSTANT_INT:
+    case GNT::CONSTANT_VEC2:
+    case GNT::CONSTANT_VEC3:
+    case GNT::CONSTANT_VEC4:
+        return true;
+    default:
+        return false;
+    }
+}
+
 using SpawnFn = std::function<void(Rapture::GraphNodeType, std::string_view, Amethyst::Color3)>;
 
 static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,
@@ -253,7 +349,7 @@ void NodeEditorPanel::setupCanvas()
         .clipsDescendants = true,
         .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
     });
-    m_canvas->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+    m_canvas->setBaseStyleProperties({.backgroundColor = COL_BG, .backgroundTransparency = 0.0f});
 
     // The content layer is a zero size, non clipping transform anchor: nodes live in its local
     // (graph) space, so panning is a single write to its offset and every node follows for free.
@@ -356,12 +452,6 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
         return;
     }
 
-    // Pins come straight from the node definition: outputs first (right, top down), then inputs
-    // (left, continuing on the next rows).
-    const Rapture::NodeDefinition *def = Rapture::NodeRegistry::get(type);
-    size_t rowCount = (def != nullptr) ? def->outputs.size() + def->inputs.size() : 0;
-    float bodyHeight = static_cast<float>(rowCount) * NODE_ROW_HEIGHT + NODE_PADDING;
-
     // Convert the screen space right click into content (graph) space so the node lands under the
     // cursor regardless of the current pan.
     Amethyst::vec2 canvasPos = m_menuScreenPos - m_content->absolutePosition;
@@ -370,11 +460,10 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
 
     auto *node = m_content->add<Amethyst::Frame>();
     node->name = "Node " + std::to_string(nodeId);
-    // Do not clip: pin sockets straddle the node border.
+    // Do not clip: pin sockets straddle the node border. The size is set by layoutPins.
     node->setBaseProperties({
         .clipsDescendants = false,
         .position = Amethyst::UDim2::fromOffset(canvasPos.x, canvasPos.y),
-        .size = Amethyst::UDim2::fromOffset(NODE_WIDTH, NODE_HEADER_HEIGHT + bodyHeight),
         .zIndex = 1,
     });
     node->setBaseStyleProperties({
@@ -389,6 +478,10 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
     drag->mode = Amethyst::DragMode::FREE;
     drag->onDragUpdate = [this, nodeId](Amethyst::vec2, Amethyst::vec2) { refreshNodeWires(nodeId); };
 
+    // A grouped node's header shows the group name; the variant is chosen with the node's dropdown.
+    const NodeVariantGroup *group = s_variantGroupFor(type);
+    std::string headerText = (group != nullptr) ? std::string(group->groupLabel) : std::string(label);
+
     auto *header = node->add<Amethyst::Frame>();
     header->name = "Header";
     // Inset the header by the border so it sits inside the outline, centred on x via the anchor.
@@ -401,7 +494,7 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
     header->propagate(Amethyst::INTERACTION_CATEGORY_ALL);
 
     auto *title = header->add<Amethyst::TextLabel>();
-    title->setText(std::string(label));
+    title->setText(headerText);
     title->setBaseProperties({
         .padding = {.left = Amethyst::UDim::fromOffset(NODE_PADDING)},
         .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
@@ -412,27 +505,193 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
 
     NodeView view;
     view.frame = node;
+    view.type = type;
+    m_nodes[nodeId] = std::move(view);
 
-    if (def != nullptr) {
-        float rowY = NODE_HEADER_HEIGHT;
-        for (const auto &pin : def->outputs) {
-            view.pinIds.push_back(addPin(nodeId, node, pin.name, pin.type, rowY, true));
-            rowY += NODE_ROW_HEIGHT;
-        }
-        for (const auto &pin : def->inputs) {
-            view.pinIds.push_back(addPin(nodeId, node, pin.name, pin.type, rowY, false));
-            rowY += NODE_ROW_HEIGHT;
-        }
+    // Controls sit directly under the outputs; they and the pins share the plain row height.
+    const Rapture::NodeDefinition *def = Rapture::NodeRegistry::get(type);
+    float controlRowY = NODE_HEADER_HEIGHT + static_cast<float>(def != nullptr ? def->outputs.size() : 0) * NODE_ROW_HEIGHT;
+    if (group != nullptr) {
+        addVariantControl(nodeId, node, controlRowY);
+    } else if (s_isConstantType(type)) {
+        addConstantEditor(nodeId, node, controlRowY);
+    }
+    layoutPins(nodeId);
+}
+
+void NodeEditorPanel::layoutPins(uint32_t nodeId)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end() || it->second.frame == nullptr) {
+        return;
+    }
+    NodeView &view = it->second;
+    Amethyst::Frame *node = view.frame;
+
+    const Rapture::NodeDefinition *def = Rapture::NodeRegistry::get(view.type);
+    size_t outCount = (def != nullptr) ? def->outputs.size() : 0;
+    size_t inCount = (def != nullptr) ? def->inputs.size() : 0;
+
+    // A grouped node reserves one control row for its dropdown; a constant reserves one per component.
+    size_t controlRows = 0;
+    if (s_variantGroupFor(view.type) != nullptr) {
+        controlRows = 1;
+    } else if (s_isConstantType(view.type) && def != nullptr && !def->outputs.empty()) {
+        controlRows = Rapture::graph_pinTypeComponents(def->outputs[0].type);
     }
 
-    m_nodes[nodeId] = std::move(view);
+    float rowCount = static_cast<float>(outCount + controlRows + inCount);
+    float bodyHeight = rowCount * NODE_ROW_HEIGHT + NODE_PADDING;
+    node->setBaseProperties({.size = Amethyst::UDim2::fromOffset(NODE_WIDTH, NODE_HEADER_HEIGHT + bodyHeight)});
+
+    if (def == nullptr) {
+        return;
+    }
+
+    // Outputs first (right, top down), then the control-row gap, then inputs (left).
+    float rowY = NODE_HEADER_HEIGHT;
+    uint32_t slot = 0;
+    for (const auto &pin : def->outputs) {
+        view.pinIds.push_back(addPin(nodeId, node, pin.name, pin.type, slot++, rowY, true));
+        rowY += NODE_ROW_HEIGHT;
+    }
+    rowY += static_cast<float>(controlRows) * NODE_ROW_HEIGHT;
+    slot = 0;
+    for (const auto &pin : def->inputs) {
+        uint32_t pinId = addPin(nodeId, node, pin.name, pin.type, slot, rowY, false);
+        view.pinIds.push_back(pinId);
+
+        PinView &pv = m_pins[pinId];
+        pv.value = std::make_unique<Rapture::PinValue>(pin.defaultValue);
+
+        // A scalar input carries an inline drag on its own row, hidden while the input is wired.
+        if (Rapture::graph_pinTypeComponents(pin.type) == 1) {
+            bool integer = (pin.type == Rapture::PinType::INT);
+            float usable = NODE_WIDTH - 2.0f * NODE_PADDING;
+            float x = NODE_PADDING + usable * 0.2f; // leave 20% on the left for the pin label
+            float width = usable * 0.8f;
+            pv.editor = addValueDrag(node, x, rowY, width, pv.value.get(), 0, integer);
+            pv.editor->setBaseProperties({.visible = !isInputConnected(nodeId, slot)});
+        }
+
+        ++slot;
+        rowY += NODE_ROW_HEIGHT;
+    }
+}
+
+void NodeEditorPanel::addVariantControl(uint32_t nodeId, Amethyst::Frame *node, float rowY)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end()) {
+        return;
+    }
+    const NodeVariantGroup *group = s_variantGroupFor(it->second.type);
+    if (group == nullptr) {
+        return;
+    }
+
+    auto *dropdown = node->add<Amethyst::Dropdown>();
+    dropdown->setBaseProperties({
+        .position = Amethyst::UDim2(0.0f, NODE_PADDING, 0.0f, rowY + 1.0f),
+        .size = Amethyst::UDim2(1.0f, -2.0f * NODE_PADDING, 0.0f, NODE_ROW_HEIGHT - 2.0f),
+        .zIndex = 2,
+    });
+
+    std::vector<Amethyst::ContextMenuItem> items;
+    for (const auto &variant : group->variants) {
+        Rapture::GraphNodeType variantType = variant.type;
+        std::string variantLabel = variant.label;
+        items.push_back(Amethyst::ContextMenuItem::action(variantLabel, [this, nodeId, variantType, variantLabel, dropdown]() {
+            dropdown->setText(variantLabel);
+            changeNodeType(nodeId, variantType);
+        }));
+    }
+    dropdown->setItems(std::move(items));
+    dropdown->setText(std::string(s_variantLabel(*group, it->second.type)));
+
+    NodeControl control;
+    control.widgets.push_back(dropdown);
+    it->second.controls.push_back(std::move(control));
+}
+
+void NodeEditorPanel::addConstantEditor(uint32_t nodeId, Amethyst::Frame *node, float rowY)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end()) {
+        return;
+    }
+    const Rapture::NodeDefinition *def = Rapture::NodeRegistry::get(it->second.type);
+    if (def == nullptr || def->outputs.empty()) {
+        return;
+    }
+
+    Rapture::PinType type = def->outputs[0].type;
+    bool integer = (type == Rapture::PinType::INT);
+    uint32_t components = Rapture::graph_pinTypeComponents(type);
+
+    NodeControl control;
+    control.value = std::make_unique<Rapture::PinValue>();
+
+    static constexpr const char *AXIS[4] = {"X", "Y", "Z", "W"};
+    for (uint32_t c = 0; c < components; ++c) {
+        float y = rowY + static_cast<float>(c) * NODE_ROW_HEIGHT;
+        float dragX = NODE_PADDING;
+        float dragWidth = NODE_WIDTH - 2.0f * NODE_PADDING;
+
+        // A multi-component value labels each drag with its axis.
+        if (components > 1) {
+            static constexpr float AXIS_LABEL_WIDTH = 14.0f;
+            auto *axisLabel = node->add<Amethyst::TextLabel>();
+            axisLabel->setText(AXIS[c]);
+            axisLabel->setBaseProperties({
+                .position = Amethyst::UDim2::fromOffset(NODE_PADDING, y),
+                .size = Amethyst::UDim2::fromOffset(AXIS_LABEL_WIDTH, NODE_ROW_HEIGHT),
+            });
+            axisLabel->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+            axisLabel->setTextStyleProperties({.fontSize = 12.0f, .textYAlignment = Amethyst::TextYAlignment::CENTER});
+            axisLabel->propagate(Amethyst::INTERACTION_CATEGORY_ALL);
+            control.widgets.push_back(axisLabel);
+            dragX += AXIS_LABEL_WIDTH;
+            dragWidth -= AXIS_LABEL_WIDTH;
+        }
+
+        control.widgets.push_back(addValueDrag(node, dragX, y, dragWidth, control.value.get(), c, integer));
+    }
+
+    it->second.controls.push_back(std::move(control));
+}
+
+Amethyst::UIObject *NodeEditorPanel::addValueDrag(Amethyst::Frame *node, float x, float y, float width, Rapture::PinValue *value,
+                                                 uint32_t component, bool integer)
+{
+    auto *drag = node->add<Amethyst::DragFloat>();
+    drag->valueF = &value->v4[component];
+    drag->speed = integer ? 1.0 : 0.01;
+    drag->setFormat(integer ? "%.0f" : "%.3f");
+    drag->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(x, y + 1.0f),
+        .size = Amethyst::UDim2::fromOffset(width, NODE_ROW_HEIGHT - 2.0f),
+        .zIndex = 2,
+    });
+    return drag;
+}
+
+bool NodeEditorPanel::isInputConnected(uint32_t nodeId, uint32_t slotIndex) const
+{
+    for (const auto &wire : m_connections) {
+        if (m_pins.isLive(wire.dstPinId)) {
+            const PinView &pin = m_pins[wire.dstPinId];
+            if (pin.nodeId == nodeId && pin.slotIndex == slotIndex) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 uint32_t NodeEditorPanel::addPin(uint32_t nodeId, Amethyst::Frame *node, std::string_view name, Rapture::PinType type,
-                                 float rowY, bool isOutput)
+                                 uint32_t slotIndex, float rowY, bool isOutput)
 {
-    uint32_t pinId = static_cast<uint32_t>(m_pins.size());
-
     auto *socket = node->add<Amethyst::Shape>(Amethyst::PRIMITIVE_CIRCLE);
     socket->setBaseProperties({
         .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
@@ -463,16 +722,19 @@ uint32_t NodeEditorPanel::addPin(uint32_t nodeId, Amethyst::Frame *node, std::st
 
     PinView pin;
     pin.socket = socket;
+    pin.label = label;
     pin.nodeId = nodeId;
+    pin.slotIndex = slotIndex;
     pin.isOutput = isOutput;
     pin.type = type;
     pin.localOffset = Amethyst::vec2(isOutput ? NODE_WIDTH : 0.0f, rowY + NODE_ROW_HEIGHT * 0.5f);
-    pin.pressConn = socket->onInputBeganCb.connect([this, pinId](const Amethyst::InputObject &io) {
+
+    uint32_t pinId = m_pins.insert(std::move(pin));
+    m_pins[pinId].pressConn = socket->onInputBeganCb.connect([this, pinId](const Amethyst::InputObject &io) {
         if (io.type == Amethyst::InputType::MOUSE_BUTTON_1) {
             beginConnection(pinId);
         }
     });
-    m_pins.push_back(std::move(pin));
     return pinId;
 }
 
@@ -490,23 +752,37 @@ uint32_t NodeEditorPanel::pinAt(Amethyst::vec2 contentPos) const
 {
     uint32_t best = INVALID_PIN;
     float bestDist = PIN_HIT_RADIUS * PIN_HIT_RADIUS;
-    for (uint32_t i = 0; i < m_pins.size(); ++i) {
-        Amethyst::vec2 d = pinPosition(i) - contentPos;
+    m_pins.forEach([&](uint32_t id, const PinView &) {
+        Amethyst::vec2 d = pinPosition(id) - contentPos;
         float dist = d.x * d.x + d.y * d.y;
         if (dist < bestDist) {
             bestDist = dist;
-            best = i;
+            best = id;
         }
-    }
+    });
     return best;
+}
+
+uint32_t NodeEditorPanel::findPin(uint32_t nodeId, bool isOutput, uint32_t slotIndex) const
+{
+    uint32_t found = INVALID_PIN;
+    m_pins.forEach([&](uint32_t id, const PinView &pin) {
+        if (pin.nodeId == nodeId && pin.isOutput == isOutput && pin.slotIndex == slotIndex) {
+            found = id;
+        }
+    });
+    return found;
 }
 
 bool NodeEditorPanel::canConnect(uint32_t a, uint32_t b) const
 {
-    if (a == b || a >= m_pins.size() || b >= m_pins.size()) {
+    if (a == b || !m_pins.isLive(a) || !m_pins.isLive(b)) {
         return false;
     }
     if (m_pins[a].nodeId == m_pins[b].nodeId) {
+        return false;
+    }
+    if (m_pins[a].type != m_pins[b].type) {
         return false;
     }
     return m_pins[a].isOutput != m_pins[b].isOutput;
@@ -605,6 +881,11 @@ void NodeEditorPanel::createWire(uint32_t outPinId, uint32_t inPinId)
     wire.spline = spline;
     applyWireKnots(wire);
     m_connections.push_back(wire);
+
+    // A wired input hides its inline default editor.
+    if (m_pins.isLive(inPinId) && m_pins[inPinId].editor != nullptr) {
+        m_pins[inPinId].editor->setBaseProperties({.visible = false});
+    }
 }
 
 void NodeEditorPanel::refreshNodeWires(uint32_t nodeId)
@@ -621,6 +902,106 @@ void NodeEditorPanel::applyWireKnots(const WireView &wire)
     if (wire.spline != nullptr) {
         wire.spline->setKnots({pinPosition(wire.srcPinId), pinPosition(wire.dstPinId)});
     }
+}
+
+void NodeEditorPanel::clearNodePins(uint32_t nodeId)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end()) {
+        return;
+    }
+    NodeView &view = it->second;
+    for (uint32_t pinId : view.pinIds) {
+        if (!m_pins.isLive(pinId)) {
+            continue;
+        }
+        PinView &pin = m_pins[pinId];
+        pin.pressConn.disconnect(); // sever before the socket that owns the signal is destroyed
+        if (view.frame != nullptr) {
+            if (pin.socket != nullptr) {
+                view.frame->removeChild(pin.socket);
+            }
+            if (pin.label != nullptr) {
+                view.frame->removeChild(pin.label);
+            }
+            if (pin.editor != nullptr) {
+                view.frame->removeChild(pin.editor);
+            }
+        }
+        m_pins.remove(pinId);
+    }
+    view.pinIds.clear();
+}
+
+void NodeEditorPanel::changeNodeType(uint32_t nodeId, Rapture::GraphNodeType newType)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end() || it->second.type == newType) {
+        return;
+    }
+
+    // Record where each wire touches this node (side, slot, type) so it can be re-pointed to the
+    // rebuilt pins. A wire touches the node on exactly one side, so each appears here once.
+    struct Touch {
+        size_t wireIdx;
+        bool isOutput;
+        uint32_t slot;
+        Rapture::PinType type;
+    };
+    std::vector<Touch> touches;
+    for (size_t i = 0; i < m_connections.size(); ++i) {
+        const WireView &wire = m_connections[i];
+        if (m_pins.isLive(wire.srcPinId) && m_pins[wire.srcPinId].nodeId == nodeId) {
+            const PinView &pin = m_pins[wire.srcPinId];
+            touches.push_back({i, true, pin.slotIndex, pin.type});
+        } else if (m_pins.isLive(wire.dstPinId) && m_pins[wire.dstPinId].nodeId == nodeId) {
+            const PinView &pin = m_pins[wire.dstPinId];
+            touches.push_back({i, false, pin.slotIndex, pin.type});
+        }
+    }
+
+    it->second.type = newType;
+    clearNodePins(nodeId);
+    layoutPins(nodeId);
+
+    // Re-point a wire when the same-side slot still exists with the same type; drop it otherwise.
+    std::vector<size_t> dropped;
+    for (const Touch &touch : touches) {
+        uint32_t newPin = findPin(nodeId, touch.isOutput, touch.slot);
+        if (newPin == INVALID_PIN || m_pins[newPin].type != touch.type) {
+            dropped.push_back(touch.wireIdx);
+            continue;
+        }
+        WireView &wire = m_connections[touch.wireIdx];
+        if (touch.isOutput) {
+            wire.srcPinId = newPin;
+        } else {
+            wire.dstPinId = newPin;
+        }
+    }
+
+    // Erase dropped wires from the back so the lower indices stay valid as we go.
+    std::sort(dropped.begin(), dropped.end(), std::greater<size_t>());
+    for (size_t idx : dropped) {
+        if (m_connections[idx].spline != nullptr && m_wireLayer != nullptr) {
+            m_wireLayer->removeChild(m_connections[idx].spline);
+        }
+        m_connections.erase(m_connections.begin() + idx);
+    }
+
+    // layoutPins set editor visibility before the wires were re-pointed, so refresh it now that
+    // m_connections is final.
+    for (uint32_t pinId : it->second.pinIds) {
+        if (!m_pins.isLive(pinId)) {
+            continue;
+        }
+        PinView &pin = m_pins[pinId];
+        if (!pin.isOutput && pin.editor != nullptr) {
+            pin.editor->setBaseProperties({.visible = !isInputConnected(nodeId, pin.slotIndex)});
+        }
+    }
+
+    refreshNodeWires(nodeId);
 }
 
 void NodeEditorPanel::setHoverPin(uint32_t pinId)

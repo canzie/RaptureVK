@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-#include <glm/glm.hpp>
-
 #include "MaterialGraphTypes.h"
 #include "asset_manager/AssetHandle.h"
 
@@ -20,9 +18,8 @@ class Texture;
 struct GraphNode {
     uint32_t id = 0;
     GraphNodeType type = GraphNodeType::NONE;
-    glm::vec4 constantValue{0.0f};  // CONSTANT nodes: the slot value
-    AssetPtr<Texture> texture = {};  // TEXTURE nodes: bound texture, bindless index read at compile
-    glm::vec2 editorPosition{0.0f}; // editor only, ignored by the compiler
+    PinValue constantValue{};       // CONSTANT nodes: the slot value
+    AssetPtr<Texture> texture = {}; // TEXTURE nodes: bound texture, bindless index read at compile
 };
 
 /**

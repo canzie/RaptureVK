@@ -166,7 +166,7 @@ static std::string s_assignResources(const MaterialGraph &graph, const std::vect
                 return "graph uses more than " + std::to_string(GRAPH_MAX_CONSTANTS) + " constants";
             }
             uint32_t slot = nextConstant++;
-            defaults.constants[slot] = node->constantValue;
+            defaults.constants[slot] = node->constantValue.v4;
             mapping.constantSlots[nodeId] = slot;
         } else if (def->resourceKind == ResourceKind::TEXTURE) {
             if (nextTexture >= GRAPH_MAX_TEXTURES) {

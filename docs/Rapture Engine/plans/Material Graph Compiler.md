@@ -461,3 +461,28 @@ Then 2c (async), then Phase 3 (editor), Phase 4 (MaterialX/glTF lowering into th
   - *constant* — a true literal **baked into the generated GLSL** (`0.5`, `vec3(...)`), consuming **no** slot but requiring a recompile when changed. Cheaper at runtime and frees pool slots for values that never move.
 
   The `resourceKind` mechanism already supports this: a baked constant is just `resourceKind = NONE` with the literal substituted directly into consumers, no slot assigned. Deferred — the starter set keeps one slot-backed `constant`.
+
+---
+
+## 10. Known limitation: per-node values are underpowered (compiler overhaul owed)
+
+The node editor's model is "an unconnected input pin always carries an editable value; a control (e.g. a constant editor) carries its value." The IR/compiler cannot express that today. This is an accepted, written-down gap — the compiler needs an overhaul before authored input values reach the GPU.
+
+**Where values can live today:**
+- `GraphNode.constantValue` — a **single** `PinValue`, used **only** by `CONSTANT` nodes. It maps to one `{const}` pool slot (`s_assignResources` → `mapping.constantSlots[nodeId]`), and the template language has exactly **one** `{const}` per node. So a node can bake **at most one** value.
+- Every other node's unconnected-input value comes from the **shared** `NodeDefinition.PinDef.defaultValue` via `s_literal` (`s_resolveInput`), or — for the `SURFACE_OUTPUT` sink — from **hardcoded fallbacks** in `s_emitSurfaceBody` (`"0.5"`, `"vec3(1.0)"`, `normalize(si.worldNormal)`, …). Neither is per-node, neither is authored.
+
+**What breaks because of it:**
+1. **`SURFACE_OUTPUT` is the clearest case.** Its `albedo/normal/roughness/metallic/ao` inputs have no single "node value" — each is a separate input. When unconnected they emit compiler-hardcoded fallbacks, so a user cannot set "this material's roughness = 0.6" without wiring a constant node. The node conceptually has *many* values (one per input); the IR gives it zero.
+2. **Per-node input-default overrides have no home.** The editor stores an unconnected input's value on the pin (`PinView.value`), but `GraphNode` has nowhere to put it, so `s_resolveInput` can never read it — editing an input default in the UI cannot affect the output.
+3. **A node cannot have more than one baked/control value.** Single `constantValue`, single `{const}` placeholder. A future node with several tweakable parameters is unrepresentable.
+
+**Overhaul owed (compiler + IR):**
+- Give `GraphNode` **per-input** value storage (e.g. `std::vector<PinValue> inputValues` indexed by input-pin index) and, for multi-value control nodes, more than one control value.
+- `s_resolveInput` and the `SURFACE_OUTPUT` sink read the node's **authored** value for an unconnected input instead of the shared def default / hardcoded fallback.
+- Make authored unconnected-input values into **pool constants** (runtime-editable, no recompile — same mechanism as constant nodes), which means resource-slot assignment for those inputs and template placeholders that can reference **multiple** per-node constant slots (indexed `{const0}`, `{const1}`, or a per-input slot ref) rather than the single `{const}`.
+- This subsumes and generalizes the single-`{const}`-per-node design; the current single `GraphNode.constantValue` becomes one case of the general per-value storage.
+
+Until then: constant nodes are the only way to author a value that reaches the shader, and `SURFACE_OUTPUT`'s unconnected channels use fixed fallbacks.
+
+**Proposed fix: [[Per-node Graph Values]].**
