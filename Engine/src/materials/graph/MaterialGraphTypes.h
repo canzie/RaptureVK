@@ -15,6 +15,7 @@ enum class PinType {
     VEC2,
     VEC3,
     VEC4,
+    TEXTURE, // a bindless texture index
 };
 
 enum class GraphNodeType {
@@ -115,15 +116,6 @@ enum class GraphNodeType {
 };
 
 /**
- * @brief Whether a node consumes a per-instance GraphInstanceData pool slot
- */
-enum class ResourceKind {
-    NONE,     // pure compute or input reader
-    TEXTURE,  // reserves one textures[] slot, exposed to the template as {tex}
-    CONSTANT, // reserves one constants[] slot, exposed to the template as {const}
-};
-
-/**
  * @brief A pin default stored as whichever scalar or vector type the pin uses
  *
  * The widest member overlaps the narrower ones, so a scalar default splats across the
@@ -161,8 +153,7 @@ struct NodeDefinition {
     GraphNodeType type = GraphNodeType::NONE;
     std::vector<PinDef> inputs = {};
     std::vector<PinDef> outputs = {};
-    std::string glslTemplate = {}; // single output nodes: the RHS expression, empty for a constant node
-    ResourceKind resourceKind = ResourceKind::NONE;
+    std::string glslTemplate = {}; // single output nodes: the RHS expression
 };
 
 /**

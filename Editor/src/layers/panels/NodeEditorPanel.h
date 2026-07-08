@@ -12,6 +12,7 @@
 #include <memory>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /**
@@ -46,15 +47,13 @@ class NodeEditorPanel : public Panel {
         Amethyst::vec2 localOffset{0.0f};         // pin centre relative to its node's origin
         std::unique_ptr<Rapture::PinValue> value; // an input pin's default, edited while it is unconnected
         Amethyst::UIObject *editor = nullptr;     // inline default editor, shown while the input is unconnected
-        Amethyst::EventConnection pressConn;
     };
 
     /**
-     * @brief A control-row widget group and, for a value editor, the value it edits
+     * @brief A control-row widget group belonging to a node
      */
     struct NodeControl {
         std::vector<Amethyst::UIObject *> widgets;
-        std::unique_ptr<Rapture::PinValue> value;
     };
 
     /**
@@ -135,8 +134,8 @@ class NodeEditorPanel : public Panel {
      * @param isOutput True for an output (socket right), false for an input (socket left)
      * @return The new pin's id
      */
-    uint32_t addPin(uint32_t nodeId, Amethyst::Frame *node, std::string_view name, Rapture::PinType type,
-                    uint32_t slotIndex, float rowY, bool isOutput);
+    uint32_t addPin(uint32_t nodeId, Amethyst::Frame *node, std::string_view name, Rapture::PinType type, uint32_t slotIndex,
+                    float rowY, bool isOutput);
 
     /**
      * @brief Adds the variant-selector dropdown control row to a node
@@ -238,6 +237,42 @@ class NodeEditorPanel : public Panel {
      */
     void setHoverPin(uint32_t pinId);
 
+    /**
+     * @brief Makes a node the primary selection, optionally keeping the current selection
+     * @param nodeId The node to select
+     * @param additive True to add to the selection, false to replace it
+     */
+    void selectNode(uint32_t nodeId, bool additive);
+
+    /**
+     * @brief Clears the selection and restores every selected node's default border
+     */
+    void clearSelection(void);
+
+    /**
+     * @brief Applies a node's border colour for its current selection state
+     * @param nodeId The node to restyle
+     */
+    void applyNodeBorder(uint32_t nodeId);
+
+    /**
+     * @brief Opens the per-node context menu, selecting the node first if it is not already
+     * @param nodeId The node the menu acts on
+     * @param screenPos The screen position to open the menu at
+     */
+    void showNodeMenu(uint32_t nodeId, Amethyst::vec2 screenPos);
+
+    /**
+     * @brief Deletes a node, its pins, and every wire touching it
+     * @param nodeId The node to delete
+     */
+    void deleteNode(uint32_t nodeId);
+
+    /**
+     * @brief Deletes every currently selected node
+     */
+    void deleteSelection(void);
+
     Amethyst::Frame *m_root = nullptr;
     Amethyst::Frame *m_canvas = nullptr;
     Amethyst::Frame *m_content = nullptr;
@@ -262,6 +297,9 @@ class NodeEditorPanel : public Panel {
     uint32_t m_connectSrcPinId = 0;
     uint32_t m_hoverPinId = INVALID_PIN;
     Amethyst::Spline *m_dragWire = nullptr;
+
+    std::unordered_set<uint32_t> m_selectedNodes;
+    uint32_t m_primaryNodeId = 0; // the main selected node, 0 when nothing is selected
 
     uint32_t m_nextNodeId = 1;
 };

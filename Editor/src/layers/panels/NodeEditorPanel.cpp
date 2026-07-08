@@ -33,8 +33,12 @@
 #define COL_PIN_VEC2   Amethyst::Color3::fromHex(0x5fb0c9)
 #define COL_PIN_VEC3   Amethyst::Color3::fromHex(0x6b6bd6)
 #define COL_PIN_VEC4   Amethyst::Color3::fromHex(0xd0b24a)
+#define COL_PIN_TEX    Amethyst::Color3::fromHex(0xb05fa5)
 #define COL_PIN_HOVER  Amethyst::Color3::fromHex(0xffffff)
 #define COL_PIN_BORDER Amethyst::Color3::fromHex(0x2b2b2b)
+
+#define COL_NODE_SELECTED         Amethyst::Color3::fromHex(0xc07a2c)
+#define COL_NODE_SELECTED_PRIMARY Amethyst::Color3::fromHex(0xf5f0e6)
 
 static constexpr float NODE_WIDTH = 168.0f;
 static constexpr float NODE_HEADER_HEIGHT = 26.0f;
@@ -89,6 +93,8 @@ static Amethyst::Color3 s_pinColor(Rapture::PinType type)
         return COL_PIN_VEC3;
     case Rapture::PinType::VEC4:
         return COL_PIN_VEC4;
+    case Rapture::PinType::TEXTURE:
+        return COL_PIN_TEX;
     }
     return COL_PIN_FLOAT;
 }
@@ -321,6 +327,8 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const PanelServices &
         m_contextMenu = nullptr;
         m_dragWire = nullptr;
         m_connecting = false;
+        m_selectedNodes.clear();
+        m_primaryNodeId = 0;
     });
     m_root->name = "Node Editor";
     m_root->addClass("background-secondary");
@@ -386,6 +394,11 @@ void NodeEditorPanel::onCanvasInputBegan(const Amethyst::InputObject &io)
         if (auto *window = m_canvas->getWindow()) {
             window->captureMouse(m_canvas);
         }
+        return;
+    }
+
+    if (io.type == Amethyst::InputType::MOUSE_BUTTON_1) {
+        clearSelection();
     }
 }
 
@@ -478,6 +491,14 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
     drag->mode = Amethyst::DragMode::FREE;
     drag->onDragUpdate = [this, nodeId](Amethyst::vec2, Amethyst::vec2) { refreshNodeWires(nodeId); };
 
+    node->track(node->onInputBeganCb.connect([this, nodeId](const Amethyst::InputObject &io) {
+        if (io.type == Amethyst::InputType::MOUSE_BUTTON_1) {
+            selectNode(nodeId, false);
+        } else if (io.type == Amethyst::InputType::MOUSE_BUTTON_2) {
+            showNodeMenu(nodeId, Amethyst::vec2(io.position.x, io.position.y));
+        }
+    }));
+
     // A grouped node's header shows the group name; the variant is chosen with the node's dropdown.
     const NodeVariantGroup *group = s_variantGroupFor(type);
     std::string headerText = (group != nullptr) ? std::string(group->groupLabel) : std::string(label);
@@ -511,12 +532,12 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
     // Controls sit directly under the outputs; they and the pins share the plain row height.
     const Rapture::NodeDefinition *def = Rapture::NodeRegistry::get(type);
     float controlRowY = NODE_HEADER_HEIGHT + static_cast<float>(def != nullptr ? def->outputs.size() : 0) * NODE_ROW_HEIGHT;
+    layoutPins(nodeId);
     if (group != nullptr) {
         addVariantControl(nodeId, node, controlRowY);
     } else if (s_isConstantType(type)) {
         addConstantEditor(nodeId, node, controlRowY);
     }
-    layoutPins(nodeId);
 }
 
 void NodeEditorPanel::layoutPins(uint32_t nodeId)
@@ -530,7 +551,10 @@ void NodeEditorPanel::layoutPins(uint32_t nodeId)
 
     const Rapture::NodeDefinition *def = Rapture::NodeRegistry::get(view.type);
     size_t outCount = (def != nullptr) ? def->outputs.size() : 0;
-    size_t inCount = (def != nullptr) ? def->inputs.size() : 0;
+
+    // A constant/variable edits its value through its control, so its input pin is not drawn.
+    bool hideInputs = s_isConstantType(view.type);
+    size_t inCount = (def != nullptr && !hideInputs) ? def->inputs.size() : 0;
 
     // A grouped node reserves one control row for its dropdown; a constant reserves one per component.
     size_t controlRows = 0;
@@ -556,6 +580,19 @@ void NodeEditorPanel::layoutPins(uint32_t nodeId)
         rowY += NODE_ROW_HEIGHT;
     }
     rowY += static_cast<float>(controlRows) * NODE_ROW_HEIGHT;
+    if (hideInputs) {
+        uint32_t valueSlot = 0;
+        for (const auto &pin : def->inputs) {
+            PinView pv;
+            pv.nodeId = nodeId;
+            pv.slotIndex = valueSlot;
+            pv.type = pin.type;
+            pv.value = std::make_unique<Rapture::PinValue>(pin.defaultValue);
+            view.pinIds.push_back(m_pins.insert(std::move(pv)));
+            ++valueSlot;
+        }
+        return;
+    }
     slot = 0;
     for (const auto &pin : def->inputs) {
         uint32_t pinId = addPin(nodeId, node, pin.name, pin.type, slot, rowY, false);
@@ -625,12 +662,17 @@ void NodeEditorPanel::addConstantEditor(uint32_t nodeId, Amethyst::Frame *node, 
         return;
     }
 
+    uint32_t valuePinId = findPin(nodeId, false, 0);
+    if (valuePinId == INVALID_PIN || m_pins[valuePinId].value == nullptr) {
+        return;
+    }
+    Rapture::PinValue *value = m_pins[valuePinId].value.get();
+
     Rapture::PinType type = def->outputs[0].type;
     bool integer = (type == Rapture::PinType::INT);
     uint32_t components = Rapture::graph_pinTypeComponents(type);
 
     NodeControl control;
-    control.value = std::make_unique<Rapture::PinValue>();
 
     static constexpr const char *AXIS[4] = {"X", "Y", "Z", "W"};
     for (uint32_t c = 0; c < components; ++c) {
@@ -655,14 +697,14 @@ void NodeEditorPanel::addConstantEditor(uint32_t nodeId, Amethyst::Frame *node, 
             dragWidth -= AXIS_LABEL_WIDTH;
         }
 
-        control.widgets.push_back(addValueDrag(node, dragX, y, dragWidth, control.value.get(), c, integer));
+        control.widgets.push_back(addValueDrag(node, dragX, y, dragWidth, value, c, integer));
     }
 
     it->second.controls.push_back(std::move(control));
 }
 
 Amethyst::UIObject *NodeEditorPanel::addValueDrag(Amethyst::Frame *node, float x, float y, float width, Rapture::PinValue *value,
-                                                 uint32_t component, bool integer)
+                                                  uint32_t component, bool integer)
 {
     auto *drag = node->add<Amethyst::DragFloat>();
     drag->valueF = &value->v4[component];
@@ -730,11 +772,11 @@ uint32_t NodeEditorPanel::addPin(uint32_t nodeId, Amethyst::Frame *node, std::st
     pin.localOffset = Amethyst::vec2(isOutput ? NODE_WIDTH : 0.0f, rowY + NODE_ROW_HEIGHT * 0.5f);
 
     uint32_t pinId = m_pins.insert(std::move(pin));
-    m_pins[pinId].pressConn = socket->onInputBeganCb.connect([this, pinId](const Amethyst::InputObject &io) {
+    socket->track(socket->onInputBeganCb.connect([this, pinId](const Amethyst::InputObject &io) {
         if (io.type == Amethyst::InputType::MOUSE_BUTTON_1) {
             beginConnection(pinId);
         }
-    });
+    }));
     return pinId;
 }
 
@@ -916,7 +958,6 @@ void NodeEditorPanel::clearNodePins(uint32_t nodeId)
             continue;
         }
         PinView &pin = m_pins[pinId];
-        pin.pressConn.disconnect(); // sever before the socket that owns the signal is destroyed
         if (view.frame != nullptr) {
             if (pin.socket != nullptr) {
                 view.frame->removeChild(pin.socket);
@@ -1016,6 +1057,117 @@ void NodeEditorPanel::setHoverPin(uint32_t pinId)
         m_pins[pinId].socket->setBaseStyleProperties({.backgroundColor = COL_PIN_HOVER});
     }
     m_hoverPinId = pinId;
+}
+
+void NodeEditorPanel::selectNode(uint32_t nodeId, bool additive)
+{
+    if (m_nodes.find(nodeId) == m_nodes.end()) {
+        return;
+    }
+    if (!additive) {
+        clearSelection();
+    }
+
+    uint32_t previousPrimary = m_primaryNodeId;
+    m_selectedNodes.insert(nodeId);
+    m_primaryNodeId = nodeId;
+
+    // The old primary drops to the secondary style; the clicked node becomes primary.
+    if (previousPrimary != 0 && previousPrimary != nodeId) {
+        applyNodeBorder(previousPrimary);
+    }
+    applyNodeBorder(nodeId);
+}
+
+void NodeEditorPanel::clearSelection()
+{
+    std::unordered_set<uint32_t> previous = std::move(m_selectedNodes);
+    m_selectedNodes.clear();
+    m_primaryNodeId = 0;
+    for (uint32_t nodeId : previous) {
+        applyNodeBorder(nodeId);
+    }
+}
+
+void NodeEditorPanel::applyNodeBorder(uint32_t nodeId)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end() || it->second.frame == nullptr) {
+        return;
+    }
+
+    Amethyst::Color3 color = COL_PIN_BORDER;
+    if (nodeId == m_primaryNodeId) {
+        color = COL_NODE_SELECTED_PRIMARY;
+    } else if (m_selectedNodes.count(nodeId) > 0) {
+        color = COL_NODE_SELECTED;
+    }
+    it->second.frame->setBaseStyleProperties({.borderColor = color});
+}
+
+void NodeEditorPanel::showNodeMenu(uint32_t nodeId, Amethyst::vec2 screenPos)
+{
+    if (m_contextMenu == nullptr) {
+        return;
+    }
+
+    // Right clicking a node outside the selection makes it the target so Delete acts on it.
+    if (m_selectedNodes.count(nodeId) == 0) {
+        selectNode(nodeId, false);
+    }
+
+    std::vector<Amethyst::ContextMenuItem> items;
+    items.push_back(Amethyst::ContextMenuItem::action("Delete", [this]() { deleteSelection(); }));
+    m_contextMenu->setItems(std::move(items));
+    m_contextMenu->showAt(screenPos);
+}
+
+void NodeEditorPanel::deleteNode(uint32_t nodeId)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end()) {
+        return;
+    }
+
+    // Drop every wire touching this node before its pins are freed. A wire whose far end is a
+    // surviving node's input leaves that input unconnected, so its inline editor reappears.
+    for (auto wireIt = m_connections.begin(); wireIt != m_connections.end();) {
+        bool srcTouches = m_pins.isLive(wireIt->srcPinId) && m_pins[wireIt->srcPinId].nodeId == nodeId;
+        bool dstTouches = m_pins.isLive(wireIt->dstPinId) && m_pins[wireIt->dstPinId].nodeId == nodeId;
+        if (!srcTouches && !dstTouches) {
+            ++wireIt;
+            continue;
+        }
+
+        uint32_t dstPin = wireIt->dstPinId;
+        if (!dstTouches && m_pins.isLive(dstPin) && m_pins[dstPin].editor != nullptr) {
+            m_pins[dstPin].editor->setBaseProperties({.visible = true});
+        }
+        if (wireIt->spline != nullptr && m_wireLayer != nullptr) {
+            m_wireLayer->removeChild(wireIt->spline);
+        }
+        wireIt = m_connections.erase(wireIt);
+    }
+
+    clearNodePins(nodeId);
+
+    if (it->second.frame != nullptr && m_content != nullptr) {
+        m_content->removeChild(it->second.frame);
+    }
+
+    m_nodes.erase(it);
+    m_selectedNodes.erase(nodeId);
+    if (m_primaryNodeId == nodeId) {
+        m_primaryNodeId = 0;
+    }
+}
+
+void NodeEditorPanel::deleteSelection()
+{
+    std::vector<uint32_t> targets(m_selectedNodes.begin(), m_selectedNodes.end());
+    for (uint32_t nodeId : targets) {
+        deleteNode(nodeId);
+    }
 }
 
 static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,

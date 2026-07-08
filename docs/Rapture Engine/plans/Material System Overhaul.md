@@ -144,6 +144,8 @@ draw → inMaterialIndex → u_materials[idx]  (MaterialData)
 
 Start A, treat hitting 16 as the signal to move to B.
 
+**Update: Option B is now implemented.** The pool is a flat `uint` arena sub-allocated in 32-byte blocks by a `VirtualStorageBuffer` (VMA virtual block), and `MaterialData` stores `graphDataOffset` (a uint base offset). Option A's fixed `vec4[16]/uint[16]` struct is gone. Details in [[Material Graph Compiler]] §0a.
+
 ### 6.3 Graph compiler
 **Full design: [[Material Graph Compiler]].** `Engine/src/materials/graph/` (new, snake_case folder):
 - `MaterialGraph` — typed nodes + connections + exposed params (the `PROCEDURAL_MATERIALS_DESIGN.md` data structures are a fine starting point; drop everything bytecode-related).

@@ -27,8 +27,11 @@ MaterialInstance::~MaterialInstance()
     }
 }
 
-void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data)
+void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data, std::vector<AssetPtr<Texture>> textures)
 {
+    // Retain the textures the slice indexes so they outlive eviction while this instance uses them
+    m_graphTextureRefs = std::move(textures);
+
     // The slice size is graph specific, so a structural change reallocates from scratch
     if (m_graphDataOffset != UINT32_MAX) {
         MaterialManager::freeGraphData(m_graphDataOffset);

@@ -7,7 +7,9 @@
 #include <unordered_set>
 
 #include "NodeRegistry.h"
+#include "logging/Log.h"
 #include "textures/Texture.h"
+#include "utils/rp_assert.h"
 
 namespace Rapture {
 
@@ -64,6 +66,9 @@ static std::string s_literal(const PinValue &value, PinType type)
     case PinType::VEC4:
         return "vec4(" + s_formatFloat(value.v4.x) + ", " + s_formatFloat(value.v4.y) + ", " + s_formatFloat(value.v4.z) + ", " +
                s_formatFloat(value.v4.w) + ")";
+    case PinType::TEXTURE:
+        RP_CORE_ERROR("Graph compiler asked for a numeric literal of a texture pin, textures carry no literal");
+        break;
     }
     return "vec4(0.0)";
 }
@@ -128,6 +133,8 @@ static std::string s_poolRead(GraphBufferOffset offset, PinType type)
     case PinType::VEC4:
         return "vec4(uintBitsToFloat(" + s_poolElem(offset) + "), uintBitsToFloat(" + s_poolElem(offset + 1) +
                "), uintBitsToFloat(" + s_poolElem(offset + 2) + "), uintBitsToFloat(" + s_poolElem(offset + 3) + "))";
+    case PinType::TEXTURE:
+        return s_poolElem(offset);
     }
     return "0.0";
 }
@@ -287,52 +294,109 @@ static void s_validateGraph(const MaterialGraph &graph, const GraphNode *outputN
                             connection.dstNode);
         }
     }
+
+    // A texture pin has no literal fallback, so a required one must be wired or authored
+    for (const auto &node : graph.nodes) {
+        const NodeDefinition *def = NodeRegistry::get(node.type);
+        if (def == nullptr) {
+            continue;
+        }
+        for (uint32_t i = 0; i < def->inputs.size(); ++i) {
+            if (def->inputs[i].type != PinType::TEXTURE) {
+                continue;
+            }
+            bool wired = wiredInputs.count(s_emitKey(node.id, i)) != 0;
+            bool authored = i < node.inputTextures.size() && static_cast<bool>(node.inputTextures[i]);
+            if (!wired && !authored) {
+                s_addDiagnostic(diagnostics, Level::ERROR,
+                                "input pin '" + def->inputs[i].name + "' requires a texture but none is connected or set",
+                                node.id);
+            }
+        }
+    }
 }
 
 /**
- * @brief Pack each resource node's value into the instance slice and record where it landed
+ * @brief Pack each node's authored, unwired input pin values into the instance slice
  * @param graph The graph being compiled
  * @param order The topologically sorted node ids
- * @param defaults The slice, grown and pre-filled with each resource node's default value
- * @param mapping Node id to its slice offset, for later editor writes
+ * @param defaults The slice, grown and pre-filled with each authored pin value
+ * @param mapping Records where each authored pin landed, for later editor writes
+ * @param textureRefs Collects every texture the slice indexes so it stays resident
+ *
+ * A wired pin draws its value from upstream and an unauthored pin bakes its literal default, so
+ * only an unwired pin carrying an authored value reserves a slot.
  */
 static void s_assignResources(const MaterialGraph &graph, const std::vector<uint32_t> &order, GraphInstanceData &defaults,
-                              GraphSlotMapping &mapping)
+                              GraphSlotMapping &mapping, std::vector<AssetPtr<Texture>> &textureRefs)
 {
     GraphBufferOffset next = 0;
     for (uint32_t nodeId : order) {
-        if (nodeId == graph.outputNodeId) continue;
         const GraphNode *node = graph.findNode(nodeId);
         const NodeDefinition *def = NodeRegistry::get(node->type);
+        if (def == nullptr) {
+            continue;
+        }
 
-        if (def->resourceKind == ResourceKind::CONSTANT) {
-            PinType type = def->outputs.empty() ? PinType::VEC4 : def->outputs[0].type;
-            GraphBufferOffset offset = next;
-            next += graph_pinTypeComponents(type);
-            s_packValue(defaults, offset, node->constantValue, type);
-            mapping.constantSlots[nodeId] = {offset, type};
-        } else if (def->resourceKind == ResourceKind::TEXTURE) {
-            GraphBufferOffset offset = next++;
-            uint32_t textureIndex = node->texture ? node->texture->getBindlessIndex() : 0u;
-            if (defaults.size() <= offset) defaults.resize(offset + 1, 0u);
-            defaults[offset] = textureIndex;
-            mapping.textureSlots[nodeId] = offset;
+        for (uint32_t i = 0; i < def->inputs.size(); ++i) {
+            if (s_findInputConnection(graph, nodeId, i) != nullptr) {
+                continue;
+            }
+
+            const PinDef &pin = def->inputs[i];
+            if (pin.type == PinType::TEXTURE) {
+                AssetPtr<Texture> texture = i < node->inputTextures.size() ? node->inputTextures[i] : AssetPtr<Texture>{};
+                if (!texture) {
+                    continue;
+                }
+
+                GraphBufferOffset offset = next++;
+                if (defaults.size() <= offset) {
+                    defaults.resize(offset + 1, 0u);
+                }
+                defaults[offset] = texture->getBindlessIndex();
+                mapping.slots[Graph_pinKey(nodeId, i)] = {offset, PinType::TEXTURE};
+                textureRefs.push_back(std::move(texture));
+            } else {
+                if (i >= node->inputValues.size() || !node->inputValues[i].has_value()) {
+                    continue;
+                }
+
+                GraphBufferOffset offset = next;
+                next += graph_pinTypeComponents(pin.type);
+                s_packValue(defaults, offset, *node->inputValues[i], pin.type);
+                mapping.slots[Graph_pinKey(nodeId, i)] = {offset, pin.type};
+            }
         }
     }
 }
 
 /**
  * @brief Resolve the expression feeding one input pin, coerced to the pin type
+ *
+ * A wired pin uses its upstream local; an unwired pin reads its authored slot from the instance
+ * slice, or bakes its literal default when nothing was authored.
  */
-static std::string s_resolveInput(const MaterialGraph &graph, const EmittedMap &emitted, uint32_t nodeId, const PinDef &pin,
-                                  uint32_t pinIndex)
+static std::string s_resolveInput(const MaterialGraph &graph, const GraphSlotMapping &mapping, const EmittedMap &emitted,
+                                  uint32_t nodeId, const PinDef &pin, uint32_t pinIndex)
 {
     const GraphConnection *connection = s_findInputConnection(graph, nodeId, pinIndex);
-    if (connection == nullptr) return s_literal(pin.defaultValue, pin.type);
+    if (connection != nullptr) {
+        auto it = emitted.find(s_emitKey(connection->srcNode, connection->srcPin));
+        if (it != emitted.end()) {
+            return s_coerce(it->second.var, it->second.type, pin.type);
+        }
+    }
 
-    auto it = emitted.find(s_emitKey(connection->srcNode, connection->srcPin));
-    if (it == emitted.end()) return s_literal(pin.defaultValue, pin.type);
-    return s_coerce(it->second.var, it->second.type, pin.type);
+    auto slot = mapping.slots.find(Graph_pinKey(nodeId, pinIndex));
+    if (pin.type == PinType::TEXTURE) {
+        RP_ASSERT(slot != mapping.slots.end(), "texture pin reached codegen without a slot, validation should have rejected it");
+        return s_poolElem(slot->second.offset);
+    }
+    if (slot != mapping.slots.end()) {
+        return s_poolRead(slot->second.offset, slot->second.type);
+    }
+    return s_literal(pin.defaultValue, pin.type);
 }
 
 /**
@@ -342,16 +406,8 @@ static std::string s_emitNodeExpr(const MaterialGraph &graph, const NodeDefiniti
                                   const GraphSlotMapping &mapping, const EmittedMap &emitted, std::string_view templateStr)
 {
     std::string expr(templateStr);
-    if (expr.empty() && def.resourceKind == ResourceKind::CONSTANT) expr = "{const}";
-
     for (uint32_t i = 0; i < def.inputs.size(); ++i) {
-        s_replaceAll(expr, "{" + def.inputs[i].name + "}", s_resolveInput(graph, emitted, node.id, def.inputs[i], i));
-    }
-    if (auto it = mapping.textureSlots.find(node.id); it != mapping.textureSlots.end()) {
-        s_replaceAll(expr, "{tex}", s_poolElem(it->second));
-    }
-    if (auto it = mapping.constantSlots.find(node.id); it != mapping.constantSlots.end()) {
-        s_replaceAll(expr, "{const}", s_poolRead(it->second.offset, it->second.type));
+        s_replaceAll(expr, "{" + def.inputs[i].name + "}", s_resolveInput(graph, mapping, emitted, node.id, def.inputs[i], i));
     }
     return expr;
 }
@@ -393,11 +449,17 @@ static std::string s_emitSurfaceBody(const MaterialGraph &graph, const std::vect
     auto sink = [&](std::string_view pinName, PinType type, std::string_view fallback) -> std::string {
         for (uint32_t i = 0; i < outputDef.inputs.size(); ++i) {
             if (outputDef.inputs[i].name != pinName) continue;
+
             const GraphConnection *connection = s_findInputConnection(graph, outputNode.id, i);
-            if (connection == nullptr) break;
-            auto it = emitted.find(s_emitKey(connection->srcNode, connection->srcPin));
-            if (it == emitted.end()) break;
-            return s_coerce(it->second.var, it->second.type, type);
+            if (connection != nullptr) {
+                auto it = emitted.find(s_emitKey(connection->srcNode, connection->srcPin));
+                if (it != emitted.end()) return s_coerce(it->second.var, it->second.type, type);
+            }
+            auto slot = mapping.slots.find(Graph_pinKey(outputNode.id, i));
+            if (slot != mapping.slots.end()) {
+                return s_coerce(s_poolRead(slot->second.offset, slot->second.type), slot->second.type, type);
+            }
+            break;
         }
         return std::string(fallback);
     };
@@ -427,7 +489,7 @@ CompileResult MaterialGraphCompiler::compile(const MaterialGraph &graph, uint32_
     }
     s_reportDeadNodes(graph, order, result.diagnostics);
 
-    s_assignResources(graph, order, result.defaults, result.mapping);
+    s_assignResources(graph, order, result.defaults, result.mapping, result.textureRefs);
 
     const NodeDefinition *outputDef = NodeRegistry::get(outputNode->type);
     std::string body = s_emitSurfaceBody(graph, order, result.mapping, *outputNode, *outputDef);

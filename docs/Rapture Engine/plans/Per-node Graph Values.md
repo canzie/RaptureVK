@@ -6,6 +6,15 @@ The design to make an authored value on *any* pin — not just a `CONSTANT` node
 
 ---
 
+## Note: representation substrate changed since this was written
+
+This design predates the pool rework. The graph pool is no longer a fixed `vec4 constants[16]` / `uint textures[16]` struct — it is a flat `uint` arena (`u_graphPool.data[]`) sub-allocated in 32-byte blocks by a `VirtualStorageBuffer`, with each value tightly packed and typed. See [[Material Graph Compiler]] §0a. The impact on this plan:
+
+- **The core idea holds unchanged**: sparse `inputValues` + dense `controlValues` on `GraphNode`, slot-aware `s_resolveInput`, "authored value is a pool constant, editable with no recompile."
+- **The 16-slot budget (§4) is mostly moot.** Values compete for arena *bytes*, not 16 fixed slots; overflow is Option B, which is already done. Scalar packing is automatic (a `FLOAT` is one uint, not a wasted `vec4`).
+- **Mapping shape is already the general form.** `GraphSlotMapping.constantSlots` now maps node id → `GraphPoolConstant{ offset, type }`; extend it to key by `(nodeId, index)` for per-input/per-control values as §3.3 describes.
+- **`s_poolSwizzle` already exists as `s_poolRead(offset, type)`** — it emits the full typed read from packed uints. The runtime write path is `MaterialManager::writeGraphData` (bytes), not the old 320 B `writeGraphSlot`.
+
 ## 0. The limitation, verified against source
 
 The §10 write-up is accurate. Confirmed against the current tree:

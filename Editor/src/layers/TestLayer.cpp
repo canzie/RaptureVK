@@ -36,10 +36,10 @@ static Rapture::MaterialGraph s_buildFractTintGraph()
     Rapture::MaterialGraph graph;
     graph.name = "Graph0";
     graph.nodes.push_back({.id = 1, .type = GN::POSITION});
-    graph.nodes.push_back({.id = 2, .type = GN::CONSTANT_VEC3, .constantValue = glm::vec4(0.5f, 0.5f, 0.5f, 0.0f)});
+    graph.nodes.push_back({.id = 2, .type = GN::CONSTANT_VEC3, .inputValues = {Rapture::PinValue(glm::vec3(0.5f))}});
     graph.nodes.push_back({.id = 3, .type = GN::MULTIPLY_VEC3});
     graph.nodes.push_back({.id = 4, .type = GN::FRACT_VEC3});
-    graph.nodes.push_back({.id = 5, .type = GN::CONSTANT_VEC3, .constantValue = glm::vec4(1.0f, 0.4f, 0.2f, 1.0f)});
+    graph.nodes.push_back({.id = 5, .type = GN::CONSTANT_VEC3, .inputValues = {Rapture::PinValue(glm::vec3(1.0f, 0.4f, 0.2f))}});
     graph.nodes.push_back({.id = 6, .type = GN::MULTIPLY_VEC3});
     graph.nodes.push_back({.id = 7, .type = GN::SURFACE_OUTPUT});
     graph.connections.push_back({.srcNode = 1, .dstNode = 3, .dstPin = 0});
@@ -66,15 +66,15 @@ static Rapture::MaterialGraph s_buildSineBandGraph()
     graph.name = "Graph1";
     graph.nodes.push_back({.id = 1, .type = GN::TEXCOORD});
     graph.nodes.push_back({.id = 2, .type = GN::SPLIT_VEC2});
-    graph.nodes.push_back({.id = 3, .type = GN::CONSTANT_FLOAT, .constantValue = glm::vec4(20.0f, 0.0f, 0.0f, 0.0f)});
+    graph.nodes.push_back({.id = 3, .type = GN::CONSTANT_FLOAT, .inputValues = {Rapture::PinValue(20.0f)}});
     graph.nodes.push_back({.id = 4, .type = GN::MULTIPLY_FLOAT});
     graph.nodes.push_back({.id = 5, .type = GN::MULTIPLY_FLOAT});
     graph.nodes.push_back({.id = 6, .type = GN::ADD_FLOAT});
     graph.nodes.push_back({.id = 7, .type = GN::SIN_FLOAT});
-    graph.nodes.push_back({.id = 8, .type = GN::CONSTANT_FLOAT, .constantValue = glm::vec4(-1.0f, 0.0f, 0.0f, 0.0f)});
+    graph.nodes.push_back({.id = 8, .type = GN::CONSTANT_FLOAT, .inputValues = {Rapture::PinValue(-1.0f)}});
     graph.nodes.push_back({.id = 9, .type = GN::REMAP_FLOAT});
-    graph.nodes.push_back({.id = 10, .type = GN::CONSTANT_VEC3, .constantValue = glm::vec4(0.9f, 0.1f, 0.1f, 1.0f)});
-    graph.nodes.push_back({.id = 11, .type = GN::CONSTANT_VEC3, .constantValue = glm::vec4(0.1f, 0.3f, 0.9f, 1.0f)});
+    graph.nodes.push_back({.id = 10, .type = GN::CONSTANT_VEC3, .inputValues = {Rapture::PinValue(glm::vec3(0.9f, 0.1f, 0.1f))}});
+    graph.nodes.push_back({.id = 11, .type = GN::CONSTANT_VEC3, .inputValues = {Rapture::PinValue(glm::vec3(0.1f, 0.3f, 0.9f))}});
     graph.nodes.push_back({.id = 12, .type = GN::MIX_VEC3});
     graph.nodes.push_back({.id = 13, .type = GN::LUMINANCE});
     graph.nodes.push_back({.id = 14, .type = GN::SURFACE_OUTPUT});
@@ -180,7 +180,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
             auto baseMaterial = Rapture::MaterialManager::getMaterial("PBR");
             auto mat = std::make_unique<Rapture::MaterialInstance>(baseMaterial, name);
-            mat->setGraph(graphId, graphManager.getDefaults(graphId));
+            mat->setGraph(graphId, graphManager.getDefaults(graphId), graphManager.getTextureRefs(graphId));
 
             auto matRef = Rapture::AssetManager::registerVirtualAsset(std::move(mat), name, Rapture::AssetType::MATERIAL);
             sphere.setComponent<Rapture::MaterialComponent>(matRef);

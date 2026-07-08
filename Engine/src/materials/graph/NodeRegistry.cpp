@@ -12,23 +12,15 @@ static std::unordered_map<GraphNodeType, NodeDefinition> s_definitions;
 static bool s_builtinsRegistered = false;
 
 /**
- * @brief Assert a node definition uses no reserved or duplicate pin names
+ * @brief Assert a node definition uses no duplicate pin names
  *
- * Pin names become {name} template placeholders, so they must be unique within a direction and
- * must not collide with the built in {tex} / {const} placeholders.
+ * Pin names become {name} template placeholders, so they must be unique within a direction.
  */
 static void s_validateDefinition(const NodeDefinition &def)
 {
     auto checkPins = [&](const std::vector<PinDef> &pins, const char *direction) {
         std::unordered_set<std::string> names;
         for (const auto &pin : pins) {
-            bool reserved = pin.name == "tex" || pin.name == "const";
-            if (reserved) {
-                RP_CORE_ERROR("Node type {} has a pin using the reserved template name '{}'",
-                              static_cast<int>(def.type), pin.name);
-            }
-            RP_ASSERT(!reserved, "node pin uses a reserved template name (tex or const)");
-
             bool unique = names.insert(pin.name).second;
             if (!unique) {
                 RP_CORE_ERROR("Node type {} has a duplicate {} pin name '{}'", static_cast<int>(def.type), direction,
@@ -54,6 +46,8 @@ const char *graph_pinTypeGlsl(PinType type)
         return "vec3";
     case PinType::VEC4:
         return "vec4";
+    case PinType::TEXTURE:
+        return "uint";
     }
     return "vec4";
 }
@@ -63,6 +57,7 @@ uint32_t graph_pinTypeComponents(PinType type)
     switch (type) {
     case PinType::FLOAT:
     case PinType::INT:
+    case PinType::TEXTURE:
         return 1;
     case PinType::VEC2:
         return 2;
@@ -102,32 +97,31 @@ void NodeRegistry::registerBuiltins()
 
     // Slot-backed values, {const} expands to the packed slice value read at the node's type
     registerNode({.type = GraphNodeType::CONSTANT_FLOAT,
+                  .inputs = {{"value", PinType::FLOAT}},
                   .outputs = {{"out", PinType::FLOAT}},
-                  .glslTemplate = "{const}",
-                  .resourceKind = ResourceKind::CONSTANT});
+                  .glslTemplate = "{value}"});
     registerNode({.type = GraphNodeType::CONSTANT_INT,
+                  .inputs = {{"value", PinType::INT}},
                   .outputs = {{"out", PinType::INT}},
-                  .glslTemplate = "{const}",
-                  .resourceKind = ResourceKind::CONSTANT});
+                  .glslTemplate = "{value}"});
     registerNode({.type = GraphNodeType::CONSTANT_VEC2,
+                  .inputs = {{"value", PinType::VEC2}},
                   .outputs = {{"out", PinType::VEC2}},
-                  .glslTemplate = "{const}",
-                  .resourceKind = ResourceKind::CONSTANT});
+                  .glslTemplate = "{value}"});
     registerNode({.type = GraphNodeType::CONSTANT_VEC3,
+                  .inputs = {{"value", PinType::VEC3}},
                   .outputs = {{"out", PinType::VEC3}},
-                  .glslTemplate = "{const}",
-                  .resourceKind = ResourceKind::CONSTANT});
+                  .glslTemplate = "{value}"});
     registerNode({.type = GraphNodeType::CONSTANT_VEC4,
+                  .inputs = {{"value", PinType::VEC4}},
                   .outputs = {{"out", PinType::VEC4}},
-                  .glslTemplate = "{const}",
-                  .resourceKind = ResourceKind::CONSTANT});
+                  .glslTemplate = "{value}"});
 
     // Texture sample
     registerNode({.type = GraphNodeType::TEXTURE_SAMPLE,
-                  .inputs = {{"uv", PinType::VEC2}},
+                  .inputs = {{"tex", PinType::TEXTURE}, {"uv", PinType::VEC2}},
                   .outputs = {{"out", PinType::VEC4}},
-                  .glslTemplate = "texture(u_textures[nonuniformEXT({tex})], {uv})",
-                  .resourceKind = ResourceKind::TEXTURE});
+                  .glslTemplate = "texture(u_textures[nonuniformEXT({tex})], {uv})"});
 
     // Add
     registerNode({.type = GraphNodeType::ADD_FLOAT,

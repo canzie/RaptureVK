@@ -6,6 +6,27 @@ The design for Phase 2b: the `MaterialGraph` IR and the **data-driven** GLSL com
 
 ---
 
+## 0a. As-built status (read first — supersedes the pool/representation details below)
+
+The compiler shipped, then got a hardening pass. Several concrete details below (the fixed `vec4[16]/uint[16]` pool, the `CompileResult.error` string, `u_graphData.instances[gii]`, the worked-example GLSL) describe the *original* cut and are now superseded. Current reality:
+
+- **Pool representation — flat `uint` arena, not fixed vec4/uint arrays.** `MaterialCommon.glsl:77` is now `layout(std430, set=1, binding=1) readonly buffer GraphPoolBuffer { uint data[]; } u_graphPool;`. The C++ mirror `GraphInstanceData.h` is now `using GraphInstanceData = std::vector<uint32_t>` — one graph instance's values, tightly packed as uints. No 320 B struct, no `GRAPH_MAX_TEXTURES/CONSTANTS` cap. This is [[Material System Overhaul]] §6.2 Option B, landed.
+- **Typed tight packing.** The compiler packs each value by type (`s_packValue`, `MaterialGraphCompiler.cpp`): a texture index is one raw uint, a `FLOAT`/`INT` one uint (float via `floatBitsToUint` on write / `uintBitsToFloat` on read, `int` stored/read raw), a `vec3` three consecutive uints — no std430 padding. This fixed the old `INT`-through-`vec4` punning bug. Reads are emitted by `s_poolRead(offset, type)`; a texture read is `s_poolElem(offset)` wrapped in `nonuniformEXT`.
+- **Addressing.** `MaterialData.graphInstanceIndex` was renamed `graphDataOffset` (C++ `MaterialData.h`, GLSL `MaterialCommon.glsl:54`) — a **uint offset** into `u_graphPool.data[]`, not an element index. The dispatch seam passes it as `base`: `evalSurfaceGraph(mat.graphId, si, mat.graphDataOffset)` (`GBuffer.fs.glsl:81`), and every generated function is `evalSurface_<name>_<graphId>(SurfaceInputs si, uint base)` reading `u_graphPool.data[base + K]`.
+- **Allocation — `VirtualStorageBuffer`.** The graph arena is a `VirtualStorageBuffer` (`Engine/src/buffers/VirtualStorageBuffer.h`): one host-visible SSBO sub-allocated by a VMA virtual block in fixed **32-byte blocks**, 512 blocks (`Material.cpp:15`). `MaterialManager` exposes `allocateGraphData(sizeBytes) → uint offset`, `writeGraphData`, `freeGraphData`; `MaterialInstance` holds the raw `graphDataOffset` (flagged fragile, to become an opaque slot later). A structural graph change reallocates the slice; value-only edits will write in place (see [[Per-node Graph Values]] §5).
+- **`CompileResult` shape.** No `error` string and no `dispatcherCase`. Instead: `std::vector<MaterialCompilerDiagnostic> diagnostics` with `MaterialCompilerDiagnosticLevel { NONE, INFO, WARNING, ERROR }` and `hasErrors()`; a `graphId` baked into the function name; `defaults` is the packed `std::vector<uint32_t>` slice; `GraphSlotMapping.constantSlots` maps node id → `GraphPoolConstant{ offset, type }`, `textureSlots` → uint offset. `compile()` takes `(const MaterialGraph&, uint32_t graphId)`.
+- **Validation, as a real compiler.** `compile` gathers *all* problems as diagnostics before bailing: output node missing / not a `SURFACE_OUTPUT`, unregistered node types, connections to missing nodes, out-of-range pins, and **more than one wire into one input**. Cycle detection is an iterative gray/black topo sort. `registerNode` asserts pins use no reserved (`tex`/`const`) or duplicate names. Unconnected inputs are still fine (they fall to defaults).
+
+## 0b. Registry lifecycle (planned, not yet built)
+
+`SurfaceGraphManager::registerGraph` (`SurfaceGraphManager.cpp`) is append-only today: it assigns `graphId = m_graphs.size()`, compiles, logs diagnostics, stores the `CompileResult`. An editor that re-compiles on every edit would leak a new function per edit and grow the file/dispatcher unbounded. Add:
+
+- **`updateGraph(uint32_t graphId, const MaterialGraph&)`** — recompile in place, keeping the id (and thus the dispatcher case + every material's stored `graphId`) stable. Overwrites the stored `CompileResult`; the `evalSurface_<name>_<graphId>` name stays put because it is id-suffixed. Only structural edits call this; value drags take the cheap `writeGraphData` path with no recompile.
+- **`removeGraph(uint32_t graphId)`** — drop a graph. Because ids double as dispatcher cases and are stored in `MaterialData.graphId`, ids must stay stable, so removal leaves a hole rather than renumbering: switch `m_graphs` from a bare vector to a slotted store (free-list of ids, or `unordered_map<uint32_t, CompileResult>`), and `writeGeneratedFile` emits only live graphs. A removed id falls through the dispatcher to the magenta error default.
+- **Regeneration + rebuild.** `updateGraph`/`removeGraph` mark the generated file dirty; `writeGeneratedFile` re-emits every live graph and its dispatcher. Triggering the actual shader rebuild + pipeline swap is still Phase 2c and out of scope here.
+
+---
+
 ## 0. What already exists (verified, do not rebuild)
 
 The 2a plumbing this compiler feeds into is live and proven on a lit sphere:

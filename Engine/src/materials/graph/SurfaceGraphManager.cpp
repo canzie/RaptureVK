@@ -100,4 +100,12 @@ GraphSlotMapping SurfaceGraphManager::getMapping(uint32_t graphId) const
     return m_graphs[graphId].mapping;
 }
 
+std::vector<AssetPtr<Texture>> SurfaceGraphManager::getTextureRefs(uint32_t graphId) const
+{
+    if (graphId >= m_graphs.size()) {
+        return {};
+    }
+    return m_graphs[graphId].textureRefs;
+}
+
 } // namespace Rapture

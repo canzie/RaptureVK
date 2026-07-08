@@ -47,6 +47,13 @@ class SurfaceGraphManager {
      */
     GraphSlotMapping getMapping(uint32_t graphId) const;
 
+    /**
+     * @brief The textures a graph references, to retain alongside a seeded instance
+     * @param graphId The graph to query
+     * @return The texture references, or empty if the id is unknown
+     */
+    std::vector<AssetPtr<Texture>> getTextureRefs(uint32_t graphId) const;
+
   private:
     std::vector<CompileResult> m_graphs;
     MaterialGraphCompiler m_compiler;

@@ -2,7 +2,7 @@
  * @file SurfaceGraphs.glsl
  * @brief Generated surface graph functions and their dispatcher
  * @author Rapture Material Graph Compiler
- * @version 1
+ * @version 2
  * @note DO NOT EDIT, this file is regenerated from material graphs
  */
 

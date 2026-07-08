@@ -2,6 +2,7 @@
 #define RAPTURE__MATERIAL_GRAPH_H
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,8 +19,8 @@ class Texture;
 struct GraphNode {
     uint32_t id = 0;
     GraphNodeType type = GraphNodeType::NONE;
-    PinValue constantValue{};       // CONSTANT nodes: the slot value
-    AssetPtr<Texture> texture = {}; // TEXTURE nodes: bound texture, bindless index read at compile
+    std::vector<std::optional<PinValue>> inputValues; // authored numeric value per input pin, nullopt when unset
+    std::vector<AssetPtr<Texture>> inputTextures;     // authored texture per texture input pin, null when unset
 };
 
 /**

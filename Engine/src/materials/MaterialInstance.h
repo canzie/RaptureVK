@@ -63,9 +63,10 @@ class MaterialInstance {
     /**
      * @brief Turn this instance into a graph material backed by a generated surface function
      * @param graphId Which generated evalSurface_* to dispatch to
-     * @param data Graph instance pool (compiler-assigned textures/constants)
+     * @param data Graph instance pool (compiler-assigned textures and values)
+     * @param textures Textures the pool indexes, retained so they are not evicted while in use
      */
-    void setGraph(uint32_t graphId, const GraphInstanceData &data);
+    void setGraph(uint32_t graphId, const GraphInstanceData &data, std::vector<AssetPtr<Texture>> textures);
 
   private:
     void syncToGPU();
@@ -82,6 +83,7 @@ class MaterialInstance {
     std::mutex m_pendingTexturesMutex;
 
     std::vector<std::pair<ParameterID, AssetPtr<Texture>>> m_textureRefs;
+    std::vector<AssetPtr<Texture>> m_graphTextureRefs;
 };
 
 } // namespace Rapture

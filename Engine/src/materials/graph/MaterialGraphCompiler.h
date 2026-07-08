@@ -16,7 +16,7 @@ namespace Rapture {
  *
  * Stamped into the generated file so stale or incompatible output can be detected.
  */
-constexpr uint32_t MATERIAL_GRAPH_COMPILER_VERSION = 1;
+constexpr uint32_t MATERIAL_GRAPH_COMPILER_VERSION = 2;
 
 /**
  * @brief Severity of a compile diagnostic, ordered least to most severe
@@ -39,21 +39,32 @@ struct MaterialCompilerDiagnostic {
 
 using GraphNodeId = uint32_t;
 using GraphBufferOffset = uint32_t;
+using GraphPinKey = uint64_t;
 
 /**
- * @brief A constant value packed into the instance slice: where it sits and how to read it back
+ * @brief Pack a node id and its input pin index into a single slot mapping key
+ * @param nodeId The owning node
+ * @param pinIndex The input pin index on that node
+ * @return The combined key
  */
-struct GraphPoolConstant {
+inline GraphPinKey Graph_pinKey(GraphNodeId nodeId, uint32_t pinIndex)
+{
+    return (static_cast<uint64_t>(nodeId) << 32) | pinIndex;
+}
+
+/**
+ * @brief An authored pin value packed into the instance slice: where it sits and its pin type
+ */
+struct GraphPoolSlot {
     GraphBufferOffset offset = 0;
     PinType type = PinType::FLOAT;
 };
 
 /**
- * @brief Where each resource node's value lives in the instance slice, for editor writes
+ * @brief Where each authored input pin's value lives in the instance slice, for editor writes
  */
 struct GraphSlotMapping {
-    std::unordered_map<GraphNodeId, GraphPoolConstant> constantSlots;
-    std::unordered_map<GraphNodeId, GraphBufferOffset> textureSlots;
+    std::unordered_map<GraphPinKey, GraphPoolSlot> slots;
 };
 
 /**
@@ -67,8 +78,9 @@ struct CompileResult {
     std::string glslFunction;
     uint32_t graphId = 0; // global identifier for the graph among all registered graphs
 
-    GraphInstanceData defaults; // packed default slice, one uint per texture index and per constant component
+    GraphInstanceData defaults; // packed default slice, one uint per texture index and per value component
     GraphSlotMapping mapping;
+    std::vector<AssetPtr<Texture>> textureRefs; // holds every texture the slice references so it is not evicted
 
     /**
      * @brief Whether any diagnostic is an error
