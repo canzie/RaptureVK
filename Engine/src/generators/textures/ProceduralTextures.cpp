@@ -58,6 +58,7 @@ void ProceduralTexture::initFromShaderPath(const std::string &shaderPath, bool c
     }
 
     initDescriptorSet();
+    reflectParameters();
     m_isValid = true;
 }
 
@@ -70,6 +71,8 @@ void ProceduralTexture::initFromShaderHandle(const AssetHandle &shaderHandle, bo
         return;
     }
 
+    m_assets.push_back(std::move(asset));
+
     extractExpectedPushConstantSize();
     initPipeline();
     initCommandBuffer();
@@ -79,6 +82,7 @@ void ProceduralTexture::initFromShaderHandle(const AssetHandle &shaderHandle, bo
     }
 
     initDescriptorSet();
+    reflectParameters();
     m_isValid = true;
 }
 
@@ -157,6 +161,127 @@ void ProceduralTexture::extractExpectedPushConstantSize()
     for (const auto &layout : pushConstantLayouts) {
         m_expectedPushConstantSize = std::max(m_expectedPushConstantSize, static_cast<size_t>(layout.offset + layout.size));
     }
+}
+
+// Stores a member's annotated default value into the push-constant buffer at its offset
+static void s_writeMemberDefault(std::vector<uint8_t> &buffer, const PushConstantMemberInfo &member)
+{
+    const auto &meta = member.metadata;
+    if (!meta.hasDefault || meta.defaultValue.empty() || member.offset >= buffer.size()) {
+        return;
+    }
+
+    uint8_t *dst = buffer.data() + member.offset;
+    const auto &def = meta.defaultValue;
+    auto get = [&](int i) { return static_cast<size_t>(i) < def.size() ? def[i] : 0.0f; };
+
+    using BaseType = PushConstantMemberInfo::BaseType;
+    switch (member.getBaseType()) {
+    case BaseType::FLOAT: { float v = get(0); std::memcpy(dst, &v, 4); break; }
+    case BaseType::INT: { int32_t v = static_cast<int32_t>(get(0)); std::memcpy(dst, &v, 4); break; }
+    case BaseType::UINT: { uint32_t v = static_cast<uint32_t>(get(0)); std::memcpy(dst, &v, 4); break; }
+    case BaseType::VEC2: { float v[2] = {get(0), get(1)}; std::memcpy(dst, v, 8); break; }
+    case BaseType::VEC3: { float v[3] = {get(0), get(1), get(2)}; std::memcpy(dst, v, 12); break; }
+    case BaseType::VEC4: { float v[4] = {get(0), get(1), get(2), get(3)}; std::memcpy(dst, v, 16); break; }
+    default: break;
+    }
+}
+
+void ProceduralTexture::reflectParameters()
+{
+    m_parameters.clear();
+    if (m_shader == nullptr) {
+        return;
+    }
+
+    const auto &pushConstants = m_shader->getDetailedPushConstants();
+    if (pushConstants.empty()) {
+        return;
+    }
+
+    if (m_expectedPushConstantSize > 0) {
+        m_pushConstantData.assign(m_expectedPushConstantSize, 0);
+    }
+
+    for (const auto &member : pushConstants[0].members) {
+        ProceduralParameter param;
+        param.name = member.name;
+        param.displayName = member.metadata.displayName.empty() ? member.name : member.metadata.displayName;
+        param.type = member.getBaseType();
+        param.offset = member.offset;
+        param.hasRange = member.metadata.hasRange;
+        param.minValue = member.metadata.minValue;
+        param.maxValue = member.metadata.maxValue;
+        param.hidden = member.metadata.hidden;
+        param.isColor = member.metadata.isColor;
+        m_parameters.push_back(std::move(param));
+
+        s_writeMemberDefault(m_pushConstantData, member);
+    }
+}
+
+void ProceduralTexture::setParameterFloat(size_t index, double value)
+{
+    if (index >= m_parameters.size()) {
+        return;
+    }
+    const ProceduralParameter &param = m_parameters[index];
+    if (param.offset + sizeof(float) > m_pushConstantData.size()) {
+        return;
+    }
+    float v = static_cast<float>(value);
+    std::memcpy(m_pushConstantData.data() + param.offset, &v, sizeof(float));
+}
+
+double ProceduralTexture::getParameterFloat(size_t index) const
+{
+    if (index >= m_parameters.size()) {
+        return 0.0;
+    }
+    const ProceduralParameter &param = m_parameters[index];
+    if (param.offset + sizeof(float) > m_pushConstantData.size()) {
+        return 0.0;
+    }
+    float v;
+    std::memcpy(&v, m_pushConstantData.data() + param.offset, sizeof(float));
+    return v;
+}
+
+void ProceduralTexture::setParameterInt(size_t index, int64_t value)
+{
+    if (index >= m_parameters.size()) {
+        return;
+    }
+    const ProceduralParameter &param = m_parameters[index];
+    if (param.offset + sizeof(int32_t) > m_pushConstantData.size()) {
+        return;
+    }
+    if (param.type == PushConstantMemberInfo::BaseType::UINT) {
+        uint32_t v = static_cast<uint32_t>(value);
+        std::memcpy(m_pushConstantData.data() + param.offset, &v, sizeof(uint32_t));
+    } else {
+        int32_t v = static_cast<int32_t>(value);
+        std::memcpy(m_pushConstantData.data() + param.offset, &v, sizeof(int32_t));
+    }
+}
+
+int64_t ProceduralTexture::getParameterInt(size_t index) const
+{
+    if (index >= m_parameters.size()) {
+        return 0;
+    }
+    const ProceduralParameter &param = m_parameters[index];
+    if (param.offset + sizeof(int32_t) > m_pushConstantData.size()) {
+        return 0;
+    }
+    if (param.type == PushConstantMemberInfo::BaseType::UINT) {
+        uint32_t v;
+        std::memcpy(&v, m_pushConstantData.data() + param.offset, sizeof(uint32_t));
+        return static_cast<int64_t>(v);
+    }
+    int32_t v;
+    std::memcpy(&v, m_pushConstantData.data() + param.offset, sizeof(int32_t));
+    return v;
 }
 
 bool ProceduralTexture::verifyPushConstantSize(size_t providedSize)
@@ -250,130 +375,108 @@ void ProceduralTexture::generate()
     queue->waitIdle();
 }
 
-AssetPtr<Texture> ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTextureConfig &config)
+// Lazily imports a generator shader (caching its handle) and builds a ready generator from it
+static std::unique_ptr<ProceduralTexture> s_makeGenerator(const char *shaderRelPath, AssetHandle &cachedHandle,
+                                                          const ProceduralTextureConfig &config, const char *label)
 {
-    // Function-local static for shader handle - AssetManager handles caching
-    static AssetHandle s_shaderHandle = 0;
-
-    if (s_shaderHandle == 0) {
-        auto &app = Application::getInstance();
-        auto &proj = app.getProject();
-        auto shaderDir = proj.getProjectShaderDirectory();
-
-        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/WhiteNoise.cs.glsl");
-        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-        if (!shader) {
-            RP_CORE_ERROR("Failed to load WhiteNoise shader");
-            return AssetRef();
+    if (cachedHandle == 0) {
+        auto shaderDir = Application::getInstance().getProject().getProjectShaderDirectory();
+        auto asset = AssetManager::importAsset(shaderDir / shaderRelPath);
+        auto *shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+        if (shader == nullptr) {
+            RP_CORE_ERROR("Failed to load {} shader", label);
+            return nullptr;
         }
-        s_shaderHandle = asset.get()->getHandle();
+        cachedHandle = asset.get()->getHandle();
     }
 
-    ProceduralTexture generator(s_shaderHandle, config);
-    if (!generator.isValid()) {
-        RP_CORE_ERROR("Failed to create white noise generator");
-        return AssetRef();
+    auto generator = std::make_unique<ProceduralTexture>(cachedHandle, config);
+    if (!generator->isValid()) {
+        RP_CORE_ERROR("Failed to create {} generator", label);
+        return nullptr;
+    }
+    return generator;
+}
+
+std::unique_ptr<ProceduralTexture> ProceduralTexture::createWhiteNoiseGenerator(const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle = 0;
+    return s_makeGenerator("glsl/Generators/WhiteNoise.cs.glsl", s_shaderHandle, config, "WhiteNoise");
+}
+
+std::unique_ptr<ProceduralTexture> ProceduralTexture::createPerlinNoiseGenerator(const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle = 0;
+    return s_makeGenerator("glsl/Generators/PerlinNoise.cs.glsl", s_shaderHandle, config, "PerlinNoise");
+}
+
+std::unique_ptr<ProceduralTexture> ProceduralTexture::createSimplexNoiseGenerator(const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle = 0;
+    return s_makeGenerator("glsl/Generators/SimplexNoise.cs.glsl", s_shaderHandle, config, "SimplexNoise");
+}
+
+std::unique_ptr<ProceduralTexture> ProceduralTexture::createRidgedNoiseGenerator(const ProceduralTextureConfig &config)
+{
+    static AssetHandle s_shaderHandle = 0;
+    return s_makeGenerator("glsl/Generators/RidgedNoise.cs.glsl", s_shaderHandle, config, "RidgedNoise");
+}
+
+AssetPtr<Texture> ProceduralTexture::generateWhiteNoise(uint32_t seed, const ProceduralTextureConfig &config)
+{
+    auto generator = createWhiteNoiseGenerator(config);
+    if (!generator) {
+        return {};
     }
 
     WhiteNoisePushConstants pc{};
     pc.seed = seed;
-    generator.setPushConstants(pc);
-    generator.generate();
+    generator->setPushConstants(pc);
+    generator->generate();
 
-    return generator.getTextureAsset();
+    return generator->getTextureAsset();
 }
 
 AssetPtr<Texture> ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &params,
                                                          const ProceduralTextureConfig &config)
 {
-    static AssetHandle s_shaderHandle;
-
-    if (0 == s_shaderHandle) {
-        auto &app = Application::getInstance();
-        auto &proj = app.getProject();
-        auto shaderDir = proj.getProjectShaderDirectory();
-
-        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/PerlinNoise.cs.glsl");
-        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-        if (!shader) {
-            RP_CORE_ERROR("Failed to load PerlinNoise shader");
-            return AssetPtr<Texture>();
-        }
-        s_shaderHandle = asset.get()->getHandle();
+    auto generator = createPerlinNoiseGenerator(config);
+    if (!generator) {
+        return {};
     }
 
-    ProceduralTexture generator(s_shaderHandle, config);
-    if (!generator.isValid()) {
-        RP_CORE_ERROR("Failed to create Perlin noise generator");
-        return AssetRef();
-    }
+    generator->setPushConstants(params);
+    generator->generate();
 
-    generator.setPushConstants(params);
-    generator.generate();
-
-    return generator.getTextureAsset();
+    return generator->getTextureAsset();
 }
 
 AssetPtr<Texture> ProceduralTexture::generateSimplexNoise(const SimplexNoisePushConstants &params,
                                                           const ProceduralTextureConfig &config)
 {
-    static AssetHandle s_shaderHandle;
-
-    if (s_shaderHandle == 0) {
-        auto &app = Application::getInstance();
-        auto &proj = app.getProject();
-        auto shaderDir = proj.getProjectShaderDirectory();
-
-        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/SimplexNoise.cs.glsl");
-        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-        if (!shader) {
-            RP_CORE_ERROR("Failed to load SimplexNoise shader");
-            return AssetRef();
-        }
-        s_shaderHandle = asset.get()->getHandle();
+    auto generator = createSimplexNoiseGenerator(config);
+    if (!generator) {
+        return {};
     }
 
-    ProceduralTexture generator(s_shaderHandle, config);
-    if (!generator.isValid()) {
-        RP_CORE_ERROR("Failed to create Simplex noise generator");
-        return AssetRef();
-    }
+    generator->setPushConstants(params);
+    generator->generate();
 
-    generator.setPushConstants(params);
-    generator.generate();
-
-    return generator.getTextureAsset();
+    return generator->getTextureAsset();
 }
 
 AssetPtr<Texture> ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &params,
                                                          const ProceduralTextureConfig &config)
 {
-    static AssetHandle s_shaderHandle;
-
-    if (s_shaderHandle == 0) {
-        auto &app = Application::getInstance();
-        auto &proj = app.getProject();
-        auto shaderDir = proj.getProjectShaderDirectory();
-
-        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/RidgedNoise.cs.glsl");
-        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-        if (!shader) {
-            RP_CORE_ERROR("Failed to load RidgedNoise shader");
-            return AssetRef();
-        }
-        s_shaderHandle = asset.get()->getHandle();
+    auto generator = createRidgedNoiseGenerator(config);
+    if (!generator) {
+        return {};
     }
 
-    ProceduralTexture generator(s_shaderHandle, config);
-    if (!generator.isValid()) {
-        RP_CORE_ERROR("Failed to create Ridged noise generator");
-        return AssetRef();
-    }
+    generator->setPushConstants(params);
+    generator->generate();
 
-    generator.setPushConstants(params);
-    generator.generate();
-
-    return generator.getTextureAsset();
+    return generator->getTextureAsset();
 }
 
 static AtmospherePushConstants s_buildAtmospherePushConstants(float timeOfDay, const AtmospherePushConstants *params)

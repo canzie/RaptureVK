@@ -61,6 +61,13 @@ class MaterialInstance {
     void updatePendingTextures();
 
     /**
+     * @brief The texture bound to a texture parameter, for reading a material back into a graph
+     * @param id The texture parameter to look up
+     * @return The bound texture, or null if none is set
+     */
+    AssetPtr<Texture> getTextureRef(ParameterID id) const;
+
+    /**
      * @brief Turn this instance into a graph material backed by a generated surface function
      * @param graphId Which generated evalSurface_* to dispatch to
      * @param data Graph instance pool (compiler-assigned textures and values)

@@ -7,6 +7,7 @@
 #include "buffers/descriptors/DescriptorSet.h"
 #include "pipelines/ComputePipeline.h"
 #include "shaders/Shader.h"
+#include "shaders/ShaderReflections.h"
 #include "textures/Texture.h"
 
 #include <glm/glm.hpp>
@@ -97,6 +98,21 @@ struct AtmospherePushConstants {
 };
 
 static_assert(sizeof(AtmospherePushConstants) == 96, "AtmospherePushConstants size must be 96 bytes");
+
+/**
+ * @brief A reflected, editable push-constant parameter of a generator's shader
+ */
+struct ProceduralParameter {
+    std::string name;
+    std::string displayName;
+    PushConstantMemberInfo::BaseType type = PushConstantMemberInfo::BaseType::UNKNOWN;
+    uint32_t offset = 0;
+    bool hasRange = false;
+    float minValue = 0.0f;
+    float maxValue = 1.0f;
+    bool hidden = false;
+    bool isColor = false;
+};
 
 /**
  * @brief Generates textures using compute shaders.
@@ -240,6 +256,68 @@ class ProceduralTexture {
     size_t getExpectedPushConstantSize() const { return m_expectedPushConstantSize; }
 
     /**
+     * @brief The reflected, editable parameters of this generator's shader
+     * @return The parameter descriptors, in push-constant declaration order
+     */
+    const std::vector<ProceduralParameter> &getParameters() const { return m_parameters; }
+
+    /**
+     * @brief Stores a float parameter's value into the push-constant buffer
+     * @param index The parameter index into getParameters
+     * @param value The value to store
+     */
+    void setParameterFloat(size_t index, double value);
+
+    /**
+     * @brief Reads a float parameter's value from the push-constant buffer
+     * @param index The parameter index into getParameters
+     * @return The stored value, or 0 if the index is out of range
+     */
+    double getParameterFloat(size_t index) const;
+
+    /**
+     * @brief Stores an integer parameter's value into the push-constant buffer
+     * @param index The parameter index into getParameters
+     * @param value The value to store
+     */
+    void setParameterInt(size_t index, int64_t value);
+
+    /**
+     * @brief Reads an integer parameter's value from the push-constant buffer
+     * @param index The parameter index into getParameters
+     * @return The stored value, or 0 if the index is out of range
+     */
+    int64_t getParameterInt(size_t index) const;
+
+    /**
+     * @brief Creates a persistent white noise generator that can be regenerated on demand
+     * @param config Optional texture configuration
+     * @return The generator, or nullptr if the shader or pipeline failed to initialise
+     */
+    static std::unique_ptr<ProceduralTexture> createWhiteNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Creates a persistent Perlin noise generator that can be regenerated on demand
+     * @param config Optional texture configuration
+     * @return The generator, or nullptr if the shader or pipeline failed to initialise
+     */
+    static std::unique_ptr<ProceduralTexture> createPerlinNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Creates a persistent simplex noise generator that can be regenerated on demand
+     * @param config Optional texture configuration
+     * @return The generator, or nullptr if the shader or pipeline failed to initialise
+     */
+    static std::unique_ptr<ProceduralTexture> createSimplexNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Creates a persistent ridged noise generator that can be regenerated on demand
+     * @param config Optional texture configuration
+     * @return The generator, or nullptr if the shader or pipeline failed to initialise
+     */
+    static std::unique_ptr<ProceduralTexture> createRidgedNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
      * @brief Generates a white noise texture.
      *
      * Static helper method that creates a one-shot white noise texture.
@@ -325,6 +403,7 @@ class ProceduralTexture {
     void initCommandBuffer();
     void extractExpectedPushConstantSize();
     bool verifyPushConstantSize(size_t providedSize);
+    void reflectParameters();
 
     Shader *m_shader;
     std::shared_ptr<ComputePipeline> m_pipeline;
@@ -334,6 +413,7 @@ class ProceduralTexture {
     CommandPoolHash m_commandPoolHash = 0;
 
     std::vector<uint8_t> m_pushConstantData;
+    std::vector<ProceduralParameter> m_parameters;
     size_t m_expectedPushConstantSize = 0;
     ProceduralTextureConfig m_config;
     bool m_isValid = false;

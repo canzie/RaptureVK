@@ -1,6 +1,6 @@
 # Material System Overhaul
 
-**Related: [[Material]], [[MaterialData]], [[MaterialInstance]], [[GBufferPass]], [[LightingPass]], [[OpenPBR and Deferred Materials]], [[Procedural Texture and Shader Editor]]**
+**Related: [[Material]], [[MaterialData]], [[MaterialInstance]], [[GBufferPass]], [[LightingPass]], [[OpenPBR and Deferred Materials]], [[Procedural Texture and Shader Editor]], [[Unified Material Graph]]**
 
 The plan for replacing the current static-only material system with a two-path system: an OpenPBR-superset static struct for the common case, and a codegen-based node-graph path for procedural surfaces. Supersedes the interpreter design in `Engine/src/materials/PROCEDURAL_MATERIALS_DESIGN.md` (kept for reference; its interpreter is explicitly rejected below).
 

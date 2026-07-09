@@ -53,6 +53,16 @@ void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data,
     AssetEvents::onMaterialInstanceChanged().publish(this);
 }
 
+AssetPtr<Texture> MaterialInstance::getTextureRef(ParameterID id) const
+{
+    for (const auto &entry : m_textureRefs) {
+        if (entry.first == id) {
+            return entry.second;
+        }
+    }
+    return {};
+}
+
 void MaterialInstance::setParameter(ParameterID id, AssetRef textureAsset)
 {
     const ParamInfo *info = getParamInfo(id);

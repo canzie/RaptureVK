@@ -89,7 +89,7 @@ void NodeRegistry::registerBuiltins()
     s_builtinsRegistered = true;
 
     // Input readers
-    registerNode({.type = GraphNodeType::TEXCOORD, .outputs = {{"out", PinType::VEC2}}, .glslTemplate = "si.uv"});
+    registerNode({.type = GraphNodeType::TEXCOORD, .outputs = {{"UV", PinType::VEC2}}, .glslTemplate = "si.uv"});
     registerNode({.type = GraphNodeType::POSITION, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.worldPos"});
     registerNode({.type = GraphNodeType::NORMAL, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.worldNormal"});
     registerNode({.type = GraphNodeType::TANGENT, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.tangent"});

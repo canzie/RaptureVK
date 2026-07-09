@@ -3,18 +3,32 @@
 #include "Icons.h"
 #include "layers/panels/components/tab_layouts.h"
 
+#include "materials/graph/MaterialGraphCompiler.h"
 #include "materials/graph/NodeRegistry.h"
+
+#include "asset_manager/Asset.h"
+#include "asset_manager/AssetManager.h"
+#include "generators/textures/ProceduralTextures.h"
+#include "logging/Log.h"
+#include "materials/MaterialData.h"
+#include "materials/MaterialInstance.h"
+#include "materials/MaterialParameters.h"
+#include "textures/Texture.h"
 
 #include <components/drag.h>
 #include <components/dropdown.h>
 #include <components/extensions/ui_drag_detector.h>
+#include <components/image_label.h>
 #include <components/shape.h>
+#include <components/text_button.h>
 #include <components/text_label.h>
 
 #include <algorithm>
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #define COL_NODE_BODY  Amethyst::Color3::fromHex(0x303030)
 #define COL_MENU_HOVER Amethyst::Color3::fromHex(0x4772b3)
@@ -25,6 +39,7 @@
 #define COL_CAT_UTILITIES Amethyst::Color3::fromHex(0x555b66)
 #define COL_CAT_GEOMETRY  Amethyst::Color3::fromHex(0xa5613a)
 #define COL_CAT_COLOR     Amethyst::Color3::fromHex(0xa59a3a)
+#define COL_CAT_TEXTURE   Amethyst::Color3::fromHex(0x7a3a6e)
 #define COL_CAT_OUTPUT    Amethyst::Color3::fromHex(0x3a8a4f)
 #define COL_CAT_DEFAULT   Amethyst::Color3::fromHex(0x394150)
 
@@ -69,6 +84,9 @@ static Amethyst::Color3 s_categoryColor(std::string_view category)
     if (category == "Color") {
         return COL_CAT_COLOR;
     }
+    if (category == "Texture") {
+        return COL_CAT_TEXTURE;
+    }
     if (category == "Output") {
         return COL_CAT_OUTPUT;
     }
@@ -105,6 +123,7 @@ static Amethyst::Color3 s_pinColor(Rapture::PinType type)
 struct NodeCatalogEntry {
     const char *label;
     Rapture::GraphNodeType type;
+    NodeEditorPanel::TextureNodeKind textureKind = NodeEditorPanel::TextureNodeKind::NONE;
 };
 
 /**
@@ -211,7 +230,14 @@ static const std::vector<NodeCatalogCategory> &s_nodeCatalog()
           {"Normal Map", GNT::NORMAL_MAP}},
          {}},
         {"Color", {{"Luminance", GNT::LUMINANCE}}, {}},
-        {"Output", {{"Surface Output", GNT::SURFACE_OUTPUT}}, {}},
+        {"Texture",
+         {{"Image", GNT::NONE, NodeEditorPanel::TextureNodeKind::ASSET},
+          {"White Noise", GNT::NONE, NodeEditorPanel::TextureNodeKind::WHITE_NOISE},
+          {"Perlin Noise", GNT::NONE, NodeEditorPanel::TextureNodeKind::PERLIN_NOISE},
+          {"Simplex Noise", GNT::NONE, NodeEditorPanel::TextureNodeKind::SIMPLEX_NOISE},
+          {"Ridged Noise", GNT::NONE, NodeEditorPanel::TextureNodeKind::RIDGED_NOISE}},
+         {}},
+        {"Output", {{"PBR Surface", GNT::SURFACE_OUTPUT}}, {}},
     };
     return catalog;
 }
@@ -309,9 +335,10 @@ static bool s_isConstantType(Rapture::GraphNodeType type)
 }
 
 using SpawnFn = std::function<void(Rapture::GraphNodeType, std::string_view, Amethyst::Color3)>;
+using TexSpawnFn = std::function<void(NodeEditorPanel::TextureNodeKind, std::string_view)>;
 
 static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,
-                                                      Amethyst::Color3 color);
+                                                      const TexSpawnFn &spawnTexture, Amethyst::Color3 color);
 
 NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
 {
@@ -326,6 +353,8 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const PanelServices &
         m_wireLayer = nullptr;
         m_contextMenu = nullptr;
         m_dragWire = nullptr;
+        m_materialBar = nullptr;
+        m_materialDropdown = nullptr;
         m_connecting = false;
         m_selectedNodes.clear();
         m_primaryNodeId = 0;
@@ -334,6 +363,7 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const PanelServices &
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
 
+    setupMaterialBar();
     setupCanvas();
     setupContextMenu();
 
@@ -355,7 +385,8 @@ void NodeEditorPanel::setupCanvas()
     m_canvas->name = "Canvas";
     m_canvas->setBaseProperties({
         .clipsDescendants = true,
-        .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
+        .position = Amethyst::UDim2::fromOffset(0.0f, MATERIAL_BAR_HEIGHT),
+        .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -MATERIAL_BAR_HEIGHT),
     });
     m_canvas->setBaseStyleProperties({.backgroundColor = COL_BG, .backgroundTransparency = 0.0f});
 
@@ -442,15 +473,76 @@ void NodeEditorPanel::setupContextMenu()
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
 }
 
+void NodeEditorPanel::setupMaterialBar()
+{
+    m_materialBar = m_root->add<Amethyst::Frame>();
+    m_materialBar->name = "Material Bar";
+    m_materialBar->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, MATERIAL_BAR_HEIGHT), .zIndex = 1});
+    m_materialBar->addClass("background-tertiary");
+
+    m_materialDropdown = m_materialBar->add<Amethyst::Dropdown>();
+    m_materialDropdown->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(6.0f, 4.0f),
+        .size = Amethyst::UDim2::fromOffset(220.0f, MATERIAL_BAR_HEIGHT - 8.0f),
+    });
+    m_materialDropdown->setText("Select material");
+    rebuildMaterialList();
+
+    auto *refresh = m_materialBar->add<Amethyst::TextButton>();
+    refresh->setText("Refresh");
+    refresh->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(232.0f, 4.0f),
+        .size = Amethyst::UDim2::fromOffset(70.0f, MATERIAL_BAR_HEIGHT - 8.0f),
+    });
+    refresh->onMouseButton1ClickCb = [this]() {
+        rebuildMaterialList();
+        return Amethyst::EventResult::CONSUMED;
+    };
+}
+
+void NodeEditorPanel::rebuildMaterialList()
+{
+    if (m_materialDropdown == nullptr) {
+        return;
+    }
+    std::vector<Amethyst::ContextMenuItem> items;
+    for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::MATERIAL)) {
+        std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
+        items.push_back(Amethyst::ContextMenuItem::action(name, [this, handle]() { selectMaterial(handle); }));
+    }
+    m_materialDropdown->setItems(std::move(items));
+}
+
+void NodeEditorPanel::selectMaterial(Rapture::AssetHandle handle)
+{
+    Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
+    if (!ref) {
+        return;
+    }
+    auto *material = ref.get()->getUnderlyingAsset<Rapture::MaterialInstance>();
+    if (material == nullptr) {
+        return;
+    }
+    m_materialDropdown->setText(Rapture::AssetManager::getAssetMetadata(handle).getName());
+    loadMaterialAsGraph(*material);
+}
+
 std::vector<Amethyst::ContextMenuItem> NodeEditorPanel::buildAddMenu()
 {
     SpawnFn spawn = [this](Rapture::GraphNodeType type, std::string_view label, Amethyst::Color3 color) {
-        spawnNode(type, label, color);
+        if (m_content != nullptr) {
+            spawnNode(type, label, color, m_menuScreenPos - m_content->absolutePosition);
+        }
+    };
+    TexSpawnFn spawnTexture = [this](NodeEditorPanel::TextureNodeKind kind, std::string_view label) {
+        if (m_content != nullptr) {
+            spawnTextureNode(kind, label, m_menuScreenPos - m_content->absolutePosition);
+        }
     };
 
     std::vector<Amethyst::ContextMenuItem> addItems;
     for (const auto &category : s_nodeCatalog()) {
-        addItems.push_back(s_categoryToMenuItem(category, spawn, s_categoryColor(category.label)));
+        addItems.push_back(s_categoryToMenuItem(category, spawn, spawnTexture, s_categoryColor(category.label)));
     }
 
     std::vector<Amethyst::ContextMenuItem> root;
@@ -459,21 +551,12 @@ std::vector<Amethyst::ContextMenuItem> NodeEditorPanel::buildAddMenu()
     return root;
 }
 
-void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view label, Amethyst::Color3 headerColor)
+Amethyst::Frame *NodeEditorPanel::createNodeShell(uint32_t nodeId, Amethyst::vec2 canvasPos, std::string_view headerText,
+                                                  Amethyst::Color3 headerColor)
 {
-    if (m_content == nullptr) {
-        return;
-    }
-
-    // Convert the screen space right click into content (graph) space so the node lands under the
-    // cursor regardless of the current pan.
-    Amethyst::vec2 canvasPos = m_menuScreenPos - m_content->absolutePosition;
-
-    uint32_t nodeId = m_nextNodeId++;
-
     auto *node = m_content->add<Amethyst::Frame>();
     node->name = "Node " + std::to_string(nodeId);
-    // Do not clip: pin sockets straddle the node border. The size is set by layoutPins.
+    // Do not clip: pin sockets straddle the node border. The size is set once the pins are laid out.
     node->setBaseProperties({
         .clipsDescendants = false,
         .position = Amethyst::UDim2::fromOffset(canvasPos.x, canvasPos.y),
@@ -499,10 +582,6 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
         }
     }));
 
-    // A grouped node's header shows the group name; the variant is chosen with the node's dropdown.
-    const NodeVariantGroup *group = s_variantGroupFor(type);
-    std::string headerText = (group != nullptr) ? std::string(group->groupLabel) : std::string(label);
-
     auto *header = node->add<Amethyst::Frame>();
     header->name = "Header";
     // Inset the header by the border so it sits inside the outline, centred on x via the anchor.
@@ -515,7 +594,7 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
     header->propagate(Amethyst::INTERACTION_CATEGORY_ALL);
 
     auto *title = header->add<Amethyst::TextLabel>();
-    title->setText(headerText);
+    title->setText(std::string(headerText));
     title->setBaseProperties({
         .padding = {.left = Amethyst::UDim::fromOffset(NODE_PADDING)},
         .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
@@ -523,6 +602,23 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
     title->setBaseStyleProperties({.backgroundTransparency = 1.0f});
     title->setTextStyleProperties({.fontSize = 14.0f, .textYAlignment = Amethyst::TextYAlignment::CENTER});
     title->propagate(Amethyst::INTERACTION_CATEGORY_ALL);
+
+    return node;
+}
+
+uint32_t NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view label, Amethyst::Color3 headerColor,
+                                   Amethyst::vec2 canvasPos)
+{
+    if (m_content == nullptr) {
+        return 0;
+    }
+
+    uint32_t nodeId = m_nextNodeId++;
+
+    // A grouped node's header shows the group name; the variant is chosen with the node's dropdown.
+    const NodeVariantGroup *group = s_variantGroupFor(type);
+    std::string headerText = (group != nullptr) ? std::string(group->groupLabel) : std::string(label);
+    auto *node = createNodeShell(nodeId, canvasPos, headerText, headerColor);
 
     NodeView view;
     view.frame = node;
@@ -538,6 +634,50 @@ void NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view la
     } else if (s_isConstantType(type)) {
         addConstantEditor(nodeId, node, controlRowY);
     }
+    return nodeId;
+}
+
+// Builds the persistent generator backing a procedural texture node kind
+static std::unique_ptr<Rapture::ProceduralTexture> s_createNoiseGenerator(NodeEditorPanel::TextureNodeKind kind)
+{
+    switch (kind) {
+    case NodeEditorPanel::TextureNodeKind::WHITE_NOISE:
+        return Rapture::ProceduralTexture::createWhiteNoiseGenerator();
+    case NodeEditorPanel::TextureNodeKind::PERLIN_NOISE:
+        return Rapture::ProceduralTexture::createPerlinNoiseGenerator();
+    case NodeEditorPanel::TextureNodeKind::SIMPLEX_NOISE:
+        return Rapture::ProceduralTexture::createSimplexNoiseGenerator();
+    case NodeEditorPanel::TextureNodeKind::RIDGED_NOISE:
+        return Rapture::ProceduralTexture::createRidgedNoiseGenerator();
+    default:
+        return nullptr;
+    }
+}
+
+uint32_t NodeEditorPanel::spawnTextureNode(TextureNodeKind kind, std::string_view label, Amethyst::vec2 canvasPos)
+{
+    if (m_content == nullptr) {
+        return 0;
+    }
+
+    uint32_t nodeId = m_nextNodeId++;
+
+    auto *node = createNodeShell(nodeId, canvasPos, label, COL_CAT_TEXTURE);
+
+    NodeView view;
+    view.frame = node;
+    view.textureData = std::make_unique<TextureNodeData>();
+    view.textureData->kind = kind;
+    if (kind != TextureNodeKind::ASSET) {
+        view.textureData->generator = s_createNoiseGenerator(kind);
+    }
+    m_nodes[nodeId] = std::move(view);
+
+    layoutTexturePins(nodeId);
+    if (kind != TextureNodeKind::ASSET) {
+        regenerateProcedural(nodeId);
+    }
+    return nodeId;
 }
 
 void NodeEditorPanel::layoutPins(uint32_t nodeId)
@@ -716,6 +856,337 @@ Amethyst::UIObject *NodeEditorPanel::addValueDrag(Amethyst::Frame *node, float x
         .zIndex = 2,
     });
     return drag;
+}
+
+void NodeEditorPanel::layoutTexturePins(uint32_t nodeId)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end() || it->second.frame == nullptr || it->second.textureData == nullptr) {
+        return;
+    }
+    NodeView &view = it->second;
+    Amethyst::Frame *node = view.frame;
+
+    float rowY = NODE_HEADER_HEIGHT;
+    view.pinIds.push_back(addPin(nodeId, node, "Color", Rapture::PinType::VEC3, 0, rowY, true));
+    rowY += NODE_ROW_HEIGHT;
+    view.pinIds.push_back(addPin(nodeId, node, "Alpha", Rapture::PinType::FLOAT, 1, rowY, true));
+    rowY += NODE_ROW_HEIGHT;
+
+    auto *preview = node->add<Amethyst::ImageLabel>();
+    preview->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(NODE_PADDING, rowY),
+        .size = Amethyst::UDim2::fromOffset(NODE_WIDTH - 2.0f * NODE_PADDING, TEXTURE_PREVIEW_HEIGHT),
+    });
+    preview->setBaseStyleProperties({.backgroundColor = COL_BG, .cornerRadius = 3.0f});
+    view.textureData->preview = preview;
+    rowY += TEXTURE_PREVIEW_HEIGHT + NODE_PADDING;
+
+    if (view.textureData->kind == TextureNodeKind::ASSET) {
+        auto *picker = node->add<Amethyst::Dropdown>();
+        picker->setBaseProperties({
+            .position = Amethyst::UDim2(0.0f, NODE_PADDING, 0.0f, rowY + 1.0f),
+            .size = Amethyst::UDim2(1.0f, -2.0f * NODE_PADDING, 0.0f, NODE_ROW_HEIGHT - 2.0f),
+            .zIndex = 2,
+        });
+        picker->setText("Select texture");
+
+        std::vector<Amethyst::ContextMenuItem> items;
+        for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::TEXTURE)) {
+            std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
+            items.push_back(Amethyst::ContextMenuItem::action(name, [this, nodeId, handle, picker, name]() {
+                picker->setText(name);
+                setTextureNodeAsset(nodeId, handle);
+            }));
+        }
+        picker->setItems(std::move(items));
+
+        NodeControl control;
+        control.widgets.push_back(picker);
+        view.controls.push_back(std::move(control));
+        rowY += NODE_ROW_HEIGHT;
+    } else if (view.textureData->generator != nullptr && view.textureData->generator->isValid()) {
+        // One labelled drag per reflected generator parameter, seeded from its current value.
+        const auto &descs = view.textureData->generator->getParameters();
+        for (size_t index = 0; index < descs.size(); ++index) {
+            const Rapture::ProceduralParameter &desc = descs[index];
+            if (desc.hidden) {
+                continue;
+            }
+
+            auto param = std::make_unique<TextureParam>();
+            param->index = index;
+            param->f = view.textureData->generator->getParameterFloat(index);
+            param->i = view.textureData->generator->getParameterInt(index);
+            addTextureParamRow(nodeId, node, rowY, desc, param.get());
+            view.textureData->params.push_back(std::move(param));
+            rowY += NODE_ROW_HEIGHT;
+        }
+    }
+
+    // An unconnected UV falls back to the mesh texcoords when the node is lowered for compilation.
+    view.pinIds.push_back(addPin(nodeId, node, "UV", Rapture::PinType::VEC2, 0, rowY, false));
+    rowY += NODE_ROW_HEIGHT;
+
+    node->setBaseProperties({.size = Amethyst::UDim2::fromOffset(NODE_WIDTH, rowY + NODE_PADDING)});
+}
+
+void NodeEditorPanel::setTextureNodeAsset(uint32_t nodeId, Rapture::AssetHandle handle)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end() || it->second.textureData == nullptr) {
+        return;
+    }
+
+    Rapture::AssetRef assetRef = Rapture::AssetManager::getAsset(handle);
+    if (!assetRef) {
+        return;
+    }
+    auto *texture = assetRef.get()->getUnderlyingAsset<Rapture::Texture>();
+    if (texture == nullptr) {
+        return;
+    }
+
+    it->second.textureData->texture = Rapture::AssetPtr<Rapture::Texture>(assetRef);
+
+    if (it->second.textureData->preview != nullptr && m_services.registerTexture) {
+        it->second.textureData->preview->setImage(m_services.registerTexture(texture));
+    }
+}
+
+void NodeEditorPanel::addTextureParamRow(uint32_t nodeId, Amethyst::Frame *node, float rowY,
+                                         const Rapture::ProceduralParameter &desc, TextureParam *param)
+{
+    static constexpr float LABEL_FRACTION = 0.45f;
+    float usable = NODE_WIDTH - 2.0f * NODE_PADDING;
+    float labelWidth = usable * LABEL_FRACTION;
+
+    auto *label = node->add<Amethyst::TextLabel>();
+    label->setText(desc.displayName);
+    label->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(NODE_PADDING, rowY),
+        .size = Amethyst::UDim2::fromOffset(labelWidth, NODE_ROW_HEIGHT),
+    });
+    label->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+    label->setTextStyleProperties({.fontSize = 12.0f, .textYAlignment = Amethyst::TextYAlignment::CENTER});
+    label->propagate(Amethyst::INTERACTION_CATEGORY_ALL);
+
+    float dragX = NODE_PADDING + labelWidth;
+    float dragWidth = usable - labelWidth;
+    Amethyst::BaseProperties dragProps = {
+        .position = Amethyst::UDim2::fromOffset(dragX, rowY + 1.0f),
+        .size = Amethyst::UDim2::fromOffset(dragWidth, NODE_ROW_HEIGHT - 2.0f),
+        .zIndex = 2,
+    };
+
+    bool isInteger = desc.type == Rapture::PushConstantMemberInfo::BaseType::INT ||
+                     desc.type == Rapture::PushConstantMemberInfo::BaseType::UINT;
+
+    NodeControl control;
+    if (isInteger) {
+        auto *drag = node->add<Amethyst::DragInt>();
+        drag->value = &param->i;
+        drag->speed = 1;
+        if (desc.hasRange) {
+            drag->min = static_cast<int64_t>(desc.minValue);
+            drag->max = static_cast<int64_t>(desc.maxValue);
+        }
+        drag->onValueChanged = [this, nodeId](int64_t) { regenerateProcedural(nodeId); };
+        drag->setBaseProperties(dragProps);
+        control.widgets.push_back(drag);
+    } else {
+        auto *drag = node->add<Amethyst::DragFloat>();
+        drag->value = &param->f;
+        drag->speed = desc.hasRange ? (desc.maxValue - desc.minValue) * 0.01 : 0.01;
+        drag->setFormat("%.3f");
+        if (desc.hasRange) {
+            drag->min = desc.minValue;
+            drag->max = desc.maxValue;
+        }
+        drag->onValueChanged = [this, nodeId](double) { regenerateProcedural(nodeId); };
+        drag->setBaseProperties(dragProps);
+        control.widgets.push_back(drag);
+    }
+
+    auto it = m_nodes.find(nodeId);
+    if (it != m_nodes.end()) {
+        control.widgets.push_back(label);
+        it->second.controls.push_back(std::move(control));
+    }
+}
+
+void NodeEditorPanel::regenerateProcedural(uint32_t nodeId)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end() || it->second.textureData == nullptr) {
+        return;
+    }
+    TextureNodeData &td = *it->second.textureData;
+    if (td.generator == nullptr || !td.generator->isValid()) {
+        return;
+    }
+
+    // Push the edited drag values back into the generator, then re-run the compute pass.
+    const auto &descs = td.generator->getParameters();
+    for (const auto &param : td.params) {
+        if (param->index >= descs.size()) {
+            continue;
+        }
+        Rapture::PushConstantMemberInfo::BaseType type = descs[param->index].type;
+        if (type == Rapture::PushConstantMemberInfo::BaseType::INT || type == Rapture::PushConstantMemberInfo::BaseType::UINT) {
+            td.generator->setParameterInt(param->index, param->i);
+        } else {
+            td.generator->setParameterFloat(param->index, param->f);
+        }
+    }
+
+    td.generator->generate();
+    td.texture = td.generator->getTextureAsset();
+
+    if (td.preview != nullptr && m_services.registerTexture) {
+        td.preview->setImage(m_services.registerTexture(&td.generator->getTexture()));
+    }
+}
+
+void NodeEditorPanel::clearGraph()
+{
+    std::vector<uint32_t> ids;
+    ids.reserve(m_nodes.size());
+    for (const auto &[nodeId, view] : m_nodes) {
+        ids.push_back(nodeId);
+    }
+    for (uint32_t nodeId : ids) {
+        deleteNode(nodeId);
+    }
+    m_nextNodeId = 1;
+}
+
+void NodeEditorPanel::connectPins(uint32_t srcNode, uint32_t srcSlot, uint32_t dstNode, uint32_t dstSlot)
+{
+    uint32_t outPin = findPin(srcNode, true, srcSlot);
+    uint32_t inPin = findPin(dstNode, false, dstSlot);
+    if (outPin == INVALID_PIN || inPin == INVALID_PIN) {
+        return;
+    }
+    createWire(outPin, inPin);
+}
+
+void NodeEditorPanel::setConstantValue(uint32_t nodeId, const Rapture::PinValue &value)
+{
+    uint32_t pinId = findPin(nodeId, false, 0);
+    if (pinId == INVALID_PIN || !m_pins.isLive(pinId) || m_pins[pinId].value == nullptr) {
+        return;
+    }
+    *m_pins[pinId].value = value;
+}
+
+void NodeEditorPanel::setImageTexture(uint32_t nodeId, Rapture::AssetPtr<Rapture::Texture> texture)
+{
+    auto it = m_nodes.find(nodeId);
+    if (it == m_nodes.end() || it->second.textureData == nullptr) {
+        return;
+    }
+    Rapture::Texture *tex = texture.get();
+    it->second.textureData->texture = std::move(texture);
+
+    if (tex != nullptr && it->second.textureData->preview != nullptr && m_services.registerTexture) {
+        it->second.textureData->preview->setImage(m_services.registerTexture(tex));
+    }
+}
+
+void NodeEditorPanel::loadMaterialAsGraph(const Rapture::MaterialInstance &material)
+{
+    if (m_content == nullptr) {
+        return;
+    }
+    clearGraph();
+
+    const Rapture::MaterialData &data = material.getData();
+    uint32_t flags = data.flags;
+
+    // Sources sit on the left, an optional middle stage feeds the sink on the right.
+    static constexpr float COL_SOURCE = 0.0f;
+    static constexpr float COL_MIDDLE = 260.0f;
+    static constexpr float COL_SINK = 560.0f;
+    static constexpr float BAND = 320.0f;
+
+    float bandY = 0.0f;
+    uint32_t sink = spawnNode(Rapture::GraphNodeType::SURFACE_OUTPUT, "PBR Surface", COL_CAT_OUTPUT,
+                              Amethyst::vec2(COL_SINK, BAND));
+
+    // Albedo: base colour, multiplied by the albedo map only when the base colour is tinted.
+    glm::vec3 baseColor(data.albedo);
+    if (Rapture::hasFlag(flags, Rapture::MAT_FLAG_HAS_ALBEDO_MAP)) {
+        uint32_t img = spawnTextureNode(TextureNodeKind::ASSET, "Image", Amethyst::vec2(COL_SOURCE, bandY));
+        setImageTexture(img, material.getTextureRef(Rapture::ParameterID::ALBEDO_MAP));
+
+        if (baseColor != glm::vec3(1.0f)) {
+            uint32_t factor = spawnNode(Rapture::GraphNodeType::CONSTANT_VEC3, "Base Color", COL_CAT_INPUT,
+                                        Amethyst::vec2(COL_MIDDLE, bandY + 140.0f));
+            setConstantValue(factor, Rapture::PinValue(baseColor));
+            uint32_t mul = spawnNode(Rapture::GraphNodeType::MULTIPLY_VEC3, "Multiply", COL_CAT_UTILITIES,
+                                     Amethyst::vec2(COL_MIDDLE, bandY));
+            connectPins(img, 0, mul, 0);
+            connectPins(factor, 0, mul, 1);
+            connectPins(mul, 0, sink, 0);
+        } else {
+            connectPins(img, 0, sink, 0);
+        }
+    } else {
+        uint32_t color = spawnNode(Rapture::GraphNodeType::CONSTANT_VEC3, "Base Color", COL_CAT_INPUT,
+                                   Amethyst::vec2(COL_MIDDLE, bandY));
+        setConstantValue(color, Rapture::PinValue(baseColor));
+        connectPins(color, 0, sink, 0);
+    }
+    bandY += BAND;
+
+    // Normal: unpack the normal map when present, otherwise the sink keeps the mesh normal.
+    if (Rapture::hasFlag(flags, Rapture::MAT_FLAG_HAS_NORMAL_MAP)) {
+        uint32_t img = spawnTextureNode(TextureNodeKind::ASSET, "Image", Amethyst::vec2(COL_SOURCE, bandY));
+        setImageTexture(img, material.getTextureRef(Rapture::ParameterID::NORMAL_MAP));
+        uint32_t nmap = spawnNode(Rapture::GraphNodeType::NORMAL_MAP, "Normal Map", COL_CAT_GEOMETRY,
+                                  Amethyst::vec2(COL_MIDDLE, bandY));
+        connectPins(img, 0, nmap, 0);
+        connectPins(nmap, 0, sink, 1);
+        bandY += BAND;
+    }
+
+    // Roughness and metallic: split the packed metallic-roughness map (G, B), or two constants.
+    if (Rapture::hasFlag(flags, Rapture::MAT_FLAG_HAS_METALLIC_ROUGHNESS_MAP)) {
+        uint32_t img = spawnTextureNode(TextureNodeKind::ASSET, "Image", Amethyst::vec2(COL_SOURCE, bandY));
+        setImageTexture(img, material.getTextureRef(Rapture::ParameterID::METALLIC_ROUGHNESS_MAP));
+        uint32_t split = spawnNode(Rapture::GraphNodeType::SPLIT_VEC3, "Split", COL_CAT_UTILITIES,
+                                   Amethyst::vec2(COL_MIDDLE, bandY));
+        connectPins(img, 0, split, 0);
+        connectPins(split, 1, sink, 2);
+        connectPins(split, 2, sink, 3);
+        bandY += BAND;
+    } else {
+        uint32_t roughness = spawnNode(Rapture::GraphNodeType::CONSTANT_FLOAT, "Roughness", COL_CAT_INPUT,
+                                       Amethyst::vec2(COL_MIDDLE, bandY));
+        setConstantValue(roughness, Rapture::PinValue(data.roughness));
+        connectPins(roughness, 0, sink, 2);
+        uint32_t metallic = spawnNode(Rapture::GraphNodeType::CONSTANT_FLOAT, "Metallic", COL_CAT_INPUT,
+                                      Amethyst::vec2(COL_MIDDLE, bandY + 110.0f));
+        setConstantValue(metallic, Rapture::PinValue(data.metallic));
+        connectPins(metallic, 0, sink, 3);
+        bandY += BAND;
+    }
+
+    // Ambient occlusion: red channel of the AO map, or a constant.
+    if (Rapture::hasFlag(flags, Rapture::MAT_FLAG_HAS_AO_MAP)) {
+        uint32_t img = spawnTextureNode(TextureNodeKind::ASSET, "Image", Amethyst::vec2(COL_SOURCE, bandY));
+        setImageTexture(img, material.getTextureRef(Rapture::ParameterID::AO_MAP));
+        uint32_t split = spawnNode(Rapture::GraphNodeType::SPLIT_VEC3, "Split", COL_CAT_UTILITIES,
+                                   Amethyst::vec2(COL_MIDDLE, bandY));
+        connectPins(img, 0, split, 0);
+        connectPins(split, 0, sink, 4);
+    } else {
+        uint32_t ao = spawnNode(Rapture::GraphNodeType::CONSTANT_FLOAT, "AO", COL_CAT_INPUT,
+                                Amethyst::vec2(COL_MIDDLE, bandY));
+        setConstantValue(ao, Rapture::PinValue(data.ao));
+        connectPins(ao, 0, sink, 4);
+    }
 }
 
 bool NodeEditorPanel::isInputConnected(uint32_t nodeId, uint32_t slotIndex) const
@@ -1170,19 +1641,231 @@ void NodeEditorPanel::deleteSelection()
     }
 }
 
+Rapture::MaterialGraph NodeEditorPanel::buildGraph() const
+{
+    Rapture::MaterialGraph graph;
+
+    uint32_t outputNodeId = 0;
+    for (const auto &[nodeId, view] : m_nodes) {
+        if (view.type == Rapture::GraphNodeType::SURFACE_OUTPUT) {
+            outputNodeId = nodeId;
+            break;
+        }
+    }
+    if (outputNodeId == 0) {
+        Rapture::RP_WARN("Node editor has no Surface Output node, nothing to compile");
+        return graph;
+    }
+
+    // Walk backwards from the output so only nodes feeding it are kept, leaving orphans out.
+    std::unordered_set<uint32_t> reachable;
+    std::vector<uint32_t> stack{outputNodeId};
+    reachable.insert(outputNodeId);
+    while (!stack.empty()) {
+        uint32_t current = stack.back();
+        stack.pop_back();
+        for (const auto &wire : m_connections) {
+            if (!m_pins.isLive(wire.srcPinId) || !m_pins.isLive(wire.dstPinId)) {
+                continue;
+            }
+            if (m_pins[wire.dstPinId].nodeId != current) {
+                continue;
+            }
+            uint32_t source = m_pins[wire.srcPinId].nodeId;
+            if (reachable.insert(source).second) {
+                stack.push_back(source);
+            }
+        }
+    }
+
+    graph.name = "EditorGraph";
+    graph.outputNodeId = outputNodeId;
+
+    // A texture node is editor sugar: it lowers to a TEXTURE_SAMPLE, a synthesised TEXCOORD when its
+    // uv is unconnected, and a SPLIT_VEC4 when its alpha is used. These maps redirect a lowered
+    // node's editor pins onto the primitive pin that ends up carrying them.
+    struct Endpoint {
+        uint32_t node;
+        uint32_t pin;
+    };
+    std::unordered_map<uint64_t, Endpoint> outputRemap;
+    std::unordered_map<uint64_t, Endpoint> inputRemap;
+    auto pinKey = [](uint32_t node, uint32_t pin) { return (static_cast<uint64_t>(node) << 32) | pin; };
+
+    // Synthesised primitives take fresh ids above every editor id, which m_nextNodeId already is.
+    uint32_t nextSynthId = m_nextNodeId;
+
+    auto inputWired = [&](uint32_t node, uint32_t slot) {
+        for (const auto &wire : m_connections) {
+            if (!m_pins.isLive(wire.dstPinId)) {
+                continue;
+            }
+            const PinView &pin = m_pins[wire.dstPinId];
+            if (pin.nodeId == node && !pin.isOutput && pin.slotIndex == slot) {
+                return true;
+            }
+        }
+        return false;
+    };
+    auto outputUsed = [&](uint32_t node, uint32_t slot) {
+        for (const auto &wire : m_connections) {
+            if (!m_pins.isLive(wire.srcPinId)) {
+                continue;
+            }
+            const PinView &pin = m_pins[wire.srcPinId];
+            if (pin.nodeId == node && pin.isOutput && pin.slotIndex == slot) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    for (uint32_t nodeId : reachable) {
+        auto it = m_nodes.find(nodeId);
+        if (it == m_nodes.end()) {
+            continue;
+        }
+        const NodeView &view = it->second;
+
+        if (view.textureData != nullptr) {
+            uint32_t sampleId = nextSynthId++;
+            Rapture::GraphNode sample;
+            sample.id = sampleId;
+            sample.type = Rapture::GraphNodeType::TEXTURE_SAMPLE;
+            sample.inputValues.resize(2);
+            sample.inputTextures.resize(1);
+            sample.inputTextures[0] = view.textureData->texture;
+            graph.nodes.push_back(std::move(sample));
+
+            // uv is the sample's second input; synth a TEXCOORD source when it is unconnected.
+            inputRemap[pinKey(nodeId, 0)] = {sampleId, 1};
+            if (!inputWired(nodeId, 0)) {
+                uint32_t texcoordId = nextSynthId++;
+                Rapture::GraphNode texcoord;
+                texcoord.id = texcoordId;
+                texcoord.type = Rapture::GraphNodeType::TEXCOORD;
+                graph.nodes.push_back(std::move(texcoord));
+                graph.connections.push_back({.srcNode = texcoordId, .srcPin = 0, .dstNode = sampleId, .dstPin = 1});
+            }
+
+            // Color reads the sample directly; the vec4 to vec3 coercion already takes rgb.
+            outputRemap[pinKey(nodeId, 0)] = {sampleId, 0};
+
+            // Alpha needs the w channel, so split the sample only when something consumes it.
+            if (outputUsed(nodeId, 1)) {
+                uint32_t splitId = nextSynthId++;
+                Rapture::GraphNode split;
+                split.id = splitId;
+                split.type = Rapture::GraphNodeType::SPLIT_VEC4;
+                split.inputValues.resize(1);
+                graph.nodes.push_back(std::move(split));
+                graph.connections.push_back({.srcNode = sampleId, .srcPin = 0, .dstNode = splitId, .dstPin = 0});
+                outputRemap[pinKey(nodeId, 1)] = {splitId, 3};
+            }
+            continue;
+        }
+
+        Rapture::GraphNode node;
+        node.id = nodeId;
+        node.type = view.type;
+
+        // Carry every input pin's authored value across; the compiler ignores it on wired pins.
+        const Rapture::NodeDefinition *def = Rapture::NodeRegistry::get(node.type);
+        if (def != nullptr) {
+            node.inputValues.resize(def->inputs.size());
+            for (uint32_t i = 0; i < def->inputs.size(); ++i) {
+                uint32_t pinId = findPin(nodeId, false, i);
+                if (pinId != INVALID_PIN && m_pins[pinId].value != nullptr) {
+                    node.inputValues[i] = *m_pins[pinId].value;
+                }
+            }
+        }
+
+        graph.nodes.push_back(std::move(node));
+    }
+
+    // A wire into a reachable node always has a reachable source, so keep every wire ending inside,
+    // redirecting each endpoint that a lowered texture node moved onto a primitive pin.
+    for (const auto &wire : m_connections) {
+        if (!m_pins.isLive(wire.srcPinId) || !m_pins.isLive(wire.dstPinId)) {
+            continue;
+        }
+        const PinView &src = m_pins[wire.srcPinId];
+        const PinView &dst = m_pins[wire.dstPinId];
+        if (reachable.count(dst.nodeId) == 0) {
+            continue;
+        }
+
+        Endpoint from{src.nodeId, src.slotIndex};
+        auto outIt = outputRemap.find(pinKey(src.nodeId, src.slotIndex));
+        if (outIt != outputRemap.end()) {
+            from = outIt->second;
+        }
+        Endpoint to{dst.nodeId, dst.slotIndex};
+        auto inIt = inputRemap.find(pinKey(dst.nodeId, dst.slotIndex));
+        if (inIt != inputRemap.end()) {
+            to = inIt->second;
+        }
+        graph.connections.push_back({.srcNode = from.node, .srcPin = from.pin, .dstNode = to.node, .dstPin = to.pin});
+    }
+
+    return graph;
+}
+
+void NodeEditorPanel::compileGraph()
+{
+    Rapture::MaterialGraph graph = buildGraph();
+    if (graph.nodes.empty()) {
+        return;
+    }
+
+    Rapture::MaterialGraphCompiler compiler;
+    Rapture::CompileResult result = compiler.compile(graph, 0);
+
+    for (const auto &diagnostic : result.diagnostics) {
+        std::string suffix;
+        if (diagnostic.nodeId != UINT32_MAX) {
+            suffix = " (node " + std::to_string(diagnostic.nodeId) + ")";
+        }
+        switch (diagnostic.level) {
+        case Rapture::MaterialCompilerDiagnosticLevel::ERROR:
+            Rapture::RP_ERROR("Graph compile: {}{}", diagnostic.message, suffix);
+            break;
+        case Rapture::MaterialCompilerDiagnosticLevel::WARNING:
+            Rapture::RP_WARN("Graph compile: {}{}", diagnostic.message, suffix);
+            break;
+        default:
+            Rapture::RP_INFO("Graph compile: {}{}", diagnostic.message, suffix);
+            break;
+        }
+    }
+
+    if (!result.success) {
+        Rapture::RP_ERROR("Graph compile failed");
+        return;
+    }
+
+    Rapture::RP_INFO("Graph compiled to {}:\n{}", result.functionName, result.glslFunction);
+}
+
 static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,
-                                                      Amethyst::Color3 color)
+                                                      const TexSpawnFn &spawnTexture, Amethyst::Color3 color)
 {
     std::vector<Amethyst::ContextMenuItem> items;
 
     for (const auto &entry : category.entries) {
-        Rapture::GraphNodeType type = entry.type;
         std::string label = entry.label;
+        if (entry.textureKind != NodeEditorPanel::TextureNodeKind::NONE) {
+            NodeEditorPanel::TextureNodeKind kind = entry.textureKind;
+            items.push_back(Amethyst::ContextMenuItem::action(label, [spawnTexture, kind, label]() { spawnTexture(kind, label); }));
+            continue;
+        }
+        Rapture::GraphNodeType type = entry.type;
         items.push_back(Amethyst::ContextMenuItem::action(label, [spawn, type, label, color]() { spawn(type, label, color); }));
     }
 
     for (const auto &sub : category.subcategories) {
-        items.push_back(s_categoryToMenuItem(sub, spawn, color));
+        items.push_back(s_categoryToMenuItem(sub, spawn, spawnTexture, color));
     }
 
     return Amethyst::ContextMenuItem::submenu(category.label, std::move(items));

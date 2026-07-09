@@ -4,9 +4,17 @@
 #include <amethyst/Amethyst.h>
 #include <components/shape.h>
 
+#include "asset_manager/AssetCommon.h"
 #include "layers/panels/Panel.h"
+#include "materials/graph/MaterialGraph.h"
 #include "materials/graph/MaterialGraphTypes.h"
 #include "utils/FreeList.h"
+
+namespace Rapture {
+class ProceduralTexture;
+struct ProceduralParameter;
+class MaterialInstance;
+}
 
 #include <cstdint>
 #include <memory>
@@ -31,8 +39,33 @@ class NodeEditorPanel : public Panel {
     NodeEditorPanel(NodeEditorPanel &&) = delete;
     NodeEditorPanel &operator=(NodeEditorPanel &&) = delete;
 
+    /**
+     * @brief Builds the current graph, runs it through the compiler, and logs the outcome
+     */
+    void compileGraph(void);
+
+    /**
+     * @brief Replaces the canvas with a graph synthesised from a material's parameters and maps
+     * @param material The material to represent as nodes
+     */
+    void loadMaterialAsGraph(const Rapture::MaterialInstance &material);
+
+    /**
+     * @brief Which texture source an editor-only texture node samples
+     */
+    enum class TextureNodeKind {
+        NONE,
+        ASSET,
+        WHITE_NOISE,
+        PERLIN_NOISE,
+        SIMPLEX_NOISE,
+        RIDGED_NOISE,
+    };
+
   private:
     static constexpr uint32_t INVALID_PIN = UINT32_MAX;
+    static constexpr float TEXTURE_PREVIEW_HEIGHT = 120.0f;
+    static constexpr float MATERIAL_BAR_HEIGHT = 34.0f;
 
     /**
      * @brief A single pin socket and the data needed to place and wire it
@@ -57,6 +90,26 @@ class NodeEditorPanel : public Panel {
     };
 
     /**
+     * @brief Drag binding for one procedural parameter, indexing into the generator's parameter list
+     */
+    struct TextureParam {
+        size_t index = 0;
+        double f = 0.0;
+        int64_t i = 0;
+    };
+
+    /**
+     * @brief Editor-only state for a texture node, lowered to a texture sample at compile time
+     */
+    struct TextureNodeData {
+        TextureNodeKind kind = TextureNodeKind::ASSET;
+        Rapture::AssetPtr<Rapture::Texture> texture;
+        Amethyst::ImageLabel *preview = nullptr;
+        std::unique_ptr<Rapture::ProceduralTexture> generator;
+        std::vector<std::unique_ptr<TextureParam>> params;
+    };
+
+    /**
      * @brief A spawned node's root frame, its graph type, and the pins it owns
      */
     struct NodeView {
@@ -64,6 +117,7 @@ class NodeEditorPanel : public Panel {
         Rapture::GraphNodeType type = Rapture::GraphNodeType::NONE;
         std::vector<uint32_t> pinIds;
         std::vector<NodeControl> controls;
+        std::unique_ptr<TextureNodeData> textureData;
     };
 
     /**
@@ -77,6 +131,18 @@ class NodeEditorPanel : public Panel {
 
     void setupCanvas(void);
     void setupContextMenu(void);
+    void setupMaterialBar(void);
+
+    /**
+     * @brief Repopulates the material dropdown from the loaded material assets
+     */
+    void rebuildMaterialList(void);
+
+    /**
+     * @brief Loads the picked material into the canvas as a graph
+     * @param handle The material asset to load
+     */
+    void selectMaterial(Rapture::AssetHandle handle);
 
     /**
      * @brief Opens the add-node menu on right click, starts a pan on middle click
@@ -103,12 +169,92 @@ class NodeEditorPanel : public Panel {
     std::vector<Amethyst::ContextMenuItem> buildAddMenu(void);
 
     /**
-     * @brief Spawns a node frame at the position of the last background right click
+     * @brief Builds the shared node frame, drag handling, input hooks, and header
+     * @param nodeId The node's id
+     * @param canvasPos The node's origin in content space
+     * @param headerText The header label text
+     * @param headerColor The header background colour
+     * @return The created node frame
+     */
+    Amethyst::Frame *createNodeShell(uint32_t nodeId, Amethyst::vec2 canvasPos, std::string_view headerText,
+                                     Amethyst::Color3 headerColor);
+
+    /**
+     * @brief Spawns a node frame at a content-space position
      * @param type The graph node type the visual represents
      * @param label The node header text
      * @param headerColor The node header colour, taken from its menu category
+     * @param canvasPos The node's origin in content space
+     * @return The new node's id
      */
-    void spawnNode(Rapture::GraphNodeType type, std::string_view label, Amethyst::Color3 headerColor);
+    uint32_t spawnNode(Rapture::GraphNodeType type, std::string_view label, Amethyst::Color3 headerColor, Amethyst::vec2 canvasPos);
+
+    /**
+     * @brief Spawns an editor-only texture node at a content-space position
+     * @param kind The texture source the node samples
+     * @param label The node header text
+     * @param canvasPos The node's origin in content space
+     * @return The new node's id
+     */
+    uint32_t spawnTextureNode(TextureNodeKind kind, std::string_view label, Amethyst::vec2 canvasPos);
+
+    /**
+     * @brief Lays out a texture node's pins, preview image, and source controls
+     * @param nodeId The texture node to populate
+     */
+    void layoutTexturePins(uint32_t nodeId);
+
+    /**
+     * @brief Points a texture asset node at a loaded texture and refreshes its preview
+     * @param nodeId The texture node to assign
+     * @param handle The texture asset to sample
+     */
+    void setTextureNodeAsset(uint32_t nodeId, Rapture::AssetHandle handle);
+
+    /**
+     * @brief Adds one reflected generator parameter to a procedural node as a labelled drag
+     * @param nodeId The owning texture node's id
+     * @param node The node frame the row is parented to
+     * @param rowY The row's top offset within the node
+     * @param desc The reflected parameter the drag edits
+     * @param param The drag binding backing the parameter
+     */
+    void addTextureParamRow(uint32_t nodeId, Amethyst::Frame *node, float rowY, const Rapture::ProceduralParameter &desc,
+                            TextureParam *param);
+
+    /**
+     * @brief Regenerates a procedural texture node's image from its current parameters
+     * @param nodeId The procedural texture node to regenerate
+     */
+    void regenerateProcedural(uint32_t nodeId);
+
+    /**
+     * @brief Deletes every node, pin, and wire, resetting the canvas to empty
+     */
+    void clearGraph(void);
+
+    /**
+     * @brief Wires an output pin of one node to an input pin of another
+     * @param srcNode The source node id
+     * @param srcSlot The source node's output pin index
+     * @param dstNode The destination node id
+     * @param dstSlot The destination node's input pin index
+     */
+    void connectPins(uint32_t srcNode, uint32_t srcSlot, uint32_t dstNode, uint32_t dstSlot);
+
+    /**
+     * @brief Sets a constant node's authored value
+     * @param nodeId The constant node id
+     * @param value The value to store
+     */
+    void setConstantValue(uint32_t nodeId, const Rapture::PinValue &value);
+
+    /**
+     * @brief Binds an image node to a texture and refreshes its preview
+     * @param nodeId The image node id
+     * @param texture The texture the node samples
+     */
+    void setImageTexture(uint32_t nodeId, Rapture::AssetPtr<Rapture::Texture> texture);
 
     /**
      * @brief Lays out a node's pins for its current type
@@ -273,7 +419,15 @@ class NodeEditorPanel : public Panel {
      */
     void deleteSelection(void);
 
+    /**
+     * @brief Extracts a compiler-ready graph from the current editor state
+     * @return The built graph, or an empty graph if there is no surface output node
+     */
+    Rapture::MaterialGraph buildGraph(void) const;
+
     Amethyst::Frame *m_root = nullptr;
+    Amethyst::Frame *m_materialBar = nullptr;
+    Amethyst::Dropdown *m_materialDropdown = nullptr;
     Amethyst::Frame *m_canvas = nullptr;
     Amethyst::Frame *m_content = nullptr;
     Amethyst::Frame *m_wireLayer = nullptr;
