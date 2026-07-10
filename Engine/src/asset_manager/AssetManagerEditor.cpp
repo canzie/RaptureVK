@@ -163,7 +163,7 @@ Asset &AssetManagerEditor::importDefaultAsset(AssetType assetType)
         return *it->second;
     }
     case AssetType::MATERIAL: {
-        auto baseMaterial = MaterialManager::getMaterial("PBR");
+        auto baseMaterial = MaterialManager::getMaterial("Default Material");
         if (!baseMaterial) {
             RP_CORE_ERROR("Failed to get default material");
             return Asset::null;

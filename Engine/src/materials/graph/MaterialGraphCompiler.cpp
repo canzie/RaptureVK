@@ -3,11 +3,13 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 #include <string_view>
 #include <unordered_set>
 
 #include "NodeRegistry.h"
 #include "logging/Log.h"
+#include "materials/MaterialData.h"
 #include "textures/Texture.h"
 #include "utils/rp_assert.h"
 
@@ -164,15 +166,57 @@ static const GraphConnection *s_findInputConnection(const MaterialGraph &graph, 
 }
 
 /**
- * @brief Topologically order the nodes feeding the output, sources before consumers
+ * @brief Index of the SURFACE_OUTPUT input pin with a name
+ * @param outputDef The sink node definition
+ * @param name The field name to match
+ * @return The pin index, or -1 if the sink has no such pin
+ */
+static int s_findSinkPin(const NodeDefinition &outputDef, std::string_view name)
+{
+    for (uint32_t i = 0; i < outputDef.inputs.size(); ++i) {
+        if (outputDef.inputs[i].name == name) return static_cast<int>(i);
+    }
+    return -1;
+}
+
+/**
+ * @brief The source nodes feeding the sink pins a variant's fields drive, its topo sort roots
+ * @param graph The graph
+ * @param outputNodeId The sink node id
+ * @param outputDef The sink node definition
+ * @param fields The variant's surface output fields
+ * @param fieldCount Number of fields
+ * @return The source node ids feeding those pins
+ */
+static std::vector<uint32_t> s_sinkRoots(const MaterialGraph &graph, uint32_t outputNodeId, const NodeDefinition &outputDef,
+                                         const SurfaceOutputField *fields, size_t fieldCount)
+{
+    std::unordered_set<uint32_t> pins;
+    for (size_t i = 0; i < fieldCount; ++i) {
+        int pin = s_findSinkPin(outputDef, fields[i].name);
+        if (pin >= 0) pins.insert(static_cast<uint32_t>(pin));
+    }
+
+    std::vector<uint32_t> roots;
+    for (const auto &connection : graph.connections) {
+        if (connection.dstNode == outputNodeId && pins.count(connection.dstPin) != 0) {
+            roots.push_back(connection.srcNode);
+        }
+    }
+    return roots;
+}
+
+/**
+ * @brief Topologically order the nodes feeding the given roots, sources before consumers
  * @param graph The graph to walk
+ * @param roots The nodes to walk back from
  * @param order Filled with reachable node ids in dependency order
  * @return False if the graph contains a cycle
  *
- * Iterative post-order DFS from the output. A node is colored gray while its dependencies are on
- * the stack and black once emitted; meeting a gray dependency is a back edge, so a cycle.
+ * Iterative post-order DFS from each root. A node is colored gray while its dependencies are on the
+ * stack and black once emitted; meeting a gray dependency is a back edge, so a cycle.
  */
-static bool s_topoSort(const MaterialGraph &graph, std::vector<uint32_t> &order)
+static bool s_topoSort(const MaterialGraph &graph, const std::vector<uint32_t> &roots, std::vector<uint32_t> &order)
 {
     // Each node's dependencies are the sources feeding any of its inputs
     std::unordered_map<uint32_t, std::vector<uint32_t>> dependencies;
@@ -185,29 +229,34 @@ static bool s_topoSort(const MaterialGraph &graph, std::vector<uint32_t> &order)
     bool acyclic = true;
 
     std::vector<uint32_t> stack;
-    stack.push_back(graph.outputNodeId);
-    while (!stack.empty()) {
-        uint32_t nodeId = stack.back();
-        Color state = color[nodeId];
-        if (state == WHITE) {
-            color[nodeId] = GRAY;
-            auto it = dependencies.find(nodeId);
-            if (it != dependencies.end()) {
-                for (uint32_t dependency : it->second) {
-                    Color depState = color[dependency];
-                    if (depState == GRAY) {
-                        acyclic = false;
-                    } else if (depState == WHITE) {
-                        stack.push_back(dependency);
+    for (uint32_t root : roots) {
+        if (color[root] != WHITE) {
+            continue;
+        }
+        stack.push_back(root);
+        while (!stack.empty()) {
+            uint32_t nodeId = stack.back();
+            Color state = color[nodeId];
+            if (state == WHITE) {
+                color[nodeId] = GRAY;
+                auto it = dependencies.find(nodeId);
+                if (it != dependencies.end()) {
+                    for (uint32_t dependency : it->second) {
+                        Color depState = color[dependency];
+                        if (depState == GRAY) {
+                            acyclic = false;
+                        } else if (depState == WHITE) {
+                            stack.push_back(dependency);
+                        }
                     }
                 }
+            } else if (state == GRAY) {
+                color[nodeId] = BLACK;
+                order.push_back(nodeId);
+                stack.pop_back();
+            } else {
+                stack.pop_back();
             }
-        } else if (state == GRAY) {
-            color[nodeId] = BLACK;
-            order.push_back(nodeId);
-            stack.pop_back();
-        } else {
-            stack.pop_back();
         }
     }
     return acyclic;
@@ -413,10 +462,13 @@ static std::string s_emitNodeExpr(const MaterialGraph &graph, const NodeDefiniti
 }
 
 /**
- * @brief Emit the function body, one local per node then the SurfaceData assignments
+ * @brief Emit the function body, one local per node then the surface field assignments
+ * @param fields The chosen variant's surface output fields, mirroring the GLSL struct
+ * @param fieldCount Number of fields
  */
 static std::string s_emitSurfaceBody(const MaterialGraph &graph, const std::vector<uint32_t> &order,
-                                     const GraphSlotMapping &mapping, const GraphNode &outputNode, const NodeDefinition &outputDef)
+                                     const GraphSlotMapping &mapping, const GraphNode &outputNode, const NodeDefinition &outputDef,
+                                     const SurfaceOutputField *fields, size_t fieldCount)
 {
     EmittedMap emitted;
     std::string body;
@@ -446,30 +498,27 @@ static std::string s_emitSurfaceBody(const MaterialGraph &graph, const std::vect
         }
     }
 
-    auto sink = [&](std::string_view pinName, PinType type, std::string_view fallback) -> std::string {
-        for (uint32_t i = 0; i < outputDef.inputs.size(); ++i) {
-            if (outputDef.inputs[i].name != pinName) continue;
+    for (size_t f = 0; f < fieldCount; ++f) {
+        const SurfaceOutputField &field = fields[f];
+        std::string value = field.fallback;
 
-            const GraphConnection *connection = s_findInputConnection(graph, outputNode.id, i);
+        int pinIndex = s_findSinkPin(outputDef, field.name);
+        if (pinIndex >= 0) {
+            uint32_t pin = static_cast<uint32_t>(pinIndex);
+            PinType fieldType = outputDef.inputs[pin].type;
+            const GraphConnection *connection = s_findInputConnection(graph, outputNode.id, pin);
             if (connection != nullptr) {
                 auto it = emitted.find(s_emitKey(connection->srcNode, connection->srcPin));
-                if (it != emitted.end()) return s_coerce(it->second.var, it->second.type, type);
+                if (it != emitted.end()) value = s_coerce(it->second.var, it->second.type, fieldType);
+            } else {
+                auto slot = mapping.slots.find(Graph_pinKey(outputNode.id, pin));
+                if (slot != mapping.slots.end()) {
+                    value = s_coerce(s_poolRead(slot->second.offset, slot->second.type), slot->second.type, fieldType);
+                }
             }
-            auto slot = mapping.slots.find(Graph_pinKey(outputNode.id, i));
-            if (slot != mapping.slots.end()) {
-                return s_coerce(s_poolRead(slot->second.offset, slot->second.type), slot->second.type, type);
-            }
-            break;
         }
-        return std::string(fallback);
-    };
-
-    body += "surf.albedo=" + sink("albedo", PinType::VEC3, "vec3(1.0)") + ";\n";
-    body += "surf.normal=" + sink("normal", PinType::VEC3, "normalize(si.worldNormal)") + ";\n";
-    body += "surf.roughness=" + sink("roughness", PinType::FLOAT, "0.5") + ";\n";
-    body += "surf.metallic=" + sink("metallic", PinType::FLOAT, "0.0") + ";\n";
-    body += "surf.ao=" + sink("ao", PinType::FLOAT, "1.0") + ";\n";
-    body += "surf.shadingModelId=SM_OPENPBR_STANDARD;\n";
+        body += "surf." + std::string(field.name) + "=" + value + ";\n";
+    }
     return body;
 }
 
@@ -482,22 +531,42 @@ CompileResult MaterialGraphCompiler::compile(const MaterialGraph &graph, uint32_
     s_validateGraph(graph, outputNode, result.diagnostics);
     if (result.hasErrors()) return result;
 
-    std::vector<uint32_t> order;
-    if (!s_topoSort(graph, order)) {
+    const NodeDefinition *outputDef = NodeRegistry::get(outputNode->type);
+
+    // The G-buffer variant walks the whole graph from the sink; the output node itself stays in the
+    // order so dead-node reporting does not flag it
+    std::vector<uint32_t> gbufferOrder;
+    if (!s_topoSort(graph, {graph.outputNodeId}, gbufferOrder)) {
         s_addDiagnostic(result.diagnostics, MaterialCompilerDiagnosticLevel::ERROR, "graph contains a cycle", UINT32_MAX);
         return result;
     }
-    s_reportDeadNodes(graph, order, result.diagnostics);
+    s_reportDeadNodes(graph, gbufferOrder, result.diagnostics);
 
-    s_assignResources(graph, order, result.defaults, result.mapping, result.textureRefs);
-
-    const NodeDefinition *outputDef = NodeRegistry::get(outputNode->type);
-    std::string body = s_emitSurfaceBody(graph, order, result.mapping, *outputNode, *outputDef);
+    s_assignResources(graph, gbufferOrder, result.defaults, result.mapping, result.textureRefs);
 
     // graphId keeps the name unique even when two graphs share a sanitized name
-    result.functionName = "evalSurface_" + s_sanitizeName(graph.name) + "_" + std::to_string(graphId);
-    result.glslFunction = "SurfaceData " + result.functionName + "(SurfaceInputs si, uint base){\nSurfaceData surf;\n" + body +
-                          "return surf;\n}\n";
+    std::string name = s_sanitizeName(graph.name) + "_" + std::to_string(graphId);
+
+    std::string gbufferBody = s_emitSurfaceBody(graph, gbufferOrder, result.mapping, *outputNode, *outputDef, SURFACE_DATA_FIELDS,
+                                                std::size(SURFACE_DATA_FIELDS));
+    std::string gbufferName = "evalSurface_" + name;
+    result.functions.push_back({SurfaceVariant::GBUFFER, gbufferName,
+                                "SurfaceData " + gbufferName + "(SurfaceInputs si, uint base){\nSurfaceData surf;\n" + gbufferBody +
+                                    "return surf;\n}\n"});
+
+    // The diffuse variant seeds only its own fields, so branches feeding roughness, metallic or ao
+    // prune away and the emit shares the slice layout assigned above
+    std::vector<uint32_t> diffuseRoots =
+        s_sinkRoots(graph, outputNode->id, *outputDef, SURFACE_DATA_DIFFUSE_FIELDS, std::size(SURFACE_DATA_DIFFUSE_FIELDS));
+    std::vector<uint32_t> diffuseOrder;
+    s_topoSort(graph, diffuseRoots, diffuseOrder);
+    std::string diffuseBody = s_emitSurfaceBody(graph, diffuseOrder, result.mapping, *outputNode, *outputDef,
+                                                SURFACE_DATA_DIFFUSE_FIELDS, std::size(SURFACE_DATA_DIFFUSE_FIELDS));
+    std::string diffuseName = "evalSurfaceDiffuse_" + name;
+    result.functions.push_back({SurfaceVariant::DIFFUSE, diffuseName,
+                                "SurfaceDataDiffuse " + diffuseName + "(SurfaceInputs si, uint base){\nSurfaceDataDiffuse surf;\n" +
+                                    diffuseBody + "return surf;\n}\n"});
+
     result.success = true;
     return result;
 }

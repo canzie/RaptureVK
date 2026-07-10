@@ -1,6 +1,7 @@
 #include "MaterialInstance.h"
 
 #include "asset_manager/Asset.h"
+#include "graph/SurfaceGraphManager.h"
 #include "logging/Log.h"
 #include "textures/Texture.h"
 
@@ -10,11 +11,14 @@ MaterialInstance::MaterialInstance(std::shared_ptr<BaseMaterial> material, const
     : m_baseMaterial(material), m_bindlessIndex(UINT32_MAX)
 {
     m_name = name.empty() ? material->getName() + "_instance" : name;
-    m_data = material->getDefaults();
-
     m_bindlessIndex = MaterialManager::allocateSlot();
 
-    syncToGPU();
+    uint32_t graphId = material->getGraphId();
+    SurfaceGraphManager &graphs = MaterialManager::getSurfaceGraphManager();
+    m_slice = graphs.getDefaults(graphId);
+
+    m_data = MaterialData::createDefault();
+    setGraph(graphId, m_slice, graphs.getTextureRefs(graphId));
 }
 
 MaterialInstance::~MaterialInstance()
@@ -65,41 +69,18 @@ AssetPtr<Texture> MaterialInstance::getTextureRef(ParameterID id) const
 
 void MaterialInstance::setParameter(ParameterID id, AssetRef textureAsset)
 {
-    const ParamInfo *info = getParamInfo(id);
-    if (!info || info->type != ParamType::TEXTURE) return;
-
     AssetPtr<Texture> texturePtr(textureAsset);
     Texture *texture = texturePtr.get();
+    if (texture == nullptr) return;
 
-    auto it = std::find_if(m_textureRefs.begin(), m_textureRefs.end(),
-                           [id](const std::pair<ParameterID, AssetPtr<Texture>> &entry) { return entry.first == id; });
-    if (texture != nullptr) {
-        if (it != m_textureRefs.end()) {
-            it->second = std::move(texturePtr);
-        } else {
-            m_textureRefs.emplace_back(id, std::move(texturePtr));
-        }
-    } else if (it != m_textureRefs.end()) {
-        m_textureRefs.erase(it);
-    }
+    m_graphTextureRefs.push_back(texturePtr);
 
-    if (texture != nullptr && texture->isReady()) {
+    if (texture->isReady()) {
         uint32_t bindlessIdx = texture->getBindlessIndex();
-        char *dataPtr = reinterpret_cast<char *>(&m_data);
-        std::memcpy(dataPtr + info->offset, &bindlessIdx, sizeof(uint32_t));
-
-        if (info->flag) {
-            m_data.flags |= info->flag;
-        }
-        applyTextureEncodingFlags(id, texture);
-        syncToGPU();
-        AssetEvents::onMaterialInstanceChanged().publish(this);
-    } else if (texture != nullptr) {
+        writeSlice(id, &bindlessIdx, sizeof(uint32_t));
+    } else {
         std::lock_guard<std::mutex> lock(m_pendingTexturesMutex);
         m_pendingTextures.push_back({id, texture});
-    } else if (info->flag && (m_data.flags & info->flag)) {
-        m_data.flags &= ~info->flag;
-        syncToGPU();
     }
 }
 
@@ -114,35 +95,26 @@ void MaterialInstance::updatePendingTextures()
                                                    return false;
                                                }
 
-                                               const ParamInfo *info = getParamInfo(pending.parameterId);
-                                               if (!info) return true;
-
                                                uint32_t bindlessIdx = pending.texture->getBindlessIndex();
-                                               char *dataPtr = reinterpret_cast<char *>(&m_data);
-                                               std::memcpy(dataPtr + info->offset, &bindlessIdx, sizeof(uint32_t));
-
-                                               if (info->flag) {
-                                                   m_data.flags |= info->flag;
-                                               }
-                                               applyTextureEncodingFlags(pending.parameterId, pending.texture);
-                                               syncToGPU();
-                                               AssetEvents::onMaterialInstanceChanged().publish(this);
+                                               writeSlice(pending.parameterId, &bindlessIdx, sizeof(uint32_t));
                                                return true;
                                            }),
                             m_pendingTextures.end());
 }
 
-void MaterialInstance::applyTextureEncodingFlags(ParameterID id, Texture *texture)
+void MaterialInstance::writeSlice(ParameterID id, const void *data, size_t size)
 {
-    if (id != ParameterID::NORMAL_MAP) {
-        return;
-    }
+    uint32_t offset = 0;
+    if (!m_baseMaterial->tryGetOffset(id, offset)) return;
 
-    if (texture->getSpecification().format == TextureFormat::BC5) {
-        m_data.flags |= MAT_FLAG_NORMAL_BC5;
-    } else {
-        m_data.flags &= ~MAT_FLAG_NORMAL_BC5;
+    uint32_t words = static_cast<uint32_t>(size / sizeof(uint32_t));
+    if (m_slice.size() < offset + words) m_slice.resize(offset + words, 0u);
+    std::memcpy(&m_slice[offset], data, size);
+
+    if (m_graphDataOffset != UINT32_MAX) {
+        MaterialManager::writeGraphData(m_graphDataOffset + offset, data, static_cast<uint32_t>(size));
     }
+    AssetEvents::onMaterialInstanceChanged().publish(this);
 }
 
 void MaterialInstance::syncToGPU()

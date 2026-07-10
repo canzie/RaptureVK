@@ -112,6 +112,7 @@ Application::~Application()
 
     m_viewportManager.reset();
 
+    MaterialManager::releaseGraphResources();
     AssetManager::shutdown();
     MaterialManager::shutdown();
 

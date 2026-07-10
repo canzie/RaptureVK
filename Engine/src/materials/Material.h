@@ -4,11 +4,9 @@
 #include "MaterialData.h"
 #include "MaterialParameters.h"
 
-#include <initializer_list>
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace Rapture {
 
@@ -21,18 +19,24 @@ constexpr uint32_t MAX_MATERIALS = 4096;
 
 class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
   public:
-    BaseMaterial(const std::string &name, std::initializer_list<ParameterID> editableParams, const MaterialData &defaults);
+    BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterID, uint32_t> table);
     ~BaseMaterial() = default;
 
     const std::string &getName() const { return m_name; }
-    const MaterialData &getDefaults() const { return m_defaults; }
-    bool canEdit(ParameterID id) const { return m_editableParams.find(id) != m_editableParams.end(); }
-    const std::unordered_set<ParameterID> &getEditableParams() const { return m_editableParams; }
+    uint32_t getGraphId() const { return m_graphId; }
+
+    /**
+     * @brief Resolve the slice offset a parameter writes to
+     * @param id The parameter to resolve
+     * @param out Set to the uint offset within the instance slice when found
+     * @return True if this base exposes the parameter
+     */
+    bool tryGetOffset(ParameterID id, uint32_t &out) const;
 
   private:
     std::string m_name;
-    std::unordered_set<ParameterID> m_editableParams;
-    MaterialData m_defaults;
+    uint32_t m_graphId;
+    std::unordered_map<ParameterID, uint32_t> m_table;
 
     friend class MaterialInstance;
     friend class MaterialManager;
@@ -41,11 +45,17 @@ class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
 class MaterialManager {
   public:
     static void init();
+
+    /**
+     * @brief Releases graph resources holding asset references, so they free while the AssetManager is still alive
+     */
+    static void releaseGraphResources();
+
     static void shutdown();
 
     static std::shared_ptr<BaseMaterial> getMaterial(const std::string &name);
-    static std::shared_ptr<BaseMaterial> createMaterial(const std::string &name, std::initializer_list<ParameterID> editableParams,
-                                                        const MaterialData &defaults);
+    static std::shared_ptr<BaseMaterial> createMaterial(const std::string &name, uint32_t graphId,
+                                                        std::unordered_map<ParameterID, uint32_t> table);
     static uint32_t getDefaultTextureIndex();
     static void printMaterialNames();
 

@@ -19,51 +19,12 @@ layout(location = 6) in flat uint inMaterialIndex;
 
 precision highp float;
 
-layout(set = 3, binding = 0) uniform sampler2D u_textures[];
-
 layout(push_constant) uniform PushConstants {
     uint batchInfoBufferIndex;
     uint cameraSSBOIndex;
     uint cameraSlotIndex;
     uint meshSSBOIndex;
 } pc;
-
-SurfaceData evalStaticSurface(SurfaceInputs si, MaterialData mat) {
-    SurfaceData surf;
-    surf.albedo = SAMPLE_ALBEDO(mat, u_textures, si.uv);
-    surf.roughness = SAMPLE_ROUGHNESS(mat, u_textures, si.uv);
-    surf.metallic = SAMPLE_METALLIC(mat, u_textures, si.uv);
-    surf.ao = SAMPLE_AO(mat, u_textures, si.uv);
-    surf.shadingModelId = SM_OPENPBR_STANDARD;
-
-    if (matHasFlag(si.flags, MAT_FLAG_HAS_NORMAL_MAP) && matHasFlag(si.flags, MAT_FLAG_HAS_TEXCOORDS)) {
-        vec3 tangentNormal = SAMPLE_NORMAL_MAP(mat, u_textures, si.uv);
-
-        if (matHasFlag(si.flags, MAT_FLAG_HAS_TANGENTS) && matHasFlag(si.flags, MAT_FLAG_HAS_BITANGENTS)) {
-            vec3 N = normalize(si.worldNormal);
-            vec3 T = normalize(si.tangent);
-            vec3 B = normalize(si.bitangent);
-            mat3 TBN = mat3(T, B, N);
-            surf.normal = normalize(TBN * tangentNormal);
-        } else if (matHasFlag(si.flags, MAT_FLAG_HAS_NORMALS)) {
-            vec3 Q1 = dFdx(si.worldPos);
-            vec3 Q2 = dFdy(si.worldPos);
-            vec2 st1 = dFdx(si.uv);
-            vec2 st2 = dFdy(si.uv);
-            vec3 N = normalize(si.worldNormal);
-            vec3 T = normalize(Q1 * st2.t - Q2 * st1.t);
-            vec3 B = normalize(cross(N, T));
-            mat3 TBN = mat3(T, B, N);
-            surf.normal = normalize(TBN * tangentNormal);
-        } else {
-            surf.normal = vec3(0.0, 1.0, 0.0);
-        }
-    } else {
-        surf.normal = normalize(si.worldNormal);
-    }
-
-    return surf;
-}
 
 void main() {
     MaterialData mat = getMaterialData(inMaterialIndex);
@@ -77,9 +38,7 @@ void main() {
     si.bitangent = inBitangent;
     si.flags = flags;
 
-    SurfaceData surf = matHasFlag(flags, MAT_FLAG_IS_GRAPH)
-        ? evalSurfaceGraph(mat.graphId, si, mat.graphDataOffset)
-        : evalStaticSurface(si, mat);
+    SurfaceData surf = evalSurfaceGraph(mat.graphId, si, mat.graphDataOffset);
 
     gNormal = octEncodeNormal(normalize(surf.normal));
     gAlbedoSpec = vec4(surf.albedo, 1.0);

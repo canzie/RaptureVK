@@ -36,24 +36,17 @@ class MaterialInstance {
 
     template <typename T> void setParameter(ParameterID id, const T &value)
     {
-        const ParamInfo *info = getParamInfo(id);
-        if (!info) return;
-        if (sizeof(T) != info->size) return;
-
-        char *dataPtr = reinterpret_cast<char *>(&m_data);
-        std::memcpy(dataPtr + info->offset, &value, info->size);
-        syncToGPU();
-        AssetEvents::onMaterialInstanceChanged().publish(this);
+        writeSlice(id, &value, sizeof(T));
     }
 
     template <typename T> T getParameter(ParameterID id) const
     {
-        const ParamInfo *info = getParamInfo(id);
-        if (!info || sizeof(T) != info->size) return T{};
-
         T value{};
-        const char *dataPtr = reinterpret_cast<const char *>(&m_data);
-        std::memcpy(&value, dataPtr + info->offset, info->size);
+        uint32_t offset = 0;
+        if (!m_baseMaterial->tryGetOffset(id, offset)) return value;
+        if (offset + sizeof(T) / sizeof(uint32_t) <= m_slice.size()) {
+            std::memcpy(&value, &m_slice[offset], sizeof(T));
+        }
         return value;
     }
 
@@ -77,7 +70,7 @@ class MaterialInstance {
 
   private:
     void syncToGPU();
-    void applyTextureEncodingFlags(ParameterID id, Texture *texture);
+    void writeSlice(ParameterID id, const void *data, size_t size);
 
     std::string m_name;
     std::shared_ptr<BaseMaterial> m_baseMaterial;
@@ -85,6 +78,7 @@ class MaterialInstance {
     uint32_t m_graphDataOffset = UINT32_MAX;
 
     MaterialData m_data;
+    GraphInstanceData m_slice;
 
     std::vector<PendingTexture> m_pendingTextures;
     std::mutex m_pendingTexturesMutex;

@@ -109,6 +109,7 @@ enum class GraphNodeType {
     SPLIT_VEC4,
 
     NORMAL_MAP,
+    NORMAL_MAP_RG,
     LUMINANCE,
     REMAP_FLOAT,
 
@@ -139,7 +140,7 @@ union PinValue {
 struct PinDef {
     std::string name; // referenced in a template as {name}
     PinType type;
-    PinValue defaultValue{}; // emitted as a literal when an input pin is unconnected
+    PinValue defaultValue{};       // emitted as a literal when an input pin is unconnected
     std::string glslTemplate = {}; // this output pin's expression on a multi output node
 };
 

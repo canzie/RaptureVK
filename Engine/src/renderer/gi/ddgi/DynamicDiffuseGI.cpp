@@ -118,7 +118,11 @@ void DynamicDiffuseGI::createPipelines()
     ShaderImportConfig shaderBaseProbeConfig;
     shaderBaseProbeConfig.compileInfo.includePath = shaderDir / "glsl/ddgi/";
 
-    auto probeTraceAsset = AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", shaderBaseProbeConfig);
+    // ProbeTrace pulls in common/ and generated/ surface graph headers, so it resolves includes from the glsl root
+    ShaderImportConfig probeTraceConfigImport;
+    probeTraceConfigImport.compileInfo.includePath = shaderDir / "glsl/";
+
+    auto probeTraceAsset = AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", probeTraceConfigImport);
     m_DDGI_ProbeTraceShader = probeTraceAsset ? probeTraceAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
     if (m_DDGI_ProbeTraceShader) m_shaderAssets.push_back(std::move(probeTraceAsset));
 
@@ -561,7 +565,9 @@ void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint
     // Set 0: Common resources (camera, lights, shadows, probe volume)
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeTracePipeline);
 
-    // Set 1: Material resources (not used in DDGI)
+    // Set 1: Material header SSBO + graph pool, read by the generated diffuse surface graph
+    m_rc->descriptorManager->bindSet(1, commandBuffer, m_DDGI_ProbeTracePipeline);
+
     // Set 2: Object/Mesh resources (mesh data SSBO)
     // m_rc->descriptorManager->bindSet(2, currentCommandBuffer, m_DDGI_ProbeTracePipeline);
 

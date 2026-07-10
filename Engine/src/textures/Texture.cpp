@@ -756,6 +756,61 @@ std::unique_ptr<Texture> Texture::createDefaultWhiteTexture()
     return defaultWhiteTexture;
 }
 
+std::unique_ptr<Texture> Texture::createDefaultFlatNormalTexture()
+{
+    // Create a 1x1 flat normal texture, tangent space (0, 0, 1) encoded as (0.5, 0.5, 1.0)
+    TextureSpecification spec{};
+    spec.width = 1;
+    spec.height = 1;
+    spec.depth = 1;
+    spec.type = TextureType::TEXTURE2D;
+    spec.format = TextureFormat::RGBA8;
+    spec.filter = TextureFilter::Linear;
+    spec.wrap = TextureWrap::Repeat;
+    spec.srgb = false;
+    spec.mipLevels = 1;
+
+    auto defaultFlatNormalTexture = std::make_unique<Texture>(spec);
+
+    auto &app = Application::getInstance();
+    VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    uint32_t flatNormalPixel = 0xFFFF8080; // RGBA (128, 128, 255, 255) in little-endian byte order
+    VkDeviceSize imageSize = sizeof(uint32_t);
+
+    VkBuffer stagingBuffer;
+    VmaAllocation stagingAllocation;
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = imageSize;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocInfo = {};
+    allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+    if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create staging buffer for default flat normal texture!");
+        return nullptr;
+    }
+
+    void *data;
+    vmaMapMemory(allocator, stagingAllocation, &data);
+    memcpy(data, &flatNormalPixel, imageSize);
+    vmaUnmapMemory(allocator, stagingAllocation);
+
+    defaultFlatNormalTexture->transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    defaultFlatNormalTexture->copyBufferToImage(stagingBuffer, 1, 1);
+    defaultFlatNormalTexture->transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+
+    RP_CORE_INFO("Created default flat normal texture (1x1 RGBA8)");
+
+    return defaultFlatNormalTexture;
+}
+
 std::unique_ptr<Texture> Texture::createDefaultWhiteCubemapTexture()
 {
     // Create a 1x1 white cubemap

@@ -23,8 +23,7 @@ static void s_validateDefinition(const NodeDefinition &def)
         for (const auto &pin : pins) {
             bool unique = names.insert(pin.name).second;
             if (!unique) {
-                RP_CORE_ERROR("Node type {} has a duplicate {} pin name '{}'", static_cast<int>(def.type), direction,
-                              pin.name);
+                RP_CORE_ERROR("Node type {} has a duplicate {} pin name '{}'", static_cast<int>(def.type), direction, pin.name);
             }
             RP_ASSERT(unique, "node has a duplicate pin name within one direction");
         }
@@ -390,7 +389,15 @@ void NodeRegistry::registerBuiltins()
     registerNode({.type = GraphNodeType::NORMAL_MAP,
                   .inputs = {{"sample", PinType::VEC3, glm::vec3(0.5f, 0.5f, 1.0f)}},
                   .outputs = {{"out", PinType::VEC3}},
-                  .glslTemplate = "normalize(mat3(normalize(si.tangent), normalize(si.bitangent), normalize(si.worldNormal)) * ({sample} * 2.0 - 1.0))"});
+                  .glslTemplate = "normalize(mat3(normalize(si.tangent), normalize(si.bitangent), normalize(si.worldNormal)) * "
+                                  "({sample} * 2.0 - 1.0))"});
+
+    // Normal map reading only RG and reconstructing Z, valid for BC5 and plain tangent normal maps
+    registerNode({.type = GraphNodeType::NORMAL_MAP_RG,
+                  .inputs = {{"sample", PinType::VEC3, glm::vec3(0.5f, 0.5f, 1.0f)}},
+                  .outputs = {{"out", PinType::VEC3}},
+                  .glslTemplate = "normalize(mat3(normalize(si.tangent), normalize(si.bitangent), normalize(si.worldNormal)) * "
+                                  "reconstructNormalZ(({sample}).xy))"});
 
     // Luminance
     registerNode({.type = GraphNodeType::LUMINANCE,
@@ -414,7 +421,9 @@ void NodeRegistry::registerBuiltins()
                              {"normal", PinType::VEC3},
                              {"roughness", PinType::FLOAT},
                              {"metallic", PinType::FLOAT},
-                             {"ao", PinType::FLOAT}}});
+                             {"ao", PinType::FLOAT},
+                             {"emission", PinType::VEC4},
+                             {"emissiveStrength", PinType::FLOAT}}});
 }
 
 } // namespace Rapture

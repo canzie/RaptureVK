@@ -17,14 +17,7 @@ namespace Rapture {
 class MaterialInstance;
 
 struct RtInstanceInfo {
-    alignas(4) uint32_t AlbedoTextureIndex;
-    alignas(4) uint32_t NormalTextureIndex;
-    alignas(4) uint32_t flags; // material flags (see MaterialData.h MaterialFlags)
-
-    alignas(16) glm::vec3 albedo;
-
-    alignas(16) glm::vec3 emissiveColor;
-    alignas(4) uint32_t EmissiveFactorTextureIndex;
+    alignas(4) uint32_t materialIndex; // bindless index into the material header SSBO
 
     alignas(4) uint32_t iboIndex; // index of the buffer in the bindless buffers array
     alignas(4) uint32_t vboIndex; // index of the buffer in the bindless buffers array

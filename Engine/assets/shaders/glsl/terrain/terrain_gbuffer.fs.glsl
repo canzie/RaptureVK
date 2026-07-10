@@ -3,6 +3,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "common/MaterialCommon.glsl"
+#include "generated/SurfaceGraphs.glsl"
 #include "terrain/terrain_common.glsl"
 
 layout(location = 0) out vec2 gNormal;
@@ -13,8 +14,6 @@ layout(location = 0) in vec4 inFragPosDepth;
 layout(location = 3) in flat uint inChunkIndex;
 layout(location = 4) in flat uint inLOD;
 layout(location = 5) in float inNormalizedHeight;
-
-layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 
 layout(push_constant) uniform TerrainPushConstants {
     uint cameraSSBOIndex;
@@ -85,11 +84,22 @@ TerrainSample sampleTerrainMaterial(uint matIndex, vec3 worldPos, vec3 normal) {
     float scale = mat.tilingScale > 0.0 ? mat.tilingScale : 1.0;
     vec2 uv = triplanarUV(worldPos, normal, scale);
 
+    // Temporary bridge to the unified graph model until the terrain path is reworked
+    SurfaceInputs si;
+    si.uv = uv;
+    si.worldPos = worldPos;
+    si.worldNormal = normal;
+    si.tangent = vec3(1.0, 0.0, 0.0);
+    si.bitangent = vec3(0.0, 0.0, 1.0);
+    si.flags = mat.flags;
+
+    SurfaceData surf = evalSurfaceGraph(mat.graphId, si, mat.graphDataOffset);
+
     TerrainSample s;
-    s.albedo = SAMPLE_ALBEDO(mat, u_textures, uv);
-    s.roughness = SAMPLE_ROUGHNESS(mat, u_textures, uv);
-    s.metallic = SAMPLE_METALLIC(mat, u_textures, uv);
-    s.ao = SAMPLE_AO(mat, u_textures, uv);
+    s.albedo = surf.albedo;
+    s.roughness = surf.roughness;
+    s.metallic = surf.metallic;
+    s.ao = surf.ao;
     return s;
 }
 

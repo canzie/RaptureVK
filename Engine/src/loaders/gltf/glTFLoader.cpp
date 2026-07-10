@@ -21,6 +21,9 @@
 #include "materials/Material.h"
 #include "materials/MaterialInstance.h"
 #include "materials/MaterialParameters.h"
+#include "materials/graph/MaterialGraph.h"
+#include "materials/graph/MaterialGraphCompiler.h"
+#include "materials/graph/SurfaceGraphManager.h"
 #include "meshes/Mesh.h"
 #include "scenes/entities/Entity.h"
 
@@ -746,6 +749,91 @@ SceneFileMetadata glTF2Loader::getMetadata()
     return metadata;
 }
 
+/**
+ * @brief The glTF metallic-roughness base material, built and registered on first use
+ *
+ * The graph is authored here so the loader owns which node backs which parameter; the offsets the
+ * compiler assigns are resolved into the parameter table the base exposes.
+ */
+static std::shared_ptr<BaseMaterial> s_obtainGltfBaseMaterial()
+{
+    if (auto existing = MaterialManager::getMaterial("glTF Base Material")) {
+        return existing;
+    }
+
+    AssetPtr<Texture> white(AssetManager::importDefaultAsset(AssetType::TEXTURE));
+    AssetPtr<Texture> flatNormal(
+        AssetManager::registerVirtualAsset(Texture::createDefaultFlatNormalTexture(), "<default_flat_normal>", AssetType::TEXTURE));
+
+    using GN = GraphNodeType;
+    MaterialGraph graph;
+    graph.name = "glTF";
+
+    graph.nodes.push_back({.id = 1, .type = GN::TEXCOORD});
+
+    graph.nodes.push_back({.id = 2, .type = GN::TEXTURE_SAMPLE, .inputTextures = {white}});
+    graph.nodes.push_back({.id = 3, .type = GN::CONSTANT_VEC4, .inputValues = {PinValue(glm::vec4(1.0f))}});
+    graph.nodes.push_back({.id = 4, .type = GN::MULTIPLY_VEC3});
+
+    graph.nodes.push_back({.id = 5, .type = GN::TEXTURE_SAMPLE, .inputTextures = {flatNormal}});
+    graph.nodes.push_back({.id = 6, .type = GN::NORMAL_MAP_RG});
+
+    graph.nodes.push_back({.id = 7, .type = GN::TEXTURE_SAMPLE, .inputTextures = {white}});
+    graph.nodes.push_back({.id = 8, .type = GN::SPLIT_VEC4});
+    graph.nodes.push_back({.id = 9, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(1.0f)}});
+    graph.nodes.push_back({.id = 10, .type = GN::MULTIPLY_FLOAT});
+    graph.nodes.push_back({.id = 11, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(1.0f)}});
+    graph.nodes.push_back({.id = 12, .type = GN::MULTIPLY_FLOAT});
+
+    graph.nodes.push_back({.id = 13, .type = GN::TEXTURE_SAMPLE, .inputTextures = {white}});
+    graph.nodes.push_back({.id = 14, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(1.0f)}});
+    graph.nodes.push_back({.id = 15, .type = GN::MULTIPLY_FLOAT});
+
+    graph.nodes.push_back({.id = 16, .type = GN::TEXTURE_SAMPLE, .inputTextures = {white}});
+    graph.nodes.push_back({.id = 17, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(1.0f))}});
+    graph.nodes.push_back({.id = 18, .type = GN::MULTIPLY_VEC3});
+    graph.nodes.push_back({.id = 19, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(0.0f)}});
+
+    graph.nodes.push_back({.id = 20, .type = GN::SURFACE_OUTPUT});
+    graph.outputNodeId = 20;
+
+    graph.connections = {
+        {1, 0, 2, 1},   {1, 0, 5, 1},   {1, 0, 7, 1},   {1, 0, 13, 1},  {1, 0, 16, 1},  {2, 0, 4, 0},
+        {3, 0, 4, 1},   {4, 0, 20, 0},  {5, 0, 6, 0},   {6, 0, 20, 1},  {7, 0, 8, 0},   {8, 1, 10, 0},
+        {9, 0, 10, 1},  {10, 0, 20, 2}, {8, 2, 12, 0},  {11, 0, 12, 1}, {12, 0, 20, 3}, {13, 0, 15, 0},
+        {14, 0, 15, 1}, {15, 0, 20, 4}, {16, 0, 18, 0}, {17, 0, 18, 1}, {18, 0, 20, 5}, {19, 0, 20, 6},
+    };
+
+    SurfaceGraphManager &graphs = MaterialManager::getSurfaceGraphManager();
+    uint32_t graphId = graphs.registerGraph(graph);
+    if (graphId == UINT32_MAX) {
+        RP_CORE_ERROR("Failed to compile the glTF base material graph");
+        return nullptr;
+    }
+
+    GraphSlotMapping mapping = graphs.getMapping(graphId);
+    std::unordered_map<ParameterID, uint32_t> table;
+    auto bind = [&](ParameterID id, uint32_t nodeId) {
+        auto slot = mapping.slots.find(Graph_pinKey(nodeId, 0));
+        if (slot != mapping.slots.end()) {
+            table[id] = slot->second.offset;
+        }
+    };
+    bind(ParameterID::ALBEDO_MAP, 2);
+    bind(ParameterID::ALBEDO, 3);
+    bind(ParameterID::NORMAL_MAP, 5);
+    bind(ParameterID::METALLIC_ROUGHNESS_MAP, 7);
+    bind(ParameterID::ROUGHNESS, 9);
+    bind(ParameterID::METALLIC, 11);
+    bind(ParameterID::AO_MAP, 13);
+    bind(ParameterID::AO, 14);
+    bind(ParameterID::EMISSIVE_MAP, 16);
+    bind(ParameterID::EMISSIVE, 17);
+    bind(ParameterID::EMISSIVE_STRENGTH, 19);
+
+    return MaterialManager::createMaterial("glTF Base Material", graphId, std::move(table));
+}
+
 AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
 {
     auto it = m_loadedData->materials.find(materialIndex);
@@ -771,7 +859,10 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
     float metallic = 0.0f;
     float roughness = 0.5f;
 
-    auto baseMaterial = MaterialManager::getMaterial("PBR");
+    auto baseMaterial = s_obtainGltfBaseMaterial();
+    if (!baseMaterial) {
+        return AssetRef();
+    }
     auto material = std::make_unique<MaterialInstance>(baseMaterial, materialName);
 
     yyjson_val *pbrMetallicRoughness = getObjectValue(materialVal, "pbrMetallicRoughness");
@@ -836,9 +927,9 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
 
     yyjson_val *emissiveFactorVal = getObjectValue(materialVal, "emissiveFactor");
     if (emissiveFactorVal && yyjson_is_arr(emissiveFactorVal) && getArraySize(emissiveFactorVal) >= 3) {
-        glm::vec4 emissiveFactor(static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 0), 0.0)),
+        glm::vec3 emissiveFactor(static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 0), 0.0)),
                                  static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 1), 0.0)),
-                                 static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 2), 0.0)), 1.0f);
+                                 static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 2), 0.0)));
         material->setParameter(ParameterID::EMISSIVE, emissiveFactor);
     }
 

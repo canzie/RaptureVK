@@ -45,12 +45,6 @@ class NodeEditorPanel : public Panel {
     void compileGraph(void);
 
     /**
-     * @brief Replaces the canvas with a graph synthesised from a material's parameters and maps
-     * @param material The material to represent as nodes
-     */
-    void loadMaterialAsGraph(const Rapture::MaterialInstance &material);
-
-    /**
      * @brief Which texture source an editor-only texture node samples
      */
     enum class TextureNodeKind {

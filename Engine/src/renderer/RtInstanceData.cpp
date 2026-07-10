@@ -71,11 +71,6 @@ void RtInstanceData::rebuild(Scene &scene)
 
         RtInstanceInfo &info = infos[i];
         info = {};
-        info.AlbedoTextureIndex = UINT32_MAX;
-        info.NormalTextureIndex = UINT32_MAX;
-        info.EmissiveFactorTextureIndex = UINT32_MAX;
-        info.albedo = glm::vec3(1.0f);
-        info.emissiveColor = glm::vec3(0.0f);
 
         if (view.contains(ent)) {
             auto [meshComp, materialComp, transformComp] = view.get<MeshComponent, MaterialComponent, TransformComponent>(ent);
@@ -83,15 +78,7 @@ void RtInstanceData::rebuild(Scene &scene)
             info.modelMatrix = transformComp.transformMatrix();
 
             if (materialComp.material) {
-                auto *mat = materialComp.material.get();
-                info.AlbedoTextureIndex = mat->getParameter<uint32_t>(ParameterID::ALBEDO_MAP);
-                info.NormalTextureIndex = mat->getParameter<uint32_t>(ParameterID::NORMAL_MAP);
-                info.flags = mat->getFlags();
-                info.EmissiveFactorTextureIndex = mat->getParameter<uint32_t>(ParameterID::EMISSIVE_MAP);
-                glm::vec4 albedo4 = mat->getParameter<glm::vec4>(ParameterID::ALBEDO);
-                glm::vec4 emissive4 = mat->getParameter<glm::vec4>(ParameterID::EMISSIVE);
-                info.albedo = glm::vec3(albedo4.x, albedo4.y, albedo4.z);
-                info.emissiveColor = glm::vec3(emissive4.x, emissive4.y, emissive4.z);
+                info.materialIndex = materialComp.material->getBindlessIndex();
             }
 
             if (meshComp.mesh) {
@@ -164,18 +151,13 @@ void RtInstanceData::patchDirty(Scene &scene)
 
     if (!m_buffer) return;
 
-    constexpr size_t MAT_START = offsetof(RtInstanceInfo, AlbedoTextureIndex);
+    constexpr size_t MAT_START = offsetof(RtInstanceInfo, materialIndex);
     constexpr size_t MAT_END = offsetof(RtInstanceInfo, iboIndex);
     constexpr size_t MAT_SIZE = MAT_END - MAT_START;
     constexpr size_t TRANSFORM_OFFSET = offsetof(RtInstanceInfo, modelMatrix);
 
     struct PackedMat {
-        uint32_t AlbedoTextureIndex;
-        uint32_t NormalTextureIndex;
-        uint32_t flags;
-        alignas(16) glm::vec3 albedo;
-        alignas(16) glm::vec3 emissiveColor;
-        uint32_t EmissiveFactorTextureIndex;
+        uint32_t materialIndex;
     };
 
     for (auto *mat : m_dirtyMaterials) {
@@ -185,14 +167,7 @@ void RtInstanceData::patchDirty(Scene &scene)
         if (it == m_materialToOffsets.end()) continue;
 
         PackedMat packed = {};
-        packed.AlbedoTextureIndex = mat->getParameter<uint32_t>(ParameterID::ALBEDO_MAP);
-        packed.NormalTextureIndex = mat->getParameter<uint32_t>(ParameterID::NORMAL_MAP);
-        packed.flags = mat->getFlags();
-        glm::vec4 albedo4 = mat->getParameter<glm::vec4>(ParameterID::ALBEDO);
-        glm::vec4 emissive4 = mat->getParameter<glm::vec4>(ParameterID::EMISSIVE);
-        packed.albedo = glm::vec3(albedo4.x, albedo4.y, albedo4.z);
-        packed.emissiveColor = glm::vec3(emissive4.x, emissive4.y, emissive4.z);
-        packed.EmissiveFactorTextureIndex = mat->getParameter<uint32_t>(ParameterID::EMISSIVE_MAP);
+        packed.materialIndex = mat->getBindlessIndex();
 
         for (uint32_t baseOffset : it->second) {
             uint32_t dst = baseOffset + static_cast<uint32_t>(MAT_START);

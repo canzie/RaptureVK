@@ -53,18 +53,14 @@ precision highp float;
 // Added constant to represent an invalid index/offset (all bits set)
 const uint UINT32_MAX = 0xFFFFFFFFu;
 
-// Mirror of MaterialData.h: normal map is BC5-compressed (reconstruct Z from RG)
-const uint MAT_FLAG_NORMAL_BC5 = 1u << 14;
+// Material header SSBO, graph pool and the generated diffuse surface graph dispatcher
+#include "common/MaterialCommon.glsl"
+#include "generated/SurfaceGraphsDiffuse.glsl"
 
-// Simplified MeshInfo structure matching our C++ version
+// Per-instance geometry info, mirror of RtInstanceInfo (RtInstanceData.h)
 struct MeshInfo {
-    uint AlbedoTextureIndex;
-    uint NormalTextureIndex;
-    uint flags;
-    vec3 albedo;
-    vec3 emissiveColor;
-    uint EmissiveFactorTextureIndex;
-    
+    uint materialIndex; // bindless index into the material header SSBO
+
     uint iboIndex; // index of the buffer in the bindless buffers array
     uint vboIndex; // index of the buffer in the bindless buffers array
     uint meshIndex; // index of the mesh in the mesh array, this is the same index as the tlasinstance instanceCustomIndex
@@ -92,8 +88,8 @@ layout(std430, set=3, binding = 9) readonly buffer SceneInfo {
 #define DESCRIPTOR_ARRAYS_DEFINED
 #endif
 
-#include "ProbeCommon.glsl"
-#include "IrradianceCommon.glsl"
+#include "ddgi/ProbeCommon.glsl"
+#include "ddgi/IrradianceCommon.glsl"
 
 // Input Uniforms / Buffers
 layout(std140, set=0, binding = 5) uniform ProbeInfo {
@@ -114,8 +110,8 @@ struct VertexAttributes {
     vec3 bitangent;
 };
 
-// Interpolated surface data
-struct SurfaceData {
+// Interpolated hit geometry (distinct from MaterialCommon's shading SurfaceData)
+struct HitSurface {
     vec3 position;
     vec2 texCoord;
     vec3 normal;
@@ -223,10 +219,10 @@ VertexAttributes fetchVertexAttributes(uint vertexIndex, MeshInfo meshInfo) {
 /**
  * Interpolates vertex attributes using barycentric coordinates
  */
-SurfaceData interpolateVertexAttributes(VertexAttributes v0, VertexAttributes v1, VertexAttributes v2, vec2 barycentrics) {
+HitSurface interpolateVertexAttributes(VertexAttributes v0, VertexAttributes v1, VertexAttributes v2, vec2 barycentrics) {
     vec3 weights = vec3(1.0 - barycentrics.x - barycentrics.y, barycentrics.x, barycentrics.y);
     
-    SurfaceData surface;
+    HitSurface surface;
     surface.position = v0.position * weights.x + v1.position * weights.y + v2.position * weights.z;
     surface.texCoord = v0.texCoord * weights.x + v1.texCoord * weights.y + v2.texCoord * weights.z;
     surface.normal = normalize(v0.normal * weights.x + v1.normal * weights.y + v2.normal * weights.z);
@@ -251,7 +247,7 @@ SurfaceData interpolateVertexAttributes(VertexAttributes v0, VertexAttributes v1
 /**
  * Gets complete surface data for a ray hit
  */
-SurfaceData getSurfaceDataForHit(uint primitiveID, vec2 barycentrics, MeshInfo meshInfo) {
+HitSurface getSurfaceDataForHit(uint primitiveID, vec2 barycentrics, MeshInfo meshInfo) {
     // Fetch triangle indices
     uvec3 indices = fetchTriangleIndices(primitiveID, meshInfo);
     
@@ -264,55 +260,19 @@ SurfaceData getSurfaceDataForHit(uint primitiveID, vec2 barycentrics, MeshInfo m
     return interpolateVertexAttributes(v0, v1, v2, barycentrics);
 }
 
-vec3 sampleAlbedo(MeshInfo meshInfo, vec2 uv) {
-    uint texIndex = meshInfo.AlbedoTextureIndex;
-    vec3 baseColor = meshInfo.albedo;
+// Evaluates the material's compiled diffuse surface graph at a hit point
+SurfaceDataDiffuse evalHitSurface(MeshInfo meshInfo, HitSurface hit) {
+    MaterialData mat = getMaterialData(meshInfo.materialIndex);
 
-    if(texIndex == UINT32_MAX || texIndex == 0) {
-        return baseColor; 
-    }
+    SurfaceInputs si;
+    si.uv = hit.texCoord;
+    si.worldPos = hit.position;
+    si.worldNormal = hit.normal;
+    si.tangent = hit.tangent.xyz;
+    si.bitangent = hit.bitangent;
+    si.flags = mat.flags;
 
-    vec4 albedoMaterial = textureLod(gTextures[texIndex], uv, 0.0);
-    return baseColor * albedoMaterial.rgb;
-}
-
-vec3 sampleEmissiveColor(MeshInfo meshInfo, vec2 uv) {
-    uint texIndex = meshInfo.EmissiveFactorTextureIndex;
-    if(texIndex == UINT32_MAX || texIndex == 0) {
-        return meshInfo.emissiveColor;
-    }
-    return textureLod(gTextures[texIndex], uv, 0.0).rgb * meshInfo.emissiveColor;
-}
-
-vec3 calculateShadingNormal(
-    MeshInfo meshInfo,
-    vec2 uv,
-    vec3 N_geom,   // Interpolated geometric normal (world space)
-    vec4 T_geom,   // Interpolated tangent (world space, w component contains handedness)
-    vec3 B_geom    // Pre-computed bitangent (world space)
-) {
-    // If no normal map is provided, just return the geometric normal
-    // This avoids issues with inconsistent tangent generation
-    if (meshInfo.NormalTextureIndex == UINT32_MAX || meshInfo.NormalTextureIndex == 0) {
-        return normalize(N_geom);
-    }
-
-    // Apply normal map only if a valid texture index is provided
-    vec3 tangentNormal;
-    if ((meshInfo.flags & MAT_FLAG_NORMAL_BC5) != 0u) {
-        vec2 xy = textureLod(gTextures[meshInfo.NormalTextureIndex], uv, 0.0).rg * 2.0 - 1.0;
-        tangentNormal = vec3(xy, sqrt(max(0.0, 1.0 - dot(xy, xy))));
-    } else {
-        tangentNormal = textureLod(gTextures[meshInfo.NormalTextureIndex], uv, 0.0).xyz * 2.0 - 1.0;
-    }
-
-    // Use the pre-computed tangent, bitangent, and normal directly
-    vec3 N = normalize(N_geom);
-    vec3 T = normalize(T_geom.xyz);
-    vec3 B = normalize(B_geom);
-
-    mat3 TBN = mat3(T, B, N);
-    return normalize(TBN * tangentNormal);
+    return evalSurfaceGraphDiffuse(mat.graphId, si, mat.graphDataOffset);
 }
 
 void main() {
@@ -384,14 +344,14 @@ void main() {
 
             // Get mesh info using the instance custom index
             MeshInfo meshInfo = u_sceneInfo.MeshInfos[instanceCustomIndex];
-            
-            // Get complete surface data for the hit point
-            SurfaceData surface = getSurfaceDataForHit(primitiveID, barycentrics, meshInfo);
-            
-            vec3 worldShadingNormal = calculateShadingNormal(meshInfo, surface.texCoord, surface.normal, surface.tangent, surface.bitangent);
-            vec3 albedo = sampleAlbedo(meshInfo, surface.texCoord);
-            vec3 emissiveColor = sampleEmissiveColor(meshInfo, surface.texCoord);
-            //albedo += emissiveColor; 
+
+            // Get interpolated hit geometry, then run the material's diffuse surface graph
+            HitSurface surface = getSurfaceDataForHit(primitiveID, barycentrics, meshInfo);
+            SurfaceDataDiffuse mat = evalHitSurface(meshInfo, surface);
+
+            vec3 worldShadingNormal = normalize(mat.normal);
+            vec3 albedo = mat.albedo;
+            vec3 emissiveColor = mat.emission.rgb * mat.emissiveStrength;
     
             // Indirect Lighting (recursive)
             vec3 irradiance = vec3(0.0);

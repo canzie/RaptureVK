@@ -1,5 +1,4 @@
 /**
- * @file SurfaceGraphs.glsl
  * @brief Generated surface graph functions and their dispatcher
  * @author Rapture Material Graph Compiler
  * @version 2
@@ -9,7 +8,53 @@
 #ifndef SURFACE_GRAPHS_GLSL
 #define SURFACE_GRAPHS_GLSL
 
-SurfaceData evalSurface_Graph0_0(SurfaceInputs si, uint base){
+SurfaceData evalSurface_Default_0(SurfaceInputs si, uint base){
+SurfaceData surf;
+surf.albedo=vec3(1.0);
+surf.normal=normalize(si.worldNormal);
+surf.roughness=0.5;
+surf.metallic=0.0;
+surf.ao=1.0;
+surf.emission=vec4(1.0);
+surf.emissiveStrength=0.0;
+surf.shadingModelId=SM_OPENPBR_STANDARD;
+return surf;
+}
+
+SurfaceData evalSurface_glTF_1(SurfaceInputs si, uint base){
+SurfaceData surf;
+float _n0=uintBitsToFloat(u_graphPool.data[base + 0]);
+vec3 _n1=vec3(uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]), uintBitsToFloat(u_graphPool.data[base + 3]));
+vec2 _n2=si.uv;
+vec4 _n3=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 4])], _n2);
+vec3 _n4=(_n3).xyz * _n1;
+float _n5=uintBitsToFloat(u_graphPool.data[base + 5]);
+vec4 _n6=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 6])], _n2);
+float _n7=(_n6).x * _n5;
+float _n8=uintBitsToFloat(u_graphPool.data[base + 7]);
+vec4 _n9=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 8])], _n2);
+float _n10=(_n9).y;
+float _n11=(_n9).z;
+float _n12=_n11 * _n8;
+float _n13=uintBitsToFloat(u_graphPool.data[base + 9]);
+float _n14=_n10 * _n13;
+vec4 _n15=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 10])], _n2);
+vec3 _n16=normalize(mat3(normalize(si.tangent), normalize(si.bitangent), normalize(si.worldNormal)) * reconstructNormalZ(((_n15).xyz).xy));
+vec4 _n17=vec4(uintBitsToFloat(u_graphPool.data[base + 11]), uintBitsToFloat(u_graphPool.data[base + 12]), uintBitsToFloat(u_graphPool.data[base + 13]), uintBitsToFloat(u_graphPool.data[base + 14]));
+vec4 _n18=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 15])], _n2);
+vec3 _n19=(_n18).xyz * (_n17).xyz;
+surf.albedo=_n19;
+surf.normal=_n16;
+surf.roughness=_n14;
+surf.metallic=_n12;
+surf.ao=_n7;
+surf.emission=vec4(_n4, 1.0);
+surf.emissiveStrength=_n0;
+surf.shadingModelId=SM_OPENPBR_STANDARD;
+return surf;
+}
+
+SurfaceData evalSurface_Graph0_2(SurfaceInputs si, uint base){
 SurfaceData surf;
 vec3 _n0=vec3(uintBitsToFloat(u_graphPool.data[base + 0]), uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]));
 vec3 _n1=vec3(uintBitsToFloat(u_graphPool.data[base + 3]), uintBitsToFloat(u_graphPool.data[base + 4]), uintBitsToFloat(u_graphPool.data[base + 5]));
@@ -22,11 +67,13 @@ surf.normal=normalize(si.worldNormal);
 surf.roughness=0.5;
 surf.metallic=0.0;
 surf.ao=1.0;
+surf.emission=vec4(1.0);
+surf.emissiveStrength=0.0;
 surf.shadingModelId=SM_OPENPBR_STANDARD;
 return surf;
 }
 
-SurfaceData evalSurface_Graph1_1(SurfaceInputs si, uint base){
+SurfaceData evalSurface_Graph1_3(SurfaceInputs si, uint base){
 SurfaceData surf;
 float _n0=uintBitsToFloat(u_graphPool.data[base + 0]);
 float _n1=uintBitsToFloat(u_graphPool.data[base + 1]);
@@ -47,14 +94,18 @@ surf.normal=normalize(si.worldNormal);
 surf.roughness=_n13;
 surf.metallic=0.0;
 surf.ao=1.0;
+surf.emission=vec4(1.0);
+surf.emissiveStrength=0.0;
 surf.shadingModelId=SM_OPENPBR_STANDARD;
 return surf;
 }
 
 SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint base) {
     switch (graphId) {
-        case 0u: return evalSurface_Graph0_0(si, base);
-        case 1u: return evalSurface_Graph1_1(si, base);
+        case 0u: return evalSurface_Default_0(si, base);
+        case 1u: return evalSurface_glTF_1(si, base);
+        case 2u: return evalSurface_Graph0_2(si, base);
+        case 3u: return evalSurface_Graph1_3(si, base);
     }
 
     SurfaceData surf;
@@ -63,6 +114,8 @@ SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint base) {
     surf.roughness = 0.5;
     surf.metallic = 0.0;
     surf.ao = 1.0;
+    surf.emission = vec4(0.0);
+    surf.emissiveStrength = 0.0;
     surf.shadingModelId = SM_OPENPBR_STANDARD;
     return surf;
 }

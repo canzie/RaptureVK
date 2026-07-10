@@ -2,7 +2,6 @@
 #define RAPTURE__MATERIAL_DATA_H
 
 #include <cstdint>
-#include <glm/glm.hpp>
 
 namespace Rapture {
 
@@ -45,71 +44,61 @@ inline bool hasFlag(uint32_t flags, uint32_t flag)
     return (flags & flag) != 0;
 }
 
-// ============================================================================
-// Material Data Struct - 96 bytes, std140 compatible
-// Must match MaterialCommon.glsl exactly
-// ============================================================================
+// Per-material header indexed by material id. Surface inputs live in the graph slice at
+// graphDataOffset; the terrain scalars are kept until the terrain path is removed.
+struct MaterialData {
+    uint32_t flags;
+    uint32_t graphId;
+    uint32_t graphDataOffset;
+    float tilingScale;
+    float heightBlend;
+    float slopeThreshold;
 
-struct alignas(16) MaterialData {
-    glm::vec4 albedo; // 0-16: rgb = albedo, a = alpha
-
-    float roughness; // 16-20
-    float metallic;  // 20-24
-    float ao;        // 24-28
-    uint32_t flags;  // 28-32
-
-    glm::vec4 emissive; // 32-48: rgb = color, a = strength
-
-    glm::uvec4 texIndices0; // 48-64: albedo, normal, metallicRoughness, ao
-    glm::uvec4 texIndices1; // 64-80: emissive, height, specular, splatMap
-
-    float tilingScale;    // 80-84
-    float heightBlend;    // 84-88
-    float slopeThreshold; // 88-92
-
-    uint32_t graphId;         // 92-96: which generated surface function (when MAT_FLAG_IS_GRAPH)
-    uint32_t graphDataOffset; // 96-100: uint offset of this instance's slice into the graph arena
-    // alignas(16) rounds the struct out to 112 (trailing 100-112 unused)
-
-    // Returns a MaterialData with sensible defaults
-    // defaultTexIndex should be the bindless index of a 1x1 white texture
-    static MaterialData createDefault(uint32_t defaultTexIndex)
+    /**
+     * @brief A header with default terrain scalars and no bound graph
+     * @return The default material header
+     */
+    static MaterialData createDefault()
     {
         MaterialData data{};
-        data.albedo = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        data.roughness = 0.5f;
-        data.metallic = 0.0f;
-        data.ao = 1.0f;
-        data.flags = 0;
-        data.emissive = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-        data.texIndices0 = glm::uvec4(defaultTexIndex);
-        data.texIndices1 = glm::uvec4(defaultTexIndex);
         data.tilingScale = 1.0f;
         data.heightBlend = 0.5f;
         data.slopeThreshold = 0.7f;
-        data.graphId = 0;
-        data.graphDataOffset = 0;
         return data;
     }
 };
 
-static_assert(sizeof(MaterialData) == 112, "MaterialData must be 112 bytes for std140/std430 compatibility");
+static_assert(sizeof(MaterialData) == 24, "MaterialData must be 24 bytes to match its std430 mirror");
 
-// ============================================================================
-// Texture Index Helpers
-// ============================================================================
+/**
+ * @brief One field of a surface output struct, mirroring MaterialCommon.glsl
+ *
+ * The graph compiler emits an assignment per field for the chosen surface variant, so these lists
+ * must stay in sync with SurfaceData / SurfaceDataDiffuse. The coercion type comes from the matching
+ * SURFACE_OUTPUT pin, so only the name and the unconnected fallback expression live here.
+ */
+struct SurfaceOutputField {
+    const char *name;
+    const char *fallback;
+};
 
-// Indices into texIndices0
-constexpr uint32_t TEX_IDX_ALBEDO = 0;
-constexpr uint32_t TEX_IDX_NORMAL = 1;
-constexpr uint32_t TEX_IDX_METALLIC_ROUGHNESS = 2;
-constexpr uint32_t TEX_IDX_AO = 3;
+inline constexpr SurfaceOutputField SURFACE_DATA_FIELDS[] = {
+    {"albedo", "vec3(1.0)"},
+    {"normal", "normalize(si.worldNormal)"},
+    {"roughness", "0.5"},
+    {"metallic", "0.0"},
+    {"ao", "1.0"},
+    {"emission", "vec4(1.0)"},
+    {"emissiveStrength", "0.0"},
+    {"shadingModelId", "SM_OPENPBR_STANDARD"},
+};
 
-// Indices into texIndices1
-constexpr uint32_t TEX_IDX_EMISSIVE = 0;
-constexpr uint32_t TEX_IDX_HEIGHT = 1;
-constexpr uint32_t TEX_IDX_SPECULAR = 2;
-constexpr uint32_t TEX_IDX_SPLAT_MAP = 3;
+inline constexpr SurfaceOutputField SURFACE_DATA_DIFFUSE_FIELDS[] = {
+    {"albedo", "vec3(1.0)"},
+    {"normal", "normalize(si.worldNormal)"},
+    {"emission", "vec4(1.0)"},
+    {"emissiveStrength", "0.0"},
+};
 
 } // namespace Rapture
 

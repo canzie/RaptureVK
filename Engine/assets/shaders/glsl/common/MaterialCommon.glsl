@@ -29,30 +29,15 @@ const uint MAT_FLAG_HAS_SPLAT_MAP  = 1u << 17;
 const uint MAT_FLAG_USE_TRIPLANAR  = 1u << 18;
 const uint MAT_FLAG_IS_GRAPH       = 1u << 19;
 
-// ============================================================================
-// Material Data Struct - 96 bytes, std140 compatible
-// Texture indices default to 0 (white texture) when not used
-// ============================================================================
-
+// Per-material header, mirror of MaterialData.h. Surface inputs live in the graph slice at
+// graphDataOffset; the terrain scalars are kept until the terrain path is removed.
 struct MaterialData {
-    vec4 albedo;               // 0-16: rgb = albedo, a = alpha
-
-    float roughness;           // 16-20
-    float metallic;            // 20-24
-    float ao;                  // 24-28
-    uint flags;                // 28-32
-
-    vec4 emissive;             // 32-48: rgb = color, a = strength
-
-    uvec4 texIndices0;         // 48-64: albedo, normal, metallicRoughness, ao
-    uvec4 texIndices1;         // 64-80: emissive, height, specular, splatMap
-
-    float tilingScale;         // 80-84
-    float heightBlend;         // 84-88
-    float slopeThreshold;      // 88-92
-    uint graphId;              // 92-96: which generated surface function (when MAT_FLAG_IS_GRAPH)
-    uint graphDataOffset;      // 96-100: uint offset of this instance's slice into the graph arena
-    // std430 rounds the struct out to 112 (trailing 100-112 unused)
+    uint flags;
+    uint graphId;
+    uint graphDataOffset;
+    float tilingScale;
+    float heightBlend;
+    float slopeThreshold;
 };
 
 // ============================================================================
@@ -78,6 +63,9 @@ layout(std430, set = 1, binding = 1) readonly buffer GraphPoolBuffer {
     uint data[];
 } u_graphPool;
 
+// Bindless texture array sampled by the generated surface graph texture nodes (set 3, binding 0)
+layout(set = 3, binding = 0) uniform sampler2D u_textures[];
+
 #include "common/ShadingModels.glsl"
 
 // ============================================================================
@@ -100,7 +88,16 @@ struct SurfaceData {
     float roughness;
     float metallic;
     float ao;
+    vec4 emission;
+    float emissiveStrength;
     uint shadingModelId;
+};
+
+struct SurfaceDataDiffuse {
+    vec3 albedo;
+    vec3 normal;        // world space
+    vec4 emission;
+    float emissiveStrength;
 };
 
 // ============================================================================
@@ -141,26 +138,5 @@ vec3 reconstructNormalZ(vec2 xy) {
     float z = sqrt(max(0.0, 1.0 - dot(n, n)));
     return vec3(n, z);
 }
-
-// Sampling macros - TEXTURES must be the bindless sampler2D array declared in the shader
-#define SAMPLE_ALBEDO(mat, TEXTURES, uv) \
-    (mat.albedo.rgb * mix(vec3(1.0), texture(TEXTURES[mat.texIndices0.x], uv).rgb, matFlagMul(mat.flags, MAT_FLAG_HAS_ALBEDO_MAP)))
-
-#define SAMPLE_ROUGHNESS(mat, TEXTURES, uv) \
-    (mat.roughness * mix(1.0, texture(TEXTURES[mat.texIndices0.z], uv).g, matFlagMul(mat.flags, MAT_FLAG_HAS_METALLIC_ROUGHNESS_MAP)))
-
-#define SAMPLE_METALLIC(mat, TEXTURES, uv) \
-    (mat.metallic * mix(1.0, texture(TEXTURES[mat.texIndices0.z], uv).b, matFlagMul(mat.flags, MAT_FLAG_HAS_METALLIC_ROUGHNESS_MAP)))
-
-#define SAMPLE_AO(mat, TEXTURES, uv) \
-    (mat.ao * mix(1.0, texture(TEXTURES[mat.texIndices0.w], uv).r, matFlagMul(mat.flags, MAT_FLAG_HAS_AO_MAP)))
-
-#define SAMPLE_NORMAL_MAP(mat, TEXTURES, uv) ( \
-    matHasFlag(mat.flags, MAT_FLAG_NORMAL_BC5) \
-        ? reconstructNormalZ(texture(TEXTURES[mat.texIndices0.y], uv).rg) \
-        : mix(vec3(0.0, 0.0, 1.0), texture(TEXTURES[mat.texIndices0.y], uv).xyz * 2.0 - 1.0, matFlagMul(mat.flags, MAT_FLAG_HAS_NORMAL_MAP)))
-
-#define SAMPLE_EMISSIVE(mat, TEXTURES, uv) \
-    (mat.emissive.rgb * mat.emissive.a * mix(vec3(1.0), texture(TEXTURES[mat.texIndices1.x], uv).rgb, matFlagMul(mat.flags, MAT_FLAG_HAS_EMISSIVE_MAP)))
 
 #endif // MATERIAL_COMMON_GLSL

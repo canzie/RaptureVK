@@ -108,6 +108,7 @@ class Texture {
                        VkCommandBuffer extCommandBuffer = VK_NULL_HANDLE, bool useInternalFence = true);
 
     static std::unique_ptr<Texture> createDefaultWhiteTexture();
+    static std::unique_ptr<Texture> createDefaultFlatNormalTexture();
     static std::unique_ptr<Texture> createDefaultWhiteCubemapTexture();
 
   private:

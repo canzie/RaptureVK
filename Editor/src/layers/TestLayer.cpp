@@ -178,7 +178,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
             transform.transforms.setTranslation(position);
             transform.transforms.setScale(glm::vec3(2.0f));
 
-            auto baseMaterial = Rapture::MaterialManager::getMaterial("PBR");
+            auto baseMaterial = Rapture::MaterialManager::getMaterial("Default Material");
             auto mat = std::make_unique<Rapture::MaterialInstance>(baseMaterial, name);
             mat->setGraph(graphId, graphManager.getDefaults(graphId), graphManager.getTextureRefs(graphId));
 

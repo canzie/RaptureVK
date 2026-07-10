@@ -68,14 +68,30 @@ struct GraphSlotMapping {
 };
 
 /**
- * @brief Result of compiling one graph: the emitted GLSL plus the data it expects
+ * @brief Which surface a compiled function produces
+ */
+enum class SurfaceVariant {
+    GBUFFER,
+    DIFFUSE,
+};
+
+/**
+ * @brief One compiled variant of a graph: which surface it produces and its GLSL
+ */
+struct CompiledFunction {
+    SurfaceVariant variant = SurfaceVariant::GBUFFER;
+    std::string functionName;
+    std::string glslFunction;
+};
+
+/**
+ * @brief Result of compiling one graph: the emitted GLSL variants plus the data they expect
  */
 struct CompileResult {
     bool success = false;
     std::vector<MaterialCompilerDiagnostic> diagnostics;
 
-    std::string functionName;
-    std::string glslFunction;
+    std::vector<CompiledFunction> functions; // one per SurfaceVariant, sharing the slice layout below
     uint32_t graphId = 0; // global identifier for the graph among all registered graphs
 
     GraphInstanceData defaults; // packed default slice, one uint per texture index and per value component

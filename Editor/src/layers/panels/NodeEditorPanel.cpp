@@ -524,7 +524,6 @@ void NodeEditorPanel::selectMaterial(Rapture::AssetHandle handle)
         return;
     }
     m_materialDropdown->setText(Rapture::AssetManager::getAssetMetadata(handle).getName());
-    loadMaterialAsGraph(*material);
 }
 
 std::vector<Amethyst::ContextMenuItem> NodeEditorPanel::buildAddMenu()
@@ -1091,101 +1090,6 @@ void NodeEditorPanel::setImageTexture(uint32_t nodeId, Rapture::AssetPtr<Rapture
 
     if (tex != nullptr && it->second.textureData->preview != nullptr && m_services.registerTexture) {
         it->second.textureData->preview->setImage(m_services.registerTexture(tex));
-    }
-}
-
-void NodeEditorPanel::loadMaterialAsGraph(const Rapture::MaterialInstance &material)
-{
-    if (m_content == nullptr) {
-        return;
-    }
-    clearGraph();
-
-    const Rapture::MaterialData &data = material.getData();
-    uint32_t flags = data.flags;
-
-    // Sources sit on the left, an optional middle stage feeds the sink on the right.
-    static constexpr float COL_SOURCE = 0.0f;
-    static constexpr float COL_MIDDLE = 260.0f;
-    static constexpr float COL_SINK = 560.0f;
-    static constexpr float BAND = 320.0f;
-
-    float bandY = 0.0f;
-    uint32_t sink = spawnNode(Rapture::GraphNodeType::SURFACE_OUTPUT, "PBR Surface", COL_CAT_OUTPUT,
-                              Amethyst::vec2(COL_SINK, BAND));
-
-    // Albedo: base colour, multiplied by the albedo map only when the base colour is tinted.
-    glm::vec3 baseColor(data.albedo);
-    if (Rapture::hasFlag(flags, Rapture::MAT_FLAG_HAS_ALBEDO_MAP)) {
-        uint32_t img = spawnTextureNode(TextureNodeKind::ASSET, "Image", Amethyst::vec2(COL_SOURCE, bandY));
-        setImageTexture(img, material.getTextureRef(Rapture::ParameterID::ALBEDO_MAP));
-
-        if (baseColor != glm::vec3(1.0f)) {
-            uint32_t factor = spawnNode(Rapture::GraphNodeType::CONSTANT_VEC3, "Base Color", COL_CAT_INPUT,
-                                        Amethyst::vec2(COL_MIDDLE, bandY + 140.0f));
-            setConstantValue(factor, Rapture::PinValue(baseColor));
-            uint32_t mul = spawnNode(Rapture::GraphNodeType::MULTIPLY_VEC3, "Multiply", COL_CAT_UTILITIES,
-                                     Amethyst::vec2(COL_MIDDLE, bandY));
-            connectPins(img, 0, mul, 0);
-            connectPins(factor, 0, mul, 1);
-            connectPins(mul, 0, sink, 0);
-        } else {
-            connectPins(img, 0, sink, 0);
-        }
-    } else {
-        uint32_t color = spawnNode(Rapture::GraphNodeType::CONSTANT_VEC3, "Base Color", COL_CAT_INPUT,
-                                   Amethyst::vec2(COL_MIDDLE, bandY));
-        setConstantValue(color, Rapture::PinValue(baseColor));
-        connectPins(color, 0, sink, 0);
-    }
-    bandY += BAND;
-
-    // Normal: unpack the normal map when present, otherwise the sink keeps the mesh normal.
-    if (Rapture::hasFlag(flags, Rapture::MAT_FLAG_HAS_NORMAL_MAP)) {
-        uint32_t img = spawnTextureNode(TextureNodeKind::ASSET, "Image", Amethyst::vec2(COL_SOURCE, bandY));
-        setImageTexture(img, material.getTextureRef(Rapture::ParameterID::NORMAL_MAP));
-        uint32_t nmap = spawnNode(Rapture::GraphNodeType::NORMAL_MAP, "Normal Map", COL_CAT_GEOMETRY,
-                                  Amethyst::vec2(COL_MIDDLE, bandY));
-        connectPins(img, 0, nmap, 0);
-        connectPins(nmap, 0, sink, 1);
-        bandY += BAND;
-    }
-
-    // Roughness and metallic: split the packed metallic-roughness map (G, B), or two constants.
-    if (Rapture::hasFlag(flags, Rapture::MAT_FLAG_HAS_METALLIC_ROUGHNESS_MAP)) {
-        uint32_t img = spawnTextureNode(TextureNodeKind::ASSET, "Image", Amethyst::vec2(COL_SOURCE, bandY));
-        setImageTexture(img, material.getTextureRef(Rapture::ParameterID::METALLIC_ROUGHNESS_MAP));
-        uint32_t split = spawnNode(Rapture::GraphNodeType::SPLIT_VEC3, "Split", COL_CAT_UTILITIES,
-                                   Amethyst::vec2(COL_MIDDLE, bandY));
-        connectPins(img, 0, split, 0);
-        connectPins(split, 1, sink, 2);
-        connectPins(split, 2, sink, 3);
-        bandY += BAND;
-    } else {
-        uint32_t roughness = spawnNode(Rapture::GraphNodeType::CONSTANT_FLOAT, "Roughness", COL_CAT_INPUT,
-                                       Amethyst::vec2(COL_MIDDLE, bandY));
-        setConstantValue(roughness, Rapture::PinValue(data.roughness));
-        connectPins(roughness, 0, sink, 2);
-        uint32_t metallic = spawnNode(Rapture::GraphNodeType::CONSTANT_FLOAT, "Metallic", COL_CAT_INPUT,
-                                      Amethyst::vec2(COL_MIDDLE, bandY + 110.0f));
-        setConstantValue(metallic, Rapture::PinValue(data.metallic));
-        connectPins(metallic, 0, sink, 3);
-        bandY += BAND;
-    }
-
-    // Ambient occlusion: red channel of the AO map, or a constant.
-    if (Rapture::hasFlag(flags, Rapture::MAT_FLAG_HAS_AO_MAP)) {
-        uint32_t img = spawnTextureNode(TextureNodeKind::ASSET, "Image", Amethyst::vec2(COL_SOURCE, bandY));
-        setImageTexture(img, material.getTextureRef(Rapture::ParameterID::AO_MAP));
-        uint32_t split = spawnNode(Rapture::GraphNodeType::SPLIT_VEC3, "Split", COL_CAT_UTILITIES,
-                                   Amethyst::vec2(COL_MIDDLE, bandY));
-        connectPins(img, 0, split, 0);
-        connectPins(split, 0, sink, 4);
-    } else {
-        uint32_t ao = spawnNode(Rapture::GraphNodeType::CONSTANT_FLOAT, "AO", COL_CAT_INPUT,
-                                Amethyst::vec2(COL_MIDDLE, bandY));
-        setConstantValue(ao, Rapture::PinValue(data.ao));
-        connectPins(ao, 0, sink, 4);
     }
 }
 
@@ -1845,7 +1749,9 @@ void NodeEditorPanel::compileGraph()
         return;
     }
 
-    Rapture::RP_INFO("Graph compiled to {}:\n{}", result.functionName, result.glslFunction);
+    for (const auto &function : result.functions) {
+        Rapture::RP_INFO("Graph compiled to {}:\n{}", function.functionName, function.glslFunction);
+    }
 }
 
 static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,
