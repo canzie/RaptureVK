@@ -69,8 +69,8 @@ layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 #include "common/ShadingModels.glsl"
 
 // ============================================================================
-// Surface interface - what a surface eval reads (inputs) and writes (outputs)
-// A static material or a generated graph both fill a SurfaceData for the G-buffer
+// Surface interface - the inputs a surface eval reads
+// The per-pass output structs (SurfaceData, SurfaceDataDiffuse) are generated into their pass files
 // ============================================================================
 
 struct SurfaceInputs {
@@ -80,24 +80,6 @@ struct SurfaceInputs {
     vec3 tangent;
     vec3 bitangent;
     uint flags;
-};
-
-struct SurfaceData {
-    vec3 albedo;
-    vec3 normal;        // world space
-    float roughness;
-    float metallic;
-    float ao;
-    vec4 emission;
-    float emissiveStrength;
-    uint shadingModelId;
-};
-
-struct SurfaceDataDiffuse {
-    vec3 albedo;
-    vec3 normal;        // world space
-    vec4 emission;
-    float emissiveStrength;
 };
 
 // ============================================================================

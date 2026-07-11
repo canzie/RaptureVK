@@ -342,7 +342,7 @@ static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory 
 
 NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
 {
-    Rapture::NodeRegistry::registerBuiltins();
+    Rapture::GraphDomainRegistry::registerBuiltins();
 
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();

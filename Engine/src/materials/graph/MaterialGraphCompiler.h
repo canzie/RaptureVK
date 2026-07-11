@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "GraphDomain.h"
 #include "MaterialGraph.h"
 #include "materials/GraphInstanceData.h"
 
@@ -16,7 +17,7 @@ namespace Rapture {
  *
  * Stamped into the generated file so stale or incompatible output can be detected.
  */
-constexpr uint32_t MATERIAL_GRAPH_COMPILER_VERSION = 2;
+constexpr uint32_t MATERIAL_GRAPH_COMPILER_VERSION = 3;
 
 /**
  * @brief Severity of a compile diagnostic, ordered least to most severe
@@ -68,30 +69,23 @@ struct GraphSlotMapping {
 };
 
 /**
- * @brief Which surface a compiled function produces
- */
-enum class SurfaceVariant {
-    GBUFFER,
-    DIFFUSE,
-};
-
-/**
- * @brief One compiled variant of a graph: which surface it produces and its GLSL
+ * @brief One compiled pass of a graph: which pass it fills and its GLSL function
  */
 struct CompiledFunction {
-    SurfaceVariant variant = SurfaceVariant::GBUFFER;
+    size_t passIndex = 0; // index into the graph's domain passes
     std::string functionName;
     std::string glslFunction;
 };
 
 /**
- * @brief Result of compiling one graph: the emitted GLSL variants plus the data they expect
+ * @brief Result of compiling one graph: the emitted GLSL passes plus the data they expect
  */
 struct CompileResult {
     bool success = false;
     std::vector<MaterialCompilerDiagnostic> diagnostics;
 
-    std::vector<CompiledFunction> functions; // one per SurfaceVariant, sharing the slice layout below
+    const GraphDomain *domain = nullptr;     // the domain the graph belongs to, resolved from its sink
+    std::vector<CompiledFunction> functions; // one per domain pass, sharing the slice layout below
     uint32_t graphId = 0; // global identifier for the graph among all registered graphs
 
     GraphInstanceData defaults; // packed default slice, one uint per texture index and per value component

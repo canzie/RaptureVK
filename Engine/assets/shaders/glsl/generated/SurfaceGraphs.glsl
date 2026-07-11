@@ -1,12 +1,23 @@
 /**
  * @brief Generated surface graph functions and their dispatcher
  * @author Rapture Material Graph Compiler
- * @version 2
+ * @version 3
  * @note DO NOT EDIT, this file is regenerated from material graphs
  */
 
 #ifndef SURFACE_GRAPHS_GLSL
 #define SURFACE_GRAPHS_GLSL
+
+struct SurfaceData {
+    vec3 albedo;
+    vec3 normal;
+    float roughness;
+    float metallic;
+    float ao;
+    vec4 emission;
+    float emissiveStrength;
+    uint shadingModelId;
+};
 
 SurfaceData evalSurface_Default_0(SurfaceInputs si, uint base){
 SurfaceData surf;
@@ -23,33 +34,33 @@ return surf;
 
 SurfaceData evalSurface_glTF_1(SurfaceInputs si, uint base){
 SurfaceData surf;
-float _n0=uintBitsToFloat(u_graphPool.data[base + 0]);
-vec3 _n1=vec3(uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]), uintBitsToFloat(u_graphPool.data[base + 3]));
-vec2 _n2=si.uv;
-vec4 _n3=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 4])], _n2);
-vec3 _n4=(_n3).xyz * _n1;
-float _n5=uintBitsToFloat(u_graphPool.data[base + 5]);
-vec4 _n6=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 6])], _n2);
-float _n7=(_n6).x * _n5;
-float _n8=uintBitsToFloat(u_graphPool.data[base + 7]);
-vec4 _n9=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 8])], _n2);
-float _n10=(_n9).y;
-float _n11=(_n9).z;
-float _n12=_n11 * _n8;
-float _n13=uintBitsToFloat(u_graphPool.data[base + 9]);
-float _n14=_n10 * _n13;
-vec4 _n15=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 10])], _n2);
-vec3 _n16=normalize(mat3(normalize(si.tangent), normalize(si.bitangent), normalize(si.worldNormal)) * reconstructNormalZ(((_n15).xyz).xy));
-vec4 _n17=vec4(uintBitsToFloat(u_graphPool.data[base + 11]), uintBitsToFloat(u_graphPool.data[base + 12]), uintBitsToFloat(u_graphPool.data[base + 13]), uintBitsToFloat(u_graphPool.data[base + 14]));
-vec4 _n18=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 15])], _n2);
-vec3 _n19=(_n18).xyz * (_n17).xyz;
-surf.albedo=_n19;
-surf.normal=_n16;
-surf.roughness=_n14;
+vec4 _n0=vec4(uintBitsToFloat(u_graphPool.data[base + 11]), uintBitsToFloat(u_graphPool.data[base + 12]), uintBitsToFloat(u_graphPool.data[base + 13]), uintBitsToFloat(u_graphPool.data[base + 14]));
+vec2 _n1=si.uv;
+vec4 _n2=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 15])], _n1);
+vec3 _n3=(_n2).xyz * (_n0).xyz;
+vec4 _n4=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 10])], _n1);
+vec3 _n5=normalize(mat3(normalize(si.tangent), normalize(si.bitangent), normalize(si.worldNormal)) * reconstructNormalZ(((_n4).xyz).xy));
+float _n6=uintBitsToFloat(u_graphPool.data[base + 9]);
+vec4 _n7=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 8])], _n1);
+float _n8=(_n7).y;
+float _n9=(_n7).z;
+float _n10=_n8 * _n6;
+float _n11=uintBitsToFloat(u_graphPool.data[base + 7]);
+float _n12=_n9 * _n11;
+float _n13=uintBitsToFloat(u_graphPool.data[base + 5]);
+vec4 _n14=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 6])], _n1);
+float _n15=(_n14).x * _n13;
+vec3 _n16=vec3(uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]), uintBitsToFloat(u_graphPool.data[base + 3]));
+vec4 _n17=texture(u_textures[nonuniformEXT(u_graphPool.data[base + 4])], _n1);
+vec3 _n18=(_n17).xyz * _n16;
+float _n19=uintBitsToFloat(u_graphPool.data[base + 0]);
+surf.albedo=_n3;
+surf.normal=_n5;
+surf.roughness=_n10;
 surf.metallic=_n12;
-surf.ao=_n7;
-surf.emission=vec4(_n4, 1.0);
-surf.emissiveStrength=_n0;
+surf.ao=_n15;
+surf.emission=vec4(_n18, 1.0);
+surf.emissiveStrength=_n19;
 surf.shadingModelId=SM_OPENPBR_STANDARD;
 return surf;
 }

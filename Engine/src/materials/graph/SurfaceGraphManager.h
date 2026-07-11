@@ -27,11 +27,11 @@ class SurfaceGraphManager {
     uint32_t registerGraph(const MaterialGraph &graph);
 
     /**
-     * @brief Write every registered graph and the dispatcher to the generated GLSL file
-     * @param path Destination path for generated/SurfaceGraphs.glsl
-     * @return True if the file was written
+     * @brief Write one generated GLSL file per pass of every registered domain
+     * @param directory Destination directory for the generated pass files
+     * @return True if every file was written
      */
-    bool writeGeneratedFile(const std::filesystem::path &path);
+    bool writeGeneratedFiles(const std::filesystem::path &directory);
 
     /**
      * @brief Default instance pool a graph expects, for seeding a MaterialInstance

@@ -70,36 +70,6 @@ struct MaterialData {
 
 static_assert(sizeof(MaterialData) == 24, "MaterialData must be 24 bytes to match its std430 mirror");
 
-/**
- * @brief One field of a surface output struct, mirroring MaterialCommon.glsl
- *
- * The graph compiler emits an assignment per field for the chosen surface variant, so these lists
- * must stay in sync with SurfaceData / SurfaceDataDiffuse. The coercion type comes from the matching
- * SURFACE_OUTPUT pin, so only the name and the unconnected fallback expression live here.
- */
-struct SurfaceOutputField {
-    const char *name;
-    const char *fallback;
-};
-
-inline constexpr SurfaceOutputField SURFACE_DATA_FIELDS[] = {
-    {"albedo", "vec3(1.0)"},
-    {"normal", "normalize(si.worldNormal)"},
-    {"roughness", "0.5"},
-    {"metallic", "0.0"},
-    {"ao", "1.0"},
-    {"emission", "vec4(1.0)"},
-    {"emissiveStrength", "0.0"},
-    {"shadingModelId", "SM_OPENPBR_STANDARD"},
-};
-
-inline constexpr SurfaceOutputField SURFACE_DATA_DIFFUSE_FIELDS[] = {
-    {"albedo", "vec3(1.0)"},
-    {"normal", "normalize(si.worldNormal)"},
-    {"emission", "vec4(1.0)"},
-    {"emissiveStrength", "0.0"},
-};
-
 } // namespace Rapture
 
 #endif // RAPTURE__MATERIAL_DATA_H

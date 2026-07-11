@@ -1,12 +1,19 @@
 /**
  * @brief Generated surface graph functions and their dispatcher
  * @author Rapture Material Graph Compiler
- * @version 2
+ * @version 3
  * @note DO NOT EDIT, this file is regenerated from material graphs
  */
 
 #ifndef SURFACE_GRAPHS_DIFFUSE_GLSL
 #define SURFACE_GRAPHS_DIFFUSE_GLSL
+
+struct SurfaceDataDiffuse {
+    vec3 albedo;
+    vec3 normal;
+    vec4 emission;
+    float emissiveStrength;
+};
 
 SurfaceDataDiffuse evalSurfaceDiffuse_Default_0(SurfaceInputs si, uint base){
 SurfaceDataDiffuse surf;

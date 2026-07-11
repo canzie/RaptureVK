@@ -170,7 +170,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
         uint32_t graph0Id = graphManager.registerGraph(s_buildFractTintGraph());
         uint32_t graph1Id = graphManager.registerGraph(s_buildSineBandGraph());
-        graphManager.writeGeneratedFile(project.getProjectShaderDirectory() / "glsl/generated/SurfaceGraphs.glsl");
+        graphManager.writeGeneratedFiles(project.getProjectShaderDirectory() / "glsl/generated");
 
         auto spawnGraphSphere = [&](const std::string &name, const glm::vec3 &position, uint32_t graphId) {
             auto sphere = activeScene.createSphere(name);
