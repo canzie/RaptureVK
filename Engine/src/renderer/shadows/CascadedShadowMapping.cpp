@@ -209,12 +209,17 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
         minY = -radius;
         maxY = radius;
 
-        float zRange = maxZ - minZ;
-        float zPadding = zRange * 2.0f;
-        minZ = minZ - zPadding;
-        maxZ = maxZ + zPadding;
+        // Light-space Z is negative in front of the light (RH lookAt), so convert
+        // the signed extents into positive near/far distances. Pad outward so casters
+        // and receivers at the slice edges stay inside the depth range. A zero-to-one
+        // ortho keeps projCoords.z in Vulkan's [0,1] NDC, which the sampling shader assumes.
+        float nearDist = -maxZ; // closest corner to the light
+        float farDist = -minZ;  // farthest corner from the light
+        float zPadding = (farDist - nearDist) * 2.0f;
+        nearDist -= zPadding; // pull toward the light to catch casters outside the frustum
+        farDist += zPadding;
 
-        glm::mat4 lightProjectionMatrix = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
+        glm::mat4 lightProjectionMatrix = glm::orthoRH_ZO(minX, maxX, minY, maxY, nearDist, farDist);
         lightProjectionMatrix[1][1] *= -1;
 
         // Round the projection of a fixed world point (origin) to the shadow texel
