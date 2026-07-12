@@ -12,6 +12,8 @@ class World;
 class Entity;
 class SwapChain;
 
+using EventListenerId = size_t;
+
 /**
  * EventBus - A templated event dispatcher for the observer pattern
  * Allows subscribing to and publishing events with arbitrary parameters
@@ -19,17 +21,16 @@ class SwapChain;
 template <typename... Args> class EventBus {
   public:
     using EventCallback = std::function<void(Args...)>;
-    using ListenerID = size_t;
 
     // Add a listener to this event
-    ListenerID addListener(const EventCallback &callback)
+    EventListenerId addListener(const EventCallback &callback)
     {
         m_listeners[m_nextListenerID] = callback;
         return m_nextListenerID++;
     }
 
     // Remove a listener by ID
-    void removeListener(ListenerID id) { m_listeners.erase(id); }
+    void removeListener(EventListenerId id) { m_listeners.erase(id); }
 
     // Publish an event to all listeners
     void publish(Args... args) const
@@ -43,8 +44,8 @@ template <typename... Args> class EventBus {
     void clearListeners() { m_listeners.clear(); }
 
   private:
-    std::unordered_map<ListenerID, EventCallback> m_listeners;
-    ListenerID m_nextListenerID = 0;
+    std::unordered_map<EventListenerId, EventCallback> m_listeners;
+    EventListenerId m_nextListenerID = 0;
 };
 
 // Type-erased event handler base class for the event registry

@@ -10,7 +10,7 @@ using SceneDeactivatedEvent = EventBus<Scene &>;
 
 // World events
 using WorldTransitionRequestedEvent = EventBus<std::string>;
-using WorldActivatedEvent = EventBus<std::shared_ptr<World>>;
+using WorldActivatedEvent = EventBus<World *>;
 
 // Layer communication events
 using LayerCommunicationEvent = EventBus<std::string, std::string>;
@@ -45,7 +45,7 @@ inline WorldTransitionRequestedEvent &onWorldTransitionRequested()
 
 inline WorldActivatedEvent &onWorldActivated()
 {
-    return EventRegistry::getInstance().getEventBus<std::shared_ptr<World>>("WorldActivated");
+    return EventRegistry::getInstance().getEventBus<World *>("WorldActivated");
 }
 
 inline LayerCommunicationEvent &onLayerCommunication()

@@ -3,6 +3,8 @@
 
 #include "MaterialData.h"
 #include "MaterialParameters.h"
+#include "events/ProjectEvents.h"
+#include "graph/MaterialGraph.h"
 
 #include <memory>
 #include <string>
@@ -19,11 +21,17 @@ constexpr uint32_t MAX_MATERIALS = 4096;
 
 class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
   public:
-    BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterID, uint32_t> table);
+    BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterID, uint32_t> table, MaterialGraph graph);
     ~BaseMaterial() = default;
 
     const std::string &getName() const { return m_name; }
     uint32_t getGraphId() const { return m_graphId; }
+
+    /**
+     * @brief The authored graph this base was compiled from, retained so the editor can redraw it
+     * @return The source graph
+     */
+    const MaterialGraph &getGraph() const { return m_graph; }
 
     /**
      * @brief Resolve the slice offset a parameter writes to
@@ -37,6 +45,7 @@ class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
     std::string m_name;
     uint32_t m_graphId;
     std::unordered_map<ParameterID, uint32_t> m_table;
+    MaterialGraph m_graph;
 
     friend class MaterialInstance;
     friend class MaterialManager;
@@ -55,7 +64,7 @@ class MaterialManager {
 
     static std::shared_ptr<BaseMaterial> getMaterial(const std::string &name);
     static std::shared_ptr<BaseMaterial> createMaterial(const std::string &name, uint32_t graphId,
-                                                        std::unordered_map<ParameterID, uint32_t> table);
+                                                        std::unordered_map<ParameterID, uint32_t> table, MaterialGraph graph);
     static uint32_t getDefaultTextureIndex();
     static void printMaterialNames();
 
@@ -114,6 +123,9 @@ class MaterialManager {
     static std::unique_ptr<FreeListStorageBuffer> s_materialBuffer;
     static std::unique_ptr<VirtualStorageBuffer> s_graphBuffer;
     static std::unique_ptr<SurfaceGraphManager> s_surfaceGraphManager;
+    static EventListenerId s_serializeListener;
+    static EventListenerId s_registerListener;
+    static EventListenerId s_registerCompleteListener;
 };
 
 } // namespace Rapture

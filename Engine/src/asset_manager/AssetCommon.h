@@ -36,6 +36,12 @@ enum class AssetStatus {
     FILE_NOT_FOUND
 };
 
+enum class AssetEvictionPolicy {
+    EVICT_IMMEDIATE, // evict as soon as useCount hits 0
+    EVICT_HINT_LAZY, // useCount 0 -> cold LRU list, freed under memory-budget pressure
+    EVICT_HINT_LAST  // "keep loaded" hint, evicted last under pressure, never a guarantee
+};
+
 inline std::string AssetTypeToString(AssetType type)
 {
     switch (type) {

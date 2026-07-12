@@ -5,6 +5,7 @@
 #include <components/shape.h>
 
 #include "asset_manager/AssetCommon.h"
+#include "events/ProjectEvents.h"
 #include "layers/panels/Panel.h"
 #include "materials/graph/MaterialGraph.h"
 #include "materials/graph/MaterialGraphTypes.h"
@@ -139,6 +140,12 @@ class NodeEditorPanel : public Panel {
     void selectMaterial(Rapture::AssetHandle handle);
 
     /**
+     * @brief Rebuilds the canvas from an authored graph, laying its nodes out left to right
+     * @param graph The source graph to reconstruct as editor nodes and wires
+     */
+    void loadGraph(const Rapture::MaterialGraph &graph);
+
+    /**
      * @brief Opens the add-node menu on right click, starts a pan on middle click
      * @param io The input that began on the canvas background
      */
@@ -197,6 +204,14 @@ class NodeEditorPanel : public Panel {
      * @param nodeId The texture node to populate
      */
     void layoutTexturePins(uint32_t nodeId);
+
+    /**
+     * @brief Adds a texture preview image to a node at a row offset
+     * @param node The node frame the preview is parented to
+     * @param rowY The preview's top offset within the node
+     * @return The created preview image
+     */
+    Amethyst::ImageLabel *addTexturePreview(Amethyst::Frame *node, float rowY);
 
     /**
      * @brief Points a texture asset node at a loaded texture and refreshes its preview
@@ -450,6 +465,8 @@ class NodeEditorPanel : public Panel {
     uint32_t m_primaryNodeId = 0; // the main selected node, 0 when nothing is selected
 
     uint32_t m_nextNodeId = 1;
+
+    Rapture::EventListenerId m_serializeListener = 0;
 };
 
 #endif // RAPTURE__NODE_EDITOR_PANEL_H

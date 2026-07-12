@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "Asset.h"
+#include "events/ProjectEvents.h"
 #include "utils/UUID.h"
 
 #include "logging/Log.h"
@@ -25,6 +26,9 @@ class AssetManager {
         }
         s_activeAssetManager = new AssetManagerEditor();
         s_isInitialized = true;
+
+        s_serializeListener = ProjectEvents::onProjectSerialize().addListener([](WriteNode &root) { (void)root; });
+        s_registerListener = ProjectEvents::onProjectRegister().addListener([](ReadNode &root) { (void)root; });
     }
 
     static void shutdown();
@@ -165,6 +169,8 @@ class AssetManager {
   private:
     static bool s_isInitialized;
     static AssetManagerEditor *s_activeAssetManager;
+    static EventListenerId s_serializeListener;
+    static EventListenerId s_registerListener;
 };
 
 } // namespace Rapture

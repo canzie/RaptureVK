@@ -50,7 +50,7 @@ class EditorApp : public Rapture::Application {
             [](Rapture::Scene& scene) { Rapture::RP_INFO("Scene activated"); });
 
         m_worldActivatedListenerId = Rapture::GameEvents::onWorldActivated().addListener(
-            [](std::shared_ptr<Rapture::World> world) { Rapture::RP_INFO("World activated: {0}", world->getName()); });
+            [](Rapture::World *world) { Rapture::RP_INFO("World activated: {0}", world->getName()); });
 
         // World transition events
         m_worldTransitionListenerId =

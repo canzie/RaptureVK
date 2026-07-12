@@ -2,7 +2,6 @@ uncouple the engines core
     - allow running headless (decoupling of graphics/window related stuff from the core), is a must for future headless servers
 
 ### ui/editor
-    - create a proper material editor workspace
     - create a nice terrain panel
     - set up a good way for settings, these need to then be serialised
         - color mapping/palette
@@ -10,7 +9,30 @@ uncouple the engines core
         - couple sizings like gaps/borders/corners
         - an actual settings/preferences panel to open
     - drag/drop assets into the viewport
-    
+    - the ability to add/remove individual components from entities
+        - includes depedencies like how a shadow component requires a light, this can be enforec in editor or in the engine, iam leaning towards engine
+
+## Material Graph Node Editor 
+    - need a way to go from a materialGraph to a representation the editor can draw
+        - we can have materials made in editor, those will later serialise their metadata
+        - we can also have materials loaded in and translated, something like the gltf base material, these ones need to allow generating the graph
+    - the graph visible in the editor will be the base material, to edit material instances a separate panel will be provided where named parameters can be edited
+    - when a new base mat is made and opened it cannot be viewd on a sphere, since we only render material instances, so for every material we will create a base instance, this one will be immutable
+      it will make no changes and jsut take the defaults from the base material. there should be some kind of logic forcing this base instance to exist, so we cant delete it and its part of the base.
+    - when editing a base materail in the editor it needs to be very simple to create a copy of a base.
+    - the editor/workspace also needs its own viewport, this viewport needs its own little scene, something with just a sphere a skybox a light? completly separate from any level scenes
+      this also means its own renderer etc. this begs the question, do we remove the concept of main scenes? i think so, every workspace will have an optional scene it uses.
+      every worksapce will provide a worksapceContext to a panel it creates, inside of this context there will be a scene, the dockinglayer, ???
+    - adding or changing a material can mutate its gpu structure, we do not want this to cause out of bound reads, so it is important to make sure all places like gbuffers or probe trace shaders to be refreshed as soon as possible
+      right now this only happens when we resize but iam not sure the shaders are recompiled, so what we need is a way to ask these places, like the gbuffer pass to recreate its pipeline using the new shader we compiled with the new material in it.
+    - the properties panel now needs to be able to set a material isntance. it also eneds a button to open a material node editor workspace for the material, this also neds to happen in the content browser
+
+
+### PHYSICS
+    - integrate jolt
+    - write a little wrapper for it
+    - implement ray picking so we can select entities using it in the editor
+
 
 
 
@@ -23,7 +45,6 @@ uncouple the engines core
 - TODO later: BC7 (high quality RGBA) and BC6H (HDR) encoders
 - fix stencil buffer
 - shader/pipeline hot reloading
-- jolt???
 - parallise/jobify shader compilation (note, current stack size is too small for this, maybe spawn another process and use gslang exec???)
 - add model to the asset manager
   - ditinction between static and dynamic meshes here
@@ -35,30 +56,6 @@ uncouple the engines core
 - virtual texturing??? like decima i guess
 - phyics -> raypicking -> terrain editor and mesh placer
 
-### PHYSICS
-    - raypicking, can be part of the physics system with something like this: physics.raycast(ray, ...)
-    - fixing the imguizmo thing    
-    - the larger problem with open world means we need a seperate tlas for the tlasses per chunk, this can be one on the cpu.
-    - fix issue where the dynamic tree does not remove entities when they are removed
-    - redo all of the maths, including addition of balancing when something falls, it should rotate to go flat
-    - add option to view the meshes collider seperatly instead of only the aabb, and move this collider -> add it to the entity browser directly
-    - move physics object and updates to the scenes onupdate, instead of the testlayer
-
-
-
-### MATERIAL OVERHAUL 
-- add material interpreter
-- add material editor
-
-
-
-### Render passes
-    - defined as what is now a gbuffer pass, shadow pass, skybox pass etc etc, needs to become more generic so we can easily add them
-    - this means:
-        - a more uniform interface
-        - some kind of exec order
-    - this would clean up the unfloded stuff at the bottom of the file where we record all passes
-    - makes it easier to add things like a post process step or even a user defined pass. if we ever decide to allow users to insert into the rendering pipeline a nicer interface will be provided, not the raw vulkan one used by something like the gbuffer pass, but thats for later. for now we just allow providing an exec order and a nicer way to record commands
 
 
 --------------------------------
@@ -75,7 +72,6 @@ uncouple the engines core
 - post processing
 - some limit testing
 - volumetric fog/clouds
-- atmospheric scattering
 - audio
 - ui
 - game?

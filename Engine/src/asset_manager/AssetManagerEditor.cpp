@@ -343,9 +343,18 @@ bool AssetManagerEditor::evictAsset(AssetHandle handle)
     const AssetMetadata &metadata = getAssetMetadata(handle);
     uint32_t refCount = metadata.useCount.load(std::memory_order_acquire);
     if (refCount != 0) {
-        RP_CORE_WARN("Cannot unload asset({}) still in use, {} references remain", AssetTypeToString(metadata.assetType),
-                     refCount);
+        RP_CORE_WARN("Cannot unload asset({}) still in use, {} references remain", AssetTypeToString(metadata.assetType), refCount);
         return false;
+    }
+
+    switch (metadata.evictionPolicy) {
+    case AssetEvictionPolicy::EVICT_IMMEDIATE:
+        break;
+    case AssetEvictionPolicy::EVICT_HINT_LAZY:
+    case AssetEvictionPolicy::EVICT_HINT_LAST:
+        // TODO: No residency layer (cold list / memory budget) yet, so these behave identically to
+        // EVICT_IMMEDIATE for now. Skipping eviction here without a budget system would leak.
+        break;
     }
 
     RP_CORE_INFO("Evicting {} asset '{}'", AssetTypeToString(metadata.assetType),

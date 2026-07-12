@@ -29,6 +29,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #define COL_NODE_BODY  Amethyst::Color3::fromHex(0x303030)
 #define COL_MENU_HOVER Amethyst::Color3::fromHex(0x4772b3)
@@ -368,10 +369,14 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const PanelServices &
     setupContextMenu();
 
     tabBar->addTab(std::move(root), iconTabLayout("Node Editor", Icons::SVG_MATERIAL));
+
+    m_serializeListener = Rapture::ProjectEvents::onProjectSerialize().addListener([this](Rapture::WriteNode &root) { (void)root; });
 }
 
 NodeEditorPanel::~NodeEditorPanel()
 {
+    Rapture::ProjectEvents::onProjectSerialize().removeListener(m_serializeListener);
+
     if (m_root != nullptr && m_root->parent != nullptr) {
         if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
             tabBar->removeTab(m_root);
@@ -498,6 +503,19 @@ void NodeEditorPanel::setupMaterialBar()
         rebuildMaterialList();
         return Amethyst::EventResult::CONSUMED;
     };
+
+    auto *newMaterial = m_materialBar->add<Amethyst::TextButton>();
+    newMaterial->setText("New");
+    newMaterial->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(308.0f, 4.0f),
+        .size = Amethyst::UDim2::fromOffset(60.0f, MATERIAL_BAR_HEIGHT - 8.0f),
+    });
+    newMaterial->onMouseButton1ClickCb = [this]() {
+        clearGraph();
+        spawnNode(Rapture::GraphNodeType::SURFACE_OUTPUT, "PBR Surface", COL_CAT_OUTPUT, Amethyst::vec2(60.0f, 60.0f));
+        m_materialDropdown->setText("New Material");
+        return Amethyst::EventResult::CONSUMED;
+    };
 }
 
 void NodeEditorPanel::rebuildMaterialList()
@@ -523,7 +541,201 @@ void NodeEditorPanel::selectMaterial(Rapture::AssetHandle handle)
     if (material == nullptr) {
         return;
     }
+    std::shared_ptr<Rapture::BaseMaterial> base = material->getBaseMaterial();
+    if (base == nullptr) {
+        return;
+    }
+    loadGraph(base->getGraph());
     m_materialDropdown->setText(Rapture::AssetManager::getAssetMetadata(handle).getName());
+}
+
+static const char *s_nodeDisplayName(Rapture::GraphNodeType type)
+{
+    switch (type) {
+    case GNT::NONE: return "None";
+    case GNT::POSITION: return "Position";
+    case GNT::NORMAL: return "Normal";
+    case GNT::TANGENT: return "Tangent";
+    case GNT::BITANGENT: return "Bitangent";
+    case GNT::TEXCOORD: return "Texture Coordinate";
+    case GNT::CONSTANT_FLOAT: return "Float";
+    case GNT::CONSTANT_INT: return "Integer";
+    case GNT::CONSTANT_VEC2: return "Vector 2";
+    case GNT::CONSTANT_VEC3: return "Vector 3";
+    case GNT::CONSTANT_VEC4: return "Vector 4";
+    case GNT::TEXTURE_SAMPLE: return "Texture Sample";
+    case GNT::TEXTURE_WHITE_NOISE: return "White Noise";
+    case GNT::TEXTURE_PERLIN: return "Perlin Noise";
+    case GNT::TEXTURE_SIMPLEX: return "Simplex Noise";
+    case GNT::TEXTURE_RIDGED: return "Ridged Noise";
+    case GNT::ADD_FLOAT:
+    case GNT::ADD_VEC3:
+    case GNT::ADD_INT: return "Add";
+    case GNT::SUBTRACT_FLOAT:
+    case GNT::SUBTRACT_VEC3:
+    case GNT::SUBTRACT_INT: return "Subtract";
+    case GNT::MULTIPLY_FLOAT:
+    case GNT::MULTIPLY_VEC3:
+    case GNT::MULTIPLY_INT: return "Multiply";
+    case GNT::DIVIDE_FLOAT:
+    case GNT::DIVIDE_VEC3:
+    case GNT::DIVIDE_INT: return "Divide";
+    case GNT::ABS_FLOAT:
+    case GNT::ABS_VEC3:
+    case GNT::ABS_INT: return "Absolute";
+    case GNT::MIN_FLOAT:
+    case GNT::MIN_VEC3:
+    case GNT::MIN_INT: return "Minimum";
+    case GNT::MAX_FLOAT:
+    case GNT::MAX_VEC3:
+    case GNT::MAX_INT: return "Maximum";
+    case GNT::CLAMP_FLOAT:
+    case GNT::CLAMP_VEC3:
+    case GNT::CLAMP_INT: return "Clamp";
+    case GNT::SATURATE_FLOAT:
+    case GNT::SATURATE_VEC3: return "Saturate";
+    case GNT::MIX_FLOAT:
+    case GNT::MIX_VEC3: return "Mix";
+    case GNT::STEP_FLOAT:
+    case GNT::STEP_VEC3: return "Step";
+    case GNT::SMOOTHSTEP_FLOAT:
+    case GNT::SMOOTHSTEP_VEC3: return "Smoothstep";
+    case GNT::FRACT_FLOAT:
+    case GNT::FRACT_VEC3: return "Fract";
+    case GNT::POWER_FLOAT:
+    case GNT::POWER_VEC3: return "Power";
+    case GNT::SQRT_FLOAT:
+    case GNT::SQRT_VEC3: return "Square Root";
+    case GNT::SIN_FLOAT:
+    case GNT::SIN_VEC3: return "Sine";
+    case GNT::COS_FLOAT:
+    case GNT::COS_VEC3: return "Cosine";
+    case GNT::DOT_VEC3: return "Dot Product";
+    case GNT::CROSS_VEC3: return "Cross Product";
+    case GNT::NORMALIZE_VEC3: return "Normalize";
+    case GNT::LENGTH_VEC3: return "Length";
+    case GNT::DISTANCE_VEC3: return "Distance";
+    case GNT::COMBINE_VEC2: return "Combine 2";
+    case GNT::COMBINE_VEC3: return "Combine 3";
+    case GNT::COMBINE_VEC4: return "Combine 4";
+    case GNT::SPLIT_VEC2: return "Split 2";
+    case GNT::SPLIT_VEC3: return "Split 3";
+    case GNT::SPLIT_VEC4: return "Split 4";
+    case GNT::NORMAL_MAP: return "Normal Map";
+    case GNT::NORMAL_MAP_RG: return "Normal Map (RG)";
+    case GNT::LUMINANCE: return "Luminance";
+    case GNT::REMAP_FLOAT: return "Remap";
+    case GNT::SURFACE_OUTPUT: return "PBR Surface";
+    }
+    return Rapture::Graph_nodeTypeName(type);
+}
+
+static bool s_categoryContainsType(const NodeCatalogCategory &category, Rapture::GraphNodeType type)
+{
+    for (const auto &entry : category.entries) {
+        if (entry.textureKind == NodeEditorPanel::TextureNodeKind::NONE && entry.type == type) {
+            return true;
+        }
+    }
+    for (const auto &sub : category.subcategories) {
+        if (s_categoryContainsType(sub, type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static Amethyst::Color3 s_nodeCategoryColor(Rapture::GraphNodeType type)
+{
+    for (const auto &category : s_nodeCatalog()) {
+        if (s_categoryContainsType(category, type)) {
+            return s_categoryColor(category.label);
+        }
+    }
+    return COL_CAT_DEFAULT;
+}
+
+// Longest distance of each node from the output along the connection graph, output at level 0. Nodes
+// further from the output lay out further left, so a node used at several depths sits left of every consumer.
+static std::unordered_map<uint32_t, int> s_computeLevels(const Rapture::MaterialGraph &graph)
+{
+    std::unordered_map<uint32_t, int> level;
+    std::vector<uint32_t> stack;
+    level[graph.outputNodeId] = 0;
+    stack.push_back(graph.outputNodeId);
+    while (!stack.empty()) {
+        uint32_t current = stack.back();
+        stack.pop_back();
+        int next = level[current] + 1;
+        for (const auto &connection : graph.connections) {
+            if (connection.dstNode != current) {
+                continue;
+            }
+            auto it = level.find(connection.srcNode);
+            if (it == level.end() || next > it->second) {
+                level[connection.srcNode] = next;
+                stack.push_back(connection.srcNode);
+            }
+        }
+    }
+    return level;
+}
+
+void NodeEditorPanel::loadGraph(const Rapture::MaterialGraph &graph)
+{
+    clearGraph();
+    if (graph.nodes.empty()) {
+        return;
+    }
+
+    static constexpr float COLUMN_SPACING = NODE_WIDTH + 90.0f;
+    static constexpr float ROW_SPACING = 260.0f;
+
+    std::unordered_map<uint32_t, int> level = s_computeLevels(graph);
+    int maxLevel = 0;
+    for (const auto &[id, lvl] : level) {
+        maxLevel = std::max(maxLevel, lvl);
+    }
+
+    std::unordered_map<uint32_t, uint32_t> idMap;
+    std::unordered_map<int, int> columnRows;
+    for (const auto &node : graph.nodes) {
+        auto lvlIt = level.find(node.id);
+        int lvl = (lvlIt != level.end()) ? lvlIt->second : maxLevel + 1;
+        int column = maxLevel - lvl;
+        int row = columnRows[lvl]++;
+        Amethyst::vec2 pos{static_cast<float>(column) * COLUMN_SPACING, static_cast<float>(row) * ROW_SPACING};
+
+        uint32_t spawnedId = spawnNode(node.type, s_nodeDisplayName(node.type), s_nodeCategoryColor(node.type), pos);
+        if (spawnedId == 0) {
+            continue;
+        }
+        idMap[node.id] = spawnedId;
+
+        if (node.type == Rapture::GraphNodeType::TEXTURE_SAMPLE && !node.inputTextures.empty() &&
+            node.inputTextures[0].get() != nullptr) {
+            setImageTexture(spawnedId, node.inputTextures[0]);
+        }
+
+        for (uint32_t i = 0; i < node.inputValues.size(); ++i) {
+            if (!node.inputValues[i].has_value()) {
+                continue;
+            }
+            uint32_t pinId = findPin(spawnedId, false, i);
+            if (pinId != INVALID_PIN && m_pins.isLive(pinId) && m_pins[pinId].value != nullptr) {
+                *m_pins[pinId].value = *node.inputValues[i];
+            }
+        }
+    }
+
+    for (const auto &connection : graph.connections) {
+        auto srcIt = idMap.find(connection.srcNode);
+        auto dstIt = idMap.find(connection.dstNode);
+        if (srcIt == idMap.end() || dstIt == idMap.end()) {
+            continue;
+        }
+        connectPins(srcIt->second, connection.srcPin, dstIt->second, connection.dstPin);
+    }
 }
 
 std::vector<Amethyst::ContextMenuItem> NodeEditorPanel::buildAddMenu()
@@ -740,8 +952,7 @@ void NodeEditorPanel::layoutPins(uint32_t nodeId)
         PinView &pv = m_pins[pinId];
         pv.value = std::make_unique<Rapture::PinValue>(pin.defaultValue);
 
-        // A scalar input carries an inline drag on its own row, hidden while the input is wired.
-        if (Rapture::graph_pinTypeComponents(pin.type) == 1) {
+        if (Rapture::graph_pinTypeComponents(pin.type) == 1 && pin.type != Rapture::PinType::TEXTURE) {
             bool integer = (pin.type == Rapture::PinType::INT);
             float usable = NODE_WIDTH - 2.0f * NODE_PADDING;
             float x = NODE_PADDING + usable * 0.2f; // leave 20% on the left for the pin label
@@ -752,6 +963,14 @@ void NodeEditorPanel::layoutPins(uint32_t nodeId)
 
         ++slot;
         rowY += NODE_ROW_HEIGHT;
+    }
+
+    if (view.type == Rapture::GraphNodeType::TEXTURE_SAMPLE) {
+        if (view.textureData == nullptr) {
+            view.textureData = std::make_unique<TextureNodeData>();
+        }
+        view.textureData->preview = addTexturePreview(node, rowY);
+        node->setBaseProperties({.size = Amethyst::UDim2::fromOffset(NODE_WIDTH, rowY + TEXTURE_PREVIEW_HEIGHT + NODE_PADDING)});
     }
 }
 
@@ -857,6 +1076,17 @@ Amethyst::UIObject *NodeEditorPanel::addValueDrag(Amethyst::Frame *node, float x
     return drag;
 }
 
+Amethyst::ImageLabel *NodeEditorPanel::addTexturePreview(Amethyst::Frame *node, float rowY)
+{
+    auto *preview = node->add<Amethyst::ImageLabel>();
+    preview->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(NODE_PADDING, rowY),
+        .size = Amethyst::UDim2::fromOffset(NODE_WIDTH - 2.0f * NODE_PADDING, TEXTURE_PREVIEW_HEIGHT),
+    });
+    preview->setBaseStyleProperties({.backgroundColor = COL_BG, .cornerRadius = 3.0f});
+    return preview;
+}
+
 void NodeEditorPanel::layoutTexturePins(uint32_t nodeId)
 {
     auto it = m_nodes.find(nodeId);
@@ -872,13 +1102,7 @@ void NodeEditorPanel::layoutTexturePins(uint32_t nodeId)
     view.pinIds.push_back(addPin(nodeId, node, "Alpha", Rapture::PinType::FLOAT, 1, rowY, true));
     rowY += NODE_ROW_HEIGHT;
 
-    auto *preview = node->add<Amethyst::ImageLabel>();
-    preview->setBaseProperties({
-        .position = Amethyst::UDim2::fromOffset(NODE_PADDING, rowY),
-        .size = Amethyst::UDim2::fromOffset(NODE_WIDTH - 2.0f * NODE_PADDING, TEXTURE_PREVIEW_HEIGHT),
-    });
-    preview->setBaseStyleProperties({.backgroundColor = COL_BG, .cornerRadius = 3.0f});
-    view.textureData->preview = preview;
+    view.textureData->preview = addTexturePreview(node, rowY);
     rowY += TEXTURE_PREVIEW_HEIGHT + NODE_PADDING;
 
     if (view.textureData->kind == TextureNodeKind::ASSET) {
@@ -1631,7 +1855,7 @@ Rapture::MaterialGraph NodeEditorPanel::buildGraph() const
         }
         const NodeView &view = it->second;
 
-        if (view.textureData != nullptr) {
+        if (view.textureData != nullptr && view.type == Rapture::GraphNodeType::NONE) {
             uint32_t sampleId = nextSynthId++;
             Rapture::GraphNode sample;
             sample.id = sampleId;
@@ -1683,6 +1907,12 @@ Rapture::MaterialGraph NodeEditorPanel::buildGraph() const
                     node.inputValues[i] = *m_pins[pinId].value;
                 }
             }
+        }
+
+        if (view.type == Rapture::GraphNodeType::TEXTURE_SAMPLE && view.textureData != nullptr &&
+            view.textureData->texture.get() != nullptr) {
+            node.inputTextures.resize(1);
+            node.inputTextures[0] = view.textureData->texture;
         }
 
         graph.nodes.push_back(std::move(node));

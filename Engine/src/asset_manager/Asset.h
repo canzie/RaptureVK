@@ -45,6 +45,7 @@ struct AssetMetadata {
     std::string virtualName = "untitled";
 
     std::atomic<uint32_t> useCount{0};
+    AssetEvictionPolicy evictionPolicy = AssetEvictionPolicy::EVICT_IMMEDIATE;
 
     bool isDiskAsset() const { return storageType == AssetStorageType::DISK; }
     bool isVirtualAsset() const { return storageType == AssetStorageType::VIRTUAL; }

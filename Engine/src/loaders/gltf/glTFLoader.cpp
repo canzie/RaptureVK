@@ -831,7 +831,7 @@ static std::shared_ptr<BaseMaterial> s_obtainGltfBaseMaterial()
     bind(ParameterID::EMISSIVE, 17);
     bind(ParameterID::EMISSIVE_STRENGTH, 19);
 
-    return MaterialManager::createMaterial("glTF Base Material", graphId, std::move(table));
+    return MaterialManager::createMaterial("glTF Base Material", graphId, std::move(table), std::move(graph));
 }
 
 AssetRef glTF2Loader::loadMaterial(size_t materialIndex)

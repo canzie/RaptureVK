@@ -3,6 +3,7 @@
 #include "asset_manager/AssetManager.h"
 #include "buffers/FreeListStorageBuffer.h"
 #include "buffers/VirtualStorageBuffer.h"
+#include "events/ProjectEvents.h"
 #include "graph/SurfaceGraphManager.h"
 #include "logging/Log.h"
 #include "textures/Texture.h"
@@ -21,9 +22,12 @@ std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> MaterialManager::
 std::unique_ptr<FreeListStorageBuffer> MaterialManager::s_materialBuffer;
 std::unique_ptr<VirtualStorageBuffer> MaterialManager::s_graphBuffer;
 std::unique_ptr<SurfaceGraphManager> MaterialManager::s_surfaceGraphManager;
+EventListenerId MaterialManager::s_serializeListener = 0;
+EventListenerId MaterialManager::s_registerListener = 0;
+EventListenerId MaterialManager::s_registerCompleteListener = 0;
 
-BaseMaterial::BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterID, uint32_t> table)
-    : m_name(std::move(name)), m_graphId(graphId), m_table(std::move(table))
+BaseMaterial::BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterID, uint32_t> table, MaterialGraph graph)
+    : m_name(std::move(name)), m_graphId(graphId), m_table(std::move(table)), m_graph(std::move(graph))
 {
 }
 
@@ -62,6 +66,10 @@ void MaterialManager::init()
 
     s_initialized = true;
     createDefaultMaterials();
+
+    s_serializeListener = ProjectEvents::onProjectSerialize().addListener([](WriteNode &root) { (void)root; });
+    s_registerListener = ProjectEvents::onProjectRegister().addListener([](ReadNode &root) { (void)root; });
+    s_registerCompleteListener = ProjectEvents::onProjectRegisterComplete().addListener([]() {});
 }
 
 void MaterialManager::releaseGraphResources()
@@ -72,6 +80,9 @@ void MaterialManager::releaseGraphResources()
 
 void MaterialManager::shutdown()
 {
+    ProjectEvents::onProjectSerialize().removeListener(s_serializeListener);
+    ProjectEvents::onProjectRegister().removeListener(s_registerListener);
+    ProjectEvents::onProjectRegisterComplete().removeListener(s_registerCompleteListener);
     s_materials.clear();
     s_surfaceGraphManager.reset();
     s_materialBuffer.reset();
@@ -138,7 +149,7 @@ void MaterialManager::createDefaultMaterials()
         return;
     }
 
-    createMaterial("Default Material", graphId, {});
+    createMaterial("Default Material", graphId, {}, std::move(graph));
 }
 
 std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &name)
@@ -148,7 +159,7 @@ std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &na
 }
 
 std::shared_ptr<BaseMaterial> MaterialManager::createMaterial(const std::string &name, uint32_t graphId,
-                                                              std::unordered_map<ParameterID, uint32_t> table)
+                                                              std::unordered_map<ParameterID, uint32_t> table, MaterialGraph graph)
 {
     RP_ASSERT(s_initialized, "Initialise the material manager first");
 
@@ -157,7 +168,7 @@ std::shared_ptr<BaseMaterial> MaterialManager::createMaterial(const std::string 
         return nullptr;
     }
 
-    auto material = std::make_shared<BaseMaterial>(name, graphId, std::move(table));
+    auto material = std::make_shared<BaseMaterial>(name, graphId, std::move(table), std::move(graph));
     s_materials[name] = material;
     return material;
 }

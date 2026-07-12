@@ -88,15 +88,31 @@ class SceneManager {
     }
 
     // World interactions
-    void registerWorld(std::shared_ptr<World> world) { m_worlds[world->getName()] = world; }
+    World *createWorld(const std::string &worldName)
+    {
+        auto world = std::make_unique<World>(worldName);
+        World *worldPtr = world.get();
+        m_worlds[worldName] = std::move(world);
+        return worldPtr;
+    }
 
-    void unregisterWorld(const std::string &worldName) { m_worlds.erase(worldName); }
+    void destroyWorld(const std::string &worldName)
+    {
+        auto it = m_worlds.find(worldName);
+        if (it == m_worlds.end()) {
+            return;
+        }
+        if (m_activeWorld == it->second.get()) {
+            m_activeWorld = nullptr;
+        }
+        m_worlds.erase(it);
+    }
 
-    std::shared_ptr<World> getWorld(const std::string &worldName)
+    World *getWorld(const std::string &worldName)
     {
         auto it = m_worlds.find(worldName);
         if (it != m_worlds.end()) {
-            return it->second;
+            return it->second.get();
         }
         return nullptr;
     }
@@ -104,9 +120,9 @@ class SceneManager {
     // Set active world and its main scene as active scene
     void setActiveWorld(const std::string &worldName)
     {
-        auto world = getWorld(worldName);
-        if (world) {
-            if (m_activeWorld) {
+        World *world = getWorld(worldName);
+        if (world != nullptr) {
+            if (m_activeWorld != nullptr) {
                 m_activeWorld->setActive(false);
             }
 
@@ -123,12 +139,12 @@ class SceneManager {
         }
     }
 
-    std::shared_ptr<World> getActiveWorld() const { return m_activeWorld; }
+    World *getActiveWorld() const { return m_activeWorld; }
 
     void reset()
     {
         m_activeScene = nullptr;
-        m_activeWorld.reset();
+        m_activeWorld = nullptr;
         m_worlds.clear();
         m_scenes.clear();
     }
@@ -137,8 +153,8 @@ class SceneManager {
     std::unordered_map<std::string, std::unique_ptr<Scene>> m_scenes;
     Scene *m_activeScene = nullptr;
 
-    std::unordered_map<std::string, std::shared_ptr<World>> m_worlds;
-    std::shared_ptr<World> m_activeWorld;
+    std::unordered_map<std::string, std::unique_ptr<World>> m_worlds;
+    World *m_activeWorld = nullptr;
 };
 
 } // namespace Rapture

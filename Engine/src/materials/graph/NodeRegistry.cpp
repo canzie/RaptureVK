@@ -68,6 +68,29 @@ uint32_t graph_pinTypeComponents(PinType type)
     return 4;
 }
 
+const char *Graph_nodeTypeName(GraphNodeType type)
+{
+    switch (type) {
+#define X(name)                                                                                                                \
+    case GraphNodeType::name:                                                                                                  \
+        return #name;
+        RP_GRAPH_NODE_TYPES(X)
+#undef X
+    }
+    return "NONE";
+}
+
+GraphNodeType Graph_nodeTypeFromName(std::string_view name)
+{
+    static const std::unordered_map<std::string_view, GraphNodeType> names = {
+#define X(name) {#name, GraphNodeType::name},
+        RP_GRAPH_NODE_TYPES(X)
+#undef X
+    };
+    auto it = names.find(name);
+    return it == names.end() ? GraphNodeType::NONE : it->second;
+}
+
 const NodeDefinition *NodeRegistry::get(GraphNodeType type)
 {
     auto it = s_definitions.find(type);
