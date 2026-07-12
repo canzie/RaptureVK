@@ -39,6 +39,7 @@ class Viewport {
     struct EditorBinding {
         CameraController *controller = nullptr; ///< Non-owning controller driving this viewport's camera
         bool hovered = false;                   ///< Cursor is over this viewport's on-screen display
+        bool displayed = false;                 ///< A ViewportPanel is bound to this viewport
     };
 
     EditorBinding &editorBinding() { return m_editorBinding; }

@@ -5,10 +5,12 @@
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
 
-LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::Scene *scene)
+LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::Scene *scene,
+                                           Rapture::Viewport *viewport)
 {
     m_context.services = services;
     m_context.scene = scene;
+    m_context.viewport = viewport;
     setupBase(tabs, "Level Editor");
 
     m_dockingLayer->name = "Editor Dock";

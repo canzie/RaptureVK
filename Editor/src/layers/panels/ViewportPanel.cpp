@@ -5,6 +5,8 @@
 #include "components/systems/CameraController.h"
 #include "events/GameEvents.h"
 #include "layers/panels/components/tab_layouts.h"
+#include "render_targets/SceneRenderTarget.h"
+#include "utils/rp_assert.h"
 #include "viewport/Viewport.h"
 #include "window_context/Application.h"
 
@@ -28,6 +30,17 @@ static const Amethyst::TextStyleProperties HEADER_BTN_TEXT{
 
 ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
 {
+    m_viewport = context.viewport;
+    if (m_viewport != nullptr) {
+        bool alreadyDisplayed = m_viewport->editorBinding().displayed;
+        RP_ASSERT(!alreadyDisplayed, "viewport is already displayed by another panel");
+        if (alreadyDisplayed) {
+            m_viewport = nullptr;
+        } else {
+            m_viewport->editorBinding().displayed = true;
+        }
+    }
+
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
@@ -85,6 +98,15 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
 
 ViewportPanel::~ViewportPanel()
 {
+    for (auto &slot : m_slotImages) {
+        if (slot.id.isValid() && m_services.unregisterTexture) {
+            m_services.unregisterTexture(slot.id);
+        }
+    }
+    if (m_viewport != nullptr) {
+        m_viewport->editorBinding().displayed = false;
+    }
+
     Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
     Rapture::GameEvents::onEntityDeselected().removeListener(m_entityDeselectedListenerId);
     if (m_root != nullptr && m_root->parent != nullptr) {
@@ -184,7 +206,7 @@ void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
         [this](Amethyst::TextButtonScope &b) {
             m_giBtn = &b.component;
             b.component.onMouseButton1ClickCb = [this]() {
-                auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+                auto *viewport = m_viewport;
                 if (viewport == nullptr) {
                     return Amethyst::EventResult::CONSUMED;
                 }
@@ -196,9 +218,9 @@ void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
         });
 
     f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_showDirectLighting},
-               [](Amethyst::CheckboxScope &c) {
-                   c.component.onValueChanged = [](bool on) {
-                       auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+               [this](Amethyst::CheckboxScope &c) {
+                   c.component.onValueChanged = [this](bool on) {
+                       auto *viewport = m_viewport;
                        if (viewport == nullptr) {
                            return;
                        }
@@ -208,9 +230,9 @@ void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
     f.textLabel({.base = {.size = Amethyst::UDim2::fromOffset(56, 24)}, .text = HEADER_BTN_TEXT, .label = "Direct"});
 
     f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_showIndirectLighting},
-               [](Amethyst::CheckboxScope &c) {
-                   c.component.onValueChanged = [](bool on) {
-                       auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+               [this](Amethyst::CheckboxScope &c) {
+                   c.component.onValueChanged = [this](bool on) {
+                       auto *viewport = m_viewport;
                        if (viewport == nullptr) {
                            return;
                        }
@@ -220,9 +242,9 @@ void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
     f.textLabel({.base = {.size = Amethyst::UDim2::fromOffset(56, 24)}, .text = HEADER_BTN_TEXT, .label = "Indirect"});
 
     f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_rawIrradiance},
-               [](Amethyst::CheckboxScope &c) {
-                   c.component.onValueChanged = [](bool on) {
-                       auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+               [this](Amethyst::CheckboxScope &c) {
+                   c.component.onValueChanged = [this](bool on) {
+                       auto *viewport = m_viewport;
                        if (viewport == nullptr) {
                            return;
                        }
@@ -234,7 +256,7 @@ void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
 
 Rapture::CameraController *ViewportPanel::cameraController() const
 {
-    auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+    auto *viewport = m_viewport;
     if (viewport == nullptr) {
         return nullptr;
     }
@@ -257,6 +279,44 @@ void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
     }
 }
 
+void ViewportPanel::updateViewportImage()
+{
+    if (m_viewport == nullptr) {
+        return;
+    }
+    auto *target = m_viewport->getSceneRenderTarget();
+    if (target == nullptr) {
+        return;
+    }
+    uint32_t slot = m_viewport->getLastRenderedFrameIndex();
+    if (slot == UINT32_MAX) {
+        return;
+    }
+    if (slot >= m_slotImages.size()) {
+        m_slotImages.resize(slot + 1);
+    }
+
+    auto texture = target->getTexture(slot);
+    if (texture == nullptr) {
+        return;
+    }
+
+    SlotImage &cached = m_slotImages[slot];
+    if (texture.get() != cached.texture) {
+        if (cached.id.isValid() && m_services.unregisterTexture) {
+            m_services.unregisterTexture(cached.id);
+        }
+        if (m_services.registerTexture) {
+            cached.id = m_services.registerTexture(texture.get());
+        }
+        cached.texture = texture.get();
+    }
+
+    if (cached.id.isValid()) {
+        setViewportImage(cached.id);
+    }
+}
+
 void ViewportPanel::onUpdate(float dt)
 {
     if (m_root == nullptr) {
@@ -266,11 +326,12 @@ void ViewportPanel::onUpdate(float dt)
     updateGizmo();
     syncCameraModeButton();
 
-    auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
-    if (viewport != nullptr) {
-        viewport->editorBinding().hovered = m_viewportHovered;
+    if (m_viewport != nullptr) {
+        m_viewport->editorBinding().hovered = m_viewportHovered;
     }
+    updateViewportImage();
 
+    auto *viewport = m_viewport;
     Amethyst::vec2 size = m_viewportImage->absoluteContentSize;
     if (size.x > 0.0f && size.y > 0.0f) {
         if (size != m_pendingViewportSize) {

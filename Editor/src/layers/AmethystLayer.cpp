@@ -4,7 +4,6 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "layers/panels/FileBrowser.h"
 #include "layers/panels/ImportPanel.h"
-#include "layers/panels/ViewportPanel.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "layers/workspaces/AnimationsWorkspace.h"
 #include "layers/workspaces/LevelEditorWorkspace.h"
@@ -76,12 +75,6 @@ AmethystLayer::~AmethystLayer()
     auto &vulkanContext = app.getVulkanContext();
     vulkanContext.waitIdle();
 
-    for (auto &texId : m_viewportTextureIds) {
-        if (texId.isValid()) {
-            m_backend.unregisterTexture(texId);
-        }
-    }
-
     m_secondaryWindows.clear();
 
     m_backend.shutdown();
@@ -149,9 +142,6 @@ void AmethystLayer::onAttach()
     setupWorkspaces(screenSize);
 
     m_bottomBar = std::make_unique<BottomBar>(&m_window, buildServices());
-
-    m_viewportTextureIds.resize(swapChain->getImageCount());
-    m_viewportTextureViews.resize(swapChain->getImageCount(), VK_NULL_HANDLE);
 }
 
 void AmethystLayer::onDetach()
@@ -180,36 +170,6 @@ void AmethystLayer::onUpdate(float dt)
     }
 
     m_window.tick(dt);
-
-
-    auto *sceneViewport = app.getViewportManager().getPrimaryViewport();
-    auto *sceneRenderTarget = sceneViewport != nullptr ? sceneViewport->getSceneRenderTarget() : nullptr;
-    if (sceneRenderTarget != nullptr) {
-        uint32_t renderedSlot = sceneViewport->getLastRenderedFrameIndex();
-        if (renderedSlot < m_viewportTextureIds.size()) {
-            auto texture = sceneRenderTarget->getTexture(renderedSlot);
-            if (texture != nullptr) {
-                VkImageView view = texture->getImageView();
-                if (!m_viewportTextureIds[renderedSlot].isValid() || m_viewportTextureViews[renderedSlot] != view) {
-                    if (m_viewportTextureIds[renderedSlot].isValid()) {
-                        m_backend.unregisterTexture(m_viewportTextureIds[renderedSlot]);
-                    }
-                    m_viewportTextureIds[renderedSlot] = m_backend.registerTexture(view, texture->getSampler().getSamplerVk());
-                    m_viewportTextureViews[renderedSlot] = view;
-                }
-            }
-
-            if (m_viewportTextureIds[renderedSlot].isValid()) {
-                for (auto &ws : m_workspaces) {
-                    for (auto &panel : ws->getPanels()) {
-                        if (auto *vp = dynamic_cast<ViewportPanel *>(panel.get()); vp != nullptr) {
-                            vp->setViewportImage(m_viewportTextureIds[renderedSlot]);
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     VkCommandBuffer cmd = frame.commandBuffer->getCommandBufferVk();
 
@@ -302,7 +262,8 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
 
             PanelServices services = buildServices();
             Rapture::Scene *activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
-            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, activeScene));
+            Rapture::Viewport *primaryViewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
+            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, activeScene, primaryViewport));
             m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<MaterialEditorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs, services));
@@ -419,19 +380,6 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
     glm::vec2 screenSize = {static_cast<float>(swapChain.getExtent().width), static_cast<float>(swapChain.getExtent().height)};
 
     if (&swapChain == app.getMainWindow().getSwapChain().get()) {
-        // TODO: viewport textures should track the viewport panel's own size, not the
-        // window's, and only need to change when that panel actually resizes.
-        for (auto &texId : m_viewportTextureIds) {
-            if (texId.isValid()) {
-                m_backend.unregisterTexture(texId);
-            }
-        }
-
-        m_viewportTextureIds.clear();
-        m_viewportTextureIds.resize(swapChain.getImageCount());
-        m_viewportTextureViews.clear();
-        m_viewportTextureViews.resize(swapChain.getImageCount(), VK_NULL_HANDLE);
-
         m_window.absoluteSize = screenSize;
         m_window.markDirty();
 
@@ -466,6 +414,7 @@ PanelServices AmethystLayer::buildServices(void)
         if (tex == nullptr) return Amethyst::AM_INVALID_TEXTURE;
         return m_backend.registerTexture(tex->getImageView(), tex->getSampler().getSamplerVk());
     };
+    services.unregisterTexture = [this](Amethyst::AmTextureId id) { m_backend.unregisterTexture(id); };
     services.openImportPanel = [this](const std::filesystem::path &path) {
         struct Session {
             std::unique_ptr<ImportPanel> panel;

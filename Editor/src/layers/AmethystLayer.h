@@ -69,9 +69,6 @@ class AmethystLayer : public Rapture::Layer {
     int m_activeWorkspaceIndex = 0;
     std::vector<std::unique_ptr<Workspace>> m_workspaces;
 
-    std::vector<Amethyst::AmTextureId> m_viewportTextureIds;
-    std::vector<VkImageView> m_viewportTextureViews;
-
     std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
 
     Rapture::EventConnection m_mainSwapchainRecreatedConn;

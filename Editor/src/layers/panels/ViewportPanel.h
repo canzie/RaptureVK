@@ -11,9 +11,12 @@
 
 #include <math/math.h>
 #include <memory>
+#include <vector>
 
 namespace Rapture {
 class CameraController;
+class Viewport;
+class Texture;
 }
 
 class ViewportPanel : public Panel {
@@ -38,6 +41,7 @@ class ViewportPanel : public Panel {
     void setupHeader(Amethyst::FrameScope &f);
     void syncCameraModeButton(void);
     Rapture::CameraController *cameraController(void) const;
+    void updateViewportImage(void);
 
   private:
     Amethyst::Frame *m_root = nullptr;
@@ -69,6 +73,14 @@ class ViewportPanel : public Panel {
     Amethyst::vec2 m_pendingViewportSize = {};
     float m_resizeStableTime = 0.0f;
     bool m_resizePending = false;
+
+    Rapture::Viewport *m_viewport = nullptr;
+
+    struct SlotImage {
+        Amethyst::AmTextureId id = Amethyst::AM_INVALID_TEXTURE;
+        Rapture::Texture *texture = nullptr;
+    };
+    std::vector<SlotImage> m_slotImages;
 };
 
 #endif // RAPTURE__VIEWPORT_PANEL_H

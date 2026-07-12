@@ -21,6 +21,7 @@ struct PanelServices {
     std::function<void(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm)> openFileExplorer;
     std::function<void(const std::filesystem::path &path)> openImportPanel;
     std::function<Amethyst::AmTextureId(Rapture::Texture *)> registerTexture;
+    std::function<void(Amethyst::AmTextureId)> unregisterTexture;
 };
 
 struct WorkspaceContext {
