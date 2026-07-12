@@ -11,9 +11,9 @@
 
 static constexpr float PICKER_HEADER_HEIGHT = 34.0f;
 
-ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const PanelServices &services, std::string_view title,
+ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string_view title,
                                      ImagePreviewMode mode)
-    : Panel(services), m_mode(mode)
+    : Panel(context), m_mode(mode)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();

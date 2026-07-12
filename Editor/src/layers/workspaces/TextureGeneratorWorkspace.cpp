@@ -25,7 +25,7 @@ static void s_addPlaceholderTab(Amethyst::TabBar *tabBar, std::string_view name)
 
 TextureGeneratorWorkspace::TextureGeneratorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services)
 {
-    m_services = services;
+    m_context.services = services;
     setupBase(tabs, "Texture Generator");
     m_dockingLayer->name = "Texture Generator Dock";
 
@@ -46,11 +46,11 @@ TextureGeneratorWorkspace::TextureGeneratorWorkspace(Amethyst::TabBarScope &tabs
 
     if (inputsTabBar != nullptr) {
         inputsTabBar->addClass("panel-tab-bar");
-        m_panels.push_back(std::make_unique<ShaderInputsPanel>(inputsTabBar, m_services));
+        m_panels.push_back(std::make_unique<ShaderInputsPanel>(inputsTabBar, m_context));
     }
     if (previewTabBar != nullptr) {
         previewTabBar->addClass("panel-tab-bar");
-        m_panels.push_back(std::make_unique<ImagePreviewPanel>(previewTabBar, m_services, "Preview"));
+        m_panels.push_back(std::make_unique<ImagePreviewPanel>(previewTabBar, m_context, "Preview"));
     }
     if (sourceTabBar != nullptr) {
         s_addPlaceholderTab(sourceTabBar, "Source");
@@ -368,11 +368,11 @@ void TextureGeneratorWorkspace::generate()
     Rapture::RP_INFO("Generated texture for instance '{}'", instance->name);
 
     if (!instance->previewAmTexId.isValid()) {
-        if (!m_services.registerTexture) {
+        if (!m_context.services.registerTexture) {
             Rapture::RP_ERROR("registerTexture service not set, cannot display preview");
         } else {
             Rapture::Texture &tex = instance->generator->getTexture();
-            instance->previewAmTexId = m_services.registerTexture(&tex);
+            instance->previewAmTexId = m_context.services.registerTexture(&tex);
             Rapture::RP_INFO("Registered texture, id={}", instance->previewAmTexId.id);
         }
     }

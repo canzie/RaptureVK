@@ -7,7 +7,7 @@
 
 MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services)
 {
-    m_services = services;
+    m_context.services = services;
     setupBase(tabs, "Material Editor");
     m_dockingLayer->name = "Material Editor Dock";
 
@@ -16,7 +16,7 @@ MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, co
 
     if (canvasTabBar != nullptr) {
         canvasTabBar->addClass("panel-tab-bar");
-        auto panel = std::make_unique<NodeEditorPanel>(canvasTabBar, m_services);
+        auto panel = std::make_unique<NodeEditorPanel>(canvasTabBar, m_context);
         m_nodeEditor = panel.get();
         m_panels.push_back(std::move(panel));
     }

@@ -4,8 +4,6 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "layers/panels/FileBrowser.h"
 #include "layers/panels/ImportPanel.h"
-#include "layers/panels/OutlinerPanel.h"
-#include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "layers/workspaces/AnimationsWorkspace.h"
@@ -17,7 +15,6 @@
 #include "logging/TracyProfiler.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "textures/Texture.h"
-#include "scenes/SceneManager.h"
 #include "utils/Timestep.h"
 #include "viewport/ViewportManager.h"
 #include "window_context/Application.h"
@@ -152,20 +149,6 @@ void AmethystLayer::onAttach()
     setupWorkspaces(screenSize);
 
     m_bottomBar = std::make_unique<BottomBar>(&m_window, buildServices());
-
-    auto activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
-    if (activeScene != nullptr) {
-        for (auto &ws : m_workspaces) {
-            for (auto &panel : ws->getPanels()) {
-                if (auto *outliner = dynamic_cast<OutlinerPanel *>(panel.get()); outliner != nullptr) {
-                    outliner->setScene(activeScene);
-                }
-                if (auto *properties = dynamic_cast<PropertiesPanel *>(panel.get()); properties != nullptr) {
-                    properties->setScene(activeScene);
-                }
-            }
-        }
-    }
 
     m_viewportTextureIds.resize(swapChain->getImageCount());
     m_viewportTextureViews.resize(swapChain->getImageCount(), VK_NULL_HANDLE);
@@ -318,7 +301,8 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
             m_workspaceTabBar = &tabs.component;
 
             PanelServices services = buildServices();
-            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services));
+            Rapture::Scene *activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
+            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, activeScene));
             m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<MaterialEditorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs, services));

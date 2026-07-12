@@ -17,7 +17,7 @@ namespace Rapture { class Shader; }
  */
 class ShaderInputsPanel : public Panel {
   public:
-    ShaderInputsPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
+    ShaderInputsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
     ~ShaderInputsPanel();
 
     /**

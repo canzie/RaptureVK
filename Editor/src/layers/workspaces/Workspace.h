@@ -2,7 +2,7 @@
 #define RAPTURE__WORKSPACE_H
 
 #include "layers/panels/Panel.h"
-#include "layers/panels/PanelServices.h"
+#include "layers/panels/common.h"
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 #include <memory>
@@ -27,7 +27,7 @@ class Workspace {
     bool focused = false;
 
   protected:
-    PanelServices m_services;
+    WorkspaceContext m_context;
     Amethyst::Frame *m_container = nullptr;
     Amethyst::Frame *m_hotbar = nullptr;
     Amethyst::DockingLayer *m_dockingLayer = nullptr;

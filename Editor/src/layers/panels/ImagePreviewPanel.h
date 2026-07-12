@@ -26,7 +26,7 @@ enum class ImagePreviewMode {
  */
 class ImagePreviewPanel : public Panel {
   public:
-    ImagePreviewPanel(Amethyst::TabBar *tabBar, const PanelServices &services, std::string_view title = "Preview",
+    ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string_view title = "Preview",
                       ImagePreviewMode mode = ImagePreviewMode::EXTERNAL);
     ~ImagePreviewPanel();
 

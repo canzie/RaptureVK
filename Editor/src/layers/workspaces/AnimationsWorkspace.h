@@ -5,7 +5,7 @@
 
 class AnimationsWorkspace : public Workspace {
   public:
-    AnimationsWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services) { m_services = services; setupBase(tabs, "Animations"); }
+    AnimationsWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services) { m_context.services = services; setupBase(tabs, "Animations"); }
 
     void saveLayout() override {}
 };

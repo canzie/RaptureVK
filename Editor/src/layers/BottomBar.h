@@ -1,7 +1,7 @@
 #ifndef RAPTURE__BOTTOM_BAR_H
 #define RAPTURE__BOTTOM_BAR_H
 
-#include "layers/panels/PanelServices.h"
+#include "layers/panels/common.h"
 #include <amethyst/Amethyst.h>
 
 #include <memory>

@@ -168,7 +168,7 @@ void ShaderInputsPanel::applyShaderDefaults(std::vector<uint8_t> &buffer, const 
     }
 }
 
-ShaderInputsPanel::ShaderInputsPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
+ShaderInputsPanel::ShaderInputsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();

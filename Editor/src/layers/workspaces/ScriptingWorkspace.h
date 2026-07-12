@@ -5,7 +5,7 @@
 
 class ScriptingWorkspace : public Workspace {
   public:
-    ScriptingWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services) { m_services = services; setupBase(tabs, "Scripting"); }
+    ScriptingWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services) { m_context.services = services; setupBase(tabs, "Scripting"); }
 
     void saveLayout() override {}
 };

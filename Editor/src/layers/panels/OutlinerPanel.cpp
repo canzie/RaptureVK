@@ -25,7 +25,7 @@ static void s_nameLabel(Amethyst::UIScope &s, const std::string &text)
         [](Amethyst::TextLabelScope &l) { l.component.propagate(Amethyst::INTERACTION_CATEGORY_ALL); });
 }
 
-OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
+OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -83,6 +83,8 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const PanelServices &serv
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
 
     tabBar->addTab(std::move(root), iconTabLayout("Outliner", Icons::SVG_LAYERS));
+
+    setScene(context.scene);
 }
 
 OutlinerPanel::~OutlinerPanel()

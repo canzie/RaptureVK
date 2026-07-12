@@ -19,7 +19,7 @@ enum class BrowseMode {
 
 class ContentBrowserPanel : public Panel {
   public:
-    ContentBrowserPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
+    ContentBrowserPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
     ContentBrowserPanel(Amethyst::PopupScope &scope, const PanelServices &services);
     ~ContentBrowserPanel();
     ContentBrowserPanel(const ContentBrowserPanel &) = delete;

@@ -33,7 +33,7 @@ class MaterialInstance;
  */
 class NodeEditorPanel : public Panel {
   public:
-    NodeEditorPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
+    NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
     ~NodeEditorPanel() override;
     NodeEditorPanel(const NodeEditorPanel &) = delete;
     NodeEditorPanel &operator=(const NodeEditorPanel &) = delete;

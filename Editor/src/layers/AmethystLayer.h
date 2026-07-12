@@ -2,7 +2,7 @@
 #define RAPTURE__AMETHYST_LAYER_H
 
 #include "layers/Layer.h"
-#include "layers/panels/PanelServices.h"
+#include "layers/panels/common.h"
 
 #include <amethyst/Amethyst.h>
 #include <amethyst__vk13_glfw.h>

@@ -14,7 +14,7 @@
 
 class OutlinerPanel : public Panel {
   public:
-    OutlinerPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
+    OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
     ~OutlinerPanel();
     OutlinerPanel(const OutlinerPanel &) = delete;
     OutlinerPanel &operator=(const OutlinerPanel &) = delete;

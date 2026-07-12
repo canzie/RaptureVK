@@ -5,9 +5,10 @@
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
 
-LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services)
+LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::Scene *scene)
 {
-    m_services = services;
+    m_context.services = services;
+    m_context.scene = scene;
     setupBase(tabs, "Level Editor");
 
     m_dockingLayer->name = "Editor Dock";
@@ -29,16 +30,16 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
 
     if (viewportTabBar != nullptr) {
         viewportTabBar->addClass("panel-tab-bar");
-        m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_services));
+        m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
     }
     if (outlinerTabBar != nullptr) {
         outlinerTabBar->addClass("panel-tab-bar");
-        m_panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar, m_services));
+        m_panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar, m_context));
     }
     if (propertiesTabBar != nullptr) {
         propertiesTabBar->addClass("panel-tab-bar");
-        m_panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar, m_services));
-        m_panels.push_back(std::make_unique<ImagePreviewPanel>(propertiesTabBar, m_services, "Texture Viewer",
+        m_panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar, m_context));
+        m_panels.push_back(std::make_unique<ImagePreviewPanel>(propertiesTabBar, m_context, "Texture Viewer",
                                                                ImagePreviewMode::ASSET_PICKER));
     }
 

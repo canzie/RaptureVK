@@ -17,7 +17,7 @@
 
 class PropertiesPanel : public Panel {
   public:
-    PropertiesPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
+    PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
     ~PropertiesPanel();
     PropertiesPanel(const PropertiesPanel &) = delete;
     PropertiesPanel &operator=(const PropertiesPanel &) = delete;

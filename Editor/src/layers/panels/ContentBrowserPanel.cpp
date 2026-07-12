@@ -123,7 +123,7 @@ static void s_wireGhostHover(Amethyst::TextButton *btn)
     }));
 }
 
-ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
+ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -134,7 +134,8 @@ ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const PanelSe
     tabBar->addTab(std::move(root), iconTabLayout("Content Browser", Icons::SVG_FOLDER));
 }
 
-ContentBrowserPanel::ContentBrowserPanel(Amethyst::PopupScope &scope, const PanelServices &services) : Panel(services), m_root(&scope.component)
+ContentBrowserPanel::ContentBrowserPanel(Amethyst::PopupScope &scope, const PanelServices &services)
+    : Panel(WorkspaceContext{.services = services}), m_root(&scope.component)
 {
     m_root->name = "Content Browser";
 

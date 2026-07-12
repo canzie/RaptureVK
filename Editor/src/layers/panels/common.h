@@ -1,5 +1,5 @@
-#ifndef RAPTURE__PANEL_SERVICES_H
-#define RAPTURE__PANEL_SERVICES_H
+#ifndef RAPTURE__PANELS_COMMON_H
+#define RAPTURE__PANELS_COMMON_H
 
 #include "layers/panels/FileBrowser.h"
 #include <amethyst/Amethyst.h>
@@ -9,6 +9,8 @@
 
 namespace Rapture {
 class Texture;
+class Scene;
+class Viewport;
 }
 
 /**
@@ -21,4 +23,11 @@ struct PanelServices {
     std::function<Amethyst::AmTextureId(Rapture::Texture *)> registerTexture;
 };
 
-#endif // RAPTURE__PANEL_SERVICES_H
+struct WorkspaceContext {
+    Rapture::Scene *scene = nullptr;
+    Rapture::Viewport *viewport = nullptr;
+    Amethyst::DockingLayer *dockingLayer = nullptr;
+    PanelServices services;
+};
+
+#endif // RAPTURE__PANELS_COMMON_H

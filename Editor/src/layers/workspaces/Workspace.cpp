@@ -27,5 +27,7 @@ void Workspace::setupBase(Amethyst::TabBarScope &tabs, std::string_view label)
         m_dockingLayer->innerSpacing = EDITOR_DOCK_INNER_SPACING;
         m_dockingLayer->absolutePosition = {0.0f, EDITOR_CONTENT_TOP + EDITOR_DOCK_SPACING};
         m_dockingLayer->markDirty();
+
+        m_context.dockingLayer = m_dockingLayer;
     });
 }

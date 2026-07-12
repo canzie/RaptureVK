@@ -341,7 +341,7 @@ using TexSpawnFn = std::function<void(NodeEditorPanel::TextureNodeKind, std::str
 static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,
                                                       const TexSpawnFn &spawnTexture, Amethyst::Color3 color);
 
-NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const PanelServices &services) : Panel(services)
+NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
 {
     Rapture::GraphDomainRegistry::registerBuiltins();
 

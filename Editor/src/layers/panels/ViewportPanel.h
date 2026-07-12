@@ -18,7 +18,7 @@ class CameraController;
 
 class ViewportPanel : public Panel {
   public:
-    ViewportPanel(Amethyst::TabBar *tabBar, const PanelServices &services);
+    ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
     ~ViewportPanel();
     ViewportPanel(const ViewportPanel &) = delete;
     ViewportPanel &operator=(const ViewportPanel &) = delete;
