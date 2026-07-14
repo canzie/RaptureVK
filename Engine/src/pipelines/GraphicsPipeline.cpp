@@ -10,10 +10,17 @@ namespace Rapture {
 
 GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineConfiguration &config)
 {
-    buildPipelines(config);
+    retainConfig(config);
+    buildPipelines(m_config);
+    m_shaderReloadConn = m_config.shader->onRecompiled().connect([this]() { rebuild(); });
 }
 
 GraphicsPipeline::~GraphicsPipeline()
+{
+    destroyPipeline();
+}
+
+void GraphicsPipeline::destroyPipeline()
 {
     auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
@@ -27,6 +34,53 @@ GraphicsPipeline::~GraphicsPipeline()
 
     m_pipeline = VK_NULL_HANDLE;
     m_pipelineLayout = VK_NULL_HANDLE;
+}
+
+void GraphicsPipeline::rebuild()
+{
+    destroyPipeline();
+    buildPipelines(m_config);
+}
+
+void GraphicsPipeline::retainConfig(const GraphicsPipelineConfiguration &config)
+{
+    m_config = config;
+
+    if (config.dynamicState.pDynamicStates != nullptr) {
+        m_dynamicStates.assign(config.dynamicState.pDynamicStates,
+                               config.dynamicState.pDynamicStates + config.dynamicState.dynamicStateCount);
+    }
+    m_config.dynamicState.pDynamicStates = m_dynamicStates.data();
+
+    if (config.viewportState.pViewports != nullptr) {
+        m_viewports.assign(config.viewportState.pViewports, config.viewportState.pViewports + config.viewportState.viewportCount);
+    }
+    if (config.viewportState.pScissors != nullptr) {
+        m_scissors.assign(config.viewportState.pScissors, config.viewportState.pScissors + config.viewportState.scissorCount);
+    }
+    m_config.viewportState.pViewports = m_viewports.data();
+    m_config.viewportState.pScissors = m_scissors.data();
+
+    if (config.colorBlendState.pAttachments != nullptr) {
+        m_colorBlendAttachments.assign(config.colorBlendState.pAttachments,
+                                       config.colorBlendState.pAttachments + config.colorBlendState.attachmentCount);
+    }
+    m_config.colorBlendState.pAttachments = m_colorBlendAttachments.data();
+
+    if (m_config.vertexInputState.has_value()) {
+        const VkPipelineVertexInputStateCreateInfo &vin = config.vertexInputState.value();
+        if (vin.pVertexBindingDescriptions != nullptr) {
+            m_vertexBindings.assign(vin.pVertexBindingDescriptions,
+                                    vin.pVertexBindingDescriptions + vin.vertexBindingDescriptionCount);
+        }
+        if (vin.pVertexAttributeDescriptions != nullptr) {
+            m_vertexAttributes.assign(vin.pVertexAttributeDescriptions,
+                                      vin.pVertexAttributeDescriptions + vin.vertexAttributeDescriptionCount);
+        }
+        m_config.vertexInputState.value().pVertexBindingDescriptions = m_vertexBindings.empty() ? nullptr : m_vertexBindings.data();
+        m_config.vertexInputState.value().pVertexAttributeDescriptions =
+            m_vertexAttributes.empty() ? nullptr : m_vertexAttributes.data();
+    }
 }
 
 void GraphicsPipeline::buildPipelines(const GraphicsPipelineConfiguration &config)

@@ -4,12 +4,15 @@
 #include <filesystem>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "ShaderCommon.h"
 #include "ShaderCompilation.h"
 #include "ShaderReflections.h"
 #include "buffers/Buffers.h"
+#include "events/EventSignal.h"
+#include "events/Events.h"
 #include <vulkan/vulkan.h>
 
 #include <spirv_reflect.h>
@@ -69,7 +72,7 @@ std::string shaderTypeToString(ShaderType type);
  */
 class Shader {
   public:
-    Shader() = default;
+    Shader();
 
     // Legacy constructors for backward compatibility
     Shader(const std::filesystem::path &vertexPath, const std::filesystem::path &fragmentPath, ShaderCompileInfo compileInfo = {});
@@ -77,13 +80,10 @@ class Shader {
 
     ~Shader();
 
-    // Non-copyable
     Shader(const Shader &) = delete;
     Shader &operator=(const Shader &) = delete;
-
-    // Movable
-    Shader(Shader &&other) noexcept;
-    Shader &operator=(Shader &&other) noexcept;
+    Shader(Shader &&) = delete;
+    Shader &operator=(Shader &&) = delete;
 
     // Stage management (fluent API)
     Shader &addStage(ShaderType type, const std::filesystem::path &path);
@@ -95,6 +95,21 @@ class Shader {
 
     // Convenience: compile() + createDescriptorLayouts()
     bool build();
+
+    /**
+     * @brief Rebuilds every stage from source in place
+     *
+     * The caller must ensure the device is idle first, since existing modules and owned layouts
+     * are destroyed.
+     * @return True if the shader rebuilt successfully
+     */
+    bool recompile();
+
+    /**
+     * @brief Fired after a successful recompile so dependent pipelines can rebuild
+     * @return The signal to connect pipeline rebuilds to
+     */
+    EventSignal<void()> &onRecompiled() { return m_onRecompiled; }
 
     // State queries
     bool isCompiled() const { return m_status >= ShaderStatus::COMPILED; }
@@ -118,6 +133,8 @@ class Shader {
 
   private:
     void cleanup();
+    void scanDirectIncludes();
+    void onSourceChanged(std::string_view fileName);
     bool compileStage(ShaderStage &stage);
     void reflectStage(const ShaderStage &stage);
     void mergeReflectionData();
@@ -139,6 +156,11 @@ class Shader {
     std::vector<VkPushConstantRange> m_pushConstantLayouts;
     std::vector<DetailedPushConstantInfo> m_detailedPushConstants;
     std::vector<DescriptorInfo> m_materialSets;
+
+    EventSignal<void()> m_onRecompiled;
+
+    std::vector<std::string> m_directIncludes;
+    EventListenerId m_sourceChangedListener = 0;
 };
 
 } // namespace Rapture

@@ -8,12 +8,18 @@
 
 namespace Rapture {
 
-ComputePipeline::ComputePipeline(const ComputePipelineConfiguration &config)
+ComputePipeline::ComputePipeline(const ComputePipelineConfiguration &config) : m_config(config)
 {
-    buildPipelines(config);
+    buildPipelines(m_config);
+    m_shaderReloadConn = m_config.shader->onRecompiled().connect([this]() { rebuild(); });
 }
 
 ComputePipeline::~ComputePipeline()
+{
+    destroyPipeline();
+}
+
+void ComputePipeline::destroyPipeline()
 {
     auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
@@ -27,6 +33,12 @@ ComputePipeline::~ComputePipeline()
 
     m_pipeline = VK_NULL_HANDLE;
     m_pipelineLayout = VK_NULL_HANDLE;
+}
+
+void ComputePipeline::rebuild()
+{
+    destroyPipeline();
+    buildPipelines(m_config);
 }
 
 void ComputePipeline::buildPipelines(const ComputePipelineConfiguration &config)

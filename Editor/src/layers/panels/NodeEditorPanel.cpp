@@ -5,15 +5,18 @@
 
 #include "materials/graph/MaterialGraphCompiler.h"
 #include "materials/graph/NodeRegistry.h"
+#include "materials/graph/SurfaceGraphManager.h"
 
 #include "asset_manager/Asset.h"
 #include "asset_manager/AssetManager.h"
 #include "generators/textures/ProceduralTextures.h"
 #include "logging/Log.h"
+#include "materials/Material.h"
 #include "materials/MaterialData.h"
 #include "materials/MaterialInstance.h"
 #include "materials/MaterialParameters.h"
 #include "textures/Texture.h"
+#include "window_context/Application.h"
 
 #include <components/drag.h>
 #include <components/dropdown.h>
@@ -395,18 +398,7 @@ void NodeEditorPanel::setupCanvas()
     });
     m_canvas->setBaseStyleProperties({.backgroundColor = COL_BG, .backgroundTransparency = 0.0f});
 
-    // The content layer is a zero size, non clipping transform anchor: nodes live in its local
-    // (graph) space, so panning is a single write to its offset and every node follows for free.
-    m_content = m_canvas->add<Amethyst::Frame>();
-    m_content->name = "Content";
-    m_content->setBaseProperties({.clipsDescendants = false, .size = Amethyst::UDim2::fromOffset(0.0f, 0.0f)});
-    m_content->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-
-    // Wires render under the nodes (nodes use zIndex 1), in the same content space.
-    m_wireLayer = m_content->add<Amethyst::Frame>();
-    m_wireLayer->name = "Wires";
-    m_wireLayer->setBaseProperties({.clipsDescendants = false, .size = Amethyst::UDim2::fromOffset(0.0f, 0.0f)});
-    m_wireLayer->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+    activateCanvasLayer();
 
     m_canvasBeganConn = m_canvas->onInputBeganCb.connect([this](const Amethyst::InputObject &io) { onCanvasInputBegan(io); });
     m_canvasMovedConn = m_canvas->onInputChangedCb.connect([this](const Amethyst::InputObject &io) { onCanvasInputChanged(io); });
@@ -545,8 +537,29 @@ void NodeEditorPanel::selectMaterial(Rapture::AssetHandle handle)
     if (base == nullptr) {
         return;
     }
-    loadGraph(base->getGraph());
+    uint32_t newGraphId = base->getGraphId();
+    if (newGraphId != m_selectedGraphId) {
+        bool hadPrevious = m_selectedGraphId != UINT32_MAX;
+        if (hadPrevious) {
+            stashGraph(m_selectedGraphId);
+        }
+        m_selectedGraphId = newGraphId;
+
+        auto it = m_graphViews.find(newGraphId);
+        if (it != m_graphViews.end()) {
+            restoreGraph(it->second);
+            m_graphViews.erase(it);
+        } else {
+            if (hadPrevious) {
+                activateCanvasLayer();
+            }
+            loadGraph(base->getGraph());
+        }
+    }
+
     m_materialDropdown->setText(Rapture::AssetManager::getAssetMetadata(handle).getName());
+
+    m_onMaterialSelectionChanged.fire(handle);
 }
 
 static const char *s_nodeDisplayName(Rapture::GraphNodeType type)
@@ -1284,6 +1297,58 @@ void NodeEditorPanel::clearGraph()
     m_nextNodeId = 1;
 }
 
+void NodeEditorPanel::activateCanvasLayer()
+{
+    m_content = m_canvas->add<Amethyst::Frame>();
+    m_content->name = "Content";
+    m_content->setBaseProperties({.clipsDescendants = false, .size = Amethyst::UDim2::fromOffset(0.0f, 0.0f)});
+    m_content->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+
+    m_wireLayer = m_content->add<Amethyst::Frame>();
+    m_wireLayer->name = "Wires";
+    m_wireLayer->setBaseProperties({.clipsDescendants = false, .size = Amethyst::UDim2::fromOffset(0.0f, 0.0f)});
+    m_wireLayer->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+
+    m_nodes.clear();
+    m_pins = {};
+    m_connections.clear();
+    m_nextNodeId = 1;
+    m_pan = Amethyst::vec2(0.0f);
+}
+
+void NodeEditorPanel::stashGraph(uint32_t graphId)
+{
+    GraphView view;
+    view.content = m_content;
+    view.wireLayer = m_wireLayer;
+    view.nodes = std::move(m_nodes);
+    view.pins = std::move(m_pins);
+    view.connections = std::move(m_connections);
+    view.nextNodeId = m_nextNodeId;
+    view.pan = m_pan;
+
+    auto props = m_content->getBaseProperties();
+    props.visible = false;
+    m_content->setBaseProperties(props);
+
+    m_graphViews[graphId] = std::move(view);
+}
+
+void NodeEditorPanel::restoreGraph(GraphView &view)
+{
+    m_content = view.content;
+    m_wireLayer = view.wireLayer;
+    m_nodes = std::move(view.nodes);
+    m_pins = std::move(view.pins);
+    m_connections = std::move(view.connections);
+    m_nextNodeId = view.nextNodeId;
+    m_pan = view.pan;
+
+    auto props = m_content->getBaseProperties();
+    props.visible = true;
+    m_content->setBaseProperties(props);
+}
+
 void NodeEditorPanel::connectPins(uint32_t srcNode, uint32_t srcSlot, uint32_t dstNode, uint32_t dstSlot)
 {
     uint32_t outPin = findPin(srcNode, true, srcSlot);
@@ -1948,40 +2013,25 @@ Rapture::MaterialGraph NodeEditorPanel::buildGraph() const
 
 void NodeEditorPanel::compileGraph()
 {
+    if (m_selectedGraphId == UINT32_MAX) {
+        Rapture::RP_WARN("No material selected to compile into");
+        return;
+    }
+
     Rapture::MaterialGraph graph = buildGraph();
     if (graph.nodes.empty()) {
         return;
     }
 
-    Rapture::MaterialGraphCompiler compiler;
-    Rapture::CompileResult result = compiler.compile(graph, 0);
-
-    for (const auto &diagnostic : result.diagnostics) {
-        std::string suffix;
-        if (diagnostic.nodeId != UINT32_MAX) {
-            suffix = " (node " + std::to_string(diagnostic.nodeId) + ")";
-        }
-        switch (diagnostic.level) {
-        case Rapture::MaterialCompilerDiagnosticLevel::ERROR:
-            Rapture::RP_ERROR("Graph compile: {}{}", diagnostic.message, suffix);
-            break;
-        case Rapture::MaterialCompilerDiagnosticLevel::WARNING:
-            Rapture::RP_WARN("Graph compile: {}{}", diagnostic.message, suffix);
-            break;
-        default:
-            Rapture::RP_INFO("Graph compile: {}{}", diagnostic.message, suffix);
-            break;
-        }
-    }
-
-    if (!result.success) {
+    auto &graphs = Rapture::MaterialManager::getSurfaceGraphManager();
+    if (!graphs.updateGraph(m_selectedGraphId, graph)) {
         Rapture::RP_ERROR("Graph compile failed");
         return;
     }
 
-    for (const auto &function : result.functions) {
-        Rapture::RP_INFO("Graph compiled to {}:\n{}", function.functionName, function.glslFunction);
-    }
+    auto generatedDir = Rapture::Application::getInstance().getProject().getProjectShaderDirectory() / "glsl/generated";
+    graphs.writeGeneratedFiles(generatedDir);
+    graphs.notifyShadersOfRegeneration();
 }
 
 static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,

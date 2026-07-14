@@ -3,10 +3,13 @@
 #include <fstream>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 
 #include "GraphDomain.h"
 #include "MaterialGraphTypes.h"
+#include "events/ShaderEvents.h"
 #include "logging/Log.h"
+#include "window_context/Application.h"
 
 namespace Rapture {
 
@@ -44,6 +47,24 @@ uint32_t SurfaceGraphManager::registerGraph(const MaterialGraph &graph)
 
     m_graphs.push_back(std::move(result));
     return graphId;
+}
+
+bool SurfaceGraphManager::updateGraph(uint32_t graphId, const MaterialGraph &graph)
+{
+    if (graphId >= m_graphs.size()) {
+        RP_CORE_ERROR("Cannot update unknown graph id {}", graphId);
+        return false;
+    }
+
+    CompileResult result = m_compiler.compile(graph, graphId);
+    s_logDiagnostics(graph.name, result);
+
+    if (!result.success) {
+        return false;
+    }
+
+    m_graphs[graphId] = std::move(result);
+    return true;
 }
 
 // The struct field type: a pin type, or an explicit override for a non-pin field like the model id
@@ -135,6 +156,20 @@ bool SurfaceGraphManager::writeGeneratedFiles(const std::filesystem::path &direc
         }
     }
     return ok;
+}
+
+void SurfaceGraphManager::notifyShadersOfRegeneration() const
+{
+    Application::getInstance().getVulkanContext().waitIdle();
+
+    std::unordered_set<std::string_view> fired;
+    for (const auto &domain : GraphDomainRegistry::all()) {
+        for (const GraphPass &pass : domain.passes) {
+            if (fired.insert(pass.fileName).second) {
+                ShaderEvents::onShaderSourceChanged().publish(pass.fileName);
+            }
+        }
+    }
 }
 
 GraphInstanceData SurfaceGraphManager::getDefaults(uint32_t graphId) const

@@ -1,6 +1,7 @@
 #include "Shader.h"
 
 #include "buffers/descriptors/DescriptorManager.h"
+#include "events/ShaderEvents.h"
 #include "logging/Log.h"
 #include "utils/io.h"
 #include "window_context/Application.h"
@@ -11,8 +12,15 @@
 
 namespace Rapture {
 
+Shader::Shader()
+{
+    m_sourceChangedListener =
+        ShaderEvents::onShaderSourceChanged().addListener([this](std::string_view fileName) { onSourceChanged(fileName); });
+}
+
 // Legacy constructor: vertex + fragment
 Shader::Shader(const std::filesystem::path &vertexPath, const std::filesystem::path &fragmentPath, ShaderCompileInfo compileInfo)
+    : Shader()
 {
     m_compileInfo = compileInfo;
 
@@ -27,7 +35,7 @@ Shader::Shader(const std::filesystem::path &vertexPath, const std::filesystem::p
 }
 
 // Legacy constructor: compute
-Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compileInfo)
+Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compileInfo) : Shader()
 {
     m_compileInfo = compileInfo;
 
@@ -41,42 +49,8 @@ Shader::Shader(const std::filesystem::path &computePath, ShaderCompileInfo compi
 
 Shader::~Shader()
 {
+    ShaderEvents::onShaderSourceChanged().removeListener(m_sourceChangedListener);
     cleanup();
-}
-
-Shader::Shader(Shader &&other) noexcept
-    : m_stages(std::move(other.m_stages)), m_compileInfo(std::move(other.m_compileInfo)), m_status(other.m_status),
-      m_pipelineStages(std::move(other.m_pipelineStages)), m_descriptorSetInfos(std::move(other.m_descriptorSetInfos)),
-      m_descriptorSetLayouts(std::move(other.m_descriptorSetLayouts)), m_ownedLayouts(std::move(other.m_ownedLayouts)),
-      m_pushConstantLayouts(std::move(other.m_pushConstantLayouts)),
-      m_detailedPushConstants(std::move(other.m_detailedPushConstants)), m_materialSets(std::move(other.m_materialSets))
-{
-    other.m_status = ShaderStatus::UNINITIALIZED;
-    other.m_descriptorSetLayouts.clear();
-    other.m_ownedLayouts.clear();
-}
-
-Shader &Shader::operator=(Shader &&other) noexcept
-{
-    if (this != &other) {
-        cleanup();
-
-        m_stages = std::move(other.m_stages);
-        m_compileInfo = std::move(other.m_compileInfo);
-        m_status = other.m_status;
-        m_pipelineStages = std::move(other.m_pipelineStages);
-        m_descriptorSetInfos = std::move(other.m_descriptorSetInfos);
-        m_descriptorSetLayouts = std::move(other.m_descriptorSetLayouts);
-        m_ownedLayouts = std::move(other.m_ownedLayouts);
-        m_pushConstantLayouts = std::move(other.m_pushConstantLayouts);
-        m_detailedPushConstants = std::move(other.m_detailedPushConstants);
-        m_materialSets = std::move(other.m_materialSets);
-
-        other.m_status = ShaderStatus::UNINITIALIZED;
-        other.m_descriptorSetLayouts.clear();
-        other.m_ownedLayouts.clear();
-    }
-    return *this;
 }
 
 void Shader::cleanup()
@@ -100,6 +74,47 @@ void Shader::cleanup()
     }
 
     m_pipelineStages.clear();
+}
+
+void Shader::scanDirectIncludes()
+{
+    m_directIncludes.clear();
+
+    for (const auto &stage : m_stages) {
+        if (stage.sourcePath.extension() == ".spv") {
+            continue;
+        }
+
+        std::string source = readFileAsString(stage.sourcePath);
+        size_t pos = 0;
+        while ((pos = source.find("#include", pos)) != std::string::npos) {
+            size_t open = source.find('"', pos);
+            size_t lineEnd = source.find('\n', pos);
+            if (open == std::string::npos || (lineEnd != std::string::npos && open > lineEnd)) {
+                pos += 8;
+                continue;
+            }
+            size_t close = source.find('"', open + 1);
+            if (close == std::string::npos) {
+                break;
+            }
+
+            std::string included(source.substr(open + 1, close - open - 1));
+            std::string name = std::filesystem::path(included).filename().string();
+            if (std::find(m_directIncludes.begin(), m_directIncludes.end(), name) == m_directIncludes.end()) {
+                m_directIncludes.push_back(std::move(name));
+            }
+            pos = close + 1;
+        }
+    }
+}
+
+void Shader::onSourceChanged(std::string_view fileName)
+{
+    if (std::find(m_directIncludes.begin(), m_directIncludes.end(), fileName) == m_directIncludes.end()) {
+        return;
+    }
+    recompile();
 }
 
 Shader &Shader::addStage(ShaderType type, const std::filesystem::path &path)
@@ -346,6 +361,8 @@ bool Shader::compile()
     // Build pipeline stage infos
     buildPipelineStages();
 
+    scanDirectIncludes();
+
     m_status = ShaderStatus::COMPILED;
     return true;
 }
@@ -467,6 +484,34 @@ bool Shader::build()
         return false;
     }
 
+    return true;
+}
+
+bool Shader::recompile()
+{
+    if (m_stages.empty()) {
+        RP_CORE_ERROR("No shader stages to recompile");
+        return false;
+    }
+
+    cleanup();
+
+    m_descriptorSetInfos.clear();
+    m_pushConstantLayouts.clear();
+    m_detailedPushConstants.clear();
+    m_materialSets.clear();
+    for (auto &stage : m_stages) {
+        stage.spirv.clear();
+    }
+    m_status = ShaderStatus::STAGES_ADDED;
+
+    if (!build()) {
+        m_status = ShaderStatus::FAILED;
+        RP_CORE_ERROR("Failed to recompile shader");
+        return false;
+    }
+
+    m_onRecompiled.fire();
     return true;
 }
 

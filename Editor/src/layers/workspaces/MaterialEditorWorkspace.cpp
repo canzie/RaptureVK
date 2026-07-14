@@ -3,9 +3,12 @@
 #include "layers/panels/NodeEditorPanel.h"
 #include "layers/panels/ViewportPanel.h"
 
+#include <asset_manager/Asset.h>
+#include <asset_manager/AssetManager.h>
 #include <components/Components.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
+#include <materials/MaterialInstance.h>
 #include <render_targets/SceneRenderTarget.h>
 #include <scenes/Scene.h>
 #include <scenes/entities/Entity.h>
@@ -35,6 +38,8 @@ MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, co
         canvasTabBar->addClass("panel-tab-bar");
         auto panel = std::make_unique<NodeEditorPanel>(canvasTabBar, m_context);
         m_nodeEditor = panel.get();
+        m_materialSelectedConn =
+            m_nodeEditor->onMaterialSelectionChanged().connect([this](Rapture::AssetHandle handle) { showMaterialOnSphere(handle); });
         m_panels.push_back(std::move(panel));
     }
 
@@ -77,7 +82,7 @@ void MaterialEditorWorkspace::setupPreviewScene()
     auto &sceneManager = app.getProject().getSceneManager();
 
     m_previewScene = sceneManager.createScene(s_previewSceneName);
-    m_previewScene->createSphere("Preview Sphere");
+    m_previewSphere = m_previewScene->createSphere("Preview Sphere");
 
     Rapture::Entity camera = m_previewScene->createEntity("Preview Camera");
     camera.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f, 0.0f, 4.0f), glm::vec3(0.0f), glm::vec3(1.0f));
@@ -105,6 +110,25 @@ void MaterialEditorWorkspace::setupPreviewScene()
 
     m_context.scene = m_previewScene;
     m_context.viewport = m_previewViewport;
+}
+
+void MaterialEditorWorkspace::showMaterialOnSphere(Rapture::AssetHandle handle)
+{
+    if (!m_previewSphere.isValid()) {
+        return;
+    }
+
+    Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
+    if (!ref) {
+        return;
+    }
+
+    auto *materialComp = m_previewSphere.tryGetComponent<Rapture::MaterialComponent>();
+    if (materialComp == nullptr) {
+        m_previewSphere.addComponent<Rapture::MaterialComponent>(std::move(ref));
+        return;
+    }
+    materialComp->material = Rapture::AssetPtr<Rapture::MaterialInstance>(std::move(ref));
 }
 
 void MaterialEditorWorkspace::setupHotbar()

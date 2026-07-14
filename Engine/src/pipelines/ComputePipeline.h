@@ -30,6 +30,12 @@ class ComputePipeline : public PipelineBase {
   private:
     void createPipelineLayout(const ComputePipelineConfiguration &config);
     void createPipeline(const ComputePipelineConfiguration &config);
+    void destroyPipeline();
+    void rebuild();
+
+  private:
+    ComputePipelineConfiguration m_config;
+    EventConnection m_shaderReloadConn;
 };
 
 } // namespace Rapture

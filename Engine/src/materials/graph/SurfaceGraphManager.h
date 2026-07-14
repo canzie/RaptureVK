@@ -27,11 +27,24 @@ class SurfaceGraphManager {
     uint32_t registerGraph(const MaterialGraph &graph);
 
     /**
+     * @brief Recompile a graph in place under its existing graphId
+     * @param graphId The graph to replace
+     * @param graph The new authored graph
+     * @return True if it recompiled successfully
+     */
+    bool updateGraph(uint32_t graphId, const MaterialGraph &graph);
+
+    /**
      * @brief Write one generated GLSL file per pass of every registered domain
      * @param directory Destination directory for the generated pass files
      * @return True if every file was written
      */
     bool writeGeneratedFiles(const std::filesystem::path &directory);
+
+    /**
+     * @brief Fire a source-changed event for every generated pass file so dependent shaders reload
+     */
+    void notifyShadersOfRegeneration() const;
 
     /**
      * @brief Default instance pool a graph expects, for seeding a MaterialInstance

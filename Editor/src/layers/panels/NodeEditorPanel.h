@@ -5,6 +5,7 @@
 #include <components/shape.h>
 
 #include "asset_manager/AssetCommon.h"
+#include "events/EventSignal.h"
 #include "events/ProjectEvents.h"
 #include "layers/panels/Panel.h"
 #include "materials/graph/MaterialGraph.h"
@@ -15,7 +16,7 @@ namespace Rapture {
 class ProceduralTexture;
 struct ProceduralParameter;
 class MaterialInstance;
-}
+} // namespace Rapture
 
 #include <cstdint>
 #include <memory>
@@ -44,6 +45,12 @@ class NodeEditorPanel : public Panel {
      * @brief Builds the current graph, runs it through the compiler, and logs the outcome
      */
     void compileGraph(void);
+
+    /**
+     * @brief Fired when a material is picked, carrying its asset handle
+     * @return The signal to connect a preview to
+     */
+    Rapture::EventSignal<void(Rapture::AssetHandle)> &onMaterialSelectionChanged() { return m_onMaterialSelectionChanged; }
 
     /**
      * @brief Which texture source an editor-only texture node samples
@@ -122,6 +129,16 @@ class NodeEditorPanel : public Panel {
         uint32_t srcPinId = 0;
         uint32_t dstPinId = 0;
         Amethyst::Spline *spline = nullptr;
+    };
+
+    struct GraphView {
+        Amethyst::Frame *content = nullptr;
+        Amethyst::Frame *wireLayer = nullptr;
+        std::unordered_map<uint32_t, NodeView> nodes;
+        Rapture::FreeList<PinView> pins;
+        std::vector<WireView> connections;
+        uint32_t nextNodeId = 1;
+        Amethyst::vec2 pan{0.0f};
     };
 
     void setupCanvas(void);
@@ -241,6 +258,23 @@ class NodeEditorPanel : public Panel {
      * @brief Deletes every node, pin, and wire, resetting the canvas to empty
      */
     void clearGraph(void);
+
+    /**
+     * @brief Creates a fresh content and wire layer and makes it the active canvas
+     */
+    void activateCanvasLayer(void);
+
+    /**
+     * @brief Hides the active canvas and stores its live state under the given graph
+     * @param graphId The graph to store the current canvas under
+     */
+    void stashGraph(uint32_t graphId);
+
+    /**
+     * @brief Restores a stored canvas as the active one and shows it
+     * @param view The stored graph view to make active
+     */
+    void restoreGraph(GraphView &view);
 
     /**
      * @brief Wires an output pin of one node to an input pin of another
@@ -465,6 +499,12 @@ class NodeEditorPanel : public Panel {
     uint32_t m_primaryNodeId = 0; // the main selected node, 0 when nothing is selected
 
     uint32_t m_nextNodeId = 1;
+
+    uint32_t m_selectedGraphId = UINT32_MAX;
+
+    std::unordered_map<uint32_t, GraphView> m_graphViews;
+
+    Rapture::EventSignal<void(Rapture::AssetHandle)> m_onMaterialSelectionChanged;
 
     Rapture::EventListenerId m_serializeListener = 0;
 };

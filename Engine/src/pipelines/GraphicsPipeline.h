@@ -51,6 +51,27 @@ class GraphicsPipeline : public PipelineBase {
   private:
     void createPipelineLayout(const GraphicsPipelineConfiguration &config);
     void createPipeline(const GraphicsPipelineConfiguration &config);
+    void destroyPipeline();
+    void rebuild();
+
+    /**
+     * @brief Deep-copies a config into owned storage so the pipeline can rebuild itself later
+     *
+     * The incoming config's create-infos point at caller temporaries; this re-homes the referenced
+     * arrays into members and re-points the retained copy at them.
+     * @param config The config to retain
+     */
+    void retainConfig(const GraphicsPipelineConfiguration &config);
+
+  private:
+    GraphicsPipelineConfiguration m_config;
+    std::vector<VkDynamicState> m_dynamicStates;
+    std::vector<VkViewport> m_viewports;
+    std::vector<VkRect2D> m_scissors;
+    std::vector<VkPipelineColorBlendAttachmentState> m_colorBlendAttachments;
+    std::vector<VkVertexInputBindingDescription> m_vertexBindings;
+    std::vector<VkVertexInputAttributeDescription> m_vertexAttributes;
+    EventConnection m_shaderReloadConn;
 };
 
 } // namespace Rapture
