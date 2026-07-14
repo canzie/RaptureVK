@@ -491,7 +491,7 @@ void DynamicDiffuseGI::updateFromIndirectLightingComponent(Scene &scene)
 void DynamicDiffuseGI::updateSkybox(Scene &scene)
 {
     SkyboxComponent *skyboxComp = nullptr;
-    Entity environment = scene.environment();
+    Entity environment = scene.environmentEntity();
     if (environment.hasComponent<SkyboxComponent>()) {
         skyboxComp = &environment.getComponent<SkyboxComponent>();
     }

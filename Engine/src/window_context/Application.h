@@ -42,6 +42,7 @@ class Application {
     const WindowContext &getWindowContext() const { return *m_mainWindow->getWindowContext(); }
     WindowContext &getWindowContext() { return *m_mainWindow->getWindowContext(); }
     const Project &getProject() const { return *m_project; }
+    Project &getProject() { return *m_project; }
     ViewportManager &getViewportManager() { return *m_viewportManager; }
     const ViewportManager &getViewportManager() const { return *m_viewportManager; }
 

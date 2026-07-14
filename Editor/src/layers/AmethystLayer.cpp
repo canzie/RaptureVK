@@ -261,9 +261,10 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
             m_workspaceTabBar = &tabs.component;
 
             PanelServices services = buildServices();
-            Rapture::Scene *activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
+            Rapture::Scene *levelScene =
+                Rapture::Application::getInstance().getProject().getSceneManager().getScene(RAPTURE_DEFAULT_SCENE_NAME);
             Rapture::Viewport *primaryViewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
-            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, activeScene, primaryViewport));
+            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, levelScene, primaryViewport));
             m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<MaterialEditorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs, services));

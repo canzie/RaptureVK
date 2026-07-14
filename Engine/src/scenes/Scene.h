@@ -46,7 +46,12 @@ class Scene {
      * @brief The scene's single environment entity, always present and not destroyable.
      * @return The environment entity.
      */
-    Entity environment() const;
+    Entity environmentEntity() const;
+
+    /**
+     * @brief The scene's environment, owner of skybox generation and image-based lighting
+     */
+    Environment *environment() const { return m_environment.get(); }
 
     void registerBLAS(Entity &entity);
 

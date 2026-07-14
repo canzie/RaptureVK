@@ -81,6 +81,17 @@ class Texture {
     VkFormat getFormat() const { return toVkFormat(m_spec.format); }
 
     VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType = TextureViewType::DEFAULT) const;
+
+    /**
+     * @brief Get a storage-image descriptor bound to a single mip of a cubemap
+     *
+     * Storage-image views must be single-mip, so prefilter-style passes that write one
+     * roughness mip at a time bind the matching 2D-array (6-layer) view here.
+     * @param mip Mip level to bind
+     * @return Descriptor image info in GENERAL layout with no sampler
+     */
+    VkDescriptorImageInfo getStorageMipDescriptorInfo(uint32_t mip) const;
+
     uint32_t getBindlessIndex();
 
     VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask,
@@ -132,6 +143,7 @@ class Texture {
     VkImageView m_imageViewStencilOnly = VK_NULL_HANDLE;
     VkImageView m_imageViewDepthOnly = VK_NULL_HANDLE;
     VkImageView m_imageViewStorage = VK_NULL_HANDLE;
+    std::vector<VkImageView> m_imageViewStorageMips;
 
     VmaAllocation m_allocation = VK_NULL_HANDLE;
 

@@ -27,28 +27,20 @@
 #include "utils/Timestep.h"
 
 /**
- * @brief Graph 0: fract(position * scale) * tint feeding albedo
+ * @brief Graph 0: smooth silver metal, a clean surface to read the DDGI specular reflection
  * @return The authored graph
  */
-static Rapture::MaterialGraph s_buildFractTintGraph()
+static Rapture::MaterialGraph s_buildSilverMetalGraph()
 {
     using GN = Rapture::GraphNodeType;
     Rapture::MaterialGraph graph;
     graph.name = "Graph0";
-    graph.nodes.push_back({.id = 1, .type = GN::POSITION});
-    graph.nodes.push_back({.id = 2, .type = GN::CONSTANT_VEC3, .inputValues = {Rapture::PinValue(glm::vec3(0.5f))}});
-    graph.nodes.push_back({.id = 3, .type = GN::MULTIPLY_VEC3});
-    graph.nodes.push_back({.id = 4, .type = GN::FRACT_VEC3});
-    graph.nodes.push_back({.id = 5, .type = GN::CONSTANT_VEC3, .inputValues = {Rapture::PinValue(glm::vec3(1.0f, 0.4f, 0.2f))}});
-    graph.nodes.push_back({.id = 6, .type = GN::MULTIPLY_VEC3});
-    graph.nodes.push_back({.id = 7, .type = GN::SURFACE_OUTPUT});
-    graph.connections.push_back({.srcNode = 1, .dstNode = 3, .dstPin = 0});
-    graph.connections.push_back({.srcNode = 2, .dstNode = 3, .dstPin = 1});
-    graph.connections.push_back({.srcNode = 3, .dstNode = 4, .dstPin = 0});
-    graph.connections.push_back({.srcNode = 4, .dstNode = 6, .dstPin = 0});
-    graph.connections.push_back({.srcNode = 5, .dstNode = 6, .dstPin = 1});
-    graph.connections.push_back({.srcNode = 6, .dstNode = 7, .dstPin = 0});
-    graph.outputNodeId = 7;
+    // Pins: albedo(0), normal(1), roughness(2), metallic(3). Albedo tints the reflection for a metal.
+    graph.nodes.push_back({.id = 1,
+                           .type = GN::SURFACE_OUTPUT,
+                           .inputValues = {Rapture::PinValue(glm::vec3(0.95f, 0.94f, 0.90f)), std::nullopt,
+                                           Rapture::PinValue(0.04f), Rapture::PinValue(1.0f)}});
+    graph.outputNodeId = 1;
     return graph;
 }
 
@@ -117,12 +109,12 @@ void TestLayer::onAttach()
         onNewActiveScene(scene);
     });
 
-    // Check if a scene is already active when the layer is attached
+    // Bootstrap the default scene when the layer is attached
     // This handles the case where the initial scene is set before this layer's listener is registered
-    auto currentActiveScene = Rapture::Application::getInstance().getProject().getActiveScene();
-    if (currentActiveScene) {
-        Rapture::RP_INFO("TestLayer::onAttach - Initial scene already active: {0}", currentActiveScene->getSceneName());
-        onNewActiveScene(*currentActiveScene);
+    Rapture::Scene *defaultScene =
+        Rapture::Application::getInstance().getProject().getSceneManager().getScene(RAPTURE_DEFAULT_SCENE_NAME);
+    if (defaultScene != nullptr) {
+        onNewActiveScene(*defaultScene);
     }
 
     // Initialize FPS counter variables
@@ -132,6 +124,10 @@ void TestLayer::onAttach()
 
 void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 {
+    if (scene.getSceneName() != RAPTURE_DEFAULT_SCENE_NAME) {
+        return;
+    }
+
     auto &activeScene = scene;
 
     // Get project paths
@@ -168,7 +164,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     {
         auto &graphManager = Rapture::MaterialManager::getSurfaceGraphManager();
 
-        uint32_t graph0Id = graphManager.registerGraph(s_buildFractTintGraph());
+        uint32_t graph0Id = graphManager.registerGraph(s_buildSilverMetalGraph());
         uint32_t graph1Id = graphManager.registerGraph(s_buildSineBandGraph());
         graphManager.writeGeneratedFiles(project.getProjectShaderDirectory() / "glsl/generated");
 
@@ -184,6 +180,9 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
             auto matRef = Rapture::AssetManager::registerVirtualAsset(std::move(mat), name, Rapture::AssetType::MATERIAL);
             sphere.setComponent<Rapture::MaterialComponent>(matRef);
+
+            sphere.addComponent<Rapture::BLASComponent>(sphere.getComponent<Rapture::MeshComponent>().mesh);
+            activeScene.registerBLAS(sphere);
         };
 
         spawnGraphSphere("Graph Sphere 0", glm::vec3(-3.0f, 2.0f, 0.0f), graph0Id);
@@ -221,7 +220,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
     // Create environment entity with a procedurally generated atmosphere skybox
     {
-        auto envEntity = activeScene.environment();
+        auto envEntity = activeScene.environmentEntity();
         auto &sky = envEntity.addComponent<Rapture::SkyboxComponent>();
         sky.skyIntensity = 0.1f;
         sky.useAtmosphereSkybox = true;
@@ -288,9 +287,6 @@ void TestLayer::onUpdate(float ts)
 {
 
     RAPTURE_PROFILE_SCOPE("TestLayer::onUpdate");
-    // Get the active scene from the project
-    auto activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
-    if (!activeScene) return;
 
     // Update FPS counter
     m_fpsCounter++;

@@ -287,7 +287,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
     RAPTURE_PROFILE_FUNCTION();
 
     if (!m_skyboxPass->hasActiveSkybox()) {
-        Entity environment = activeScene.environment();
+        Entity environment = activeScene.environmentEntity();
         if (environment.hasComponent<SkyboxComponent>()) {
             auto &skyboxComp = environment.getComponent<SkyboxComponent>();
             m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture.get());

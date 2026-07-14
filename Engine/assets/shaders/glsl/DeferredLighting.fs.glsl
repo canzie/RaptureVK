@@ -492,6 +492,7 @@ void main() {
     }
 
     vec3 indirectDiffuse = vec3(0.0);
+    vec3 indirectSpecular = vec3(0.0);
 
     if ((pc.lightingFlags & RENDER_SHOW_INDIRECT) != 0u) {
         if ((pc.lightingFlags & RENDER_USE_GLOBAL_ILLUMINATION) != 0u) {
@@ -499,8 +500,18 @@ void main() {
 
             if ((pc.lightingFlags & RENDER_MODULATE_INDIRECT) != 0u) {
                 vec3 F0 = mix(vec3(0.04), albedo, metallic);
-                vec3 kD_indirect = (vec3(1.0) - F0) * (1.0 - metallic);
-                indirectDiffuse = irradiance * (albedo/3.14159265359) * kD_indirect * ao;
+                vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+
+                vec3 kD_indirect = (vec3(1.0) - F) * (1.0 - metallic);
+                indirectDiffuse = irradiance * (albedo / PI) * kD_indirect * ao;
+
+                // Rough specular reflection: the diffuse irradiance field sampled along the
+                // reflection vector approximates a prefiltered environment. Only valid for the
+                // glossy/rough range, sharp mirror reflections need a traced source. Divide by
+                // PI to recover an approximate incident radiance from the integrated irradiance.
+                vec3 R = reflect(-V, N);
+                vec3 prefilteredRadiance = getIrradiance(fragPos, R, V, u_DDGI_Volume) / PI;
+                indirectSpecular = prefilteredRadiance * F * ao;
             } else {
                 indirectDiffuse = irradiance;
             }
@@ -509,7 +520,7 @@ void main() {
         }
     }
 
-    vec3 color = indirectDiffuse + Lo;
+    vec3 color = indirectDiffuse + indirectSpecular + Lo;
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {

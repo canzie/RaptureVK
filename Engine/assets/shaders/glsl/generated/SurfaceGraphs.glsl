@@ -67,16 +67,10 @@ return surf;
 
 SurfaceData evalSurface_Graph0_2(SurfaceInputs si, uint base){
 SurfaceData surf;
-vec3 _n0=vec3(uintBitsToFloat(u_graphPool.data[base + 0]), uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]));
-vec3 _n1=vec3(uintBitsToFloat(u_graphPool.data[base + 3]), uintBitsToFloat(u_graphPool.data[base + 4]), uintBitsToFloat(u_graphPool.data[base + 5]));
-vec3 _n2=si.worldPos;
-vec3 _n3=_n2 * _n1;
-vec3 _n4=fract(_n3);
-vec3 _n5=_n4 * _n0;
-surf.albedo=_n5;
+surf.albedo=vec3(uintBitsToFloat(u_graphPool.data[base + 0]), uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]));
 surf.normal=normalize(si.worldNormal);
-surf.roughness=0.5;
-surf.metallic=0.0;
+surf.roughness=uintBitsToFloat(u_graphPool.data[base + 3]);
+surf.metallic=uintBitsToFloat(u_graphPool.data[base + 4]);
 surf.ao=1.0;
 surf.emission=vec4(1.0);
 surf.emissiveStrength=0.0;

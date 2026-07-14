@@ -8,7 +8,6 @@
 #include "render_targets/SceneRenderTarget.h"
 #include "utils/rp_assert.h"
 #include "viewport/Viewport.h"
-#include "window_context/Application.h"
 
 #include <components/checkbox.h>
 #include <components/extensions/ui_list_layout.h>
@@ -38,6 +37,9 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
             m_viewport = nullptr;
         } else {
             m_viewport->editorBinding().displayed = true;
+            if (context.scene != nullptr) {
+                m_viewport->setScene(context.scene);
+            }
         }
     }
 
@@ -376,8 +378,11 @@ void ViewportPanel::updateGizmo()
         return;
     }
 
-    auto scene = Rapture::Application::getInstance().getProject().getActiveScene();
-    if (!scene) {
+    if (m_viewport == nullptr) {
+        return;
+    }
+    auto *scene = m_viewport->getScene();
+    if (scene == nullptr) {
         return;
     }
 

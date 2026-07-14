@@ -13,6 +13,13 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+// Roughness-aware Fresnel for ambient / IBL specular (Lagarde). Rough surfaces
+// keep a dimmer grazing response than the mirror-smooth fresnelSchlick would give.
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    vec3 Fr = max(vec3(1.0 - roughness), F0);
+    return F0 + (Fr - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 // GGX / Trowbridge-Reitz normal distribution
 float D_GGX(float NdotH, float roughness) {
     float a = roughness * roughness;

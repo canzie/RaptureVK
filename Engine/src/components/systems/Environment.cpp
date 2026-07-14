@@ -4,6 +4,7 @@
 #include "asset_manager/AssetManager.h"
 #include "generators/textures/ProceduralTextures.h"
 #include "logging/Log.h"
+#include "renderer/ImageBasedLighting.h"
 #include "scenes/Scene.h"
 #include "shaders/Shader.h"
 #include "window_context/Application.h"
@@ -118,6 +119,7 @@ float Environment::wavelengthNm(float rayleighCoefficient)
 Environment::Environment(Entity environment) : m_entity(environment)
 {
     m_lastApplied.timeOfDay = -1.0f;
+    m_ibl = std::make_unique<ImageBasedLighting>();
 }
 
 Environment::~Environment() = default;
@@ -175,6 +177,7 @@ void Environment::update()
         AtmospherePushConstants pc = s_buildPushConstants(*atmo, sunDir);
         m_skyboxGenerator->setPushConstants(pc);
         m_skyboxGenerator->generate();
+        m_ibl->bakeFromCube(sky->skyboxTexture.get());
     }
 }
 

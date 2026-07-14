@@ -280,7 +280,7 @@ Entity Scene::getMainCamera() const
     return Entity::null();
 }
 
-Entity Scene::environment() const
+Entity Scene::environmentEntity() const
 {
     return m_environment->getEntity();
 }

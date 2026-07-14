@@ -153,6 +153,25 @@ uint32_t DescriptorBindingTexture::add(Texture &resource)
     return index;
 }
 
+void DescriptorBindingTexture::addStorageMip(Texture &resource, uint32_t mip)
+{
+    VkDescriptorImageInfo imageInfo = resource.getStorageMipDescriptorInfo(mip);
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = m_set->getDescriptorSet();
+    descriptorWrite.dstBinding = m_binding;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = m_type;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pImageInfo = &imageInfo;
+
+    auto &app = Application::getInstance();
+    auto device = app.getVulkanContext().getLogicalDevice();
+
+    vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+}
+
 DescriptorBindingTLAS::DescriptorBindingTLAS(DescriptorSet *set, uint32_t binding, uint32_t size)
     : DescriptorBinding<TLAS>(set, binding, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, size)
 {

@@ -11,11 +11,11 @@ Project::Project()
     RP_CORE_INFO("Creating Project: {0}", m_config.name);
 
     World *defaultWorld = m_sceneManager.createWorld("DefaultWorld");
-    auto defaultScene = m_sceneManager.createScene("DefaultScene");
-    m_sceneManager.setActiveScene("DefaultScene");
+    auto defaultScene = m_sceneManager.createScene(RAPTURE_DEFAULT_SCENE_NAME);
+    m_sceneManager.activateScene(RAPTURE_DEFAULT_SCENE_NAME);
 
-    defaultWorld->addScene("DefaultScene", defaultScene);
-    defaultWorld->setMainScene("DefaultScene");
+    defaultWorld->addScene(RAPTURE_DEFAULT_SCENE_NAME, defaultScene);
+    defaultWorld->setMainScene(RAPTURE_DEFAULT_SCENE_NAME);
 
     m_sceneManager.setActiveWorld("DefaultWorld");
 }

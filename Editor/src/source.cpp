@@ -6,6 +6,7 @@
 
 #include "EntryPoint.h"
 #include "events/Events.h"
+#include "events/GameEvents.h"
 #include "scenes/Project.h"
 #include "scenes/SceneManager.h"
 

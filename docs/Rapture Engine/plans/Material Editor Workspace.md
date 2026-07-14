@@ -9,7 +9,13 @@
 > **Done so far:** graph retained on `BaseMaterial`; `loadGraph` implemented (graph → canvas
 > reconstruction); `selectMaterial` shows the selected material's base graph; "New" button seeds an
 > empty graph; per-type node display names; texture samples shown as `TEXTURE_SAMPLE` nodes with a
-> preview (decision 5).
+> preview (decision 5); **W1 WorkspaceContext across all workspaces**; **viewport display decoupled**
+> so each `ViewportPanel` drives its own `m_context.viewport` (per-panel register/resize, 1-per-panel
+> lock); **W2 preview scene live** — `MaterialEditorWorkspace` owns a `MaterialPreview` scene (sphere +
+> cubemap skybox + directional light) and its own offscreen viewport; **multi-active-scene refactor**
+> (`SceneManager` active *set*, `activate/deactivateScene`, `getActiveScene` removed); **`EditorLayer`
+> per-viewport** camera+controller. Next: base instance on the sphere (W2 remainder), then pipeline
+> refresh (W3).
 
 **Related: [[Project Serialization]], [[Material System Overhaul]], [[Material Graph Compiler]], [[Scene]], [[Viewport]]**
 
@@ -34,11 +40,17 @@ Most of the plumbing already exists. This doc is mostly wiring + three genuinely
    exists. It is *not* made undeletable/immutable in v1 — if it goes missing we recreate it
    cheaply from `SurfaceGraphManager::getDefaults(graphId)`. Enforcement (a delete-guard) is a
    later refinement only if it proves necessary.
-2. **Multiple scenes, no "main scene."** `SceneManager` already owns many named scenes
-   (`SceneManager.h:23`, `unordered_map<string, unique_ptr<Scene>>`). We drop the
-   `World`/`getMainScene` coupling and pass a `Scene*` explicitly (workspace/viewport), rather than
-   pulling a single global active scene. The `World` layer becomes vestigial and can be removed
-   once the call sites are converted (enumerated below).
+2. **Multiple scenes, no single "active scene." — DONE.** `SceneManager` now holds an active *set*
+   (`std::vector<Scene*> m_activeScenes`) instead of one `m_activeScene`. `setActiveScene` →
+   `activateScene`/`deactivateScene` (idempotent membership; `destroyScene` auto-deactivates);
+   `getActiveScene()` is **removed** entirely (Project + SceneManager); `getActiveScenes()` +
+   `isSceneActive()` added. The main loop (`Application.cpp:148`) pumps `onUpdate` for **every** active
+   scene and no longer binds a scene to the primary viewport (that moved to `ViewportPanel`, below).
+   `createScene` now names the `Scene` (was always "Untitled Scene"); the level scene's name lives in
+   the `RAPTURE_DEFAULT_SCENE_NAME` macro (`SceneManager.h`) so listeners can filter by it. The `World`
+   layer is untouched for now (still vestigial). Now split cleanly: an **active set** = scenes pumped +
+   renderable; **editor focus** (which scene the Outliner/Properties act on) is carried per-panel via
+   `WorkspaceContext.scene`, not a global.
 3. **Instance params are edited in two places.** A dedicated instance panel inside the material
    workspace (focused editing with live preview) **and** a compact inline editor in the Properties
    panel when a mesh's material is selected (quick tweaks without opening the workspace).
@@ -130,37 +142,74 @@ Mechanical and cheap: deep-copy the retained `MaterialGraph`, mint a new UUID, `
 → new `graphId`, build a new `BaseMaterial` + its base instance. Exposed as a **Duplicate** action
 in the content browser and the node-editor material bar.
 
-### 4. WorkspaceContext + preview scene
-Replace the `dynamic_cast`-scanning scene injection in `AmethystLayer.cpp:156-167` with a context
-the `Workspace` owns and passes to each panel it builds:
+### 4. WorkspaceContext + viewport decoupling — **DONE**
+`WorkspaceContext` lives in `Editor/src/layers/panels/common.h` (which also absorbed `PanelServices`;
+the old `PanelServices.h` was deleted):
 
 ```cpp
 struct WorkspaceContext {
-    Rapture::Scene* scene = nullptr;         // optional; the scene this workspace operates on
-    Rapture::Viewport* viewport = nullptr;   // the workspace's render viewport (optional)
+    Rapture::Scene* scene = nullptr;
+    Rapture::Viewport* viewport = nullptr;
     Amethyst::DockingLayer* dockingLayer = nullptr;
-    PanelServices services;                  // fold the existing PanelServices in
+    PanelServices services;
 };
 ```
 
-- `LevelEditorWorkspace` → context points at the level scene + the primary viewport.
-- `MaterialEditorWorkspace` → owns a private preview scene
-  (`sceneManager.createScene("mat_preview_<uuid>")`: sphere + skybox + light) and its own
-  offscreen `Viewport` rendering it. Its `ViewportPanel` shows that viewport's target; swapping the
-  previewed instance = re-binding the sphere's material.
-- Panels stop reaching for a global "active scene"; they read `context.scene`.
+- **Workspaces create the context, panels receive it.** Workspace ctors still take `PanelServices`
+  (and the level one a `Scene*` + `Viewport*`); each sets `m_context.services`, `setupBase` fills
+  `m_context.dockingLayer`, and panels are built with `m_context`. `Panel` extracts `m_services` from
+  the context so panel bodies are unchanged. The `ContentBrowser` popup ctor and `BottomBar` keep raw
+  `PanelServices` (not launched from a workspace).
+- **The `dynamic_cast` scene injection is gone.** `OutlinerPanel`/`PropertiesPanel` call
+  `setScene(context.scene)` in their ctors. `AmethystLayer` passes the active scene + primary viewport
+  to `LevelEditorWorkspace`; the material workspace will make its own (next step).
+- **Each `ViewportPanel` drives its own viewport.** It reads `m_context.viewport` (no more
+  `getPrimaryViewport()`), and owns its display in `updateViewportImage()`: pulls the viewport's
+  render-target texture for the last-rendered slot, registers/unregisters via a new
+  `services.unregisterTexture` with a per-slot `{AmTextureId, Texture*}` cache, and resizes its own
+  viewport (debounced). `AmethystLayer`'s single-viewport feed block + `m_viewportTextureIds/Views`
+  and their lifecycle were deleted.
+- **1-per-panel lock:** `Viewport::EditorBinding` gained a `displayed` flag; a `ViewportPanel` asserts
+  the viewport isn't already displayed, claims it on construct, releases on destroy — two panels can't
+  drive the same viewport.
 
-### 5. Scenes: remove the main-scene coupling
-`getActiveScene()`/main-scene call sites to convert (verified 2026-07-12):
-- `Project.cpp:13-20` — creates `DefaultWorld` + `setActiveWorld`. Becomes: create the level scene
-  directly, hand it to the level workspace.
-- `Project.h:30,34,38,40` — `getActiveScene` + `createWorld`/`setActiveWorld`/`getActiveWorld`
-  passthroughs. Trim to scene ownership.
-- `Application.cpp:148`, `EditorLayer.cpp:39`, `AmethystLayer.cpp:156`, `ViewportPanel.cpp:318`,
-  `ImportPanel.cpp:145`, `TestLayer.cpp:122,292` — each currently pulls the single global active
-  scene; each should instead receive its scene from the workspace/viewport context.
-- `World`/`getMainScene` (`World.h:65-74`, `SceneManager.h:121-140`) become removable once the
-  above no longer depend on "the active world's main scene."
+**DONE:** `MaterialEditorWorkspace::setupPreviewScene` creates its `MaterialPreview` scene via
+`SceneManager` (holds a non-owning `Scene*`), populates it (sphere via `createSphere`, camera entity
+set as main camera, directional light, `default.cubemap` skybox on the environment entity),
+`activateScene`s it so the main loop pumps it, creates its own offscreen `Viewport` via
+`ViewportManager` (`createRenderer(DEFERRED)`, `setScene`/`setCamera`), sets `m_context.scene`/`viewport`,
+and adds a second `ViewportPanel`. Teardown = `destroyViewport` + `destroyScene` after `m_panels.clear()`.
+DDGI is off on the preview viewport (`RenderSettings` `RENDER_USE_GLOBAL_ILLUMINATION` cleared).
+
+### 5. Scenes: remove the single-active-scene coupling — **DONE (World kept)**
+`getActiveScene()` is gone; every call site converted:
+- `Application.cpp:148` — pumps `onUpdate` over `getActiveScenes()`; the `primaryViewport->setScene`
+  special-case removed.
+- `ViewportPanel` — binds `context.scene → its viewport` in the ctor (the binding that left the main
+  loop); the gizmo reads `m_viewport->getScene()` (not a global) so a preview viewport's gizmo uses the
+  preview scene.
+- `EditorLayer` — rewritten **per-viewport**: `unordered_map<Viewport*, {Entity camera, unique_ptr<CameraController>}>`;
+  `syncViewportControls()` lazily creates a camera+controller for each viewport with a scene (reusing an
+  existing `viewport->getCamera()` if set — so the preview keeps its own camera), prunes controls for
+  destroyed viewports, and drives only the hovered/capturing one. No more single `getPrimaryViewport()`
+  camera that got hijacked when a second scene activated.
+- `TestLayer` — bootstraps only `RAPTURE_DEFAULT_SCENE_NAME` (via `getScene(...)` in `onAttach`, and its
+  `onSceneActivated` listener early-returns for other scenes), so activating the preview scene never
+  dumps the level into it. `AmethystLayer` hands `LevelEditorWorkspace` the `DefaultScene` explicitly.
+- `ImportPanel:145` is dead-commented, left as-is.
+- `Project`/`World`/`getMainScene` kept (vestigial); only the single-active accessor was removed.
+
+**Descriptor sizing (SCUFFED TEMP).** A second active scene exposed that the per-scene bindless arrays
+in `DescriptorManager.cpp` (`CAMERA/LIGHT/SHADOW_DATA/MESH_DATA` SSBOs + `PROBE_VOLUME_DATA` UBO) were
+sized to `3` = one scene's frames-in-flight, so scene #2 got "No free slots" and rendered black. Bumped
+`3 → 6` (fits exactly 2 scenes) with `SCUFFED TEMP` comments — the real fix is sizing per active-scene
+count. Pool sizes (`s_maxStorageBuffers` etc.) have ample headroom.
+
+**Preview lighting (open).** The engine has **no IBL**, so the `default.cubemap` skybox is a backdrop
+only — it does not light the sphere. With DDGI off the sphere is lit by the directional light + the
+hardcoded `vec3(0.03)` ambient (`PBR.fs.glsl:207`; `IndirectLightingComponent`'s `AmbientSettings` is the
+intended flat-ambient lever, `LightingPass.cpp:160` falls back to it when GI is absent). Making the
+shadow side read soft without IBL = bump that ambient or add fill lights (studio rig). Not yet decided.
 
 ### 6. Pipeline refresh on material mutation (the OOB-safety piece)
 Consumers of the generated surface GLSL — the closed list (verified via `evalSurface` grep):
@@ -201,11 +250,16 @@ authoring action, not a hot path.
 - **W0 — graph retention + reconstruction. [DONE, except `uuid → graphId`]** Graph retained on
   `BaseMaterial`; `loadGraph`, `selectMaterial`, "New", display names, texture-sample preview all
   in. The `uuid → graphId` map still comes with serialization S2.
-- **W1 — WorkspaceContext**: introduce the struct, route scenes through it, delete the
-  `dynamic_cast` scene injection. Convert the `getActiveScene` call sites (decision 2). Low-risk,
-  unblocks the preview.
-- **W2 — material preview**: `MaterialEditorWorkspace` owns a preview scene + offscreen viewport +
-  a second `ViewportPanel`; base instance seeded from defaults on the sphere.
+- **W1 — WorkspaceContext. [DONE]** Struct in `common.h` (absorbed `PanelServices`); workspaces build
+  it, panels receive it; `dynamic_cast` scene injection deleted; viewport display decoupled per panel
+  (`services.unregisterTexture`, per-slot cache, 1-per-panel `displayed` lock). The `getActiveScene`
+  call-site cleanup that was deferred here is now **done** as part of W2 (decision 2 / section 5).
+- **W2 — material preview. [preview scene DONE; base instance TODO]** `MaterialEditorWorkspace` owns a
+  `MaterialPreview` scene + offscreen viewport + a second `ViewportPanel` (sphere, cubemap skybox,
+  directional light, DDGI off). Came with the multi-active-scene refactor (`SceneManager` active set,
+  `EditorLayer` per-viewport, descriptor bump) and the single-active-scene call-site cleanup that W1
+  had deferred. Remaining: seed the base instance from defaults onto the sphere; settle preview lighting
+  (no IBL — ambient/fill decision above).
 - **W3 — pipeline refresh**: `onSurfaceShaderRebuilt` + synchronous rebuild in `GBufferPass`
   (both pipelines) and DDGI probe trace. Verify no validation OOB on a live material edit.
 - **W4 — instance editing UI**: MaterialInstancePanel + Properties inline editor + "Open in

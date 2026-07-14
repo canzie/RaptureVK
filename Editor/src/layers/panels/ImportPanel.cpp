@@ -7,10 +7,10 @@
 
 #include <components/extensions/ui_drag_detector.h>
 
-#define COL_BG     Amethyst::Color3::fromHex(0x282828)
-#define COL_TITLE  Amethyst::Color3::fromHex(0x202020)
-#define COL_BORDER Amethyst::Color3::fromHex(0x3a3a3a)
-#define COL_BTN    Amethyst::Color3::fromHex(0x2e2e2e)
+#define COL_BG         Amethyst::Color3::fromHex(0x282828)
+#define COL_TITLE      Amethyst::Color3::fromHex(0x202020)
+#define COL_BORDER     Amethyst::Color3::fromHex(0x3a3a3a)
+#define COL_BTN        Amethyst::Color3::fromHex(0x2e2e2e)
 #define COL_TEXT       Amethyst::Color4(0.92f, 0.92f, 0.92f, 1.0f)
 #define COL_TEXT_MUTED Amethyst::Color4(1.0f, 1.0f, 1.0f, 0.62f)
 
@@ -142,6 +142,7 @@ void ImportPanel::build()
 
 void ImportPanel::doImport()
 {
+    /*
     Rapture::Scene *scene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (scene == nullptr) {
         Rapture::RP_WARN("No active scene to import into");
@@ -153,6 +154,7 @@ void ImportPanel::doImport()
         Rapture::RP_WARN("Failed to import: {}", m_path.string());
         return;
     }
+    */
 }
 
 void ImportPanel::close()

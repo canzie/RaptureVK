@@ -123,6 +123,7 @@ The real axis is **not "MSAA vs TAA"** — it's **what aliasing dominates, and w
 - DDGI gives **zero specular** today. Options:
   - **SSR + cubemap/probe fallback** (cheap path): march reflection ray in screen space (Hi-Z), sample lit color; roughness → cone/blur; **fall back to skybox/probe when the ray misses or leaves screen** (the fallback is what makes it shippable). Runs after lighting (needs lit color).
   - **RT reflections** (accurate path): use the TLAS, low-res + denoise. Ties into the "RT as reference/benchmark" goal.
+- **IBL** is the cheap always-on ambient specular and the natural ray-miss fallback here: prefiltered env cube + BRDF split-sum LUT, composes under SSR. See [[Image-Based Lighting]] for the implementation path.
 
 ### 6.6 Atmosphere + volumetrics (replace the skybox)
 - Hillaire/Bruneton **sky-atmosphere** (precomputed multi-scatter LUT + aerial perspective). Replaces the static skybox and feeds the GI a *real* sun+sky.

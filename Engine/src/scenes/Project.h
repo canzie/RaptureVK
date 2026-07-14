@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace Rapture {
 
@@ -27,9 +28,11 @@ class Project {
     SceneManager &getSceneManager() { return m_sceneManager; }
     const SceneManager &getSceneManager() const { return m_sceneManager; }
 
-    Scene *getActiveScene() const { return m_sceneManager.getActiveScene(); }
+    const std::vector<Scene *> &getActiveScenes() const { return m_sceneManager.getActiveScenes(); }
 
-    void setActiveScene(Scene *scene) { m_sceneManager.setActiveScene(scene); }
+    void activateScene(Scene *scene) { m_sceneManager.activateScene(scene); }
+
+    void deactivateScene(Scene *scene) { m_sceneManager.deactivateScene(scene); }
 
     World *createWorld(const std::string &name) { return m_sceneManager.createWorld(name); }
 

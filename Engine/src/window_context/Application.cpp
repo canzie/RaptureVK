@@ -145,15 +145,10 @@ void Application::run()
             (*it)->onUpdate(Timestep::deltaTime());
         }
 
-        auto activeScene = m_project->getActiveScene();
-        if (activeScene != nullptr) {
-            activeScene->onUpdate(Timestep::deltaTime());
-        }
-
-        // TODO: scene-viewport binding should not live in the main loop
-        auto *primaryViewport = m_viewportManager->getPrimaryViewport();
-        if (primaryViewport != nullptr && activeScene != nullptr) {
-            primaryViewport->setScene(activeScene);
+        for (auto *scene : m_project->getActiveScenes()) {
+            if (scene != nullptr) {
+                scene->onUpdate(Timestep::deltaTime());
+            }
         }
 
         m_viewportManager->drawAll();

@@ -2,10 +2,10 @@
 
 #include "components/Components.h"
 #include "components/systems/CameraController.h"
-#include "events/GameEvents.h"
 #include "input/Input.h"
 #include "scenes/Scene.h"
 #include "viewport/Viewport.h"
+#include "viewport/ViewportManager.h"
 #include "window_context/Application.h"
 
 #include <glm/glm.hpp>
@@ -32,63 +32,78 @@ EditorLayer::~EditorLayer() = default;
 void EditorLayer::onAttach()
 {
     m_input = std::make_unique<Rapture::Input>(&Rapture::Application::getInstance().getWindowContext());
-
-    m_sceneActivatedListenerId = Rapture::GameEvents::onSceneActivated().addListener(
-        [this](Rapture::Scene& scene) { onNewActiveScene(&scene); });
-
-    auto activeScene = Rapture::Application::getInstance().getProject().getActiveScene();
-    if (activeScene != nullptr) {
-        onNewActiveScene(activeScene);
-    }
 }
 
-void EditorLayer::onDetach()
-{
-    Rapture::GameEvents::onSceneActivated().removeListener(m_sceneActivatedListenerId);
-}
+void EditorLayer::onDetach() {}
 
-void EditorLayer::onNewActiveScene(Rapture::Scene* scene)
+void EditorLayer::syncViewportControls()
 {
-    if (scene == nullptr) {
-        return;
+    const auto &viewports = Rapture::Application::getInstance().getViewportManager().getViewports();
+
+    for (const auto &vp : viewports) {
+        Rapture::Viewport *viewport = vp.get();
+        if (viewport->getScene() == nullptr || m_controls.count(viewport) != 0) {
+            continue;
+        }
+
+        ViewportControl control;
+        control.camera = viewport->getCamera();
+        if (!control.camera.isValid()) {
+            Rapture::Scene *scene = viewport->getScene();
+            control.camera = scene->createEntity("Editor Camera");
+            control.camera.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f),
+                                                                     glm::vec3(1.0f));
+            auto &cameraComp = control.camera.addComponent<Rapture::CameraComponent>(90.0f, 16.0f / 9.0f, 0.1f, 200.0f);
+            cameraComp.isMainCamera = true;
+            scene->setMainCamera(control.camera);
+            viewport->setCamera(control.camera);
+        }
+
+        control.controller = std::make_unique<Rapture::CameraController>(control.camera);
+        viewport->editorBinding().controller = control.controller.get();
+        m_controls.emplace(viewport, std::move(control));
     }
 
-    m_cameraEntity = scene->createEntity("Editor Camera");
-    scene->setMainCamera(m_cameraEntity);
-
-    m_cameraEntity.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f), glm::vec3(1.0f));
-    auto &camera = m_cameraEntity.addComponent<Rapture::CameraComponent>(90.0f, 16.0f / 9.0f, 0.1f, 200.0f);
-    camera.isMainCamera = true;
-
-    m_controller = std::make_unique<Rapture::CameraController>(m_cameraEntity);
-    m_registeredOnViewport = false;
+    for (auto it = m_controls.begin(); it != m_controls.end();) {
+        bool stillExists = false;
+        for (const auto &vp : viewports) {
+            if (vp.get() == it->first) {
+                stillExists = true;
+                break;
+            }
+        }
+        if (stillExists) {
+            ++it;
+        } else {
+            it = m_controls.erase(it);
+        }
+    }
 }
 
 void EditorLayer::onUpdate(float dt)
 {
-    if (m_input == nullptr || m_controller == nullptr) {
+    if (m_input == nullptr) {
         return;
     }
 
-    bool hovered = false;
-    auto *viewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
-    if (viewport != nullptr) {
-        if (!m_registeredOnViewport) {
-            viewport->setCamera(m_cameraEntity);
-            viewport->editorBinding().controller = m_controller.get();
-            m_registeredOnViewport = true;
-        }
-        hovered = viewport->editorBinding().hovered;
-    }
+    syncViewportControls();
 
     m_input->onUpdate();
 
-    // Active while hovering, or while an interaction already holds the cursor captured
-    bool active = hovered || m_controller->desiresCursorCapture();
-    Rapture::ControlInput intent;
-    if (active) {
-        intent = s_mapEditorCameraInput(*m_input);
+    Rapture::ControlInput mapped = s_mapEditorCameraInput(*m_input);
+
+    bool anyCapture = false;
+    for (auto &[viewport, control] : m_controls) {
+        bool active = viewport->editorBinding().hovered || control.controller->desiresCursorCapture();
+        Rapture::ControlInput intent;
+        if (active) {
+            intent = mapped;
+        }
+        control.controller->update(dt, intent);
+        if (control.controller->desiresCursorCapture()) {
+            anyCapture = true;
+        }
     }
-    m_controller->update(dt, intent);
-    m_input->setCursorMode(m_controller->desiresCursorCapture() ? Rapture::CursorMode::DISABLED : Rapture::CursorMode::NORMAL);
+
+    m_input->setCursorMode(anyCapture ? Rapture::CursorMode::DISABLED : Rapture::CursorMode::NORMAL);
 }

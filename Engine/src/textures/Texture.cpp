@@ -166,7 +166,12 @@ Texture::~Texture()
         vkDestroyImageView(device, m_imageViewStencilOnly, nullptr);
     }
 
-    if (m_imageViewStorage != VK_NULL_HANDLE) {
+    for (VkImageView mipView : m_imageViewStorageMips) {
+        if (mipView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, mipView, nullptr);
+        }
+    }
+    if (m_imageViewStorage != VK_NULL_HANDLE && m_imageViewStorageMips.empty()) {
         vkDestroyImageView(device, m_imageViewStorage, nullptr);
     }
 
@@ -616,13 +621,19 @@ void Texture::createImageView()
     }
 
     if (isCubeType(m_spec.type) && m_spec.storageImage) {
-        VkImageViewCreateInfo storageViewInfo = viewInfo;
-        storageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-        storageViewInfo.subresourceRange.layerCount = 6;
-        if (vkCreateImageView(device, &storageViewInfo, nullptr, &m_imageViewStorage) != VK_SUCCESS) {
-            RP_CORE_ERROR("Failed to create cubemap storage image view!");
-            return;
+        m_imageViewStorageMips.resize(m_spec.mipLevels, VK_NULL_HANDLE);
+        for (uint32_t mip = 0; mip < m_spec.mipLevels; ++mip) {
+            VkImageViewCreateInfo storageViewInfo = viewInfo;
+            storageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+            storageViewInfo.subresourceRange.baseMipLevel = mip;
+            storageViewInfo.subresourceRange.levelCount = 1;
+            storageViewInfo.subresourceRange.layerCount = 6;
+            if (vkCreateImageView(device, &storageViewInfo, nullptr, &m_imageViewStorageMips[mip]) != VK_SUCCESS) {
+                RP_CORE_ERROR("Failed to create cubemap storage image view for mip {}!", mip);
+                return;
+            }
         }
+        m_imageViewStorage = m_imageViewStorageMips[0];
     }
 
     // Create additional views for depth-stencil formats
@@ -685,6 +696,23 @@ VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) 
         imageInfo.imageView = m_imageView;
     }
 
+    return imageInfo;
+}
+
+VkDescriptorImageInfo Texture::getStorageMipDescriptorInfo(uint32_t mip) const
+{
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.sampler = VK_NULL_HANDLE;
+
+    if (mip >= m_imageViewStorageMips.size()) {
+        RP_CORE_ERROR("Requested storage mip view {} but texture only has {} storage mip views!", mip,
+                      m_imageViewStorageMips.size());
+        imageInfo.imageView = m_imageView;
+        return imageInfo;
+    }
+
+    imageInfo.imageView = m_imageViewStorageMips[mip];
     return imageInfo;
 }
 

@@ -45,6 +45,10 @@ compile vertex   Shadows/CascadedShadowPass.vs.glsl shadows/CascadedShadowPass.v
 
 compile compute  Generators/PerlinNoise.cs.glsl     Generators/PerlinNoise.cs.spv
 
+compile compute  Generators/BRDFIntegration.cs.glsl      Generators/BRDFIntegration.cs.spv
+compile compute  Generators/IrradianceConvolution.cs.glsl Generators/IrradianceConvolution.cs.spv
+compile compute  Generators/SpecularPrefilter.cs.glsl    Generators/SpecularPrefilter.cs.spv
+
 if [ "$FAILED" -gt 0 ]; then
     echo "FAILED: $FAILED shader(s) failed to compile"
     exit 1

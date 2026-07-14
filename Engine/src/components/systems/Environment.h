@@ -10,6 +10,7 @@
 namespace Rapture {
 
 class ProceduralTexture;
+class ImageBasedLighting;
 
 class Environment {
   public:
@@ -19,6 +20,7 @@ class Environment {
     void update();
 
     Entity getEntity() const { return m_entity; }
+    ImageBasedLighting *getImageBasedLighting() const { return m_ibl.get(); }
 
     static glm::vec3 sunDirection(float timeOfDay, float latitude, float longitude);
     static float timeOfDayFromSun(const glm::vec3 &sunDirection, float latitude);
@@ -31,6 +33,7 @@ class Environment {
 
     Entity m_entity;
     std::unique_ptr<ProceduralTexture> m_skyboxGenerator;
+    std::unique_ptr<ImageBasedLighting> m_ibl;
 
     AtmosphereComponent m_lastApplied{};
 };

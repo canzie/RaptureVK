@@ -77,6 +77,16 @@ class DescriptorBindingTexture : public DescriptorBinding<Texture> {
     virtual uint32_t add(Texture &resource) override;
     virtual void update(Texture &resource, uint32_t index = 0) override;
 
+    /**
+     * @brief Bind a single mip of a cubemap storage image (2D-array, 6-layer view)
+     *
+     * Storage-image views are single-mip, so prefilter-style passes that write one
+     * roughness mip per descriptor set bind the matching mip view here.
+     * @param resource Cubemap texture created with per-mip storage views
+     * @param mip Mip level to bind
+     */
+    void addStorageMip(Texture &resource, uint32_t mip);
+
   private:
     void fillAllSlotsWithPlaceholder();
 
