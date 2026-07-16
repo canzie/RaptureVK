@@ -101,11 +101,11 @@ TestLayer::~TestLayer()
 void TestLayer::onAttach()
 {
 
-    Rapture::RP_INFO("TestLayer attached");
+    RP_INFO("TestLayer attached");
 
     // Register for scene activation events - store the ID for cleanup
     m_sceneActivatedListenerId = Rapture::GameEvents::onSceneActivated().addListener([this](Rapture::Scene &scene) {
-        Rapture::RP_INFO("TestLayer::onSceneActivated - New active scene: {0}", scene.getSceneName());
+        RP_INFO("TestLayer::onSceneActivated - New active scene: {0}", scene.getSceneName());
         onNewActiveScene(scene);
     });
 
@@ -140,11 +140,11 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
     auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
     if (std::filesystem::exists(sponzaPath)) {
-        Rapture::RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
+        RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
         auto loader = Rapture::glTF2Loader(sponzaPath);
         loader.load(&activeScene);
     } else {
-        Rapture::RP_WARN("Sponza model not found at: {}", sponzaPath.string());
+        RP_WARN("Sponza model not found at: {}", sponzaPath.string());
 
         // Fallback: Create a simple test cube if Sponza not found
         auto cube = activeScene.createCube("Test Cube");
@@ -166,7 +166,6 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
         uint32_t graph0Id = graphManager.registerGraph(s_buildSilverMetalGraph());
         uint32_t graph1Id = graphManager.registerGraph(s_buildSineBandGraph());
-        graphManager.writeGeneratedFiles(project.getProjectShaderDirectory() / "glsl/generated");
 
         auto spawnGraphSphere = [&](const std::string &name, const glm::vec3 &position, uint32_t graphId) {
             auto sphere = activeScene.createSphere(name);
@@ -235,7 +234,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         config.name = "test_white_noise";
         auto noiseTexture = Rapture::ProceduralTexture::generateWhiteNoise(12345, config);
         if (noiseTexture) {
-            Rapture::RP_INFO("Generated white noise texture: {}", config.name);
+            RP_INFO("Generated white noise texture: {}", config.name);
         }
     }
 
@@ -248,18 +247,18 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
         auto atmosphereTexture = Rapture::ProceduralTexture::generateAtmosphere(12.0f, nullptr, config);
         if (atmosphereTexture) {
-            Rapture::RP_INFO("Generated atmospheric scattering texture: {}", config.name);
+            RP_INFO("Generated atmospheric scattering texture: {}", config.name);
         }
     }
 
     constexpr float chunkSize = 64.0f;
-    constexpr int32_t chunkRadius = 6;
+    constexpr int32_t chunkRadius = 10;
     constexpr uint32_t chunkGridSize = (2 * chunkRadius + 1) * (2 * chunkRadius + 1);
     constexpr float terrainExtent = chunkSize * (2 * chunkRadius + 1);
 
     Rapture::TerrainConfig terrainConfig = {};
     terrainConfig.chunkWorldSize = chunkSize;
-    terrainConfig.heightScale = 40.0f;
+    terrainConfig.heightScale = 70.0f;
     terrainConfig.terrainWorldSize = terrainExtent;
     terrainConfig.chunkGridSize = chunkGridSize;
     terrainConfig.hmType = Rapture::HM_CEPV;
@@ -267,10 +266,13 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     auto terrainEntity = activeScene.createEntity("Terrain");
     auto &terrainComp = terrainEntity.addComponent<Rapture::TerrainComponent>(terrainConfig);
     terrainComp.isEnabled = true;
-    Rapture::RP_INFO("Terrain entity created with {} chunks (radius {})", terrainComp.generator->getChunkCount(),
+    RP_INFO("Terrain entity created with {} chunks (radius {})", terrainComp.generator->getChunkCount(),
                      terrainConfig.getChunkRadius());
 
-    Rapture::RP_INFO("Scene setup complete for: {}", activeScene.getSceneName());
+    Rapture::MaterialManager::getSurfaceGraphManager().writeGeneratedFiles(project.getProjectShaderDirectory() /
+                                                                           "glsl/generated");
+
+    RP_INFO("Scene setup complete for: {}", activeScene.getSceneName());
 }
 
 void TestLayer::onDetach()
@@ -295,7 +297,7 @@ void TestLayer::onUpdate(float ts)
     // Log FPS approximately once per second
     if (m_fpsTimer >= 1.0f) {
         float fps = static_cast<float>(m_fpsCounter) / m_fpsTimer;
-        Rapture::RP_INFO("FPS: {0:.1f}", fps);
+        RP_INFO("FPS: {0:.1f}", fps);
 
         // Reset counters
         m_fpsCounter = 0;

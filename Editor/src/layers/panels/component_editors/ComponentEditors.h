@@ -36,7 +36,7 @@ class DirectionalLightEditor : public ComponentEditorBase {
     bool m_castsShadow = false;
     bool m_useTemperature = false;
     bool m_atmosphereSunLight = false;
-    double m_temperature = 6500.0;
+    float m_temperature = 6500.0f;
 
     std::optional<ColorField> m_colorField;
     Rapture::Entity m_entity;
@@ -55,7 +55,7 @@ class PointLightEditor : public ComponentEditorBase {
     float m_range = 10.0f;
     bool m_castsShadow = false;
     bool m_useTemperature = false;
-    double m_temperature = 6500.0;
+    float m_temperature = 6500.0f;
 
     std::optional<ColorField> m_colorField;
     Rapture::Entity m_entity;
@@ -72,11 +72,11 @@ class SpotLightEditor : public ComponentEditorBase {
     glm::vec3 m_color = glm::vec3(1.0f);
     float m_intensity = 1.0f;
     float m_range = 10.0f;
-    double m_innerConeAngle = 30.0;
-    double m_outerConeAngle = 45.0;
+    float m_innerConeAngle = 30.0f;
+    float m_outerConeAngle = 45.0f;
     bool m_castsShadow = false;
     bool m_useTemperature = false;
-    double m_temperature = 6500.0;
+    float m_temperature = 6500.0f;
 
     std::optional<ColorField> m_colorField;
     Rapture::Entity m_entity;

@@ -12,7 +12,7 @@ int main()
 
     if (app) {
         // Simple log without format string
-        Rapture::RP_INFO("Starting application");
+        RP_INFO("Starting application");
 
         // Run the application
         app->run();

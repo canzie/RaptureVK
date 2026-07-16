@@ -84,7 +84,7 @@ struct CompileResult {
     bool success = false;
     std::vector<MaterialCompilerDiagnostic> diagnostics;
 
-    const GraphDomain *domain = nullptr;     // the domain the graph belongs to, resolved from its sink
+    GraphDomainId domainId = GD_SURFACE;     // the domain the graph belongs to
     std::vector<CompiledFunction> functions; // one per domain pass, sharing the slice layout below
     uint32_t graphId = 0; // global identifier for the graph among all registered graphs
 

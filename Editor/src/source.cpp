@@ -17,7 +17,7 @@ class EditorApp : public Rapture::Application {
     {
 
         // Log startup message
-        Rapture::RP_INFO("Rapture Editor starting up...");
+        RP_INFO("Rapture Editor starting up...");
 
         // Initialize event listeners
         setupEventHandlers();
@@ -35,7 +35,7 @@ class EditorApp : public Rapture::Application {
 
     ~EditorApp()
     {
-        Rapture::RP_INFO("Rapture Editor shutting down...");
+        RP_INFO("Rapture Editor shutting down...");
 
         // Clean up event listeners
         Rapture::GameEvents::onSceneActivated().removeListener(m_sceneActivatedListenerId);
@@ -48,15 +48,15 @@ class EditorApp : public Rapture::Application {
     {
         // Scene change events
         m_sceneActivatedListenerId = Rapture::GameEvents::onSceneActivated().addListener(
-            [](Rapture::Scene& scene) { Rapture::RP_INFO("Scene activated"); });
+            [](Rapture::Scene& scene) { RP_INFO("Scene activated"); });
 
         m_worldActivatedListenerId = Rapture::GameEvents::onWorldActivated().addListener(
-            [](Rapture::World *world) { Rapture::RP_INFO("World activated: {0}", world->getName()); });
+            [](Rapture::World *world) { RP_INFO("World activated: {0}", world->getName()); });
 
         // World transition events
         m_worldTransitionListenerId =
             Rapture::GameEvents::onWorldTransitionRequested().addListener([this](const std::string &worldName) {
-                Rapture::RP_INFO("World transition requested: {0}", worldName);
+                RP_INFO("World transition requested: {0}", worldName);
                 // transitionToWorld(worldName);
             });
     }

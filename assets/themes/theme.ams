@@ -81,9 +81,12 @@ slider {
     background-color: #282828;
     slider-color: #3d3d3d;
     thumb-color: #4772b3;
+    thumb-transparency: 1.0;
     track-corner-radius: 2px;
     thumb-corner-radius: 2px;
-    label-padding: 8px;
+    slider-fill-color: #575757ff;
+    text-y-alignment: center;
+    label-padding: 16px;
 }
 
 checkbox {

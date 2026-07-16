@@ -4,6 +4,7 @@
 #include "TerrainCuller.h"
 #include "TerrainTypes.h"
 
+#include "asset_manager/AssetHandle.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/IndexBuffer.h"
@@ -77,9 +78,17 @@ class TerrainGenerator {
     bool isWireframe() const { return m_wireframe; }
 
     // Materials
-    uint32_t getGrassMaterialIndex() const;
-    uint32_t getRockMaterialIndex() const;
-    uint32_t getSnowMaterialIndex() const;
+    /**
+     * @brief Bindless index of the material the terrain shades with
+     * @return The material's slot, or UINT32_MAX when no material was created
+     */
+    uint32_t getMaterialIndex() const;
+
+    /**
+     * @brief The material the terrain shades with, for binding an authored graph to it
+     * @return The material instance, null when none was created
+     */
+    const AssetPtr<MaterialInstance> &getMaterial() const { return m_material; }
 
   private:
     void createTerrainMaterials();
@@ -114,9 +123,7 @@ class TerrainGenerator {
 
     std::vector<AssetRef> m_shaderAssets;
 
-    std::shared_ptr<MaterialInstance> m_grassMaterial;
-    std::shared_ptr<MaterialInstance> m_rockMaterial;
-    std::shared_ptr<MaterialInstance> m_snowMaterial;
+    AssetPtr<MaterialInstance> m_material;
 };
 
 } // namespace Rapture

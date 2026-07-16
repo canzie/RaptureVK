@@ -32,7 +32,7 @@ surf.shadingModelId=SM_OPENPBR_STANDARD;
 return surf;
 }
 
-SurfaceData evalSurface_glTF_1(SurfaceInputs si, uint base){
+SurfaceData evalSurface_glTF_2(SurfaceInputs si, uint base){
 SurfaceData surf;
 vec4 _n0=vec4(uintBitsToFloat(u_graphPool.data[base + 11]), uintBitsToFloat(u_graphPool.data[base + 12]), uintBitsToFloat(u_graphPool.data[base + 13]), uintBitsToFloat(u_graphPool.data[base + 14]));
 vec2 _n1=si.uv;
@@ -65,7 +65,7 @@ surf.shadingModelId=SM_OPENPBR_STANDARD;
 return surf;
 }
 
-SurfaceData evalSurface_Graph0_2(SurfaceInputs si, uint base){
+SurfaceData evalSurface_Graph0_3(SurfaceInputs si, uint base){
 SurfaceData surf;
 surf.albedo=vec3(uintBitsToFloat(u_graphPool.data[base + 0]), uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]));
 surf.normal=normalize(si.worldNormal);
@@ -78,7 +78,7 @@ surf.shadingModelId=SM_OPENPBR_STANDARD;
 return surf;
 }
 
-SurfaceData evalSurface_Graph1_3(SurfaceInputs si, uint base){
+SurfaceData evalSurface_Graph1_4(SurfaceInputs si, uint base){
 SurfaceData surf;
 float _n0=uintBitsToFloat(u_graphPool.data[base + 0]);
 float _n1=uintBitsToFloat(u_graphPool.data[base + 1]);
@@ -108,9 +108,9 @@ return surf;
 SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint base) {
     switch (graphId) {
         case 0u: return evalSurface_Default_0(si, base);
-        case 1u: return evalSurface_glTF_1(si, base);
-        case 2u: return evalSurface_Graph0_2(si, base);
-        case 3u: return evalSurface_Graph1_3(si, base);
+        case 2u: return evalSurface_glTF_2(si, base);
+        case 3u: return evalSurface_Graph0_3(si, base);
+        case 4u: return evalSurface_Graph1_4(si, base);
     }
 
     SurfaceData surf;

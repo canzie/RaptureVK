@@ -661,7 +661,7 @@ void ContentBrowserPanel::refreshAssetBrowser()
         size_t itemIndex = index;
         item.action->onMouseButton1ClickCb = [this, itemIndex, assetName]() {
             selectItem(itemIndex);
-            Rapture::RP_INFO("selected asset '{0}'", assetName);
+            RP_INFO("selected asset '{0}'", assetName);
             return Amethyst::EventResult::CONSUMED;
         };
 
@@ -730,7 +730,7 @@ void ContentBrowserPanel::refreshFileBrowser()
         } else {
             item.action->onMouseButton1ClickCb = [this, itemIndex, filename]() {
                 selectItem(itemIndex);
-                Rapture::RP_INFO("selected file '{0}'", filename);
+                RP_INFO("selected file '{0}'", filename);
                 return Amethyst::EventResult::CONSUMED;
             };
         }

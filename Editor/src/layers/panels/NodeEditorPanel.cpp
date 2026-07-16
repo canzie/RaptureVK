@@ -18,6 +18,7 @@
 #include "textures/Texture.h"
 #include "window_context/Application.h"
 
+#include <components/common.h>
 #include <components/drag.h>
 #include <components/dropdown.h>
 #include <components/extensions/ui_drag_detector.h>
@@ -373,7 +374,8 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
 
     tabBar->addTab(std::move(root), iconTabLayout("Node Editor", Icons::SVG_MATERIAL));
 
-    m_serializeListener = Rapture::ProjectEvents::onProjectSerialize().addListener([this](Rapture::WriteNode &root) { (void)root; });
+    m_serializeListener =
+        Rapture::ProjectEvents::onProjectSerialize().addListener([this](Rapture::WriteNode &root) { (void)root; });
 }
 
 NodeEditorPanel::~NodeEditorPanel()
@@ -565,80 +567,129 @@ void NodeEditorPanel::selectMaterial(Rapture::AssetHandle handle)
 static const char *s_nodeDisplayName(Rapture::GraphNodeType type)
 {
     switch (type) {
-    case GNT::NONE: return "None";
-    case GNT::POSITION: return "Position";
-    case GNT::NORMAL: return "Normal";
-    case GNT::TANGENT: return "Tangent";
-    case GNT::BITANGENT: return "Bitangent";
-    case GNT::TEXCOORD: return "Texture Coordinate";
-    case GNT::CONSTANT_FLOAT: return "Float";
-    case GNT::CONSTANT_INT: return "Integer";
-    case GNT::CONSTANT_VEC2: return "Vector 2";
-    case GNT::CONSTANT_VEC3: return "Vector 3";
-    case GNT::CONSTANT_VEC4: return "Vector 4";
-    case GNT::TEXTURE_SAMPLE: return "Texture Sample";
-    case GNT::TEXTURE_WHITE_NOISE: return "White Noise";
-    case GNT::TEXTURE_PERLIN: return "Perlin Noise";
-    case GNT::TEXTURE_SIMPLEX: return "Simplex Noise";
-    case GNT::TEXTURE_RIDGED: return "Ridged Noise";
+    case GNT::NONE:
+        return "None";
+    case GNT::POSITION:
+        return "Position";
+    case GNT::NORMAL:
+        return "Normal";
+    case GNT::TANGENT:
+        return "Tangent";
+    case GNT::BITANGENT:
+        return "Bitangent";
+    case GNT::TEXCOORD:
+        return "Texture Coordinate";
+    case GNT::CONSTANT_FLOAT:
+        return "Float";
+    case GNT::CONSTANT_INT:
+        return "Integer";
+    case GNT::CONSTANT_VEC2:
+        return "Vector 2";
+    case GNT::CONSTANT_VEC3:
+        return "Vector 3";
+    case GNT::CONSTANT_VEC4:
+        return "Vector 4";
+    case GNT::TEXTURE_SAMPLE:
+        return "Texture Sample";
+    case GNT::TEXTURE_WHITE_NOISE:
+        return "White Noise";
+    case GNT::TEXTURE_PERLIN:
+        return "Perlin Noise";
+    case GNT::TEXTURE_SIMPLEX:
+        return "Simplex Noise";
+    case GNT::TEXTURE_RIDGED:
+        return "Ridged Noise";
     case GNT::ADD_FLOAT:
     case GNT::ADD_VEC3:
-    case GNT::ADD_INT: return "Add";
+    case GNT::ADD_INT:
+        return "Add";
     case GNT::SUBTRACT_FLOAT:
     case GNT::SUBTRACT_VEC3:
-    case GNT::SUBTRACT_INT: return "Subtract";
+    case GNT::SUBTRACT_INT:
+        return "Subtract";
     case GNT::MULTIPLY_FLOAT:
     case GNT::MULTIPLY_VEC3:
-    case GNT::MULTIPLY_INT: return "Multiply";
+    case GNT::MULTIPLY_INT:
+        return "Multiply";
     case GNT::DIVIDE_FLOAT:
     case GNT::DIVIDE_VEC3:
-    case GNT::DIVIDE_INT: return "Divide";
+    case GNT::DIVIDE_INT:
+        return "Divide";
     case GNT::ABS_FLOAT:
     case GNT::ABS_VEC3:
-    case GNT::ABS_INT: return "Absolute";
+    case GNT::ABS_INT:
+        return "Absolute";
     case GNT::MIN_FLOAT:
     case GNT::MIN_VEC3:
-    case GNT::MIN_INT: return "Minimum";
+    case GNT::MIN_INT:
+        return "Minimum";
     case GNT::MAX_FLOAT:
     case GNT::MAX_VEC3:
-    case GNT::MAX_INT: return "Maximum";
+    case GNT::MAX_INT:
+        return "Maximum";
     case GNT::CLAMP_FLOAT:
     case GNT::CLAMP_VEC3:
-    case GNT::CLAMP_INT: return "Clamp";
+    case GNT::CLAMP_INT:
+        return "Clamp";
     case GNT::SATURATE_FLOAT:
-    case GNT::SATURATE_VEC3: return "Saturate";
+    case GNT::SATURATE_VEC3:
+        return "Saturate";
     case GNT::MIX_FLOAT:
-    case GNT::MIX_VEC3: return "Mix";
+    case GNT::MIX_VEC3:
+        return "Mix";
     case GNT::STEP_FLOAT:
-    case GNT::STEP_VEC3: return "Step";
+    case GNT::STEP_VEC3:
+        return "Step";
     case GNT::SMOOTHSTEP_FLOAT:
-    case GNT::SMOOTHSTEP_VEC3: return "Smoothstep";
+    case GNT::SMOOTHSTEP_VEC3:
+        return "Smoothstep";
     case GNT::FRACT_FLOAT:
-    case GNT::FRACT_VEC3: return "Fract";
+    case GNT::FRACT_VEC3:
+        return "Fract";
     case GNT::POWER_FLOAT:
-    case GNT::POWER_VEC3: return "Power";
+    case GNT::POWER_VEC3:
+        return "Power";
     case GNT::SQRT_FLOAT:
-    case GNT::SQRT_VEC3: return "Square Root";
+    case GNT::SQRT_VEC3:
+        return "Square Root";
     case GNT::SIN_FLOAT:
-    case GNT::SIN_VEC3: return "Sine";
+    case GNT::SIN_VEC3:
+        return "Sine";
     case GNT::COS_FLOAT:
-    case GNT::COS_VEC3: return "Cosine";
-    case GNT::DOT_VEC3: return "Dot Product";
-    case GNT::CROSS_VEC3: return "Cross Product";
-    case GNT::NORMALIZE_VEC3: return "Normalize";
-    case GNT::LENGTH_VEC3: return "Length";
-    case GNT::DISTANCE_VEC3: return "Distance";
-    case GNT::COMBINE_VEC2: return "Combine 2";
-    case GNT::COMBINE_VEC3: return "Combine 3";
-    case GNT::COMBINE_VEC4: return "Combine 4";
-    case GNT::SPLIT_VEC2: return "Split 2";
-    case GNT::SPLIT_VEC3: return "Split 3";
-    case GNT::SPLIT_VEC4: return "Split 4";
-    case GNT::NORMAL_MAP: return "Normal Map";
-    case GNT::NORMAL_MAP_RG: return "Normal Map (RG)";
-    case GNT::LUMINANCE: return "Luminance";
-    case GNT::REMAP_FLOAT: return "Remap";
-    case GNT::SURFACE_OUTPUT: return "PBR Surface";
+    case GNT::COS_VEC3:
+        return "Cosine";
+    case GNT::DOT_VEC3:
+        return "Dot Product";
+    case GNT::CROSS_VEC3:
+        return "Cross Product";
+    case GNT::NORMALIZE_VEC3:
+        return "Normalize";
+    case GNT::LENGTH_VEC3:
+        return "Length";
+    case GNT::DISTANCE_VEC3:
+        return "Distance";
+    case GNT::COMBINE_VEC2:
+        return "Combine 2";
+    case GNT::COMBINE_VEC3:
+        return "Combine 3";
+    case GNT::COMBINE_VEC4:
+        return "Combine 4";
+    case GNT::SPLIT_VEC2:
+        return "Split 2";
+    case GNT::SPLIT_VEC3:
+        return "Split 3";
+    case GNT::SPLIT_VEC4:
+        return "Split 4";
+    case GNT::NORMAL_MAP:
+        return "Normal Map";
+    case GNT::NORMAL_MAP_RG:
+        return "Normal Map (RG)";
+    case GNT::LUMINANCE:
+        return "Luminance";
+    case GNT::REMAP_FLOAT:
+        return "Remap";
+    case GNT::SURFACE_OUTPUT:
+        return "PBR Surface";
     }
     return Rapture::Graph_nodeTypeName(type);
 }
@@ -831,7 +882,7 @@ Amethyst::Frame *NodeEditorPanel::createNodeShell(uint32_t nodeId, Amethyst::vec
 }
 
 uint32_t NodeEditorPanel::spawnNode(Rapture::GraphNodeType type, std::string_view label, Amethyst::Color3 headerColor,
-                                   Amethyst::vec2 canvasPos)
+                                    Amethyst::vec2 canvasPos)
 {
     if (m_content == nullptr) {
         return 0;
@@ -1215,8 +1266,8 @@ void NodeEditorPanel::addTextureParamRow(uint32_t nodeId, Amethyst::Frame *node,
         .zIndex = 2,
     };
 
-    bool isInteger = desc.type == Rapture::PushConstantMemberInfo::BaseType::INT ||
-                     desc.type == Rapture::PushConstantMemberInfo::BaseType::UINT;
+    bool isInteger =
+        desc.type == Rapture::PushConstantMemberInfo::BaseType::INT || desc.type == Rapture::PushConstantMemberInfo::BaseType::UINT;
 
     NodeControl control;
     if (isInteger) {
@@ -1398,7 +1449,7 @@ bool NodeEditorPanel::isInputConnected(uint32_t nodeId, uint32_t slotIndex) cons
 uint32_t NodeEditorPanel::addPin(uint32_t nodeId, Amethyst::Frame *node, std::string_view name, Rapture::PinType type,
                                  uint32_t slotIndex, float rowY, bool isOutput)
 {
-    auto *socket = node->add<Amethyst::Shape>(Amethyst::PRIMITIVE_CIRCLE);
+    auto *socket = node->add<Amethyst::Shape>(Amethyst::ShapeKind::CIRCLE);
     socket->setBaseProperties({
         .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
         .position = Amethyst::UDim2(isOutput ? 1.0f : 0.0f, 0.0f, 0.0f, rowY + NODE_ROW_HEIGHT * 0.5f),
@@ -1846,7 +1897,7 @@ Rapture::MaterialGraph NodeEditorPanel::buildGraph() const
         }
     }
     if (outputNodeId == 0) {
-        Rapture::RP_WARN("Node editor has no Surface Output node, nothing to compile");
+        RP_WARN("Node editor has no Surface Output node, nothing to compile");
         return graph;
     }
 
@@ -2014,7 +2065,7 @@ Rapture::MaterialGraph NodeEditorPanel::buildGraph() const
 void NodeEditorPanel::compileGraph()
 {
     if (m_selectedGraphId == UINT32_MAX) {
-        Rapture::RP_WARN("No material selected to compile into");
+        RP_WARN("No material selected to compile into");
         return;
     }
 
@@ -2025,7 +2076,7 @@ void NodeEditorPanel::compileGraph()
 
     auto &graphs = Rapture::MaterialManager::getSurfaceGraphManager();
     if (!graphs.updateGraph(m_selectedGraphId, graph)) {
-        Rapture::RP_ERROR("Graph compile failed");
+        RP_ERROR("Graph compile failed");
         return;
     }
 

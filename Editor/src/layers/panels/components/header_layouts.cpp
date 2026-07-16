@@ -81,7 +81,7 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
                     if (onMenuClicked) {
                         onMenuClicked();
                     } else {
-                        Rapture::RP_INFO("{} menu clicked", label);
+                        RP_INFO("{} menu clicked", label);
                     }
                     return Amethyst::EventResult::CONSUMED;
                 };

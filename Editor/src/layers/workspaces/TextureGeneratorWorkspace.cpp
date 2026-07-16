@@ -333,7 +333,7 @@ void TextureGeneratorWorkspace::createInstance(const std::string &name, uint32_t
     instance->generator = std::make_unique<Rapture::ProceduralTexture>(shaderHandle, config);
 
     if (!instance->generator->isValid()) {
-        Rapture::RP_ERROR("Failed to create procedural texture generator for '{}'", name);
+        RP_ERROR("Failed to create procedural texture generator for '{}'", name);
         return;
     }
 
@@ -350,13 +350,13 @@ void TextureGeneratorWorkspace::createInstance(const std::string &name, uint32_t
 void TextureGeneratorWorkspace::generate()
 {
     if (m_selectedIndex < 0 || m_selectedIndex >= static_cast<int>(m_instances.size())) {
-        Rapture::RP_WARN("Generate called with no selected instance");
+        RP_WARN("Generate called with no selected instance");
         return;
     }
 
     TextureGeneratorInstance *instance = m_instances[m_selectedIndex].get();
     if (instance->generator == nullptr || !instance->generator->isValid()) {
-        Rapture::RP_ERROR("Generate called but instance '{}' has no valid generator", instance->name);
+        RP_ERROR("Generate called but instance '{}' has no valid generator", instance->name);
         return;
     }
 
@@ -365,15 +365,15 @@ void TextureGeneratorWorkspace::generate()
     }
 
     instance->generator->generate();
-    Rapture::RP_INFO("Generated texture for instance '{}'", instance->name);
+    RP_INFO("Generated texture for instance '{}'", instance->name);
 
     if (!instance->previewAmTexId.isValid()) {
         if (!m_context.services.registerTexture) {
-            Rapture::RP_ERROR("registerTexture service not set, cannot display preview");
+            RP_ERROR("registerTexture service not set, cannot display preview");
         } else {
             Rapture::Texture &tex = instance->generator->getTexture();
             instance->previewAmTexId = m_context.services.registerTexture(&tex);
-            Rapture::RP_INFO("Registered texture, id={}", instance->previewAmTexId.id);
+            RP_INFO("Registered texture, id={}", instance->previewAmTexId.id);
         }
     }
 
@@ -386,9 +386,9 @@ void TextureGeneratorWorkspace::generate()
             }
         }
         if (!found) {
-            Rapture::RP_WARN("No ImagePreviewPanel found to display generated texture");
+            RP_WARN("No ImagePreviewPanel found to display generated texture");
         }
     } else {
-        Rapture::RP_ERROR("Texture registration failed, previewAmTexId is invalid");
+        RP_ERROR("Texture registration failed, previewAmTexId is invalid");
     }
 }

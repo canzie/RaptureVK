@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "plans/Project Serialization.md",
+                "file": "plans/Material Editor Workspace.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Project Serialization"
+              "title": "Material Editor Workspace"
             }
           }
         ]
@@ -185,6 +185,10 @@
   },
   "active": "6fa67950a6ea8521",
   "lastOpenFiles": [
+    "plans/Image-Based Lighting.md",
+    "plans/Editor UX Polish Roadmap.md",
+    "plans/Material Editor Workspace.md",
+    "plans/Project Serialization.md",
     "plans/Per-node Graph Values.md",
     "Material Graph Nodes.md",
     "Material Graph Nodes.md.tmp.1513.8fef1da2ab09",
@@ -210,10 +214,6 @@
     "systems/Scene.md",
     "systems/Mesh.md",
     "systems/MaterialInstance.md",
-    "systems/MaterialData.md",
-    "systems/Material.md",
-    "systems/LightingPass.md",
-    "systems/JobSystem.md",
     "systems",
     "stuff",
     "plans",

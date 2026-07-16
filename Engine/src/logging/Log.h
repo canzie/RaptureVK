@@ -122,38 +122,38 @@ class Log {
     logger->critical("[CRITICAL] {}: {}", Rapture::s_extractFunctionInfo(FUNCTION_SIGNATURE), fmt::format(__VA_ARGS__))
 
 // Core log macros
-#define RP_CORE_TRACE(...)    RP_LOG_TRACE(Log::GetCoreLogger(), __VA_ARGS__)
-#define RP_CORE_INFO(...)     RP_LOG_INFO(Log::GetCoreLogger(), __VA_ARGS__)
-#define RP_CORE_WARN(...)     RP_LOG_WARN(Log::GetCoreLogger(), __VA_ARGS__)
-#define RP_CORE_ERROR(...)    RP_LOG_ERROR(Log::GetCoreLogger(), __VA_ARGS__)
-#define RP_CORE_CRITICAL(...) RP_LOG_CRITICAL(Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_TRACE(...)    RP_LOG_TRACE(Rapture::Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_INFO(...)     RP_LOG_INFO(Rapture::Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_WARN(...)     RP_LOG_WARN(Rapture::Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_ERROR(...)    RP_LOG_ERROR(Rapture::Log::GetCoreLogger(), __VA_ARGS__)
+#define RP_CORE_CRITICAL(...) RP_LOG_CRITICAL(Rapture::Log::GetCoreLogger(), __VA_ARGS__)
 
 // Client log macros
-#define RP_TRACE(...)    RP_LOG_TRACE(Log::GetClientLogger(), __VA_ARGS__)
-#define RP_INFO(...)     RP_LOG_INFO(Log::GetClientLogger(), __VA_ARGS__)
-#define RP_WARN(...)     RP_LOG_WARN(Log::GetClientLogger(), __VA_ARGS__)
-#define RP_ERROR(...)    RP_LOG_ERROR(Log::GetClientLogger(), __VA_ARGS__)
-#define RP_CRITICAL(...) RP_LOG_CRITICAL(Log::GetClientLogger(), __VA_ARGS__)
+#define RP_TRACE(...)    RP_LOG_TRACE(Rapture::Log::GetClientLogger(), __VA_ARGS__)
+#define RP_INFO(...)     RP_LOG_INFO(Rapture::Log::GetClientLogger(), __VA_ARGS__)
+#define RP_WARN(...)     RP_LOG_WARN(Rapture::Log::GetClientLogger(), __VA_ARGS__)
+#define RP_ERROR(...)    RP_LOG_ERROR(Rapture::Log::GetClientLogger(), __VA_ARGS__)
+#define RP_CRITICAL(...) RP_LOG_CRITICAL(Rapture::Log::GetClientLogger(), __VA_ARGS__)
 
 // Render log macros
-#define RP_RENDER_TRACE(...) RP_LOG_TRACE(Log::GetRenderLogger(), __VA_ARGS__)
-#define RP_RENDER_INFO(...)  RP_LOG_INFO(Log::GetRenderLogger(), __VA_ARGS__)
-#define RP_RENDER_WARN(...)  RP_LOG_WARN(Log::GetRenderLogger(), __VA_ARGS__)
-#define RP_RENDER_ERROR(...) RP_LOG_ERROR(Log::GetRenderLogger(), __VA_ARGS__)
-#define RP_RENDER_FATAL(...) RP_LOG_CRITICAL(Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_TRACE(...) RP_LOG_TRACE(Rapture::Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_INFO(...)  RP_LOG_INFO(Rapture::Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_WARN(...)  RP_LOG_WARN(Rapture::Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_ERROR(...) RP_LOG_ERROR(Rapture::Log::GetRenderLogger(), __VA_ARGS__)
+#define RP_RENDER_FATAL(...) RP_LOG_CRITICAL(Rapture::Log::GetRenderLogger(), __VA_ARGS__)
 
 // Physics log macros
-#define RP_PHYSICS_TRACE(...) RP_LOG_TRACE(Log::GetPhysicsLogger(), __VA_ARGS__)
-#define RP_PHYSICS_INFO(...)  RP_LOG_INFO(Log::GetPhysicsLogger(), __VA_ARGS__)
-#define RP_PHYSICS_WARN(...)  RP_LOG_WARN(Log::GetPhysicsLogger(), __VA_ARGS__)
-#define RP_PHYSICS_ERROR(...) RP_LOG_ERROR(Log::GetPhysicsLogger(), __VA_ARGS__)
-#define RP_PHYSICS_FATAL(...) RP_LOG_CRITICAL(Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_TRACE(...) RP_LOG_TRACE(Rapture::Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_INFO(...)  RP_LOG_INFO(Rapture::Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_WARN(...)  RP_LOG_WARN(Rapture::Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_ERROR(...) RP_LOG_ERROR(Rapture::Log::GetPhysicsLogger(), __VA_ARGS__)
+#define RP_PHYSICS_FATAL(...) RP_LOG_CRITICAL(Rapture::Log::GetPhysicsLogger(), __VA_ARGS__)
 
 // Audio log macros
-#define RP_AUDIO_TRACE(...) RP_LOG_TRACE(Log::GetAudioLogger(), __VA_ARGS__)
-#define RP_AUDIO_INFO(...)  RP_LOG_INFO(Log::GetAudioLogger(), __VA_ARGS__)
-#define RP_AUDIO_WARN(...)  RP_LOG_WARN(Log::GetAudioLogger(), __VA_ARGS__)
-#define RP_AUDIO_ERROR(...) RP_LOG_ERROR(Log::GetAudioLogger(), __VA_ARGS__)
-#define RP_AUDIO_FATAL(...) RP_LOG_CRITICAL(Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_TRACE(...) RP_LOG_TRACE(Rapture::Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_INFO(...)  RP_LOG_INFO(Rapture::Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_WARN(...)  RP_LOG_WARN(Rapture::Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_ERROR(...) RP_LOG_ERROR(Rapture::Log::GetAudioLogger(), __VA_ARGS__)
+#define RP_AUDIO_FATAL(...) RP_LOG_CRITICAL(Rapture::Log::GetAudioLogger(), __VA_ARGS__)
 
 #endif // RAPTURE__LOG_H

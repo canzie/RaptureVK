@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "GraphDomain.h"
 #include "MaterialGraphTypes.h"
 #include "asset_manager/AssetHandle.h"
 
@@ -34,10 +35,11 @@ struct GraphConnection {
 };
 
 /**
- * @brief An authored surface graph: nodes, connections, and the output node
+ * @brief An authored surface graph: its domain, nodes, connections, and the output node
  */
 struct MaterialGraph {
     std::string name;
+    GraphDomainId domain = GD_SURFACE; // which inputs the nodes may read and which passes it compiles to
     std::vector<GraphNode> nodes;
     std::vector<GraphConnection> connections;
     uint32_t outputNodeId = 0;

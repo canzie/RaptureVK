@@ -81,12 +81,12 @@ AmethystLayer::~AmethystLayer()
     vkDestroyDescriptorPool(vulkanContext.getLogicalDevice(), m_uiDescriptorPool, nullptr);
     Amethyst::Log::Shutdown();
 
-    Rapture::RP_INFO("---Closing AmethystLayer---");
+    RP_INFO("---Closing AmethystLayer---");
 }
 
 void AmethystLayer::onAttach()
 {
-    Rapture::RP_INFO("Attaching AmethystLayer...");
+    RP_INFO("Attaching AmethystLayer...");
 
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
@@ -121,7 +121,7 @@ void AmethystLayer::onAttach()
 
     auto fontPath = rootPath / "assets/fonts/Roboto-Regular.ttf";
     if (!m_amCtx.loadFont(fontPath.string())) {
-        Rapture::RP_WARN("Failed to load font from: {}", fontPath.string());
+        RP_WARN("Failed to load font from: {}", fontPath.string());
     }
 
     m_amCtx.init(m_backend);
@@ -146,7 +146,7 @@ void AmethystLayer::onAttach()
 
 void AmethystLayer::onDetach()
 {
-    Rapture::RP_INFO("Detaching AmethystLayer...");
+    RP_INFO("Detaching AmethystLayer...");
 
     for (auto &ws : m_workspaces) {
         ws->saveLayout();

@@ -29,14 +29,6 @@ enum MaterialFlags {
 
     // Normal map is BC5-compressed (RG only), reconstruct Z in the shader
     MAT_FLAG_NORMAL_BC5 = 1u << 14,
-
-    // Material type flags (bits 16-18)
-    MAT_FLAG_IS_TERRAIN = 1u << 16,
-    MAT_FLAG_HAS_SPLAT_MAP = 1u << 17,
-    MAT_FLAG_USE_TRIPLANAR = 1u << 18,
-
-    // Graph material: surface computed by a generated function, not the static path
-    MAT_FLAG_IS_GRAPH = 1u << 19,
 };
 
 inline bool hasFlag(uint32_t flags, uint32_t flag)
@@ -45,30 +37,20 @@ inline bool hasFlag(uint32_t flags, uint32_t flag)
 }
 
 // Per-material header indexed by material id. Surface inputs live in the graph slice at
-// graphDataOffset; the terrain scalars are kept until the terrain path is removed.
+// graphDataOffset.
 struct MaterialData {
     uint32_t flags;
     uint32_t graphId;
     uint32_t graphDataOffset;
-    float tilingScale;
-    float heightBlend;
-    float slopeThreshold;
 
     /**
-     * @brief A header with default terrain scalars and no bound graph
+     * @brief A header with no bound graph
      * @return The default material header
      */
-    static MaterialData createDefault()
-    {
-        MaterialData data{};
-        data.tilingScale = 1.0f;
-        data.heightBlend = 0.5f;
-        data.slopeThreshold = 0.7f;
-        return data;
-    }
+    static MaterialData createDefault() { return MaterialData{}; }
 };
 
-static_assert(sizeof(MaterialData) == 24, "MaterialData must be 24 bytes to match its std430 mirror");
+static_assert(sizeof(MaterialData) == 12, "MaterialData must be 12 bytes to match its std430 mirror");
 
 } // namespace Rapture
 

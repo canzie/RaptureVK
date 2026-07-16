@@ -50,7 +50,6 @@ void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data,
         }
     }
 
-    m_data.flags |= MAT_FLAG_IS_GRAPH;
     m_data.graphId = graphId;
     m_data.graphDataOffset = m_graphDataOffset == UINT32_MAX ? 0u : m_graphDataOffset;
     syncToGPU();

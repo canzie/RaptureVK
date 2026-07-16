@@ -9,6 +9,7 @@
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "materials/Material.h"
+#include "materials/graph/SurfaceGraphManager.h"
 #include "renderer/Frustum.h"
 #include "window_context/Application.h"
 
@@ -376,6 +377,82 @@ VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const
     return m_indexBuffers[lod]->getBufferVk();
 }
 
+/**
+ * @brief A layered natural terrain shaded from the terrain domain's inputs, with no textures
+ *
+ * Four signals drive it: erosion tints grass from lush to dry, curvature darkens the concavities
+ * sediment collects in, slope exposes rock on steep faces, and height puts sand at the bottom and
+ * snow on the peaks. Snow is masked off anything steep enough to be rock, so cliffs stay bare.
+ * @return The authored graph
+ */
+static MaterialGraph s_buildTerrainGraph()
+{
+    using GN = GraphNodeType;
+    using PV = PinValue;
+    MaterialGraph graph;
+    graph.name = "TerrainLayered";
+    graph.domain = GD_TERRAIN;
+
+    graph.nodes.push_back({.id = 1, .type = GN::SLOPE});
+    graph.nodes.push_back({.id = 2, .type = GN::TERRAIN_HEIGHT});
+    graph.nodes.push_back({.id = 3, .type = GN::TERRAIN_EROSION});
+    graph.nodes.push_back({.id = 4, .type = GN::TERRAIN_CURVATURE});
+
+    // Grass tinted from lush to dry by erosion
+    graph.nodes.push_back({.id = 5, .type = GN::CONSTANT_VEC3, .inputValues = {PV(glm::vec3(0.04f, 0.17f, 0.04f))}});
+    graph.nodes.push_back({.id = 6, .type = GN::CONSTANT_VEC3, .inputValues = {PV(glm::vec3(0.14f, 0.25f, 0.07f))}});
+    graph.nodes.push_back({.id = 7, .type = GN::MIX_VEC3});
+
+    // Concavities collect darker sediment
+    graph.nodes.push_back({.id = 8, .type = GN::CONSTANT_FLOAT, .inputValues = {PV(6.0f)}});
+    graph.nodes.push_back({.id = 9, .type = GN::MULTIPLY_FLOAT});
+    graph.nodes.push_back({.id = 10, .type = GN::SATURATE_FLOAT});
+    graph.nodes.push_back({.id = 11, .type = GN::CONSTANT_VEC3, .inputValues = {PV(glm::vec3(0.18f, 0.14f, 0.09f))}});
+    graph.nodes.push_back({.id = 12, .type = GN::MIX_VEC3});
+
+    // Rock on the steep faces
+    graph.nodes.push_back({.id = 13, .type = GN::CONSTANT_FLOAT, .inputValues = {PV(0.30f)}});
+    graph.nodes.push_back({.id = 14, .type = GN::CONSTANT_FLOAT, .inputValues = {PV(0.55f)}});
+    graph.nodes.push_back({.id = 15, .type = GN::SMOOTHSTEP_FLOAT});
+    graph.nodes.push_back({.id = 16, .type = GN::CONSTANT_VEC3, .inputValues = {PV(glm::vec3(0.33f, 0.30f, 0.28f))}});
+    graph.nodes.push_back({.id = 17, .type = GN::MIX_VEC3});
+
+    graph.nodes.push_back({.id = 21, .type = GN::CONSTANT_FLOAT, .inputValues = {PV(1.0f)}});
+
+    // Snow on the peaks, kept off anything steep enough to be rock
+    graph.nodes.push_back({.id = 25, .type = GN::CONSTANT_FLOAT, .inputValues = {PV(0.60f)}});
+    graph.nodes.push_back({.id = 26, .type = GN::CONSTANT_FLOAT, .inputValues = {PV(0.72f)}});
+    graph.nodes.push_back({.id = 27, .type = GN::SMOOTHSTEP_FLOAT});
+    graph.nodes.push_back({.id = 28, .type = GN::SUBTRACT_FLOAT});
+    graph.nodes.push_back({.id = 29, .type = GN::MULTIPLY_FLOAT});
+    graph.nodes.push_back({.id = 30, .type = GN::CONSTANT_VEC3, .inputValues = {PV(glm::vec3(0.90f, 0.93f, 0.97f))}});
+    graph.nodes.push_back({.id = 31, .type = GN::MIX_VEC3});
+
+    // Snow reads smoother than the ground it covers
+    graph.nodes.push_back({.id = 32, .type = GN::CONSTANT_FLOAT, .inputValues = {PV(0.92f)}});
+    graph.nodes.push_back({.id = 33, .type = GN::CONSTANT_FLOAT, .inputValues = {PV(0.38f)}});
+    graph.nodes.push_back({.id = 34, .type = GN::MIX_FLOAT});
+
+    graph.nodes.push_back({.id = 35, .type = GN::SURFACE_OUTPUT});
+    graph.outputNodeId = 35;
+
+    graph.connections = {
+        {5, 0, 7, 0},   {6, 0, 7, 1},   {3, 0, 7, 2},   // grass = mix(lush, dry, erosion)
+        {4, 0, 9, 0},   {8, 0, 9, 1},   {9, 0, 10, 0},  // sediment mask = saturate(curvature * gain)
+        {7, 0, 12, 0},  {11, 0, 12, 1}, {10, 0, 12, 2}, // ground = mix(grass, sediment, sediment mask)
+        {13, 0, 15, 0}, {14, 0, 15, 1}, {1, 0, 15, 2},  // rock mask = smoothstep(slope)
+        {12, 0, 17, 0}, {16, 0, 17, 1}, {15, 0, 17, 2}, // ground = mix(ground, rock, rock mask)
+        {25, 0, 27, 0}, {26, 0, 27, 1}, {2, 0, 27, 2},  // high mask = smoothstep(height)
+        {21, 0, 28, 0}, {15, 0, 28, 1},                 // not steep = 1 - rock mask
+        {27, 0, 29, 0}, {28, 0, 29, 1},                 // snow mask = high mask * not steep
+        {17, 0, 31, 0}, {30, 0, 31, 1}, {29, 0, 31, 2}, // albedo = mix(ground, snow, snow mask)
+        {32, 0, 34, 0}, {33, 0, 34, 1}, {29, 0, 34, 2}, // roughness = mix(ground, snow, snow mask)
+        {31, 0, 35, 0}, {34, 0, 35, 2},                 // -> albedo, roughness
+    };
+
+    return graph;
+}
+
 void TerrainGenerator::createTerrainMaterials()
 {
     auto terrainBase = MaterialManager::getMaterial("Terrain");
@@ -384,43 +461,23 @@ void TerrainGenerator::createTerrainMaterials()
         return;
     }
 
-    m_grassMaterial = std::make_shared<MaterialInstance>(terrainBase, "TerrainGrass");
-    m_grassMaterial->setParameter(ParameterID::ALBEDO, glm::vec4(19.0f / 255.0f, 109.0f / 255.0f, 21.0f / 255.0f, 1.0f));
-    m_grassMaterial->setParameter(ParameterID::ROUGHNESS, 0.9f);
-    m_grassMaterial->setParameter(ParameterID::METALLIC, 0.0f);
-    m_grassMaterial->setParameter(ParameterID::TILING_SCALE, 0.1f);
-    m_grassMaterial->setParameter(ParameterID::SLOPE_THRESHOLD, 0.4f);
-    m_grassMaterial->setParameter(ParameterID::HEIGHT_BLEND, 0.75f);
+    auto instance = std::make_unique<MaterialInstance>(terrainBase, "Terrain");
+    m_material = AssetPtr<MaterialInstance>(AssetManager::registerVirtualAsset(std::move(instance), "Terrain", AssetType::MATERIAL));
 
-    m_rockMaterial = std::make_shared<MaterialInstance>(terrainBase, "TerrainRock");
-    m_rockMaterial->setParameter(ParameterID::ALBEDO, glm::vec4(0.4f, 0.35f, 0.3f, 1.0f));
-    m_rockMaterial->setParameter(ParameterID::ROUGHNESS, 0.85f);
-    m_rockMaterial->setParameter(ParameterID::METALLIC, 0.0f);
-    m_rockMaterial->setParameter(ParameterID::TILING_SCALE, 0.15f);
+    SurfaceGraphManager &graphs = MaterialManager::getSurfaceGraphManager();
+    uint32_t graphId = graphs.registerGraph(s_buildTerrainGraph());
+    if (graphId == UINT32_MAX) {
+        RP_CORE_ERROR("Failed to compile the terrain material graph, terrain keeps its base material");
+        return;
+    }
+    m_material->setGraph(graphId, graphs.getDefaults(graphId), graphs.getTextureRefs(graphId));
 
-    m_snowMaterial = std::make_shared<MaterialInstance>(terrainBase, "TerrainSnow");
-    m_snowMaterial->setParameter(ParameterID::ALBEDO, glm::vec4(0.95f, 0.95f, 0.98f, 1.0f));
-    m_snowMaterial->setParameter(ParameterID::ROUGHNESS, 0.3f);
-    m_snowMaterial->setParameter(ParameterID::METALLIC, 0.0f);
-    m_snowMaterial->setParameter(ParameterID::TILING_SCALE, 0.2f);
-
-    RP_CORE_INFO("Terrain materials created: grass={}, rock={}, snow={}", m_grassMaterial->getBindlessIndex(),
-                 m_rockMaterial->getBindlessIndex(), m_snowMaterial->getBindlessIndex());
+    RP_CORE_INFO("Terrain material created: index={}, graph={}", m_material->getBindlessIndex(), graphId);
 }
 
-uint32_t TerrainGenerator::getGrassMaterialIndex() const
+uint32_t TerrainGenerator::getMaterialIndex() const
 {
-    return m_grassMaterial ? m_grassMaterial->getBindlessIndex() : 0;
-}
-
-uint32_t TerrainGenerator::getRockMaterialIndex() const
-{
-    return m_rockMaterial ? m_rockMaterial->getBindlessIndex() : 0;
-}
-
-uint32_t TerrainGenerator::getSnowMaterialIndex() const
-{
-    return m_snowMaterial ? m_snowMaterial->getBindlessIndex() : 0;
+    return m_material ? m_material->getBindlessIndex() : UINT32_MAX;
 }
 
 } // namespace Rapture

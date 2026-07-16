@@ -3,7 +3,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "common/MaterialCommon.glsl"
-#include "generated/SurfaceGraphs.glsl"
+#include "generated/TerrainGraphs.glsl"
 #include "terrain/terrain_common.glsl"
 
 layout(location = 0) out vec2 gNormal;
@@ -27,9 +27,7 @@ layout(push_constant) uniform TerrainPushConstants {
     uint lodResolution;
     float heightScale;
     float terrainWorldSize;
-    uint grassMaterialIndex;
-    uint rockMaterialIndex;
-    uint snowMaterialIndex;
+    uint materialIndex;
 } pc;
 
 float getHeightTexelWorldSize() {
@@ -44,7 +42,14 @@ float sampleHeightWorld(vec2 worldXZ) {
     return rawToWorldHeight(raw, pc.heightScale);
 }
 
-vec3 computeTerrainNormal(vec3 worldPos) {
+struct TerrainGeometry {
+    vec3 normal;
+    float curvature;
+};
+
+// Normal and curvature share the same four height taps: the normal is their central difference and
+// the curvature their laplacian against the centre height, so curvature costs no extra samples.
+TerrainGeometry computeTerrainGeometry(vec3 worldPos) {
     float step = getHeightTexelWorldSize();
 
     float hL = sampleHeightWorld(worldPos.xz + vec2(-step, 0.0));
@@ -58,95 +63,32 @@ vec3 computeTerrainNormal(vec3 worldPos) {
     vec3 dx = vec3(1.0, dhdx, 0.0);
     vec3 dz = vec3(0.0, dhdz, 1.0);
 
-    return normalize(cross(dz, dx));
-}
-
-vec2 triplanarUV(vec3 worldPos, vec3 normal, float scale) {
-    vec3 n = abs(normal);
-    if (n.y >= n.x && n.y >= n.z) {
-        return worldPos.xz * scale;
-    } else if (n.x >= n.z) {
-        return worldPos.yz * scale;
-    } else {
-        return worldPos.xy * scale;
-    }
-}
-
-struct TerrainSample {
-    vec3 albedo;
-    float roughness;
-    float metallic;
-    float ao;
-};
-
-TerrainSample sampleTerrainMaterial(uint matIndex, vec3 worldPos, vec3 normal) {
-    MaterialData mat = getMaterialData(matIndex);
-    float scale = mat.tilingScale > 0.0 ? mat.tilingScale : 1.0;
-    vec2 uv = triplanarUV(worldPos, normal, scale);
-
-    // Temporary bridge to the unified graph model until the terrain path is reworked
-    SurfaceInputs si;
-    si.uv = uv;
-    si.worldPos = worldPos;
-    si.worldNormal = normal;
-    si.tangent = vec3(1.0, 0.0, 0.0);
-    si.bitangent = vec3(0.0, 0.0, 1.0);
-    si.flags = mat.flags;
-
-    SurfaceData surf = evalSurfaceGraph(mat.graphId, si, mat.graphDataOffset);
-
-    TerrainSample s;
-    s.albedo = surf.albedo;
-    s.roughness = surf.roughness;
-    s.metallic = surf.metallic;
-    s.ao = surf.ao;
-    return s;
-}
-
-TerrainSample blendSamples(TerrainSample a, TerrainSample b, float t) {
-    TerrainSample result;
-    result.albedo = mix(a.albedo, b.albedo, t);
-    result.roughness = mix(a.roughness, b.roughness, t);
-    result.metallic = mix(a.metallic, b.metallic, t);
-    result.ao = mix(a.ao, b.ao, t);
-    return result;
+    TerrainGeometry geom;
+    geom.normal = normalize(cross(dz, dx));
+    geom.curvature = ((hL + hR + hD + hU) * 0.25 - worldPos.y) / step;
+    return geom;
 }
 
 void main() {
-    vec3 normalWS = computeTerrainNormal(inFragPosDepth.xyz);
-    gNormal = octEncodeNormal(normalize(normalWS));
+    vec3 worldPos = inFragPosDepth.xyz;
+    TerrainGeometry geom = computeTerrainGeometry(worldPos);
 
-    MaterialData grassMat = getMaterialData(pc.grassMaterialIndex);
-    float slopeThreshold = grassMat.slopeThreshold > 0.0 ? grassMat.slopeThreshold : 0.7;
-    float heightBlend = grassMat.heightBlend > 0.0 ? grassMat.heightBlend : 0.8;
+    MaterialData mat = getMaterialData(pc.materialIndex);
 
-    float slope = 1.0 - normalWS.y;
-    float height = inNormalizedHeight;
+    TerrainInputs si;
+    si.uv = worldPos.xz / pc.terrainWorldSize + 0.5;
+    si.worldPos = worldPos;
+    si.worldNormal = geom.normal;
+    si.normalizedHeight = inNormalizedHeight;
+    si.curvature = geom.curvature;
+    si.lod = inLOD;
+    si.continentalnessTex = pc.continentalnessIndex;
+    si.erosionTex = pc.erosionIndex;
+    si.peaksValleysTex = pc.peaksValleysIndex;
 
-    TerrainSample grass = sampleTerrainMaterial(pc.grassMaterialIndex, inFragPosDepth.xyz, normalWS);
-    TerrainSample rock = sampleTerrainMaterial(pc.rockMaterialIndex, inFragPosDepth.xyz, normalWS);
-    TerrainSample snow = sampleTerrainMaterial(pc.snowMaterialIndex, inFragPosDepth.xyz, normalWS);
+    TerrainSurfaceData surf = evalTerrainSurfaceGraph(mat.graphId, si, mat.graphDataOffset);
 
-    float slopeBlend = smoothstep(slopeThreshold - 0.1, slopeThreshold + 0.1, slope);
-    TerrainSample groundLayer = blendSamples(grass, rock, slopeBlend);
-
-    float snowBlend = smoothstep(heightBlend - 0.1, heightBlend + 0.1, height) * (1.0 - slope * 0.5);
-    TerrainSample finalSample = blendSamples(groundLayer, snow, snowBlend);
-
-    //vec3 finalCol = vec3(1.0);
-    //if (height < 0.4) {
-    //    finalCol = vec3(0.0, 0.0, 1.0);
-    //} else if (height < 0.5) {
-    //    finalCol = vec3(0.0, 1.0, 0.0);
-    //} else if (height <= 0.6) {
-    //    finalCol = vec3(0.1, 0.1, 0.1);
-    //} else {
-    //    finalCol = vec3(0.9, 0.9, 0.9);
-    //}
-
-
-
-
-    gAlbedoSpec = vec4(finalSample.albedo, 1.0);
-    gMaterial = vec4(finalSample.metallic, finalSample.roughness, finalSample.ao, packShadingModel(SM_OPENPBR_STANDARD));
+    gNormal = octEncodeNormal(normalize(surf.normal));
+    gAlbedoSpec = vec4(surf.albedo, 1.0);
+    gMaterial = vec4(surf.metallic, surf.roughness, surf.ao, packShadingModel(surf.shadingModelId));
 }

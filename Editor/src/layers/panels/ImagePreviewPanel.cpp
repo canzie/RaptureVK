@@ -125,7 +125,7 @@ void ImagePreviewPanel::rebuildSelector()
 void ImagePreviewPanel::selectTexture(Rapture::AssetHandle handle)
 {
     if (!m_services.registerTexture) {
-        Rapture::RP_ERROR("registerTexture service not set, cannot display texture");
+        RP_ERROR("registerTexture service not set, cannot display texture");
         return;
     }
 

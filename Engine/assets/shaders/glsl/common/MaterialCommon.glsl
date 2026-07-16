@@ -24,20 +24,12 @@ const uint MAT_FLAG_HAS_SPECULAR_MAP           = 1u << 12;
 const uint MAT_FLAG_HAS_HEIGHT_MAP             = 1u << 13;
 const uint MAT_FLAG_NORMAL_BC5                 = 1u << 14;
 
-const uint MAT_FLAG_IS_TERRAIN     = 1u << 16;
-const uint MAT_FLAG_HAS_SPLAT_MAP  = 1u << 17;
-const uint MAT_FLAG_USE_TRIPLANAR  = 1u << 18;
-const uint MAT_FLAG_IS_GRAPH       = 1u << 19;
-
 // Per-material header, mirror of MaterialData.h. Surface inputs live in the graph slice at
-// graphDataOffset; the terrain scalars are kept until the terrain path is removed.
+// graphDataOffset.
 struct MaterialData {
     uint flags;
     uint graphId;
     uint graphDataOffset;
-    float tilingScale;
-    float heightBlend;
-    float slopeThreshold;
 };
 
 // ============================================================================
@@ -82,6 +74,20 @@ struct SurfaceInputs {
     uint flags;
 };
 
+// Terrain has no vertex attributes, so it carries no tangent frame and no mesh uv. The noise field
+// indices are sampled lazily by the terrain graph nodes that read them.
+struct TerrainInputs {
+    vec2 uv;                  // global terrain uv, 0..1 across the whole terrain
+    vec3 worldPos;
+    vec3 worldNormal;         // derived from the heightmap, not normalized
+    float normalizedHeight;   // raw spline height, 0..1
+    float curvature;          // heightmap laplacian, positive concave, negative convex
+    uint lod;
+    uint continentalnessTex;
+    uint erosionTex;
+    uint peaksValleysTex;
+};
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -119,6 +125,57 @@ vec3 reconstructNormalZ(vec2 xy) {
     vec2 n = xy * 2.0 - 1.0;
     float z = sqrt(max(0.0, 1.0 - dot(n, n)));
     return vec3(n, z);
+}
+
+#ifndef TWO_PI
+#define TWO_PI 6.28318530718
+#endif
+
+// Which horizontal direction the surface faces, as 0..1 around Y where 0 is +Z
+float horizontalFacingAngle(vec3 normal) {
+    vec3 n = normalize(normal);
+    return fract(atan(n.x, n.z) / TWO_PI + 1.0);
+}
+
+// Per-axis projection weights, sharpness tightens the transition between the three planes
+vec3 triplanarWeights(vec3 normal, float sharpness) {
+    vec3 w = pow(abs(normalize(normal)), vec3(max(sharpness, 1.0)));
+    return w / max(w.x + w.y + w.z, 1e-5);
+}
+
+vec4 triplanarSample(sampler2D tex, vec3 worldPos, vec3 normal, float scale, float sharpness) {
+    vec3 w = triplanarWeights(normal, sharpness);
+    return texture(tex, worldPos.zy * scale) * w.x
+         + texture(tex, worldPos.xz * scale) * w.y
+         + texture(tex, worldPos.xy * scale) * w.z;
+}
+
+// Triplanar tangent-space normal map, whiteout blended into world space. Needs no tangent frame,
+// which is what makes it the only normal mapping terrain can express.
+vec3 triplanarNormal(sampler2D tex, vec3 worldPos, vec3 normal, float scale, float sharpness) {
+    vec3 n = normalize(normal);
+    vec3 w = triplanarWeights(n, sharpness);
+
+    vec3 tx = texture(tex, worldPos.zy * scale).xyz * 2.0 - 1.0;
+    vec3 ty = texture(tex, worldPos.xz * scale).xyz * 2.0 - 1.0;
+    vec3 tz = texture(tex, worldPos.xy * scale).xyz * 2.0 - 1.0;
+
+    vec3 nx = vec3(tx.xy + n.zy, abs(tx.z) * n.x);
+    vec3 ny = vec3(ty.xy + n.xz, abs(ty.z) * n.y);
+    vec3 nz = vec3(tz.xy + n.xy, abs(tz.z) * n.z);
+
+    return normalize(nx.zyx * w.x + ny.xzy * w.y + nz.xyz * w.z);
+}
+
+// Weight for b when blending two layers by their own height maps rather than lerping linearly.
+// sharpness is the width of the band where both layers still contribute.
+float heightBlendWeight(float heightA, float heightB, float t, float sharpness) {
+    float a = heightA * (1.0 - t);
+    float b = heightB * t;
+    float m = max(a, b) - max(sharpness, 1e-5);
+    float wa = max(a - m, 0.0);
+    float wb = max(b - m, 0.0);
+    return wb / max(wa + wb, 1e-5);
 }
 
 #endif // MATERIAL_COMMON_GLSL

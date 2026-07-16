@@ -13,6 +13,7 @@
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 
+#include "logging/Log.h"
 #include "renderer/RenderSettings.h"
 
 #include <glm/gtc/matrix_transform.hpp>

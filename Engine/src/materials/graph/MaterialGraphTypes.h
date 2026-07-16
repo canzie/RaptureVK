@@ -118,6 +118,19 @@ enum class GraphNodeType {
     LUMINANCE,
     REMAP_FLOAT,
 
+    SLOPE,
+    FACING_ANGLE,
+    TRIPLANAR_SAMPLE,
+    TRIPLANAR_NORMAL,
+    HEIGHT_BLEND_WEIGHT,
+
+    TERRAIN_HEIGHT,
+    TERRAIN_CURVATURE,
+    TERRAIN_LOD,
+    TERRAIN_EROSION,
+    TERRAIN_CONTINENTALNESS,
+    TERRAIN_PEAKS_VALLEYS,
+
     SURFACE_OUTPUT,
 };
 
@@ -148,6 +161,9 @@ enum class GraphNodeType {
     X(COMBINE_VEC2) X(COMBINE_VEC3) X(COMBINE_VEC4)                                                                             \
     X(SPLIT_VEC2) X(SPLIT_VEC3) X(SPLIT_VEC4)                                                                                   \
     X(NORMAL_MAP) X(NORMAL_MAP_RG) X(LUMINANCE) X(REMAP_FLOAT)                                                                  \
+    X(SLOPE) X(FACING_ANGLE) X(TRIPLANAR_SAMPLE) X(TRIPLANAR_NORMAL) X(HEIGHT_BLEND_WEIGHT)                                     \
+    X(TERRAIN_HEIGHT) X(TERRAIN_CURVATURE) X(TERRAIN_LOD)                                                                       \
+    X(TERRAIN_EROSION) X(TERRAIN_CONTINENTALNESS) X(TERRAIN_PEAKS_VALLEYS)                                                      \
     X(SURFACE_OUTPUT)
 
 /**
@@ -182,14 +198,26 @@ struct PinDef {
  * @brief Data-driven description of a node type: pins plus a GLSL expression template
  *
  * The compiler substitutes placeholders into glslTemplate rather than switching on the
- * type, so adding a node type is a data entry, not a compiler edit.
+ * type, so adding a node type is a data entry, not a compiler edit. A template references an
+ * input pin as {pinName} and a domain input as {$inputName}.
  */
 struct NodeDefinition {
     GraphNodeType type = GraphNodeType::NONE;
     std::vector<PinDef> inputs = {};
     std::vector<PinDef> outputs = {};
     std::string glslTemplate = {}; // single output nodes: the RHS expression
+
+    // Domain inputs the templates reference, scanned from them by NodeRegistry::registerNode.
+    // A node is usable in a domain only if the domain provides every name here.
+    std::vector<std::string> requiredInputs = {};
 };
+
+/**
+ * @brief Collect the {$name} domain input references in a template
+ * @param templateStr The GLSL template to scan
+ * @param out Appended with each referenced name, skipping ones already present
+ */
+void Graph_scanRequiredInputs(std::string_view templateStr, std::vector<std::string> &out);
 
 /**
  * @brief GLSL scalar/vector type name for a pin type

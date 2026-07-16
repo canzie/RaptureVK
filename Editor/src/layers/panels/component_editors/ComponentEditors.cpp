@@ -101,17 +101,18 @@ static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&
 }
 
 static void s_rowSlider(Amethyst::TableScope &t, std::string_view label, float *value, float min, float max,
-                        const std::function<void(float)> &onChanged)
+                        const std::function<void(float)> &onChanged, std::string format = {})
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, min, max, onChanged](Amethyst::UIScope &cell) {
+        tr.cell([value, min, max, onChanged, format](Amethyst::UIScope &cell) {
             cell.sliderFloat(
                 {
                     .classes = {"generic-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                    .format = format,
                     .min = min,
                     .max = max,
                     .value = value,
@@ -334,14 +335,17 @@ void DirectionalLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             light->useTemperature = b;
             m_entity.markDirty();
         });
-        s_rowDragFloat(t, "Temperature", &m_temperature, 50.0, 1000.0, 40000.0, "%.1f K", [this](double v) {
-            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->temperature = static_cast<float>(v);
-            m_entity.markDirty();
-        });
+        s_rowSlider(
+            t, "Temperature", &m_temperature, 1000.0f, 40000.0f,
+            [this](float v) {
+                auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
+                if (light == nullptr) {
+                    return;
+                }
+                light->temperature = v;
+                m_entity.markDirty();
+            },
+            "%.1f K");
     });
 }
 
@@ -357,7 +361,7 @@ void DirectionalLightEditor::sync(const Rapture::Entity &entity)
     m_atmosphereSunLight = light->atmosphereSunLight;
     m_castsShadow = light->castsShadow;
     m_useTemperature = light->useTemperature;
-    m_temperature = static_cast<double>(light->temperature);
+    m_temperature = light->temperature;
     if (m_colorField) {
         m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
     }
@@ -406,14 +410,17 @@ void PointLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             light->useTemperature = b;
             m_entity.markDirty();
         });
-        s_rowDragFloat(t, "Temperature", &m_temperature, 50.0, 1000.0, 40000.0, "%.1f K", [this](double v) {
-            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->temperature = static_cast<float>(v);
-            m_entity.markDirty();
-        });
+        s_rowSlider(
+            t, "Temperature", &m_temperature, 1000.0f, 40000.0f,
+            [this](float v) {
+                auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
+                if (light == nullptr) {
+                    return;
+                }
+                light->temperature = v;
+                m_entity.markDirty();
+            },
+            "%.1f K");
     });
 }
 
@@ -429,7 +436,7 @@ void PointLightEditor::sync(const Rapture::Entity &entity)
     m_range = light->range;
     m_castsShadow = light->castsShadow;
     m_useTemperature = light->useTemperature;
-    m_temperature = static_cast<double>(light->temperature);
+    m_temperature = light->temperature;
     if (m_colorField) {
         m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
     }
@@ -462,22 +469,28 @@ void SpotLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             light->range = v;
             m_entity.markDirty();
         });
-        s_rowDragFloat(t, "Inner Cone", &m_innerConeAngle, 0.5, 0.0, 89.0, "%.1f deg", [this](double v) {
-            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->innerConeAngle = glm::radians(static_cast<float>(v));
-            m_entity.markDirty();
-        });
-        s_rowDragFloat(t, "Outer Cone", &m_outerConeAngle, 0.5, 0.0, 90.0, "%.1f deg", [this](double v) {
-            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->outerConeAngle = glm::radians(static_cast<float>(v));
-            m_entity.markDirty();
-        });
+        s_rowSlider(
+            t, "Inner Cone", &m_innerConeAngle, 0.0f, 89.0f,
+            [this](float v) {
+                auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+                if (light == nullptr) {
+                    return;
+                }
+                light->innerConeAngle = glm::radians(v);
+                m_entity.markDirty();
+            },
+            "%.1f deg");
+        s_rowSlider(
+            t, "Outer Cone", &m_outerConeAngle, 0.0f, 90.0f,
+            [this](float v) {
+                auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+                if (light == nullptr) {
+                    return;
+                }
+                light->outerConeAngle = glm::radians(v);
+                m_entity.markDirty();
+            },
+            "%.1f deg");
         s_rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
             auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
             if (light == nullptr) {
@@ -494,14 +507,17 @@ void SpotLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             light->useTemperature = b;
             m_entity.markDirty();
         });
-        s_rowDragFloat(t, "Temperature", &m_temperature, 50.0, 1000.0, 40000.0, "%.1f K", [this](double v) {
-            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->temperature = static_cast<float>(v);
-            m_entity.markDirty();
-        });
+        s_rowSlider(
+            t, "Temperature", &m_temperature, 1000.0f, 40000.0f,
+            [this](float v) {
+                auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
+                if (light == nullptr) {
+                    return;
+                }
+                light->temperature = v;
+                m_entity.markDirty();
+            },
+            "%.1f K");
     });
 }
 
@@ -515,11 +531,11 @@ void SpotLightEditor::sync(const Rapture::Entity &entity)
     m_color = light->color;
     m_intensity = light->intensity;
     m_range = light->range;
-    m_innerConeAngle = static_cast<double>(glm::degrees(light->innerConeAngle));
-    m_outerConeAngle = static_cast<double>(glm::degrees(light->outerConeAngle));
+    m_innerConeAngle = glm::degrees(light->innerConeAngle);
+    m_outerConeAngle = glm::degrees(light->outerConeAngle);
     m_castsShadow = light->castsShadow;
     m_useTemperature = light->useTemperature;
-    m_temperature = static_cast<double>(light->temperature);
+    m_temperature = light->temperature;
     if (m_colorField) {
         m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
     }

@@ -1,9 +1,9 @@
 #include "NodeRegistry.h"
 
+#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "logging/Log.h"
 #include "utils/rp_assert.h"
 
 namespace Rapture {
@@ -21,15 +21,30 @@ static void s_validateDefinition(const NodeDefinition &def)
     auto checkPins = [&](const std::vector<PinDef> &pins, const char *direction) {
         std::unordered_set<std::string> names;
         for (const auto &pin : pins) {
-            bool unique = names.insert(pin.name).second;
-            if (!unique) {
-                RP_CORE_ERROR("Node type {} has a duplicate {} pin name '{}'", static_cast<int>(def.type), direction, pin.name);
-            }
-            RP_ASSERT(unique, "node has a duplicate pin name within one direction");
+            [[maybe_unused]] bool unique = names.insert(pin.name).second;
+            RP_ASSERT(unique, "node type '{}' has a duplicate {} pin name '{}'", Graph_nodeTypeName(def.type), direction,
+                      pin.name);
         }
     };
     checkPins(def.inputs, "input");
     checkPins(def.outputs, "output");
+}
+
+void Graph_scanRequiredInputs(std::string_view templateStr, std::vector<std::string> &out)
+{
+    size_t pos = 0;
+    while ((pos = templateStr.find("{$", pos)) != std::string_view::npos) {
+        size_t end = templateStr.find('}', pos);
+        if (end == std::string_view::npos) {
+            break;
+        }
+
+        std::string_view name = templateStr.substr(pos + 2, end - pos - 2);
+        if (std::find(out.begin(), out.end(), name) == out.end()) {
+            out.emplace_back(name);
+        }
+        pos = end + 1;
+    }
 }
 
 const char *graph_pinTypeGlsl(PinType type)
@@ -101,6 +116,13 @@ const NodeDefinition *NodeRegistry::get(GraphNodeType type)
 void NodeRegistry::registerNode(NodeDefinition def)
 {
     s_validateDefinition(def);
+
+    def.requiredInputs.clear();
+    Graph_scanRequiredInputs(def.glslTemplate, def.requiredInputs);
+    for (const auto &output : def.outputs) {
+        Graph_scanRequiredInputs(output.glslTemplate, def.requiredInputs);
+    }
+
     GraphNodeType key = def.type;
     s_definitions[key] = std::move(def);
 }
@@ -111,11 +133,11 @@ void NodeRegistry::registerBuiltins()
     s_builtinsRegistered = true;
 
     // Input readers
-    registerNode({.type = GraphNodeType::TEXCOORD, .outputs = {{"UV", PinType::VEC2}}, .glslTemplate = "si.uv"});
-    registerNode({.type = GraphNodeType::POSITION, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.worldPos"});
-    registerNode({.type = GraphNodeType::NORMAL, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.worldNormal"});
-    registerNode({.type = GraphNodeType::TANGENT, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.tangent"});
-    registerNode({.type = GraphNodeType::BITANGENT, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "si.bitangent"});
+    registerNode({.type = GraphNodeType::TEXCOORD, .outputs = {{"UV", PinType::VEC2}}, .glslTemplate = "{$uv}"});
+    registerNode({.type = GraphNodeType::POSITION, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "{$worldPos}"});
+    registerNode({.type = GraphNodeType::NORMAL, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "{$worldNormal}"});
+    registerNode({.type = GraphNodeType::TANGENT, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "{$tangent}"});
+    registerNode({.type = GraphNodeType::BITANGENT, .outputs = {{"out", PinType::VEC3}}, .glslTemplate = "{$bitangent}"});
 
     // Slot-backed values, {const} expands to the packed slice value read at the node's type
     registerNode({.type = GraphNodeType::CONSTANT_FLOAT,
@@ -412,14 +434,14 @@ void NodeRegistry::registerBuiltins()
     registerNode({.type = GraphNodeType::NORMAL_MAP,
                   .inputs = {{"sample", PinType::VEC3, glm::vec3(0.5f, 0.5f, 1.0f)}},
                   .outputs = {{"out", PinType::VEC3}},
-                  .glslTemplate = "normalize(mat3(normalize(si.tangent), normalize(si.bitangent), normalize(si.worldNormal)) * "
+                  .glslTemplate = "normalize(mat3(normalize({$tangent}), normalize({$bitangent}), normalize({$worldNormal})) * "
                                   "({sample} * 2.0 - 1.0))"});
 
     // Normal map reading only RG and reconstructing Z, valid for BC5 and plain tangent normal maps
     registerNode({.type = GraphNodeType::NORMAL_MAP_RG,
                   .inputs = {{"sample", PinType::VEC3, glm::vec3(0.5f, 0.5f, 1.0f)}},
                   .outputs = {{"out", PinType::VEC3}},
-                  .glslTemplate = "normalize(mat3(normalize(si.tangent), normalize(si.bitangent), normalize(si.worldNormal)) * "
+                  .glslTemplate = "normalize(mat3(normalize({$tangent}), normalize({$bitangent}), normalize({$worldNormal})) * "
                                   "reconstructNormalZ(({sample}).xy))"});
 
     // Luminance
@@ -437,6 +459,53 @@ void NodeRegistry::registerBuiltins()
                              {"outMax", PinType::FLOAT, 1.0f}},
                   .outputs = {{"out", PinType::FLOAT}},
                   .glslTemplate = "({outMin} + ({outMax} - {outMin}) * (({x} - {inMin}) / ({inMax} - {inMin})))"});
+
+    // Steepness and heading, pure functions of the normal, so any domain providing one supports them
+    registerNode({.type = GraphNodeType::SLOPE,
+                  .outputs = {{"out", PinType::FLOAT}},
+                  .glslTemplate = "(1.0 - normalize({$worldNormal}).y)"});
+    registerNode({.type = GraphNodeType::FACING_ANGLE,
+                  .outputs = {{"out", PinType::FLOAT}},
+                  .glslTemplate = "horizontalFacingAngle({$worldNormal})"});
+
+    // Triplanar projection, reads world position instead of a uv and needs no tangent frame
+    registerNode({.type = GraphNodeType::TRIPLANAR_SAMPLE,
+                  .inputs = {{"tex", PinType::TEXTURE}, {"scale", PinType::FLOAT, 1.0f}, {"sharpness", PinType::FLOAT, 4.0f}},
+                  .outputs = {{"out", PinType::VEC4}},
+                  .glslTemplate = "triplanarSample(u_textures[nonuniformEXT({tex})], {$worldPos}, {$worldNormal}, {scale}, "
+                                  "{sharpness})"});
+    registerNode({.type = GraphNodeType::TRIPLANAR_NORMAL,
+                  .inputs = {{"tex", PinType::TEXTURE}, {"scale", PinType::FLOAT, 1.0f}, {"sharpness", PinType::FLOAT, 4.0f}},
+                  .outputs = {{"out", PinType::VEC3}},
+                  .glslTemplate = "triplanarNormal(u_textures[nonuniformEXT({tex})], {$worldPos}, {$worldNormal}, {scale}, "
+                                  "{sharpness})"});
+
+    // Weight for mixing two layers by their own height maps, drives a MIX rather than blending itself
+    registerNode({.type = GraphNodeType::HEIGHT_BLEND_WEIGHT,
+                  .inputs = {{"heightA", PinType::FLOAT, 0.5f},
+                             {"heightB", PinType::FLOAT, 0.5f},
+                             {"t", PinType::FLOAT, 0.5f},
+                             {"sharpness", PinType::FLOAT, 0.1f}},
+                  .outputs = {{"out", PinType::FLOAT}},
+                  .glslTemplate = "heightBlendWeight({heightA}, {heightB}, {t}, {sharpness})"});
+
+    // Terrain readers, each unavailable anywhere the domain does not provide the input it names
+    registerNode({.type = GraphNodeType::TERRAIN_HEIGHT,
+                  .outputs = {{"out", PinType::FLOAT}},
+                  .glslTemplate = "{$normalizedHeight}"});
+    registerNode({.type = GraphNodeType::TERRAIN_CURVATURE,
+                  .outputs = {{"out", PinType::FLOAT}},
+                  .glslTemplate = "{$curvature}"});
+    registerNode({.type = GraphNodeType::TERRAIN_LOD, .outputs = {{"out", PinType::INT}}, .glslTemplate = "{$chunkLod}"});
+    registerNode({.type = GraphNodeType::TERRAIN_EROSION,
+                  .outputs = {{"out", PinType::FLOAT}},
+                  .glslTemplate = "{$erosion}"});
+    registerNode({.type = GraphNodeType::TERRAIN_CONTINENTALNESS,
+                  .outputs = {{"out", PinType::FLOAT}},
+                  .glslTemplate = "{$continentalness}"});
+    registerNode({.type = GraphNodeType::TERRAIN_PEAKS_VALLEYS,
+                  .outputs = {{"out", PinType::FLOAT}},
+                  .glslTemplate = "{$peaksValleys}"});
 
     // Sink
     registerNode({.type = GraphNodeType::SURFACE_OUTPUT,

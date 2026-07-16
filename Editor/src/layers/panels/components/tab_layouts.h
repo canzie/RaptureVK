@@ -6,7 +6,8 @@
 
 namespace Amethyst {
 class Frame;
-}
+class FrameScope;
+} // namespace Amethyst
 
 /**
  * @brief Builds a tab label that left-aligns text with a small left inset, optionally preceded by an icon.
@@ -16,5 +17,5 @@ class Frame;
  * @return Callback usable with TabBar::addTab(content, labelSetup), or wrapped into TabScope::label().
  */
 std::function<void(Amethyst::Frame &)> iconTabLayout(std::string_view label, std::string_view iconSvg = {});
-
+std::function<void(Amethyst::FrameScope &)> iconTabLayoutScope(std::string_view label, std::string_view iconSvg = {});
 #endif // RAPTURE__TAB_LAYOUTS_H

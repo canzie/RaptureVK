@@ -140,6 +140,7 @@ void MaterialManager::createDefaultMaterials()
     // metallic 0 and ao 1 from the SurfaceData fallbacks
     MaterialGraph graph;
     graph.name = "Default";
+    graph.domain = GD_SURFACE;
     graph.nodes.push_back({.id = 1, .type = GraphNodeType::SURFACE_OUTPUT});
     graph.outputNodeId = 1;
 
@@ -150,6 +151,21 @@ void MaterialManager::createDefaultMaterials()
     }
 
     createMaterial("Default Material", graphId, {}, std::move(graph));
+
+    // The same bare output in the terrain domain, so terrain starts white and is authored from there
+    MaterialGraph terrainGraph;
+    terrainGraph.name = "Terrain";
+    terrainGraph.domain = GD_TERRAIN;
+    terrainGraph.nodes.push_back({.id = 1, .type = GraphNodeType::SURFACE_OUTPUT});
+    terrainGraph.outputNodeId = 1;
+
+    uint32_t terrainGraphId = s_surfaceGraphManager->registerGraph(terrainGraph);
+    if (terrainGraphId == UINT32_MAX) {
+        RP_CORE_ERROR("Failed to compile the terrain material graph");
+        return;
+    }
+
+    createMaterial("Terrain", terrainGraphId, {}, std::move(terrainGraph));
 }
 
 std::shared_ptr<BaseMaterial> MaterialManager::getMaterial(const std::string &name)

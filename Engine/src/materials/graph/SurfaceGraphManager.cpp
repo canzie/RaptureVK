@@ -73,10 +73,13 @@ static std::string_view s_fieldGlslType(const GraphOutputField &field)
     return field.glslTypeOverride.empty() ? std::string_view(graph_pinTypeGlsl(field.type)) : field.glslTypeOverride;
 }
 
-// The dispatcher fallback value for a field: its debug errorFallback if set, else its normal fallback
-static std::string_view s_fieldFallback(const GraphOutputField &field)
+// The dispatcher fallback for a field: its debug errorFallback if set, else its normal fallback, with
+// its domain input references bound the same way a node template's are
+static std::string s_fieldFallback(const GraphOutputField &field, const GraphDomain &domain)
 {
-    return field.errorFallback.empty() ? field.fallback : field.errorFallback;
+    std::string expr(field.errorFallback.empty() ? field.fallback : field.errorFallback);
+    Graph_substituteDomainInputs(expr, domain);
+    return expr;
 }
 
 /**
@@ -108,7 +111,7 @@ static std::string s_emitPassFile(const std::vector<CompileResult> &graphs, cons
     out += "};\n\n";
 
     for (const auto &graph : graphs) {
-        if (graph.domain != nullptr && graph.domain->sinkType == domain.sinkType && passIndex < graph.functions.size()) {
+        if (graph.domainId == domain.id && passIndex < graph.functions.size()) {
             out += graph.functions[passIndex].glslFunction;
             out += "\n";
         }
@@ -118,7 +121,7 @@ static std::string s_emitPassFile(const std::vector<CompileResult> &graphs, cons
            std::string(domain.inputStructName) + " si, uint base) {\n";
     out += "    switch (graphId) {\n";
     for (const auto &graph : graphs) {
-        if (graph.domain != nullptr && graph.domain->sinkType == domain.sinkType && passIndex < graph.functions.size()) {
+        if (graph.domainId == domain.id && passIndex < graph.functions.size()) {
             out += "        case " + std::to_string(graph.graphId) + "u: return " + graph.functions[passIndex].functionName +
                    "(si, base);\n";
         }
@@ -126,7 +129,7 @@ static std::string s_emitPassFile(const std::vector<CompileResult> &graphs, cons
     out += "    }\n\n";
     out += "    " + std::string(pass.structName) + " surf;\n";
     for (const auto &field : pass.fields) {
-        out += "    surf." + std::string(field.name) + " = " + std::string(s_fieldFallback(field)) + ";\n";
+        out += "    surf." + std::string(field.name) + " = " + s_fieldFallback(field, domain) + ";\n";
     }
     out += "    return surf;\n";
     out += "}\n\n";

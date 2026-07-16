@@ -18,12 +18,7 @@ enum class ParameterID {
     AO_MAP,
     EMISSIVE_MAP,
     HEIGHT_MAP,
-    SPECULAR_MAP,
-
-    TILING_SCALE,
-    HEIGHT_BLEND,
-    SLOPE_THRESHOLD,
-    SPLAT_MAP
+    SPECULAR_MAP
 };
 
 } // namespace Rapture

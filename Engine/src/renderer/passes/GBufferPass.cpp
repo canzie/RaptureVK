@@ -33,9 +33,7 @@ struct TerrainGBufferPushConstants {
     uint32_t lodResolution;
     float heightScale;
     float terrainWorldSize;
-    uint32_t grassMaterialIndex;
-    uint32_t rockMaterialIndex;
-    uint32_t snowMaterialIndex;
+    uint32_t materialIndex;
 };
 
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
@@ -860,6 +858,12 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &act
 
     VkBuffer countBuffer = cullBuffers->drawCountBuffer->getBufferVk();
 
+    // Without a material there is no graph to shade with, and the index would read past the buffer
+    uint32_t materialIndex = terrain.getMaterialIndex();
+    if (materialIndex == UINT32_MAX) {
+        return;
+    }
+
     for (uint32_t lod = 0; lod < TERRAIN_LOD_COUNT; ++lod) {
         if (!cullBuffers->indirectBuffers[lod]) {
             continue;
@@ -880,9 +884,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &act
         pc.lodResolution = getTerrainLODResolution(lod);
         pc.heightScale = terrainConfig.heightScale;
         pc.terrainWorldSize = terrainConfig.terrainWorldSize;
-        pc.grassMaterialIndex = terrain.getGrassMaterialIndex();
-        pc.rockMaterialIndex = terrain.getRockMaterialIndex();
-        pc.snowMaterialIndex = terrain.getSnowMaterialIndex();
+        pc.materialIndex = materialIndex;
 
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (m_terrainShader && m_terrainShader->getPushConstantLayouts().size() > 0) {

@@ -145,13 +145,13 @@ void ImportPanel::doImport()
     /*
     Rapture::Scene *scene = Rapture::Application::getInstance().getProject().getActiveScene();
     if (scene == nullptr) {
-        Rapture::RP_WARN("No active scene to import into");
+        RP_WARN("No active scene to import into");
         return;
     }
 
     Rapture::glTF2Loader loader(m_path);
     if (!loader.load(scene)) {
-        Rapture::RP_WARN("Failed to import: {}", m_path.string());
+        RP_WARN("Failed to import: {}", m_path.string());
         return;
     }
     */

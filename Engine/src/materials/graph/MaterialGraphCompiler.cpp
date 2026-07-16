@@ -261,12 +261,23 @@ static void s_validate(const GraphContext &ctx, DiagnosticList &diagnostics)
         }
     }
 
-    // A texture pin has no literal fallback, so a required one must be wired or authored
     for (const auto &node : ctx.graph.nodes) {
         const NodeDefinition *def = ctx.defById.at(node.id);
         if (def == nullptr) {
-            continue;
+            continue; // unregistered type already reported
         }
+
+        // A node can only read the inputs its domain provides
+        std::string_view missing;
+        if (!Graph_nodeFitsDomain(*def, ctx.domain, &missing)) {
+            s_addDiagnostic(diagnostics, Level::ERROR,
+                            "node type " + std::string(Graph_nodeTypeName(node.type)) + " reads the input '" +
+                                std::string(missing) + "', which the " + Graph_domainName(ctx.domain.id) +
+                                " domain does not provide",
+                            node.id);
+        }
+
+        // A texture pin has no literal fallback, so a required one must be wired or authored
         for (uint32_t i = 0; i < def->inputs.size(); ++i) {
             if (def->inputs[i].type != PinType::TEXTURE) {
                 continue;
@@ -425,6 +436,9 @@ static std::string s_resolveInput(const GraphContext &ctx, const GraphSlotMappin
 
 /**
  * @brief Substitute a node definition template into its concrete GLSL expression
+ *
+ * A {pin} placeholder resolves to an upstream local or a slice read, a {$name} placeholder to the
+ * domain's expression for that input.
  */
 static std::string s_emitNodeExpr(const GraphContext &ctx, const NodeDefinition &def, const GraphNode &node,
                                   const GraphSlotMapping &mapping, const EmittedMap &emitted, std::string_view templateStr)
@@ -433,6 +447,7 @@ static std::string s_emitNodeExpr(const GraphContext &ctx, const NodeDefinition 
     for (uint32_t i = 0; i < def.inputs.size(); ++i) {
         s_replaceAll(expr, "{" + def.inputs[i].name + "}", s_resolveInput(ctx, mapping, emitted, node.id, def.inputs[i], i));
     }
+    Graph_substituteDomainInputs(expr, ctx.domain);
     return expr;
 }
 
@@ -479,6 +494,16 @@ static int s_fieldPin(const NodeDefinition &sinkDef, const GraphOutputField &fie
 }
 
 /**
+ * @brief A field's fallback with its domain input references bound
+ */
+static std::string s_fallbackExpr(const GraphContext &ctx, const GraphOutputField &field)
+{
+    std::string expr(field.fallback);
+    Graph_substituteDomainInputs(expr, ctx.domain);
+    return expr;
+}
+
+/**
  * @brief The value expression for one output field: its bound pin, its authored slot, or its fallback
  */
 static std::string s_emitFieldValue(const GraphContext &ctx, const GraphOutputField &field, const GraphSlotMapping &mapping,
@@ -486,7 +511,7 @@ static std::string s_emitFieldValue(const GraphContext &ctx, const GraphOutputFi
 {
     int pinIndex = s_fieldPin(ctx.sinkDef, field);
     if (pinIndex < 0) {
-        return std::string(field.fallback);
+        return s_fallbackExpr(ctx, field);
     }
 
     uint32_t pin = static_cast<uint32_t>(pinIndex);
@@ -501,7 +526,7 @@ static std::string s_emitFieldValue(const GraphContext &ctx, const GraphOutputFi
     if (slot != mapping.slots.end()) {
         return s_coerce(s_poolRead(slot->second.offset, slot->second.type), slot->second.type, field.type);
     }
-    return std::string(field.fallback);
+    return s_fallbackExpr(ctx, field);
 }
 
 /**
@@ -551,16 +576,26 @@ CompileResult MaterialGraphCompiler::compile(const MaterialGraph &graph, uint32_
     CompileResult result;
     result.graphId = graphId;
 
+    const GraphDomain *domain = GraphDomainRegistry::forId(graph.domain);
+    if (domain == nullptr) {
+        s_addDiagnostic(result.diagnostics, MaterialCompilerDiagnosticLevel::ERROR,
+                        "graph names the domain " + std::string(Graph_domainName(graph.domain)) + ", which is not registered",
+                        UINT32_MAX);
+        return result;
+    }
+
     const GraphNode *sink = graph.findNode(graph.outputNodeId);
     if (sink == nullptr) {
         s_addDiagnostic(result.diagnostics, MaterialCompilerDiagnosticLevel::ERROR,
                         "graph has no output node with id " + std::to_string(graph.outputNodeId), UINT32_MAX);
         return result;
     }
-    const GraphDomain *domain = GraphDomainRegistry::forSink(sink->type);
-    if (domain == nullptr) {
+    if (sink->type != domain->sinkType) {
         s_addDiagnostic(result.diagnostics, MaterialCompilerDiagnosticLevel::ERROR,
-                        "the output node type is not a registered surface output", sink->id);
+                        "graph output node is a " + std::string(Graph_nodeTypeName(sink->type)) + " but the " +
+                            Graph_domainName(domain->id) + " domain sinks into a " +
+                            std::string(Graph_nodeTypeName(domain->sinkType)),
+                        sink->id);
         return result;
     }
     const NodeDefinition *sinkDef = NodeRegistry::get(sink->type);
@@ -569,7 +604,7 @@ CompileResult MaterialGraphCompiler::compile(const MaterialGraph &graph, uint32_
                         "the output node type has no registered definition", sink->id);
         return result;
     }
-    result.domain = domain;
+    result.domainId = domain->id;
 
     GraphContext ctx{graph, *domain, *sink, *sinkDef};
     s_buildContext(ctx);

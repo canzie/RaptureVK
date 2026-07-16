@@ -13,16 +13,9 @@ uncouple the engines core
         - includes depedencies like how a shadow component requires a light, this can be enforec in editor or in the engine, iam leaning towards engine
 
 ## Material Graph Node Editor 
-    - need a way to go from a materialGraph to a representation the editor can draw
-        - we can have materials made in editor, those will later serialise their metadata
-        - we can also have materials loaded in and translated, something like the gltf base material, these ones need to allow generating the graph
-    - the graph visible in the editor will be the base material, to edit material instances a separate panel will be provided where named parameters can be edited
     - when a new base mat is made and opened it cannot be viewd on a sphere, since we only render material instances, so for every material we will create a base instance, this one will be immutable
       it will make no changes and jsut take the defaults from the base material. there should be some kind of logic forcing this base instance to exist, so we cant delete it and its part of the base.
     - when editing a base materail in the editor it needs to be very simple to create a copy of a base.
-    - the editor/workspace also needs its own viewport, this viewport needs its own little scene, something with just a sphere a skybox a light? completly separate from any level scenes
-      this also means its own renderer etc. this begs the question, do we remove the concept of main scenes? i think so, every workspace will have an optional scene it uses.
-      every worksapce will provide a worksapceContext to a panel it creates, inside of this context there will be a scene, the dockinglayer, ???
     - adding or changing a material can mutate its gpu structure, we do not want this to cause out of bound reads, so it is important to make sure all places like gbuffers or probe trace shaders to be refreshed as soon as possible
       right now this only happens when we resize but iam not sure the shaders are recompiled, so what we need is a way to ask these places, like the gbuffer pass to recreate its pipeline using the new shader we compiled with the new material in it.
     - the properties panel now needs to be able to set a material isntance. it also eneds a button to open a material node editor workspace for the material, this also neds to happen in the content browser
