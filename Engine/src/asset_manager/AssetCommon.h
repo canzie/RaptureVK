@@ -9,6 +9,8 @@ namespace Rapture {
 
 using AssetHandle = UUID;
 
+static constexpr AssetHandle INVALID_ASSET_HANDLE = 0;
+
 enum class AssetType {
     NONE,
     TEXTURE,
@@ -16,7 +18,7 @@ enum class AssetType {
     SHADER,
     MATERIAL,
     MESH,
-    MODEL,
+    PREFAB,
     ANIMATION,
     AUDIO,
     VIDEO,
@@ -55,8 +57,8 @@ inline std::string AssetTypeToString(AssetType type)
         return "Material";
     case AssetType::MESH:
         return "Mesh";
-    case AssetType::MODEL:
-        return "Model";
+    case AssetType::PREFAB:
+        return "Prefab";
     case AssetType::ANIMATION:
         return "Animation";
     case AssetType::AUDIO:

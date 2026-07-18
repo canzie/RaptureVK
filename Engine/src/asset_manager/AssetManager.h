@@ -53,6 +53,19 @@ class AssetManager {
         return AssetRef(&asset, &metadata.useCount);
     }
 
+    static AssetRef importAsset(AssetImportDataVariant importData, const std::string &name,
+                                std::optional<AssetProvenance> provenance = std::nullopt)
+    {
+        auto &asset = s_activeAssetManager->importAsset(std::move(importData), name, std::move(provenance));
+
+        if (!asset || !asset.isValid()) {
+            return AssetRef();
+        }
+
+        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
+        return AssetRef(&asset, &metadata.useCount);
+    }
+
     static AssetRef importDefaultAsset(AssetType assetType)
     {
         auto &asset = s_activeAssetManager->importDefaultAsset(assetType);

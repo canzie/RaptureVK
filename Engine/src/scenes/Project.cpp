@@ -6,9 +6,12 @@
 namespace Rapture {
 
 Project::Project()
-    : m_config{"New Project", std::filesystem::current_path(), std::filesystem::current_path(), "DefaultWorld"}
+    : m_config{"Untitled", std::filesystem::current_path(), std::filesystem::current_path(),
+               std::filesystem::current_path() / "Untitled", "DefaultWorld"}
 {
     RP_CORE_INFO("Creating Project: {0}", m_config.name);
+
+    createProjectDirectories();
 
     World *defaultWorld = m_sceneManager.createWorld("DefaultWorld");
     auto defaultScene = m_sceneManager.createScene(RAPTURE_DEFAULT_SCENE_NAME);
@@ -18,6 +21,20 @@ Project::Project()
     defaultWorld->setMainScene(RAPTURE_DEFAULT_SCENE_NAME);
 
     m_sceneManager.setActiveWorld("DefaultWorld");
+}
+
+void Project::createProjectDirectories()
+{
+    std::error_code ec;
+    std::filesystem::create_directories(getBlobDirectory(), ec);
+    std::filesystem::create_directories(getThumbnailDirectory(), ec);
+
+    if (ec) {
+        RP_CORE_ERROR("Failed to create project directories at '{0}': {1}", m_config.projectDirectory.string(), ec.message());
+        return;
+    }
+
+    RP_CORE_INFO("Project directory: {0}", m_config.projectDirectory.string());
 }
 
 void Project::saveProject(std::filesystem::path path)

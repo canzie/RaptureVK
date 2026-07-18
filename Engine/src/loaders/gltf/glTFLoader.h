@@ -12,6 +12,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Rapture {
@@ -53,10 +54,27 @@ class glTF2Loader {
     bool isLoaded() const { return m_isLoaded; }
 
   private:
+    /**
+     * @brief Decoded mesh + material for one glTF primitive, cached per glTF mesh index
+     *
+     * Cached so multiple nodes referencing the same glTF mesh share the decoded mesh assets
+     * instead of decoding and registering duplicates.
+     */
+    struct PrimitiveData {
+        AssetRef meshRef;
+        int32_t materialIndex = -1;
+        glm::vec3 boundingBoxMin = glm::vec3(0.0f);
+        glm::vec3 boundingBoxMax = glm::vec3(0.0f);
+
+        bool hasBoundingBox() const { return glm::any(glm::notEqual(boundingBoxMin, boundingBoxMax)); }
+    };
+
     bool loadScene(yyjson_val *sceneRoot);
     bool loadNode(glTF_SceneNode *parent, size_t nodeIndex);
     bool loadMesh(glTF_SceneNode *node, size_t meshIndex);
-    bool loadPrimitive(glTF_SceneNode *parent, yyjson_val *primitiveJson, size_t primitiveIndex);
+    bool decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, PrimitiveData &out);
+
+    void buildPrefab();
 
     void loadSkin(yyjson_val *skinVal);
     void loadWeights(yyjson_val *weightsVal);
@@ -64,7 +82,6 @@ class glTF2Loader {
 
     AssetRef loadMaterial(size_t materialIndex);
 
-    void finalizeToScene(Scene *scene);
 
     void loadAccessor(yyjson_val *accessorVal, std::vector<unsigned char> &dataVec);
     void cleanUp();
@@ -98,6 +115,8 @@ class glTF2Loader {
     yyjson_val *m_textures = nullptr;
     yyjson_val *m_images = nullptr;
     yyjson_val *m_samplers = nullptr;
+
+    std::unordered_map<size_t, std::vector<PrimitiveData>> m_meshCache; ///< glTF mesh index -> decoded primitives
 
     std::vector<unsigned char> m_binVec;
     std::filesystem::path m_filepath;

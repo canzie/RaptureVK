@@ -9,7 +9,7 @@
 > list). This is the source of truth for the flow; refine it, don't re-derive it. Open refinement
 > points are collected at the bottom.
 
-**Related: [[Material System Overhaul]], [[Material Graph Compiler]], [[Asset Manager]], [[Scene]]**
+**Related: [[Material System Overhaul]], [[Material Graph Compiler]], [[Asset Manager]], [[Scene]], [[Asset Metadata]], [[Prefab]]**
 
 ## Goal / intent
 
@@ -427,6 +427,10 @@ The registry entry (metadata) is the persistent identity; **the loaded object ex
 something uses it**. If nothing references an asset, it does not stay in memory — that is what
 the metadata is for. No new storage type, no eviction flag, no root set.
 
+[[Asset Metadata]] refines this section: it splits **provenance** (where it came from, reimport
+only, allowed to dangle) from the **reload source** below (how to get the bytes back, always
+valid), and defines what import writes. [[Prefab]] covers the asset layer glTF import produces.
+
 The reload source lives in the metadata and is **flexible per asset type** — a variant of options,
 not one mechanism:
 - **Own file**: a texture's is its `filePath` (as today).
@@ -639,7 +643,9 @@ violate:
   every open (start: regenerate).
 - glTF import persistence: today glTF import registers virtual instances every run; long-term an
   import becomes a one-time step that persists instances into the project (classic editor model).
-  Tied to scene serialization, does not block materials.
+  Tied to scene serialization, does not block materials. **Designed in [[Asset Metadata]] and
+  [[Prefab]]** (import cooks + evicts, prefab records the arrangement); still unbuilt, still not
+  blocking materials.
 - Instance param read-back needs the base's `GraphSlotMapping` `PinType` to write typed JSON —
   confirm the mapping is retained per base or re-queryable at save time.
 - `metadata` growth: project config (initial world name, shader dir) once scenes serialize.

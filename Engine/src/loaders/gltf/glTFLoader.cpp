@@ -276,8 +276,10 @@ bool glTF2Loader::load(Scene *scene, int32_t sceneIndex)
     m_isInitialized = true;
     m_isLoaded = true;
 
+    buildPrefab();
+
     if (scene) {
-        finalizeToScene(scene);
+        Prefab::instantiate(m_loadedData->prefab.ref(), scene);
     }
 
     return true;
@@ -308,8 +310,8 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
     node->parent = parent;
     node->name = getString(getObjectValue(nodeJson, "name"), "Node");
 
-    glm::mat4 localTransform = getNodeTransform(nodeJson);
-    node->worldTransform = (parent ? parent->worldTransform : glm::mat4(1.0f)) * localTransform;
+    node->localTransform = getNodeTransform(nodeJson);
+    node->worldTransform = (parent ? parent->worldTransform : glm::mat4(1.0f)) * node->localTransform;
 
     yyjson_val *meshIdxVal = getObjectValue(nodeJson, "mesh");
     if (meshIdxVal && yyjson_is_int(meshIdxVal)) {
@@ -350,38 +352,52 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
 
 bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex)
 {
-    yyjson_val *meshJson = getArrayElement(m_meshes, static_cast<uint32_t>(meshIndex));
-    if (!meshJson) return false;
+    auto cacheIt = m_meshCache.find(meshIndex);
+    if (cacheIt == m_meshCache.end()) {
+        yyjson_val *meshJson = getArrayElement(m_meshes, static_cast<uint32_t>(meshIndex));
+        if (!meshJson) return false;
 
-    std::string meshName = getString(getObjectValue(meshJson, "name"), "");
-    if (meshName.empty()) {
-        meshName = "Mesh_" + std::to_string(meshIndex);
+        yyjson_val *primitivesVal = getObjectValue(meshJson, "primitives");
+        if (!primitivesVal || !yyjson_is_arr(primitivesVal)) return false;
+
+        std::vector<PrimitiveData> primitives;
+        size_t idx, max;
+        yyjson_val *primitiveJson;
+        yyjson_arr_foreach(primitivesVal, idx, max, primitiveJson)
+        {
+            PrimitiveData data;
+            if (decodePrimitive(primitiveJson, meshIndex, idx, data)) {
+                primitives.push_back(std::move(data));
+            }
+        }
+
+        cacheIt = m_meshCache.emplace(meshIndex, std::move(primitives)).first;
     }
 
-    yyjson_val *primitivesVal = getObjectValue(meshJson, "primitives");
-    if (!primitivesVal || !yyjson_is_arr(primitivesVal)) return false;
+    // Every node referencing this glTF mesh gets its own primitive child nodes, sharing the cached
+    // mesh assets instead of decoding duplicates.
+    const std::vector<PrimitiveData> &primitives = cacheIt->second;
+    for (size_t i = 0; i < primitives.size(); i++) {
+        const PrimitiveData &data = primitives[i];
 
-    size_t primitiveCount = getArraySize(primitivesVal);
-    if (primitiveCount < 1) return false;
+        auto primNode = std::make_unique<glTF_SceneNode>();
+        primNode->parent = node;
+        primNode->name = node->name + "_Primitive_" + std::to_string(i);
+        primNode->type = glTF_NodeType::PRIMITIVE;
+        primNode->worldTransform = node->worldTransform;
+        primNode->meshRef = data.meshRef;
+        primNode->materialIndex = data.materialIndex;
+        primNode->boundingBoxMin = data.boundingBoxMin;
+        primNode->boundingBoxMax = data.boundingBoxMax;
 
-    size_t idx, max;
-    yyjson_val *primitiveJson;
-    yyjson_arr_foreach(primitivesVal, idx, max, primitiveJson)
-    {
-        loadPrimitive(node, primitiveJson, idx);
+        node->children.push_back(std::move(primNode));
     }
 
     return true;
 }
 
-bool glTF2Loader::loadPrimitive(glTF_SceneNode *parent, yyjson_val *primitiveJson, size_t primitiveIndex)
+bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, PrimitiveData &out)
 {
-    auto node = std::make_unique<glTF_SceneNode>();
-    node->parent = parent;
-    node->name = parent->name + "_Primitive_" + std::to_string(primitiveIndex);
-    node->type = glTF_NodeType::PRIMITIVE;
-    node->worldTransform = parent->worldTransform;
-
     std::vector<std::pair<std::string, std::vector<uint8_t>>> attributeData;
     uint32_t vertexCount = 0;
 
@@ -433,9 +449,8 @@ bool glTF2Loader::loadPrimitive(glTF_SceneNode *parent, yyjson_val *primitiveJso
     }
 
     if (hasBounds) {
-        node->boundingBoxMin = minBounds;
-        node->boundingBoxMax = maxBounds;
-        node->hasBoundingBox = true;
+        out.boundingBoxMin = minBounds;
+        out.boundingBoxMax = maxBounds;
     }
 
     uint32_t vertexStride = 0;
@@ -502,7 +517,7 @@ bool glTF2Loader::loadPrimitive(glTF_SceneNode *parent, yyjson_val *primitiveJso
         return false;
     }
 
-    AllocatorParams params;
+    MeshAllocatorParams params;
     params.bufferLayout = bufferLayout;
     params.vertexData = interleavedData.data();
     params.vertexDataSize = totalVertexDataSize;
@@ -511,19 +526,19 @@ bool glTF2Loader::loadPrimitive(glTF_SceneNode *parent, yyjson_val *primitiveJso
     params.indexCount = indexCount;
     params.indexType = indexType;
 
-    auto mesh = std::make_unique<Mesh>(params);
-    std::string meshAssetName = m_filepath.stem().string() + "_" + node->name;
-    node->meshRef = AssetManager::registerVirtualAsset(std::move(mesh), meshAssetName, AssetType::MESH);
+    std::string meshAssetName =
+        m_filepath.stem().string() + "_Mesh" + std::to_string(meshIndex) + "_Prim" + std::to_string(primitiveIndex);
+    AssetProvenance provenance{m_filepath, static_cast<uint32_t>(meshIndex)};
+    out.meshRef = AssetManager::importAsset(MeshImportData{std::move(params)}, meshAssetName, provenance);
 
     yyjson_val *materialVal = getObjectValue(primitiveJson, "material");
     if (materialVal && yyjson_is_int(materialVal)) {
-        node->materialIndex = getInt(materialVal, -1);
-        if (node->materialIndex >= 0) {
-            loadMaterial(static_cast<size_t>(node->materialIndex));
+        out.materialIndex = getInt(materialVal, -1);
+        if (out.materialIndex >= 0) {
+            loadMaterial(static_cast<size_t>(out.materialIndex));
         }
     }
 
-    parent->children.push_back(std::move(node));
     return true;
 }
 
@@ -580,53 +595,48 @@ glm::mat4 glTF2Loader::getNodeTransform(yyjson_val *nodeVal)
     return transformMatrix;
 }
 
-void glTF2Loader::finalizeToScene(Scene *scene)
+void glTF2Loader::buildPrefab()
 {
-    if (!scene || !m_loadedData) return;
+    std::vector<Prefab::Node> nodes;
 
-    std::function<Entity(glTF_SceneNode *, Entity)> createEntityFromNode = [&](glTF_SceneNode *node,
-                                                                               Entity parentEntity) -> Entity {
-        if (!node) return Entity::null();
+    std::function<void(glTF_SceneNode *, int32_t)> flatten = [&](glTF_SceneNode *src, int32_t parentIndex) {
+        int32_t myIndex = static_cast<int32_t>(nodes.size());
 
-        Entity entity = scene->createEntity(node->name);
-        entity.addComponent<TransformComponent>(node->worldTransform);
+        Prefab::Node node;
+        node.name = src->name;
+        node.parent = parentIndex;
+        node.localTransform = src->localTransform;
+        node.boundingBoxMin = src->boundingBoxMin;
+        node.boundingBoxMax = src->boundingBoxMax;
 
-        if (parentEntity.isValid()) {
-            HierarchyComponent::setParent(entity, parentEntity);
+        if (src->meshRef) {
+            node.mesh = src->meshRef.get()->getHandle();
         }
 
-        if (node->type == glTF_NodeType::PRIMITIVE) {
-            if (node->meshRef) {
-                auto &meshComp = entity.addComponent<MeshComponent>(node->meshRef);
-
-                if (meshComp.mesh) {
-                    if (node->hasBoundingBox) {
-                        entity.addComponent<BoundingBoxComponent>(node->boundingBoxMin, node->boundingBoxMax);
-                    }
-
-                    entity.addComponent<BLASComponent>(meshComp.mesh);
-                    scene->registerBLAS(entity);
-                }
-            }
-
-            if (node->materialIndex >= 0) {
-                auto matIt = m_loadedData->materials.find(static_cast<size_t>(node->materialIndex));
-                if (matIt != m_loadedData->materials.end() && matIt->second) {
-                    entity.addComponent<MaterialComponent>(matIt->second);
-                }
+        if (src->materialIndex >= 0) {
+            auto matIt = m_loadedData->materials.find(static_cast<size_t>(src->materialIndex));
+            if (matIt != m_loadedData->materials.end() && matIt->second) {
+                node.material = matIt->second.get()->getHandle();
             }
         }
 
-        for (auto &child : node->children) {
-            createEntityFromNode(child.get(), entity);
-        }
+        nodes.push_back(std::move(node));
 
-        return entity;
+        for (auto &child : src->children) {
+            flatten(child.get(), myIndex);
+        }
     };
 
     for (auto &rootNode : m_loadedData->rootNodes) {
-        createEntityFromNode(rootNode.get(), Entity::null());
+        flatten(rootNode.get(), -1);
     }
+
+    auto prefab = std::make_unique<Prefab>();
+    prefab->setName(m_filepath.stem().string());
+    prefab->setNodes(std::move(nodes));
+
+    AssetRef ref = AssetManager::registerVirtualAsset(std::move(prefab), m_filepath.stem().string(), AssetType::PREFAB);
+    m_loadedData->prefab = AssetPtr<Prefab>(std::move(ref));
 }
 
 void glTF2Loader::loadAccessor(yyjson_val *accessorVal, std::vector<unsigned char> &dataVec)
@@ -978,6 +988,7 @@ void glTF2Loader::cleanUp()
     m_samplers = nullptr;
 
     m_binVec.clear();
+    m_meshCache.clear();
 
     m_isInitialized = false;
     m_isLoaded = false;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meshes/Mesh.h"
 #include "shaders/Shader.h"
 #include "textures/TextureCommon.h"
 
@@ -25,5 +26,12 @@ struct TextureImportConfig {
 };
 
 using AssetImportConfigVariant = std::variant<std::monostate, ShaderImportConfig, TextureImportConfig>;
+
+struct MeshImportData {
+    MeshAllocatorParams params;
+    bool writeBlob = true;
+};
+
+using AssetImportDataVariant = std::variant<std::monostate, MeshImportData>;
 
 } // namespace Rapture

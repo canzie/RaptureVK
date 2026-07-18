@@ -7,12 +7,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <variant>
 
 #include "AssetHandle.h"
 
+#include "components/systems/Prefab.h"
 #include "loaders/SceneFileCommon.h"
 #include "materials/MaterialInstance.h"
 #include "meshes/Mesh.h"
@@ -22,12 +24,21 @@
 namespace Rapture {
 
 using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
-                                  std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>, std::unique_ptr<SceneFileData>>;
+                                  std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>, std::unique_ptr<SceneFileData>,
+                                  std::unique_ptr<Prefab>>;
 
 template <typename T, typename Variant>
 struct IsAssetType;
 template <typename T, typename... Us>
 struct IsAssetType<T, std::variant<Us...>> : std::bool_constant<(std::is_same_v<std::unique_ptr<T>, Us> || ...)> {};
+
+/**
+ * @brief Where an asset was originally imported from, kept for reimport not for loading
+ */
+struct AssetProvenance {
+    std::filesystem::path sourcePath;       // original file, empty if generated
+    std::optional<uint32_t> sourceSubIndex; // sub-asset index within a container source, e.g. a glTF mesh
+};
 
 struct AssetMetadata {
 
@@ -44,6 +55,9 @@ struct AssetMetadata {
     AssetImportConfigVariant importConfig = std::monostate();
     std::string virtualName = "untitled";
 
+    bool hasBlob = false; // a reloadable blob exists in the BlobStore under this handle
+    std::optional<AssetProvenance> provenance;
+
     std::atomic<uint32_t> useCount{0};
     AssetEvictionPolicy evictionPolicy = AssetEvictionPolicy::EVICT_IMMEDIATE;
 
@@ -51,12 +65,7 @@ struct AssetMetadata {
     bool isVirtualAsset() const { return storageType == AssetStorageType::VIRTUAL; }
     const std::string getName()
     {
-        if (storageType == AssetStorageType::DISK) {
-            return filePath.string();
-        } else if (storageType == AssetStorageType::VIRTUAL) {
-            return virtualName;
-        }
-        return "No Name";
+        return filePath.empty() ? virtualName : filePath.stem().string();
     }
 
     operator bool() const { return assetType != AssetType::NONE; }

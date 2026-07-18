@@ -12,6 +12,8 @@
 
 namespace Rapture {
 
+class BlobStore;
+
 class AssetManagerEditor : public AssetManagerBase {
   public:
     AssetManagerEditor();
@@ -25,6 +27,16 @@ class AssetManagerEditor : public AssetManagerBase {
     const AssetMetadata &getAssetMetadata(AssetHandle handle) const;
 
     Asset &importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate());
+
+    /**
+     * @brief Builds and registers a disk-backed asset from raw data instead of a file
+     * @param importData Per-type data to build the asset, and whether to write a reloadable blob
+     * @param name A display name for the asset
+     * @param provenance The original import source, kept for reimport
+     * @return The created asset, or Asset::null on failure
+     */
+    Asset &importAsset(AssetImportDataVariant importData, const std::string &name,
+                       std::optional<AssetProvenance> provenance = std::nullopt);
 
     Asset &importDefaultAsset(AssetType assetType);
 
@@ -48,6 +60,10 @@ class AssetManagerEditor : public AssetManagerBase {
 
     bool evictAsset(AssetHandle handle);
     void ensureDeferredFreeBuckets();
+
+    BlobStore &getBlobStore();
+
+    std::unique_ptr<BlobStore> m_blobStore;
 
     std::unordered_map<AssetType, AssetHandle> m_defaultAssetHandles;
 

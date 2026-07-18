@@ -34,6 +34,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace Rapture {
 
@@ -146,6 +147,21 @@ struct MeshComponent {
     {
         isLoading = false;
     }
+};
+
+struct PrefabComponent {
+    AssetPtr<Prefab> sourcePrefab;
+    bool autoInherit = true;
+    std::unordered_map<uint32_t, AssetHandle> materialOverrides; // prefab node index -> material
+
+    PrefabComponent() = default;
+
+    PrefabComponent(AssetRef ref) : sourcePrefab(std::move(ref))
+    {
+    }
+
+  private:
+    EventConnection m_structureChangedConnection;
 };
 
 struct InstanceComponent {

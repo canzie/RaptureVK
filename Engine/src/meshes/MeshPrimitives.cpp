@@ -9,7 +9,7 @@ namespace Rapture {
 
 Mesh Primitives::CreateCube()
 {
-    AllocatorParams params;
+    MeshAllocatorParams params;
 
     // Setup buffer layout for cube (position, normal, UV)
     BufferLayout bufferLayout;
@@ -102,7 +102,7 @@ Mesh Primitives::CreateCube()
 
 Mesh Primitives::CreateSphere(float radius, uint32_t segments)
 {
-    AllocatorParams params;
+    MeshAllocatorParams params;
 
     // Setup buffer layout for sphere (position, normal, UV)
     BufferLayout bufferLayout;
@@ -192,7 +192,7 @@ Mesh Primitives::CreateSphere(float radius, uint32_t segments)
 
 Mesh Primitives::CreatePlane(float segments)
 {
-    AllocatorParams params;
+    MeshAllocatorParams params;
 
     // Setup buffer layout for plane (position, normal, UV)
     BufferLayout bufferLayout;
@@ -272,7 +272,7 @@ Mesh Primitives::CreatePlane(float segments)
 
 Mesh Primitives::CreateLine(float start, float end)
 {
-    AllocatorParams params;
+    MeshAllocatorParams params;
 
     // Setup buffer layout for line (only position needed)
     BufferLayout bufferLayout;

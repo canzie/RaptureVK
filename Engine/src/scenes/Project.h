@@ -17,6 +17,7 @@ struct ProjectConfig {
     std::string name;
     std::filesystem::path rootDirectory;
     std::filesystem::path shaderDirectory;
+    std::filesystem::path projectDirectory;
 
     std::string initialWorldName;
 };
@@ -49,6 +50,10 @@ class Project {
     // Project config access
     std::filesystem::path getProjectRootDirectory() const { return m_config.rootDirectory; }
     std::filesystem::path getProjectShaderDirectory() const { return m_config.shaderDirectory; }
+    std::filesystem::path getProjectDirectory() const { return m_config.projectDirectory; }
+    std::filesystem::path getCacheDirectory() const { return m_config.projectDirectory / ".cache"; }
+    std::filesystem::path getBlobDirectory() const { return m_config.projectDirectory / "blobs"; }
+    std::filesystem::path getThumbnailDirectory() const { return getCacheDirectory() / "thumbnails"; }
     std::string getProjectName() const { return m_config.name; }
     std::string getInitialWorldName() const { return m_config.initialWorldName; }
 
@@ -59,6 +64,12 @@ class Project {
     void setInitialWorldName(const std::string &name) { m_config.initialWorldName = name; }
 
     const ProjectConfig &getConfig() const { return m_config; }
+
+  private:
+    /**
+     * @brief Creates the project directory and its cache subfolders on disk if missing
+     */
+    void createProjectDirectories();
 
   private:
     ProjectConfig m_config;

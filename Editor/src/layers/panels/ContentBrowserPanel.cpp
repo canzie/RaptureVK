@@ -53,7 +53,7 @@ static const char *s_iconForAssetType(Rapture::AssetType type)
         return Icons::SVG_MATERIAL;
     case Rapture::AssetType::MESH:
         return Icons::SVG_MESH;
-    case Rapture::AssetType::MODEL:
+    case Rapture::AssetType::PREFAB:
         return Icons::SVG_CUBE;
     case Rapture::AssetType::ANIMATION:
         return Icons::SVG_PLAY;
@@ -81,7 +81,7 @@ static Amethyst::Color3 s_colorForAssetType(Rapture::AssetType type)
         return Amethyst::Color3(0.75f, 0.45f, 0.95f);
     case Rapture::AssetType::MESH:
         return Amethyst::Color3(0.9f, 0.65f, 0.35f);
-    case Rapture::AssetType::MODEL:
+    case Rapture::AssetType::PREFAB:
         return Amethyst::Color3(0.9f, 0.55f, 0.2f);
     case Rapture::AssetType::ANIMATION:
         return Amethyst::Color3(0.95f, 0.8f, 0.25f);

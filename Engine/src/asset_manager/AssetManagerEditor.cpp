@@ -1,5 +1,6 @@
 #include "AssetManagerEditor.h"
 #include "AssetImporter.h"
+#include "BlobStore.h"
 #include "asset_manager/Asset.h"
 #include "asset_manager/AssetCommon.h"
 #include "entt/meta/factory.hpp"
@@ -257,6 +258,52 @@ Asset &AssetManagerEditor::registerVirtualAsset(AssetVariant assetValue, const s
 
     RP_CORE_INFO("Registered virtual {} asset: '{}'", AssetTypeToString(assetType), virtualName);
     return *it->second;
+}
+
+BlobStore &AssetManagerEditor::getBlobStore()
+{
+    if (!m_blobStore) {
+        m_blobStore = std::make_unique<BlobStore>(Application::getInstance().getProject().getBlobDirectory());
+    }
+    return *m_blobStore;
+}
+
+Asset &AssetManagerEditor::importAsset(AssetImportDataVariant importData, const std::string &name,
+                                       std::optional<AssetProvenance> provenance)
+{
+    if (auto *meshData = std::get_if<MeshImportData>(&importData)) {
+        AssetHandle handle = UUIDGenerator::Generate();
+
+        bool hasBlob = false;
+        if (meshData->writeBlob) {
+            std::vector<uint8_t> blob = meshData->params.serialize();
+            hasBlob = getBlobStore().store(handle, blob) >= 0;
+            if (!hasBlob) {
+                RP_CORE_ERROR("Failed to write mesh blob for '{0}'", name);
+            }
+        }
+
+        auto mesh = std::make_unique<Mesh>(meshData->params);
+
+        auto asset = std::make_unique<Asset>(AssetVariant(std::move(mesh)), handle);
+        asset->status = AssetStatus::LOADED;
+
+        auto metadata = std::make_unique<AssetMetadata>();
+        metadata->assetType = AssetType::MESH;
+        metadata->storageType = AssetStorageType::DISK;
+        metadata->virtualName = name;
+        metadata->hasBlob = hasBlob;
+        metadata->provenance = std::move(provenance);
+
+        auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
+        m_assetRegistry.insert_or_assign(handle, std::move(metadata));
+
+        RP_CORE_INFO("Created mesh asset: '{0}'", name);
+        return *it->second;
+    }
+
+    RP_CORE_ERROR("Unsupported asset import data for '{0}'", name);
+    return Asset::null;
 }
 
 bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)

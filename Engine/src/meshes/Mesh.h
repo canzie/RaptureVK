@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -11,7 +14,7 @@
 
 namespace Rapture {
 
-struct AllocatorParams {
+struct MeshAllocatorParams {
     void *vertexData = nullptr;
     uint32_t vertexDataSize = 0;
     void *indexData = nullptr;
@@ -20,16 +23,29 @@ struct AllocatorParams {
     uint32_t indexType = 0;
 
     BufferLayout bufferLayout;
+
+    /**
+     * @brief Serializes this mesh data into a self-contained blob of header, vertex and index bytes
+     * @return The serialized bytes
+     */
+    std::vector<uint8_t> serialize() const;
 };
 
 class Mesh {
 
   public:
-    Mesh(AllocatorParams &params);
+    Mesh(MeshAllocatorParams &params);
     Mesh();
     ~Mesh();
 
-    void setMeshData(AllocatorParams &params);
+    void setMeshData(MeshAllocatorParams &params);
+
+    /**
+     * @brief Builds a mesh from a blob produced by MeshAllocatorParams::serialize
+     * @param blob The serialized mesh bytes
+     * @return The mesh, or nullptr if the blob is invalid
+     */
+    static std::unique_ptr<Mesh> deserialize(std::span<const uint8_t> blob);
 
     std::shared_ptr<VertexBuffer> getVertexBuffer() const { return m_vertexBuffer; }
     std::shared_ptr<IndexBuffer> getIndexBuffer() const { return m_indexBuffer; }

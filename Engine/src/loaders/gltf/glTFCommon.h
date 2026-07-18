@@ -33,6 +33,7 @@ struct glTF_SceneNode {
     std::string name;
     glTF_NodeType type = glTF_NodeType::EMPTY;
 
+    glm::mat4 localTransform = glm::mat4(1.0f);
     glm::mat4 worldTransform = glm::mat4(1.0f);
 
     AssetRef meshRef;           ///< Mesh asset reference (registered with AssetManager)
@@ -40,10 +41,11 @@ struct glTF_SceneNode {
 
     glm::vec3 boundingBoxMin = glm::vec3(0.0f);
     glm::vec3 boundingBoxMax = glm::vec3(0.0f);
-    bool hasBoundingBox = false;
 
     std::vector<std::unique_ptr<glTF_SceneNode>> children;
     glTF_SceneNode *parent = nullptr;
+
+    bool hasBoundingBox() const { return glm::any(glm::notEqual(boundingBoxMin, boundingBoxMax)); }
 };
 
 /**
@@ -55,6 +57,8 @@ struct glTF_LoadedSceneData {
     std::unordered_map<size_t, AssetRef> materials; ///< Keyed by glTF material index
 
     std::vector<std::unique_ptr<glTF_SceneNode>> rootNodes;
+
+    AssetPtr<Prefab> prefab;
 
     SceneFileMetadata metadata;
 };
