@@ -10,7 +10,9 @@
 #include <vector>
 
 struct TextureGeneratorInstance;
-namespace Rapture { class Shader; }
+namespace Rapture {
+class Shader;
+}
 
 /**
  * @brief Panel that reflects a compute shader's push constant members as editable controls.
@@ -34,7 +36,6 @@ class ShaderInputsPanel : public Panel {
 
     void rebuild(TextureGeneratorInstance &instance, const std::function<void()> &onChanged);
 
-    Amethyst::Frame *m_root = nullptr;
     Amethyst::ScrollingFrame *m_content = nullptr;
 
     std::vector<std::unique_ptr<MemberState>> m_memberStates;

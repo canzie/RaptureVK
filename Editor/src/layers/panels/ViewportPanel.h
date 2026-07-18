@@ -17,7 +17,7 @@ namespace Rapture {
 class CameraController;
 class Viewport;
 class Texture;
-}
+} // namespace Rapture
 
 class ViewportPanel : public Panel {
   public:
@@ -44,7 +44,6 @@ class ViewportPanel : public Panel {
     void updateViewportImage(void);
 
   private:
-    Amethyst::Frame *m_root = nullptr;
     Amethyst::ImageLabel *m_viewportImage = nullptr;
     Amethyst::Frame *m_header = nullptr;
 

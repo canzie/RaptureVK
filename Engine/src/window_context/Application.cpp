@@ -8,6 +8,10 @@
 #include "materials/Material.h"
 #include "utils/Timestep.h"
 
+#if defined(__linux__)
+#include <sys/sysinfo.h>
+#endif
+
 namespace Rapture {
 
 Application *Application::s_instance = nullptr;
@@ -32,7 +36,7 @@ Application::Application(int width, int height, const char *title) : m_running(t
     m_mainWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
     m_vulkanContext->initDevice(m_mainWindow->getSurface());
 
-    AssetManager::init();
+    AssetManager::init(&m_telemetry);
 
     m_mainWindow->createSwapChain(*m_vulkanContext);
     m_vulkanContext->initManagers(m_mainWindow->getSwapChain()->getImageCount());
@@ -124,6 +128,19 @@ Application::~Application()
     RP_CORE_INFO("Application shutting down...");
 }
 
+void Application::pollTelemetry()
+{
+    m_vulkanContext->getDeviceLocalMemoryUsage(m_telemetry.vramUsedBytes, m_telemetry.vramBudgetBytes);
+
+#if defined(__linux__)
+    struct sysinfo info;
+    if (sysinfo(&info) == 0) {
+        m_telemetry.ramTotalBytes = static_cast<uint64_t>(info.totalram) * info.mem_unit;
+        m_telemetry.ramUsedBytes = static_cast<uint64_t>(info.totalram - info.freeram) * info.mem_unit;
+    }
+#endif
+}
+
 void Application::run()
 {
 
@@ -138,6 +155,12 @@ void Application::run()
         m_vulkanContext->getTransferQueue()->flush();
 
         m_vulkanContext->getRenderContext().commandPoolManager->beginFrame();
+
+        m_telemetryPollAccum += Timestep::deltaTime();
+        if (m_telemetryPollAccum >= 1.0f) {
+            m_telemetryPollAccum = 0.0f;
+            pollTelemetry();
+        }
 
         AssetManager::onUpdate();
 

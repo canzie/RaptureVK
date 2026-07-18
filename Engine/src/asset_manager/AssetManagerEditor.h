@@ -13,10 +13,11 @@
 namespace Rapture {
 
 class BlobStore;
+struct Telemetry;
 
 class AssetManagerEditor : public AssetManagerBase {
   public:
-    AssetManagerEditor();
+    explicit AssetManagerEditor(const Telemetry *telemetry);
     ~AssetManagerEditor();
 
     bool isAssetLoaded(AssetHandle handle) const;
@@ -61,9 +62,19 @@ class AssetManagerEditor : public AssetManagerBase {
     bool evictAsset(AssetHandle handle);
     void ensureDeferredFreeBuckets();
 
+    /**
+     * @brief Rebuilds an asset from its reload source described in the metadata
+     * @param handle The asset handle
+     * @param metadata The asset's metadata
+     * @return The rebuilt asset, or nullptr on failure
+     */
+    std::unique_ptr<Asset> loadFromMetadata(AssetHandle handle, AssetMetadata &metadata);
+
     BlobStore &getBlobStore();
 
     std::unique_ptr<BlobStore> m_blobStore;
+
+    const Telemetry *m_telemetry = nullptr;
 
     std::unordered_map<AssetType, AssetHandle> m_defaultAssetHandles;
 

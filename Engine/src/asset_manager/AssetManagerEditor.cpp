@@ -16,7 +16,7 @@
 
 namespace Rapture {
 
-AssetManagerEditor::AssetManagerEditor() : AssetManagerBase() {}
+AssetManagerEditor::AssetManagerEditor(const Telemetry *telemetry) : AssetManagerBase(), m_telemetry(telemetry) {}
 
 AssetManagerEditor::~AssetManagerEditor()
 {
@@ -53,16 +53,14 @@ Asset &AssetManagerEditor::getAsset(AssetHandle handle)
             RP_CORE_ERROR("Invalid asset metadata, import asset first");
             return Asset::null;
         }
-        auto asset = std::make_unique<Asset>(handle);
-        bool success = AssetImporter::importAsset(*asset, metadata);
-
-        if (success) {
-            auto [it, inserted] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
-            return *it->second;
-        } else {
-            RP_CORE_ERROR("Failed to load asset: {}", metadata.filePath.string());
+        std::unique_ptr<Asset> asset = loadFromMetadata(handle, metadata);
+        if (!asset) {
+            RP_CORE_ERROR("Failed to load asset '{}'", metadata.getName());
             return Asset::null;
         }
+
+        auto [it, inserted] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
+        return *it->second;
     }
 }
 
@@ -268,6 +266,43 @@ BlobStore &AssetManagerEditor::getBlobStore()
     return *m_blobStore;
 }
 
+std::unique_ptr<Asset> AssetManagerEditor::loadFromMetadata(AssetHandle handle, AssetMetadata &metadata)
+{
+    if (!metadata.hasBlob) {
+        auto asset = std::make_unique<Asset>(handle);
+        if (!AssetImporter::importAsset(*asset, metadata)) {
+            return nullptr;
+        }
+        return asset;
+    }
+
+    std::vector<uint8_t> blob = getBlobStore().read(handle);
+    if (blob.empty()) {
+        RP_CORE_ERROR("No blob found for asset {}", handle);
+        return nullptr;
+    }
+
+    AssetVariant variant;
+    switch (metadata.assetType) {
+    case AssetType::MESH: {
+        auto mesh = Mesh::deserialize(blob);
+        if (!mesh) {
+            RP_CORE_ERROR("Failed to deserialize mesh blob for asset {}", handle);
+            return nullptr;
+        }
+        variant = std::move(mesh);
+        break;
+    }
+    default:
+        RP_CORE_ERROR("Blob reload not supported for {} asset", AssetTypeToString(metadata.assetType));
+        return nullptr;
+    }
+
+    auto asset = std::make_unique<Asset>(std::move(variant), handle);
+    asset->status = AssetStatus::LOADED;
+    return asset;
+}
+
 Asset &AssetManagerEditor::importAsset(AssetImportDataVariant importData, const std::string &name,
                                        std::optional<AssetProvenance> provenance)
 {
@@ -366,9 +401,22 @@ void AssetManagerEditor::onUpdate()
     std::vector<std::unique_ptr<Asset>> toFree = std::move(m_deferredFrees[m_deferredFreeBucket]);
     m_deferredFrees[m_deferredFreeBucket].clear();
 
+    std::vector<AssetHandle> stillLoading;
     AssetHandle handle;
     while (m_pendingUnloadChecks.try_dequeue(handle)) {
+        auto it = m_loadedAssets.find(handle);
+        if (it != m_loadedAssets.end()) {
+            AssetStatus status = it->second->getStatus();
+            if (status == AssetStatus::REQUESTED || status == AssetStatus::LOADING) {
+                stillLoading.push_back(handle);
+                continue;
+            }
+        }
         evictAsset(handle);
+    }
+
+    for (AssetHandle h : stillLoading) {
+        m_pendingUnloadChecks.enqueue(h);
     }
 
     toFree.clear();

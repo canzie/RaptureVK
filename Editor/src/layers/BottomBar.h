@@ -2,6 +2,7 @@
 #define RAPTURE__BOTTOM_BAR_H
 
 #include "layers/panels/common.h"
+#include "layers/workspaces/Workspace.h"
 #include <amethyst/Amethyst.h>
 
 #include <memory>
@@ -17,12 +18,15 @@ class BottomBar {
     BottomBar(BottomBar &&) = delete;
     BottomBar &operator=(BottomBar &&) = delete;
 
+    void setCurrentWorkspace(Workspace *workspace) { m_currWorkspace = workspace; }
+
   private:
     void setupContentBrowserToggle(void);
     void toggleContentBrowser(void);
 
   private:
     PanelServices m_services;
+    Workspace *m_currWorkspace;
     Amethyst::Window *m_window = nullptr;
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextButton *m_contentBrowserBtn = nullptr;

@@ -1,11 +1,14 @@
 #include "ImportPanel.h"
 
+#include "asset_manager/AssetManager.h"
 #include "loaders/gltf/glTFLoader.h"
 #include "logging/Log.h"
 #include "scenes/Scene.h"
 #include "window_context/Application.h"
 
 #include <components/extensions/ui_drag_detector.h>
+
+#include <cctype>
 
 #define COL_BG         Amethyst::Color3::fromHex(0x282828)
 #define COL_TITLE      Amethyst::Color3::fromHex(0x202020)
@@ -142,19 +145,23 @@ void ImportPanel::build()
 
 void ImportPanel::doImport()
 {
-    /*
-    Rapture::Scene *scene = Rapture::Application::getInstance().getProject().getActiveScene();
-    if (scene == nullptr) {
-        RP_WARN("No active scene to import into");
-        return;
+    std::string extension = m_path.extension().string();
+    for (char &c : extension) {
+        c = static_cast<char>(std::tolower(c));
     }
 
-    Rapture::glTF2Loader loader(m_path);
-    if (!loader.load(scene)) {
+    if (extension == ".gltf" || extension == ".glb") {
+        Rapture::glTF2Loader loader(m_path);
+        if (!loader.load()) {
+            RP_WARN("Failed to import: {}", m_path.string());
+            return;
+        }
+    } else if (!Rapture::AssetManager::importAsset(m_path)) {
         RP_WARN("Failed to import: {}", m_path.string());
         return;
     }
-    */
+
+    RP_INFO("Imported '{}'", m_path.filename().string());
 }
 
 void ImportPanel::close()

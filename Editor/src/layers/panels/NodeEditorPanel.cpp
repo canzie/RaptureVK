@@ -345,7 +345,7 @@ using TexSpawnFn = std::function<void(NodeEditorPanel::TextureNodeKind, std::str
 static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,
                                                       const TexSpawnFn &spawnTexture, Amethyst::Color3 color);
 
-NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
+NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Node Editor", context)
 {
     Rapture::GraphDomainRegistry::registerBuiltins();
 
@@ -364,7 +364,6 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
         m_selectedNodes.clear();
         m_primaryNodeId = 0;
     });
-    m_root->name = "Node Editor";
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
 
@@ -372,7 +371,8 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
     setupCanvas();
     setupContextMenu();
 
-    tabBar->addTab(std::move(root), iconTabLayout("Node Editor", Icons::SVG_MATERIAL));
+    icon = Icons::SVG_MATERIAL;
+    attach(tabBar, std::move(root));
 
     m_serializeListener =
         Rapture::ProjectEvents::onProjectSerialize().addListener([this](Rapture::WriteNode &root) { (void)root; });

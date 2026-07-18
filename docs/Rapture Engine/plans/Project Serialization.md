@@ -423,6 +423,13 @@ generator params unserializable engine-side and graph→canvas reconstruction lo
 
 ## Asset lifetime: reload from metadata
 
+> **Status (2026-07-18):** the mechanism is built for meshes.
+> `AssetManagerEditor::getAsset` on an unloaded-but-registered handle calls `loadFromMetadata`,
+> which reload-branches on the metadata: `hasBlob` → `BlobStore::read` + `Mesh::deserialize`;
+> otherwise the existing file importer. This closed a real gap — evicted meshes previously hit an
+> unregistered importer. Material-instance descriptions and the container-locator path below are
+> still designed-only.
+
 The registry entry (metadata) is the persistent identity; **the loaded object exists only while
 something uses it**. If nothing references an asset, it does not stay in memory — that is what
 the metadata is for. No new storage type, no eviction flag, no root set.
@@ -470,15 +477,28 @@ materials loads nothing.
 
 ### Residency refinement (future, orthogonal to serialization)
 
+> **Status (2026-07-18):** the **sensor** is built, the **policy** is not. `VK_EXT_memory_budget` +
+> `VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT` are enabled, `VulkanContext::getDeviceLocalMemoryUsage`
+> sums the device-local heaps via `vmaGetHeapBudgets`, and the `Application` samples a `Telemetry`
+> struct (`window_context/Telemetry.h` — VRAM used/budget + RAM, per-core CPU and temps not yet
+> filled) once per second in `run()` and hands a `const Telemetry*` to `AssetManagerEditor` at init.
+> Still to build: the cold LRU list itself and the drain in `evictAsset`/`onUpdate` — the three
+> `AssetEvictionPolicy` values still behave like `EVICT_IMMEDIATE`.
+
 Instant evict at count 0 is correct but can hitch mid-play: a material that only *sometimes*
 appears (the animal-skin case) would reload — textures included — at the worst moment. The fix is
 a residency layer over the same mechanics, inside `AssetManagerEditor`:
 - count 0 → a **cold LRU list** instead of instant free (each entry: handle, GPU byte size, last
-  used frame); actually freed when memory pressure demands it.
-- **Pressure = our watermarks over the driver-reported budget** (`VK_EXT_memory_budget` via
-  `vmaGetHeapBudgets` on the device-local heap, polled ~1/s in `onUpdate`; the extension is only
-  a sensor — usage and budget per heap, already accounting for other processes — the policy below
-  is ours). With `budget = min(driverBudget, userCapBytes if set)`:
+  used time); actually freed when memory pressure demands it — or when it ages out (below).
+- **TTL age-out**: a cold entry unused for longer than a fixed window frees on its own, decoupled
+  from pressure, so nothing lingers needlessly and the list stays short enough that pressure drains
+  are rarely large.
+- **Amortized draining**: a pressure drain is capped per tick (a few entries or a byte budget), not
+  one batch, so freeing does not spike against active loads — it layers onto the existing
+  deferred-free buckets. The hard watermark may drain harder, since avoiding an OOM beats smoothness.
+- **Pressure = our watermarks over the driver-reported budget** (the `Telemetry` sensor above; the
+  extension is only a sensor — usage and budget per heap, already accounting for other processes —
+  the policy here is ours). With `budget = min(driverBudget, userCapBytes if set)`:
   - **soft, usage > 80% of budget** → drain the cold list oldest-first, skipping
     `EVICT_HINT_LAST`, down to 75% (drain past the line, else it thrashes at the watermark);
   - **hard, usage > 90% of budget** → drain the whole cold list, hints included;

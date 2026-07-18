@@ -1,7 +1,5 @@
 #include "ImagePreviewPanel.h"
 
-#include "layers/panels/components/tab_layouts.h"
-
 #include "asset_manager/Asset.h"
 #include "asset_manager/AssetManager.h"
 #include "logging/Log.h"
@@ -11,9 +9,9 @@
 
 static constexpr float PICKER_HEADER_HEIGHT = 34.0f;
 
-ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string_view title,
+ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string title,
                                      ImagePreviewMode mode)
-    : Panel(context), m_mode(mode)
+    : Panel(title, context), m_mode(mode)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -79,7 +77,7 @@ ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceCo
         rebuildSelector();
     }
 
-    tabBar->addTab(std::move(root), iconTabLayout(title));
+    attach(tabBar, std::move(root));
 }
 
 ImagePreviewPanel::~ImagePreviewPanel()

@@ -110,6 +110,8 @@ void MaterialEditorWorkspace::setupPreviewScene()
 
     m_context.scene = m_previewScene;
     m_context.viewport = m_previewViewport;
+
+    m_previewScene->locked = true;
 }
 
 void MaterialEditorWorkspace::showMaterialOnSphere(Rapture::AssetHandle handle)

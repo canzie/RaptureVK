@@ -126,6 +126,7 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     m_deviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+    m_deviceExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 
     checkExtensionSupport();
     createInstance(windowContext);
@@ -1434,7 +1435,7 @@ void VulkanContext::createVmaAllocator()
 
     RP_CORE_INFO("Creating VMA allocator create info...");
     VmaAllocatorCreateInfo allocatorInfo = {};
-    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT | VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
     allocatorInfo.physicalDevice = m_physicalDevice;
     allocatorInfo.device = m_device;
     allocatorInfo.instance = m_instance;
@@ -1448,6 +1449,29 @@ void VulkanContext::createVmaAllocator()
     }
 
     RP_CORE_INFO("Successfully created VMA allocator");
+}
+
+void VulkanContext::getDeviceLocalMemoryUsage(uint64_t &usedBytes, uint64_t &budgetBytes) const
+{
+    usedBytes = 0;
+    budgetBytes = 0;
+
+    if (!m_vmaAllocator) {
+        return;
+    }
+
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memoryProperties);
+
+    VmaBudget budgets[VK_MAX_MEMORY_HEAPS];
+    vmaGetHeapBudgets(m_vmaAllocator, budgets);
+
+    for (uint32_t heap = 0; heap < memoryProperties.memoryHeapCount; ++heap) {
+        if (memoryProperties.memoryHeaps[heap].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+            usedBytes += budgets[heap].usage;
+            budgetBytes += budgets[heap].budget;
+        }
+    }
 }
 
 } // namespace Rapture

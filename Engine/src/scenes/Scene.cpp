@@ -34,6 +34,11 @@ Scene::~Scene()
 
 Entity Scene::createEntity(const std::string &name)
 {
+    if (locked) {
+        RP_CORE_WARN("Cannot create entity in locked scene '{}'", getSceneName());
+        return Entity::null();
+    }
+
     // Create entity in the registry
     entt::entity handle = m_registry.create();
 
@@ -48,6 +53,11 @@ Entity Scene::createEntity(const std::string &name)
 
 Entity Scene::createCube(const std::string &name)
 {
+    if (locked) {
+        RP_CORE_WARN("Cannot create entity in locked scene '{}'", getSceneName());
+        return Entity::null();
+    }
+
     // Create entity in the registry
     entt::entity handle = m_registry.create();
 
@@ -77,6 +87,11 @@ Entity Scene::createCube(const std::string &name)
 
 Entity Scene::createSphere(const std::string &name)
 {
+    if (locked) {
+        RP_CORE_WARN("Cannot create entity in locked scene '{}'", getSceneName());
+        return Entity::null();
+    }
+
     // Create entity in the registry
     entt::entity handle = m_registry.create();
 

@@ -104,18 +104,18 @@ The stated philosophy (CLAUDE.md) is: components are data, logic belongs in syst
 
 The engine currently has no mechanism for unloading resources when they're no longer needed (e.g., level transitions).
 
-- [ ] Implement deferred GPU resource destruction — resources flagged for deletion should survive until all in-flight frames referencing them have completed (frame-delayed destruction queue)
+- [x] Implement deferred GPU resource destruction — evicted assets rotate through per-frame buckets (`AssetManagerEditor` `m_deferredFrees`) so they outlive every in-flight frame
 - [ ] Add scene/level unload path that tears down scene-specific GPU resources (textures, buffers, acceleration structures) while keeping engine-global resources alive
-- [ ] AssetManager needs an unload/evict path — currently assets are loaded and never freed
-- [ ] Consider reference-counted asset eviction: when `AssetRef` use count hits 0, schedule for deferred unload after N frames
+- [x] AssetManager has an unload/evict path (`requestUnload` → `evictAsset`), and evicted meshes reload from their blob (`loadFromMetadata`)
+- [x] Reference-counted asset eviction: `AssetRef` use count hitting 0 queues a deferred unload — see [[Project Serialization]] for the coming cold-list/residency layer on top
 
 ---
 
 ## Asset System
 
-- [ ] Make `AssetRef::useCount` atomic — currently `uint32_t` but copied across threads, causing data races
-- [ ] Do NOT use `shared_ptr` for asset ownership — ownership is clear (AssetManager owns), others borrow via AssetRef. Atomic counter is sufficient.
-- [ ] Note: `std::atomic<uint32_t>` is not copyable/movable. Solution: store the atomic in `AssetMetadata` (which is not copied), and have `AssetRef` hold a raw pointer to it (which is the current design, just needs the type changed to atomic)
+- [x] Make `useCount` atomic — it is now `std::atomic<uint32_t>` on `AssetMetadata` (`Asset.h`), with `AssetRef` holding a raw pointer to it
+- [x] Do NOT use `shared_ptr` for asset ownership — ownership is clear (AssetManager owns), others borrow via AssetRef. Atomic counter is sufficient.
+- [x] Store the atomic in `AssetMetadata` (not copied) and have `AssetRef` hold a raw pointer to it — done
 - [ ] Replace `new AssetManagerEditor()` in `AssetManager::init()` with `unique_ptr`
 - [ ] Add thread safety to AssetManager methods (concurrent `importAsset` calls can corrupt internal maps)
 - [ ] Stop using `Ref` suffix typedefs to hide pointer semantics (e.g., `AssetRef`). Existing ones stay, but new code should use explicit pointer types so ownership is visible at the call site

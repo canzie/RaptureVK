@@ -18,7 +18,7 @@ static constexpr float HEADER_HEIGHT = 28.0f;
 static constexpr float SECTION_SPACING = 6.0f;
 static constexpr float SECTION_TOP_PAD = 4.0f;
 
-PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
+PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Properties", context)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -28,7 +28,6 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
         m_entityView = nullptr;
         m_searchInput = nullptr;
     });
-    m_root->name = "Properties";
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
 
@@ -36,7 +35,8 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
     setupPlaceholder();
     setupEntityView();
 
-    tabBar->addTab(std::move(root), iconTabLayout("Properties", Icons::SVG_PROPERTIES));
+    icon = Icons::SVG_PROPERTIES;
+    attach(tabBar, std::move(root));
 
     m_entitySelectedListenerID =
         Rapture::GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) {

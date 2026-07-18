@@ -1,14 +1,15 @@
 #include "ContentBrowserPanel.h"
 #include "Icons.h"
 #include "asset_manager/AssetManager.h"
-#include "layers/panels/components/tab_layouts.h"
 #include "logging/Log.h"
 
 #include <algorithm>
 #include <components/extensions/ui_grid_layout.h>
 #include <components/extensions/ui_list_layout.h>
+#include <components/frame.h>
 #include <components/popup.h>
 #include <components/ui_scope.h>
+#include <memory>
 
 static constexpr float TOP_BAR_HEIGHT = 36.0f;
 static constexpr float SIDE_BAR_WIDTH = 200.0f;
@@ -123,22 +124,22 @@ static void s_wireGhostHover(Amethyst::TextButton *btn)
     }));
 }
 
-ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
+ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context)
+    : Panel("Content Browser", context)
 {
+    m_isDocked = true;
+
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
-    m_root->name = "Content Browser";
 
     buildContent();
-
-    tabBar->addTab(std::move(root), iconTabLayout("Content Browser", Icons::SVG_FOLDER));
+    attach(tabBar, std::move(root));
 }
 
 ContentBrowserPanel::ContentBrowserPanel(Amethyst::PopupScope &scope, const PanelServices &services)
-    : Panel(WorkspaceContext{.services = services}), m_root(&scope.component)
+    : Panel("Content Browser", services)
 {
-    m_root->name = "Content Browser";
-
+    m_root = &scope.component;
     buildContent();
 }
 
@@ -314,6 +315,32 @@ void ContentBrowserPanel::setupTopBar()
                     m_settingsBtn = &b.component;
                     s_wireIconHover(m_settingsBtn);
                 });
+
+            if (!m_isDocked) {
+                top.textButton(
+                    {
+                        .base =
+                            {
+                                .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
+                                .position = Amethyst::UDim2(1.0f, -38.0f, 0.5f, 0.0f),
+                                .size = Amethyst::UDim2::fromOffset(100.0f, 24.0f),
+                            },
+                        .style = {.cornerRadius = 3.0f},
+                        .text = {.fontSize = 12.0f,
+                                 .textColor = COL_TEXT,
+                                 .textXAlignment = Amethyst::TextXAlignment::CENTER,
+                                 .textYAlignment = Amethyst::TextYAlignment::CENTER},
+                        .label = "Dock in layout",
+                    },
+                    [this](Amethyst::TextButtonScope &b) {
+                        s_wireButtonHover(&b.component);
+                        b.component.onMouseButton1ClickCb = [this]() {
+                            m_isDocked = true;
+                            onDockInLayout.fire();
+                            return Amethyst::EventResult::CONSUMED;
+                        };
+                    });
+            }
         });
 }
 

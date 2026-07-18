@@ -1,8 +1,10 @@
 #ifndef RAPTURE__CONTENT_BROWSER_PANEL_H
 #define RAPTURE__CONTENT_BROWSER_PANEL_H
 
+#include "events/EventSignal.h"
 #include <amethyst/Amethyst.h>
 #include <components/context_menu.h>
+#include <components/tab_bar.h>
 #include <components/tree_view.h>
 #include <components/ui_scope.h>
 
@@ -29,6 +31,8 @@ class ContentBrowserPanel : public Panel {
 
     void refresh();
     void setBaseDirectory(const std::filesystem::path &path);
+
+    Rapture::EventSignal<void()> onDockInLayout;
 
   private:
     void buildContent(void);
@@ -74,8 +78,6 @@ class ContentBrowserPanel : public Panel {
     void buildFilesSubtree(const std::filesystem::path &path, uint16_t depth);
 
   private:
-    Amethyst::Frame *m_root = nullptr;
-
     Amethyst::Frame *m_topBarPane = nullptr;
     Amethyst::TextButton *m_addBtn = nullptr;
     Amethyst::TextButton *m_importBtn = nullptr;
@@ -99,6 +101,8 @@ class ContentBrowserPanel : public Panel {
 
     std::vector<ContentItemComponents> m_contentItemPool;
     size_t m_selectedItem = SIZE_MAX;
+
+    bool m_isDocked = false;
 
     BrowseMode m_browseMode = BrowseMode::ASSETS;
     std::filesystem::path m_baseDirectory;

@@ -142,6 +142,7 @@ void AmethystLayer::onAttach()
     setupWorkspaces(screenSize);
 
     m_bottomBar = std::make_unique<BottomBar>(&m_window, buildServices());
+    m_bottomBar->setCurrentWorkspace(m_workspaces.empty() ? nullptr : m_workspaces[m_activeWorkspaceIndex].get());
 }
 
 void AmethystLayer::onDetach()
@@ -290,6 +291,9 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
         }
         if (index >= 0 && index < static_cast<int32_t>(m_workspaces.size())) {
             m_workspaces[index]->active = true;
+            if (m_bottomBar != nullptr) {
+                m_bottomBar->setCurrentWorkspace(m_workspaces[index].get());
+            }
         }
         m_activeWorkspaceIndex = index;
     };

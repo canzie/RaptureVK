@@ -16,6 +16,13 @@ class Workspace {
     Amethyst::DockingLayer *getDockingLayer(void) const { return m_dockingLayer; }
     const std::vector<std::unique_ptr<Panel>> &getPanels(void) const { return m_panels; }
 
+    /**
+     * @brief Dock a panel into this workspace's layout.
+     * @param panel The panel to add.
+     * @param zone Side of the layout the panel is docked on.
+     */
+    void addPanel(std::unique_ptr<Panel> panel, Amethyst::DockZone zone);
+
     virtual void onUpdate(float dt);
     virtual void saveLayout(void) = 0;
 

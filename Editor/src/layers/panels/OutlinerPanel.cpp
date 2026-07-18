@@ -25,7 +25,7 @@ static void s_nameLabel(Amethyst::UIScope &s, const std::string &text)
         [](Amethyst::TextLabelScope &l) { l.component.propagate(Amethyst::INTERACTION_CATEGORY_ALL); });
 }
 
-OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
+OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Outliner", context)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -36,7 +36,6 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
         m_contextMenu = nullptr;
         m_renameInput = nullptr;
     });
-    m_root->name = "Outliner";
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
 
@@ -82,7 +81,8 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
 
-    tabBar->addTab(std::move(root), iconTabLayout("Outliner", Icons::SVG_LAYERS));
+    icon = Icons::SVG_LAYERS;
+    attach(tabBar, std::move(root));
 
     setScene(context.scene);
 }
@@ -290,7 +290,8 @@ void OutlinerPanel::buildNameCell(uint32_t row, uint32_t entityId, const std::st
     } else {
         auto label = std::make_unique<Amethyst::TextLabel>();
         label->setText(name);
-        label->setBaseProperties({.padding = {.left = Amethyst::UDim::fromOffset(2.0f)}, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
+        label->setBaseProperties(
+            {.padding = {.left = Amethyst::UDim::fromOffset(2.0f)}, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
         label->setBaseStyleProperties({.backgroundTransparency = 1.0f});
         label->setTextStyleProperties({.textYAlignment = Amethyst::TextYAlignment::CENTER});
         label->propagate(Amethyst::INTERACTION_CATEGORY_ALL);

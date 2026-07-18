@@ -3,6 +3,7 @@
 
 #include "PlatformContext.h"
 #include "RenderWindow.h"
+#include "Telemetry.h"
 #include "WindowContext.h"
 #include "layers/LayerStack.h"
 #include "scenes/Project.h"
@@ -45,6 +46,7 @@ class Application {
     Project &getProject() { return *m_project; }
     ViewportManager &getViewportManager() { return *m_viewportManager; }
     const ViewportManager &getViewportManager() const { return *m_viewportManager; }
+    const Telemetry &getTelemetry() const { return m_telemetry; }
 
     /**
      * @brief App-wide frame-in-flight ring index, advanced once per main-loop iteration.
@@ -54,6 +56,12 @@ class Application {
 
     static Application &getInstance() { return *s_instance; }
     static const RenderContext &getRenderContext() { return s_instance->m_vulkanContext->getRenderContext(); }
+
+  private:
+    /**
+     * @brief Samples the current hardware readings into m_telemetry
+     */
+    void pollTelemetry();
 
   private:
     bool m_running;
@@ -73,6 +81,9 @@ class Application {
     std::unique_ptr<ViewportManager> m_viewportManager;
 
     uint32_t m_frameInFlightIndex = 0;
+
+    Telemetry m_telemetry;
+    float m_telemetryPollAccum = 0.0f;
 
     static Application *s_instance;
 };

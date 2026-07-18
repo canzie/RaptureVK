@@ -7,7 +7,6 @@
 
 #include <amethyst/Amethyst.h>
 
-#include <string_view>
 #include <unordered_map>
 
 /**
@@ -26,7 +25,7 @@ enum class ImagePreviewMode {
  */
 class ImagePreviewPanel : public Panel {
   public:
-    ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string_view title = "Preview",
+    ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string title = "Preview",
                       ImagePreviewMode mode = ImagePreviewMode::EXTERNAL);
     ~ImagePreviewPanel();
 
@@ -37,7 +36,6 @@ class ImagePreviewPanel : public Panel {
     void rebuildSelector();
     void selectTexture(Rapture::AssetHandle handle);
 
-    Amethyst::Frame *m_root = nullptr;
     Amethyst::ImageLabel *m_image = nullptr;
     Amethyst::Dropdown *m_selector = nullptr;
 

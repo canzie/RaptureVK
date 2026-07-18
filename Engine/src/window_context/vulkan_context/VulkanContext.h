@@ -35,6 +35,13 @@ class VulkanContext {
     VmaAllocator getVmaAllocator() const { return m_vmaAllocator; }
     uint32_t getApiVersion() const { return m_applicationInfo.apiVersion; }
 
+    /**
+     * @brief Sums usage and budget across the device-local memory heaps
+     * @param usedBytes Filled with current device-local usage
+     * @param budgetBytes Filled with the driver-reported device-local budget
+     */
+    void getDeviceLocalMemoryUsage(uint64_t &usedBytes, uint64_t &budgetBytes) const;
+
     uint32_t getGraphicsQueueIndex() const { return m_queueFamilyIndices.familyIndices[GRAPHICS]; }
     uint32_t getComputeQueueIndex() const { return m_queueFamilyIndices.familyIndices[COMPUTE]; }
     uint32_t getTransferQueueIndex() const { return m_queueFamilyIndices.familyIndices[TRANSFER]; }

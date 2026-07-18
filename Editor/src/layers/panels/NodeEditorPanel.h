@@ -468,7 +468,6 @@ class NodeEditorPanel : public Panel {
      */
     Rapture::MaterialGraph buildGraph(void) const;
 
-    Amethyst::Frame *m_root = nullptr;
     Amethyst::Frame *m_materialBar = nullptr;
     Amethyst::Dropdown *m_materialDropdown = nullptr;
     Amethyst::Frame *m_canvas = nullptr;

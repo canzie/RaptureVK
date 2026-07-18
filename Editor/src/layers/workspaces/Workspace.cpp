@@ -3,6 +3,7 @@
 #include "layers/EditorLayout.h"
 #include "layers/panels/components/tab_layouts.h"
 #include <components/ui_scope.h>
+#include <memory>
 
 void Workspace::onUpdate(float dt)
 {
@@ -35,4 +36,17 @@ void Workspace::setupBase(Amethyst::TabBarScope &tabs, std::string_view label)
             m_context.dockingLayer = m_dockingLayer;
         });
     });
+}
+
+void Workspace::addPanel(std::unique_ptr<Panel> panel, Amethyst::DockZone zone)
+{
+    panel->attach(m_dockingLayer->dockNewRegion(zone));
+
+    Amethyst::Frame *root = panel->root();
+    Panel *panelPtr = panel.get();
+    root->onDestroy.detachedOnce([this, panelPtr](Amethyst::Instance *) {
+        std::erase_if(m_panels, [panelPtr](const std::unique_ptr<Panel> &p) { return p.get() == panelPtr; });
+    });
+
+    m_panels.push_back(std::move(panel));
 }

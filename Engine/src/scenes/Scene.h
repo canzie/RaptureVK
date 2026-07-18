@@ -73,6 +73,9 @@ class Scene {
     SceneRenderData *getRenderData() { return m_renderData.get(); }
     const SceneRenderData *getRenderData() const { return m_renderData.get(); }
 
+  public:
+    bool locked = false;
+
   private:
     void ensureBLASFreeBuckets();
 

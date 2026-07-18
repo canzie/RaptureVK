@@ -16,15 +16,17 @@
 
 namespace Rapture {
 
+struct Telemetry;
+
 class AssetManager {
   public:
-    static void init()
+    static void init(const Telemetry *telemetry)
     {
         if (s_isInitialized) {
             RP_CORE_WARN("AssetManager already initialized");
             return;
         }
-        s_activeAssetManager = new AssetManagerEditor();
+        s_activeAssetManager = new AssetManagerEditor(telemetry);
         s_isInitialized = true;
 
         s_serializeListener = ProjectEvents::onProjectSerialize().addListener([](WriteNode &root) { (void)root; });

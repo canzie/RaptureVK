@@ -61,27 +61,44 @@ struct ShaderInputsPanel::MemberState {
         const uint8_t *src = buf + member.offset;
         switch (baseType) {
         case BaseType::FLOAT: {
-            float f; std::memcpy(&f, src, 4); components[0] = f; break;
+            float f;
+            std::memcpy(&f, src, 4);
+            components[0] = f;
+            break;
         }
         case BaseType::INT: {
-            int32_t v; std::memcpy(&v, src, 4); intValue = v; break;
+            int32_t v;
+            std::memcpy(&v, src, 4);
+            intValue = v;
+            break;
         }
         case BaseType::UINT: {
-            uint32_t v; std::memcpy(&v, src, 4); intValue = static_cast<int64_t>(v); break;
+            uint32_t v;
+            std::memcpy(&v, src, 4);
+            intValue = static_cast<int64_t>(v);
+            break;
         }
         case BaseType::VEC2: {
-            float v[2]; std::memcpy(v, src, 8);
-            components[0] = v[0]; components[1] = v[1]; break;
+            float v[2];
+            std::memcpy(v, src, 8);
+            components[0] = v[0];
+            components[1] = v[1];
+            break;
         }
         case BaseType::VEC3: {
-            float v[3]; std::memcpy(v, src, 12);
-            for (int i = 0; i < 3; ++i) components[i] = v[i]; break;
+            float v[3];
+            std::memcpy(v, src, 12);
+            for (int i = 0; i < 3; ++i) components[i] = v[i];
+            break;
         }
         case BaseType::VEC4: {
-            float v[4]; std::memcpy(v, src, 16);
-            for (int i = 0; i < 4; ++i) components[i] = v[i]; break;
+            float v[4];
+            std::memcpy(v, src, 16);
+            for (int i = 0; i < 4; ++i) components[i] = v[i];
+            break;
         }
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -151,29 +168,51 @@ void ShaderInputsPanel::applyShaderDefaults(std::vector<uint8_t> &buffer, const 
 
             uint8_t *dst = buffer.data() + member.offset;
             const auto &def = meta.defaultValue;
-            auto get = [&](int i) -> float {
-                return static_cast<size_t>(i) < def.size() ? def[i] : 0.0f;
-            };
+            auto get = [&](int i) -> float { return static_cast<size_t>(i) < def.size() ? def[i] : 0.0f; };
 
             switch (member.getBaseType()) {
-            case BaseType::FLOAT: { float v = get(0); std::memcpy(dst, &v, 4); break; }
-            case BaseType::INT:   { int32_t v = static_cast<int32_t>(get(0)); std::memcpy(dst, &v, 4); break; }
-            case BaseType::UINT:  { uint32_t v = static_cast<uint32_t>(get(0)); std::memcpy(dst, &v, 4); break; }
-            case BaseType::VEC2:  { float v[2] = {get(0), get(1)}; std::memcpy(dst, v, 8); break; }
-            case BaseType::VEC3:  { float v[3] = {get(0), get(1), get(2)}; std::memcpy(dst, v, 12); break; }
-            case BaseType::VEC4:  { float v[4] = {get(0), get(1), get(2), get(3)}; std::memcpy(dst, v, 16); break; }
-            default: break;
+            case BaseType::FLOAT: {
+                float v = get(0);
+                std::memcpy(dst, &v, 4);
+                break;
+            }
+            case BaseType::INT: {
+                int32_t v = static_cast<int32_t>(get(0));
+                std::memcpy(dst, &v, 4);
+                break;
+            }
+            case BaseType::UINT: {
+                uint32_t v = static_cast<uint32_t>(get(0));
+                std::memcpy(dst, &v, 4);
+                break;
+            }
+            case BaseType::VEC2: {
+                float v[2] = {get(0), get(1)};
+                std::memcpy(dst, v, 8);
+                break;
+            }
+            case BaseType::VEC3: {
+                float v[3] = {get(0), get(1), get(2)};
+                std::memcpy(dst, v, 12);
+                break;
+            }
+            case BaseType::VEC4: {
+                float v[4] = {get(0), get(1), get(2), get(3)};
+                std::memcpy(dst, v, 16);
+                break;
+            }
+            default:
+                break;
             }
         }
     }
 }
 
-ShaderInputsPanel::ShaderInputsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
+ShaderInputsPanel::ShaderInputsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Inputs", context)
 {
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
-    m_root->name = "Shader Inputs";
     m_root->addClass("background-secondary");
 
     Amethyst::UIScope(*m_root).scrollingFrame(
@@ -187,8 +226,7 @@ ShaderInputsPanel::ShaderInputsPanel(Amethyst::TabBar *tabBar, const WorkspaceCo
                 },
         },
         [this](Amethyst::ScrollingFrameScope &sf) { m_content = &sf.component; });
-
-    tabBar->addTab(std::move(root), iconTabLayout("Inputs"));
+    attach(tabBar, std::move(root));
 }
 
 ShaderInputsPanel::~ShaderInputsPanel()

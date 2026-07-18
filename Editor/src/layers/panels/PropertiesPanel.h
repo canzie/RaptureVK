@@ -70,7 +70,6 @@ class PropertiesPanel : public Panel {
     void showPlaceholder(void);
     void clearSelection(void);
 
-    Amethyst::Frame *m_root = nullptr;
     Amethyst::TextLabel *m_placeholderText = nullptr;
     Amethyst::ScrollingFrame *m_entityView = nullptr;
     Amethyst::TextInput *m_searchInput = nullptr;

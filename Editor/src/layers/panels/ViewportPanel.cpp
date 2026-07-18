@@ -28,7 +28,7 @@ static const Amethyst::TextStyleProperties HEADER_BTN_TEXT{
     .textYAlignment = Amethyst::TextYAlignment::CENTER,
 };
 
-ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel(context)
+ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Viewport", context)
 {
     m_viewport = context.viewport;
     if (m_viewport != nullptr) {
@@ -47,7 +47,6 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
-    m_root->name = "Viewport";
     m_root->addClass("background-secondary");
     m_root->setBaseProperties({.clipsDescendants = true});
 
@@ -96,7 +95,8 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
         }
     });
 
-    tabBar->addTab(std::move(root), iconTabLayout("Viewport", Icons::SVG_VIEWPORT));
+    icon = Icons::SVG_VIEWPORT;
+    attach(tabBar, std::move(root));
 }
 
 ViewportPanel::~ViewportPanel()
