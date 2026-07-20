@@ -18,7 +18,7 @@ class BottomBar {
     BottomBar(BottomBar &&) = delete;
     BottomBar &operator=(BottomBar &&) = delete;
 
-    void setCurrentWorkspace(Workspace *workspace) { m_currWorkspace = workspace; }
+    void setCurrentWorkspace(Workspace *workspace);
 
   private:
     void setupContentBrowserToggle(void);

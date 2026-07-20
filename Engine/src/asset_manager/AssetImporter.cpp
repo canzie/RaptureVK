@@ -26,7 +26,7 @@ bool AssetImporter::s_isInitialized = false;
 
 bool AssetImporter::loadShader(Asset &asset, AssetMetadata &metadata)
 {
-    const auto &initialPath = metadata.filePath;
+    const auto &initialPath = metadata.getSourcePath();
     if (!std::filesystem::exists(initialPath)) {
         FILE_NOT_FOUND_ERROR(initialPath);
         asset.status = AssetStatus::FILE_NOT_FOUND;
@@ -158,8 +158,11 @@ bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
         texSpec.srgb = importConfig.srgb;
     }
 
-    if (!getImageDimensions(metadata.filePath, texSpec.width, texSpec.height)) {
-        RP_CORE_ERROR("Failed to read texture dimensions: {}", metadata.filePath.string());
+    // Serializing the compressed image reads it back, which needs transfer-source usage
+    texSpec.allowReadback = isCompressedFormat(texSpec.format);
+
+    if (!getImageDimensions(metadata.getSourcePath(), texSpec.width, texSpec.height)) {
+        RP_CORE_ERROR("Failed to read texture dimensions: {}", metadata.getSourcePath().string());
         asset.status = AssetStatus::FAILED;
         return false;
     }
@@ -167,7 +170,7 @@ bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
     auto tex = Texture::createPlaceholder(texSpec);
     Texture *texPtr = tex.get();
     Asset *assetPtr = &asset;
-    std::filesystem::path path = metadata.filePath;
+    std::filesystem::path path = metadata.getSourcePath();
 
     asset.status = AssetStatus::LOADING;
     asset.setAssetVariant(std::move(tex));
@@ -249,9 +252,9 @@ bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
 
 bool AssetImporter::loadCubemap(Asset &asset, AssetMetadata &metadata)
 {
-    std::vector<std::string> cubemapPaths = getCubemapPaths(metadata.filePath);
+    std::vector<std::string> cubemapPaths = getCubemapPaths(metadata.getSourcePath());
     if (cubemapPaths.size() != 6) {
-        RP_CORE_ERROR("Cubemap file must contain exactly 6 paths. File: {}", metadata.filePath.string());
+        RP_CORE_ERROR("Cubemap file must contain exactly 6 paths. File: {}", metadata.getSourcePath().string());
         asset.status = AssetStatus::FAILED;
         return false;
     }
@@ -298,7 +301,7 @@ bool AssetImporter::loadCubemap(Asset &asset, AssetMetadata &metadata)
 
 bool AssetImporter::loadScene(Asset &asset, AssetMetadata &metadata)
 {
-    const auto &path = metadata.filePath;
+    const auto &path = metadata.getSourcePath();
     if (!std::filesystem::exists(path)) {
         FILE_NOT_FOUND_ERROR(path);
         asset.status = AssetStatus::FILE_NOT_FOUND;

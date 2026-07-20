@@ -1,15 +1,21 @@
 #include "ContentBrowserPanel.h"
 #include "Icons.h"
 #include "asset_manager/AssetManager.h"
+#include "components/systems/Prefab.h"
 #include "logging/Log.h"
+#include "scenes/Project.h"
+#include "scenes/entities/Entity.h"
+#include "window_context/Application.h"
 
 #include <algorithm>
+#include <cctype>
 #include <components/extensions/ui_grid_layout.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/frame.h>
 #include <components/popup.h>
 #include <components/ui_scope.h>
 #include <memory>
+#include <string_view>
 
 static constexpr float TOP_BAR_HEIGHT = 36.0f;
 static constexpr float SIDE_BAR_WIDTH = 200.0f;
@@ -17,10 +23,10 @@ static constexpr float SEARCH_BAR_HEIGHT = 36.0f;
 static constexpr float STATUS_BAR_HEIGHT = 24.0f;
 static constexpr float SECTION_HEADER_HEIGHT = 26.0f;
 
-static constexpr float TILE_MIN_WIDTH = 100.0f;
-static constexpr float TILE_MAX_WIDTH = 140.0f;
-static constexpr float TILE_ASPECT = 0.86f;
-static constexpr float TILE_FOOTER_HEIGHT = 26.0f;
+static constexpr float TILE_MIN_WIDTH = 150.0f;
+static constexpr float TILE_MAX_WIDTH = 210.0f;
+static constexpr float TILE_ASPECT = 0.75f;
+static constexpr float TILE_FOOTER_HEIGHT = 46.0f;
 static constexpr float TILE_TYPEBAR_HEIGHT = 3.0f;
 static constexpr float TILE_ICON_SIZE = 42.0f;
 
@@ -51,6 +57,7 @@ static const char *s_iconForAssetType(Rapture::AssetType type)
     case Rapture::AssetType::SHADER:
         return Icons::SVG_SCRIPT;
     case Rapture::AssetType::MATERIAL:
+    case Rapture::AssetType::MATERIAL_INSTANCE:
         return Icons::SVG_MATERIAL;
     case Rapture::AssetType::MESH:
         return Icons::SVG_MESH;
@@ -73,28 +80,53 @@ static Amethyst::Color3 s_colorForAssetType(Rapture::AssetType type)
 {
     switch (type) {
     case Rapture::AssetType::TEXTURE:
-        return Amethyst::Color3(0.9f, 0.55f, 0.8f);
+        return Amethyst::Color3(0.92f, 0.40f, 0.78f); // magenta
     case Rapture::AssetType::CUBEMAP:
-        return Amethyst::Color3(0.4f, 0.75f, 1.0f);
+        return Amethyst::Color3(0.30f, 0.68f, 0.98f); // azure
     case Rapture::AssetType::SHADER:
-        return Amethyst::Color3(0.5f, 0.9f, 0.5f);
+        return Amethyst::Color3(0.45f, 0.85f, 0.45f); // green
     case Rapture::AssetType::MATERIAL:
-        return Amethyst::Color3(0.75f, 0.45f, 0.95f);
+    case Rapture::AssetType::MATERIAL_INSTANCE:
+        return Amethyst::Color3(0.68f, 0.45f, 0.95f); // violet
     case Rapture::AssetType::MESH:
-        return Amethyst::Color3(0.9f, 0.65f, 0.35f);
+        return Amethyst::Color3(0.95f, 0.60f, 0.25f); // orange
     case Rapture::AssetType::PREFAB:
-        return Amethyst::Color3(0.9f, 0.55f, 0.2f);
+        return Amethyst::Color3(0.50f, 0.50f, 0.95f); // periwinkle
     case Rapture::AssetType::ANIMATION:
-        return Amethyst::Color3(0.95f, 0.8f, 0.25f);
+        return Amethyst::Color3(0.95f, 0.82f, 0.30f); // yellow
     case Rapture::AssetType::AUDIO:
-        return Amethyst::Color3(0.3f, 0.85f, 0.85f);
+        return Amethyst::Color3(0.25f, 0.82f, 0.72f); // teal
     case Rapture::AssetType::VIDEO:
-        return Amethyst::Color3(0.95f, 0.35f, 0.35f);
+        return Amethyst::Color3(0.95f, 0.35f, 0.35f); // red
     case Rapture::AssetType::SCENE:
-        return Amethyst::Color3(0.85f, 0.7f, 0.15f);
+        return Amethyst::Color3(0.72f, 0.85f, 0.30f); // lime
     default:
-        return Amethyst::Color3(0.5f, 0.5f, 0.5f);
+        return Amethyst::Color3(0.55f, 0.55f, 0.55f); // gray
     }
+}
+
+static void s_loadPrefabIntoScene(Rapture::AssetHandle handle, Rapture::Scene *scene)
+{
+    if (scene == nullptr) {
+        RP_WARN("No scene to load the prefab into");
+        return;
+    }
+    if (!Rapture::Prefab::instantiate(Rapture::AssetManager::getAsset(handle), scene).isValid()) {
+        RP_WARN("Failed to load prefab into the scene");
+    }
+}
+
+static std::string s_normalizeForSearch(std::string_view text)
+{
+    std::string out;
+    out.reserve(text.size());
+    for (char c : text) {
+        if (c == ' ') {
+            continue;
+        }
+        out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    }
+    return out;
 }
 
 static float s_estimateTextWidth(const std::string &text, float fontSize)
@@ -128,6 +160,7 @@ ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const Workspa
     : Panel("Content Browser", context)
 {
     m_isDocked = true;
+    m_scene = context.scene;
 
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -152,13 +185,19 @@ ContentBrowserPanel::~ContentBrowserPanel()
     }
 }
 
+void ContentBrowserPanel::setContext(const WorkspaceContext &context)
+{
+    Panel::setContext(context);
+    m_scene = context.scene;
+}
+
 void ContentBrowserPanel::buildContent()
 {
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
 
     m_root->setBaseStyleProperties({.backgroundColor = COL_GRID_BG});
 
-    m_baseDirectory = std::filesystem::current_path();
+    m_baseDirectory = Rapture::Application::getInstance().getProject().getProjectDirectory();
     m_currentDirectory = m_baseDirectory;
     m_navigationHistory.push_back(m_currentDirectory);
 
@@ -235,7 +274,7 @@ void ContentBrowserPanel::setupTopBar()
                             s_wireButtonHover(m_importBtn);
                             m_importBtn->onMouseButton1ClickCb = [this]() {
                                 m_services.openFileExplorer(FileBrowser::Mode::OPEN, [this](const std::filesystem::path &path) {
-                                    m_services.openImportPanel(path);
+                                    m_services.openImportPanel(path, m_currentDirectory);
                                 });
                                 return Amethyst::EventResult::CONSUMED;
                             };
@@ -568,6 +607,16 @@ void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<Amethy
     m_contextMenu->showAt(pos);
 }
 
+std::vector<Amethyst::ContextMenuItem> ContentBrowserPanel::assetActions(Rapture::AssetType type, Rapture::AssetHandle handle)
+{
+    switch (type) {
+    case Rapture::AssetType::PREFAB:
+        return {Amethyst::ContextMenuItem::action("Load in scene", [this, handle]() { s_loadPrefabIntoScene(handle, m_scene); })};
+    default:
+        return {};
+    }
+}
+
 void ContentBrowserPanel::rebuildBreadcrumb()
 {
     if (m_breadcrumbBar == nullptr) {
@@ -641,12 +690,7 @@ void ContentBrowserPanel::rebuildBreadcrumb()
 void ContentBrowserPanel::refresh()
 {
     m_selectedItem = SIZE_MAX;
-
-    if (m_browseMode == BrowseMode::ASSETS) {
-        refreshAssetBrowser();
-    } else {
-        refreshFileBrowser();
-    }
+    refreshFileBrowser();
     rebuildBreadcrumb();
 }
 
@@ -659,54 +703,6 @@ void ContentBrowserPanel::setBaseDirectory(const std::filesystem::path &path)
     m_historyIndex = 0;
     buildDirectoryTree();
     refresh();
-}
-
-void ContentBrowserPanel::refreshAssetBrowser()
-{
-    const auto &registry = Rapture::AssetManager::getAssetRegistry();
-    size_t index = 0;
-
-    for (const auto &[handle, metadata] : registry) {
-        if (!metadata) continue;
-
-        std::string assetName = metadata->getName();
-        if (!m_searchFilter.empty() && assetName.find(m_searchFilter) == std::string::npos) {
-            continue;
-        }
-
-        auto &item = acquirePoolItem(index);
-        item.container->setBaseProperties({.layoutOrder = static_cast<uint32_t>(index)});
-
-        item.icon->setSvg(s_iconForAssetType(metadata->assetType));
-        item.icon->setImageStyleProperties({.imageColor = COL_ICON});
-
-        item.typeBar->setBaseProperties({.visible = true});
-        item.typeBar->setBaseStyleProperties({.backgroundColor = s_colorForAssetType(metadata->assetType)});
-
-        item.name->setText(assetName);
-
-        size_t itemIndex = index;
-        item.action->onMouseButton1ClickCb = [this, itemIndex, assetName]() {
-            selectItem(itemIndex);
-            RP_INFO("selected asset '{0}'", assetName);
-            return Amethyst::EventResult::CONSUMED;
-        };
-
-        item.action->onMouseButton2DownCb = [this](int32_t x, int32_t y) {
-            showContextMenu(Amethyst::vec2(static_cast<float>(x), static_cast<float>(y)),
-                            {
-                                Amethyst::ContextMenuItem::action("Open", [] {}),
-                                Amethyst::ContextMenuItem::action("Rename", [] {}),
-                                Amethyst::ContextMenuItem::action("Delete", [] {}),
-                            });
-            return Amethyst::EventResult::CONSUMED;
-        };
-
-        index++;
-    }
-
-    releasePoolItems(index);
-    updateStatus(index);
 }
 
 void ContentBrowserPanel::refreshFileBrowser()
@@ -731,21 +727,49 @@ void ContentBrowserPanel::refreshFileBrowser()
     size_t index = 0;
 
     for (const auto &entry : entries) {
+        bool isDir = entry.is_directory();
         std::string filename = entry.path().filename().string();
 
-        if (!m_searchFilter.empty() && filename.find(m_searchFilter) == std::string::npos) {
+        const Rapture::AssetMetadata *metadata = nullptr;
+        Rapture::AssetHandle assetHandle = Rapture::INVALID_ASSET_HANDLE;
+        if (!isDir && entry.path().extension() == ".rasset") {
+            assetHandle = Rapture::AssetManager::findAssetByPath(entry.path());
+            if (assetHandle == Rapture::INVALID_ASSET_HANDLE) {
+                continue;
+            }
+            metadata = &Rapture::AssetManager::getAssetMetadata(assetHandle);
+        }
+
+        std::string displayName = metadata != nullptr ? metadata->getName() : filename;
+        if (!m_searchFilter.empty() && s_normalizeForSearch(displayName).find(m_searchFilter) == std::string::npos) {
             continue;
         }
 
         auto &item = acquirePoolItem(index);
         item.container->setBaseProperties({.layoutOrder = static_cast<uint32_t>(index)});
 
-        bool isDir = entry.is_directory();
-        item.icon->setSvg(isDir ? Icons::SVG_FOLDER : Icons::SVG_SCRIPT);
-        item.icon->setImageStyleProperties({.imageColor = isDir ? Amethyst::Color4(0.85f, 0.72f, 0.4f, 1.0f) : COL_ICON});
+        if (isDir) {
+            item.icon->setSvg(Icons::SVG_FOLDER);
+            item.icon->setImageStyleProperties({.imageColor = Amethyst::Color4(0.85f, 0.72f, 0.4f, 1.0f)});
+            item.typeBar->setBaseProperties({.visible = false});
+            item.type->setBaseProperties({.visible = false});
+        } else if (metadata != nullptr) {
+            item.icon->setSvg(s_iconForAssetType(metadata->assetType));
+            item.icon->setImageStyleProperties({.imageColor = COL_ICON});
+            item.typeBar->setBaseProperties({.visible = true});
+            item.typeBar->setBaseStyleProperties({.backgroundColor = s_colorForAssetType(metadata->assetType)});
+            item.type->setBaseProperties({.visible = true});
+            item.type->setText(Rapture::AssetTypeToString(metadata->assetType));
+        } else {
+            item.icon->setSvg(Icons::SVG_SCRIPT);
+            item.icon->setImageStyleProperties({.imageColor = COL_ICON});
+            item.typeBar->setBaseProperties({.visible = false});
+            item.type->setBaseProperties({.visible = true});
+            std::string extension = entry.path().extension().string();
+            item.type->setText(extension.empty() ? "file" : extension);
+        }
 
-        item.typeBar->setBaseProperties({.visible = false});
-        item.name->setText(filename);
+        item.name->setText(displayName);
 
         size_t itemIndex = index;
         if (isDir) {
@@ -755,17 +779,24 @@ void ContentBrowserPanel::refreshFileBrowser()
                 return Amethyst::EventResult::CONSUMED;
             };
         } else {
-            item.action->onMouseButton1ClickCb = [this, itemIndex, filename]() {
+            item.action->onMouseButton1ClickCb = [this, itemIndex, displayName]() {
                 selectItem(itemIndex);
-                RP_INFO("selected file '{0}'", filename);
+                RP_INFO("selected '{0}'", displayName);
                 return Amethyst::EventResult::CONSUMED;
             };
         }
 
-        item.action->onMouseButton2DownCb = [this, isDir](int32_t x, int32_t y) {
+        Rapture::AssetType assetType = metadata != nullptr ? metadata->assetType : Rapture::AssetType::NONE;
+        bool isAsset = metadata != nullptr;
+        item.action->onMouseButton2DownCb = [this, isDir, isAsset, assetType, assetHandle](int32_t x, int32_t y) {
             std::vector<Amethyst::ContextMenuItem> items;
-            if (!isDir) {
+            if (isAsset) {
+                items = assetActions(assetType, assetHandle);
+            } else if (!isDir) {
                 items.push_back(Amethyst::ContextMenuItem::action("Import", [] {}));
+            }
+            if (!items.empty()) {
+                items.push_back(Amethyst::ContextMenuItem::separator());
             }
             items.push_back(Amethyst::ContextMenuItem::action("Rename", [] {}));
             items.push_back(Amethyst::ContextMenuItem::action("Delete", [] {}));
@@ -807,23 +838,11 @@ void ContentBrowserPanel::buildDirectoryTree()
 {
     m_directoryTree->clear();
 
-    // "Assets" root: shows the asset registry in the grid.
-    m_directoryTree->addRow(0);
-    {
-        auto btn = s_makeTreeCell("Assets");
-        btn->onMouseButton1ClickCb = [this]() {
-            showAssets();
-            return Amethyst::EventResult::CONSUMED;
-        };
-        m_directoryTree->nextCell(std::move(btn));
-    }
-
-    // "Files" root: filesystem tree. Selecting a folder browses it in the grid.
     if (std::filesystem::exists(m_baseDirectory)) {
         m_directoryTree->addRow(0);
         {
             std::filesystem::path base = m_baseDirectory;
-            auto btn = s_makeTreeCell("Files");
+            auto btn = s_makeTreeCell(m_baseDirectory.filename().string());
             btn->onMouseButton1ClickCb = [this, base]() {
                 navigateToDirectory(base);
                 return Amethyst::EventResult::CONSUMED;
@@ -861,7 +880,6 @@ void ContentBrowserPanel::navigateToDirectory(const std::filesystem::path &path)
         m_navigationHistory.erase(m_navigationHistory.begin() + m_historyIndex + 1, m_navigationHistory.end());
     }
 
-    m_browseMode = BrowseMode::FILES;
     m_currentDirectory = path;
     m_navigationHistory.push_back(m_currentDirectory);
     m_historyIndex = m_navigationHistory.size() - 1;
@@ -889,13 +907,7 @@ void ContentBrowserPanel::navigateForward()
 
 void ContentBrowserPanel::onSearchTextChanged(const std::string &text)
 {
-    m_searchFilter = text;
-    refresh();
-}
-
-void ContentBrowserPanel::showAssets()
-{
-    m_browseMode = BrowseMode::ASSETS;
+    m_searchFilter = s_normalizeForSearch(text);
     refresh();
 }
 
@@ -990,14 +1002,31 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
         item.name = item.footer->add<Amethyst::TextLabel>();
         item.name->setBaseProperties({
             .interactable = false,
-            .position = Amethyst::UDim2(0.0f, 4.0f, 0.0f, 0.0f),
-            .size = Amethyst::UDim2(1.0f, -8.0f, 1.0f, 0.0f),
+            .position = Amethyst::UDim2(0.0f, 4.0f, 0.0f, 6.0f),
+            .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 22.0f),
             .zIndex = 2,
         });
         item.name->setBaseStyleProperties({.backgroundTransparency = 1.0f});
         item.name->setTextStyleProperties({
-            .fontSize = 11.0f,
+            .fontSize = 12.0f,
             .textColor = Amethyst::Color4(1.0f, 1.0f, 1.0f, 1.0f),
+            .textXAlignment = Amethyst::TextXAlignment::CENTER,
+            .textYAlignment = Amethyst::TextYAlignment::CENTER,
+            .textTruncate = Amethyst::TextTruncate::AT_END,
+        });
+
+        item.type = item.footer->add<Amethyst::TextLabel>();
+        item.type->setBaseProperties({
+            .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
+            .interactable = false,
+            .position = Amethyst::UDim2(0.0f, 4.0f, 1.0f, -4.0f),
+            .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 14.0f),
+            .zIndex = 2,
+        });
+        item.type->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+        item.type->setTextStyleProperties({
+            .fontSize = 10.0f,
+            .textColor = Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f),
             .textXAlignment = Amethyst::TextXAlignment::CENTER,
             .textYAlignment = Amethyst::TextYAlignment::CENTER,
             .textTruncate = Amethyst::TextTruncate::AT_END,

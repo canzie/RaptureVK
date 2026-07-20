@@ -1,4 +1,11 @@
-#include "BlobStore.h"
+// Parked: the packed `.rblob` partition store, the future runtime bake/export format.
+//
+// It packs many opaque payloads into 64MB partition files keyed by asset handle. It stores no
+// registry/metadata, so it must be revamped to carry that before the runtime path is built. Kept
+// verbatim for that work and compiled out until then. When revived, re-attach these to a class and
+// decide how metadata rides alongside the packed payloads.
+
+#if 0
 
 #include "logging/Log.h"
 
@@ -49,19 +56,19 @@ static uint32_t s_checksum(std::span<const uint8_t> bytes)
     return hash;
 }
 
-BlobStore::BlobStore(std::filesystem::path directory) : m_directory(std::move(directory))
+AssetCodec::AssetCodec(std::filesystem::path directory) : m_directory(std::move(directory))
 {
     loadExistingPartitions();
 }
 
-std::filesystem::path BlobStore::partitionPath(uint32_t index) const
+std::filesystem::path AssetCodec::partitionPath(uint32_t index) const
 {
     char name[32];
     std::snprintf(name, sizeof(name), "blob_%04u.rblob", index);
     return m_directory / name;
 }
 
-void BlobStore::loadExistingPartitions()
+void AssetCodec::loadExistingPartitions()
 {
     std::error_code ec;
     if (!std::filesystem::exists(m_directory, ec)) {
@@ -81,7 +88,7 @@ void BlobStore::loadExistingPartitions()
     }
 }
 
-bool BlobStore::loadPartition(const std::filesystem::path &path)
+bool AssetCodec::loadPartition(const std::filesystem::path &path)
 {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
@@ -135,7 +142,7 @@ bool BlobStore::loadPartition(const std::filesystem::path &path)
     return true;
 }
 
-uint32_t BlobStore::acquirePartition(uint64_t neededBytes)
+uint32_t AssetCodec::acquirePartition(uint64_t neededBytes)
 {
     for (Partition &partition : m_partitions) {
         if (!partition.path.empty() && sizeof(BlobPartitionHeader) + partition.usedBytes + neededBytes <= BLOB_PARTITION_CAPACITY) {
@@ -151,7 +158,7 @@ uint32_t BlobStore::acquirePartition(uint64_t neededBytes)
     return index;
 }
 
-bool BlobStore::writePartitionDirectory(Partition &partition)
+bool AssetCodec::writePartitionDirectory(Partition &partition)
 {
     std::vector<BlobEntry> table;
     table.reserve(partition.entries.size());
@@ -189,7 +196,7 @@ bool BlobStore::writePartitionDirectory(Partition &partition)
     return true;
 }
 
-int32_t BlobStore::store(AssetHandle id, std::span<const uint8_t> data)
+int32_t AssetCodec::store(AssetHandle id, std::span<const uint8_t> data)
 {
     auto existing = m_idToPartition.find(id);
     if (existing != m_idToPartition.end()) {
@@ -228,7 +235,7 @@ int32_t BlobStore::store(AssetHandle id, std::span<const uint8_t> data)
     return static_cast<int32_t>(index);
 }
 
-std::vector<uint8_t> BlobStore::read(AssetHandle id) const
+std::vector<uint8_t> AssetCodec::read(AssetHandle id) const
 {
     auto partitionIt = m_idToPartition.find(id);
     if (partitionIt == m_idToPartition.end()) {
@@ -262,3 +269,5 @@ std::vector<uint8_t> BlobStore::read(AssetHandle id) const
 }
 
 } // namespace Rapture
+
+#endif

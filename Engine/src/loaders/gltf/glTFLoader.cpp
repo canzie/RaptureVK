@@ -15,6 +15,7 @@
 #include <yyjson.h>
 
 #include "asset_manager/AssetManager.h"
+#include "asset_manager/ReservedAssets.h"
 #include "buffers/BufferLayout.h"
 #include "components/Components.h"
 #include "components/HierarchyComponent.h"
@@ -29,7 +30,8 @@
 
 namespace Rapture {
 
-glTF2Loader::glTF2Loader(const std::filesystem::path &filepath) : m_filepath(filepath)
+glTF2Loader::glTF2Loader(const std::filesystem::path &filepath, std::filesystem::path outputFolder, std::string name)
+    : m_filepath(filepath), m_outputFolder(std::move(outputFolder)), m_name(std::move(name))
 {
     m_basePath = filepath.parent_path().string();
     if (!m_basePath.empty() && m_basePath.back() != '/' && m_basePath.back() != '\\') {
@@ -90,7 +92,7 @@ size_t glTF2Loader::getArraySize(yyjson_val *arr)
     return yyjson_arr_size(arr);
 }
 
-void glTF2Loader::loadAndSetTexture(MaterialInstance *material, ParameterID id, int textureIndex)
+void glTF2Loader::loadAndSetTexture(MaterialInstance *material, const ParameterId &id, int textureIndex)
 {
     if (textureIndex < 0 || static_cast<size_t>(textureIndex) >= getArraySize(m_textures)) {
         RP_CORE_ERROR("glTF2Loader: Invalid texture index {}", textureIndex);
@@ -128,24 +130,25 @@ void glTF2Loader::loadAndSetTexture(MaterialInstance *material, ParameterID id, 
     std::filesystem::path texturePathFS = std::filesystem::path(texturePath);
 
     TextureImportConfig texImportConfig;
-    if (id == ParameterID::ALBEDO_MAP) {
+    if (id == MP_ALBEDO_MAP) {
         texImportConfig.srgb = true;
         texImportConfig.format = TextureFormat::BC3; // keep base color alpha for cutout/blend
-    } else if (id == ParameterID::METALLIC_ROUGHNESS_MAP) {
+    } else if (id == MP_METALLIC_ROUGHNESS_MAP) {
         texImportConfig.srgb = false;
         texImportConfig.format = TextureFormat::BC1_RGB; // roughness in G, metallic in B
-    } else if (id == ParameterID::NORMAL_MAP) {
+    } else if (id == MP_NORMAL_MAP) {
         texImportConfig.srgb = false;
         texImportConfig.format = TextureFormat::BC5; // Z reconstructed in shader via MAT_FLAG_NORMAL_BC5
-    } else if (id == ParameterID::AO_MAP) {
+    } else if (id == MP_AO_MAP) {
         texImportConfig.srgb = false;
         texImportConfig.format = TextureFormat::BC4; // occlusion in R
-    } else if (id == ParameterID::EMISSIVE_MAP) {
+    } else if (id == MP_EMISSIVE_MAP) {
         texImportConfig.srgb = true;
         texImportConfig.format = TextureFormat::BC1_RGB;
     }
 
-    auto asset = AssetManager::importAsset(texturePathFS, texImportConfig);
+    AssetImportFileRequest request{.source = texturePathFS, .output = m_outputFolder, .config = texImportConfig};
+    auto asset = AssetManager::importAsset(request);
     auto tex = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
 
     if (!tex) {
@@ -529,7 +532,10 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
     std::string meshAssetName =
         m_filepath.stem().string() + "_Mesh" + std::to_string(meshIndex) + "_Prim" + std::to_string(primitiveIndex);
     AssetProvenance provenance{m_filepath, static_cast<uint32_t>(meshIndex)};
-    out.meshRef = AssetManager::importAsset(MeshImportData{std::move(params)}, meshAssetName, provenance);
+    out.meshRef = AssetManager::importAsset(AssetImportDataRequest{.data = MeshImportData{std::move(params)},
+                                                                   .output = m_outputFolder,
+                                                                   .name = meshAssetName,
+                                                                   .provenance = provenance});
 
     yyjson_val *materialVal = getObjectValue(primitiveJson, "material");
     if (materialVal && yyjson_is_int(materialVal)) {
@@ -631,11 +637,14 @@ void glTF2Loader::buildPrefab()
         flatten(rootNode.get(), -1);
     }
 
+    std::string prefabName = m_name.empty() ? m_filepath.stem().string() : m_name;
+
     auto prefab = std::make_unique<Prefab>();
-    prefab->setName(m_filepath.stem().string());
+    prefab->setName(prefabName);
     prefab->setNodes(std::move(nodes));
 
-    AssetRef ref = AssetManager::registerVirtualAsset(std::move(prefab), m_filepath.stem().string(), AssetType::PREFAB);
+    AssetRef ref = AssetManager::importAsset(
+        AssetImportDataRequest{.data = PrefabImportData{std::move(prefab)}, .output = m_outputFolder, .name = prefabName});
     m_loadedData->prefab = AssetPtr<Prefab>(std::move(ref));
 }
 
@@ -765,83 +774,13 @@ SceneFileMetadata glTF2Loader::getMetadata()
  * The graph is authored here so the loader owns which node backs which parameter; the offsets the
  * compiler assigns are resolved into the parameter table the base exposes.
  */
-static std::shared_ptr<BaseMaterial> s_obtainGltfBaseMaterial()
+static AssetPtr<BaseMaterial> s_obtainGltfBaseMaterial()
 {
-    if (auto existing = MaterialManager::getMaterial("glTF Base Material")) {
-        return existing;
+    auto base = MaterialManager::getMaterial("glTF Base Material");
+    if (!base) {
+        RP_CORE_ERROR("glTF base material was not created at startup");
     }
-
-    AssetPtr<Texture> white(AssetManager::importDefaultAsset(AssetType::TEXTURE));
-    AssetPtr<Texture> flatNormal(
-        AssetManager::registerVirtualAsset(Texture::createDefaultFlatNormalTexture(), "<default_flat_normal>", AssetType::TEXTURE));
-
-    using GN = GraphNodeType;
-    MaterialGraph graph;
-    graph.name = "glTF";
-
-    graph.nodes.push_back({.id = 1, .type = GN::TEXCOORD});
-
-    graph.nodes.push_back({.id = 2, .type = GN::TEXTURE_SAMPLE, .inputTextures = {white}});
-    graph.nodes.push_back({.id = 3, .type = GN::CONSTANT_VEC4, .inputValues = {PinValue(glm::vec4(1.0f))}});
-    graph.nodes.push_back({.id = 4, .type = GN::MULTIPLY_VEC3});
-
-    graph.nodes.push_back({.id = 5, .type = GN::TEXTURE_SAMPLE, .inputTextures = {flatNormal}});
-    graph.nodes.push_back({.id = 6, .type = GN::NORMAL_MAP_RG});
-
-    graph.nodes.push_back({.id = 7, .type = GN::TEXTURE_SAMPLE, .inputTextures = {white}});
-    graph.nodes.push_back({.id = 8, .type = GN::SPLIT_VEC4});
-    graph.nodes.push_back({.id = 9, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(1.0f)}});
-    graph.nodes.push_back({.id = 10, .type = GN::MULTIPLY_FLOAT});
-    graph.nodes.push_back({.id = 11, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(1.0f)}});
-    graph.nodes.push_back({.id = 12, .type = GN::MULTIPLY_FLOAT});
-
-    graph.nodes.push_back({.id = 13, .type = GN::TEXTURE_SAMPLE, .inputTextures = {white}});
-    graph.nodes.push_back({.id = 14, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(1.0f)}});
-    graph.nodes.push_back({.id = 15, .type = GN::MULTIPLY_FLOAT});
-
-    graph.nodes.push_back({.id = 16, .type = GN::TEXTURE_SAMPLE, .inputTextures = {white}});
-    graph.nodes.push_back({.id = 17, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(1.0f))}});
-    graph.nodes.push_back({.id = 18, .type = GN::MULTIPLY_VEC3});
-    graph.nodes.push_back({.id = 19, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(0.0f)}});
-
-    graph.nodes.push_back({.id = 20, .type = GN::SURFACE_OUTPUT});
-    graph.outputNodeId = 20;
-
-    graph.connections = {
-        {1, 0, 2, 1},   {1, 0, 5, 1},   {1, 0, 7, 1},   {1, 0, 13, 1},  {1, 0, 16, 1},  {2, 0, 4, 0},
-        {3, 0, 4, 1},   {4, 0, 20, 0},  {5, 0, 6, 0},   {6, 0, 20, 1},  {7, 0, 8, 0},   {8, 1, 10, 0},
-        {9, 0, 10, 1},  {10, 0, 20, 2}, {8, 2, 12, 0},  {11, 0, 12, 1}, {12, 0, 20, 3}, {13, 0, 15, 0},
-        {14, 0, 15, 1}, {15, 0, 20, 4}, {16, 0, 18, 0}, {17, 0, 18, 1}, {18, 0, 20, 5}, {19, 0, 20, 6},
-    };
-
-    SurfaceGraphManager &graphs = MaterialManager::getSurfaceGraphManager();
-    uint32_t graphId = graphs.registerGraph(graph);
-    if (graphId == UINT32_MAX) {
-        RP_CORE_ERROR("Failed to compile the glTF base material graph");
-        return nullptr;
-    }
-
-    GraphSlotMapping mapping = graphs.getMapping(graphId);
-    std::unordered_map<ParameterID, uint32_t> table;
-    auto bind = [&](ParameterID id, uint32_t nodeId) {
-        auto slot = mapping.slots.find(Graph_pinKey(nodeId, 0));
-        if (slot != mapping.slots.end()) {
-            table[id] = slot->second.offset;
-        }
-    };
-    bind(ParameterID::ALBEDO_MAP, 2);
-    bind(ParameterID::ALBEDO, 3);
-    bind(ParameterID::NORMAL_MAP, 5);
-    bind(ParameterID::METALLIC_ROUGHNESS_MAP, 7);
-    bind(ParameterID::ROUGHNESS, 9);
-    bind(ParameterID::METALLIC, 11);
-    bind(ParameterID::AO_MAP, 13);
-    bind(ParameterID::AO, 14);
-    bind(ParameterID::EMISSIVE_MAP, 16);
-    bind(ParameterID::EMISSIVE, 17);
-    bind(ParameterID::EMISSIVE_STRENGTH, 19);
-
-    return MaterialManager::createMaterial("glTF Base Material", graphId, std::move(table), std::move(graph));
+    return base;
 }
 
 AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
@@ -898,7 +837,7 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
         if (baseColorTextureInfo) {
             int texIndex = getInt(getObjectValue(baseColorTextureInfo, "index"), -1);
             if (texIndex != -1) {
-                loadAndSetTexture(material.get(), ParameterID::ALBEDO_MAP, texIndex);
+                loadAndSetTexture(material.get(), MP_ALBEDO_MAP, texIndex);
             }
         }
 
@@ -906,7 +845,7 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
         if (metallicRoughnessTextureInfo) {
             int texIndex = getInt(getObjectValue(metallicRoughnessTextureInfo, "index"), -1);
             if (texIndex != -1) {
-                loadAndSetTexture(material.get(), ParameterID::METALLIC_ROUGHNESS_MAP, texIndex);
+                loadAndSetTexture(material.get(), MP_METALLIC_ROUGHNESS_MAP, texIndex);
             }
         }
     }
@@ -915,7 +854,7 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
     if (normalTextureInfo) {
         int texIndex = getInt(getObjectValue(normalTextureInfo, "index"), -1);
         if (texIndex != -1) {
-            loadAndSetTexture(material.get(), ParameterID::NORMAL_MAP, texIndex);
+            loadAndSetTexture(material.get(), MP_NORMAL_MAP, texIndex);
         }
     }
 
@@ -923,7 +862,7 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
     if (occlusionTextureInfo) {
         int texIndex = getInt(getObjectValue(occlusionTextureInfo, "index"), -1);
         if (texIndex != -1) {
-            loadAndSetTexture(material.get(), ParameterID::AO_MAP, texIndex);
+            loadAndSetTexture(material.get(), MP_AO_MAP, texIndex);
         }
     }
 
@@ -931,7 +870,7 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
     if (emissiveTextureInfo) {
         int texIndex = getInt(getObjectValue(emissiveTextureInfo, "index"), -1);
         if (texIndex != -1) {
-            loadAndSetTexture(material.get(), ParameterID::EMISSIVE_MAP, texIndex);
+            loadAndSetTexture(material.get(), MP_EMISSIVE_MAP, texIndex);
         }
     }
 
@@ -940,14 +879,15 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
         glm::vec3 emissiveFactor(static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 0), 0.0)),
                                  static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 1), 0.0)),
                                  static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 2), 0.0)));
-        material->setParameter(ParameterID::EMISSIVE, emissiveFactor);
+        material->setParameter(MP_EMISSIVE, emissiveFactor);
     }
 
-    material->setParameter(ParameterID::ALBEDO, glm::vec4(baseColor, 1.0f));
-    material->setParameter(ParameterID::METALLIC, metallic);
-    material->setParameter(ParameterID::ROUGHNESS, roughness);
+    material->setParameter(MP_ALBEDO, glm::vec4(baseColor, 1.0f));
+    material->setParameter(MP_METALLIC, metallic);
+    material->setParameter(MP_ROUGHNESS, roughness);
 
-    AssetRef ref = AssetManager::registerVirtualAsset(std::move(material), materialName, AssetType::MATERIAL);
+    AssetRef ref = AssetManager::importAsset(AssetImportDataRequest{
+        .data = MaterialInstanceImportData{std::move(material)}, .output = m_outputFolder, .name = materialName});
     m_loadedData->materials[materialIndex] = ref;
 
     return ref;

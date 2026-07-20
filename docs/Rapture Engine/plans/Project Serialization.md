@@ -9,6 +9,34 @@
 > list). This is the source of truth for the flow; refine it, don't re-derive it. Open refinement
 > points are collected at the bottom.
 
+> **Revision 2026-07-19 — physical `.rasset` files per asset, no `.rapt` registry section, no
+> virtual folders.** The editor no longer stores the asset registry inside the `.rapt`; each
+> imported asset is a self-contained **`.rasset`** file on disk under the project `content/` folder,
+> in real directories (a metadata header + the existing cooked payload from the type's `serialize`).
+> Folders are physical — the virtual-folder idea is dead, replaced by real files precisely so empty
+> folders and on-disk feel work. On project open the AssetManager scans `content/`, reads each
+> header, and registers the assets. Files are the source of truth.
+>
+> Invariants: a `.rasset` is **fully isolated** — it embeds everything for its own asset and never
+> references another file on disk. Cross-asset links (material → texture, instance → base) are
+> **UUID references resolved through the registry**, never a path. Identity is the **UUID, embedded
+> in the header**; filenames are human (the asset name), never the uuid.
+>
+> **Locations do not live in metadata** — a stored path is unstable (files move/rename). Instead a
+> refreshable **`uuid → path` map** is built by scanning `content/`; a stale/failed write path
+> triggers a rescan (the uuid is inside each file). The **AssetManager never chooses the destination
+> folder**: a target path is provided by the caller (later the editor/import panel — relative to
+> `content/`, defaulting to the folder open in the browser, user-overridable). Pure virtual assets
+> are no longer shown in the browser (accepted); builtins/reserved-UUID stay registered in-memory.
+>
+> The `serialize`/`deserialize` functions are reused unchanged — the codec (`AssetCodec`, renamed
+> from BlobStore) gains the binary `.rasset` header + metadata encoding. The **packed `.rblob` code
+> is parked, not deleted** (`AssetPack.cpp`, `#if 0`): future runtime bake, and a later blob→`.rasset`
+> migration. Status: codec built and standalone; persistence is currently **stripped out of
+> `AssetManagerEditor`** (in-memory build/register only) pending correct map-based integration. This
+> supersedes "the `.rapt` holds the asset registry" in [[#Goal / intent]] and reframes
+> [[#Binary path (.rasset)]] as the *packed* form of the same file.
+
 **Related: [[Material System Overhaul]], [[Material Graph Compiler]], [[Asset Manager]], [[Scene]], [[Asset Metadata]], [[Prefab]]**
 
 ## Goal / intent

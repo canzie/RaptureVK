@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -50,6 +51,19 @@ struct MaterialGraph {
      * @return Pointer to the node, or nullptr if not present
      */
     const GraphNode *findNode(uint32_t id) const;
+
+    /**
+     * @brief Serializes this graph into a self-contained blob, texture inputs stored by handle
+     * @return The serialized bytes
+     */
+    std::vector<uint8_t> serialize() const;
+
+    /**
+     * @brief Rebuilds a graph from a blob, resolving texture handles back to asset pointers
+     * @param blob The serialized bytes
+     * @return The graph, or empty on failure
+     */
+    static std::optional<MaterialGraph> deserialize(std::span<const uint8_t> blob);
 };
 
 } // namespace Rapture

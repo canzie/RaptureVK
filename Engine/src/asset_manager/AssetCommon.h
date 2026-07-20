@@ -3,6 +3,8 @@
 
 #include "utils/UUID.h"
 
+#include <filesystem>
+#include <optional>
 #include <string>
 
 namespace Rapture {
@@ -11,12 +13,21 @@ using AssetHandle = UUID;
 
 static constexpr AssetHandle INVALID_ASSET_HANDLE = 0;
 
+/**
+ * @brief Where an asset was originally imported from, kept for reimport not for loading
+ */
+struct AssetProvenance {
+    std::filesystem::path sourcePath;                      // original file, empty if generated
+    std::optional<uint32_t> sourceSubIndex = std::nullopt; // sub-asset index within a container source, e.g. a glTF mesh
+};
+
 enum class AssetType {
     NONE,
     TEXTURE,
     CUBEMAP,
     SHADER,
     MATERIAL,
+    MATERIAL_INSTANCE,
     MESH,
     PREFAB,
     ANIMATION,
@@ -55,6 +66,8 @@ inline std::string AssetTypeToString(AssetType type)
         return "Shader";
     case AssetType::MATERIAL:
         return "Material";
+    case AssetType::MATERIAL_INSTANCE:
+        return "Material Instance";
     case AssetType::MESH:
         return "Mesh";
     case AssetType::PREFAB:

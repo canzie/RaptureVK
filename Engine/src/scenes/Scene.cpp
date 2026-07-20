@@ -77,7 +77,7 @@ Entity Scene::createCube(const std::string &name)
     entity.addComponent<BoundingBoxComponent>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
 
     // Add a material
-    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL);
+    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL_INSTANCE);
     if (materialRef) {
         entity.addComponent<MaterialComponent>(materialRef);
     }
@@ -111,7 +111,7 @@ Entity Scene::createSphere(const std::string &name)
     entity.addComponent<BoundingBoxComponent>(glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
     // Add a material
-    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL);
+    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL_INSTANCE);
     if (materialRef) {
         entity.addComponent<MaterialComponent>(materialRef);
     }

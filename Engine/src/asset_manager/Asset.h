@@ -24,21 +24,13 @@
 namespace Rapture {
 
 using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
-                                  std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>, std::unique_ptr<SceneFileData>,
-                                  std::unique_ptr<Prefab>>;
+                                  std::unique_ptr<BaseMaterial>, std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>,
+                                  std::unique_ptr<SceneFileData>, std::unique_ptr<Prefab>>;
 
 template <typename T, typename Variant>
 struct IsAssetType;
 template <typename T, typename... Us>
 struct IsAssetType<T, std::variant<Us...>> : std::bool_constant<(std::is_same_v<std::unique_ptr<T>, Us> || ...)> {};
-
-/**
- * @brief Where an asset was originally imported from, kept for reimport not for loading
- */
-struct AssetProvenance {
-    std::filesystem::path sourcePath;       // original file, empty if generated
-    std::optional<uint32_t> sourceSubIndex; // sub-asset index within a container source, e.g. a glTF mesh
-};
 
 struct AssetMetadata {
 
@@ -51,22 +43,20 @@ struct AssetMetadata {
     AssetType assetType = AssetType::NONE;
     AssetStorageType storageType = AssetStorageType::DISK;
 
-    std::filesystem::path filePath;
     AssetImportConfigVariant importConfig = std::monostate();
-    std::string virtualName = "untitled";
+    std::string name = "untitled";
 
-    bool hasBlob = false; // a reloadable blob exists in the BlobStore under this handle
     std::optional<AssetProvenance> provenance;
+    std::filesystem::path assetPath;
 
     std::atomic<uint32_t> useCount{0};
     AssetEvictionPolicy evictionPolicy = AssetEvictionPolicy::EVICT_IMMEDIATE;
+    uint64_t sizeHintBytes = 0;
 
     bool isDiskAsset() const { return storageType == AssetStorageType::DISK; }
     bool isVirtualAsset() const { return storageType == AssetStorageType::VIRTUAL; }
-    const std::string getName()
-    {
-        return filePath.empty() ? virtualName : filePath.stem().string();
-    }
+    const std::string &getName() const { return name; }
+    std::filesystem::path getSourcePath() const { return provenance ? provenance->sourcePath : std::filesystem::path{}; }
 
     operator bool() const { return assetType != AssetType::NONE; }
 };

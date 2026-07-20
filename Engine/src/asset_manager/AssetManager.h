@@ -38,14 +38,17 @@ class AssetManager {
     static AssetRef getAsset(AssetHandle handle)
     {
         Asset &asset = s_activeAssetManager->getAsset(handle);
+        if (!asset) {
+            return AssetRef();
+        }
         AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(handle);
 
         return AssetRef(&asset, &metadata.useCount);
     }
 
-    static AssetRef importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate())
+    static AssetRef importAsset(const AssetImportFileRequest &request)
     {
-        auto &asset = s_activeAssetManager->importAsset(path, importConfig);
+        auto &asset = s_activeAssetManager->importAsset(request);
 
         if (!asset || !asset.isValid()) {
             return AssetRef();
@@ -55,10 +58,16 @@ class AssetManager {
         return AssetRef(&asset, &metadata.useCount);
     }
 
-    static AssetRef importAsset(AssetImportDataVariant importData, const std::string &name,
-                                std::optional<AssetProvenance> provenance = std::nullopt)
+    static AssetRef importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate(),
+                                std::string name = {})
     {
-        auto &asset = s_activeAssetManager->importAsset(std::move(importData), name, std::move(provenance));
+        return importAsset(
+            AssetImportFileRequest{.source = std::move(path), .config = std::move(importConfig), .name = std::move(name)});
+    }
+
+    static AssetRef importAsset(AssetImportDataRequest request)
+    {
+        auto &asset = s_activeAssetManager->importAsset(std::move(request));
 
         if (!asset || !asset.isValid()) {
             return AssetRef();
@@ -66,6 +75,21 @@ class AssetManager {
 
         AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
         return AssetRef(&asset, &metadata.useCount);
+    }
+
+    static AssetHandle registerRaptureAsset(std::filesystem::path path)
+    {
+        return s_activeAssetManager->registerRaptureAsset(std::move(path));
+    }
+
+    static uint32_t registerAssetDirectory(const std::filesystem::path &directory)
+    {
+        return s_activeAssetManager->registerAssetDirectory(directory);
+    }
+
+    static AssetHandle findAssetByPath(const std::filesystem::path &path)
+    {
+        return s_activeAssetManager->findAssetByPath(path);
     }
 
     static AssetRef importDefaultAsset(AssetType assetType)
@@ -88,6 +112,18 @@ class AssetManager {
         auto &asset = s_activeAssetManager->registerVirtualAsset(std::move(assetValue), virtualName, assetType);
         auto &metdata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
         return asset ? AssetRef(&asset, &metdata.useCount) : AssetRef();
+    }
+
+    static AssetRef registerReservedAsset(AssetHandle handle, AssetVariant &&assetValue, const std::string &name,
+                                          AssetType assetType)
+    {
+        if (!s_isInitialized || !s_activeAssetManager) {
+            RP_CORE_ERROR("AssetManager not initialized");
+            return AssetRef();
+        }
+        auto &asset = s_activeAssetManager->registerReservedAsset(handle, std::move(assetValue), name, assetType);
+        auto &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
+        return asset ? AssetRef(&asset, &metadata.useCount) : AssetRef();
     }
 
     static bool unregisterVirtualAsset(AssetHandle handle)

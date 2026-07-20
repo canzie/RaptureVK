@@ -3,12 +3,17 @@
 
 #include "MaterialData.h"
 #include "MaterialParameters.h"
-#include "events/ProjectEvents.h"
+#include "asset_manager/AssetCommon.h"
+#include "asset_manager/AssetHandle.h"
+#include "events/Events.h"
 #include "graph/MaterialGraph.h"
 
+#include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace Rapture {
 
@@ -19,13 +24,26 @@ class SurfaceGraphManager;
 // Maximum number of live material instances backed by the shared SSBO arena
 constexpr uint32_t MAX_MATERIALS = 4096;
 
-class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
+class BaseMaterial {
   public:
-    BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterID, uint32_t> table, MaterialGraph graph);
+    BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph);
     ~BaseMaterial() = default;
 
     const std::string &getName() const { return m_name; }
     uint32_t getGraphId() const { return m_graphId; }
+
+    /**
+     * @brief Serializes this base material's graph and parameter table into a self-contained blob
+     * @return The serialized bytes
+     */
+    std::vector<uint8_t> serialize() const;
+
+    /**
+     * @brief Rebuilds a base material from a blob, recompiling its graph to obtain a graph id
+     * @param blob The serialized bytes
+     * @return The base material, or nullptr if the blob is invalid
+     */
+    static std::unique_ptr<BaseMaterial> deserialize(std::span<const uint8_t> blob);
 
     /**
      * @brief The authored graph this base was compiled from, retained so the editor can redraw it
@@ -39,12 +57,12 @@ class BaseMaterial : public std::enable_shared_from_this<BaseMaterial> {
      * @param out Set to the uint offset within the instance slice when found
      * @return True if this base exposes the parameter
      */
-    bool tryGetOffset(ParameterID id, uint32_t &out) const;
+    bool tryGetOffset(const ParameterId &id, uint32_t &out) const;
 
   private:
     std::string m_name;
     uint32_t m_graphId;
-    std::unordered_map<ParameterID, uint32_t> m_table;
+    std::unordered_map<ParameterId, uint32_t> m_table;
     MaterialGraph m_graph;
 
     friend class MaterialInstance;
@@ -62,9 +80,13 @@ class MaterialManager {
 
     static void shutdown();
 
-    static std::shared_ptr<BaseMaterial> getMaterial(const std::string &name);
-    static std::shared_ptr<BaseMaterial> createMaterial(const std::string &name, uint32_t graphId,
-                                                        std::unordered_map<ParameterID, uint32_t> table, MaterialGraph graph);
+    static AssetPtr<BaseMaterial> getMaterial(const std::string &name);
+    static AssetPtr<BaseMaterial> createMaterial(const std::string &name, uint32_t graphId,
+                                                 std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
+                                                 std::filesystem::path outputFolder);
+    static AssetPtr<BaseMaterial> createBuiltinMaterial(const std::string &name, uint32_t graphId,
+                                                        std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
+                                                        AssetHandle reservedHandle);
     static uint32_t getDefaultTextureIndex();
     static void printMaterialNames();
 
@@ -119,7 +141,7 @@ class MaterialManager {
 
     static bool s_initialized;
     static uint32_t s_defaultTextureIndex;
-    static std::unordered_map<std::string, std::shared_ptr<BaseMaterial>> s_materials;
+    static std::unordered_map<std::string, AssetHandle> s_materialHandles;
     static std::unique_ptr<FreeListStorageBuffer> s_materialBuffer;
     static std::unique_ptr<VirtualStorageBuffer> s_graphBuffer;
     static std::unique_ptr<SurfaceGraphManager> s_surfaceGraphManager;

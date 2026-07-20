@@ -9,6 +9,9 @@
 #include "utils/Timestep.h"
 
 #if defined(__linux__)
+#include <cstdlib>
+#include <fstream>
+#include <string>
 #include <sys/sysinfo.h>
 #endif
 
@@ -101,6 +104,8 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     MaterialManager::init();
 
+    AssetManager::registerAssetDirectory(m_project->getContentDirectory());
+
     RP_CORE_INFO("========== Application created ==========");
 }
 
@@ -137,6 +142,19 @@ void Application::pollTelemetry()
     if (sysinfo(&info) == 0) {
         m_telemetry.ramTotalBytes = static_cast<uint64_t>(info.totalram) * info.mem_unit;
         m_telemetry.ramUsedBytes = static_cast<uint64_t>(info.totalram - info.freeram) * info.mem_unit;
+    }
+
+    // sysinfo's freeram counts reclaimable cache and buffers as used, so it overreports; MemAvailable
+    // is the kernel's estimate of allocatable memory, matching what system monitors report as free
+    std::ifstream meminfo("/proc/meminfo");
+    std::string line;
+    while (std::getline(meminfo, line)) {
+        if (line.rfind("MemAvailable:", 0) == 0) {
+            uint64_t availableBytes = std::strtoull(line.c_str() + 13, nullptr, 10) * 1024;
+            m_telemetry.ramUsedBytes =
+                m_telemetry.ramTotalBytes > availableBytes ? m_telemetry.ramTotalBytes - availableBytes : 0;
+            break;
+        }
     }
 #endif
 }

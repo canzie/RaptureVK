@@ -55,6 +55,18 @@ Mesh::~Mesh()
     m_vertexAllocation.reset();
 }
 
+uint64_t Mesh::getSizeBytes() const
+{
+    uint64_t size = 0;
+    if (m_vertexAllocation) {
+        size += m_vertexAllocation->sizeBytes;
+    }
+    if (m_indexAllocation) {
+        size += m_indexAllocation->sizeBytes;
+    }
+    return size;
+}
+
 void Mesh::setMeshData(MeshAllocatorParams &params)
 {
     auto &app = Application::getInstance();

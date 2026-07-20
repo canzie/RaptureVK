@@ -60,6 +60,12 @@ class Mesh {
     std::shared_ptr<BufferAllocation> getIndexAllocation() const { return m_indexAllocation; }
     std::shared_ptr<BufferAllocation> getVertexAllocation() const { return m_vertexAllocation; }
 
+    /**
+     * @brief Approximate GPU footprint of this mesh in bytes
+     * @return The combined size of the vertex and index allocations
+     */
+    uint64_t getSizeBytes() const;
+
   private:
     uint32_t m_indexCount;
     std::shared_ptr<VertexBuffer> m_vertexBuffer;

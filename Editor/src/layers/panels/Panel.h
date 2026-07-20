@@ -29,6 +29,7 @@ class Panel {
         tabBar->addTab(std::move(m_root->parent->removeChild(m_root)), iconTabLayout(m_name, icon));
     }
     virtual void onUpdate(float dt) {}
+    virtual void setContext(const WorkspaceContext &context) { m_services = context.services; }
     Amethyst::Frame *root() { return m_root; }
 
   public:

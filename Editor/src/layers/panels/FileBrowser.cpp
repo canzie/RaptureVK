@@ -537,7 +537,7 @@ void FileBrowser::setupListArea()
     const float listTop = TOP_BAR_HEIGHT;
     const float bottomReserve = STATUS_BAR_HEIGHT + FOOTER_HEIGHT;
 
-    Amethyst::UIScope(*m_root).table(
+    Amethyst::UIScope(*m_root).scrollingFrame(
         {
             .base =
                 {
@@ -546,37 +546,54 @@ void FileBrowser::setupListArea()
                     .size = Amethyst::UDim2(1.0f, -SIDE_BAR_WIDTH, 1.0f, -(listTop + bottomReserve)),
                 },
             .style = {.backgroundColor = COL_LIST_BG},
-            .table =
+            .scroll =
                 {
-                    .rowHeight = ROW_HEIGHT,
-                    .cellPadding = {Amethyst::UDim::fromOffset(0.0f), Amethyst::UDim::fromOffset(CONTENT_PADDING),
-                                    Amethyst::UDim::fromOffset(0.0f), Amethyst::UDim::fromOffset(CONTENT_PADDING)},
-                    .separatorMode = Amethyst::TableSeparatorMode::OFF,
-                    .showHeader = true,
-                    .headerHeight = LIST_HEADER_HEIGHT,
-                    .headerColor = COL_PANEL_2,
-                    .header =
-                        {
-                            .fontSize = 11.0f,
-                            .textColor = COL_TEXT_DIM,
-                            .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                            .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                        },
-                    .rowBackgroundColor = COL_LIST_BG_4,
-                    .rowAlternateColor = COL_ROW_ALT_4,
-                    .selectedRowColor = COL_SELECTED_4,
+                    .scrollAxis = Amethyst::ScrollAxis::Y,
+                    .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
+                    .automaticCanvasSize = Amethyst::AutomaticSize::Y,
                 },
         },
-        [this](Amethyst::TableScope &t) {
-            m_table = &t.component;
-            // Weights are relative widths (no real pixel lock yet). Name dominates; the
-            // metadata columns stay compact. The icon lives inside the name cell.
-            t.column("NAME", 6.0f);
-            t.column("SIZE", 1.0f);
-            t.column("TYPE", 1.1f);
-            t.column("DATE", 1.6f);
+        [this](Amethyst::ScrollingFrameScope &sf) {
+            sf.table(
+                {
+                    .base =
+                        {
+                            .position = Amethyst::UDim2::fromScale(0.0f),
+                            .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, 0.0f),
+                        },
+                    .style = {.backgroundTransparency = 1.0f},
+                    .table =
+                        {
+                            .rowHeight = ROW_HEIGHT,
+                            .cellPadding = {Amethyst::UDim::fromOffset(0.0f), Amethyst::UDim::fromOffset(CONTENT_PADDING),
+                                            Amethyst::UDim::fromOffset(0.0f), Amethyst::UDim::fromOffset(CONTENT_PADDING)},
+                            .separatorMode = Amethyst::TableSeparatorMode::OFF,
+                            .showHeader = true,
+                            .headerHeight = LIST_HEADER_HEIGHT,
+                            .headerColor = COL_PANEL_2,
+                            .header =
+                                {
+                                    .fontSize = 11.0f,
+                                    .textColor = COL_TEXT_DIM,
+                                    .textXAlignment = Amethyst::TextXAlignment::LEFT,
+                                    .textYAlignment = Amethyst::TextYAlignment::CENTER,
+                                },
+                            .rowBackgroundColor = COL_LIST_BG_4,
+                            .rowAlternateColor = COL_ROW_ALT_4,
+                            .selectedRowColor = COL_SELECTED_4,
+                        },
+                },
+                [this](Amethyst::TableScope &t) {
+                    m_table = &t.component;
+                    // Weights are relative widths (no real pixel lock yet). Name dominates; the
+                    // metadata columns stay compact. The icon lives inside the name cell.
+                    t.column("NAME", 6.0f);
+                    t.column("SIZE", 1.0f);
+                    t.column("TYPE", 1.1f);
+                    t.column("DATE", 1.6f);
 
-            m_table->onRowSelected = [this](uint32_t row) { onRowClicked(row); };
+                    m_table->onRowSelected = [this](uint32_t row) { onRowClicked(row); };
+                });
         });
 }
 
@@ -938,6 +955,9 @@ void FileBrowser::populate()
                 .cell([=](Amethyst::UIScope &s) { s_textCell(s, date, COL_TEXT_DIM, Amethyst::TextXAlignment::LEFT); });
         });
     }
+
+    float contentHeight = LIST_HEADER_HEIGHT + static_cast<float>(m_visibleEntries.size()) * ROW_HEIGHT;
+    m_table->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, contentHeight)});
 
     if (m_statusLabel != nullptr) {
         m_statusLabel->setText(std::to_string(m_visibleEntries.size()) + " items");

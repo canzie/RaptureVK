@@ -1,7 +1,9 @@
-#pragma once
+#ifndef RAPTURE__ASSET_MANAGER_EDITOR_H
+#define RAPTURE__ASSET_MANAGER_EDITOR_H
 
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -9,10 +11,10 @@
 
 #include "Asset.h"
 #include "AssetManagerBase.h"
+#include "utils/PriorityQueue.h"
 
 namespace Rapture {
 
-class BlobStore;
 struct Telemetry;
 
 class AssetManagerEditor : public AssetManagerBase {
@@ -27,25 +29,58 @@ class AssetManagerEditor : public AssetManagerBase {
     AssetMetadata &getAssetMetadata(AssetHandle handle);
     const AssetMetadata &getAssetMetadata(AssetHandle handle) const;
 
-    Asset &importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate());
+    /**
+     * @brief Imports an external non-.rasset file into an owned asset
+     * @param request The source file, output folder, import config and name
+     * @return The imported asset, or Asset::null on failure
+     */
+    Asset &importAsset(const AssetImportFileRequest &request);
 
     /**
-     * @brief Builds and registers a disk-backed asset from raw data instead of a file
-     * @param importData Per-type data to build the asset, and whether to write a reloadable blob
-     * @param name A display name for the asset
-     * @param provenance The original import source, kept for reimport
-     * @return The created asset, or Asset::null on failure
+     * @brief Imports in-memory data into an owned asset, writing its .rasset
+     * @param request The data, output folder, name and provenance
+     * @return The imported asset, or Asset::null on failure
      */
-    Asset &importAsset(AssetImportDataVariant importData, const std::string &name,
-                       std::optional<AssetProvenance> provenance = std::nullopt);
+    Asset &importAsset(AssetImportDataRequest request);
+
+    /**
+     * @brief Registers an owned asset from its .rasset file without loading its data
+     * @param path The .rasset file
+     * @return The registered asset handle, or INVALID_ASSET_HANDLE on failure
+     */
+    AssetHandle registerRaptureAsset(std::filesystem::path path);
+
+    /**
+     * @brief Registers every .rasset under a directory tree without loading their data
+     * @param directory The directory to scan recursively
+     * @return The number of newly registered assets
+     */
+    uint32_t registerAssetDirectory(const std::filesystem::path &directory);
 
     Asset &importDefaultAsset(AssetType assetType);
 
     Asset &registerVirtualAsset(AssetVariant asset, const std::string &virtualName, AssetType assetType);
     bool unregisterVirtualAsset(AssetHandle handle);
 
+    /**
+     * @brief Registers an engine builtin under its fixed reserved handle, recreated in code each run
+     * @param handle The reserved handle
+     * @param asset The built asset value
+     * @param name A display name for the asset
+     * @param assetType The asset type
+     * @return The registered asset, or the existing one if the handle is already registered
+     */
+    Asset &registerReservedAsset(AssetHandle handle, AssetVariant asset, const std::string &name, AssetType assetType);
+
     Asset &getVirtualAssetByName(const std::string &virtualName);
     std::vector<AssetHandle> getVirtualAssetsByType(AssetType type) const;
+
+    /**
+     * @brief Looks up the asset registered at an on-disk .rasset path
+     * @param path The .rasset file path
+     * @return The asset handle, or INVALID_ASSET_HANDLE if no asset is registered there
+     */
+    AssetHandle findAssetByPath(const std::filesystem::path &path) const;
 
     void onUpdate();
 
@@ -62,6 +97,37 @@ class AssetManagerEditor : public AssetManagerBase {
     bool evictAsset(AssetHandle handle);
     void ensureDeferredFreeBuckets();
 
+    void processUnloadRequests();
+    void addToColdList(AssetHandle handle, const AssetMetadata &metadata);
+    void drainColdList();
+
+    /**
+     * @brief Writes the .rasset for any imported asset whose load has finished
+     */
+    void processPendingWrites();
+
+    /**
+     * @brief Writes an asset's payload to <folder>/<name>.rasset and records its path
+     * @param handle The asset handle stored in the file
+     * @param folder The output directory
+     * @param metadata The asset metadata encoded into the file
+     * @param payload The serialized asset bytes
+     */
+    void writeRaptureAssetFile(AssetHandle handle, const std::filesystem::path &folder, AssetMetadata &metadata,
+                               std::span<const uint8_t> payload);
+
+    /**
+     * @brief Registers a built asset, then writes its .rasset now or defers it until its load finishes
+     * @param handle The asset handle
+     * @param asset The built asset, loaded or still loading
+     * @param metadata The asset metadata
+     * @param outputFolder Directory the owned .rasset is written into, empty to skip
+     * @param payload The serialized bytes for a synchronous write, empty to defer to the async load
+     * @return The registered asset
+     */
+    Asset &registerImportedAsset(AssetHandle handle, std::unique_ptr<Asset> asset, std::unique_ptr<AssetMetadata> metadata,
+                                 const std::filesystem::path &outputFolder, std::span<const uint8_t> payload);
+
     /**
      * @brief Rebuilds an asset from its reload source described in the metadata
      * @param handle The asset handle
@@ -69,10 +135,6 @@ class AssetManagerEditor : public AssetManagerBase {
      * @return The rebuilt asset, or nullptr on failure
      */
     std::unique_ptr<Asset> loadFromMetadata(AssetHandle handle, AssetMetadata &metadata);
-
-    BlobStore &getBlobStore();
-
-    std::unique_ptr<BlobStore> m_blobStore;
 
     const Telemetry *m_telemetry = nullptr;
 
@@ -84,6 +146,17 @@ class AssetManagerEditor : public AssetManagerBase {
     bool m_shuttingDown = false;
 
     moodycamel::ConcurrentQueue<AssetHandle> m_pendingUnloadChecks;
+
+    PriorityQueue<AssetHandle> m_coldList;
+    bool m_coldDraining = false;
+
+    // Hash of a .rasset path to the handle registered at that path
+    std::unordered_map<uint64_t, AssetHandle> m_pathIndex;
+
+    // The output folder for each handle whose async load must finish before its .rasset is written
+    std::vector<std::pair<AssetHandle, std::filesystem::path>> m_pendingWrites;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__ASSET_MANAGER_EDITOR_H

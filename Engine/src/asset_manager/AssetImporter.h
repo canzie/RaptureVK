@@ -23,7 +23,7 @@ class AssetImporter {
             return;
         }
         s_assetImporters[AssetType::SHADER] = loadShader;
-        s_assetImporters[AssetType::MATERIAL] = loadMaterial;
+        s_assetImporters[AssetType::MATERIAL_INSTANCE] = loadMaterial;
         s_assetImporters[AssetType::TEXTURE] = loadTexture;
         s_assetImporters[AssetType::CUBEMAP] = loadCubemap;
         s_assetImporters[AssetType::SCENE] = loadScene;

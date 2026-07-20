@@ -1,16 +1,17 @@
 #ifndef RAPTURE__MATERIAL_INSTANCE_H
 #define RAPTURE__MATERIAL_INSTANCE_H
 
-#include "asset_manager/AssetHandle.h"
-#include "events/AssetEvents.h"
 #include "GraphInstanceData.h"
 #include "Material.h"
 #include "MaterialData.h"
 #include "MaterialParameters.h"
+#include "asset_manager/AssetHandle.h"
+#include "events/AssetEvents.h"
 
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -19,27 +20,33 @@ namespace Rapture {
 class Texture;
 
 struct PendingTexture {
-    ParameterID parameterId;
+    ParameterId parameterId;
     Texture *texture;
 };
 
 class MaterialInstance {
   public:
-    MaterialInstance(std::shared_ptr<BaseMaterial> material, const std::string &name = "");
+    MaterialInstance(AssetPtr<BaseMaterial> material, const std::string &name = "");
     ~MaterialInstance();
 
-    std::shared_ptr<BaseMaterial> getBaseMaterial() const { return m_baseMaterial; }
+    BaseMaterial *getBaseMaterial() const { return m_baseMaterial.get(); }
+
+    std::vector<uint8_t> serialize() const;
+    static std::unique_ptr<MaterialInstance> deserialize(std::span<const uint8_t> blob);
+
     const std::string &getName() const { return m_name; }
     uint32_t getBindlessIndex() const { return m_bindlessIndex; }
     const MaterialData &getData() const { return m_data; }
     uint32_t getFlags() const { return m_data.flags; }
 
-    template <typename T> void setParameter(ParameterID id, const T &value)
+    template <typename T>
+    void setParameter(const ParameterId &id, const T &value)
     {
         writeSlice(id, &value, sizeof(T));
     }
 
-    template <typename T> T getParameter(ParameterID id) const
+    template <typename T>
+    T getParameter(const ParameterId &id) const
     {
         T value{};
         uint32_t offset = 0;
@@ -50,7 +57,7 @@ class MaterialInstance {
         return value;
     }
 
-    void setParameter(ParameterID id, AssetRef texture);
+    void setParameter(const ParameterId &id, AssetRef texture);
     void updatePendingTextures();
 
     /**
@@ -58,7 +65,7 @@ class MaterialInstance {
      * @param id The texture parameter to look up
      * @return The bound texture, or null if none is set
      */
-    AssetPtr<Texture> getTextureRef(ParameterID id) const;
+    AssetPtr<Texture> getTextureRef(const ParameterId &id) const;
 
     /**
      * @brief Turn this instance into a graph material backed by a generated surface function
@@ -70,10 +77,10 @@ class MaterialInstance {
 
   private:
     void syncToGPU();
-    void writeSlice(ParameterID id, const void *data, size_t size);
+    void writeSlice(const ParameterId &id, const void *data, size_t size);
 
     std::string m_name;
-    std::shared_ptr<BaseMaterial> m_baseMaterial;
+    AssetPtr<BaseMaterial> m_baseMaterial;
     uint32_t m_bindlessIndex;
     uint32_t m_graphDataOffset = UINT32_MAX;
 
@@ -83,7 +90,7 @@ class MaterialInstance {
     std::vector<PendingTexture> m_pendingTextures;
     std::mutex m_pendingTexturesMutex;
 
-    std::vector<std::pair<ParameterID, AssetPtr<Texture>>> m_textureRefs;
+    std::vector<std::pair<ParameterId, AssetPtr<Texture>>> m_textureRefs;
     std::vector<AssetPtr<Texture>> m_graphTextureRefs;
 };
 

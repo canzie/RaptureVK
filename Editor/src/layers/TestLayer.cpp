@@ -133,32 +133,18 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     // Get project paths
     auto &app = Rapture::Application::getInstance();
     auto &project = app.getProject();
-    auto rootPath = project.getProjectRootDirectory();
 
-    // Load Sponza model
-    // Disabled: models are now imported from the UI via the file browser / import panel.
+    // Models are imported from the UI now; the registration pass picks up their .rasset files at startup
+    auto cube = activeScene.createCube("Test Cube");
+    cube.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
+    cube.addComponent<Rapture::BLASComponent>(cube.getComponent<Rapture::MeshComponent>().mesh);
+    activeScene.registerBLAS(cube);
 
-    auto sponzaPath = rootPath / "assets/models/glTF2.0/Sponza/Sponza.gltf";
-    if (std::filesystem::exists(sponzaPath)) {
-        RP_INFO("Loading Sponza scene from: {}", sponzaPath.string());
-        auto loader = Rapture::glTF2Loader(sponzaPath);
-        loader.load(&activeScene);
-    } else {
-        RP_WARN("Sponza model not found at: {}", sponzaPath.string());
-
-        // Fallback: Create a simple test cube if Sponza not found
-        auto cube = activeScene.createCube("Test Cube");
-        cube.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
-        cube.addComponent<Rapture::BLASComponent>(cube.getComponent<Rapture::MeshComponent>().mesh);
-        activeScene.registerBLAS(cube);
-
-        // Create a floor
-        auto floor = activeScene.createCube("Floor");
-        floor.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, -1.5f, 0.0f));
-        floor.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 0.1f, 10.0f));
-        floor.addComponent<Rapture::BLASComponent>(floor.getComponent<Rapture::MeshComponent>().mesh);
-        activeScene.registerBLAS(floor);
-    }
+    auto floor = activeScene.createCube("Floor");
+    floor.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, -1.5f, 0.0f));
+    floor.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 0.1f, 10.0f));
+    floor.addComponent<Rapture::BLASComponent>(floor.getComponent<Rapture::MeshComponent>().mesh);
+    activeScene.registerBLAS(floor);
 
     // Graph material test spheres - two different generated graphs, so evalSurfaceGraph dispatch is visible
     {
@@ -177,7 +163,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
             auto mat = std::make_unique<Rapture::MaterialInstance>(baseMaterial, name);
             mat->setGraph(graphId, graphManager.getDefaults(graphId), graphManager.getTextureRefs(graphId));
 
-            auto matRef = Rapture::AssetManager::registerVirtualAsset(std::move(mat), name, Rapture::AssetType::MATERIAL);
+            auto matRef = Rapture::AssetManager::registerVirtualAsset(std::move(mat), name, Rapture::AssetType::MATERIAL_INSTANCE);
             sphere.setComponent<Rapture::MaterialComponent>(matRef);
 
             sphere.addComponent<Rapture::BLASComponent>(sphere.getComponent<Rapture::MeshComponent>().mesh);
@@ -267,10 +253,9 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     auto &terrainComp = terrainEntity.addComponent<Rapture::TerrainComponent>(terrainConfig);
     terrainComp.isEnabled = true;
     RP_INFO("Terrain entity created with {} chunks (radius {})", terrainComp.generator->getChunkCount(),
-                     terrainConfig.getChunkRadius());
+            terrainConfig.getChunkRadius());
 
-    Rapture::MaterialManager::getSurfaceGraphManager().writeGeneratedFiles(project.getProjectShaderDirectory() /
-                                                                           "glsl/generated");
+    Rapture::MaterialManager::getSurfaceGraphManager().writeGeneratedFiles(project.getProjectShaderDirectory() / "glsl/generated");
 
     RP_INFO("Scene setup complete for: {}", activeScene.getSceneName());
 }
@@ -297,7 +282,14 @@ void TestLayer::onUpdate(float ts)
     // Log FPS approximately once per second
     if (m_fpsTimer >= 1.0f) {
         float fps = static_cast<float>(m_fpsCounter) / m_fpsTimer;
-        RP_INFO("FPS: {0:.1f}", fps);
+
+        const Rapture::Telemetry &telemetry = Rapture::Application::getInstance().getTelemetry();
+        double vramUsedMb = static_cast<double>(telemetry.vramUsedBytes) / (1024.0 * 1024.0);
+        double vramBudgetMb = static_cast<double>(telemetry.vramBudgetBytes) / (1024.0 * 1024.0);
+        double vramPercent = telemetry.vramBudgetBytes > 0 ? (vramUsedMb / vramBudgetMb) * 100.0 : 0.0;
+        double ramUsedMb = static_cast<double>(telemetry.ramUsedBytes) / (1024.0 * 1024.0);
+        RP_INFO("FPS: {0:.1f}  VRAM: {1:.0f}/{2:.0f} MB ({3:.1f}%)  RAM: {4:.0f} MB", fps, vramUsedMb, vramBudgetMb, vramPercent,
+                ramUsedMb);
 
         // Reset counters
         m_fpsCounter = 0;

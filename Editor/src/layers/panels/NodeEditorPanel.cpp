@@ -518,7 +518,7 @@ void NodeEditorPanel::rebuildMaterialList()
         return;
     }
     std::vector<Amethyst::ContextMenuItem> items;
-    for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::MATERIAL)) {
+    for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::MATERIAL_INSTANCE)) {
         std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
         items.push_back(Amethyst::ContextMenuItem::action(name, [this, handle]() { selectMaterial(handle); }));
     }
@@ -535,7 +535,7 @@ void NodeEditorPanel::selectMaterial(Rapture::AssetHandle handle)
     if (material == nullptr) {
         return;
     }
-    std::shared_ptr<Rapture::BaseMaterial> base = material->getBaseMaterial();
+    Rapture::BaseMaterial *base = material->getBaseMaterial();
     if (base == nullptr) {
         return;
     }

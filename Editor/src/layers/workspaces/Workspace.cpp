@@ -44,6 +44,7 @@ void Workspace::addPanel(std::unique_ptr<Panel> panel, Amethyst::DockZone zone)
 
     Amethyst::Frame *root = panel->root();
     Panel *panelPtr = panel.get();
+    panel->setContext(m_context);
     root->onDestroy.detachedOnce([this, panelPtr](Amethyst::Instance *) {
         std::erase_if(m_panels, [panelPtr](const std::unique_ptr<Panel> &p) { return p.get() == panelPtr; });
     });

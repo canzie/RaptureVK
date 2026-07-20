@@ -10,12 +10,106 @@
 #include "window_context/Application.h"
 #include "window_context/vulkan_context/TimelineSemaphore.h"
 
+#include <algorithm>
 #include <cstring>
 #include <memory>
 
 namespace Rapture {
 
 std::shared_ptr<DescriptorBindingTexture> Texture::s_bindlessTextures = nullptr;
+
+static constexpr uint32_t TEXTURE_BLOB_MAGIC = 0x58545052; // "RPTX", identifies the blob as a texture
+
+// Version packs major in the high 16 bits and minor in the low 16, matching the mesh blob scheme.
+static constexpr uint16_t TEXTURE_BLOB_VERSION_MAJOR = 1;
+static constexpr uint16_t TEXTURE_BLOB_VERSION_MINOR = 0;
+static constexpr uint32_t TEXTURE_BLOB_VERSION =
+    (static_cast<uint32_t>(TEXTURE_BLOB_VERSION_MAJOR) << 16) | TEXTURE_BLOB_VERSION_MINOR;
+
+enum TextureBlobMode : uint32_t {
+    TEXTURE_BLOB_EMBEDDED = 0,
+    TEXTURE_BLOB_SOURCE = 1
+};
+
+// Fixed 64-byte directory at the start of every texture blob. The reserved tail absorbs new fields
+// without moving the payload; grow the header and bump the major version when it runs out.
+struct TextureBlobHeader {
+    uint32_t magic = TEXTURE_BLOB_MAGIC;
+    uint32_t version = TEXTURE_BLOB_VERSION;
+    uint32_t mode = TEXTURE_BLOB_EMBEDDED;
+    uint32_t format = 0;
+    uint32_t type = 0;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t depth = 0;
+    uint32_t mipLevels = 0;
+    uint32_t srgb = 0;
+    uint32_t payloadSize = 0;
+    uint32_t payloadOffset = 0;
+    uint32_t reserved[4] = {};
+};
+
+static_assert(sizeof(TextureBlobHeader) == 64, "texture blob header is a fixed 64-byte directory, bump to 128 and the major version if it must grow");
+
+/**
+ * @brief Acquire a primary command buffer from a transient graphics-queue pool for this thread
+ * @return A command buffer ready to begin recording
+ */
+static CommandBuffer *s_acquireTransientGraphicsCommandBuffer()
+{
+    auto &app = Application::getInstance();
+
+    CommandPoolConfig poolConfig{};
+    poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
+    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
+    poolConfig.threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
+
+    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
+    return commandPool->getPrimaryCommandBuffer();
+}
+
+/**
+ * @brief Build one buffer-image copy region per mip, each covering the full layer set
+ * @param spec The texture specification describing the layout
+ * @param totalBytes Set to the tightly packed byte size across all mips and layers
+ * @return The copy regions, mip-major with layer-contiguous data
+ */
+static std::vector<VkBufferImageCopy> s_buildImageCopyRegions(const TextureSpecification &spec, uint64_t &totalBytes)
+{
+    uint32_t layers = isArrayType(spec.type) ? spec.depth : (isCubeType(spec.type) ? 6 : 1);
+    uint32_t depth = (isArrayType(spec.type) || isCubeType(spec.type)) ? 1 : spec.depth;
+    uint32_t mipLevels = spec.mipLevels == 0 ? 1 : spec.mipLevels;
+    bool compressed = isCompressedFormat(spec.format);
+    VkImageAspectFlags aspect = getImageAspectFlags(spec.format);
+
+    std::vector<VkBufferImageCopy> regions;
+    regions.reserve(mipLevels);
+    uint64_t offset = 0;
+    for (uint32_t mip = 0; mip < mipLevels; ++mip) {
+        uint32_t w = std::max(1u, spec.width >> mip);
+        uint32_t h = std::max(1u, spec.height >> mip);
+        uint32_t d = std::max(1u, depth >> mip);
+
+        VkBufferImageCopy region{};
+        region.bufferOffset = offset;
+        region.imageSubresource.aspectMask = aspect;
+        region.imageSubresource.mipLevel = mip;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = layers;
+        region.imageExtent = {w, h, d};
+        regions.push_back(region);
+
+        uint64_t mipBytesPerLayer =
+            compressed ? static_cast<uint64_t>((w + 3) / 4) * ((h + 3) / 4) * d * getBytesPerBlock(spec.format)
+                       : static_cast<uint64_t>(w) * h * d * getBytesPerPixel(spec.format);
+        offset += mipBytesPerLayer * layers;
+    }
+
+    totalBytes = offset;
+    return regions;
+}
 
 // Sampler implementation
 Sampler::Sampler(const TextureSpecification &spec)
@@ -345,17 +439,8 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
     bool useExternalCommandBuffer = (extCommandBuffer != VK_NULL_HANDLE);
 
     if (!useExternalCommandBuffer) {
-        // Get or create a command pool for graphics operations
-        CommandPoolConfig poolConfig{};
-        poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
-        poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-        poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-
-        auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
-        auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
-        internalCommandBuffer = commandPool->getPrimaryCommandBuffer();
+        internalCommandBuffer = s_acquireTransientGraphicsCommandBuffer();
         commandBufferVk = internalCommandBuffer->getCommandBufferVk();
-
         internalCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     } else {
         commandBufferVk = extCommandBuffer;
@@ -537,6 +622,242 @@ uint32_t Texture::getBindlessIndex()
     return m_bindlessIndex;
 }
 
+uint64_t Texture::getSizeBytes() const
+{
+    uint32_t layers = isArrayType(m_spec.type) ? m_spec.depth : (isCubeType(m_spec.type) ? 6 : 1);
+    uint32_t depth = (isArrayType(m_spec.type) || isCubeType(m_spec.type)) ? 1 : m_spec.depth;
+    uint32_t mipLevels = m_spec.mipLevels == 0 ? 1 : m_spec.mipLevels;
+    bool compressed = isCompressedFormat(m_spec.format);
+
+    uint64_t total = 0;
+    for (uint32_t mip = 0; mip < mipLevels; ++mip) {
+        uint32_t w = m_spec.width >> mip;
+        uint32_t h = m_spec.height >> mip;
+        uint32_t d = depth >> mip;
+        if (w == 0) {
+            w = 1;
+        }
+        if (h == 0) {
+            h = 1;
+        }
+        if (d == 0) {
+            d = 1;
+        }
+
+        if (compressed) {
+            uint64_t blocksX = (w + 3) / 4;
+            uint64_t blocksY = (h + 3) / 4;
+            total += blocksX * blocksY * d * getBytesPerBlock(m_spec.format);
+        } else {
+            total += static_cast<uint64_t>(w) * h * d * getBytesPerPixel(m_spec.format);
+        }
+    }
+    return total * layers;
+}
+
+std::vector<uint8_t> Texture::readbackData()
+{
+    if (m_image == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("Cannot read back a null image");
+        return {};
+    }
+    if (!m_spec.allowReadback) {
+        RP_CORE_ERROR("Texture was not created with allowReadback set");
+        return {};
+    }
+
+    uint64_t total = 0;
+    std::vector<VkBufferImageCopy> regions = s_buildImageCopyRegions(m_spec, total);
+    if (total == 0) {
+        return {};
+    }
+
+    auto &app = Application::getInstance();
+    VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = total;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VmaAllocation stagingAllocation = VK_NULL_HANDLE;
+    VmaAllocationInfo stagingInfo{};
+    if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, &stagingInfo) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create readback staging buffer");
+        return {};
+    }
+
+    auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
+    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
+    recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    vkCmdCopyImageToBuffer(cmd, m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer,
+                           static_cast<uint32_t>(regions.size()), regions.data());
+    recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer->end();
+
+    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    // TODO: replace this blocking waitIdle with a fence/timeline wait once readback correctness is verified
+    graphicsQueue->waitIdle();
+
+    std::vector<uint8_t> out(total);
+    vmaInvalidateAllocation(allocator, stagingAllocation, 0, total);
+    std::memcpy(out.data(), stagingInfo.pMappedData, total);
+    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+    return out;
+}
+
+std::vector<uint8_t> Texture::serialize(std::string_view sourcePath)
+{
+    TextureBlobHeader header{};
+    header.format = static_cast<uint32_t>(m_spec.format);
+    header.type = static_cast<uint32_t>(m_spec.type);
+    header.width = m_spec.width;
+    header.height = m_spec.height;
+    header.depth = m_spec.depth;
+    header.mipLevels = m_spec.mipLevels == 0 ? 1 : m_spec.mipLevels;
+    header.srgb = m_spec.srgb ? 1u : 0u;
+    header.payloadOffset = sizeof(TextureBlobHeader);
+
+    std::vector<uint8_t> payload;
+    if (isCompressedFormat(m_spec.format)) {
+        payload = readbackData();
+        if (payload.empty()) {
+            RP_CORE_ERROR("Failed to read back texture for serialization");
+            return {};
+        }
+        header.mode = TEXTURE_BLOB_EMBEDDED;
+    } else {
+        payload.assign(sourcePath.begin(), sourcePath.end());
+        header.mode = TEXTURE_BLOB_SOURCE;
+    }
+    header.payloadSize = static_cast<uint32_t>(payload.size());
+
+    std::vector<uint8_t> blob(sizeof(TextureBlobHeader) + payload.size());
+    std::memcpy(blob.data(), &header, sizeof(TextureBlobHeader));
+    std::memcpy(blob.data() + sizeof(TextureBlobHeader), payload.data(), payload.size());
+    return blob;
+}
+
+std::unique_ptr<Texture> Texture::deserialize(std::span<const uint8_t> blob)
+{
+    if (blob.size() < sizeof(TextureBlobHeader)) {
+        RP_CORE_ERROR("Texture blob is smaller than its header");
+        return nullptr;
+    }
+
+    TextureBlobHeader header{};
+    std::memcpy(&header, blob.data(), sizeof(TextureBlobHeader));
+    if (header.magic != TEXTURE_BLOB_MAGIC) {
+        RP_CORE_ERROR("Texture blob has an invalid magic");
+        return nullptr;
+    }
+    if ((header.version >> 16) != TEXTURE_BLOB_VERSION_MAJOR) {
+        RP_CORE_ERROR("Texture blob major version {} is unsupported", header.version >> 16);
+        return nullptr;
+    }
+    if (header.mode != TEXTURE_BLOB_EMBEDDED) {
+        RP_CORE_ERROR("Texture blob references a source path, reload it through the importer");
+        return nullptr;
+    }
+    if (blob.size() < static_cast<size_t>(header.payloadOffset) + header.payloadSize) {
+        RP_CORE_ERROR("Texture blob payload is truncated");
+        return nullptr;
+    }
+
+    TextureSpecification spec{};
+    spec.format = static_cast<TextureFormat>(header.format);
+    spec.type = static_cast<TextureType>(header.type);
+    spec.width = header.width;
+    spec.height = header.height;
+    spec.depth = header.depth;
+    spec.mipLevels = header.mipLevels;
+    spec.srgb = header.srgb != 0;
+
+    auto texture = createPlaceholder(spec);
+    texture->uploadCompressedBlob(blob.subspan(header.payloadOffset, header.payloadSize));
+    return texture;
+}
+
+std::string Texture::readBlobSourcePath(std::span<const uint8_t> blob)
+{
+    if (blob.size() < sizeof(TextureBlobHeader)) {
+        return {};
+    }
+
+    TextureBlobHeader header{};
+    std::memcpy(&header, blob.data(), sizeof(TextureBlobHeader));
+    if (header.magic != TEXTURE_BLOB_MAGIC || header.mode != TEXTURE_BLOB_SOURCE) {
+        return {};
+    }
+    if (blob.size() < static_cast<size_t>(header.payloadOffset) + header.payloadSize) {
+        return {};
+    }
+
+    return std::string(reinterpret_cast<const char *>(blob.data() + header.payloadOffset), header.payloadSize);
+}
+
+void Texture::uploadCompressedBlob(std::span<const uint8_t> bytes)
+{
+    if (bytes.empty()) {
+        RP_CORE_ERROR("No data to upload into texture");
+        markFailed();
+        return;
+    }
+
+    auto &app = Application::getInstance();
+    VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = bytes.size();
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VmaAllocation stagingAllocation = VK_NULL_HANDLE;
+    VmaAllocationInfo stagingInfo{};
+    if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, &stagingInfo) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create upload staging buffer");
+        markFailed();
+        return;
+    }
+
+    std::memcpy(stagingInfo.pMappedData, bytes.data(), bytes.size());
+
+    uint64_t total = 0;
+    std::vector<VkBufferImageCopy> regions = s_buildImageCopyRegions(m_spec, total);
+
+    auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
+    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
+    recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vkCmdCopyBufferToImage(cmd, stagingBuffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           static_cast<uint32_t>(regions.size()), regions.data());
+    recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer->end();
+
+    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->waitIdle();
+
+    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+    markReady();
+}
+
 void Texture::createImage()
 {
     auto &app = Application::getInstance();
@@ -565,11 +886,14 @@ void Texture::createImage()
         imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     } else if (isCompressedFormat(m_spec.format)) {
         imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        if (m_spec.allowReadback) {
+            imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        }
     } else {
         imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
         // Add transfer source bit if we have multiple mip levels (needed for mipmap generation)
-        if (m_spec.mipLevels > 1) {
+        if (m_spec.mipLevels > 1 || m_spec.allowReadback) {
             imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         }
 
@@ -913,18 +1237,7 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
     auto &app = Application::getInstance();
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
-
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-    poolConfig.threadId = threadId;
-
-    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), oldLayout, newLayout);
@@ -987,6 +1300,16 @@ void Texture::recordTransitionImageLayout(VkCommandBuffer cmd, VkImageLayout old
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } else {
         RP_CORE_ERROR("Unsupported layout transition!");
         return;
@@ -1017,18 +1340,7 @@ void Texture::generateMipmaps()
     }
 
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
-
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-    poolConfig.threadId = threadId;
-
-    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     recordGenerateMipmaps(commandBuffer->getCommandBufferVk());
@@ -1117,18 +1429,7 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
 
     auto &app = Application::getInstance();
     auto queue = app.getVulkanContext().getGraphicsQueue();
-
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-    poolConfig.threadId = threadId;
-
-    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), buffer, width, height);

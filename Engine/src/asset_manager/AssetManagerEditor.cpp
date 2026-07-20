@@ -1,20 +1,148 @@
 #include "AssetManagerEditor.h"
+#include "AssetCodec.h"
 #include "AssetImporter.h"
-#include "BlobStore.h"
+#include "ReservedAssets.h"
 #include "asset_manager/Asset.h"
 #include "asset_manager/AssetCommon.h"
-#include "entt/meta/factory.hpp"
 #include "logging/Log.h"
 #include "materials/Material.h"
 #include "materials/MaterialInstance.h"
 #include "textures/Texture.h"
 #include "utils/UUID.h"
 #include "window_context/Application.h"
+#include "window_context/Telemetry.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <memory>
 
 namespace Rapture {
+
+static constexpr int32_t EVICTION_PRIORITY_LAZY = 1000; // EVICT_HINT_LAZY, drained before LAST
+static constexpr int32_t EVICTION_PRIORITY_LAST = 0;    // EVICT_HINT_LAST, drained only under hard pressure
+
+static constexpr double COLD_DRAIN_SOFT = 0.80;
+static constexpr double COLD_DRAIN_STOP = 0.75;
+static constexpr double COLD_DRAIN_HARD = 0.90;
+static constexpr uint32_t COLD_DRAIN_CAP_SOFT = 8;
+static constexpr uint32_t COLD_DRAIN_CAP_HARD = 64;
+
+static uint64_t s_hashPath(const std::filesystem::path &path)
+{
+    return std::hash<std::string>{}(path.lexically_normal().generic_string());
+}
+
+static uint64_t s_assetSizeHint(const Asset &asset)
+{
+    if (const Mesh *mesh = asset.getUnderlyingAsset<Mesh>()) {
+        return mesh->getSizeBytes();
+    }
+    if (const Texture *texture = asset.getUnderlyingAsset<Texture>()) {
+        return texture->getSizeBytes();
+    }
+    return 0;
+}
+
+static int32_t s_evictionPriority(const AssetMetadata &metadata)
+{
+    return metadata.evictionPolicy == AssetEvictionPolicy::EVICT_HINT_LAST ? EVICTION_PRIORITY_LAST : EVICTION_PRIORITY_LAZY;
+}
+
+static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &metadata)
+{
+    switch (metadata.assetType) {
+    case AssetType::TEXTURE:
+        if (Texture *texture = asset.getUnderlyingAsset<Texture>()) {
+            return texture->serialize(metadata.getSourcePath().string());
+        }
+        break;
+    case AssetType::PREFAB:
+        if (Prefab *prefab = asset.getUnderlyingAsset<Prefab>()) {
+            return prefab->serialize();
+        }
+        break;
+    case AssetType::MATERIAL:
+        if (BaseMaterial *material = asset.getUnderlyingAsset<BaseMaterial>()) {
+            return material->serialize();
+        }
+        break;
+    case AssetType::MATERIAL_INSTANCE:
+        if (MaterialInstance *instance = asset.getUnderlyingAsset<MaterialInstance>()) {
+            return instance->serialize();
+        }
+        break;
+    default:
+        break;
+    }
+    return {};
+}
+
+static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std::span<const uint8_t> payload)
+{
+    switch (metadata.assetType) {
+    case AssetType::TEXTURE:
+        if (auto texture = Texture::deserialize(payload)) {
+            asset.setAssetVariant(std::move(texture));
+            return true;
+        }
+        break;
+    case AssetType::MESH:
+        if (auto mesh = Mesh::deserialize(payload)) {
+            asset.setAssetVariant(std::move(mesh));
+            return true;
+        }
+        break;
+    case AssetType::PREFAB:
+        if (auto prefab = Prefab::deserialize(payload)) {
+            asset.setAssetVariant(std::move(prefab));
+            return true;
+        }
+        break;
+    case AssetType::MATERIAL:
+        if (auto material = BaseMaterial::deserialize(payload)) {
+            asset.setAssetVariant(std::move(material));
+            return true;
+        }
+        break;
+    case AssetType::MATERIAL_INSTANCE:
+        if (auto instance = MaterialInstance::deserialize(payload)) {
+            asset.setAssetVariant(std::move(instance));
+            return true;
+        }
+        break;
+    default:
+        break;
+    }
+    return false;
+}
+
+static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<uint8_t> &payload, AssetType &type)
+{
+    if (auto *meshData = std::get_if<MeshImportData>(&data)) {
+        // The Mesh keeps only GPU buffers, so serialize the source data before it builds
+        payload = meshData->params.serialize();
+        type = AssetType::MESH;
+        return std::make_unique<Mesh>(meshData->params);
+    }
+    if (auto *prefabData = std::get_if<PrefabImportData>(&data)) {
+        payload = prefabData->prefab->serialize();
+        type = AssetType::PREFAB;
+        return std::move(prefabData->prefab);
+    }
+    if (auto *materialData = std::get_if<BaseMaterialImportData>(&data)) {
+        payload = materialData->material->serialize();
+        type = AssetType::MATERIAL;
+        return std::move(materialData->material);
+    }
+    if (auto *instanceData = std::get_if<MaterialInstanceImportData>(&data)) {
+        payload = instanceData->instance->serialize();
+        type = AssetType::MATERIAL_INSTANCE;
+        return std::move(instanceData->instance);
+    }
+
+    type = AssetType::NONE;
+    return std::monostate{};
+}
 
 AssetManagerEditor::AssetManagerEditor(const Telemetry *telemetry) : AssetManagerBase(), m_telemetry(telemetry) {}
 
@@ -60,6 +188,7 @@ Asset &AssetManagerEditor::getAsset(AssetHandle handle)
         }
 
         auto [it, inserted] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
+        metadata.sizeHintBytes = s_assetSizeHint(*it->second);
         return *it->second;
     }
 }
@@ -82,44 +211,111 @@ const AssetMetadata &AssetManagerEditor::getAssetMetadata(AssetHandle handle) co
     return AssetMetadata::const_null;
 }
 
-Asset &AssetManagerEditor::importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig)
+Asset &AssetManagerEditor::importAsset(const AssetImportFileRequest &request)
 {
+    if (request.source.empty()) {
+        RP_CORE_ERROR("Import source path is empty");
+        return Asset::null;
+    }
 
-    if (path.empty()) {
-        RP_CORE_ERROR("Path is empty");
+    if (request.source.extension() == ".rasset") {
+        RP_CORE_ERROR("importAsset expects an external file, use registerRaptureAsset for '{}'", request.source.string());
         return Asset::null;
     }
 
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata->filePath == path && metadata->importConfig == importConfig) {
+        if (metadata->getSourcePath() == request.source && metadata->importConfig == request.config) {
             return getAsset(handle);
         }
     }
 
     auto metadata = std::make_unique<AssetMetadata>();
     metadata->storageType = AssetStorageType::DISK;
-    metadata->filePath = path;
-    metadata->assetType = determineAssetType(path.string());
-    metadata->importConfig = importConfig;
+    metadata->provenance = AssetProvenance{.sourcePath = request.source};
+    metadata->name = request.name.empty() ? request.source.stem().string() : request.name;
+    metadata->assetType = determineAssetType(request.source.string());
+    metadata->importConfig = request.config;
 
-    // idk how cpp evaluates this if the bool() is overloaded
-    if (metadata == nullptr || !metadata) {
-        RP_CORE_ERROR("Unknown asset type for extension: {}", path.extension().string());
+    AssetHandle handle = UUIDGenerator::Generate();
+    auto asset = std::make_unique<Asset>(handle);
+    if (!AssetImporter::importAsset(*asset, *metadata)) {
+        RP_CORE_ERROR("Failed to import asset: {}", request.source.string());
+        return Asset::null;
+    }
+
+    // The load is asynchronous, so the empty payload defers the .rasset write until it finishes
+    return registerImportedAsset(handle, std::move(asset), std::move(metadata), request.output, {});
+}
+
+Asset &AssetManagerEditor::importAsset(AssetImportDataRequest request)
+{
+    std::vector<uint8_t> payload;
+    AssetType type = AssetType::NONE;
+    AssetVariant value = s_buildImportData(request.data, payload, type);
+    if (type == AssetType::NONE) {
+        RP_CORE_ERROR("Unsupported asset import data for '{}'", request.name);
         return Asset::null;
     }
 
     AssetHandle handle = UUIDGenerator::Generate();
-    auto asset = std::make_unique<Asset>(handle);
-    bool success = AssetImporter::importAsset(*asset, *metadata);
-    if (success) {
-        m_assetRegistry.insert_or_assign(handle, std::move(metadata));
-        auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
+    auto asset = std::make_unique<Asset>(std::move(value), handle);
+    asset->status = AssetStatus::LOADED;
 
-        return *it->second;
+    auto metadata = std::make_unique<AssetMetadata>();
+    metadata->assetType = type;
+    metadata->storageType = AssetStorageType::DISK;
+    metadata->name = request.name;
+    metadata->provenance = std::move(request.provenance);
+
+    return registerImportedAsset(handle, std::move(asset), std::move(metadata), request.output, payload);
+}
+
+AssetHandle AssetManagerEditor::registerRaptureAsset(std::filesystem::path path)
+{
+    if (path.extension() != ".rasset") {
+        RP_CORE_ERROR("registerRaptureAsset expects a .rasset file: {}", path.string());
+        return INVALID_ASSET_HANDLE;
     }
 
-    RP_CORE_ERROR("Failed to import asset: {}", path.string());
-    return Asset::null;
+    auto info = AssetCodec::readRaptureAssetInfo(path);
+    if (!info || !info->metadata) {
+        RP_CORE_ERROR("Failed to read .rasset header: {}", path.string());
+        return INVALID_ASSET_HANDLE;
+    }
+
+    AssetHandle handle = info->uuid;
+
+    auto existing = m_assetRegistry.find(handle);
+    if (existing == m_assetRegistry.end()) {
+        info->metadata->assetPath = path;
+        m_assetRegistry.insert_or_assign(handle, std::move(info->metadata));
+    } else {
+        existing->second->assetPath = path;
+    }
+    m_pathIndex[s_hashPath(path)] = handle;
+
+    return handle;
+}
+
+uint32_t AssetManagerEditor::registerAssetDirectory(const std::filesystem::path &directory)
+{
+    std::error_code ec;
+    if (!std::filesystem::exists(directory, ec)) {
+        return 0;
+    }
+
+    uint32_t registered = 0;
+    for (std::filesystem::recursive_directory_iterator it(directory, ec), end; !ec && it != end; it.increment(ec)) {
+        if (!it->is_regular_file() || it->path().extension() != ".rasset") {
+            continue;
+        }
+        if (registerRaptureAsset(it->path()) != INVALID_ASSET_HANDLE) {
+            ++registered;
+        }
+    }
+
+    RP_CORE_INFO("Registered {} assets from '{}'", registered, directory.string());
+    return registered;
 }
 
 Asset &AssetManagerEditor::importDefaultAsset(AssetType assetType)
@@ -145,23 +341,14 @@ Asset &AssetManagerEditor::importDefaultAsset(AssetType assetType)
             return Asset::null;
         }
 
-        AssetHandle handle = UUIDGenerator::Generate();
-
-        auto metadata = std::make_unique<AssetMetadata>();
-        metadata->assetType = AssetType::TEXTURE;
-        metadata->storageType = AssetStorageType::DISK; // Default assets are treated as disk assets
-        metadata->filePath = "<default_white_texture>"; // Special path to indicate default asset
-        metadata->importConfig = std::monostate();
-
-        m_assetRegistry.insert_or_assign(handle, std::move(metadata));
-        auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::make_unique<Asset>(std::move(defaultTexture), handle));
-        it->second->status = AssetStatus::LOADED;
-        m_defaultAssetHandles[assetType] = handle;
-
-        RP_CORE_INFO("Created default white texture with handle");
-        return *it->second;
+        Asset &asset =
+            registerReservedAsset(RE_WHITE_TEXTURE, std::move(defaultTexture), "<default_white_texture>", AssetType::TEXTURE);
+        if (asset) {
+            m_defaultAssetHandles[assetType] = asset.getHandle();
+        }
+        return asset;
     }
-    case AssetType::MATERIAL: {
+    case AssetType::MATERIAL_INSTANCE: {
         auto baseMaterial = MaterialManager::getMaterial("Default Material");
         if (!baseMaterial) {
             RP_CORE_ERROR("Failed to get default material");
@@ -169,27 +356,12 @@ Asset &AssetManagerEditor::importDefaultAsset(AssetType assetType)
         }
 
         auto defaultMaterial = std::make_unique<MaterialInstance>(baseMaterial, "Default");
-        if (!defaultMaterial) {
-            RP_CORE_ERROR("Failed to create default material");
-            return Asset::null;
+        Asset &asset = registerReservedAsset(RE_DEFAULT_MATERIAL_INSTANCE, std::move(defaultMaterial), "<default_material>",
+                                             AssetType::MATERIAL_INSTANCE);
+        if (asset) {
+            m_defaultAssetHandles[assetType] = asset.getHandle();
         }
-
-        AssetHandle handle = UUIDGenerator::Generate();
-
-        auto metadata = std::make_unique<AssetMetadata>();
-        metadata->assetType = AssetType::MATERIAL;
-        metadata->storageType = AssetStorageType::VIRTUAL;
-        metadata->virtualName = "<default_material>";
-        metadata->importConfig = std::monostate();
-
-        // Register the asset
-        m_assetRegistry.insert_or_assign(handle, std::move(metadata));
-        auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::make_unique<Asset>(std::move(defaultMaterial), handle));
-        it->second->status = AssetStatus::LOADED;
-        // Track this as a default asset
-        m_defaultAssetHandles[assetType] = handle;
-
-        return *it->second;
+        return asset;
     }
     default:
         RP_CORE_WARN("Default asset type {} not implemented", AssetTypeToString(assetType));
@@ -236,7 +408,7 @@ Asset &AssetManagerEditor::registerVirtualAsset(AssetVariant assetValue, const s
     }
 
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata->isVirtualAsset() && metadata->virtualName == virtualName && metadata->assetType != assetType) {
+        if (metadata->isVirtualAsset() && metadata->name == virtualName && metadata->assetType == assetType) {
             RP_CORE_WARN("Virtual asset with name '{}' already exists", virtualName);
             return Asset::null;
         }
@@ -249,7 +421,8 @@ Asset &AssetManagerEditor::registerVirtualAsset(AssetVariant assetValue, const s
     auto metadata = std::make_unique<AssetMetadata>();
     metadata->assetType = assetType;
     metadata->storageType = AssetStorageType::VIRTUAL;
-    metadata->virtualName = virtualName;
+    metadata->name = virtualName;
+    metadata->sizeHintBytes = s_assetSizeHint(*asset);
 
     auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
     m_assetRegistry.insert_or_assign(handle, std::move(metadata));
@@ -258,87 +431,76 @@ Asset &AssetManagerEditor::registerVirtualAsset(AssetVariant assetValue, const s
     return *it->second;
 }
 
-BlobStore &AssetManagerEditor::getBlobStore()
+Asset &AssetManagerEditor::registerReservedAsset(AssetHandle handle, AssetVariant assetValue, const std::string &name,
+                                                 AssetType assetType)
 {
-    if (!m_blobStore) {
-        m_blobStore = std::make_unique<BlobStore>(Application::getInstance().getProject().getBlobDirectory());
+    if (!Asset_isReserved(handle)) {
+        RP_CORE_ERROR("registerReservedAsset called with a non-reserved handle {}", handle);
+        return Asset::null;
     }
-    return *m_blobStore;
+
+    if (std::holds_alternative<std::monostate>(assetValue)) {
+        RP_CORE_ERROR("Asset variant is empty");
+        return Asset::null;
+    }
+
+    if (auto it = m_loadedAssets.find(handle); it != m_loadedAssets.end()) {
+        return *it->second;
+    }
+
+    auto asset = std::make_unique<Asset>(std::move(assetValue), handle);
+    asset->status = AssetStatus::LOADED;
+
+    auto metadata = std::make_unique<AssetMetadata>();
+    metadata->assetType = assetType;
+    metadata->storageType = AssetStorageType::VIRTUAL;
+    metadata->name = name;
+    metadata->sizeHintBytes = s_assetSizeHint(*asset);
+
+    auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
+    m_assetRegistry.insert_or_assign(handle, std::move(metadata));
+    return *it->second;
 }
 
 std::unique_ptr<Asset> AssetManagerEditor::loadFromMetadata(AssetHandle handle, AssetMetadata &metadata)
 {
-    if (!metadata.hasBlob) {
-        auto asset = std::make_unique<Asset>(handle);
-        if (!AssetImporter::importAsset(*asset, metadata)) {
-            return nullptr;
+    auto asset = std::make_unique<Asset>(handle);
+
+    if (!metadata.assetPath.empty() && std::filesystem::exists(metadata.assetPath)) {
+        std::vector<uint8_t> payload = AssetCodec::readRaptureAssetPayload(metadata.assetPath);
+        if (!payload.empty() && s_deserializeAsset(*asset, metadata, payload)) {
+            asset->status = AssetStatus::LOADED;
+            return asset;
         }
-        return asset;
+        RP_CORE_WARN("Failed to load '{}' from its .rasset, falling back to the source file", metadata.getName());
     }
 
-    std::vector<uint8_t> blob = getBlobStore().read(handle);
-    if (blob.empty()) {
-        RP_CORE_ERROR("No blob found for asset {}", handle);
+    if (!AssetImporter::importAsset(*asset, metadata)) {
         return nullptr;
     }
-
-    AssetVariant variant;
-    switch (metadata.assetType) {
-    case AssetType::MESH: {
-        auto mesh = Mesh::deserialize(blob);
-        if (!mesh) {
-            RP_CORE_ERROR("Failed to deserialize mesh blob for asset {}", handle);
-            return nullptr;
-        }
-        variant = std::move(mesh);
-        break;
-    }
-    default:
-        RP_CORE_ERROR("Blob reload not supported for {} asset", AssetTypeToString(metadata.assetType));
-        return nullptr;
-    }
-
-    auto asset = std::make_unique<Asset>(std::move(variant), handle);
-    asset->status = AssetStatus::LOADED;
     return asset;
 }
 
-Asset &AssetManagerEditor::importAsset(AssetImportDataVariant importData, const std::string &name,
-                                       std::optional<AssetProvenance> provenance)
+Asset &AssetManagerEditor::registerImportedAsset(AssetHandle handle, std::unique_ptr<Asset> asset,
+                                                 std::unique_ptr<AssetMetadata> metadata, const std::filesystem::path &outputFolder,
+                                                 std::span<const uint8_t> payload)
 {
-    if (auto *meshData = std::get_if<MeshImportData>(&importData)) {
-        AssetHandle handle = UUIDGenerator::Generate();
+    metadata->sizeHintBytes = s_assetSizeHint(*asset);
 
-        bool hasBlob = false;
-        if (meshData->writeBlob) {
-            std::vector<uint8_t> blob = meshData->params.serialize();
-            hasBlob = getBlobStore().store(handle, blob) >= 0;
-            if (!hasBlob) {
-                RP_CORE_ERROR("Failed to write mesh blob for '{0}'", name);
-            }
+    if (outputFolder.empty()) {
+        // Shaders keep their native format, everything else is expected to own a .rasset
+        if (metadata->assetType != AssetType::SHADER) {
+            RP_CORE_ERROR("No output folder provided for '{}'", metadata->name);
         }
-
-        auto mesh = std::make_unique<Mesh>(meshData->params);
-
-        auto asset = std::make_unique<Asset>(AssetVariant(std::move(mesh)), handle);
-        asset->status = AssetStatus::LOADED;
-
-        auto metadata = std::make_unique<AssetMetadata>();
-        metadata->assetType = AssetType::MESH;
-        metadata->storageType = AssetStorageType::DISK;
-        metadata->virtualName = name;
-        metadata->hasBlob = hasBlob;
-        metadata->provenance = std::move(provenance);
-
-        auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
-        m_assetRegistry.insert_or_assign(handle, std::move(metadata));
-
-        RP_CORE_INFO("Created mesh asset: '{0}'", name);
-        return *it->second;
+    } else if (!payload.empty()) {
+        writeRaptureAssetFile(handle, outputFolder, *metadata, payload);
+    } else {
+        m_pendingWrites.emplace_back(handle, outputFolder);
     }
 
-    RP_CORE_ERROR("Unsupported asset import data for '{0}'", name);
-    return Asset::null;
+    auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
+    m_assetRegistry.insert_or_assign(handle, std::move(metadata));
+    return *it->second;
 }
 
 bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
@@ -351,21 +513,21 @@ bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
 
     const AssetMetadata &metadata = *registryIt->second;
     if (!metadata.isVirtualAsset()) {
-        RP_CORE_ERROR("Cannot unregister non-virtual asset: {}", metadata.filePath.string());
+        RP_CORE_ERROR("Cannot unregister non-virtual asset: {}", metadata.name);
         return false;
     }
 
     m_loadedAssets.erase(handle);
     m_assetRegistry.erase(handle);
 
-    RP_CORE_INFO("Unregistered virtual asset: '{}'", metadata.virtualName);
+    RP_CORE_INFO("Unregistered virtual asset: '{}'", metadata.name);
     return true;
 }
 
 Asset &AssetManagerEditor::getVirtualAssetByName(const std::string &virtualName)
 {
     for (const auto &[handle, metadata] : m_assetRegistry) {
-        if (metadata->isVirtualAsset() && metadata->virtualName == virtualName) {
+        if (metadata->isVirtualAsset() && metadata->name == virtualName) {
             return getAsset(handle);
         }
     }
@@ -381,6 +543,21 @@ std::vector<AssetHandle> AssetManagerEditor::getVirtualAssetsByType(AssetType ty
         }
     }
     return result;
+}
+
+AssetHandle AssetManagerEditor::findAssetByPath(const std::filesystem::path &path) const
+{
+    auto it = m_pathIndex.find(s_hashPath(path));
+    if (it == m_pathIndex.end()) {
+        return INVALID_ASSET_HANDLE;
+    }
+
+    // Guard against the rare hash collision by confirming the stored path matches
+    const AssetMetadata &metadata = getAssetMetadata(it->second);
+    if (metadata.assetPath.lexically_normal() != path.lexically_normal()) {
+        return INVALID_ASSET_HANDLE;
+    }
+    return it->second;
 }
 
 void AssetManagerEditor::ensureDeferredFreeBuckets()
@@ -401,6 +578,61 @@ void AssetManagerEditor::onUpdate()
     std::vector<std::unique_ptr<Asset>> toFree = std::move(m_deferredFrees[m_deferredFreeBucket]);
     m_deferredFrees[m_deferredFreeBucket].clear();
 
+    processUnloadRequests();
+    processPendingWrites();
+    drainColdList();
+
+    toFree.clear();
+}
+
+void AssetManagerEditor::processPendingWrites()
+{
+    for (size_t i = 0; i < m_pendingWrites.size();) {
+        AssetHandle handle = m_pendingWrites[i].first;
+        auto loadedIt = m_loadedAssets.find(handle);
+
+        bool finished = true;
+        if (loadedIt != m_loadedAssets.end()) {
+            AssetStatus status = loadedIt->second->getStatus();
+            if (status == AssetStatus::LOADED) {
+                AssetMetadata &metadata = getAssetMetadata(handle);
+                writeRaptureAssetFile(handle, m_pendingWrites[i].second, metadata, s_serializeAsset(*loadedIt->second, metadata));
+            } else if (status != AssetStatus::FAILED) {
+                finished = false;
+            }
+        }
+
+        if (finished) {
+            m_pendingWrites[i] = std::move(m_pendingWrites.back());
+            m_pendingWrites.pop_back();
+        } else {
+            ++i;
+        }
+    }
+}
+
+void AssetManagerEditor::writeRaptureAssetFile(AssetHandle handle, const std::filesystem::path &folder,
+                                               AssetMetadata &metadata, std::span<const uint8_t> payload)
+{
+    if (payload.empty()) {
+        RP_CORE_ERROR("Failed to serialize '{}'", metadata.getName());
+        return;
+    }
+
+    // The display name keeps its spaces, the on-disk file name does not
+    std::string fileName = metadata.getName();
+    std::replace(fileName.begin(), fileName.end(), ' ', '_');
+    std::filesystem::path output = folder / (fileName + ".rasset");
+    if (AssetCodec::writeRaptureAsset(output, handle, metadata, payload)) {
+        metadata.assetPath = output;
+        m_pathIndex[s_hashPath(output)] = handle;
+    } else {
+        RP_CORE_ERROR("Failed to write .rasset for '{}'", metadata.getName());
+    }
+}
+
+void AssetManagerEditor::processUnloadRequests()
+{
     std::vector<AssetHandle> stillLoading;
     AssetHandle handle;
     while (m_pendingUnloadChecks.try_dequeue(handle)) {
@@ -412,14 +644,66 @@ void AssetManagerEditor::onUpdate()
                 continue;
             }
         }
-        evictAsset(handle);
+
+        const AssetMetadata &metadata = getAssetMetadata(handle);
+        if (metadata.useCount.load(std::memory_order_acquire) != 0) {
+            continue;
+        }
+
+        if (metadata.evictionPolicy == AssetEvictionPolicy::EVICT_IMMEDIATE) {
+            evictAsset(handle);
+        } else {
+            addToColdList(handle, metadata);
+        }
     }
 
     for (AssetHandle h : stillLoading) {
         m_pendingUnloadChecks.enqueue(h);
     }
+}
 
-    toFree.clear();
+void AssetManagerEditor::addToColdList(AssetHandle handle, const AssetMetadata &metadata)
+{
+    m_coldList.push(handle, s_evictionPriority(metadata));
+}
+
+void AssetManagerEditor::drainColdList()
+{
+    if (m_telemetry == nullptr || m_telemetry->vramBudgetBytes == 0 || m_coldList.empty()) {
+        return;
+    }
+
+    double usage = static_cast<double>(m_telemetry->vramUsedBytes) / static_cast<double>(m_telemetry->vramBudgetBytes);
+    if (usage < COLD_DRAIN_STOP) {
+        m_coldDraining = false;
+    } else if (usage > COLD_DRAIN_SOFT) {
+        m_coldDraining = true;
+    }
+
+    bool hard = usage > COLD_DRAIN_HARD;
+    if (!m_coldDraining && !hard) {
+        return;
+    }
+
+    uint32_t cap = hard ? COLD_DRAIN_CAP_HARD : COLD_DRAIN_CAP_SOFT;
+    uint32_t drained = 0;
+    while (!m_coldList.empty() && drained < cap) {
+        AssetHandle handle = m_coldList.front();
+        const AssetMetadata &metadata = getAssetMetadata(handle);
+
+        if (!hard && metadata.evictionPolicy == AssetEvictionPolicy::EVICT_HINT_LAST) {
+            break;
+        }
+
+        m_coldList.pop();
+
+        if (metadata.useCount.load(std::memory_order_acquire) != 0) {
+            continue;
+        }
+
+        evictAsset(handle);
+        ++drained;
+    }
 }
 
 bool AssetManagerEditor::evictAsset(AssetHandle handle)
@@ -429,10 +713,9 @@ bool AssetManagerEditor::evictAsset(AssetHandle handle)
         return false;
     }
 
-    for (const auto &[type, defaultHandle] : m_defaultAssetHandles) {
-        if (defaultHandle == handle) {
-            return false;
-        }
+    // Engine builtins live under reserved handles and are never evicted
+    if (Asset_isReserved(handle)) {
+        return false;
     }
 
     const AssetMetadata &metadata = getAssetMetadata(handle);
@@ -442,18 +725,7 @@ bool AssetManagerEditor::evictAsset(AssetHandle handle)
         return false;
     }
 
-    switch (metadata.evictionPolicy) {
-    case AssetEvictionPolicy::EVICT_IMMEDIATE:
-        break;
-    case AssetEvictionPolicy::EVICT_HINT_LAZY:
-    case AssetEvictionPolicy::EVICT_HINT_LAST:
-        // TODO: No residency layer (cold list / memory budget) yet, so these behave identically to
-        // EVICT_IMMEDIATE for now. Skipping eviction here without a budget system would leak.
-        break;
-    }
-
-    RP_CORE_INFO("Evicting {} asset '{}'", AssetTypeToString(metadata.assetType),
-                 metadata.isDiskAsset() ? metadata.filePath.string() : metadata.virtualName);
+    RP_CORE_INFO("Evicting {} asset '{}'", AssetTypeToString(metadata.assetType), metadata.name);
 
     ensureDeferredFreeBuckets();
     m_deferredFrees[m_deferredFreeBucket].push_back(std::move(it->second));

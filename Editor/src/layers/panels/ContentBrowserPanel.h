@@ -1,6 +1,7 @@
 #ifndef RAPTURE__CONTENT_BROWSER_PANEL_H
 #define RAPTURE__CONTENT_BROWSER_PANEL_H
 
+#include "asset_manager/AssetCommon.h"
 #include "events/EventSignal.h"
 #include <amethyst/Amethyst.h>
 #include <components/context_menu.h>
@@ -11,11 +12,6 @@
 #include <filesystem>
 #include <string>
 #include <vector>
-
-enum class BrowseMode {
-    ASSETS,
-    FILES
-};
 
 #include "layers/panels/Panel.h"
 
@@ -29,8 +25,11 @@ class ContentBrowserPanel : public Panel {
     ContentBrowserPanel(ContentBrowserPanel &&) = delete;
     ContentBrowserPanel &operator=(ContentBrowserPanel &&) = delete;
 
+    virtual void setContext(const WorkspaceContext &context);
+
     void refresh();
     void setBaseDirectory(const std::filesystem::path &path);
+    void setScene(Rapture::Scene *scene) { m_scene = scene; }
 
     Rapture::EventSignal<void()> onDockInLayout;
 
@@ -44,7 +43,14 @@ class ContentBrowserPanel : public Panel {
 
     void showContextMenu(Amethyst::vec2 pos, std::vector<Amethyst::ContextMenuItem> items);
 
-    void refreshAssetBrowser(void);
+    /**
+     * @brief The context menu actions specific to an asset type, before the shared rename/delete items
+     * @param type The asset's type
+     * @param handle The asset's handle
+     * @return The type-specific menu items, empty if the type has none
+     */
+    std::vector<Amethyst::ContextMenuItem> assetActions(Rapture::AssetType type, Rapture::AssetHandle handle);
+
     void refreshFileBrowser(void);
     void buildDirectoryTree(void);
     void rebuildBreadcrumb(void);
@@ -53,8 +59,6 @@ class ContentBrowserPanel : public Panel {
     void navigateToDirectory(const std::filesystem::path &path);
     void navigateBack(void);
     void navigateForward(void);
-
-    void showAssets(void);
 
     void onSearchTextChanged(const std::string &text);
 
@@ -65,6 +69,7 @@ class ContentBrowserPanel : public Panel {
         Amethyst::ImageLabel *icon = nullptr;
         Amethyst::Frame *footer = nullptr;
         Amethyst::TextLabel *name = nullptr;
+        Amethyst::TextLabel *type = nullptr;
         Amethyst::Frame *typeBar = nullptr;
         bool attached = false;
     };
@@ -103,8 +108,8 @@ class ContentBrowserPanel : public Panel {
     size_t m_selectedItem = SIZE_MAX;
 
     bool m_isDocked = false;
+    Rapture::Scene *m_scene = nullptr;
 
-    BrowseMode m_browseMode = BrowseMode::ASSETS;
     std::filesystem::path m_baseDirectory;
     std::filesystem::path m_currentDirectory;
     std::vector<std::filesystem::path> m_navigationHistory;

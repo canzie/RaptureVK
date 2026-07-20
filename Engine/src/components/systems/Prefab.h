@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -49,6 +51,19 @@ class Prefab {
      * @return The root entity of the spawned instance, or a null entity on failure
      */
     static Entity instantiate(AssetRef prefab, Scene *scene, const glm::mat4 &rootTransform = glm::mat4(1.0f));
+
+    /**
+     * @brief Serializes this prefab tree into a self-contained blob
+     * @return The serialized bytes
+     */
+    std::vector<uint8_t> serialize() const;
+
+    /**
+     * @brief Rebuilds a prefab from a blob produced by serialize
+     * @param blob The serialized bytes
+     * @return The prefab, or nullptr if the blob is invalid
+     */
+    static std::unique_ptr<Prefab> deserialize(std::span<const uint8_t> blob);
 
     std::string_view getName() const { return m_name; }
     const std::vector<Node> &getNodes() const { return m_nodes; }

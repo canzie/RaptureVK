@@ -2,6 +2,7 @@
 #define RAPTURE__GLTF_LOADER_H
 
 #include "glTFCommon.h"
+#include "materials/MaterialParameters.h"
 #include "yyjson.h"
 
 #include <cstddef>
@@ -20,7 +21,6 @@ namespace Rapture {
 struct Counter;
 class Scene;
 class MaterialInstance;
-enum class ParameterID;
 
 /**
  * @brief Loader for glTF 2.0 format 3D models
@@ -33,8 +33,10 @@ class glTF2Loader {
     /**
      * @brief Constructor
      * @param filepath Path to the .gltf file
+     * @param outputFolder Directory every .rasset this loader creates is written into
+     * @param name Name for the produced prefab, falls back to the file stem when empty
      */
-    explicit glTF2Loader(const std::filesystem::path &filepath);
+    explicit glTF2Loader(const std::filesystem::path &filepath, std::filesystem::path outputFolder, std::string name = {});
     ~glTF2Loader();
 
     /**
@@ -97,7 +99,7 @@ class glTF2Loader {
     bool getBool(yyjson_val *val, bool defaultValue = false);
     size_t getArraySize(yyjson_val *arr);
 
-    void loadAndSetTexture(MaterialInstance *material, ParameterID id, int texIndex);
+    void loadAndSetTexture(MaterialInstance *material, const ParameterId &id, int texIndex);
 
   private:
     std::unique_ptr<glTF_LoadedSceneData> m_loadedData;
@@ -120,6 +122,8 @@ class glTF2Loader {
 
     std::vector<unsigned char> m_binVec;
     std::filesystem::path m_filepath;
+    std::filesystem::path m_outputFolder;
+    std::string m_name;
     std::string m_basePath;
 
     bool m_isLoaded = false;

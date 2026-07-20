@@ -53,6 +53,7 @@ class Project {
     std::filesystem::path getProjectDirectory() const { return m_config.projectDirectory; }
     std::filesystem::path getCacheDirectory() const { return m_config.projectDirectory / ".cache"; }
     std::filesystem::path getBlobDirectory() const { return m_config.projectDirectory / "blobs"; }
+    std::filesystem::path getContentDirectory() const { return m_config.projectDirectory / "content"; }
     std::filesystem::path getThumbnailDirectory() const { return getCacheDirectory() / "thumbnails"; }
     std::string getProjectName() const { return m_config.name; }
     std::string getInitialWorldName() const { return m_config.initialWorldName; }

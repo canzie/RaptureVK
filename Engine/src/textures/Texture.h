@@ -7,6 +7,8 @@
 #include <atomic>
 #include <memory>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 #include <vk_mem_alloc.h>
 
@@ -80,6 +82,42 @@ class Texture {
     const TextureSpecification &getSpecification() const { return m_spec; }
     VkFormat getFormat() const { return toVkFormat(m_spec.format); }
 
+    /**
+     * @brief Approximate GPU footprint of this texture in bytes across all mips and layers
+     * @return The estimated image size derived from the specification
+     */
+    uint64_t getSizeBytes() const;
+
+    /**
+     * @brief Copy the image contents back to CPU memory, tightly packed mip-major across all layers
+     *
+     * The spec must have allowReadback set. The returned buffer is laid out mip by mip, each mip
+     * holding its full layer set contiguously, sized to match getSizeBytes().
+     * @return The image bytes, or empty on failure
+     */
+    std::vector<uint8_t> readbackData();
+
+    /**
+     * @brief Serialize this texture into a self-contained blob
+     * @param sourcePath The texture's source file
+     * @return The serialized bytes, or empty on failure
+     */
+    std::vector<uint8_t> serialize(std::string_view sourcePath);
+
+    /**
+     * @brief Rebuild a texture from a serialized blob
+     * @param blob The serialized bytes
+     * @return The texture, or nullptr on failure
+     */
+    static std::unique_ptr<Texture> deserialize(std::span<const uint8_t> blob);
+
+    /**
+     * @brief The source path referenced by a serialized texture blob
+     * @param blob The serialized bytes
+     * @return The path, or empty if absent
+     */
+    static std::string readBlobSourcePath(std::span<const uint8_t> blob);
+
     VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType = TextureViewType::DEFAULT) const;
 
     /**
@@ -128,6 +166,12 @@ class Texture {
     void createImage();
     void createImageView();
     void uploadInitialData(const std::vector<std::span<const uint8_t>> &layerData);
+
+    /**
+     * @brief Upload packed bytes into every mip and layer of the image, then mark it ready
+     * @param bytes The tightly packed bytes matching this texture's layout
+     */
+    void uploadCompressedBlob(std::span<const uint8_t> bytes);
 
     void recordTransitionImageLayout(VkCommandBuffer cmd, VkImageLayout oldLayout, VkImageLayout newLayout);
     void recordCopyBufferToImage(VkCommandBuffer cmd, VkBuffer buffer, uint32_t width, uint32_t height);

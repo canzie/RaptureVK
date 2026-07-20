@@ -420,14 +420,14 @@ PanelServices AmethystLayer::buildServices(void)
         return m_backend.registerTexture(tex->getImageView(), tex->getSampler().getSamplerVk());
     };
     services.unregisterTexture = [this](Amethyst::AmTextureId id) { m_backend.unregisterTexture(id); };
-    services.openImportPanel = [this](const std::filesystem::path &path) {
+    services.openImportPanel = [this](const std::filesystem::path &source, const std::filesystem::path &outputFolder) {
         struct Session {
             std::unique_ptr<ImportPanel> panel;
             Amethyst::TickHandle watchTick;
             bool pendingDestroy = false;
         };
         auto session = std::make_shared<Session>();
-        session->panel = std::make_unique<ImportPanel>(m_window, path);
+        session->panel = std::make_unique<ImportPanel>(m_window, source, outputFolder);
         session->panel->onClose = [session](void) { session->pendingDestroy = true; };
         session->watchTick = m_window.registerTick([session](float) {
             if (session->pendingDestroy) {

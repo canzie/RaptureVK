@@ -3,10 +3,10 @@
 #include "asset_manager/AssetManager.h"
 #include "loaders/gltf/glTFLoader.h"
 #include "logging/Log.h"
-#include "scenes/Scene.h"
-#include "window_context/Application.h"
 
+#include <components/checkbox.h>
 #include <components/extensions/ui_drag_detector.h>
+#include <components/text_input.h>
 
 #include <cctype>
 
@@ -18,12 +18,14 @@
 #define COL_TEXT_MUTED Amethyst::Color4(1.0f, 1.0f, 1.0f, 0.62f)
 
 static constexpr float PANEL_WIDTH = 380.0f;
-static constexpr float PANEL_HEIGHT = 150.0f;
+static constexpr float PANEL_HEIGHT = 210.0f;
 static constexpr float TITLE_HEIGHT = 36.0f;
 static constexpr float BTN_WIDTH = 92.0f;
 static constexpr float BTN_HEIGHT = 32.0f;
 
-ImportPanel::ImportPanel(Amethyst::Window &window, const std::filesystem::path &path) : m_path(path)
+ImportPanel::ImportPanel(Amethyst::Window &window, const std::filesystem::path &path,
+                         const std::filesystem::path &outputFolder)
+    : m_path(path), m_outputFolder(outputFolder)
 {
     m_popup = window.add<Amethyst::Popup>();
     m_popupDestroyConn = m_popup->onDestroy.connect([this](Amethyst::Instance *) { m_popup = nullptr; });
@@ -91,6 +93,88 @@ void ImportPanel::build()
             });
         });
 
+    const float contentX = 14.0f;
+
+    const Amethyst::TextStyleProperties sectionText{
+        .fontSize = 10.0f,
+        .textColor = COL_TEXT_MUTED,
+        .textXAlignment = Amethyst::TextXAlignment::LEFT,
+        .textYAlignment = Amethyst::TextYAlignment::CENTER,
+    };
+
+    // Source file (read-only)
+    root.textLabel({
+        .base = {.interactable = false,
+                 .position = Amethyst::UDim2(0.0f, contentX, 0.0f, TITLE_HEIGHT + 12.0f),
+                 .size = Amethyst::UDim2(1.0f, -2.0f * contentX, 0.0f, 12.0f)},
+        .style = {.backgroundTransparency = 1.0f},
+        .text = sectionText,
+        .label = "Source",
+    });
+    root.textLabel({
+        .base = {.interactable = false,
+                 .position = Amethyst::UDim2(0.0f, contentX, 0.0f, TITLE_HEIGHT + 26.0f),
+                 .size = Amethyst::UDim2(1.0f, -2.0f * contentX, 0.0f, 16.0f)},
+        .style = {.backgroundTransparency = 1.0f},
+        .text = {.fontSize = 12.0f,
+                 .textColor = COL_TEXT,
+                 .textXAlignment = Amethyst::TextXAlignment::LEFT,
+                 .textYAlignment = Amethyst::TextYAlignment::CENTER,
+                 .textTruncate = Amethyst::TextTruncate::AT_END},
+        .label = m_path.string(),
+    });
+
+    // Output location + name (editable)
+    root.textLabel({
+        .base = {.interactable = false,
+                 .position = Amethyst::UDim2(0.0f, contentX, 0.0f, TITLE_HEIGHT + 52.0f),
+                 .size = Amethyst::UDim2(1.0f, -2.0f * contentX, 0.0f, 12.0f)},
+        .style = {.backgroundTransparency = 1.0f},
+        .text = sectionText,
+        .label = "Output",
+    });
+    root.frame(
+        {
+            .base = {.position = Amethyst::UDim2(0.0f, contentX, 0.0f, TITLE_HEIGHT + 66.0f),
+                     .size = Amethyst::UDim2(1.0f, -2.0f * contentX, 0.0f, 26.0f)},
+            .style = {.backgroundColor = COL_BTN, .borderPixelSize = 1.0f, .borderColor = COL_BORDER, .cornerRadius = 4.0f},
+        },
+        [this](Amethyst::FrameScope &field) {
+            field.textInput(
+                {
+                    .base = {.position = Amethyst::UDim2(0.0f, 8.0f, 0.0f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -16.0f, 1.0f, 0.0f)},
+                    .style = {.backgroundTransparency = 1.0f},
+                    .textInput = {.text = {.fontSize = 12.0f,
+                                           .textColor = COL_TEXT,
+                                           .textYAlignment = Amethyst::TextYAlignment::CENTER}},
+                    .placeholder = "name",
+                },
+                [this](Amethyst::TextInputScope &ti) {
+                    m_outputInput = &ti.component;
+                    m_outputInput->setText(m_path.stem().string());
+                });
+        });
+
+    root.checkbox(
+        {
+            .base = {.position = Amethyst::UDim2(0.0f, contentX, 0.0f, TITLE_HEIGHT + 102.0f),
+                     .size = Amethyst::UDim2::fromOffset(16.0f, 16.0f)},
+            .value = &m_createSubfolder,
+        },
+        [](Amethyst::CheckboxScope &) {});
+    root.textLabel({
+        .base = {.interactable = false,
+                 .position = Amethyst::UDim2(0.0f, contentX + 24.0f, 0.0f, TITLE_HEIGHT + 100.0f),
+                 .size = Amethyst::UDim2(1.0f, -(2.0f * contentX + 24.0f), 0.0f, 20.0f)},
+        .style = {.backgroundTransparency = 1.0f},
+        .text = {.fontSize = 11.0f,
+                 .textColor = COL_TEXT,
+                 .textXAlignment = Amethyst::TextXAlignment::LEFT,
+                 .textYAlignment = Amethyst::TextYAlignment::CENTER},
+        .label = "Place in its own subfolder",
+    });
+
     const Amethyst::TextStyleProperties btnText{
         .fontSize = 12.0f,
         .textColor = COL_TEXT,
@@ -145,23 +229,33 @@ void ImportPanel::build()
 
 void ImportPanel::doImport()
 {
+    std::string name = m_outputInput != nullptr ? m_outputInput->getText() : std::string{};
+    if (name.empty()) {
+        name = m_path.stem().string();
+    }
+
     std::string extension = m_path.extension().string();
     for (char &c : extension) {
         c = static_cast<char>(std::tolower(c));
     }
 
+    std::filesystem::path output = m_createSubfolder ? m_outputFolder / name : m_outputFolder;
+
     if (extension == ".gltf" || extension == ".glb") {
-        Rapture::glTF2Loader loader(m_path);
+        Rapture::glTF2Loader loader(m_path, output, name);
         if (!loader.load()) {
             RP_WARN("Failed to import: {}", m_path.string());
             return;
         }
-    } else if (!Rapture::AssetManager::importAsset(m_path)) {
-        RP_WARN("Failed to import: {}", m_path.string());
-        return;
+    } else {
+        Rapture::AssetImportFileRequest request{.source = m_path, .output = output, .name = name};
+        if (!Rapture::AssetManager::importAsset(request)) {
+            RP_WARN("Failed to import: {}", m_path.string());
+            return;
+        }
     }
 
-    RP_INFO("Imported '{}'", m_path.filename().string());
+    RP_INFO("Imported '{}'", name);
 }
 
 void ImportPanel::close()

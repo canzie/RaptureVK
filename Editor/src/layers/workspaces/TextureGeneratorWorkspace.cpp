@@ -277,7 +277,7 @@ void TextureGeneratorWorkspace::refreshShaderDropdown()
         if (shader == nullptr || !shader->isReady()) continue;
         if (!shader->hasStage(Rapture::ShaderType::COMPUTE)) continue;
 
-        std::string name = metaPtr->filePath.stem().string();
+        std::string name = metaPtr->getName();
         Rapture::AssetHandle h = handle;
         items.push_back(Amethyst::ContextMenuItem::action(name, [this, h, name]() {
             m_pendingShaderHandle = h;
