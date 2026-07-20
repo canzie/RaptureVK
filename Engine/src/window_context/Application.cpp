@@ -98,8 +98,12 @@ Application::Application(int width, int height, const char *title) : m_running(t
     m_viewportManager = std::make_unique<ViewportManager>(m_vulkanContext->getRenderContext());
 
     auto swapExtent = m_mainWindow->getSwapChain()->getExtent();
-    auto *primaryViewport =
-        m_viewportManager->createViewport("main", SceneRenderTarget::TargetType::OFFSCREEN, swapExtent.width, swapExtent.height);
+    auto *primaryViewport = m_viewportManager->createViewport({
+        .name = "main",
+        .targetType = SceneRenderTarget::TargetType::OFFSCREEN,
+        .width = swapExtent.width,
+        .height = swapExtent.height,
+    });
     primaryViewport->createRenderer(RendererType::DEFERRED);
 
     MaterialManager::init();

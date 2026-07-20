@@ -17,10 +17,21 @@ namespace Rapture {
 
 class CameraController;
 
+/**
+ * @brief Creation-time configuration for a viewport and its render target.
+ */
+struct ViewportConfig {
+    std::string name;
+    SceneRenderTarget::TargetType targetType;
+    uint32_t width;
+    uint32_t height;
+    bool allowReadback = false;
+    bool enableAccelerationStructures = true;
+};
+
 class Viewport {
   public:
-    Viewport(const std::string &name, RenderContext renderContext, SceneRenderTarget::TargetType targetType, uint32_t width,
-             uint32_t height);
+    Viewport(const ViewportConfig &config, RenderContext renderContext);
 
     ~Viewport();
 
@@ -69,16 +80,15 @@ class Viewport {
      */
     uint32_t getLastRenderedFrameIndex() const;
 
-    const std::string &getName() const { return m_name; }
-    uint32_t getWidth() const { return m_width; }
-    uint32_t getHeight() const { return m_height; }
+    const std::string &getName() const { return m_config.name; }
+    uint32_t getWidth() const { return m_config.width; }
+    uint32_t getHeight() const { return m_config.height; }
     bool isActive() const { return m_active; }
     void setActive(bool active) { m_active = active; }
 
   private:
-    std::string m_name;
+    ViewportConfig m_config;
     RenderContext m_renderContext;
-    SceneRenderTarget::TargetType m_targetType;
 
     std::unique_ptr<Renderer> m_renderer;
     RendererType m_rendererType = RendererType::DEFERRED;
@@ -88,8 +98,6 @@ class Viewport {
     EditorBinding m_editorBinding;
     RenderSettings m_renderSettings;
 
-    uint32_t m_width;
-    uint32_t m_height;
     bool m_active = true;
 
     EventConnection m_windowResizeConn;

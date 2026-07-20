@@ -19,7 +19,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <math/math.h>
 
-static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.2f;
+static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.1f;
 
 static const Amethyst::UDim2 HEADER_BTN_SIZE = Amethyst::UDim2::fromOffset(80, 24);
 static const Amethyst::TextStyleProperties HEADER_BTN_TEXT{

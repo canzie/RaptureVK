@@ -33,8 +33,10 @@ class SceneRenderTarget {
      * @param height Initial height of the render target
      * @param imageCount Number of images (typically matches frames in flight)
      * @param format The texture format for the render target
+     * @param allowReadback Whether the color textures can be copied back to the CPU
      */
-    SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format = TextureFormat::BGRA8);
+    SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format = TextureFormat::BGRA8,
+                      bool allowReadback = false);
 
     /**
      * @brief Construct a swapchain-backed render target (Standalone mode)
@@ -104,6 +106,7 @@ class SceneRenderTarget {
     uint32_t m_width = 0;
     uint32_t m_height = 0;
     TextureFormat m_format = TextureFormat::BGRA8;
+    bool m_allowReadback = false;
 
     // For SWAPCHAIN mode
     std::shared_ptr<SwapChain> m_swapChain;

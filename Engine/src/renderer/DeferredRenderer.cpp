@@ -21,14 +21,15 @@ static constexpr uint32_t MAX_LIGHTS = 16;
 
 static Counter s_cmdCounter{};
 
-DeferredRenderer::DeferredRenderer(RenderContext renderContext, SceneRenderTarget::TargetType targetType)
-    : Renderer(renderContext, targetType)
+DeferredRenderer::DeferredRenderer(RenderContext renderContext, const RendererConfig &config) : Renderer(renderContext, config)
 {
     setupCommandResources();
     createRenderTarget();
 
-    m_rtInstanceData = std::make_unique<RtInstanceData>(m_renderContext);
-    m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(m_swapChain->getImageCount());
+    if (m_config.enableAccelerationStructures) {
+        m_rtInstanceData = std::make_unique<RtInstanceData>(m_renderContext);
+        m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(m_swapChain->getImageCount());
+    }
 
     // Get the render target format for pipeline creation
     VkFormat colorFormat = m_sceneRenderTarget->getFormat();
@@ -82,14 +83,14 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
 
     m_currentFrame = Application::getInstance().getFrameInFlightIndex();
 
-    m_giActive = settings.useGlobalIllumination();
+    m_giActive = m_config.enableAccelerationStructures && settings.useGlobalIllumination();
     m_lightingFlags = settings.flags;
 
     // For PRESENTATION mode, we need to acquire a swapchain image
     // For OFFSCREEN mode, we just use m_currentFrame as the target index
     uint32_t imageIndex = m_currentFrame;
 
-    if (m_targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
+    if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
         int imageIndexi = m_swapChain->acquireImage(m_currentFrame);
         if (imageIndexi == -1) {
             return;
@@ -97,7 +98,9 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
         imageIndex = static_cast<uint32_t>(imageIndexi);
     }
 
-    m_rtInstanceData->update(activeScene);
+    if (m_rtInstanceData) {
+        m_rtInstanceData->update(activeScene);
+    }
 
     if (m_giActive) {
         JobSystem &system = jobs();
@@ -118,7 +121,7 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
     VkSemaphore frSignalSemaphores[1];
     VkPipelineStageFlags frWaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-    if (m_targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
+    if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
         // PRESENTATION mode: Wait for swapchain image, signal when done, then present
         frWaitSemaphores[0] = m_swapChain->getImageAvailableSemaphore(m_currentFrame);
         frSignalSemaphores[0] = m_swapChain->getRenderFinishedSemaphore(m_currentFrame);
@@ -156,10 +159,6 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
         }
     } else {
         m_graphicsQueue->addToBatch(commandBuffer);
-
-        // OFFSCREEN mode: Do NOT submit here - ImguiLayer handles submission
-        // The command buffer has been recorded and added to the queue.
-        // ImguiLayer will submit it with proper semaphore synchronization.
     }
 
     m_lastRenderedFrame = imageIndex;
@@ -173,7 +172,7 @@ void DeferredRenderer::onSwapChainRecreated()
 
     // In PRESENTATION mode, the render target is backed by swapchain, so we need to recreate everything
     // In OFFSCREEN mode, only update the swapchain reference (image count may have changed)
-    if (m_targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
+    if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
         m_width = static_cast<float>(m_swapChain->getExtent().width);
         m_height = static_cast<float>(m_swapChain->getExtent().height);
 
@@ -196,7 +195,7 @@ void DeferredRenderer::onSwapChainRecreated()
 
 void DeferredRenderer::resizeRenderTarget(uint32_t width, uint32_t height)
 {
-    if (m_targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
+    if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
         m_framebufferNeedsResize = true;
         return;
     }
@@ -208,11 +207,12 @@ void DeferredRenderer::resizeRenderTarget(uint32_t width, uint32_t height)
 
 void DeferredRenderer::createRenderTarget()
 {
-    if (m_targetType == SceneRenderTarget::TargetType::OFFSCREEN) {
+    if (m_config.targetType == SceneRenderTarget::TargetType::OFFSCREEN) {
         // Create offscreen render target for Editor mode
         // Use BGRA8 SRGB format (matches typical swapchain format)
         m_sceneRenderTarget = std::make_unique<SceneRenderTarget>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height),
-                                                                  m_swapChain->getImageCount(), TextureFormat::RGBA16F);
+                                                                  m_swapChain->getImageCount(), TextureFormat::RGBA16F,
+                                                                  m_config.allowReadback);
         RP_CORE_INFO("Created OFFSCREEN render target for Editor mode");
     } else {
         // Create swapchain-backed render target for Standalone mode
@@ -393,8 +393,8 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             [&lightingBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
              lightingInheritance, lightingPass = m_lightingPass.get(), lightingFlags = m_lightingFlags](JobContext &ctx) {
                 (void)ctx;
-                lightingBuffer = lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame,
-                                                               lightingInheritance, lightingFlags);
+                lightingBuffer =
+                    lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, lightingInheritance, lightingFlags);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 

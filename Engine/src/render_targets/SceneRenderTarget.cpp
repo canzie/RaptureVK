@@ -4,8 +4,9 @@
 
 namespace Rapture {
 
-SceneRenderTarget::SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format)
-    : m_type(TargetType::OFFSCREEN), m_width(width), m_height(height), m_format(format), m_swapChain(nullptr)
+SceneRenderTarget::SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format, bool allowReadback)
+    : m_type(TargetType::OFFSCREEN), m_width(width), m_height(height), m_format(format), m_allowReadback(allowReadback),
+      m_swapChain(nullptr)
 {
 
     createOffscreenTextures(width, height, imageCount, format);
@@ -47,6 +48,7 @@ void SceneRenderTarget::createOffscreenTextures(uint32_t width, uint32_t height,
     spec.mipLevels = 1;
     spec.wrap = TextureWrap::ClampToEdge;
     spec.filter = TextureFilter::Linear;
+    spec.allowReadback = m_allowReadback;
 
     for (uint32_t i = 0; i < imageCount; i++) {
         auto texture = std::make_shared<Texture>(spec);

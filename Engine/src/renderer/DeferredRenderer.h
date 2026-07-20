@@ -23,7 +23,7 @@ struct LightComponent;
 class DeferredRenderer : public Renderer {
 
   public:
-    DeferredRenderer(RenderContext renderContext, SceneRenderTarget::TargetType targetType);
+    DeferredRenderer(RenderContext renderContext, const RendererConfig &config);
     ~DeferredRenderer() override;
 
     void drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings) override;

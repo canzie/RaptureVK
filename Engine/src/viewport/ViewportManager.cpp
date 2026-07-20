@@ -6,10 +6,9 @@ namespace Rapture {
 
 ViewportManager::ViewportManager(RenderContext renderContext) : m_renderContext(renderContext) {}
 
-Viewport *ViewportManager::createViewport(const std::string &name, SceneRenderTarget::TargetType targetType, uint32_t width,
-                                          uint32_t height)
+Viewport *ViewportManager::createViewport(const ViewportConfig &config)
 {
-    auto viewport = std::make_unique<Viewport>(name, m_renderContext, targetType, width, height);
+    auto viewport = std::make_unique<Viewport>(config, m_renderContext);
     auto *ptr = viewport.get();
     m_viewports.push_back(std::move(viewport));
 

@@ -5,8 +5,7 @@
 
 namespace Rapture {
 
-Renderer::Renderer(RenderContext renderContext, SceneRenderTarget::TargetType targetType)
-    : m_renderContext(renderContext), m_targetType(targetType)
+Renderer::Renderer(RenderContext renderContext, const RendererConfig &config) : m_renderContext(renderContext), m_config(config)
 {
     auto &vc = *m_renderContext.vulkanContext;
 

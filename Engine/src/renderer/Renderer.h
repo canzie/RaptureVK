@@ -15,9 +15,18 @@ namespace Rapture {
 
 class Scene;
 
+/**
+ * @brief Creation-time configuration for a renderer and its render target.
+ */
+struct RendererConfig {
+    SceneRenderTarget::TargetType targetType;
+    bool allowReadback = false;
+    bool enableAccelerationStructures = true;
+};
+
 class Renderer {
   public:
-    Renderer(RenderContext renderContext, SceneRenderTarget::TargetType targetType);
+    Renderer(RenderContext renderContext, const RendererConfig &config);
     virtual ~Renderer() = default;
 
     Renderer(const Renderer &) = delete;
@@ -46,11 +55,11 @@ class Renderer {
      * @return The slot index of the most recently rendered frame.
      */
     uint32_t getLastRenderedFrameIndex() const { return m_lastRenderedFrame; }
-    SceneRenderTarget::TargetType getTargetType() const { return m_targetType; }
+    SceneRenderTarget::TargetType getTargetType() const { return m_config.targetType; }
 
   protected:
     RenderContext m_renderContext;
-    SceneRenderTarget::TargetType m_targetType;
+    RendererConfig m_config;
 
     std::shared_ptr<SwapChain> m_swapChain;
     std::unique_ptr<SceneRenderTarget> m_sceneRenderTarget;

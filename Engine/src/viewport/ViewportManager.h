@@ -20,13 +20,10 @@ class ViewportManager {
 
     /**
      * @brief Create a new viewport
-     * @param name Unique name used to identify this viewport
-     * @param targetType OFFSCREEN for editor viewports, SWAPCHAIN for standalone
-     * @param width Initial width in pixels
-     * @param height Initial height in pixels
+     * @param config Creation-time configuration for the viewport and its render target
      * @return Non-owning pointer to the created viewport
      */
-    Viewport *createViewport(const std::string &name, SceneRenderTarget::TargetType targetType, uint32_t width, uint32_t height);
+    Viewport *createViewport(const ViewportConfig &config);
 
     void destroyViewport(const std::string &name);
 

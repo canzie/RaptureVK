@@ -149,8 +149,6 @@ void Scene::onUpdate(float dt)
     // Get current frame dimensions for camera updates
     auto &app = Application::getInstance();
     auto swapChain = app.getMainWindow().getSwapChain();
-    float width = static_cast<float>(swapChain->getExtent().width);
-    float height = static_cast<float>(swapChain->getExtent().height);
     uint32_t frameCounter = app.getFrameInFlightIndex();
 
     {
@@ -161,20 +159,6 @@ void Scene::onUpdate(float dt)
                 meshView.get<TransformComponent, MeshComponent, MaterialComponent, TagComponent>(entity);
 
             material.material->updatePendingTextures();
-        }
-    }
-
-    {
-        RAPTURE_PROFILE_SCOPE("OldPerEntity::updateCameras");
-        auto cameraView = m_registry.view<TransformComponent, CameraComponent>();
-        for (auto entity : cameraView) {
-            auto [transform, camera] = cameraView.get<TransformComponent, CameraComponent>(entity);
-
-            // Update camera aspect ratio based on current swapchain extent
-            float aspectRatio = width / height;
-            if (camera.aspectRatio != aspectRatio) {
-                camera.updateProjectionMatrix(camera.fov, aspectRatio, camera.nearPlane, camera.farPlane);
-            }
         }
     }
 

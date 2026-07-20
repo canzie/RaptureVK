@@ -11,7 +11,7 @@
 
 class Workspace {
   public:
-    virtual ~Workspace() = default;
+    virtual ~Workspace();
 
     Amethyst::DockingLayer *getDockingLayer(void) const { return m_dockingLayer; }
     const std::vector<std::unique_ptr<Panel>> &getPanels(void) const { return m_panels; }
@@ -40,6 +40,7 @@ class Workspace {
     Amethyst::Frame *m_hotbar = nullptr;
     Amethyst::DockingLayer *m_dockingLayer = nullptr;
     std::vector<std::unique_ptr<Panel>> m_panels;
+    bool m_teardown = false;
 };
 
 #endif // RAPTURE__WORKSPACE_H

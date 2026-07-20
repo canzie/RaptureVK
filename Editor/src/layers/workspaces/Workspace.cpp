@@ -5,6 +5,11 @@
 #include <components/ui_scope.h>
 #include <memory>
 
+Workspace::~Workspace()
+{
+    m_teardown = true;
+}
+
 void Workspace::onUpdate(float dt)
 {
     for (auto &panel : m_panels) {
@@ -46,6 +51,9 @@ void Workspace::addPanel(std::unique_ptr<Panel> panel, Amethyst::DockZone zone)
     Panel *panelPtr = panel.get();
     panel->setContext(m_context);
     root->onDestroy.detachedOnce([this, panelPtr](Amethyst::Instance *) {
+        if (m_teardown) {
+            return;
+        }
         std::erase_if(m_panels, [panelPtr](const std::unique_ptr<Panel> &p) { return p.get() == panelPtr; });
     });
 
