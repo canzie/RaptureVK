@@ -57,6 +57,14 @@ struct PhysicsBodyState {
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
 };
 
+struct PhysicsRaycastHit {
+    bool hit = false;
+    uint64_t userData = 0;
+    glm::vec3 position{0.0f};
+    glm::vec3 normal{0.0f};
+    float distance = 0.0f;
+};
+
 struct PhysicsConfig {
     glm::vec3 gravity{0.0f, -9.81f, 0.0f};
     float fixedTimeStep = 1.0f / 60.0f;

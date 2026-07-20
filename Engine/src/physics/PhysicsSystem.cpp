@@ -4,6 +4,10 @@
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Body/BodyLock.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/NarrowPhaseQuery.h>
+#include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
@@ -350,6 +354,32 @@ bool PhysicsSystem::isActive(PhysicsBodyId body) const
 void PhysicsSystem::setGravity(const glm::vec3 &gravity)
 {
     m_impl->physicsSystem.SetGravity(s_glmToJolt(gravity));
+}
+
+PhysicsRaycastHit PhysicsSystem::raycast(const glm::vec3 &origin, const glm::vec3 &direction, float maxDistance) const
+{
+    PhysicsRaycastHit hit;
+
+    const JPH::RRayCast ray(s_glmToJoltPosition(origin), s_glmToJolt(direction) * maxDistance);
+
+    JPH::RayCastResult result;
+    if (!m_impl->physicsSystem.GetNarrowPhaseQuery().CastRay(ray, result)) {
+        return hit;
+    }
+
+    const JPH::RVec3 hitPosition = ray.mOrigin + result.mFraction * ray.mDirection;
+    hit.hit = true;
+    hit.position = s_joltToGlm(hitPosition);
+    hit.distance = maxDistance * result.mFraction;
+
+    JPH::BodyLockRead lock(m_impl->physicsSystem.GetBodyLockInterface(), result.mBodyID);
+    if (lock.Succeeded()) {
+        const JPH::Body &body = lock.GetBody();
+        hit.userData = body.GetUserData();
+        hit.normal = s_joltToGlm(body.GetWorldSpaceSurfaceNormal(result.mSubShapeID2, hitPosition));
+    }
+
+    return hit;
 }
 
 const std::vector<PhysicsBodyState> &PhysicsSystem::getActiveBodyStates()

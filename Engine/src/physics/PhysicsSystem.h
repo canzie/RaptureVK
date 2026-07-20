@@ -88,6 +88,15 @@ class PhysicsSystem {
      */
     void setGravity(const glm::vec3 &gravity);
 
+    /**
+     * @brief Cast a ray against the simulation and return the closest hit.
+     * @param origin Ray start in world space.
+     * @param direction Unit ray direction in world space.
+     * @param maxDistance Maximum distance to test along the direction.
+     * @return The closest hit; its hit field is false when nothing was struck.
+     */
+    PhysicsRaycastHit raycast(const glm::vec3 &origin, const glm::vec3 &direction, float maxDistance) const;
+
   private:
     struct Impl;
     std::unique_ptr<Impl> m_impl;
