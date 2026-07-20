@@ -1,6 +1,7 @@
 #pragma once
 
 #include "acceleration_structures/TLAS.h"
+#include "scenes/entities/EntityCommon.h"
 #include <entt/entt.hpp>
 #include <memory>
 #include <string>
@@ -11,6 +12,7 @@ namespace Rapture {
 class Entity;
 class Environment;
 class SceneRenderData;
+class PhysicsSystem;
 struct RenderContext;
 
 struct SceneSettings {
@@ -25,7 +27,7 @@ class Scene {
 
     Entity createEntity(const std::string &name = "Untitled Entity");
     Entity createCube(const std::string &name = "Untitled Entity");
-    Entity createSphere(const std::string &name = "Untitled Entity");
+    Entity createSphere(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
 
     void destroyEntity(Entity entity);
 
@@ -53,6 +55,11 @@ class Scene {
      */
     Environment *environment() const { return m_environment.get(); }
 
+    /**
+     * @brief The scene's rigid body physics simulation.
+     */
+    PhysicsSystem *physics() const { return m_physics.get(); }
+
     void registerBLAS(Entity &entity);
 
     void buildTLAS();
@@ -78,11 +85,16 @@ class Scene {
 
   private:
     void ensureBLASFreeBuckets();
+    void onRigidBodyConstructed(entt::registry &registry, entt::entity entity);
+    void registerRigidBodies();
+    void syncRigidBodyTransforms();
 
   private:
     entt::registry m_registry;
     std::unique_ptr<Environment> m_environment;
     std::unique_ptr<SceneRenderData> m_renderData;
+    std::unique_ptr<PhysicsSystem> m_physics;
+    std::vector<entt::entity> m_pendingRigidBodies;
     SceneSettings m_config;
 
     std::shared_ptr<TLAS> m_tlas;

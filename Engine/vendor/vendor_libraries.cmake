@@ -156,6 +156,25 @@ FetchContent_Declare(
     GIT_PROGRESS TRUE
 )
 
+# --- Jolt Physics ---
+# NOTE: Jolt's CMakeLists.txt lives in the Build/ subdir, not the repo root,
+# hence SOURCE_SUBDIR Build.
+set(TARGET_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(TARGET_HELLO_WORLD OFF CACHE BOOL "" FORCE)
+set(TARGET_PERFORMANCE_TEST OFF CACHE BOOL "" FORCE)
+set(TARGET_SAMPLES OFF CACHE BOOL "" FORCE)
+set(TARGET_VIEWER OFF CACHE BOOL "" FORCE)
+# Keep LTO off to match the rest of the vendor libs.
+set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    JoltPhysics
+    GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+    GIT_TAG v5.6.0
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+    SOURCE_SUBDIR Build
+)
+
 
 # ==================== Make Dependencies Available ====================
 
@@ -178,6 +197,7 @@ FetchContent_MakeAvailable(glslang)
 FetchContent_MakeAvailable(tomlplusplus)
 target_compile_definitions(tomlplusplus_tomlplusplus INTERFACE TOML_EXCEPTIONS=0)
 FetchContent_MakeAvailable(concurrentqueue)
+FetchContent_MakeAvailable(JoltPhysics)
 message(STATUS "=== All vendor dependencies available ===")
 
 # ==================== Suppress Warnings from Vendor Libraries ====================
@@ -233,6 +253,7 @@ mark_as_system_includes(glslang-default-resource-limits)
 mark_as_system_includes(glfw)
 mark_as_system_includes(spdlog)
 mark_as_system_includes(EnTT)
+mark_as_system_includes(Jolt)
 
 # ==================== Manual Target Configuration ====================
 
@@ -322,6 +343,7 @@ target_link_libraries(vendor_libraries INTERFACE
     glslang-default-resource-limits
     tomlplusplus::tomlplusplus
     concurrentqueue
+    Jolt
 )
 
 # Mark vendor_libraries includes as SYSTEM to suppress warnings

@@ -2,6 +2,7 @@
 #include "entities/Entity.h"
 
 #include "components/Components.h"
+#include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
 #include "components/systems/Environment.h"
 #include "renderer/SceneRenderData.h"
@@ -9,6 +10,7 @@
 #include "asset_manager/AssetManager.h"
 #include "logging/TracyProfiler.h"
 #include "meshes/MeshPrimitives.h"
+#include "physics/PhysicsSystem.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "window_context/Application.h"
 
@@ -25,6 +27,9 @@ Scene::Scene(const std::string &sceneName)
     m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, frameCount);
 
     m_environment = std::make_unique<Environment>(createEntity("Environment"));
+
+    m_physics = std::make_unique<PhysicsSystem>();
+    m_registry.on_construct<RigidBodyComponent>().connect<&Scene::onRigidBodyConstructed>(this);
 }
 
 Scene::~Scene()
@@ -85,7 +90,7 @@ Entity Scene::createCube(const std::string &name)
     return entity;
 }
 
-Entity Scene::createSphere(const std::string &name)
+Entity Scene::createSphere(const std::string &name, Mobility mobility)
 {
     if (locked) {
         RP_CORE_WARN("Cannot create entity in locked scene '{}'", getSceneName());
@@ -106,7 +111,7 @@ Entity Scene::createSphere(const std::string &name)
     // Add a sphere mesh
     auto sphereMesh = std::make_unique<Mesh>(Primitives::CreateSphere(1.0f, 32));
     auto meshRef = AssetManager::registerVirtualAsset(std::move(sphereMesh), "Primitive_Sphere_" + name, AssetType::MESH);
-    entity.addComponent<MeshComponent>(meshRef);
+    entity.addComponent<MeshComponent>(meshRef, mobility);
 
     entity.addComponent<BoundingBoxComponent>(glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
@@ -144,7 +149,11 @@ void Scene::destroyEntity(Entity entity)
 
 void Scene::onUpdate(float dt)
 {
-    (void)dt;
+    if (m_physics) {
+        registerRigidBodies();
+        m_physics->onUpdate(dt);
+        syncRigidBodyTransforms();
+    }
 
     // Get current frame dimensions for camera updates
     auto &app = Application::getInstance();
@@ -247,6 +256,68 @@ const SceneSettings &Scene::getSettings() const
 std::string Scene::getSceneName() const
 {
     return m_config.sceneName;
+}
+
+void Scene::onRigidBodyConstructed(entt::registry &registry, entt::entity entity)
+{
+    (void)registry;
+    m_pendingRigidBodies.push_back(entity);
+}
+
+void Scene::registerRigidBodies()
+{
+    if (m_pendingRigidBodies.empty()) {
+        return;
+    }
+
+    for (entt::entity handle : m_pendingRigidBodies) {
+        if (!m_registry.valid(handle)) {
+            continue;
+        }
+
+        Entity entity(handle, this);
+        auto [rigidBody, transform] = entity.tryGetComponents<RigidBodyComponent, TransformComponent>();
+        if (rigidBody == nullptr || transform == nullptr || rigidBody->bodyId.isValid()) {
+            continue;
+        }
+
+        RigidBodyConfig config;
+        config.shape = rigidBody->shape;
+        if (rigidBody->shapeFromBounds) {
+            if (auto *bounds = entity.tryGetComponent<BoundingBoxComponent>()) {
+                glm::vec3 halfExtents = bounds->localBoundingBox.getExtents() * 0.5f * transform->scale();
+                config.shape = PhysicsBoxShape{halfExtents};
+            }
+        }
+        config.position = transform->translation();
+        config.rotation = transform->transforms.getRotationQuat();
+        config.motionType = rigidBody->motionType;
+        config.friction = rigidBody->friction;
+        config.restitution = rigidBody->restitution;
+        config.startActive = rigidBody->startActive;
+
+        rigidBody->bodyId = m_physics->createRigidBody(config, static_cast<uint64_t>(handle));
+    }
+
+    m_pendingRigidBodies.clear();
+}
+
+void Scene::syncRigidBodyTransforms()
+{
+    for (const PhysicsBodyState &state : m_physics->getActiveBodyStates()) {
+        const entt::entity handle = static_cast<entt::entity>(static_cast<uint32_t>(state.userData));
+        if (!m_registry.valid(handle)) {
+            continue;
+        }
+
+        auto *transform = m_registry.try_get<TransformComponent>(handle);
+        if (transform == nullptr) {
+            continue;
+        }
+
+        transform->transforms.setTranslation(state.position);
+        transform->transforms.setRotation(state.rotation);
+    }
 }
 
 void Scene::setMainCamera(Entity camera)

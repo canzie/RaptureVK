@@ -15,10 +15,8 @@
 
 #include "logging/TracyProfiler.h"
 
-#include "acceleration_structures/cpu/bvh/BVH.h"
-#include "acceleration_structures/cpu/bvh/BVH_SAH.h"
-#include "acceleration_structures/cpu/bvh/DBVH.h"
 #include "asset_manager/AssetManager.h"
+#include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
 #include "generators/textures/ProceduralTextures.h"
 #include "materials/Material.h"
@@ -145,6 +143,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     floor.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 0.1f, 10.0f));
     floor.addComponent<Rapture::BLASComponent>(floor.getComponent<Rapture::MeshComponent>().mesh);
     activeScene.registerBLAS(floor);
+    floor.addComponent<Rapture::RigidBodyComponent>().motionType = Rapture::PHYSICS_MOTION_STATIC;
 
     // Graph material test spheres - two different generated graphs, so evalSurfaceGraph dispatch is visible
     {
@@ -154,7 +153,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         uint32_t graph1Id = graphManager.registerGraph(s_buildSineBandGraph());
 
         auto spawnGraphSphere = [&](const std::string &name, const glm::vec3 &position, uint32_t graphId) {
-            auto sphere = activeScene.createSphere(name);
+            auto sphere = activeScene.createSphere(name, Rapture::MOBILITY_DYNAMIC);
             auto &transform = sphere.getComponent<Rapture::TransformComponent>();
             transform.transforms.setTranslation(position);
             transform.transforms.setScale(glm::vec3(2.0f));
@@ -168,6 +167,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
             sphere.addComponent<Rapture::BLASComponent>(sphere.getComponent<Rapture::MeshComponent>().mesh);
             activeScene.registerBLAS(sphere);
+            sphere.addComponent<Rapture::RigidBodyComponent>();
         };
 
         spawnGraphSphere("Graph Sphere 0", glm::vec3(-3.0f, 2.0f, 0.0f), graph0Id);

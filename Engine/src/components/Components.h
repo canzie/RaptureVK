@@ -25,10 +25,9 @@
 #include "cameras/PerspectiveCamera.h"
 #include "materials/MaterialInstance.h"
 #include "meshes/Mesh.h"
-#include "physics/EntropyComponents.h"
-#include "physics/colliders/ColliderPrimitives.h"
 
 #include "asset_manager/AssetManager.h"
+#include "scenes/entities/Entity.h"
 #include "scenes/entities/EntityCommon.h"
 #include "textures/Texture.h"
 
@@ -143,7 +142,7 @@ struct MeshComponent {
 
     MeshComponent() = default;
 
-    MeshComponent(AssetRef ref) : mesh(std::move(ref))
+    MeshComponent(AssetRef ref, Mobility mob = MOBILITY_STATIC) : mesh(std::move(ref)), mobility(mob)
     {
         isLoading = false;
     }
