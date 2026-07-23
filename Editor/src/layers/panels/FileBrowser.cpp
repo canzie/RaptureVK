@@ -262,7 +262,7 @@ void FileBrowser::setupTopBar()
             // editable path string (not breadcrumbs) — fills the gap up to the search box.
             top.frame(
                 {
-                    .classes = {"generic-input-field"},
+                    .classes = {"searchbar"},
                     .base =
                         {
                             .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
@@ -300,7 +300,7 @@ void FileBrowser::setupTopBar()
             // right-aligned search / filter box
             top.frame(
                 {
-                    .classes = {"generic-input-field"},
+                    .classes = {"searchbar"},
                     .base =
                         {
                             .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
@@ -691,7 +691,7 @@ void FileBrowser::setupFooter()
             // filename field (flex). Editable only when saving; otherwise it just mirrors the selection.
             foot.frame(
                 {
-                    .classes = {"generic-input-field"},
+                    .classes = {"searchbar"},
                     .base =
                         {
                             .anchorPoint = Amethyst::vec2(0.0f, 0.5f),

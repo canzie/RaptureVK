@@ -28,11 +28,8 @@ static float s_tableHeight(uint32_t rows)
 static void s_labelCell(Amethyst::UIScope &cell, std::string_view label)
 {
     cell.textLabel({
-        .classes = {"property-field"},
+        .classes = {"property-label"},
         .base = {.position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.0f, 0.0f), .size = Amethyst::UDim2(1.0f, -LABEL_PAD, 1.0f, 0.0f)},
-        .text = {.textColor = Amethyst::Color4::fromHex(0xffffff9e, true),
-                 .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                 .textYAlignment = Amethyst::TextYAlignment::CENTER},
         .label = std::string(label),
     });
 }
@@ -42,13 +39,6 @@ static float s_fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std::funct
     float height = 0.0f;
     ch.table(
         {
-            .style =
-                {
-                    .backgroundTransparency = 1.0f,
-                    .borderMode = Amethyst::BorderMode::OUTLINE,
-                    .borderPixelSize = 1.0f,
-                    .borderColor = Amethyst::Color3::fromHex(0x181818),
-                },
             .table =
                 {
                     .rowHeight = ROW_HEIGHT,
@@ -79,7 +69,7 @@ static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&
             for (int axis = 0; axis < 3; ++axis) {
                 cell.dragFloat(
                     {
-                        .classes = {"generic-input-field"},
+                        .classes = {"property-input-field"},
                         .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                                  .position = Amethyst::UDim2(axis * w, axis == 0 ? CONTROL_HPAD : 2.0f, 0.5f, 0.0f),
                                  .size = Amethyst::UDim2(w, axis == 2 ? -2.0f - CONTROL_HPAD : -2.0f, 1.0f, -2.0f * CONTROL_VPAD)},
@@ -108,7 +98,7 @@ static void s_rowSlider(Amethyst::TableScope &t, std::string_view label, float *
         tr.cell([value, min, max, onChanged, format](Amethyst::UIScope &cell) {
             cell.sliderFloat(
                 {
-                    .classes = {"generic-input-field"},
+                    .classes = {"property-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
@@ -133,7 +123,7 @@ static void s_rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool 
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
         tr.cell([value, onChanged](Amethyst::UIScope &cell) {
-            cell.checkbox({.classes = {"generic-input-field"},
+            cell.checkbox({.classes = {"property-input-field"},
                            .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                                     .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                                     .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
@@ -164,7 +154,7 @@ static void s_rowColor(Amethyst::TableScope &t, std::string_view label, std::opt
                 },
                 [&](Amethyst::FrameScope &wrap) {
                     out.emplace(wrap, Amethyst::Color3(initial.x, initial.y, initial.z),
-                                std::vector<std::string>{"generic-input-field"});
+                                std::vector<std::string>{"property-input-field"});
                     out->onColorChanged = [onChanged](const Amethyst::Color4 &c) {
                         if (onChanged) {
                             onChanged(glm::vec3(c.r, c.g, c.b));
@@ -184,7 +174,7 @@ static Amethyst::Dropdown *s_rowDropdown(Amethyst::TableScope &t, std::string_vi
         tr.cell([&](Amethyst::UIScope &cell) {
             cell.dropdown(
                 {
-                    .classes = {"generic-input-field"},
+                    .classes = {"property-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
@@ -214,7 +204,7 @@ static void s_rowDragFloat(Amethyst::TableScope &t, std::string_view label, doub
         tr.cell([value, speed, min, max, format, onChanged](Amethyst::UIScope &cell) {
             cell.dragFloat(
                 {
-                    .classes = {"generic-input-field"},
+                    .classes = {"property-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
@@ -808,13 +798,12 @@ void AtmosphereEditor::pushToComponent()
 void StubEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     ch.textLabel({
-        .classes = {"property-field"},
+        .classes = {"property-label"},
         .base =
             {
                 .position = Amethyst::UDim2::fromOffset(4.0f, 4.0f),
                 .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 28.0f),
             },
-        .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
         .label = "Not yet implemented",
     });
 }

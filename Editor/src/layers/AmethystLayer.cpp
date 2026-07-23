@@ -136,7 +136,7 @@ void AmethystLayer::onAttach()
         .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
         .zIndex = 0,
     });
-    m_backgroundFrame->addClass("background-primary");
+    m_backgroundFrame->setBaseStyleProperties({.backgroundColor = Amethyst::Color3::fromHex(0x181818)});
 
     setupMenuBar(screenSize);
     setupWorkspaces(screenSize);
@@ -191,7 +191,6 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
 {
     Amethyst::UIScope(m_window).menuBar(
         {
-            .classes = {"background-primary"},
             .base =
                 {
                     .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
@@ -246,7 +245,7 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
 
     Amethyst::UIScope(m_window).tabBar(
         {
-            .classes = {"background-primary"},
+            .classes = {"workspace-tab"},
             .base =
                 {
                     .position = Amethyst::UDim2::fromOffset(0.0f, EDITOR_MENU_BAR_HEIGHT),

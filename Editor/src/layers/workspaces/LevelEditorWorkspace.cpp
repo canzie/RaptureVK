@@ -14,6 +14,7 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
     setupBase(tabs, "Level Editor");
 
     m_dockingLayer->name = "Editor Dock";
+    m_dockingLayer->tabBarClasses = {"panel-tab"};
 
     Amethyst::TabBar *viewportTabBar = nullptr;
     Amethyst::TabBar *outlinerTabBar = nullptr;
@@ -31,15 +32,12 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
             });
 
     if (viewportTabBar != nullptr) {
-        viewportTabBar->addClass("panel-tab-bar");
         m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
     }
     if (outlinerTabBar != nullptr) {
-        outlinerTabBar->addClass("panel-tab-bar");
         m_panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar, m_context));
     }
     if (propertiesTabBar != nullptr) {
-        propertiesTabBar->addClass("panel-tab-bar");
         m_panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar, m_context));
         m_panels.push_back(std::make_unique<ImagePreviewPanel>(propertiesTabBar, m_context, "Texture Viewer",
                                                                ImagePreviewMode::ASSET_PICKER));

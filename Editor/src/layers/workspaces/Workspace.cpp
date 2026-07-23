@@ -23,14 +23,14 @@ void Workspace::setupBase(Amethyst::TabBarScope &tabs, std::string_view label)
         tab.label(iconTabLayoutScope(label));
         tab.content([this](Amethyst::FrameScope &f) {
             m_container = &f.component;
-            m_container->addClass("background-primary");
+            m_container->addClass("workspace");
 
             m_hotbar = m_container->add<Amethyst::Frame>();
             m_hotbar->setBaseProperties({
                 .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
                 .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
             });
-            m_hotbar->addClass("background-tertiary");
+            m_hotbar->addClass("workspace-hotbar");
 
             m_dockingLayer = m_container->add<Amethyst::DockingLayer>();
             m_dockingLayer->setDisplayOrder(1);

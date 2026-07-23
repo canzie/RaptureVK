@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_grid_layout.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/frame.h>
@@ -404,12 +405,12 @@ void ContentBrowserPanel::setupSideBar()
 {
     Amethyst::UIScope(*m_root).frame(
         {
+            .classes = {"panel"},
             .base =
                 {
                     .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, TOP_BAR_HEIGHT),
                     .size = Amethyst::UDim2(0.0f, SIDE_BAR_WIDTH, 1.0f, -TOP_BAR_HEIGHT),
                 },
-            .style = {.backgroundColor = COL_SIDE_BAR},
         },
         [this](Amethyst::FrameScope &side) {
             m_sideBarPane = &side.component;
@@ -422,6 +423,7 @@ void ContentBrowserPanel::setupSideBar()
                             .position = Amethyst::UDim2::fromScale(0.0f),
                             .size = Amethyst::UDim2::fromScale(1.0f),
                         },
+                    .style = {.backgroundTransparency = 1.0f},
                     .header = s_sidebarHeaderStyle(),
                     .title = "Project",
                 },
@@ -448,6 +450,7 @@ void ContentBrowserPanel::setupSideBar()
                         },
                         [this](Amethyst::ScrollingFrameScope &sf) {
                             m_directoryTreeContainer = &sf.component;
+                            m_directoryTreeContainer->setBaseStyleProperties({.backgroundTransparency = 1.0f});
                             sf.treeView(
                                 {
                                     .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
@@ -490,7 +493,7 @@ void ContentBrowserPanel::setupContentArea()
 
                     options.frame(
                         {
-                            .classes = {"generic-input-field"},
+                            .classes = {"searchbar"},
                             .base =
                                 {
                                     .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
@@ -548,6 +551,7 @@ void ContentBrowserPanel::setupContentArea()
                 },
                 [this](Amethyst::ScrollingFrameScope &sf) {
                     m_contentContainer = &sf.component;
+                    m_contentContainer->setBaseStyleProperties({.backgroundTransparency = 1.0f});
                     auto *gridLayout = sf.component.addExtension<Amethyst::UIGridLayout>();
                     gridLayout->cellSize = Amethyst::UDim2::fromOffset(TILE_MIN_WIDTH, TILE_MIN_WIDTH / TILE_ASPECT);
                     gridLayout->cellPadding = Amethyst::UDim2::fromOffset(CONTENT_PADDING, CONTENT_PADDING);
@@ -952,8 +956,8 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
         ContentItemComponents item;
 
         item.container = m_contentContainer->add<Amethyst::Frame>();
+        item.container->setClasses({"panel"});
         item.container->setBaseStyleProperties({
-            .backgroundColor = COL_TILE,
             .borderMode = Amethyst::BorderMode::OUTLINE,
             .borderPixelSize = 0.0f,
             .borderColor = COL_SELECTION,
@@ -977,6 +981,9 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
             .zIndex = 1,
         });
         item.thumbWell->setBaseStyleProperties({.backgroundColor = COL_TILE_WELL});
+        auto *thumbAspect = item.thumbWell->addExtension<Amethyst::UIAspectRatioConstraint>();
+        thumbAspect->aspectRatio = 1.0f;
+        thumbAspect->dominantAxis = Amethyst::DominantAxis::WIDTH;
 
         item.icon = item.thumbWell->add<Amethyst::ImageLabel>();
         item.icon->setBaseProperties({

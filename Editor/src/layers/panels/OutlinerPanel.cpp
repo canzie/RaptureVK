@@ -13,10 +13,11 @@
 
 #define COL_MENU_HOVER Amethyst::Color3::fromHex(0x4772b3)
 
-static void s_nameLabel(Amethyst::UIScope &s, const std::string &text)
+static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::string_view className)
 {
     s.textLabel(
         {
+            .classes = {std::string(className)},
             .base = {.padding = {.left = Amethyst::UDim::fromOffset(2.0f)}, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
             .style = {.backgroundTransparency = 1.0f},
             .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
@@ -36,15 +37,17 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
         m_contextMenu = nullptr;
         m_renameInput = nullptr;
     });
-    m_root->addClass("background-secondary");
+    m_root->addClass("panel");
     m_root->setBaseProperties({.clipsDescendants = true});
 
     Amethyst::UIScope(*m_root)
         .frame({
             .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            .style = {.backgroundTransparency = 1.0f},
         })
         .scrollingFrame(
             {
+                .classes = {"panel"},
                 .base =
                     {
                         .clipsDescendants = true,
@@ -170,8 +173,8 @@ void OutlinerPanel::buildEntityTree(Rapture::Entity entity, Amethyst::TreeRowSco
 
     std::string entityName = entity.getComponent<Rapture::TagComponent>().tag;
 
-    rowScope.cell([entityName](Amethyst::UIScope &s) { s_nameLabel(s, entityName); });
-    rowScope.cell([](Amethyst::UIScope &s) { s_nameLabel(s, "Entity"); });
+    rowScope.cell([entityName](Amethyst::UIScope &s) { s_nameLabel(s, entityName, "treeview-primary-column"); });
+    rowScope.cell([](Amethyst::UIScope &s) { s_nameLabel(s, "Entity", "treeview-secondary-column"); });
 
     if (entity.hasComponent<Rapture::HierarchyComponent>()) {
         const auto &hierarchy = entity.getComponent<Rapture::HierarchyComponent>();
@@ -276,7 +279,7 @@ void OutlinerPanel::buildNameCell(uint32_t row, uint32_t entityId, const std::st
         auto input = std::make_unique<Amethyst::TextInput>();
         Amethyst::TextInput *raw = input.get();
         m_renameInput = raw;
-        raw->addClass("generic-input-field");
+        raw->addClass("property-input-field");
         raw->setText(name);
         raw->setBaseProperties({
             .padding = {.left = Amethyst::UDim::fromOffset(2.0f)},
@@ -290,6 +293,7 @@ void OutlinerPanel::buildNameCell(uint32_t row, uint32_t entityId, const std::st
     } else {
         auto label = std::make_unique<Amethyst::TextLabel>();
         label->setText(name);
+        label->setClasses({"treeview-primary-column"});
         label->setBaseProperties(
             {.padding = {.left = Amethyst::UDim::fromOffset(2.0f)}, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
         label->setBaseStyleProperties({.backgroundTransparency = 1.0f});

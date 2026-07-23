@@ -15,10 +15,10 @@
 
 static void s_addPlaceholderTab(Amethyst::TabBar *tabBar, std::string_view name)
 {
-    tabBar->addClass("panel-tab-bar");
+    tabBar->addClass("panel-tab");
     auto root = std::make_unique<Amethyst::Frame>();
     root->name = std::string(name);
-    root->addClass("background-secondary");
+    root->addClass("panel");
     root->setBaseProperties({.clipsDescendants = true});
     tabBar->addTab(std::move(root), iconTabLayout(name));
 }
@@ -28,6 +28,7 @@ TextureGeneratorWorkspace::TextureGeneratorWorkspace(Amethyst::TabBarScope &tabs
     m_context.services = services;
     setupBase(tabs, "Texture Generator");
     m_dockingLayer->name = "Texture Generator Dock";
+    m_dockingLayer->tabBarClasses = {"panel-tab"};
 
     Amethyst::TabBar *inputsTabBar = nullptr;
     Amethyst::TabBar *previewTabBar = nullptr;
@@ -45,11 +46,9 @@ TextureGeneratorWorkspace::TextureGeneratorWorkspace(Amethyst::TabBarScope &tabs
             });
 
     if (inputsTabBar != nullptr) {
-        inputsTabBar->addClass("panel-tab-bar");
         m_panels.push_back(std::make_unique<ShaderInputsPanel>(inputsTabBar, m_context));
     }
     if (previewTabBar != nullptr) {
-        previewTabBar->addClass("panel-tab-bar");
         m_panels.push_back(std::make_unique<ImagePreviewPanel>(previewTabBar, m_context, "Preview"));
     }
     if (sourceTabBar != nullptr) {

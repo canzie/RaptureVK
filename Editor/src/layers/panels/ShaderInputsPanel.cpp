@@ -213,7 +213,7 @@ ShaderInputsPanel::ShaderInputsPanel(Amethyst::TabBar *tabBar, const WorkspaceCo
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
-    m_root->addClass("background-secondary");
+    m_root->addClass("panel");
 
     Amethyst::UIScope(*m_root).scrollingFrame(
         {
@@ -329,12 +329,9 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
                     t.row([=, &instance, memberCopy = std::move(memberCopy)](Amethyst::TableRowScope &tr) mutable {
                         tr.cell([label](Amethyst::UIScope &cell) {
                             cell.textLabel({
-                                .classes = {"property-field"},
+                                .classes = {"property-label"},
                                 .base = {.position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.0f, 0.0f),
                                          .size = Amethyst::UDim2(1.0f, -LABEL_PAD, 1.0f, 0.0f)},
-                                .text = {.textColor = Amethyst::Color4::fromHex(0xffffff9e, true),
-                                         .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                                         .textYAlignment = Amethyst::TextYAlignment::CENTER},
                                 .label = std::string(label),
                             });
                         });
@@ -355,7 +352,7 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
 
                             switch (state->baseType) {
                             case BT::FLOAT:
-                                cell.dragFloat({.classes = {"generic-input-field"},
+                                cell.dragFloat({.classes = {"property-input-field"},
                                                 .base = s_fullCtrl,
                                                 .speed = speed,
                                                 .min = dmin,
@@ -368,7 +365,7 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
 
                             case BT::INT:
                             case BT::UINT:
-                                cell.dragInt({.classes = {"generic-input-field"},
+                                cell.dragInt({.classes = {"property-input-field"},
                                               .base = s_fullCtrl,
                                               .speed = 1,
                                               .min = imin,
@@ -383,7 +380,7 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
                                 const float w = 0.5f;
                                 for (int axis = 0; axis < 2; ++axis) {
                                     cell.dragFloat(
-                                        {.classes = {"generic-input-field"},
+                                        {.classes = {"property-input-field"},
                                          .base = {.anchorPoint = Amethyst::vec2(0.0f, 0.5f),
                                                   .position = Amethyst::UDim2(axis * w, axis == 0 ? CTRL_HPAD : 2.0f, 0.5f, 0.0f),
                                                   .size = Amethyst::UDim2(w, axis == 1 ? -2.0f - CTRL_HPAD : -2.0f, 1.0f,
@@ -408,7 +405,7 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
                                                        Amethyst::Color3(static_cast<float>(state->components[0]),
                                                                         static_cast<float>(state->components[1]),
                                                                         static_cast<float>(state->components[2])),
-                                                       std::vector<std::string>{"generic-input-field"});
+                                                       std::vector<std::string>{"property-input-field"});
                                                    state->colorField->onColorChanged = [state, notify](const Amethyst::Color4 &c) {
                                                        state->components[0] = c.r;
                                                        state->components[1] = c.g;
@@ -419,7 +416,7 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
                                 } else {
                                     const float w = 1.0f / 3.0f;
                                     for (int axis = 0; axis < 3; ++axis) {
-                                        cell.dragFloat({.classes = {"generic-input-field"},
+                                        cell.dragFloat({.classes = {"property-input-field"},
                                                         .base = {.anchorPoint = Amethyst::vec2(0.0f, 0.5f),
                                                                  .position = Amethyst::UDim2(axis * w, axis == 0 ? CTRL_HPAD : 2.0f,
                                                                                              0.5f, 0.0f),
@@ -446,7 +443,7 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
                                                                         static_cast<float>(state->components[1]),
                                                                         static_cast<float>(state->components[2]),
                                                                         static_cast<float>(state->components[3])),
-                                                       std::vector<std::string>{"generic-input-field"});
+                                                       std::vector<std::string>{"property-input-field"});
                                                    state->colorField->onColorChanged = [state, notify](const Amethyst::Color4 &c) {
                                                        state->components[0] = c.r;
                                                        state->components[1] = c.g;
@@ -458,7 +455,7 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
                                 } else {
                                     const float w = 0.25f;
                                     for (int axis = 0; axis < 4; ++axis) {
-                                        cell.dragFloat({.classes = {"generic-input-field"},
+                                        cell.dragFloat({.classes = {"property-input-field"},
                                                         .base = {.anchorPoint = Amethyst::vec2(0.0f, 0.5f),
                                                                  .position = Amethyst::UDim2(axis * w, axis == 0 ? CTRL_HPAD : 2.0f,
                                                                                              0.5f, 0.0f),

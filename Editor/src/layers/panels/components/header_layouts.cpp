@@ -8,8 +8,6 @@
 
 // CollapsibleHeader's default disclosure triangle uses indicatorPadding=6, indicatorSize=10, so its
 // content starts at 6 + 10 + 6 = 22px; this mirrors that so icon/label line up with the triangle.
-#define HEADER_TEXT_COLOR Amethyst::Color4::fromHex(0xe8e8e8ff, true)
-
 static constexpr float HEADER_CONTENT_OFFSET = 30.0f;
 static constexpr float HEADER_ICON_SIZE = 16.0f;
 static constexpr float HEADER_ICON_LABEL_GAP = 6.0f;
@@ -40,6 +38,7 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
         }
 
         scope.textLabel({
+            .classes = {"component-header"},
             .base =
                 {
                     .position = Amethyst::UDim2(0.0f, textOffset, 0.0f, 0.0f),
@@ -47,13 +46,6 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
                     .zindexBehavior = Amethyst::ZIndexBehavior::GLOBAL,
                 },
             .style = {.backgroundTransparency = 1.0f},
-            .text =
-                {
-                    .fontSize = 13.0f,
-                    .textColor = HEADER_TEXT_COLOR,
-                    .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                    .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                },
             .label = label,
         });
 

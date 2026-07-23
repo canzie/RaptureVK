@@ -23,6 +23,7 @@ MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, co
     m_context.services = services;
     setupBase(tabs, "Material Editor");
     m_dockingLayer->name = "Material Editor Dock";
+    m_dockingLayer->tabBarClasses = {"panel-tab"};
 
     setupPreviewScene();
 
@@ -35,7 +36,6 @@ MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, co
             [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { previewTabBar = &tb.component; }); });
 
     if (canvasTabBar != nullptr) {
-        canvasTabBar->addClass("panel-tab-bar");
         auto panel = std::make_unique<NodeEditorPanel>(canvasTabBar, m_context);
         m_nodeEditor = panel.get();
         m_materialSelectedConn =
@@ -44,7 +44,6 @@ MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, co
     }
 
     if (previewTabBar != nullptr) {
-        previewTabBar->addClass("panel-tab-bar");
         m_panels.push_back(std::make_unique<ViewportPanel>(previewTabBar, m_context));
     }
 

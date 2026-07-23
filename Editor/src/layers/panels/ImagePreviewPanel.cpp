@@ -17,7 +17,7 @@ ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceCo
     m_root = root.get();
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
     m_root->name = std::string(title);
-    m_root->addClass("background-secondary");
+    m_root->addClass("panel");
     m_root->setBaseProperties({.clipsDescendants = true});
 
     const bool picker = m_mode == ImagePreviewMode::ASSET_PICKER;
@@ -28,7 +28,7 @@ ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceCo
     if (picker) {
         scope.frame(
             {
-                .classes = {"background-tertiary"},
+                .classes = {"panel"},
                 .base = {.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, PICKER_HEADER_HEIGHT)},
             },
             [this](Amethyst::FrameScope &f) {

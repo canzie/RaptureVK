@@ -28,7 +28,7 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
         m_entityView = nullptr;
         m_searchInput = nullptr;
     });
-    m_root->addClass("background-secondary");
+    m_root->addClass("panel");
     m_root->setBaseProperties({.clipsDescendants = true});
 
     setupSearchBar();
@@ -83,7 +83,7 @@ void PropertiesPanel::setupSearchBar()
         [this](Amethyst::FrameScope &bar) {
             bar.frame(
                 {
-                    .classes = {"generic-input-field"},
+                    .classes = {"property-input-field"},
                     .base =
                         {
                             .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
@@ -193,7 +193,7 @@ void PropertiesPanel::setupEntityView()
 {
     Amethyst::UIScope(*m_root).scrollingFrame(
         {
-            .classes = {"background-secondary"},
+            .classes = {"panel"},
             .base =
                 {
                     .clipsDescendants = true,
@@ -216,7 +216,7 @@ void PropertiesPanel::buildSection(ComponentEditorBase &editor)
     Amethyst::UIScope(*m_entityView)
         .collapsibleHeader(
             {
-                .classes = {"background-tertiary"},
+                .classes = {"component-header"},
                 .base =
                     {
                         .position = Amethyst::UDim2::fromOffset(0.0f, SECTION_TOP_PAD),

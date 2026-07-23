@@ -1,165 +1,178 @@
-/* Rapture Editor Dark Theme */
 
-ui-object {
-    background-color: #282828;
-    background-transparency: 0.0;
-    border-color: #1a1a1a;
-    corner-radius: 4px;
-    font-family: "default";
-    font-size: 13px;
-    text-color: #e5e5e5;
-    label-color: rgba(229, 229, 229, 255);
-    value-color: rgba(180, 180, 180, 255);
+@property bg-window #181818
+@property bg-canvas #1A1A1A
+@property bg-input  #111111
+@property bg-panel  #252525
+@property bg-header #2F2F2F
+@property bg-frame  #1F1F1F
+
+// 1=LIGHTEST, N=DARKEST
+
+@property text-1 #EEEEEE
+@property text-2 #BEBEBE
+@property text-3 #868686
+@property text-4 #555555
+
+@property border-1 #1C1C1C
+@property border-2 #272727
+@property border-3 #343434
+@property border-4 #414141
+
+@property fill-1 #5A5A5A
+@property fill-2 rgba(238, 238, 238, 64)
+
+@property accent          #4772B3
+@property accent-contrast #FFFFFF
+// @property accent-hover    #
+// @property accent-light    #
+// @property accent-dark     #
+
+
+@property white #FFFFFF
+
+tab-bar {
+    background-color: @bg-window;
 }
 
-frame {
-    background-color: #303030;
-    border-color: #1a1a1a;
-    corner-radius: 0px;
-}
-
-ui-button {
-    background-color: #545454;
-    corner-radius: 4px;
-    padding: 8px;
-    text-color: #ffffff;
-}
-
-text-button {
-    background-color: #545454;
-    corner-radius: 4px;
-    text-color: #ffffff;
-}
-
-ui-label {
-    background-transparency: 1.0;
-    border-pixel-size: 0px;
+menu-bar {
+    background-color: @bg-window;
+    text-color: @text-1;
 }
 
 image-label {
-    background-color: #ffffff;
-    background-transparency: 0.0;
-    border-pixel-size: 0px;
+    background-transparency: 1.0;
+    image-color: @white;
 }
 
-scrolling-frame {
-    background-color: #1d1d1d;
-    scrollbar-color: #333333;
-    scrollbar-thumb-color: #5a5a5a;
-    scrollbar-thickness: 10px;
-    corner-radius: 0px;
+image-button {
+    background-transparency: 1.0;
+    image-color: @white;
 }
 
 table {
-    background-color: #1d1d1d;
-    row-height: 32px;
-    cell-padding: 4px;
-    column-separator-width: 1px;
-    column-separator-color: rgba(50, 50, 50, 255);
+    background-transparency: 1.0;
+    border-pixel-size: 1px;
+    border-color: @bg-window;
+    separator-width: 1px;
+    separator-color: @bg-window;
 }
 
 tree-view {
-    background-color: #1d1d1d;
-    row-height: 24px;
-    row-background-color: #2B2B2B;
-    row-alternate-color: #303030;
-    row-hover-color: rgba(60, 60, 60, 255);
-    row-selected-color: rgba(71, 114, 179, 255);
-    indent-per-level: 20px;
-    disclosure-triangle-size: 8px;
-    disclosure-triangle-padding: 4px;
-    disclosure-triangle-color: rgba(140, 140, 140, 255);
+    background-transparency: 1.0;
+    border-pixel-size: 0px;
+    row-background-color: @bg-panel;
+    row-alternate-color: @bg-frame;
 }
 
-text-input {
-    background-color: #181818;
-    background-transparency: 0.0;
-    corner-radius: 4px;
+scrolling-frame {
+    scrollbar-color: @bg-header;
+    scrollbar-thumb-color: @fill-1;
 }
 
-slider {
-    background-color: #282828;
-    slider-color: #3d3d3d;
-    thumb-color: #4772b3;
-    thumb-transparency: 1.0;
-    track-corner-radius: 2px;
-    thumb-corner-radius: 2px;
-    slider-fill-color: #575757ff;
-    text-y-alignment: center;
-    label-padding: 16px;
-}
 
-checkbox {
-    background-color: #282828;
-    check-color: #4772b3;
-    checkbox-size: 18px;
+.panel {
+    background-color: @bg-panel;
     corner-radius: 2px;
 }
 
-dropdown {
-    background-color: #3d3d3d;
-    highlight-color: #4772b3;
-    corner-radius: 4px;
+.panel-tab {
+    tab-color: @bg-panel;
+    tab-active-color: @bg-panel;
+    tab-hovered-color: @bg-panel;
+    tab-pressed-color: @bg-panel;
+    text-color: @text-1;
+    tab-spacing: 2px;
+    tab-offset: 6px;
+    tab-corner-radius: 2px 2px 0px 0px;
+    tab-close-color: @text-3;
 }
 
-tab-bar {
-    background-color: #181818;
-    bar-thickness: 30px;
-    tab-color: #3f3f3f;
-    tab-active-color: #303030;
-    tab-hovered-color: #303030;
-    tab-pressed-color: #303030;
-    tab-spacing: 3px;
-    tab-width: 120px;
+.workspace {
+    background-color: @bg-window;
+
 }
 
-collapsible-header#header {
-    background-color: #303030;
-    indicator-size: 24px;
+.workspace-tab {
+    tab-color: @bg-panel;
+    tab-active-color: @bg-panel;
+    tab-hovered-color: @bg-panel;
+    tab-pressed-color: @bg-panel;
+    text-color: @text-1;
+    tab-spacing: 2px;
+    tab-offset: 12px;
+    tab-corner-radius: 2px 2px 0px 0px;
+    tab-close-color: @text-3;
 }
 
-text-button.primary {
-    background-color: #4772b3;
-    text-color: #ffffff;
+.workspace-hotbar {
+    background-color: @bg-panel;
 }
 
-.background-primary {
-    background-color: #181818;
+.bottom-bar {
+    background-color: @bg-panel;
 }
 
-.background-secondary {
-    corner-radius: 2px;
-    background-color: #2B2B2B;
+// stuff like the material node graph editor and spline editor, even viewport bg (if for some reason the image doesnt load)
+.canvas-area {
+    background-color: @bg-canvas;
+    image-color: @white;
 }
 
-.background-tertiary {
-    background-color: #303030;
-    header-color: #303030;
-}
-
-.generic-input-field {
+.property-input-field {
     font-size: 12px;
-    text-color: #ffffff9e;
-    background-color: #0F0F0F;
+    text-color: @text-1;
+    background-color: @bg-input;
     corner-radius: 2px;
     border-pixel-size: 1px;
-    border-color: #303030;
-    thumb-color: #575757;
-    scrollbar-color: #0F0F0F;
-    scrollbar-thumb-color: #575757;
+    border-color: @border-3;
+    thumb-color: @fill-1;
+    thumb-transparency: 1.0;
+    slider-fill-color: @fill-1;
+    scrollbar-color: @bg-header;
+    scrollbar-thumb-color: @fill-1;
+    check-color: @accent;
+    text-x-alignment: left;
+    text-y-alignment: center;
+
 }
 
-tab-bar.panel-tab-bar {
-    background-color: #303030;
-    tab-color: #3f3f3f;
-    tab-active-color: #303030;
-    tab-hovered-color: #303030;
-    tab-pressed-color: #303030;
-}
-
-.property-field {
-    font-size: 12px;
-    label-color: #ffffff9e;
-    text-color: #ffffff9e;
+.searchbar {
+    font-size: 13px;
+    text-color: @text-1;
+    placeholder-color: @text-3;
+    image-color: @text-3;
+    background-color: @bg-input;
     corner-radius: 2px;
+    border-pixel-size: 1px;
+    border-color: @border-3;
+}
+
+.property-label {
+    font-size: 12px;
+    text-color: @text-2;
+    background-color: @bg-panel;
+    background-transparency: 1.0;
+    text-x-alignment: left;
+    text-y-alignment: center;
+}
+
+// the collapsible headers showing component information
+.component-header {
+    header-color: @bg-header;
+    background-transparency: 1.0;
+    text-color: @text-1;
+    text-x-alignment: left;
+    text-y-alignment: center;
+}
+
+.treeview-primary-column {
+    text-color: @text-1;
+}
+
+.treeview-secondary-column {
+    text-color: @text-2;
+}
+
+.graph-node-body {
+    text-color: @text-1;
 }

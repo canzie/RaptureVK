@@ -25,6 +25,7 @@ BottomBar::BottomBar(Amethyst::Window *window, const PanelServices &services) : 
 {
     m_root = window->add<Amethyst::Frame>();
     m_root->name = "Bottom Bar";
+    m_root->addClass("bottom-bar");
     m_root->setBaseProperties({
         .padding = {Amethyst::UDim::fromOffset(BOTTOM_BAR_PADDING), Amethyst::UDim::fromOffset(BOTTOM_BAR_PADDING),
                     Amethyst::UDim::fromOffset(BOTTOM_BAR_PADDING), Amethyst::UDim::fromOffset(BOTTOM_BAR_PADDING)},

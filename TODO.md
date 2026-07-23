@@ -12,6 +12,8 @@ uncouple the engines core
     - the ability to add/remove individual components from entities
         - includes depedencies like how a shadow component requires a light, this can be enforec in editor or in the engine, iam leaning towards engine
 
+    - add pseudo states to ams
+
 ## Material Graph Node Editor 
     - when a new base mat is made and opened it cannot be viewd on a sphere, since we only render material instances, so for every material we will create a base instance, this one will be immutable
       it will make no changes and jsut take the defaults from the base material. there should be some kind of logic forcing this base instance to exist, so we cant delete it and its part of the base.
@@ -22,8 +24,6 @@ uncouple the engines core
 
 
 ### PHYSICS
-    - integrate jolt
-    - write a little wrapper for it
     - implement ray picking so we can select entities using it in the editor
 
 

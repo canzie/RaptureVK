@@ -364,7 +364,7 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
         m_selectedNodes.clear();
         m_primaryNodeId = 0;
     });
-    m_root->addClass("background-secondary");
+    m_root->addClass("panel");
     m_root->setBaseProperties({.clipsDescendants = true});
 
     setupMaterialBar();
@@ -477,7 +477,7 @@ void NodeEditorPanel::setupMaterialBar()
     m_materialBar = m_root->add<Amethyst::Frame>();
     m_materialBar->name = "Material Bar";
     m_materialBar->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, MATERIAL_BAR_HEIGHT), .zIndex = 1});
-    m_materialBar->addClass("background-tertiary");
+    m_materialBar->addClass("panel");
 
     m_materialDropdown = m_materialBar->add<Amethyst::Dropdown>();
     m_materialDropdown->setBaseProperties({
@@ -870,6 +870,7 @@ Amethyst::Frame *NodeEditorPanel::createNodeShell(uint32_t nodeId, Amethyst::vec
 
     auto *title = header->add<Amethyst::TextLabel>();
     title->setText(std::string(headerText));
+    title->setClasses({"graph-node-body"});
     title->setBaseProperties({
         .padding = {.left = Amethyst::UDim::fromOffset(NODE_PADDING)},
         .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
@@ -1129,6 +1130,7 @@ Amethyst::UIObject *NodeEditorPanel::addValueDrag(Amethyst::Frame *node, float x
                                                   uint32_t component, bool integer)
 {
     auto *drag = node->add<Amethyst::DragFloat>();
+    drag->setClasses({"property-input-field"});
     drag->valueF = &value->v4[component];
     drag->speed = integer ? 1.0 : 0.01;
     drag->setFormat(integer ? "%.0f" : "%.3f");
@@ -1272,6 +1274,7 @@ void NodeEditorPanel::addTextureParamRow(uint32_t nodeId, Amethyst::Frame *node,
     NodeControl control;
     if (isInteger) {
         auto *drag = node->add<Amethyst::DragInt>();
+        drag->setClasses({"property-input-field"});
         drag->value = &param->i;
         drag->speed = 1;
         if (desc.hasRange) {
@@ -1283,6 +1286,7 @@ void NodeEditorPanel::addTextureParamRow(uint32_t nodeId, Amethyst::Frame *node,
         control.widgets.push_back(drag);
     } else {
         auto *drag = node->add<Amethyst::DragFloat>();
+        drag->setClasses({"property-input-field"});
         drag->value = &param->f;
         drag->speed = desc.hasRange ? (desc.maxValue - desc.minValue) * 0.01 : 0.01;
         drag->setFormat("%.3f");
@@ -1465,6 +1469,7 @@ uint32_t NodeEditorPanel::addPin(uint32_t nodeId, Amethyst::Frame *node, std::st
 
     auto *label = node->add<Amethyst::TextLabel>();
     label->setText(std::string(name));
+    label->setClasses({"graph-node-body"});
     label->setBaseProperties({
         .position = Amethyst::UDim2(0.0f, NODE_PADDING, 0.0f, rowY),
         .size = Amethyst::UDim2(1.0f, -2.0f * NODE_PADDING, 0.0f, NODE_ROW_HEIGHT),
