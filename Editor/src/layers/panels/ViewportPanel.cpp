@@ -4,29 +4,46 @@
 #include "components/Components.h"
 #include "components/systems/CameraController.h"
 #include "events/GameEvents.h"
+#include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "utils/rp_assert.h"
 #include "viewport/Viewport.h"
 
 #include <components/checkbox.h>
+#include <components/common.h>
 #include <components/extensions/ui_list_layout.h>
+#include <components/input_events.h>
 #include <components/ui_scope.h>
 
 #include "logging/Log.h"
 #include "renderer/RenderSettings.h"
 
+#include <algorithm>
+#include <climits>
 #include <glm/gtc/matrix_transform.hpp>
 #include <math/math.h>
 
 static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.1f;
+static constexpr float VIEWPORT_PADDING = 6.0f;
 
 static const Amethyst::UDim2 HEADER_BTN_SIZE = Amethyst::UDim2::fromOffset(80, 24);
-static const Amethyst::TextStyleProperties HEADER_BTN_TEXT{
+static const Amethyst::TextStylePropertiesArgs HEADER_BTN_TEXT{
     .fontSize = 12.0f,
     .textXAlignment = Amethyst::TextXAlignment::CENTER,
     .textYAlignment = Amethyst::TextYAlignment::CENTER,
 };
+
+static void s_showGrownMenu(Amethyst::ContextMenu *menu, Amethyst::UIObject *anchor, Amethyst::Frame *boundsRoot)
+{
+    if (menu == nullptr || anchor == nullptr || boundsRoot == nullptr) {
+        return;
+    }
+    float anchorBottom = anchor->absolutePosition.y + anchor->absoluteSize.y;
+    float boundsBottom = boundsRoot->absolutePosition.y + boundsRoot->absoluteSize.y;
+    menu->maxContentHeight = std::max(0.0f, boundsBottom - anchorBottom);
+    menu->show(anchor);
+}
 
 ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Viewport", context)
 {
@@ -44,46 +61,39 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
         }
     }
 
+    m_gizmoSpaceGroup.value = static_cast<int32_t>(m_gizmoSpace);
+    m_lightingModeGroup.value = VLM_FULL_GI; // matches RenderSettings' default flags
+
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
     m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
+    m_root->setBaseProperties({.clipsDescendants = true, .padding = Amethyst::UDim4::fromOffset(VIEWPORT_PADDING)});
 
-    Amethyst::UIScope(*m_root)
-        .frame(
-            {
-                .classes = {"panel"},
-                .base = {.size = Amethyst::UDim2::fromScale(1.0f, 0.05f)},
-            },
-            [this](Amethyst::FrameScope &f) {
-                m_header = &f.component;
-                auto *layout = f.component.addExtension<Amethyst::UIListLayout>();
-                layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-                layout->innerPadding = Amethyst::UDim(0, 4);
-                layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-                setupHeader(f);
-            })
-        .imageLabel(
-            {
-                .base =
-                    {
-                        .position = Amethyst::UDim2::fromScale(0.0f, 0.05f),
-                        .size = Amethyst::UDim2::fromScale(1.0f, 0.95f),
-                        .zIndex = 100,
-                    },
-                .style = {.cornerRadius = 2.0f},
-                .image = {.scaleType = Amethyst::ImageScaleType::STRETCH},
-            },
-            [this](Amethyst::ImageLabelScope &img) {
-                m_viewportImage = &img.component;
-                m_viewportImageDestroyConn =
-                    m_viewportImage->onDestroy.connect([this](Amethyst::Instance *) { m_viewportImage = nullptr; });
-                m_viewportImage->track(
-                    m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
-            });
+    Amethyst::UIScope(*m_root).imageLabel(
+        {
+            .base =
+                {
+                    .padding = Amethyst::UDim4::fromOffset(8.0f),
+                    .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
+                    .zIndex = 100,
+                },
+            .style = {.cornerRadius = 2.0f},
+            .image = {.scaleType = Amethyst::ImageScaleType::STRETCH},
+        },
+        [this](Amethyst::ImageLabelScope &img) {
+            m_viewportImage = &img.component;
+            m_viewportImage->propagate(Amethyst::INTERACTION_CATEGORY_ALL);
+            m_viewportImageDestroyConn =
+                m_viewportImage->onDestroy.connect([this](Amethyst::Instance *) { m_viewportImage = nullptr; });
+            m_viewportImage->track(m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
+        });
 
     m_gizmo = std::make_unique<Amethyst::Gizmo>(m_viewportImage);
+
+    setupOverlayButtons();
+    buildTransformMenu();
+    buildRenderMenu();
 
     m_entitySelectedListenerId = Rapture::GameEvents::onEntitySelected().addListener(
         [this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
@@ -119,142 +129,137 @@ ViewportPanel::~ViewportPanel()
     }
 }
 
-void ViewportPanel::setupHeader(Amethyst::FrameScope &f)
+void ViewportPanel::setupOverlayButtons()
 {
-    f.textButton(
-        {
-            .base = {.size = HEADER_BTN_SIZE},
-            .text = HEADER_BTN_TEXT,
-            .label = "Translate",
-        },
-        [this](Amethyst::TextButtonScope &b) {
-            m_translateBtn = &b.component;
-            b.component.onMouseButton1ClickCb = [this]() {
-                m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE;
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
-    f.textButton(
-        {
-            .base = {.size = HEADER_BTN_SIZE},
-            .text = HEADER_BTN_TEXT,
-            .label = "Rotate",
-        },
-        [this](Amethyst::TextButtonScope &b) {
-            m_rotateBtn = &b.component;
-            b.component.onMouseButton1ClickCb = [this]() {
-                m_gizmoOperation = Amethyst::GizmoOperation::ROTATE;
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
-    f.textButton(
-        {
-            .base = {.size = HEADER_BTN_SIZE},
-            .text = HEADER_BTN_TEXT,
-            .label = "Scale",
-        },
-        [this](Amethyst::TextButtonScope &b) {
-            m_scaleBtn = &b.component;
-            b.component.onMouseButton1ClickCb = [this]() {
-                m_gizmoOperation = Amethyst::GizmoOperation::SCALE;
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
-    f.textButton(
-        {
-            .base = {.size = HEADER_BTN_SIZE},
-            .text = HEADER_BTN_TEXT,
-            .label = "World",
-        },
-        [this](Amethyst::TextButtonScope &b) {
-            m_spaceBtn = &b.component;
-            b.component.onMouseButton1ClickCb = [this]() {
-                if (m_gizmoSpace == Amethyst::GizmoSpace::WORLD) {
-                    m_gizmoSpace = Amethyst::GizmoSpace::LOCAL;
-                    m_spaceBtn->setText("Local");
-                } else {
-                    m_gizmoSpace = Amethyst::GizmoSpace::WORLD;
-                    m_spaceBtn->setText("World");
-                }
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
-    f.textButton(
-        {
-            .base = {.size = HEADER_BTN_SIZE},
-            .text = HEADER_BTN_TEXT,
-            .label = "Orbit",
-        },
-        [this](Amethyst::TextButtonScope &b) {
-            m_cameraModeBtn = &b.component;
-            b.component.onMouseButton1ClickCb = [this]() {
-                auto *controller = cameraController();
-                if (controller == nullptr) {
+    static const float BTN_GAP = 4.0f;
+
+    Amethyst::UIScope(*m_viewportImage)
+        .textButton(
+            {
+                .classes = {"viewport-overlay-button"},
+                .base =
+                    {
+                        .position = Amethyst::UDim2::fromScale(0.0f, 0.0f),
+                        .size = HEADER_BTN_SIZE,
+                        .zIndex = 101,
+                    },
+                .text = HEADER_BTN_TEXT,
+                .label = "Transform",
+            },
+            [this](Amethyst::TextButtonScope &b) {
+                m_transformMenuBtn = &b.component;
+                b.component.onMouseButton1ClickCb = [this]() {
+                    s_showGrownMenu(m_transformMenu, m_transformMenuBtn, m_root);
                     return Amethyst::EventResult::CONSUMED;
-                }
-                if (controller->getMode() == Rapture::CameraControlMode::FLY) {
-                    controller->setMode(Rapture::CameraControlMode::ORBIT);
-                } else {
-                    controller->setMode(Rapture::CameraControlMode::FLY);
-                }
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
-    f.textButton(
-        {
-            .base = {.size = HEADER_BTN_SIZE},
-            .text = HEADER_BTN_TEXT,
-            .label = "GI",
-        },
-        [this](Amethyst::TextButtonScope &b) {
-            m_giBtn = &b.component;
-            b.component.onMouseButton1ClickCb = [this]() {
-                auto *viewport = m_viewport;
-                if (viewport == nullptr) {
+                };
+            })
+        .textButton(
+            {
+                .classes = {"viewport-overlay-button"},
+                .base =
+                    {
+                        .position = Amethyst::UDim2::fromOffset(HEADER_BTN_SIZE.offset.x + BTN_GAP, 0.0f),
+                        .size = HEADER_BTN_SIZE,
+                        .zIndex = 101,
+                    },
+                .text = HEADER_BTN_TEXT,
+                .label = "Render",
+            },
+            [this](Amethyst::TextButtonScope &b) {
+                m_renderMenuBtn = &b.component;
+                b.component.onMouseButton1ClickCb = [this]() {
+                    s_showGrownMenu(m_renderMenu, m_renderMenuBtn, m_root);
                     return Amethyst::EventResult::CONSUMED;
-                }
-                bool useGI = !viewport->renderSettings().useGlobalIllumination();
-                viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, useGI);
-                m_giBtn->setText(useGI ? "GI" : "Direct");
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
+                };
+            });
+}
 
-    f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_showDirectLighting},
-               [this](Amethyst::CheckboxScope &c) {
-                   c.component.onValueChanged = [this](bool on) {
-                       auto *viewport = m_viewport;
-                       if (viewport == nullptr) {
-                           return;
-                       }
-                       viewport->renderSettings().setFlag(Rapture::RENDER_SHOW_DIRECT, on);
-                   };
-               });
-    f.textLabel({.base = {.size = Amethyst::UDim2::fromOffset(56, 24)}, .text = HEADER_BTN_TEXT, .label = "Direct"});
+void ViewportPanel::buildTransformMenu()
+{
+    m_transformMenu = m_root->add<Amethyst::ContextMenu>();
+    m_transformMenu->addClass("viewport-context-menu");
+    m_transformMenu->popupWidth *= 1.3f;
+    m_transformMenu->maxVisibleItems = INT_MAX;
+    m_transformMenu->setRowFactories({
+        .separator = [] { return std::make_unique<ViewportContextMenuSIV>(); },
+        .radio = [] { return std::make_unique<ViewportContextMenuRIV>(); },
+    });
 
-    f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_showIndirectLighting},
-               [this](Amethyst::CheckboxScope &c) {
-                   c.component.onValueChanged = [this](bool on) {
-                       auto *viewport = m_viewport;
-                       if (viewport == nullptr) {
-                           return;
-                       }
-                       viewport->renderSettings().setFlag(Rapture::RENDER_SHOW_INDIRECT, on);
-                   };
-               });
-    f.textLabel({.base = {.size = Amethyst::UDim2::fromOffset(56, 24)}, .text = HEADER_BTN_TEXT, .label = "Indirect"});
+    m_gizmoOpGroupConn = m_gizmoOpGroup.onChanged.connect(
+        [this]() { m_gizmoOperation = static_cast<Amethyst::GizmoOperation>(m_gizmoOpGroup.value); });
+    m_gizmoSpaceGroupConn = m_gizmoSpaceGroup.onChanged.connect(
+        [this]() { m_gizmoSpace = static_cast<Amethyst::GizmoSpace>(m_gizmoSpaceGroup.value); });
+    m_cameraModeGroupConn = m_cameraModeGroup.onChanged.connect([this]() {
+        auto *controller = cameraController();
+        if (controller != nullptr) {
+            controller->setMode(m_cameraModeGroup.value == static_cast<int32_t>(Rapture::CameraControlMode::ORBIT)
+                                    ? Rapture::CameraControlMode::ORBIT
+                                    : Rapture::CameraControlMode::FLY);
+        }
+    });
 
-    f.checkbox({.base = {.size = Amethyst::UDim2::fromOffset(18, 18)}, .value = &m_rawIrradiance},
-               [this](Amethyst::CheckboxScope &c) {
-                   c.component.onValueChanged = [this](bool on) {
-                       auto *viewport = m_viewport;
-                       if (viewport == nullptr) {
-                           return;
-                       }
-                       viewport->renderSettings().setFlag(Rapture::RENDER_MODULATE_INDIRECT, !on);
-                   };
-               });
-    f.textLabel({.base = {.size = Amethyst::UDim2::fromOffset(56, 24)}, .text = HEADER_BTN_TEXT, .label = "Raw GI"});
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
+    items.push_back(
+        ViewportContextMenuRID::create("Translate", &m_gizmoOpGroup, static_cast<int32_t>(Amethyst::GizmoOperation::TRANSLATE)));
+    items.push_back(
+        ViewportContextMenuRID::create("Rotate", &m_gizmoOpGroup, static_cast<int32_t>(Amethyst::GizmoOperation::ROTATE)));
+    items.push_back(
+        ViewportContextMenuRID::create("Scale", &m_gizmoOpGroup, static_cast<int32_t>(Amethyst::GizmoOperation::SCALE)));
+    items.push_back(ViewportContextMenuSID::create("Space"));
+    items.push_back(ViewportContextMenuRID::create("World", &m_gizmoSpaceGroup, static_cast<int32_t>(Amethyst::GizmoSpace::WORLD)));
+    items.push_back(ViewportContextMenuRID::create("Local", &m_gizmoSpaceGroup, static_cast<int32_t>(Amethyst::GizmoSpace::LOCAL)));
+    items.push_back(ViewportContextMenuSID::create("Camera"));
+    items.push_back(
+        ViewportContextMenuRID::create("Orbit", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::ORBIT)));
+    items.push_back(
+        ViewportContextMenuRID::create("Fly", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::FLY)));
+    m_transformMenu->setItems(std::move(items));
+}
+
+void ViewportPanel::buildRenderMenu()
+{
+    m_renderMenu = m_root->add<Amethyst::ContextMenu>();
+    m_renderMenu->addClass("viewport-context-menu");
+    m_renderMenu->popupWidth *= 1.3f;
+    m_renderMenu->maxVisibleItems = INT_MAX;
+    m_renderMenu->setRowFactories({.radio = [] { return std::make_unique<ViewportContextMenuRIV>(); }});
+
+    m_lightingModeGroupConn = m_lightingModeGroup.onChanged.connect(
+        [this]() { applyLightingMode(static_cast<ViewportLightingMode>(m_lightingModeGroup.value)); });
+
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
+    items.push_back(ViewportContextMenuRID::create("Unlit", &m_lightingModeGroup, VLM_UNLIT));
+    items.push_back(ViewportContextMenuRID::create("Full GI", &m_lightingModeGroup, VLM_FULL_GI));
+    items.push_back(ViewportContextMenuRID::create("Only Irradiance", &m_lightingModeGroup, VLM_ONLY_IRRADIANCE));
+    m_renderMenu->setItems(std::move(items));
+}
+
+void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
+{
+    auto *viewport = m_viewport;
+    if (viewport == nullptr) {
+        return;
+    }
+    auto &settings = viewport->renderSettings();
+    switch (mode) {
+    case VLM_UNLIT:
+        settings.setFlag(Rapture::RENDER_SHOW_DIRECT, false);
+        settings.setFlag(Rapture::RENDER_SHOW_INDIRECT, false);
+        break;
+    case VLM_ONLY_IRRADIANCE:
+        settings.setFlag(Rapture::RENDER_SHOW_DIRECT, false);
+        settings.setFlag(Rapture::RENDER_SHOW_INDIRECT, true);
+        settings.setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, true);
+        settings.setFlag(Rapture::RENDER_MODULATE_INDIRECT, false);
+        break;
+    case VLM_FULL_GI:
+    default:
+        settings.setFlag(Rapture::RENDER_SHOW_DIRECT, true);
+        settings.setFlag(Rapture::RENDER_SHOW_INDIRECT, true);
+        settings.setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, true);
+        settings.setFlag(Rapture::RENDER_MODULATE_INDIRECT, true);
+        break;
+    }
 }
 
 Rapture::CameraController *ViewportPanel::cameraController() const
@@ -264,15 +269,6 @@ Rapture::CameraController *ViewportPanel::cameraController() const
         return nullptr;
     }
     return viewport->editorBinding().controller;
-}
-
-void ViewportPanel::syncCameraModeButton()
-{
-    auto *controller = cameraController();
-    if (controller == nullptr || m_cameraModeBtn == nullptr) {
-        return;
-    }
-    m_cameraModeBtn->setText(controller->getMode() == Rapture::CameraControlMode::FLY ? "Fly" : "Orbit");
 }
 
 void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
@@ -327,7 +323,11 @@ void ViewportPanel::onUpdate(float dt)
     }
 
     updateGizmo();
-    syncCameraModeButton();
+
+    auto *controller = cameraController();
+    if (controller != nullptr) {
+        m_cameraModeGroup.value = static_cast<int32_t>(controller->getMode());
+    }
 
     if (m_viewport != nullptr) {
         m_viewport->editorBinding().hovered = m_viewportHovered;

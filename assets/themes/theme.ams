@@ -34,7 +34,8 @@ tab-bar {
     background-color: @bg-window;
 }
 
-menu-bar {
+// easier to use a class so that it nicely propegates these values to its children
+.main-menu-bar {
     background-color: @bg-window;
     text-color: @text-1;
 }
@@ -73,36 +74,49 @@ scrolling-frame {
 .panel {
     background-color: @bg-panel;
     corner-radius: 2px;
-}
-
-.panel-tab {
-    tab-color: @bg-panel;
-    tab-active-color: @bg-panel;
-    tab-hovered-color: @bg-panel;
-    tab-pressed-color: @bg-panel;
-    text-color: @text-1;
     tab-spacing: 2px;
     tab-offset: 6px;
     tab-corner-radius: 2px 2px 0px 0px;
     tab-close-color: @text-3;
+
+}
+
+.panel-tab#tab {
+    text-color: @text-2;
+    background-transparency: 1.0f;
+}
+
+.panel-tab#tab:active {
+    background-color: @bg-panel;
+    text-color: @text-1;
+    background-transparency: 0.0f;
+}
+
+
+.panel-tab {
+    background-color: @bg-window;
 }
 
 .workspace {
     background-color: @bg-window;
-
-}
-
-.workspace-tab {
-    tab-color: @bg-panel;
-    tab-active-color: @bg-panel;
-    tab-hovered-color: @bg-panel;
-    tab-pressed-color: @bg-panel;
-    text-color: @text-1;
     tab-spacing: 2px;
     tab-offset: 12px;
     tab-corner-radius: 2px 2px 0px 0px;
     tab-close-color: @text-3;
+
 }
+
+.workspace-tab#tab {
+    text-color: @text-2;
+    background-transparency: 1.0f;
+}
+.workspace-tab#tab:active {
+    background-color: @bg-panel;
+    text-color: @text-1;
+    background-transparency: 0.0f;
+}
+
+
 
 .workspace-hotbar {
     background-color: @bg-panel;
@@ -111,6 +125,16 @@ scrolling-frame {
 .bottom-bar {
     background-color: @bg-panel;
 }
+
+.bottom-bar-button {
+    background-transparency: 1.0;
+    text-color: @text-2;
+    font-size: 12px;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    
+}
+
 
 // stuff like the material node graph editor and spline editor, even viewport bg (if for some reason the image doesnt load)
 .canvas-area {
@@ -145,6 +169,7 @@ scrolling-frame {
     corner-radius: 2px;
     border-pixel-size: 1px;
     border-color: @border-3;
+    text-y-alignment: center;
 }
 
 .property-label {
@@ -158,8 +183,15 @@ scrolling-frame {
 
 // the collapsible headers showing component information
 .component-header {
-    header-color: @bg-header;
     background-transparency: 1.0;
+    text-color: @text-1;
+    text-x-alignment: left;
+    text-y-alignment: center;
+}
+
+.component-header#header {
+    background-color: @bg-header;
+    background-transparency: 0.0;
     text-color: @text-1;
     text-x-alignment: left;
     text-y-alignment: center;
@@ -175,4 +207,30 @@ scrolling-frame {
 
 .graph-node-body {
     text-color: @text-1;
+}
+
+.viewport-context-menu {
+    text-color: @text-2;
+    background-color: @fill-1;
+    
+}
+
+.viewport-context-menu#separator {
+    text-color: @text-3;
+    background-color: @text-3;
+}
+
+
+radio-button.viewport-context-menu {
+    background-color: @bg-input;
+}
+
+radio-button.viewport-context-menu:active {
+    background-color: @text-1;
+}
+
+.viewport-overlay-button {
+    background-color: @fill-1;
+    text-color: @text-2;
+    corner-radius: 4px;
 }

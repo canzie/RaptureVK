@@ -25,7 +25,6 @@
 #include <modules/color.h>
 #include <modules/style.h>
 #include <parsers/config/layout_config.h>
-#include <parsers/ttf/ttf_parser.h>
 
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
@@ -191,6 +190,7 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
 {
     Amethyst::UIScope(m_window).menuBar(
         {
+            .classes = {"main-menu-bar"},
             .base =
                 {
                     .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
@@ -245,7 +245,7 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
 
     Amethyst::UIScope(m_window).tabBar(
         {
-            .classes = {"workspace-tab"},
+            .classes = {"workspace", "workspace-tab"},
             .base =
                 {
                     .position = Amethyst::UDim2::fromOffset(0.0f, EDITOR_MENU_BAR_HEIGHT),
@@ -408,7 +408,8 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
 PanelServices AmethystLayer::buildServices(void)
 {
     PanelServices services;
-    services.openSecondaryWindow = [this](int32_t width, int32_t height, std::string_view title, std::function<void(Amethyst::Window &)> build) {
+    services.openSecondaryWindow = [this](int32_t width, int32_t height, std::string_view title,
+                                          std::function<void(Amethyst::Window &)> build) {
         openSecondaryWindow(width, height, title, std::move(build));
     };
     services.openFileExplorer = [this](FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm) {
@@ -438,7 +439,8 @@ PanelServices AmethystLayer::buildServices(void)
     return services;
 }
 
-void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::string_view title, std::function<void(Amethyst::Window &)> build)
+void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::string_view title,
+                                        std::function<void(Amethyst::Window &)> build)
 {
     auto &app = Rapture::Application::getInstance();
 

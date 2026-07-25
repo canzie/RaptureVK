@@ -6,7 +6,7 @@ static constexpr float TAB_LABEL_PADDING = 8.0f;
 static constexpr float TAB_ICON_SIZE = 16.0f;
 static constexpr float TAB_ICON_LABEL_GAP = 6.0f;
 
-static void s_idk(std::string label, std::string iconSvg, Amethyst::FrameScope &scope, std::string_view className)
+static void s_idk(std::string label, std::string iconSvg, Amethyst::FrameScope &scope)
 {
     float textOffset = TAB_LABEL_PADDING;
 
@@ -26,7 +26,6 @@ static void s_idk(std::string label, std::string iconSvg, Amethyst::FrameScope &
     }
 
     scope.textLabel({
-        .classes = {std::string(className)},
         .base =
             {
                 .position = Amethyst::UDim2(0.0f, textOffset, 0.0f, 0.0f),
@@ -46,14 +45,12 @@ std::function<void(Amethyst::Frame &)> iconTabLayout(std::string_view label, std
 {
     return [label = std::string(label), iconSvg = std::string(iconSvg)](Amethyst::Frame &frame) {
         auto scope = Amethyst::FrameScope(frame);
-        s_idk(label, iconSvg, scope, "panel-tab");
+        s_idk(label, iconSvg, scope);
     };
 }
 
 std::function<void(Amethyst::FrameScope &)> iconTabLayoutScope(std::string_view label, std::string_view iconSvg)
 {
     return
-        [label = std::string(label), iconSvg = std::string(iconSvg)](Amethyst::FrameScope &scope) {
-            s_idk(label, iconSvg, scope, "workspace-tab");
-        };
+        [label = std::string(label), iconSvg = std::string(iconSvg)](Amethyst::FrameScope &scope) { s_idk(label, iconSvg, scope); };
 }

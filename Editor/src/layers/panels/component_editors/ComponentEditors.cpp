@@ -47,6 +47,7 @@ static float s_fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std::funct
                     .showHeader = false,
                     .rowBackgroundColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
                     .rowAlternateColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
+                    .scrollBarVisibility = Amethyst::ScrollBarVisibility::NEVER,
                 },
         },
         [&](Amethyst::TableScope &t) {

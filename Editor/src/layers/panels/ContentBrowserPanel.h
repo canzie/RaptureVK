@@ -10,6 +10,7 @@
 #include <components/ui_scope.h>
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -41,7 +42,7 @@ class ContentBrowserPanel : public Panel {
     void setupContentArea(void);
     void setupContextMenu(void);
 
-    void showContextMenu(Amethyst::vec2 pos, std::vector<Amethyst::ContextMenuItem> items);
+    void showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items);
 
     /**
      * @brief The context menu actions specific to an asset type, before the shared rename/delete items
@@ -49,7 +50,7 @@ class ContentBrowserPanel : public Panel {
      * @param handle The asset's handle
      * @return The type-specific menu items, empty if the type has none
      */
-    std::vector<Amethyst::ContextMenuItem> assetActions(Rapture::AssetType type, Rapture::AssetHandle handle);
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> assetActions(Rapture::AssetType type, Rapture::AssetHandle handle);
 
     void refreshFileBrowser(void);
     void buildDirectoryTree(void);

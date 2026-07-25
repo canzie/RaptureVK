@@ -6,6 +6,8 @@
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/entities/Entity.h"
 
+#include <components/common.h>
+#include <components/context_menu_item.h>
 #include <components/text_input.h>
 #include <components/text_label.h>
 #include <components/ui_scope.h>
@@ -15,10 +17,11 @@
 
 static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::string_view className)
 {
+    Amethyst::UDim4 pd = {.left = Amethyst::UDim::fromOffset(2.0f)};
     s.textLabel(
         {
             .classes = {std::string(className)},
-            .base = {.padding = {.left = Amethyst::UDim::fromOffset(2.0f)}, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            .base = {.padding = pd, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
             .style = {.backgroundTransparency = 1.0f},
             .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
             .label = text,
@@ -65,14 +68,14 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
                 sf.treeView(
                     {
                         .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                        .treeView = {.cellPadding = {0},
+                        .treeView = {.cellPadding = Amethyst::UDim4{{0.0f, 0.0f}},
                                      .showColumnSeparators = false,
                                      .disclosureTriangleSize = 24.0f,
                                      .showHeader = true},
                     },
                     [this](Amethyst::TreeViewScope &tv) {
                         m_treeView = &tv.component;
-                        tv.column("Name", 3.0f);
+                        tv.column({.header = "Name", .weight = 3.0f, .labelPadding = Amethyst::UDim4{.left = {0.0f, 0.0f}}});
                         tv.column("Type", 1.0f);
                         tv.column("", 0.5f);
                     });
@@ -216,12 +219,11 @@ void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
         hasChildren = hierarchy->hasChildren();
     }
 
-    std::vector<Amethyst::ContextMenuItem> items;
-    items.push_back(Amethyst::ContextMenuItem::action("Rename", [this, row, entityId]() { startRename(row, entityId); }));
-    items.push_back(Amethyst::ContextMenuItem::action("Delete", [this, entityId]() { requestDelete(entityId, false); }));
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
+    items.push_back(Amethyst::makeActionItem("Rename", [this, row, entityId]() { startRename(row, entityId); }));
+    items.push_back(Amethyst::makeActionItem("Delete", [this, entityId]() { requestDelete(entityId, false); }));
     if (hasChildren) {
-        items.push_back(
-            Amethyst::ContextMenuItem::action("Delete (keep children)", [this, entityId]() { requestDelete(entityId, true); }));
+        items.push_back(Amethyst::makeActionItem("Delete (keep children)", [this, entityId]() { requestDelete(entityId, true); }));
     }
 
     showContextMenu(pos, std::move(items));
@@ -260,7 +262,7 @@ void OutlinerPanel::applyPendingDelete()
     refresh();
 }
 
-void OutlinerPanel::showContextMenu(Amethyst::vec2 pos, std::vector<Amethyst::ContextMenuItem> items)
+void OutlinerPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items)
 {
     if (m_contextMenu == nullptr) {
         return;
@@ -282,7 +284,7 @@ void OutlinerPanel::buildNameCell(uint32_t row, uint32_t entityId, const std::st
         raw->addClass("property-input-field");
         raw->setText(name);
         raw->setBaseProperties({
-            .padding = {.left = Amethyst::UDim::fromOffset(2.0f)},
+            .padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(2.0f)},
             .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
             .zIndex = 2,
         });
@@ -295,7 +297,7 @@ void OutlinerPanel::buildNameCell(uint32_t row, uint32_t entityId, const std::st
         label->setText(name);
         label->setClasses({"treeview-primary-column"});
         label->setBaseProperties(
-            {.padding = {.left = Amethyst::UDim::fromOffset(2.0f)}, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
+            {.padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(2.0f)}, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
         label->setBaseStyleProperties({.backgroundTransparency = 1.0f});
         label->setTextStyleProperties({.textYAlignment = Amethyst::TextYAlignment::CENTER});
         label->propagate(Amethyst::INTERACTION_CATEGORY_ALL);

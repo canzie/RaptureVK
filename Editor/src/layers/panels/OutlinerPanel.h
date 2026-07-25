@@ -9,6 +9,7 @@
 #include "layers/panels/Panel.h"
 #include "scenes/Scene.h"
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -42,7 +43,7 @@ class OutlinerPanel : public Panel {
     void requestDelete(uint32_t entityId, bool keepChildren);
     void applyPendingDelete(void);
 
-    void showContextMenu(Amethyst::vec2 pos, std::vector<Amethyst::ContextMenuItem> items);
+    void showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items);
 
     void startRename(uint32_t row, uint32_t entityId);
     void buildNameCell(uint32_t row, uint32_t entityId, const std::string &name, bool editing);

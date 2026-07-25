@@ -344,7 +344,7 @@ void ShaderInputsPanel::rebuild(TextureGeneratorInstance &instance, const std::f
                                 if (onChanged) onChanged();
                             };
 
-                            const Amethyst::BaseProperties s_fullCtrl = {
+                            const Amethyst::BasePropertiesArgs s_fullCtrl = {
                                 .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
                                 .position = Amethyst::UDim2(0.0f, CTRL_HPAD, 0.5f, 0.0f),
                                 .size = Amethyst::UDim2(1.0f, -2.0f * CTRL_HPAD, 1.0f, -2.0f * CTRL_VPAD),

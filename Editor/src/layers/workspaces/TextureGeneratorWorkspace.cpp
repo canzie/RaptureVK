@@ -8,6 +8,7 @@
 #include "shaders/Shader.h"
 #include "shaders/ShaderCommon.h"
 
+#include <components/context_menu_item.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 
@@ -80,38 +81,36 @@ void TextureGeneratorWorkspace::setupHotbar()
 
     Amethyst::UIScope hotbarScope(*m_hotbar);
 
-    static const Amethyst::TextStyleProperties s_btnText = {.textXAlignment = Amethyst::TextXAlignment::CENTER,
-                                                             .textYAlignment = Amethyst::TextYAlignment::CENTER};
+    static const Amethyst::TextStylePropertiesArgs s_btnText = {.textXAlignment = Amethyst::TextXAlignment::CENTER,
+                                                                .textYAlignment = Amethyst::TextYAlignment::CENTER};
 
     hotbarScope
         .dropdown({.base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(200.0f, 28.0f)},
                    .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
                    .label = "No instances"},
                   [this](Amethyst::DropdownScope &d) { m_instanceDropdown = &d.component; })
-        .textButton({.base = {.layoutOrder = 1, .size = Amethyst::UDim2::fromOffset(50.0f, 28.0f)},
-                     .text = s_btnText,
-                     .label = "New"},
-                    [this](Amethyst::TextButtonScope &b) {
-                        m_newBtn = &b.component;
-                        m_newBtn->onMouseButton1ClickCb = [this]() {
-                            if (m_newPopup != nullptr) {
-                                refreshShaderDropdown();
-                                m_newPopup->open(m_newBtn);
-                            }
-                            return Amethyst::EventResult::CONSUMED;
-                        };
-                    })
+        .textButton(
+            {.base = {.layoutOrder = 1, .size = Amethyst::UDim2::fromOffset(50.0f, 28.0f)}, .text = s_btnText, .label = "New"},
+            [this](Amethyst::TextButtonScope &b) {
+                m_newBtn = &b.component;
+                m_newBtn->onMouseButton1ClickCb = [this]() {
+                    if (m_newPopup != nullptr) {
+                        refreshShaderDropdown();
+                        m_newPopup->open(m_newBtn);
+                    }
+                    return Amethyst::EventResult::CONSUMED;
+                };
+            })
         .frame({.base = {.layoutOrder = 2, .size = Amethyst::UDim2::fromOffset(1.0f, 24.0f)},
                 .style = {.backgroundColor = Amethyst::Color4::fromHex(0x444444)}})
-        .textButton({.base = {.layoutOrder = 3, .size = Amethyst::UDim2::fromOffset(80.0f, 28.0f)},
-                     .text = s_btnText,
-                     .label = "Generate"},
-                    [this](Amethyst::TextButtonScope &b) {
-                        b.component.onMouseButton1ClickCb = [this]() {
-                            generate();
-                            return Amethyst::EventResult::CONSUMED;
-                        };
-                    })
+        .textButton(
+            {.base = {.layoutOrder = 3, .size = Amethyst::UDim2::fromOffset(80.0f, 28.0f)}, .text = s_btnText, .label = "Generate"},
+            [this](Amethyst::TextButtonScope &b) {
+                b.component.onMouseButton1ClickCb = [this]() {
+                    generate();
+                    return Amethyst::EventResult::CONSUMED;
+                };
+            })
         .frame({.base = {.layoutOrder = 4, .size = Amethyst::UDim2::fromOffset(184.0f, 28.0f)},
                 .style = {.backgroundTransparency = 1.0f}},
                [this](Amethyst::FrameScope &f) {
@@ -119,8 +118,8 @@ void TextureGeneratorWorkspace::setupHotbar()
                    grpLayout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
                    grpLayout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
                    grpLayout->innerPadding = Amethyst::UDim::fromOffset(6.0f);
-                   f.checkbox({.base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
-                               .value = &m_autoGenerate});
+                   f.checkbox(
+                       {.base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)}, .value = &m_autoGenerate});
                    f.textLabel({.base = {.layoutOrder = 1, .size = Amethyst::UDim2::fromOffset(160.0f, 28.0f)},
                                 .label = "Run generate on change"});
                });
@@ -246,10 +245,10 @@ void TextureGeneratorWorkspace::rebuildInstanceDropdown()
 {
     if (m_instanceDropdown == nullptr) return;
 
-    std::vector<Amethyst::ContextMenuItem> items;
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     items.reserve(m_instances.size());
     for (size_t i = 0; i < m_instances.size(); ++i) {
-        items.push_back(Amethyst::ContextMenuItem::action(m_instances[i]->name, [this, i]() { selectInstance(i); }));
+        items.push_back(Amethyst::makeActionItem(m_instances[i]->name, [this, i]() { selectInstance(i); }));
     }
     m_instanceDropdown->setItems(std::move(items));
 
@@ -265,7 +264,7 @@ void TextureGeneratorWorkspace::refreshShaderDropdown()
     if (m_shaderDropdown == nullptr) return;
 
     const auto &registry = Rapture::AssetManager::getAssetRegistry();
-    std::vector<Amethyst::ContextMenuItem> items;
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
 
     for (const auto &[handle, metaPtr] : registry) {
         if (!metaPtr || metaPtr->assetType != Rapture::AssetType::SHADER) continue;
@@ -278,7 +277,7 @@ void TextureGeneratorWorkspace::refreshShaderDropdown()
 
         std::string name = metaPtr->getName();
         Rapture::AssetHandle h = handle;
-        items.push_back(Amethyst::ContextMenuItem::action(name, [this, h, name]() {
+        items.push_back(Amethyst::makeActionItem(name, [this, h, name]() {
             m_pendingShaderHandle = h;
             if (m_shaderDropdown != nullptr) m_shaderDropdown->setText(name);
         }));

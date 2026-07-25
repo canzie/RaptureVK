@@ -184,7 +184,7 @@ class NodeEditorPanel : public Panel {
      * @brief Builds the categorised add-node submenu tree from the editor node catalog
      * @return Context menu items for the canvas background menu
      */
-    std::vector<Amethyst::ContextMenuItem> buildAddMenu(void);
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> buildAddMenu(void);
 
     /**
      * @brief Builds the shared node frame, drag handling, input hooks, and header

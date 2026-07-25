@@ -23,8 +23,7 @@ static constexpr float TITLE_HEIGHT = 36.0f;
 static constexpr float BTN_WIDTH = 92.0f;
 static constexpr float BTN_HEIGHT = 32.0f;
 
-ImportPanel::ImportPanel(Amethyst::Window &window, const std::filesystem::path &path,
-                         const std::filesystem::path &outputFolder)
+ImportPanel::ImportPanel(Amethyst::Window &window, const std::filesystem::path &path, const std::filesystem::path &outputFolder)
     : m_path(path), m_outputFolder(outputFolder)
 {
     m_popup = window.add<Amethyst::Popup>();
@@ -95,7 +94,7 @@ void ImportPanel::build()
 
     const float contentX = 14.0f;
 
-    const Amethyst::TextStyleProperties sectionText{
+    const Amethyst::TextStylePropertiesArgs sectionText{
         .fontSize = 10.0f,
         .textColor = COL_TEXT_MUTED,
         .textXAlignment = Amethyst::TextXAlignment::LEFT,
@@ -175,7 +174,7 @@ void ImportPanel::build()
         .label = "Place in its own subfolder",
     });
 
-    const Amethyst::TextStyleProperties btnText{
+    const Amethyst::TextStylePropertiesArgs btnText{
         .fontSize = 12.0f,
         .textColor = COL_TEXT,
         .textXAlignment = Amethyst::TextXAlignment::CENTER,

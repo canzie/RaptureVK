@@ -5,6 +5,7 @@
 #include "logging/Log.h"
 #include "textures/Texture.h"
 
+#include <components/context_menu_item.h>
 #include <components/ui_scope.h>
 
 static constexpr float PICKER_HEADER_HEIGHT = 34.0f;
@@ -111,11 +112,11 @@ void ImagePreviewPanel::rebuildSelector()
 
     auto handles = Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::TEXTURE);
 
-    std::vector<Amethyst::ContextMenuItem> items;
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     items.reserve(handles.size());
     for (Rapture::AssetHandle handle : handles) {
         std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
-        items.push_back(Amethyst::ContextMenuItem::action(name, [this, handle]() { selectTexture(handle); }));
+        items.push_back(Amethyst::makeActionItem(name, [this, handle]() { selectTexture(handle); }));
     }
     m_selector->setItems(std::move(items));
 }

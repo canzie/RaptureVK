@@ -3,12 +3,15 @@
 
 #include <amethyst/Amethyst.h>
 #include <amethyst__vk13_glfw.h>
+#include <components/context_menu.h>
+#include <components/radio_button.h>
 #include <components/ui_scope.h>
 #include <components/widgets/gizmo.h>
 
 #include "layers/panels/Panel.h"
 #include "scenes/entities/Entity.h"
 
+#include <cstdint>
 #include <math/math.h>
 #include <memory>
 #include <vector>
@@ -18,6 +21,13 @@ class CameraController;
 class Viewport;
 class Texture;
 } // namespace Rapture
+
+enum ViewportLightingMode {
+    VLM_UNLIT,
+    VLM_FULL_GI,
+    VLM_ONLY_IRRADIANCE,
+    VLM_COUNT
+};
 
 class ViewportPanel : public Panel {
   public:
@@ -32,32 +42,47 @@ class ViewportPanel : public Panel {
     void onUpdate(float dt) override;
 
     Amethyst::GizmoOperation getGizmoOperation() const { return m_gizmoOperation; }
-    void setGizmoOperation(Amethyst::GizmoOperation op) { m_gizmoOperation = op; }
+    void setGizmoOperation(Amethyst::GizmoOperation op)
+    {
+        m_gizmoOperation = op;
+        m_gizmoOpGroup.value = static_cast<int32_t>(op);
+    }
     Amethyst::GizmoSpace getGizmoSpace() const { return m_gizmoSpace; }
-    void setGizmoSpace(Amethyst::GizmoSpace space) { m_gizmoSpace = space; }
+    void setGizmoSpace(Amethyst::GizmoSpace space)
+    {
+        m_gizmoSpace = space;
+        m_gizmoSpaceGroup.value = static_cast<int32_t>(space);
+    }
 
   private:
     void updateGizmo(void);
-    void setupHeader(Amethyst::FrameScope &f);
-    void syncCameraModeButton(void);
+    void setupOverlayButtons(void);
+    void buildTransformMenu(void);
+    void buildRenderMenu(void);
+    void applyLightingMode(ViewportLightingMode mode);
     Rapture::CameraController *cameraController(void) const;
     void updateViewportImage(void);
 
   private:
     Amethyst::ImageLabel *m_viewportImage = nullptr;
-    Amethyst::Frame *m_header = nullptr;
 
     Amethyst::EventConnection m_viewportImageDestroyConn;
 
-    Amethyst::TextButton *m_translateBtn = nullptr;
-    Amethyst::TextButton *m_rotateBtn = nullptr;
-    Amethyst::TextButton *m_scaleBtn = nullptr;
-    Amethyst::TextButton *m_spaceBtn = nullptr;
-    Amethyst::TextButton *m_cameraModeBtn = nullptr;
-    Amethyst::TextButton *m_giBtn = nullptr;
-    bool m_showDirectLighting = true;
-    bool m_showIndirectLighting = true;
-    bool m_rawIrradiance = false;
+    Amethyst::TextButton *m_transformMenuBtn = nullptr;
+    Amethyst::TextButton *m_renderMenuBtn = nullptr;
+    Amethyst::ContextMenu *m_transformMenu = nullptr;
+    Amethyst::ContextMenu *m_renderMenu = nullptr;
+
+    Amethyst::RadioGroup m_gizmoOpGroup;
+    Amethyst::RadioGroup m_gizmoSpaceGroup;
+    Amethyst::RadioGroup m_cameraModeGroup;
+    Amethyst::RadioGroup m_lightingModeGroup;
+
+    Amethyst::EventConnection m_gizmoOpGroupConn;
+    Amethyst::EventConnection m_gizmoSpaceGroupConn;
+    Amethyst::EventConnection m_cameraModeGroupConn;
+    Amethyst::EventConnection m_lightingModeGroupConn;
+
     bool m_viewportHovered = false;
 
     std::unique_ptr<Amethyst::Gizmo> m_gizmo;

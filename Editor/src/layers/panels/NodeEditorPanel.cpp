@@ -19,6 +19,7 @@
 #include "window_context/Application.h"
 
 #include <components/common.h>
+#include <components/context_menu_item.h>
 #include <components/drag.h>
 #include <components/dropdown.h>
 #include <components/extensions/ui_drag_detector.h>
@@ -342,8 +343,9 @@ static bool s_isConstantType(Rapture::GraphNodeType type)
 using SpawnFn = std::function<void(Rapture::GraphNodeType, std::string_view, Amethyst::Color3)>;
 using TexSpawnFn = std::function<void(NodeEditorPanel::TextureNodeKind, std::string_view)>;
 
-static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,
-                                                      const TexSpawnFn &spawnTexture, Amethyst::Color3 color);
+static std::unique_ptr<Amethyst::ContextMenu::ItemData> s_categoryToMenuItem(const NodeCatalogCategory &category,
+                                                                             const SpawnFn &spawn, const TexSpawnFn &spawnTexture,
+                                                                             Amethyst::Color3 color);
 
 NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Node Editor", context)
 {
@@ -517,10 +519,10 @@ void NodeEditorPanel::rebuildMaterialList()
     if (m_materialDropdown == nullptr) {
         return;
     }
-    std::vector<Amethyst::ContextMenuItem> items;
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::MATERIAL_INSTANCE)) {
         std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
-        items.push_back(Amethyst::ContextMenuItem::action(name, [this, handle]() { selectMaterial(handle); }));
+        items.push_back(Amethyst::makeActionItem(name, [this, handle]() { selectMaterial(handle); }));
     }
     m_materialDropdown->setItems(std::move(items));
 }
@@ -690,8 +692,9 @@ static const char *s_nodeDisplayName(Rapture::GraphNodeType type)
         return "Remap";
     case GNT::SURFACE_OUTPUT:
         return "PBR Surface";
+    default:
+        return Rapture::Graph_nodeTypeName(type);
     }
-    return Rapture::Graph_nodeTypeName(type);
 }
 
 static bool s_categoryContainsType(const NodeCatalogCategory &category, Rapture::GraphNodeType type)
@@ -802,7 +805,7 @@ void NodeEditorPanel::loadGraph(const Rapture::MaterialGraph &graph)
     }
 }
 
-std::vector<Amethyst::ContextMenuItem> NodeEditorPanel::buildAddMenu()
+std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> NodeEditorPanel::buildAddMenu()
 {
     SpawnFn spawn = [this](Rapture::GraphNodeType type, std::string_view label, Amethyst::Color3 color) {
         if (m_content != nullptr) {
@@ -815,14 +818,16 @@ std::vector<Amethyst::ContextMenuItem> NodeEditorPanel::buildAddMenu()
         }
     };
 
-    std::vector<Amethyst::ContextMenuItem> addItems;
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> addItems;
     for (const auto &category : s_nodeCatalog()) {
         addItems.push_back(s_categoryToMenuItem(category, spawn, spawnTexture, s_categoryColor(category.label)));
     }
 
-    std::vector<Amethyst::ContextMenuItem> root;
-    root.push_back(Amethyst::ContextMenuItem::submenu("Add", std::move(addItems)));
-    root.push_back(Amethyst::ContextMenuItem::action("Paste", [] {}).withEnabled(false));
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> root;
+    root.push_back(Amethyst::makeSubmenuItem("Add", std::move(addItems)));
+    auto paste = Amethyst::makeActionItem("Paste", [] {});
+    paste->as<Amethyst::ContextMenuAction>().enabled = false;
+    root.push_back(std::move(paste));
     return root;
 }
 
@@ -872,7 +877,7 @@ Amethyst::Frame *NodeEditorPanel::createNodeShell(uint32_t nodeId, Amethyst::vec
     title->setText(std::string(headerText));
     title->setClasses({"graph-node-body"});
     title->setBaseProperties({
-        .padding = {.left = Amethyst::UDim::fromOffset(NODE_PADDING)},
+        .padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(NODE_PADDING)},
         .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
     });
     title->setBaseStyleProperties({.backgroundTransparency = 1.0f});
@@ -1057,11 +1062,11 @@ void NodeEditorPanel::addVariantControl(uint32_t nodeId, Amethyst::Frame *node, 
         .zIndex = 2,
     });
 
-    std::vector<Amethyst::ContextMenuItem> items;
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     for (const auto &variant : group->variants) {
         Rapture::GraphNodeType variantType = variant.type;
         std::string variantLabel = variant.label;
-        items.push_back(Amethyst::ContextMenuItem::action(variantLabel, [this, nodeId, variantType, variantLabel, dropdown]() {
+        items.push_back(Amethyst::makeActionItem(variantLabel, [this, nodeId, variantType, variantLabel, dropdown]() {
             dropdown->setText(variantLabel);
             changeNodeType(nodeId, variantType);
         }));
@@ -1180,10 +1185,10 @@ void NodeEditorPanel::layoutTexturePins(uint32_t nodeId)
         });
         picker->setText("Select texture");
 
-        std::vector<Amethyst::ContextMenuItem> items;
+        std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
         for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::TEXTURE)) {
             std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
-            items.push_back(Amethyst::ContextMenuItem::action(name, [this, nodeId, handle, picker, name]() {
+            items.push_back(Amethyst::makeActionItem(name, [this, nodeId, handle, picker, name]() {
                 picker->setText(name);
                 setTextureNodeAsset(nodeId, handle);
             }));
@@ -1262,7 +1267,7 @@ void NodeEditorPanel::addTextureParamRow(uint32_t nodeId, Amethyst::Frame *node,
 
     float dragX = NODE_PADDING + labelWidth;
     float dragWidth = usable - labelWidth;
-    Amethyst::BaseProperties dragProps = {
+    Amethyst::BasePropertiesArgs dragProps = {
         .position = Amethyst::UDim2::fromOffset(dragX, rowY + 1.0f),
         .size = Amethyst::UDim2::fromOffset(dragWidth, NODE_ROW_HEIGHT - 2.0f),
         .zIndex = 2,
@@ -1836,8 +1841,8 @@ void NodeEditorPanel::showNodeMenu(uint32_t nodeId, Amethyst::vec2 screenPos)
         selectNode(nodeId, false);
     }
 
-    std::vector<Amethyst::ContextMenuItem> items;
-    items.push_back(Amethyst::ContextMenuItem::action("Delete", [this]() { deleteSelection(); }));
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
+    items.push_back(Amethyst::makeActionItem("Delete", [this]() { deleteSelection(); }));
     m_contextMenu->setItems(std::move(items));
     m_contextMenu->showAt(screenPos);
 }
@@ -2090,25 +2095,26 @@ void NodeEditorPanel::compileGraph()
     graphs.notifyShadersOfRegeneration();
 }
 
-static Amethyst::ContextMenuItem s_categoryToMenuItem(const NodeCatalogCategory &category, const SpawnFn &spawn,
-                                                      const TexSpawnFn &spawnTexture, Amethyst::Color3 color)
+static std::unique_ptr<Amethyst::ContextMenu::ItemData> s_categoryToMenuItem(const NodeCatalogCategory &category,
+                                                                             const SpawnFn &spawn, const TexSpawnFn &spawnTexture,
+                                                                             Amethyst::Color3 color)
 {
-    std::vector<Amethyst::ContextMenuItem> items;
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
 
     for (const auto &entry : category.entries) {
         std::string label = entry.label;
         if (entry.textureKind != NodeEditorPanel::TextureNodeKind::NONE) {
             NodeEditorPanel::TextureNodeKind kind = entry.textureKind;
-            items.push_back(Amethyst::ContextMenuItem::action(label, [spawnTexture, kind, label]() { spawnTexture(kind, label); }));
+            items.push_back(Amethyst::makeActionItem(label, [spawnTexture, kind, label]() { spawnTexture(kind, label); }));
             continue;
         }
         Rapture::GraphNodeType type = entry.type;
-        items.push_back(Amethyst::ContextMenuItem::action(label, [spawn, type, label, color]() { spawn(type, label, color); }));
+        items.push_back(Amethyst::makeActionItem(label, [spawn, type, label, color]() { spawn(type, label, color); }));
     }
 
     for (const auto &sub : category.subcategories) {
         items.push_back(s_categoryToMenuItem(sub, spawn, spawnTexture, color));
     }
 
-    return Amethyst::ContextMenuItem::submenu(category.label, std::move(items));
+    return Amethyst::makeSubmenuItem(category.label, std::move(items));
 }

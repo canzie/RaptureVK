@@ -9,6 +9,7 @@
 
 #include <components/common.h>
 #include <components/ui_scope.h>
+#include <modules/color.h>
 
 static constexpr float SEARCH_BAR_HEIGHT = 28.0f;
 static constexpr float SEARCH_BAR_TOP_PAD = 8.0f;
@@ -89,16 +90,11 @@ void PropertiesPanel::setupSearchBar()
                             .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
                             .size = Amethyst::UDim2(0.82f, -3.0f, 1.0f, 0.0f),
                         },
-                    .style =
-                        {
-                            .borderColor = Amethyst::Color3(0.4f, 0.4f, 0.4f),
-                            .cornerRadius = 4.0f,
-                        },
                 },
                 [this](Amethyst::FrameScope &sf) {
                     auto *searchFrame = &sf.component;
                     sf.track(sf.component.onHoverChanged.connect([searchFrame](bool hovered) {
-                        searchFrame->setBaseStyleProperties({.borderPixelSize = hovered ? 2.0f : 0.0f});
+                        searchFrame->setBaseStyleProperties({.borderPixelSize = hovered ? 1.0f : 0.0f});
                     }));
                     sf.imageLabel({
                         .base =
@@ -119,7 +115,11 @@ void PropertiesPanel::setupSearchBar()
                                     .size = Amethyst::UDim2(1.0f, -28.0f, 1.0f, 0.0f),
                                 },
                             .style = {.backgroundTransparency = 1.0f},
-                            .textInput = {.text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
+                            .textInput = {.text =
+                                              {
+                                                  .textColor = Amethyst::Color4::fromHex(0xEEEEEE),
+                                                  .textYAlignment = Amethyst::TextYAlignment::CENTER,
+                                              },
                                           .cursorColor = Amethyst::Color4(0.9f, 0.9f, 0.9f, 1.0f)},
                             .placeholder = "Search Properties...",
                         },
@@ -132,7 +132,7 @@ void PropertiesPanel::setupSearchBar()
                             .position = Amethyst::UDim2(0.82f, 3.0f, 0.0f, 3.0f),
                             .size = Amethyst::UDim2(0.09f, -2.0f, 1.0f, -6.0f),
                         },
-                    .style = {.cornerRadius = 4.0f},
+                    .style = {.backgroundTransparency = 1.0f},
                     .image = {.imageColor = Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)},
                     .svg = Icons::SVG_FILTER,
                 },
@@ -142,7 +142,6 @@ void PropertiesPanel::setupSearchBar()
                     b->track(b->onHoverChanged.connect([b](bool hovered) {
                         b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
                                                                           : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
-                        b->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.85f : 1.0f});
                     }));
                 });
             bar.imageButton(
@@ -152,7 +151,7 @@ void PropertiesPanel::setupSearchBar()
                             .position = Amethyst::UDim2(0.91f, 1.0f, 0.0f, 3.0f),
                             .size = Amethyst::UDim2(0.09f, 0.0f, 1.0f, -6.0f),
                         },
-                    .style = {.cornerRadius = 4.0f},
+                    .style = {.backgroundTransparency = 1.0f},
                     .image = {.imageColor = Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)},
                     .svg = Icons::SVG_MORE,
                 },
@@ -162,7 +161,6 @@ void PropertiesPanel::setupSearchBar()
                     b->track(b->onHoverChanged.connect([b](bool hovered) {
                         b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
                                                                           : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
-                        b->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.85f : 1.0f});
                     }));
                 });
         });

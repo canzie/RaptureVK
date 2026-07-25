@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <components/properties.h>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -14,18 +15,18 @@
 #include <components/dropdown.h>
 #include <components/extensions/ui_list_layout.h>
 
-#define COL_TOOLBAR  Amethyst::Color3::fromHex(0x202020)
-#define COL_PANEL    Amethyst::Color3::fromHex(0x282828)
-#define COL_PANEL_2  Amethyst::Color3::fromHex(0x2e2e2e)
-#define COL_LIST_BG   Amethyst::Color3::fromHex(0x2b2b2b)
-#define COL_LIST_BG_4 Amethyst::Color4(0.169f, 0.169f, 0.169f, 1.0f)
-#define COL_ROW_ALT_4 Amethyst::Color4(0.188f, 0.188f, 0.188f, 1.0f)
+#define COL_TOOLBAR    Amethyst::Color3::fromHex(0x202020)
+#define COL_PANEL      Amethyst::Color3::fromHex(0x282828)
+#define COL_PANEL_2    Amethyst::Color3::fromHex(0x2e2e2e)
+#define COL_LIST_BG    Amethyst::Color3::fromHex(0x2b2b2b)
+#define COL_LIST_BG_4  Amethyst::Color4(0.169f, 0.169f, 0.169f, 1.0f)
+#define COL_ROW_ALT_4  Amethyst::Color4(0.188f, 0.188f, 0.188f, 1.0f)
 #define COL_SELECTED_4 Amethyst::Color4(0.278f, 0.447f, 0.702f, 0.45f)
-#define COL_ACCENT   Amethyst::Color3::fromHex(0x4772b3)
-#define COL_HOVER    Amethyst::Color3::fromHex(0x363636)
-#define COL_APP       Amethyst::Color3::fromHex(0x0d0d0d)
-#define COL_LINE      Amethyst::Color3::fromHex(0x252525)
-#define COL_APP_HOVER Amethyst::Color3::fromHex(0x1a1a1a)
+#define COL_ACCENT     Amethyst::Color3::fromHex(0x4772b3)
+#define COL_HOVER      Amethyst::Color3::fromHex(0x363636)
+#define COL_APP        Amethyst::Color3::fromHex(0x0d0d0d)
+#define COL_LINE       Amethyst::Color3::fromHex(0x252525)
+#define COL_APP_HOVER  Amethyst::Color3::fromHex(0x1a1a1a)
 
 #define COL_TEXT          Amethyst::Color4(0.92f, 0.92f, 0.92f, 1.0f)
 #define COL_TEXT_STRONG   Amethyst::Color4(0.95f, 0.95f, 0.95f, 1.0f)
@@ -343,7 +344,7 @@ void FileBrowser::setupTopBar()
         });
 }
 
-static Amethyst::CollapsibleHeaderStyleProperties s_sectionHeaderStyle()
+static Amethyst::CollapsibleHeaderStylePropertiesArgs s_sectionHeaderStyle()
 {
     return {
         .titleStyle =
@@ -354,7 +355,6 @@ static Amethyst::CollapsibleHeaderStyleProperties s_sectionHeaderStyle()
                 .textYAlignment = Amethyst::TextYAlignment::CENTER,
             },
         .headerHeight = SECTION_HEADER_HEIGHT,
-        .headerTransparency = 1.0f,
         .indicatorSize = 12.0f,
         .indicatorColor = COL_TEXT_DIM,
     };
@@ -430,18 +430,15 @@ static void s_addBookmark(Amethyst::UIScope &scope, uint32_t order, const Bookma
 // A collapsible sidebar section holding a vertical list of bookmark rows. The
 // header does not auto-size to its content, so the expanded height is computed
 // up front from the item count.
-static void s_addSection(Amethyst::UIScope &side, uint32_t order, const std::string &title,
-                         const std::vector<BookmarkDef> &items,
+static void s_addSection(Amethyst::UIScope &side, uint32_t order, const std::string &title, const std::vector<BookmarkDef> &items,
                          const std::function<void(const std::filesystem::path &)> &navigate)
 {
     static constexpr float ITEM_GAP = 1.0f;
     static constexpr float PAD_TOP = 4.0f;
     static constexpr float PAD_BOTTOM = 6.0f;
 
-    const float itemsHeight = items.empty()
-                                  ? 0.0f
-                                  : static_cast<float>(items.size()) * BOOKMARK_HEIGHT +
-                                        static_cast<float>(items.size() - 1) * ITEM_GAP;
+    const float itemsHeight =
+        items.empty() ? 0.0f : static_cast<float>(items.size()) * BOOKMARK_HEIGHT + static_cast<float>(items.size() - 1) * ITEM_GAP;
     const float contentHeight = PAD_TOP + itemsHeight + PAD_BOTTOM;
 
     side.collapsibleHeader(
@@ -514,8 +511,8 @@ void FileBrowser::setupSideBar()
             const char *home = std::getenv("HOME");
             std::filesystem::path homePath = (home != nullptr) ? std::filesystem::path(home) : std::filesystem::path();
 
-            s_addSection(side, 0, "FAVORITES",
-                         {{Icons::SVG_PIN, "Project Root", std::filesystem::current_path(), false}}, navigate);
+            s_addSection(side, 0, "FAVORITES", {{Icons::SVG_PIN, "Project Root", std::filesystem::current_path(), false}},
+                         navigate);
             if (!homePath.empty()) {
                 s_addSection(side, 1, "SYSTEM",
                              {
@@ -765,7 +762,7 @@ void FileBrowser::setupFooter()
                         .action("Scripts", [pick] { pick("Scripts", {".lua", ".cpp", ".h", ".hpp"}); });
                 });
 
-            const Amethyst::TextStyleProperties btnText{
+            const Amethyst::TextStylePropertiesArgs btnText{
                 .fontSize = 12.0f,
                 .textColor = COL_TEXT,
                 .textXAlignment = Amethyst::TextXAlignment::CENTER,
@@ -828,8 +825,7 @@ void FileBrowser::setupFooter()
 }
 
 // One muted, single-aligned text cell filling its table cell.
-static void s_textCell(Amethyst::UIScope &s, const std::string &text, const Amethyst::Color4 &color,
-                       Amethyst::TextXAlignment align)
+static void s_textCell(Amethyst::UIScope &s, const std::string &text, const Amethyst::Color4 &color, Amethyst::TextXAlignment align)
 {
     s.textLabel({
         .base = {.interactable = false, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},

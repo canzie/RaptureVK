@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <components/common.h>
+#include <components/context_menu_item.h>
 #include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_grid_layout.h>
 #include <components/extensions/ui_list_layout.h>
@@ -225,7 +227,7 @@ void ContentBrowserPanel::setupTopBar()
         [this](Amethyst::FrameScope &top) {
             m_topBarPane = &top.component;
 
-            const Amethyst::TextStyleProperties btnTextStyle{
+            const Amethyst::TextStylePropertiesArgs btnTextStyle{
                 .fontSize = 12.0f,
                 .textColor = COL_TEXT,
                 .textXAlignment = Amethyst::TextXAlignment::CENTER,
@@ -384,7 +386,7 @@ void ContentBrowserPanel::setupTopBar()
         });
 }
 
-static Amethyst::CollapsibleHeaderStyleProperties s_sidebarHeaderStyle()
+static Amethyst::CollapsibleHeaderStylePropertiesArgs s_sidebarHeaderStyle()
 {
     return {
         .titleStyle =
@@ -395,7 +397,6 @@ static Amethyst::CollapsibleHeaderStyleProperties s_sidebarHeaderStyle()
                 .textYAlignment = Amethyst::TextYAlignment::CENTER,
             },
         .headerHeight = SECTION_HEADER_HEIGHT,
-        .headerTransparency = 1.0f,
         .indicatorSize = 14.0f,
         .indicatorColor = COL_TEXT_DIM,
     };
@@ -417,6 +418,7 @@ void ContentBrowserPanel::setupSideBar()
 
             side.collapsibleHeader(
                 {
+                    .classes = {"component-header"},
                     .base =
                         {
                             .clipsDescendants = true,
@@ -434,10 +436,10 @@ void ContentBrowserPanel::setupSideBar()
                             .base =
                                 {
                                     .clipsDescendants = true,
-                                    .padding = {{},
-                                                {},
-                                                Amethyst::UDim::fromOffset(CONTENT_PADDING),
-                                                Amethyst::UDim::fromOffset(CONTENT_PADDING)},
+                                    .padding = Amethyst::UDim4{{},
+                                                               {},
+                                                               Amethyst::UDim::fromOffset(CONTENT_PADDING),
+                                                               Amethyst::UDim::fromOffset(CONTENT_PADDING)},
                                     .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, SECTION_HEADER_HEIGHT),
                                     .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -SECTION_HEADER_HEIGHT),
                                 },
@@ -602,7 +604,7 @@ void ContentBrowserPanel::setupContextMenu()
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
 }
 
-void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<Amethyst::ContextMenuItem> items)
+void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items)
 {
     if (m_contextMenu == nullptr) {
         return;
@@ -611,13 +613,16 @@ void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<Amethy
     m_contextMenu->showAt(pos);
 }
 
-std::vector<Amethyst::ContextMenuItem> ContentBrowserPanel::assetActions(Rapture::AssetType type, Rapture::AssetHandle handle)
+std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPanel::assetActions(Rapture::AssetType type,
+                                                                                                Rapture::AssetHandle handle)
 {
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     switch (type) {
     case Rapture::AssetType::PREFAB:
-        return {Amethyst::ContextMenuItem::action("Load in scene", [this, handle]() { s_loadPrefabIntoScene(handle, m_scene); })};
+        items.push_back(Amethyst::makeActionItem("Load in scene", [this, handle]() { s_loadPrefabIntoScene(handle, m_scene); }));
+        return items;
     default:
-        return {};
+        return items;
     }
 }
 
@@ -793,17 +798,17 @@ void ContentBrowserPanel::refreshFileBrowser()
         Rapture::AssetType assetType = metadata != nullptr ? metadata->assetType : Rapture::AssetType::NONE;
         bool isAsset = metadata != nullptr;
         item.action->onMouseButton2DownCb = [this, isDir, isAsset, assetType, assetHandle](int32_t x, int32_t y) {
-            std::vector<Amethyst::ContextMenuItem> items;
+            std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
             if (isAsset) {
                 items = assetActions(assetType, assetHandle);
             } else if (!isDir) {
-                items.push_back(Amethyst::ContextMenuItem::action("Import", [] {}));
+                items.push_back(Amethyst::makeActionItem("Import", [] {}));
             }
             if (!items.empty()) {
-                items.push_back(Amethyst::ContextMenuItem::separator());
+                items.push_back(Amethyst::makeSeparatorItem());
             }
-            items.push_back(Amethyst::ContextMenuItem::action("Rename", [] {}));
-            items.push_back(Amethyst::ContextMenuItem::action("Delete", [] {}));
+            items.push_back(Amethyst::makeActionItem("Rename", [] {}));
+            items.push_back(Amethyst::makeActionItem("Delete", [] {}));
             showContextMenu(Amethyst::vec2(static_cast<float>(x), static_cast<float>(y)), std::move(items));
             return Amethyst::EventResult::CONSUMED;
         };
