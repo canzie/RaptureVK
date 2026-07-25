@@ -50,7 +50,8 @@ class ContentBrowserPanel : public Panel {
      * @param handle The asset's handle
      * @return The type-specific menu items, empty if the type has none
      */
-    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> assetActions(Rapture::AssetType type, Rapture::AssetHandle handle);
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> assetActions(Rapture::AssetType type,
+                                                                               Rapture::AssetHandle handle);
 
     void refreshFileBrowser(void);
     void buildDirectoryTree(void);
@@ -95,8 +96,6 @@ class ContentBrowserPanel : public Panel {
     Amethyst::ContextMenu *m_contextMenu = nullptr;
 
     Amethyst::Frame *m_sideBarPane = nullptr;
-    Amethyst::CollapsibleHeader *m_projectHeader = nullptr;
-    Amethyst::ScrollingFrame *m_directoryTreeContainer = nullptr;
     Amethyst::TreeView *m_directoryTree = nullptr;
 
     Amethyst::Frame *m_contentPane = nullptr;

@@ -1,10 +1,12 @@
 
-@property bg-window #181818
-@property bg-canvas #1A1A1A
-@property bg-input  #111111
-@property bg-panel  #252525
-@property bg-header #2F2F2F
-@property bg-frame  #1F1F1F
+@property bg-window   #181818
+@property bg-canvas   #1A1A1A
+@property bg-input    #111111
+@property bg-panel    #252525
+@property bg-header   #2F2F2F
+@property bg-frame    #1F1F1F
+@property bg-buttons  #383838 // not exclusive to buttons, could also be used for some context menus etc
+@property bg-contrast #4D4D4D // to be used on stuff like scrollbar thumbs. should be less  
 
 // 1=LIGHTEST, N=DARKEST
 
@@ -33,6 +35,12 @@
 tab-bar {
     background-color: @bg-window;
 }
+
+text-button {
+    background-color: @bg-buttons;
+    text-color: @text-2;
+}
+
 
 // easier to use a class so that it nicely propegates these values to its children
 .main-menu-bar {
@@ -67,7 +75,7 @@ tree-view {
 
 scrolling-frame {
     scrollbar-color: @bg-header;
-    scrollbar-thumb-color: @fill-1;
+    scrollbar-thumb-color: @bg-contrast;
 }
 
 
@@ -149,11 +157,10 @@ scrolling-frame {
     corner-radius: 2px;
     border-pixel-size: 1px;
     border-color: @border-3;
-    thumb-color: @fill-1;
+    thumb-color: @bg-contrast;
     thumb-transparency: 1.0;
-    slider-fill-color: @fill-1;
+    slider-fill-color: @bg-contrast;
     scrollbar-color: @bg-header;
-    scrollbar-thumb-color: @fill-1;
     check-color: @accent;
     text-x-alignment: left;
     text-y-alignment: center;
@@ -211,7 +218,7 @@ scrolling-frame {
 
 .viewport-context-menu {
     text-color: @text-2;
-    background-color: @fill-1;
+    background-color: @bg-buttons;
     
 }
 
@@ -230,7 +237,70 @@ radio-button.viewport-context-menu:active {
 }
 
 .viewport-overlay-button {
-    background-color: @fill-1;
+    background-color: @bg-buttons;
     text-color: @text-2;
     corner-radius: 4px;
+}
+
+.generic-text-button {
+    background-color: @bg-buttons;
+    text-color: @text-2;
+    border-pixel-size: 1px;
+    border-color: @border-1;
+    border-mode: outline;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    font-size: 12px;
+    corner-radius: 2px;
+}
+
+.generic-text-button:hover {
+    background-color: @bg-buttons;
+    text-color: @text-1;
+    border-color: @border-2;
+}
+
+
+.content-browser-section {
+    background-color: @bg-panel;
+}
+
+// stuff like a grid of cards needs a nice bg
+.grid-sink {
+    background-color: @bg-frame;
+    background-transparency: 0.0;
+}
+
+.status-bar {
+    text-color: @text-3;
+    background-color: @bg-header;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    font-size: 11px;
+}
+
+.content-browser-card-well {
+    background-color: @bg-panel;
+    corner-radius: 2px;
+    border-color: @border-4;
+    border-mode: outline;
+    border-pixel-size: 1px;
+}
+
+.content-browser-card-footer {
+    background-color: @bg-buttons;
+    text-color: @text-1;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    text-truncate: at_end;
+    font-size: 12px;
+}
+
+.content-browser-card-footer-type {
+    background-transparency: 1.0;
+    text-color: @text-2;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    text-truncate: at_end;
+    font-size: 10px;
 }

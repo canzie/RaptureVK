@@ -18,6 +18,7 @@
 #include <components/popup.h>
 #include <components/ui_scope.h>
 #include <memory>
+#include <modules/color.h>
 #include <string_view>
 
 static constexpr float TOP_BAR_HEIGHT = 36.0f;
@@ -33,19 +34,9 @@ static constexpr float TILE_FOOTER_HEIGHT = 46.0f;
 static constexpr float TILE_TYPEBAR_HEIGHT = 3.0f;
 static constexpr float TILE_ICON_SIZE = 42.0f;
 
-#define COL_TOP_BAR   Amethyst::Color3::fromHex(0x252525)
-#define COL_SIDE_BAR  Amethyst::Color3::fromHex(0x2b2b2b)
-#define COL_GRID_BG   Amethyst::Color3::fromHex(0x1b1b1b)
-#define COL_TILE      Amethyst::Color3::fromHex(0x303030)
-#define COL_TILE_WELL Amethyst::Color3::fromHex(0x3c3c3c)
-#define COL_TILE_FOOT Amethyst::Color3::fromHex(0x232323)
 #define COL_SELECTION Amethyst::Color3(0.13f, 0.45f, 0.85f)
 #define COL_SEPARATOR Amethyst::Color3::fromHex(0x181818)
-#define COL_TEXT      Amethyst::Color4(0.85f, 0.85f, 0.85f, 1.0f)
-#define COL_TEXT_DIM  Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)
 #define COL_ICON      Amethyst::Color4(0.8f, 0.8f, 0.8f, 1.0f)
-#define COL_BTN       Amethyst::Color3::fromHex(0x3a3a3a)
-#define COL_BTN_HOVER Amethyst::Color3::fromHex(0x4d4d4d)
 #define COL_HOVER     Amethyst::Color3::fromHex(0x4d4d4d)
 
 static constexpr float CONTENT_PADDING = 10.0f;
@@ -136,29 +127,6 @@ static float s_estimateTextWidth(const std::string &text, float fontSize)
 {
     return static_cast<float>(text.size()) * fontSize * 0.55f + 14.0f;
 }
-
-static void s_wireIconHover(Amethyst::ImageButton *btn)
-{
-    btn->track(btn->onHoverChanged.connect([btn](bool hovered) {
-        btn->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4(0.95f, 0.95f, 0.95f, 1.0f) : COL_ICON});
-        btn->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.8f : 1.0f});
-    }));
-}
-
-static void s_wireButtonHover(Amethyst::TextButton *btn)
-{
-    btn->setBaseStyleProperties({.backgroundColor = COL_BTN});
-    btn->track(btn->onHoverChanged.connect(
-        [btn](bool hovered) { btn->setBaseStyleProperties({.backgroundColor = hovered ? COL_BTN_HOVER : COL_BTN}); }));
-}
-
-static void s_wireGhostHover(Amethyst::TextButton *btn)
-{
-    btn->track(btn->onHoverChanged.connect([btn](bool hovered) {
-        btn->setBaseStyleProperties({.backgroundColor = COL_BTN_HOVER, .backgroundTransparency = hovered ? 0.0f : 1.0f});
-    }));
-}
-
 ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context)
     : Panel("Content Browser", context)
 {
@@ -198,11 +166,15 @@ void ContentBrowserPanel::buildContent()
 {
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
 
-    m_root->setBaseStyleProperties({.backgroundColor = COL_GRID_BG});
-
     m_baseDirectory = Rapture::Application::getInstance().getProject().getProjectDirectory();
     m_currentDirectory = m_baseDirectory;
     m_navigationHistory.push_back(m_currentDirectory);
+
+    m_root->setBaseStyleProperties({
+        .borderMode = Amethyst::BorderMode::INSET,
+        .borderPixelSize = 2.0f,
+        .borderColor = Amethyst::Color3::fromHex(0x181818),
+    });
 
     setupTopBar();
     setupSideBar();
@@ -217,22 +189,15 @@ void ContentBrowserPanel::setupTopBar()
 {
     Amethyst::UIScope(*m_root).frame(
         {
+            .classes = {"content-browser-section"},
             .base =
                 {
                     .position = Amethyst::UDim2::fromScale(0.0f),
                     .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TOP_BAR_HEIGHT),
                 },
-            .style = {.backgroundColor = COL_TOP_BAR},
         },
         [this](Amethyst::FrameScope &top) {
             m_topBarPane = &top.component;
-
-            const Amethyst::TextStylePropertiesArgs btnTextStyle{
-                .fontSize = 12.0f,
-                .textColor = COL_TEXT,
-                .textXAlignment = Amethyst::TextXAlignment::CENTER,
-                .textYAlignment = Amethyst::TextYAlignment::CENTER,
-            };
 
             // Single horizontal list-layout cluster so item positions are computed, not hardcoded.
             // It spans from the left edge up to the settings button reserved on the right.
@@ -247,7 +212,7 @@ void ContentBrowserPanel::setupTopBar()
                         },
                     .style = {.backgroundTransparency = 1.0f},
                 },
-                [this, &btnTextStyle](Amethyst::FrameScope &cluster) {
+                [this](Amethyst::FrameScope &cluster) {
                     auto *layout = cluster.component.addExtension<Amethyst::UIListLayout>();
                     layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
                     layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
@@ -256,25 +221,19 @@ void ContentBrowserPanel::setupTopBar()
 
                     cluster.textButton(
                         {
+                            .classes = {"generic-text-button"},
                             .base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(56.0f, 24.0f)},
-                            .style = {.cornerRadius = 3.0f},
-                            .text = btnTextStyle,
                             .label = "+ Add",
                         },
-                        [this](Amethyst::TextButtonScope &b) {
-                            m_addBtn = &b.component;
-                            s_wireButtonHover(m_addBtn);
-                        });
+                        [this](Amethyst::TextButtonScope &b) { m_addBtn = &b.component; });
                     cluster.textButton(
                         {
+                            .classes = {"generic-text-button"},
                             .base = {.layoutOrder = 1, .size = Amethyst::UDim2::fromOffset(58.0f, 24.0f)},
-                            .style = {.cornerRadius = 3.0f},
-                            .text = btnTextStyle,
                             .label = "Import",
                         },
                         [this](Amethyst::TextButtonScope &b) {
                             m_importBtn = &b.component;
-                            s_wireButtonHover(m_importBtn);
                             m_importBtn->onMouseButton1ClickCb = [this]() {
                                 m_services.openFileExplorer(FileBrowser::Mode::OPEN, [this](const std::filesystem::path &path) {
                                     m_services.openImportPanel(path, m_currentDirectory);
@@ -296,7 +255,6 @@ void ContentBrowserPanel::setupTopBar()
                                 navigateBack();
                                 return Amethyst::EventResult::CONSUMED;
                             };
-                            s_wireIconHover(m_goBackBtn);
                         });
                     cluster.imageButton(
                         {
@@ -312,7 +270,6 @@ void ContentBrowserPanel::setupTopBar()
                                 navigateForward();
                                 return Amethyst::EventResult::CONSUMED;
                             };
-                            s_wireIconHover(m_goForwardBtn);
                         });
                     cluster.imageLabel({
                         .base = {.layoutOrder = 4, .size = Amethyst::UDim2::fromOffset(16.0f, 16.0f)},
@@ -353,29 +310,21 @@ void ContentBrowserPanel::setupTopBar()
                     .image = {.imageColor = COL_ICON},
                     .svg = Icons::SVG_SETTINGS,
                 },
-                [this](Amethyst::ImageButtonScope &b) {
-                    m_settingsBtn = &b.component;
-                    s_wireIconHover(m_settingsBtn);
-                });
+                [this](Amethyst::ImageButtonScope &b) { m_settingsBtn = &b.component; });
 
             if (!m_isDocked) {
                 top.textButton(
                     {
+                        .classes = {"generic-text-button"},
                         .base =
                             {
                                 .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
                                 .position = Amethyst::UDim2(1.0f, -38.0f, 0.5f, 0.0f),
                                 .size = Amethyst::UDim2::fromOffset(100.0f, 24.0f),
                             },
-                        .style = {.cornerRadius = 3.0f},
-                        .text = {.fontSize = 12.0f,
-                                 .textColor = COL_TEXT,
-                                 .textXAlignment = Amethyst::TextXAlignment::CENTER,
-                                 .textYAlignment = Amethyst::TextYAlignment::CENTER},
                         .label = "Dock in layout",
                     },
                     [this](Amethyst::TextButtonScope &b) {
-                        s_wireButtonHover(&b.component);
                         b.component.onMouseButton1ClickCb = [this]() {
                             m_isDocked = true;
                             onDockInLayout.fire();
@@ -389,16 +338,8 @@ void ContentBrowserPanel::setupTopBar()
 static Amethyst::CollapsibleHeaderStylePropertiesArgs s_sidebarHeaderStyle()
 {
     return {
-        .titleStyle =
-            {
-                .fontSize = 12.0f,
-                .textColor = COL_TEXT,
-                .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                .textYAlignment = Amethyst::TextYAlignment::CENTER,
-            },
         .headerHeight = SECTION_HEADER_HEIGHT,
         .indicatorSize = 14.0f,
-        .indicatorColor = COL_TEXT_DIM,
     };
 }
 
@@ -406,7 +347,7 @@ void ContentBrowserPanel::setupSideBar()
 {
     Amethyst::UIScope(*m_root).frame(
         {
-            .classes = {"panel"},
+            .classes = {"content-browser-section"},
             .base =
                 {
                     .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, TOP_BAR_HEIGHT),
@@ -415,6 +356,8 @@ void ContentBrowserPanel::setupSideBar()
         },
         [this](Amethyst::FrameScope &side) {
             m_sideBarPane = &side.component;
+            auto *ll = m_sideBarPane->addExtension<Amethyst::UIListLayout>();
+            ll->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
 
             side.collapsibleHeader(
                 {
@@ -422,47 +365,31 @@ void ContentBrowserPanel::setupSideBar()
                     .base =
                         {
                             .clipsDescendants = true,
-                            .position = Amethyst::UDim2::fromScale(0.0f),
-                            .size = Amethyst::UDim2::fromScale(1.0f),
+                            .size = Amethyst::UDim2::fromScale(1.0f, 0.8f),
                         },
-                    .style = {.backgroundTransparency = 1.0f},
                     .header = s_sidebarHeaderStyle(),
                     .title = "Project",
                 },
                 [this](Amethyst::CollapsibleHeaderScope &ch) {
-                    m_projectHeader = &ch.component;
-                    ch.scrollingFrame(
+                    ch.treeView(
                         {
-                            .base =
-                                {
-                                    .clipsDescendants = true,
-                                    .padding = Amethyst::UDim4{{},
-                                                               {},
-                                                               Amethyst::UDim::fromOffset(CONTENT_PADDING),
-                                                               Amethyst::UDim::fromOffset(CONTENT_PADDING)},
-                                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, SECTION_HEADER_HEIGHT),
-                                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -SECTION_HEADER_HEIGHT),
-                                },
-                            .scroll =
-                                {
-                                    .scrollAxis = Amethyst::ScrollAxis::Y,
-                                    .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
-                                    .automaticCanvasSize = Amethyst::AutomaticSize::Y,
-                                },
+                            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
                         },
-                        [this](Amethyst::ScrollingFrameScope &sf) {
-                            m_directoryTreeContainer = &sf.component;
-                            m_directoryTreeContainer->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-                            sf.treeView(
-                                {
-                                    .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                                },
-                                [this](Amethyst::TreeViewScope &tv) {
-                                    m_directoryTree = &tv.component;
-                                    tv.column("", 1.0f);
-                                });
+                        [this](Amethyst::TreeViewScope &tv) {
+                            m_directoryTree = &tv.component;
+                            tv.column("", 1.0f);
                         });
                 });
+            side.collapsibleHeader({
+                .classes = {"component-header"},
+                .base =
+                    {
+                        .clipsDescendants = true,
+                        .size = Amethyst::UDim2::fromScale(1.0f, 0.2f),
+                    },
+                .header = s_sidebarHeaderStyle(),
+                .title = "Recent",
+            });
         });
 }
 
@@ -475,20 +402,22 @@ void ContentBrowserPanel::setupContentArea()
                     .position = Amethyst::UDim2(0.0f, SIDE_BAR_WIDTH, 0.0f, TOP_BAR_HEIGHT),
                     .size = Amethyst::UDim2(1.0f, -SIDE_BAR_WIDTH, 1.0f, -TOP_BAR_HEIGHT),
                 },
-            .style = {.backgroundColor = COL_GRID_BG},
         },
         [this](Amethyst::FrameScope &content) {
             m_contentPane = &content.component;
+            auto *ll = m_contentPane->addExtension<Amethyst::UIListLayout>();
+            ll->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
 
             // Search / options bar (section 5)
             content.frame(
                 {
+                    .classes = {"content-browser-section"},
                     .base =
                         {
-                            .position = Amethyst::UDim2::fromScale(0.0f),
+                            .layoutOrder = 0,
+                            .padding = {},
                             .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, SEARCH_BAR_HEIGHT),
                         },
-                    .style = {.backgroundColor = COL_TOP_BAR},
                 },
                 [this](Amethyst::FrameScope &options) {
                     m_searchBar = &options.component;
@@ -498,11 +427,10 @@ void ContentBrowserPanel::setupContentArea()
                             .classes = {"searchbar"},
                             .base =
                                 {
-                                    .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
-                                    .position = Amethyst::UDim2(0.5f, 0.0f, 0.5f, 0.0f),
-                                    .size = Amethyst::UDim2(1.0f, -2.0f * CONTENT_PADDING, 1.0f, -8.0f),
+                                    .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+                                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.5f, 0.0f),
+                                    .size = Amethyst::UDim2(0.8f, -2.0f * CONTENT_PADDING, 1.0f, -8.0f),
                                 },
-                            .style = {.cornerRadius = 3.0f},
                         },
                         [this](Amethyst::FrameScope &field) {
                             field.imageLabel({
@@ -536,12 +464,12 @@ void ContentBrowserPanel::setupContentArea()
 
             content.scrollingFrame(
                 {
+                    .classes = {"grid-sink"},
                     .base =
                         {
                             .clipsDescendants = true,
-                            .padding = {Amethyst::UDim::fromOffset(CONTENT_PADDING), Amethyst::UDim::fromOffset(CONTENT_PADDING),
-                                        Amethyst::UDim::fromOffset(CONTENT_PADDING), Amethyst::UDim::fromOffset(CONTENT_PADDING)},
-                            .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, SEARCH_BAR_HEIGHT),
+                            .layoutOrder = 1,
+                            .padding = Amethyst::UDim4::fromOffset(CONTENT_PADDING),
                             .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(SEARCH_BAR_HEIGHT + STATUS_BAR_HEIGHT)),
                         },
                     .scroll =
@@ -553,7 +481,6 @@ void ContentBrowserPanel::setupContentArea()
                 },
                 [this](Amethyst::ScrollingFrameScope &sf) {
                     m_contentContainer = &sf.component;
-                    m_contentContainer->setBaseStyleProperties({.backgroundTransparency = 1.0f});
                     auto *gridLayout = sf.component.addExtension<Amethyst::UIGridLayout>();
                     gridLayout->cellSize = Amethyst::UDim2::fromOffset(TILE_MIN_WIDTH, TILE_MIN_WIDTH / TILE_ASPECT);
                     gridLayout->cellPadding = Amethyst::UDim2::fromOffset(CONTENT_PADDING, CONTENT_PADDING);
@@ -568,30 +495,23 @@ void ContentBrowserPanel::setupContentArea()
             // Status bar (item count)
             content.frame(
                 {
+                    .classes = {"status-bar"},
                     .base =
                         {
-                            .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
-                            .position = Amethyst::UDim2(0.0f, 0.0f, 1.0f, 0.0f),
+                            .layoutOrder = 2,
                             .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, STATUS_BAR_HEIGHT),
                         },
-                    .style = {.backgroundColor = COL_TOP_BAR},
                 },
                 [this](Amethyst::FrameScope &status) {
                     status.textLabel(
                         {
+                            .classes = {"status-bar"},
                             .base =
                                 {
                                     .position = Amethyst::UDim2(0.0f, 10.0f, 0.0f, 0.0f),
                                     .size = Amethyst::UDim2(1.0f, -10.0f, 1.0f, 0.0f),
                                 },
                             .style = {.backgroundTransparency = 1.0f},
-                            .text =
-                                {
-                                    .fontSize = 11.0f,
-                                    .textColor = COL_TEXT_DIM,
-                                    .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                                    .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                                },
                             .label = "0 items",
                         },
                         [this](Amethyst::TextLabelScope &lbl) { m_statusLabel = &lbl.component; });
@@ -660,7 +580,6 @@ void ContentBrowserPanel::rebuildBreadcrumb()
                         .size = Amethyst::UDim2::fromOffset(12.0f, 12.0f),
                     },
                 .style = {.backgroundTransparency = 1.0f},
-                .image = {.imageColor = COL_TEXT_DIM},
                 .svg = Icons::SVG_CARET_RIGHT,
             });
         }
@@ -680,14 +599,12 @@ void ContentBrowserPanel::rebuildBreadcrumb()
                 .text =
                     {
                         .fontSize = 12.0f,
-                        .textColor = isLast ? COL_TEXT : COL_TEXT_DIM,
                         .textXAlignment = Amethyst::TextXAlignment::CENTER,
                         .textYAlignment = Amethyst::TextYAlignment::CENTER,
                     },
                 .label = label,
             },
             [this, target](Amethyst::TextButtonScope &b) {
-                s_wireGhostHover(&b.component);
                 b.component.onMouseButton1ClickCb = [this, target]() {
                     navigateToDirectory(target);
                     return Amethyst::EventResult::CONSUMED;
@@ -835,7 +752,7 @@ static std::unique_ptr<Amethyst::TextButton> s_makeTreeCell(const std::string &l
     auto btn = std::make_unique<Amethyst::TextButton>();
     btn->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
     btn->setBaseStyleProperties({.backgroundColor = COL_HOVER, .backgroundTransparency = 1.0f});
-    btn->setTextStyleProperties({.fontSize = 13.0f, .textColor = COL_TEXT});
+    btn->setTextStyleProperties({.fontSize = 13.0f});
     btn->setText(label);
     auto *raw = btn.get();
     raw->track(raw->onHoverChanged.connect(
@@ -925,31 +842,19 @@ void ContentBrowserPanel::selectItem(size_t index)
     if (m_selectedItem == index) {
         return;
     }
-    if (m_selectedItem != SIZE_MAX && m_selectedItem < m_contentItemPool.size()) {
-        applyItemSelection(m_contentItemPool[m_selectedItem], false);
-    }
+
+    /*
+     * TODO: check if this is safe, and maybe use something else? instead of active? since it would be the same as selected but,
+     * reads very differently
+     * auto &newCard = m_contentItemPool[index];
+     * newCard.container->setGuiState(newCard.container->getGuiState() | Amethyst::GUI_STATE_ACTIVE);
+     *
+     * auto &oldCard = m_contentItemPool[m_selectedItem];
+     * oldCard.container->setGuiState(oldCard.container->getGuiState() & ~Amethyst::GUI_STATE_ACTIVE);
+     */
+
     m_selectedItem = index;
-    if (index < m_contentItemPool.size()) {
-        applyItemSelection(m_contentItemPool[index], true);
-    }
     updateStatus(m_contentItemPool.size());
-}
-
-void ContentBrowserPanel::applyItemSelection(ContentItemComponents &item, bool selected)
-{
-    item.container->setBaseStyleProperties({
-        .borderPixelSize = selected ? 2.0f : 0.0f,
-        .borderColor = COL_SELECTION,
-    });
-    item.footer->setBaseStyleProperties({.backgroundColor = selected ? COL_SELECTION : COL_TILE_FOOT});
-}
-
-void ContentBrowserPanel::applyItemHover(ContentItemComponents &item, bool hovered)
-{
-    item.container->setBaseStyleProperties({
-        .borderPixelSize = hovered ? 1.0f : 0.0f,
-        .borderColor = COL_HOVER,
-    });
 }
 
 ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem(size_t index)
@@ -961,22 +866,10 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
         ContentItemComponents item;
 
         item.container = m_contentContainer->add<Amethyst::Frame>();
-        item.container->setClasses({"panel"});
-        item.container->setBaseStyleProperties({
-            .borderMode = Amethyst::BorderMode::OUTLINE,
-            .borderPixelSize = 0.0f,
-            .borderColor = COL_SELECTION,
-            .cornerRadius = 3.0f,
-        });
+        item.container->setClasses({"content-browser-card-well"});
 
         item.action = item.container->add<Amethyst::InvisibleButton>();
         item.action->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
-        item.action->track(item.action->onHoverChanged.connect([this, slot](bool hovered) {
-            if (slot >= m_contentItemPool.size() || m_selectedItem == slot) {
-                return;
-            }
-            applyItemHover(m_contentItemPool[slot], hovered);
-        }));
 
         item.thumbWell = item.action->add<Amethyst::Frame>();
         item.thumbWell->setBaseProperties({
@@ -985,7 +878,8 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
             .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(TILE_FOOTER_HEIGHT + TILE_TYPEBAR_HEIGHT)),
             .zIndex = 1,
         });
-        item.thumbWell->setBaseStyleProperties({.backgroundColor = COL_TILE_WELL});
+        item.thumbWell->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+
         auto *thumbAspect = item.thumbWell->addExtension<Amethyst::UIAspectRatioConstraint>();
         thumbAspect->aspectRatio = 1.0f;
         thumbAspect->dominantAxis = Amethyst::DominantAxis::WIDTH;
@@ -1001,7 +895,7 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
         item.icon->setBaseStyleProperties({.backgroundTransparency = 1.0f});
         item.icon->setImageStyleProperties({.imageColor = COL_ICON});
 
-        item.footer = item.action->add<Amethyst::Frame>();
+        item.footer = item.container->add<Amethyst::Frame>();
         item.footer->setBaseProperties({
             .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
             .interactable = false,
@@ -1009,9 +903,10 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
             .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TILE_FOOTER_HEIGHT),
             .zIndex = 1,
         });
-        item.footer->setBaseStyleProperties({.backgroundColor = COL_TILE_FOOT});
+        item.footer->addClass("content-browser-card-footer");
 
         item.name = item.footer->add<Amethyst::TextLabel>();
+        item.name->addClass("content-browser-card-footer");
         item.name->setBaseProperties({
             .interactable = false,
             .position = Amethyst::UDim2(0.0f, 4.0f, 0.0f, 6.0f),
@@ -1019,29 +914,15 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
             .zIndex = 2,
         });
         item.name->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-        item.name->setTextStyleProperties({
-            .fontSize = 12.0f,
-            .textColor = Amethyst::Color4(1.0f, 1.0f, 1.0f, 1.0f),
-            .textXAlignment = Amethyst::TextXAlignment::CENTER,
-            .textYAlignment = Amethyst::TextYAlignment::CENTER,
-            .textTruncate = Amethyst::TextTruncate::AT_END,
-        });
 
         item.type = item.footer->add<Amethyst::TextLabel>();
+        item.type->addClass("content-browser-card-footer-type");
         item.type->setBaseProperties({
             .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
             .interactable = false,
             .position = Amethyst::UDim2(0.0f, 4.0f, 1.0f, -4.0f),
             .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 14.0f),
             .zIndex = 2,
-        });
-        item.type->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-        item.type->setTextStyleProperties({
-            .fontSize = 10.0f,
-            .textColor = Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f),
-            .textXAlignment = Amethyst::TextXAlignment::CENTER,
-            .textYAlignment = Amethyst::TextYAlignment::CENTER,
-            .textTruncate = Amethyst::TextTruncate::AT_END,
         });
 
         item.typeBar = item.action->add<Amethyst::Frame>();
@@ -1062,8 +943,6 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
         item.container->setBaseProperties({.visible = true});
         item.attached = true;
     }
-    item.container->setBaseStyleProperties({.borderPixelSize = 0.0f});
-    item.footer->setBaseStyleProperties({.backgroundColor = COL_TILE_FOOT});
     return item;
 }
 
