@@ -1,7 +1,7 @@
 /**
  * @brief Generated surface graph functions and their dispatcher
  * @author Rapture Material Graph Compiler
- * @version 3
+ * @version 4
  * @note DO NOT EDIT, this file is regenerated from material graphs
  */
 
@@ -52,7 +52,16 @@ surf.emissiveStrength=0.0;
 return surf;
 }
 
-SurfaceDataDiffuse evalSurfaceDiffuse_Graph1_4(SurfaceInputs si, uint base){
+SurfaceDataDiffuse evalSurfaceDiffuse_Graph0b_4(SurfaceInputs si, uint base){
+SurfaceDataDiffuse surf;
+surf.albedo=vec3(uintBitsToFloat(u_graphPool.data[base + 0]), uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]));
+surf.normal=normalize(si.worldNormal);
+surf.emission=vec4(1.0);
+surf.emissiveStrength=0.0;
+return surf;
+}
+
+SurfaceDataDiffuse evalSurfaceDiffuse_Graph1_5(SurfaceInputs si, uint base){
 SurfaceDataDiffuse surf;
 float _n0=uintBitsToFloat(u_graphPool.data[base + 0]);
 float _n1=uintBitsToFloat(u_graphPool.data[base + 1]);
@@ -79,7 +88,8 @@ SurfaceDataDiffuse evalSurfaceGraphDiffuse(uint graphId, SurfaceInputs si, uint 
         case 0u: return evalSurfaceDiffuse_Default_0(si, base);
         case 2u: return evalSurfaceDiffuse_glTF_2(si, base);
         case 3u: return evalSurfaceDiffuse_Graph0_3(si, base);
-        case 4u: return evalSurfaceDiffuse_Graph1_4(si, base);
+        case 4u: return evalSurfaceDiffuse_Graph0b_4(si, base);
+        case 5u: return evalSurfaceDiffuse_Graph1_5(si, base);
     }
 
     SurfaceDataDiffuse surf;

@@ -21,15 +21,14 @@ class Shader;
 
 class InstancedShapesPass {
   public:
-    InstancedShapesPass(float width, float height, uint32_t framesInFlight,
-                        std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
+    InstancedShapesPass(float width, float height, uint32_t framesInFlight, std::vector<Texture *> depthStencilTextures,
+                        VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
     ~InstancedShapesPass();
 
-    CommandBuffer *recordSecondary(Scene &scene, Entity camera, SceneRenderTarget &renderTarget,
-                                   uint32_t frameInFlight, const SecondaryBufferInheritance &inheritance);
+    CommandBuffer *recordSecondary(Scene &scene, Entity camera, Texture *target, uint32_t frameInFlight,
+                                   const SecondaryBufferInheritance &inheritance);
 
-    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
-                               uint32_t frameInFlightIndex);
+    void beginDynamicRendering(CommandBuffer *commandBuffer, Texture *target, uint32_t frameInFlightIndex);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 
   private:
@@ -42,7 +41,7 @@ class InstancedShapesPass {
     float m_height;
     uint32_t m_framesInFlight;
 
-    std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
+    std::vector<Texture *> m_depthStencilTextures;
     Shader *m_shader;
     std::vector<AssetRef> m_assets;
 

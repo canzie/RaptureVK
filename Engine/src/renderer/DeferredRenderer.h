@@ -6,6 +6,7 @@
 #include "events/EventSignal.h"
 #include "renderer/RtInstanceData.h"
 #include "renderer/gi/ddgi/DynamicDiffuseGI.h"
+#include "renderer/passes/CompositePass.h"
 #include "renderer/passes/GBufferPass.h"
 #include "renderer/passes/InstancedShapesPass.h"
 #include "renderer/passes/LightingPass.h"
@@ -35,10 +36,22 @@ class DeferredRenderer : public Renderer {
   private:
     void setupCommandResources();
     void createRenderTarget();
+    void createSceneColorTextures();
     void recreateRenderPasses();
     void processPendingViewportResize();
 
-    void recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, uint32_t imageIndex);
+    /**
+     * @brief Build the per-frame context handed to every render pass
+     * @param activeScene Scene being rendered
+     * @param camera Camera the frame is rendered from
+     * @param imageIndex Index of the render target image being written
+     * @param settings Display overrides for this view
+     * @return The context for this frame
+     */
+    RenderPassContext buildPassContext(Scene &activeScene, Entity camera, uint32_t imageIndex, const RenderSettings &settings);
+
+    void recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, uint32_t imageIndex,
+                             const RenderSettings &settings);
 
   private:
     std::unique_ptr<GBufferPass> m_gbufferPass;
@@ -46,6 +59,10 @@ class DeferredRenderer : public Renderer {
     std::unique_ptr<StencilBorderPass> m_stencilBorderPass;
     std::unique_ptr<SkyboxPass> m_skyboxPass;
     std::unique_ptr<InstancedShapesPass> m_instancedShapesPass;
+    std::unique_ptr<CompositePass> m_compositePass;
+
+    std::vector<std::unique_ptr<Texture>> m_sceneColorHdrTextures;
+    RenderPassTargets m_passTargets;
 
     // Pending viewport resize (deferred to start of next frame)
     uint32_t m_pendingViewportWidth = 0;

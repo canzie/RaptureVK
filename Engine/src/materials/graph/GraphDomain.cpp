@@ -179,6 +179,8 @@ static std::vector<GraphOutputField> s_surfaceOutputFields()
         {.name = "roughness", .type = PinType::FLOAT, .fallback = "0.5"},
         {.name = "metallic", .type = PinType::FLOAT, .fallback = "0.0"},
         {.name = "ao", .type = PinType::FLOAT, .fallback = "1.0"},
+        // Dielectric F0, already folded from OpenPBR's specular_weight and specular_ior. 0.04 is ior 1.5
+        {.name = "specular", .type = PinType::FLOAT, .fallback = "0.04"},
         {.name = "emission", .type = PinType::VEC4, .fallback = "vec4(1.0)", .errorFallback = "vec4(0.0)"},
         {.name = "emissiveStrength", .type = PinType::FLOAT, .fallback = "0.0"},
         {.name = "shadingModelId", .fallback = "SM_OPENPBR_STANDARD", .constant = true, .glslTypeOverride = "uint"},

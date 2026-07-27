@@ -6,6 +6,7 @@
 #include "renderer/DeferredRenderer.h"
 #include "scenes/Scene.h"
 #include "scenes/SceneManager.h"
+#include "scenes/entities/EntityCommon.h"
 #include "utils/Timestep.h"
 #include "window_context/Application.h"
 
@@ -38,6 +39,24 @@ static Rapture::MaterialGraph s_buildSilverMetalGraph()
                            .type = GN::SURFACE_OUTPUT,
                            .inputValues = {Rapture::PinValue(glm::vec3(0.95f, 0.94f, 0.90f)), std::nullopt,
                                            Rapture::PinValue(0.04f), Rapture::PinValue(1.0f)}});
+    graph.outputNodeId = 1;
+    return graph;
+}
+
+/**
+ * @brief Graph 0b: same silver metal, but at the roughness where SSR should be handing off to
+ * the DDGI-approximated specular (below this, SSR should carry the reflection instead)
+ * @return The authored graph
+ */
+static Rapture::MaterialGraph s_buildSatinMetalGraph()
+{
+    using GN = Rapture::GraphNodeType;
+    Rapture::MaterialGraph graph;
+    graph.name = "Graph0b";
+    graph.nodes.push_back({.id = 1,
+                           .type = GN::SURFACE_OUTPUT,
+                           .inputValues = {Rapture::PinValue(glm::vec3(0.95f, 0.94f, 0.90f)), std::nullopt,
+                                           Rapture::PinValue(0.35f), Rapture::PinValue(1.0f)}});
     graph.outputNodeId = 1;
     return graph;
 }
@@ -134,12 +153,12 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
     // Models are imported from the UI now; the registration pass picks up their .rasset files at startup
     auto cube = activeScene.createCube("Test Cube");
-    cube.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
+    cube.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 5.0f, 0.0f));
     cube.addComponent<Rapture::BLASComponent>(cube.getComponent<Rapture::MeshComponent>().mesh);
     activeScene.registerBLAS(cube);
 
-    auto floor = activeScene.createCube("Floor");
-    floor.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, -1.5f, 0.0f));
+    auto floor = activeScene.createCube("Floor", Rapture::MOBILITY_DYNAMIC);
+    floor.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
     floor.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 0.1f, 10.0f));
     floor.addComponent<Rapture::BLASComponent>(floor.getComponent<Rapture::MeshComponent>().mesh);
     activeScene.registerBLAS(floor);
@@ -150,6 +169,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         auto &graphManager = Rapture::MaterialManager::getSurfaceGraphManager();
 
         uint32_t graph0Id = graphManager.registerGraph(s_buildSilverMetalGraph());
+        uint32_t graph0bId = graphManager.registerGraph(s_buildSatinMetalGraph());
         uint32_t graph1Id = graphManager.registerGraph(s_buildSineBandGraph());
 
         auto spawnGraphSphere = [&](const std::string &name, const glm::vec3 &position, uint32_t graphId) {
@@ -164,14 +184,17 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
             auto matRef = Rapture::AssetManager::registerVirtualAsset(std::move(mat), name, Rapture::AssetType::MATERIAL_INSTANCE);
             sphere.setComponent<Rapture::MaterialComponent>(matRef);
-
+            if (graphId == graph0Id) {
+                cube.setComponent<Rapture::MaterialComponent>(matRef);
+            }
             sphere.addComponent<Rapture::BLASComponent>(sphere.getComponent<Rapture::MeshComponent>().mesh);
             activeScene.registerBLAS(sphere);
             sphere.addComponent<Rapture::RigidBodyComponent>();
         };
 
-        spawnGraphSphere("Graph Sphere 0", glm::vec3(-3.0f, 2.0f, 0.0f), graph0Id);
-        spawnGraphSphere("Graph Sphere 1", glm::vec3(3.0f, 2.0f, 0.0f), graph1Id);
+        spawnGraphSphere("Graph Sphere 0", glm::vec3(-3.0f, 10.0f, 0.0f), graph0Id);
+        spawnGraphSphere("Graph Sphere 0b", glm::vec3(0.0f, 10.0f, -3.0f), graph0bId);
+        spawnGraphSphere("Graph Sphere 1", glm::vec3(3.0f, 10.0f, 0.0f), graph1Id);
     }
 
     // Create a spot light with shadow mapping (inside Sponza courtyard)

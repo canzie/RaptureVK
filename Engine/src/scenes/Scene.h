@@ -26,7 +26,7 @@ class Scene {
     ~Scene();
 
     Entity createEntity(const std::string &name = "Untitled Entity");
-    Entity createCube(const std::string &name = "Untitled Entity");
+    Entity createCube(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
     Entity createSphere(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
 
     void destroyEntity(Entity entity);

@@ -153,6 +153,7 @@ Rough priority:
 
 ### 6.10 Radiance Cascades 3D (parked)
 - Loved the 2D implementation; world-space 3D probe RC is immature. PoE2 ships RC but in **screen space**, exploiting the near-fixed ARPG camera angle. The 3D-probe frontier lives on the Radiance Cascades Discord (revisit when their demos stabilize). Keep on the experimental shelf, off the critical path. See [[Radiance Cascades Theory]] if/when expanded.
+- Separate, cheaper thread to pull: borrow only RC's **level scaling policy** for DDGI probes without adopting RC transport. See [[Cascaded Irradiance Probes]].
 
 ---
 

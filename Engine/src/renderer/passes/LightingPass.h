@@ -11,32 +11,29 @@
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
 
-#include "render_targets/SceneRenderTarget.h"
-#include "renderer/passes/GBufferPass.h"
+#include "renderer/passes/RenderPass.h"
+#include "textures/Texture.h"
 #include <memory>
 
 #include "renderer/gi/ddgi/DynamicDiffuseGI.h"
 
 namespace Rapture {
 
-class LightingPass {
+class LightingPass : public RenderPass {
   public:
-    LightingPass(float width, float height, GBufferPass *gBufferPass, DynamicDiffuseGI *ddgi,
-                 VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
+    LightingPass(float width, float height, DynamicDiffuseGI *ddgi, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
     ~LightingPass();
-
-    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex);
-    void endDynamicRendering(CommandBuffer *commandBuffer);
 
     FramebufferSpecification getFramebufferSpecification();
 
-    CommandBuffer *recordSecondary(Scene &activeScene, Entity camera, SceneRenderTarget &renderTarget,
-                                   uint32_t frameIndex, const SecondaryBufferInheritance &inheritance, uint32_t lightingFlags);
+    CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
+    void onResize(uint32_t width, uint32_t height) override;
+
+  protected:
+    void updateAttachments(const RenderPassContext &context) override;
 
   private:
     void createPipeline();
-
-    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage);
 
   private:
     const RenderContext *m_rc = nullptr;
@@ -52,8 +49,6 @@ class LightingPass {
     std::vector<std::shared_ptr<UniformBuffer>> m_lightUBOs;
     std::vector<std::shared_ptr<UniformBuffer>> m_shadowDataUBOs;
     std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets; // all sets are in set 0
-
-    GBufferPass *m_gBufferPass = nullptr;
 
     DynamicDiffuseGI *m_ddgi = nullptr;
 

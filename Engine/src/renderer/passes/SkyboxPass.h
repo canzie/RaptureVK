@@ -9,7 +9,7 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorSet.h"
 #include "pipelines/GraphicsPipeline.h"
-#include "render_targets/SceneRenderTarget.h"
+#include "renderer/passes/RenderPass.h"
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
 #include "window_context/Application.h"
@@ -23,20 +23,21 @@ namespace Rapture {
 
 class Scene;
 
-class SkyboxPass {
+class SkyboxPass : public RenderPass {
   public:
-    SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat);
+    SkyboxPass(std::vector<Texture *> depthTextures, VkFormat colorFormat);
 
     ~SkyboxPass();
 
-    CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
-                                   Scene &activeScene, Entity camera,
-                                   const SecondaryBufferInheritance &inheritance);
+    CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
+    void onResize(uint32_t width, uint32_t height) override;
 
-    void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
-                               uint32_t frameInFlightIndex);
-    void endDynamicRendering(CommandBuffer *commandBuffer);
+    void beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb) override;
 
+  protected:
+    void updateAttachments(const RenderPassContext &context) override;
+
+  public:
     void setSkyboxTexture(Texture *skyboxTexture);
 
     bool hasActiveSkybox() const { return m_skyboxTexture != nullptr; }
@@ -57,7 +58,7 @@ class SkyboxPass {
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     Texture *m_skyboxTexture;
-    std::vector<std::shared_ptr<Texture>> m_depthTextures;
+    std::vector<Texture *> m_depthTextures;
     std::shared_ptr<VertexBuffer> m_skyboxVertexBuffer;
     std::shared_ptr<IndexBuffer> m_skyboxIndexBuffer;
 

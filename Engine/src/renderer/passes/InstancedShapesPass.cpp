@@ -8,8 +8,8 @@
 #include "buffers/descriptors/DescriptorManager.h"
 #include "components/Components.h"
 #include "logging/Log.h"
-#include "renderer/SceneRenderData.h"
 #include "logging/TracyProfiler.h"
+#include "renderer/SceneRenderData.h"
 #include "shaders/Shader.h"
 #include "window_context/Application.h"
 
@@ -24,8 +24,8 @@ struct InstancedShapesPushConstants {
 };
 
 InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t framesInFlight,
-                                         std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat)
-    : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_depthStencilTextures(depthStencilTextures),
+                                         std::vector<Texture *> depthStencilTextures, VkFormat colorFormat)
+    : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_depthStencilTextures(std::move(depthStencilTextures)),
       m_colorFormat(colorFormat)
 {
 
@@ -48,8 +48,7 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
 
 InstancedShapesPass::~InstancedShapesPass() {}
 
-CommandBuffer *InstancedShapesPass::recordSecondary(Scene &scene, Entity camera,
-                                                    SceneRenderTarget &renderTarget, uint32_t frameInFlight,
+CommandBuffer *InstancedShapesPass::recordSecondary(Scene &scene, Entity camera, Texture *target, uint32_t frameInFlight,
                                                     const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -76,7 +75,8 @@ CommandBuffer *InstancedShapesPass::recordSecondary(Scene &scene, Entity camera,
 
     commandBuffer->beginSecondary(inheritance);
 
-    VkExtent2D targetExtent = renderTarget.getExtent();
+    const TextureSpecification &targetSpec = target->getSpecification();
+    VkExtent2D targetExtent = {targetSpec.width, targetSpec.height};
 
     m_width = static_cast<float>(targetExtent.width);
     m_height = static_cast<float>(targetExtent.height);
@@ -245,12 +245,12 @@ void InstancedShapesPass::createPipeline()
     m_pipelineWireframe = std::make_shared<GraphicsPipeline>(config);
 }
 
-void InstancedShapesPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
-                                                uint32_t frameInFlightIndex)
+void InstancedShapesPass::beginDynamicRendering(CommandBuffer *commandBuffer, Texture *target, uint32_t frameInFlightIndex)
 {
-    VkImage targetImage = renderTarget.getImage(imageIndex);
-    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
-    VkExtent2D targetExtent = renderTarget.getExtent();
+    VkImage targetImage = target->getImage();
+    VkImageView targetImageView = target->getImageView();
+    const TextureSpecification &targetSpec = target->getSpecification();
+    VkExtent2D targetExtent = {targetSpec.width, targetSpec.height};
 
     setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage, frameInFlightIndex);
 

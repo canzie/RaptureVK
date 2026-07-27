@@ -2,9 +2,9 @@
 #define RAPTURE__RENDERER_H
 
 #include "buffers/command_buffers/CommandPool.h"
-#include "renderer/RenderSettings.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "render_targets/swap_chains/SwapChain.h"
+#include "renderer/RenderSettings.h"
 #include "scenes/entities/Entity.h"
 #include "window_context/vulkan_context/RenderContext.h"
 #include "window_context/vulkan_context/VulkanQueue.h"

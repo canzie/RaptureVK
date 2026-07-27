@@ -31,20 +31,7 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, const RendererCo
         m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(m_swapChain->getImageCount());
     }
 
-    // Get the render target format for pipeline creation
-    VkFormat colorFormat = m_sceneRenderTarget->getFormat();
-
-    m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
-
-    m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_gbufferPass.get(), m_dynamicDiffuseGI.get(), colorFormat);
-
-    m_stencilBorderPass = std::make_unique<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
-                                                              m_gbufferPass->getDepthTextures(), colorFormat);
-
-    m_instancedShapesPass = std::make_unique<InstancedShapesPass>(m_width, m_height, m_swapChain->getImageCount(),
-                                                                  m_gbufferPass->getDepthTextures(), colorFormat);
-
-    m_skyboxPass = std::make_unique<SkyboxPass>(m_gbufferPass->getDepthTextures(), colorFormat);
+    recreateRenderPasses();
 
     m_swapchainRecreatedConn = m_swapChain->onRecreated.connect([this]() { onSwapChainRecreated(); });
 }
@@ -115,7 +102,7 @@ void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const Render
     auto pool = m_renderContext.commandPoolManager->getCommandPool(m_commandPoolHash, m_currentFrame);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
-    recordCommandBuffer(commandBuffer, activeScene, camera, imageIndex);
+    recordCommandBuffer(commandBuffer, activeScene, camera, imageIndex, settings);
 
     VkSemaphore frWaitSemaphores[1];
     VkSemaphore frSignalSemaphores[1];
@@ -210,15 +197,53 @@ void DeferredRenderer::createRenderTarget()
     if (m_config.targetType == SceneRenderTarget::TargetType::OFFSCREEN) {
         // Create offscreen render target for Editor mode
         // Use BGRA8 SRGB format (matches typical swapchain format)
-        m_sceneRenderTarget = std::make_unique<SceneRenderTarget>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height),
-                                                                  m_swapChain->getImageCount(), TextureFormat::RGBA16F,
-                                                                  m_config.allowReadback);
+        m_sceneRenderTarget =
+            std::make_unique<SceneRenderTarget>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height),
+                                                m_swapChain->getImageCount(), TextureFormat::RGBA16F, m_config.allowReadback);
         RP_CORE_INFO("Created OFFSCREEN render target for Editor mode");
     } else {
         // Create swapchain-backed render target for Standalone mode
         m_sceneRenderTarget = std::make_unique<SceneRenderTarget>(m_swapChain);
         RP_CORE_INFO("Created SWAPCHAIN-backed render target for Standalone mode");
     }
+}
+
+void DeferredRenderer::createSceneColorTextures()
+{
+    m_sceneColorHdrTextures.clear();
+
+    TextureSpecification spec;
+    spec.width = static_cast<uint32_t>(m_width);
+    spec.height = static_cast<uint32_t>(m_height);
+    spec.format = TextureFormat::RGBA16F;
+    spec.type = TextureType::TEXTURE2D;
+    spec.srgb = false;
+
+    for (uint32_t i = 0; i < m_swapChain->getImageCount(); i++) {
+        m_sceneColorHdrTextures.push_back(std::make_unique<Texture>(spec));
+    }
+}
+
+RenderPassContext DeferredRenderer::buildPassContext(Scene &activeScene, Entity camera, uint32_t imageIndex,
+                                                     const RenderSettings &settings)
+{
+    m_passTargets.gbufferNormalMotion = m_gbufferPass->getNormalTexture(m_currentFrame);
+    m_passTargets.gbufferBaseColor = m_gbufferPass->getAlbedoTexture(m_currentFrame);
+    m_passTargets.gbufferMaterial = m_gbufferPass->getMaterialTexture(m_currentFrame);
+    m_passTargets.gbufferShadingModel = m_gbufferPass->getShadingModelTexture(m_currentFrame);
+    m_passTargets.depthStencil = m_gbufferPass->getDepthTexture(m_currentFrame);
+    m_passTargets.sceneColorHdr = m_sceneColorHdrTextures[m_currentFrame].get();
+
+    RenderPassContext context;
+    context.scene = &activeScene;
+    context.camera = camera;
+    context.renderTarget = m_sceneRenderTarget.get();
+    context.targets = &m_passTargets;
+    context.settings = &settings;
+    context.frameInFlight = m_currentFrame;
+    context.imageIndex = imageIndex;
+
+    return context;
 }
 
 void DeferredRenderer::recreateRenderPasses()
@@ -231,19 +256,24 @@ void DeferredRenderer::recreateRenderPasses()
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
 
-    VkFormat colorFormat = m_sceneRenderTarget->getFormat();
+    VkFormat presentFormat = m_sceneRenderTarget->getFormat();
+
+    createSceneColorTextures();
+    VkFormat hdrFormat = m_sceneColorHdrTextures[0]->getFormat();
 
     m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
 
-    m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_gbufferPass.get(), m_dynamicDiffuseGI.get(), colorFormat);
+    m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_dynamicDiffuseGI.get(), hdrFormat);
 
     m_stencilBorderPass = std::make_unique<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
-                                                              m_gbufferPass->getDepthTextures(), colorFormat);
+                                                              m_gbufferPass->getDepthTextures(), hdrFormat);
 
     m_instancedShapesPass = std::make_unique<InstancedShapesPass>(m_width, m_height, m_swapChain->getImageCount(),
-                                                                  m_gbufferPass->getDepthTextures(), colorFormat);
+                                                                  m_gbufferPass->getDepthTextures(), hdrFormat);
 
-    m_skyboxPass = std::make_unique<SkyboxPass>(m_gbufferPass->getDepthTextures(), colorFormat);
+    m_skyboxPass = std::make_unique<SkyboxPass>(m_gbufferPass->getDepthTextures(), hdrFormat);
+
+    m_compositePass = std::make_unique<CompositePass>(m_width, m_height, presentFormat);
 }
 
 void DeferredRenderer::processPendingViewportResize()
@@ -281,7 +311,8 @@ void DeferredRenderer::setupCommandResources()
     m_commandPoolHash = m_renderContext.commandPoolManager->createCommandPool(config);
 }
 
-void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, uint32_t imageIndex)
+void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, uint32_t imageIndex,
+                                           const RenderSettings &settings)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -363,10 +394,11 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         CommandBuffer *gbufferBuffer = nullptr;
         CommandBuffer *lightingBuffer = nullptr;
         CommandBuffer *skyboxBuffer = nullptr;
-        CommandBuffer *instancedShapesBuffer = nullptr;
-        CommandBuffer *stencilBorderBuffer = nullptr;
 
-        s_cmdCounter.increment(4); // GBuffer, Lighting, Skybox, Instanced Shapes
+        RenderPassContext context = buildPassContext(activeScene, camera, imageIndex, settings);
+        context.terrain = terrain;
+
+        s_cmdCounter.increment(3); // GBuffer, Lighting, Skybox
 
         JobSystem &system = jobs();
 
@@ -378,62 +410,45 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         gbufferInheritance.depthFormat = fbSpec.depthAttachment;
         gbufferInheritance.stencilFormat = fbSpec.stencilAttachment;
 
+        // Inheritance is resolved here rather than inside the jobs, since it fills each pass's cached attachments
+        SecondaryBufferInheritance lightingInheritance = m_lightingPass->getInheritance(context);
+        SecondaryBufferInheritance skyboxInheritance = m_skyboxPass->getInheritance(context);
+
         system.run(JobDeclaration(
-            [&gbufferBuffer, scenePtr = &activeScene, camera, m_currentFrame = m_currentFrame, gbufferInheritance, terrain,
-             gbufferPass = m_gbufferPass.get()](JobContext &ctx) {
+            [&gbufferBuffer, &context, gbufferInheritance, gbufferPass = m_gbufferPass.get()](JobContext &ctx) {
                 (void)ctx;
-                gbufferBuffer = gbufferPass->recordSecondary(*scenePtr, camera, m_currentFrame, gbufferInheritance, terrain);
+                gbufferBuffer = gbufferPass->record(context, gbufferInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "GBUFFER"));
 
-        SecondaryBufferInheritance lightingInheritance;
-        lightingInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
-
         system.run(JobDeclaration(
-            [&lightingBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
-             lightingInheritance, lightingPass = m_lightingPass.get(), lightingFlags = m_lightingFlags](JobContext &ctx) {
+            [&lightingBuffer, &context, lightingInheritance, lightingPass = m_lightingPass.get()](JobContext &ctx) {
                 (void)ctx;
-                lightingBuffer =
-                    lightingPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, lightingInheritance, lightingFlags);
+                lightingBuffer = lightingPass->record(context, lightingInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 
-        SecondaryBufferInheritance skyboxInheritance;
-        skyboxInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
-        skyboxInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
-
         system.run(JobDeclaration(
-            [&skyboxBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(), m_currentFrame = m_currentFrame,
-             skyboxInheritance, skyboxPass = m_skyboxPass.get()](JobContext &ctx) {
+            [&skyboxBuffer, &context, skyboxInheritance, skyboxPass = m_skyboxPass.get()](JobContext &ctx) {
                 (void)ctx;
-                skyboxBuffer = skyboxPass->recordSecondary(*sceneRT, m_currentFrame, *scenePtr, camera, skyboxInheritance);
+                skyboxBuffer = skyboxPass->record(context, skyboxInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SKYBOX"));
 
-        SecondaryBufferInheritance instancedInheritance;
-        instancedInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
-        instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
-
-        system.run(JobDeclaration(
-            [&instancedShapesBuffer, scenePtr = &activeScene, camera, sceneRT = m_sceneRenderTarget.get(),
-             m_currentFrame = m_currentFrame, instancedInheritance,
-             instancedShapesPass = m_instancedShapesPass.get()](JobContext &ctx) {
-                (void)ctx;
-                instancedShapesBuffer =
-                    instancedShapesPass->recordSecondary(*scenePtr, camera, *sceneRT, m_currentFrame, instancedInheritance);
-            },
-            JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "INSTANCED_SHAPES"));
-
-        {
-            SecondaryBufferInheritance stencilInheritance;
-            stencilInheritance.colorFormats = {m_sceneRenderTarget->getFormat()};
-            // stencilInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
-            stencilInheritance.stencilFormat = m_gbufferPass->getDepthTexture()->getFormat();
-
-            // stencilBorderBuffer =
-            //     m_stencilBorderPass->recordSecondary(*m_sceneRenderTarget, m_currentFrame, activeScene, camera,
-            //     stencilInheritance);
-        }
+        // TODO: instanced shapes and the stencil border are disabled until they are converted to RenderPass
+        // SecondaryBufferInheritance instancedInheritance;
+        // instancedInheritance.colorFormats = {hdrFormat};
+        // instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
+        //
+        // system.run(JobDeclaration(
+        //     [&instancedShapesBuffer, scenePtr = &activeScene, camera, sceneColorHdr,
+        //      m_currentFrame = m_currentFrame, instancedInheritance,
+        //      instancedShapesPass = m_instancedShapesPass.get()](JobContext &ctx) {
+        //         (void)ctx;
+        //         instancedShapesBuffer =
+        //             instancedShapesPass->recordSecondary(*scenePtr, camera, sceneColorHdr, m_currentFrame, instancedInheritance);
+        //     },
+        //     JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "INSTANCED_SHAPES"));
 
         {
 
@@ -444,33 +459,44 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         if (gbufferBuffer) {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
-            m_gbufferPass->beginDynamicRendering(commandBuffer, m_currentFrame);
+            m_gbufferPass->beginRendering(context, commandBuffer);
             commandBuffer->executeSecondary(*gbufferBuffer);
-            m_gbufferPass->endDynamicRendering(commandBuffer, m_currentFrame);
+            m_gbufferPass->endRendering(commandBuffer);
         }
 
         if (lightingBuffer) {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
-            m_lightingPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
+            m_lightingPass->beginRendering(context, commandBuffer);
             commandBuffer->executeSecondary(*lightingBuffer);
-            m_lightingPass->endDynamicRendering(commandBuffer);
+            m_lightingPass->endRendering(commandBuffer);
         }
         if (skyboxBuffer) {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
-            m_skyboxPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame);
+            m_skyboxPass->beginRendering(context, commandBuffer);
             commandBuffer->executeSecondary(*skyboxBuffer);
-            m_skyboxPass->endDynamicRendering(commandBuffer);
+            m_skyboxPass->endRendering(commandBuffer);
         }
-        if (instancedShapesBuffer) {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
-            m_instancedShapesPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex, m_currentFrame);
-            commandBuffer->executeSecondary(*instancedShapesBuffer);
-            m_instancedShapesPass->endDynamicRendering(commandBuffer);
-        }
-        if (stencilBorderBuffer) {
-            m_stencilBorderPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
-            commandBuffer->executeSecondary(*stencilBorderBuffer);
-            m_stencilBorderPass->endDynamicRendering(commandBuffer);
+        // if (instancedShapesBuffer) {
+        //     RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
+        //     m_instancedShapesPass->beginDynamicRendering(commandBuffer, sceneColorHdr, m_currentFrame);
+        //     commandBuffer->executeSecondary(*instancedShapesBuffer);
+        //     m_instancedShapesPass->endDynamicRendering(commandBuffer);
+        // }
+        // if (stencilBorderBuffer) {
+        //     m_stencilBorderPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
+        //     commandBuffer->executeSecondary(*stencilBorderBuffer);
+        //     m_stencilBorderPass->endDynamicRendering(commandBuffer);
+        // }
+
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Composite Pass");
+
+            CommandBuffer *compositeBuffer = m_compositePass->record(context, m_compositePass->getInheritance(context));
+            if (compositeBuffer != nullptr) {
+                m_compositePass->beginRendering(context, commandBuffer);
+                commandBuffer->executeSecondary(*compositeBuffer);
+                m_compositePass->endRendering(commandBuffer);
+            }
         }
 
         // Transition to shader read layout for OFFSCREEN mode so ImGui can sample it

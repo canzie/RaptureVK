@@ -1,7 +1,7 @@
 /**
  * @brief Generated surface graph functions and their dispatcher
  * @author Rapture Material Graph Compiler
- * @version 3
+ * @version 4
  * @note DO NOT EDIT, this file is regenerated from material graphs
  */
 
@@ -14,6 +14,7 @@ struct SurfaceData {
     float roughness;
     float metallic;
     float ao;
+    float specular;
     vec4 emission;
     float emissiveStrength;
     uint shadingModelId;
@@ -26,6 +27,7 @@ surf.normal=normalize(si.worldNormal);
 surf.roughness=0.5;
 surf.metallic=0.0;
 surf.ao=1.0;
+surf.specular=0.04;
 surf.emission=vec4(1.0);
 surf.emissiveStrength=0.0;
 surf.shadingModelId=SM_OPENPBR_STANDARD;
@@ -59,6 +61,7 @@ surf.normal=_n5;
 surf.roughness=_n10;
 surf.metallic=_n12;
 surf.ao=_n15;
+surf.specular=0.04;
 surf.emission=vec4(_n18, 1.0);
 surf.emissiveStrength=_n19;
 surf.shadingModelId=SM_OPENPBR_STANDARD;
@@ -72,13 +75,28 @@ surf.normal=normalize(si.worldNormal);
 surf.roughness=uintBitsToFloat(u_graphPool.data[base + 3]);
 surf.metallic=uintBitsToFloat(u_graphPool.data[base + 4]);
 surf.ao=1.0;
+surf.specular=0.04;
 surf.emission=vec4(1.0);
 surf.emissiveStrength=0.0;
 surf.shadingModelId=SM_OPENPBR_STANDARD;
 return surf;
 }
 
-SurfaceData evalSurface_Graph1_4(SurfaceInputs si, uint base){
+SurfaceData evalSurface_Graph0b_4(SurfaceInputs si, uint base){
+SurfaceData surf;
+surf.albedo=vec3(uintBitsToFloat(u_graphPool.data[base + 0]), uintBitsToFloat(u_graphPool.data[base + 1]), uintBitsToFloat(u_graphPool.data[base + 2]));
+surf.normal=normalize(si.worldNormal);
+surf.roughness=uintBitsToFloat(u_graphPool.data[base + 3]);
+surf.metallic=uintBitsToFloat(u_graphPool.data[base + 4]);
+surf.ao=1.0;
+surf.specular=0.04;
+surf.emission=vec4(1.0);
+surf.emissiveStrength=0.0;
+surf.shadingModelId=SM_OPENPBR_STANDARD;
+return surf;
+}
+
+SurfaceData evalSurface_Graph1_5(SurfaceInputs si, uint base){
 SurfaceData surf;
 float _n0=uintBitsToFloat(u_graphPool.data[base + 0]);
 float _n1=uintBitsToFloat(u_graphPool.data[base + 1]);
@@ -99,6 +117,7 @@ surf.normal=normalize(si.worldNormal);
 surf.roughness=_n13;
 surf.metallic=0.0;
 surf.ao=1.0;
+surf.specular=0.04;
 surf.emission=vec4(1.0);
 surf.emissiveStrength=0.0;
 surf.shadingModelId=SM_OPENPBR_STANDARD;
@@ -110,7 +129,8 @@ SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint base) {
         case 0u: return evalSurface_Default_0(si, base);
         case 2u: return evalSurface_glTF_2(si, base);
         case 3u: return evalSurface_Graph0_3(si, base);
-        case 4u: return evalSurface_Graph1_4(si, base);
+        case 4u: return evalSurface_Graph0b_4(si, base);
+        case 5u: return evalSurface_Graph1_5(si, base);
     }
 
     SurfaceData surf;
@@ -119,6 +139,7 @@ SurfaceData evalSurfaceGraph(uint graphId, SurfaceInputs si, uint base) {
     surf.roughness = 0.5;
     surf.metallic = 0.0;
     surf.ao = 1.0;
+    surf.specular = 0.04;
     surf.emission = vec4(0.0);
     surf.emissiveStrength = 0.0;
     surf.shadingModelId = SM_OPENPBR_STANDARD;

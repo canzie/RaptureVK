@@ -2,13 +2,9 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
-#include "common/MaterialCommon.glsl"
+#include "common/GBufferOutput.glsl"
 #include "generated/TerrainGraphs.glsl"
 #include "terrain/terrain_common.glsl"
-
-layout(location = 0) out vec2 gNormal;
-layout(location = 1) out vec4 gAlbedoSpec;
-layout(location = 2) out vec4 gMaterial;
 
 layout(location = 0) in vec4 inFragPosDepth;
 layout(location = 3) in flat uint inChunkIndex;
@@ -88,7 +84,14 @@ void main() {
 
     TerrainSurfaceData surf = evalTerrainSurfaceGraph(mat.graphId, si, mat.graphDataOffset);
 
-    gNormal = octEncodeNormal(normalize(surf.normal));
-    gAlbedoSpec = vec4(surf.albedo, 1.0);
-    gMaterial = vec4(surf.metallic, surf.roughness, surf.ao, packShadingModel(surf.shadingModelId));
+    GBufferSurface gs = defaultGBufferSurface();
+    gs.normal = surf.normal;
+    gs.baseColor = surf.albedo;
+    gs.emissiveIntensity = surf.emissiveStrength * LinearRGBToLuminance(surf.emission.rgb);
+    gs.metallic = surf.metallic;
+    gs.roughness = surf.roughness;
+    gs.ao = surf.ao;
+    gs.specular = surf.specular;
+    gs.shadingModelId = surf.shadingModelId;
+    writeGBuffer(gs);
 }

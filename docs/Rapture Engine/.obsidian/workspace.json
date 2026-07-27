@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "plans/Material Editor Workspace.md",
+                "file": "plans/G-Buffer Expansion.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Material Editor Workspace"
+              "title": "G-Buffer Expansion"
             }
           }
         ]
@@ -185,16 +185,25 @@
   },
   "active": "6fa67950a6ea8521",
   "lastOpenFiles": [
+    "plans/G-Buffer Expansion.md.tmp.38954.0dc25488b988",
+    "plans/G-Buffer Expansion.md.tmp.38954.5b17d56bd610",
+    "plans/G-Buffer Expansion.md.tmp.38954.61d307f18742",
+    "plans/G-Buffer Expansion.md.tmp.38954.8bb74698efdf",
+    "plans/G-Buffer Expansion.md.tmp.38954.3cf676249688",
+    "plans/G-Buffer Expansion.md.tmp.38954.ea4ef74388b1",
+    "plans/G-Buffer Expansion.md.tmp.16502.9af835fee293",
+    "plans/G-Buffer Expansion.md.tmp.16502.c864772f86fb",
+    "plans/G-Buffer Expansion.md.tmp.16502.c6689b76cd17",
+    "plans/Stochastic Screen-Space Reflections.md",
+    "plans/Stochastic Screen-Space Reflections.md.tmp.16502.23813ef2a81e",
+    "plans/Material Editor Workspace.md",
     "plans/Image-Based Lighting.md",
     "plans/Editor UX Polish Roadmap.md",
-    "plans/Material Editor Workspace.md",
     "plans/Project Serialization.md",
     "plans/Per-node Graph Values.md",
     "Material Graph Nodes.md",
     "Material Graph Nodes.md.tmp.1513.8fef1da2ab09",
-    "Material Graph Nodes.md.tmp.1513.9d0324ff9ef7",
     "systems/AssetManager.md",
-    "Material Graph Nodes.md.tmp.1513.9bee6da3d7dc",
     "systems/AssetRef.md",
     "plans/Material Graph Compiler.md",
     "plans/Material System Overhaul.md",
@@ -212,15 +221,6 @@
     "systems/ShadowMapping.md",
     "systems/Shader.md",
     "systems/Scene.md",
-    "systems/Mesh.md",
-    "systems/MaterialInstance.md",
-    "systems",
-    "stuff",
-    "plans",
-    "ideas",
-    "archive",
-    "plans/Material System Overhaul.md.tmp.60032.0d9ab45083a1",
-    "plans/Material System Overhaul.md.tmp.60032.9d37325de234",
     "Pasted image 20260517113657.png"
   ]
 }

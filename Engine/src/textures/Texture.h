@@ -80,7 +80,7 @@ class Texture {
 
     const Sampler &getSampler() const { return *m_sampler; }
     const TextureSpecification &getSpecification() const { return m_spec; }
-    VkFormat getFormat() const { return toVkFormat(m_spec.format); }
+    VkFormat getFormat() const { return toVkFormat(m_spec.format, m_spec.srgb); }
 
     /**
      * @brief Approximate GPU footprint of this texture in bytes across all mips and layers
@@ -132,6 +132,10 @@ class Texture {
 
     uint32_t getBindlessIndex();
 
+    // TODO: Texture does not track its own current layout, so every caller has to pass oldLayout and
+    // get it right. Tracking it here would let barriers be generated from (texture, desired layout)
+    // alone, which is what RenderPass::beginRendering needs to handle LOAD attachments. Only sound
+    // while submission stays linear and single-queue.
     VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask,
                                                VkAccessFlags dstAccessMask);
 

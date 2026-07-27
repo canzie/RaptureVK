@@ -267,9 +267,15 @@ vec3 DDGIGetVolumeIrradiance(
         // Compute the octahedral coordinates of the adjacent probe
         vec2 octantCoords = DDGIGetOctahedralCoordinates(-biasedPosToAdjProbe);
 
-        // Clamp octahedral coordinates inward by half a texel to prevent bilinear filtering from sampling border texels
-        float distanceOctInset = 1.0 / float(volume.probeNumDistanceInteriorTexels);
-        octantCoords = clamp(octantCoords, vec2(-1.0 + distanceOctInset), vec2(1.0 - distanceOctInset));
+        // octantCoords is left unclamped: DDGIGetProbeUV maps [-1, 1] to stay within this
+        // probe's own border texels (never a neighboring probe's tile), and letting the
+        // sample reach the border lets the seamless wrap written by UpdateBorderTexelsGLSL
+        // smooth the octahedral fold.
+        //
+        // Previously clamped inward by a full texel here (kept for reference, not reinstated
+        // - a tiny epsilon clamp made no observable difference, so it's not pulling its weight):
+        // float distanceOctInset = 1.0 / float(volume.probeNumDistanceInteriorTexels);
+        // octantCoords = clamp(octantCoords, vec2(-1.0 + distanceOctInset), vec2(1.0 - distanceOctInset));
 
         // Get the texture array coordinates for the octant of the probe
         vec3 probeTextureUV = DDGIGetProbeUV(adjacentProbeIndex, octantCoords, volume.probeNumDistanceInteriorTexels, volume);
@@ -314,9 +320,13 @@ vec3 DDGIGetVolumeIrradiance(
         // Get the octahedral coordinates for the sample direction
         octantCoords = DDGIGetOctahedralCoordinates(direction);
 
-        // Clamp octahedral coordinates inward by half a texel to prevent bilinear filtering from sampling border texels
-        float irradianceOctInset = 1.0 / float(volume.probeNumIrradianceInteriorTexels);
-        octantCoords = clamp(octantCoords, vec2(-1.0 + irradianceOctInset), vec2(1.0 - irradianceOctInset));
+        // Left unclamped, same reasoning as the distance lookup above: the border texels
+        // hold the seamless wrap that smooths the octahedral fold, and clamping away from
+        // them is what caused the original seam.
+        //
+        // Previously clamped inward by a full texel here (kept for reference, not reinstated):
+        // float irradianceOctInset = 1.0 / float(volume.probeNumIrradianceInteriorTexels);
+        // octantCoords = clamp(octantCoords, vec2(-1.0 + irradianceOctInset), vec2(1.0 - irradianceOctInset));
 
         // Get the probe's texture coordinates
         probeTextureUV = DDGIGetProbeUV(adjacentProbeIndex, octantCoords, volume.probeNumIrradianceInteriorTexels, volume);

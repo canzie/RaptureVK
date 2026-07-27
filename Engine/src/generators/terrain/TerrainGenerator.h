@@ -5,10 +5,10 @@
 #include "TerrainTypes.h"
 
 #include "asset_manager/AssetHandle.h"
-#include "buffers/command_buffers/CommandBuffer.h"
-#include "buffers/command_buffers/CommandPool.h"
 #include "buffers/IndexBuffer.h"
 #include "buffers/StorageBuffer.h"
+#include "buffers/command_buffers/CommandBuffer.h"
+#include "buffers/command_buffers/CommandPool.h"
 #include "generators/textures/ProceduralTextures.h"
 #include "materials/MaterialInstance.h"
 #include "pipelines/ComputePipeline.h"

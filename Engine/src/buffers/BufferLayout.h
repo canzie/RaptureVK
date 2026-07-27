@@ -200,7 +200,7 @@ struct BufferLayout {
                 return attrib.offset;
             }
         }
-        return 0;
+        return UINT32_MAX;
     }
 
     // Calculate and cache vertex attribute flags based on available attributes

@@ -133,13 +133,24 @@ uvec3 fetchTriangleIndices(uint primitiveID, MeshInfo meshInfo) {
         indices.z = gBuffers[meshInfo.iboIndex].data[(indexOffset + 8) / 4];
     } else { // GL_UNSIGNED_SHORT (5123)
         uint indexOffset = baseIndex * 2; // 2 bytes per ushort
-        uint packedIndices0 = gBuffers[meshInfo.iboIndex].data[indexOffset / 4];
-        uint packedIndices1 = gBuffers[meshInfo.iboIndex].data[(indexOffset + 4) / 4];
-        
-        // Extract 16-bit indices from packed 32-bit values
-        indices.x = packedIndices0 & 0xFFFF;
-        indices.y = (packedIndices0 >> 16) & 0xFFFF;
-        indices.z = packedIndices1 & 0xFFFF;
+
+        // First two uint16_t may straddle a 4-byte boundary
+        uint lo = gBuffers[meshInfo.iboIndex].data[indexOffset / 4];
+        uint hi = gBuffers[meshInfo.iboIndex].data[indexOffset / 4 + 1];
+        uint shift = (indexOffset % 4) * 8; // 0 (aligned) or 16 (misaligned)
+
+        uint pair;
+        if (shift == 0) {
+            pair = lo;
+        } else {
+            pair = (lo >> shift) | (hi << (32 - shift));
+        }
+        indices.x = pair & 0xFFFF;
+        indices.y = (pair >> 16) & 0xFFFF;
+
+        // Third uint16_t at indexOffset + 4
+        uint tailOff = indexOffset + 4;
+        indices.z = (gBuffers[meshInfo.iboIndex].data[tailOff / 4] >> ((tailOff % 4) * 8)) & 0xFFFF;
     }
     
     return indices;

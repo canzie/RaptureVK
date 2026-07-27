@@ -48,7 +48,8 @@ class DirtyBitfield {
      * @brief Invoke a callback for each dirty slot index
      * @param fn Callable with signature void(uint32_t slotIndex)
      */
-    template <typename Fn> void forEachDirty(Fn &&fn) const
+    template <typename Fn>
+    void forEachDirty(Fn &&fn) const
     {
         for (uint32_t wordIdx = 0; wordIdx < static_cast<uint32_t>(m_words.size()); wordIdx++) {
             uint64_t word = m_words[wordIdx];
@@ -75,7 +76,8 @@ class DirtyBitfield {
  * Packed array of T (SSBO contents) with O(1) add/remove via swap-and-pop.
  * Sparse array maps EntityID to dense index. One dirty bitfield per frame in flight.
  */
-template <typename T> class RenderPartition {
+template <typename T>
+class RenderPartition {
   public:
     using SwapCallback = std::function<void(EntityID entityId, uint32_t newDenseIndex)>;
 
@@ -198,7 +200,8 @@ template <typename T> class RenderPartition {
  * renderDataSlot can encode both SSBO index and slot via bit packing
  * (upper bits = SSBO index, lower bits = slot within that SSBO)
  */
-template <typename T> class GPUDataStore {
+template <typename T>
+class GPUDataStore {
   public:
     GPUDataStore();
     ~GPUDataStore();

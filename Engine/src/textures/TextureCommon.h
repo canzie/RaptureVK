@@ -37,6 +37,7 @@ enum class TextureFormat : uint16_t {
     R11G11B10F, // VK_FORMAT_B10G11R11_UFLOAT_PACK32 (Note: BGR order in Vulkan common format)
     RG16F,      // VK_FORMAT_R16G16_SFLOAT
     R16F,       // VK_FORMAT_R16_SFLOAT
+    R32F,       // VK_FORMAT_R32_SFLOAT
     R8UI,       // VK_FORMAT_R8_UINT
     R8U,        // VK_FORMAT_R8_SINT
     BC1_RGB,    // VK_FORMAT_BC1_RGB_UNORM_BLOCK or _SRGB_BLOCK, 4x4 block, 8 bytes/block, opaque color
@@ -150,6 +151,8 @@ inline VkFormat toVkFormat(TextureFormat format, bool srgb = true)
         return VK_FORMAT_R16G16_SFLOAT;
     case TextureFormat::R16F:
         return VK_FORMAT_R16_SFLOAT;
+    case TextureFormat::R32F:
+        return VK_FORMAT_R32_SFLOAT;
     case TextureFormat::R8UI:
         return VK_FORMAT_R8_UINT;
     case TextureFormat::R8U:
@@ -176,6 +179,28 @@ inline VkFormat toVkFormat(TextureFormat format, bool srgb = true)
     default:
         RP_CORE_ERROR("Unsupported format!");
         return VK_FORMAT_UNDEFINED;
+    }
+}
+
+/**
+ * @brief Whether a format carries the sRGB transfer function, so the hardware encodes on write
+ * @param format The format to test
+ * @return True when the format is an _SRGB variant
+ */
+inline bool Texture_isSrgbFormat(VkFormat format)
+{
+    switch (format) {
+    case VK_FORMAT_R8G8B8A8_SRGB:
+    case VK_FORMAT_B8G8R8A8_SRGB:
+    case VK_FORMAT_R8G8B8_SRGB:
+    case VK_FORMAT_B8G8R8_SRGB:
+    case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
+    case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
+    case VK_FORMAT_BC3_SRGB_BLOCK:
+    case VK_FORMAT_BC7_SRGB_BLOCK:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -342,6 +367,8 @@ inline uint32_t getBytesPerPixel(TextureFormat format)
         return 4; // 2 channels × 2 bytes
     case TextureFormat::R16F:
         return 2; // 1 channel × 2 bytes
+    case TextureFormat::R32F:
+        return 4; // 1 channel × 4 bytes
     case TextureFormat::R8UI:
         return 1; // 1 channel × 1 byte
     case TextureFormat::R8U:

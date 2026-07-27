@@ -24,14 +24,13 @@ namespace Rapture {
 
 class StencilBorderPass {
   public:
-    StencilBorderPass(float width, float height, uint32_t framesInFlight,
-                      std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
+    StencilBorderPass(float width, float height, uint32_t framesInFlight, std::vector<Texture *> depthStencilTextures,
+                      VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
 
     ~StencilBorderPass();
 
-    CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
-                                   Scene &activeScene, Entity camera,
-                                   const SecondaryBufferInheritance &inheritance);
+    CommandBuffer *recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight, Scene &activeScene,
+                                   Entity camera, const SecondaryBufferInheritance &inheritance);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex);
     void endDynamicRendering(CommandBuffer *commandBuffer);
@@ -58,7 +57,7 @@ class StencilBorderPass {
     Shader *m_shader = nullptr;
     std::vector<AssetRef> m_shaderAssets;
 
-    std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
+    std::vector<Texture *> m_depthStencilTextures;
 
     std::shared_ptr<Entity> m_selectedEntity;
     size_t m_entitySelectedListenerId = 0;

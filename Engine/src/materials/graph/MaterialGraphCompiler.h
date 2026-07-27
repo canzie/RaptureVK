@@ -17,7 +17,7 @@ namespace Rapture {
  *
  * Stamped into the generated file so stale or incompatible output can be detected.
  */
-constexpr uint32_t MATERIAL_GRAPH_COMPILER_VERSION = 3;
+constexpr uint32_t MATERIAL_GRAPH_COMPILER_VERSION = 4;
 
 /**
  * @brief Severity of a compile diagnostic, ordered least to most severe

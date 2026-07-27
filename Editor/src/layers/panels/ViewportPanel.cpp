@@ -62,7 +62,7 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     }
 
     m_gizmoSpaceGroup.value = static_cast<int32_t>(m_gizmoSpace);
-    m_lightingModeGroup.value = VLM_FULL_GI; // matches RenderSettings' default flags
+    m_lightingModeGroup.value = VLM_LIT;
 
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -228,9 +228,11 @@ void ViewportPanel::buildRenderMenu()
         [this]() { applyLightingMode(static_cast<ViewportLightingMode>(m_lightingModeGroup.value)); });
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    items.push_back(ViewportContextMenuRID::create("Unlit", &m_lightingModeGroup, VLM_UNLIT));
-    items.push_back(ViewportContextMenuRID::create("Full GI", &m_lightingModeGroup, VLM_FULL_GI));
-    items.push_back(ViewportContextMenuRID::create("Only Irradiance", &m_lightingModeGroup, VLM_ONLY_IRRADIANCE));
+    items.push_back(ViewportContextMenuRID::create("Lit", &m_lightingModeGroup, VLM_LIT));
+    items.push_back(ViewportContextMenuRID::create("Direct Lighting", &m_lightingModeGroup, VLM_DIRECT_LIGHTING));
+    items.push_back(ViewportContextMenuRID::create("Indirect Lighting", &m_lightingModeGroup, VLM_INDIRECT_LIGHTING));
+    items.push_back(ViewportContextMenuRID::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
+    items.push_back(ViewportContextMenuRID::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
     m_renderMenu->setItems(std::move(items));
 }
 
@@ -241,18 +243,29 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
         return;
     }
     auto &settings = viewport->renderSettings();
+
+    settings.setFlag(Rapture::RENDER_SHOW_NORMALS, false);
     switch (mode) {
-    case VLM_UNLIT:
-        settings.setFlag(Rapture::RENDER_SHOW_DIRECT, false);
+    case VLM_DIRECT_LIGHTING:
+        settings.setFlag(Rapture::RENDER_SHOW_DIRECT, true);
         settings.setFlag(Rapture::RENDER_SHOW_INDIRECT, false);
         break;
-    case VLM_ONLY_IRRADIANCE:
+    case VLM_INDIRECT_LIGHTING:
+        settings.setFlag(Rapture::RENDER_SHOW_DIRECT, false);
+        settings.setFlag(Rapture::RENDER_SHOW_INDIRECT, true);
+        settings.setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, true);
+        settings.setFlag(Rapture::RENDER_MODULATE_INDIRECT, true);
+        break;
+    case VLM_RAW_IRRADIANCE:
         settings.setFlag(Rapture::RENDER_SHOW_DIRECT, false);
         settings.setFlag(Rapture::RENDER_SHOW_INDIRECT, true);
         settings.setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, true);
         settings.setFlag(Rapture::RENDER_MODULATE_INDIRECT, false);
         break;
-    case VLM_FULL_GI:
+    case VLM_NORMALS:
+        settings.setFlag(Rapture::RENDER_SHOW_NORMALS, true);
+        break;
+    case VLM_LIT:
     default:
         settings.setFlag(Rapture::RENDER_SHOW_DIRECT, true);
         settings.setFlag(Rapture::RENDER_SHOW_INDIRECT, true);

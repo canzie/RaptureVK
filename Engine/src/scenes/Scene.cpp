@@ -12,6 +12,7 @@
 #include "meshes/MeshPrimitives.h"
 #include "physics/PhysicsSystem.h"
 #include "render_targets/swap_chains/SwapChain.h"
+#include "scenes/entities/EntityCommon.h"
 #include "window_context/Application.h"
 
 #include <memory>
@@ -56,7 +57,7 @@ Entity Scene::createEntity(const std::string &name)
     return entity;
 }
 
-Entity Scene::createCube(const std::string &name)
+Entity Scene::createCube(const std::string &name, Mobility mobility)
 {
     if (locked) {
         RP_CORE_WARN("Cannot create entity in locked scene '{}'", getSceneName());
@@ -77,7 +78,7 @@ Entity Scene::createCube(const std::string &name)
     // Add a cube mesh
     auto cubeMesh = std::make_unique<Mesh>(Primitives::CreateCube());
     auto meshRef = AssetManager::registerVirtualAsset(std::move(cubeMesh), "Primitive_Cube_" + name, AssetType::MESH);
-    entity.addComponent<MeshComponent>(meshRef);
+    entity.addComponent<MeshComponent>(meshRef, mobility);
 
     entity.addComponent<BoundingBoxComponent>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
 

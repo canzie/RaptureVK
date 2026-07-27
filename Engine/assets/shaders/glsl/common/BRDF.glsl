@@ -37,8 +37,14 @@ float V_SmithGGXCorrelated(float NdotV, float NdotL, float roughness) {
     return 0.5 / max(ggxV + ggxL, 1e-5);
 }
 
+// The Fresnel reflectance at normal incidence: the dielectric F0 for a non-metal, the base color
+// itself for a metal
+vec3 computeF0(vec3 albedo, float metallic, float _specular) {
+    return mix(vec3(_specular), albedo, metallic);
+}
+
 // OpenPBR standard surface, single scatter. Returns BRDF * NdotL (no light color/intensity)
-vec3 evalStandardBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float roughness) {
+vec3 evalStandardBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float roughness, float _specular) {
     float NdotL = max(dot(N, L), 0.0);
     if (NdotL <= 0.0) {
         return vec3(0.0);
@@ -49,7 +55,7 @@ vec3 evalStandardBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float
     float NdotH = max(dot(N, H), 0.0);
     float VdotH = max(dot(V, H), 0.0);
 
-    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    vec3 F0 = computeF0(albedo, metallic, _specular);
     vec3 F = fresnelSchlick(VdotH, F0);
     float D = D_GGX(NdotH, roughness);
     float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
@@ -63,9 +69,9 @@ vec3 evalStandardBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float
 }
 
 // Dispatch by shading model. Returns BRDF * NdotL
-vec3 evalBRDF(uint shadingModelId, vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float roughness) {
+vec3 evalBRDF(uint shadingModelId, vec3 N, vec3 V, vec3 L, vec3 albedo, float metallic, float roughness, float _specular) {
     if (shadingModelId == SM_OPENPBR_STANDARD) {
-        return evalStandardBRDF(N, V, L, albedo, metallic, roughness);
+        return evalStandardBRDF(N, V, L, albedo, metallic, roughness, _specular);
     }
     return vec3(0.0);
 }

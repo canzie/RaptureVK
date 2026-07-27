@@ -11,23 +11,35 @@ uncouple the engines core
     - drag/drop assets into the viewport
     - the ability to add/remove individual components from entities
         - includes depedencies like how a shadow component requires a light, this can be enforec in editor or in the engine, iam leaning towards engine
+    - ability to hot reload an ams file, and update the actual stuff, pretty sure marking the window dirty and updating the style maps and invalidating cache is all it takes.
+    - make the gizmo support discrete steps, also the gizmo direction maybe be cooked.
 
-    - add pseudo states to ams
-
-## Material Graph Node Editor 
+### Materials 
     - when a new base mat is made and opened it cannot be viewd on a sphere, since we only render material instances, so for every material we will create a base instance, this one will be immutable
       it will make no changes and jsut take the defaults from the base material. there should be some kind of logic forcing this base instance to exist, so we cant delete it and its part of the base.
-    - when editing a base materail in the editor it needs to be very simple to create a copy of a base.
+      -> tldr, take all the default values from a base material and create a read-only/lock instance that is tied to the lifetime of the base-material, engine owned
     - adding or changing a material can mutate its gpu structure, we do not want this to cause out of bound reads, so it is important to make sure all places like gbuffers or probe trace shaders to be refreshed as soon as possible
       right now this only happens when we resize but iam not sure the shaders are recompiled, so what we need is a way to ask these places, like the gbuffer pass to recreate its pipeline using the new shader we compiled with the new material in it.
     - the properties panel now needs to be able to set a material isntance. it also eneds a button to open a material node editor workspace for the material, this also neds to happen in the content browser
+    
+    - expand the material system, probably need to update the gbuffer too. so stuff like dielectrics
+    - fix specular/reflections, or improve them, maybe some ssr using diffuse skybox?
 
 
 ### PHYSICS
     - implement ray picking so we can select entities using it in the editor
 
+### Terrain
+    - Add a path to use custom heightmaps first, for the time being it will take priority over fully procedural worksflows
+    - fix the random black triangles
+    - get a basic editor panel going for adjusting certain parameters about how it is rendered
+    - go over the material, check if terrain materials are a strict superset of regular materials (if yes then we can use reg mats on terrain)
+    - create a nicer terrain material, maybe using noise or some actual textures->texture import flow
 
 
+### Engine Architecture
+    - Add a concept of ownership, can be something like ENGINE, EDITOR, DEVELEOPER, USER. these could then be used for modify access to things like internal assets
+      
 
 - Make rendering things like bounds easier
   - current method is creating an instancedshapes component and providing the transformmatrix
@@ -39,7 +51,6 @@ uncouple the engines core
 - fix stencil buffer
 - shader/pipeline hot reloading
 - parallise/jobify shader compilation (note, current stack size is too small for this, maybe spawn another process and use gslang exec???)
-- add model to the asset manager
   - ditinction between static and dynamic meshes here
   - the asset importer in the editor will be able to set these options and they can be either metadata or ...
     - editor settings could be static/dynamic, prefab options?
@@ -59,14 +70,12 @@ uncouple the engines core
 - ss reflections
 - animations
 - scripting
-- jolt
 - Photometry (use camera settings to calculate the correct exposure)
-- giga serializaiton
 - post processing
 - some limit testing
 - volumetric fog/clouds
 - audio
-- ui
+- ui(in game)
 - game?
 
 

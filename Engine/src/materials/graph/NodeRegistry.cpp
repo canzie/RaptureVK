@@ -515,7 +515,9 @@ void NodeRegistry::registerBuiltins()
                              {"metallic", PinType::FLOAT},
                              {"ao", PinType::FLOAT},
                              {"emission", PinType::VEC4},
-                             {"emissiveStrength", PinType::FLOAT}}});
+                             {"emissiveStrength", PinType::FLOAT},
+                             // Graph connections address pins by index, so a new channel is appended, never inserted
+                             {"specular", PinType::FLOAT}}});
 }
 
 } // namespace Rapture

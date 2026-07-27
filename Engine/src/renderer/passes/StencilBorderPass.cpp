@@ -3,8 +3,8 @@
 #include "StencilBorderPass.h"
 #include "components/Components.h"
 #include "logging/Log.h"
-#include "renderer/SceneRenderData.h"
 #include "logging/TracyProfiler.h"
+#include "renderer/SceneRenderData.h"
 #include "window_context/Application.h"
 
 namespace Rapture {
@@ -19,10 +19,10 @@ struct StencilBorderPushConstants {
 };
 
 StencilBorderPass::StencilBorderPass(float width, float height, uint32_t framesInFlight,
-                                     std::vector<std::shared_ptr<Texture>> depthStencilTextures, VkFormat colorFormat)
+                                     std::vector<Texture *> depthStencilTextures, VkFormat colorFormat)
     : m_width(width), m_height(height), m_colorFormat(colorFormat), m_device(VK_NULL_HANDLE), m_vmaAllocator(nullptr),
-      m_pipeline(nullptr), m_framesInFlight(framesInFlight), m_currentImageIndex(0), m_depthStencilTextures(depthStencilTextures),
-      m_selectedEntity(nullptr)
+      m_pipeline(nullptr), m_framesInFlight(framesInFlight), m_currentImageIndex(0),
+      m_depthStencilTextures(std::move(depthStencilTextures)), m_selectedEntity(nullptr)
 {
 
     auto &app = Application::getInstance();
@@ -63,8 +63,7 @@ StencilBorderPass::~StencilBorderPass()
 }
 
 CommandBuffer *StencilBorderPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t currentFrameInFlight,
-                                                  Scene &activeScene, Entity camera,
-                                                  const SecondaryBufferInheritance &inheritance)
+                                                  Scene &activeScene, Entity camera, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 

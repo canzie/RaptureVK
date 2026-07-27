@@ -15,8 +15,8 @@ struct SkyboxPushConstants {
     uint32_t skyboxTextureIndex;
 };
 
-SkyboxPass::SkyboxPass(std::vector<std::shared_ptr<Texture>> depthTextures, VkFormat colorFormat)
-    : m_skyboxTexture(nullptr), m_depthTextures(depthTextures), m_width(0.0f), m_height(0.0f), m_colorFormat(colorFormat)
+SkyboxPass::SkyboxPass(std::vector<Texture *> depthTextures, VkFormat colorFormat)
+    : m_skyboxTexture(nullptr), m_depthTextures(std::move(depthTextures)), m_width(0.0f), m_height(0.0f), m_colorFormat(colorFormat)
 {
 
     auto &app = Application::getInstance();
@@ -44,10 +44,13 @@ SkyboxPass::~SkyboxPass()
     m_skyboxIndexBuffer.reset();
 }
 
-CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint32_t frameInFlightIndex,
-                                           Scene &activeScene, Entity camera,
-                                           const SecondaryBufferInheritance &inheritance)
+CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
+    Scene &activeScene = *context.scene;
+    Entity camera = context.camera;
+    Texture *target = context.targets->sceneColorHdr;
+    uint32_t frameInFlightIndex = context.frameInFlight;
+
     if (!m_skyboxTexture || !m_skyboxTexture->isReady()) {
         return nullptr;
     }
@@ -69,7 +72,8 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
 
     commandBuffer->beginSecondary(inheritance);
 
-    VkExtent2D targetExtent = renderTarget.getExtent();
+    const TextureSpecification &targetSpec = target->getSpecification();
+    VkExtent2D targetExtent = {targetSpec.width, targetSpec.height};
 
     // Update dimensions from target extent
     m_width = static_cast<float>(targetExtent.width);
@@ -101,7 +105,8 @@ CommandBuffer *SkyboxPass::recordSecondary(SceneRenderTarget &renderTarget, uint
 
     SkyboxPushConstants pushConstants{};
     pushConstants.cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(frameInFlightIndex);
-    pushConstants.cameraSlotIndex = (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
+    pushConstants.cameraSlotIndex =
+        (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
     pushConstants.skyboxTextureIndex = m_skyboxTexture->getBindlessIndex();
 
     VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -255,49 +260,39 @@ void SkyboxPass::createSkyboxGeometry()
     m_skyboxIndexBuffer->addDataGPU(indices.data(), indices.size() * sizeof(uint32_t), 0);
 }
 
-void SkyboxPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex,
-                                       uint32_t frameInFlightIndex)
+void SkyboxPass::updateAttachments(const RenderPassContext &context)
 {
-    VkImage targetImage = renderTarget.getImage(imageIndex);
-    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
-    VkExtent2D targetExtent = renderTarget.getExtent();
+    RenderPassAttachment colorAttachment;
+    colorAttachment.texture = context.targets->sceneColorHdr;
+    colorAttachment.loadOp = RenderPassAttachmentLoadOp::LOAD;
+    colorAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
 
-    VkImage depthImage = m_depthTextures[frameInFlightIndex]->getImage();
-    VkImageView depthImageView = m_depthTextures[frameInFlightIndex]->getImageView();
+    m_attachments.colorAttachments.clear();
+    m_attachments.colorAttachments.push_back(colorAttachment);
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage, depthImage);
+    m_attachments.depthAttachment = {};
+    m_attachments.depthAttachment.texture = m_depthTextures[context.frameInFlight];
+    m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::LOAD;
+    m_attachments.depthAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
 
-    VkRenderingAttachmentInfo colorAttachmentInfo{};
-    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachmentInfo.imageView = targetImageView;
-    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-    VkRenderingAttachmentInfo depthAttachmentInfo{};
-    depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depthAttachmentInfo.imageView = depthImageView;
-    depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent = targetExtent;
-    renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachmentInfo;
-    renderingInfo.pDepthAttachment = &depthAttachmentInfo;
-    renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
-    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
-
-    vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
+    m_attachments.stencilAttachment = {};
 }
 
-void SkyboxPass::endDynamicRendering(CommandBuffer *commandBuffer)
+void SkyboxPass::onResize(uint32_t width, uint32_t height)
 {
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
+    // TODO: see GBufferPass::onResize, passes are destroyed and rebuilt on resize today
+    m_width = static_cast<float>(width);
+    m_height = static_cast<float>(height);
+}
+
+// Both attachments are loaded, which the base skips, so the sync barriers between this pass and the
+// one that filled them are issued here
+void SkyboxPass::beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb)
+{
+    setupDynamicRenderingMemoryBarriers(primaryCb, context.targets->sceneColorHdr->getImage(),
+                                        m_depthTextures[context.frameInFlight]->getImage());
+
+    RenderPass::beginRendering(context, primaryCb);
 }
 
 void SkyboxPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, VkImage depthImage)

@@ -1,6 +1,8 @@
 #include "LightingPass.h"
 #include "window_context/Application.h"
 
+#include "buffers/descriptors/DescriptorManager.h"
+#include "components/Components.h"
 #include "components/FogComponent.h"
 #include "renderer/RenderSettings.h"
 #include "renderer/SceneRenderData.h"
@@ -14,6 +16,10 @@ namespace Rapture {
 struct LightingPushConstants {
 
     glm::vec4 cameraPos;
+
+    // Fog
+    glm::vec4 fogColor;     // .rgb = color, .a = enabled
+    glm::vec2 fogDistances; // .x = near, .y = far
 
     uint32_t lightDataSSBOIndex;
     uint32_t lightStaticCount;
@@ -30,6 +36,7 @@ struct LightingPushConstants {
     uint32_t cameraSlotIndex;
     uint32_t GBufferMaterialHandle;
     uint32_t GBufferDepthHandle;
+    uint32_t GBufferShadingModelHandle;
 
     uint32_t lightingFlags;
     uint32_t probeVolumeHandle;
@@ -37,14 +44,10 @@ struct LightingPushConstants {
     uint32_t probeVisibilityHandle;
     uint32_t probeOffsetHandle;
     uint32_t probeClassificationHandle;
-
-    // Fog
-    glm::vec4 fogColor;     // .rgb = color, .a = enabled
-    glm::vec2 fogDistances; // .x = near, .y = far
 };
 
-LightingPass::LightingPass(float width, float height, GBufferPass *gBufferPass, DynamicDiffuseGI *ddgi, VkFormat colorFormat)
-    : m_colorFormat(colorFormat), m_gBufferPass(gBufferPass), m_ddgi(ddgi), m_width(width), m_height(height)
+LightingPass::LightingPass(float width, float height, DynamicDiffuseGI *ddgi, VkFormat colorFormat)
+    : m_colorFormat(colorFormat), m_ddgi(ddgi), m_width(width), m_height(height)
 {
 
     auto &app = Application::getInstance();
@@ -92,11 +95,15 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
     return spec;
 }
 
-CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, SceneRenderTarget &renderTarget,
-                                             uint32_t frameIndex, const SecondaryBufferInheritance &inheritance,
-                                             uint32_t lightingFlags)
+CommandBuffer *LightingPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
+
+    Scene &activeScene = *context.scene;
+    Entity camera = context.camera;
+    Texture *target = context.targets->sceneColorHdr;
+    uint32_t frameIndex = context.frameInFlight;
+    uint32_t lightingFlags = context.settings->flags;
 
     auto &vc = Application::getInstance().getVulkanContext();
 
@@ -112,11 +119,11 @@ CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, 
 
     commandBuffer->beginSecondary(inheritance);
 
-    VkExtent2D targetExtent = renderTarget.getExtent();
+    const TextureSpecification &targetSpec = target->getSpecification();
 
     // Update dimensions from target extent
-    m_width = static_cast<float>(targetExtent.width);
-    m_height = static_cast<float>(targetExtent.height);
+    m_width = static_cast<float>(targetSpec.width);
+    m_height = static_cast<float>(targetSpec.height);
 
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
@@ -131,7 +138,7 @@ CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, 
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent = targetExtent;
+    scissor.extent = {targetSpec.width, targetSpec.height};
     vkCmdSetScissor(commandBuffer->getCommandBufferVk(), 0, 1, &scissor);
 
     glm::vec3 cameraPos = glm::vec3(0.0f);
@@ -150,12 +157,13 @@ CommandBuffer *LightingPass::recordSecondary(Scene &activeScene, Entity camera, 
     LightingPushConstants pushConstants;
     pushConstants.cameraPos = glm::vec4(cameraPos, 1.0f);
 
-    pushConstants.GBufferAlbedoHandle = m_gBufferPass->getAlbedoTextureIndex();
-    pushConstants.GBufferNormalHandle = m_gBufferPass->getNormalTextureIndex();
+    pushConstants.GBufferAlbedoHandle = context.targets->gbufferBaseColor->getBindlessIndex();
+    pushConstants.GBufferNormalHandle = context.targets->gbufferNormalMotion->getBindlessIndex();
     pushConstants.cameraSSBOIndex = activeScene.getRenderData()->getCameras().getDescriptorIndex(frameIndex);
     pushConstants.cameraSlotIndex = cameraSlotIndex;
-    pushConstants.GBufferMaterialHandle = m_gBufferPass->getMaterialTextureIndex();
-    pushConstants.GBufferDepthHandle = m_gBufferPass->getDepthTextureIndex();
+    pushConstants.GBufferMaterialHandle = context.targets->gbufferMaterial->getBindlessIndex();
+    pushConstants.GBufferDepthHandle = context.targets->depthStencil->getBindlessIndex();
+    pushConstants.GBufferShadingModelHandle = context.targets->gbufferShadingModel->getBindlessIndex();
 
     // DDGI indirect requires the GI system to exist; fall back to ambient otherwise
     pushConstants.lightingFlags = m_ddgi ? lightingFlags : (lightingFlags & ~RENDER_USE_GLOBAL_ILLUMINATION);
@@ -323,62 +331,25 @@ void LightingPass::createPipeline()
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
 
-void LightingPass::beginDynamicRendering(CommandBuffer *commandBuffer, SceneRenderTarget &renderTarget, uint32_t imageIndex)
+void LightingPass::updateAttachments(const RenderPassContext &context)
 {
+    RenderPassAttachment colorAttachment;
+    colorAttachment.texture = context.targets->sceneColorHdr;
+    colorAttachment.loadOp = RenderPassAttachmentLoadOp::CLEAR;
+    colorAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
+    colorAttachment.clearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-    VkImage targetImage = renderTarget.getImage(imageIndex);
-    VkImageView targetImageView = renderTarget.getImageView(imageIndex);
-    VkExtent2D targetExtent = renderTarget.getExtent();
+    m_attachments.colorAttachments.clear();
+    m_attachments.colorAttachments.push_back(colorAttachment);
 
-    setupDynamicRenderingMemoryBarriers(commandBuffer, targetImage);
-
-    VkRenderingAttachmentInfo colorAttachmentInfo{};
-    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachmentInfo.imageView = targetImageView;
-    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent = targetExtent;
-    renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachmentInfo;
-    renderingInfo.pDepthAttachment = VK_NULL_HANDLE;
-    renderingInfo.pStencilAttachment = VK_NULL_HANDLE;
-    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
-
-    vkCmdBeginRendering(commandBuffer->getCommandBufferVk(), &renderingInfo);
+    m_attachments.depthAttachment = {};
+    m_attachments.stencilAttachment = {};
 }
 
-void LightingPass::endDynamicRendering(CommandBuffer *commandBuffer)
+void LightingPass::onResize(uint32_t width, uint32_t height)
 {
-    vkCmdEndRendering(commandBuffer->getCommandBufferVk());
-}
-
-void LightingPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage)
-{
-
-    VkImageMemoryBarrier colorBarrier{};
-    // Image layout transitions for dynamic rendering
-    colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Always start from undefined for the first transition
-    colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    colorBarrier.image = targetImage;
-    colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    colorBarrier.subresourceRange.baseMipLevel = 0;
-    colorBarrier.subresourceRange.levelCount = 1;
-    colorBarrier.subresourceRange.baseArrayLayer = 0;
-    colorBarrier.subresourceRange.layerCount = 1;
-    colorBarrier.srcAccessMask = 0; // No access before
-    colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &colorBarrier);
+    // TODO: see GBufferPass::onResize, passes are destroyed and rebuilt on resize today
+    m_width = static_cast<float>(width);
+    m_height = static_cast<float>(height);
 }
 } // namespace Rapture

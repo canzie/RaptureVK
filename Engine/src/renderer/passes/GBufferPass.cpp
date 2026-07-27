@@ -67,12 +67,11 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     m_entitySelectedListenerId =
         GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
 
-    m_entityDeselectedListenerId =
-        GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
-            if (m_selectedEntity && *m_selectedEntity == entity) {
-                m_selectedEntity = nullptr;
-            }
-        });
+    m_entityDeselectedListenerId = GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
+        if (m_selectedEntity && *m_selectedEntity == entity) {
+            m_selectedEntity = nullptr;
+        }
+    });
 }
 
 void GBufferPass::setupCommandResources()
@@ -102,6 +101,7 @@ GBufferPass::~GBufferPass()
     m_normalTextures.clear();
     m_albedoSpecTextures.clear();
     m_materialTextures.clear();
+    m_shadingModelTextures.clear();
     m_depthStencilTextures.clear();
 
     // Clean up pipelines
@@ -115,17 +115,33 @@ FramebufferSpecification GBufferPass::getFramebufferSpecification()
     FramebufferSpecification spec;
     spec.depthAttachment = VK_FORMAT_D24_UNORM_S8_UINT;
     spec.stencilAttachment = VK_FORMAT_D24_UNORM_S8_UINT;
-    spec.colorAttachments.push_back(VK_FORMAT_R16G16_SFLOAT); // octahedral-encoded world normal
-    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_SRGB); // albedo + specular
-    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM); // r=metallic g=roughness b=AO a=???
+    spec.colorAttachments.push_back(VK_FORMAT_R16G16B16A16_SFLOAT); // rg=octahedral world normal ba=motion vector
+    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_SRGB);       // rgb=base color a=packed emissive intensity
+    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM);      // r=metallic g=roughness b=AO a=specular
+    spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM);      // r=shading model id gba=custom data
 
     return spec;
 }
 
-CommandBuffer *GBufferPass::recordSecondary(Scene &activeScene, Entity camera, uint32_t currentFrame,
-                                            const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain)
+std::vector<Texture *> GBufferPass::getDepthTextures() const
+{
+    std::vector<Texture *> depthTextures;
+    depthTextures.reserve(m_depthStencilTextures.size());
+    for (const std::unique_ptr<Texture> &texture : m_depthStencilTextures) {
+        depthTextures.push_back(texture.get());
+    }
+
+    return depthTextures;
+}
+
+CommandBuffer *GBufferPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
+
+    Scene &activeScene = *context.scene;
+    Entity camera = context.camera;
+    TerrainGenerator *terrain = context.terrain;
+    uint32_t currentFrame = context.frameInFlight;
 
     m_currentFrame = currentFrame;
 
@@ -156,8 +172,7 @@ CommandBuffer *GBufferPass::recordSecondary(Scene &activeScene, Entity camera, u
     return commandBuffer;
 }
 
-void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera,
-                                       uint32_t currentFrame)
+void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -373,93 +388,60 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
     }
 }
 
-void GBufferPass::beginDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame)
+void GBufferPass::updateAttachments(const RenderPassContext &context)
 {
-    RAPTURE_PROFILE_FUNCTION();
+    uint32_t frame = context.frameInFlight;
+    m_currentFrame = frame;
 
-    setupDynamicRenderingMemoryBarriers(primaryCb, currentFrame);
+    RenderPassAttachment colorAttachment;
+    colorAttachment.loadOp = RenderPassAttachmentLoadOp::CLEAR;
+    colorAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
+    colorAttachment.clearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-    // Update color attachment infos for current frame
-    m_colorAttachmentInfo[0] = {};
-    m_colorAttachmentInfo[0].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_colorAttachmentInfo[0].imageView = m_normalTextures[currentFrame]->getImageView();
-    m_colorAttachmentInfo[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    m_colorAttachmentInfo[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    m_colorAttachmentInfo[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    m_colorAttachmentInfo[0].clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    m_attachments.colorAttachments.clear();
+    m_attachments.colorAttachments.reserve(4);
 
-    m_colorAttachmentInfo[1] = {};
-    m_colorAttachmentInfo[1].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_colorAttachmentInfo[1].imageView = m_albedoSpecTextures[currentFrame]->getImageView();
-    m_colorAttachmentInfo[1].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    m_colorAttachmentInfo[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    m_colorAttachmentInfo[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    m_colorAttachmentInfo[1].clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    colorAttachment.texture = m_normalTextures[frame].get();
+    m_attachments.colorAttachments.push_back(colorAttachment);
 
-    m_colorAttachmentInfo[2] = {};
-    m_colorAttachmentInfo[2].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_colorAttachmentInfo[2].imageView = m_materialTextures[currentFrame]->getImageView();
-    m_colorAttachmentInfo[2].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    m_colorAttachmentInfo[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    m_colorAttachmentInfo[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    m_colorAttachmentInfo[2].clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    colorAttachment.texture = m_albedoSpecTextures[frame].get();
+    m_attachments.colorAttachments.push_back(colorAttachment);
 
-    // Depth-stencil attachment configuration
-    m_depthAttachmentInfo = {};
-    m_depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    m_depthAttachmentInfo.imageView = m_depthStencilTextures[currentFrame]->getImageView();
-    m_depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    m_depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    m_depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    // Clear depth to 1.0f (far) and stencil to 0
-    m_depthAttachmentInfo.clearValue.depthStencil = {1.0f, 0};
+    colorAttachment.texture = m_materialTextures[frame].get();
+    m_attachments.colorAttachments.push_back(colorAttachment);
 
-    // Configure dynamic rendering info
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
-    renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 3;
-    renderingInfo.pColorAttachments = m_colorAttachmentInfo;
-    renderingInfo.pDepthAttachment = &m_depthAttachmentInfo;
-    renderingInfo.pStencilAttachment = &m_depthAttachmentInfo;
-    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
+    colorAttachment.texture = m_shadingModelTextures[frame].get();
+    m_attachments.colorAttachments.push_back(colorAttachment);
 
-    vkCmdBeginRendering(primaryCb->getCommandBufferVk(), &renderingInfo);
+    m_attachments.depthAttachment.texture = m_depthStencilTextures[frame].get();
+    m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::CLEAR;
+    m_attachments.depthAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
+    m_attachments.depthAttachment.clearDepth = 1.0f;
+    m_attachments.depthAttachment.clearStencil = 0;
+
+    m_attachments.stencilAttachment = m_attachments.depthAttachment;
 }
 
-void GBufferPass::endDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame)
+void GBufferPass::endRendering(CommandBuffer *primaryCb)
 {
-    vkCmdEndRendering(primaryCb->getCommandBufferVk());
-    transitionToShaderReadableLayout(primaryCb, currentFrame);
+    RenderPass::endRendering(primaryCb);
+    transitionToShaderReadableLayout(primaryCb, m_currentFrame);
 }
 
-void GBufferPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb, uint32_t currentFrame)
+void GBufferPass::onResize(uint32_t width, uint32_t height)
 {
-    RAPTURE_PROFILE_FUNCTION();
-
-    VkImageMemoryBarrier barriers[4];
-    barriers[0] = m_normalTextures[currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[1] = m_albedoSpecTextures[currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[2] = m_materialTextures[currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-    barriers[3] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED,
-                                                                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 0,
-                                                                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-
-    vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, nullptr,
-                         0, nullptr, 4, barriers);
+    // TODO: the renderer currently destroys and rebuilds every pass on resize, so only the size is
+    // updated here. Recreate the textures and pipelines in place once passes outlive a resize, which
+    // is also what shader/pipeline hot reloading needs.
+    m_width = static_cast<float>(width);
+    m_height = static_cast<float>(height);
 }
 
 void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    VkImageMemoryBarrier barriers[4];
+    VkImageMemoryBarrier barriers[5];
     barriers[0] = m_normalTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
@@ -469,13 +451,16 @@ void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb, uin
     barriers[2] = m_materialTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
-    barriers[3] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(
+    barriers[3] = m_shadingModelTextures[currentFrame]->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+    barriers[4] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
     vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(),
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 4, barriers);
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 5, barriers);
 }
 
 void GBufferPass::createTextures()
@@ -483,7 +468,7 @@ void GBufferPass::createTextures()
     TextureSpecification normalSpec;
     normalSpec.width = static_cast<uint32_t>(m_width);
     normalSpec.height = static_cast<uint32_t>(m_height);
-    normalSpec.format = TextureFormat::RG16F;
+    normalSpec.format = TextureFormat::RGBA16F;
     normalSpec.type = TextureType::TEXTURE2D;
     normalSpec.srgb = false;
 
@@ -501,6 +486,13 @@ void GBufferPass::createTextures()
     materialSpec.type = TextureType::TEXTURE2D;
     materialSpec.srgb = false;
 
+    TextureSpecification shadingModelSpec;
+    shadingModelSpec.width = static_cast<uint32_t>(m_width);
+    shadingModelSpec.height = static_cast<uint32_t>(m_height);
+    shadingModelSpec.format = TextureFormat::RGBA8;
+    shadingModelSpec.type = TextureType::TEXTURE2D;
+    shadingModelSpec.srgb = false;
+
     TextureSpecification depthStencilSpec;
     depthStencilSpec.width = static_cast<uint32_t>(m_width);
     depthStencilSpec.height = static_cast<uint32_t>(m_height);
@@ -510,10 +502,11 @@ void GBufferPass::createTextures()
 
     // Create textures for each frame in flight
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
-        m_normalTextures.push_back(std::make_shared<Texture>(normalSpec));
-        m_albedoSpecTextures.push_back(std::make_shared<Texture>(albedoSpec));
-        m_materialTextures.push_back(std::make_shared<Texture>(materialSpec));
-        m_depthStencilTextures.push_back(std::make_shared<Texture>(depthStencilSpec));
+        m_normalTextures.push_back(std::make_unique<Texture>(normalSpec));
+        m_albedoSpecTextures.push_back(std::make_unique<Texture>(albedoSpec));
+        m_materialTextures.push_back(std::make_unique<Texture>(materialSpec));
+        m_shadingModelTextures.push_back(std::make_unique<Texture>(shadingModelSpec));
+        m_depthStencilTextures.push_back(std::make_unique<Texture>(depthStencilSpec));
     }
 }
 
@@ -524,6 +517,7 @@ void GBufferPass::bindGBufferTexturesToBindlessSet()
     m_normalTextureIndices.resize(m_framesInFlight);
     m_albedoTextureIndices.resize(m_framesInFlight);
     m_materialTextureIndices.resize(m_framesInFlight);
+    m_shadingModelTextureIndices.resize(m_framesInFlight);
     m_depthTextureIndices.resize(m_framesInFlight);
 
     // Add each texture to the bindless set and store the indices
@@ -531,10 +525,12 @@ void GBufferPass::bindGBufferTexturesToBindlessSet()
         m_normalTextureIndices[i] = m_normalTextures[i]->getBindlessIndex();
         m_albedoTextureIndices[i] = m_albedoSpecTextures[i]->getBindlessIndex();
         m_materialTextureIndices[i] = m_materialTextures[i]->getBindlessIndex();
+        m_shadingModelTextureIndices[i] = m_shadingModelTextures[i]->getBindlessIndex();
         m_depthTextureIndices[i] = m_depthStencilTextures[i]->getBindlessIndex();
 
         if (m_normalTextureIndices[i] == UINT32_MAX || m_albedoTextureIndices[i] == UINT32_MAX ||
-            m_materialTextureIndices[i] == UINT32_MAX || m_depthTextureIndices[i] == UINT32_MAX) {
+            m_materialTextureIndices[i] == UINT32_MAX || m_shadingModelTextureIndices[i] == UINT32_MAX ||
+            m_depthTextureIndices[i] == UINT32_MAX) {
             RP_CORE_ERROR("Failed to add GBuffer texture(s) to bindless array for frame {}", i);
         }
     }
@@ -602,8 +598,8 @@ void GBufferPass::createPipeline()
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachments[3];
-    for (int i = 0; i < 3; ++i) {
+    VkPipelineColorBlendAttachmentState colorBlendAttachments[4];
+    for (int i = 0; i < 4; ++i) {
         colorBlendAttachments[i] = {};
         colorBlendAttachments[i].colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -615,7 +611,7 @@ void GBufferPass::createPipeline()
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.logicOp = VK_LOGIC_OP_COPY;           // Optional
-    colorBlending.attachmentCount = 3;                  // one per G-buffer color target
+    colorBlending.attachmentCount = 4;                  // one per G-buffer color target
     colorBlending.pAttachments = colorBlendAttachments; // Changed from &colorBlendAttachment
     colorBlending.blendConstants[0] = 0.0f;             // Optional
     colorBlending.blendConstants[1] = 0.0f;             // Optional
@@ -739,8 +735,8 @@ void GBufferPass::createTerrainPipeline()
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachments[3];
-    for (int i = 0; i < 3; ++i) {
+    VkPipelineColorBlendAttachmentState colorBlendAttachments[4];
+    for (int i = 0; i < 4; ++i) {
         colorBlendAttachments[i] = {};
         colorBlendAttachments[i].colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -750,7 +746,7 @@ void GBufferPass::createTerrainPipeline()
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.attachmentCount = 3;
+    colorBlending.attachmentCount = 4;
     colorBlending.pAttachments = colorBlendAttachments;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
@@ -792,8 +788,8 @@ void GBufferPass::createTerrainPipeline()
     RP_CORE_TRACE("GBufferPass: Terrain pipeline created");
 }
 
-void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera,
-                                        TerrainGenerator &terrain, uint32_t currentFrame)
+void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, TerrainGenerator &terrain,
+                                        uint32_t currentFrame)
 {
     (void)activeScene;
     RAPTURE_PROFILE_FUNCTION();

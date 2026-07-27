@@ -30,6 +30,10 @@ layout(location = 0) in vec2 fragTexCoord;
 
 #define CASCADE_BLEND_WIDTH_PERCENT 0.15
 
+// Debug: tint each pixel by the DDGI base-probe grid cell it falls into (checkerboard
+// per axis), to check whether an irradiance artifact lines up with a probe cell boundary.
+#define DEBUG_DDGI_PROBE_GRID 0
+
 
 layout(set = 3, binding = 0) uniform sampler2D gTextures[];
 layout(set = 3, binding = 0) uniform sampler2DShadow gShadowTextures[];
@@ -100,8 +104,15 @@ vec3 octDecodeNormal(vec2 enc) {
 }
 
 
+// The vec4s lead so the trailing uint block needs no alignment padding, keeping the block under the
+// 128 byte guaranteed push constant size
 layout(push_constant) uniform PushConstants {
     vec4 cameraPos;
+
+    // Fog
+    vec4 fogColor;     // .rgb = color, .a = enabled
+    vec2 fogDistances; // .x = near, .y = far
+
     uint lightDataSSBOIndex;
     uint lightStaticCount;
     uint lightDynamicOffset;
@@ -117,6 +128,7 @@ layout(push_constant) uniform PushConstants {
     uint cameraSlotIndex;
     uint GBufferMaterialHandle;
     uint GBufferDepthHandle;
+    uint GBufferShadingModelHandle;
 
     uint lightingFlags;
     uint probeVolumeHandle;
@@ -124,10 +136,6 @@ layout(push_constant) uniform PushConstants {
     uint probeVisibilityHandle;
     uint probeOffsetHandle;
     uint probeClassificationHandle;
-
-    // Fog
-    vec4 fogColor;     // .rgb = color, .a = enabled
-    vec2 fogDistances; // .x = near, .y = far
 } pc;
 
 const uint RENDER_NONE = 0u;
@@ -135,6 +143,7 @@ const uint RENDER_USE_GLOBAL_ILLUMINATION = 1u << 0;
 const uint RENDER_SHOW_DIRECT = 1u << 1;
 const uint RENDER_SHOW_INDIRECT = 1u << 2;
 const uint RENDER_MODULATE_INDIRECT = 1u << 3;
+const uint RENDER_SHOW_NORMALS = 1u << 5;
 const uint RENDER_ALL = 0xFFFFFFFFu;
 
 
@@ -364,11 +373,17 @@ float calculateShadow(vec3 fragPosWorld, float fragDepthView, vec3 normal, vec3 
     }
 }
 
-vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume volume) {
-    
+vec3 getSpecularDominantDir(vec3 N, vec3 R, float roughness) {
+    float smoothness = clamp(1.0 - roughness, 0.0, 1.0);
+    float lerpFactor = smoothness * (sqrt(smoothness) + roughness);
+    return mix(N, R, lerpFactor);
+}
 
-    vec3 surfaceBias = DDGIGetSurfaceBias(normal, cameraDirection,  volume);
-    
+vec3 getIrradiance(vec3 worldPos, vec3 surfaceNormal, vec3 sampleDirection, vec3 cameraDirection, ProbeVolume volume) {
+
+
+    vec3 surfaceBias = DDGIGetSurfaceBias(surfaceNormal, cameraDirection,  volume);
+
     float blendWeight = DDGIGetVolumeBlendWeight(worldPos, volume);
 
     vec3 irradiance = vec3(0.0);
@@ -376,7 +391,7 @@ vec3 getIrradiance(vec3 worldPos, vec3 normal, vec3 cameraDirection, ProbeVolume
     if (blendWeight > 0.0) {
         irradiance = DDGIGetVolumeIrradiance(
             worldPos,
-            normal,
+            sampleDirection,
             surfaceBias,
             gTextureArrays[pc.probeIrradianceHandle],
             gTextureArrays[pc.probeVisibilityHandle],
@@ -412,17 +427,32 @@ void main() {
     float viewDepth = -(cam.view * vec4(fragPos, 1.0)).z;
 
     vec3 N = octDecodeNormal(texture(gTextures[pc.GBufferNormalHandle], fragTexCoord).rg);
-    vec4 albedoSpec = texture(gTextures[pc.GBufferAlbedoHandle], fragTexCoord);
-    vec4 metallicRoughnessAO = texture(gTextures[pc.GBufferMaterialHandle], fragTexCoord);
+    if ((pc.lightingFlags & RENDER_SHOW_NORMALS) != 0u) {
+        outColor = vec4(N, 1.0);
+        return;
+    }
+    vec4 baseColorEmissive = texture(gTextures[pc.GBufferAlbedoHandle], fragTexCoord);
+    vec4 material = texture(gTextures[pc.GBufferMaterialHandle], fragTexCoord);
+    vec4 shadingModel = texture(gTextures[pc.GBufferShadingModelHandle], fragTexCoord);
 
-    vec3 albedo = albedoSpec.rgb;
-    float metallic = metallicRoughnessAO.r;
-    float roughness = metallicRoughnessAO.g;
-    float ao = metallicRoughnessAO.b;
-    uint shadingModelId = unpackShadingModel(metallicRoughnessAO.a);
-    
+    vec3 albedo = baseColorEmissive.rgb;
+    vec3 emissive = albedo * unpackEmissive(baseColorEmissive.a);
+    float metallic = material.r;
+    float roughness = material.g;
+    float ao = material.b;
+    float specular = unpackSpecular(material.a);
+    uint shadingModelId = unpackShadingModel(shadingModel.r);
+
     vec3 V = normalize(pc.cameraPos.xyz - fragPos);
-    
+
+#if DEBUG_DDGI_PROBE_GRID
+    {
+        vec2 debugOctUV = DDGIGetOctahedralCoordinates(N);
+        outColor = vec4(debugOctUV * 0.5 + 0.5, 0.0, 1.0);
+        return;
+    }
+#endif
+
     vec3 Lo = vec3(0.0);
     int debugCascadeIndex = -1;
 
@@ -486,7 +516,7 @@ void main() {
         }
 
 
-        vec3 brdf = evalBRDF(shadingModelId, N, V, lightDirWorld, albedo, metallic, roughness);
+        vec3 brdf = evalBRDF(shadingModelId, N, V, lightDirWorld, albedo, metallic, roughness, specular);
 
         Lo += brdf * lightColor * lightIntensity * attenuation * shadowFactor;
     }
@@ -496,10 +526,10 @@ void main() {
 
     if ((pc.lightingFlags & RENDER_SHOW_INDIRECT) != 0u) {
         if ((pc.lightingFlags & RENDER_USE_GLOBAL_ILLUMINATION) != 0u) {
-            vec3 irradiance = getIrradiance(fragPos, N, V, u_DDGI_Volume);
+            vec3 irradiance = getIrradiance(fragPos, N, N, V, u_DDGI_Volume);
 
             if ((pc.lightingFlags & RENDER_MODULATE_INDIRECT) != 0u) {
-                vec3 F0 = mix(vec3(0.04), albedo, metallic);
+                vec3 F0 = computeF0(albedo, metallic, specular);
                 vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
 
                 vec3 kD_indirect = (vec3(1.0) - F) * (1.0 - metallic);
@@ -510,7 +540,8 @@ void main() {
                 // glossy/rough range, sharp mirror reflections need a traced source. Divide by
                 // PI to recover an approximate incident radiance from the integrated irradiance.
                 vec3 R = reflect(-V, N);
-                vec3 prefilteredRadiance = getIrradiance(fragPos, R, V, u_DDGI_Volume) / PI;
+                vec3 Rd = getSpecularDominantDir(N, R, roughness);
+                vec3 prefilteredRadiance = getIrradiance(fragPos, N, Rd, V, u_DDGI_Volume) / PI;
                 indirectSpecular = prefilteredRadiance * F * ao;
             } else {
                 indirectDiffuse = irradiance;
@@ -520,7 +551,7 @@ void main() {
         }
     }
 
-    vec3 color = indirectDiffuse + indirectSpecular + Lo;
+    vec3 color = indirectDiffuse + indirectSpecular + Lo + emissive;
 
     // Apply Fog
     if (pc.fogColor.a > 0.5) {
@@ -540,10 +571,6 @@ void main() {
         color *= cascadeColorTint;
     }
 #endif
-
-    color *= exposure(1.0);
-    color = ACESFilm(color);
-    color = LinearToSRGB(color);
 
     outColor = vec4(color, 1.0);
 }

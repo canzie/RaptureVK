@@ -3,6 +3,7 @@
 
 #include "pipelines/GraphicsPipeline.h"
 #include "renderer/MDIBatch.h"
+#include "renderer/passes/RenderPass.h"
 #include "shaders/Shader.h"
 
 #include "asset_manager/AssetManager.h"
@@ -44,36 +45,35 @@ enum class GBufferFlags : uint32_t {
     HAS_HEIGHT_MAP = 8192u
 };
 
-class GBufferPass {
+class GBufferPass : public RenderPass {
   public:
     GBufferPass(float width, float height, uint32_t framesInFlight);
     ~GBufferPass();
 
     static FramebufferSpecification getFramebufferSpecification();
 
-    // Main entry point: records to internal secondary command buffer
-    // Returns the secondary command buffer for the caller to execute
-    CommandBuffer *recordSecondary(Scene &activeScene, Entity camera, uint32_t currentFrame,
-                                   const SecondaryBufferInheritance &inheritance, TerrainGenerator *terrain = nullptr);
+    CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
+    void onResize(uint32_t width, uint32_t height) override;
 
-    void beginDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
-    void endDynamicRendering(CommandBuffer *primaryCb, uint32_t currentFrame);
+    void endRendering(CommandBuffer *primaryCb) override;
 
-    // Getters for current frame's GBuffer textures
-    std::shared_ptr<Texture> getNormalTexture() const { return m_normalTextures[m_currentFrame]; }
-    std::shared_ptr<Texture> getAlbedoTexture() const { return m_albedoSpecTextures[m_currentFrame]; }
-    std::shared_ptr<Texture> getMaterialTexture() const { return m_materialTextures[m_currentFrame]; }
-    std::shared_ptr<Texture> getDepthTexture() const { return m_depthStencilTextures[m_currentFrame]; }
+    Texture *getNormalTexture(uint32_t frameInFlight) const { return m_normalTextures[frameInFlight].get(); }
+    Texture *getAlbedoTexture(uint32_t frameInFlight) const { return m_albedoSpecTextures[frameInFlight].get(); }
+    Texture *getMaterialTexture(uint32_t frameInFlight) const { return m_materialTextures[frameInFlight].get(); }
+    Texture *getShadingModelTexture(uint32_t frameInFlight) const { return m_shadingModelTextures[frameInFlight].get(); }
+    Texture *getDepthTexture(uint32_t frameInFlight) const { return m_depthStencilTextures[frameInFlight].get(); }
 
-    std::vector<std::shared_ptr<Texture>> getNormalTextures() const { return m_normalTextures; }
-    std::vector<std::shared_ptr<Texture>> getAlbedoSpecTextures() const { return m_albedoSpecTextures; }
-    std::vector<std::shared_ptr<Texture>> getMaterialTextures() const { return m_materialTextures; }
-    std::vector<std::shared_ptr<Texture>> getDepthTextures() const { return m_depthStencilTextures; }
+    /**
+     * @brief Non-owning views of the per-frame depth textures, for passes that share this depth buffer
+     * @return One pointer per frame in flight
+     */
+    std::vector<Texture *> getDepthTextures() const;
 
     // Getters for bindless texture indices for current frame
     uint32_t getNormalTextureIndex() const { return m_normalTextureIndices[m_currentFrame]; }
     uint32_t getAlbedoTextureIndex() const { return m_albedoTextureIndices[m_currentFrame]; }
     uint32_t getMaterialTextureIndex() const { return m_materialTextureIndices[m_currentFrame]; }
+    uint32_t getShadingModelTextureIndex() const { return m_shadingModelTextureIndices[m_currentFrame]; }
     uint32_t getDepthTextureIndex() const { return m_depthTextureIndices[m_currentFrame]; }
 
     // Getters for all bindless texture indices
@@ -90,15 +90,16 @@ class GBufferPass {
     void setupCommandResources();
 
     // Record terrain rendering only
-    void recordTerrainCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera,
-                               TerrainGenerator &terrain, uint32_t currentFrame);
+    void recordTerrainCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera, TerrainGenerator &terrain,
+                               uint32_t currentFrame);
 
     // Record entity rendering only
     void recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera, uint32_t currentFrame);
 
-    void setupDynamicRenderingMemoryBarriers(CommandBuffer *primaryCb, uint32_t currentFrame);
-
     void transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame);
+
+  protected:
+    void updateAttachments(const RenderPassContext &context) override;
 
   private:
     const RenderContext *m_rc = nullptr;
@@ -112,15 +113,17 @@ class GBufferPass {
     VkDevice m_device;
 
     // Multiple textures for each frame in flight
-    std::vector<std::shared_ptr<Texture>> m_normalTextures;
-    std::vector<std::shared_ptr<Texture>> m_albedoSpecTextures;
-    std::vector<std::shared_ptr<Texture>> m_materialTextures;
-    std::vector<std::shared_ptr<Texture>> m_depthStencilTextures;
+    std::vector<std::unique_ptr<Texture>> m_normalTextures;
+    std::vector<std::unique_ptr<Texture>> m_albedoSpecTextures;
+    std::vector<std::unique_ptr<Texture>> m_materialTextures;
+    std::vector<std::unique_ptr<Texture>> m_shadingModelTextures;
+    std::vector<std::unique_ptr<Texture>> m_depthStencilTextures;
 
     // Bindless texture indices for each frame in flight
     std::vector<uint32_t> m_normalTextureIndices;
     std::vector<uint32_t> m_albedoTextureIndices;
     std::vector<uint32_t> m_materialTextureIndices;
+    std::vector<uint32_t> m_shadingModelTextureIndices;
     std::vector<uint32_t> m_depthTextureIndices;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
@@ -134,9 +137,6 @@ class GBufferPass {
     // MDI batching system - one set per frame in flight
     std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
     std::vector<std::unique_ptr<MDIBatchMap>> m_selectedEntityBatchMaps; // Separate batches for selected entities
-
-    VkRenderingAttachmentInfo m_colorAttachmentInfo[3];
-    VkRenderingAttachmentInfo m_depthAttachmentInfo;
 
     std::shared_ptr<Entity> m_selectedEntity;
     size_t m_entitySelectedListenerId;

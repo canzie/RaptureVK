@@ -82,8 +82,7 @@ void CascadedShadowMap::enableDebugTexture(bool enabled)
     m_debugFlattenEnabled = enabled;
 
     if (enabled && m_flattenedShadowTexture == nullptr) {
-        m_flattenedShadowTexture =
-            TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
+        m_flattenedShadowTexture = TextureFlattener::createFlattenTexture(m_shadowTextureArray, "[CSM] Flattened Shadow Map Array");
     }
 }
 
@@ -277,8 +276,7 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     return cascadeData;
 }
 
-CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame,
-                                                  TerrainGenerator *terrain)
+CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain)
 {
     RAPTURE_PROFILE_FUNCTION();
 

@@ -23,9 +23,18 @@ class Texture;
 } // namespace Rapture
 
 enum ViewportLightingMode {
-    VLM_UNLIT,
-    VLM_FULL_GI,
-    VLM_ONLY_IRRADIANCE,
+    VLM_LIT,
+    VLM_RAW_IRRADIANCE,
+    VLM_INDIRECT_LIGHTING,
+    VLM_DIRECT_LIGHTING,
+    VLM_SHADOW_CASCADES,
+    VLM_NORMALS,
+    VLM_METTALIC,
+    VLM_ROUGHNESS,
+    VLM_AO,
+    VLM_ALBEDO,
+    VLM_MATERIAL_ID,
+    VLM_DEPTH,
     VLM_COUNT
 };
 

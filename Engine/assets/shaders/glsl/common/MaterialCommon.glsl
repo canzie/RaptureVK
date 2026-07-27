@@ -100,6 +100,11 @@ float matFlagMul(uint flags, uint flag) {
     return float((flags & flag) != 0u);
 }
 
+float LinearRGBToLuminance(vec3 rgb) {
+    const vec3 LuminanceWeights = vec3(0.2126, 0.7152, 0.0722);
+    return dot(rgb, LuminanceWeights);
+}
+
 vec2 signNotZero(vec2 v) {
     return vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
 }
