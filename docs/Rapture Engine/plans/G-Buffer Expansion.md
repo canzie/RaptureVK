@@ -266,11 +266,23 @@ Owned by this plan because they are frame-lifetime resources, consumed by
 
 | Resource | Format | Notes |
 |---|---|---|
-| `sceneColorHDR` | `RGBA16F` | linear radiance, the output of §8. `R11G11B10F` is the later optimisation (no alpha needed) |
-| `historyColor` + mips | `RGBA16F` | previous frame's `sceneColorHDR`, **with a mip chain** for filtered importance sampling. Needs a downsample compute pass |
-| `historyDepth` | `R32F` | previous frame's *linear* view depth, for disocclusion rejection |
+| `sceneColorHDR` | `RGBA16F` | ✅ linear radiance, the output of §8. `R11G11B10F` is the later optimisation (no alpha needed) |
+| `historyColor` + mips | `RGBA16F` | **not a new resource** — see below. Needs only a mip chain and a downsample compute pass |
+| `historyDepth` | `R32F` | **not a new resource** — Hi-Z mip 0 already is linear view depth |
 | `hiZ` pyramid | `R32F` | min-Z pyramid over linear view depth, for the SSR hierarchical trace |
 | `ssrHistory` | `RGBA16F` | previous frame's resolved SSR, pre-FG, for temporal accumulation |
+
+**Two of these turned out to already exist**, which shrinks this step considerably:
+
+- `m_sceneColorHdrTextures` is allocated per frame-in-flight and nothing clears it, so the previous
+  slot *is* last frame's lit HDR image. "History colour" is `(frameInFlight + N - 1) % N`, free. All
+  that is missing is `mipLevels` on the spec plus the downsample pass.
+- The Hi-Z pyramid's **mip 0 is full-res linear view depth** by construction. Allocated per
+  frame-in-flight, the previous slot serves the disocclusion check, so `historyDepth` never needs its
+  own allocation.
+
+That leaves `hiZ` and `ssrHistory` as the only genuinely new resources, and `ssrHistory` is not needed
+until SSR step 8.
 
 ### Format gap
 
@@ -398,14 +410,28 @@ What the conversion established, and what to carry forward:
   shadows flickered under camera motion and looked correct when still. It survived unnoticed before
   the conversion only because `LightingPass` read those getters from inside its own job, racing the
   G-buffer job and usually winning. **Cross-pass getters take the frame index as a parameter.**
-- `beginRendering` only barriers `CLEAR` / `DONT_CARE` attachments; `LOAD` attachments are assumed
-  already in the correct layout. Retired by Texture layout tracking (TODO at `Texture.h`, deferred
-  because it touches every transition call site in the engine).
+- ✅ `Texture` now tracks its own layout. `getImageMemoryBarrier` records the new layout, and a
+  3-argument overload builds the barrier straight out of the tracked one, so every existing call site
+  keeps working while feeding the tracking. Sound only while submission stays linear and single-queue.
+
+  This retired the `LOAD` attachment gap: `beginRendering` now barriers those too, from the tracked
+  layout. It also surfaced a real bug — `SkyboxPass` hand-rolled a depth barrier declaring
+  `oldLayout = DEPTH_STENCIL_ATTACHMENT_OPTIMAL`, but `GBufferPass::endRendering` leaves depth in
+  `SHADER_READ_ONLY_OPTIMAL` for the lighting pass to sample. That barrier had been lying about the
+  layout. Its manual barriers are deleted; the base does it correctly.
+
+  Note barriers are emitted **even when the layout does not change**, because they still carry the
+  dependency on whichever pass last wrote the attachment — that is what `SkyboxPass`'s colour barrier
+  was actually for.
 - `Texture::getFormat()` was fixed to honour `m_spec.srgb` — it defaulted to `true`, so non-sRGB
   `RGBA8` targets such as RT2 reported `R8G8B8A8_SRGB` while the image was `UNORM`. Harmless before,
   because only depth textures queried it; wrong the moment `getInheritance` queries colour targets.
-- No `ComputePass` sibling yet. Add it when the Hi-Z pass lands and its barrier shape is known from
-  a real caller.
+- ✅ `ComputePass` is the sibling for work with no attachments, same template method: the base owns
+  the barrier envelope, the subclass declares its resources and records the dispatch. A
+  `ComputeResource` carries the texture, its access (which picks `GENERAL` for storage vs
+  `SHADER_READ_ONLY_OPTIMAL` for sampled), its **declared** current layout, and a `readableAfter`
+  flag. Two conservative bits, both downstream of the missing `Texture` layout tracking: the current
+  layout is declared rather than known, and the surrounding stages are `ALL_COMMANDS`.
 - `endRendering` is only `vkCmdEndRendering`. `GBufferPass` overrides it to also transition its
   targets to `SHADER_READ_ONLY_OPTIMAL` so the lighting pass can sample them. Promote that into a
   declared "readable after" flag on `RenderPassAttachment` only if a second pass needs it.
@@ -507,8 +533,10 @@ What the conversion established, and what to carry forward:
    Now shared via `common/CameraCommon.glsl`. Two of those shaders (`SkyboxPass`, `StencilBorderPass`)
    loaded precompiled `SPIRV/*.spv`, where a `.glsl` edit would simply not apply; both were switched
    to the runtime-compiled `.glsl` path their sources already matched.
-7. **History resources** (§9): `historyColor` + mip chain, `historyDepth`. This is the handoff
-   point to [[Stochastic Screen-Space Reflections]].
+7. **History resources** (§9) — mostly already satisfied. What remains is a mip chain on
+   `sceneColorHdr` plus its downsample pass; `historyDepth` falls out of the Hi-Z build. This is the
+   handoff point to [[Stochastic Screen-Space Reflections]], and it does **not** block starting that
+   plan: its steps 1-3 need none of it.
 8. *(later, demand-driven)* per-object motion vectors into RT4; coat / fuzz / anisotropy models;
    split diffuse/specular lighting targets for SSS.
 

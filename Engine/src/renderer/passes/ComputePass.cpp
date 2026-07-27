@@ -64,18 +64,19 @@ void ComputePass::execute(const RenderPassContext &context, CommandBuffer *comma
         }
 
         const VkImageLayout target = s_dispatchLayout(resource.access);
-        if (resource.currentLayout != VK_IMAGE_LAYOUT_UNDEFINED) {
-            // TODO: conservative until Texture tracks its own layout and producing stage, see the
-            // TODO on Texture::getImageMemoryBarrier
+        const VkImageLayout current =
+            resource.discardContents ? VK_IMAGE_LAYOUT_UNDEFINED : resource.texture->getCurrentLayout();
+
+        if (current != VK_IMAGE_LAYOUT_UNDEFINED) {
+            // TODO: conservative until Texture also tracks the stage that last wrote it
             srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
         }
 
-        if (resource.currentLayout == target) {
+        if (current == target) {
             continue;
         }
 
-        barriers.push_back(resource.texture->getImageMemoryBarrier(resource.currentLayout, target, 0,
-                                                                   s_dispatchAccess(resource.access)));
+        barriers.push_back(resource.texture->getImageMemoryBarrier(current, target, 0, s_dispatchAccess(resource.access)));
     }
 
     if (!barriers.empty()) {
@@ -91,8 +92,7 @@ void ComputePass::execute(const RenderPassContext &context, CommandBuffer *comma
             continue;
         }
 
-        barriers.push_back(resource.texture->getImageMemoryBarrier(s_dispatchLayout(resource.access),
-                                                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        barriers.push_back(resource.texture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                                    s_dispatchAccess(resource.access), VK_ACCESS_SHADER_READ_BIT));
     }
 

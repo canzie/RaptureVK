@@ -178,8 +178,12 @@ void main() {
 
     vec3 color = s_scatter(cameraPos, viewDir, normalize(pc.sunDirection), betaR, betaM, pc.g, pc.eSun);
 
-    // Tone mapping
+#ifndef OUTPUT_CUBEMAP
+    // The flat preview is displayed as-is, so it is the only path that tone maps. The cubemap is
+    // radiance: the skybox pass, the DDGI miss ray and the IBL bake all consume it linearly, and the
+    // composite pass tone maps once at the end.
     color = 1.0 - exp(-color);
+#endif
 
 #ifdef OUTPUT_CUBEMAP
     imageStore(outputTexture, ivec3(texel, face), vec4(color, 1.0));

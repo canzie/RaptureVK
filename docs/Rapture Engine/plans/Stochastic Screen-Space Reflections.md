@@ -6,8 +6,9 @@ Implementation plan for SSR following Stachowiak & Uludag, *Stochastic Screen-Sp
 (SIGGRAPH 2015 Advances in Real-Time Rendering). Covers the roughness range the DDGI field cannot:
 the field handles rough/glossy for free, this handles the sharp end.
 
-**Prerequisite: [[G-Buffer Expansion]] steps 1-6 must land first.** This plan assumes a linear HDR
-scene colour target, motion vectors, a mipped history colour buffer, and `R32F`.
+**Prerequisite: [[G-Buffer Expansion]] steps 1-6 — all landed.** This plan assumes a linear HDR scene
+colour target, motion vectors, a mipped history colour buffer, and `R32F`. The mip chain is the one
+piece outstanding, and it is not needed until step 4 below.
 
 Zero-assumption: current-state claims are cited to source.
 
@@ -169,16 +170,26 @@ leave the DDGI volume.
 
 ---
 
-## 4. The BRDF LUT is already built but not wired
+## 4. The BRDF LUT — **wired**
 
-`ImageBasedLighting` (`Engine/src/renderer/ImageBasedLighting.h`) already bakes a split-sum BRDF
-integration LUT alongside the irradiance and prefiltered cubes, and exposes
-`getBrdfLutBindlessIndex()`. It is constructed at `Engine/src/components/systems/Environment.cpp:122`
-and **never reaches the lighting shader** — `DeferredLighting.fs.glsl` contains no reference to it
-and uses `fresnelSchlickRoughness` (`common/BRDF.glsl:18`) alone for the indirect specular weight.
+`ImageBasedLighting` (`Engine/src/renderer/ImageBasedLighting.h`) bakes a split-sum BRDF integration
+LUT alongside the irradiance and prefiltered cubes and exposes `getBrdfLutBindlessIndex()`. It used to
+never reach the lighting shader, which relied on `fresnelSchlickRoughness` (`common/BRDF.glsl:18`)
+alone for the indirect specular weight.
 
-Wiring it up gives the `FG` term this technique needs, and independently fixes ambient specular
-energy. Cheap, do it early.
+`DeferredLighting.fs.glsl` now samples it at `(NdotV, roughness)` and applies `F0 * a + b`. Because the
+LUT integrates the **full** GGX lobe including the geometry/masking term that the Fresnel-only
+approximation omits, rough metals get dimmer — the previous behaviour was over-energetic. Smooth
+surfaces are close to unchanged.
+
+`getBrdfLutBindlessIndex()` returns 0 before the bake completes and the shader samples it
+unconditionally, so the first frames of a scene read whatever occupies bindless slot 0.
+
+This is the same `FG` term applied after the temporal pass (§3.5), so it is shared, not duplicated.
+
+**Push constant budget:** `LightingPushConstants` reached exactly 128 bytes — the guaranteed limit —
+before fog was removed to make room. It now sits at 104. The next few handles fit; after that they
+belong in a UBO rather than push constants.
 
 ---
 
@@ -212,9 +223,12 @@ composite point, and both need the same prerequisites (motion vectors, temporal,
 
 ## 7. Build order
 
-1. **Wire the BRDF LUT** into `DeferredLighting.fs.glsl` (§4). Independent, cheap, immediately
+1. ✅ **Wire the BRDF LUT** into `DeferredLighting.fs.glsl` (§4). Independent, cheap, immediately
    improves ambient specular.
-2. **Hi-Z pyramid** build pass (§3.1). Verify by visualising mip levels.
+2. **Hi-Z pyramid** build pass (§3.1). Verify by visualising mip levels. The `ComputePass` base it
+   builds on now exists; this is its first caller, so expect the resource declaration to need
+   adjusting once a real dispatch exercises it. Allocate it **per frame-in-flight** — mip 0 is the
+   linear view depth the temporal pass needs from the previous frame.
 3. **Trace pass, half-res, linear march only** — no Hi-Z path, no bias, no importance sampling
    (pure mirror ray). Output hit UV. Debug-view it directly; this proves the marching and the
    world-position reconstruction.

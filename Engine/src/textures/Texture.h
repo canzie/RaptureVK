@@ -132,10 +132,39 @@ class Texture {
 
     uint32_t getBindlessIndex();
 
-    // TODO: Texture does not track its own current layout, so every caller has to pass oldLayout and
-    // get it right. Tracking it here would let barriers be generated from (texture, desired layout)
-    // alone, which is what RenderPass::beginRendering needs to handle LOAD attachments. Only sound
-    // while submission stays linear and single-queue.
+    /**
+     * @brief The layout the texture was last transitioned into
+     *
+     * Tracked as commands are recorded, so it is only sound while submission stays linear and
+     * single-queue, and while a texture is not transitioned from two threads at once.
+     * @return The tracked layout, UNDEFINED before the first transition
+     */
+    VkImageLayout getCurrentLayout() const { return m_currentLayout; }
+
+    /**
+     * @brief Records a layout the image was put into by something that did not go through Texture
+     * @param layout The layout the image is now in
+     */
+    void setCurrentLayout(VkImageLayout layout) { m_currentLayout = layout; }
+
+    /**
+     * @brief Builds a barrier out of the tracked layout, and records the new one
+     * @param newLayout Layout to transition into
+     * @param srcAccessMask Access to make available
+     * @param dstAccessMask Access to make visible
+     * @return The barrier, for the caller to submit
+     */
+    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout newLayout, VkAccessFlags srcAccessMask,
+                                               VkAccessFlags dstAccessMask);
+
+    /**
+     * @brief Builds a barrier out of an explicit old layout, and records the new one
+     * @param oldLayout Layout the image is assumed to be in
+     * @param newLayout Layout to transition into
+     * @param srcAccessMask Access to make available
+     * @param dstAccessMask Access to make visible
+     * @return The barrier, for the caller to submit
+     */
     VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask,
                                                VkAccessFlags dstAccessMask);
 
@@ -187,6 +216,7 @@ class Texture {
 
     std::unique_ptr<Sampler> m_sampler;
     VkImage m_image = VK_NULL_HANDLE;
+    VkImageLayout m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageView m_imageView = VK_NULL_HANDLE;
     VkImageView m_imageViewStencilOnly = VK_NULL_HANDLE;
     VkImageView m_imageViewDepthOnly = VK_NULL_HANDLE;

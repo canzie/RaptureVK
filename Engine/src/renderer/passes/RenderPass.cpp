@@ -82,6 +82,21 @@ static VkRenderingAttachmentInfo s_buildStencilAttachmentInfo(const RenderPassAt
     return info;
 }
 
+// The writes a layout implies, so a barrier out of it makes them available
+static VkAccessFlags s_writeAccessForLayout(VkImageLayout layout)
+{
+    switch (layout) {
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    case VK_IMAGE_LAYOUT_GENERAL:
+        return VK_ACCESS_SHADER_WRITE_BIT;
+    default:
+        return 0;
+    }
+}
+
 static void s_appendTransitionBarrier(std::vector<VkImageMemoryBarrier> &barriers, const RenderPassAttachment &attachment,
                                       VkImageLayout newLayout, VkAccessFlags dstAccessMask)
 {
@@ -89,14 +104,15 @@ static void s_appendTransitionBarrier(std::vector<VkImageMemoryBarrier> &barrier
         return;
     }
 
-    if (attachment.loadOp == RenderPassAttachmentLoadOp::LOAD) {
-        // TODO: Texture does not track its own layout yet, so a LOAD attachment cannot be transitioned
-        // from its actual current layout here. Assumed to already be in the correct layout until
-        // per-texture layout tracking exists.
-        return;
-    }
+    // A cleared or discarded attachment has nothing worth preserving, so it transitions from
+    // UNDEFINED. A LOAD attachment keeps its contents and so comes from the layout it tracks.
+    const VkImageLayout oldLayout =
+        attachment.loadOp == RenderPassAttachmentLoadOp::LOAD ? attachment.texture->getCurrentLayout() : VK_IMAGE_LAYOUT_UNDEFINED;
 
-    barriers.push_back(attachment.texture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, newLayout, 0, dstAccessMask));
+    // Emitted even when the layout does not change, since it still carries the dependency on
+    // whichever pass last wrote the attachment
+    barriers.push_back(
+        attachment.texture->getImageMemoryBarrier(oldLayout, newLayout, s_writeAccessForLayout(oldLayout), dstAccessMask));
 }
 
 const RenderPassAttachments &RenderPass::getAttachments(const RenderPassContext &context)
@@ -150,8 +166,19 @@ void RenderPass::beginRendering(const RenderPassContext &context, CommandBuffer 
                                   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
     }
 
+    // An attachment coming from a real layout was written by an earlier pass, so the barrier has to
+    // wait on it. Nothing here knows which stage that was.
+    // TODO: narrow once Texture also tracks the stage that last wrote each image
+    VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    for (const VkImageMemoryBarrier &barrier : barriers) {
+        if (barrier.oldLayout != VK_IMAGE_LAYOUT_UNDEFINED) {
+            srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            break;
+        }
+    }
+
     if (!barriers.empty()) {
-        vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(), srcStage,
                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0,
                              nullptr, 0, nullptr, static_cast<uint32_t>(barriers.size()), barriers.data());
     }

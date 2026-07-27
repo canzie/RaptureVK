@@ -576,9 +576,17 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
     }
 }
 
+VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout newLayout, VkAccessFlags srcAccessMask,
+                                                    VkAccessFlags dstAccessMask)
+{
+    return getImageMemoryBarrier(m_currentLayout, newLayout, srcAccessMask, dstAccessMask);
+}
+
 VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask,
                                                     VkAccessFlags dstAccessMask)
 {
+    m_currentLayout = newLayout;
+
     VkImageMemoryBarrier barrier{};
     // Image layout transitions for dynamic rendering
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1235,6 +1243,8 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
         return;
     }
 
+    m_currentLayout = newLayout;
+
     auto &app = Application::getInstance();
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
     auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
@@ -1249,6 +1259,8 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
 void Texture::recordTransitionImageLayout(VkCommandBuffer cmd, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
+    m_currentLayout = newLayout;
+
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;

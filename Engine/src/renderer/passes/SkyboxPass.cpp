@@ -14,6 +14,7 @@ struct SkyboxPushConstants {
     uint32_t cameraSSBOIndex;
     uint32_t cameraSlotIndex;
     uint32_t skyboxTextureIndex;
+    float skyIntensity;
 };
 
 SkyboxPass::SkyboxPass(std::vector<Texture *> depthTextures, VkFormat colorFormat)
@@ -112,6 +113,7 @@ CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const Second
     pushConstants.cameraSlotIndex =
         (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
     pushConstants.skyboxTextureIndex = m_skyboxTexture->getBindlessIndex();
+    pushConstants.skyIntensity = m_skyIntensity;
 
     VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
@@ -287,60 +289,6 @@ void SkyboxPass::onResize(uint32_t width, uint32_t height)
     // TODO: see GBufferPass::onResize, passes are destroyed and rebuilt on resize today
     m_width = static_cast<float>(width);
     m_height = static_cast<float>(height);
-}
-
-// Both attachments are loaded, which the base skips, so the sync barriers between this pass and the
-// one that filled them are issued here
-void SkyboxPass::beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb)
-{
-    setupDynamicRenderingMemoryBarriers(primaryCb, context.targets->sceneColorHdr->getImage(),
-                                        m_depthTextures[context.frameInFlight]->getImage());
-
-    RenderPass::beginRendering(context, primaryCb);
-}
-
-void SkyboxPass::setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, VkImage depthImage)
-{
-    if (!m_depthTextures.empty() && m_depthTextures[0]) {
-        VkImageMemoryBarrier barriers[2];
-
-        // Barrier for color attachment (load previous pass results)
-        barriers[0] = {};
-        barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        barriers[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        barriers[0].image = targetImage;
-        barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barriers[0].subresourceRange.baseMipLevel = 0;
-        barriers[0].subresourceRange.levelCount = 1;
-        barriers[0].subresourceRange.baseArrayLayer = 0;
-        barriers[0].subresourceRange.layerCount = 1;
-        barriers[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        barriers[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-        // Barrier for depth attachment (synchronize access from previous pass)
-        barriers[1] = {};
-        barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barriers[1].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        barriers[1].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        barriers[1].image = depthImage;
-        barriers[1].subresourceRange.aspectMask = getImageAspectFlags(m_depthTextures[0]->getSpecification().format);
-        barriers[1].subresourceRange.baseMipLevel = 0;
-        barriers[1].subresourceRange.levelCount = 1;
-        barriers[1].subresourceRange.baseArrayLayer = 0;
-        barriers[1].subresourceRange.layerCount = 1;
-        barriers[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        barriers[1].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-
-        vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(),
-                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0,
-                             nullptr, 0, nullptr, 2, barriers);
-    }
 }
 
 } // namespace Rapture

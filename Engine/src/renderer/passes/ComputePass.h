@@ -28,9 +28,9 @@ struct ComputeResource {
     Texture *texture = nullptr;
     ComputeResourceAccess access = ComputeResourceAccess::READ;
 
-    /// The layout the texture is in when the pass begins. Texture does not track its own layout, so
-    /// the pass declares it. UNDEFINED discards the contents.
-    VkImageLayout currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    /// Discard the contents instead of transitioning from the layout the texture tracks, for an
+    /// output that is fully overwritten
+    bool discardContents = false;
 
     /// Transition to SHADER_READ_ONLY_OPTIMAL after the dispatch, for a consumer that samples it
     bool readableAfter = false;

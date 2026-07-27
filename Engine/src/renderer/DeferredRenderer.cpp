@@ -319,12 +319,13 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_skyboxPass->hasActiveSkybox()) {
-        Entity environment = activeScene.environmentEntity();
-        if (environment.hasComponent<SkyboxComponent>()) {
-            auto &skyboxComp = environment.getComponent<SkyboxComponent>();
+    Entity environment = activeScene.environmentEntity();
+    if (environment.hasComponent<SkyboxComponent>()) {
+        auto &skyboxComp = environment.getComponent<SkyboxComponent>();
+        if (!m_skyboxPass->hasActiveSkybox()) {
             m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture.get());
         }
+        m_skyboxPass->setSkyIntensity(skyboxComp.skyIntensity);
     }
 
     if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {

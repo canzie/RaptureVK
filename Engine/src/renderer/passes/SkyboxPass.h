@@ -32,21 +32,23 @@ class SkyboxPass : public RenderPass {
     CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
     void onResize(uint32_t width, uint32_t height) override;
 
-    void beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb) override;
-
   protected:
     void updateAttachments(const RenderPassContext &context) override;
 
   public:
     void setSkyboxTexture(Texture *skyboxTexture);
 
+    /**
+     * @brief Scales the sampled sky radiance, matching what the DDGI miss ray applies
+     * @param intensity The multiplier
+     */
+    void setSkyIntensity(float intensity) { m_skyIntensity = intensity; }
+
     bool hasActiveSkybox() const { return m_skyboxTexture != nullptr; }
 
   private:
     void createPipeline();
     void createSkyboxGeometry();
-
-    void setupDynamicRenderingMemoryBarriers(CommandBuffer *commandBuffer, VkImage targetImage, VkImage depthImage);
 
   private:
     const RenderContext *m_rc = nullptr;
@@ -58,6 +60,7 @@ class SkyboxPass : public RenderPass {
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     Texture *m_skyboxTexture;
+    float m_skyIntensity = 1.0f;
     std::vector<Texture *> m_depthTextures;
     std::shared_ptr<VertexBuffer> m_skyboxVertexBuffer;
     std::shared_ptr<IndexBuffer> m_skyboxIndexBuffer;
