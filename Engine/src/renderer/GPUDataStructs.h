@@ -33,6 +33,7 @@ struct alignas(16) CameraGPUData {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 projection;
     alignas(16) glm::mat4 invViewProj;
+    alignas(16) glm::mat4 prevViewProj;
 };
 
 #define MAX_CASCADES 4u

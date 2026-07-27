@@ -233,6 +233,7 @@ void ViewportPanel::buildRenderMenu()
     items.push_back(ViewportContextMenuRID::create("Indirect Lighting", &m_lightingModeGroup, VLM_INDIRECT_LIGHTING));
     items.push_back(ViewportContextMenuRID::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
     items.push_back(ViewportContextMenuRID::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
+    items.push_back(ViewportContextMenuRID::create("Show Motion Vectors", &m_lightingModeGroup, VLM_MOTION));
     m_renderMenu->setItems(std::move(items));
 }
 
@@ -245,6 +246,7 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
     auto &settings = viewport->renderSettings();
 
     settings.setFlag(Rapture::RENDER_SHOW_NORMALS, false);
+    settings.setFlag(Rapture::RENDER_SHOW_MOTION, false);
     switch (mode) {
     case VLM_DIRECT_LIGHTING:
         settings.setFlag(Rapture::RENDER_SHOW_DIRECT, true);
@@ -264,6 +266,9 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
         break;
     case VLM_NORMALS:
         settings.setFlag(Rapture::RENDER_SHOW_NORMALS, true);
+        break;
+    case VLM_MOTION:
+        settings.setFlag(Rapture::RENDER_SHOW_MOTION, true);
         break;
     case VLM_LIT:
     default:

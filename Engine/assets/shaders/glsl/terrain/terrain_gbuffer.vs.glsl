@@ -2,6 +2,7 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
+#include "common/CameraCommon.glsl"
 #include "terrain/terrain_common.glsl"
 
 // No vertex attributes - position generated from gl_VertexIndex
@@ -11,16 +12,6 @@ layout(location = 0) out vec4 outFragPosDepth;
 layout(location = 3) out flat uint outChunkIndex;
 layout(location = 4) out flat uint outLOD;
 layout(location = 5) out float outNormalizedHeight;
-
-struct CameraGPUData {
-    mat4 view;
-    mat4 proj;
-    mat4 invViewProj;
-};
-
-layout(set = 0, binding = 0) readonly buffer CameraDataSSBO {
-    CameraGPUData cameras[];
-} u_cameraSSBO[];
 
 layout(set = 3, binding = 1) readonly buffer TerrainChunkBuffer {
     TerrainChunkData chunks[];

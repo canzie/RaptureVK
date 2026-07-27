@@ -59,7 +59,7 @@ void TerrainGenerator::init(const TerrainConfig &config)
     m_culler = std::make_unique<TerrainCuller>(m_chunkDataBuffer, m_chunkCount, m_config.heightScale, 64, vc.getVmaAllocator());
 
     std::vector<uint32_t> allLODs = {0, 1, 2, 3};
-    uint32_t framesInFlight = Application::getInstance().getMainWindow().getSwapChain()->getImageCount();
+    uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
     m_cullBuffers.resize(framesInFlight);
     for (auto &buffers : m_cullBuffers) {
         buffers = m_culler->createBuffers(allLODs);

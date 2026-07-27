@@ -4,6 +4,8 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_nonuniform_qualifier : require
 
+#include "common/CameraCommon.glsl"
+
 layout(location = 0) in vec3 inPosition;
 
 layout(location = 0) out vec4 outColor;
@@ -17,16 +19,6 @@ layout(push_constant) uniform PushConstants {
     uint instanceDataSSBOIndex;
 } pc;
 
-
-struct CameraGPUData {
-    mat4 view;
-    mat4 proj;
-    mat4 invViewProj;
-};
-
-layout(set = 0, binding = 0) readonly buffer CameraDataSSBO {
-    CameraGPUData cameras[];
-} u_cameraSSBO[];
 
 // Bindless array of SSBOs
 layout(set = 3, binding = 1) readonly buffer InstanceDataSSBO {

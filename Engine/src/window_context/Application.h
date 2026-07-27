@@ -52,7 +52,19 @@ class Application {
      * @brief App-wide frame-in-flight ring index, advanced once per main-loop iteration.
      * @return The slot every per-frame CPU->GPU resource should be indexed by.
      */
-    uint32_t getFrameInFlightIndex() const { return m_frameInFlightIndex; }
+    uint32_t getFrameInFlightIndex() const { return static_cast<uint32_t>(m_frameCount % m_framesInFlight); }
+
+    /**
+     * @brief The size of every per-frame-in-flight resource ring.
+     * @return The number of frames the renderer keeps in flight.
+     */
+    uint32_t getFramesInFlight() const { return m_framesInFlight; }
+
+    /**
+     * @brief Frames elapsed since startup, never wrapping.
+     * @return The frame number.
+     */
+    uint64_t getFrameCount() const { return m_frameCount; }
 
     static Application &getInstance() { return *s_instance; }
     static const RenderContext &getRenderContext() { return s_instance->m_vulkanContext->getRenderContext(); }
@@ -80,7 +92,8 @@ class Application {
 
     std::unique_ptr<ViewportManager> m_viewportManager;
 
-    uint32_t m_frameInFlightIndex = 0;
+    uint64_t m_frameCount = 0;
+    uint32_t m_framesInFlight = 1;
 
     Telemetry m_telemetry;
     float m_telemetryPollAccum = 0.0f;

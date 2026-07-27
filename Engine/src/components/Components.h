@@ -78,6 +78,8 @@ struct CameraComponent {
     bool isMainCamera = false;
     // slot into the SSBO where the camera metadata lives
     uint32_t renderDataSlot = UINT32_MAX;
+    // whether the slot holds matrices from a previous update, so prevViewProj can carry them
+    bool hasRenderData = false;
 
     CameraComponent(float fovy = 45.0f, float ar = 16.0f / 9.0f, float near_ = 0.1f, float far_ = 100.0f)
         : fov(fovy), aspectRatio(ar), nearPlane(near_), farPlane(far_)

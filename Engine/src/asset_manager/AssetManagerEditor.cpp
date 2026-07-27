@@ -562,7 +562,7 @@ AssetHandle AssetManagerEditor::findAssetByPath(const std::filesystem::path &pat
 
 void AssetManagerEditor::ensureDeferredFreeBuckets()
 {
-    uint32_t framesInFlight = Application::getInstance().getMainWindow().getSwapChain()->getImageCount();
+    uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
     size_t bucketCount = static_cast<size_t>(framesInFlight) + 1;
     if (m_deferredFrees.size() < bucketCount) {
         m_deferredFrees.resize(bucketCount);

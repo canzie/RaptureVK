@@ -2,6 +2,8 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
+#include "common/CameraCommon.glsl"
+
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
@@ -15,12 +17,6 @@ layout(location = 4) out vec3 outBitangent;
 layout(location = 5) out flat uint outFlags;
 layout(location = 6) out flat uint outMaterialIndex;
 
-struct CameraGPUData {
-    mat4 view;
-    mat4 proj;
-    mat4 invViewProj;
-};
-
 struct MeshGPUData {
     mat4 model;
     uint materialIndex;
@@ -33,9 +29,6 @@ struct ObjectInfo {
     uint materialIndex;
 };
 
-layout(set = 0, binding = 0) readonly buffer CameraDataSSBO {
-    CameraGPUData cameras[];
-} u_cameraSSBO[];
 
 layout(set = 0, binding = 6) readonly buffer BatchInfoBuffer {
     ObjectInfo objects[];

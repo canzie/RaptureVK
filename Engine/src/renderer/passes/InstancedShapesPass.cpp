@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "InstancedShapesPass.h"
+#include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "components/Components.h"
@@ -39,7 +40,10 @@ InstancedShapesPass::InstancedShapesPass(float width, float height, uint32_t fra
     auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/InstancedShapes.vs.glsl");
+    ShaderImportConfig shaderConfig;
+    shaderConfig.compileInfo.includePath = shaderPath / "glsl";
+
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/InstancedShapes.vs.glsl", shaderConfig);
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
     m_assets.push_back(std::move(asset));
 

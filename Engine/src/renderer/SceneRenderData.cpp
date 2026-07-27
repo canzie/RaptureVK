@@ -482,10 +482,17 @@ void SceneRenderData::updateCameras(uint32_t frameIndex)
 
         auto &data = partition.getSlotData(i);
 
+        // Carried from the values this slot still holds, so it lags exactly one update
+        const glm::mat4 previousViewProj = data.projection * data.view;
+
         data.view = camera->camera.getViewMatrix();
         data.projection = camera->camera.getProjectionMatrix();
         data.projection[1][1] *= -1;
         data.invViewProj = glm::inverse(data.projection * data.view);
+
+        // A slot that has never been updated holds a zero matrix, which would reproject to w = 0
+        data.prevViewProj = camera->hasRenderData ? previousViewProj : (data.projection * data.view);
+        camera->hasRenderData = true;
     }
 }
 

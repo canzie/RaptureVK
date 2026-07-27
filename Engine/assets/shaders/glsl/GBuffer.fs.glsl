@@ -2,6 +2,7 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
+#include "common/CameraCommon.glsl"
 #include "common/GBufferOutput.glsl"
 #include "generated/SurfaceGraphs.glsl"
 
@@ -36,8 +37,11 @@ void main() {
 
     SurfaceData surf = evalSurfaceGraph(mat.graphId, si, mat.graphDataOffset);
 
+    CameraGPUData cam = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex];
+
     GBufferSurface gs = defaultGBufferSurface();
     gs.normal = surf.normal;
+    gs.motion = cameraMotionUV(cam, inFragPosDepth.xyz);
     gs.baseColor = surf.albedo;
     gs.emissiveIntensity = surf.emissiveStrength * LinearRGBToLuminance(surf.emission.rgb);
     gs.metallic = surf.metallic;

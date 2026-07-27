@@ -24,8 +24,7 @@ Scene::Scene(const std::string &sceneName)
     m_config.sceneName = sceneName;
 
     auto &app = Application::getInstance();
-    uint32_t frameCount = app.getMainWindow().getSwapChain()->getImageCount();
-    m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, frameCount);
+    m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, app.getFramesInFlight());
 
     m_environment = std::make_unique<Environment>(createEntity("Environment"));
 
@@ -389,7 +388,7 @@ void Scene::buildTLAS()
 
 void Scene::ensureBLASFreeBuckets()
 {
-    uint32_t framesInFlight = Application::getInstance().getMainWindow().getSwapChain()->getImageCount();
+    uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
     size_t bucketCount = static_cast<size_t>(framesInFlight) + 1;
     if (m_blasFreeBuckets.size() < bucketCount) {
         m_blasFreeBuckets.resize(bucketCount);

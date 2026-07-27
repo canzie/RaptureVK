@@ -7,6 +7,7 @@
 #include "logging/TracyProfiler.h"
 #include "materials/Material.h"
 #include "utils/Timestep.h"
+#include "utils/rp_assert.h"
 
 #if defined(__linux__)
 #include <cstdlib>
@@ -42,7 +43,9 @@ Application::Application(int width, int height, const char *title) : m_running(t
     AssetManager::init(&m_telemetry);
 
     m_mainWindow->createSwapChain(*m_vulkanContext);
-    m_vulkanContext->initManagers(m_mainWindow->getSwapChain()->getImageCount());
+    m_framesInFlight = m_mainWindow->getSwapChain()->getImageCount();
+    RP_ASSERT(m_framesInFlight > 0, "the main window's swapchain reported no images");
+    m_vulkanContext->initManagers(m_framesInFlight);
     m_mainWindow->getSwapChain()->invalidate();
 
     TracyProfiler::init();
@@ -225,7 +228,7 @@ void Application::run()
 
         m_vulkanContext->getRenderContext().commandPoolManager->endFrame();
 
-        m_frameInFlightIndex = (m_frameInFlightIndex + 1) % m_mainWindow->getSwapChain()->getImageCount();
+        m_frameCount++;
 
         TracyProfiler::endFrame();
     }

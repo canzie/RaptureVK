@@ -1,6 +1,8 @@
 #include "renderer/passes/StencilBorderPass.h"
 
 #include "StencilBorderPass.h"
+#include "asset_manager/AssetImportConfig.h"
+#include "asset_manager/AssetManager.h"
 #include "components/Components.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
@@ -36,7 +38,10 @@ StencilBorderPass::StencilBorderPass(float width, float height, uint32_t framesI
 
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/StencilBorder.vs.spv");
+    ShaderImportConfig shaderConfig;
+    shaderConfig.compileInfo.includePath = shaderPath / "glsl";
+
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/StencilBorder.vs.glsl", shaderConfig);
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
     if (m_shader) m_shaderAssets.push_back(std::move(asset));
 

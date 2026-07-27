@@ -365,9 +365,15 @@ The three parts:
   plus `frameInFlight` / `imageIndex`). Replaces the divergent positional argument lists, where the
   same six values appear in a different order in every pass. `frameInFlight` is
   `Application::getFrameInFlightIndex()` — it selects per-frame-in-flight *resources* and wraps.
-  Temporal passes and the Halton sequence need a **monotonic** frame counter, which does not exist
-  yet; add it to `Application` alongside `m_frameInFlightIndex` when §13 step 6 lands. Do not
-  conflate the two.
+  Temporal work needs a **monotonic** counter instead: `Application::getFrameCount()` (`uint64_t`).
+  Do not conflate the two — the in-flight index wraps at 2-3, so a Halton sequence driven by it would
+  only ever visit 2-3 of its points.
+
+  `Application` now owns both, plus `getFramesInFlight()`, which is the single source for the ring
+  size. It is set once from the main window's swapchain image count at init — those two numbers were
+  always equal, but the value used to be fetched through five separate paths
+  (`app.getMainWindow().getSwapChain()->getImageCount()`) under the name "image count", which is what
+  made the history ping-pong look unsafe. It is not; it just read as if it were.
 - **`RenderPassTargets`** — the textures passes hand one another. `LightingPass` reads
   `context.targets->gbufferNormal` instead of holding a `GBufferPass *`, so passes stop depending on
   each other's concrete types.
@@ -484,7 +490,23 @@ What the conversion established, and what to carry forward:
      namespaces; shared headers use `_specular`, `_packed`, `_id`.
 5. **Shading-model switch** in the lighting pass with `SM_UNLIT` + `SM_OPENPBR_STANDARD` only —
    proves the dispatch works before any new model exists.
-6. **Camera-only motion vectors** (§7a) + camera jitter. No RT4 write yet.
+6. ✅ **Camera-only motion vectors** (§7a), written into RT0.zw.
+
+   The doc originally said to derive motion from depth in each consumer and leave the channels
+   unwritten. That was reasoned about a separate optional RT4; once the layout packed motion into RT0,
+   the channels are allocated and were being written as zero anyway, so writing real motion there
+   costs nothing and gives consumers one interface for both §7(a) and §7(b).
+
+   **Camera jitter is deliberately not part of this step.** SSR's stochastic sampling uses per-pixel
+   noise, not sub-pixel camera offsets — jitter is a TAA concern. When it lands, `prevViewProj` must
+   stay **unjittered** or reprojection picks up the jitter delta as false motion.
+
+   Prerequisite that turned out to matter more than the motion itself: `CameraGPUData` was
+   hand-redeclared in **six** shaders. Adding a field changes the SSBO stride, so any missed copy
+   silently reads garbage for every camera slot past 0 — no compile error, no validation warning.
+   Now shared via `common/CameraCommon.glsl`. Two of those shaders (`SkyboxPass`, `StencilBorderPass`)
+   loaded precompiled `SPIRV/*.spv`, where a `.glsl` edit would simply not apply; both were switched
+   to the runtime-compiled `.glsl` path their sources already matched.
 7. **History resources** (§9): `historyColor` + mip chain, `historyDepth`. This is the handoff
    point to [[Stochastic Screen-Space Reflections]].
 8. *(later, demand-driven)* per-object motion vectors into RT4; coat / fuzz / anisotropy models;

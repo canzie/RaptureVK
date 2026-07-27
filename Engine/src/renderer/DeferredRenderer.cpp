@@ -28,7 +28,7 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, const RendererCo
 
     if (m_config.enableAccelerationStructures) {
         m_rtInstanceData = std::make_unique<RtInstanceData>(m_renderContext);
-        m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(m_swapChain->getImageCount());
+        m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(Application::getInstance().getFramesInFlight());
     }
 
     recreateRenderPasses();
@@ -197,9 +197,9 @@ void DeferredRenderer::createRenderTarget()
     if (m_config.targetType == SceneRenderTarget::TargetType::OFFSCREEN) {
         // Create offscreen render target for Editor mode
         // Use BGRA8 SRGB format (matches typical swapchain format)
-        m_sceneRenderTarget =
-            std::make_unique<SceneRenderTarget>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height),
-                                                m_swapChain->getImageCount(), TextureFormat::RGBA16F, m_config.allowReadback);
+        m_sceneRenderTarget = std::make_unique<SceneRenderTarget>(
+            static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), Application::getInstance().getFramesInFlight(),
+            TextureFormat::RGBA16F, m_config.allowReadback);
         RP_CORE_INFO("Created OFFSCREEN render target for Editor mode");
     } else {
         // Create swapchain-backed render target for Standalone mode
@@ -219,7 +219,7 @@ void DeferredRenderer::createSceneColorTextures()
     spec.type = TextureType::TEXTURE2D;
     spec.srgb = false;
 
-    for (uint32_t i = 0; i < m_swapChain->getImageCount(); i++) {
+    for (uint32_t i = 0; i < Application::getInstance().getFramesInFlight(); i++) {
         m_sceneColorHdrTextures.push_back(std::make_unique<Texture>(spec));
     }
 }
@@ -261,15 +261,17 @@ void DeferredRenderer::recreateRenderPasses()
     createSceneColorTextures();
     VkFormat hdrFormat = m_sceneColorHdrTextures[0]->getFormat();
 
-    m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, m_swapChain->getImageCount());
+    const uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
+
+    m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, framesInFlight);
 
     m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_dynamicDiffuseGI.get(), hdrFormat);
 
-    m_stencilBorderPass = std::make_unique<StencilBorderPass>(m_width, m_height, m_swapChain->getImageCount(),
-                                                              m_gbufferPass->getDepthTextures(), hdrFormat);
+    m_stencilBorderPass =
+        std::make_unique<StencilBorderPass>(m_width, m_height, framesInFlight, m_gbufferPass->getDepthTextures(), hdrFormat);
 
-    m_instancedShapesPass = std::make_unique<InstancedShapesPass>(m_width, m_height, m_swapChain->getImageCount(),
-                                                                  m_gbufferPass->getDepthTextures(), hdrFormat);
+    m_instancedShapesPass =
+        std::make_unique<InstancedShapesPass>(m_width, m_height, framesInFlight, m_gbufferPass->getDepthTextures(), hdrFormat);
 
     m_skyboxPass = std::make_unique<SkyboxPass>(m_gbufferPass->getDepthTextures(), hdrFormat);
 

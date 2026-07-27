@@ -43,6 +43,7 @@ layout(set = 3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
 
 #include "ddgi/ProbeCommon.glsl"
 #include "ddgi/IrradianceCommon.glsl"
+#include "common/CameraCommon.glsl"
 #include "common/ShadingModels.glsl"
 #include "common/BRDF.glsl"
 #include "common/Tonemapping.glsl"
@@ -80,16 +81,6 @@ layout(std140, set = 0, binding = 5) uniform ProbeInfo {
 } u_probeInfo[];
 
 ProbeVolume u_DDGI_Volume;
-
-struct CameraGPUData {
-    mat4 view;
-    mat4 proj;
-    mat4 invViewProj;
-};
-
-layout(std430, set = 0, binding = 0) readonly buffer CameraDataSSBO {
-    CameraGPUData cameras[];
-} u_cameraSSBO[];
 
 vec2 signNotZero(vec2 v) {
     return vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
@@ -144,6 +135,7 @@ const uint RENDER_SHOW_DIRECT = 1u << 1;
 const uint RENDER_SHOW_INDIRECT = 1u << 2;
 const uint RENDER_MODULATE_INDIRECT = 1u << 3;
 const uint RENDER_SHOW_NORMALS = 1u << 5;
+const uint RENDER_SHOW_MOTION = 1u << 6;
 const uint RENDER_ALL = 0xFFFFFFFFu;
 
 
@@ -426,9 +418,21 @@ void main() {
     // View-space linear depth (positive into screen), matches the old gPositionDepth.a
     float viewDepth = -(cam.view * vec4(fragPos, 1.0)).z;
 
-    vec3 N = octDecodeNormal(texture(gTextures[pc.GBufferNormalHandle], fragTexCoord).rg);
+    vec4 normalMotion = texture(gTextures[pc.GBufferNormalHandle], fragTexCoord);
+
+    vec3 N = octDecodeNormal(normalMotion.rg);
     if ((pc.lightingFlags & RENDER_SHOW_NORMALS) != 0u) {
         outColor = vec4(N, 1.0);
+        return;
+    }
+
+    if ((pc.lightingFlags & RENDER_SHOW_MOTION) != 0u) {
+        // Pixels per frame, saturating at 16. Red is rightward, green downward, flat grey is static.
+        // The composite pass still applies exposure and ACES to this, which flatten anything near
+        // 1.0 into a narrow band, so the range is centred low where the curve still has slope
+        vec2 motionPixels = normalMotion.zw * vec2(textureSize(gTextures[pc.GBufferNormalHandle], 0));
+        vec2 encoded = clamp(motionPixels / 16.0, -1.0, 1.0) * 0.1 + 0.1;
+        outColor = vec4(encoded, 0.1, 1.0);
         return;
     }
     vec4 baseColorEmissive = texture(gTextures[pc.GBufferAlbedoHandle], fragTexCoord);

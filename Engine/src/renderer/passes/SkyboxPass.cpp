@@ -1,4 +1,5 @@
 #include "SkyboxPass.h"
+#include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "components/Components.h"
@@ -29,7 +30,10 @@ SkyboxPass::SkyboxPass(std::vector<Texture *> depthTextures, VkFormat colorForma
     auto &project = app.getProject();
     auto shaderPath = project.getProjectShaderDirectory();
 
-    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/SkyboxPass.vs.spv");
+    ShaderImportConfig shaderConfig;
+    shaderConfig.compileInfo.includePath = shaderPath / "glsl";
+
+    auto asset = AssetManager::importAsset(shaderPath / "glsl/Skybox.vs.glsl", shaderConfig);
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
     if (m_shader) m_shaderAssets.push_back(std::move(asset));
 

@@ -2,21 +2,13 @@
 
 #extension GL_EXT_nonuniform_qualifier : require
 
+#include "common/CameraCommon.glsl"
+
 // No vertex input - we'll generate a fullscreen triangle in the vertex shader
 layout(location = 0) in vec3 aPosition;
 
 // Output to fragment shader
 layout(location = 0) out vec3 localPosition;
-
-struct CameraGPUData {
-    mat4 view;
-    mat4 proj;
-    mat4 invViewProj;
-};
-
-layout(set = 0, binding = 0) readonly buffer CameraDataSSBO {
-    CameraGPUData cameras[];
-} u_cameraSSBO[];
 
 layout(push_constant) uniform PushConstants {
     uint cameraSSBOIndex;
