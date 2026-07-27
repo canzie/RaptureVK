@@ -3,7 +3,8 @@
 
 #include "buffers/descriptors/DescriptorManager.h"
 #include "components/Components.h"
-#include "components/FogComponent.h"
+#include "components/systems/Environment.h"
+#include "renderer/ImageBasedLighting.h"
 #include "renderer/RenderSettings.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/ShadowMapping.h"
@@ -16,10 +17,6 @@ namespace Rapture {
 struct LightingPushConstants {
 
     glm::vec4 cameraPos;
-
-    // Fog
-    glm::vec4 fogColor;     // .rgb = color, .a = enabled
-    glm::vec2 fogDistances; // .x = near, .y = far
 
     uint32_t lightDataSSBOIndex;
     uint32_t lightStaticCount;
@@ -44,6 +41,7 @@ struct LightingPushConstants {
     uint32_t probeVisibilityHandle;
     uint32_t probeOffsetHandle;
     uint32_t probeClassificationHandle;
+    uint32_t brdfLutHandle;
 };
 
 LightingPass::LightingPass(float width, float height, DynamicDiffuseGI *ddgi, VkFormat colorFormat)
@@ -168,17 +166,10 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
     // DDGI indirect requires the GI system to exist; fall back to ambient otherwise
     pushConstants.lightingFlags = m_ddgi ? lightingFlags : (lightingFlags & ~RENDER_USE_GLOBAL_ILLUMINATION);
 
-    // Query FogComponent from scene
-    auto fogView = activeScene.getRegistry().view<FogComponent>();
-    if (!fogView.empty()) {
-        auto &fogComp = fogView.get<FogComponent>(*fogView.begin());
-        pushConstants.fogColor = glm::vec4(fogComp.color, fogComp.enabled ? 1.0f : 0.0f);
-        pushConstants.fogDistances = glm::vec2(fogComp.start, fogComp.end);
-    } else {
-        // No fog component - disable fog
-        pushConstants.fogColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
-        pushConstants.fogDistances = glm::vec2(0.0f, 0.0f);
-    }
+    // Already 0 until the bake finishes, which the shader samples harmlessly
+    Environment *environment = activeScene.environment();
+    ImageBasedLighting *ibl = environment != nullptr ? environment->getImageBasedLighting() : nullptr;
+    pushConstants.brdfLutHandle = ibl != nullptr ? ibl->getBrdfLutBindlessIndex() : 0;
 
     auto &renderData = *(activeScene.getRenderData());
     auto &lightStore = renderData.getLights();

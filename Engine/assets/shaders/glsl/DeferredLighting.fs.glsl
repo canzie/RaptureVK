@@ -95,14 +95,10 @@ vec3 octDecodeNormal(vec2 enc) {
 }
 
 
-// The vec4s lead so the trailing uint block needs no alignment padding, keeping the block under the
+// The vec4 leads so the trailing uint block needs no alignment padding, keeping the block under the
 // 128 byte guaranteed push constant size
 layout(push_constant) uniform PushConstants {
     vec4 cameraPos;
-
-    // Fog
-    vec4 fogColor;     // .rgb = color, .a = enabled
-    vec2 fogDistances; // .x = near, .y = far
 
     uint lightDataSSBOIndex;
     uint lightStaticCount;
@@ -127,6 +123,7 @@ layout(push_constant) uniform PushConstants {
     uint probeVisibilityHandle;
     uint probeOffsetHandle;
     uint probeClassificationHandle;
+    uint brdfLutHandle;
 } pc;
 
 const uint RENDER_NONE = 0u;
@@ -536,6 +533,11 @@ void main() {
                 vec3 F0 = computeF0(albedo, metallic, specular);
                 vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
 
+                // Karis split-sum environment BRDF: the integral of the full GGX lobe, so it carries
+                // the geometry term the Fresnel-only approximation above leaves out
+                vec2 envBRDF = texture(gTextures[nonuniformEXT(pc.brdfLutHandle)], vec2(max(dot(N, V), 0.0), roughness)).rg;
+                vec3 specularWeight = F0 * envBRDF.x + envBRDF.y;
+
                 vec3 kD_indirect = (vec3(1.0) - F) * (1.0 - metallic);
                 indirectDiffuse = irradiance * (albedo / PI) * kD_indirect * ao;
 
@@ -546,7 +548,7 @@ void main() {
                 vec3 R = reflect(-V, N);
                 vec3 Rd = getSpecularDominantDir(N, R, roughness);
                 vec3 prefilteredRadiance = getIrradiance(fragPos, N, Rd, V, u_DDGI_Volume) / PI;
-                indirectSpecular = prefilteredRadiance * F * ao;
+                indirectSpecular = prefilteredRadiance * specularWeight * ao;
             } else {
                 indirectDiffuse = irradiance;
             }
@@ -556,13 +558,6 @@ void main() {
     }
 
     vec3 color = indirectDiffuse + indirectSpecular + Lo + emissive;
-
-    // Apply Fog
-    if (pc.fogColor.a > 0.5) {
-        float fragDepthView = abs(viewDepth); // Reconstructed view-space depth
-        float fogFactor = smoothstep(pc.fogDistances.x, pc.fogDistances.y, fragDepthView);
-        color = mix(color, pc.fogColor.rgb, fogFactor);
-    }
 
 #if DEBUG_CASCADES
     // Apply cascade visualization tint if enabled and a cascade was determined
