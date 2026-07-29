@@ -8,10 +8,12 @@
 #include "renderer/gi/ddgi/DynamicDiffuseGI.h"
 #include "renderer/passes/CompositePass.h"
 #include "renderer/passes/GBufferPass.h"
+#include "renderer/passes/HiZPass.h"
 #include "renderer/passes/InstancedShapesPass.h"
 #include "renderer/passes/LightingPass.h"
 #include "renderer/passes/SkyboxPass.h"
 #include "renderer/passes/StencilBorderPass.h"
+#include "renderer/passes/StochasticScreenSpaceReflectionsPass.h"
 
 #include <memory>
 
@@ -55,6 +57,8 @@ class DeferredRenderer : public Renderer {
 
   private:
     std::unique_ptr<GBufferPass> m_gbufferPass;
+    std::unique_ptr<HiZPass> m_hiZPass;
+    std::unique_ptr<StochasticScreenSpaceReflectionsPass> m_sssrPass;
     std::unique_ptr<LightingPass> m_lightingPass;
     std::unique_ptr<StencilBorderPass> m_stencilBorderPass;
     std::unique_ptr<SkyboxPass> m_skyboxPass;

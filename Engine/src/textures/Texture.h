@@ -75,6 +75,19 @@ class Texture {
 
     VkImage getImage() const { return m_image; }
     VkImageView getImageView() const { return m_imageView; }
+
+    /**
+     * @brief The view to render into, which covers mip 0 alone
+     *
+     * A rendering attachment must reference a single mip, while the sampled view spans the whole
+     * chain, so the two differ once a texture is mipped.
+     * @return The attachment view
+     */
+    VkImageView getAttachmentImageView() const
+    {
+        return m_imageViewAttachment != VK_NULL_HANDLE ? m_imageViewAttachment : m_imageView;
+    }
+
     VkImageView getDepthOnlyImageView() const { return m_imageViewDepthOnly; }
     VkImageView getStencilOnlyImageView() const { return m_imageViewStencilOnly; }
 
@@ -218,6 +231,7 @@ class Texture {
     VkImage m_image = VK_NULL_HANDLE;
     VkImageLayout m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageView m_imageView = VK_NULL_HANDLE;
+    VkImageView m_imageViewAttachment = VK_NULL_HANDLE;
     VkImageView m_imageViewStencilOnly = VK_NULL_HANDLE;
     VkImageView m_imageViewDepthOnly = VK_NULL_HANDLE;
     VkImageView m_imageViewStorage = VK_NULL_HANDLE;

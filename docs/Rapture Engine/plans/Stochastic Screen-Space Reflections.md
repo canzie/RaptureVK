@@ -76,9 +76,14 @@ Per half-res pixel:
 4. **Sampling bias** — this is cheap and high-impact, do not skip it:
    ```glsl
    vec2 u = halton(sampleIdx);
-   u.x = mix(u.x, 1.0, bias);   // bias ~0.7
+   u.x = mix(u.x, 0.0, bias);   // bias ~0.7
    importanceSample(u);
    ```
+   **The direction depends on the parameterisation.** With the VNDF sampler in
+   `common/ImportanceSampling.glsl`, `u.x` drives `r = sqrt(u.x)`, the radius on the projected
+   disk, so **0** is the mirror end and the bias pulls toward zero. A plain NDF sampler that maps
+   `u.x` to `cosTheta` runs the other way. Getting this backwards widens the lobe instead of
+   narrowing it, which adds variance rather than removing it.
    Shifting samples toward the mirror direction kills the BRDF-tail noise. The truncated
    distribution has a different normalisation constant, but the resolve's weight normalisation
    (§3.3) re-normalises it automatically, so this stays energy-correct.

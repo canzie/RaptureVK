@@ -40,10 +40,12 @@ layout(set = 3, binding = 0) uniform sampler2DShadow gShadowTextures[];
 layout(set = 3, binding = 0) uniform sampler2DArrayShadow gShadowArrays[];
 layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
 layout(set = 3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
+layout(set = 3, binding = 0) uniform samplerCube gCubemaps[];
 
 #include "ddgi/ProbeCommon.glsl"
 #include "ddgi/IrradianceCommon.glsl"
 #include "common/CameraCommon.glsl"
+#include "common/RenderFlags.glsl"
 #include "common/ShadingModels.glsl"
 #include "common/BRDF.glsl"
 #include "common/Tonemapping.glsl"
@@ -124,16 +126,11 @@ layout(push_constant) uniform PushConstants {
     uint probeOffsetHandle;
     uint probeClassificationHandle;
     uint brdfLutHandle;
+    uint sssrAccumulatedHandle;
+    uint prefilteredEnvHandle;
+    float prefilteredEnvMipCount;
 } pc;
 
-const uint RENDER_NONE = 0u;
-const uint RENDER_USE_GLOBAL_ILLUMINATION = 1u << 0;
-const uint RENDER_SHOW_DIRECT = 1u << 1;
-const uint RENDER_SHOW_INDIRECT = 1u << 2;
-const uint RENDER_MODULATE_INDIRECT = 1u << 3;
-const uint RENDER_SHOW_NORMALS = 1u << 5;
-const uint RENDER_SHOW_MOTION = 1u << 6;
-const uint RENDER_ALL = 0xFFFFFFFFu;
 
 
 float calculateAttenuation(vec3 lightPos, vec3 fragPos, float range) {
@@ -432,6 +429,7 @@ void main() {
         outColor = vec4(encoded, 0.1, 1.0);
         return;
     }
+
     vec4 baseColorEmissive = texture(gTextures[pc.GBufferAlbedoHandle], fragTexCoord);
     vec4 material = texture(gTextures[pc.GBufferMaterialHandle], fragTexCoord);
     vec4 shadingModel = texture(gTextures[pc.GBufferShadingModelHandle], fragTexCoord);
@@ -541,13 +539,15 @@ void main() {
                 vec3 kD_indirect = (vec3(1.0) - F) * (1.0 - metallic);
                 indirectDiffuse = irradiance * (albedo / PI) * kD_indirect * ao;
 
-                // Rough specular reflection: the diffuse irradiance field sampled along the
-                // reflection vector approximates a prefiltered environment. Only valid for the
-                // glossy/rough range, sharp mirror reflections need a traced source. Divide by
-                // PI to recover an approximate incident radiance from the integrated irradiance.
+                // The other half of the split sum: incident radiance already integrated against the
+                // GGX lobe, one mip per roughness. The prefilter bakes mip i at roughness
+                // i / (mips - 1), so the lookup is linear in roughness to match it.
                 vec3 R = reflect(-V, N);
                 vec3 Rd = getSpecularDominantDir(N, R, roughness);
-                vec3 prefilteredRadiance = getIrradiance(fragPos, N, Rd, V, u_DDGI_Volume) / PI;
+                vec3 prefilteredRadiance =
+                    textureLod(gCubemaps[nonuniformEXT(pc.prefilteredEnvHandle)], Rd,
+                               roughness * (pc.prefilteredEnvMipCount - 1.0)).rgb;
+
                 indirectSpecular = prefilteredRadiance * specularWeight * ao;
             } else {
                 indirectDiffuse = irradiance;

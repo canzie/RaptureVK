@@ -41,6 +41,12 @@ target_include_directories(${ENGINE_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Vulkan clips at 0 <= z <= w, so glm must build projections for that range. PUBLIC because a
+# matrix built in one target and consumed in another has to agree on the convention.
+target_compile_definitions(${ENGINE_NAME} PUBLIC
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+)
+
 # Link with vendor libraries
 target_link_libraries(${ENGINE_NAME} PUBLIC
     vendor_libraries

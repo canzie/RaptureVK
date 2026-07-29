@@ -93,7 +93,7 @@ class ComputePass {
      * @param localSize The shader's local_size along the same axis
      * @return The group count, rounded up
      */
-    static uint32_t computePass_groupCount(uint32_t threads, uint32_t localSize);
+    static uint32_t groupCount(uint32_t threads, uint32_t localSize);
 
   protected:
     std::vector<ComputeResource> m_resources;

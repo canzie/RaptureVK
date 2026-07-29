@@ -28,7 +28,7 @@ static VkAccessFlags s_dispatchAccess(ComputeResourceAccess access)
     return VK_ACCESS_SHADER_READ_BIT;
 }
 
-uint32_t ComputePass::computePass_groupCount(uint32_t threads, uint32_t localSize)
+uint32_t ComputePass::groupCount(uint32_t threads, uint32_t localSize)
 {
     if (localSize == 0) {
         return 0;
@@ -64,8 +64,7 @@ void ComputePass::execute(const RenderPassContext &context, CommandBuffer *comma
         }
 
         const VkImageLayout target = s_dispatchLayout(resource.access);
-        const VkImageLayout current =
-            resource.discardContents ? VK_IMAGE_LAYOUT_UNDEFINED : resource.texture->getCurrentLayout();
+        const VkImageLayout current = resource.discardContents ? VK_IMAGE_LAYOUT_UNDEFINED : resource.texture->getCurrentLayout();
 
         if (current != VK_IMAGE_LAYOUT_UNDEFINED) {
             // TODO: conservative until Texture also tracks the stage that last wrote it
@@ -80,8 +79,8 @@ void ComputePass::execute(const RenderPassContext &context, CommandBuffer *comma
     }
 
     if (!barriers.empty()) {
-        vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), srcStage, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
-                             0, nullptr, static_cast<uint32_t>(barriers.size()), barriers.data());
+        vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), srcStage, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0,
+                             nullptr, static_cast<uint32_t>(barriers.size()), barriers.data());
     }
 
     record(context, commandBuffer);
@@ -98,8 +97,8 @@ void ComputePass::execute(const RenderPassContext &context, CommandBuffer *comma
 
     if (!barriers.empty()) {
         vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                             static_cast<uint32_t>(barriers.size()), barriers.data());
+                             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(barriers.size()),
+                             barriers.data());
     }
 }
 

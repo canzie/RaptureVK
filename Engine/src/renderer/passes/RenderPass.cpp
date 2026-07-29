@@ -35,7 +35,7 @@ static VkRenderingAttachmentInfo s_buildColorAttachmentInfo(const RenderPassAtta
 {
     VkRenderingAttachmentInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    info.imageView = attachment.texture->getImageView();
+    info.imageView = attachment.texture->getAttachmentImageView();
     info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     info.loadOp = s_toVkLoadOp(attachment.loadOp);
     info.storeOp = s_toVkStoreOp(attachment.storeOp);
@@ -54,7 +54,7 @@ static VkRenderingAttachmentInfo s_buildDepthAttachmentInfo(const RenderPassAtta
 {
     VkRenderingAttachmentInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    info.imageView = attachment.texture->getImageView();
+    info.imageView = attachment.texture->getAttachmentImageView();
     info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     info.loadOp = s_toVkLoadOp(attachment.loadOp);
     info.storeOp = s_toVkStoreOp(attachment.storeOp);
@@ -70,7 +70,7 @@ static VkRenderingAttachmentInfo s_buildStencilAttachmentInfo(const RenderPassAt
 {
     VkRenderingAttachmentInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    info.imageView = attachment.texture->getImageView();
+    info.imageView = attachment.texture->getAttachmentImageView();
     info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     info.loadOp = s_toVkLoadOp(attachment.loadOp);
     info.storeOp = s_toVkStoreOp(attachment.storeOp);

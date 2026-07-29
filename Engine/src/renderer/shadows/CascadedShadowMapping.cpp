@@ -479,13 +479,13 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
 
     // Define the 8 corners of a canonical view frustum in NDC space
     // These are the same for both projection types (perspective and orthographic)
-    // NDC space is a cube from (-1,-1,-1) to (1,1,1)
+    // NDC space is a box from (-1,-1,0) to (1,1,1), matching Vulkan's clip range
     std::array<glm::vec4, 8> ndcCorners = {
-        // Near face corners (z = -1 in NDC)
-        glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f), // Near-bottom-left
-        glm::vec4(1.0f, -1.0f, -1.0f, 1.0f),  // Near-bottom-right
-        glm::vec4(1.0f, 1.0f, -1.0f, 1.0f),   // Near-top-right
-        glm::vec4(-1.0f, 1.0f, -1.0f, 1.0f),  // Near-top-left
+        // Near face corners (z = 0 in NDC)
+        glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f), // Near-bottom-left
+        glm::vec4(1.0f, -1.0f, 0.0f, 1.0f),  // Near-bottom-right
+        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),   // Near-top-right
+        glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f),  // Near-top-left
 
         // Far face corners (z = 1 in NDC)
         glm::vec4(-1.0f, -1.0f, 1.0f, 1.0f), // Far-bottom-left

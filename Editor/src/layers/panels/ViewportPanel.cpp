@@ -234,6 +234,12 @@ void ViewportPanel::buildRenderMenu()
     items.push_back(ViewportContextMenuRID::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
     items.push_back(ViewportContextMenuRID::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
     items.push_back(ViewportContextMenuRID::create("Show Motion Vectors", &m_lightingModeGroup, VLM_MOTION));
+    items.push_back(ViewportContextMenuRID::create("Show Reflection Hits", &m_lightingModeGroup, VLM_SSSR_HIT));
+    items.push_back(ViewportContextMenuRID::create("Show Reflections (Resolved)", &m_lightingModeGroup, VLM_SSSR_RESOLVED));
+    items.push_back(
+        ViewportContextMenuRID::create("Show Reflections (Accumulated)", &m_lightingModeGroup, VLM_SSSR_ACCUMULATED));
+    items.push_back(
+        ViewportContextMenuRID::create("Show Reflection Confidence", &m_lightingModeGroup, VLM_SSSR_CONFIDENCE));
     m_renderMenu->setItems(std::move(items));
 }
 
@@ -247,6 +253,10 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
 
     settings.setFlag(Rapture::RENDER_SHOW_NORMALS, false);
     settings.setFlag(Rapture::RENDER_SHOW_MOTION, false);
+    settings.setFlag(Rapture::RENDER_SHOW_SSSR_HIT, false);
+    settings.setFlag(Rapture::RENDER_SHOW_SSSR_RESOLVED, false);
+    settings.setFlag(Rapture::RENDER_SHOW_SSSR_ACCUMULATED, false);
+    settings.setFlag(Rapture::RENDER_SHOW_SSSR_CONFIDENCE, false);
     switch (mode) {
     case VLM_DIRECT_LIGHTING:
         settings.setFlag(Rapture::RENDER_SHOW_DIRECT, true);
@@ -269,6 +279,18 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
         break;
     case VLM_MOTION:
         settings.setFlag(Rapture::RENDER_SHOW_MOTION, true);
+        break;
+    case VLM_SSSR_HIT:
+        settings.setFlag(Rapture::RENDER_SHOW_SSSR_HIT, true);
+        break;
+    case VLM_SSSR_RESOLVED:
+        settings.setFlag(Rapture::RENDER_SHOW_SSSR_RESOLVED, true);
+        break;
+    case VLM_SSSR_ACCUMULATED:
+        settings.setFlag(Rapture::RENDER_SHOW_SSSR_ACCUMULATED, true);
+        break;
+    case VLM_SSSR_CONFIDENCE:
+        settings.setFlag(Rapture::RENDER_SHOW_SSSR_CONFIDENCE, true);
         break;
     case VLM_LIT:
     default:

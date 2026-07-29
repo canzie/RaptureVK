@@ -42,6 +42,9 @@ struct LightingPushConstants {
     uint32_t probeOffsetHandle;
     uint32_t probeClassificationHandle;
     uint32_t brdfLutHandle;
+    uint32_t sssrAccumulatedHandle;
+    uint32_t prefilteredEnvHandle;
+    float prefilteredEnvMipCount;
 };
 
 LightingPass::LightingPass(float width, float height, DynamicDiffuseGI *ddgi, VkFormat colorFormat)
@@ -170,6 +173,11 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
     Environment *environment = activeScene.environment();
     ImageBasedLighting *ibl = environment != nullptr ? environment->getImageBasedLighting() : nullptr;
     pushConstants.brdfLutHandle = ibl != nullptr ? ibl->getBrdfLutBindlessIndex() : 0;
+
+    pushConstants.sssrAccumulatedHandle =
+        context.targets->sssrAccumulated != nullptr ? context.targets->sssrAccumulated->getBindlessIndex() : 0;
+    pushConstants.prefilteredEnvHandle = ibl != nullptr ? ibl->getPrefilteredBindlessIndex() : 0;
+    pushConstants.prefilteredEnvMipCount = ibl != nullptr ? static_cast<float>(ibl->getPrefilteredMipCount()) : 1.0f;
 
     auto &renderData = *(activeScene.getRenderData());
     auto &lightStore = renderData.getLights();

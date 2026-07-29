@@ -252,6 +252,10 @@ Texture::~Texture()
         vkDestroyImageView(device, m_imageView, nullptr);
     }
 
+    if (m_imageViewAttachment != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, m_imageViewAttachment, nullptr);
+    }
+
     if (m_imageViewDepthOnly != VK_NULL_HANDLE) {
         vkDestroyImageView(device, m_imageViewDepthOnly, nullptr);
     }
@@ -600,7 +604,7 @@ VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkI
         barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     }
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.levelCount = m_spec.mipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
     barrier.srcAccessMask = srcAccessMask;
@@ -952,16 +956,31 @@ void Texture::createImageView()
         throw std::runtime_error("Failed to create texture image view!");
     }
 
-    if (isCubeType(m_spec.type) && m_spec.storageImage) {
+    // A rendering attachment must reference exactly one mip, so a mipped render target needs a
+    // second view alongside the sampled one that spans the chain
+    if (m_spec.mipLevels > 1 && !isDepthFormat(m_spec.format)) {
+        VkImageViewCreateInfo attachmentViewInfo = viewInfo;
+        attachmentViewInfo.subresourceRange.levelCount = 1;
+        if (vkCreateImageView(device, &attachmentViewInfo, nullptr, &m_imageViewAttachment) != VK_SUCCESS) {
+            RP_CORE_ERROR("Failed to create attachment image view!");
+            return;
+        }
+    }
+
+    // A storage image view spans a single mip, so a pass that writes one mip at a time binds the
+    // matching view from here instead of the whole-image one
+    if (m_spec.storageImage && (isCubeType(m_spec.type) || m_spec.mipLevels > 1)) {
         m_imageViewStorageMips.resize(m_spec.mipLevels, VK_NULL_HANDLE);
         for (uint32_t mip = 0; mip < m_spec.mipLevels; ++mip) {
             VkImageViewCreateInfo storageViewInfo = viewInfo;
-            storageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
             storageViewInfo.subresourceRange.baseMipLevel = mip;
             storageViewInfo.subresourceRange.levelCount = 1;
-            storageViewInfo.subresourceRange.layerCount = 6;
+            if (isCubeType(m_spec.type)) {
+                storageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+                storageViewInfo.subresourceRange.layerCount = 6;
+            }
             if (vkCreateImageView(device, &storageViewInfo, nullptr, &m_imageViewStorageMips[mip]) != VK_SUCCESS) {
-                RP_CORE_ERROR("Failed to create cubemap storage image view for mip {}!", mip);
+                RP_CORE_ERROR("Failed to create storage image view for mip {}!", mip);
                 return;
             }
         }

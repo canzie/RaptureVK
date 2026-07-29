@@ -4,6 +4,7 @@
 #include "asset_manager/AssetManager.h"
 #include "buffers/descriptors/DescriptorManager.h"
 #include "render_targets/SceneRenderTarget.h"
+#include "renderer/RenderSettings.h"
 #include "textures/Texture.h"
 
 #include "logging/Log.h"
@@ -16,7 +17,33 @@ namespace Rapture {
 struct CompositePushConstants {
     uint32_t sceneColorHandle;
     float exposureStops;
+    uint32_t renderFlags;
+    uint32_t debugTextureHandle;
 };
+
+/**
+ * @brief The texture a display override wants shown in place of the scene
+ * @param settings The view's display overrides, or nullptr for none
+ * @param targets The frame's pass targets
+ * @return The texture to show, or nullptr if no override is active
+ */
+static Texture *Composite_selectDebugTexture(const RenderSettings *settings, const RenderPassTargets &targets)
+{
+    if (settings == nullptr) {
+        return nullptr;
+    }
+
+    if ((settings->flags & RENDER_SHOW_SSSR_HIT) != 0u) {
+        return targets.sssrHit;
+    }
+    if ((settings->flags & RENDER_SHOW_SSSR_RESOLVED) != 0u) {
+        return targets.sssrResolved;
+    }
+    if ((settings->flags & (RENDER_SHOW_SSSR_ACCUMULATED | RENDER_SHOW_SSSR_CONFIDENCE)) != 0u) {
+        return targets.sssrAccumulated;
+    }
+    return nullptr;
+}
 
 CompositePass::CompositePass(float width, float height, VkFormat colorFormat)
     : m_colorFormat(colorFormat), m_width(width), m_height(height)
@@ -102,9 +129,14 @@ CommandBuffer *CompositePass::record(const RenderPassContext &context, const Sec
 
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
 
+    Texture *debugTexture = Composite_selectDebugTexture(context.settings, *context.targets);
+
     CompositePushConstants pushConstants;
     pushConstants.sceneColorHandle = context.targets->sceneColorHdr->getBindlessIndex();
     pushConstants.exposureStops = m_exposureStops;
+    // A view with no texture behind it falls back to the scene rather than sampling a stale handle
+    pushConstants.renderFlags = debugTexture != nullptr ? context.settings->flags : RENDER_NONE;
+    pushConstants.debugTextureHandle = debugTexture != nullptr ? debugTexture->getBindlessIndex() : 0;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                        sizeof(CompositePushConstants), &pushConstants);

@@ -58,6 +58,7 @@ layout(std430, set = 1, binding = 1) readonly buffer GraphPoolBuffer {
 // Bindless texture array sampled by the generated surface graph texture nodes (set 3, binding 0)
 layout(set = 3, binding = 0) uniform sampler2D u_textures[];
 
+#include "common/Octahedral.glsl"
 #include "common/ShadingModels.glsl"
 
 // ============================================================================
@@ -103,26 +104,6 @@ float matFlagMul(uint flags, uint flag) {
 float LinearRGBToLuminance(vec3 rgb) {
     const vec3 LuminanceWeights = vec3(0.2126, 0.7152, 0.0722);
     return dot(rgb, LuminanceWeights);
-}
-
-vec2 signNotZero(vec2 v) {
-    return vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
-}
-
-// Octahedral encode a unit normal into a 2-component value in [-1, 1]
-vec2 octEncodeNormal(vec3 n) {
-    n /= (abs(n.x) + abs(n.y) + abs(n.z));
-    vec2 enc = (n.z >= 0.0) ? n.xy : (1.0 - abs(n.yx)) * signNotZero(n.xy);
-    return enc;
-}
-
-// Decode an octahedral-encoded normal back to a unit vector
-vec3 octDecodeNormal(vec2 enc) {
-    vec3 n = vec3(enc.xy, 1.0 - abs(enc.x) - abs(enc.y));
-    if (n.z < 0.0) {
-        n.xy = (1.0 - abs(n.yx)) * signNotZero(n.xy);
-    }
-    return normalize(n);
 }
 
 // Reconstruct a tangent-space normal's Z from its XY (unit-length assumption), for BC5 normal maps
