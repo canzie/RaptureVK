@@ -126,14 +126,10 @@ layout(push_constant) uniform PushConstants {
     uint probeOffsetHandle;
     uint probeClassificationHandle;
     uint brdfLutHandle;
-    uint sssrAccumulatedHandle;
-    uint ambientOcclusionHandle;
     uint prefilteredEnvHandle;
     float prefilteredEnvMipCount;
     float skyIntensity;
 } pc;
-
-
 
 float calculateAttenuation(vec3 lightPos, vec3 fragPos, float range) {
     float distance = length(lightPos - fragPos);
@@ -431,7 +427,6 @@ void main() {
         outColor = vec4(encoded, 0.1, 1.0);
         return;
     }
-
     vec4 baseColorEmissive = texture(gTextures[pc.GBufferAlbedoHandle], fragTexCoord);
     vec4 material = texture(gTextures[pc.GBufferMaterialHandle], fragTexCoord);
     vec4 shadingModel = texture(gTextures[pc.GBufferShadingModelHandle], fragTexCoord);
@@ -442,14 +437,6 @@ void main() {
     float roughness = material.g;
     float ao = material.b;
     float specular = unpackSpecular(material.a);
-
-    // The material's own occlusion is baked from the mesh and describes its cavities. It knows
-    // nothing about the room the mesh was put in, which is what the traced term adds, so the two
-    // occlude different scales and multiply rather than replace one another.
-    if ((pc.lightingFlags & RENDER_USE_AMBIENT_OCCLUSION) != 0u) {
-        ao *= texture(gTextures[nonuniformEXT(pc.ambientOcclusionHandle)], fragTexCoord).a;
-    }
-
     uint shadingModelId = unpackShadingModel(shadingModel.r);
 
     vec3 V = normalize(pc.cameraPos.xyz - fragPos);
@@ -549,37 +536,14 @@ void main() {
                 vec3 kD_indirect = (vec3(1.0) - F) * (1.0 - metallic);
                 indirectDiffuse = irradiance * (albedo / PI) * kD_indirect * ao;
 
-                // The other half of the split sum: incident radiance already integrated against the
-                // GGX lobe, one mip per roughness. The prefilter bakes mip i at roughness
-                // i / (mips - 1), so the lookup is linear in roughness to match it.
+                // The other half of the split sum: the incident radiance along the lobe's dominant
+                // direction. The probe field is occluded, so it is the source that knows an interior
+                // surface cannot see the sky.
                 vec3 R = reflect(-V, N);
                 vec3 Rd = getSpecularDominantDir(N, R, roughness);
+                vec3 prefilteredRadiance = getIrradiance(fragPos, N, Rd, V, u_DDGI_Volume) / PI;
 
-                vec3 environmentRadiance = textureLod(gCubemaps[nonuniformEXT(pc.prefilteredEnvHandle)], Rd,
-                                                      roughness * (pc.prefilteredEnvMipCount - 1.0)).rgb *
-                                           pc.skyIntensity;
-
-                // Occluded by the specular form rather than by the scalar the diffuse uses, since a
-                // lobe narrows with roughness while the diffuse one always covers the hemisphere.
-                //
-                // It applies to the environment alone. A traced ray that landed already accounted
-                // for whatever stood in its way, so occluding the reflection as well would darken a
-                // wall the trace resolved correctly.
-                float occlusion = specularOcclusion(max(dot(N, V), 0.0), ao, roughness);
-                vec3 prefilteredRadiance = environmentRadiance * occlusion;
-
-                // The traced reflection takes over wherever rays actually landed, and the
-                // environment fills the rest. Alpha is how much of the accumulation is backed by
-                // real hits, so it fades out on its own across a miss rather than needing a cutoff.
-                if ((pc.lightingFlags & RENDER_USE_SCREEN_SPACE_REFLECTIONS) != 0u) {
-                    vec4 reflection = texture(gTextures[nonuniformEXT(pc.sssrAccumulatedHandle)], fragTexCoord);
-                    prefilteredRadiance = mix(prefilteredRadiance, reflection.rgb, reflection.a);
-                }
-
-                // The split-sum weight multiplies the blend, not the reflection alone. That is the
-                // pre-integrated half of the estimator, and applying it after the temporal filter
-                // rather than inside the resolve is what keeps it from amplifying the noise.
-                indirectSpecular = prefilteredRadiance * specularWeight;
+                indirectSpecular = prefilteredRadiance * specularWeight * ao;
             } else {
                 indirectDiffuse = irradiance;
             }

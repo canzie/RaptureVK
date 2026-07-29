@@ -20,19 +20,6 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
     return F0 + (Fr - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-// How much of the specular lobe survives the visibility an ambient occlusion pass measured
-// (Lagarde and de Rousiers, Moving Frostbite to PBR, 4.10).
-//
-// A cone fit around the bent normal is the tempting way to do this, and it does not survive contact
-// with a curved surface. At grazing the reflection direction sits on the rim of the visible
-// hemisphere, so the moment the occlusion drops below one the cone's edge sweeps past it and the
-// term falls off a cliff, which is a hard black outline on anything smooth and round. The NdotV
-// term here is what stands in for that geometry: it holds the occlusion open as the view grazes,
-// where the drop is a limit of what screen space can measure rather than something in the way.
-float specularOcclusion(float _NdotV, float _ao, float _roughness) {
-    return clamp(pow(_NdotV + _ao, exp2(-16.0 * _roughness - 1.0)) - 1.0 + _ao, 0.0, 1.0);
-}
-
 // GGX / Trowbridge-Reitz normal distribution
 float D_GGX(float NdotH, float roughness) {
     float a = roughness * roughness;

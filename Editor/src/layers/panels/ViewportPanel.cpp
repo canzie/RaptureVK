@@ -235,32 +235,6 @@ void ViewportPanel::buildRenderMenu()
     items.push_back(ViewportContextMenuRID::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
     items.push_back(ViewportContextMenuRID::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
     items.push_back(ViewportContextMenuRID::create("Show Motion Vectors", &m_lightingModeGroup, VLM_MOTION));
-    items.push_back(ViewportContextMenuRID::create("Show Reflection Hits", &m_lightingModeGroup, VLM_SSSR_HIT));
-    items.push_back(ViewportContextMenuRID::create("Show Reflections (Resolved)", &m_lightingModeGroup, VLM_SSSR_RESOLVED));
-    items.push_back(
-        ViewportContextMenuRID::create("Show Reflections (Accumulated)", &m_lightingModeGroup, VLM_SSSR_ACCUMULATED));
-    items.push_back(
-        ViewportContextMenuRID::create("Show Reflection Confidence", &m_lightingModeGroup, VLM_SSSR_CONFIDENCE));
-    items.push_back(
-        ViewportContextMenuRID::create("Show Ambient Occlusion", &m_lightingModeGroup, VLM_AMBIENT_OCCLUSION));
-    items.push_back(ViewportContextMenuRID::create("Show Bent Normals", &m_lightingModeGroup, VLM_BENT_NORMALS));
-
-    auto reflectionsToggle = ViewportContextMenuTID::create("Screen-Space Reflections", [this](bool on) {
-        if (m_viewport != nullptr) {
-            m_viewport->renderSettings().setFlag(Rapture::RENDER_USE_SCREEN_SPACE_REFLECTIONS, on);
-        }
-    });
-    reflectionsToggle->as<ViewportContextMenuTID>().value = true;
-    items.push_back(std::move(reflectionsToggle));
-
-    auto occlusionToggle = ViewportContextMenuTID::create("Ambient Occlusion", [this](bool on) {
-        if (m_viewport != nullptr) {
-            m_viewport->renderSettings().setFlag(Rapture::RENDER_USE_AMBIENT_OCCLUSION, on);
-        }
-    });
-    occlusionToggle->as<ViewportContextMenuTID>().value = true;
-    items.push_back(std::move(occlusionToggle));
-
     m_renderMenu->setItems(std::move(items));
 }
 
@@ -274,12 +248,6 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
 
     settings.setFlag(Rapture::RENDER_SHOW_NORMALS, false);
     settings.setFlag(Rapture::RENDER_SHOW_MOTION, false);
-    settings.setFlag(Rapture::RENDER_SHOW_SSSR_HIT, false);
-    settings.setFlag(Rapture::RENDER_SHOW_SSSR_RESOLVED, false);
-    settings.setFlag(Rapture::RENDER_SHOW_SSSR_ACCUMULATED, false);
-    settings.setFlag(Rapture::RENDER_SHOW_SSSR_CONFIDENCE, false);
-    settings.setFlag(Rapture::RENDER_SHOW_AMBIENT_OCCLUSION, false);
-    settings.setFlag(Rapture::RENDER_SHOW_BENT_NORMALS, false);
     switch (mode) {
     case VLM_DIRECT_LIGHTING:
         settings.setFlag(Rapture::RENDER_SHOW_DIRECT, true);
@@ -302,24 +270,6 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
         break;
     case VLM_MOTION:
         settings.setFlag(Rapture::RENDER_SHOW_MOTION, true);
-        break;
-    case VLM_SSSR_HIT:
-        settings.setFlag(Rapture::RENDER_SHOW_SSSR_HIT, true);
-        break;
-    case VLM_SSSR_RESOLVED:
-        settings.setFlag(Rapture::RENDER_SHOW_SSSR_RESOLVED, true);
-        break;
-    case VLM_SSSR_ACCUMULATED:
-        settings.setFlag(Rapture::RENDER_SHOW_SSSR_ACCUMULATED, true);
-        break;
-    case VLM_SSSR_CONFIDENCE:
-        settings.setFlag(Rapture::RENDER_SHOW_SSSR_CONFIDENCE, true);
-        break;
-    case VLM_AMBIENT_OCCLUSION:
-        settings.setFlag(Rapture::RENDER_SHOW_AMBIENT_OCCLUSION, true);
-        break;
-    case VLM_BENT_NORMALS:
-        settings.setFlag(Rapture::RENDER_SHOW_BENT_NORMALS, true);
         break;
     case VLM_LIT:
     default:

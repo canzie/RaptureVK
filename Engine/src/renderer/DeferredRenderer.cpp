@@ -43,9 +43,6 @@ DeferredRenderer::~DeferredRenderer()
     m_skyboxPass.reset();
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
-    m_sssrPass.reset();
-    m_ambientOcclusionPass.reset();
-    m_hiZPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
     m_dynamicDiffuseGI.reset();
@@ -222,12 +219,6 @@ void DeferredRenderer::createSceneColorTextures()
     spec.type = TextureType::TEXTURE2D;
     spec.srgb = false;
 
-    // The reflection resolve reads this as history through a filtered cone footprint, which needs
-    // the chain, and writes the lower mips itself
-    spec.mipLevels = calculateMaxMipLevels(spec.width, spec.height);
-    spec.filter = TextureFilter::LinearMipmapLinear;
-    spec.storageImage = true;
-
     for (uint32_t i = 0; i < Application::getInstance().getFramesInFlight(); i++) {
         m_sceneColorHdrTextures.push_back(std::make_unique<Texture>(spec));
     }
@@ -242,22 +233,6 @@ RenderPassContext DeferredRenderer::buildPassContext(Scene &activeScene, Entity 
     m_passTargets.gbufferShadingModel = m_gbufferPass->getShadingModelTexture(m_currentFrame);
     m_passTargets.depthStencil = m_gbufferPass->getDepthTexture(m_currentFrame);
     m_passTargets.sceneColorHdr = m_sceneColorHdrTextures[m_currentFrame].get();
-
-    // The slot one frame back still holds the scene as it was last drawn, which is what a temporal
-    // technique reprojects into
-    const uint32_t frameCount = static_cast<uint32_t>(m_sceneColorHdrTextures.size());
-    m_passTargets.historyColor = m_sceneColorHdrTextures[(m_currentFrame + frameCount - 1) % frameCount].get();
-
-    m_passTargets.hiZ = m_hiZPass->getHiZTexture(m_currentFrame);
-
-    // Mip 0 of the pyramid is that frame's linear depth, so the slot one frame back is what a
-    // temporal technique validates its reprojection against
-    m_passTargets.historyLinearDepth = m_hiZPass->getHiZTexture((m_currentFrame + frameCount - 1) % frameCount);
-
-    m_passTargets.ambientOcclusion = m_ambientOcclusionPass->getDenoisedTexture(m_currentFrame);
-    m_passTargets.sssrHit = m_sssrPass->getHitTexture(m_currentFrame);
-    m_passTargets.sssrResolved = m_sssrPass->getResolvedTexture(m_currentFrame);
-    m_passTargets.sssrAccumulated = m_sssrPass->getAccumulatedTexture(m_currentFrame);
 
     RenderPassContext context;
     context.scene = &activeScene;
@@ -278,9 +253,6 @@ void DeferredRenderer::recreateRenderPasses()
     m_skyboxPass.reset();
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
-    m_sssrPass.reset();
-    m_ambientOcclusionPass.reset();
-    m_hiZPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
 
@@ -292,20 +264,6 @@ void DeferredRenderer::recreateRenderPasses()
     const uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
 
     m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, framesInFlight);
-
-    m_hiZPass = std::make_unique<HiZPass>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), framesInFlight);
-
-    m_ambientOcclusionPass = std::make_unique<GroundTruthAmbientOcclusionPass>(
-        static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), framesInFlight);
-
-    std::vector<Texture *> sceneColorTextures;
-    sceneColorTextures.reserve(m_sceneColorHdrTextures.size());
-    for (const std::unique_ptr<Texture> &texture : m_sceneColorHdrTextures) {
-        sceneColorTextures.push_back(texture.get());
-    }
-
-    m_sssrPass = std::make_unique<StochasticScreenSpaceReflectionsPass>(
-        static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), framesInFlight, std::move(sceneColorTextures));
 
     m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_dynamicDiffuseGI.get(), hdrFormat);
 
@@ -509,21 +467,6 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             m_gbufferPass->endRendering(commandBuffer);
         }
 
-        {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Hi-Z Pass");
-            m_hiZPass->execute(context, commandBuffer);
-        }
-
-        {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Ambient Occlusion Pass");
-            m_ambientOcclusionPass->execute(context, commandBuffer);
-        }
-
-        {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "SSSR Pass");
-            m_sssrPass->execute(context, commandBuffer);
-        }
-
         if (lightingBuffer) {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
             m_lightingPass->beginRendering(context, commandBuffer);
@@ -557,11 +500,6 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
                 commandBuffer->executeSecondary(*compositeBuffer);
                 m_compositePass->endRendering(commandBuffer);
             }
-        }
-
-        {
-            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Scene Color Mip Chain");
-            m_sssrPass->recordSceneColorMipChain(context, commandBuffer);
         }
 
         // Transition to shader read layout for OFFSCREEN mode so ImGui can sample it
