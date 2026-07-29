@@ -28,8 +28,9 @@ struct RenderPassTargets {
 
     Texture *sceneColorHdr = nullptr;
     Texture *historyColor = nullptr;
-    Texture *historyDepth = nullptr;
+    Texture *historyLinearDepth = nullptr;
     Texture *hiZ = nullptr;
+    Texture *ambientOcclusion = nullptr;
     Texture *sssrHit = nullptr;
     Texture *sssrResolved = nullptr;
     Texture *sssrAccumulated = nullptr;

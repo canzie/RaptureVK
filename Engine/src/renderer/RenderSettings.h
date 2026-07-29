@@ -22,6 +22,9 @@ enum RenderSettingFlags {
     RENDER_SHOW_SSSR_ACCUMULATED = 1 << 9, // debug view: temporally accumulated reflection
     RENDER_SHOW_SSSR_CONFIDENCE = 1 << 10, // debug view: accumulated reflection confidence
     RENDER_USE_SCREEN_SPACE_REFLECTIONS = 1 << 11, // blend traced reflections over the environment
+    RENDER_USE_AMBIENT_OCCLUSION = 1 << 12,        // modulate indirect light by the traced occlusion
+    RENDER_SHOW_AMBIENT_OCCLUSION = 1 << 13,       // debug view: the occlusion term on its own
+    RENDER_SHOW_BENT_NORMALS = 1 << 14,            // debug view: the direction a surface is open towards
     RENDER_ALL = 0xFFFFFFFF,
 };
 
@@ -30,7 +33,7 @@ enum RenderSettingFlags {
  */
 struct RenderSettings {
     uint32_t flags = RENDER_USE_GLOBAL_ILLUMINATION | RENDER_SHOW_DIRECT | RENDER_SHOW_INDIRECT |
-                     RENDER_MODULATE_INDIRECT | RENDER_USE_SCREEN_SPACE_REFLECTIONS;
+                     RENDER_MODULATE_INDIRECT | RENDER_USE_SCREEN_SPACE_REFLECTIONS | RENDER_USE_AMBIENT_OCCLUSION;
 
     bool useGlobalIllumination() const { return (flags & RENDER_USE_GLOBAL_ILLUMINATION) != 0u; }
     bool useDirectLighting() const { return (flags & RENDER_SHOW_DIRECT) != 0u; }

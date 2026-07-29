@@ -8,6 +8,7 @@
 #include "renderer/gi/ddgi/DynamicDiffuseGI.h"
 #include "renderer/passes/CompositePass.h"
 #include "renderer/passes/GBufferPass.h"
+#include "renderer/passes/GroundTruthAmbientOcclusionPass.h"
 #include "renderer/passes/HiZPass.h"
 #include "renderer/passes/InstancedShapesPass.h"
 #include "renderer/passes/LightingPass.h"
@@ -58,6 +59,7 @@ class DeferredRenderer : public Renderer {
   private:
     std::unique_ptr<GBufferPass> m_gbufferPass;
     std::unique_ptr<HiZPass> m_hiZPass;
+    std::unique_ptr<GroundTruthAmbientOcclusionPass> m_ambientOcclusionPass;
     std::unique_ptr<StochasticScreenSpaceReflectionsPass> m_sssrPass;
     std::unique_ptr<LightingPass> m_lightingPass;
     std::unique_ptr<StencilBorderPass> m_stencilBorderPass;

@@ -42,6 +42,9 @@ static Texture *Composite_selectDebugTexture(const RenderSettings *settings, con
     if ((settings->flags & (RENDER_SHOW_SSSR_ACCUMULATED | RENDER_SHOW_SSSR_CONFIDENCE)) != 0u) {
         return targets.sssrAccumulated;
     }
+    if ((settings->flags & (RENDER_SHOW_AMBIENT_OCCLUSION | RENDER_SHOW_BENT_NORMALS)) != 0u) {
+        return targets.ambientOcclusion;
+    }
     return nullptr;
 }
 

@@ -23,7 +23,8 @@ void main() {
     // Drawing a visualisation into it makes the reflections reflect the visualisation, and that
     // compounds every frame. Nothing reads back what this pass writes.
     bool showHit = (pc.renderFlags & RENDER_SHOW_SSSR_HIT) != 0u;
-    bool showAlpha = (pc.renderFlags & RENDER_SHOW_SSSR_CONFIDENCE) != 0u;
+    bool showAlpha = (pc.renderFlags & (RENDER_SHOW_SSSR_CONFIDENCE | RENDER_SHOW_AMBIENT_OCCLUSION)) != 0u;
+    bool showDirection = (pc.renderFlags & RENDER_SHOW_BENT_NORMALS) != 0u;
     bool showRadiance = (pc.renderFlags & (RENDER_SHOW_SSSR_RESOLVED | RENDER_SHOW_SSSR_ACCUMULATED)) != 0u;
 
     vec3 color;
@@ -36,6 +37,9 @@ void main() {
     } else if (showAlpha) {
         // Negative marks a record with no rays behind it, which reads the same as empty here
         color = vec3(max(texture(gTextures[nonuniformEXT(pc.debugTextureHandle)], fragTexCoord).a, 0.0));
+    } else if (showDirection) {
+        // A world direction, shown the same way the normal view shows one
+        color = texture(gTextures[nonuniformEXT(pc.debugTextureHandle)], fragTexCoord).rgb * 0.5 + 0.5;
     } else {
         uint source = showRadiance ? pc.debugTextureHandle : pc.sceneColorHandle;
         color = texture(gTextures[nonuniformEXT(source)], fragTexCoord).rgb;

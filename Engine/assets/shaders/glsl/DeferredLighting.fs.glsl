@@ -127,6 +127,7 @@ layout(push_constant) uniform PushConstants {
     uint probeClassificationHandle;
     uint brdfLutHandle;
     uint sssrAccumulatedHandle;
+    uint ambientOcclusionHandle;
     uint prefilteredEnvHandle;
     float prefilteredEnvMipCount;
     float skyIntensity;
@@ -441,6 +442,14 @@ void main() {
     float roughness = material.g;
     float ao = material.b;
     float specular = unpackSpecular(material.a);
+
+    // The material's own occlusion is baked from the mesh and describes its cavities. It knows
+    // nothing about the room the mesh was put in, which is what the traced term adds, so the two
+    // occlude different scales and multiply rather than replace one another.
+    if ((pc.lightingFlags & RENDER_USE_AMBIENT_OCCLUSION) != 0u) {
+        ao *= texture(gTextures[nonuniformEXT(pc.ambientOcclusionHandle)], fragTexCoord).a;
+    }
+
     uint shadingModelId = unpackShadingModel(shadingModel.r);
 
     vec3 V = normalize(pc.cameraPos.xyz - fragPos);

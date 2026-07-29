@@ -44,6 +44,7 @@ DeferredRenderer::~DeferredRenderer()
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
     m_sssrPass.reset();
+    m_ambientOcclusionPass.reset();
     m_hiZPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
@@ -248,6 +249,12 @@ RenderPassContext DeferredRenderer::buildPassContext(Scene &activeScene, Entity 
     m_passTargets.historyColor = m_sceneColorHdrTextures[(m_currentFrame + frameCount - 1) % frameCount].get();
 
     m_passTargets.hiZ = m_hiZPass->getHiZTexture(m_currentFrame);
+
+    // Mip 0 of the pyramid is that frame's linear depth, so the slot one frame back is what a
+    // temporal technique validates its reprojection against
+    m_passTargets.historyLinearDepth = m_hiZPass->getHiZTexture((m_currentFrame + frameCount - 1) % frameCount);
+
+    m_passTargets.ambientOcclusion = m_ambientOcclusionPass->getDenoisedTexture(m_currentFrame);
     m_passTargets.sssrHit = m_sssrPass->getHitTexture(m_currentFrame);
     m_passTargets.sssrResolved = m_sssrPass->getResolvedTexture(m_currentFrame);
     m_passTargets.sssrAccumulated = m_sssrPass->getAccumulatedTexture(m_currentFrame);
@@ -272,6 +279,7 @@ void DeferredRenderer::recreateRenderPasses()
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
     m_sssrPass.reset();
+    m_ambientOcclusionPass.reset();
     m_hiZPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
@@ -286,6 +294,9 @@ void DeferredRenderer::recreateRenderPasses()
     m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, framesInFlight);
 
     m_hiZPass = std::make_unique<HiZPass>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), framesInFlight);
+
+    m_ambientOcclusionPass = std::make_unique<GroundTruthAmbientOcclusionPass>(
+        static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), framesInFlight);
 
     std::vector<Texture *> sceneColorTextures;
     sceneColorTextures.reserve(m_sceneColorHdrTextures.size());
@@ -501,6 +512,11 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Hi-Z Pass");
             m_hiZPass->execute(context, commandBuffer);
+        }
+
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Ambient Occlusion Pass");
+            m_ambientOcclusionPass->execute(context, commandBuffer);
         }
 
         {
