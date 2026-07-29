@@ -130,6 +130,7 @@ void main() {
     float offset = fract(spatialOffsetNoise(dst) + TEMPORAL_OFFSETS[(pc.frameIndex / 6u) % 4u]);
 
     float visibility = 0.0;
+    float openVisibility = 0.0;
     vec3 bentNormal = vec3(0.0);
 
     for (int slice = 0; slice < pc.sliceCount; ++slice) {
@@ -192,9 +193,17 @@ void main() {
         // projecting the hemisphere onto the slice plane
         visibility += projectedNormalLength * sliceVisibility(h1, h2, n);
         bentNormal += projectedNormalLength * sliceBentDirection(h1, h2, n, view, tangent);
+
+        // The same integral over the arc before any sample closed it. Dividing by this rather than
+        // by the slice count is what keeps the arc the camera could never see out of the answer: an
+        // edge on surface has half its hemisphere behind the view plane, and charging it for that
+        // darkens every silhouette in the scene by around half with nothing in front of it.
+        float openH1 = -acos(clamp(lowHorizonCos1, -1.0, 1.0));
+        float openH2 = acos(clamp(lowHorizonCos2, -1.0, 1.0));
+        openVisibility += projectedNormalLength * sliceVisibility(openH1, openH2, n);
     }
 
-    visibility /= float(pc.sliceCount);
+    visibility = openVisibility > 1e-5 ? visibility / openVisibility : 1.0;
 
     // Slices that cancel leave no direction to report, and the surface normal is the answer a
     // consumer would have used without a bent normal at all

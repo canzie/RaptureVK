@@ -61,9 +61,24 @@ Screen space holds no record of anything behind the view vector, so the arc can 
 normal either. Taking the tighter of the two up front means samples only ever close the horizon
 further and no separate clamp step is needed after the march.
 
-A consequence worth knowing: at grazing angles the normal's hemisphere sticks out past the camera's,
-the arc is truncated, and the visibility of a flat unoccluded surface comes out slightly below 1
-(about 0.785 at the extreme). That is inherent to the method, not a bug in this implementation.
+### Normalising against the open arc
+
+That truncation has a cost. At an edge-on surface `n` is +-PI/2 in *every* slice, the arc is half of
+what the normal's hemisphere covers, and `sliceVisibility` returns about 0.785 with nothing in front
+of the surface at all. Weighted by `projectedNormalLength`, whose mean over slices at that angle is
+`2/PI`, dividing by the slice count would report roughly **0.5 occlusion on every silhouette in the
+scene**. The half of the hemisphere behind the view plane is not an occluder, it is an absence of
+measurement, and screen space never had it to lose.
+
+So the pass divides by the same integral over the arc *before any sample closed it*:
+
+```glsl
+visibility = openVisibility > 1e-5 ? visibility / openVisibility : 1.0;
+```
+
+An unoccluded surface now reports exactly 1 at any view angle, and the term means "the fraction of
+what could be seen that is not blocked" rather than "the fraction of the hemisphere that happens to
+face the camera". One extra `sliceVisibility` call per slice, no constants.
 
 ## Bent normal
 
@@ -150,6 +165,62 @@ Debug views go through [[CompositePass]], not the lighting shader:
 - **No thin-occluder compensation.** A depth buffer records surfaces, not solids, and the horizon
   search treats every one as infinitely thick. Railings, foliage and thin props therefore cast more
   occlusion than they should.
-- **The bent normal is produced but not yet consumed.** Specular occlusion is the reason it exists;
-  see the note in [[LightingPass]].
 - **No half-resolution path.** Every dispatch is full resolution.
+- **AO only modulates indirect light**, which is correct but means a surface lit mostly by direct
+  sun barely responds to it. Terrain outside the DDGI volume gets `indirectDiffuse == 0` (see
+  `getIrradiance`, which returns zero when `DDGIGetVolumeBlendWeight` is zero) and so cannot respond
+  to the occlusion term at all, however good the map over it looks.
+
+## Specular occlusion
+
+`specularOcclusion` in `common/BRDF.glsl` replaces the scalar `ao` multiply on `indirectSpecular`.
+It is the Lagarde and de Rousiers form (*Moving Frostbite to PBR* 4.10):
+
+```glsl
+clamp(pow(NdotV + ao, exp2(-16 * roughness - 1)) - 1 + ao, 0, 1)
+```
+
+### Why not the bent-normal cone test
+
+The obvious construction — fit the visibility to a cone of half-angle `acos(sqrt(1 - ao))` around
+the bent normal, fit the lobe to a cone from the GGX CDF, and intersect the two spherical caps
+(Oat and Sander) — was tried and does not survive contact with a curved surface. It is worth writing
+down so it is not tried again.
+
+The reflection direction is always `angle(N, V)` away from the normal, so at grazing it sits exactly
+on the **rim** of the visible hemisphere. The visibility cap shrinks symmetrically from that rim as
+soon as `ao` drops below 1, so the lobe crosses from "contained" to "disjoint" over a tiny range of
+`ao`. The term is therefore a near step function of `ao` at grazing, and a smooth sphere gets a hard
+black outline. Two fixes were attempted:
+
+1. Normalising the cone test by the unoccluded hemisphere instead of by the lobe, so `ao == 1` gives
+   `occlusion == 1` at any view angle. This removed the outline at the silhouette exactly, and left
+   a black ring slightly inside it wherever `ao` dipped even to ~0.9.
+2. Removing the silhouette dip at its source in the occlusion pass (see *Normalising against the
+   open arc* above — that change is correct on its own merits and was kept). It does not help here,
+   because *any* residual dip still falls off the same cliff.
+
+The problem is the model, not the inputs. A cap centred on the bent normal cannot represent "mostly
+open with a bite taken out" when the direction of interest lies on the rim. The Frostbite form's
+`NdotV` term is precisely the compensation for this: it holds the occlusion open as the view grazes,
+where the drop is a limit of what screen space can measure rather than something in the way.
+
+The bent normal is still produced. Nothing consumes it yet beyond the debug view.
+
+### Occlusion applies to the environment only
+
+In `DeferredLighting.fs.glsl` the term multiplies `environmentRadiance` *before* the traced
+reflection is blended in, not the blend afterwards. A ray that landed already accounted for whatever
+stood in its way; occluding it again darkens a wall the trace resolved correctly. Only the assumed
+sky that fills in behind a miss needs gating.
+
+The lobe half-angle is floored at `MIN_SPECULAR_LOBE_HALF_ANGLE`, both to keep the ratio
+well-conditioned as roughness goes to zero and because neither input resolves finer than that: a
+bent normal is an averaged direction and an occlusion cone is a one-number fit.
+
+**What this fixes and what it does not.** It darkens specular where the occlusion says the surface is
+enclosed and the lobe points into the enclosure: creases, contact, corners, undersides. It does
+*not* fix a flat open wall reflecting sky it should have no line of sight to, because the occlusion
+there is ~1 over the whole radius. That is a separate problem, in `DeferredLighting.fs.glsl` where
+`prefilteredRadiance` starts as `environmentRadiance` unconditionally and the traced reflection only
+blends over it by confidence. Wherever the trace misses indoors, the sky comes through the wall.

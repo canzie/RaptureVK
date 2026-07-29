@@ -559,7 +559,14 @@ void main() {
                                                       roughness * (pc.prefilteredEnvMipCount - 1.0)).rgb *
                                            pc.skyIntensity;
 
-                vec3 prefilteredRadiance = environmentRadiance;
+                // Occluded by the specular form rather than by the scalar the diffuse uses, since a
+                // lobe narrows with roughness while the diffuse one always covers the hemisphere.
+                //
+                // It applies to the environment alone. A traced ray that landed already accounted
+                // for whatever stood in its way, so occluding the reflection as well would darken a
+                // wall the trace resolved correctly.
+                float occlusion = specularOcclusion(max(dot(N, V), 0.0), ao, roughness);
+                vec3 prefilteredRadiance = environmentRadiance * occlusion;
 
                 // The traced reflection takes over wherever rays actually landed, and the
                 // environment fills the rest. Alpha is how much of the accumulation is backed by
@@ -572,7 +579,7 @@ void main() {
                 // The split-sum weight multiplies the blend, not the reflection alone. That is the
                 // pre-integrated half of the estimator, and applying it after the temporal filter
                 // rather than inside the resolve is what keeps it from amplifying the noise.
-                indirectSpecular = prefilteredRadiance * specularWeight * ao;
+                indirectSpecular = prefilteredRadiance * specularWeight;
             } else {
                 indirectDiffuse = irradiance;
             }
