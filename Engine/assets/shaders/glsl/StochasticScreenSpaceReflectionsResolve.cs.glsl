@@ -9,6 +9,7 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 3, binding = 0) uniform sampler2D gTextures[];
+layout(set = 3, binding = 0) uniform sampler2DArray gTextureArrays[];
 
 layout(set = 4, binding = 0, rgba16f) uniform restrict writeonly image2D outResolved;
 
@@ -21,6 +22,7 @@ layout(push_constant) uniform PushConstants {
     uint normalTextureIndex;
     uint materialTextureIndex;
     uint frameIndex;
+    int maxRays;
     float historyMipCount;
     // Last, so the block ends on the 8 byte alignment the ivec2s give it and its size matches
     // sizeof on the matching struct
@@ -103,9 +105,13 @@ void main() {
     float weightSum = 0.0;
     float distanceSum = 0.0;
 
+    // Every neighbour is gathered across every ray slot it was allocated. Slots beyond a tile's
+    // budget hold a zero density and drop out on the same test a miss does, so a variable ray count
+    // needs no special handling: the estimator normalises by whatever weight it ends up summing.
     for (int i = 0; i < 4; ++i) {
+    for (int layer = 0; layer < pc.maxRays; ++layer) {
         ivec2 coord = clamp(windowOrigin + NEIGHBOUR_OFFSETS[i], ivec2(0), pc.hitSize - 1);
-        vec4 hit = texelFetch(gTextures[nonuniformEXT(pc.hitTextureIndex)], coord, 0);
+        vec4 hit = texelFetch(gTextureArrays[nonuniformEXT(pc.hitTextureIndex)], ivec3(coord, layer), 0);
 
         float pdf = hit.w;
         if (pdf <= 0.0) {
@@ -141,6 +147,7 @@ void main() {
         radianceSum += textureLod(gTextures[nonuniformEXT(pc.historyColorTextureIndex)], historyUV, mip).rgb * weight;
         weightSum += weight;
         distanceSum += hitDistance * weight;
+    }
     }
 
     // A negative distance is what marks the record unusable, since a real one never is

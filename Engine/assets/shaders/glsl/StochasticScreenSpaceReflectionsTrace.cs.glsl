@@ -10,7 +10,13 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 3, binding = 0) uniform sampler2D gTextures[];
 
-layout(set = 4, binding = 0, rgba32f) uniform restrict writeonly image2D outHit;
+layout(set = 4, binding = 0, rgba32f) uniform restrict writeonly image2DArray outHit;
+
+// One entry per allocated ray, written by the allocation pass. A workgroup is one tile's one ray
+// slot, so unallocated slots are never dispatched rather than dispatched and retired.
+layout(std430, set = 4, binding = 1) readonly buffer WorkItems {
+    uvec2 items[];
+} u_workItems;
 
 layout(push_constant) uniform PushConstants {
     uint cameraSSBOIndex;
@@ -19,6 +25,7 @@ layout(push_constant) uniform PushConstants {
     uint normalTextureIndex;
     uint materialTextureIndex;
     uint linearDepthTextureIndex;
+    uint tileCountX;
     uint frameIndex;
     float maxDistance;
     float thickness;
@@ -254,7 +261,13 @@ TraceResult hiZMarch(CameraGPUData _cam, vec3 _viewPos, vec3 _viewDir) {
 }
 
 void main() {
-    ivec2 dst = ivec2(gl_GlobalInvocationID.xy);
+    // The workgroup index selects a tile and a ray slot from the compacted list rather than being a
+    // position on screen, so the pixel this invocation owns has to be rebuilt from the tile
+    uvec2 workItem = u_workItems.items[gl_WorkGroupID.x];
+    uvec2 tile = uvec2(workItem.x % pc.tileCountX, workItem.x / pc.tileCountX);
+    int rayIndex = int(workItem.y);
+
+    ivec2 dst = ivec2(tile * gl_WorkGroupSize.xy + gl_LocalInvocationID.xy);
     if (any(greaterThanEqual(dst, pc.outputSize))) {
         return;
     }
@@ -263,7 +276,7 @@ void main() {
 
     float depth = texelFetch(gTextures[nonuniformEXT(pc.depthTextureIndex)], srcCoord, 0).r;
     if (depth >= 1.0) {
-        imageStore(outHit, dst, vec4(0.0));
+        imageStore(outHit, ivec3(dst, rayIndex), vec4(0.0));
         return;
     }
 
@@ -284,7 +297,7 @@ void main() {
     mat3 tangentFrame = buildTangentFrame(viewNormal);
     vec3 tangentV = normalize(transpose(tangentFrame) * viewDirToEye);
     if (tangentV.z <= 0.0) {
-        imageStore(outHit, dst, vec4(0.0));
+        imageStore(outHit, ivec3(dst, rayIndex), vec4(0.0));
         return;
     }
 
@@ -299,7 +312,8 @@ void main() {
     for (int attempt = 0; attempt < MAX_RAY_ATTEMPTS; ++attempt) {
         // The step between attempts has to be smaller than the sequence, or every attempt lands on
         // the same point and redraws the ray it just rejected
-        uint sampleIndex = (pc.frameIndex + uint(attempt) + pixelSeed) % SAMPLE_SEQUENCE_LENGTH;
+        uint sampleIndex =
+            (pc.frameIndex + uint(attempt) + uint(rayIndex) * uint(MAX_RAY_ATTEMPTS) + pixelSeed) % SAMPLE_SEQUENCE_LENGTH;
         vec2 u = fract(hammersley(sampleIndex, SAMPLE_SEQUENCE_LENGTH) + jitter);
 
         // Zero is the mirror end of this parameterisation: it puts the sample at the centre of the
@@ -318,7 +332,7 @@ void main() {
     }
 
     if (pdf <= 0.0) {
-        imageStore(outHit, dst, vec4(0.0));
+        imageStore(outHit, ivec3(dst, rayIndex), vec4(0.0));
         return;
     }
 
@@ -340,10 +354,10 @@ void main() {
                              ? hiZMarch(cam, biasedOrigin, viewDir)
                              : ssrMarch(cam, biasedOrigin, viewDir);
     if (!result.hit) {
-        imageStore(outHit, dst, vec4(0.0));
+        imageStore(outHit, ivec3(dst, rayIndex), vec4(0.0));
         return;
     }
 
     // A stored pdf above zero is what marks the record as usable, so no separate mask is needed
-    imageStore(outHit, dst, vec4(result.hitUV, result.hitLinearDepth, pdf));
+    imageStore(outHit, ivec3(dst, rayIndex), vec4(result.hitUV, result.hitLinearDepth, pdf));
 }

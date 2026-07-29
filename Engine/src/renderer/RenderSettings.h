@@ -21,6 +21,7 @@ enum RenderSettingFlags {
     RENDER_SHOW_SSSR_RESOLVED = 1 << 8, // debug view: resolved reflection radiance
     RENDER_SHOW_SSSR_ACCUMULATED = 1 << 9, // debug view: temporally accumulated reflection
     RENDER_SHOW_SSSR_CONFIDENCE = 1 << 10, // debug view: accumulated reflection confidence
+    RENDER_USE_SCREEN_SPACE_REFLECTIONS = 1 << 11, // blend traced reflections over the environment
     RENDER_ALL = 0xFFFFFFFF,
 };
 
@@ -28,8 +29,8 @@ enum RenderSettingFlags {
  * @brief Per-view, non-destructive render display overrides consumed by the renderer.
  */
 struct RenderSettings {
-    uint32_t flags =
-        RENDER_USE_GLOBAL_ILLUMINATION | RENDER_SHOW_DIRECT | RENDER_SHOW_INDIRECT | RENDER_MODULATE_INDIRECT;
+    uint32_t flags = RENDER_USE_GLOBAL_ILLUMINATION | RENDER_SHOW_DIRECT | RENDER_SHOW_INDIRECT |
+                     RENDER_MODULATE_INDIRECT | RENDER_USE_SCREEN_SPACE_REFLECTIONS;
 
     bool useGlobalIllumination() const { return (flags & RENDER_USE_GLOBAL_ILLUMINATION) != 0u; }
     bool useDirectLighting() const { return (flags & RENDER_SHOW_DIRECT) != 0u; }

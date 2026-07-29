@@ -16,6 +16,7 @@ const uint RENDER_SHOW_SSSR_HIT = 1u << 7;
 const uint RENDER_SHOW_SSSR_RESOLVED = 1u << 8;
 const uint RENDER_SHOW_SSSR_ACCUMULATED = 1u << 9;
 const uint RENDER_SHOW_SSSR_CONFIDENCE = 1u << 10;
+const uint RENDER_USE_SCREEN_SPACE_REFLECTIONS = 1u << 11;
 const uint RENDER_ALL = 0xFFFFFFFFu;
 
 #endif // RENDER_FLAGS_GLSL

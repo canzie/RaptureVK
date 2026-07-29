@@ -2,6 +2,7 @@
 #define RAPTURE__STOCHASTIC_SCREEN_SPACE_REFLECTIONS_PASS_H
 
 #include "asset_manager/AssetHandle.h"
+#include "buffers/StorageBuffer.h"
 #include "buffers/descriptors/DescriptorSet.h"
 #include "pipelines/ComputePipeline.h"
 #include "renderer/passes/ComputePass.h"
@@ -75,6 +76,19 @@ class StochasticScreenSpaceReflectionsPass : public ComputePass {
     void createTextures();
     void createDescriptorSets();
 
+    /**
+     * @brief Sets each tile's ray budget from the roughness it covers
+     * @param context The frame being rendered
+     * @param commandBuffer The buffer to record into
+     */
+    void recordClassify(const RenderPassContext &context, CommandBuffer *commandBuffer);
+
+    /**
+     * @brief Compacts the tile budgets into a ray list and the indirect dispatch that consumes it
+     * @param context The frame being rendered
+     * @param commandBuffer The buffer to record into
+     */
+    void recordAllocate(const RenderPassContext &context, CommandBuffer *commandBuffer);
 
     /**
      * @brief Marches a reflection ray per half-resolution pixel into the hit record
@@ -100,15 +114,28 @@ class StochasticScreenSpaceReflectionsPass : public ComputePass {
   private:
     const RenderContext *m_rc = nullptr;
 
+    Shader *m_classifyShader = nullptr;
+    Shader *m_allocateShader = nullptr;
     Shader *m_traceShader = nullptr;
     Shader *m_resolveShader = nullptr;
     Shader *m_downsampleShader = nullptr;
     Shader *m_temporalShader = nullptr;
     std::vector<AssetRef> m_shaderAssets;
+    std::shared_ptr<ComputePipeline> m_classifyPipeline;
+    std::shared_ptr<ComputePipeline> m_allocatePipeline;
     std::shared_ptr<ComputePipeline> m_tracePipeline;
     std::shared_ptr<ComputePipeline> m_resolvePipeline;
     std::shared_ptr<ComputePipeline> m_downsamplePipeline;
     std::shared_ptr<ComputePipeline> m_temporalPipeline;
+
+    std::vector<std::unique_ptr<Texture>> m_tileRayCountTextures;
+    std::vector<std::unique_ptr<DescriptorSet>> m_tileRayCountSets;
+
+    /// One entry per allocated ray, plus the VkDispatchIndirectCommand the trace is dispatched from
+    std::vector<std::unique_ptr<StorageBuffer>> m_workItemBuffers;
+    std::vector<std::unique_ptr<StorageBuffer>> m_indirectBuffers;
+    std::vector<std::unique_ptr<DescriptorSet>> m_allocateSets;
+    uint32_t m_maxWorkItems = 0;
 
     std::vector<std::unique_ptr<Texture>> m_hitTextures;
     std::vector<std::unique_ptr<Texture>> m_resolvedTextures;
@@ -128,7 +155,13 @@ class StochasticScreenSpaceReflectionsPass : public ComputePass {
     uint32_t m_height;
     uint32_t m_halfWidth;
     uint32_t m_halfHeight;
+    uint32_t m_tileCountX;
+    uint32_t m_tileCountY;
     uint32_t m_framesInFlight;
+
+    /// Rays per half-resolution pixel a tile may be allocated, by how rough it is
+    int32_t m_minRays = 1;
+    int32_t m_maxRays = 4;
 
     float m_maxDistance = 40.0f;
     float m_thickness = 0.5f;

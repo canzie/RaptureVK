@@ -45,6 +45,7 @@ struct LightingPushConstants {
     uint32_t sssrAccumulatedHandle;
     uint32_t prefilteredEnvHandle;
     float prefilteredEnvMipCount;
+    float skyIntensity;
 };
 
 LightingPass::LightingPass(float width, float height, DynamicDiffuseGI *ddgi, VkFormat colorFormat)
@@ -178,6 +179,10 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
         context.targets->sssrAccumulated != nullptr ? context.targets->sssrAccumulated->getBindlessIndex() : 0;
     pushConstants.prefilteredEnvHandle = ibl != nullptr ? ibl->getPrefilteredBindlessIndex() : 0;
     pushConstants.prefilteredEnvMipCount = ibl != nullptr ? static_cast<float>(ibl->getPrefilteredMipCount()) : 1.0f;
+
+    Entity environmentEntity = activeScene.environmentEntity();
+    pushConstants.skyIntensity =
+        environmentEntity.hasComponent<SkyboxComponent>() ? environmentEntity.getComponent<SkyboxComponent>().skyIntensity : 1.0f;
 
     auto &renderData = *(activeScene.getRenderData());
     auto &lightStore = renderData.getLights();

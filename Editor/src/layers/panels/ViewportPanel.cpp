@@ -222,7 +222,8 @@ void ViewportPanel::buildRenderMenu()
     m_renderMenu->addClass("viewport-context-menu");
     m_renderMenu->popupWidth *= 1.3f;
     m_renderMenu->maxVisibleItems = INT_MAX;
-    m_renderMenu->setRowFactories({.radio = [] { return std::make_unique<ViewportContextMenuRIV>(); }});
+    m_renderMenu->setRowFactories({.toggle = [] { return std::make_unique<ViewportContextMenuTIV>(); },
+                                   .radio = [] { return std::make_unique<ViewportContextMenuRIV>(); }});
 
     m_lightingModeGroupConn = m_lightingModeGroup.onChanged.connect(
         [this]() { applyLightingMode(static_cast<ViewportLightingMode>(m_lightingModeGroup.value)); });
@@ -240,6 +241,15 @@ void ViewportPanel::buildRenderMenu()
         ViewportContextMenuRID::create("Show Reflections (Accumulated)", &m_lightingModeGroup, VLM_SSSR_ACCUMULATED));
     items.push_back(
         ViewportContextMenuRID::create("Show Reflection Confidence", &m_lightingModeGroup, VLM_SSSR_CONFIDENCE));
+
+    auto reflectionsToggle = ViewportContextMenuTID::create("Screen-Space Reflections", [this](bool on) {
+        if (m_viewport != nullptr) {
+            m_viewport->renderSettings().setFlag(Rapture::RENDER_USE_SCREEN_SPACE_REFLECTIONS, on);
+        }
+    });
+    reflectionsToggle->as<ViewportContextMenuTID>().value = true;
+    items.push_back(std::move(reflectionsToggle));
+
     m_renderMenu->setItems(std::move(items));
 }
 

@@ -129,6 +129,7 @@ layout(push_constant) uniform PushConstants {
     uint sssrAccumulatedHandle;
     uint prefilteredEnvHandle;
     float prefilteredEnvMipCount;
+    float skyIntensity;
 } pc;
 
 
@@ -544,10 +545,24 @@ void main() {
                 // i / (mips - 1), so the lookup is linear in roughness to match it.
                 vec3 R = reflect(-V, N);
                 vec3 Rd = getSpecularDominantDir(N, R, roughness);
-                vec3 prefilteredRadiance =
-                    textureLod(gCubemaps[nonuniformEXT(pc.prefilteredEnvHandle)], Rd,
-                               roughness * (pc.prefilteredEnvMipCount - 1.0)).rgb;
 
+                vec3 environmentRadiance = textureLod(gCubemaps[nonuniformEXT(pc.prefilteredEnvHandle)], Rd,
+                                                      roughness * (pc.prefilteredEnvMipCount - 1.0)).rgb *
+                                           pc.skyIntensity;
+
+                vec3 prefilteredRadiance = environmentRadiance;
+
+                // The traced reflection takes over wherever rays actually landed, and the
+                // environment fills the rest. Alpha is how much of the accumulation is backed by
+                // real hits, so it fades out on its own across a miss rather than needing a cutoff.
+                if ((pc.lightingFlags & RENDER_USE_SCREEN_SPACE_REFLECTIONS) != 0u) {
+                    vec4 reflection = texture(gTextures[nonuniformEXT(pc.sssrAccumulatedHandle)], fragTexCoord);
+                    prefilteredRadiance = mix(prefilteredRadiance, reflection.rgb, reflection.a);
+                }
+
+                // The split-sum weight multiplies the blend, not the reflection alone. That is the
+                // pre-integrated half of the estimator, and applying it after the temporal filter
+                // rather than inside the resolve is what keeps it from amplifying the noise.
                 indirectSpecular = prefilteredRadiance * specularWeight * ao;
             } else {
                 indirectDiffuse = irradiance;
