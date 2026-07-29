@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "plans/G-Buffer Expansion.md",
+                "file": "theory/Horizon-Based Ambient Occlusion.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "G-Buffer Expansion"
+              "title": "Horizon-Based Ambient Occlusion"
             }
           }
         ]
@@ -185,24 +185,29 @@
   },
   "active": "6fa67950a6ea8521",
   "lastOpenFiles": [
-    "plans/G-Buffer Expansion.md.tmp.38954.0dc25488b988",
-    "plans/G-Buffer Expansion.md.tmp.38954.5b17d56bd610",
-    "plans/G-Buffer Expansion.md.tmp.38954.61d307f18742",
-    "plans/G-Buffer Expansion.md.tmp.38954.8bb74698efdf",
-    "plans/G-Buffer Expansion.md.tmp.38954.3cf676249688",
-    "plans/G-Buffer Expansion.md.tmp.38954.ea4ef74388b1",
-    "plans/G-Buffer Expansion.md.tmp.16502.9af835fee293",
-    "plans/G-Buffer Expansion.md.tmp.16502.c864772f86fb",
-    "plans/G-Buffer Expansion.md.tmp.16502.c6689b76cd17",
+    "theory/Ground Truth Ambient Occlusion.md",
+    "theory/Ground Truth Ambient Occlusion.md.tmp.1451.77ca9c4ffbc0",
+    "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.bbbaf4da68b5",
+    "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.edb6b49cf73c",
+    "theory/Ambient Occlusion.md",
+    "theory/Horizon-Based Ambient Occlusion.md",
+    "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.e075d99e5eb3",
+    "theory/Monte Carlo Integration.md.tmp.1451.da5c8f9f2dde",
+    "theory/Monte Carlo Integration.md.tmp.1451.2c2a2dc3a8a5",
+    "theory/Monte Carlo Integration.md.tmp.1451.01127b664b0d",
+    "theory/Solid Angle.md.tmp.1451.26d992e34773",
+    "theory/Solid Angle.md.tmp.1451.3f158a21191e",
+    "theory/Ambient Occlusion.md.tmp.1451.361ab5a05d13",
+    "theory/Monte Carlo Integration.md",
+    "theory/Solid Angle.md",
+    "plans/G-Buffer Expansion.md",
     "plans/Stochastic Screen-Space Reflections.md",
-    "plans/Stochastic Screen-Space Reflections.md.tmp.16502.23813ef2a81e",
     "plans/Material Editor Workspace.md",
     "plans/Image-Based Lighting.md",
     "plans/Editor UX Polish Roadmap.md",
     "plans/Project Serialization.md",
     "plans/Per-node Graph Values.md",
     "Material Graph Nodes.md",
-    "Material Graph Nodes.md.tmp.1513.8fef1da2ab09",
     "systems/AssetManager.md",
     "systems/AssetRef.md",
     "plans/Material Graph Compiler.md",
@@ -216,11 +221,6 @@
     "Amethyst UI Library.md",
     "systems/Viewport.md",
     "systems/Texture.md",
-    "systems/StencilBorderPass.md",
-    "systems/SkyboxPass.md",
-    "systems/ShadowMapping.md",
-    "systems/Shader.md",
-    "systems/Scene.md",
     "Pasted image 20260517113657.png"
   ]
 }

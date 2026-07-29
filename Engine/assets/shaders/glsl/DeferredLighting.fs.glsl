@@ -126,6 +126,7 @@ layout(push_constant) uniform PushConstants {
     uint probeOffsetHandle;
     uint probeClassificationHandle;
     uint brdfLutHandle;
+    uint ambientOcclusionHandle;
     uint prefilteredEnvHandle;
     float prefilteredEnvMipCount;
     float skyIntensity;
@@ -427,6 +428,15 @@ void main() {
         outColor = vec4(encoded, 0.1, 1.0);
         return;
     }
+
+    if ((pc.lightingFlags & RENDER_SHOW_AMBIENT_OCCLUSION) != 0u) {
+        // Shown raw. The composite pass still applies exposure and ACES, which is monotone, so the
+        // structure reads correctly while the absolute values sit lower than they are.
+        float occlusion = texture(gTextures[nonuniformEXT(pc.ambientOcclusionHandle)], fragTexCoord).r;
+        outColor = vec4(vec3(occlusion), 1.0);
+        return;
+    }
+
     vec4 baseColorEmissive = texture(gTextures[pc.GBufferAlbedoHandle], fragTexCoord);
     vec4 material = texture(gTextures[pc.GBufferMaterialHandle], fragTexCoord);
     vec4 shadingModel = texture(gTextures[pc.GBufferShadingModelHandle], fragTexCoord);
@@ -437,6 +447,14 @@ void main() {
     float roughness = material.g;
     float ao = material.b;
     float specular = unpackSpecular(material.a);
+
+    // The material's own occlusion is baked from the mesh and describes its cavities. It knows
+    // nothing about the room the mesh was put in, which is what the traced term adds, so the two
+    // occlude different scales and multiply rather than replace one another.
+    if ((pc.lightingFlags & RENDER_USE_AMBIENT_OCCLUSION) != 0u) {
+        ao *= texture(gTextures[nonuniformEXT(pc.ambientOcclusionHandle)], fragTexCoord).r;
+    }
+
     uint shadingModelId = unpackShadingModel(shadingModel.r);
 
     vec3 V = normalize(pc.cameraPos.xyz - fragPos);

@@ -30,6 +30,7 @@ enum ViewportLightingMode {
     VLM_SHADOW_CASCADES,
     VLM_NORMALS,
     VLM_MOTION,
+    VLM_AMBIENT_OCCLUSION,
     VLM_METTALIC,
     VLM_ROUGHNESS,
     VLM_AO,

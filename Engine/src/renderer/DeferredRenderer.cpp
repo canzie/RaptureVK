@@ -43,6 +43,7 @@ DeferredRenderer::~DeferredRenderer()
     m_skyboxPass.reset();
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
+    m_ambientOcclusionPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
     m_dynamicDiffuseGI.reset();
@@ -233,6 +234,7 @@ RenderPassContext DeferredRenderer::buildPassContext(Scene &activeScene, Entity 
     m_passTargets.gbufferShadingModel = m_gbufferPass->getShadingModelTexture(m_currentFrame);
     m_passTargets.depthStencil = m_gbufferPass->getDepthTexture(m_currentFrame);
     m_passTargets.sceneColorHdr = m_sceneColorHdrTextures[m_currentFrame].get();
+    m_passTargets.ambientOcclusion = m_ambientOcclusionPass->getOcclusionTexture(m_currentFrame);
 
     RenderPassContext context;
     context.scene = &activeScene;
@@ -253,6 +255,7 @@ void DeferredRenderer::recreateRenderPasses()
     m_skyboxPass.reset();
     m_stencilBorderPass.reset();
     m_lightingPass.reset();
+    m_ambientOcclusionPass.reset();
     m_gbufferPass.reset();
     m_instancedShapesPass.reset();
 
@@ -264,6 +267,9 @@ void DeferredRenderer::recreateRenderPasses()
     const uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
 
     m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, framesInFlight);
+
+    m_ambientOcclusionPass = std::make_unique<GroundTruthAmbientOcclusionPass>(
+        static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), framesInFlight);
 
     m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_dynamicDiffuseGI.get(), hdrFormat);
 
@@ -465,6 +471,11 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             m_gbufferPass->beginRendering(context, commandBuffer);
             commandBuffer->executeSecondary(*gbufferBuffer);
             m_gbufferPass->endRendering(commandBuffer);
+        }
+
+        {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Ambient Occlusion Pass");
+            m_ambientOcclusionPass->execute(context, commandBuffer);
         }
 
         if (lightingBuffer) {

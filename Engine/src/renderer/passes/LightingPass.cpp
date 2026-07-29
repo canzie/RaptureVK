@@ -42,6 +42,7 @@ struct LightingPushConstants {
     uint32_t probeOffsetHandle;
     uint32_t probeClassificationHandle;
     uint32_t brdfLutHandle;
+    uint32_t ambientOcclusionHandle;
     uint32_t prefilteredEnvHandle;
     float prefilteredEnvMipCount;
     float skyIntensity;
@@ -174,6 +175,8 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
     ImageBasedLighting *ibl = environment != nullptr ? environment->getImageBasedLighting() : nullptr;
     pushConstants.brdfLutHandle = ibl != nullptr ? ibl->getBrdfLutBindlessIndex() : 0;
 
+    pushConstants.ambientOcclusionHandle =
+        context.targets->ambientOcclusion != nullptr ? context.targets->ambientOcclusion->getBindlessIndex() : 0;
     pushConstants.prefilteredEnvHandle = ibl != nullptr ? ibl->getPrefilteredBindlessIndex() : 0;
     pushConstants.prefilteredEnvMipCount = ibl != nullptr ? static_cast<float>(ibl->getPrefilteredMipCount()) : 1.0f;
 

@@ -27,6 +27,7 @@ struct RenderPassTargets {
     Texture *depthStencil = nullptr;
 
     Texture *sceneColorHdr = nullptr;
+    Texture *ambientOcclusion = nullptr;
 };
 
 /**

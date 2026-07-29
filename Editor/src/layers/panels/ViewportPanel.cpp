@@ -235,6 +235,17 @@ void ViewportPanel::buildRenderMenu()
     items.push_back(ViewportContextMenuRID::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
     items.push_back(ViewportContextMenuRID::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
     items.push_back(ViewportContextMenuRID::create("Show Motion Vectors", &m_lightingModeGroup, VLM_MOTION));
+    items.push_back(
+        ViewportContextMenuRID::create("Show Ambient Occlusion", &m_lightingModeGroup, VLM_AMBIENT_OCCLUSION));
+
+    auto occlusionToggle = ViewportContextMenuTID::create("Ambient Occlusion", [this](bool on) {
+        if (m_viewport != nullptr) {
+            m_viewport->renderSettings().setFlag(Rapture::RENDER_USE_AMBIENT_OCCLUSION, on);
+        }
+    });
+    occlusionToggle->as<ViewportContextMenuTID>().value = true;
+    items.push_back(std::move(occlusionToggle));
+
     m_renderMenu->setItems(std::move(items));
 }
 
@@ -248,6 +259,7 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
 
     settings.setFlag(Rapture::RENDER_SHOW_NORMALS, false);
     settings.setFlag(Rapture::RENDER_SHOW_MOTION, false);
+    settings.setFlag(Rapture::RENDER_SHOW_AMBIENT_OCCLUSION, false);
     switch (mode) {
     case VLM_DIRECT_LIGHTING:
         settings.setFlag(Rapture::RENDER_SHOW_DIRECT, true);
@@ -270,6 +282,9 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
         break;
     case VLM_MOTION:
         settings.setFlag(Rapture::RENDER_SHOW_MOTION, true);
+        break;
+    case VLM_AMBIENT_OCCLUSION:
+        settings.setFlag(Rapture::RENDER_SHOW_AMBIENT_OCCLUSION, true);
         break;
     case VLM_LIT:
     default:
