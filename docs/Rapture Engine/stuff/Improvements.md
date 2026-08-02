@@ -197,6 +197,6 @@ These are in good shape. Minor items only.
 ## Not Prioritized / Future
 
 - Descriptor set caching (reuse identical layouts) — noted in DescriptorSet.h TODO
-- EntityView wrapper performance (10x overhead vs raw EnTT views) — known, documented in CLAUDE.md
+- ~~EntityView wrapper performance (10x overhead vs raw EnTT views)~~ — done, the wrapper was unused and is deleted
 - Multi-threaded asset loading thread safety
 - Shader hot-reload

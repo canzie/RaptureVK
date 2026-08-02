@@ -80,6 +80,20 @@ class SceneRenderTarget {
     std::shared_ptr<Texture> getTexture(uint32_t index) const;
 
     /**
+     * @brief The layout the image at an index is currently in
+     * @param index The image index
+     * @return The tracked layout, or VK_IMAGE_LAYOUT_UNDEFINED where the index is invalid
+     */
+    VkImageLayout getImageLayout(uint32_t index) const;
+
+    /**
+     * @brief Record the layout an image has been transitioned into
+     * @param index The image index
+     * @param layout The layout the image is now in
+     */
+    void setImageLayout(uint32_t index, VkImageLayout layout);
+
+    /**
      * @brief Check if this render target needs image layout transitions for sampling
      * OFFSCREEN targets need to transition to SHADER_READ_ONLY_OPTIMAL for ImGui sampling.
      * SWAPCHAIN targets need to transition to PRESENT_SRC_KHR for presentation.
@@ -110,6 +124,7 @@ class SceneRenderTarget {
 
     // For SWAPCHAIN mode
     std::shared_ptr<SwapChain> m_swapChain;
+    std::vector<VkImageLayout> m_swapChainLayouts;
 };
 
 } // namespace Rapture

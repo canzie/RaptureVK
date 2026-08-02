@@ -338,7 +338,7 @@ void LightingPass::createPipeline()
 void LightingPass::updateAttachments(const RenderPassContext &context)
 {
     RenderPassAttachment colorAttachment;
-    colorAttachment.texture = context.targets->sceneColorHdr;
+    colorAttachment.target = context.targets->sceneColorHdr;
     colorAttachment.loadOp = RenderPassAttachmentLoadOp::CLEAR;
     colorAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
     colorAttachment.clearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);

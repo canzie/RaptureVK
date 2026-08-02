@@ -92,6 +92,7 @@ void SceneRenderTarget::onSwapChainRecreated()
     if (m_type == TargetType::SWAPCHAIN && m_swapChain) {
         m_width = m_swapChain->getExtent().width;
         m_height = m_swapChain->getExtent().height;
+        m_swapChainLayouts.assign(m_swapChain->getImageCount(), VK_IMAGE_LAYOUT_UNDEFINED);
         RP_CORE_INFO("SceneRenderTarget updated after swapchain recreation: {}x{}", m_width, m_height);
     }
     // For OFFSCREEN type, this is a no-op - viewport size is independent
@@ -164,6 +165,36 @@ std::shared_ptr<Texture> SceneRenderTarget::getTexture(uint32_t index) const
     }
     RP_CORE_ERROR("Invalid index {}", index);
     return nullptr;
+}
+
+VkImageLayout SceneRenderTarget::getImageLayout(uint32_t index) const
+{
+    if (m_type == TargetType::OFFSCREEN) {
+        if (index < m_offscreenTextures.size()) {
+            return m_offscreenTextures[index]->getCurrentLayout();
+        }
+        return VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+
+    if (index < m_swapChainLayouts.size()) {
+        return m_swapChainLayouts[index];
+    }
+    return VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
+void SceneRenderTarget::setImageLayout(uint32_t index, VkImageLayout layout)
+{
+    if (m_type == TargetType::OFFSCREEN) {
+        if (index < m_offscreenTextures.size()) {
+            m_offscreenTextures[index]->setCurrentLayout(layout);
+        }
+        return;
+    }
+
+    if (index >= m_swapChainLayouts.size()) {
+        m_swapChainLayouts.resize(index + 1, VK_IMAGE_LAYOUT_UNDEFINED);
+    }
+    m_swapChainLayouts[index] = layout;
 }
 
 void SceneRenderTarget::transitionToShaderReadLayout(CommandBuffer *commandBuffer, uint32_t imageIndex)

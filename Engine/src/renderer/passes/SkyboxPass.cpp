@@ -269,7 +269,7 @@ void SkyboxPass::createSkyboxGeometry()
 void SkyboxPass::updateAttachments(const RenderPassContext &context)
 {
     RenderPassAttachment colorAttachment;
-    colorAttachment.texture = context.targets->sceneColorHdr;
+    colorAttachment.target = context.targets->sceneColorHdr;
     colorAttachment.loadOp = RenderPassAttachmentLoadOp::LOAD;
     colorAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
 
@@ -277,7 +277,7 @@ void SkyboxPass::updateAttachments(const RenderPassContext &context)
     m_attachments.colorAttachments.push_back(colorAttachment);
 
     m_attachments.depthAttachment = {};
-    m_attachments.depthAttachment.texture = m_depthTextures[context.frameInFlight];
+    m_attachments.depthAttachment.target = m_depthTextures[context.frameInFlight];
     m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::LOAD;
     m_attachments.depthAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
 

@@ -17,10 +17,6 @@ class Texture;
 
 /**
  * @brief Tone maps the linear HDR scene colour into the presented render target
- *
- * The only pass that writes a swapchain image, which SceneRenderTarget exposes as a raw VkImage
- * rather than a Texture. It therefore overrides beginRendering and endRendering instead of
- * declaring attachments, and updateAttachments stays empty.
  */
 class CompositePass : public RenderPass {
   public:
@@ -32,7 +28,6 @@ class CompositePass : public RenderPass {
 
     SecondaryBufferInheritance getInheritance(const RenderPassContext &context) override;
     void beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb) override;
-    void endRendering(CommandBuffer *primaryCb) override;
 
     /**
      * @brief Set the exposure applied before tone mapping
@@ -47,12 +42,11 @@ class CompositePass : public RenderPass {
     void createPipeline();
 
     /**
-     * @brief Transition the presented image into a colour attachment layout and the scene colour into a sampleable one
+     * @brief Transition the scene colour this pass samples into a shader readable layout
      * @param primaryCb Primary buffer the rendering is issued on
-     * @param targetImage Image being written this frame
      * @param sceneColor HDR scene colour this pass samples
      */
-    void setupMemoryBarriers(CommandBuffer *primaryCb, VkImage targetImage, Texture *sceneColor);
+    void transitionSceneColorForSampling(CommandBuffer *primaryCb, Texture *sceneColor);
 
   private:
     const RenderContext *m_rc = nullptr;

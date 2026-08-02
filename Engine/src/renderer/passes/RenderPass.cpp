@@ -1,9 +1,99 @@
 #include "renderer/passes/RenderPass.h"
 
+#include "render_targets/SceneRenderTarget.h"
 #include "textures/Texture.h"
 #include "utils/rp_assert.h"
 
 namespace Rapture {
+
+static bool s_hasTarget(const RenderTargetRef &ref)
+{
+    return !std::holds_alternative<std::monostate>(ref);
+}
+
+static VkImageView s_attachmentView(const RenderTargetRef &ref)
+{
+    if (const auto *texture = std::get_if<Texture *>(&ref)) {
+        return (*texture)->getAttachmentImageView();
+    }
+    if (const auto *image = std::get_if<RenderTargetImage>(&ref)) {
+        return image->target->getImageView(image->index);
+    }
+
+    return VK_NULL_HANDLE;
+}
+
+static VkFormat s_attachmentFormat(const RenderTargetRef &ref)
+{
+    if (const auto *texture = std::get_if<Texture *>(&ref)) {
+        return (*texture)->getFormat();
+    }
+    if (const auto *image = std::get_if<RenderTargetImage>(&ref)) {
+        return image->target->getFormat();
+    }
+
+    return VK_FORMAT_UNDEFINED;
+}
+
+static VkExtent2D s_attachmentExtent(const RenderTargetRef &ref)
+{
+    if (const auto *texture = std::get_if<Texture *>(&ref)) {
+        const TextureSpecification &spec = (*texture)->getSpecification();
+        return {spec.width, spec.height};
+    }
+    if (const auto *image = std::get_if<RenderTargetImage>(&ref)) {
+        return image->target->getExtent();
+    }
+
+    return {0, 0};
+}
+
+static VkImageLayout s_attachmentLayout(const RenderTargetRef &ref)
+{
+    if (const auto *texture = std::get_if<Texture *>(&ref)) {
+        return (*texture)->getCurrentLayout();
+    }
+    if (const auto *image = std::get_if<RenderTargetImage>(&ref)) {
+        return image->target->getImageLayout(image->index);
+    }
+
+    return VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
+/**
+ * @brief Barrier moving an attachment into a layout, recording the new layout on its owner
+ */
+static VkImageMemoryBarrier s_attachmentBarrier(const RenderTargetRef &ref, VkImageLayout oldLayout, VkImageLayout newLayout,
+                                                VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask)
+{
+    if (const auto *texture = std::get_if<Texture *>(&ref)) {
+        return (*texture)->getImageMemoryBarrier(oldLayout, newLayout, srcAccessMask, dstAccessMask);
+    }
+
+    const auto *image = std::get_if<RenderTargetImage>(&ref);
+    if (image == nullptr) {
+        RP_CORE_ERROR("Cannot barrier an attachment that references no image");
+        return {};
+    }
+    image->target->setImageLayout(image->index, newLayout);
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image->target->getImage(image->index);
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = srcAccessMask;
+    barrier.dstAccessMask = dstAccessMask;
+
+    return barrier;
+}
 
 static VkAttachmentLoadOp s_toVkLoadOp(RenderPassAttachmentLoadOp loadOp)
 {
@@ -35,7 +125,7 @@ static VkRenderingAttachmentInfo s_buildColorAttachmentInfo(const RenderPassAtta
 {
     VkRenderingAttachmentInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    info.imageView = attachment.texture->getAttachmentImageView();
+    info.imageView = s_attachmentView(attachment.target);
     info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     info.loadOp = s_toVkLoadOp(attachment.loadOp);
     info.storeOp = s_toVkStoreOp(attachment.storeOp);
@@ -54,7 +144,7 @@ static VkRenderingAttachmentInfo s_buildDepthAttachmentInfo(const RenderPassAtta
 {
     VkRenderingAttachmentInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    info.imageView = attachment.texture->getAttachmentImageView();
+    info.imageView = s_attachmentView(attachment.target);
     info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     info.loadOp = s_toVkLoadOp(attachment.loadOp);
     info.storeOp = s_toVkStoreOp(attachment.storeOp);
@@ -70,7 +160,7 @@ static VkRenderingAttachmentInfo s_buildStencilAttachmentInfo(const RenderPassAt
 {
     VkRenderingAttachmentInfo info{};
     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    info.imageView = attachment.texture->getAttachmentImageView();
+    info.imageView = s_attachmentView(attachment.target);
     info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     info.loadOp = s_toVkLoadOp(attachment.loadOp);
     info.storeOp = s_toVkStoreOp(attachment.storeOp);
@@ -100,19 +190,19 @@ static VkAccessFlags s_writeAccessForLayout(VkImageLayout layout)
 static void s_appendTransitionBarrier(std::vector<VkImageMemoryBarrier> &barriers, const RenderPassAttachment &attachment,
                                       VkImageLayout newLayout, VkAccessFlags dstAccessMask)
 {
-    if (attachment.texture == nullptr) {
+    if (!s_hasTarget(attachment.target)) {
         return;
     }
 
     // A cleared or discarded attachment has nothing worth preserving, so it transitions from
     // UNDEFINED. A LOAD attachment keeps its contents and so comes from the layout it tracks.
-    const VkImageLayout oldLayout =
-        attachment.loadOp == RenderPassAttachmentLoadOp::LOAD ? attachment.texture->getCurrentLayout() : VK_IMAGE_LAYOUT_UNDEFINED;
+    const VkImageLayout oldLayout = attachment.loadOp == RenderPassAttachmentLoadOp::LOAD ? s_attachmentLayout(attachment.target)
+                                                                                         : VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Emitted even when the layout does not change, since it still carries the dependency on
     // whichever pass last wrote the attachment
     barriers.push_back(
-        attachment.texture->getImageMemoryBarrier(oldLayout, newLayout, s_writeAccessForLayout(oldLayout), dstAccessMask));
+        s_attachmentBarrier(attachment.target, oldLayout, newLayout, s_writeAccessForLayout(oldLayout), dstAccessMask));
 }
 
 const RenderPassAttachments &RenderPass::getAttachments(const RenderPassContext &context)
@@ -132,15 +222,15 @@ SecondaryBufferInheritance RenderPass::getInheritance(const RenderPassContext &c
     SecondaryBufferInheritance inheritance;
     inheritance.colorFormats.reserve(attachments.colorAttachments.size());
     for (const RenderPassAttachment &colorAttachment : attachments.colorAttachments) {
-        inheritance.colorFormats.push_back(colorAttachment.texture->getFormat());
+        inheritance.colorFormats.push_back(s_attachmentFormat(colorAttachment.target));
     }
 
-    if (attachments.depthAttachment.texture != nullptr) {
-        inheritance.depthFormat = attachments.depthAttachment.texture->getFormat();
+    if (s_hasTarget(attachments.depthAttachment.target)) {
+        inheritance.depthFormat = s_attachmentFormat(attachments.depthAttachment.target);
     }
 
-    if (attachments.stencilAttachment.texture != nullptr) {
-        inheritance.stencilFormat = attachments.stencilAttachment.texture->getFormat();
+    if (s_hasTarget(attachments.stencilAttachment.target)) {
+        inheritance.stencilFormat = s_attachmentFormat(attachments.stencilAttachment.target);
     }
 
     return inheritance;
@@ -161,7 +251,7 @@ void RenderPass::beginRendering(const RenderPassContext &context, CommandBuffer 
                               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
     // Depth and stencil may point at the same combined texture; do not barrier it twice.
-    if (attachments.stencilAttachment.texture != attachments.depthAttachment.texture) {
+    if (attachments.stencilAttachment.target != attachments.depthAttachment.target) {
         s_appendTransitionBarrier(barriers, attachments.stencilAttachment, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                                   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
     }
@@ -189,8 +279,8 @@ void RenderPass::beginRendering(const RenderPassContext &context, CommandBuffer 
         colorAttachmentInfos.push_back(s_buildColorAttachmentInfo(colorAttachment));
     }
 
-    bool hasDepth = attachments.depthAttachment.texture != nullptr;
-    bool hasStencil = attachments.stencilAttachment.texture != nullptr;
+    bool hasDepth = s_hasTarget(attachments.depthAttachment.target);
+    bool hasStencil = s_hasTarget(attachments.stencilAttachment.target);
 
     VkRenderingAttachmentInfo depthAttachmentInfo{};
     if (hasDepth) {
@@ -204,11 +294,9 @@ void RenderPass::beginRendering(const RenderPassContext &context, CommandBuffer 
 
     VkExtent2D renderExtent{0, 0};
     if (!attachments.colorAttachments.empty()) {
-        const TextureSpecification &spec = attachments.colorAttachments[0].texture->getSpecification();
-        renderExtent = {spec.width, spec.height};
+        renderExtent = s_attachmentExtent(attachments.colorAttachments[0].target);
     } else if (hasDepth) {
-        const TextureSpecification &spec = attachments.depthAttachment.texture->getSpecification();
-        renderExtent = {spec.width, spec.height};
+        renderExtent = s_attachmentExtent(attachments.depthAttachment.target);
     }
 
     RP_ASSERT(renderExtent.width != 0 && renderExtent.height != 0, "A pass must declare at least one attachment");

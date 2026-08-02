@@ -59,7 +59,7 @@ SelectionOutlinePass::~SelectionOutlinePass()
 void SelectionOutlinePass::updateAttachments(const RenderPassContext &context)
 {
     RenderPassAttachment colorAttachment;
-    colorAttachment.texture = context.targets->sceneColorHdr;
+    colorAttachment.target = context.targets->sceneColorHdr;
     colorAttachment.loadOp = RenderPassAttachmentLoadOp::LOAD;
     colorAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
 

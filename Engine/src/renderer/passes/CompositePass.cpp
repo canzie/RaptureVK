@@ -3,7 +3,6 @@
 
 #include "asset_manager/AssetManager.h"
 #include "buffers/descriptors/DescriptorManager.h"
-#include "render_targets/SceneRenderTarget.h"
 #include "textures/Texture.h"
 
 #include "logging/Log.h"
@@ -50,8 +49,16 @@ CompositePass::~CompositePass()
 
 void CompositePass::updateAttachments(const RenderPassContext &context)
 {
-    // The presented image is a raw VkImage, not a Texture, so this pass drives its own rendering info
-    (void)context;
+    RenderPassAttachment colorAttachment;
+    colorAttachment.target = RenderTargetImage{context.renderTarget, context.imageIndex};
+    colorAttachment.loadOp = RenderPassAttachmentLoadOp::DONT_CARE;
+    colorAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
+
+    m_attachments.colorAttachments.clear();
+    m_attachments.colorAttachments.push_back(colorAttachment);
+
+    m_attachments.depthAttachment = {};
+    m_attachments.stencilAttachment = {};
 }
 
 SecondaryBufferInheritance CompositePass::getInheritance(const RenderPassContext &context)
@@ -120,42 +127,18 @@ CommandBuffer *CompositePass::record(const RenderPassContext &context, const Sec
 
 void CompositePass::beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb)
 {
-    SceneRenderTarget *renderTarget = context.renderTarget;
-    if (renderTarget == nullptr) {
+    if (context.renderTarget == nullptr) {
         RP_CORE_ERROR("No render target to composite into");
         return;
     }
 
-    VkImage targetImage = renderTarget->getImage(context.imageIndex);
-    VkImageView targetImageView = renderTarget->getImageView(context.imageIndex);
+    transitionSceneColorForSampling(primaryCb, context.targets->sceneColorHdr);
 
-    setupMemoryBarriers(primaryCb, targetImage, context.targets->sceneColorHdr);
+    // The presented image is picked by image index rather than by frame in flight, and the two do
+    // not advance together, so the cached attachments cannot be reused across frames
+    invalidateAttachments();
 
-    VkRenderingAttachmentInfo colorAttachmentInfo{};
-    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachmentInfo.imageView = targetImageView;
-    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentInfo.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent = renderTarget->getExtent();
-    renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachmentInfo;
-    renderingInfo.pDepthAttachment = nullptr;
-    renderingInfo.pStencilAttachment = nullptr;
-    renderingInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
-
-    vkCmdBeginRendering(primaryCb->getCommandBufferVk(), &renderingInfo);
-}
-
-void CompositePass::endRendering(CommandBuffer *primaryCb)
-{
-    vkCmdEndRendering(primaryCb->getCommandBufferVk());
+    RenderPass::beginRendering(context, primaryCb);
 }
 
 void CompositePass::onResize(uint32_t width, uint32_t height)
@@ -164,7 +147,7 @@ void CompositePass::onResize(uint32_t width, uint32_t height)
     m_height = static_cast<float>(height);
 }
 
-void CompositePass::setupMemoryBarriers(CommandBuffer *primaryCb, VkImage targetImage, Texture *sceneColor)
+void CompositePass::transitionSceneColorForSampling(CommandBuffer *primaryCb, Texture *sceneColor)
 {
     VkImageMemoryBarrier sceneColorBarrier =
         sceneColor->getImageMemoryBarrier(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -172,24 +155,6 @@ void CompositePass::setupMemoryBarriers(CommandBuffer *primaryCb, VkImage target
 
     vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &sceneColorBarrier);
-
-    VkImageMemoryBarrier colorBarrier{};
-    colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    colorBarrier.image = targetImage;
-    colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    colorBarrier.subresourceRange.baseMipLevel = 0;
-    colorBarrier.subresourceRange.levelCount = 1;
-    colorBarrier.subresourceRange.baseArrayLayer = 0;
-    colorBarrier.subresourceRange.layerCount = 1;
-    colorBarrier.srcAccessMask = 0;
-    colorBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &colorBarrier);
 }
 
 void CompositePass::createPipeline()

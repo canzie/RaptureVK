@@ -7,11 +7,31 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <variant>
 #include <vector>
 
 namespace Rapture {
 
+class SceneRenderTarget;
 class Texture;
+
+/**
+ * @brief One image of a render target, for targets whose images are not Textures
+ */
+struct RenderTargetImage {
+    SceneRenderTarget *target = nullptr;
+    uint32_t index = 0;
+
+    bool operator==(const RenderTargetImage &) const = default;
+};
+
+/**
+ * @brief One image a pass renders into
+ *
+ * A swapchain-backed SceneRenderTarget has no Texture for its images, so an attachment names the
+ * target and an image index instead. Monostate is an attachment the pass does not use.
+ */
+using RenderTargetRef = std::variant<std::monostate, Texture *, RenderTargetImage>;
 
 /**
  * @brief What happens to an attachment's existing contents when rendering begins
@@ -37,7 +57,7 @@ enum class RenderPassAttachmentStoreOp {
  * depth/stencil attachments taking clearDepth and clearStencil.
  */
 struct RenderPassAttachment {
-    Texture *texture = nullptr;
+    RenderTargetRef target;
     RenderPassAttachmentLoadOp loadOp = RenderPassAttachmentLoadOp::LOAD;
     RenderPassAttachmentStoreOp storeOp = RenderPassAttachmentStoreOp::STORE;
     glm::vec4 clearColor = glm::vec4(0.0f);
@@ -48,7 +68,7 @@ struct RenderPassAttachment {
 /**
  * @brief The set of attachments a pass renders into for one frame
  *
- * A depth or stencil attachment with a null texture is absent.
+ * A depth or stencil attachment holding monostate is absent.
  */
 struct RenderPassAttachments {
     std::vector<RenderPassAttachment> colorAttachments;

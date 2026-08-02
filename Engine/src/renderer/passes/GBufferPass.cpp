@@ -334,24 +334,24 @@ void GBufferPass::updateAttachments(const RenderPassContext &context)
     m_attachments.colorAttachments.clear();
     m_attachments.colorAttachments.reserve(m_gbufferE.empty() ? 4 : 5);
 
-    colorAttachment.texture = m_normalTextures[frame].get();
+    colorAttachment.target = m_normalTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
 
-    colorAttachment.texture = m_albedoSpecTextures[frame].get();
+    colorAttachment.target = m_albedoSpecTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
 
-    colorAttachment.texture = m_materialTextures[frame].get();
+    colorAttachment.target = m_materialTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
 
-    colorAttachment.texture = m_shadingModelTextures[frame].get();
+    colorAttachment.target = m_shadingModelTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
 
     if (!m_gbufferE.empty()) {
-        colorAttachment.texture = m_gbufferE[frame].get();
+        colorAttachment.target = m_gbufferE[frame].get();
         m_attachments.colorAttachments.push_back(colorAttachment);
     }
 
-    m_attachments.depthAttachment.texture = m_depthStencilTextures[frame].get();
+    m_attachments.depthAttachment.target = m_depthStencilTextures[frame].get();
     m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::CLEAR;
     m_attachments.depthAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
     m_attachments.depthAttachment.clearDepth = 1.0f;
