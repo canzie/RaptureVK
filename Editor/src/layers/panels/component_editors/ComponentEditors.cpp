@@ -2,6 +2,7 @@
 
 #include "components/Components.h"
 #include "components/systems/Environment.h"
+#include "logging/Log.h"
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -12,6 +13,7 @@
 #include <modules/color.h>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 static constexpr float ROW_HEIGHT = 32.0f;
@@ -161,6 +163,27 @@ static void s_rowColor(Amethyst::TableScope &t, std::string_view label, std::opt
                             onChanged(glm::vec3(c.r, c.g, c.b));
                         }
                     };
+                });
+        });
+    });
+}
+
+static void s_rowAssetPicker(Amethyst::TableScope &t, std::string_view label, std::optional<AssetPicker> &out,
+                             AssetPickerConfig config, const std::function<void(Rapture::AssetHandle)> &onSelected)
+{
+    t.row([&](Amethyst::TableRowScope &tr) {
+        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
+        tr.cell([&](Amethyst::UIScope &cell) {
+            cell.frame(
+                {
+                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                    .style = {.backgroundTransparency = 1.0f},
+                },
+                [&](Amethyst::FrameScope &wrap) {
+                    out.emplace(wrap, std::move(config), std::vector<std::string>{"property-input-field"});
+                    out->onAssetSelected = onSelected;
                 });
         });
     });
@@ -568,6 +591,38 @@ void MeshEditor::sync(const Rapture::Entity &entity)
     if (entityChanged && m_mobilityDropdown != nullptr) {
         m_mobilityDropdown->setText(Rapture::mobilityToString(mc.mobility));
     }
+}
+
+void MaterialEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::AssetType::MATERIAL_INSTANCE}},
+                         [this](Rapture::AssetHandle handle) {
+                             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::MaterialComponent>()) {
+                                 return;
+                             }
+                             Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
+                             if (ref.get() == nullptr) {
+                                 RP_WARN("Material instance {} could not be resolved", handle);
+                                 return;
+                             }
+                             m_entity.getComponent<Rapture::MaterialComponent>().material =
+                                 Rapture::AssetPtr<Rapture::MaterialInstance>(std::move(ref));
+                             m_entity.markDirty();
+                         });
+    });
+}
+
+void MaterialEditor::sync(const Rapture::Entity &entity)
+{
+    bool entityChanged = !(entity == m_entity);
+    m_entity = entity;
+    if (!entityChanged || !m_materialPicker.has_value() || !entity.hasComponent<Rapture::MaterialComponent>()) {
+        return;
+    }
+
+    const Rapture::Asset *asset = entity.getComponent<Rapture::MaterialComponent>().material.ref().get();
+    m_materialPicker->setAsset(asset != nullptr ? asset->getHandle() : Rapture::INVALID_ASSET_HANDLE);
 }
 
 void CameraEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

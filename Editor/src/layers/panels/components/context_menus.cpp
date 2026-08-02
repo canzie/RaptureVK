@@ -3,6 +3,7 @@
 #include "amethyst/icons.h"
 #include "asset_manager/AssetCommon.h"
 #include "asset_manager/AssetManager.h"
+#include "asset_visuals.h"
 #include "components/context_menu.h"
 
 #include <components/common.h>
@@ -25,35 +26,6 @@ static constexpr float SEPARATOR_GAP = 8.0f;
 static float s_estimateTextWidth(const std::string &text, float fontSize)
 {
     return static_cast<float>(text.size()) * fontSize * 0.55f + 4.0f;
-}
-
-static Color3 s_colorForAssetType(Rapture::AssetType type)
-{
-    switch (type) {
-    case Rapture::AssetType::TEXTURE:
-        return Color3(0.92f, 0.40f, 0.78f); // magenta
-    case Rapture::AssetType::CUBEMAP:
-        return Color3(0.30f, 0.68f, 0.98f); // azure
-    case Rapture::AssetType::SHADER:
-        return Color3(0.45f, 0.85f, 0.45f); // green
-    case Rapture::AssetType::MATERIAL:
-    case Rapture::AssetType::MATERIAL_INSTANCE:
-        return Color3(0.68f, 0.45f, 0.95f); // violet
-    case Rapture::AssetType::MESH:
-        return Color3(0.95f, 0.60f, 0.25f); // orange
-    case Rapture::AssetType::PREFAB:
-        return Color3(0.50f, 0.50f, 0.95f); // periwinkle
-    case Rapture::AssetType::ANIMATION:
-        return Color3(0.95f, 0.82f, 0.30f); // yellow
-    case Rapture::AssetType::AUDIO:
-        return Color3(0.25f, 0.82f, 0.72f); // teal
-    case Rapture::AssetType::VIDEO:
-        return Color3(0.95f, 0.35f, 0.35f); // red
-    case Rapture::AssetType::SCENE:
-        return Color3(0.72f, 0.85f, 0.30f); // lime
-    default:
-        return Color3(0.55f, 0.55f, 0.55f); // gray
-    }
 }
 
 std::unique_ptr<ContextMenu::ItemData> AssetContextMenuAID::create(Rapture::AssetHandle asset)
@@ -118,9 +90,13 @@ void AssetContextMenuAIV::bind(ContextMenu::ItemData &item)
 
     float thumbSize = m_owner->itemHeight - THUMB_INSET;
     m_preview->setBaseProperties({.size = UDim2::fromOffset(thumbSize, thumbSize), .visible = true});
-    m_preview->setImage(asset.thumbnail);
+    if (asset.thumbnail == AM_INVALID_TEXTURE) {
+        m_preview->setSvg(Asset_iconForType(asset.assetType));
+    } else {
+        m_preview->setImage(asset.thumbnail);
+    }
 
-    m_assetTypeAccent->setBaseStyleProperties({.backgroundColor = s_colorForAssetType(asset.assetType)});
+    m_assetTypeAccent->setBaseStyleProperties({.backgroundColor = Asset_colorForType(asset.assetType)});
 
     m_label->setBaseProperties({
         .padding = UDim4{UDim::fromOffset(0.0f), UDim::fromOffset(ROW_PADDING), UDim::fromOffset(0.0f),

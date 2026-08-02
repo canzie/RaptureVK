@@ -4,6 +4,7 @@
 #include "ComponentEditorBase.h"
 #include "Icons.h"
 #include "components/Components.h"
+#include "layers/panels/components/asset_picker.h"
 #include "layers/panels/components/color_field.h"
 
 #include <glm/glm.hpp>
@@ -112,8 +113,16 @@ class MeshEditor : public ComponentEditorBase {
     Rapture::Entity m_entity;
 };
 
-struct MaterialEditor : StubEditor {
-    MaterialEditor() : StubEditor("Material", Icons::SVG_MATERIAL) {}
+class MaterialEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Material"; }
+    const char *icon() const override { return Icons::SVG_MATERIAL; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    std::optional<AssetPicker> m_materialPicker;
+    Rapture::Entity m_entity;
 };
 
 class CameraEditor : public ComponentEditorBase {
