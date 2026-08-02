@@ -136,6 +136,16 @@ class AssetManagerEditor : public AssetManagerBase {
      */
     std::unique_ptr<Asset> loadFromMetadata(AssetHandle handle, AssetMetadata &metadata);
 
+    /**
+     * @brief An import whose async load must finish before its .rasset can be written
+     *
+     * The ref pins the asset for the lifetime of the entry, so an eviction cannot destroy it before its payload is serialized.
+     */
+    struct PendingWrite {
+        AssetRef asset;
+        std::filesystem::path outputFolder;
+    };
+
     const Telemetry *m_telemetry = nullptr;
 
     std::unordered_map<AssetType, AssetHandle> m_defaultAssetHandles;
@@ -153,8 +163,7 @@ class AssetManagerEditor : public AssetManagerBase {
     // Hash of a .rasset path to the handle registered at that path
     std::unordered_map<uint64_t, AssetHandle> m_pathIndex;
 
-    // The output folder for each handle whose async load must finish before its .rasset is written
-    std::vector<std::pair<AssetHandle, std::filesystem::path>> m_pendingWrites;
+    std::vector<PendingWrite> m_pendingWrites;
 };
 
 } // namespace Rapture

@@ -287,9 +287,16 @@ std::unique_ptr<MaterialInstance> MaterialInstance::deserialize(std::span<const 
     }
 
     for (const auto &[param, textureHandle] : textureDeps) {
-        if (textureHandle != INVALID_ASSET_HANDLE) {
-            instance->setParameter(param, AssetManager::getAsset(textureHandle));
+        if (textureHandle == INVALID_ASSET_HANDLE) {
+            continue;
         }
+
+        AssetRef textureAsset = AssetManager::getAsset(textureHandle);
+        if (!textureAsset) {
+            RP_CORE_ERROR("Material instance '{}' references a missing texture {} for parameter '{}'", name, textureHandle, param);
+            continue;
+        }
+        instance->setParameter(param, std::move(textureAsset));
     }
 
     return instance;

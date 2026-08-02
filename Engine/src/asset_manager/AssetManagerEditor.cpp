@@ -149,6 +149,8 @@ AssetManagerEditor::AssetManagerEditor(const Telemetry *telemetry) : AssetManage
 AssetManagerEditor::~AssetManagerEditor()
 {
     m_shuttingDown = true;
+    // The pending writes hold refs into the assets and their metadata, so they have to go first
+    m_pendingWrites.clear();
     m_deferredFrees.clear();
     m_loadedAssets.clear();
     m_assetRegistry.clear();
@@ -169,7 +171,7 @@ Asset &AssetManagerEditor::getAsset(AssetHandle handle)
 {
 
     if (!isAssetHandleValid(handle)) {
-        RP_CORE_ERROR("Invalid asset handle");
+        RP_CORE_ERROR("Invalid asset handle {}, it is not registered", handle);
         return Asset::null;
     }
 
@@ -487,6 +489,7 @@ Asset &AssetManagerEditor::registerImportedAsset(AssetHandle handle, std::unique
 {
     metadata->sizeHintBytes = s_assetSizeHint(*asset);
 
+    bool deferWrite = false;
     if (outputFolder.empty()) {
         // Shaders keep their native format, everything else is expected to own a .rasset
         if (metadata->assetType != AssetType::SHADER) {
@@ -495,12 +498,17 @@ Asset &AssetManagerEditor::registerImportedAsset(AssetHandle handle, std::unique
     } else if (!payload.empty()) {
         writeRaptureAssetFile(handle, outputFolder, *metadata, payload);
     } else {
-        m_pendingWrites.emplace_back(handle, outputFolder);
+        deferWrite = true;
     }
 
-    auto [it, _] = m_loadedAssets.insert_or_assign(handle, std::move(asset));
-    m_assetRegistry.insert_or_assign(handle, std::move(metadata));
-    return *it->second;
+    auto loadedIt = m_loadedAssets.insert_or_assign(handle, std::move(asset)).first;
+    auto registryIt = m_assetRegistry.insert_or_assign(handle, std::move(metadata)).first;
+
+    if (deferWrite) {
+        m_pendingWrites.push_back({AssetRef(loadedIt->second.get(), &registryIt->second->useCount), outputFolder});
+    }
+
+    return *loadedIt->second;
 }
 
 bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
@@ -588,16 +596,19 @@ void AssetManagerEditor::onUpdate()
 void AssetManagerEditor::processPendingWrites()
 {
     for (size_t i = 0; i < m_pendingWrites.size();) {
-        AssetHandle handle = m_pendingWrites[i].first;
-        auto loadedIt = m_loadedAssets.find(handle);
+        Asset *asset = m_pendingWrites[i].asset.get();
 
         bool finished = true;
-        if (loadedIt != m_loadedAssets.end()) {
-            AssetStatus status = loadedIt->second->getStatus();
+        if (asset != nullptr) {
+            AssetHandle handle = asset->getHandle();
+            AssetMetadata &metadata = getAssetMetadata(handle);
+            AssetStatus status = asset->getStatus();
             if (status == AssetStatus::LOADED) {
-                AssetMetadata &metadata = getAssetMetadata(handle);
-                writeRaptureAssetFile(handle, m_pendingWrites[i].second, metadata, s_serializeAsset(*loadedIt->second, metadata));
-            } else if (status != AssetStatus::FAILED) {
+                writeRaptureAssetFile(handle, m_pendingWrites[i].outputFolder, metadata, s_serializeAsset(*asset, metadata));
+            } else if (status == AssetStatus::FAILED) {
+                RP_CORE_WARN("Dropping the deferred .rasset write for '{}' ({}), its load failed", metadata.getName(),
+                             AssetTypeToString(metadata.assetType));
+            } else {
                 finished = false;
             }
         }
