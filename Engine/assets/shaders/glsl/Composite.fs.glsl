@@ -18,7 +18,7 @@ void main() {
     vec3 color = texture(gTextures[nonuniformEXT(pc.sceneColorHandle)], fragTexCoord).rgb;
 
     color *= exposure(pc.exposureStops);
-    color = ACESFilm(color);
+    color = GT7ToneMapping(color);
 
 // Defined when the target is not an _SRGB format, so the hardware does not encode on write
 #ifdef COMPOSITE_APPLY_SRGB_ENCODE
