@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "theory/Ground Truth Ambient Occlusion.md",
+                "file": "plans/ECS Tiers and Ownership.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ground Truth Ambient Occlusion"
+              "title": "ECS Tiers and Ownership"
             }
           }
         ]
@@ -41,7 +41,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
               "title": "Files"
@@ -185,19 +187,23 @@
   },
   "active": "6fa67950a6ea8521",
   "lastOpenFiles": [
-    "theory/Horizon-Based Ambient Occlusion.md",
+    "plans/ECS Tiers and Ownership.md.tmp.2791.b63b8bdf5de4",
+    "plans/ECS Tiers and Ownership.md.tmp.2791.c0fe8f3323ad",
+    "ideas/Custom Entity Component System.md",
+    "plans/ECS Tiers and Ownership.md",
+    "plans/ECS Tiers and Ownership.md.tmp.2791.13d4aeff5c79",
+    "ideas/Custom Entity Component System.md.tmp.2791.535b6faa0aaf",
+    "ideas/Procedural Texture and Shader Editor.md",
+    "ideas/Custom Entity Component System.md.tmp.2791.2e289169c699",
     "theory/Ground Truth Ambient Occlusion.md",
+    "ideas/Custom Entity Component System.md.tmp.2791.89dfa660aa16",
+    "theory/Horizon-Based Ambient Occlusion.md",
     "theory/Ground Truth Ambient Occlusion.md.tmp.1451.77ca9c4ffbc0",
     "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.bbbaf4da68b5",
     "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.edb6b49cf73c",
     "theory/Ambient Occlusion.md",
     "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.e075d99e5eb3",
     "theory/Monte Carlo Integration.md.tmp.1451.da5c8f9f2dde",
-    "theory/Monte Carlo Integration.md.tmp.1451.2c2a2dc3a8a5",
-    "theory/Monte Carlo Integration.md.tmp.1451.01127b664b0d",
-    "theory/Solid Angle.md.tmp.1451.26d992e34773",
-    "theory/Solid Angle.md.tmp.1451.3f158a21191e",
-    "theory/Ambient Occlusion.md.tmp.1451.361ab5a05d13",
     "theory/Monte Carlo Integration.md",
     "theory/Solid Angle.md",
     "plans/G-Buffer Expansion.md",
@@ -217,10 +223,6 @@
     "SceneRenderData.md",
     "SceneRenderData Implementation.md",
     "Improvements.md",
-    "Editor Layout Design.md",
-    "Amethyst UI Library.md",
-    "systems/Viewport.md",
-    "systems/Texture.md",
     "Pasted image 20260517113657.png"
   ]
 }

@@ -15,6 +15,18 @@
     #define RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS (RTXGI_DDGI_PROBE_NUM_TEXELS - 2)
 #endif
 
+// Number of rays cached in shared memory per iteration, must equal the workgroup thread count
+#define DDGI_BLEND_RAYS_PER_CHUNK (RTXGI_DDGI_PROBE_NUM_TEXELS * RTXGI_DDGI_PROBE_NUM_TEXELS)
+
+// Every texel of a probe blends the same set of rays, so the ray data and the ray directions
+// are loaded and computed once per workgroup instead of once per texel
+#ifdef DDGI_BLEND_RADIANCE
+    shared vec4 sRayData[DDGI_BLEND_RAYS_PER_CHUNK];
+#else
+    shared float sRayDistance[DDGI_BLEND_RAYS_PER_CHUNK];
+#endif
+shared vec3 sRayDirection[DDGI_BLEND_RAYS_PER_CHUNK];
+
 
 
 // Bindless texture arrays (set 3, binding 0)
@@ -22,10 +34,11 @@ layout (set=3, binding = 0) uniform sampler2DArray gTextureArrays[];
 layout (set=3, binding = 0) uniform usampler2DArray gUintTextureArrays[];
 
 // Storage image bindings for writing current probe data
+// coherent: the border texel pass reads interior texels written by other invocations of the same workgroup
 #ifdef DDGI_BLEND_RADIANCE
-    layout (set=4, binding = 1, rgba16f) uniform restrict image2DArray ProbeIrradianceAtlas;
+    layout (set=4, binding = 1, rgba16f) uniform restrict coherent image2DArray ProbeIrradianceAtlas;
 #else
-    layout (set=4, binding = 2, rg16f) uniform restrict image2DArray ProbeDistanceAtlas;
+    layout (set=4, binding = 2, rg16f) uniform restrict coherent image2DArray ProbeDistanceAtlas;
 #endif
 
 // Skybox Cubemap
@@ -104,102 +117,125 @@ void main() {
 #if defined(DDGI_BLEND_RADIANCE) || defined(DDGI_BLEND_DISTANCE)
     // Determine if the current thread is processing an INTERIOR texel
     // Border texels are at local invocation 0 or (NUM_INTERIOR_TEXELS + 1) which is (NUM_TEXELS - 1)
-    bool isBorderTexel = 
+    bool isBorderTexel =
         ( (gl_LocalInvocationID.x == 0 || gl_LocalInvocationID.x == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1)) ||
            (gl_LocalInvocationID.y == 0 || gl_LocalInvocationID.y == (RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS + 1)) );
 
-    if (!isBorderTexel) {
-        ivec3 probeGridCoords;
-        probeGridCoords.x = int(gl_WorkGroupID.x);
-        probeGridCoords.z = int(gl_WorkGroupID.y);
-        probeGridCoords.y = int(gl_WorkGroupID.z);
+    // One workgroup covers one probe, so every thread resolves the same probe and the checks below
+    // are workgroup uniform. Border texels take part in the loads and the barriers, they only skip
+    // the accumulation and the store.
+    ivec3 probeGridCoords;
+    probeGridCoords.x = int(gl_WorkGroupID.x);
+    probeGridCoords.z = int(gl_WorkGroupID.y);
+    probeGridCoords.y = int(gl_WorkGroupID.z);
 
 
-        //int probeIndex = DDGIGetProbeIndex(probeGridCoords, u_volume);
-        int probeIndex = DDGIGetProbeIndex(ivec3(gl_GlobalInvocationID.xyz), RTXGI_DDGI_PROBE_NUM_TEXELS, u_volume);
+    //int probeIndex = DDGIGetProbeIndex(probeGridCoords, u_volume);
+    int probeIndex = DDGIGetProbeIndex(ivec3(gl_GlobalInvocationID.xyz), RTXGI_DDGI_PROBE_NUM_TEXELS, u_volume);
 
-        uint numProbes = (u_volume.gridDimensions.x * u_volume.gridDimensions.y * u_volume.gridDimensions.z);
+    uint numProbes = (u_volume.gridDimensions.x * u_volume.gridDimensions.y * u_volume.gridDimensions.z);
 
-        if (probeIndex < 0 || probeIndex >= numProbes) return;
+    if (probeIndex < 0 || probeIndex >= numProbes) {
+        return;
+    }
 
-        uint probeState = DDGILoadProbeState(probeIndex, gUintTextureArrays[pc.probeClassificationHandle], u_volume);
-        if (probeState != 0u) {
-            return;
-        }
+    uint probeState = DDGILoadProbeState(probeIndex, gUintTextureArrays[pc.probeClassificationHandle], u_volume);
+    if (probeState != 0u) {
+        return;
+    }
 
-        int rayIndex = 0;
-        ivec3 threadCoords = ivec3(gl_WorkGroupID.x * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, gl_WorkGroupID.y * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, int(gl_GlobalInvocationID.z)) + ivec3(gl_LocalInvocationID.xyz) - ivec3(1, 1, 0);
+    int firstRayIndex = 0;
+    ivec3 threadCoords = ivec3(gl_WorkGroupID.x * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, gl_WorkGroupID.y * RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS, int(gl_GlobalInvocationID.z)) + ivec3(gl_LocalInvocationID.xyz) - ivec3(1, 1, 0);
 
-        if (u_volume.probeClassificationEnabled > 0.0 || u_volume.probeRelocationEnabled > 0.0) {
-            rayIndex = int(u_volume.probeStaticRayCount);
-        }
+    if (u_volume.probeClassificationEnabled > 0.0 || u_volume.probeRelocationEnabled > 0.0) {
+        firstRayIndex = int(u_volume.probeStaticRayCount);
+    }
 
-        
+    vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(threadCoords.xy, RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS);
+    vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
+
     #ifdef DDGI_BLEND_RADIANCE
         uint backfaces = 0;
-        uint maxBackfaces = uint((u_volume.probeNumRays - rayIndex) * u_volume.probeRandomRayBackfaceThreshold);
-        
-        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(threadCoords.xy, RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS);
-        vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
-        
+        uint maxBackfaces = uint((u_volume.probeNumRays - firstRayIndex) * u_volume.probeRandomRayBackfaceThreshold);
     #endif
-    #ifdef DDGI_BLEND_DISTANCE 
-
-        vec2 probeOctantUV = DDGIGetNormalizedOctahedralCoordinates(threadCoords.xy, RTXGI_DDGI_PROBE_NUM_INTERIOR_TEXELS);
-        vec3 probeRayDirection = DDGIGetOctahedralDirection(probeOctantUV);
-
+    #ifdef DDGI_BLEND_DISTANCE
+        float probeMaxRayDistance = length(u_volume.spacing) * 1.5;
     #endif
-        vec4 result = vec4(0.0, 0.0, 0.0, 0.0);
 
-        for ( ; rayIndex < u_volume.probeNumRays; rayIndex++)
+    // Set when the backface threshold is exceeded, the probe then keeps its previous value.
+    // The count is texel independent, so this resolves identically in every thread of the workgroup
+    bool skipStore = false;
+    vec4 result = vec4(0.0, 0.0, 0.0, 0.0);
+
+    // The chunk bounds are workgroup uniform, so every thread runs the same number of iterations
+    // and reaches the same barriers
+    for (int chunkStart = firstRayIndex; chunkStart < u_volume.probeNumRays; chunkStart += DDGI_BLEND_RAYS_PER_CHUNK)
+    {
+        // Wait for the previous iteration to finish reading before overwriting the cache
+        barrier();
+
+        int loadRayIndex = chunkStart + int(gl_LocalInvocationIndex);
+        if (loadRayIndex < u_volume.probeNumRays)
         {
-            vec3 rayDirection = DDGIGetProbeRayDirection(rayIndex, u_volume);
-
-            // Find the weight of the contribution for this ray
-            // Weight is based on the cosine of the angle between the ray direction and the direction of the probe octant's texel
-            float weight = max(0.0, dot(probeRayDirection, rayDirection));
-            ivec3 rayDataTexCoords = ivec3(DDGIGetRayDataTexelCoords(rayIndex, probeIndex, u_volume));
-
-    #ifdef DDGI_BLEND_RADIANCE
-                // Load the ray traced radiance and hit distance
-            // Use texelFetch for integer coordinates, not texture()
+            ivec3 rayDataTexCoords = ivec3(DDGIGetRayDataTexelCoords(loadRayIndex, probeIndex, u_volume));
             vec4 probeRayData = texelFetch(gTextureArrays[pc.rayDataIndex], rayDataTexCoords, 0);
 
-            vec3 probeRayRadiance = probeRayData.rgb;
-            float probeRayDistance = probeRayData.a;
+            sRayDirection[gl_LocalInvocationIndex] = DDGIGetProbeRayDirection(loadRayIndex, u_volume);
+    #ifdef DDGI_BLEND_RADIANCE
+            sRayData[gl_LocalInvocationIndex] = probeRayData;
+    #else
+            sRayDistance[gl_LocalInvocationIndex] = probeRayData.a;
+    #endif
+        }
 
-            // Backface hit, don't blend this sample
-            if (probeRayDistance < 0.0)
+        barrier();
+
+        int chunkRayCount = min(DDGI_BLEND_RAYS_PER_CHUNK, u_volume.probeNumRays - chunkStart);
+
+        if (!isBorderTexel && !skipStore)
+        {
+            for (int i = 0; i < chunkRayCount; i++)
             {
-                backfaces++;
+                // Find the weight of the contribution for this ray
+                // Weight is based on the cosine of the angle between the ray direction and the direction of the probe octant's texel
+                float weight = max(0.0, dot(probeRayDirection, sRayDirection[i]));
 
-                // Early out: only blend ray radiance into the probe if the backface threshold hasn't been exceeded
-                if (backfaces >= maxBackfaces) return;
-                
-                continue;
-            }
+    #ifdef DDGI_BLEND_RADIANCE
+                vec3 probeRayRadiance = sRayData[i].rgb;
+                float probeRayDistance = sRayData[i].a;
 
-            // Blend the ray's radiance
-            result += vec4(probeRayRadiance * weight, weight);
+                // Backface hit, don't blend this sample
+                if (probeRayDistance < 0.0)
+                {
+                    backfaces++;
 
+                    // Only blend ray radiance into the probe if the backface threshold hasn't been exceeded
+                    if (backfaces >= maxBackfaces)
+                    {
+                        skipStore = true;
+                        break;
+                    }
+
+                    continue;
+                }
+
+                // Blend the ray's radiance
+                result += vec4(probeRayRadiance * weight, weight);
     #endif
 
     #ifdef DDGI_BLEND_DISTANCE
+                // Increase or decrease the filtered distance value's "sharpness"
+                weight = pow(weight, u_volume.probeDistanceExponent);
 
-            float probeMaxRayDistance = length(u_volume.spacing) * 1.5;
+                float probeRayDistance = min(abs(sRayDistance[i]), probeMaxRayDistance);
 
-            // Increase or decrease the filtered distance value's "sharpness"
-            weight = pow(weight, u_volume.probeDistanceExponent);
-
-            vec4 probeRayData = texelFetch(gTextureArrays[pc.rayDataIndex], rayDataTexCoords, 0);
-            float probeRayDistance = probeRayData.a;
-
-
-            probeRayDistance = min(abs(probeRayDistance), probeMaxRayDistance);
-
-            result += vec4(probeRayDistance * weight, (probeRayDistance * probeRayDistance) * weight, 0.0, weight);
+                result += vec4(probeRayDistance * weight, (probeRayDistance * probeRayDistance) * weight, 0.0, weight);
     #endif
+            }
         }
+    }
+
+    if (!isBorderTexel && !skipStore) {
 
         float epsilon = float(u_volume.probeNumRays);
         epsilon -= u_volume.probeStaticRayCount;
@@ -293,17 +329,17 @@ void main() {
         imageStore(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz), result);
     #endif
 
-    return;
     } // End of interior texel processing
 
     // Synchronization: Ensure all interior texel calculations and stores are complete
     // before any thread attempts to read them for border updates.
-    memoryBarrierShared();
-    memoryBarrier();
+    memoryBarrierImage();
     barrier();
 
     // Border Texel Update Logic:
-    UpdateBorderTexelsGLSL(ivec3(gl_GlobalInvocationID), ivec3(gl_LocalInvocationID), ivec3(gl_WorkGroupID));
+    if (isBorderTexel) {
+        UpdateBorderTexelsGLSL(ivec3(gl_GlobalInvocationID), ivec3(gl_LocalInvocationID), ivec3(gl_WorkGroupID));
+    }
 
 #else // issue with compilation, use either DDGI_BLEND_RADIANCE or DDGI_BLEND_DISTANCE
     #ifdef DDGI_BLEND_RADIANCE
