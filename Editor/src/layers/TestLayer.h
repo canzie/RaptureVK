@@ -19,7 +19,7 @@ class DBVH;
 class TestLayer : public Rapture::Layer {
   public:
     // Define a callback for entity selection changes
-    using EntitySelectedCallback = std::function<void(std::shared_ptr<Rapture::Entity>)>;
+    using EntitySelectedCallback = std::function<void(Rapture::Entity)>;
 
     TestLayer() : Layer("Test Layer"), m_sceneActivatedListenerId(0) {}
 

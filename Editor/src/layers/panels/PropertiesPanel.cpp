@@ -40,14 +40,14 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
     attach(tabBar, std::move(root));
 
     m_entitySelectedListenerID =
-        Rapture::GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) {
-            if (!entity->isValid()) {
+        Rapture::GameEvents::onEntitySelected().addListener([this](Rapture::Entity entity) {
+            if (!entity.isValid()) {
                 return;
             }
-            if (m_scene != nullptr && entity->getScene() != m_scene) {
+            if (m_scene != nullptr && entity.getScene() != m_scene) {
                 return;
             }
-            showEntity(*entity);
+            showEntity(entity);
         });
 
     m_entityDeselectedListenerID = Rapture::GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {

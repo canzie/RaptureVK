@@ -509,6 +509,12 @@ void VulkanContext::pickPhysicalDevice(VkSurfaceKHR surface)
         RP_CORE_ERROR("failed to find a suitable GPU!");
         throw std::runtime_error("failed to find a suitable GPU!");
     }
+
+    VkPhysicalDeviceProperties chosenProperties;
+    vkGetPhysicalDeviceProperties(m_physicalDevice, &chosenProperties);
+    m_maxColorAttachments =
+        std::min(chosenProperties.limits.maxColorAttachments, chosenProperties.limits.maxFragmentOutputAttachments);
+    RP_CORE_INFO("Colour attachment budget: {0}", m_maxColorAttachments);
 }
 
 bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface)

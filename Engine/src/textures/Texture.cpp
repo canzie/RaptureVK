@@ -727,6 +727,82 @@ std::vector<uint8_t> Texture::readbackData()
     return out;
 }
 
+std::vector<uint8_t> Texture::readbackRegion(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    if (m_image == VK_NULL_HANDLE) {
+        RP_CORE_ERROR("Cannot read back a null image");
+        return {};
+    }
+    if (!m_spec.allowReadback) {
+        RP_CORE_ERROR("Texture was not created with allowReadback set");
+        return {};
+    }
+    if (isCompressedFormat(m_spec.format)) {
+        RP_CORE_ERROR("Region readback does not support block-compressed formats");
+        return {};
+    }
+    if (width == 0 || height == 0 || x + width > m_spec.width || y + height > m_spec.height) {
+        RP_CORE_ERROR("Readback region {}x{} at ({}, {}) lies outside the {}x{} image", width, height, x, y, m_spec.width,
+                      m_spec.height);
+        return {};
+    }
+
+    const uint64_t total = static_cast<uint64_t>(width) * height * getBytesPerPixel(m_spec.format);
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = getImageAspectFlags(m_spec.format);
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {static_cast<int32_t>(x), static_cast<int32_t>(y), 0};
+    region.imageExtent = {width, height, 1};
+
+    auto &app = Application::getInstance();
+    VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = total;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VmaAllocation stagingAllocation = VK_NULL_HANDLE;
+    VmaAllocationInfo stagingInfo{};
+    if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, &stagingInfo) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create readback staging buffer");
+        return {};
+    }
+
+    auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
+    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
+    recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    vkCmdCopyImageToBuffer(cmd, m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &region);
+    recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer->end();
+
+    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    // TODO: replace this blocking waitIdle with a fence/timeline wait, and with an async ring once
+    // hover highlighting or marquee selection needs a result every frame
+    graphicsQueue->waitIdle();
+
+    std::vector<uint8_t> out(total);
+    vmaInvalidateAllocation(allocator, stagingAllocation, 0, total);
+    std::memcpy(out.data(), stagingInfo.pMappedData, total);
+    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+    return out;
+}
+
 std::vector<uint8_t> Texture::serialize(std::string_view sourcePath)
 {
     TextureBlobHeader header{};

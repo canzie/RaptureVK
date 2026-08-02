@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 namespace Rapture {
 
@@ -36,8 +37,20 @@ struct TerrainGBufferPushConstants {
     uint32_t materialIndex;
 };
 
+// The targets every device is guaranteed to give one pass
+static constexpr uint32_t GBUFFER_ATTACHMENT_COUNT_MIN = 4;
+// Every target the G-buffer wants, optional slots included
+static constexpr uint32_t GBUFFER_ATTACHMENT_COUNT_ALL = 5;
+
+// Targets past the guaranteed four are a hard drop: a device that cannot afford them loses the
+// features they carry rather than getting a substitute.
+static bool s_hasAllGBufferAttachments()
+{
+    return Application::getInstance().getVulkanContext().getMaxColorAttachments() >= GBUFFER_ATTACHMENT_COUNT_ALL;
+}
+
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
-    : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_currentFrame(0), m_selectedEntity(nullptr)
+    : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_currentFrame(0)
 {
 
     auto &app = Application::getInstance();
@@ -53,25 +66,14 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
 
     // Initialize MDI batching system - one set per frame in flight
     m_mdiBatchMaps.resize(framesInFlight);
-    m_selectedEntityBatchMaps.resize(framesInFlight);
     for (uint32_t i = 0; i < framesInFlight; i++) {
         m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>(*m_rc);
-        m_selectedEntityBatchMaps[i] = std::make_unique<MDIBatchMap>(*m_rc);
     }
 
     // Bind GBuffer textures to bindless set
     bindGBufferTexturesToBindlessSet();
 
     setupCommandResources();
-
-    m_entitySelectedListenerId =
-        GameEvents::onEntitySelected().addListener([this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
-
-    m_entityDeselectedListenerId = GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
-        if (m_selectedEntity && *m_selectedEntity == entity) {
-            m_selectedEntity = nullptr;
-        }
-    });
 }
 
 void GBufferPass::setupCommandResources()
@@ -94,14 +96,12 @@ GBufferPass::~GBufferPass()
     auto &vc = app.getVulkanContext();
     vc.waitIdle();
 
-    GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
-    GameEvents::onEntityDeselected().removeListener(m_entityDeselectedListenerId);
-
     // Clean up textures
     m_normalTextures.clear();
     m_albedoSpecTextures.clear();
     m_materialTextures.clear();
     m_shadingModelTextures.clear();
+    m_gbufferE.clear();
     m_depthStencilTextures.clear();
 
     // Clean up pipelines
@@ -119,6 +119,9 @@ FramebufferSpecification GBufferPass::getFramebufferSpecification()
     spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_SRGB);       // rgb=base color a=packed emissive intensity
     spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM);      // r=metallic g=roughness b=AO a=specular
     spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM);      // r=shading model id gba=custom data
+    if (s_hasAllGBufferAttachments()) {
+        spec.colorAttachments.push_back(VK_FORMAT_R32_UINT); // r=entity id, biased by one
+    }
 
     return spec;
 }
@@ -206,7 +209,6 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
 
     // Begin frame for MDI batching - use current frame's batch maps
     m_mdiBatchMaps[currentFrame]->beginFrame();
-    m_selectedEntityBatchMaps[currentFrame]->beginFrame();
 
     // bind descriptor sets
     m_rc->descriptorManager->bindSet(0, secondaryCb, m_pipeline); // camera stuff
@@ -248,14 +250,6 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
             }
         }
 
-        // Check if current entity is the selected one
-        bool isSelected = false;
-        if (m_selectedEntity) {
-            if (m_selectedEntity->getHandle() == entity) {
-                isSelected = true;
-            }
-        }
-
         // Get buffer allocation info to determine batch
         auto vboAlloc = meshComp.mesh->getVertexAllocation();
         auto iboAlloc = meshComp.mesh->getIndexAllocation();
@@ -264,12 +258,10 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
             continue;
         }
 
-        // Choose the appropriate batch map based on selection state
-        MDIBatchMap *batchMap = isSelected ? m_selectedEntityBatchMaps[currentFrame].get() : m_mdiBatchMaps[currentFrame].get();
-
         // Get or create batch for this VBO/IBO arena combination
-        MDIBatch *batch = batchMap->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(),
-                                                meshComp.mesh->getIndexBuffer()->getIndexType());
+        MDIBatch *batch =
+            m_mdiBatchMaps[currentFrame]->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(),
+                                                      meshComp.mesh->getIndexBuffer()->getIndexType());
 
         uint32_t meshSlotIndex = meshComp.renderDataSlot;
         uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
@@ -277,18 +269,13 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
         batch->addObject(*meshComp.mesh, meshSlotIndex, materialIndex);
     }
 
-    // Second pass: Render non-selected entities using MDI
-    // Set stencil reference to 0 for non-selected entities
-    vkCmdSetStencilReference(secondaryCb->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0);
-    // Disable stencil writing for non-selected entities
-    vkCmdSetStencilWriteMask(secondaryCb->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0x00);
-
+    // Second pass: Render the batches using MDI
     for (const auto &[batchKey, batch] : m_mdiBatchMaps[currentFrame]->getBatches()) {
         if (batch->getDrawCount() == 0) {
             continue;
         }
 
-        RAPTURE_PROFILE_SCOPE("Draw Non-Selected Batch");
+        RAPTURE_PROFILE_SCOPE("Draw Batch");
 
         // Upload batch data to GPU
         batch->uploadBuffers();
@@ -332,60 +319,6 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
         }
     }
 
-    // Third pass: Render selected entities using MDI with different stencil settings
-    // Set stencil reference to 1 for the selected entity
-    vkCmdSetStencilReference(secondaryCb->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 1);
-    // Enable stencil writing for selected entity
-    vkCmdSetStencilWriteMask(secondaryCb->getCommandBufferVk(), VK_STENCIL_FACE_FRONT_AND_BACK, 0xFF);
-
-    for (const auto &[batchKey, batch] : m_selectedEntityBatchMaps[currentFrame]->getBatches()) {
-        if (batch->getDrawCount() == 0) {
-            continue;
-        }
-
-        RAPTURE_PROFILE_SCOPE("Draw Selected Batch");
-
-        // Upload batch data to GPU
-        batch->uploadBuffers();
-
-        // Get layout from batch
-        auto bindingDescription = batch->getBufferLayout().getBindingDescription2EXT();
-        auto attributeDescriptions = batch->getBufferLayout().getAttributeDescriptions2EXT();
-
-        vc.vkCmdSetVertexInputEXT(secondaryCb->getCommandBufferVk(), 1, &bindingDescription,
-                                  static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
-
-        // Set push constants for this batch
-        GBufferPushConstants pushConstants{};
-        pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
-        pushConstants.cameraSSBOIndex = cameraSSBOIndex;
-        pushConstants.cameraSlotIndex = cameraSlotIndex;
-        pushConstants.meshSSBOIndex = meshSSBOIndex;
-
-        VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
-            stageFlags = m_shader->getPushConstantLayouts()[0].stageFlags;
-        }
-
-        vkCmdPushConstants(secondaryCb->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
-                           sizeof(GBufferPushConstants), &pushConstants);
-
-        // Bind vertex buffer from the arena
-        VkBuffer vertexBuffer = batch->getVertexBuffer();
-        VkDeviceSize vertexOffset = 0;
-        vkCmdBindVertexBuffers(secondaryCb->getCommandBufferVk(), 0, 1, &vertexBuffer, &vertexOffset);
-
-        // Bind index buffer from the arena
-        VkBuffer indexBuffer = batch->getIndexBuffer();
-        vkCmdBindIndexBuffer(secondaryCb->getCommandBufferVk(), indexBuffer, 0, batch->getIndexType());
-
-        // Execute multi-draw indirect
-        auto indirectBuffer = batch->getIndirectBuffer();
-        if (indirectBuffer) {
-            vkCmdDrawIndexedIndirect(secondaryCb->getCommandBufferVk(), indirectBuffer->getBufferVk(), 0, batch->getDrawCount(),
-                                     sizeof(VkDrawIndexedIndirectCommand));
-        }
-    }
 }
 
 void GBufferPass::updateAttachments(const RenderPassContext &context)
@@ -399,7 +332,7 @@ void GBufferPass::updateAttachments(const RenderPassContext &context)
     colorAttachment.clearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     m_attachments.colorAttachments.clear();
-    m_attachments.colorAttachments.reserve(4);
+    m_attachments.colorAttachments.reserve(m_gbufferE.empty() ? 4 : 5);
 
     colorAttachment.texture = m_normalTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
@@ -413,6 +346,11 @@ void GBufferPass::updateAttachments(const RenderPassContext &context)
     colorAttachment.texture = m_shadingModelTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
 
+    if (!m_gbufferE.empty()) {
+        colorAttachment.texture = m_gbufferE[frame].get();
+        m_attachments.colorAttachments.push_back(colorAttachment);
+    }
+
     m_attachments.depthAttachment.texture = m_depthStencilTextures[frame].get();
     m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::CLEAR;
     m_attachments.depthAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
@@ -420,6 +358,28 @@ void GBufferPass::updateAttachments(const RenderPassContext &context)
     m_attachments.depthAttachment.clearStencil = 0;
 
     m_attachments.stencilAttachment = m_attachments.depthAttachment;
+}
+
+EntityID GBufferPass::readEntityId(uint32_t x, uint32_t y, uint32_t frameInFlight) const
+{
+    if (m_gbufferE.empty() || frameInFlight >= m_gbufferE.size()) {
+        return INVALID_ENTITY_ID;
+    }
+
+    Texture *entityIdTexture = m_gbufferE[frameInFlight].get();
+    std::vector<uint8_t> pixel = entityIdTexture->readbackRegion(x, y, 1, 1);
+    if (pixel.size() < sizeof(uint32_t)) {
+        return INVALID_ENTITY_ID;
+    }
+
+    uint32_t biased = 0;
+    std::memcpy(&biased, pixel.data(), sizeof(uint32_t));
+
+    // Ids are stored biased by one so the cleared value reads as nothing drawn
+    if (biased == 0) {
+        return INVALID_ENTITY_ID;
+    }
+    return biased - 1;
 }
 
 void GBufferPass::endRendering(CommandBuffer *primaryCb)
@@ -441,7 +401,7 @@ void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb, uin
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    VkImageMemoryBarrier barriers[5];
+    VkImageMemoryBarrier barriers[6];
     barriers[0] = m_normalTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
@@ -454,14 +414,21 @@ void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb, uin
     barriers[3] = m_shadingModelTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
-    barriers[4] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(
+    uint32_t barrierCount = 4;
+    if (!m_gbufferE.empty()) {
+        barriers[barrierCount++] = m_gbufferE[currentFrame]->getImageMemoryBarrier(
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+    }
+
+    barriers[barrierCount++] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
     vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(),
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                         5, barriers);
+                         barrierCount, barriers);
 }
 
 void GBufferPass::createTextures()
@@ -494,6 +461,17 @@ void GBufferPass::createTextures()
     shadingModelSpec.type = TextureType::TEXTURE2D;
     shadingModelSpec.srgb = false;
 
+    TextureSpecification entityIdSpec;
+    entityIdSpec.width = static_cast<uint32_t>(m_width);
+    entityIdSpec.height = static_cast<uint32_t>(m_height);
+    entityIdSpec.format = TextureFormat::R32UI;
+    entityIdSpec.type = TextureType::TEXTURE2D;
+    entityIdSpec.srgb = false;
+    entityIdSpec.allowReadback = true;
+    // Integer formats support no filtering, and neighbouring ids must not be blended in any case
+    entityIdSpec.filter = TextureFilter::Nearest;
+    entityIdSpec.wrap = TextureWrap::ClampToEdge;
+
     TextureSpecification depthStencilSpec;
     depthStencilSpec.width = static_cast<uint32_t>(m_width);
     depthStencilSpec.height = static_cast<uint32_t>(m_height);
@@ -501,12 +479,17 @@ void GBufferPass::createTextures()
     depthStencilSpec.type = TextureType::TEXTURE2D;
     depthStencilSpec.srgb = false;
 
+    const bool entityIdSlot = s_hasAllGBufferAttachments();
+
     // Create textures for each frame in flight
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
         m_normalTextures.push_back(std::make_unique<Texture>(normalSpec));
         m_albedoSpecTextures.push_back(std::make_unique<Texture>(albedoSpec));
         m_materialTextures.push_back(std::make_unique<Texture>(materialSpec));
         m_shadingModelTextures.push_back(std::make_unique<Texture>(shadingModelSpec));
+        if (entityIdSlot) {
+            m_gbufferE.push_back(std::make_unique<Texture>(entityIdSpec));
+        }
         m_depthStencilTextures.push_back(std::make_unique<Texture>(depthStencilSpec));
     }
 }
@@ -539,11 +522,8 @@ void GBufferPass::bindGBufferTexturesToBindlessSet()
 
 void GBufferPass::createPipeline()
 {
-    std::vector<VkDynamicState> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_VERTEX_INPUT_EXT,
-        VK_DYNAMIC_STATE_STENCIL_REFERENCE, // Added for dynamic stencil reference
-        VK_DYNAMIC_STATE_STENCIL_WRITE_MASK // Added for dynamic stencil write mask
-    };
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                                 VK_DYNAMIC_STATE_VERTEX_INPUT_EXT};
 
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -599,8 +579,11 @@ void GBufferPass::createPipeline()
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachments[4];
-    for (int i = 0; i < 4; ++i) {
+    const uint32_t colorAttachmentCount =
+        s_hasAllGBufferAttachments() ? GBUFFER_ATTACHMENT_COUNT_ALL : GBUFFER_ATTACHMENT_COUNT_MIN;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachments[5];
+    for (uint32_t i = 0; i < colorAttachmentCount; ++i) {
         colorBlendAttachments[i] = {};
         colorBlendAttachments[i].colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -612,7 +595,7 @@ void GBufferPass::createPipeline()
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.logicOp = VK_LOGIC_OP_COPY;           // Optional
-    colorBlending.attachmentCount = 4;                  // one per G-buffer color target
+    colorBlending.attachmentCount = colorAttachmentCount;
     colorBlending.pAttachments = colorBlendAttachments; // Changed from &colorBlendAttachment
     colorBlending.blendConstants[0] = 0.0f;             // Optional
     colorBlending.blendConstants[1] = 0.0f;             // Optional
@@ -625,19 +608,7 @@ void GBufferPass::createPipeline()
     depthStencil.depthWriteEnable = VK_TRUE;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
-    depthStencil.stencilTestEnable = VK_TRUE;
-
-    // Front face stencil operations
-    depthStencil.front.failOp = VK_STENCIL_OP_KEEP;         // Keep current value if stencil test fails
-    depthStencil.front.passOp = VK_STENCIL_OP_REPLACE;      // Replace with reference value when stencil test passes
-    depthStencil.front.depthFailOp = VK_STENCIL_OP_REPLACE; // Replace with reference value even if depth test fails
-    depthStencil.front.compareOp = VK_COMPARE_OP_ALWAYS;    // Always pass the stencil test
-    depthStencil.front.compareMask = 0xFF;                  // Compare all bits
-    depthStencil.front.writeMask = 0xFF;                    // Write all bits in stencil buffer
-    depthStencil.front.reference = 0; // Default reference value (will be overridden by vkCmdSetStencilReference)
-
-    // Back face stencil operations (same as front face)
-    depthStencil.back = depthStencil.front;
+    depthStencil.stencilTestEnable = VK_FALSE;
 
     depthStencil.minDepthBounds = 0.0f;
     depthStencil.maxDepthBounds = 1.0f;
@@ -649,6 +620,8 @@ void GBufferPass::createPipeline()
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
+    shaderConfig.compileInfo.macros.emplace_back(s_hasAllGBufferAttachments() ? "GBUFFER_ATTACHMENT_COUNT_ALL"
+                                                                             : "GBUFFER_ATTACHMENT_COUNT_MIN");
 
     auto asset = AssetManager::importAsset(shaderPath / "glsl/GBuffer.vs.glsl", shaderConfig);
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
@@ -736,8 +709,11 @@ void GBufferPass::createTerrainPipeline()
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachments[4];
-    for (int i = 0; i < 4; ++i) {
+    const uint32_t colorAttachmentCount =
+        s_hasAllGBufferAttachments() ? GBUFFER_ATTACHMENT_COUNT_ALL : GBUFFER_ATTACHMENT_COUNT_MIN;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachments[5];
+    for (uint32_t i = 0; i < colorAttachmentCount; ++i) {
         colorBlendAttachments[i] = {};
         colorBlendAttachments[i].colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -747,7 +723,7 @@ void GBufferPass::createTerrainPipeline()
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.attachmentCount = 4;
+    colorBlending.attachmentCount = colorAttachmentCount;
     colorBlending.pAttachments = colorBlendAttachments;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
@@ -763,6 +739,8 @@ void GBufferPass::createTerrainPipeline()
 
     ShaderImportConfig terrainShaderConfig;
     terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
+    terrainShaderConfig.compileInfo.macros.emplace_back(s_hasAllGBufferAttachments() ? "GBUFFER_ATTACHMENT_COUNT_ALL"
+                                                                                    : "GBUFFER_ATTACHMENT_COUNT_MIN");
 
     auto asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
     m_terrainShader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;

@@ -24,6 +24,7 @@ struct RenderPassTargets {
     Texture *gbufferBaseColor = nullptr;
     Texture *gbufferMaterial = nullptr;
     Texture *gbufferShadingModel = nullptr;
+    Texture *gbufferEntityId = nullptr; ///< null where the device cannot afford the optional slot
     Texture *depthStencil = nullptr;
 
     Texture *sceneColorHdr = nullptr;

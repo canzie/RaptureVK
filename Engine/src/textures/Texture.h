@@ -111,6 +111,19 @@ class Texture {
     std::vector<uint8_t> readbackData();
 
     /**
+     * @brief Copy one rectangle of mip zero back to CPU memory, tightly packed
+     *
+     * The spec must have allowReadback set. Blocking: the copy is submitted and waited on before
+     * the bytes are returned.
+     * @param x Region origin x in pixels
+     * @param y Region origin y in pixels
+     * @param width Region width in pixels
+     * @param height Region height in pixels
+     * @return The region's bytes, or empty on failure
+     */
+    std::vector<uint8_t> readbackRegion(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+
+    /**
      * @brief Serialize this texture into a self-contained blob
      * @param sourcePath The texture's source file
      * @return The serialized bytes, or empty on failure

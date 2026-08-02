@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "theory/Horizon-Based Ambient Occlusion.md",
+                "file": "theory/Ground Truth Ambient Occlusion.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Horizon-Based Ambient Occlusion"
+              "title": "Ground Truth Ambient Occlusion"
             }
           }
         ]
@@ -185,12 +185,12 @@
   },
   "active": "6fa67950a6ea8521",
   "lastOpenFiles": [
+    "theory/Horizon-Based Ambient Occlusion.md",
     "theory/Ground Truth Ambient Occlusion.md",
     "theory/Ground Truth Ambient Occlusion.md.tmp.1451.77ca9c4ffbc0",
     "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.bbbaf4da68b5",
     "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.edb6b49cf73c",
     "theory/Ambient Occlusion.md",
-    "theory/Horizon-Based Ambient Occlusion.md",
     "theory/Horizon-Based Ambient Occlusion.md.tmp.1451.e075d99e5eb3",
     "theory/Monte Carlo Integration.md.tmp.1451.da5c8f9f2dde",
     "theory/Monte Carlo Integration.md.tmp.1451.2c2a2dc3a8a5",

@@ -38,6 +38,7 @@ enum class TextureFormat : uint16_t {
     RG16F,      // VK_FORMAT_R16G16_SFLOAT
     R16F,       // VK_FORMAT_R16_SFLOAT
     R32F,       // VK_FORMAT_R32_SFLOAT
+    R32UI,      // VK_FORMAT_R32_UINT
     R8UI,       // VK_FORMAT_R8_UINT
     R8U,        // VK_FORMAT_R8_SINT
     BC1_RGB,    // VK_FORMAT_BC1_RGB_UNORM_BLOCK or _SRGB_BLOCK, 4x4 block, 8 bytes/block, opaque color
@@ -153,6 +154,8 @@ inline VkFormat toVkFormat(TextureFormat format, bool srgb = true)
         return VK_FORMAT_R16_SFLOAT;
     case TextureFormat::R32F:
         return VK_FORMAT_R32_SFLOAT;
+    case TextureFormat::R32UI:
+        return VK_FORMAT_R32_UINT;
     case TextureFormat::R8UI:
         return VK_FORMAT_R8_UINT;
     case TextureFormat::R8U:
@@ -368,6 +371,8 @@ inline uint32_t getBytesPerPixel(TextureFormat format)
     case TextureFormat::R16F:
         return 2; // 1 channel × 2 bytes
     case TextureFormat::R32F:
+        return 4; // 1 channel × 4 bytes
+    case TextureFormat::R32UI:
         return 4; // 1 channel × 4 bytes
     case TextureFormat::R8UI:
         return 1; // 1 channel × 1 byte

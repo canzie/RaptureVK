@@ -66,6 +66,12 @@ class VulkanContext {
         return m_accelerationStructureProperties;
     }
 
+    /**
+     * @brief Colour attachments a single pass may render into on this device
+     * @return The lower of maxColorAttachments and maxFragmentOutputAttachments
+     */
+    uint32_t getMaxColorAttachments() const { return m_maxColorAttachments; }
+
     // Extension function pointers
     PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
     PFN_vkCmdBeginRenderingKHR vkCmdBeginRenderingKHR = nullptr;
@@ -153,6 +159,8 @@ class VulkanContext {
     bool m_isNullDescriptorEnabled;
     bool m_isRayTracingEnabled;
     bool m_isMeshShaderEnabled;
+
+    uint32_t m_maxColorAttachments = 4;
 
     // Store descriptor indexing features support
     VkPhysicalDeviceDescriptorIndexingFeatures m_descriptorIndexingFeatures{};

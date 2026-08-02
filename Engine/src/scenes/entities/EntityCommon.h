@@ -6,6 +6,8 @@ namespace Rapture {
 
 using EntityID = uint32_t;
 
+static constexpr EntityID INVALID_ENTITY_ID = UINT32_MAX;
+
 enum Mobility {
     MOBILITY_STATIC = 0,
     MOBILITY_DYNAMIC,

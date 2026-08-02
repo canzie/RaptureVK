@@ -201,7 +201,7 @@ void OutlinerPanel::onRowClicked(uint32_t row)
 {
     Rapture::Entity entity = entityForRow(row);
     if (entity.isValid()) {
-        Rapture::GameEvents::onEntitySelected().publish(std::make_shared<Rapture::Entity>(entity));
+        Rapture::GameEvents::onEntitySelected().publish(entity);
     }
 }
 

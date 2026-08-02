@@ -19,7 +19,7 @@ using LayerCommunicationEvent = EventBus<std::string, std::string>;
 using ProjectLoadRequestedEvent = EventBus<std::string>;
 using ProjectLoadedEvent = EventBus<std::string>;
 
-using EntitySelectedEvent = EventBus<std::shared_ptr<Entity>>;
+using EntitySelectedEvent = EventBus<Entity>;
 using EntityDeselectedEvent = EventBus<Entity>;
 
 // Global event accessors
@@ -65,7 +65,7 @@ inline ProjectLoadedEvent &onProjectLoaded()
 
 inline EntitySelectedEvent &onEntitySelected()
 {
-    return EventRegistry::getInstance().getEventBus<std::shared_ptr<Entity>>("EntitySelected");
+    return EventRegistry::getInstance().getEventBus<Entity>("EntitySelected");
 }
 
 inline EntityDeselectedEvent &onEntityDeselected()

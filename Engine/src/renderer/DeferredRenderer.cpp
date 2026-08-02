@@ -41,7 +41,7 @@ DeferredRenderer::~DeferredRenderer()
     m_renderContext.vulkanContext->waitIdle();
 
     m_skyboxPass.reset();
-    m_stencilBorderPass.reset();
+    m_selectionOutlinePass.reset();
     m_lightingPass.reset();
     m_ambientOcclusionPass.reset();
     m_gbufferPass.reset();
@@ -193,6 +193,14 @@ void DeferredRenderer::resizeRenderTarget(uint32_t width, uint32_t height)
     m_viewportResizePending = true;
 }
 
+EntityID DeferredRenderer::pickEntity(uint32_t x, uint32_t y)
+{
+    if (!m_gbufferPass) {
+        return INVALID_ENTITY_ID;
+    }
+    return m_gbufferPass->readEntityId(x, y, m_currentFrame);
+}
+
 void DeferredRenderer::createRenderTarget()
 {
     if (m_config.targetType == SceneRenderTarget::TargetType::OFFSCREEN) {
@@ -232,6 +240,7 @@ RenderPassContext DeferredRenderer::buildPassContext(Scene &activeScene, Entity 
     m_passTargets.gbufferBaseColor = m_gbufferPass->getAlbedoTexture(m_currentFrame);
     m_passTargets.gbufferMaterial = m_gbufferPass->getMaterialTexture(m_currentFrame);
     m_passTargets.gbufferShadingModel = m_gbufferPass->getShadingModelTexture(m_currentFrame);
+    m_passTargets.gbufferEntityId = m_gbufferPass->getGBufferE(m_currentFrame);
     m_passTargets.depthStencil = m_gbufferPass->getDepthTexture(m_currentFrame);
     m_passTargets.sceneColorHdr = m_sceneColorHdrTextures[m_currentFrame].get();
     m_passTargets.ambientOcclusion = m_ambientOcclusionPass->getOcclusionTexture(m_currentFrame);
@@ -253,7 +262,7 @@ void DeferredRenderer::recreateRenderPasses()
     jobs().waitFor(s_cmdCounter, 0);
 
     m_skyboxPass.reset();
-    m_stencilBorderPass.reset();
+    m_selectionOutlinePass.reset();
     m_lightingPass.reset();
     m_ambientOcclusionPass.reset();
     m_gbufferPass.reset();
@@ -273,8 +282,7 @@ void DeferredRenderer::recreateRenderPasses()
 
     m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_dynamicDiffuseGI.get(), hdrFormat);
 
-    m_stencilBorderPass =
-        std::make_unique<StencilBorderPass>(m_width, m_height, framesInFlight, m_gbufferPass->getDepthTextures(), hdrFormat);
+    m_selectionOutlinePass = std::make_unique<SelectionOutlinePass>(framesInFlight, hdrFormat);
 
     m_instancedShapesPass =
         std::make_unique<InstancedShapesPass>(m_width, m_height, framesInFlight, m_gbufferPass->getDepthTextures(), hdrFormat);
@@ -403,11 +411,12 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         CommandBuffer *gbufferBuffer = nullptr;
         CommandBuffer *lightingBuffer = nullptr;
         CommandBuffer *skyboxBuffer = nullptr;
+        CommandBuffer *selectionOutlineBuffer = nullptr;
 
         RenderPassContext context = buildPassContext(activeScene, camera, imageIndex, settings);
         context.terrain = terrain;
 
-        s_cmdCounter.increment(3); // GBuffer, Lighting, Skybox
+        s_cmdCounter.increment(4); // GBuffer, Lighting, Skybox, Selection Outline
 
         JobSystem &system = jobs();
 
@@ -422,6 +431,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         // Inheritance is resolved here rather than inside the jobs, since it fills each pass's cached attachments
         SecondaryBufferInheritance lightingInheritance = m_lightingPass->getInheritance(context);
         SecondaryBufferInheritance skyboxInheritance = m_skyboxPass->getInheritance(context);
+        SecondaryBufferInheritance selectionOutlineInheritance = m_selectionOutlinePass->getInheritance(context);
 
         system.run(JobDeclaration(
             [&gbufferBuffer, &context, gbufferInheritance, gbufferPass = m_gbufferPass.get()](JobContext &ctx) {
@@ -443,6 +453,14 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
                 skyboxBuffer = skyboxPass->record(context, skyboxInheritance);
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SKYBOX"));
+
+        system.run(JobDeclaration(
+            [&selectionOutlineBuffer, &context, selectionOutlineInheritance,
+             selectionOutlinePass = m_selectionOutlinePass.get()](JobContext &ctx) {
+                (void)ctx;
+                selectionOutlineBuffer = selectionOutlinePass->record(context, selectionOutlineInheritance);
+            },
+            JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SELECTION_OUTLINE"));
 
         // TODO: instanced shapes and the stencil border are disabled until they are converted to RenderPass
         // SecondaryBufferInheritance instancedInheritance;
@@ -496,11 +514,12 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         //     commandBuffer->executeSecondary(*instancedShapesBuffer);
         //     m_instancedShapesPass->endDynamicRendering(commandBuffer);
         // }
-        // if (stencilBorderBuffer) {
-        //     m_stencilBorderPass->beginDynamicRendering(commandBuffer, *m_sceneRenderTarget, imageIndex);
-        //     commandBuffer->executeSecondary(*stencilBorderBuffer);
-        //     m_stencilBorderPass->endDynamicRendering(commandBuffer);
-        // }
+        if (selectionOutlineBuffer) {
+            RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Selection Outline Pass");
+            m_selectionOutlinePass->beginRendering(context, commandBuffer);
+            commandBuffer->executeSecondary(*selectionOutlineBuffer);
+            m_selectionOutlinePass->endRendering(commandBuffer);
+        }
 
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Composite Pass");

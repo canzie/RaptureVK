@@ -13,6 +13,7 @@ uncouple the engines core
         - includes depedencies like how a shadow component requires a light, this can be enforec in editor or in the engine, iam leaning towards engine
     - ability to hot reload an ams file, and update the actual stuff, pretty sure marking the window dirty and updating the style maps and invalidating cache is all it takes.
     - make the gizmo support discrete steps, also the gizmo direction maybe be cooked.
+    - check all the clears done, and which ones are redundant.
 
 ### Materials 
     - when a new base mat is made and opened it cannot be viewd on a sphere, since we only render material instances, so for every material we will create a base instance, this one will be immutable
@@ -51,7 +52,6 @@ uncouple the engines core
 - fix stencil buffer
 - shader/pipeline hot reloading
 - parallise/jobify shader compilation (note, current stack size is too small for this, maybe spawn another process and use gslang exec???)
-  - ditinction between static and dynamic meshes here
   - the asset importer in the editor will be able to set these options and they can be either metadata or ...
     - editor settings could be static/dynamic, prefab options?
     - animation options etc (once they exist)
@@ -66,8 +66,6 @@ uncouple the engines core
 
 # features / stuff to add
 
-- ssao
-- ss reflections
 - animations
 - scripting
 - Photometry (use camera settings to calculate the correct exposure)

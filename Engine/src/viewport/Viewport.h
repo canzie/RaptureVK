@@ -65,6 +65,14 @@ class Viewport {
 
     void drawFrame();
 
+    /**
+     * @brief Entity drawn at a pixel of this viewport's most recently rendered frame
+     * @param x Pixel x in render target space
+     * @param y Pixel y in render target space
+     * @return The entity, or an invalid entity where nothing was drawn
+     */
+    Entity pickEntity(uint32_t x, uint32_t y);
+
     void resize(uint32_t width, uint32_t height);
     void onSwapChainRecreated();
 

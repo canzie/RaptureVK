@@ -67,6 +67,12 @@ class ViewportPanel : public Panel {
 
   private:
     void updateGizmo(void);
+
+    /**
+     * @brief Selects the entity under the cursor on a left press in the viewport
+     * @param input The press that landed on the viewport image
+     */
+    void onViewportPressed(const Amethyst::InputObject &input);
     void setupOverlayButtons(void);
     void buildTransformMenu(void);
     void buildRenderMenu(void);
@@ -100,8 +106,8 @@ class ViewportPanel : public Panel {
     Amethyst::GizmoOperation m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE;
     Amethyst::GizmoSpace m_gizmoSpace = Amethyst::GizmoSpace::WORLD;
 
-    std::shared_ptr<Rapture::Entity> m_selectedEntity;
-    std::shared_ptr<Rapture::Entity> m_previousSelectedEntity;
+    Rapture::Entity m_selectedEntity;
+    Rapture::Entity m_previousSelectedEntity;
     size_t m_entitySelectedListenerId = 0;
     size_t m_entityDeselectedListenerId = 0;
     Amethyst::vec2 m_lastViewportSize = {};

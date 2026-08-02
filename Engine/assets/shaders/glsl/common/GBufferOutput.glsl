@@ -10,6 +10,22 @@ layout(location = 1) out vec4 gBaseColor;
 layout(location = 2) out vec4 gMaterial;
 layout(location = 3) out vec4 gShadingModel;
 
+// Attachments past the guaranteed four exist only under GBUFFER_ATTACHMENT_COUNT_ALL. A device that
+// cannot afford them loses the feature outright, so there is no fallback path to write here.
+#ifdef GBUFFER_ATTACHMENT_COUNT_ALL
+layout(location = 4) out uint gEntityId;
+
+// Ids are stored biased by one so the cleared value, zero, reads back as nothing drawn. Every
+// fragment must write this slot, since an output left untouched is undefined.
+void writeGBufferEntityId(uint _entityId) {
+    gEntityId = _entityId + 1u;
+}
+
+void writeGBufferNoEntityId() {
+    gEntityId = 0u;
+}
+#endif // GBUFFER_ATTACHMENT_COUNT_ALL
+
 // The surface as the G-buffer stores it: the evaluated response, not the authoring parameters.
 // customData is reinterpreted per shadingModelId, see the shading model table
 struct GBufferSurface {

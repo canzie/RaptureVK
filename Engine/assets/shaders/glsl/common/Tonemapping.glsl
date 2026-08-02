@@ -35,4 +35,12 @@ vec3 LinearToSRGB(vec3 rgb) {
         LessThan(rgb, 0.0031308));
 }
 
+vec3 SRGBToLinear(vec3 _srgb) {
+    _srgb = clamp(_srgb, 0.0, 1.0);
+    return mix(
+        pow3((_srgb + 0.055) / 1.055, 2.4),
+        _srgb / 12.92,
+        LessThan(_srgb, 0.04045));
+}
+
 #endif // TONEMAPPING_GLSL

@@ -59,6 +59,24 @@ void Viewport::drawFrame()
     m_renderer->drawFrame(*m_scene, camera, m_renderSettings);
 }
 
+Entity Viewport::pickEntity(uint32_t x, uint32_t y)
+{
+    if (m_renderer == nullptr || m_scene == nullptr) {
+        return Entity();
+    }
+    if (x >= m_config.width || y >= m_config.height) {
+        return Entity();
+    }
+
+    EntityID id = m_renderer->pickEntity(x, y);
+    if (id == INVALID_ENTITY_ID) {
+        return Entity();
+    }
+
+    Entity picked(id, m_scene);
+    return picked.isValid() ? picked : Entity();
+}
+
 void Viewport::resize(uint32_t width, uint32_t height)
 {
     if (m_config.width == width && m_config.height == height) {

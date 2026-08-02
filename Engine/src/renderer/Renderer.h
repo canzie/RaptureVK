@@ -42,6 +42,14 @@ class Renderer {
      */
     virtual void resizeRenderTarget(uint32_t width, uint32_t height) = 0;
 
+    /**
+     * @brief Entity drawn at a pixel of the most recently rendered frame
+     * @param x Pixel x in render target space
+     * @param y Pixel y in render target space
+     * @return The entity, or INVALID_ENTITY_ID where nothing was drawn
+     */
+    virtual EntityID pickEntity(uint32_t x, uint32_t y) = 0;
+
     SceneRenderTarget &getSceneRenderTarget() { return *m_sceneRenderTarget; }
     const SceneRenderTarget &getSceneRenderTarget() const { return *m_sceneRenderTarget; }
     uint32_t getCurrentFrame() const { return m_currentFrame; }

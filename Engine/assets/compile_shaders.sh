@@ -34,9 +34,6 @@ compile fragment DeferredLighting.fs.glsl           DeferredLighting.fs.spv  -I"
 compile vertex   Skybox.vs.glsl                     SkyboxPass.vs.spv
 compile fragment Skybox.fs.glsl                     SkyboxPass.fs.spv
 
-compile vertex   StencilBorder.vs.glsl              StencilBorder.vs.spv
-compile fragment StencilBorder.fs.glsl              StencilBorder.fs.spv
-
 compile vertex   InstancedShapes.vs.glsl            InstancedShapes.vs.spv
 compile fragment InstancedShapes.fs.glsl            InstancedShapes.fs.spv
 

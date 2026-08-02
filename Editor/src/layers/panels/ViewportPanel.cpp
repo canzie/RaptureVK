@@ -10,6 +10,7 @@
 #include "utils/rp_assert.h"
 #include "viewport/Viewport.h"
 
+#include <components/canvas.h>
 #include <components/checkbox.h>
 #include <components/common.h>
 #include <components/extensions/ui_list_layout.h>
@@ -87,6 +88,8 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
             m_viewportImageDestroyConn =
                 m_viewportImage->onDestroy.connect([this](Amethyst::Instance *) { m_viewportImage = nullptr; });
             m_viewportImage->track(m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
+            m_viewportImage->track(m_viewportImage->onInputBeganCb.connect(
+                [this](const Amethyst::InputObject &input) { onViewportPressed(input); }));
         });
 
     m_gizmo = std::make_unique<Amethyst::Gizmo>(m_viewportImage);
@@ -95,12 +98,12 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     buildTransformMenu();
     buildRenderMenu();
 
-    m_entitySelectedListenerId = Rapture::GameEvents::onEntitySelected().addListener(
-        [this](std::shared_ptr<Rapture::Entity> entity) { m_selectedEntity = entity; });
+    m_entitySelectedListenerId =
+        Rapture::GameEvents::onEntitySelected().addListener([this](Rapture::Entity entity) { m_selectedEntity = entity; });
 
     m_entityDeselectedListenerId = Rapture::GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
-        if (m_selectedEntity != nullptr && *m_selectedEntity == entity) {
-            m_selectedEntity = nullptr;
+        if (m_selectedEntity == entity) {
+            m_selectedEntity = Rapture::Entity();
             m_gizmo->reset();
         }
     });
@@ -390,15 +393,48 @@ void ViewportPanel::onUpdate(float dt)
     }
 }
 
-void ViewportPanel::updateGizmo()
+void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
 {
-    if (m_selectedEntity != nullptr && !m_selectedEntity->isValid()) {
-        m_selectedEntity = nullptr;
-        m_gizmo->reset();
+    if (input.type != Amethyst::InputType::MOUSE_BUTTON_1) {
+        return;
+    }
+    if (m_viewport == nullptr || m_gizmo == nullptr || m_gizmo->isHovered()) {
+        return;
     }
 
-    if (!m_selectedEntity) {
-        m_previousSelectedEntity = nullptr;
+    // The gizmo canvas is what the rendered image is mapped onto, so picking shares its rect to stay
+    // aligned with what the handles are drawn against
+    Amethyst::Canvas &canvas = m_gizmo->canvas();
+    Amethyst::vec2 origin = canvas.absolutePosition;
+    Amethyst::vec2 size = canvas.absoluteSize;
+    if (size.x < 1.0f || size.y < 1.0f) {
+        return;
+    }
+
+    float u = (input.position.x - origin.x) / size.x;
+    float v = (input.position.y - origin.y) / size.y;
+    if (u < 0.0f || u >= 1.0f || v < 0.0f || v >= 1.0f) {
+        return;
+    }
+
+    uint32_t px = static_cast<uint32_t>(u * static_cast<float>(m_viewport->getWidth()));
+    uint32_t py = static_cast<uint32_t>(v * static_cast<float>(m_viewport->getHeight()));
+
+    Rapture::Entity picked = m_viewport->pickEntity(px, py);
+    if (picked.isValid()) {
+        Rapture::GameEvents::onEntitySelected().publish(picked);
+    } else if (m_selectedEntity.isValid()) {
+        Rapture::GameEvents::onEntityDeselected().publish(m_selectedEntity);
+    }
+}
+
+void ViewportPanel::updateGizmo()
+{
+    if (!m_selectedEntity.isValid()) {
+        if (m_previousSelectedEntity.isValid()) {
+            m_gizmo->reset();
+            m_previousSelectedEntity = Rapture::Entity();
+        }
         return;
     }
 
@@ -408,7 +444,7 @@ void ViewportPanel::updateGizmo()
     }
 
     auto [transformComponent, bbComp] =
-        m_selectedEntity->tryGetComponents<Rapture::TransformComponent, Rapture::BoundingBoxComponent>();
+        m_selectedEntity.tryGetComponents<Rapture::TransformComponent, Rapture::BoundingBoxComponent>();
     if (!transformComponent) {
         return;
     }
@@ -471,6 +507,6 @@ void ViewportPanel::updateGizmo()
         transformComponent->transforms.setScale(scale);
         transformComponent->transforms.recalculateTransform();
 
-        m_selectedEntity->markDirty();
+        m_selectedEntity.markDirty();
     }
 }
