@@ -45,7 +45,6 @@ DeferredRenderer::~DeferredRenderer()
     m_lightingPass.reset();
     m_ambientOcclusionPass.reset();
     m_gbufferPass.reset();
-    m_instancedShapesPass.reset();
     m_dynamicDiffuseGI.reset();
     m_rtInstanceData.reset();
 
@@ -266,7 +265,6 @@ void DeferredRenderer::recreateRenderPasses()
     m_lightingPass.reset();
     m_ambientOcclusionPass.reset();
     m_gbufferPass.reset();
-    m_instancedShapesPass.reset();
 
     VkFormat presentFormat = m_sceneRenderTarget->getFormat();
 
@@ -283,9 +281,6 @@ void DeferredRenderer::recreateRenderPasses()
     m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_dynamicDiffuseGI.get(), hdrFormat);
 
     m_selectionOutlinePass = std::make_unique<SelectionOutlinePass>(framesInFlight, hdrFormat);
-
-    m_instancedShapesPass =
-        std::make_unique<InstancedShapesPass>(m_width, m_height, framesInFlight, m_gbufferPass->getDepthTextures(), hdrFormat);
 
     m_skyboxPass = std::make_unique<SkyboxPass>(m_gbufferPass->getDepthTextures(), hdrFormat);
 
@@ -462,21 +457,6 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SELECTION_OUTLINE"));
 
-        // TODO: instanced shapes and the stencil border are disabled until they are converted to RenderPass
-        // SecondaryBufferInheritance instancedInheritance;
-        // instancedInheritance.colorFormats = {hdrFormat};
-        // instancedInheritance.depthFormat = m_gbufferPass->getDepthTexture()->getFormat();
-        //
-        // system.run(JobDeclaration(
-        //     [&instancedShapesBuffer, scenePtr = &activeScene, camera, sceneColorHdr,
-        //      m_currentFrame = m_currentFrame, instancedInheritance,
-        //      instancedShapesPass = m_instancedShapesPass.get()](JobContext &ctx) {
-        //         (void)ctx;
-        //         instancedShapesBuffer =
-        //             instancedShapesPass->recordSecondary(*scenePtr, camera, sceneColorHdr, m_currentFrame, instancedInheritance);
-        //     },
-        //     JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "INSTANCED_SHAPES"));
-
         {
 
             RAPTURE_PROFILE_SCOPE("command buffer Wait");
@@ -508,12 +488,6 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             commandBuffer->executeSecondary(*skyboxBuffer);
             m_skyboxPass->endRendering(commandBuffer);
         }
-        // if (instancedShapesBuffer) {
-        //     RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Instanced Shapes Pass");
-        //     m_instancedShapesPass->beginDynamicRendering(commandBuffer, sceneColorHdr, m_currentFrame);
-        //     commandBuffer->executeSecondary(*instancedShapesBuffer);
-        //     m_instancedShapesPass->endDynamicRendering(commandBuffer);
-        // }
         if (selectionOutlineBuffer) {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Selection Outline Pass");
             m_selectionOutlinePass->beginRendering(context, commandBuffer);

@@ -194,28 +194,6 @@ struct InstanceComponent {
     }
 };
 
-// enables efficient instancing of 1000s of instances
-// a more limited version of instancing as materials and other data is static
-// if you want more complex objects, boohoo
-struct InstanceShapeComponent {
-    // ssbo containing instance data and other instancing details like wiremode, ...
-    std::shared_ptr<StorageBuffer> instanceSSBO;
-    glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    bool useWireMode = true;
-    uint32_t instanceCount = 0;
-
-    InstanceShapeComponent(std::vector<InstanceData> instanceData, VmaAllocator allocator)
-    {
-
-        if (!instanceData.empty()) {
-            instanceSSBO =
-                std::make_shared<StorageBuffer>(sizeof(InstanceData) * instanceData.size(), BufferUsage::DYNAMIC, allocator);
-            instanceSSBO->addDataGPU(instanceData.data(), instanceData.size() * sizeof(InstanceData), 0);
-            instanceCount = static_cast<uint32_t>(instanceData.size());
-        }
-    }
-};
-
 struct AtmosphereComponent {
     float timeOfDay = 12.0f;
     float latitude = 0.0f;

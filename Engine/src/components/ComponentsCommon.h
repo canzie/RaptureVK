@@ -8,10 +8,6 @@ namespace Rapture {
 
 using generation_t = uint64_t;
 
-struct InstanceData {
-    glm::mat4 transform;
-};
-
 // Light types for the LightComponent
 enum class LightType {
     POINT = 0,

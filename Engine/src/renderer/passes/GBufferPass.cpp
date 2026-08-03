@@ -65,10 +65,7 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     createTextures();
 
     // Initialize MDI batching system - one set per frame in flight
-    m_mdiBatchMaps.resize(framesInFlight);
-    for (uint32_t i = 0; i < framesInFlight; i++) {
-        m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>(*m_rc);
-    }
+    m_geometry = std::make_unique<SceneGeometryDraw>(*m_rc, framesInFlight);
 
     // Bind GBuffer textures to bindless set
     bindGBufferTexturesToBindlessSet();
@@ -181,9 +178,6 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
 
     m_pipeline->bind(secondaryCb->getCommandBufferVk());
 
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -198,17 +192,18 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
     scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
     vkCmdSetScissor(secondaryCb->getCommandBufferVk(), 0, 1, &scissor);
 
-    // Get entities with TransformComponent and MeshComponent
-    auto &registry = activeScene.getRegistry();
-    auto view = registry.view<TransformComponent, MeshComponent, MaterialComponent, BoundingBoxComponent>();
     CameraComponent *cameraComp = nullptr;
 
     if (camera.isValid()) {
         cameraComp = camera.tryGetComponent<CameraComponent>();
     }
 
-    // Begin frame for MDI batching - use current frame's batch maps
-    m_mdiBatchMaps[currentFrame]->beginFrame();
+    const Frustum *frustum = nullptr;
+    if (cameraComp != nullptr && activeScene.getSettings().frustumCullingEnabled) {
+        frustum = &cameraComp->frustum;
+    }
+
+    m_geometry->populate(activeScene, frustum, currentFrame);
 
     // bind descriptor sets
     m_rc->descriptorManager->bindSet(0, secondaryCb, m_pipeline); // camera stuff
@@ -221,71 +216,10 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
     uint32_t cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrame);
     uint32_t cameraSlotIndex = (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
 
-    // First pass: Populate MDI batches with mesh data
-    for (auto entity : view) {
-        RAPTURE_PROFILE_SCOPE("Populate Batch");
-
-        auto &transform = view.get<TransformComponent>(entity);
-        auto &meshComp = view.get<MeshComponent>(entity);
-        auto &materialComp = view.get<MaterialComponent>(entity);
-        auto &boundingBoxComp = view.get<BoundingBoxComponent>(entity);
-
-        // Check if mesh is valid and not loading
-        if (!meshComp.mesh || meshComp.isLoading) {
-            continue;
-        }
-
-        auto mesh = meshComp.mesh;
-
-        // Check if mesh has valid buffers
-        if (!mesh->getVertexBuffer() || !mesh->getIndexBuffer()) {
-            continue;
-        }
-
-        boundingBoxComp.updateWorldBoundingBox(transform);
-
-        if (cameraComp && activeScene.getSettings().frustumCullingEnabled) {
-            if (cameraComp->frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside) {
-                continue;
-            }
-        }
-
-        // Get buffer allocation info to determine batch
-        auto vboAlloc = meshComp.mesh->getVertexAllocation();
-        auto iboAlloc = meshComp.mesh->getIndexAllocation();
-
-        if (!vboAlloc || !iboAlloc) {
-            continue;
-        }
-
-        // Get or create batch for this VBO/IBO arena combination
-        MDIBatch *batch =
-            m_mdiBatchMaps[currentFrame]->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(),
-                                                      meshComp.mesh->getIndexBuffer()->getIndexType());
-
-        uint32_t meshSlotIndex = meshComp.renderDataSlot;
-        uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
-
-        batch->addObject(*meshComp.mesh, meshSlotIndex, materialIndex);
-    }
-
-    // Second pass: Render the batches using MDI
-    for (const auto &[batchKey, batch] : m_mdiBatchMaps[currentFrame]->getBatches()) {
-        if (batch->getDrawCount() == 0) {
-            continue;
-        }
-
+    for (MDIBatch *batch : m_geometry->batches(currentFrame)) {
         RAPTURE_PROFILE_SCOPE("Draw Batch");
 
-        // Upload batch data to GPU
-        batch->uploadBuffers();
-
-        // Get layout from batch
-        auto bindingDescription = batch->getBufferLayout().getBindingDescription2EXT();
-        auto attributeDescriptions = batch->getBufferLayout().getAttributeDescriptions2EXT();
-
-        vc.vkCmdSetVertexInputEXT(secondaryCb->getCommandBufferVk(), 1, &bindingDescription,
-                                  static_cast<uint32_t>(attributeDescriptions.size()), attributeDescriptions.data());
+        m_geometry->bindBatch(secondaryCb, batch);
 
         // Set push constants for this batch
         GBufferPushConstants pushConstants{};
@@ -301,15 +235,6 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
 
         vkCmdPushConstants(secondaryCb->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
                            sizeof(GBufferPushConstants), &pushConstants);
-
-        // Bind vertex buffer from the arena
-        VkBuffer vertexBuffer = batch->getVertexBuffer();
-        VkDeviceSize vertexOffset = 0;
-        vkCmdBindVertexBuffers(secondaryCb->getCommandBufferVk(), 0, 1, &vertexBuffer, &vertexOffset);
-
-        // Bind index buffer from the arena
-        VkBuffer indexBuffer = batch->getIndexBuffer();
-        vkCmdBindIndexBuffer(secondaryCb->getCommandBufferVk(), indexBuffer, 0, batch->getIndexType());
 
         // Execute multi-draw indirect
         auto indirectBuffer = batch->getIndirectBuffer();

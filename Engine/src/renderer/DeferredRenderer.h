@@ -9,7 +9,6 @@
 #include "renderer/passes/CompositePass.h"
 #include "renderer/passes/GBufferPass.h"
 #include "renderer/passes/GroundTruthAmbientOcclusionPass.h"
-#include "renderer/passes/InstancedShapesPass.h"
 #include "renderer/passes/LightingPass.h"
 #include "renderer/passes/SkyboxPass.h"
 #include "renderer/passes/SelectionOutlinePass.h"
@@ -61,7 +60,6 @@ class DeferredRenderer : public Renderer {
     std::unique_ptr<LightingPass> m_lightingPass;
     std::unique_ptr<SelectionOutlinePass> m_selectionOutlinePass;
     std::unique_ptr<SkyboxPass> m_skyboxPass;
-    std::unique_ptr<InstancedShapesPass> m_instancedShapesPass;
     std::unique_ptr<CompositePass> m_compositePass;
 
     std::vector<std::unique_ptr<Texture>> m_sceneColorHdrTextures;

@@ -3,6 +3,7 @@
 
 #include "pipelines/GraphicsPipeline.h"
 #include "renderer/MDIBatch.h"
+#include "renderer/SceneGeometryDraw.h"
 #include "renderer/passes/RenderPass.h"
 #include "shaders/Shader.h"
 
@@ -146,7 +147,7 @@ class GBufferPass : public RenderPass {
     std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
 
     // MDI batching system - one set per frame in flight
-    std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
+    std::unique_ptr<SceneGeometryDraw> m_geometry;
 
     CommandPoolHash m_commandPoolHash = 0;
 };
