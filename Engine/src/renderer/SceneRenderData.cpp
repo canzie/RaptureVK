@@ -487,7 +487,6 @@ void SceneRenderData::updateCameras(uint32_t frameIndex)
 
         data.view = camera->camera.getViewMatrix();
         data.projection = camera->camera.getProjectionMatrix();
-        data.projection[1][1] *= -1;
         data.invViewProj = glm::inverse(data.projection * data.view);
 
         // A slot that has never been updated holds a zero matrix, which would reproject to w = 0

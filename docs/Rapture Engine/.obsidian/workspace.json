@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "plans/Editor Picking and Tool Overlay.md",
+                "file": "ideas/Entity Types and Authoring Schema.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Editor Picking and Tool Overlay"
+              "title": "Entity Types and Authoring Schema"
             }
           }
         ]
@@ -187,8 +187,8 @@
   },
   "active": "6fa67950a6ea8521",
   "lastOpenFiles": [
-    "plans/ECS Tiers and Ownership.md",
     "plans/Editor Picking and Tool Overlay.md",
+    "plans/ECS Tiers and Ownership.md",
     "plans/Editor Picking and Tool Overlay.md.tmp.2791.e2d59b4ad131",
     "ideas/Editor Tools and Gizmos.md.tmp.2791.76f1ec3c596e",
     "plans/ECS Tiers and Ownership.md.tmp.2791.f4bd1c7b4d3b",

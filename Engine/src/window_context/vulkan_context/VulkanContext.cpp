@@ -747,6 +747,12 @@ static void s_enableCoreFeatures(VkPhysicalDevice physicalDevice, VkPhysicalDevi
     } else {
         RP_CORE_WARN("depthBiasClamp NOT supported.");
     }
+
+    if (supported.features.fragmentStoresAndAtomics) {
+        featuresToEnable.features.fragmentStoresAndAtomics = VK_TRUE;
+    } else {
+        RP_CORE_WARN("fragmentStoresAndAtomics NOT supported.");
+    }
 }
 
 static bool s_enableVertexInputDynamicState(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,

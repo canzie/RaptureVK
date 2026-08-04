@@ -22,11 +22,59 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstdint>
+#include <cstdlib>
 #include <glm/gtc/matrix_transform.hpp>
 #include <math/math.h>
+#include <span>
 
 static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.1f;
 static constexpr float VIEWPORT_PADDING = 6.0f;
+
+// Odd so the cursor sits on a centre pixel. The aperture is the click tolerance, and it costs only
+// the pixels it covers, so widening it is cheap
+static constexpr uint32_t PICK_APERTURE = 11;
+
+/**
+ * @brief The entity nearest the cursor within a queried region
+ *
+ * An exact hit under the cursor beats a near miss because it is nearer in pixels, so tolerance and
+ * pixel exactness do not compete. Only the front hit of a pixel is considered, since a first click
+ * selects what is visible.
+ *
+ * @param result The region's hits
+ * @param cursorX Cursor x within the region
+ * @param cursorY Cursor y within the region
+ * @return The entity, or INVALID_ENTITY_ID where the region was empty
+ */
+static Rapture::EntityID s_nearestToCursor(const Rapture::SceneQueryResult &result, uint32_t cursorX, uint32_t cursorY)
+{
+    Rapture::EntityID best = Rapture::INVALID_ENTITY_ID;
+    int32_t bestDistance = INT32_MAX;
+    float bestDepth = 0.0f;
+
+    for (uint32_t y = 0; y < result.height; y++) {
+        for (uint32_t x = 0; x < result.width; x++) {
+            std::span<const Rapture::SceneQueryHit> hits = result.at(x, y);
+            if (hits.empty()) {
+                continue;
+            }
+
+            const int32_t distance = std::max(std::abs(static_cast<int32_t>(x) - static_cast<int32_t>(cursorX)),
+                                              std::abs(static_cast<int32_t>(y) - static_cast<int32_t>(cursorY)));
+
+            if (distance > bestDistance || (distance == bestDistance && hits[0].depth >= bestDepth)) {
+                continue;
+            }
+
+            best = hits[0].entity;
+            bestDistance = distance;
+            bestDepth = hits[0].depth;
+        }
+    }
+
+    return best;
+}
 
 static const Amethyst::UDim2 HEADER_BTN_SIZE = Amethyst::UDim2::fromOffset(80, 24);
 static const Amethyst::TextStylePropertiesArgs HEADER_BTN_TEXT{
@@ -420,7 +468,19 @@ void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
     uint32_t px = static_cast<uint32_t>(u * static_cast<float>(m_viewport->getWidth()));
     uint32_t py = static_cast<uint32_t>(v * static_cast<float>(m_viewport->getHeight()));
 
-    Rapture::Entity picked = m_viewport->pickEntity(px, py);
+    // Clamped rather than centred, so an aperture against a viewport edge keeps its full width and
+    // the cursor simply sits off centre within it
+    const uint32_t half = PICK_APERTURE / 2;
+    Rapture::SceneQuery region;
+    region.x = std::min(px > half ? px - half : 0u, m_viewport->getWidth() - 1);
+    region.y = std::min(py > half ? py - half : 0u, m_viewport->getHeight() - 1);
+    region.width = std::min(PICK_APERTURE, m_viewport->getWidth() - region.x);
+    region.height = std::min(PICK_APERTURE, m_viewport->getHeight() - region.y);
+
+    Rapture::SceneQueryResult result = m_viewport->queryRegion(region);
+    Rapture::EntityID id = s_nearestToCursor(result, px - region.x, py - region.y);
+
+    Rapture::Entity picked = id == Rapture::INVALID_ENTITY_ID ? Rapture::Entity() : Rapture::Entity(id, m_viewport->getScene());
     if (picked.isValid()) {
         Rapture::GameEvents::onEntitySelected().publish(picked);
     } else if (m_selectedEntity.isValid()) {

@@ -11,7 +11,6 @@
 #include "renderer/passes/GroundTruthAmbientOcclusionPass.h"
 #include "renderer/passes/LightingPass.h"
 #include "renderer/passes/SkyboxPass.h"
-#include "renderer/passes/SelectionOutlinePass.h"
 
 #include <memory>
 
@@ -30,7 +29,6 @@ class DeferredRenderer : public Renderer {
     void drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings) override;
     void onSwapChainRecreated() override;
     void resizeRenderTarget(uint32_t width, uint32_t height) override;
-    EntityID pickEntity(uint32_t x, uint32_t y) override;
 
     GBufferPass *getGBufferPass() { return m_gbufferPass.get(); }
 
@@ -58,7 +56,6 @@ class DeferredRenderer : public Renderer {
     std::unique_ptr<GBufferPass> m_gbufferPass;
     std::unique_ptr<GroundTruthAmbientOcclusionPass> m_ambientOcclusionPass;
     std::unique_ptr<LightingPass> m_lightingPass;
-    std::unique_ptr<SelectionOutlinePass> m_selectionOutlinePass;
     std::unique_ptr<SkyboxPass> m_skyboxPass;
     std::unique_ptr<CompositePass> m_compositePass;
 

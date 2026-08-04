@@ -9,6 +9,7 @@
 #include "window_context/Application.h"
 
 #include <algorithm>
+#include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
 #include <limits>
 
@@ -503,9 +504,13 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
         float aspectRatio = 1.0f;
 
         try {
+            // The camera's projection carries Vulkan's Y flip, which is a sign on this term and says
+            // nothing about the shape of the frustum being decomposed
+            const float focalY = std::fabs(cameraProjectionMatrix[1][1]);
+
             // For perspective: extract parameters from projection matrix
-            fovY = 2.0f * atan(1.0f / cameraProjectionMatrix[1][1]);
-            aspectRatio = cameraProjectionMatrix[1][1] / cameraProjectionMatrix[0][0];
+            fovY = 2.0f * atan(1.0f / focalY);
+            aspectRatio = focalY / cameraProjectionMatrix[0][0];
 
             if (fovY <= 0.0f || fovY > glm::radians(180.0f)) {
                 RP_CORE_ERROR("Invalid FOV extracted: {0} radians", fovY);
@@ -534,9 +539,9 @@ std::array<glm::vec3, 8> CascadedShadowMap::extractFrustumCorners(const glm::mat
         float top = 0.0f;
 
         try {
-            // Extract orthographic dimensions from projection matrix
+            // Extract orthographic dimensions from projection matrix, past the Y flip
             right = 1.0f / cameraProjectionMatrix[0][0];
-            top = 1.0f / cameraProjectionMatrix[1][1];
+            top = 1.0f / std::fabs(cameraProjectionMatrix[1][1]);
 
             if (right <= 0.0f) {
                 RP_CORE_ERROR("Invalid right value extracted: {0}", right);

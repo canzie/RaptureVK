@@ -37,17 +37,7 @@ struct TerrainGBufferPushConstants {
     uint32_t materialIndex;
 };
 
-// The targets every device is guaranteed to give one pass
-static constexpr uint32_t GBUFFER_ATTACHMENT_COUNT_MIN = 4;
-// Every target the G-buffer wants, optional slots included
-static constexpr uint32_t GBUFFER_ATTACHMENT_COUNT_ALL = 5;
-
-// Targets past the guaranteed four are a hard drop: a device that cannot afford them loses the
-// features they carry rather than getting a substitute.
-static bool s_hasAllGBufferAttachments()
-{
-    return Application::getInstance().getVulkanContext().getMaxColorAttachments() >= GBUFFER_ATTACHMENT_COUNT_ALL;
-}
+static constexpr uint32_t GBUFFER_ATTACHMENT_COUNT = 4;
 
 GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     : m_width(width), m_height(height), m_framesInFlight(framesInFlight), m_currentFrame(0)
@@ -98,7 +88,6 @@ GBufferPass::~GBufferPass()
     m_albedoSpecTextures.clear();
     m_materialTextures.clear();
     m_shadingModelTextures.clear();
-    m_gbufferE.clear();
     m_depthStencilTextures.clear();
 
     // Clean up pipelines
@@ -116,9 +105,6 @@ FramebufferSpecification GBufferPass::getFramebufferSpecification()
     spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_SRGB);       // rgb=base color a=packed emissive intensity
     spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM);      // r=metallic g=roughness b=AO a=specular
     spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM);      // r=shading model id gba=custom data
-    if (s_hasAllGBufferAttachments()) {
-        spec.colorAttachments.push_back(VK_FORMAT_R32_UINT); // r=entity id, biased by one
-    }
 
     return spec;
 }
@@ -257,7 +243,7 @@ void GBufferPass::updateAttachments(const RenderPassContext &context)
     colorAttachment.clearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     m_attachments.colorAttachments.clear();
-    m_attachments.colorAttachments.reserve(m_gbufferE.empty() ? 4 : 5);
+    m_attachments.colorAttachments.reserve(GBUFFER_ATTACHMENT_COUNT);
 
     colorAttachment.target = m_normalTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
@@ -271,11 +257,6 @@ void GBufferPass::updateAttachments(const RenderPassContext &context)
     colorAttachment.target = m_shadingModelTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
 
-    if (!m_gbufferE.empty()) {
-        colorAttachment.target = m_gbufferE[frame].get();
-        m_attachments.colorAttachments.push_back(colorAttachment);
-    }
-
     m_attachments.depthAttachment.target = m_depthStencilTextures[frame].get();
     m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::CLEAR;
     m_attachments.depthAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
@@ -283,28 +264,6 @@ void GBufferPass::updateAttachments(const RenderPassContext &context)
     m_attachments.depthAttachment.clearStencil = 0;
 
     m_attachments.stencilAttachment = m_attachments.depthAttachment;
-}
-
-EntityID GBufferPass::readEntityId(uint32_t x, uint32_t y, uint32_t frameInFlight) const
-{
-    if (m_gbufferE.empty() || frameInFlight >= m_gbufferE.size()) {
-        return INVALID_ENTITY_ID;
-    }
-
-    Texture *entityIdTexture = m_gbufferE[frameInFlight].get();
-    std::vector<uint8_t> pixel = entityIdTexture->readbackRegion(x, y, 1, 1);
-    if (pixel.size() < sizeof(uint32_t)) {
-        return INVALID_ENTITY_ID;
-    }
-
-    uint32_t biased = 0;
-    std::memcpy(&biased, pixel.data(), sizeof(uint32_t));
-
-    // Ids are stored biased by one so the cleared value reads as nothing drawn
-    if (biased == 0) {
-        return INVALID_ENTITY_ID;
-    }
-    return biased - 1;
 }
 
 void GBufferPass::endRendering(CommandBuffer *primaryCb)
@@ -326,7 +285,7 @@ void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb, uin
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    VkImageMemoryBarrier barriers[6];
+    VkImageMemoryBarrier barriers[GBUFFER_ATTACHMENT_COUNT + 1];
     barriers[0] = m_normalTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
@@ -339,12 +298,7 @@ void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb, uin
     barriers[3] = m_shadingModelTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         VK_ACCESS_SHADER_READ_BIT);
-    uint32_t barrierCount = 4;
-    if (!m_gbufferE.empty()) {
-        barriers[barrierCount++] = m_gbufferE[currentFrame]->getImageMemoryBarrier(
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-    }
+    uint32_t barrierCount = GBUFFER_ATTACHMENT_COUNT;
 
     barriers[barrierCount++] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -386,17 +340,6 @@ void GBufferPass::createTextures()
     shadingModelSpec.type = TextureType::TEXTURE2D;
     shadingModelSpec.srgb = false;
 
-    TextureSpecification entityIdSpec;
-    entityIdSpec.width = static_cast<uint32_t>(m_width);
-    entityIdSpec.height = static_cast<uint32_t>(m_height);
-    entityIdSpec.format = TextureFormat::R32UI;
-    entityIdSpec.type = TextureType::TEXTURE2D;
-    entityIdSpec.srgb = false;
-    entityIdSpec.allowReadback = true;
-    // Integer formats support no filtering, and neighbouring ids must not be blended in any case
-    entityIdSpec.filter = TextureFilter::Nearest;
-    entityIdSpec.wrap = TextureWrap::ClampToEdge;
-
     TextureSpecification depthStencilSpec;
     depthStencilSpec.width = static_cast<uint32_t>(m_width);
     depthStencilSpec.height = static_cast<uint32_t>(m_height);
@@ -404,17 +347,12 @@ void GBufferPass::createTextures()
     depthStencilSpec.type = TextureType::TEXTURE2D;
     depthStencilSpec.srgb = false;
 
-    const bool entityIdSlot = s_hasAllGBufferAttachments();
-
     // Create textures for each frame in flight
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
         m_normalTextures.push_back(std::make_unique<Texture>(normalSpec));
         m_albedoSpecTextures.push_back(std::make_unique<Texture>(albedoSpec));
         m_materialTextures.push_back(std::make_unique<Texture>(materialSpec));
         m_shadingModelTextures.push_back(std::make_unique<Texture>(shadingModelSpec));
-        if (entityIdSlot) {
-            m_gbufferE.push_back(std::make_unique<Texture>(entityIdSpec));
-        }
         m_depthStencilTextures.push_back(std::make_unique<Texture>(depthStencilSpec));
     }
 }
@@ -504,11 +442,8 @@ void GBufferPass::createPipeline()
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    const uint32_t colorAttachmentCount =
-        s_hasAllGBufferAttachments() ? GBUFFER_ATTACHMENT_COUNT_ALL : GBUFFER_ATTACHMENT_COUNT_MIN;
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachments[5];
-    for (uint32_t i = 0; i < colorAttachmentCount; ++i) {
+    VkPipelineColorBlendAttachmentState colorBlendAttachments[GBUFFER_ATTACHMENT_COUNT];
+    for (uint32_t i = 0; i < GBUFFER_ATTACHMENT_COUNT; ++i) {
         colorBlendAttachments[i] = {};
         colorBlendAttachments[i].colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -520,7 +455,7 @@ void GBufferPass::createPipeline()
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.logicOp = VK_LOGIC_OP_COPY;           // Optional
-    colorBlending.attachmentCount = colorAttachmentCount;
+    colorBlending.attachmentCount = GBUFFER_ATTACHMENT_COUNT;
     colorBlending.pAttachments = colorBlendAttachments; // Changed from &colorBlendAttachment
     colorBlending.blendConstants[0] = 0.0f;             // Optional
     colorBlending.blendConstants[1] = 0.0f;             // Optional
@@ -545,8 +480,6 @@ void GBufferPass::createPipeline()
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
-    shaderConfig.compileInfo.macros.emplace_back(s_hasAllGBufferAttachments() ? "GBUFFER_ATTACHMENT_COUNT_ALL"
-                                                                             : "GBUFFER_ATTACHMENT_COUNT_MIN");
 
     auto asset = AssetManager::importAsset(shaderPath / "glsl/GBuffer.vs.glsl", shaderConfig);
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
@@ -634,11 +567,8 @@ void GBufferPass::createTerrainPipeline()
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    const uint32_t colorAttachmentCount =
-        s_hasAllGBufferAttachments() ? GBUFFER_ATTACHMENT_COUNT_ALL : GBUFFER_ATTACHMENT_COUNT_MIN;
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachments[5];
-    for (uint32_t i = 0; i < colorAttachmentCount; ++i) {
+    VkPipelineColorBlendAttachmentState colorBlendAttachments[GBUFFER_ATTACHMENT_COUNT];
+    for (uint32_t i = 0; i < GBUFFER_ATTACHMENT_COUNT; ++i) {
         colorBlendAttachments[i] = {};
         colorBlendAttachments[i].colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -648,7 +578,7 @@ void GBufferPass::createTerrainPipeline()
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.attachmentCount = colorAttachmentCount;
+    colorBlending.attachmentCount = GBUFFER_ATTACHMENT_COUNT;
     colorBlending.pAttachments = colorBlendAttachments;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
@@ -664,8 +594,6 @@ void GBufferPass::createTerrainPipeline()
 
     ShaderImportConfig terrainShaderConfig;
     terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
-    terrainShaderConfig.compileInfo.macros.emplace_back(s_hasAllGBufferAttachments() ? "GBUFFER_ATTACHMENT_COUNT_ALL"
-                                                                                    : "GBUFFER_ATTACHMENT_COUNT_MIN");
 
     auto asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
     m_terrainShader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;

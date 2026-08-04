@@ -35,6 +35,14 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
     // could probably find a way around it but its fine
     virtual void addDataGPU(void *data, VkDeviceSize size, VkDeviceSize offset) = 0;
 
+    /**
+     * @brief Copy a range of a host visible buffer back into CPU memory
+     * @param destination Memory the range is copied into, at least size bytes
+     * @param size Bytes to read
+     * @param offset Byte offset into the buffer to read from
+     */
+    void readData(void *destination, VkDeviceSize size, VkDeviceSize offset);
+
     VkBuffer getBufferVk() const;
     VkDeviceSize getSize() const;
     VkDeviceSize getOffset() const;

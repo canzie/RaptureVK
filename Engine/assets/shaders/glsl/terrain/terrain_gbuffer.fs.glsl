@@ -98,8 +98,4 @@ void main() {
     gs.specular = surf.specular;
     gs.shadingModelId = surf.shadingModelId;
     writeGBuffer(gs);
-
-#ifdef GBUFFER_ATTACHMENT_COUNT_ALL
-    writeGBufferNoEntityId();
-#endif // GBUFFER_ATTACHMENT_COUNT_ALL
 }

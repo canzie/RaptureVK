@@ -4,6 +4,7 @@
 #include "events/EventSignal.h"
 #include "renderer/RenderSettings.h"
 #include "renderer/Renderer.h"
+#include "renderer/SceneQueryRenderer.h"
 #include "renderer/common.h"
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
@@ -66,12 +67,16 @@ class Viewport {
     void drawFrame();
 
     /**
-     * @brief Entity drawn at a pixel of this viewport's most recently rendered frame
-     * @param x Pixel x in render target space
-     * @param y Pixel y in render target space
-     * @return The entity, or an invalid entity where nothing was drawn
+     * @brief Render a region of this viewport and report which entities cover each of its pixels
+     *
+     * Renders on demand and blocks on the result, so it belongs on the thread driving the editor.
+     * What the hits mean is the caller's: which one wins, how far from the cursor still counts, and
+     * how repeated queries cycle through what a pixel covers.
+     *
+     * @param region Region in this viewport's render target pixels
+     * @return The region's hits, empty where the region lies outside the viewport
      */
-    Entity pickEntity(uint32_t x, uint32_t y);
+    SceneQueryResult queryRegion(const SceneQuery &region);
 
     void resize(uint32_t width, uint32_t height);
     void onSwapChainRecreated();
@@ -99,6 +104,7 @@ class Viewport {
     RenderContext m_renderContext;
 
     std::unique_ptr<Renderer> m_renderer;
+    std::unique_ptr<SceneQueryRenderer> m_queryRenderer;
     RendererType m_rendererType = RendererType::DEFERRED;
 
     Scene *m_scene = nullptr;

@@ -13,9 +13,6 @@ layout(location = 3) in vec3 inTangent;
 layout(location = 4) in vec3 inBitangent;
 layout(location = 5) in flat uint inFlags;
 layout(location = 6) in flat uint inMaterialIndex;
-#ifdef GBUFFER_ATTACHMENT_COUNT_ALL
-layout(location = 7) in flat uint inEntityId;
-#endif // GBUFFER_ATTACHMENT_COUNT_ALL
 
 precision highp float;
 
@@ -53,8 +50,4 @@ void main() {
     gs.specular = surf.specular;
     gs.shadingModelId = surf.shadingModelId;
     writeGBuffer(gs);
-
-#ifdef GBUFFER_ATTACHMENT_COUNT_ALL
-    writeGBufferEntityId(inEntityId);
-#endif // GBUFFER_ATTACHMENT_COUNT_ALL
 }

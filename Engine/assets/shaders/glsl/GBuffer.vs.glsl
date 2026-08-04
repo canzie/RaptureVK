@@ -16,9 +16,6 @@ layout(location = 3) out vec3 outTangent;
 layout(location = 4) out vec3 outBitangent;
 layout(location = 5) out flat uint outFlags;
 layout(location = 6) out flat uint outMaterialIndex;
-#ifdef GBUFFER_ATTACHMENT_COUNT_ALL
-layout(location = 7) out flat uint outEntityId;
-#endif // GBUFFER_ATTACHMENT_COUNT_ALL
 
 struct MeshGPUData {
     mat4 model;
@@ -104,10 +101,6 @@ void main() {
 
     // Pass flags to fragment shader
     outFlags = flags;
-
-#ifdef GBUFFER_ATTACHMENT_COUNT_ALL
-    outEntityId = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].entityId;
-#endif // GBUFFER_ATTACHMENT_COUNT_ALL
 
     // Calculate position in view space
     vec4 viewPos = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex].view * vec4(outFragPosDepth.xyz, 1.0);

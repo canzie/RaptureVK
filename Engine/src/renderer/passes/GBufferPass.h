@@ -62,17 +62,7 @@ class GBufferPass : public RenderPass {
     Texture *getAlbedoTexture(uint32_t frameInFlight) const { return m_albedoSpecTextures[frameInFlight].get(); }
     Texture *getMaterialTexture(uint32_t frameInFlight) const { return m_materialTextures[frameInFlight].get(); }
     Texture *getShadingModelTexture(uint32_t frameInFlight) const { return m_shadingModelTextures[frameInFlight].get(); }
-    Texture *getGBufferE(uint32_t frameInFlight) const { return m_gbufferE.empty() ? nullptr : m_gbufferE[frameInFlight].get(); }
     Texture *getDepthTexture(uint32_t frameInFlight) const { return m_depthStencilTextures[frameInFlight].get(); }
-
-    /**
-     * @brief Reads back the entity drawn at one pixel
-     * @param x Pixel x in G-buffer space
-     * @param y Pixel y in G-buffer space
-     * @param frameInFlight Frame whose G-buffer to sample
-     * @return The entity, or INVALID_ENTITY_ID where nothing was drawn
-     */
-    EntityID readEntityId(uint32_t x, uint32_t y, uint32_t frameInFlight) const;
 
     /**
      * @brief Non-owning views of the per-frame depth textures, for passes that share this depth buffer
@@ -128,7 +118,6 @@ class GBufferPass : public RenderPass {
     std::vector<std::unique_ptr<Texture>> m_albedoSpecTextures;
     std::vector<std::unique_ptr<Texture>> m_materialTextures;
     std::vector<std::unique_ptr<Texture>> m_shadingModelTextures;
-    std::vector<std::unique_ptr<Texture>> m_gbufferE;
     std::vector<std::unique_ptr<Texture>> m_depthStencilTextures;
 
     // Bindless texture indices for each frame in flight

@@ -59,22 +59,18 @@ void Viewport::drawFrame()
     m_renderer->drawFrame(*m_scene, camera, m_renderSettings);
 }
 
-Entity Viewport::pickEntity(uint32_t x, uint32_t y)
+SceneQueryResult Viewport::queryRegion(const SceneQuery &region)
 {
-    if (m_renderer == nullptr || m_scene == nullptr) {
-        return Entity();
-    }
-    if (x >= m_config.width || y >= m_config.height) {
-        return Entity();
+    if (m_scene == nullptr) {
+        return {};
     }
 
-    EntityID id = m_renderer->pickEntity(x, y);
-    if (id == INVALID_ENTITY_ID) {
-        return Entity();
+    if (m_queryRenderer == nullptr) {
+        m_queryRenderer = std::make_unique<SceneQueryRenderer>(m_renderContext);
     }
 
-    Entity picked(id, m_scene);
-    return picked.isValid() ? picked : Entity();
+    Entity camera = m_camera.isValid() ? m_camera : m_scene->getMainCamera();
+    return m_queryRenderer->query(*m_scene, camera, m_config.width, m_config.height, region);
 }
 
 void Viewport::resize(uint32_t width, uint32_t height)

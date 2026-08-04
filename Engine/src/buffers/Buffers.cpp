@@ -61,6 +61,33 @@ void Buffer::addData(void *newData, VkDeviceSize size, VkDeviceSize offset)
     vmaUnmapMemory(m_Allocator, m_Allocation);
 }
 
+void Buffer::readData(void *destination, VkDeviceSize size, VkDeviceSize offset)
+{
+    if (offset + size > m_Size) {
+        RP_CORE_ERROR("Attempted to read {} bytes at offset {} from a buffer of size {}", size, offset, m_Size);
+        return;
+    }
+
+    if (!(m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
+        RP_CORE_ERROR("Buffer is not host visible!");
+        return;
+    }
+
+    void *mappedData;
+    if (vmaMapMemory(m_Allocator, m_Allocation, &mappedData) != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to map memory!");
+        return;
+    }
+
+    if (!(m_propertiesFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+        vmaInvalidateAllocation(m_Allocator, m_Allocation, offset, size);
+    }
+
+    memcpy(destination, (const char *)mappedData + offset, size);
+
+    vmaUnmapMemory(m_Allocator, m_Allocation);
+}
+
 void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize dstOffset)
 {
     auto &app = Application::getInstance();

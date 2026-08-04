@@ -16,6 +16,9 @@ namespace Rapture
 	void PerspectiveCamera::updateProjectionMatrix(float fov, float ratio, float nearPlane, float farPlane)
 	{
 		m_projectionMatrix = glm::perspective(glm::radians(fov), ratio, nearPlane, farPlane);
+
+		// GLM builds a GL convention matrix, Vulkan's NDC y points down
+		m_projectionMatrix[1][1] *= -1.0f;
 	}
 
 	void PerspectiveCamera::updateViewMatrix(glm::vec3 translation)
