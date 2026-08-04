@@ -3,6 +3,8 @@
 #include "components/Components.h"
 #include "components/systems/Environment.h"
 #include "logging/Log.h"
+#include "renderer/SceneRenderData.h"
+#include "scenes/Scene.h"
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -249,6 +251,17 @@ static void s_rowDragFloat(Amethyst::TableScope &t, std::string_view label, doub
     });
 }
 
+template <typename T>
+static T *s_instanceAs(const Rapture::Entity &entity)
+{
+    if (!entity.isValid() || entity.getScene() == nullptr) {
+        return nullptr;
+    }
+
+    Rapture::Instance *instance = entity.getScene()->instanceFor(entity);
+    return instance != nullptr ? instance->as<T>() : nullptr;
+}
+
 static Amethyst::Dropdown *s_rowMobility(Amethyst::TableScope &t, Rapture::Mobility current,
                                          const std::function<void(Rapture::Mobility)> &onSelect)
 {
@@ -259,7 +272,7 @@ static Amethyst::Dropdown *s_rowMobility(Amethyst::TableScope &t, Rapture::Mobil
     });
 }
 
-void TransformEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+void Node3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
         s_rowVec3(t, "Translation", m_values[0], 0.1, -100000.0, 100000.0, [this]() { apply(0); });
@@ -268,33 +281,30 @@ void TransformEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
-void TransformEditor::apply(int row)
+void Node3DEditor::apply(int row)
 {
-    if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::TransformComponent>()) {
+    if (m_node == nullptr) {
         return;
     }
-    auto &tc = m_entity.getComponent<Rapture::TransformComponent>();
     glm::vec3 v(static_cast<float>(m_values[row][0]), static_cast<float>(m_values[row][1]), static_cast<float>(m_values[row][2]));
     if (row == 0) {
-        tc.transforms.setTranslation(v);
+        m_node->setPosition(v);
     } else if (row == 1) {
-        tc.transforms.setRotation(v);
+        m_node->setRotation(v);
     } else {
-        tc.transforms.setScale(v);
+        m_node->setScale(v);
     }
-    m_entity.markDirty();
 }
 
-void TransformEditor::sync(const Rapture::Entity &entity)
+void Node3DEditor::sync(const Rapture::Entity &entity)
 {
-    m_entity = entity;
-    if (!entity.hasComponent<Rapture::TransformComponent>()) {
+    m_node = s_instanceAs<Rapture::Node3D>(entity);
+    if (m_node == nullptr) {
         return;
     }
-    const auto &tc = entity.getComponent<Rapture::TransformComponent>();
-    glm::vec3 t = tc.translation();
-    glm::vec3 r = tc.rotation();
-    glm::vec3 s = tc.scale();
+    glm::vec3 t = m_node->position();
+    glm::vec3 r = m_node->rotation();
+    glm::vec3 s = m_node->scale();
     m_values[0][0] = t.x;
     m_values[0][1] = t.y;
     m_values[0][2] = t.z;
@@ -306,379 +316,238 @@ void TransformEditor::sync(const Rapture::Entity &entity)
     m_values[2][2] = s.z;
 }
 
-void DirectionalLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+void Light3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
         s_rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
-            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
-            if (light == nullptr) {
-                return;
+            if (m_node != nullptr) {
+                m_node->setColor(c);
             }
-            light->setColor(c);
-            m_entity.markDirty();
         });
         s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
-            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
-            if (light == nullptr) {
-                return;
+            if (m_node != nullptr) {
+                m_node->setIntensity(v);
             }
-            light->setIntensity(v);
-            m_entity.markDirty();
         });
-        s_rowCheckbox(t, "Atmosphere Sun", &m_atmosphereSunLight, [this](bool b) {
-            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
-            if (light == nullptr) {
+        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
+            if (m_node == nullptr) {
                 return;
             }
-            light->atmosphereSunLight = b;
-            m_entity.markDirty();
+            m_node->setMobility(m);
+            if (m_mobilityDropdown != nullptr) {
+                m_mobilityDropdown->setText(Rapture::mobilityToString(m));
+            }
+        });
+        s_rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
+            if (m_node != nullptr) {
+                m_node->setActive(b);
+            }
         });
         s_rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
-            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
-            if (light == nullptr) {
-                return;
+            if (m_node != nullptr) {
+                m_node->setCastsShadow(b);
             }
-            light->setCastsShadow(b);
-            m_entity.markDirty();
         });
-        s_rowCheckbox(t, "Use Temperature", &m_useTemperature, [this](bool b) {
-            auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
-            if (light == nullptr) {
-                return;
+        s_rowCheckbox(t, "Use Temperature", &m_usesTemperature, [this](bool b) {
+            if (m_node != nullptr) {
+                m_node->setUsesTemperature(b);
             }
-            light->useTemperature = b;
-            m_entity.markDirty();
         });
         s_rowSlider(
             t, "Temperature", &m_temperature, 1000.0f, 40000.0f,
             [this](float v) {
-                auto *light = m_entity.tryGetComponent<Rapture::DirectionalLightComponent>();
-                if (light == nullptr) {
-                    return;
+                if (m_node != nullptr) {
+                    m_node->setTemperature(v);
                 }
-                light->temperature = v;
-                m_entity.markDirty();
             },
             "%.1f K");
     });
 }
 
-void DirectionalLightEditor::sync(const Rapture::Entity &entity)
+void Light3DEditor::sync(const Rapture::Entity &entity)
 {
-    m_entity = entity;
-    auto *light = entity.tryGetComponent<Rapture::DirectionalLightComponent>();
-    if (light == nullptr) {
+    Rapture::Light3D *previous = m_node;
+    m_node = s_instanceAs<Rapture::Light3D>(entity);
+    if (m_node == nullptr) {
         return;
     }
-    m_color = light->color;
-    m_intensity = light->intensity;
-    m_atmosphereSunLight = light->atmosphereSunLight;
-    m_castsShadow = light->castsShadow;
-    m_useTemperature = light->useTemperature;
-    m_temperature = light->temperature;
+
+    m_color = m_node->color();
+    m_intensity = m_node->intensity();
+    m_castsShadow = m_node->castsShadow();
+    m_usesTemperature = m_node->usesTemperature();
+    m_temperature = m_node->temperature();
+    m_isActive = m_node->isActive();
+
     if (m_colorField) {
-        m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
+        m_colorField->setColor3(Amethyst::Color3(m_color.x, m_color.y, m_color.z));
+    }
+
+    if (previous != m_node && m_mobilityDropdown != nullptr) {
+        m_mobilityDropdown->setText(Rapture::mobilityToString(m_node->mobility()));
     }
 }
 
-void PointLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+void DirectionalLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
-            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
-            if (light == nullptr) {
-                return;
+        s_rowCheckbox(t, "Atmosphere Sun", &m_atmosphereSun, [this](bool b) {
+            if (m_node != nullptr) {
+                m_node->setAtmosphereSun(b);
             }
-            light->setColor(c);
-            m_entity.markDirty();
         });
-        s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
-            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->setIntensity(v);
-            m_entity.markDirty();
-        });
-        s_rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
-            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->range = v;
-            m_entity.markDirty();
-        });
-        s_rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
-            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->setCastsShadow(b);
-            m_entity.markDirty();
-        });
-        s_rowCheckbox(t, "Use Temperature", &m_useTemperature, [this](bool b) {
-            auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->useTemperature = b;
-            m_entity.markDirty();
-        });
-        s_rowSlider(
-            t, "Temperature", &m_temperature, 1000.0f, 40000.0f,
-            [this](float v) {
-                auto *light = m_entity.tryGetComponent<Rapture::PointLightComponent>();
-                if (light == nullptr) {
-                    return;
-                }
-                light->temperature = v;
-                m_entity.markDirty();
-            },
-            "%.1f K");
     });
 }
 
-void PointLightEditor::sync(const Rapture::Entity &entity)
+void DirectionalLight3DEditor::sync(const Rapture::Entity &entity)
 {
-    m_entity = entity;
-    auto *light = entity.tryGetComponent<Rapture::PointLightComponent>();
-    if (light == nullptr) {
+    m_node = s_instanceAs<Rapture::DirectionalLight3D>(entity);
+    if (m_node == nullptr) {
         return;
     }
-    m_color = light->color;
-    m_intensity = light->intensity;
-    m_range = light->range;
-    m_castsShadow = light->castsShadow;
-    m_useTemperature = light->useTemperature;
-    m_temperature = light->temperature;
-    if (m_colorField) {
-        m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
-    }
+    m_atmosphereSun = m_node->isAtmosphereSun();
 }
 
-void SpotLightEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+void PointLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
-            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->setColor(c);
-            m_entity.markDirty();
-        });
-        s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
-            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->setIntensity(v);
-            m_entity.markDirty();
-        });
         s_rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
-            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-            if (light == nullptr) {
-                return;
+            if (m_node != nullptr) {
+                m_node->setRange(v);
             }
-            light->range = v;
-            m_entity.markDirty();
+        });
+    });
+}
+
+void PointLight3DEditor::sync(const Rapture::Entity &entity)
+{
+    m_node = s_instanceAs<Rapture::PointLight3D>(entity);
+    if (m_node == nullptr) {
+        return;
+    }
+    m_range = m_node->range();
+}
+
+void SpotLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
+        s_rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
+            if (m_node != nullptr) {
+                m_node->setRange(v);
+            }
         });
         s_rowSlider(
             t, "Inner Cone", &m_innerConeAngle, 0.0f, 89.0f,
             [this](float v) {
-                auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-                if (light == nullptr) {
-                    return;
+                if (m_node != nullptr) {
+                    m_node->setInnerConeAngle(glm::radians(v));
                 }
-                light->innerConeAngle = glm::radians(v);
-                m_entity.markDirty();
             },
             "%.1f deg");
         s_rowSlider(
             t, "Outer Cone", &m_outerConeAngle, 0.0f, 90.0f,
             [this](float v) {
-                auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-                if (light == nullptr) {
-                    return;
+                if (m_node != nullptr) {
+                    m_node->setOuterConeAngle(glm::radians(v));
                 }
-                light->outerConeAngle = glm::radians(v);
-                m_entity.markDirty();
             },
             "%.1f deg");
-        s_rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
-            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->setCastsShadow(b);
-            m_entity.markDirty();
-        });
-        s_rowCheckbox(t, "Use Temperature", &m_useTemperature, [this](bool b) {
-            auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-            if (light == nullptr) {
-                return;
-            }
-            light->useTemperature = b;
-            m_entity.markDirty();
-        });
-        s_rowSlider(
-            t, "Temperature", &m_temperature, 1000.0f, 40000.0f,
-            [this](float v) {
-                auto *light = m_entity.tryGetComponent<Rapture::SpotLightComponent>();
-                if (light == nullptr) {
-                    return;
-                }
-                light->temperature = v;
-                m_entity.markDirty();
-            },
-            "%.1f K");
     });
 }
 
-void SpotLightEditor::sync(const Rapture::Entity &entity)
+void SpotLight3DEditor::sync(const Rapture::Entity &entity)
 {
-    m_entity = entity;
-    auto *light = entity.tryGetComponent<Rapture::SpotLightComponent>();
-    if (light == nullptr) {
+    m_node = s_instanceAs<Rapture::SpotLight3D>(entity);
+    if (m_node == nullptr) {
         return;
     }
-    m_color = light->color;
-    m_intensity = light->intensity;
-    m_range = light->range;
-    m_innerConeAngle = glm::degrees(light->innerConeAngle);
-    m_outerConeAngle = glm::degrees(light->outerConeAngle);
-    m_castsShadow = light->castsShadow;
-    m_useTemperature = light->useTemperature;
-    m_temperature = light->temperature;
-    if (m_colorField) {
-        m_colorField->setColor3(Amethyst::Color3(light->color.x, light->color.y, light->color.z));
-    }
+    m_range = m_node->range();
+    m_innerConeAngle = glm::degrees(m_node->innerConeAngle());
+    m_outerConeAngle = glm::degrees(m_node->outerConeAngle());
 }
 
-void MeshEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
-{
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::MeshComponent>()) {
-                return;
-            }
-            m_entity.getComponent<Rapture::MeshComponent>().mobility = m;
-            if (m_mobilityDropdown != nullptr) {
-                m_mobilityDropdown->setText(Rapture::mobilityToString(m));
-            }
-            m_entity.markDirty();
-        });
-        s_rowCheckbox(t, "Enabled", &m_isEnabled, [this](bool b) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::MeshComponent>()) {
-                return;
-            }
-            m_entity.getComponent<Rapture::MeshComponent>().isEnabled = b;
-            m_entity.markDirty();
-        });
-    });
-}
-
-void MeshEditor::sync(const Rapture::Entity &entity)
-{
-    bool entityChanged = !(entity == m_entity);
-    m_entity = entity;
-    if (!entity.hasComponent<Rapture::MeshComponent>()) {
-        return;
-    }
-    const auto &mc = entity.getComponent<Rapture::MeshComponent>();
-    m_isEnabled = mc.isEnabled;
-
-    if (entityChanged && m_mobilityDropdown != nullptr) {
-        m_mobilityDropdown->setText(Rapture::mobilityToString(mc.mobility));
-    }
-}
-
-void MaterialEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
         s_rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::AssetType::MATERIAL_INSTANCE}},
                          [this](Rapture::AssetHandle handle) {
-                             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::MaterialComponent>()) {
-                                 return;
+                             if (m_node != nullptr) {
+                                 m_node->setMaterial(handle);
                              }
-                             Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
-                             if (ref.get() == nullptr) {
-                                 RP_WARN("Material instance {} could not be resolved", handle);
-                                 return;
-                             }
-                             m_entity.getComponent<Rapture::MaterialComponent>().material =
-                                 Rapture::AssetPtr<Rapture::MaterialInstance>(std::move(ref));
-                             m_entity.markDirty();
                          });
+        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
+            if (m_node == nullptr) {
+                return;
+            }
+            m_node->setMobility(m);
+            if (m_mobilityDropdown != nullptr) {
+                m_mobilityDropdown->setText(Rapture::mobilityToString(m));
+            }
+        });
+        s_rowCheckbox(t, "Visible", &m_isVisible, [this](bool b) {
+            if (m_node != nullptr) {
+                m_node->setVisible(b);
+            }
+        });
+        s_rowCheckbox(t, "Ray Traced", &m_isRayTraced, [this](bool b) {
+            if (m_node != nullptr) {
+                m_node->setRayTraced(b);
+            }
+        });
     });
 }
 
-void MaterialEditor::sync(const Rapture::Entity &entity)
+void Mesh3DEditor::sync(const Rapture::Entity &entity)
 {
-    bool entityChanged = !(entity == m_entity);
-    m_entity = entity;
-    if (!entityChanged || !m_materialPicker.has_value() || !entity.hasComponent<Rapture::MaterialComponent>()) {
+    Rapture::Mesh3D *previous = m_node;
+    m_node = s_instanceAs<Rapture::Mesh3D>(entity);
+    if (m_node == nullptr) {
         return;
     }
 
-    const Rapture::Asset *asset = entity.getComponent<Rapture::MaterialComponent>().material.ref().get();
-    m_materialPicker->setAsset(asset != nullptr ? asset->getHandle() : Rapture::INVALID_ASSET_HANDLE);
+    m_isVisible = m_node->isVisible();
+    m_isRayTraced = m_node->isRayTraced();
+
+    if (previous != m_node) {
+        if (m_mobilityDropdown != nullptr) {
+            m_mobilityDropdown->setText(Rapture::mobilityToString(m_node->mobility()));
+        }
+        if (m_materialPicker.has_value()) {
+            m_materialPicker->setAsset(m_node->material());
+        }
+    }
 }
 
-void CameraEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+void Camera3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowSlider(t, "FOV", &m_fov, 1.0f, 179.0f, [this](float v) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
-                return;
+        s_rowSlider(t, "FOV", &m_fieldOfView, 1.0f, 179.0f, [this](float v) {
+            if (m_node != nullptr) {
+                m_node->setFieldOfView(v);
             }
-            auto &cc = m_entity.getComponent<Rapture::CameraComponent>();
-            cc.updateProjectionMatrix(v, cc.aspectRatio, cc.nearPlane, cc.farPlane);
-            m_entity.markDirty();
         });
         s_rowDragFloat(t, "Near Plane", &m_nearPlane, 0.01, 0.001, 10000.0, {}, [this](double v) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
-                return;
+            if (m_node != nullptr) {
+                m_node->setNearPlane(static_cast<float>(v));
             }
-            auto &cc = m_entity.getComponent<Rapture::CameraComponent>();
-            cc.updateProjectionMatrix(cc.fov, cc.aspectRatio, static_cast<float>(v), cc.farPlane);
-            m_entity.markDirty();
         });
         s_rowDragFloat(t, "Far Plane", &m_farPlane, 1.0, 0.001, 1000000.0, {}, [this](double v) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
-                return;
+            if (m_node != nullptr) {
+                m_node->setFarPlane(static_cast<float>(v));
             }
-            auto &cc = m_entity.getComponent<Rapture::CameraComponent>();
-            cc.updateProjectionMatrix(cc.fov, cc.aspectRatio, cc.nearPlane, static_cast<float>(v));
-            m_entity.markDirty();
-        });
-        s_rowCheckbox(t, "Main Camera", &m_isMainCamera, [this](bool b) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CameraComponent>()) {
-                return;
-            }
-            if (b) {
-                if (m_entity.getScene() != nullptr) {
-                    m_entity.getScene()->setMainCamera(m_entity);
-                }
-            } else {
-                m_entity.getComponent<Rapture::CameraComponent>().isMainCamera = false;
-            }
-            m_entity.markDirty();
         });
     });
 }
 
-void CameraEditor::sync(const Rapture::Entity &entity)
+void Camera3DEditor::sync(const Rapture::Entity &entity)
 {
-    m_entity = entity;
-    if (!entity.hasComponent<Rapture::CameraComponent>()) {
+    m_node = s_instanceAs<Rapture::Camera3D>(entity);
+    if (m_node == nullptr) {
         return;
     }
-    const auto &cc = entity.getComponent<Rapture::CameraComponent>();
-    m_fov = cc.fov;
-    m_nearPlane = cc.nearPlane;
-    m_farPlane = cc.farPlane;
-    m_isMainCamera = cc.isMainCamera;
+    m_fieldOfView = m_node->fieldOfView();
+    m_nearPlane = m_node->nearPlane();
+    m_farPlane = m_node->farPlane();
 }
 
 void ShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
@@ -695,7 +564,7 @@ void ShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::ShadowComponent>()) {
                 return;
             }
-            m_entity.getComponent<Rapture::ShadowComponent>().mobility = m;
+            m_entity.getScene()->getRenderData()->setShadowMobility(m_entity.getID(), m);
             if (m_mobilityDropdown != nullptr) {
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }
@@ -733,7 +602,7 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
                 return;
             }
-            m_entity.getComponent<Rapture::CascadedShadowComponent>().mobility = m;
+            m_entity.getScene()->getRenderData()->setCascadedShadowMobility(m_entity.getID(), m);
             if (m_mobilityDropdown != nullptr) {
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }

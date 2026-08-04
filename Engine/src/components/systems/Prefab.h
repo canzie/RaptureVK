@@ -18,6 +18,7 @@ namespace Rapture {
 
 class Scene;
 class Entity;
+class Instance;
 
 /**
  * @brief A blueprint tree of entities referencing meshes and materials by handle
@@ -44,13 +45,15 @@ class Prefab {
     };
 
     /**
-     * @brief Instantiates a prefab into a scene under a single root entity
+     * @brief Instantiates a prefab into a scene under a single root instance
      * @param prefab An asset ref to the prefab, held by the instance root's PrefabComponent
-     * @param scene The scene to spawn entities into
+     * @param scene The scene to spawn into
      * @param rootTransform World transform applied to the instance root
-     * @return The root entity of the spawned instance, or a null entity on failure
+     * @param parent Instance to parent the root under, or nullptr for the scene root
+     * @return The root of the spawned instance, or nullptr on failure
      */
-    static Entity instantiate(AssetRef prefab, Scene *scene, const glm::mat4 &rootTransform = glm::mat4(1.0f));
+    static Instance *instantiate(AssetRef prefab, Scene *scene, const glm::mat4 &rootTransform = glm::mat4(1.0f),
+                                 Instance *parent = nullptr);
 
     /**
      * @brief Serializes this prefab tree into a self-contained blob

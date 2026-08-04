@@ -44,6 +44,34 @@ class SceneRenderData {
      */
     void markDirty(EntityID entityId);
 
+    /**
+     * @brief Moves a mesh's slot into the partition its new mobility belongs to
+     * @param entityId The entity whose mesh is changing mobility
+     * @param mobility The mobility to move to
+     */
+    void setMeshMobility(EntityID entityId, Mobility mobility);
+
+    /**
+     * @brief Moves a light's slot into the partition its new mobility belongs to
+     * @param entityId The entity whose light is changing mobility
+     * @param mobility The mobility to move to
+     */
+    void setLightMobility(EntityID entityId, Mobility mobility);
+
+    /**
+     * @brief Moves a shadow's slot into the partition its new mobility belongs to
+     * @param entityId The entity whose shadow is changing mobility
+     * @param mobility The mobility to move to
+     */
+    void setShadowMobility(EntityID entityId, Mobility mobility);
+
+    /**
+     * @brief Moves a cascaded shadow's slot into the partition its new mobility belongs to
+     * @param entityId The entity whose cascaded shadow is changing mobility
+     * @param mobility The mobility to move to
+     */
+    void setCascadedShadowMobility(EntityID entityId, Mobility mobility);
+
     GPUDataStore<MeshGPUData> &getMeshes() { return m_meshes; }
     GPUDataStore<LightGPUData> &getLights() { return m_lights; }
     GPUDataStore<CameraGPUData> &getCameras() { return m_cameras; }

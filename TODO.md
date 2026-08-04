@@ -27,9 +27,6 @@ uncouple the engines core
     - fix specular/reflections, or improve them, maybe some ssr using diffuse skybox?
 
 
-### PHYSICS
-    - implement ray picking so we can select entities using it in the editor
-
 ### Terrain
     - Add a path to use custom heightmaps first, for the time being it will take priority over fully procedural worksflows
     - fix the random black triangles
@@ -58,9 +55,6 @@ uncouple the engines core
     - checkox for importing material from gltf and auto making the materials and applying them
 - pre generated normals?
 - virtual texturing??? like decima i guess
-- phyics -> raypicking -> terrain editor and mesh placer
-
-
 
 --------------------------------
 

@@ -1,7 +1,5 @@
 #include "OutlinerPanel.h"
 #include "Icons.h"
-#include "components/Components.h"
-#include "components/HierarchyComponent.h"
 #include "events/GameEvents.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/entities/Entity.h"
@@ -117,7 +115,7 @@ void OutlinerPanel::setScene(Rapture::Scene *scene)
     } else {
         m_treeView->setBaseProperties({.visible = false});
         m_treeView->clear();
-        m_rowEntities.clear();
+        m_rowInstances.clear();
     }
 }
 
@@ -125,7 +123,7 @@ void OutlinerPanel::onUpdate(float dt)
 {
     (void)dt;
 
-    if (m_pendingDeleteEntityId != UINT32_MAX) {
+    if (m_pendingDeleteInstance != nullptr) {
         applyPendingDelete();
     }
 
@@ -146,118 +144,108 @@ void OutlinerPanel::refresh()
     }
 
     m_renameInput = nullptr;
-    m_renamingEntityId = UINT32_MAX;
+    m_renamingInstance = nullptr;
     m_treeView->clear();
-    m_rowEntities.clear();
+    m_rowInstances.clear();
+
+    Rapture::Instance *sceneRoot = m_scene->root();
+    if (sceneRoot == nullptr) {
+        return;
+    }
 
     Amethyst::TreeViewScope tvScope(*m_treeView);
     tvScope.columnsExplicit = true;
 
-    m_scene->getRegistry().view<Rapture::TagComponent>().each([this, &tvScope](auto entityHandle, auto &tag) {
-        Rapture::Entity entity(entityHandle, m_scene);
-
-        bool isRoot = !entity.hasComponent<Rapture::HierarchyComponent>() ||
-                      !entity.getComponent<Rapture::HierarchyComponent>().parent.isValid();
-        if (!isRoot) {
-            return;
-        }
-
-        tvScope.row([this, entity](Amethyst::TreeRowScope &row) { buildEntityTree(entity, row); });
-    });
+    for (const auto &child : sceneRoot->children()) {
+        Rapture::Instance *instance = child.get();
+        tvScope.row([this, instance](Amethyst::TreeRowScope &row) { buildInstanceTree(instance, row); });
+    }
 }
 
-void OutlinerPanel::buildEntityTree(Rapture::Entity entity, Amethyst::TreeRowScope &rowScope)
+void OutlinerPanel::buildInstanceTree(Rapture::Instance *instance, Amethyst::TreeRowScope &rowScope)
 {
-    if (!entity.isValid()) {
+    if (instance == nullptr) {
         return;
     }
 
-    m_rowEntities.push_back(entity.getID());
+    m_rowInstances.push_back(instance);
 
-    std::string entityName = entity.getComponent<Rapture::TagComponent>().tag;
+    std::string instanceName(instance->name());
+    std::string typeName(instance->type().name);
 
-    rowScope.cell([entityName](Amethyst::UIScope &s) { s_nameLabel(s, entityName, "treeview-primary-column"); });
-    rowScope.cell([](Amethyst::UIScope &s) { s_nameLabel(s, "Entity", "treeview-secondary-column"); });
+    rowScope.cell([instanceName](Amethyst::UIScope &s) { s_nameLabel(s, instanceName, "treeview-primary-column"); });
+    rowScope.cell([typeName](Amethyst::UIScope &s) { s_nameLabel(s, typeName, "treeview-secondary-column"); });
 
-    if (entity.hasComponent<Rapture::HierarchyComponent>()) {
-        const auto &hierarchy = entity.getComponent<Rapture::HierarchyComponent>();
-        for (const auto &child : hierarchy.children) {
-            if (child.isValid()) {
-                rowScope.row([this, child](Amethyst::TreeRowScope &childRow) { buildEntityTree(child, childRow); });
-            }
-        }
+    for (const auto &child : instance->children()) {
+        Rapture::Instance *childInstance = child.get();
+        rowScope.row([this, childInstance](Amethyst::TreeRowScope &childRow) { buildInstanceTree(childInstance, childRow); });
     }
 }
 
-Rapture::Entity OutlinerPanel::entityForRow(uint32_t row) const
+Rapture::Instance *OutlinerPanel::instanceForRow(uint32_t row) const
 {
-    if (m_scene == nullptr || row >= m_rowEntities.size()) {
-        return Rapture::Entity();
+    if (m_scene == nullptr || row >= m_rowInstances.size()) {
+        return nullptr;
     }
-    return Rapture::Entity(m_rowEntities[row], m_scene);
+    return m_rowInstances[row];
 }
 
 void OutlinerPanel::onRowClicked(uint32_t row)
 {
-    Rapture::Entity entity = entityForRow(row);
-    if (entity.isValid()) {
-        Rapture::GameEvents::onEntitySelected().publish(entity);
+    Rapture::Instance *instance = instanceForRow(row);
+    if (instance != nullptr) {
+        Rapture::GameEvents::onEntitySelected().publish(instance->entity());
     }
 }
 
 void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
 {
-    Rapture::Entity entity = entityForRow(row);
-    if (!entity.isValid()) {
+    Rapture::Instance *instance = instanceForRow(row);
+    if (instance == nullptr) {
         return;
     }
 
-    uint32_t entityId = entity.getID();
-
-    bool hasChildren = false;
-    if (auto *hierarchy = entity.tryGetComponent<Rapture::HierarchyComponent>()) {
-        hasChildren = hierarchy->hasChildren();
-    }
+    bool hasChildren = !instance->children().empty();
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    items.push_back(Amethyst::makeActionItem("Rename", [this, row, entityId]() { startRename(row, entityId); }));
-    items.push_back(Amethyst::makeActionItem("Delete", [this, entityId]() { requestDelete(entityId, false); }));
+    items.push_back(Amethyst::makeActionItem("Rename", [this, row, instance]() { startRename(row, instance); }));
+    items.push_back(Amethyst::makeActionItem("Delete", [this, instance]() { requestDelete(instance, false); }));
     if (hasChildren) {
-        items.push_back(Amethyst::makeActionItem("Delete (keep children)", [this, entityId]() { requestDelete(entityId, true); }));
+        items.push_back(Amethyst::makeActionItem("Delete (keep children)", [this, instance]() { requestDelete(instance, true); }));
     }
 
     showContextMenu(pos, std::move(items));
 }
 
-void OutlinerPanel::requestDelete(uint32_t entityId, bool keepChildren)
+void OutlinerPanel::requestDelete(Rapture::Instance *instance, bool keepChildren)
 {
-    m_pendingDeleteEntityId = entityId;
+    m_pendingDeleteInstance = instance;
     m_pendingDeleteKeepChildren = keepChildren;
 }
 
 void OutlinerPanel::applyPendingDelete()
 {
-    uint32_t entityId = m_pendingDeleteEntityId;
+    Rapture::Instance *instance = m_pendingDeleteInstance;
     bool keepChildren = m_pendingDeleteKeepChildren;
-    m_pendingDeleteEntityId = UINT32_MAX;
+    m_pendingDeleteInstance = nullptr;
     m_pendingDeleteKeepChildren = false;
 
-    if (m_scene == nullptr) {
+    if (m_scene == nullptr || instance == nullptr) {
         return;
     }
 
-    Rapture::Entity entity(entityId, m_scene);
-    if (!entity.isValid()) {
-        return;
-    }
+    Rapture::GameEvents::onEntityDeselected().publish(instance->entity());
 
     if (keepChildren) {
-        Rapture::HierarchyComponent::destroyKeepChildren(entity);
-    } else {
-        Rapture::HierarchyComponent::destroyHierarchy(entity);
+        Rapture::Instance *parent = instance->parent();
+        while (parent != nullptr && !instance->children().empty()) {
+            Rapture::Instance *child = instance->children().front().get();
+            parent->addChild(instance->removeChild(child));
+        }
     }
 
-    Rapture::GameEvents::onEntityDeselected().publish(entity);
+    m_scene->destroyInstance(instance);
+
     m_treeView->selectedRow = Amethyst::TreeView::NO_ROW_SELECTION;
     refresh();
 }
@@ -271,7 +259,7 @@ void OutlinerPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_
     m_contextMenu->showAt(pos);
 }
 
-void OutlinerPanel::buildNameCell(uint32_t row, uint32_t entityId, const std::string &name, bool editing)
+void OutlinerPanel::buildNameCell(uint32_t row, Rapture::Instance *instance, const std::string &name, bool editing)
 {
     if (m_treeView == nullptr) {
         return;
@@ -289,8 +277,8 @@ void OutlinerPanel::buildNameCell(uint32_t row, uint32_t entityId, const std::st
             .zIndex = 2,
         });
         raw->setTextInputProperties({.text = {.fontSize = 14.0f, .textYAlignment = Amethyst::TextYAlignment::CENTER}});
-        raw->onEnterPressed = [this, entityId, raw]() { onRenameCommitted(entityId, raw->getText()); };
-        raw->onFocusLost = [this, entityId, raw]() { onRenameCommitted(entityId, raw->getText()); };
+        raw->onEnterPressed = [this, instance, raw]() { onRenameCommitted(instance, raw->getText()); };
+        raw->onFocusLost = [this, instance, raw]() { onRenameCommitted(instance, raw->getText()); };
         m_treeView->setCell(row, 0, std::move(input));
     } else {
         auto label = std::make_unique<Amethyst::TextLabel>();
@@ -305,23 +293,20 @@ void OutlinerPanel::buildNameCell(uint32_t row, uint32_t entityId, const std::st
     }
 }
 
-void OutlinerPanel::startRename(uint32_t row, uint32_t entityId)
+void OutlinerPanel::startRename(uint32_t row, Rapture::Instance *instance)
 {
-    Rapture::Entity entity = entityForRow(row);
-    if (!entity.isValid() || entity.getID() != entityId) {
+    if (instanceForRow(row) != instance) {
         return;
     }
 
-    std::string name = entity.getComponent<Rapture::TagComponent>().tag;
-
-    m_renamingEntityId = entityId;
+    m_renamingInstance = instance;
     m_renameRow = row;
-    buildNameCell(row, entityId, name, true);
+    buildNameCell(row, instance, std::string(instance->name()), true);
 }
 
-void OutlinerPanel::onRenameCommitted(uint32_t entityId, const std::string &newName)
+void OutlinerPanel::onRenameCommitted(Rapture::Instance *instance, const std::string &newName)
 {
-    if (m_renamingEntityId != entityId) {
+    if (m_renamingInstance != instance) {
         return;
     }
     m_pendingRenameName = newName;
@@ -332,20 +317,18 @@ void OutlinerPanel::applyPendingRename()
 {
     m_pendingRenameCommit = false;
 
-    uint32_t entityId = m_renamingEntityId;
+    Rapture::Instance *instance = m_renamingInstance;
     uint32_t row = m_renameRow;
-    m_renamingEntityId = UINT32_MAX;
+    m_renamingInstance = nullptr;
     m_renameInput = nullptr;
 
-    Rapture::Entity entity = entityForRow(row);
-    if (!entity.isValid() || entity.getID() != entityId) {
+    if (instance == nullptr || instanceForRow(row) != instance) {
         return;
     }
 
-    auto &tag = entity.getComponent<Rapture::TagComponent>();
     if (!m_pendingRenameName.empty()) {
-        tag.tag = m_pendingRenameName;
+        instance->setName(m_pendingRenameName);
     }
 
-    buildNameCell(row, entityId, tag.tag, false);
+    buildNameCell(row, instance, std::string(instance->name()), false);
 }

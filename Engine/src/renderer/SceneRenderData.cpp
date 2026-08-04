@@ -226,6 +226,60 @@ void SceneRenderData::onMeshRemoved(EntityID entityId)
     mesh->renderDataSlot = UINT32_MAX;
 }
 
+void SceneRenderData::setMeshMobility(EntityID entityId, Mobility mobility)
+{
+    Entity entity(entityId, m_scene);
+    auto *mesh = entity.tryGetComponent<MeshComponent>();
+    if (mesh == nullptr || mesh->mobility == mobility) {
+        return;
+    }
+
+    // The slot is freed against the old mobility and reallocated against the new one, so the
+    // component's mobility is only changed between the two.
+    onMeshRemoved(entityId);
+    mesh->mobility = mobility;
+    onMeshAdded(entityId);
+}
+
+void SceneRenderData::setLightMobility(EntityID entityId, Mobility mobility)
+{
+    Entity entity(entityId, m_scene);
+    LightComponent *light = Light_tryGetLight(entity);
+    if (light == nullptr || light->mobility == mobility) {
+        return;
+    }
+
+    onLightRemoved(entityId);
+    light->mobility = mobility;
+    onLightAdded(entityId);
+}
+
+void SceneRenderData::setShadowMobility(EntityID entityId, Mobility mobility)
+{
+    Entity entity(entityId, m_scene);
+    auto *shadow = entity.tryGetComponent<ShadowComponent>();
+    if (shadow == nullptr || shadow->mobility == mobility) {
+        return;
+    }
+
+    onShadowRemoved(entityId);
+    shadow->mobility = mobility;
+    onShadowAdded(entityId);
+}
+
+void SceneRenderData::setCascadedShadowMobility(EntityID entityId, Mobility mobility)
+{
+    Entity entity(entityId, m_scene);
+    auto *shadow = entity.tryGetComponent<CascadedShadowComponent>();
+    if (shadow == nullptr || shadow->mobility == mobility) {
+        return;
+    }
+
+    onCascadedShadowRemoved(entityId);
+    shadow->mobility = mobility;
+    onCascadedShadowAdded(entityId);
+}
+
 void SceneRenderData::onLightAdded(EntityID entityId)
 {
     Entity entity(entityId, m_scene);

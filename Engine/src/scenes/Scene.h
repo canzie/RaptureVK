@@ -11,6 +11,7 @@ namespace Rapture {
 
 class Entity;
 class Environment;
+class Instance;
 class SceneRenderData;
 class PhysicsSystem;
 struct RenderContext;
@@ -60,6 +61,25 @@ class Scene {
      */
     PhysicsSystem *physics() const { return m_physics.get(); }
 
+    /**
+     * @brief The hidden root every authored instance lives under
+     * @return The root, which is never shown, named or written to a scene file
+     */
+    Instance *root() const { return m_root.get(); }
+
+    /**
+     * @brief Finds the instance that owns an entity
+     * @param entity The entity to look up
+     * @return The instance, or nullptr if the entity is not authored
+     */
+    Instance *instanceFor(Entity entity) const;
+
+    /**
+     * @brief Destroys an instance along with its subtree
+     * @param instance The instance to destroy, ignored if it is the root
+     */
+    void destroyInstance(Instance *instance);
+
     void registerBLAS(Entity &entity);
 
     void buildTLAS();
@@ -101,6 +121,9 @@ class Scene {
     bool m_tlasDirty = false;
     std::vector<std::vector<std::unique_ptr<BLAS>>> m_blasFreeBuckets;
     size_t m_blasFreeBucket = 0;
+
+    // declared last so its subtree tears down before anything destroyEntity touches
+    std::unique_ptr<Instance> m_root;
 
     friend class Entity;
 };

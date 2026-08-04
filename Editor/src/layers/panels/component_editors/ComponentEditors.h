@@ -6,11 +6,16 @@
 #include "components/Components.h"
 #include "layers/panels/components/asset_picker.h"
 #include "layers/panels/components/color_field.h"
+#include "scenes/instances/Camera3D.h"
+#include "scenes/instances/DirectionalLight3D.h"
+#include "scenes/instances/Mesh3D.h"
+#include "scenes/instances/PointLight3D.h"
+#include "scenes/instances/SpotLight3D.h"
 
 #include <glm/glm.hpp>
 #include <optional>
 
-class TransformEditor : public ComponentEditorBase {
+class Node3DEditor : public ComponentEditorBase {
   public:
     const char *title() const override { return "Transform"; }
     const char *icon() const override { return Icons::SVG_TRANSFORM; }
@@ -21,10 +26,30 @@ class TransformEditor : public ComponentEditorBase {
     void apply(int row);
 
     double m_values[3][3] = {};
-    Rapture::Entity m_entity;
+    Rapture::Node3D *m_node = nullptr;
 };
 
-class DirectionalLightEditor : public ComponentEditorBase {
+class Light3DEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Light"; }
+    const char *icon() const override { return Icons::SVG_LIGHT; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::Entity &entity) override;
+
+  private:
+    glm::vec3 m_color = glm::vec3(1.0f);
+    float m_intensity = 1.0f;
+    bool m_castsShadow = false;
+    bool m_usesTemperature = false;
+    float m_temperature = 6500.0f;
+    bool m_isActive = true;
+
+    Amethyst::Dropdown *m_mobilityDropdown = nullptr;
+    std::optional<ColorField> m_colorField;
+    Rapture::Light3D *m_node = nullptr;
+};
+
+class DirectionalLight3DEditor : public ComponentEditorBase {
   public:
     const char *title() const override { return "Directional Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
@@ -32,18 +57,11 @@ class DirectionalLightEditor : public ComponentEditorBase {
     void sync(const Rapture::Entity &entity) override;
 
   private:
-    glm::vec3 m_color = glm::vec3(1.0f);
-    float m_intensity = 1.0f;
-    bool m_castsShadow = false;
-    bool m_useTemperature = false;
-    bool m_atmosphereSunLight = false;
-    float m_temperature = 6500.0f;
-
-    std::optional<ColorField> m_colorField;
-    Rapture::Entity m_entity;
+    bool m_atmosphereSun = false;
+    Rapture::DirectionalLight3D *m_node = nullptr;
 };
 
-class PointLightEditor : public ComponentEditorBase {
+class PointLight3DEditor : public ComponentEditorBase {
   public:
     const char *title() const override { return "Point Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
@@ -51,18 +69,11 @@ class PointLightEditor : public ComponentEditorBase {
     void sync(const Rapture::Entity &entity) override;
 
   private:
-    glm::vec3 m_color = glm::vec3(1.0f);
-    float m_intensity = 1.0f;
     float m_range = 10.0f;
-    bool m_castsShadow = false;
-    bool m_useTemperature = false;
-    float m_temperature = 6500.0f;
-
-    std::optional<ColorField> m_colorField;
-    Rapture::Entity m_entity;
+    Rapture::PointLight3D *m_node = nullptr;
 };
 
-class SpotLightEditor : public ComponentEditorBase {
+class SpotLight3DEditor : public ComponentEditorBase {
   public:
     const char *title() const override { return "Spot Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
@@ -70,17 +81,10 @@ class SpotLightEditor : public ComponentEditorBase {
     void sync(const Rapture::Entity &entity) override;
 
   private:
-    glm::vec3 m_color = glm::vec3(1.0f);
-    float m_intensity = 1.0f;
     float m_range = 10.0f;
     float m_innerConeAngle = 30.0f;
     float m_outerConeAngle = 45.0f;
-    bool m_castsShadow = false;
-    bool m_useTemperature = false;
-    float m_temperature = 6500.0f;
-
-    std::optional<ColorField> m_colorField;
-    Rapture::Entity m_entity;
+    Rapture::SpotLight3D *m_node = nullptr;
 };
 
 /**
@@ -100,7 +104,7 @@ class StubEditor : public ComponentEditorBase {
     const char *m_icon;
 };
 
-class MeshEditor : public ComponentEditorBase {
+class Mesh3DEditor : public ComponentEditorBase {
   public:
     const char *title() const override { return "Mesh"; }
     const char *icon() const override { return Icons::SVG_MESH; }
@@ -108,24 +112,14 @@ class MeshEditor : public ComponentEditorBase {
     void sync(const Rapture::Entity &entity) override;
 
   private:
-    bool m_isEnabled = true;
+    bool m_isVisible = true;
+    bool m_isRayTraced = false;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
-    Rapture::Entity m_entity;
-};
-
-class MaterialEditor : public ComponentEditorBase {
-  public:
-    const char *title() const override { return "Material"; }
-    const char *icon() const override { return Icons::SVG_MATERIAL; }
-    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
-
-  private:
     std::optional<AssetPicker> m_materialPicker;
-    Rapture::Entity m_entity;
+    Rapture::Mesh3D *m_node = nullptr;
 };
 
-class CameraEditor : public ComponentEditorBase {
+class Camera3DEditor : public ComponentEditorBase {
   public:
     const char *title() const override { return "Camera"; }
     const char *icon() const override { return Icons::SVG_CAMERA; }
@@ -133,11 +127,10 @@ class CameraEditor : public ComponentEditorBase {
     void sync(const Rapture::Entity &entity) override;
 
   private:
-    float m_fov = 45.0f;
+    float m_fieldOfView = 45.0f;
     double m_nearPlane = 0.1;
     double m_farPlane = 100.0;
-    bool m_isMainCamera = false;
-    Rapture::Entity m_entity;
+    Rapture::Camera3D *m_node = nullptr;
 };
 
 class ShadowEditor : public ComponentEditorBase {

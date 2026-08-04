@@ -6,6 +6,7 @@
 #include "logging/Log.h"
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
+#include "scenes/instances/StaticMesh3D.h"
 
 #include <cstring>
 #include <vector>
@@ -136,34 +137,35 @@ std::unique_ptr<Prefab> Prefab::deserialize(std::span<const uint8_t> blob)
     return prefab;
 }
 
-Entity Prefab::instantiate(AssetRef prefabRef, Scene *scene, const glm::mat4 &rootTransform)
+Instance *Prefab::instantiate(AssetRef prefabRef, Scene *scene, const glm::mat4 &rootTransform, Instance *parent)
 {
     if (scene == nullptr) {
         RP_CORE_ERROR("Cannot instantiate prefab into a null scene");
-        return Entity::null();
+        return nullptr;
     }
 
     if (!prefabRef) {
         RP_CORE_ERROR("Cannot instantiate an invalid prefab ref");
-        return Entity::null();
+        return nullptr;
     }
 
     Prefab *prefab = prefabRef.get()->getUnderlyingAsset<Prefab>();
     if (prefab == nullptr) {
         RP_CORE_ERROR("Prefab ref does not hold a prefab asset");
-        return Entity::null();
+        return nullptr;
     }
 
-    Entity root = scene->createEntity(prefab->m_name);
-    root.addComponent<TransformComponent>(rootTransform);
-    root.addComponent<PrefabComponent>(prefabRef);
+    Instance *parentInstance = (parent != nullptr) ? parent : scene->root();
+    Node3D *root = parentInstance->add<Node3D>(prefab->m_name);
+    root->setLocalTransform(rootTransform);
+    root->entity().setComponent<PrefabComponent>(prefabRef);
 
     const std::vector<Node> &nodes = prefab->m_nodes;
     if (nodes.empty()) {
         RP_CORE_WARN("Instantiating prefab '{}' with no nodes", prefab->m_name);
     }
 
-    std::vector<Entity> entities(nodes.size());
+    std::vector<Node3D *> instances(nodes.size());
     std::vector<glm::mat4> worldTransforms(nodes.size());
 
     // Nodes are pre-order, so a parent is processed before its children. Transforms are flattened
@@ -174,39 +176,32 @@ Entity Prefab::instantiate(AssetRef prefabRef, Scene *scene, const glm::mat4 &ro
         glm::mat4 parentWorld = (node.parent >= 0) ? worldTransforms[node.parent] : rootTransform;
         worldTransforms[i] = parentWorld * node.localTransform;
 
-        Entity entity = scene->createEntity(node.name);
-        entity.addComponent<TransformComponent>(worldTransforms[i]);
-        entities[i] = entity;
-
-        Entity parentEntity = (node.parent >= 0) ? entities[node.parent] : root;
-        HierarchyComponent::setParent(entity, parentEntity);
+        Node3D *nodeParent = (node.parent >= 0) ? instances[node.parent] : root;
 
         if (!node.hasMesh()) {
+            Node3D *group = nodeParent->add<Node3D>(node.name);
+            group->setLocalTransform(worldTransforms[i]);
+            instances[i] = group;
             continue;
         }
 
-        AssetRef meshRef = AssetManager::getAsset(node.mesh);
-        if (!meshRef) {
-            RP_CORE_ERROR("Prefab '{}' node '{}' references missing mesh {}", prefab->m_name, node.name, node.mesh);
+        StaticMesh3D *mesh = nodeParent->add<StaticMesh3D>(node.name);
+        mesh->setLocalTransform(worldTransforms[i]);
+        instances[i] = mesh;
+
+        if (node.hasBoundingBox()) {
+            mesh->setBounds(node.boundingBoxMin, node.boundingBoxMax);
+        }
+
+        mesh->setMesh(node.mesh);
+        if (mesh->mesh() == INVALID_ASSET_HANDLE) {
             continue;
         }
 
-        auto &meshComp = entity.addComponent<MeshComponent>(meshRef);
-        if (meshComp.mesh) {
-            if (node.hasBoundingBox()) {
-                entity.addComponent<BoundingBoxComponent>(node.boundingBoxMin, node.boundingBoxMax);
-            }
-            entity.addComponent<BLASComponent>(meshComp.mesh);
-            scene->registerBLAS(entity);
-        }
+        mesh->setRayTraced(true);
 
         if (node.material != INVALID_ASSET_HANDLE) {
-            AssetRef matRef = AssetManager::getAsset(node.material);
-            if (matRef) {
-                entity.addComponent<MaterialComponent>(matRef);
-            } else {
-                RP_CORE_WARN("Prefab '{}' node '{}' references missing material {}", prefab->m_name, node.name, node.material);
-            }
+            mesh->setMaterial(node.material);
         }
     }
 

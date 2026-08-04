@@ -7,6 +7,11 @@
 #include "scenes/Scene.h"
 #include "scenes/SceneManager.h"
 #include "scenes/entities/EntityCommon.h"
+#include "scenes/instances/DirectionalLight3D.h"
+#include "scenes/instances/SpotLight3D.h"
+#include "scenes/instances/StaticMesh3D.h"
+
+#include "meshes/MeshPrimitives.h"
 #include "utils/Timestep.h"
 #include "window_context/Application.h"
 
@@ -139,6 +144,34 @@ void TestLayer::onAttach()
     m_fpsTimer = 0.0f;
 }
 
+static Rapture::AssetHandle s_registerPrimitiveMesh(Rapture::Mesh mesh, const std::string &name)
+{
+    auto ref = Rapture::AssetManager::registerVirtualAsset(std::make_unique<Rapture::Mesh>(std::move(mesh)), name,
+                                                           Rapture::AssetType::MESH);
+    return ref ? ref.get()->getHandle() : Rapture::INVALID_ASSET_HANDLE;
+}
+
+static Rapture::AssetHandle s_defaultMaterialHandle()
+{
+    auto ref = Rapture::AssetManager::importDefaultAsset(Rapture::AssetType::MATERIAL_INSTANCE);
+    return ref ? ref.get()->getHandle() : Rapture::INVALID_ASSET_HANDLE;
+}
+
+static Rapture::StaticMesh3D *s_addStaticMesh(Rapture::Scene &scene, std::string_view name, Rapture::AssetHandle mesh,
+                                              Rapture::AssetHandle material, Rapture::Mobility mobility,
+                                              const glm::vec3 &boundsMin, const glm::vec3 &boundsMax)
+{
+    auto *node = scene.root()->add<Rapture::StaticMesh3D>(name);
+    node->setMobility(mobility);
+    node->setMesh(mesh);
+    if (material != Rapture::INVALID_ASSET_HANDLE) {
+        node->setMaterial(material);
+    }
+    node->setBounds(boundsMin, boundsMax);
+    node->setRayTraced(true);
+    return node;
+}
+
 void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 {
     if (scene.getSceneName() != RAPTURE_DEFAULT_SCENE_NAME) {
@@ -152,17 +185,18 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     auto &project = app.getProject();
 
     // Models are imported from the UI now; the registration pass picks up their .rasset files at startup
-    auto cube = activeScene.createCube("Test Cube");
-    cube.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 5.0f, 0.0f));
-    cube.addComponent<Rapture::BLASComponent>(cube.getComponent<Rapture::MeshComponent>().mesh);
-    activeScene.registerBLAS(cube);
+    Rapture::AssetHandle cubeMesh = s_registerPrimitiveMesh(Rapture::Primitives::CreateCube(), "Primitive_Cube");
+    Rapture::AssetHandle sphereMesh = s_registerPrimitiveMesh(Rapture::Primitives::CreateSphere(1.0f, 32), "Primitive_Sphere");
+    Rapture::AssetHandle defaultMaterial = s_defaultMaterialHandle();
 
-    auto floor = activeScene.createCube("Floor", Rapture::MOBILITY_DYNAMIC);
-    floor.getComponent<Rapture::TransformComponent>().transforms.setTranslation(glm::vec3(0.0f, 0.0f, 0.0f));
-    floor.getComponent<Rapture::TransformComponent>().transforms.setScale(glm::vec3(10.0f, 0.1f, 10.0f));
-    floor.addComponent<Rapture::BLASComponent>(floor.getComponent<Rapture::MeshComponent>().mesh);
-    activeScene.registerBLAS(floor);
-    floor.addComponent<Rapture::RigidBodyComponent>().motionType = Rapture::PHYSICS_MOTION_STATIC;
+    auto *cube = s_addStaticMesh(activeScene, "Test Cube", cubeMesh, defaultMaterial, Rapture::MOBILITY_STATIC, glm::vec3(-0.5f),
+                                 glm::vec3(0.5f));
+    cube->setPosition(glm::vec3(0.0f, 5.0f, 0.0f));
+
+    auto *floor = s_addStaticMesh(activeScene, "Floor", cubeMesh, defaultMaterial, Rapture::MOBILITY_DYNAMIC, glm::vec3(-0.5f),
+                                  glm::vec3(0.5f));
+    floor->setScale(glm::vec3(10.0f, 0.1f, 10.0f));
+    floor->entity().addComponent<Rapture::RigidBodyComponent>().motionType = Rapture::PHYSICS_MOTION_STATIC;
 
     // Graph material test spheres - two different generated graphs, so evalSurfaceGraph dispatch is visible
     {
@@ -173,23 +207,22 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
         uint32_t graph1Id = graphManager.registerGraph(s_buildSineBandGraph());
 
         auto spawnGraphSphere = [&](const std::string &name, const glm::vec3 &position, uint32_t graphId) {
-            auto sphere = activeScene.createSphere(name, Rapture::MOBILITY_DYNAMIC);
-            auto &transform = sphere.getComponent<Rapture::TransformComponent>();
-            transform.transforms.setTranslation(position);
-            transform.transforms.setScale(glm::vec3(2.0f));
-
             auto baseMaterial = Rapture::MaterialManager::getMaterial("Default Material");
             auto mat = std::make_unique<Rapture::MaterialInstance>(baseMaterial, name);
             mat->setGraph(graphId, graphManager.getDefaults(graphId), graphManager.getTextureRefs(graphId));
 
             auto matRef = Rapture::AssetManager::registerVirtualAsset(std::move(mat), name, Rapture::AssetType::MATERIAL_INSTANCE);
-            sphere.setComponent<Rapture::MaterialComponent>(matRef);
+            Rapture::AssetHandle matHandle = matRef ? matRef.get()->getHandle() : Rapture::INVALID_ASSET_HANDLE;
+
+            auto *sphere = s_addStaticMesh(activeScene, name, sphereMesh, matHandle, Rapture::MOBILITY_DYNAMIC, glm::vec3(-1.0f),
+                                           glm::vec3(1.0f));
+            sphere->setPosition(position);
+            sphere->setScale(glm::vec3(2.0f));
+            sphere->entity().addComponent<Rapture::RigidBodyComponent>();
+
             if (graphId == graph0Id) {
-                cube.setComponent<Rapture::MaterialComponent>(matRef);
+                cube->setMaterial(matHandle);
             }
-            sphere.addComponent<Rapture::BLASComponent>(sphere.getComponent<Rapture::MeshComponent>().mesh);
-            activeScene.registerBLAS(sphere);
-            sphere.addComponent<Rapture::RigidBodyComponent>();
         };
 
         spawnGraphSphere("Graph Sphere 0", glm::vec3(-3.0f, 10.0f, 0.0f), graph0Id);
@@ -199,32 +232,25 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
     // Create a spot light with shadow mapping (inside Sponza courtyard)
     // Note: Rotation is in RADIANS
-    Rapture::Entity spotLight = activeScene.createSphere("Spot Light");
-    spotLight.setComponent<Rapture::TransformComponent>(glm::vec3(2.0f, 2.0f, -3.0f),   // Position in Sponza
-                                                        glm::vec3(-2.243f, 0.0f, 0.0f), // Point downward (radians, ~-128 degrees)
-                                                        glm::vec3(0.2f)                 // Small visual scale
-    );
-    auto &spotLightComp = spotLight.addComponent<Rapture::SpotLightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White color
-                                                                              1.2f,                        // Intensity
-                                                                              15.0f,                       // Range
-                                                                              30.0f, // Inner cone angle (degrees)
-                                                                              45.0f  // Outer cone angle (degrees)
-    );
-    spotLightComp.castsShadow = false;
-    spotLight.addComponent<Rapture::ShadowComponent>(1028.0f, 1028.0f);
+    auto *spotLight = activeScene.root()->add<Rapture::SpotLight3D>("Spot Light");
+    spotLight->setPosition(glm::vec3(2.0f, 2.0f, -3.0f));
+    spotLight->setRotation(glm::vec3(-2.243f, 0.0f, 0.0f)); // Point downward (radians, ~-128 degrees)
+    spotLight->setColor(glm::vec3(1.0f, 1.0f, 1.0f));
+    spotLight->setIntensity(1.2f);
+    spotLight->setRange(15.0f);
+    spotLight->setInnerConeAngle(glm::radians(30.0f));
+    spotLight->setOuterConeAngle(glm::radians(45.0f));
+    spotLight->setCastsShadow(false);
 
     // Create a directional light with CSM (sun) - pointing down into Sponza
     // Note: Rotation is in RADIANS
-    Rapture::Entity sunLight = activeScene.createEntity("Sun");
-    sunLight.addComponent<Rapture::TransformComponent>(glm::vec3(-2.0f, 5.0f, -3.0f),  // Position
-                                                       glm::vec3(-1.874f, 0.0f, 0.0f), // Point downwards
-                                                       glm::vec3(0.2f));
-    auto &sunLightComp = sunLight.addComponent<Rapture::DirectionalLightComponent>(glm::vec3(1.0f, 1.0f, 1.0f), // White sunlight
-                                                                                   3.14f                        // Intensity
-    );
-    sunLightComp.castsShadow = true;
-    sunLightComp.atmosphereSunLight = true;
-    sunLight.addComponent<Rapture::CascadedShadowComponent>(2048.0f, 2048.0f, 4, 0.8f);
+    auto *sunLight = activeScene.root()->add<Rapture::DirectionalLight3D>("Sun");
+    sunLight->setPosition(glm::vec3(-2.0f, 5.0f, -3.0f));
+    sunLight->setRotation(glm::vec3(-1.874f, 0.0f, 0.0f)); // Point downwards
+    sunLight->setColor(glm::vec3(1.0f, 1.0f, 1.0f));
+    sunLight->setIntensity(3.14f);
+    sunLight->setAtmosphereSun(true);
+    sunLight->setCastsShadow(true);
 
     // Create environment entity with a procedurally generated atmosphere skybox
     {

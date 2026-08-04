@@ -48,7 +48,7 @@ static void s_loadPrefabIntoScene(Rapture::AssetHandle handle, Rapture::Scene *s
         RP_WARN("No scene to load the prefab into");
         return;
     }
-    if (!Rapture::Prefab::instantiate(Rapture::AssetManager::getAsset(handle), scene).isValid()) {
+    if (Rapture::Prefab::instantiate(Rapture::AssetManager::getAsset(handle), scene) == nullptr) {
         RP_WARN("Failed to load prefab into the scene");
     }
 }

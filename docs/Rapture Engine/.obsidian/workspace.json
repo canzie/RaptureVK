@@ -187,6 +187,8 @@
   },
   "active": "6fa67950a6ea8521",
   "lastOpenFiles": [
+    "ideas/Entity Types and Authoring Schema.md.tmp.1729.4b1857aac319",
+    "ideas/Entity Types and Authoring Schema.md.tmp.1729.af5c6ca9d2fe",
     "plans/Editor Picking and Tool Overlay.md",
     "plans/ECS Tiers and Ownership.md",
     "plans/Editor Picking and Tool Overlay.md.tmp.2791.e2d59b4ad131",
@@ -199,7 +201,6 @@
     "plans/ECS Tiers and Ownership.md.tmp.2791.c0fe8f3323ad",
     "ideas/Custom Entity Component System.md",
     "plans/ECS Tiers and Ownership.md.tmp.2791.13d4aeff5c79",
-    "ideas/Custom Entity Component System.md.tmp.2791.535b6faa0aaf",
     "ideas/Procedural Texture and Shader Editor.md",
     "theory/Ground Truth Ambient Occlusion.md",
     "theory/Horizon-Based Ambient Occlusion.md",
@@ -222,7 +223,6 @@
     "Shadow Maps to SceneRenderData.md",
     "SceneRenderData.md",
     "SceneRenderData Implementation.md",
-    "Improvements.md",
     "Pasted image 20260517113657.png"
   ]
 }

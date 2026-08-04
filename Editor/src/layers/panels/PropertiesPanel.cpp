@@ -243,13 +243,18 @@ void PropertiesPanel::refresh()
 
     if (m_selectedEntity.isValid()) {
         const Rapture::Entity &e = m_selectedEntity;
-        ensure<TransformEditor>(e.hasComponent<Rapture::TransformComponent>());
-        ensure<MeshEditor>(e.hasComponent<Rapture::MeshComponent>());
-        ensure<MaterialEditor>(e.hasComponent<Rapture::MaterialComponent>());
-        ensure<DirectionalLightEditor>(e.hasComponent<Rapture::DirectionalLightComponent>());
-        ensure<PointLightEditor>(e.hasComponent<Rapture::PointLightComponent>());
-        ensure<SpotLightEditor>(e.hasComponent<Rapture::SpotLightComponent>());
-        ensure<CameraEditor>(e.hasComponent<Rapture::CameraComponent>());
+
+        // Sections come from the instance's class chain, base first, so a Transform sits above the
+        // sections its subclasses add.
+        Rapture::Instance *instance = m_scene != nullptr ? m_scene->instanceFor(e) : nullptr;
+        ensure<Node3DEditor>(instance != nullptr && instance->isA<Rapture::Node3D>());
+        ensure<Mesh3DEditor>(instance != nullptr && instance->isA<Rapture::Mesh3D>());
+        ensure<Light3DEditor>(instance != nullptr && instance->isA<Rapture::Light3D>());
+        ensure<DirectionalLight3DEditor>(instance != nullptr && instance->isA<Rapture::DirectionalLight3D>());
+        ensure<PointLight3DEditor>(instance != nullptr && instance->isA<Rapture::PointLight3D>());
+        ensure<SpotLight3DEditor>(instance != nullptr && instance->isA<Rapture::SpotLight3D>());
+        ensure<Camera3DEditor>(instance != nullptr && instance->isA<Rapture::Camera3D>());
+
         ensure<ShadowEditor>(e.hasComponent<Rapture::ShadowComponent>());
         ensure<CascadedShadowEditor>(e.hasComponent<Rapture::CascadedShadowComponent>());
         ensure<SkyboxEditor>(e.hasComponent<Rapture::SkyboxComponent>());

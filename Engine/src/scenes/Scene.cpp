@@ -6,6 +6,7 @@
 #include "components/TerrainComponent.h"
 #include "components/systems/Environment.h"
 #include "renderer/SceneRenderData.h"
+#include "scenes/instances/Instance.h"
 
 #include "asset_manager/AssetManager.h"
 #include "logging/TracyProfiler.h"
@@ -25,6 +26,8 @@ Scene::Scene(const std::string &sceneName)
 
     auto &app = Application::getInstance();
     m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, app.getFramesInFlight());
+
+    m_root = std::make_unique<Instance>(*this, "Root");
 
     m_environment = std::make_unique<Environment>(createEntity("Environment"));
 
@@ -353,6 +356,27 @@ Entity Scene::getMainCamera() const
 Entity Scene::environmentEntity() const
 {
     return m_environment->getEntity();
+}
+
+Instance *Scene::instanceFor(Entity entity) const
+{
+    const auto *ref = entity.tryGetComponent<InstanceComponent>();
+    return ref != nullptr ? ref->instance : nullptr;
+}
+
+void Scene::destroyInstance(Instance *instance)
+{
+    if (instance == nullptr || instance == m_root.get()) {
+        return;
+    }
+
+    Instance *parent = instance->parent();
+    if (parent == nullptr) {
+        RP_CORE_ERROR("cannot destroy instance '{}' because it is not parented", instance->name());
+        return;
+    }
+
+    parent->removeChild(instance);
 }
 
 void Scene::registerBLAS(Entity &entity)
