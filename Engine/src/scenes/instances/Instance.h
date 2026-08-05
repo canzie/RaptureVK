@@ -1,6 +1,7 @@
 #ifndef RAPTURE__INSTANCE_H
 #define RAPTURE__INSTANCE_H
 
+#include "events/EventSignal.h"
 #include "scenes/entities/Entity.h"
 #include "scenes/instances/TypeInfo.h"
 #include "serialization/SerialDocument.h"
@@ -138,6 +139,11 @@ class Instance {
      * @param node Cursor to this instance's object
      */
     virtual void deserialize(ReadNode node);
+
+    /**
+     * @brief Fires as this instance is destroyed, before its subtree is torn down
+     */
+    EventSignal<void(Instance *)> onDestroy;
 
     Instance *parent() const { return m_parent; }
     std::span<const std::unique_ptr<Instance>> children() const { return m_children; }

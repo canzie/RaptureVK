@@ -13,6 +13,8 @@ Instance::Instance(Scene &scene, std::string_view name) : m_scene(&scene), m_nam
 
 Instance::~Instance()
 {
+    onDestroy.fire(this);
+
     m_children.clear();
 
     if (m_entity.isValid()) {

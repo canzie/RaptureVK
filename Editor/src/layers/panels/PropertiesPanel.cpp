@@ -255,10 +255,10 @@ void PropertiesPanel::refresh()
         ensure<SpotLight3DEditor>(instance != nullptr && instance->isA<Rapture::SpotLight3D>());
         ensure<Camera3DEditor>(instance != nullptr && instance->isA<Rapture::Camera3D>());
 
+        ensure<EnvironmentEditor>(instance != nullptr && instance->isA<Rapture::Environment>());
+
         ensure<ShadowEditor>(e.hasComponent<Rapture::ShadowComponent>());
         ensure<CascadedShadowEditor>(e.hasComponent<Rapture::CascadedShadowComponent>());
-        ensure<SkyboxEditor>(e.hasComponent<Rapture::SkyboxComponent>());
-        ensure<AtmosphereEditor>(e.hasComponent<Rapture::AtmosphereComponent>());
     }
 
     relayout();

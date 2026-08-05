@@ -4,7 +4,7 @@
 #include "components/Components.h"
 #include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
-#include "components/systems/Environment.h"
+#include "scenes/instances/Environment.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
@@ -32,8 +32,7 @@ Scene::Scene(const std::string &sceneName)
     m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, app.getFramesInFlight());
 
     m_root = std::make_unique<Instance>(*this, "Root");
-
-    m_environment = std::make_unique<Environment>(createEntity("Environment"));
+    m_root->add<Environment>("Environment");
 
     m_physics = std::make_unique<PhysicsSystem>();
     m_registry.on_construct<RigidBodyComponent>().connect<&Scene::onRigidBodyConstructed>(this);
@@ -133,11 +132,6 @@ Entity Scene::createSphere(const std::string &name, Mobility mobility)
 
 void Scene::destroyEntity(Entity entity)
 {
-    if (entity.isValid() && entity == m_environment->getEntity()) {
-        RP_CORE_WARN("The environment entity cannot be destroyed");
-        return;
-    }
-
     if (entity.isValid() && entity.getScene() == this) {
         if (entity.hasComponent<RayTracedComponent>()) {
             if (m_tlas != nullptr) {
@@ -192,7 +186,9 @@ void Scene::onUpdate(float dt)
         }
     }
 
-    m_environment->update();
+    if (m_environment != nullptr) {
+        m_environment->update();
+    }
 
     // Update regular shadow maps
     auto shadowView = m_registry.view<TransformComponent, ShadowComponent>();
@@ -350,11 +346,6 @@ Entity Scene::getMainCamera() const
         }
     }
     return Entity::null();
-}
-
-Entity Scene::environmentEntity() const
-{
-    return m_environment->getEntity();
 }
 
 Instance *Scene::instanceFor(Entity entity) const

@@ -155,43 +155,6 @@ struct PrefabComponent {
     EventConnection m_structureChangedConnection;
 };
 
-struct AtmosphereComponent {
-    float timeOfDay = 12.0f;
-    float latitude = 0.0f;
-    float longitude = 0.0f;
-
-    glm::vec3 rayleigh = glm::vec3(5.8f, 13.5f, 33.1f);
-    float mie = 21.0f;
-    float sunIntensity = 20.0f;
-    float mieG = 0.76f;
-    float cameraAltitude = 1.0f;
-
-    bool operator==(const AtmosphereComponent &other) const = default;
-};
-
-struct SkyboxComponent {
-    AssetPtr<Texture> skyboxTexture;
-    float skyIntensity = 1.0f;
-    bool isEnabled = true;
-    bool useAtmosphereSkybox = false;
-
-    SkyboxComponent() = default;
-    SkyboxComponent(AssetPtr<Texture> skyboxTexture, float skyIntensity = 1.0f)
-        : skyboxTexture(std::move(skyboxTexture)), skyIntensity(skyIntensity)
-    {
-    }
-    SkyboxComponent(std::filesystem::path skyboxTexturePath, float skyIntensity = 1.0f) : skyIntensity(skyIntensity)
-    {
-        auto asset = AssetManager::importAsset(skyboxTexturePath);
-        if (asset) {
-            skyboxTexture = AssetPtr<Texture>(std::move(asset));
-        }
-        if (!skyboxTexture) {
-            RP_CORE_ERROR("Failed to load skybox texture: {}", skyboxTexturePath.string());
-        }
-    }
-};
-
 struct LightComponent {
 
     glm::vec3 color = glm::vec3(1.0f, 0.8f, 0.6f); // Light color (default: warm white?) #FFDDAA

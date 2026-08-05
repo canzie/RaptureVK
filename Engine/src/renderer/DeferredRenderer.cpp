@@ -8,6 +8,7 @@
 
 #include "components/TerrainComponent.h"
 #include "jobs/InplaceFunction.h"
+#include "scenes/instances/Environment.h"
 #include "jobs/Job.h"
 #include "jobs/JobCommon.h"
 #include "jobs/JobSystem.h"
@@ -318,13 +319,12 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
     RAPTURE_PROFILE_FUNCTION();
 
-    Entity environment = activeScene.environmentEntity();
-    if (environment.hasComponent<SkyboxComponent>()) {
-        auto &skyboxComp = environment.getComponent<SkyboxComponent>();
+    Environment *environment = activeScene.environment();
+    if (environment != nullptr) {
         if (!m_skyboxPass->hasActiveSkybox()) {
-            m_skyboxPass->setSkyboxTexture(skyboxComp.skyboxTexture.get());
+            m_skyboxPass->setSkyboxTexture(environment->skyboxTexture());
         }
-        m_skyboxPass->setSkyIntensity(skyboxComp.skyIntensity);
+        m_skyboxPass->setSkyIntensity(environment->skyIntensity());
     }
 
     if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {

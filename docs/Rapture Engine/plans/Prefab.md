@@ -7,7 +7,9 @@
 > one prefab per scene (`glTFLoader.cpp:598` `buildPrefab`), and the duplicate-mesh bug is fixed.
 > Still designed-only: sub-prefabs from selection, the kit-split option, thumbnails, reimport.
 
-**Related: [[Asset Metadata]], [[Project Serialization]], [[Entity]], [[Scene]], [[HierarchyComponent]]**
+> **Revision 2026-08-04.** Instantiation now produces **nodes**, not loose entities (see [[Entity Types and Authoring Schema]]). The root is a `Node3D` carrying the blueprint reference, a node with a mesh becomes a `StaticMesh3D`, and a mesh-less node becomes a `Node3D` group. There is no prefab instance class — the blueprint link stays a component on whatever root the prefab defines. `HierarchyComponent` is gone; parenting is the instance tree. Sponza is one outliner row with its 103 children beneath it rather than 103 loose rows. Updating instances when the blueprint changes is destroy-and-reinstantiate, triggered explicitly, which discards edits made to interiors — the alternative is per-field override tracking, which is deliberately not built.
+
+**Related: [[Asset Metadata]], [[Project Serialization]], [[Entity]], [[Scene]], [[Entity Types and Authoring Schema]]**
 
 ## Goal / intent
 

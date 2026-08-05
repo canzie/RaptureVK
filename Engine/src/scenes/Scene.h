@@ -50,15 +50,10 @@ class Scene {
     Entity getMainCamera() const;
 
     /**
-     * @brief The scene's single environment entity, always present and not destroyable.
-     * @return The environment entity.
-     */
-    Entity environmentEntity() const;
-
-    /**
      * @brief The scene's environment, owner of skybox generation and image-based lighting
+     * @return The environment, or nullptr if the scene has none
      */
-    Environment *environment() const { return m_environment.get(); }
+    Environment *environment() const { return m_environment; }
 
     /**
      * @brief The scene's rigid body physics simulation.
@@ -131,7 +126,7 @@ class Scene {
 
   private:
     entt::registry m_registry;
-    std::unique_ptr<Environment> m_environment;
+    Environment *m_environment = nullptr;
     std::unique_ptr<SceneRenderData> m_renderData;
     std::unique_ptr<PhysicsSystem> m_physics;
     std::vector<entt::entity> m_pendingRigidBodies;
@@ -144,5 +139,6 @@ class Scene {
     std::unique_ptr<Instance> m_root;
 
     friend class Entity;
+    friend class Environment;
 };
 } // namespace Rapture

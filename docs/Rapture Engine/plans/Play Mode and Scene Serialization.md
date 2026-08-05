@@ -3,7 +3,9 @@
 Working notes from the 2026-08-01 design session. Records the decisions and the ordered passes so
 they are not re-derived. Not a full plan doc — each pass gets detail when it starts.
 
-**Related: [[Project Serialization]], [[Asset Metadata]], [[Prefab]], [[Scene]], [[Entity]], [[GBufferPass]], [[Asset & Editor Roadmap]]**
+> **Revision 2026-08-04.** [[Entity Types and Authoring Schema]] replaced the per-component serialization model. The unit is now a **node class**, each serialising its own layer and chaining to its base, so "per-component functions applied to an existing component" and the authored/derived split by hand both fall away — a node's class determines its components, and derived state is unreachable from a class's `serialize`. The file is a walk of the instance tree from the scene's hidden root, and references serialise as indices into that walk, which keeps "no persistent entity ids" intact. Reading needs a `name -> factory` registry, which does not exist yet. Everything about play mode itself — in-place restore, no duplicated world, selective keep, checksum reconciliation — is unaffected.
+
+**Related: [[Project Serialization]], [[Asset Metadata]], [[Prefab]], [[Scene]], [[Entity]], [[Entity Types and Authoring Schema]], [[Asset & Editor Roadmap]]**
 
 ## Goal
 

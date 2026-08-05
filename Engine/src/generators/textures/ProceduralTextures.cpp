@@ -1,6 +1,6 @@
 #include "ProceduralTextures.h"
 
-#include "components/systems/Environment.h"
+#include "scenes/instances/Environment.h"
 
 #include "asset_manager/Asset.h"
 #include "asset_manager/AssetImportConfig.h"

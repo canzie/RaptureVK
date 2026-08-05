@@ -9,6 +9,7 @@
 #include "scenes/entities/EntityCommon.h"
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/SpotLight3D.h"
+#include "scenes/instances/Environment.h"
 #include "scenes/instances/StaticMesh3D.h"
 
 #include "meshes/MeshPrimitives.h"
@@ -254,14 +255,14 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
 
     // Create environment entity with a procedurally generated atmosphere skybox
     {
-        auto envEntity = activeScene.environmentEntity();
-        auto &sky = envEntity.addComponent<Rapture::SkyboxComponent>();
-        sky.skyIntensity = 0.1f;
-        sky.useAtmosphereSkybox = true;
-        auto atmo = envEntity.addComponent<Rapture::AtmosphereComponent>();
-        atmo.timeOfDay = 11.551f;
-        atmo.latitude = -16.069f;
-        atmo.longitude = -9.273f;
+        Rapture::Environment *environment = activeScene.environment();
+        if (environment != nullptr) {
+            environment->setSkyIntensity(0.1f);
+            environment->setUsesAtmosphereSkybox(true);
+            environment->atmosphere().timeOfDay = 11.551f;
+            environment->atmosphere().latitude = -16.069f;
+            environment->atmosphere().longitude = -9.273f;
+        }
     }
 
     {

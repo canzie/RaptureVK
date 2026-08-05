@@ -2,11 +2,13 @@
 
 #include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
+#include "components/Components.h"
 #include "generators/textures/ProceduralTextures.h"
 #include "logging/Log.h"
 #include "renderer/ImageBasedLighting.h"
 #include "scenes/Scene.h"
 #include "shaders/Shader.h"
+#include "textures/Texture.h"
 #include "window_context/Application.h"
 
 #include <glm/gtc/constants.hpp>
@@ -34,7 +36,7 @@ static AssetHandle s_atmosphereShaderHandle()
     return s_handle;
 }
 
-static AtmospherePushConstants s_buildPushConstants(const AtmosphereComponent &atmo, const glm::vec3 &sunDir)
+static AtmospherePushConstants s_buildPushConstants(const AtmosphereSettings &atmo, const glm::vec3 &sunDir)
 {
     AtmospherePushConstants pc;
     pc.cameraPos = glm::vec3(0.0f);
@@ -53,7 +55,6 @@ static AtmospherePushConstants s_buildPushConstants(const AtmosphereComponent &a
     pc.cameraAltitude = atmo.cameraAltitude;
     return pc;
 }
-
 
 static glm::quat s_rotationBetween(const glm::vec3 &from, const glm::vec3 &to)
 {
@@ -116,23 +117,54 @@ float Environment::wavelengthNm(float rayleighCoefficient)
     return static_cast<float>(550.0 * std::pow(13.5 / rayleighCoefficient, 0.25));
 }
 
-Environment::Environment(Entity environment) : m_entity(environment)
+Environment::Environment(Scene &scene, std::string_view name) : Instance(scene, name)
 {
     m_lastApplied.timeOfDay = -1.0f;
     m_ibl = std::make_unique<ImageBasedLighting>();
+    scene.m_environment = this;
 }
 
-Environment::~Environment() = default;
-
-void Environment::update()
+Environment::~Environment()
 {
-    auto *atmo = m_entity.tryGetComponent<AtmosphereComponent>();
-    if (atmo == nullptr) {
+    if (scene() != nullptr && scene()->m_environment == this) {
+        scene()->m_environment = nullptr;
+    }
+}
+
+const TypeInfo &Environment::staticType()
+{
+    static const TypeInfo type("Environment", &Instance::staticType());
+    return type;
+}
+
+const TypeInfo &Environment::type() const
+{
+    return staticType();
+}
+
+AssetHandle Environment::skybox() const
+{
+    if (!m_skyboxTexture) {
+        return INVALID_ASSET_HANDLE;
+    }
+    return m_skyboxTexture.ref().get()->getHandle();
+}
+
+void Environment::setSkybox(AssetHandle skybox)
+{
+    AssetRef ref = AssetManager::getAsset(skybox);
+    if (!ref) {
+        RP_CORE_ERROR("skybox texture {} could not be resolved", skybox);
         return;
     }
 
+    m_skyboxTexture = AssetPtr<Texture>(std::move(ref));
+}
+
+void Environment::update()
+{
     TransformComponent *sunTransform = nullptr;
-    auto sunView = m_entity.getScene()->getRegistry().view<DirectionalLightComponent, TransformComponent>();
+    auto sunView = scene()->getRegistry().view<DirectionalLightComponent, TransformComponent>();
     for (auto handle : sunView) {
         auto [light, transform] = sunView.get<DirectionalLightComponent, TransformComponent>(handle);
         if (light.atmosphereSunLight) {
@@ -141,47 +173,46 @@ void Environment::update()
         }
     }
 
-    bool sunParamsChanged = atmo->timeOfDay != m_lastApplied.timeOfDay || atmo->latitude != m_lastApplied.latitude ||
-                            atmo->longitude != m_lastApplied.longitude;
+    bool sunParamsChanged = m_atmosphere.timeOfDay != m_lastApplied.timeOfDay || m_atmosphere.latitude != m_lastApplied.latitude ||
+                            m_atmosphere.longitude != m_lastApplied.longitude;
 
     glm::vec3 sunDir;
     if (sunTransform != nullptr) {
         if (sunParamsChanged) {
-            sunDir = sunDirection(atmo->timeOfDay, atmo->latitude, atmo->longitude);
+            sunDir = sunDirection(m_atmosphere.timeOfDay, m_atmosphere.latitude, m_atmosphere.longitude);
             sunTransform->transforms.setRotation(s_rotationBetween(glm::vec3(0.0f, 0.0f, -1.0f), -sunDir));
         } else {
             sunDir = -glm::normalize(sunTransform->transforms.getRotationQuat() * glm::vec3(0.0f, 0.0f, -1.0f));
             glm::vec3 expectedDir = sunDirection(m_lastApplied.timeOfDay, m_lastApplied.latitude, m_lastApplied.longitude);
             if (glm::distance(sunDir, expectedDir) > 1e-4f) {
-                atmo->timeOfDay = timeOfDayFromSun(sunDir, atmo->latitude);
+                m_atmosphere.timeOfDay = timeOfDayFromSun(sunDir, m_atmosphere.latitude);
             }
         }
     } else {
-        sunDir = sunDirection(atmo->timeOfDay, atmo->latitude, atmo->longitude);
+        sunDir = sunDirection(m_atmosphere.timeOfDay, m_atmosphere.latitude, m_atmosphere.longitude);
     }
 
-    bool changed = !(*atmo == m_lastApplied);
-    m_lastApplied = *atmo;
+    bool changed = !(m_atmosphere == m_lastApplied);
+    m_lastApplied = m_atmosphere;
 
-    auto *sky = m_entity.tryGetComponent<SkyboxComponent>();
-    if (sky == nullptr || !sky->useAtmosphereSkybox) {
+    if (!m_usesAtmosphereSkybox) {
         return;
     }
 
-    bool created = ensureSkyboxGenerator(*sky);
+    bool created = ensureSkyboxGenerator();
     if (m_skyboxGenerator == nullptr) {
         return;
     }
 
     if (changed || created) {
-        AtmospherePushConstants pc = s_buildPushConstants(*atmo, sunDir);
+        AtmospherePushConstants pc = s_buildPushConstants(m_atmosphere, sunDir);
         m_skyboxGenerator->setPushConstants(pc);
         m_skyboxGenerator->generate();
-        m_ibl->bakeFromCube(sky->skyboxTexture.get());
+        m_ibl->bakeFromCube(m_skyboxTexture.get());
     }
 }
 
-bool Environment::ensureSkyboxGenerator(SkyboxComponent &sky)
+bool Environment::ensureSkyboxGenerator()
 {
     if (m_skyboxGenerator != nullptr) {
         return false;
@@ -205,8 +236,69 @@ bool Environment::ensureSkyboxGenerator(SkyboxComponent &sky)
         return false;
     }
 
-    sky.skyboxTexture = m_skyboxGenerator->getTextureAsset();
+    m_skyboxTexture = m_skyboxGenerator->getTextureAsset();
     return true;
+}
+
+void Environment::serialize(WriteNode node) const
+{
+    Instance::serialize(node);
+
+    WriteNode sky = node.addObject("sky");
+    sky.set("texture", skybox());
+    sky.set("intensity", static_cast<double>(m_skyIntensity));
+    sky.set("enabled", m_skyboxEnabled);
+    sky.set("useAtmosphere", m_usesAtmosphereSkybox);
+
+    WriteNode atmosphere = node.addObject("atmosphere");
+    atmosphere.set("timeOfDay", static_cast<double>(m_atmosphere.timeOfDay));
+    atmosphere.set("latitude", static_cast<double>(m_atmosphere.latitude));
+    atmosphere.set("longitude", static_cast<double>(m_atmosphere.longitude));
+    atmosphere.set("mie", static_cast<double>(m_atmosphere.mie));
+    atmosphere.set("mieG", static_cast<double>(m_atmosphere.mieG));
+    atmosphere.set("sunIntensity", static_cast<double>(m_atmosphere.sunIntensity));
+    atmosphere.set("cameraAltitude", static_cast<double>(m_atmosphere.cameraAltitude));
+
+    WriteNode rayleigh = atmosphere.addArray("rayleigh");
+    rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.x));
+    rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.y));
+    rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.z));
+}
+
+void Environment::deserialize(ReadNode node)
+{
+    Instance::deserialize(node);
+
+    ReadNode sky = node.child("sky");
+    if (sky.valid()) {
+        AssetHandle texture = sky.child("texture").asU64(INVALID_ASSET_HANDLE);
+        if (texture != INVALID_ASSET_HANDLE) {
+            setSkybox(texture);
+        }
+        m_skyIntensity = static_cast<float>(sky.child("intensity").asF64(m_skyIntensity));
+        m_skyboxEnabled = sky.child("enabled").asBool(m_skyboxEnabled);
+        m_usesAtmosphereSkybox = sky.child("useAtmosphere").asBool(m_usesAtmosphereSkybox);
+    }
+
+    ReadNode atmosphere = node.child("atmosphere");
+    if (!atmosphere.valid()) {
+        return;
+    }
+
+    m_atmosphere.timeOfDay = static_cast<float>(atmosphere.child("timeOfDay").asF64(m_atmosphere.timeOfDay));
+    m_atmosphere.latitude = static_cast<float>(atmosphere.child("latitude").asF64(m_atmosphere.latitude));
+    m_atmosphere.longitude = static_cast<float>(atmosphere.child("longitude").asF64(m_atmosphere.longitude));
+    m_atmosphere.mie = static_cast<float>(atmosphere.child("mie").asF64(m_atmosphere.mie));
+    m_atmosphere.mieG = static_cast<float>(atmosphere.child("mieG").asF64(m_atmosphere.mieG));
+    m_atmosphere.sunIntensity = static_cast<float>(atmosphere.child("sunIntensity").asF64(m_atmosphere.sunIntensity));
+    m_atmosphere.cameraAltitude = static_cast<float>(atmosphere.child("cameraAltitude").asF64(m_atmosphere.cameraAltitude));
+
+    ReadNode rayleigh = atmosphere.child("rayleigh");
+    if (rayleigh.size() == 3) {
+        m_atmosphere.rayleigh = glm::vec3(static_cast<float>(rayleigh.at(0).asF64(m_atmosphere.rayleigh.x)),
+                                          static_cast<float>(rayleigh.at(1).asF64(m_atmosphere.rayleigh.y)),
+                                          static_cast<float>(rayleigh.at(2).asF64(m_atmosphere.rayleigh.z)));
+    }
 }
 
 } // namespace Rapture

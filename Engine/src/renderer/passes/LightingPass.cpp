@@ -3,7 +3,7 @@
 
 #include "buffers/descriptors/DescriptorManager.h"
 #include "components/Components.h"
-#include "components/systems/Environment.h"
+#include "scenes/instances/Environment.h"
 #include "renderer/ImageBasedLighting.h"
 #include "renderer/RenderSettings.h"
 #include "renderer/SceneRenderData.h"
@@ -180,9 +180,7 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
     pushConstants.prefilteredEnvHandle = ibl != nullptr ? ibl->getPrefilteredBindlessIndex() : 0;
     pushConstants.prefilteredEnvMipCount = ibl != nullptr ? static_cast<float>(ibl->getPrefilteredMipCount()) : 1.0f;
 
-    Entity environmentEntity = activeScene.environmentEntity();
-    pushConstants.skyIntensity =
-        environmentEntity.hasComponent<SkyboxComponent>() ? environmentEntity.getComponent<SkyboxComponent>().skyIntensity : 1.0f;
+    pushConstants.skyIntensity = environment != nullptr ? environment->skyIntensity() : 1.0f;
 
     auto &renderData = *(activeScene.getRenderData());
     auto &lightStore = renderData.getLights();

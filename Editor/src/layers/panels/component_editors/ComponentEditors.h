@@ -8,6 +8,7 @@
 #include "layers/panels/components/color_field.h"
 #include "scenes/instances/Camera3D.h"
 #include "scenes/instances/DirectionalLight3D.h"
+#include "scenes/instances/Environment.h"
 #include "scenes/instances/Mesh3D.h"
 #include "scenes/instances/PointLight3D.h"
 #include "scenes/instances/SpotLight3D.h"
@@ -160,34 +161,26 @@ class CascadedShadowEditor : public ComponentEditorBase {
     Rapture::Entity m_entity;
 };
 
-class SkyboxEditor : public ComponentEditorBase {
+class EnvironmentEditor : public ComponentEditorBase {
   public:
-    const char *title() const override { return "Skybox"; }
+    const char *title() const override { return "Environment"; }
     const char *icon() const override { return ""; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
     void sync(const Rapture::Entity &entity) override;
 
   private:
-    float m_intensity = 1.0f;
-    bool m_isEnabled = true;
-    Rapture::Entity m_entity;
-};
+    void pushAtmosphere();
 
-class AtmosphereEditor : public ComponentEditorBase {
-  public:
-    const char *title() const override { return "Atmosphere"; }
-    const char *icon() const override { return ""; }
-    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    float m_skyIntensity = 1.0f;
+    bool m_skyboxEnabled = true;
+    bool m_usesAtmosphereSkybox = false;
 
-  private:
-    void pushToComponent();
-
-    Rapture::AtmosphereComponent m_component;
+    Rapture::AtmosphereSettings m_atmosphere;
     double m_wavelengths[3] = {680.0, 550.0, 440.0};
     double m_sunIntensity = 20.0;
     double m_cameraAltitude = 1.0;
-    Rapture::Entity m_entity;
+
+    Rapture::Environment *m_node = nullptr;
 };
 
 #endif // RAPTURE__COMPONENT_EDITORS_H

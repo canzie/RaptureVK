@@ -11,6 +11,7 @@
 #include "renderer/SceneRenderData.h"
 #include "renderer/gi/ddgi/DDGICommon.h"
 #include "scenes/Scene.h"
+#include "scenes/instances/Environment.h"
 #include "textures/Texture.h"
 #include "textures/TextureCommon.h"
 #include "window_context/Application.h"
@@ -490,17 +491,12 @@ void DynamicDiffuseGI::updateFromIndirectLightingComponent(Scene &scene)
 
 void DynamicDiffuseGI::updateSkybox(Scene &scene)
 {
-    SkyboxComponent *skyboxComp = nullptr;
-    Entity environment = scene.environmentEntity();
-    if (environment.hasComponent<SkyboxComponent>()) {
-        skyboxComp = &environment.getComponent<SkyboxComponent>();
-    }
+    Environment *environment = scene.environment();
+    Texture *skyboxTexture = environment != nullptr ? environment->skyboxTexture() : nullptr;
 
-    Texture *newTexture = (skyboxComp && skyboxComp->skyboxTexture && skyboxComp->skyboxTexture->isReady())
-                              ? skyboxComp->skyboxTexture.get()
-                              : m_defaultSkyboxTexture.get();
+    Texture *newTexture = (skyboxTexture != nullptr && skyboxTexture->isReady()) ? skyboxTexture : m_defaultSkyboxTexture.get();
 
-    m_skyIntensity = skyboxComp ? skyboxComp->skyIntensity : 1.0f;
+    m_skyIntensity = environment != nullptr ? environment->skyIntensity() : 1.0f;
 
     RAPTURE_PROFILE_FUNCTION();
 
