@@ -2,15 +2,16 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
+#include "meshes/Mesh.h"
+#include "utils/rp_assert.h"
 #include "window_context/Application.h"
-#include <stdexcept>
 
 namespace Rapture {
 
-BLAS::BLAS(AssetPtr<Mesh> meshPtr)
-    : m_meshPtr(std::move(meshPtr)), m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE),
+BLAS::BLAS(const Mesh &mesh)
+    : m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE),
       m_scratchBuffer(VK_NULL_HANDLE), m_scratchAllocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0),
-      m_scratchSize(0), m_isBuilt(false)
+      m_scratchSize(0), m_isBuilt(false), m_isValid(false), m_device(VK_NULL_HANDLE), m_allocator(VK_NULL_HANDLE)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -18,21 +19,20 @@ BLAS::BLAS(AssetPtr<Mesh> meshPtr)
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
 
+    RP_ASSERT(vulkanContext.isRayTracingEnabled(), "BLAS created while ray tracing is not enabled on this device");
     if (!vulkanContext.isRayTracingEnabled()) {
         RP_CORE_ERROR("Ray tracing is not enabled on this device!");
-        throw std::runtime_error("Ray tracing is not enabled on this device!");
+        return;
     }
 
     m_device = vulkanContext.getLogicalDevice();
     m_allocator = vulkanContext.getVmaAllocator();
 
-    if (!m_meshPtr) {
-        RP_CORE_ERROR("Mesh is null!");
-        throw std::runtime_error("Mesh is null!");
+    if (!createGeometry(mesh)) {
+        return;
     }
 
-    createGeometry();
-    createAccelerationStructure();
+    m_isValid = createAccelerationStructure();
 }
 
 BLAS::~BLAS()
@@ -53,25 +53,25 @@ BLAS::~BLAS()
     }
 }
 
-void BLAS::createGeometry()
+bool BLAS::createGeometry(const Mesh &mesh)
 {
 
     RAPTURE_PROFILE_FUNCTION();
 
-    auto vertexAllocation = m_meshPtr->getVertexAllocation();
-    auto indexAllocation = m_meshPtr->getIndexAllocation();
+    auto vertexAllocation = mesh.getVertexAllocation();
+    auto indexAllocation = mesh.getIndexAllocation();
 
-    if (!vertexAllocation || !vertexAllocation->isValid() || !indexAllocation || !indexAllocation->isValid()) {
-        RP_CORE_ERROR("BLAS: Mesh vertex or index buffer allocation is invalid!");
-        throw std::runtime_error("BLAS: Mesh vertex or index buffer allocation is invalid!");
+    if (vertexAllocation == nullptr || !vertexAllocation->isValid() || indexAllocation == nullptr || !indexAllocation->isValid()) {
+        RP_CORE_ERROR("Mesh vertex or index buffer allocation is invalid");
+        return false;
     }
 
-    auto vertexBuffer = m_meshPtr->getVertexBuffer();
-    auto indexBuffer = m_meshPtr->getIndexBuffer();
+    auto vertexBuffer = mesh.getVertexBuffer();
+    auto indexBuffer = mesh.getIndexBuffer();
 
-    if (!vertexBuffer || !indexBuffer) {
-        RP_CORE_ERROR("BLAS: Mesh vertex or index buffer is null!");
-        throw std::runtime_error("BLAS: Mesh vertex or index buffer is null!");
+    if (vertexBuffer == nullptr || indexBuffer == nullptr) {
+        RP_CORE_ERROR("Mesh vertex or index buffer is null");
+        return false;
     }
 
     // Get vertex buffer device address from allocation
@@ -120,13 +120,15 @@ void BLAS::createGeometry()
 
     // Build range info
     m_buildRangeInfo = {};
-    m_buildRangeInfo.primitiveCount = m_meshPtr->getIndexCount() / 3; // Number of triangles
+    m_buildRangeInfo.primitiveCount = mesh.getIndexCount() / 3; // Number of triangles
     m_buildRangeInfo.primitiveOffset = 0;
     m_buildRangeInfo.firstVertex = 0;
     m_buildRangeInfo.transformOffset = 0;
+
+    return true;
 }
 
-void BLAS::createAccelerationStructure()
+bool BLAS::createAccelerationStructure()
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -164,7 +166,7 @@ void BLAS::createAccelerationStructure()
 
     if (vmaCreateBuffer(m_allocator, &bufferCreateInfo, &allocCreateInfo, &m_buffer, &m_allocation, nullptr) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create acceleration structure buffer!");
-        throw std::runtime_error("Failed to create acceleration structure buffer!");
+        return false;
     }
 
     // Create acceleration structure
@@ -176,7 +178,7 @@ void BLAS::createAccelerationStructure()
 
     if (vulkanContext.vkCreateAccelerationStructureKHR(m_device, &createInfo, nullptr, &m_accelerationStructure) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create acceleration structure!");
-        throw std::runtime_error("Failed to create acceleration structure!");
+        return false;
     }
 
     // Get device address
@@ -187,6 +189,7 @@ void BLAS::createAccelerationStructure()
     m_deviceAddress = vulkanContext.vkGetAccelerationStructureDeviceAddressKHR(m_device, &addressInfo);
 
     // RP_CORE_INFO("BLAS: Acceleration structure created successfully");
+    return true;
 }
 
 void BLAS::build()
@@ -195,6 +198,11 @@ void BLAS::build()
 
     if (m_isBuilt) {
         RP_CORE_WARN("Acceleration structure is already built");
+        return;
+    }
+
+    RP_ASSERT(m_isValid, "BLAS::build called on a BLAS that failed construction");
+    if (!m_isValid) {
         return;
     }
 
@@ -217,7 +225,7 @@ void BLAS::build()
     if (vmaCreateBuffer(m_allocator, &scratchBufferCreateInfo, &scratchAllocCreateInfo, &m_scratchBuffer, &m_scratchAllocation,
                         nullptr) != VK_SUCCESS) {
         RP_CORE_ERROR("BLAS: Failed to create scratch buffer!");
-        throw std::runtime_error("BLAS: Failed to create scratch buffer!");
+        return;
     }
 
     // Get scratch buffer device address

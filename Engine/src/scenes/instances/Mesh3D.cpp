@@ -136,17 +136,17 @@ void Mesh3D::setBounds(const glm::vec3 &min, const glm::vec3 &max)
 
 bool Mesh3D::isRayTraced() const
 {
-    return m_entity.hasComponent<BLASComponent>();
+    return m_entity.hasComponent<RayTracedComponent>();
 }
 
 void Mesh3D::setRayTraced(bool rayTraced)
 {
     if (!rayTraced) {
-        m_entity.tryRemoveComponent<BLASComponent>();
+        m_entity.tryRemoveComponent<RayTracedComponent>();
         return;
     }
 
-    if (m_entity.hasComponent<BLASComponent>()) {
+    if (m_entity.hasComponent<RayTracedComponent>()) {
         return;
     }
 
@@ -156,7 +156,12 @@ void Mesh3D::setRayTraced(bool rayTraced)
         return;
     }
 
-    m_entity.addComponent<BLASComponent>(component->mesh);
+    if (!component->mesh->buildBLAS()) {
+        RP_CORE_ERROR("'{}' cannot be ray traced because its mesh has no acceleration structure", name());
+        return;
+    }
+
+    m_entity.addComponent<RayTracedComponent>();
 
     Entity self = m_entity;
     scene()->registerBLAS(self);

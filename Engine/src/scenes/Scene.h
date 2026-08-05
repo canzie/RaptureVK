@@ -104,7 +104,6 @@ class Scene {
     bool locked = false;
 
   private:
-    void ensureBLASFreeBuckets();
     void onRigidBodyConstructed(entt::registry &registry, entt::entity entity);
     void registerRigidBodies();
     void syncRigidBodyTransforms();
@@ -119,8 +118,6 @@ class Scene {
 
     std::shared_ptr<TLAS> m_tlas;
     bool m_tlasDirty = false;
-    std::vector<std::vector<std::unique_ptr<BLAS>>> m_blasFreeBuckets;
-    size_t m_blasFreeBucket = 0;
 
     // declared last so its subtree tears down before anything destroyEntity touches
     std::unique_ptr<Instance> m_root;

@@ -6,13 +6,14 @@
 #include "components/TerrainComponent.h"
 #include "components/systems/Environment.h"
 #include "renderer/SceneRenderData.h"
+#include "renderer/shadows/CascadedShadowMapping.h"
+#include "renderer/shadows/ShadowMapping.h"
 #include "scenes/instances/Instance.h"
 
 #include "asset_manager/AssetManager.h"
 #include "logging/TracyProfiler.h"
 #include "meshes/MeshPrimitives.h"
 #include "physics/PhysicsSystem.h"
-#include "render_targets/swap_chains/SwapChain.h"
 #include "scenes/entities/EntityCommon.h"
 #include "window_context/Application.h"
 
@@ -135,14 +136,9 @@ void Scene::destroyEntity(Entity entity)
     }
 
     if (entity.isValid() && entity.getScene() == this) {
-        auto *blasComp = entity.tryGetComponent<BLASComponent>();
-        if (blasComp != nullptr) {
+        if (entity.hasComponent<RayTracedComponent>()) {
             if (m_tlas != nullptr) {
                 m_tlas->removeInstance(entity.getID());
-            }
-            if (blasComp->blas != nullptr) {
-                ensureBLASFreeBuckets();
-                m_blasFreeBuckets[m_blasFreeBucket].push_back(std::move(blasComp->blas));
             }
             m_tlasDirty = true;
         }
@@ -205,10 +201,11 @@ void Scene::onUpdate(float dt)
         }
         auto [transform, shadow] = shadowView.get<TransformComponent, ShadowComponent>(entityHandle);
 
-        if (shadow.shadowMap && shadow.isActive && shadow.needsUpdate(*light, transform)) {
+        ShadowMap *shadowMap = m_renderData->getShadowMap(entity.getID());
+        if (shadowMap != nullptr && shadow.isActive && shadow.needsUpdate(*light, transform)) {
 
             // Update the shadow map view matrix
-            shadow.shadowMap->updateViewMatrix(entity, transform, cameraPosition);
+            shadowMap->updateViewMatrix(entity, transform, cameraPosition);
         }
     }
 
@@ -218,23 +215,22 @@ void Scene::onUpdate(float dt)
         auto [light, transform, shadow] =
             cascadedShadowView.get<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>(entity);
 
-        if (shadow.cascadedShadowMap && shadow.isActive) {
+        CascadedShadowMap *cascadedShadowMap = m_renderData->getCascadedShadowMap(static_cast<EntityID>(entity));
+        if (cascadedShadowMap != nullptr && shadow.isActive) {
             // Update the cascaded shadow map view matrices
             Entity mainCamera = getMainCamera();
             if (mainCamera.isValid()) {
                 auto cameraComp = mainCamera.tryGetComponent<CameraComponent>();
                 if (cameraComp) {
-                    shadow.cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
+                    cascadedShadowMap->setLambda(shadow.lambda);
+                    cascadedShadowMap->setShadowDistance(shadow.shadowDistance);
+                    cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
                 }
             }
         }
     }
 
     m_renderData->onUpdate(frameCounter);
-
-    ensureBLASFreeBuckets();
-    m_blasFreeBucket = (m_blasFreeBucket + 1) % m_blasFreeBuckets.size();
-    m_blasFreeBuckets[m_blasFreeBucket].clear();
 
     if (m_tlasDirty) {
         if (m_tlas != nullptr && m_tlas->getInstanceCount() > 0) {
@@ -386,14 +382,20 @@ void Scene::registerBLAS(Entity &entity)
         m_tlas = std::make_unique<TLAS>();
     }
 
-    auto [blas, mesh, transform] = entity.tryGetComponents<BLASComponent, MeshComponent, TransformComponent>();
-    if (!blas || !mesh || !transform) {
-        RP_CORE_ERROR("Entity does not have a valid BLAS component");
+    auto [mesh, transform] = entity.tryGetComponents<MeshComponent, TransformComponent>();
+    if (!entity.hasComponent<RayTracedComponent>() || mesh == nullptr || transform == nullptr || !mesh->mesh) {
+        RP_CORE_ERROR("Entity cannot be ray traced");
+        return;
+    }
+
+    BLAS *blas = mesh->mesh->getBLAS();
+    if (blas == nullptr) {
+        RP_CORE_ERROR("Entity's mesh has no acceleration structure");
         return;
     }
 
     TLASInstance instance;
-    instance.blas = blas->blas.get();
+    instance.blas = blas;
     instance.transform = transform->transformMatrix();
     instance.entityID = entity.getID();
     m_tlas->addInstance(instance);
@@ -408,15 +410,6 @@ void Scene::buildTLAS()
     }
 
     m_tlas->build();
-}
-
-void Scene::ensureBLASFreeBuckets()
-{
-    uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
-    size_t bucketCount = static_cast<size_t>(framesInFlight) + 1;
-    if (m_blasFreeBuckets.size() < bucketCount) {
-        m_blasFreeBuckets.resize(bucketCount);
-    }
 }
 
 // TODO: update this so we update the transform directly instead of sotring the change and letting the tlas go over it again

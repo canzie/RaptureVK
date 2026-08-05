@@ -1,4 +1,5 @@
 #include "renderer/SceneQueryRenderer.h"
+#include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
 #include "logging/Log.h"

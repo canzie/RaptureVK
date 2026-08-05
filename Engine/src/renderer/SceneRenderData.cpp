@@ -57,11 +57,13 @@ struct SceneRenderData::SignalBridge {
     {
         (void)registry;
         owner->onShadowAdded(static_cast<EntityID>(entity));
+        owner->createShadowMap(static_cast<EntityID>(entity));
     }
 
     void onShadowRemoved(entt::registry &registry, entt::entity entity)
     {
         (void)registry;
+        owner->destroyShadowMap(static_cast<EntityID>(entity));
         owner->onShadowRemoved(static_cast<EntityID>(entity));
     }
 
@@ -69,11 +71,13 @@ struct SceneRenderData::SignalBridge {
     {
         (void)registry;
         owner->onCascadedShadowAdded(static_cast<EntityID>(entity));
+        owner->createCascadedShadowMap(static_cast<EntityID>(entity));
     }
 
     void onCascadedShadowRemoved(entt::registry &registry, entt::entity entity)
     {
         (void)registry;
+        owner->destroyCascadedShadowMap(static_cast<EntityID>(entity));
         owner->onCascadedShadowRemoved(static_cast<EntityID>(entity));
     }
 };
@@ -174,11 +178,13 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
     auto existingShadows = registry.view<ShadowComponent>();
     for (auto entity : existingShadows) {
         onShadowAdded(static_cast<EntityID>(entity));
+        createShadowMap(static_cast<EntityID>(entity));
     }
 
     auto existingCascadedShadows = registry.view<CascadedShadowComponent>();
     for (auto entity : existingCascadedShadows) {
         onCascadedShadowAdded(static_cast<EntityID>(entity));
+        createCascadedShadowMap(static_cast<EntityID>(entity));
     }
 }
 
@@ -372,6 +378,54 @@ void SceneRenderData::onCascadedShadowRemoved(EntityID entityId)
     shadow->renderDataSlot = UINT32_MAX;
 }
 
+void SceneRenderData::createShadowMap(EntityID entityId)
+{
+    Entity entity(entityId, m_scene);
+    auto *shadow = entity.tryGetComponent<ShadowComponent>();
+    if (shadow == nullptr) {
+        return;
+    }
+
+    float resolution = static_cast<float>(shadow->resolution);
+    m_shadowMaps[entityId] = std::make_unique<ShadowMap>(resolution, resolution);
+}
+
+void SceneRenderData::destroyShadowMap(EntityID entityId)
+{
+    m_shadowMaps.erase(entityId);
+}
+
+void SceneRenderData::createCascadedShadowMap(EntityID entityId)
+{
+    Entity entity(entityId, m_scene);
+    auto *shadow = entity.tryGetComponent<CascadedShadowComponent>();
+    if (shadow == nullptr) {
+        return;
+    }
+
+    float resolution = static_cast<float>(shadow->resolution);
+    auto map = std::make_unique<CascadedShadowMap>(resolution, resolution, shadow->numCascades, shadow->lambda);
+    map->setShadowDistance(shadow->shadowDistance);
+    m_cascadedShadowMaps[entityId] = std::move(map);
+}
+
+void SceneRenderData::destroyCascadedShadowMap(EntityID entityId)
+{
+    m_cascadedShadowMaps.erase(entityId);
+}
+
+ShadowMap *SceneRenderData::getShadowMap(EntityID entityId) const
+{
+    auto it = m_shadowMaps.find(entityId);
+    return it != m_shadowMaps.end() ? it->second.get() : nullptr;
+}
+
+CascadedShadowMap *SceneRenderData::getCascadedShadowMap(EntityID entityId) const
+{
+    auto it = m_cascadedShadowMaps.find(entityId);
+    return it != m_cascadedShadowMaps.end() ? it->second.get() : nullptr;
+}
+
 void SceneRenderData::markDirty(EntityID entityId)
 {
     Entity entity(entityId, m_scene);
@@ -505,7 +559,7 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
         }
         data.directionAndRange = glm::vec4(direction, range);
 
-        data.colorAndIntensity = glm::vec4(light->getFinalColor(), light->intensity);
+        data.colorAndIntensity = glm::vec4(light->color, light->intensity);
 
         data.spotAngles = glm::vec4(innerCos, outerCos, static_cast<float>(entity.getID()), 0.0f);
     };
@@ -564,26 +618,28 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
         auto &data = partition.getSlotData(i);
 
         auto *shadow = entity.tryGetComponent<ShadowComponent>();
-        if (shadow != nullptr && shadow->shadowMap && shadow->isActive) {
+        ShadowMap *shadowMap = getShadowMap(entity.getID());
+        if (shadow != nullptr && shadowMap != nullptr && shadow->isActive) {
             data.type = static_cast<int>(Light_getLightType(entity));
             data.cascadeCount = 1;
             data.lightIndex = entity.getID();
-            data.textureHandle = shadow->shadowMap->getTextureHandle();
-            data.cascadeMatrices[0] = shadow->shadowMap->getLightViewProjection();
+            data.textureHandle = shadowMap->getTextureHandle();
+            data.cascadeMatrices[0] = shadowMap->getLightViewProjection();
             data.cascadeSplitsViewSpace[0] = glm::vec4(0.0f);
             return;
         }
 
         auto *cascaded = entity.tryGetComponent<CascadedShadowComponent>();
-        if (cascaded != nullptr && cascaded->cascadedShadowMap && cascaded->isActive) {
+        CascadedShadowMap *cascadedMap = getCascadedShadowMap(entity.getID());
+        if (cascaded != nullptr && cascadedMap != nullptr && cascaded->isActive) {
             data.type = static_cast<int>(Light_getLightType(entity));
-            data.cascadeCount = cascaded->cascadedShadowMap->getNumCascades();
+            data.cascadeCount = cascadedMap->getNumCascades();
             data.lightIndex = entity.getID();
-            data.textureHandle = cascaded->cascadedShadowMap->getTextureHandle();
+            data.textureHandle = cascadedMap->getTextureHandle();
 
-            auto splits = cascaded->cascadedShadowMap->getCascadeSplits();
-            for (uint8_t c = 0; c < cascaded->cascadedShadowMap->getNumCascades(); c++) {
-                data.cascadeMatrices[c] = cascaded->cascadedShadowMap->getLightViewProjections()[c];
+            auto splits = cascadedMap->getCascadeSplits();
+            for (uint8_t c = 0; c < cascadedMap->getNumCascades(); c++) {
+                data.cascadeMatrices[c] = cascadedMap->getLightViewProjections()[c];
                 data.cascadeSplitsViewSpace[c] = glm::vec4(splits[c], splits[c + 1], 0.0f, -1.0f);
             }
         }

@@ -1,6 +1,7 @@
 #ifndef RAPTURE__MATERIAL_GRAPH_COMPILER_H
 #define RAPTURE__MATERIAL_GRAPH_COMPILER_H
 
+#include "asset_manager/AssetHandle.h"
 #include <cstdint>
 #include <string>
 #include <unordered_map>

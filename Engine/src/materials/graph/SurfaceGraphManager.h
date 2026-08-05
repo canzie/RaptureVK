@@ -1,6 +1,7 @@
 #ifndef RAPTURE__SURFACE_GRAPH_MANAGER_H
 #define RAPTURE__SURFACE_GRAPH_MANAGER_H
 
+#include "asset_manager/AssetHandle.h"
 #include <cstdint>
 #include <filesystem>
 #include <vector>

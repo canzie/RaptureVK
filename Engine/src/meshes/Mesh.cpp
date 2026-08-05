@@ -1,4 +1,5 @@
 #include "Mesh.h"
+#include "acceleration_structures/BLAS.h"
 #include "buffers/BufferPool.h"
 #include "window_context/Application.h"
 
@@ -38,7 +39,8 @@ struct MeshBlobHeader {
     uint32_t reserved[2] = {};     // pad to 64 bytes, consume for backward-compatible additions
 };
 
-static_assert(sizeof(MeshBlobHeader) == 64, "mesh blob header is a fixed 64-byte directory, bump to 128 and the major version if it must grow");
+static_assert(sizeof(MeshBlobHeader) == 64,
+              "mesh blob header is a fixed 64-byte directory, bump to 128 and the major version if it must grow");
 
 // std::unique_ptr<DescriptorSubAllocationBase<Buffer>> Mesh::s_bindlessMeshDataAllocation = nullptr;
 
@@ -51,8 +53,35 @@ Mesh::Mesh() : m_indexCount(0), m_vertexBuffer(nullptr), m_indexBuffer(nullptr) 
 
 Mesh::~Mesh()
 {
+    m_blas.reset();
     m_indexAllocation.reset();
     m_vertexAllocation.reset();
+}
+
+Mesh::Mesh(Mesh &&other) noexcept = default;
+
+Mesh &Mesh::operator=(Mesh &&other) noexcept = default;
+
+bool Mesh::buildBLAS()
+{
+    if (m_blas != nullptr) {
+        return true;
+    }
+
+    auto blas = std::make_unique<BLAS>(*this);
+    if (!blas->isValid()) {
+        RP_CORE_ERROR("Failed to create the acceleration structure");
+        return false;
+    }
+
+    blas->build();
+    if (!blas->isBuilt()) {
+        RP_CORE_ERROR("Failed to build the acceleration structure");
+        return false;
+    }
+
+    m_blas = std::move(blas);
+    return true;
 }
 
 uint64_t Mesh::getSizeBytes() const
@@ -104,7 +133,8 @@ std::vector<uint8_t> MeshAllocatorParams::serialize() const
 {
     uint32_t attribBytes = 0;
     for (const auto &attrib : bufferLayout.buffer_attribs) {
-        attribBytes += sizeof(uint32_t) * 4 + static_cast<uint32_t>(attrib.type.size()); // name, componentType, offset, typeLen, chars
+        attribBytes +=
+            sizeof(uint32_t) * 4 + static_cast<uint32_t>(attrib.type.size()); // name, componentType, offset, typeLen, chars
     }
 
     MeshBlobHeader header;

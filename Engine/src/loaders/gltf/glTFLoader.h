@@ -1,6 +1,7 @@
 #ifndef RAPTURE__GLTF_LOADER_H
 #define RAPTURE__GLTF_LOADER_H
 
+#include "asset_manager/AssetHandle.h"
 #include "glTFCommon.h"
 #include "materials/MaterialParameters.h"
 #include "yyjson.h"

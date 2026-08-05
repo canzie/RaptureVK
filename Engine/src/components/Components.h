@@ -15,10 +15,7 @@
 #include "components/systems/Transforms.h"
 
 #include "renderer/Frustum.h"
-#include "renderer/shadows/CascadedShadowMapping.h"
-#include "renderer/shadows/ShadowMapping.h"
 
-#include "acceleration_structures/BLAS.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/StorageBuffer.h"
 #include "buffers/UniformBuffer.h"
@@ -129,9 +126,7 @@ struct MaterialComponent {
 
     MaterialComponent() = default;
 
-    MaterialComponent(AssetRef ref) : material(std::move(ref))
-    {
-    }
+    MaterialComponent(AssetRef ref) : material(std::move(ref)) {}
 };
 
 struct MeshComponent {
@@ -144,10 +139,7 @@ struct MeshComponent {
 
     MeshComponent() = default;
 
-    MeshComponent(AssetRef ref, Mobility mob = MOBILITY_STATIC) : mesh(std::move(ref)), mobility(mob)
-    {
-        isLoading = false;
-    }
+    MeshComponent(AssetRef ref, Mobility mob = MOBILITY_STATIC) : mesh(std::move(ref)), mobility(mob) { isLoading = false; }
 };
 
 struct PrefabComponent {
@@ -157,9 +149,7 @@ struct PrefabComponent {
 
     PrefabComponent() = default;
 
-    PrefabComponent(AssetRef ref) : sourcePrefab(std::move(ref))
-    {
-    }
+    PrefabComponent(AssetRef ref) : sourcePrefab(std::move(ref)) {}
 
   private:
     EventConnection m_structureChangedConnection;
@@ -187,7 +177,9 @@ struct SkyboxComponent {
 
     SkyboxComponent() = default;
     SkyboxComponent(AssetPtr<Texture> skyboxTexture, float skyIntensity = 1.0f)
-        : skyboxTexture(std::move(skyboxTexture)), skyIntensity(skyIntensity) {}
+        : skyboxTexture(std::move(skyboxTexture)), skyIntensity(skyIntensity)
+    {
+    }
     SkyboxComponent(std::filesystem::path skyboxTexturePath, float skyIntensity = 1.0f) : skyIntensity(skyIntensity)
     {
         auto asset = AssetManager::importAsset(skyboxTexturePath);
@@ -204,8 +196,6 @@ struct LightComponent {
 
     glm::vec3 color = glm::vec3(1.0f, 0.8f, 0.6f); // Light color (default: warm white?) #FFDDAA
     float intensity = 1.0f;                        // Light intensity multiplier
-    bool useTemperature = false;
-    float temperature = 6500.0f;
 
     bool isActive = true;
     Mobility mobility = MOBILITY_STATIC;
@@ -220,45 +210,6 @@ struct LightComponent {
     {
         color = c;
         m_generation++;
-    }
-
-    static glm::vec3 kelvinToRgb(float kelvin)
-    {
-        float t = glm::clamp(kelvin, 1000.0f, 40000.0f) / 100.0f;
-
-        float r;
-        float g;
-        float b;
-
-        if (t <= 66.0f) {
-            r = 1.0f;
-        } else {
-            r = glm::clamp(329.698727446f * std::pow(t - 60.0f, -0.1332047592f) / 255.0f, 0.0f, 1.0f);
-        }
-
-        if (t <= 66.0f) {
-            g = glm::clamp((99.4708025861f * std::log(t) - 161.1195681661f) / 255.0f, 0.0f, 1.0f);
-        } else {
-            g = glm::clamp(288.1221695283f * std::pow(t - 60.0f, -0.0755148492f) / 255.0f, 0.0f, 1.0f);
-        }
-
-        if (t >= 66.0f) {
-            b = 1.0f;
-        } else if (t <= 19.0f) {
-            b = 0.0f;
-        } else {
-            b = glm::clamp((138.5177312231f * std::log(t - 10.0f) - 305.0447927307f) / 255.0f, 0.0f, 1.0f);
-        }
-
-        return glm::vec3(r, g, b);
-    }
-
-    glm::vec3 getFinalColor() const
-    {
-        if (!useTemperature) {
-            return color;
-        }
-        return color * kelvinToRgb(temperature);
     }
 
     void setIntensity(float i)
@@ -337,23 +288,17 @@ inline LightComponent *Light_tryGetLight(Entity e)
     return nullptr;
 }
 
-struct BLASComponent {
-    std::unique_ptr<BLAS> blas;
-
-    BLASComponent(AssetPtr<Mesh> mesh)
-    {
-        blas = std::make_unique<BLAS>(std::move(mesh));
-        blas->build();
-    }
-};
+// Marks an entity as participating in ray tracing
+struct RayTracedComponent {};
 
 struct ShadowComponent {
-    std::unique_ptr<ShadowMap> shadowMap;
+    uint32_t resolution = 1024;
     bool isActive = true;
     Mobility mobility = MOBILITY_DYNAMIC;
     uint32_t renderDataSlot = UINT32_MAX;
 
-    ShadowComponent(float width, float height) { shadowMap = std::make_unique<ShadowMap>(width, height); }
+    ShadowComponent() = default;
+    explicit ShadowComponent(uint32_t resolution) : resolution(resolution) {}
 
     bool needsUpdate(const LightComponent &light, const TransformComponent &transform)
     {
@@ -371,14 +316,18 @@ struct ShadowComponent {
 };
 
 struct CascadedShadowComponent {
-    std::unique_ptr<CascadedShadowMap> cascadedShadowMap;
+    uint32_t resolution = 2048;
+    uint8_t numCascades = 4;
+    float lambda = 0.8f;
+    float shadowDistance = 80.0f;
     bool isActive = true;
     Mobility mobility = MOBILITY_DYNAMIC;
     uint32_t renderDataSlot = UINT32_MAX;
 
-    CascadedShadowComponent(float width, float height, uint8_t numCascades, float lambda)
+    CascadedShadowComponent() = default;
+    CascadedShadowComponent(uint32_t resolution, uint8_t numCascades, float lambda)
+        : resolution(resolution), numCascades(numCascades), lambda(lambda)
     {
-        cascadedShadowMap = std::make_unique<CascadedShadowMap>(width, height, numCascades, lambda);
     }
 
     bool needsUpdate(const LightComponent &light, const TransformComponent &transform)

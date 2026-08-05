@@ -7,9 +7,12 @@
 #include "window_context/vulkan_context/RenderContext.h"
 
 #include <memory>
+#include <unordered_map>
 
 namespace Rapture {
 class Scene;
+class ShadowMap;
+class CascadedShadowMap;
 
 /**
  * @brief GPU-side mirror of a scene's ECS data
@@ -72,6 +75,20 @@ class SceneRenderData {
      */
     void setCascadedShadowMobility(EntityID entityId, Mobility mobility);
 
+    /**
+     * @brief Get the shadow map owned on behalf of an entity
+     * @param entityId Entity holding the ShadowComponent
+     * @return The shadow map, or nullptr if the entity has none
+     */
+    ShadowMap *getShadowMap(EntityID entityId) const;
+
+    /**
+     * @brief Get the cascaded shadow map owned on behalf of an entity
+     * @param entityId Entity holding the CascadedShadowComponent
+     * @return The cascaded shadow map, or nullptr if the entity has none
+     */
+    CascadedShadowMap *getCascadedShadowMap(EntityID entityId) const;
+
     GPUDataStore<MeshGPUData> &getMeshes() { return m_meshes; }
     GPUDataStore<LightGPUData> &getLights() { return m_lights; }
     GPUDataStore<CameraGPUData> &getCameras() { return m_cameras; }
@@ -93,6 +110,11 @@ class SceneRenderData {
     void onCascadedShadowAdded(EntityID entityId);
     void onCascadedShadowRemoved(EntityID entityId);
 
+    void createShadowMap(EntityID entityId);
+    void destroyShadowMap(EntityID entityId);
+    void createCascadedShadowMap(EntityID entityId);
+    void destroyCascadedShadowMap(EntityID entityId);
+
     void updateMeshes(uint32_t frameIndex);
     void updateLights(uint32_t frameIndex);
     void updateCameras(uint32_t frameIndex);
@@ -102,6 +124,9 @@ class SceneRenderData {
     GPUDataStore<LightGPUData> m_lights;
     GPUDataStore<CameraGPUData> m_cameras;
     GPUDataStore<ShadowGPUData> m_shadows;
+
+    std::unordered_map<EntityID, std::unique_ptr<ShadowMap>> m_shadowMaps;
+    std::unordered_map<EntityID, std::unique_ptr<CascadedShadowMap>> m_cascadedShadowMaps;
 
     RenderContext m_renderContext;
     Scene *m_scene = nullptr;

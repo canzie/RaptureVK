@@ -1,4 +1,5 @@
 #include "GBufferPass.h"
+#include "buffers/descriptors/DescriptorManager.h"
 
 #include "asset_manager/AssetImportConfig.h"
 #include "components/Components.h"

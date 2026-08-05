@@ -1,4 +1,5 @@
 #include "CascadedShadowMapping.h"
+#include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
 #include "generators/terrain/TerrainTypes.h"

@@ -11,7 +11,10 @@
 #include "jobs/Job.h"
 #include "jobs/JobCommon.h"
 #include "jobs/JobSystem.h"
+#include "renderer/SceneRenderData.h"
+#include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowCommon.h"
+#include "renderer/shadows/ShadowMapping.h"
 #include <cstdio>
 
 namespace Rapture {
@@ -333,6 +336,7 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DeferredRenderer Frame");
 
         auto &registry = activeScene.getRegistry();
+        SceneRenderData *renderData = activeScene.getRenderData();
         auto lightView = registry.view<TransformComponent, ShadowComponent>();
         auto cascadedShadowView = registry.view<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>();
 
@@ -360,12 +364,13 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
                 bool shouldUpdateShadow =
                     shadowComp.needsUpdate(*light, transformComp) || Light_getLightType(lightEntity) == LightType::DIRECTIONAL;
 
-                if (shadowComp.shadowMap && shouldUpdateShadow) {
-                    auto shadowBuffer = shadowComp.shadowMap->recordSecondary(activeScene, m_currentFrame);
+                ShadowMap *shadowMap = renderData != nullptr ? renderData->getShadowMap(lightEntity.getID()) : nullptr;
+                if (shadowMap != nullptr && shouldUpdateShadow) {
+                    auto shadowBuffer = shadowMap->recordSecondary(activeScene, m_currentFrame);
                     if (shadowBuffer) {
-                        shadowComp.shadowMap->beginDynamicRendering(commandBuffer);
+                        shadowMap->beginDynamicRendering(commandBuffer);
                         commandBuffer->executeSecondary(*shadowBuffer);
-                        shadowComp.shadowMap->endDynamicRendering(commandBuffer);
+                        shadowMap->endDynamicRendering(commandBuffer);
                     }
                 }
             }
@@ -379,12 +384,14 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
                 bool shouldUpdateShadow =
                     shadowComp.needsUpdate(lightComp, transformComp) || Light_getLightType(lightEntity) == LightType::DIRECTIONAL;
 
-                if (shadowComp.cascadedShadowMap && shouldUpdateShadow) {
-                    auto shadowBuffer = shadowComp.cascadedShadowMap->recordSecondary(activeScene, m_currentFrame, terrain);
+                CascadedShadowMap *cascadedShadowMap =
+                    renderData != nullptr ? renderData->getCascadedShadowMap(lightEntity.getID()) : nullptr;
+                if (cascadedShadowMap != nullptr && shouldUpdateShadow) {
+                    auto shadowBuffer = cascadedShadowMap->recordSecondary(activeScene, m_currentFrame, terrain);
                     if (shadowBuffer) {
-                        shadowComp.cascadedShadowMap->beginDynamicRendering(commandBuffer);
+                        cascadedShadowMap->beginDynamicRendering(commandBuffer);
                         commandBuffer->executeSecondary(*shadowBuffer);
-                        shadowComp.cascadedShadowMap->endDynamicRendering(commandBuffer);
+                        cascadedShadowMap->endDynamicRendering(commandBuffer);
                     }
                 }
             }

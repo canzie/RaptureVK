@@ -5,7 +5,7 @@
 
 namespace Rapture {
 
-static constexpr float CASCADED_SHADOW_MAP_SIZE = 2048.0f;
+static constexpr uint32_t CASCADED_SHADOW_MAP_SIZE = 2048;
 static constexpr uint8_t CASCADE_COUNT = 4;
 static constexpr float CASCADE_LAMBDA = 0.8f;
 
@@ -58,8 +58,7 @@ void DirectionalLight3D::setCastsShadow(bool castsShadow)
     }
 
     if (!m_entity.hasComponent<CascadedShadowComponent>()) {
-        m_entity.setComponent<CascadedShadowComponent>(CASCADED_SHADOW_MAP_SIZE, CASCADED_SHADOW_MAP_SIZE, CASCADE_COUNT,
-                                                       CASCADE_LAMBDA);
+        m_entity.setComponent<CascadedShadowComponent>(CASCADED_SHADOW_MAP_SIZE, CASCADE_COUNT, CASCADE_LAMBDA);
     }
 }
 

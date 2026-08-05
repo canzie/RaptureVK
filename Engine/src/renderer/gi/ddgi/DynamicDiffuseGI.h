@@ -1,5 +1,6 @@
 #pragma once
 
+#include "asset_manager/AssetHandle.h"
 #include <memory>
 #include <vector>
 

@@ -1,6 +1,7 @@
 #ifndef RAPTURE__LIGHTING_PASS_H
 #define RAPTURE__LIGHTING_PASS_H
 
+#include "asset_manager/AssetHandle.h"
 #include "pipelines/GraphicsPipeline.h"
 #include "shaders/Shader.h"
 

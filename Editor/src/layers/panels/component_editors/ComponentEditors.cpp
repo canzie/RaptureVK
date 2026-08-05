@@ -6,6 +6,8 @@
 #include "renderer/SceneRenderData.h"
 #include "scenes/Scene.h"
 
+#include <algorithm>
+
 #include <components/checkbox.h>
 #include <components/common.h>
 #include <components/table.h>
@@ -613,9 +615,7 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 return;
             }
             auto &csc = m_entity.getComponent<Rapture::CascadedShadowComponent>();
-            if (csc.cascadedShadowMap != nullptr) {
-                csc.cascadedShadowMap->setLambda(v);
-            }
+            csc.lambda = std::clamp(v, 0.0f, 1.0f);
             m_entity.markDirty();
         });
     });
@@ -630,9 +630,7 @@ void CascadedShadowEditor::sync(const Rapture::Entity &entity)
     }
     const auto &csc = entity.getComponent<Rapture::CascadedShadowComponent>();
     m_isActive = csc.isActive;
-    if (csc.cascadedShadowMap != nullptr) {
-        m_lambda = csc.cascadedShadowMap->getLambda();
-    }
+    m_lambda = csc.lambda;
 
     if (entityChanged && m_mobilityDropdown != nullptr) {
         m_mobilityDropdown->setText(Rapture::mobilityToString(csc.mobility));

@@ -1,6 +1,7 @@
 #ifndef RAPTURE__COMPOSITE_PASS_H
 #define RAPTURE__COMPOSITE_PASS_H
 
+#include "asset_manager/AssetHandle.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "pipelines/GraphicsPipeline.h"
 #include "renderer/passes/RenderPass.h"

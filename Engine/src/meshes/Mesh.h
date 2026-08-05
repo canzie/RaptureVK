@@ -14,6 +14,8 @@
 
 namespace Rapture {
 
+class BLAS;
+
 struct MeshAllocatorParams {
     void *vertexData = nullptr;
     uint32_t vertexDataSize = 0;
@@ -37,6 +39,11 @@ class Mesh {
     Mesh(MeshAllocatorParams &params);
     Mesh();
     ~Mesh();
+
+    Mesh(const Mesh &) = delete;
+    Mesh &operator=(const Mesh &) = delete;
+    Mesh(Mesh &&other) noexcept;
+    Mesh &operator=(Mesh &&other) noexcept;
 
     void setMeshData(MeshAllocatorParams &params);
 
@@ -66,6 +73,18 @@ class Mesh {
      */
     uint64_t getSizeBytes() const;
 
+    /**
+     * @brief Build this mesh's acceleration structure if it does not have one yet
+     * @return True if the mesh has a built acceleration structure once this returns
+     */
+    bool buildBLAS();
+
+    /**
+     * @brief Get this mesh's acceleration structure without building one
+     * @return The acceleration structure, or nullptr if buildBLAS has not succeeded
+     */
+    BLAS *getBLAS() const { return m_blas.get(); }
+
   private:
     uint32_t m_indexCount;
     std::shared_ptr<VertexBuffer> m_vertexBuffer;
@@ -73,6 +92,8 @@ class Mesh {
 
     std::shared_ptr<BufferAllocation> m_indexAllocation;
     std::shared_ptr<BufferAllocation> m_vertexAllocation;
+
+    std::unique_ptr<BLAS> m_blas;
 
     // std::shared_ptr<UniformBuffer> m_objectDataBuffer; // per mesh data
     // uint32_t m_bindlessMeshDataIndex;

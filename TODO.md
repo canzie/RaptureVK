@@ -9,8 +9,6 @@ uncouple the engines core
         - couple sizings like gaps/borders/corners
         - an actual settings/preferences panel to open
     - drag/drop assets into the viewport
-    - the ability to add/remove individual components from entities
-        - includes depedencies like how a shadow component requires a light, this can be enforec in editor or in the engine, iam leaning towards engine
     - ability to hot reload an ams file, and update the actual stuff, pretty sure marking the window dirty and updating the style maps and invalidating cache is all it takes.
     - make the gizmo support discrete steps, also the gizmo direction maybe be cooked.
     - check all the clears done, and which ones are redundant.
@@ -24,8 +22,6 @@ uncouple the engines core
     - the properties panel now needs to be able to set a material isntance. it also eneds a button to open a material node editor workspace for the material, this also neds to happen in the content browser
     
     - expand the material system, probably need to update the gbuffer too. so stuff like dielectrics
-    - fix specular/reflections, or improve them, maybe some ssr using diffuse skybox?
-
 
 ### Terrain
     - Add a path to use custom heightmaps first, for the time being it will take priority over fully procedural worksflows
@@ -40,13 +36,9 @@ uncouple the engines core
       
 
 - Make rendering things like bounds easier
-  - current method is creating an instancedshapes component and providing the transformmatrix
-  - this is akward as it cannot be used from inside the editor, only in code, we should be able to add it to certain things, like a mesh, terrain, etc, and depending on if we only need 1 or more to visualise debug use a simple mesh or instancing, like if the user selects aabb of a mesh, just a mesh, but if they select aabbs of the terrain we use instanced meshes, we can do this by seeing if the get aabb method returns 1 or multiple aabbs. , so it becomes a specific thing per mesh, per terrain comp etc. the thing to decide is how we enable/disable it while not storing the instanced data like the buffers in the same component.... 
-
 - optimise the shadow passes
 - make it run on windows???
 - TODO later: BC7 (high quality RGBA) and BC6H (HDR) encoders
-- fix stencil buffer
 - shader/pipeline hot reloading
 - parallise/jobify shader compilation (note, current stack size is too small for this, maybe spawn another process and use gslang exec???)
   - the asset importer in the editor will be able to set these options and they can be either metadata or ...

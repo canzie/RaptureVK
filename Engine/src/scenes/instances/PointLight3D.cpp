@@ -5,7 +5,7 @@
 
 namespace Rapture {
 
-static constexpr float SHADOW_MAP_SIZE = 1024.0f;
+static constexpr uint32_t SHADOW_MAP_SIZE = 1024;
 
 PointLight3D::PointLight3D(Scene &scene, std::string_view name) : Light3D(scene, name)
 {
@@ -56,7 +56,7 @@ void PointLight3D::setCastsShadow(bool castsShadow)
     }
 
     if (!m_entity.hasComponent<ShadowComponent>()) {
-        m_entity.setComponent<ShadowComponent>(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+        m_entity.setComponent<ShadowComponent>(SHADOW_MAP_SIZE);
     }
 }
 

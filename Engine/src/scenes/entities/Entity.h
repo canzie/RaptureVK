@@ -43,8 +43,9 @@ class Entity {
     static Entity null() { return Entity(); }
 
     // Creates a new component and attaches it to the entity, returns reference to it
+    // (void for empty tag components)
     template <typename T, typename... Args>
-    T &addComponent(Args &&...args)
+    decltype(auto) addComponent(Args &&...args)
     {
         validateEntity("Cannot add component to invalid entity");
         if (hasComponent<T>()) {
@@ -54,8 +55,9 @@ class Entity {
     }
 
     // Creates or replaces a component on the entity, returns reference to it
+    // (void for empty tag components)
     template <typename T, typename... Args>
-    T &setComponent(Args &&...args)
+    decltype(auto) setComponent(Args &&...args)
     {
         validateEntity("Cannot set component on invalid entity");
         return m_Scene->getRegistry().emplace_or_replace<T>(m_EntityHandle, std::forward<Args>(args)...);
