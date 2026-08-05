@@ -65,6 +65,17 @@ class WriteNode {
     void set(std::string_view key, int64_t v);
 
     /**
+     * @brief Set a single precision member on this object node.
+     *
+     * Written as the shortest text that reads back as the same float, so a value like 0.8f
+     * stays "0.8" instead of the double it promotes to.
+     *
+     * @param key Member key.
+     * @param v Value, must be finite.
+     */
+    void set(std::string_view key, float v);
+
+    /**
      * @brief Set a floating point member on this object node.
      * @param key Member key.
      * @param v Value.
@@ -108,6 +119,16 @@ class WriteNode {
      * @param v Value.
      */
     void append(int64_t v);
+
+    /**
+     * @brief Append a single precision element to this array node.
+     *
+     * Written as the shortest text that reads back as the same float, so a value like 0.8f
+     * stays "0.8" instead of the double it promotes to.
+     *
+     * @param v Value, must be finite.
+     */
+    void append(float v);
 
     /**
      * @brief Append a floating point element to this array node.
@@ -249,10 +270,11 @@ class SerialDocument {
     static SerialDocument parse(std::string_view text);
 
     /**
-     * @brief Serialize the tree to pretty-printed text.
+     * @brief Serialize the tree to text.
+     * @param pretty Whether to indent and space the output instead of minifying it.
      * @return The serialized bytes, empty on failure.
      */
-    std::string toText() const;
+    std::string toText(bool pretty = false) const;
 
     /**
      * @brief Cursor to the root of a write-mode document.

@@ -68,6 +68,19 @@ void DirectionalLight3D::serialize(WriteNode node) const
 
     WriteNode light = node.addObject("directionalLight");
     light.set("atmosphereSun", isAtmosphereSun());
+
+    const CascadedShadowComponent *shadow = m_entity.tryGetComponent<CascadedShadowComponent>();
+    if (shadow == nullptr) {
+        return;
+    }
+
+    WriteNode shadowNode = node.addObject("cascadedShadow");
+    shadowNode.set("resolution", static_cast<uint64_t>(shadow->resolution));
+    shadowNode.set("numCascades", static_cast<uint64_t>(shadow->numCascades));
+    shadowNode.set("lambda", shadow->lambda);
+    shadowNode.set("shadowDistance", shadow->shadowDistance);
+    shadowNode.set("active", shadow->isActive);
+    shadowNode.set("mobility", static_cast<uint64_t>(shadow->mobility));
 }
 
 void DirectionalLight3D::deserialize(ReadNode node)

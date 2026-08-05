@@ -158,15 +158,25 @@ void Light3D::serialize(WriteNode node) const
 
     WriteNode light = node.addObject("light");
     WriteNode color = light.addArray("color");
-    color.append(static_cast<double>(m_color.x));
-    color.append(static_cast<double>(m_color.y));
-    color.append(static_cast<double>(m_color.z));
+    color.append(m_color.x);
+    color.append(m_color.y);
+    color.append(m_color.z);
     light.set("usesTemperature", m_usesTemperature);
-    light.set("temperature", static_cast<double>(m_temperature));
-    light.set("intensity", static_cast<double>(intensity()));
+    light.set("temperature", m_temperature);
+    light.set("intensity", intensity());
     light.set("active", isActive());
     light.set("mobility", static_cast<uint64_t>(mobility()));
     light.set("castsShadow", castsShadow());
+
+    const ShadowComponent *shadow = m_entity.tryGetComponent<ShadowComponent>();
+    if (shadow == nullptr) {
+        return;
+    }
+
+    WriteNode shadowNode = node.addObject("shadow");
+    shadowNode.set("resolution", static_cast<uint64_t>(shadow->resolution));
+    shadowNode.set("active", shadow->isActive);
+    shadowNode.set("mobility", static_cast<uint64_t>(shadow->mobility));
 }
 
 void Light3D::deserialize(ReadNode node)

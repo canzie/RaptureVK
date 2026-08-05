@@ -1,5 +1,7 @@
 #include "SerialDocument.h"
 
+#include <charconv>
+#include <cmath>
 #include <cstdlib>
 
 #include <yyjson.h>
@@ -21,6 +23,24 @@ static yyjson_mut_val *s_asMutVal(void *node)
 static yyjson_val *s_asVal(void *val)
 {
     return static_cast<yyjson_val *>(val);
+}
+
+// a raw value, because yyjson formats reals as doubles and 0.8f promotes to 0.800000011920929
+static yyjson_mut_val *s_floatVal(yyjson_mut_doc *doc, float v)
+{
+    if (!std::isfinite(v)) {
+        RP_CORE_ERROR("cannot write {} as a number, writing 0 instead", v);
+        return yyjson_mut_raw(doc, "0");
+    }
+
+    char text[32];
+    auto [end, error] = std::to_chars(text, text + sizeof(text), v);
+    if (error != std::errc()) {
+        RP_CORE_ERROR("failed to format {}, writing 0 instead", v);
+        return yyjson_mut_raw(doc, "0");
+    }
+
+    return yyjson_mut_rawncpy(doc, text, static_cast<size_t>(end - text));
 }
 
 WriteNode::WriteNode(void *doc, void *node) : m_doc(doc), m_node(node) {}
@@ -102,6 +122,16 @@ void WriteNode::set(std::string_view key, int64_t v)
     yyjson_mut_obj_add(s_asMutVal(m_node), keyVal, yyjson_mut_sint(doc, v));
 }
 
+void WriteNode::set(std::string_view key, float v)
+{
+    if (!valid()) {
+        return;
+    }
+    yyjson_mut_doc *doc = s_asMutDoc(m_doc);
+    yyjson_mut_val *keyVal = yyjson_mut_strncpy(doc, key.data(), key.size());
+    yyjson_mut_obj_add(s_asMutVal(m_node), keyVal, s_floatVal(doc, v));
+}
+
 void WriteNode::set(std::string_view key, double v)
 {
     if (!valid()) {
@@ -147,6 +177,14 @@ void WriteNode::append(int64_t v)
         return;
     }
     yyjson_mut_arr_append(s_asMutVal(m_node), yyjson_mut_sint(s_asMutDoc(m_doc), v));
+}
+
+void WriteNode::append(float v)
+{
+    if (!valid()) {
+        return;
+    }
+    yyjson_mut_arr_append(s_asMutVal(m_node), s_floatVal(s_asMutDoc(m_doc), v));
 }
 
 void WriteNode::append(double v)
@@ -313,14 +351,16 @@ SerialDocument SerialDocument::parse(std::string_view text)
     return out;
 }
 
-std::string SerialDocument::toText() const
+std::string SerialDocument::toText(bool pretty) const
 {
+    yyjson_write_flag flags = pretty ? YYJSON_WRITE_PRETTY : YYJSON_WRITE_NOFLAG;
+
     char *text = nullptr;
     size_t len = 0;
     if (m_mutDoc != nullptr) {
-        text = yyjson_mut_write(s_asMutDoc(m_mutDoc), YYJSON_WRITE_PRETTY, &len);
+        text = yyjson_mut_write(s_asMutDoc(m_mutDoc), flags, &len);
     } else if (m_doc != nullptr) {
-        text = yyjson_write(static_cast<yyjson_doc *>(m_doc), YYJSON_WRITE_PRETTY, &len);
+        text = yyjson_write(static_cast<yyjson_doc *>(m_doc), flags, &len);
     }
     if (text == nullptr) {
         RP_CORE_ERROR("failed to serialize document");

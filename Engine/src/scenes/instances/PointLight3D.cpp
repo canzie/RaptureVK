@@ -65,7 +65,7 @@ void PointLight3D::serialize(WriteNode node) const
     Light3D::serialize(node);
 
     WriteNode light = node.addObject("pointLight");
-    light.set("range", static_cast<double>(range()));
+    light.set("range", range());
 }
 
 void PointLight3D::deserialize(ReadNode node)

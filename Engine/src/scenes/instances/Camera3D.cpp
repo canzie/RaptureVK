@@ -77,9 +77,9 @@ void Camera3D::serialize(WriteNode node) const
     Node3D::serialize(node);
 
     WriteNode camera = node.addObject("camera");
-    camera.set("fieldOfView", static_cast<double>(fieldOfView()));
-    camera.set("nearPlane", static_cast<double>(nearPlane()));
-    camera.set("farPlane", static_cast<double>(farPlane()));
+    camera.set("fieldOfView", fieldOfView());
+    camera.set("nearPlane", nearPlane());
+    camera.set("farPlane", farPlane());
 }
 
 void Camera3D::deserialize(ReadNode node)

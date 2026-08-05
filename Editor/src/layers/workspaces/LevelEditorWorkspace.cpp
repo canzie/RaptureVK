@@ -5,6 +5,13 @@
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
 
+#include <components/extensions/ui_list_layout.h>
+#include <components/ui_scope.h>
+#include <scenes/Scene.h>
+#include <window_context/Application.h>
+
+#include <filesystem>
+
 LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::Scene *scene,
                                            Rapture::Viewport *viewport)
 {
@@ -43,6 +50,8 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
             std::make_unique<ImagePreviewPanel>(propertiesTabBar, m_context, "Texture Viewer", ImagePreviewMode::ASSET_PICKER));
     }
 
+    setupHotbar();
+
     if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
         if (auto *entry = Amethyst::LayoutConfig::instance().get("Editor Dock")) {
             if (entry->type == Amethyst::ConfigType::DOCK_LAYOUT) {
@@ -50,6 +59,40 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
             }
         }
     }
+}
+
+void LevelEditorWorkspace::setupHotbar()
+{
+    if (m_hotbar == nullptr) {
+        return;
+    }
+
+    auto *layout = m_hotbar->addExtension<Amethyst::UIListLayout>();
+    layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+    layout->innerPadding = Amethyst::UDim::fromOffset(6.0f);
+
+    Amethyst::UIScope(*m_hotbar).textButton(
+        {.base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(90.0f, 28.0f)},
+         .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+         .label = "Save Scene"},
+        [this](Amethyst::TextButtonScope &b) {
+            b.component.onMouseButton1ClickCb = [this]() {
+                saveScene();
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
+}
+
+void LevelEditorWorkspace::saveScene()
+{
+    Rapture::Scene *scene = m_context.scene;
+    if (scene == nullptr) {
+        return;
+    }
+
+    auto &project = Rapture::Application::getInstance().getProject();
+    scene->writeToFile(project.getContentDirectory() / (scene->getSceneName() + ".rscene"));
 }
 
 void LevelEditorWorkspace::saveLayout()

@@ -181,12 +181,12 @@ void Mesh3D::serialize(WriteNode node) const
     glm::vec3 min = boundsMin();
     glm::vec3 max = boundsMax();
     WriteNode bounds = mesh.addArray("bounds");
-    bounds.append(static_cast<double>(min.x));
-    bounds.append(static_cast<double>(min.y));
-    bounds.append(static_cast<double>(min.z));
-    bounds.append(static_cast<double>(max.x));
-    bounds.append(static_cast<double>(max.y));
-    bounds.append(static_cast<double>(max.z));
+    bounds.append(min.x);
+    bounds.append(min.y);
+    bounds.append(min.z);
+    bounds.append(max.x);
+    bounds.append(max.y);
+    bounds.append(max.z);
 }
 
 void Mesh3D::deserialize(ReadNode node)

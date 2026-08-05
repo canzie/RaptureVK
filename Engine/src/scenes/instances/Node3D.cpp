@@ -8,9 +8,9 @@ namespace Rapture {
 static void s_writeVec3(WriteNode node, std::string_view key, const glm::vec3 &value)
 {
     WriteNode array = node.addArray(key);
-    array.append(static_cast<double>(value.x));
-    array.append(static_cast<double>(value.y));
-    array.append(static_cast<double>(value.z));
+    array.append(value.x);
+    array.append(value.y);
+    array.append(value.z);
 }
 
 static glm::vec3 s_readVec3(ReadNode node, std::string_view key, const glm::vec3 &fallback)
@@ -27,10 +27,10 @@ static glm::vec3 s_readVec3(ReadNode node, std::string_view key, const glm::vec3
 static void s_writeQuat(WriteNode node, std::string_view key, const glm::quat &value)
 {
     WriteNode array = node.addArray(key);
-    array.append(static_cast<double>(value.x));
-    array.append(static_cast<double>(value.y));
-    array.append(static_cast<double>(value.z));
-    array.append(static_cast<double>(value.w));
+    array.append(value.x);
+    array.append(value.y);
+    array.append(value.z);
+    array.append(value.w);
 }
 
 static glm::quat s_readQuat(ReadNode node, std::string_view key, const glm::quat &fallback)

@@ -15,9 +15,12 @@
 #include "meshes/MeshPrimitives.h"
 #include "physics/PhysicsSystem.h"
 #include "scenes/entities/EntityCommon.h"
+#include "serialization/SerialDocument.h"
 #include "window_context/Application.h"
 
+#include <fstream>
 #include <memory>
+#include <unordered_map>
 
 namespace Rapture {
 
@@ -373,6 +376,92 @@ void Scene::destroyInstance(Instance *instance)
     }
 
     parent->removeChild(instance);
+}
+
+// pre-order over the tree, the order a loader recreates the instances in
+static void s_indexSubtree(const Instance *instance, std::unordered_map<EntityID, uint32_t> &indices, uint32_t &nextIndex)
+{
+    for (const auto &child : instance->children()) {
+        indices.emplace(child->entity().getID(), nextIndex);
+        nextIndex++;
+        s_indexSubtree(child.get(), indices, nextIndex);
+    }
+}
+
+void Scene::serialize(WriteNode node) const
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    node.set("formatVersion", static_cast<uint64_t>(SCENE_FORMAT_VERSION));
+    node.set("name", std::string_view(m_config.sceneName));
+    node.set("frustumCulling", m_config.frustumCullingEnabled);
+
+    std::unordered_map<EntityID, uint32_t> indices;
+    uint32_t nextIndex = 0;
+    s_indexSubtree(m_root.get(), indices, nextIndex);
+
+    Entity mainCamera = getMainCamera();
+    if (mainCamera.isValid()) {
+        auto it = indices.find(mainCamera.getID());
+        if (it != indices.end()) {
+            node.set("mainCamera", static_cast<uint64_t>(it->second));
+        }
+    }
+
+    WriteNode instances = node.addArray("instances");
+    for (const auto &child : m_root->children()) {
+        child->serialize(instances.appendObject());
+    }
+}
+
+bool Scene::writeToFile(const std::filesystem::path &path) const
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    SerialDocument doc;
+    serialize(doc.root());
+
+    std::string text = doc.toText();
+    if (text.empty()) {
+        RP_CORE_ERROR("Failed to serialize scene '{}'", m_config.sceneName);
+        return false;
+    }
+
+    std::error_code ec;
+    if (!path.parent_path().empty()) {
+        std::filesystem::create_directories(path.parent_path(), ec);
+        if (ec) {
+            RP_CORE_ERROR("Failed to create the directory for '{}': {}", path.string(), ec.message());
+            return false;
+        }
+    }
+
+    std::filesystem::path tempPath = path;
+    tempPath += ".tmp";
+
+    {
+        std::ofstream out(tempPath, std::ios::binary | std::ios::trunc);
+        if (!out.is_open()) {
+            RP_CORE_ERROR("Failed to open '{}' for writing", tempPath.string());
+            return false;
+        }
+
+        out.write(text.data(), static_cast<std::streamsize>(text.size()));
+        if (!out.good()) {
+            RP_CORE_ERROR("Failed to write '{}'", tempPath.string());
+            return false;
+        }
+    }
+
+    std::filesystem::rename(tempPath, path, ec);
+    if (ec) {
+        RP_CORE_ERROR("Failed to move '{}' onto '{}': {}", tempPath.string(), path.string(), ec.message());
+        std::filesystem::remove(tempPath, ec);
+        return false;
+    }
+
+    RP_CORE_INFO("Wrote scene '{}' to '{}'", m_config.sceneName, path.string());
+    return true;
 }
 
 void Scene::registerBLAS(Entity &entity)

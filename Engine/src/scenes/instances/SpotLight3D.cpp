@@ -99,9 +99,9 @@ void SpotLight3D::serialize(WriteNode node) const
     Light3D::serialize(node);
 
     WriteNode light = node.addObject("spotLight");
-    light.set("range", static_cast<double>(range()));
-    light.set("innerConeAngle", static_cast<double>(innerConeAngle()));
-    light.set("outerConeAngle", static_cast<double>(outerConeAngle()));
+    light.set("range", range());
+    light.set("innerConeAngle", innerConeAngle());
+    light.set("outerConeAngle", outerConeAngle());
 }
 
 void SpotLight3D::deserialize(ReadNode node)

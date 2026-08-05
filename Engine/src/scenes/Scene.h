@@ -3,6 +3,7 @@
 #include "acceleration_structures/TLAS.h"
 #include "scenes/entities/EntityCommon.h"
 #include <entt/entt.hpp>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -14,7 +15,10 @@ class Environment;
 class Instance;
 class SceneRenderData;
 class PhysicsSystem;
+class WriteNode;
 struct RenderContext;
+
+static constexpr uint32_t SCENE_FORMAT_VERSION = 1;
 
 struct SceneSettings {
     std::string sceneName;
@@ -79,6 +83,23 @@ class Scene {
      * @param instance The instance to destroy, ignored if it is the root
      */
     void destroyInstance(Instance *instance);
+
+    /**
+     * @brief Writes the scene's settings and its whole instance tree
+     * @param node Cursor to write the scene's object into
+     */
+    void serialize(WriteNode node) const;
+
+    /**
+     * @brief Writes the scene to a scene file, replacing it atomically
+     *
+     * TODO: temporary, the file I/O moves to the asset manager once scenes are assets and the
+     * project references them by uuid; only serialize stays here.
+     *
+     * @param path Destination file, its parent directories are created if missing
+     * @return True if the file now holds this scene
+     */
+    bool writeToFile(const std::filesystem::path &path) const;
 
     void registerBLAS(Entity &entity);
 

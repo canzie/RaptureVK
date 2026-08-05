@@ -91,13 +91,13 @@ scrolling-frame {
 
 .panel-tab#tab {
     text-color: @text-2;
-    background-transparency: 1.0f;
+    background-transparency: 1.0;
 }
 
 .panel-tab#tab:active {
     background-color: @bg-panel;
     text-color: @text-1;
-    background-transparency: 0.0f;
+    background-transparency: 0.0;
 }
 
 
@@ -116,12 +116,12 @@ scrolling-frame {
 
 .workspace-tab#tab {
     text-color: @text-2;
-    background-transparency: 1.0f;
+    background-transparency: 1.0;
 }
 .workspace-tab#tab:active {
     background-color: @bg-panel;
     text-color: @text-1;
-    background-transparency: 0.0f;
+    background-transparency: 0.0;
 }
 
 
