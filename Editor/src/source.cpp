@@ -1,5 +1,6 @@
 #include "layers/EditorLayer.h"
 #include "layers/AmethystLayer.h"
+#include "layers/TestLayer.h"
 #include "logging/Log.h"
 #include "window_context/Application.h"
 
@@ -11,6 +12,7 @@
 #include "scenes/SceneManager.h"
 
 #include <filesystem>
+#include <memory>
 
 // The main Editor application class
 class EditorApp : public Rapture::Application {
@@ -30,15 +32,17 @@ class EditorApp : public Rapture::Application {
             openProject(projectPath);
         }
 
+        pushLayer(std::make_unique<TestLayer>());
+
         // Without a project there is no scene to view, so the UI layer shows the launcher instead
         if (hasProject()) {
             // Push editor view layer (camera, controller, input)
-            pushLayer(new EditorLayer());
+            pushLayer(std::make_unique<EditorLayer>());
         }
 
         // Push Amethyst UI layer as an overlay so it renders on top
 
-        pushOverlay(new AmethystLayer());
+        pushOverlay(std::make_unique<AmethystLayer>());
     }
 
     ~EditorApp()

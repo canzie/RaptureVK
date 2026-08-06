@@ -28,6 +28,9 @@ layout(location = 0) in vec2 fragTexCoord;
 #define USE_PCF 0
 #define USE_SHADER_BIAS 0  // 0 = rely on hardware depth bias from the shadow pass
 
+// How many texels of depth slope a PCF tap may follow before the follow is capped
+#define SHADOW_RECEIVER_PLANE_LIMIT 2.0
+
 #define CASCADE_BLEND_WIDTH_PERCENT 0.15
 
 // Debug: tint each pixel by the DDGI base-probe grid cell it falls into (checkerboard
@@ -162,8 +165,34 @@ float LightWindowing(float distanceToLight, float maxDistance) {
 
 
 
+// How the receiver's depth changes per unit of shadow map UV, so a PCF tap can be compared against the
+// depth the surface has under that tap rather than the depth under the kernel centre. Taken from the
+// receiver's plane rather than screen space derivatives, which neighbour different surfaces in a
+// deferred pass. Exact for the orthographic cascade matrices.
+vec2 receiverPlaneDepthGradient(mat4 lightMatrix, vec3 normal) {
+    vec3 axis = abs(normal.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(axis, normal));
+    vec3 bitangent = cross(normal, tangent);
+
+    // shadow space steps for a unit step along each tangent, uv carrying the 0.5 of the ndc remap
+    vec3 alongTangent = (lightMatrix * vec4(tangent, 0.0)).xyz;
+    vec3 alongBitangent = (lightMatrix * vec4(bitangent, 0.0)).xyz;
+    vec2 duv1 = 0.5 * alongTangent.xy;
+    vec2 duv2 = 0.5 * alongBitangent.xy;
+
+    // invert the uv jacobian to turn the two depth steps into a gradient over uv
+    float det = duv1.x * duv2.y - duv2.x * duv1.y;
+    if (abs(det) < 1e-9) {
+        return vec2(0.0);
+    }
+
+    float invDet = 1.0 / det;
+    return vec2(duv2.y * alongTangent.z - duv1.y * alongBitangent.z,
+                duv1.x * alongBitangent.z - duv2.x * alongTangent.z) * invDet;
+}
+
 // Helper function to calculate shadow for a specific cascade - this contains the PCF shadow mapping logic
-float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, ShadowGPUData shadowInfo, 
+float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, ShadowGPUData shadowInfo,
                               mat4 lightMatrix, int cascadeIndex) {
     // Transform fragment position from world space to light clip space
     vec4 fragPosLightSpace = lightMatrix * vec4(fragPosWorld, 1.0);
@@ -230,13 +259,20 @@ float calculateShadowForCascade(vec3 fragPosWorld, vec3 normal, vec3 lightDir, S
         int kernelSize = (kernelRadius * 2 + 1);
         samples = float(kernelSize * kernelSize);
 
+        vec2 depthGradient = receiverPlaneDepthGradient(lightMatrix, normal);
+        // a surface edge on to the light has an unbounded gradient, so the follow is capped per tap
+        float maxTapOffset = SHADOW_RECEIVER_PLANE_LIMIT * float(kernelRadius) * max(texelSize.x, texelSize.y);
+
         // Use a 7x7 kernel for PCF with the texture array
         for(int x = -kernelRadius; x <= kernelRadius; ++x) {
             for(int y = -kernelRadius; y <= kernelRadius; ++y) {
+                vec2 tapOffset = vec2(x, y) * texelSize;
+                float tapDepth = comparisonDepth + clamp(dot(depthGradient, tapOffset), -maxTapOffset, maxTapOffset);
+
                 shadowFactor += texture(gShadowArrays[shadowInfo.textureHandle], vec4(
-                    projCoords.xy + vec2(x, y) * texelSize,
+                    projCoords.xy + tapOffset,
                     float(cascadeIndex),
-                    comparisonDepth
+                    tapDepth
                 ));
             }
         }

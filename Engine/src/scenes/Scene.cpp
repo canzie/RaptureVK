@@ -4,6 +4,8 @@
 #include "components/Components.h"
 #include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
+#include "components/systems/CameraController.h"
+#include "scenes/instances/Camera3D.h"
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
 #include "scenes/instances/StaticMesh3D.h"
@@ -11,6 +13,7 @@
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
 #include "scenes/instances/Instance.h"
+#include "scenes/instances/InstanceRegistry.h"
 
 #include "asset_manager/AssetManager.h"
 #include "asset_manager/ReservedAssets.h"
@@ -33,7 +36,6 @@ static constexpr float DEFAULT_FLOOR_SIZE = 20.0f;
 static constexpr std::string_view KEY_FORMAT_VERSION = "formatVersion";
 static constexpr std::string_view KEY_NAME = "name";
 static constexpr std::string_view KEY_FRUSTUM_CULLING = "frustumCulling";
-static constexpr std::string_view KEY_MAIN_CAMERA = "mainCamera";
 static constexpr std::string_view KEY_INSTANCES = "instances";
 
 Scene::Scene(const std::string &sceneName)
@@ -165,13 +167,20 @@ void Scene::destroyEntity(Entity entity)
     }
 }
 
+void Scene::stepPhysics(float dt)
+{
+    if (m_physics == nullptr) {
+        return;
+    }
+
+    registerRigidBodies();
+    m_physics->onUpdate(dt);
+    syncRigidBodyTransforms();
+}
+
 void Scene::onUpdate(float dt)
 {
-    if (m_physics) {
-        registerRigidBodies();
-        m_physics->onUpdate(dt);
-        syncRigidBodyTransforms();
-    }
+    (void)dt;
 
     // Get current frame dimensions for camera updates
     auto &app = Application::getInstance();
@@ -191,20 +200,23 @@ void Scene::onUpdate(float dt)
 
     glm::vec3 cameraPosition = glm::vec3(0.0f);
     Frustum *frustum = nullptr;
-    Entity mainCamera = getMainCamera();
-    if (mainCamera.isValid()) {
-        auto [cameraTransform, cameraComponent] = mainCamera.tryGetComponents<TransformComponent, CameraComponent>();
+    if (m_activeController != nullptr) {
+        Entity camera = m_activeController->camera().entity();
+        auto [cameraTransform, cameraComponent] = camera.tryGetComponents<TransformComponent, CameraComponent>();
         if (cameraTransform && cameraComponent) {
             cameraPosition = cameraTransform->translation();
             frustum = &cameraComponent->frustum;
         }
     }
 
-    auto terrainView = m_registry.view<TerrainComponent>();
-    for (auto entity : terrainView) {
-        auto &terrain = terrainView.get<TerrainComponent>(entity);
-        if (terrain.generator && terrain.isEnabled && terrain.generator->isInitialized()) {
-            terrain.generator->update(cameraPosition, *frustum, frameCounter);
+    // the chunk grid is scene wide, so it follows one camera rather than each view that draws it
+    if (frustum != nullptr) {
+        auto terrainView = m_registry.view<TerrainComponent>();
+        for (auto entity : terrainView) {
+            auto &terrain = terrainView.get<TerrainComponent>(entity);
+            if (terrain.generator && terrain.isEnabled && terrain.generator->isInitialized()) {
+                terrain.generator->update(cameraPosition, *frustum, frameCounter);
+            }
         }
     }
 
@@ -237,16 +249,13 @@ void Scene::onUpdate(float dt)
             cascadedShadowView.get<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>(entity);
 
         CascadedShadowMap *cascadedShadowMap = m_renderData->getCascadedShadowMap(static_cast<EntityID>(entity));
-        if (cascadedShadowMap != nullptr && shadow.isActive) {
+        if (cascadedShadowMap != nullptr && shadow.isActive && m_activeController != nullptr) {
             // Update the cascaded shadow map view matrices
-            Entity mainCamera = getMainCamera();
-            if (mainCamera.isValid()) {
-                auto cameraComp = mainCamera.tryGetComponent<CameraComponent>();
-                if (cameraComp) {
-                    cascadedShadowMap->setLambda(shadow.lambda);
-                    cascadedShadowMap->setShadowDistance(shadow.shadowDistance);
-                    cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
-                }
+            auto cameraComp = m_activeController->camera().entity().tryGetComponent<CameraComponent>();
+            if (cameraComp) {
+                cascadedShadowMap->setLambda(shadow.lambda);
+                cascadedShadowMap->setShadowDistance(shadow.shadowDistance);
+                cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
             }
         }
     }
@@ -342,36 +351,6 @@ void Scene::syncRigidBodyTransforms()
     }
 }
 
-void Scene::setMainCamera(Entity camera)
-{
-    if (!camera.isValid() || !camera.hasComponent<CameraComponent>()) {
-        return;
-    }
-
-    // Mark camera as main camera via component flag
-    camera.getComponent<CameraComponent>().isMainCamera = true;
-
-    // Unmark any other cameras
-    auto view = m_registry.view<CameraComponent>();
-    for (auto entity : view) {
-        if (Entity(entity, this) != camera) {
-            view.get<CameraComponent>(entity).isMainCamera = false;
-        }
-    }
-}
-
-Entity Scene::getMainCamera() const
-{
-    // Query for camera with isMainCamera flag
-    auto view = m_registry.view<CameraComponent>();
-    for (auto entity : view) {
-        if (view.get<CameraComponent>(entity).isMainCamera) {
-            return Entity(entity, const_cast<Scene *>(this));
-        }
-    }
-    return Entity::null();
-}
-
 Instance *Scene::instanceFor(Entity entity) const
 {
     const auto *ref = entity.tryGetComponent<InstanceComponent>();
@@ -393,16 +372,6 @@ void Scene::destroyInstance(Instance *instance)
     parent->removeChild(instance);
 }
 
-// pre-order over the tree, the order a loader recreates the instances in
-static void s_indexSubtree(const Instance *instance, std::unordered_map<EntityID, uint32_t> &indices, uint32_t &nextIndex)
-{
-    for (const auto &child : instance->children()) {
-        indices.emplace(child->entity().getID(), nextIndex);
-        nextIndex++;
-        s_indexSubtree(child.get(), indices, nextIndex);
-    }
-}
-
 void Scene::serialize(WriteNode node) const
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -410,18 +379,6 @@ void Scene::serialize(WriteNode node) const
     node.set(KEY_FORMAT_VERSION, static_cast<uint64_t>(SCENE_FORMAT_VERSION));
     node.set(KEY_NAME, std::string_view(m_config.sceneName));
     node.set(KEY_FRUSTUM_CULLING, m_config.frustumCullingEnabled);
-
-    std::unordered_map<EntityID, uint32_t> indices;
-    uint32_t nextIndex = 0;
-    s_indexSubtree(m_root.get(), indices, nextIndex);
-
-    Entity mainCamera = getMainCamera();
-    if (mainCamera.isValid()) {
-        auto it = indices.find(mainCamera.getID());
-        if (it != indices.end()) {
-            node.set(KEY_MAIN_CAMERA, static_cast<uint64_t>(it->second));
-        }
-    }
 
     WriteNode instances = node.addArray(KEY_INSTANCES);
     for (const auto &child : m_root->children()) {
@@ -461,17 +418,100 @@ std::unique_ptr<Scene> Scene::deserialize(ReadNode node)
         }
     }
 
-    ReadNode mainCamera = node.child(KEY_MAIN_CAMERA);
-    if (mainCamera.valid()) {
-        size_t index = static_cast<size_t>(mainCamera.asU64(order.size()));
-        if (index < order.size()) {
-            scene->setMainCamera(order[index]->entity());
+    return scene;
+}
+
+static void s_mapInstancesById(const Instance &parent, std::unordered_map<InstanceId, Instance *> &out)
+{
+    for (const auto &child : parent.children()) {
+        out.emplace(child->id(), child.get());
+        s_mapInstancesById(*child, out);
+    }
+}
+
+// Pre-order, so an instance is under its snapshot parent before its own children come looking for it.
+// Everything the snapshot names leaves the map, so what stays behind is what the scene gained since.
+static bool s_restoreSubtree(Instance &parent, ReadNode instances, std::unordered_map<InstanceId, Instance *> &live)
+{
+    for (size_t i = 0; i < instances.size(); i++) {
+        ReadNode node = instances.at(i);
+        Instance::DocumentHeader header = Instance::readHeader(node);
+
+        Instance *instance = nullptr;
+        auto found = live.find(header.id);
+
+        if (found != live.end()) {
+            instance = found->second;
+            live.erase(found);
+
+            if (instance->parent() != &parent) {
+                parent.addChild(instance->parent()->removeChild(instance));
+            }
         } else {
-            RP_CORE_WARN("scene '{}' names a main camera that is not in its tree", scene->m_config.sceneName);
+            std::unique_ptr<Instance> created = InstanceRegistry::create(header.className, *parent.scene(), header.name);
+            if (created == nullptr) {
+                RP_CORE_ERROR("no instance class named '{}', needed by '{}'", header.className, header.name);
+                return false;
+            }
+
+            instance = created.get();
+            parent.addChild(std::move(created));
+        }
+
+        instance->deserialize(node);
+
+        if (!s_restoreSubtree(*instance, header.children, live)) {
+            return false;
         }
     }
 
-    return scene;
+    return true;
+}
+
+// an instance the snapshot does not hold cannot hold one it does, so its whole subtree goes with it
+static void s_destroyInstancesNotInSnapshot(Instance &parent, const std::unordered_map<InstanceId, Instance *> &gained)
+{
+    for (size_t i = parent.children().size(); i > 0; i--) {
+        Instance *child = parent.children()[i - 1].get();
+
+        if (gained.contains(child->id())) {
+            parent.removeChild(child);
+            continue;
+        }
+
+        s_destroyInstancesNotInSnapshot(*child, gained);
+    }
+}
+
+// TODO: try holding the snapshot as a copy of the instances instead of a document, and restoring by
+// assigning those copies over the live ones. Every asset ref would go 1 -> 2 -> 1 and never reach 0,
+// so nothing can be evicted and reloaded across a restore. Measure it against reading the document.
+bool Scene::restoreFrom(ReadNode node)
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    uint32_t formatVersion = static_cast<uint32_t>(node.child(KEY_FORMAT_VERSION).asU64(0));
+    if (formatVersion != SCENE_FORMAT_VERSION) {
+        RP_CORE_ERROR("cannot read a version {} scene, this build reads version {}", formatVersion, SCENE_FORMAT_VERSION);
+        return false;
+    }
+
+    m_config.sceneName = std::string(node.child(KEY_NAME).asString(m_config.sceneName));
+    m_config.frustumCullingEnabled = node.child(KEY_FRUSTUM_CULLING).asBool(m_config.frustumCullingEnabled);
+
+    std::unordered_map<InstanceId, Instance *> live;
+    s_mapInstancesById(*m_root, live);
+
+    if (!s_restoreSubtree(*m_root, node.child(KEY_INSTANCES), live)) {
+        return false;
+    }
+
+    if (!live.empty()) {
+        s_destroyInstancesNotInSnapshot(*m_root, live);
+    }
+
+    onHierarchyChanged.fire();
+    return true;
 }
 
 void Scene::registerBLAS(Entity &entity)

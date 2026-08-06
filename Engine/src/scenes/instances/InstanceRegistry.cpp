@@ -10,6 +10,7 @@
 #include "scenes/instances/PrefabInstance.h"
 #include "scenes/instances/SpotLight3D.h"
 #include "scenes/instances/StaticMesh3D.h"
+#include "scenes/instances/Terrain3D.h"
 
 #include <unordered_map>
 
@@ -29,6 +30,7 @@ void InstanceRegistry::init()
     add<Node3D>();
     add<Camera3D>();
     add<StaticMesh3D>();
+    add<Terrain3D>();
     add<PrefabInstance>();
     add<DirectionalLight3D>();
     add<PointLight3D>();

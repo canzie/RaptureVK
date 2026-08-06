@@ -1,44 +1,26 @@
-#pragma once
+#ifndef RAPTURE__TEST_LAYER_H
+#define RAPTURE__TEST_LAYER_H
 
 #include "layers/Layer.h"
-#include "meshes/Mesh.h"
-#include "scenes/entities/Entity.h"
-#include "shaders/Shader.h"
-#include <functional>
-#include <glm/glm.hpp>
-#include <memory>
-#include <vector>
 
-// Forward declarations
-class ViewportPanel;
+#include <cstdint>
 
-namespace Rapture {
-class DBVH;
-} // namespace Rapture
-
+/**
+ * @brief Reports the frame rate and the hardware readings once a second.
+ */
 class TestLayer : public Rapture::Layer {
   public:
-    // Define a callback for entity selection changes
-    using EntitySelectedCallback = std::function<void(Rapture::Entity)>;
-
-    TestLayer() : Layer("Test Layer"), m_sceneActivatedListenerId(0) {}
-
-    virtual ~TestLayer() override;
-
-    void onAttach() override;
-    void onDetach() override;
+    TestLayer();
 
     void onUpdate(float ts) override;
 
-    void onNewActiveScene(Rapture::Scene &scene);
-
-    // Call to notify about camera changes
-    void notifyCameraChange();
+  protected:
+    void onAttach() override;
+    void onDetach() override;
 
   private:
-    size_t m_sceneActivatedListenerId;
-
-    // FPS counter variables
-    int m_fpsCounter = 0;
-    float m_fpsTimer = 0.0f;
+    uint32_t m_frameCount = 0;
+    float m_elapsed = 0.0f;
 };
+
+#endif // RAPTURE__TEST_LAYER_H

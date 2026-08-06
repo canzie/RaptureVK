@@ -12,6 +12,8 @@
 #include "events/EventSignal.h"
 #include "layers/BottomBar.h"
 #include "layers/workspaces/Workspace.h"
+
+#include <glm/vec2.hpp>
 #include <memory>
 #include <vector>
 

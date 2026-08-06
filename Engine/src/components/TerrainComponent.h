@@ -22,7 +22,6 @@ struct TerrainComponent {
 
     TerrainComponent(const TerrainConfig &config)
     {
-        (void)config;
         generator = std::make_unique<TerrainGenerator>();
         generator->init(config);
         generator->generateDefaultNoiseTextures();

@@ -11,6 +11,7 @@
 
 namespace Rapture {
 
+class CameraController;
 class Entity;
 class Environment;
 class Instance;
@@ -45,6 +46,12 @@ class Scene {
 
     void onUpdate(float dt);
 
+    /**
+     * @brief Advances the rigid body simulation and writes the result back onto the transforms
+     * @param dt Seconds to advance by
+     */
+    void stepPhysics(float dt);
+
     entt::registry &getRegistry() { return m_registry; }
     const entt::registry &getRegistry() const { return m_registry; }
 
@@ -60,8 +67,12 @@ class Scene {
     AssetHandle sourceAsset() const { return m_sourceAsset; }
     void setSourceAsset(AssetHandle sourceAsset) { m_sourceAsset = sourceAsset; }
 
-    void setMainCamera(Entity camera);
-    Entity getMainCamera() const;
+    /**
+     * @brief The controller currently driving this scene, whose camera scene wide work is done from
+     * @return The controller, or nullptr if nothing is driving the scene
+     */
+    CameraController *activeController() const { return m_activeController; }
+    void setActiveController(CameraController *controller) { m_activeController = controller; }
 
     /**
      * @brief The scene's environment, owner of skybox generation and image-based lighting
@@ -105,6 +116,13 @@ class Scene {
      * @return The new scene, or nullptr if the document could not be read
      */
     static std::unique_ptr<Scene> deserialize(ReadNode node);
+
+    /**
+     * @brief Reverts this scene to a snapshot, keeping every instance the snapshot and the scene share
+     * @param node Cursor to the scene's object, which has to outlive the call
+     * @return True if the scene now matches the snapshot
+     */
+    bool restoreFrom(ReadNode node);
 
     void registerBLAS(Entity &entity);
 
@@ -150,6 +168,7 @@ class Scene {
     Environment *m_environment = nullptr;
     std::unique_ptr<SceneRenderData> m_renderData;
     std::unique_ptr<PhysicsSystem> m_physics;
+    CameraController *m_activeController = nullptr;
     std::vector<entt::entity> m_pendingRigidBodies;
     SceneSettings m_config;
 

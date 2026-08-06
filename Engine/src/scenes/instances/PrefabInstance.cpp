@@ -26,21 +26,15 @@ const TypeInfo &PrefabInstance::type() const
     return staticType();
 }
 
-AssetHandle PrefabInstance::prefab() const
+void PrefabInstance::setPrefab(AssetHandle _prefab)
 {
-    const auto *component = m_entity.tryGetComponent<PrefabComponent>();
-    if (component == nullptr || !component->sourcePrefab) {
-        return INVALID_ASSET_HANDLE;
+    if (m_prefab == _prefab) {
+        return;
     }
 
-    return component->sourcePrefab.ref().get()->getHandle();
-}
-
-void PrefabInstance::setPrefab(AssetHandle prefab)
-{
-    AssetRef ref = AssetManager::getAsset(prefab);
+    AssetRef ref = AssetManager::getAsset(_prefab);
     if (!ref) {
-        RP_CORE_ERROR("prefab {} could not be resolved for '{}'", prefab, name());
+        RP_CORE_ERROR("prefab {} could not be resolved for '{}'", _prefab, name());
         return;
     }
 
@@ -50,6 +44,7 @@ void PrefabInstance::setPrefab(AssetHandle prefab)
     }
 
     component->sourcePrefab = AssetPtr<Prefab>(std::move(ref));
+    m_prefab = _prefab;
 }
 
 void PrefabInstance::serialize(WriteNode node) const

@@ -1,5 +1,6 @@
 #include "LevelEditorWorkspace.h"
 
+#include "layers/PlayLayer.h"
 #include "layers/panels/AddSceneObjectMenu.h"
 #include "layers/panels/ImagePreviewPanel.h"
 #include "layers/panels/OutlinerPanel.h"
@@ -8,11 +9,14 @@
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
+#include <layers/Layer.h>
 #include <scenes/Scene.h>
+#include <scenes/SceneAsset.h>
 #include <scenes/instances/Instance.h>
 #include <window_context/Application.h>
 
 static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
+static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
 
 LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::Scene *scene,
                                            Rapture::Viewport *viewport)
@@ -77,8 +81,8 @@ void LevelEditorWorkspace::setupHotbar()
     m_addMenu = m_container->add<Amethyst::ContextMenu>();
 
     Amethyst::UIScope(*m_hotbar).textButton(
-        {.base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
-         .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+        {.classes = {"generic-text-button"},
+         .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
          .label = "Add"},
         [this](Amethyst::TextButtonScope &b) {
             b.component.onMouseButton1ClickCb = [this, button = &b.component]() {
@@ -88,8 +92,8 @@ void LevelEditorWorkspace::setupHotbar()
         });
 
     Amethyst::UIScope(*m_hotbar).textButton(
-        {.base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
-         .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+        {.classes = {"generic-text-button"},
+         .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
          .label = "Save Scene"},
         [this](Amethyst::TextButtonScope &b) {
             b.component.onMouseButton1ClickCb = [this]() {
@@ -97,6 +101,66 @@ void LevelEditorWorkspace::setupHotbar()
                 return Amethyst::EventResult::CONSUMED;
             };
         });
+
+    Amethyst::UIScope(*m_hotbar).textButton(
+        {.classes = {"generic-text-button"},
+         .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
+         .label = "Play"},
+        [this](Amethyst::TextButtonScope &b) {
+            m_playButton = &b.component;
+            b.component.onMouseButton1ClickCb = [this]() {
+                if (isPlaying()) {
+                    stopPlay();
+                } else {
+                    startPlay();
+                }
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
+}
+
+void LevelEditorWorkspace::startPlay()
+{
+    Rapture::Scene *scene = m_context.scene;
+    if (scene == nullptr || m_context.viewport == nullptr || isPlaying()) {
+        return;
+    }
+
+    m_snapshot = std::make_unique<Rapture::SceneAsset>(*scene);
+
+    auto &app = Rapture::Application::getInstance();
+    if (Rapture::Layer *editor = app.getLayer(EDITOR_LAYER_NAME)) {
+        editor->detach();
+    }
+
+    if (m_playLayer == nullptr) {
+        m_playLayer = app.pushLayer(std::make_unique<PlayLayer>(*scene, *m_context.viewport));
+    } else {
+        m_playLayer->attach();
+    }
+
+    m_playButton->setText("Stop");
+}
+
+void LevelEditorWorkspace::stopPlay()
+{
+    if (!isPlaying()) {
+        return;
+    }
+
+    if (m_playLayer != nullptr) {
+        m_playLayer->detach();
+    }
+
+    // the snapshot outlives the rewind, its document is what the scene is read back out of
+    m_context.scene->restoreFrom(m_snapshot->root());
+    m_snapshot.reset();
+
+    if (Rapture::Layer *editor = Rapture::Application::getInstance().getLayer(EDITOR_LAYER_NAME)) {
+        editor->attach();
+    }
+
+    m_playButton->setText("Play");
 }
 
 void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)

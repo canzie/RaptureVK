@@ -456,7 +456,13 @@ static MaterialGraph s_buildTerrainGraph()
 
 void TerrainGenerator::createTerrainMaterials()
 {
-    auto terrainBase = MaterialManager::getMaterial("Terrain");
+    // every terrain shades the same way, so a second generator adopts the instance the first one made
+    if (AssetRef existing = AssetManager::getVirtualAsset("Terrain")) {
+        m_material = AssetPtr<MaterialInstance>(std::move(existing));
+        return;
+    }
+
+    auto terrainBase = MaterialManager::getMaterial("Terrain Base Material");
     if (!terrainBase) {
         RP_CORE_ERROR("Terrain base material not found");
         return;
@@ -472,6 +478,9 @@ void TerrainGenerator::createTerrainMaterials()
         return;
     }
     m_material->setGraph(graphId, graphs.getDefaults(graphId), graphs.getTextureRefs(graphId));
+
+    // the generated dispatcher switches on the id this registration just handed out, so it is rewritten to match
+    graphs.writeGeneratedFiles(EnginePaths::shaderDirectory() / "glsl/generated");
 
     RP_CORE_INFO("Terrain material created: index={}, graph={}", m_material->getBindlessIndex(), graphId);
 }

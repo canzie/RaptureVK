@@ -8,13 +8,19 @@
 namespace Rapture {
 
 static constexpr std::string_view KEY_CLASS = "class";
+static constexpr std::string_view KEY_ID = "id";
 static constexpr std::string_view KEY_NAME = "name";
 static constexpr std::string_view KEY_CHILDREN = "children";
 
-Instance::Instance(Scene &scene, std::string_view name) : m_scene(&scene), m_name(name)
+Instance::Instance(Scene &scene, std::string_view name) : m_scene(&scene), m_id(UUIDGenerator::Generate()), m_name(name)
 {
     m_entity = scene.createEntity(m_name);
     m_entity.setComponent<InstanceComponent>(this);
+}
+
+void Instance::remintId()
+{
+    m_id = UUIDGenerator::Generate();
 }
 
 Instance::~Instance()
@@ -113,6 +119,7 @@ Instance *Instance::findDescendant(std::string_view path) const
 void Instance::serialize(WriteNode node) const
 {
     node.set(KEY_CLASS, type().name);
+    node.set(KEY_ID, m_id);
     node.set(KEY_NAME, std::string_view(m_name));
 
     if (m_children.empty()) {
@@ -127,17 +134,28 @@ void Instance::serialize(WriteNode node) const
 
 void Instance::deserialize(ReadNode node)
 {
+    // the construction that got us here minted an id, the document's one replaces it
+    m_id = node.child(KEY_ID).asU64(m_id);
     setName(node.child(KEY_NAME).asString(m_name));
+}
+
+Instance::DocumentHeader Instance::readHeader(ReadNode node)
+{
+    DocumentHeader header;
+    header.className = node.child(KEY_CLASS).asString();
+    header.name = node.child(KEY_NAME).asString();
+    header.id = node.child(KEY_ID).asU64(INVALID_INSTANCE_ID);
+    header.children = node.child(KEY_CHILDREN);
+    return header;
 }
 
 bool Instance::loadSubtree(Instance &parent, ReadNode node, std::vector<Instance *> &order)
 {
-    std::string_view className = node.child(KEY_CLASS).asString();
-    std::string_view name = node.child(KEY_NAME).asString("Untitled Instance");
+    DocumentHeader header = readHeader(node);
 
-    std::unique_ptr<Instance> created = InstanceRegistry::create(className, *parent.scene(), name);
+    std::unique_ptr<Instance> created = InstanceRegistry::create(header.className, *parent.scene(), header.name);
     if (created == nullptr) {
-        RP_CORE_ERROR("no instance class named '{}', needed by '{}'", className, name);
+        RP_CORE_ERROR("no instance class named '{}', needed by '{}'", header.className, header.name);
         return false;
     }
 
@@ -146,9 +164,8 @@ bool Instance::loadSubtree(Instance &parent, ReadNode node, std::vector<Instance
     order.push_back(self);
     self->deserialize(node);
 
-    ReadNode children = node.child(KEY_CHILDREN);
-    for (size_t i = 0; i < children.size(); i++) {
-        if (!loadSubtree(*self, children.at(i), order)) {
+    for (size_t i = 0; i < header.children.size(); i++) {
+        if (!loadSubtree(*self, header.children.at(i), order)) {
             return false;
         }
     }

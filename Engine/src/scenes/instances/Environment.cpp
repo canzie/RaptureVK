@@ -17,6 +17,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <cmath>
+#include <limits>
 
 namespace Rapture {
 
@@ -112,16 +113,53 @@ glm::vec3 Environment::sunDirection(float timeOfDay, float latitude, float longi
     return glm::normalize(glm::vec3(cosElev * std::sin(azimuth), sinElev, -cosElev * std::cos(azimuth)));
 }
 
-float Environment::timeOfDayFromSun(const glm::vec3 &sunDirection, float latitude)
+static float s_wrapToPi(float radians)
 {
-    float elev = std::asin(glm::clamp(sunDirection.y, -1.0f, 1.0f));
-    float cphi = std::cos(glm::radians(latitude));
-    float cosH = (std::abs(cphi) > 1e-4f) ? glm::clamp(std::sin(elev) / cphi, -1.0f, 1.0f) : 1.0f;
-    float hourAngle = std::acos(cosH);
-    if (sunDirection.x > 0.0f) {
-        hourAngle = -hourAngle;
+    float wrapped = std::fmod(radians + glm::pi<float>(), glm::two_pi<float>());
+    if (wrapped < 0.0f) {
+        wrapped += glm::two_pi<float>();
     }
-    return glm::clamp(12.0f + hourAngle * (12.0f / glm::pi<float>()), 0.0f, 24.0f);
+    return wrapped - glm::pi<float>();
+}
+
+SunAngles Environment::sunAnglesFromDirection(const glm::vec3 &sunDirection, const AtmosphereSettings &current)
+{
+    SunAngles angles{current.timeOfDay, current.longitude};
+
+    float phi = glm::radians(current.latitude);
+    float cosPhi = std::cos(phi);
+    float sinPhi = std::sin(phi);
+
+    float sinElev = glm::clamp(sunDirection.y, -1.0f, 1.0f);
+    float cosElev = std::sqrt(std::max(0.0f, 1.0f - sinElev * sinElev));
+
+    // straight overhead carries no azimuth, and at a pole the elevation no longer varies with the hour
+    if (cosElev < 1e-4f || std::abs(cosPhi) < 1e-4f) {
+        return angles;
+    }
+
+    // an elevation this latitude cannot reach clamps to noon or midnight, the nearest direction it can express
+    float hourMagnitude = std::acos(glm::clamp(sinElev / cosPhi, -1.0f, 1.0f));
+    float azimuth = std::atan2(sunDirection.x, -sunDirection.z);
+
+    // both hour angle signs solve the elevation, each with its own longitude, so keep the one nearest the current time
+    float nearest = std::numeric_limits<float>::max();
+    for (float sign : {1.0f, -1.0f}) {
+        float hourAngle = sign * hourMagnitude;
+        float timeOfDay = 12.0f + hourAngle * (12.0f / glm::pi<float>());
+        float distance = std::abs(timeOfDay - current.timeOfDay);
+        if (distance >= nearest) {
+            continue;
+        }
+        nearest = distance;
+
+        // the arguments are the forward azimuth's sine and cosine, scaled by the cos(elevation) atan2 ignores
+        float baseAzimuth = std::atan2(-std::sin(hourAngle), -sinPhi * sinElev / cosPhi);
+        angles.timeOfDay = timeOfDay;
+        angles.longitude = glm::degrees(s_wrapToPi(azimuth - baseAzimuth));
+    }
+
+    return angles;
 }
 
 float Environment::rayleighCoefficient(float wavelengthNm)
@@ -167,11 +205,15 @@ AssetHandle Environment::skybox() const
     return m_skyboxTexture.ref().get()->getHandle();
 }
 
-void Environment::setSkybox(AssetHandle skybox)
+void Environment::setSkybox(AssetHandle _skybox)
 {
-    AssetRef ref = AssetManager::getAsset(skybox);
+    if (skybox() == _skybox) {
+        return;
+    }
+
+    AssetRef ref = AssetManager::getAsset(_skybox);
     if (!ref) {
-        RP_CORE_ERROR("skybox texture {} could not be resolved", skybox);
+        RP_CORE_ERROR("skybox texture {} could not be resolved", _skybox);
         return;
     }
 
@@ -202,7 +244,9 @@ void Environment::update()
             sunDir = -glm::normalize(sunTransform->transforms.getRotationQuat() * glm::vec3(0.0f, 0.0f, -1.0f));
             glm::vec3 expectedDir = sunDirection(m_lastApplied.timeOfDay, m_lastApplied.latitude, m_lastApplied.longitude);
             if (glm::distance(sunDir, expectedDir) > 1e-4f) {
-                m_atmosphere.timeOfDay = timeOfDayFromSun(sunDir, m_atmosphere.latitude);
+                SunAngles angles = sunAnglesFromDirection(sunDir, m_atmosphere);
+                m_atmosphere.timeOfDay = angles.timeOfDay;
+                m_atmosphere.longitude = angles.longitude;
             }
         }
     } else {

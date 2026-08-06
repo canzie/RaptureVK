@@ -209,7 +209,9 @@ void Application::run()
         AssetManager::onUpdate();
 
         for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
-            (*it)->onUpdate(Timestep::deltaTime());
+            if ((*it)->isAttached()) {
+                (*it)->onUpdate(Timestep::deltaTime());
+            }
         }
 
         for (auto *scene : m_project->getActiveScenes()) {
@@ -221,7 +223,9 @@ void Application::run()
         m_viewportManager->drawAll();
 
         for (auto it = m_layerStack.overlayBegin(); it != m_layerStack.overlayEnd(); ++it) {
-            (*it)->onUpdate(Timestep::deltaTime());
+            if ((*it)->isAttached()) {
+                (*it)->onUpdate(Timestep::deltaTime());
+            }
         }
 
         m_mainWindow->onUpdate();
@@ -267,18 +271,31 @@ RenderWindow &Application::createSecondaryWindow(int32_t width, int32_t height, 
     return ref;
 }
 
-void Application::pushLayer(Layer *layer)
+Layer *Application::pushLayer(std::unique_ptr<Layer> layer)
 {
-
-    m_layerStack.pushLayer(layer);
-    layer->onAttach();
+    return m_layerStack.pushLayer(std::move(layer));
 }
 
-void Application::pushOverlay(Layer *overlay)
+Layer *Application::pushOverlay(std::unique_ptr<Layer> overlay)
 {
+    return m_layerStack.pushOverlay(std::move(overlay));
+}
 
-    m_layerStack.pushOverlay(overlay);
-    overlay->onAttach();
+Layer *Application::getLayer(std::string_view name) const
+{
+    for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
+        if ((*it)->name() == name) {
+            return it->get();
+        }
+    }
+
+    for (auto it = m_layerStack.overlayBegin(); it != m_layerStack.overlayEnd(); ++it) {
+        if ((*it)->name() == name) {
+            return it->get();
+        }
+    }
+
+    return nullptr;
 }
 
 } // namespace Rapture

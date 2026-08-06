@@ -34,7 +34,7 @@ surf.shadingModelId=SM_OPENPBR_STANDARD;
 return surf;
 }
 
-TerrainSurfaceData evalTerrainSurface_TerrainLayered_6(TerrainInputs si, uint base){
+TerrainSurfaceData evalTerrainSurface_TerrainLayered_3(TerrainInputs si, uint base){
 TerrainSurfaceData surf;
 float _n0=(1.0 - normalize(si.worldNormal).y);
 float _n1=uintBitsToFloat(u_graphPool.data[base + 0]);
@@ -79,7 +79,7 @@ return surf;
 TerrainSurfaceData evalTerrainSurfaceGraph(uint graphId, TerrainInputs si, uint base) {
     switch (graphId) {
         case 1u: return evalTerrainSurface_Terrain_1(si, base);
-        case 6u: return evalTerrainSurface_TerrainLayered_6(si, base);
+        case 3u: return evalTerrainSurface_TerrainLayered_3(si, base);
     }
 
     TerrainSurfaceData surf;

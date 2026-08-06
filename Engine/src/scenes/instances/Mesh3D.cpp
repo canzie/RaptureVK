@@ -31,21 +31,15 @@ const TypeInfo &Mesh3D::type() const
     return staticType();
 }
 
-AssetHandle Mesh3D::mesh() const
+void Mesh3D::setMesh(AssetHandle _mesh)
 {
-    const auto *component = m_entity.tryGetComponent<MeshComponent>();
-    if (component == nullptr || !component->mesh) {
-        return INVALID_ASSET_HANDLE;
+    if (m_mesh == _mesh) {
+        return;
     }
 
-    return component->mesh.ref().get()->getHandle();
-}
-
-void Mesh3D::setMesh(AssetHandle mesh)
-{
-    AssetRef ref = AssetManager::getAsset(mesh);
+    AssetRef ref = AssetManager::getAsset(_mesh);
     if (!ref) {
-        RP_CORE_ERROR("mesh {} could not be resolved for '{}'", mesh, name());
+        RP_CORE_ERROR("mesh {} could not be resolved for '{}'", _mesh, name());
         return;
     }
 
@@ -58,24 +52,19 @@ void Mesh3D::setMesh(AssetHandle mesh)
 
     component->setMesh(std::move(ref));
     component->isLoading = false;
+    m_mesh = _mesh;
     m_entity.markDirty();
 }
 
-AssetHandle Mesh3D::material() const
+void Mesh3D::setMaterial(AssetHandle _material)
 {
-    const auto *component = m_entity.tryGetComponent<MaterialComponent>();
-    if (component == nullptr || !component->material) {
-        return INVALID_ASSET_HANDLE;
+    if (m_material == _material) {
+        return;
     }
 
-    return component->material.ref().get()->getHandle();
-}
-
-void Mesh3D::setMaterial(AssetHandle material)
-{
-    AssetRef ref = AssetManager::getAsset(material);
+    AssetRef ref = AssetManager::getAsset(_material);
     if (!ref) {
-        RP_CORE_ERROR("material {} could not be resolved for '{}'", material, name());
+        RP_CORE_ERROR("material {} could not be resolved for '{}'", _material, name());
         return;
     }
 
@@ -85,6 +74,7 @@ void Mesh3D::setMaterial(AssetHandle material)
     }
 
     component->material = AssetPtr<MaterialInstance>(std::move(ref));
+    m_material = _material;
     m_entity.markDirty();
 }
 

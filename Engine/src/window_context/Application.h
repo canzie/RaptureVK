@@ -58,8 +58,26 @@ class Application {
      */
     bool hasProject() const { return m_project->isValid(); }
 
-    void pushLayer(Layer *layer);
-    void pushOverlay(Layer *overlay);
+    /**
+     * @brief Hands a layer to the frame, attached
+     * @param layer The layer to hold
+     * @return The layer, owned by the application
+     */
+    Layer *pushLayer(std::unique_ptr<Layer> layer);
+
+    /**
+     * @brief Hands an overlay to the frame, attached and drawn over the layers
+     * @param overlay The overlay to hold
+     * @return The overlay, owned by the application
+     */
+    Layer *pushOverlay(std::unique_ptr<Layer> overlay);
+
+    /**
+     * @brief Finds a layer or overlay by name
+     * @param name The name the layer was created with
+     * @return The layer, or nullptr if no layer goes by that name
+     */
+    Layer *getLayer(std::string_view name) const;
 
     /**
      * @brief Create and register an additional OS window, sharing the existing device/queues.

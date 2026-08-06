@@ -379,7 +379,7 @@ void MaterialManager::createDefaultMaterials()
         return;
     }
 
-    createBuiltinMaterial("Terrain", terrainGraphId, {}, std::move(terrainGraph), RE_TERRAIN_MATERIAL);
+    createBuiltinMaterial("Terrain Base Material", terrainGraphId, {}, std::move(terrainGraph), RE_TERRAIN_MATERIAL);
 
     s_createGltfBaseMaterial();
 }

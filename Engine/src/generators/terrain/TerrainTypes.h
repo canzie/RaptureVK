@@ -159,6 +159,8 @@ struct TerrainConfig {
     }
 
     float getVertexSpacing(uint32_t lod) const { return chunkWorldSize / static_cast<float>(getTerrainLODResolution(lod) - 1); }
+
+    bool operator==(const TerrainConfig &other) const = default;
 };
 
 } // namespace Rapture

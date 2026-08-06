@@ -20,7 +20,7 @@ class PrefabInstance : public Node3D {
      * @brief The blueprint this subtree was instantiated from
      * @return The prefab handle, or INVALID_ASSET_HANDLE if it has none
      */
-    AssetHandle prefab() const;
+    AssetHandle prefab() const { return m_prefab; }
 
     /**
      * @brief Points this root at the blueprint it came from
@@ -30,6 +30,9 @@ class PrefabInstance : public Node3D {
 
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
+
+  private:
+    AssetHandle m_prefab = INVALID_ASSET_HANDLE;
 };
 
 } // namespace Rapture

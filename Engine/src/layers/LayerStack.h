@@ -1,43 +1,66 @@
+#ifndef RAPTURE__LAYER_STACK_H
+#define RAPTURE__LAYER_STACK_H
+
 #include "Layer.h"
+
+#include <memory>
 #include <vector>
 
 namespace Rapture {
 
+/**
+ * @brief Owns the layers of a frame, holding the overlays after the regular layers.
+ */
 class LayerStack {
-
   public:
-    void pushLayer(Layer *layer);
-    void pushOverlay(Layer *overlay);
+    ~LayerStack();
+
+    /**
+     * @brief Takes ownership of a layer and attaches it
+     * @param layer The layer to hold
+     * @return The layer, owned by this stack
+     */
+    Layer *pushLayer(std::unique_ptr<Layer> layer);
+
+    /**
+     * @brief Takes ownership of an overlay and attaches it
+     * @param overlay The overlay to hold
+     * @return The overlay, owned by this stack
+     */
+    Layer *pushOverlay(std::unique_ptr<Layer> overlay);
+
+    /**
+     * @brief Detaches a layer and destroys it
+     * @param layer The layer to drop, ignored if this stack does not hold it
+     */
     void popLayer(Layer *layer);
+
+    /**
+     * @brief Detaches an overlay and destroys it
+     * @param overlay The overlay to drop, ignored if this stack does not hold it
+     */
     void popOverlay(Layer *overlay);
-
-    std::vector<Layer *>::iterator begin() { return m_Layers.begin(); }
-    std::vector<Layer *>::iterator end() { return m_Layers.end(); }
-    std::vector<Layer *>::reverse_iterator rbegin() { return m_Layers.rbegin(); }
-    std::vector<Layer *>::reverse_iterator rend() { return m_Layers.rend(); }
-
-    std::vector<Layer *>::const_iterator begin() const { return m_Layers.begin(); }
-    std::vector<Layer *>::const_iterator end() const { return m_Layers.end(); }
-    std::vector<Layer *>::const_reverse_iterator rbegin() const { return m_Layers.rbegin(); }
-    std::vector<Layer *>::const_reverse_iterator rend() const { return m_Layers.rend(); }
 
     void clear();
 
-    // Iterators over regular layers (those pushed before the first overlay)
-    std::vector<Layer *>::iterator layerBegin() { return m_Layers.begin(); }
-    std::vector<Layer *>::iterator layerEnd() { return m_Layers.begin() + m_LayerInsertIndex; }
-    std::vector<Layer *>::const_iterator layerBegin() const { return m_Layers.begin(); }
-    std::vector<Layer *>::const_iterator layerEnd() const { return m_Layers.begin() + m_LayerInsertIndex; }
+    using Iterator = std::vector<std::unique_ptr<Layer>>::iterator;
+    using ConstIterator = std::vector<std::unique_ptr<Layer>>::const_iterator;
 
-    // Iterators over overlay layers (those pushed after regular layers)
-    std::vector<Layer *>::iterator overlayBegin() { return m_Layers.begin() + m_LayerInsertIndex; }
-    std::vector<Layer *>::iterator overlayEnd() { return m_Layers.end(); }
-    std::vector<Layer *>::const_iterator overlayBegin() const { return m_Layers.begin() + m_LayerInsertIndex; }
-    std::vector<Layer *>::const_iterator overlayEnd() const { return m_Layers.end(); }
+    Iterator layerBegin() { return m_layers.begin(); }
+    Iterator layerEnd() { return m_layers.begin() + m_layerInsertIndex; }
+    ConstIterator layerBegin() const { return m_layers.begin(); }
+    ConstIterator layerEnd() const { return m_layers.begin() + m_layerInsertIndex; }
+
+    Iterator overlayBegin() { return m_layers.begin() + m_layerInsertIndex; }
+    Iterator overlayEnd() { return m_layers.end(); }
+    ConstIterator overlayBegin() const { return m_layers.begin() + m_layerInsertIndex; }
+    ConstIterator overlayEnd() const { return m_layers.end(); }
 
   private:
-    std::vector<Layer *> m_Layers;
-    unsigned int m_LayerInsertIndex = 0;
+    std::vector<std::unique_ptr<Layer>> m_layers;
+    size_t m_layerInsertIndex = 0;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__LAYER_STACK_H

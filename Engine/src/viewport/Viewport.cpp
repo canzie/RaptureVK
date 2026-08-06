@@ -55,8 +55,7 @@ void Viewport::drawFrame()
         return;
     }
 
-    Entity camera = m_camera.isValid() ? m_camera : m_scene->getMainCamera();
-    m_renderer->drawFrame(*m_scene, camera, m_renderSettings);
+    m_renderer->drawFrame(*m_scene, m_camera, m_renderSettings);
 }
 
 SceneQueryResult Viewport::queryRegion(const SceneQuery &region)
@@ -69,8 +68,7 @@ SceneQueryResult Viewport::queryRegion(const SceneQuery &region)
         m_queryRenderer = std::make_unique<SceneQueryRenderer>(m_renderContext);
     }
 
-    Entity camera = m_camera.isValid() ? m_camera : m_scene->getMainCamera();
-    return m_queryRenderer->query(*m_scene, camera, m_config.width, m_config.height, region);
+    return m_queryRenderer->query(*m_scene, m_camera, m_config.width, m_config.height, region);
 }
 
 void Viewport::resize(uint32_t width, uint32_t height)

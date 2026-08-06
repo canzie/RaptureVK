@@ -5,6 +5,7 @@
 #include "scenes/entities/Entity.h"
 #include "scenes/instances/TypeInfo.h"
 #include "serialization/SerialDocument.h"
+#include "utils/UUID.h"
 
 #include <memory>
 #include <span>
@@ -15,6 +16,13 @@
 namespace Rapture {
 
 class Scene;
+
+/**
+ * @brief Identifies an instance for as long as it exists, across renames, reparenting and a reload
+ */
+using InstanceId = UUID;
+
+static constexpr InstanceId INVALID_INSTANCE_ID = 0;
 
 /**
  * @brief Base of every authored object in a scene.
@@ -141,6 +149,23 @@ class Instance {
     virtual void deserialize(ReadNode node);
 
     /**
+     * @brief What a document says an instance is, readable before there is an instance to read into
+     */
+    struct DocumentHeader {
+        std::string_view className;
+        std::string_view name;
+        InstanceId id = INVALID_INSTANCE_ID;
+        ReadNode children;
+    };
+
+    /**
+     * @brief Reads an instance's header out of a document
+     * @param node Cursor to the instance's object
+     * @return The header
+     */
+    static DocumentHeader readHeader(ReadNode node);
+
+    /**
      * @brief Creates the instance a document names, parents it and reads its subtree
      * @param parent The instance the new instance is added to
      * @param node Cursor to the instance's object
@@ -156,6 +181,17 @@ class Instance {
 
     Instance *parent() const { return m_parent; }
     std::span<const std::unique_ptr<Instance>> children() const { return m_children; }
+
+    /**
+     * @brief This instance's stable identity, what another instance stores to refer to it
+     */
+    InstanceId id() const { return m_id; }
+
+    /**
+     * @brief Gives this instance a fresh identity, so a copy does not claim to be its source
+     */
+    void remintId();
+
     std::string_view name() const { return m_name; }
     void setName(std::string_view name);
     Entity entity() const { return m_entity; }
@@ -166,6 +202,7 @@ class Instance {
 
   private:
     Scene *m_scene;
+    InstanceId m_id;
     Instance *m_parent = nullptr;
     std::vector<std::unique_ptr<Instance>> m_children;
     std::string m_name;

@@ -4,7 +4,9 @@
 #include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
+#include "components/systems/CameraController.h"
 #include "generators/terrain/TerrainTypes.h"
+#include "scenes/instances/Camera3D.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "renderer/SceneRenderData.h"
@@ -40,6 +42,11 @@ struct TerrainCSMPushConstants {
 static constexpr float SHADOW_DEPTH_BIAS_CONSTANT = 1.0f;
 static constexpr float SHADOW_DEPTH_BIAS_CLAMP = 0.005f;
 static constexpr float SHADOW_DEPTH_BIAS_SLOPE = 1.75f;
+
+// Terrain draws unculled, so its shadow depth is the lit surface itself rather than a back face shielding it
+static constexpr float TERRAIN_SHADOW_DEPTH_BIAS_CONSTANT = 2.5f;
+static constexpr float TERRAIN_SHADOW_DEPTH_BIAS_CLAMP = 0.02f;
+static constexpr float TERRAIN_SHADOW_DEPTH_BIAS_SLOPE = 4.0f;
 static constexpr float SHADOW_SPLIT_NEAR = 0.5f;
 
 CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda)
@@ -420,10 +427,10 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
         }
     }
 
+    // the chunk grid was generated around the scene's camera, so its LODs have to be picked from there too
     glm::vec3 cameraPos(0.0f);
-    Entity mainCamera = activeScene.getMainCamera();
-    if (mainCamera.isValid()) {
-        if (auto *cameraTransform = mainCamera.tryGetComponent<TransformComponent>()) {
+    if (CameraController *controller = activeScene.activeController()) {
+        if (auto *cameraTransform = controller->camera().entity().tryGetComponent<TransformComponent>()) {
             cameraPos = cameraTransform->translation();
         }
     }
@@ -775,9 +782,9 @@ void CascadedShadowMap::createTerrainPipeline()
     rasterizer.cullMode = VK_CULL_MODE_NONE;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_TRUE;
-    rasterizer.depthBiasConstantFactor = SHADOW_DEPTH_BIAS_CONSTANT;
-    rasterizer.depthBiasClamp = SHADOW_DEPTH_BIAS_CLAMP;
-    rasterizer.depthBiasSlopeFactor = SHADOW_DEPTH_BIAS_SLOPE;
+    rasterizer.depthBiasConstantFactor = TERRAIN_SHADOW_DEPTH_BIAS_CONSTANT;
+    rasterizer.depthBiasClamp = TERRAIN_SHADOW_DEPTH_BIAS_CLAMP;
+    rasterizer.depthBiasSlopeFactor = TERRAIN_SHADOW_DEPTH_BIAS_SLOPE;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;

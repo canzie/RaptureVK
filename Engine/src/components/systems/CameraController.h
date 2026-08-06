@@ -2,12 +2,12 @@
 #define RAPTURE__CAMERA_CONTROLLER_H
 
 #include "input/ControlInput.h"
-#include "scenes/entities/Entity.h"
 
 #include <glm/glm.hpp>
 
 namespace Rapture {
 
+class Camera3D;
 struct TransformComponent;
 
 enum class CameraControlMode {
@@ -21,10 +21,10 @@ enum class CameraControlMode {
 class CameraController {
   public:
     /**
-     * @brief Construct a controller that possesses a camera entity.
-     * @param camera Camera entity to drive; needs a Transform and a Camera component.
+     * @brief Construct a controller that possesses a camera.
+     * @param camera Camera to drive, which has to outlive the controller.
      */
-    explicit CameraController(Entity camera);
+    explicit CameraController(Camera3D &camera);
 
     /**
      * @brief Advance the possessed camera from this frame's intent.
@@ -32,6 +32,12 @@ class CameraController {
      * @param input Device-agnostic input for this frame.
      */
     void update(float dt, const ControlInput &input);
+
+    /**
+     * @brief The camera this controller possesses.
+     * @return The possessed camera.
+     */
+    Camera3D &camera() const { return m_camera; }
 
     /**
      * @brief Get the active control mode.
@@ -63,7 +69,7 @@ class CameraController {
     void updateOrbit(const ControlInput &input, TransformComponent &transform);
     void recalcFront();
 
-    Entity m_camera;
+    Camera3D &m_camera;
     CameraControlMode m_mode = CameraControlMode::ORBIT;
 
     float m_yaw = -90.0f;

@@ -1,6 +1,7 @@
 #include "CameraController.h"
 
 #include "components/Components.h"
+#include "scenes/instances/Camera3D.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -10,7 +11,7 @@ namespace Rapture {
 
 static const glm::vec3 WORLD_UP = glm::vec3(0.0f, 1.0f, 0.0f);
 
-CameraController::CameraController(Entity camera) : m_camera(camera)
+CameraController::CameraController(Camera3D &camera) : m_camera(camera)
 {
     recalcFront();
 }
@@ -28,11 +29,7 @@ void CameraController::setMode(CameraControlMode mode)
 
 void CameraController::update(float dt, const ControlInput &input)
 {
-    if (!m_camera.isValid()) {
-        return;
-    }
-
-    auto [transform, camera] = m_camera.tryGetComponents<TransformComponent, CameraComponent>();
+    auto [transform, camera] = m_camera.entity().tryGetComponents<TransformComponent, CameraComponent>();
     if (transform == nullptr || camera == nullptr) {
         return;
     }

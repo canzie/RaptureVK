@@ -87,9 +87,7 @@ void MaterialEditorWorkspace::setupPreviewScene()
 
     Rapture::Entity camera = m_previewScene->createEntity("Preview Camera");
     camera.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f, 0.0f, 4.0f), glm::vec3(0.0f), glm::vec3(1.0f));
-    auto &cameraComp = camera.addComponent<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 100.0f);
-    cameraComp.isMainCamera = true;
-    m_previewScene->setMainCamera(camera);
+    camera.addComponent<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 100.0f);
 
     Rapture::Entity light = m_previewScene->createEntity("Preview Light");
     light.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f), glm::vec3(-0.6f, 0.5f, 0.0f), glm::vec3(1.0f));

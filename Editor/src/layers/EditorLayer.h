@@ -2,14 +2,14 @@
 #define RAPTURE__EDITOR_LAYER_H
 
 #include "layers/Layer.h"
-#include "scenes/entities/Entity.h"
 
 #include <memory>
 #include <unordered_map>
 
 namespace Rapture {
-class Input;
+class Camera3D;
 class CameraController;
+class Input;
 class Viewport;
 } // namespace Rapture
 
@@ -26,8 +26,11 @@ class EditorLayer : public Rapture::Layer {
     void onUpdate(float dt) override;
 
   private:
+    /**
+     * @brief One viewport's editor camera, which is not part of the scene it looks at
+     */
     struct ViewportControl {
-        Rapture::Entity camera;
+        std::unique_ptr<Rapture::Camera3D> camera;
         std::unique_ptr<Rapture::CameraController> controller;
     };
 

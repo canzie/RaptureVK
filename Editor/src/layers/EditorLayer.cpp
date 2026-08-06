@@ -1,14 +1,19 @@
 #include "EditorLayer.h"
 
-#include "components/Components.h"
 #include "components/systems/CameraController.h"
 #include "input/Input.h"
 #include "scenes/Scene.h"
+#include "scenes/instances/Camera3D.h"
 #include "viewport/Viewport.h"
 #include "viewport/ViewportManager.h"
 #include "window_context/Application.h"
 
 #include <glm/glm.hpp>
+
+static constexpr glm::vec3 EDITOR_CAMERA_START = glm::vec3(0.0f, 0.0f, 5.0f);
+static constexpr float EDITOR_CAMERA_FOV = 90.0f;
+static constexpr float EDITOR_CAMERA_NEAR_PLANE = 0.1f;
+static constexpr float EDITOR_CAMERA_FAR_PLANE = 200.0f;
 
 static Rapture::ControlInput s_mapEditorCameraInput(const Rapture::Input &input)
 {
@@ -32,9 +37,23 @@ EditorLayer::~EditorLayer() = default;
 void EditorLayer::onAttach()
 {
     m_input = std::make_unique<Rapture::Input>(&Rapture::Application::getInstance().getWindowContext());
+
+    // controls outlive a detach, so whatever drove the scene while this layer was down hands it back
+    for (auto &[viewport, control] : m_controls) {
+        viewport->getScene()->setActiveController(control.controller.get());
+    }
 }
 
-void EditorLayer::onDetach() {}
+void EditorLayer::onDetach()
+{
+    if (m_input == nullptr) {
+        return;
+    }
+
+    // the cursor is only released each frame by onUpdate, which stops running the moment this returns
+    m_input->setCursorMode(Rapture::CursorMode::NORMAL);
+    m_input.reset();
+}
 
 void EditorLayer::syncViewportControls()
 {
@@ -42,24 +61,25 @@ void EditorLayer::syncViewportControls()
 
     for (const auto &vp : viewports) {
         Rapture::Viewport *viewport = vp.get();
-        if (viewport->getScene() == nullptr || m_controls.count(viewport) != 0) {
+
+        // a viewport that came with a camera is looking through someone else's, so it is not ours to drive
+        if (viewport->getScene() == nullptr || viewport->getCamera().isValid() || m_controls.count(viewport) != 0) {
             continue;
         }
 
+        // owned here and never parented, so it is not part of the scene it looks at and no save or
+        // snapshot restore can touch it
         ViewportControl control;
-        control.camera = viewport->getCamera();
-        if (!control.camera.isValid()) {
-            Rapture::Scene *scene = viewport->getScene();
-            control.camera = scene->createEntity("Editor Camera");
-            control.camera.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f),
-                                                                     glm::vec3(1.0f));
-            auto &cameraComp = control.camera.addComponent<Rapture::CameraComponent>(90.0f, 16.0f / 9.0f, 0.1f, 200.0f);
-            cameraComp.isMainCamera = true;
-            scene->setMainCamera(control.camera);
-            viewport->setCamera(control.camera);
-        }
+        control.camera = std::make_unique<Rapture::Camera3D>(*viewport->getScene(), "Editor Camera");
+        control.camera->setPosition(EDITOR_CAMERA_START);
+        control.camera->setFieldOfView(EDITOR_CAMERA_FOV);
+        control.camera->setNearPlane(EDITOR_CAMERA_NEAR_PLANE);
+        control.camera->setFarPlane(EDITOR_CAMERA_FAR_PLANE);
+        viewport->setCamera(control.camera->entity());
+        control.controller = std::make_unique<Rapture::CameraController>(*control.camera);
 
-        control.controller = std::make_unique<Rapture::CameraController>(control.camera);
+        // terrain streaming and the shadow cascades follow whoever is driving the scene
+        viewport->getScene()->setActiveController(control.controller.get());
         viewport->editorBinding().controller = control.controller.get();
         m_controls.emplace(viewport, std::move(control));
     }
@@ -74,9 +94,16 @@ void EditorLayer::syncViewportControls()
         }
         if (stillExists) {
             ++it;
-        } else {
-            it = m_controls.erase(it);
+            continue;
         }
+
+        // the viewport is already gone, so the scene is reached through the camera rather than through it
+        Rapture::Scene *scene = it->second.camera->scene();
+        if (scene != nullptr && scene->activeController() == it->second.controller.get()) {
+            scene->setActiveController(nullptr);
+        }
+
+        it = m_controls.erase(it);
     }
 }
 

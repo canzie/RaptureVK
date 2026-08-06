@@ -1,35 +1,54 @@
-#pragma once
-#include "events/Events.h"
-#include "scenes/Scene.h"
+#ifndef RAPTURE__LAYER_H
+#define RAPTURE__LAYER_H
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace Rapture {
-static unsigned int s_layer_ID = 0;
 
-// using pushLayerCallback = std::function<void(Layer*)>;
-
+/**
+ * @brief One participant in the frame, updated for as long as it is attached.
+ */
 class Layer {
   public:
-    Layer(const std::string name = "Layer_" + std::to_string(s_layer_ID)) : m_debug_name(name) { s_layer_ID++; }
+    /**
+     * @brief Creates a layer
+     * @param name Name for logs and the profiler, defaulted to a numbered one when left empty
+     */
+    explicit Layer(std::string_view name = {});
 
-    virtual ~Layer() = 0;
+    virtual ~Layer() = default;
 
-    virtual void onDetach() = 0;
-    virtual void onAttach() = 0;
+    Layer(const Layer &) = delete;
+    Layer &operator=(const Layer &) = delete;
+
     virtual void onUpdate(float ts) = 0;
 
-    // void setPushLayerCallback(const pushLayerCallback& callback) { m_pushLayerCallback = callback; }
+    /**
+     * @brief Brings this layer into the frame, doing nothing if it is already attached
+     */
+    void attach();
 
-    std::string getLayerName() { return m_debug_name; }
-    // Alias to match the function name used in profiler
-    const char *getName() { return m_debug_name.c_str(); }
+    /**
+     * @brief Stands this layer down, doing nothing if it is already detached
+     */
+    void detach();
+
+    bool isAttached() const { return m_attached; }
+    std::string_view name() const { return m_name; }
+
+  protected:
+    virtual void onAttach() = 0;
+    virtual void onDetach() = 0;
 
   private:
-    // pushLayerCallback m_pushLayerCallback;
-    std::string m_debug_name;
+    static uint32_t m_nextLayerId;
+
+    std::string m_name;
+    bool m_attached = false;
 };
 
-// Empty implementation for pure virtual destructor
-inline Layer::~Layer() {}
 } // namespace Rapture
+
+#endif // RAPTURE__LAYER_H

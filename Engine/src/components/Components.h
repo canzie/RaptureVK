@@ -71,8 +71,6 @@ struct CameraComponent {
     float nearPlane;
     float farPlane;
 
-    // Optional: Camera could be marked as main camera for rendering
-    bool isMainCamera = false;
     // slot into the SSBO where the camera metadata lives
     uint32_t renderDataSlot = UINT32_MAX;
     // whether the slot holds matrices from a previous update, so prevViewProj can carry them

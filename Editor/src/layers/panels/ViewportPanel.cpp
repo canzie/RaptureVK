@@ -517,12 +517,12 @@ void ViewportPanel::updateGizmo()
         return;
     }
 
-    auto mainCamera = scene->getMainCamera();
-    if (!mainCamera) {
+    auto viewCamera = m_viewport->getCamera();
+    if (!viewCamera) {
         return;
     }
 
-    auto &camComp = mainCamera.getComponent<Rapture::CameraComponent>();
+    auto &camComp = viewCamera.getComponent<Rapture::CameraComponent>();
     glm::mat4 viewMatrix = camComp.camera.getViewMatrix();
     glm::mat4 projectionMatrix = camComp.camera.getProjectionMatrix();
     glm::mat4 objectTransform = transformComponent->transforms.getTransform();

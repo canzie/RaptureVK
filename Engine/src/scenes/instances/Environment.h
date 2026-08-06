@@ -30,6 +30,14 @@ struct AtmosphereSettings {
 };
 
 /**
+ * @brief The pair of atmosphere angles that place the sun in a direction
+ */
+struct SunAngles {
+    float timeOfDay = 12.0f;
+    float longitude = 0.0f;
+};
+
+/**
  * @brief The scene's sky and atmosphere, and the owner of the derived skybox and image based lighting.
  *
  * Placeless, so it derives from Instance rather than Node3D. A scene holds at most one, which is a
@@ -68,7 +76,14 @@ class Environment : public Instance {
     ImageBasedLighting *getImageBasedLighting() const { return m_ibl.get(); }
 
     static glm::vec3 sunDirection(float timeOfDay, float latitude, float longitude);
-    static float timeOfDayFromSun(const glm::vec3 &sunDirection, float latitude);
+
+    /**
+     * @brief Inverts sunDirection, recovering both angles so a hand placed sun keeps the direction it was given
+     * @param sunDirection The direction to the sun, normalized
+     * @param current The settings the result stays nearest to, resolving the morning and evening solutions
+     * @return The angles, which sunDirection maps back onto the same direction
+     */
+    static SunAngles sunAnglesFromDirection(const glm::vec3 &sunDirection, const AtmosphereSettings &current);
 
     static float rayleighCoefficient(float wavelengthNm);
     static float wavelengthNm(float rayleighCoefficient);

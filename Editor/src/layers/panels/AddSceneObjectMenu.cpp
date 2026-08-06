@@ -8,6 +8,7 @@
 #include "scenes/instances/PointLight3D.h"
 #include "scenes/instances/SpotLight3D.h"
 #include "scenes/instances/StaticMesh3D.h"
+#include "scenes/instances/Terrain3D.h"
 
 #include <components/context_menu_item.h>
 
@@ -54,6 +55,7 @@ std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> buildItems(Rapture
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     items.push_back(Amethyst::makeSubmenuItem("Mesh", std::move(meshes)));
     items.push_back(Amethyst::makeSubmenuItem("Light", std::move(lights)));
+    items.push_back(Amethyst::makeActionItem("Terrain", [parent]() { s_addObject<Rapture::Terrain3D>(parent, "Terrain"); }));
     items.push_back(Amethyst::makeSeparatorItem());
     items.push_back(Amethyst::makeActionItem("Folder", [parent]() { s_addObject<Rapture::Folder>(parent, "Folder"); }));
     return items;

@@ -15,10 +15,10 @@ class Mesh3D : public Node3D {
     static const TypeInfo &staticType();
     const TypeInfo &type() const override;
 
-    AssetHandle mesh() const;
+    AssetHandle mesh() const { return m_mesh; }
     void setMesh(AssetHandle mesh);
 
-    AssetHandle material() const;
+    AssetHandle material() const { return m_material; }
     void setMaterial(AssetHandle material);
 
     bool isVisible() const;
@@ -43,6 +43,10 @@ class Mesh3D : public Node3D {
 
   protected:
     Mesh3D(Scene &scene, std::string_view name);
+
+  private:
+    AssetHandle m_mesh = INVALID_ASSET_HANDLE;
+    AssetHandle m_material = INVALID_ASSET_HANDLE;
 };
 
 } // namespace Rapture
