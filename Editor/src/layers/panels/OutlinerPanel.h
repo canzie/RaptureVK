@@ -74,6 +74,9 @@ class OutlinerPanel : public Panel {
 
     Rapture::Instance *m_pendingDeleteInstance = nullptr;
     bool m_pendingDeleteKeepChildren = false;
+
+    Rapture::EventConnection m_hierarchyChangedConn;
+    bool m_pendingRefresh = false;
 };
 
 #endif // RAPTURE__OUTLINER_PANEL_H

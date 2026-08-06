@@ -4,25 +4,37 @@
 #include "components/Components.h"
 #include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
+#include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
+#include "scenes/instances/StaticMesh3D.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
 #include "scenes/instances/Instance.h"
 
 #include "asset_manager/AssetManager.h"
+#include "asset_manager/ReservedAssets.h"
 #include "logging/TracyProfiler.h"
-#include "meshes/MeshPrimitives.h"
 #include "physics/PhysicsSystem.h"
 #include "scenes/entities/EntityCommon.h"
 #include "serialization/SerialDocument.h"
 #include "window_context/Application.h"
 
-#include <fstream>
 #include <memory>
 #include <unordered_map>
 
 namespace Rapture {
+
+static constexpr float DEFAULT_SUN_PITCH = -1.874f;
+static constexpr float DEFAULT_SUN_INTENSITY = 3.14f;
+static constexpr float DEFAULT_SKY_INTENSITY = 0.1f;
+static constexpr float DEFAULT_FLOOR_SIZE = 20.0f;
+
+static constexpr std::string_view KEY_FORMAT_VERSION = "formatVersion";
+static constexpr std::string_view KEY_NAME = "name";
+static constexpr std::string_view KEY_FRUSTUM_CULLING = "frustumCulling";
+static constexpr std::string_view KEY_MAIN_CAMERA = "mainCamera";
+static constexpr std::string_view KEY_INSTANCES = "instances";
 
 Scene::Scene(const std::string &sceneName)
 {
@@ -80,12 +92,7 @@ Entity Scene::createCube(const std::string &name, Mobility mobility)
 
     entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
-    // Add a cube mesh
-    auto cubeMesh = std::make_unique<Mesh>(Primitives::CreateCube());
-    auto meshRef = AssetManager::registerVirtualAsset(std::move(cubeMesh), "Primitive_Cube_" + name, AssetType::MESH);
-    entity.addComponent<MeshComponent>(meshRef, mobility);
-
-    entity.addComponent<BoundingBoxComponent>(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
+    entity.addComponent<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_CUBE_MESH), mobility);
 
     // Add a material
     auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL_INSTANCE);
@@ -94,6 +101,26 @@ Entity Scene::createCube(const std::string &name, Mobility mobility)
     }
 
     return entity;
+}
+
+void Scene::addDefaultContent()
+{
+    auto *sun = m_root->add<DirectionalLight3D>("Sun");
+    sun->setRotation(glm::vec3(DEFAULT_SUN_PITCH, 0.0f, 0.0f));
+    sun->setColor(glm::vec3(1.0f));
+    sun->setIntensity(DEFAULT_SUN_INTENSITY);
+    sun->setAtmosphereSun(true);
+    sun->setCastsShadow(true);
+
+    auto *floor = m_root->add<StaticMesh3D>("Floor");
+    floor->setMesh(RE_PRIMITIVE_PLANE_MESH);
+    floor->setMaterial(RE_DEFAULT_MATERIAL_INSTANCE);
+    floor->setScale(glm::vec3(DEFAULT_FLOOR_SIZE, 1.0f, DEFAULT_FLOOR_SIZE));
+
+    if (m_environment != nullptr) {
+        m_environment->setUsesAtmosphereSkybox(true);
+        m_environment->setSkyIntensity(DEFAULT_SKY_INTENSITY);
+    }
 }
 
 Entity Scene::createSphere(const std::string &name, Mobility mobility)
@@ -114,12 +141,7 @@ Entity Scene::createSphere(const std::string &name, Mobility mobility)
 
     entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
-    // Add a sphere mesh
-    auto sphereMesh = std::make_unique<Mesh>(Primitives::CreateSphere(1.0f, 32));
-    auto meshRef = AssetManager::registerVirtualAsset(std::move(sphereMesh), "Primitive_Sphere_" + name, AssetType::MESH);
-    entity.addComponent<MeshComponent>(meshRef, mobility);
-
-    entity.addComponent<BoundingBoxComponent>(glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+    entity.addComponent<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_SPHERE_MESH), mobility);
 
     // Add a material
     auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL_INSTANCE);
@@ -282,8 +304,10 @@ void Scene::registerRigidBodies()
         RigidBodyConfig config;
         config.shape = rigidBody->shape;
         if (rigidBody->shapeFromBounds) {
-            if (auto *bounds = entity.tryGetComponent<BoundingBoxComponent>()) {
-                glm::vec3 halfExtents = bounds->localBoundingBox.getExtents() * 0.5f * transform->scale();
+            auto *meshComp = entity.tryGetComponent<MeshComponent>();
+            if (meshComp != nullptr && meshComp->mesh) {
+                BoundingBox bounds(meshComp->mesh->getBoundsMin(), meshComp->mesh->getBoundsMax());
+                glm::vec3 halfExtents = bounds.getExtents() * 0.5f * transform->scale();
                 config.shape = PhysicsBoxShape{halfExtents};
             }
         }
@@ -383,9 +407,9 @@ void Scene::serialize(WriteNode node) const
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    node.set("formatVersion", static_cast<uint64_t>(SCENE_FORMAT_VERSION));
-    node.set("name", std::string_view(m_config.sceneName));
-    node.set("frustumCulling", m_config.frustumCullingEnabled);
+    node.set(KEY_FORMAT_VERSION, static_cast<uint64_t>(SCENE_FORMAT_VERSION));
+    node.set(KEY_NAME, std::string_view(m_config.sceneName));
+    node.set(KEY_FRUSTUM_CULLING, m_config.frustumCullingEnabled);
 
     std::unordered_map<EntityID, uint32_t> indices;
     uint32_t nextIndex = 0;
@@ -395,64 +419,59 @@ void Scene::serialize(WriteNode node) const
     if (mainCamera.isValid()) {
         auto it = indices.find(mainCamera.getID());
         if (it != indices.end()) {
-            node.set("mainCamera", static_cast<uint64_t>(it->second));
+            node.set(KEY_MAIN_CAMERA, static_cast<uint64_t>(it->second));
         }
     }
 
-    WriteNode instances = node.addArray("instances");
+    WriteNode instances = node.addArray(KEY_INSTANCES);
     for (const auto &child : m_root->children()) {
         child->serialize(instances.appendObject());
     }
 }
 
-bool Scene::writeToFile(const std::filesystem::path &path) const
+void Scene::clearInstances()
+{
+    while (!m_root->children().empty()) {
+        m_root->removeChild(m_root->children().front().get());
+    }
+}
+
+std::unique_ptr<Scene> Scene::deserialize(ReadNode node)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    SerialDocument doc;
-    serialize(doc.root());
-
-    std::string text = doc.toText();
-    if (text.empty()) {
-        RP_CORE_ERROR("Failed to serialize scene '{}'", m_config.sceneName);
-        return false;
+    uint32_t formatVersion = static_cast<uint32_t>(node.child(KEY_FORMAT_VERSION).asU64(0));
+    if (formatVersion != SCENE_FORMAT_VERSION) {
+        RP_CORE_ERROR("cannot read a version {} scene, this build reads version {}", formatVersion, SCENE_FORMAT_VERSION);
+        return nullptr;
     }
 
-    std::error_code ec;
-    if (!path.parent_path().empty()) {
-        std::filesystem::create_directories(path.parent_path(), ec);
-        if (ec) {
-            RP_CORE_ERROR("Failed to create the directory for '{}': {}", path.string(), ec.message());
-            return false;
+    auto scene = std::make_unique<Scene>(std::string(node.child(KEY_NAME).asString("Untitled Scene")));
+    scene->m_config.frustumCullingEnabled = node.child(KEY_FRUSTUM_CULLING).asBool(scene->m_config.frustumCullingEnabled);
+
+    // the constructor seeds a default environment, which the document supplies again
+    scene->clearInstances();
+
+    std::vector<Instance *> order;
+    ReadNode instances = node.child(KEY_INSTANCES);
+    for (size_t i = 0; i < instances.size(); i++) {
+        if (!Instance::loadSubtree(*scene->m_root, instances.at(i), order)) {
+            RP_CORE_ERROR("scene '{}' could not be read", scene->m_config.sceneName);
+            return nullptr;
         }
     }
 
-    std::filesystem::path tempPath = path;
-    tempPath += ".tmp";
-
-    {
-        std::ofstream out(tempPath, std::ios::binary | std::ios::trunc);
-        if (!out.is_open()) {
-            RP_CORE_ERROR("Failed to open '{}' for writing", tempPath.string());
-            return false;
-        }
-
-        out.write(text.data(), static_cast<std::streamsize>(text.size()));
-        if (!out.good()) {
-            RP_CORE_ERROR("Failed to write '{}'", tempPath.string());
-            return false;
+    ReadNode mainCamera = node.child(KEY_MAIN_CAMERA);
+    if (mainCamera.valid()) {
+        size_t index = static_cast<size_t>(mainCamera.asU64(order.size()));
+        if (index < order.size()) {
+            scene->setMainCamera(order[index]->entity());
+        } else {
+            RP_CORE_WARN("scene '{}' names a main camera that is not in its tree", scene->m_config.sceneName);
         }
     }
 
-    std::filesystem::rename(tempPath, path, ec);
-    if (ec) {
-        RP_CORE_ERROR("Failed to move '{}' onto '{}': {}", tempPath.string(), path.string(), ec.message());
-        std::filesystem::remove(tempPath, ec);
-        return false;
-    }
-
-    RP_CORE_INFO("Wrote scene '{}' to '{}'", m_config.sceneName, path.string());
-    return true;
+    return scene;
 }
 
 void Scene::registerBLAS(Entity &entity)

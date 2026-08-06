@@ -3,6 +3,7 @@
 
 #include "Scene.h"
 #include "World.h"
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -23,6 +24,21 @@ class SceneManager {
     Scene *createScene(const std::string &name);
     void destroyScene(const std::string &name);
     Scene *getScene(const std::string &name);
+
+    /**
+     * @brief Builds a live scene from a scene asset, or returns the one already open for it
+     * @param handle The scene asset to open
+     * @return The live scene, or nullptr if the asset could not be read
+     */
+    Scene *openScene(AssetHandle handle);
+
+    /**
+     * @brief Writes a scene back into the asset it came from, importing a new one if it has none
+     * @param scene The scene to save
+     * @param outputFolder Directory a scene with no asset yet is written into
+     * @return True if the scene's asset now holds its contents
+     */
+    bool saveScene(Scene &scene, const std::filesystem::path &outputFolder);
 
     const std::vector<Scene *> &getActiveScenes() const { return m_activeScenes; }
 

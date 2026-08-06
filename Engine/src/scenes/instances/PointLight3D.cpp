@@ -7,6 +7,9 @@ namespace Rapture {
 
 static constexpr uint32_t SHADOW_MAP_SIZE = 1024;
 
+static constexpr std::string_view KEY_POINT_LIGHT = "pointLight";
+static constexpr std::string_view KEY_RANGE = "range";
+
 PointLight3D::PointLight3D(Scene &scene, std::string_view name) : Light3D(scene, name)
 {
     m_entity.setComponent<PointLightComponent>();
@@ -64,20 +67,20 @@ void PointLight3D::serialize(WriteNode node) const
 {
     Light3D::serialize(node);
 
-    WriteNode light = node.addObject("pointLight");
-    light.set("range", range());
+    WriteNode light = node.addObject(KEY_POINT_LIGHT);
+    light.set(KEY_RANGE, range());
 }
 
 void PointLight3D::deserialize(ReadNode node)
 {
     Light3D::deserialize(node);
 
-    ReadNode light = node.child("pointLight");
+    ReadNode light = node.child(KEY_POINT_LIGHT);
     if (!light.valid()) {
         return;
     }
 
-    setRange(static_cast<float>(light.child("range").asF64(range())));
+    setRange(static_cast<float>(light.child(KEY_RANGE).asF64(range())));
 }
 
 } // namespace Rapture

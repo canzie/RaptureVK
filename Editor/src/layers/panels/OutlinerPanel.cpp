@@ -1,6 +1,7 @@
 #include "OutlinerPanel.h"
 #include "Icons.h"
 #include "events/GameEvents.h"
+#include "layers/panels/AddSceneObjectMenu.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/entities/Entity.h"
 
@@ -10,6 +11,7 @@
 #include <components/text_label.h>
 #include <components/ui_scope.h>
 #include <memory>
+#include <unordered_set>
 
 #define COL_MENU_HOVER Amethyst::Color3::fromHex(0x4772b3)
 
@@ -105,6 +107,12 @@ void OutlinerPanel::setScene(Rapture::Scene *scene)
     m_scene = scene;
     m_hasScene = (scene != nullptr);
 
+    m_hierarchyChangedConn.disconnect();
+    if (m_hasScene) {
+        // deferred, the signal reaches here from inside a context menu callback
+        m_hierarchyChangedConn = scene->onHierarchyChanged.connect([this]() { m_pendingRefresh = true; });
+    }
+
     if (m_treeView == nullptr) {
         return;
     }
@@ -127,6 +135,11 @@ void OutlinerPanel::onUpdate(float dt)
         applyPendingDelete();
     }
 
+    if (m_pendingRefresh) {
+        m_pendingRefresh = false;
+        refresh();
+    }
+
     if (m_pendingRenameCommit) {
         applyPendingRename();
     }
@@ -141,6 +154,14 @@ void OutlinerPanel::refresh()
 {
     if (!m_hasScene || !m_scene) {
         return;
+    }
+
+    // a rebuilt row starts expanded, so what the user collapsed is carried across by instance
+    std::unordered_set<const Rapture::Instance *> collapsed;
+    for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
+        if (!m_treeView->isExpanded(row)) {
+            collapsed.insert(m_rowInstances[row]);
+        }
     }
 
     m_renameInput = nullptr;
@@ -159,6 +180,12 @@ void OutlinerPanel::refresh()
     for (const auto &child : sceneRoot->children()) {
         Rapture::Instance *instance = child.get();
         tvScope.row([this, instance](Amethyst::TreeRowScope &row) { buildInstanceTree(instance, row); });
+    }
+
+    for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
+        if (collapsed.contains(m_rowInstances[row])) {
+            m_treeView->collapse(row);
+        }
     }
 }
 
@@ -208,6 +235,8 @@ void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
     bool hasChildren = !instance->children().empty();
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
+    items.push_back(Amethyst::makeSubmenuItem("Add", AddSceneObjectMenu::buildItems(instance)));
+    items.push_back(Amethyst::makeSeparatorItem());
     items.push_back(Amethyst::makeActionItem("Rename", [this, row, instance]() { startRename(row, instance); }));
     items.push_back(Amethyst::makeActionItem("Delete", [this, instance]() { requestDelete(instance, false); }));
     if (hasChildren) {

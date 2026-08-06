@@ -1,4 +1,3 @@
-#include "layers/TestLayer.h"
 #include "layers/EditorLayer.h"
 #include "layers/AmethystLayer.h"
 #include "logging/Log.h"
@@ -7,13 +6,16 @@
 #include "EntryPoint.h"
 #include "events/Events.h"
 #include "events/GameEvents.h"
+#include "LauncherConfig.h"
 #include "scenes/Project.h"
 #include "scenes/SceneManager.h"
+
+#include <filesystem>
 
 // The main Editor application class
 class EditorApp : public Rapture::Application {
   public:
-    EditorApp(int width, int height, const char *title) : Application(width, height, title)
+    EditorApp(int width, int height, const char *title, int argc, char **argv) : Application(width, height, title)
     {
 
         // Log startup message
@@ -22,11 +24,17 @@ class EditorApp : public Rapture::Application {
         // Initialize event listeners
         setupEventHandlers();
 
-        // Push scene bootstrap layer
-        pushLayer(new TestLayer());
+        std::filesystem::path projectPath =
+            argc > 1 ? std::filesystem::path(argv[1]) : LauncherConfig::load().autoLaunchProject();
+        if (!projectPath.empty()) {
+            openProject(projectPath);
+        }
 
-        // Push editor view layer (camera, controller, input)
-        pushLayer(new EditorLayer());
+        // Without a project there is no scene to view, so the UI layer shows the launcher instead
+        if (hasProject()) {
+            // Push editor view layer (camera, controller, input)
+            pushLayer(new EditorLayer());
+        }
 
         // Push Amethyst UI layer as an overlay so it renders on top
 
@@ -68,7 +76,7 @@ class EditorApp : public Rapture::Application {
 };
 
 // Implementation of the function declared in AppEntryPoint.h
-Rapture::Application *Rapture::CreateApplicationWindow(int width, int height, const char *title)
+Rapture::Application *Rapture::CreateApplicationWindow(int width, int height, const char *title, int argc, char **argv)
 {
-    return new EditorApp(width, height, title);
+    return new EditorApp(width, height, title, argc, argv);
 }

@@ -8,11 +8,16 @@
 
 namespace Rapture {
 
+static constexpr std::string_view KEY_MESH = "mesh";
+static constexpr std::string_view KEY_MATERIAL = "material";
+static constexpr std::string_view KEY_VISIBLE = "visible";
+static constexpr std::string_view KEY_MOBILITY = "mobility";
+static constexpr std::string_view KEY_RAY_TRACED = "rayTraced";
+
 Mesh3D::Mesh3D(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
     m_entity.setComponent<MeshComponent>();
     m_entity.setComponent<MaterialComponent>();
-    m_entity.setComponent<BoundingBoxComponent>();
 }
 
 const TypeInfo &Mesh3D::staticType()
@@ -51,7 +56,7 @@ void Mesh3D::setMesh(AssetHandle mesh)
         return;
     }
 
-    component->mesh = AssetPtr<Mesh>(std::move(ref));
+    component->setMesh(std::move(ref));
     component->isLoading = false;
     m_entity.markDirty();
 }
@@ -118,20 +123,14 @@ void Mesh3D::setMobility(Mobility mobility)
 
 glm::vec3 Mesh3D::boundsMin() const
 {
-    const auto *component = m_entity.tryGetComponent<BoundingBoxComponent>();
-    return component != nullptr ? component->localBoundingBox.getMin() : glm::vec3(0.0f);
+    const auto *component = m_entity.tryGetComponent<MeshComponent>();
+    return (component != nullptr && component->mesh) ? component->mesh->getBoundsMin() : glm::vec3(0.0f);
 }
 
 glm::vec3 Mesh3D::boundsMax() const
 {
-    const auto *component = m_entity.tryGetComponent<BoundingBoxComponent>();
-    return component != nullptr ? component->localBoundingBox.getMax() : glm::vec3(0.0f);
-}
-
-void Mesh3D::setBounds(const glm::vec3 &min, const glm::vec3 &max)
-{
-    m_entity.setComponent<BoundingBoxComponent>(min, max);
-    m_entity.markDirty();
+    const auto *component = m_entity.tryGetComponent<MeshComponent>();
+    return (component != nullptr && component->mesh) ? component->mesh->getBoundsMax() : glm::vec3(0.0f);
 }
 
 bool Mesh3D::isRayTraced() const
@@ -171,56 +170,37 @@ void Mesh3D::serialize(WriteNode node) const
 {
     Node3D::serialize(node);
 
-    WriteNode mesh = node.addObject("mesh");
-    mesh.set("mesh", this->mesh());
-    mesh.set("material", material());
-    mesh.set("visible", isVisible());
-    mesh.set("mobility", static_cast<uint64_t>(mobility()));
-    mesh.set("rayTraced", isRayTraced());
-
-    glm::vec3 min = boundsMin();
-    glm::vec3 max = boundsMax();
-    WriteNode bounds = mesh.addArray("bounds");
-    bounds.append(min.x);
-    bounds.append(min.y);
-    bounds.append(min.z);
-    bounds.append(max.x);
-    bounds.append(max.y);
-    bounds.append(max.z);
+    WriteNode mesh = node.addObject(KEY_MESH);
+    mesh.set(KEY_MESH, this->mesh());
+    mesh.set(KEY_MATERIAL, material());
+    mesh.set(KEY_VISIBLE, isVisible());
+    mesh.set(KEY_MOBILITY, static_cast<uint64_t>(mobility()));
+    mesh.set(KEY_RAY_TRACED, isRayTraced());
 }
 
 void Mesh3D::deserialize(ReadNode node)
 {
     Node3D::deserialize(node);
 
-    ReadNode mesh = node.child("mesh");
+    ReadNode mesh = node.child(KEY_MESH);
     if (!mesh.valid()) {
         return;
     }
 
-    setMobility(static_cast<Mobility>(mesh.child("mobility").asU64(static_cast<uint64_t>(mobility()))));
+    setMobility(static_cast<Mobility>(mesh.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(mobility()))));
 
-    AssetHandle meshHandle = mesh.child("mesh").asU64(INVALID_ASSET_HANDLE);
+    AssetHandle meshHandle = mesh.child(KEY_MESH).asU64(INVALID_ASSET_HANDLE);
     if (meshHandle != INVALID_ASSET_HANDLE) {
         setMesh(meshHandle);
     }
 
-    AssetHandle materialHandle = mesh.child("material").asU64(INVALID_ASSET_HANDLE);
+    AssetHandle materialHandle = mesh.child(KEY_MATERIAL).asU64(INVALID_ASSET_HANDLE);
     if (materialHandle != INVALID_ASSET_HANDLE) {
         setMaterial(materialHandle);
     }
 
-    ReadNode bounds = mesh.child("bounds");
-    if (bounds.size() == 6) {
-        glm::vec3 min(static_cast<float>(bounds.at(0).asF64(0.0)), static_cast<float>(bounds.at(1).asF64(0.0)),
-                      static_cast<float>(bounds.at(2).asF64(0.0)));
-        glm::vec3 max(static_cast<float>(bounds.at(3).asF64(0.0)), static_cast<float>(bounds.at(4).asF64(0.0)),
-                      static_cast<float>(bounds.at(5).asF64(0.0)));
-        setBounds(min, max);
-    }
-
-    setVisible(mesh.child("visible").asBool(isVisible()));
-    setRayTraced(mesh.child("rayTraced").asBool(isRayTraced()));
+    setVisible(mesh.child(KEY_VISIBLE).asBool(isVisible()));
+    setRayTraced(mesh.child(KEY_RAY_TRACED).asBool(isRayTraced()));
 }
 
 } // namespace Rapture

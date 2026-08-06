@@ -1,4 +1,6 @@
 #include "CompositePass.h"
+
+#include "utils/EnginePaths.h"
 #include "window_context/Application.h"
 
 #include "asset_manager/AssetManager.h"
@@ -25,7 +27,7 @@ CompositePass::CompositePass(float width, float height, VkFormat colorFormat)
 
     m_rc = &vc.getRenderContext();
 
-    auto shaderPath = app.getProject().getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/";

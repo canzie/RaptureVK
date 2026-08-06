@@ -1,5 +1,7 @@
 #include "TerrainGenerator.h"
 
+#include "utils/EnginePaths.h"
+
 #include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/command_buffers/CommandBuffer.h"
@@ -257,8 +259,7 @@ void TerrainGenerator::initComputePipeline()
 {
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
-    auto &project = app.getProject();
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";

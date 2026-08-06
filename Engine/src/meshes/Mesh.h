@@ -1,10 +1,13 @@
-#pragma once
+#ifndef RAPTURE__MESH_H
+#define RAPTURE__MESH_H
 
 #include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 #include "buffers/BufferLayout.h"
 #include "buffers/IndexBuffer.h"
@@ -23,6 +26,9 @@ struct MeshAllocatorParams {
     uint32_t indexDataSize = 0;
     uint32_t indexCount = 0;
     uint32_t indexType = 0;
+
+    glm::vec3 boundsMin = glm::vec3(0.0f);
+    glm::vec3 boundsMax = glm::vec3(0.0f);
 
     BufferLayout bufferLayout;
 
@@ -59,6 +65,16 @@ class Mesh {
 
     uint32_t getIndexCount() const { return m_indexCount; }
 
+    const glm::vec3 &getBoundsMin() const { return m_boundsMin; }
+    const glm::vec3 &getBoundsMax() const { return m_boundsMax; }
+
+    /**
+     * @brief Sets the extents of this mesh's geometry, which are authored rather than computed
+     * @param min Corner of the box with the smallest coordinates
+     * @param max Corner of the box with the largest coordinates
+     */
+    void setBounds(const glm::vec3 &min, const glm::vec3 &max);
+
     // static std::shared_ptr<UniformBuffer> createBindlessMeshDataBuffer();
 
     std::shared_ptr<BufferAllocation> getIndexAllocation() { return m_indexAllocation; }
@@ -87,6 +103,8 @@ class Mesh {
 
   private:
     uint32_t m_indexCount;
+    glm::vec3 m_boundsMin = glm::vec3(0.0f);
+    glm::vec3 m_boundsMax = glm::vec3(0.0f);
     std::shared_ptr<VertexBuffer> m_vertexBuffer;
     std::shared_ptr<IndexBuffer> m_indexBuffer;
 
@@ -101,3 +119,5 @@ class Mesh {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__MESH_H

@@ -1,9 +1,10 @@
 #pragma once
 
 #include "acceleration_structures/TLAS.h"
+#include "asset_manager/AssetCommon.h"
+#include "events/EventSignal.h"
 #include "scenes/entities/EntityCommon.h"
 #include <entt/entt.hpp>
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@ class Instance;
 class SceneRenderData;
 class PhysicsSystem;
 class WriteNode;
+class ReadNode;
 struct RenderContext;
 
 static constexpr uint32_t SCENE_FORMAT_VERSION = 1;
@@ -34,6 +36,11 @@ class Scene {
     Entity createCube(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
     Entity createSphere(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
 
+    /**
+     * @brief Fills a newly created scene with a sun, a sky and a floor
+     */
+    void addDefaultContent();
+
     void destroyEntity(Entity entity);
 
     void onUpdate(float dt);
@@ -45,6 +52,13 @@ class Scene {
     const SceneSettings &getSettings() const;
 
     std::string getSceneName() const;
+
+    /**
+     * @brief The scene file this scene was opened from, which saving writes back to
+     * @return The handle, or INVALID_ASSET_HANDLE if this scene has never been saved
+     */
+    AssetHandle sourceAsset() const { return m_sourceAsset; }
+    void setSourceAsset(AssetHandle sourceAsset) { m_sourceAsset = sourceAsset; }
 
     void setMainCamera(Entity camera);
     Entity getMainCamera() const;
@@ -86,15 +100,11 @@ class Scene {
     void serialize(WriteNode node) const;
 
     /**
-     * @brief Writes the scene to a scene file, replacing it atomically
-     *
-     * TODO: temporary, the file I/O moves to the asset manager once scenes are assets and the
-     * project references them by uuid; only serialize stays here.
-     *
-     * @param path Destination file, its parent directories are created if missing
-     * @return True if the file now holds this scene
+     * @brief Builds a scene from a scene document
+     * @param node Cursor to the scene's object
+     * @return The new scene, or nullptr if the document could not be read
      */
-    bool writeToFile(const std::filesystem::path &path) const;
+    static std::unique_ptr<Scene> deserialize(ReadNode node);
 
     void registerBLAS(Entity &entity);
 
@@ -119,13 +129,24 @@ class Scene {
   public:
     bool locked = false;
 
+    /**
+     * @brief Fires when instances are added to or removed from this scene, for views mirroring the tree
+     */
+    EventSignal<void()> onHierarchyChanged;
+
   private:
     void onRigidBodyConstructed(entt::registry &registry, entt::entity entity);
     void registerRigidBodies();
     void syncRigidBodyTransforms();
 
+    /**
+     * @brief Destroys every instance under the root, leaving the root itself
+     */
+    void clearInstances();
+
   private:
     entt::registry m_registry;
+    AssetHandle m_sourceAsset = INVALID_ASSET_HANDLE;
     Environment *m_environment = nullptr;
     std::unique_ptr<SceneRenderData> m_renderData;
     std::unique_ptr<PhysicsSystem> m_physics;

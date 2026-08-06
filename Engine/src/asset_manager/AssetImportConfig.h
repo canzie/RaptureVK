@@ -53,8 +53,14 @@ struct MaterialInstanceImportData {
     std::unique_ptr<MaterialInstance> instance;
 };
 
-using AssetImportDataVariant =
-    std::variant<std::monostate, MeshImportData, PrefabImportData, BaseMaterialImportData, MaterialInstanceImportData>;
+class SceneAsset;
+
+struct SceneImportData {
+    std::unique_ptr<SceneAsset> scene;
+};
+
+using AssetImportDataVariant = std::variant<std::monostate, MeshImportData, PrefabImportData, BaseMaterialImportData,
+                                            MaterialInstanceImportData, SceneImportData>;
 
 struct AssetImportFileRequest {
     std::filesystem::path source;

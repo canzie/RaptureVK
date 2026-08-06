@@ -11,6 +11,7 @@
 #include <materials/MaterialInstance.h>
 #include <render_targets/SceneRenderTarget.h>
 #include <scenes/Scene.h>
+#include <utils/EnginePaths.h>
 #include <scenes/entities/Entity.h>
 #include <scenes/instances/Environment.h>
 #include <viewport/ViewportManager.h>
@@ -95,7 +96,7 @@ void MaterialEditorWorkspace::setupPreviewScene()
     light.addComponent<Rapture::DirectionalLightComponent>(glm::vec3(1.0f), 3.0f);
 
     Rapture::Environment *environment = m_previewScene->environment();
-    auto skyboxPath = app.getProject().getProjectRootDirectory() / "assets/textures/cubemaps/default.cubemap";
+    auto skyboxPath = Rapture::EnginePaths::assetDirectory() / "textures/cubemaps/default.cubemap";
     Rapture::AssetRef skyboxRef = Rapture::AssetManager::importAsset(skyboxPath);
     if (environment != nullptr && skyboxRef) {
         environment->setSkybox(skyboxRef.get()->getHandle());

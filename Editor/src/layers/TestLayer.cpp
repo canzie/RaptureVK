@@ -12,11 +12,13 @@
 #include "scenes/instances/Environment.h"
 #include "scenes/instances/StaticMesh3D.h"
 
-#include "meshes/MeshPrimitives.h"
+#include "asset_manager/ReservedAssets.h"
 #include "utils/Timestep.h"
 #include "window_context/Application.h"
 
 #include "loaders/gltf/glTFLoader.h"
+
+#include <utils/EnginePaths.h>
 
 #include <filesystem>
 
@@ -145,13 +147,6 @@ void TestLayer::onAttach()
     m_fpsTimer = 0.0f;
 }
 
-static Rapture::AssetHandle s_registerPrimitiveMesh(Rapture::Mesh mesh, const std::string &name)
-{
-    auto ref = Rapture::AssetManager::registerVirtualAsset(std::make_unique<Rapture::Mesh>(std::move(mesh)), name,
-                                                           Rapture::AssetType::MESH);
-    return ref ? ref.get()->getHandle() : Rapture::INVALID_ASSET_HANDLE;
-}
-
 static Rapture::AssetHandle s_defaultMaterialHandle()
 {
     auto ref = Rapture::AssetManager::importDefaultAsset(Rapture::AssetType::MATERIAL_INSTANCE);
@@ -159,8 +154,7 @@ static Rapture::AssetHandle s_defaultMaterialHandle()
 }
 
 static Rapture::StaticMesh3D *s_addStaticMesh(Rapture::Scene &scene, std::string_view name, Rapture::AssetHandle mesh,
-                                              Rapture::AssetHandle material, Rapture::Mobility mobility,
-                                              const glm::vec3 &boundsMin, const glm::vec3 &boundsMax)
+                                              Rapture::AssetHandle material, Rapture::Mobility mobility)
 {
     auto *node = scene.root()->add<Rapture::StaticMesh3D>(name);
     node->setMobility(mobility);
@@ -168,7 +162,6 @@ static Rapture::StaticMesh3D *s_addStaticMesh(Rapture::Scene &scene, std::string
     if (material != Rapture::INVALID_ASSET_HANDLE) {
         node->setMaterial(material);
     }
-    node->setBounds(boundsMin, boundsMax);
     node->setRayTraced(true);
     return node;
 }
@@ -186,16 +179,14 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     auto &project = app.getProject();
 
     // Models are imported from the UI now; the registration pass picks up their .rasset files at startup
-    Rapture::AssetHandle cubeMesh = s_registerPrimitiveMesh(Rapture::Primitives::CreateCube(), "Primitive_Cube");
-    Rapture::AssetHandle sphereMesh = s_registerPrimitiveMesh(Rapture::Primitives::CreateSphere(1.0f, 32), "Primitive_Sphere");
+    Rapture::AssetHandle cubeMesh = Rapture::RE_PRIMITIVE_CUBE_MESH;
+    Rapture::AssetHandle sphereMesh = Rapture::RE_PRIMITIVE_SPHERE_MESH;
     Rapture::AssetHandle defaultMaterial = s_defaultMaterialHandle();
 
-    auto *cube = s_addStaticMesh(activeScene, "Test Cube", cubeMesh, defaultMaterial, Rapture::MOBILITY_STATIC, glm::vec3(-0.5f),
-                                 glm::vec3(0.5f));
+    auto *cube = s_addStaticMesh(activeScene, "Test Cube", cubeMesh, defaultMaterial, Rapture::MOBILITY_STATIC);
     cube->setPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 
-    auto *floor = s_addStaticMesh(activeScene, "Floor", cubeMesh, defaultMaterial, Rapture::MOBILITY_DYNAMIC, glm::vec3(-0.5f),
-                                  glm::vec3(0.5f));
+    auto *floor = s_addStaticMesh(activeScene, "Floor", cubeMesh, defaultMaterial, Rapture::MOBILITY_DYNAMIC);
     floor->setScale(glm::vec3(10.0f, 0.1f, 10.0f));
     floor->entity().addComponent<Rapture::RigidBodyComponent>().motionType = Rapture::PHYSICS_MOTION_STATIC;
 
@@ -215,8 +206,7 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
             auto matRef = Rapture::AssetManager::registerVirtualAsset(std::move(mat), name, Rapture::AssetType::MATERIAL_INSTANCE);
             Rapture::AssetHandle matHandle = matRef ? matRef.get()->getHandle() : Rapture::INVALID_ASSET_HANDLE;
 
-            auto *sphere = s_addStaticMesh(activeScene, name, sphereMesh, matHandle, Rapture::MOBILITY_DYNAMIC, glm::vec3(-1.0f),
-                                           glm::vec3(1.0f));
+            auto *sphere = s_addStaticMesh(activeScene, name, sphereMesh, matHandle, Rapture::MOBILITY_DYNAMIC);
             sphere->setPosition(position);
             sphere->setScale(glm::vec3(2.0f));
             sphere->entity().addComponent<Rapture::RigidBodyComponent>();
@@ -305,7 +295,8 @@ void TestLayer::onNewActiveScene(Rapture::Scene &scene)
     RP_INFO("Terrain entity created with {} chunks (radius {})", terrainComp.generator->getChunkCount(),
             terrainConfig.getChunkRadius());
 
-    Rapture::MaterialManager::getSurfaceGraphManager().writeGeneratedFiles(project.getProjectShaderDirectory() / "glsl/generated");
+    Rapture::MaterialManager::getSurfaceGraphManager().writeGeneratedFiles(Rapture::EnginePaths::shaderDirectory() /
+                                                                          "glsl/generated");
 
     RP_INFO("Scene setup complete for: {}", activeScene.getSceneName());
 }

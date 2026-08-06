@@ -68,8 +68,6 @@ class glTF2Loader {
         int32_t materialIndex = -1;
         glm::vec3 boundingBoxMin = glm::vec3(0.0f);
         glm::vec3 boundingBoxMax = glm::vec3(0.0f);
-
-        bool hasBoundingBox() const { return glm::any(glm::notEqual(boundingBoxMin, boundingBoxMax)); }
     };
 
     bool loadScene(yyjson_val *sceneRoot);

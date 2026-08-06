@@ -53,6 +53,19 @@ static void s_loadPrefabIntoScene(Rapture::AssetHandle handle, Rapture::Scene *s
     }
 }
 
+static void s_openScene(Rapture::AssetHandle handle)
+{
+    auto &sceneManager = Rapture::Application::getInstance().getProject().getSceneManager();
+
+    Rapture::Scene *scene = sceneManager.openScene(handle);
+    if (scene == nullptr) {
+        RP_WARN("Failed to open the scene");
+        return;
+    }
+
+    sceneManager.activateScene(scene);
+}
+
 static std::string s_normalizeForSearch(std::string_view text)
 {
     std::string out;

@@ -37,11 +37,7 @@ class Prefab {
         AssetHandle mesh = INVALID_ASSET_HANDLE;     ///< no mesh = group/transform node
         AssetHandle material = INVALID_ASSET_HANDLE; ///< default material for this node's mesh
 
-        glm::vec3 boundingBoxMin = glm::vec3(0.0f);
-        glm::vec3 boundingBoxMax = glm::vec3(0.0f);
-
         bool hasMesh() const { return mesh != INVALID_ASSET_HANDLE; }
-        bool hasBoundingBox() const { return glm::any(glm::notEqual(boundingBoxMin, boundingBoxMax)); }
     };
 
     /**

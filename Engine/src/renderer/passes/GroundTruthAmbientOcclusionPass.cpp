@@ -1,5 +1,7 @@
 #include "GroundTruthAmbientOcclusionPass.h"
 
+#include "utils/EnginePaths.h"
+
 #include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/command_buffers/CommandBuffer.h"
@@ -45,8 +47,7 @@ GroundTruthAmbientOcclusionPass::~GroundTruthAmbientOcclusionPass()
 
 void GroundTruthAmbientOcclusionPass::loadShaders()
 {
-    auto &project = Application::getInstance().getProject();
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";

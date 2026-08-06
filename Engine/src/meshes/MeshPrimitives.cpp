@@ -1,4 +1,5 @@
 #include "MeshPrimitives.h"
+#include <algorithm>
 #include <cmath>
 
 #ifndef M_PI
@@ -36,6 +37,8 @@ Mesh Primitives::CreateCube()
 
     bufferLayout.calculateVertexSize();
     params.bufferLayout = bufferLayout;
+    params.boundsMin = glm::vec3(-0.5f);
+    params.boundsMax = glm::vec3(0.5f);
 
     // Cube vertices (24 vertices, 4 per face for proper normals and UVs)
     // Format: position (3 floats), normal (3 floats), UV (2 floats)
@@ -129,6 +132,8 @@ Mesh Primitives::CreateSphere(float radius, uint32_t segments)
 
     bufferLayout.calculateVertexSize();
     params.bufferLayout = bufferLayout;
+    params.boundsMin = glm::vec3(-radius);
+    params.boundsMax = glm::vec3(radius);
 
     std::vector<float> vertices;
     std::vector<uint16_t> indices;
@@ -219,6 +224,8 @@ Mesh Primitives::CreatePlane(float segments)
 
     bufferLayout.calculateVertexSize();
     params.bufferLayout = bufferLayout;
+    params.boundsMin = glm::vec3(-0.5f, 0.0f, -0.5f);
+    params.boundsMax = glm::vec3(0.5f, 0.0f, 0.5f);
 
     std::vector<float> vertices;
     std::vector<uint16_t> indices;
@@ -242,21 +249,19 @@ Mesh Primitives::CreatePlane(float segments)
         }
     }
 
-    // Generate indices with correct winding order (counter-clockwise)
+    // Wound so the triangle normal comes out along +Y, matching the vertex normal above
     for (uint16_t i = 0; i < segs; ++i) {
         for (uint16_t j = 0; j < segs; ++j) {
             uint16_t first = i * (segs + 1) + j;
             uint16_t second = first + segs + 1;
 
-            // First triangle (counter-clockwise)
             indices.push_back(first);
-            indices.push_back(first + 1);
             indices.push_back(second);
+            indices.push_back(first + 1);
 
-            // Second triangle (counter-clockwise)
             indices.push_back(second);
-            indices.push_back(first + 1);
             indices.push_back(second + 1);
+            indices.push_back(first + 1);
         }
     }
 
@@ -285,6 +290,8 @@ Mesh Primitives::CreateLine(float start, float end)
 
     bufferLayout.calculateVertexSize();
     params.bufferLayout = bufferLayout;
+    params.boundsMin = glm::vec3(std::min(start, end), 0.0f, 0.0f);
+    params.boundsMax = glm::vec3(std::max(start, end), 0.0f, 0.0f);
 
     // Simple line along X-axis from start to end
     std::vector<float> vertices = {

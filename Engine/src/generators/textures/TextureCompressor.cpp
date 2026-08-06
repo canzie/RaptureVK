@@ -1,5 +1,7 @@
 #include "TextureCompressor.h"
 
+#include "utils/EnginePaths.h"
+
 #include "buffers/StorageBuffer.h"
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
@@ -67,7 +69,7 @@ static Shader *s_getEncoderShader(TextureFormat format)
         return nullptr;
     }
 
-    auto shaderDir = Application::getInstance().getProject().getProjectShaderDirectory();
+    auto shaderDir = EnginePaths::shaderDirectory();
 
     Shader *shader = new Shader(shaderDir / spv);
     if (!shader->isReady()) {

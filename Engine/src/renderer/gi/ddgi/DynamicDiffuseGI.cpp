@@ -1,5 +1,7 @@
 #include "DynamicDiffuseGI.h"
 
+#include "utils/EnginePaths.h"
+
 #include "asset_manager/Asset.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/command_buffers/CommandPool.h"
@@ -103,9 +105,7 @@ DynamicDiffuseGI::~DynamicDiffuseGI()
 void DynamicDiffuseGI::createPipelines()
 {
 
-    auto &app = Application::getInstance();
-    auto &proj = app.getProject();
-    auto shaderDir = proj.getProjectShaderDirectory();
+    auto shaderDir = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderIrradianceBlendConfig;
     shaderIrradianceBlendConfig.compileInfo.macros.push_back({"DDGI_BLEND_RADIANCE"});

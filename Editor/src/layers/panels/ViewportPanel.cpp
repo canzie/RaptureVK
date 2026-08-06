@@ -503,8 +503,8 @@ void ViewportPanel::updateGizmo()
         m_previousSelectedEntity = m_selectedEntity;
     }
 
-    auto [transformComponent, bbComp] =
-        m_selectedEntity.tryGetComponents<Rapture::TransformComponent, Rapture::BoundingBoxComponent>();
+    auto [transformComponent, meshComp] =
+        m_selectedEntity.tryGetComponents<Rapture::TransformComponent, Rapture::MeshComponent>();
     if (!transformComponent) {
         return;
     }
@@ -526,7 +526,9 @@ void ViewportPanel::updateGizmo()
     glm::mat4 viewMatrix = camComp.camera.getViewMatrix();
     glm::mat4 projectionMatrix = camComp.camera.getProjectionMatrix();
     glm::mat4 objectTransform = transformComponent->transforms.getTransform();
-    glm::vec3 pivot = bbComp ? bbComp->localBoundingBox.getCenter() : glm::vec3(0.0f);
+    glm::vec3 pivot = (meshComp != nullptr && meshComp->mesh)
+                          ? Rapture::BoundingBox(meshComp->mesh->getBoundsMin(), meshComp->mesh->getBoundsMax()).getCenter()
+                          : glm::vec3(0.0f);
 
     Amethyst::GizmoParams params;
     params.view = viewMatrix;

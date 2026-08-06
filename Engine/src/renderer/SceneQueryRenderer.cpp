@@ -1,4 +1,6 @@
 #include "renderer/SceneQueryRenderer.h"
+
+#include "utils/EnginePaths.h"
 #include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
@@ -407,8 +409,7 @@ void SceneQueryRenderer::createPipeline()
     colorBlending.attachmentCount = 0;
     colorBlending.pAttachments = nullptr;
 
-    Application &app = Application::getInstance();
-    std::filesystem::path shaderPath = app.getProject().getProjectShaderDirectory();
+    std::filesystem::path shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";

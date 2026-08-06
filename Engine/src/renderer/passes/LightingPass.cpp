@@ -1,4 +1,6 @@
 #include "LightingPass.h"
+
+#include "utils/EnginePaths.h"
 #include "window_context/Application.h"
 
 #include "buffers/descriptors/DescriptorManager.h"
@@ -59,9 +61,8 @@ LightingPass::LightingPass(float width, float height, DynamicDiffuseGI *ddgi, Vk
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
-    auto &project = app.getProject();
 
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/";

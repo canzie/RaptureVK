@@ -5,6 +5,11 @@
 
 namespace Rapture {
 
+static constexpr std::string_view KEY_TRANSFORM = "transform";
+static constexpr std::string_view KEY_TRANSLATION = "translation";
+static constexpr std::string_view KEY_ROTATION = "rotation";
+static constexpr std::string_view KEY_SCALE = "scale";
+
 static void s_writeVec3(WriteNode node, std::string_view key, const glm::vec3 &value)
 {
     WriteNode array = node.addArray(key);
@@ -159,24 +164,24 @@ void Node3D::serialize(WriteNode node) const
 {
     Instance::serialize(node);
 
-    WriteNode transform = node.addObject("transform");
-    s_writeVec3(transform, "translation", position());
-    s_writeQuat(transform, "rotation", rotationQuat());
-    s_writeVec3(transform, "scale", scale());
+    WriteNode transform = node.addObject(KEY_TRANSFORM);
+    s_writeVec3(transform, KEY_TRANSLATION, position());
+    s_writeQuat(transform, KEY_ROTATION, rotationQuat());
+    s_writeVec3(transform, KEY_SCALE, scale());
 }
 
 void Node3D::deserialize(ReadNode node)
 {
     Instance::deserialize(node);
 
-    ReadNode transform = node.child("transform");
+    ReadNode transform = node.child(KEY_TRANSFORM);
     if (!transform.valid()) {
         return;
     }
 
-    setPosition(s_readVec3(transform, "translation", position()));
-    setRotation(s_readQuat(transform, "rotation", rotationQuat()));
-    setScale(s_readVec3(transform, "scale", scale()));
+    setPosition(s_readVec3(transform, KEY_TRANSLATION, position()));
+    setRotation(s_readQuat(transform, KEY_ROTATION, rotationQuat()));
+    setScale(s_readVec3(transform, KEY_SCALE, scale()));
 }
 
 } // namespace Rapture

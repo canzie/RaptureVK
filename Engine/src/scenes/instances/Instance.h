@@ -141,6 +141,15 @@ class Instance {
     virtual void deserialize(ReadNode node);
 
     /**
+     * @brief Creates the instance a document names, parents it and reads its subtree
+     * @param parent The instance the new instance is added to
+     * @param node Cursor to the instance's object
+     * @param order Receives every instance created, in the order serialize wrote them
+     * @return True if the whole subtree was read
+     */
+    static bool loadSubtree(Instance &parent, ReadNode node, std::vector<Instance *> &order);
+
+    /**
      * @brief Fires as this instance is destroyed, before its subtree is torn down
      */
     EventSignal<void(Instance *)> onDestroy;

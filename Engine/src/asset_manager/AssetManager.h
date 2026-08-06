@@ -77,6 +77,11 @@ class AssetManager {
         return AssetRef(&asset, &metadata.useCount);
     }
 
+    static bool updateAsset(AssetHandle handle, AssetVariant asset)
+    {
+        return s_activeAssetManager->updateAsset(handle, std::move(asset));
+    }
+
     static AssetHandle registerRaptureAsset(std::filesystem::path path)
     {
         return s_activeAssetManager->registerRaptureAsset(std::move(path));
@@ -124,6 +129,15 @@ class AssetManager {
         auto &asset = s_activeAssetManager->registerReservedAsset(handle, std::move(assetValue), name, assetType);
         auto &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
         return asset ? AssetRef(&asset, &metadata.useCount) : AssetRef();
+    }
+
+    static void registerBuiltinAssets()
+    {
+        if (!s_isInitialized || !s_activeAssetManager) {
+            RP_CORE_ERROR("AssetManager not initialized");
+            return;
+        }
+        s_activeAssetManager->registerBuiltinAssets();
     }
 
     static bool unregisterVirtualAsset(AssetHandle handle)

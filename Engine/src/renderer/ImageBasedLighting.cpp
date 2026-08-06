@@ -1,5 +1,7 @@
 #include "ImageBasedLighting.h"
 
+#include "utils/EnginePaths.h"
+
 #include "buffers/command_buffers/CommandBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorSet.h"
@@ -31,7 +33,7 @@ struct PrefilterPushConstants {
 
 static std::unique_ptr<Shader> s_loadShader(const char *relPath)
 {
-    auto shaderDir = Application::getInstance().getProject().getProjectShaderDirectory();
+    auto shaderDir = EnginePaths::shaderDirectory();
     auto shader = std::make_unique<Shader>(shaderDir / relPath);
     if (!shader->isReady()) {
         RP_CORE_ERROR("Failed to load IBL bake shader {}", relPath);

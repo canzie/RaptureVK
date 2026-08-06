@@ -14,11 +14,11 @@ static constexpr uint32_t MESH_BLOB_MAGIC = 0x484D5052; // "RPMH", identifies th
 // Version packs major in the high 16 bits and minor in the low 16. A backward-compatible change
 // (consuming reserved header space) bumps minor, a breaking change (header grows, fields reorder)
 // bumps major. Readers reject a different major and warn on a different minor.
-static constexpr uint16_t MESH_BLOB_VERSION_MAJOR = 1;
+static constexpr uint16_t MESH_BLOB_VERSION_MAJOR = 2;
 static constexpr uint16_t MESH_BLOB_VERSION_MINOR = 0;
 static constexpr uint32_t MESH_BLOB_VERSION = (static_cast<uint32_t>(MESH_BLOB_VERSION_MAJOR) << 16) | MESH_BLOB_VERSION_MINOR;
 
-// Fixed 64-byte directory at the start of every mesh blob. The reserved tail absorbs new fields
+// Fixed 128-byte directory at the start of every mesh blob. The reserved tail absorbs new fields
 // without moving the data, and the section offsets let readers jump straight to the bytes. When the
 // reserved space runs out, grow the header and bump the major version.
 struct MeshBlobHeader {
@@ -36,11 +36,13 @@ struct MeshBlobHeader {
     uint32_t attribOffset = 0;     // byte offset of the attribute table
     uint32_t vertexDataOffset = 0; // byte offset of the vertex bytes
     uint32_t indexDataOffset = 0;  // byte offset of the index bytes
-    uint32_t reserved[2] = {};     // pad to 64 bytes, consume for backward-compatible additions
+    float boundsMin[3] = {};
+    float boundsMax[3] = {};
+    uint32_t reserved[12] = {}; // pad to 128 bytes, consume for backward-compatible additions
 };
 
-static_assert(sizeof(MeshBlobHeader) == 64,
-              "mesh blob header is a fixed 64-byte directory, bump to 128 and the major version if it must grow");
+static_assert(sizeof(MeshBlobHeader) == 128,
+              "mesh blob header is a fixed 128-byte directory, bump to 256 and the major version if it must grow");
 
 // std::unique_ptr<DescriptorSubAllocationBase<Buffer>> Mesh::s_bindlessMeshDataAllocation = nullptr;
 
@@ -61,6 +63,12 @@ Mesh::~Mesh()
 Mesh::Mesh(Mesh &&other) noexcept = default;
 
 Mesh &Mesh::operator=(Mesh &&other) noexcept = default;
+
+void Mesh::setBounds(const glm::vec3 &min, const glm::vec3 &max)
+{
+    m_boundsMin = min;
+    m_boundsMax = max;
+}
 
 bool Mesh::buildBLAS()
 {
@@ -102,6 +110,8 @@ void Mesh::setMeshData(MeshAllocatorParams &params)
     auto &vulkanContext = app.getVulkanContext();
 
     m_indexCount = params.indexCount;
+    m_boundsMin = params.boundsMin;
+    m_boundsMax = params.boundsMax;
 
     BufferAllocationRequest vertexRequest;
     vertexRequest.size = params.vertexDataSize;
@@ -150,6 +160,8 @@ std::vector<uint8_t> MeshAllocatorParams::serialize() const
     header.attribOffset = sizeof(MeshBlobHeader);
     header.vertexDataOffset = header.attribOffset + attribBytes;
     header.indexDataOffset = header.vertexDataOffset + vertexDataSize;
+    std::memcpy(header.boundsMin, &boundsMin, sizeof(header.boundsMin));
+    std::memcpy(header.boundsMax, &boundsMax, sizeof(header.boundsMax));
 
     std::vector<uint8_t> blob(header.indexDataOffset + indexDataSize);
     std::memcpy(blob.data(), &header, sizeof(MeshBlobHeader));
@@ -217,6 +229,8 @@ std::unique_ptr<Mesh> Mesh::deserialize(std::span<const uint8_t> blob)
     params.bufferLayout.vertexSize = header.vertexSize;
     params.bufferLayout.binding = header.binding;
     params.bufferLayout.flags = header.flags;
+    params.boundsMin = glm::vec3(header.boundsMin[0], header.boundsMin[1], header.boundsMin[2]);
+    params.boundsMax = glm::vec3(header.boundsMax[0], header.boundsMax[1], header.boundsMax[2]);
 
     size_t offset = header.attribOffset;
     auto readU32 = [&](uint32_t &out) -> bool {

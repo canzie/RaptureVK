@@ -1,6 +1,9 @@
 #include "SceneManager.h"
 
+#include "asset_manager/AssetManager.h"
 #include "events/GameEvents.h"
+#include "logging/Log.h"
+#include "scenes/SceneAsset.h"
 
 #include <algorithm>
 
@@ -31,6 +34,57 @@ Scene *SceneManager::getScene(const std::string &name)
         return it->second.get();
     }
     return nullptr;
+}
+
+Scene *SceneManager::openScene(AssetHandle handle)
+{
+    if (handle == INVALID_ASSET_HANDLE) {
+        return nullptr;
+    }
+
+    for (const auto &[name, scene] : m_scenes) {
+        if (scene->sourceAsset() == handle) {
+            return scene.get();
+        }
+    }
+
+    AssetRef ref = AssetManager::getAsset(handle);
+    const SceneAsset *sceneAsset = ref ? ref.get()->getUnderlyingAsset<SceneAsset>() : nullptr;
+    if (sceneAsset == nullptr) {
+        RP_CORE_ERROR("asset {} is not a scene", handle);
+        return nullptr;
+    }
+
+    std::unique_ptr<Scene> scene = Scene::deserialize(sceneAsset->root());
+    if (scene == nullptr) {
+        return nullptr;
+    }
+
+    scene->setSourceAsset(handle);
+
+    Scene *scenePtr = scene.get();
+    m_scenes[scene->getSceneName()] = std::move(scene);
+    return scenePtr;
+}
+
+bool SceneManager::saveScene(Scene &scene, const std::filesystem::path &outputFolder)
+{
+    auto sceneAsset = std::make_unique<SceneAsset>(scene);
+
+    if (scene.sourceAsset() != INVALID_ASSET_HANDLE) {
+        return AssetManager::updateAsset(scene.sourceAsset(), std::move(sceneAsset));
+    }
+
+    AssetRef ref = AssetManager::importAsset(AssetImportDataRequest{
+        .data = SceneImportData{std::move(sceneAsset)}, .output = outputFolder, .name = scene.getSceneName()});
+
+    if (!ref) {
+        RP_CORE_ERROR("Failed to save scene '{}'", scene.getSceneName());
+        return false;
+    }
+
+    scene.setSourceAsset(ref.get()->getHandle());
+    return true;
 }
 
 bool SceneManager::isSceneActive(Scene *scene) const

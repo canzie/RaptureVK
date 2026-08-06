@@ -6,6 +6,7 @@
 #include "logging/Log.h"
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
+#include "scenes/instances/PrefabInstance.h"
 #include "scenes/instances/StaticMesh3D.h"
 
 #include <cstring>
@@ -16,7 +17,7 @@ namespace Rapture {
 static constexpr uint32_t PREFAB_BLOB_MAGIC = 0x46505052; // "RPPF", identifies the blob as a prefab
 
 // Version packs major in the high 16 bits and minor in the low 16, matching the mesh and texture blobs.
-static constexpr uint16_t PREFAB_BLOB_VERSION_MAJOR = 1;
+static constexpr uint16_t PREFAB_BLOB_VERSION_MAJOR = 2;
 static constexpr uint16_t PREFAB_BLOB_VERSION_MINOR = 0;
 static constexpr uint32_t PREFAB_BLOB_VERSION =
     (static_cast<uint32_t>(PREFAB_BLOB_VERSION_MAJOR) << 16) | PREFAB_BLOB_VERSION_MINOR;
@@ -57,8 +58,6 @@ std::vector<uint8_t> Prefab::serialize() const
         appendBytes(nodeSection, &node.localTransform, sizeof(node.localTransform));
         appendBytes(nodeSection, &node.mesh, sizeof(node.mesh));
         appendBytes(nodeSection, &node.material, sizeof(node.material));
-        appendBytes(nodeSection, &node.boundingBoxMin, sizeof(node.boundingBoxMin));
-        appendBytes(nodeSection, &node.boundingBoxMax, sizeof(node.boundingBoxMax));
     }
 
     PrefabBlobHeader header;
@@ -125,8 +124,7 @@ std::unique_ptr<Prefab> Prefab::deserialize(std::span<const uint8_t> blob)
         Node node;
         if (!readString(node.name) || !read(&node.parent, sizeof(node.parent)) ||
             !read(&node.localTransform, sizeof(node.localTransform)) || !read(&node.mesh, sizeof(node.mesh)) ||
-            !read(&node.material, sizeof(node.material)) || !read(&node.boundingBoxMin, sizeof(node.boundingBoxMin)) ||
-            !read(&node.boundingBoxMax, sizeof(node.boundingBoxMax))) {
+            !read(&node.material, sizeof(node.material))) {
             RP_CORE_ERROR("Prefab blob node {} is truncated", i);
             return nullptr;
         }
@@ -156,9 +154,9 @@ Instance *Prefab::instantiate(AssetRef prefabRef, Scene *scene, const glm::mat4 
     }
 
     Instance *parentInstance = (parent != nullptr) ? parent : scene->root();
-    Node3D *root = parentInstance->add<Node3D>(prefab->m_name);
+    PrefabInstance *root = parentInstance->add<PrefabInstance>(prefab->m_name);
     root->setLocalTransform(rootTransform);
-    root->entity().setComponent<PrefabComponent>(prefabRef);
+    root->setPrefab(prefabRef.get()->getHandle());
 
     const std::vector<Node> &nodes = prefab->m_nodes;
     if (nodes.empty()) {
@@ -188,10 +186,6 @@ Instance *Prefab::instantiate(AssetRef prefabRef, Scene *scene, const glm::mat4 
         StaticMesh3D *mesh = nodeParent->add<StaticMesh3D>(node.name);
         mesh->setLocalTransform(worldTransforms[i]);
         instances[i] = mesh;
-
-        if (node.hasBoundingBox()) {
-            mesh->setBounds(node.boundingBoxMin, node.boundingBoxMax);
-        }
 
         mesh->setMesh(node.mesh);
         if (mesh->mesh() == INVALID_ASSET_HANDLE) {

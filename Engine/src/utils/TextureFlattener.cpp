@@ -1,5 +1,7 @@
 #include "TextureFlattener.h"
 
+#include "utils/EnginePaths.h"
+
 #include <cmath>
 
 #include "asset_manager/AssetManager.h"
@@ -224,9 +226,7 @@ std::unique_ptr<FlattenTexture> TextureFlattener::createFlattenTexture(std::shar
 
 void TextureFlattener::initializeSharedResources()
 {
-    auto &app = Application::getInstance();
-    auto &proj = app.getProject();
-    auto shaderDir = proj.getProjectShaderDirectory();
+    auto shaderDir = EnginePaths::shaderDirectory();
 
     // Load the depth texture flatten shader
     auto asset = AssetManager::importAsset(shaderDir / "glsl/FlattenDepthArray.cs.glsl");
@@ -250,9 +250,7 @@ void TextureFlattener::getOrCreateShaderAndPipeline(FlattenerDataType dataType)
         return; // Already created
     }
 
-    auto &app = Application::getInstance();
-    auto &proj = app.getProject();
-    auto shaderDir = proj.getProjectShaderDirectory();
+    auto shaderDir = EnginePaths::shaderDirectory();
     auto shaderPath = shaderDir / "glsl/Flatten2dArray.cs.glsl";
 
     ShaderImportConfig importConfig;

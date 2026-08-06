@@ -7,6 +7,11 @@ namespace Rapture {
 
 static constexpr uint32_t SHADOW_MAP_SIZE = 1024;
 
+static constexpr std::string_view KEY_SPOT_LIGHT = "spotLight";
+static constexpr std::string_view KEY_RANGE = "range";
+static constexpr std::string_view KEY_INNER_CONE_ANGLE = "innerConeAngle";
+static constexpr std::string_view KEY_OUTER_CONE_ANGLE = "outerConeAngle";
+
 SpotLight3D::SpotLight3D(Scene &scene, std::string_view name) : Light3D(scene, name)
 {
     m_entity.setComponent<SpotLightComponent>();
@@ -98,24 +103,24 @@ void SpotLight3D::serialize(WriteNode node) const
 {
     Light3D::serialize(node);
 
-    WriteNode light = node.addObject("spotLight");
-    light.set("range", range());
-    light.set("innerConeAngle", innerConeAngle());
-    light.set("outerConeAngle", outerConeAngle());
+    WriteNode light = node.addObject(KEY_SPOT_LIGHT);
+    light.set(KEY_RANGE, range());
+    light.set(KEY_INNER_CONE_ANGLE, innerConeAngle());
+    light.set(KEY_OUTER_CONE_ANGLE, outerConeAngle());
 }
 
 void SpotLight3D::deserialize(ReadNode node)
 {
     Light3D::deserialize(node);
 
-    ReadNode light = node.child("spotLight");
+    ReadNode light = node.child(KEY_SPOT_LIGHT);
     if (!light.valid()) {
         return;
     }
 
-    setRange(static_cast<float>(light.child("range").asF64(range())));
-    setInnerConeAngle(static_cast<float>(light.child("innerConeAngle").asF64(innerConeAngle())));
-    setOuterConeAngle(static_cast<float>(light.child("outerConeAngle").asF64(outerConeAngle())));
+    setRange(static_cast<float>(light.child(KEY_RANGE).asF64(range())));
+    setInnerConeAngle(static_cast<float>(light.child(KEY_INNER_CONE_ANGLE).asF64(innerConeAngle())));
+    setOuterConeAngle(static_cast<float>(light.child(KEY_OUTER_CONE_ANGLE).asF64(outerConeAngle())));
 }
 
 } // namespace Rapture

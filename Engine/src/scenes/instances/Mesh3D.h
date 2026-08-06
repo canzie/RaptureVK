@@ -30,13 +30,6 @@ class Mesh3D : public Node3D {
     glm::vec3 boundsMin() const;
     glm::vec3 boundsMax() const;
 
-    /**
-     * @brief Sets the local bounds used for culling and for bounds derived physics shapes
-     * @param min Lower corner in local space
-     * @param max Upper corner in local space
-     */
-    void setBounds(const glm::vec3 &min, const glm::vec3 &max);
-
     bool isRayTraced() const;
 
     /**

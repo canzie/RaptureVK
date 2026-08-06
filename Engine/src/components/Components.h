@@ -136,10 +136,38 @@ struct MeshComponent {
     bool isEnabled = true;
     // slot into the SSBO where the mesh metadata lives
     uint32_t renderDataSlot = UINT32_MAX;
+    BoundingBox worldBoundingBox;
 
     MeshComponent() = default;
 
     MeshComponent(AssetRef ref, Mobility mob = MOBILITY_STATIC) : mesh(std::move(ref)), mobility(mob) { isLoading = false; }
+
+    /**
+     * @brief Replaces the mesh, invalidating the world bounding box the old one produced
+     * @param ref Reference to the new mesh
+     */
+    void setMesh(AssetRef ref)
+    {
+        mesh = AssetPtr<Mesh>(std::move(ref));
+        m_lastTransformGeneration = 0;
+    }
+
+    /**
+     * @brief Recomputes the world bounding box from the mesh's bounds when the transform moved
+     * @param transform The transform placing this mesh in the world
+     */
+    void updateWorldBoundingBox(const TransformComponent &transform)
+    {
+        generation_t gen = transform.getGeneration();
+        if (gen == m_lastTransformGeneration || !mesh) {
+            return;
+        }
+        m_lastTransformGeneration = gen;
+        worldBoundingBox = BoundingBox(mesh->getBoundsMin(), mesh->getBoundsMax()).transform(transform.transformMatrix());
+    }
+
+  private:
+    generation_t m_lastTransformGeneration = 0;
 };
 
 struct PrefabComponent {
@@ -305,29 +333,6 @@ struct CascadedShadowComponent {
 
   private:
     generation_t m_lastLightGeneration = 0;
-    generation_t m_lastTransformGeneration = 0;
-};
-
-struct BoundingBoxComponent {
-    BoundingBox localBoundingBox;
-    BoundingBox worldBoundingBox;
-
-    BoundingBoxComponent() = default;
-    BoundingBoxComponent(glm::vec3 min, glm::vec3 max)
-    {
-        localBoundingBox = BoundingBox(min, max);
-        worldBoundingBox = localBoundingBox;
-    }
-
-    void updateWorldBoundingBox(const TransformComponent &transform)
-    {
-        generation_t gen = transform.getGeneration();
-        if (gen == m_lastTransformGeneration) return;
-        m_lastTransformGeneration = gen;
-        worldBoundingBox = localBoundingBox.transform(transform.transformMatrix());
-    }
-
-  private:
     generation_t m_lastTransformGeneration = 0;
 };
 

@@ -2,6 +2,8 @@
 #include "logging/Log.h"
 #include "window_context/Application.h"
 
+#include <algorithm>
+
 namespace Rapture {
 
 SceneRenderTarget::SceneRenderTarget(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format, bool allowReadback)
@@ -35,6 +37,14 @@ SceneRenderTarget::~SceneRenderTarget()
 
 void SceneRenderTarget::createOffscreenTextures(uint32_t width, uint32_t height, uint32_t imageCount, TextureFormat format)
 {
+    if (width == 0 || height == 0) {
+        RP_CORE_WARN("offscreen target asked for {}x{}, holding it at 1x1 until it is resized", width, height);
+        width = std::max(width, 1u);
+        height = std::max(height, 1u);
+        m_width = width;
+        m_height = height;
+    }
+
     m_offscreenTextures.clear();
     m_offscreenTextures.reserve(imageCount);
 

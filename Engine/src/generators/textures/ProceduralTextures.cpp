@@ -1,5 +1,7 @@
 #include "ProceduralTextures.h"
 
+#include "utils/EnginePaths.h"
+
 #include "scenes/instances/Environment.h"
 
 #include "asset_manager/Asset.h"
@@ -37,9 +39,7 @@ ProceduralTexture::~ProceduralTexture() {}
 
 void ProceduralTexture::initFromShaderPath(const std::string &shaderPath, bool createTexture)
 {
-    auto &app = Application::getInstance();
-    auto &proj = app.getProject();
-    auto shaderDir = proj.getProjectShaderDirectory();
+    auto shaderDir = EnginePaths::shaderDirectory();
 
     auto asset = AssetManager::importAsset(shaderDir / shaderPath);
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
@@ -380,7 +380,7 @@ static std::unique_ptr<ProceduralTexture> s_makeGenerator(const char *shaderRelP
                                                           const ProceduralTextureConfig &config, const char *label)
 {
     if (cachedHandle == 0) {
-        auto shaderDir = Application::getInstance().getProject().getProjectShaderDirectory();
+        auto shaderDir = EnginePaths::shaderDirectory();
         auto asset = AssetManager::importAsset(shaderDir / shaderRelPath);
         auto *shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
         if (shader == nullptr) {
@@ -513,9 +513,7 @@ AssetPtr<Texture> ProceduralTexture::generateAtmosphere(float timeOfDay, const A
     static AssetHandle s_shaderHandle;
 
     if (s_shaderHandle == 0) {
-        auto &app = Application::getInstance();
-        auto &proj = app.getProject();
-        auto shaderDir = proj.getProjectShaderDirectory();
+        auto shaderDir = EnginePaths::shaderDirectory();
 
         auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/Atmosphere.cs.glsl");
         auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
@@ -550,9 +548,7 @@ static AssetHandle s_getAtmosphereCubemapShaderHandle()
     static AssetHandle s_shaderHandle = 0;
 
     if (s_shaderHandle == 0) {
-        auto &app = Application::getInstance();
-        auto &proj = app.getProject();
-        auto shaderDir = proj.getProjectShaderDirectory();
+        auto shaderDir = EnginePaths::shaderDirectory();
 
         ShaderImportConfig importConfig;
         importConfig.compileInfo.macros.push_back(ShaderMacro("OUTPUT_CUBEMAP"));

@@ -19,6 +19,9 @@ class DirectionalLight3D : public Light3D {
 
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
+
+  protected:
+    void applyShadowSettings(ReadNode node) override;
 };
 
 } // namespace Rapture

@@ -11,6 +11,7 @@
 #include "viewport/ViewportManager.h"
 #include "vulkan_context/VulkanContext.h"
 
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -23,6 +24,39 @@ class Application {
     virtual ~Application();
 
     void run();
+
+    /**
+     * @brief Stops the run loop and asks the entry point to start the editor again
+     *
+     * Project scoped state reaches into the asset registry, the material manager and every editor
+     * panel, so switching projects restarts the process rather than tearing that down in place.
+     *
+     * @param projectPath The project the new process opens, empty for the default project
+     */
+    void requestRelaunch(const std::filesystem::path &projectPath = {});
+
+    bool isRelaunchRequested() const { return m_relaunchRequested; }
+    const std::filesystem::path &getRelaunchProject() const { return m_relaunchProject; }
+
+    /**
+     * @brief Reads a project file into the running project
+     * @param projectPath The .rapt to open
+     * @return True if the project now holds the file's contents
+     */
+    bool openProject(const std::filesystem::path &projectPath);
+
+    /**
+     * @brief Writes a new project to disk, leaving the running project alone
+     * @param projectDirectory The directory the project is created in
+     * @param name The project's name
+     * @return The new project file, empty if it could not be written
+     */
+    std::filesystem::path createProject(const std::filesystem::path &projectDirectory, std::string_view name);
+
+    /**
+     * @brief Whether a real project is open rather than the empty stand in
+     */
+    bool hasProject() const { return m_project->isValid(); }
 
     void pushLayer(Layer *layer);
     void pushOverlay(Layer *overlay);
@@ -78,6 +112,8 @@ class Application {
   private:
     bool m_running;
     bool m_isMinimized;
+    bool m_relaunchRequested = false;
+    std::filesystem::path m_relaunchProject;
 
     LayerStack m_layerStack;
 

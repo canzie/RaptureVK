@@ -1,5 +1,7 @@
 #include "Environment.h"
 
+#include "utils/EnginePaths.h"
+
 #include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
 #include "components/Components.h"
@@ -18,11 +20,26 @@
 
 namespace Rapture {
 
+static constexpr std::string_view KEY_SKY = "sky";
+static constexpr std::string_view KEY_TEXTURE = "texture";
+static constexpr std::string_view KEY_INTENSITY = "intensity";
+static constexpr std::string_view KEY_ENABLED = "enabled";
+static constexpr std::string_view KEY_USE_ATMOSPHERE = "useAtmosphere";
+static constexpr std::string_view KEY_ATMOSPHERE = "atmosphere";
+static constexpr std::string_view KEY_TIME_OF_DAY = "timeOfDay";
+static constexpr std::string_view KEY_LATITUDE = "latitude";
+static constexpr std::string_view KEY_LONGITUDE = "longitude";
+static constexpr std::string_view KEY_MIE = "mie";
+static constexpr std::string_view KEY_MIE_G = "mieG";
+static constexpr std::string_view KEY_SUN_INTENSITY = "sunIntensity";
+static constexpr std::string_view KEY_CAMERA_ALTITUDE = "cameraAltitude";
+static constexpr std::string_view KEY_RAYLEIGH = "rayleigh";
+
 static AssetHandle s_atmosphereShaderHandle()
 {
     static AssetHandle s_handle = 0;
     if (s_handle == 0) {
-        auto shaderDir = Application::getInstance().getProject().getProjectShaderDirectory();
+        auto shaderDir = EnginePaths::shaderDirectory();
         ShaderImportConfig importConfig;
         importConfig.compileInfo.macros.push_back(ShaderMacro("OUTPUT_CUBEMAP"));
         auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/Atmosphere.cs.glsl", importConfig);
@@ -244,22 +261,26 @@ void Environment::serialize(WriteNode node) const
 {
     Instance::serialize(node);
 
-    WriteNode sky = node.addObject("sky");
-    sky.set("texture", skybox());
-    sky.set("intensity", static_cast<double>(m_skyIntensity));
-    sky.set("enabled", m_skyboxEnabled);
-    sky.set("useAtmosphere", m_usesAtmosphereSkybox);
+    WriteNode sky = node.addObject(KEY_SKY);
+    // a generated skybox has a handle minted this run, the atmosphere settings below rebuild it instead
+    AssetHandle texture = skybox();
+    if (texture != INVALID_ASSET_HANDLE && !AssetManager::getAssetMetadata(texture).isVirtualAsset()) {
+        sky.set(KEY_TEXTURE, texture);
+    }
+    sky.set(KEY_INTENSITY, static_cast<double>(m_skyIntensity));
+    sky.set(KEY_ENABLED, m_skyboxEnabled);
+    sky.set(KEY_USE_ATMOSPHERE, m_usesAtmosphereSkybox);
 
-    WriteNode atmosphere = node.addObject("atmosphere");
-    atmosphere.set("timeOfDay", static_cast<double>(m_atmosphere.timeOfDay));
-    atmosphere.set("latitude", static_cast<double>(m_atmosphere.latitude));
-    atmosphere.set("longitude", static_cast<double>(m_atmosphere.longitude));
-    atmosphere.set("mie", static_cast<double>(m_atmosphere.mie));
-    atmosphere.set("mieG", static_cast<double>(m_atmosphere.mieG));
-    atmosphere.set("sunIntensity", static_cast<double>(m_atmosphere.sunIntensity));
-    atmosphere.set("cameraAltitude", static_cast<double>(m_atmosphere.cameraAltitude));
+    WriteNode atmosphere = node.addObject(KEY_ATMOSPHERE);
+    atmosphere.set(KEY_TIME_OF_DAY, static_cast<double>(m_atmosphere.timeOfDay));
+    atmosphere.set(KEY_LATITUDE, static_cast<double>(m_atmosphere.latitude));
+    atmosphere.set(KEY_LONGITUDE, static_cast<double>(m_atmosphere.longitude));
+    atmosphere.set(KEY_MIE, static_cast<double>(m_atmosphere.mie));
+    atmosphere.set(KEY_MIE_G, static_cast<double>(m_atmosphere.mieG));
+    atmosphere.set(KEY_SUN_INTENSITY, static_cast<double>(m_atmosphere.sunIntensity));
+    atmosphere.set(KEY_CAMERA_ALTITUDE, static_cast<double>(m_atmosphere.cameraAltitude));
 
-    WriteNode rayleigh = atmosphere.addArray("rayleigh");
+    WriteNode rayleigh = atmosphere.addArray(KEY_RAYLEIGH);
     rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.x));
     rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.y));
     rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.z));
@@ -269,31 +290,32 @@ void Environment::deserialize(ReadNode node)
 {
     Instance::deserialize(node);
 
-    ReadNode sky = node.child("sky");
+    ReadNode sky = node.child(KEY_SKY);
     if (sky.valid()) {
-        AssetHandle texture = sky.child("texture").asU64(INVALID_ASSET_HANDLE);
-        if (texture != INVALID_ASSET_HANDLE) {
+        m_skyIntensity = static_cast<float>(sky.child(KEY_INTENSITY).asF64(m_skyIntensity));
+        m_skyboxEnabled = sky.child(KEY_ENABLED).asBool(m_skyboxEnabled);
+        m_usesAtmosphereSkybox = sky.child(KEY_USE_ATMOSPHERE).asBool(m_usesAtmosphereSkybox);
+
+        AssetHandle texture = sky.child(KEY_TEXTURE).asU64(INVALID_ASSET_HANDLE);
+        if (!m_usesAtmosphereSkybox && texture != INVALID_ASSET_HANDLE) {
             setSkybox(texture);
         }
-        m_skyIntensity = static_cast<float>(sky.child("intensity").asF64(m_skyIntensity));
-        m_skyboxEnabled = sky.child("enabled").asBool(m_skyboxEnabled);
-        m_usesAtmosphereSkybox = sky.child("useAtmosphere").asBool(m_usesAtmosphereSkybox);
     }
 
-    ReadNode atmosphere = node.child("atmosphere");
+    ReadNode atmosphere = node.child(KEY_ATMOSPHERE);
     if (!atmosphere.valid()) {
         return;
     }
 
-    m_atmosphere.timeOfDay = static_cast<float>(atmosphere.child("timeOfDay").asF64(m_atmosphere.timeOfDay));
-    m_atmosphere.latitude = static_cast<float>(atmosphere.child("latitude").asF64(m_atmosphere.latitude));
-    m_atmosphere.longitude = static_cast<float>(atmosphere.child("longitude").asF64(m_atmosphere.longitude));
-    m_atmosphere.mie = static_cast<float>(atmosphere.child("mie").asF64(m_atmosphere.mie));
-    m_atmosphere.mieG = static_cast<float>(atmosphere.child("mieG").asF64(m_atmosphere.mieG));
-    m_atmosphere.sunIntensity = static_cast<float>(atmosphere.child("sunIntensity").asF64(m_atmosphere.sunIntensity));
-    m_atmosphere.cameraAltitude = static_cast<float>(atmosphere.child("cameraAltitude").asF64(m_atmosphere.cameraAltitude));
+    m_atmosphere.timeOfDay = static_cast<float>(atmosphere.child(KEY_TIME_OF_DAY).asF64(m_atmosphere.timeOfDay));
+    m_atmosphere.latitude = static_cast<float>(atmosphere.child(KEY_LATITUDE).asF64(m_atmosphere.latitude));
+    m_atmosphere.longitude = static_cast<float>(atmosphere.child(KEY_LONGITUDE).asF64(m_atmosphere.longitude));
+    m_atmosphere.mie = static_cast<float>(atmosphere.child(KEY_MIE).asF64(m_atmosphere.mie));
+    m_atmosphere.mieG = static_cast<float>(atmosphere.child(KEY_MIE_G).asF64(m_atmosphere.mieG));
+    m_atmosphere.sunIntensity = static_cast<float>(atmosphere.child(KEY_SUN_INTENSITY).asF64(m_atmosphere.sunIntensity));
+    m_atmosphere.cameraAltitude = static_cast<float>(atmosphere.child(KEY_CAMERA_ALTITUDE).asF64(m_atmosphere.cameraAltitude));
 
-    ReadNode rayleigh = atmosphere.child("rayleigh");
+    ReadNode rayleigh = atmosphere.child(KEY_RAYLEIGH);
     if (rayleigh.size() == 3) {
         m_atmosphere.rayleigh = glm::vec3(static_cast<float>(rayleigh.at(0).asF64(m_atmosphere.rayleigh.x)),
                                           static_cast<float>(rayleigh.at(1).asF64(m_atmosphere.rayleigh.y)),

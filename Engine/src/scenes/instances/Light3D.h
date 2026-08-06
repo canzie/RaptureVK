@@ -58,6 +58,12 @@ class Light3D : public Node3D {
      */
     void applyColor();
 
+    /**
+     * @brief Attaches the shadow this light type uses, carrying the settings a document holds
+     * @param node Cursor to this instance's object
+     */
+    virtual void applyShadowSettings(ReadNode node);
+
   private:
     glm::vec3 m_color = glm::vec3(1.0f, 0.8f, 0.6f);
     bool m_usesTemperature = false;

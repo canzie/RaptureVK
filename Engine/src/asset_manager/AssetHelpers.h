@@ -98,7 +98,6 @@ inline std::optional<std::filesystem::path> getRelatedShaderPath(const std::file
         }
     }
 
-    RP_CORE_WARN("Could not find related {} shader for base path: {}", targetStage, basePath.string());
     return std::nullopt;
 }
 

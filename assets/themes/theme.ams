@@ -78,6 +78,13 @@ scrolling-frame {
     scrollbar-thumb-color: @bg-contrast;
 }
 
+context-menu {
+    text-color: @text-2;
+    background-color: @bg-buttons;
+    menu-item-hover-background: @accent;
+    menu-separator-color: @border-4;
+}
+
 
 .panel {
     background-color: @bg-panel;
@@ -303,4 +310,105 @@ radio-button.viewport-context-menu:active {
     text-y-alignment: center;
     text-truncate: at_end;
     font-size: 10px;
+}
+
+.launcher-backdrop {
+    background-color: @bg-window;
+}
+
+.launcher-title {
+    background-transparency: 1.0;
+    text-color: @text-1;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    font-size: 20px;
+}
+
+.launcher-subtitle {
+    background-transparency: 1.0;
+    text-color: @text-3;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    font-size: 12px;
+}
+
+.launcher-section-label {
+    background-transparency: 1.0;
+    text-color: @text-3;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    font-size: 11px;
+}
+
+.launcher-list {
+    background-color: @bg-canvas;
+    border-color: @border-2;
+    border-mode: outline;
+    border-pixel-size: 1px;
+    corner-radius: 2px;
+    scrollbar-color: @bg-frame;
+    scrollbar-thumb-color: @bg-contrast;
+}
+
+.launcher-list-empty {
+    background-transparency: 1.0;
+    text-color: @text-4;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    font-size: 12px;
+}
+
+.launcher-project {
+    background-color: @bg-panel;
+    border-color: @border-2;
+    border-mode: outline;
+    border-pixel-size: 1px;
+    corner-radius: 2px;
+}
+
+.launcher-project:hover {
+    background-color: @bg-buttons;
+    border-color: @border-4;
+}
+
+.launcher-project-name {
+    background-transparency: 1.0;
+    text-color: @text-1;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    font-size: 13px;
+}
+
+.launcher-project-path {
+    background-transparency: 1.0;
+    text-color: @text-3;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    font-size: 11px;
+}
+
+.launcher-project-icon {
+    background-transparency: 1.0;
+    image-color: @text-2;
+}
+
+.launcher-name-field {
+    background-color: @bg-input;
+    border-color: @border-3;
+    border-mode: outline;
+    border-pixel-size: 1px;
+    corner-radius: 2px;
+    text-color: @text-1;
+    placeholder-color: @text-3;
+    text-y-alignment: center;
+    font-size: 13px;
+}
+
+.launcher-primary-button {
+    background-color: @accent;
+    text-color: @accent-contrast;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    font-size: 12px;
+    corner-radius: 2px;
 }

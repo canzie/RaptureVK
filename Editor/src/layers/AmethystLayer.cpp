@@ -1,6 +1,8 @@
 #include "AmethystLayer.h"
 
 #include "EditorLayout.h"
+#include "LauncherConfig.h"
+#include "ProjectLauncher.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "layers/panels/FileBrowser.h"
 #include "layers/panels/ImportPanel.h"
@@ -12,6 +14,7 @@
 #include "layers/workspaces/TextureGeneratorWorkspace.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
+#include "utils/EnginePaths.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "textures/Texture.h"
 #include "utils/Timestep.h"
@@ -56,8 +59,8 @@ AmethystLayer::AmethystLayer()
     Amethyst::Log::Init();
 
     auto &app = Rapture::Application::getInstance();
-    auto rootPath = app.getProject().getProjectRootDirectory();
-    auto themePath = rootPath / "assets/themes/theme.ams";
+
+    auto themePath = Rapture::EnginePaths::assetDirectory() / "themes/theme.ams";
     Amethyst::Style::load(themePath);
 
     m_mainSwapchainRecreatedConn = app.getMainWindow().getSwapChain()->onRecreated.connect(
@@ -94,9 +97,9 @@ void AmethystLayer::onAttach()
 
     m_uiDescriptorPool = createUiDescriptorPool();
 
-    auto rootPath = app.getProject().getProjectRootDirectory();
-    auto vertShaderPath = (rootPath / "Engine/vendor/Amethyst/backends/shaders/spirv/ui.vs.spv").string();
-    auto fragShaderPath = (rootPath / "Engine/vendor/Amethyst/backends/shaders/spirv/ui.fs.spv").string();
+    auto amethystShaders = Rapture::EnginePaths::assetDirectory() / "amethyst/spirv";
+    auto vertShaderPath = (amethystShaders / "ui.vs.spv").string();
+    auto fragShaderPath = (amethystShaders / "ui.fs.spv").string();
 
     Amethyst::AmVulkanInitInfo initInfo{};
     initInfo.device = vulkanContext.getLogicalDevice();
@@ -118,7 +121,7 @@ void AmethystLayer::onAttach()
 
     m_backend.init(initInfo, glfwInfo);
 
-    auto fontPath = rootPath / "assets/fonts/Roboto-Regular.ttf";
+    auto fontPath = Rapture::EnginePaths::assetDirectory() / "fonts/Roboto-Regular.ttf";
     if (!m_amCtx.loadFont(fontPath.string())) {
         RP_WARN("Failed to load font from: {}", fontPath.string());
     }
@@ -137,11 +140,61 @@ void AmethystLayer::onAttach()
     });
     m_backgroundFrame->setBaseStyleProperties({.backgroundColor = Amethyst::Color3::fromHex(0x181818)});
 
+    if (!app.hasProject()) {
+        m_startupLauncher = std::make_unique<ProjectLauncher>(m_window);
+        wireLauncher(*m_startupLauncher);
+        return;
+    }
+
     setupMenuBar(screenSize);
     setupWorkspaces(screenSize);
 
     m_bottomBar = std::make_unique<BottomBar>(&m_window, buildServices());
     m_bottomBar->setCurrentWorkspace(m_workspaces.empty() ? nullptr : m_workspaces[m_activeWorkspaceIndex].get());
+}
+
+void AmethystLayer::wireLauncher(ProjectLauncher &launcher)
+{
+    launcher.onOpenProject = [this](const std::filesystem::path &projectPath) { launchProject(projectPath); };
+    launcher.onCreateProject = [this](std::string_view name) { createProject(name); };
+    launcher.onBrowseForProject = [this]() {
+        openFileExplorer(FileBrowser::Mode::OPEN, [this](const std::filesystem::path &path) { launchProject(path); });
+    };
+}
+
+void AmethystLayer::openLauncherWindow()
+{
+    openSecondaryWindow(LAUNCHER_WINDOW_WIDTH, LAUNCHER_WINDOW_HEIGHT, "Rapture Projects",
+                        [this](Amethyst::Window &window, const std::function<void()> &close) {
+                            (void)close;
+                            auto launcher = std::make_shared<ProjectLauncher>(window);
+                            wireLauncher(*launcher);
+                            return launcher;
+                        });
+}
+
+void AmethystLayer::createProject(std::string_view name)
+{
+    auto &app = Rapture::Application::getInstance();
+    std::filesystem::path directory = Rapture::EnginePaths::executableDirectory() / "projects" / name;
+
+    std::filesystem::path projectPath = app.createProject(directory, name);
+    if (projectPath.empty()) {
+        return;
+    }
+
+    launchProject(projectPath);
+}
+
+void AmethystLayer::launchProject(const std::filesystem::path &projectPath)
+{
+    LauncherConfig config = LauncherConfig::load();
+    config.addRecentProject(projectPath);
+    config.setAutoLaunchProject(projectPath);
+    config.save();
+
+    // the editor is built around an open project, so it restarts into this one
+    Rapture::Application::getInstance().requestRelaunch(projectPath);
 }
 
 void AmethystLayer::onDetach()
@@ -186,6 +239,12 @@ void AmethystLayer::onUpdate(float dt)
     mainWindow.endFrame();
 }
 
+static void s_saveProject()
+{
+    auto &project = Rapture::Application::getInstance().getProject();
+    project.saveProject(project.getProjectFilePath());
+}
+
 void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
 {
     Amethyst::UIScope(m_window).menuBar(
@@ -204,13 +263,14 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
         },
         [this](Amethyst::MenuBarScope &mb) {
             m_menuBar = &mb.component;
-            mb.menuItem("File", [](Amethyst::DropdownScope &d) {
+            mb.menuItem("File", [this](Amethyst::DropdownScope &d) {
                 d.action("New Scene", [] {});
                 d.action("Open Scene", [] {});
                 d.action("Save Scene", [] {});
                 d.separator();
-                d.action("New Project", [] {});
-                d.action("Open Project", [] {});
+                d.action("New Project", [this] { openLauncherWindow(); });
+                d.action("Open Project", [this] { openLauncherWindow(); });
+                d.action("Save Project", [] { s_saveProject(); });
                 d.separator();
                 d.action("Exit", [] {});
             });
@@ -261,8 +321,10 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
             m_workspaceTabBar = &tabs.component;
 
             PanelServices services = buildServices();
-            Rapture::Scene *levelScene =
-                Rapture::Application::getInstance().getProject().getSceneManager().getScene(RAPTURE_DEFAULT_SCENE_NAME);
+
+            // the opened scene is whatever the project's startup scene was, not a fixed name
+            Rapture::World *activeWorld = Rapture::Application::getInstance().getProject().getActiveWorld();
+            Rapture::Scene *levelScene = activeWorld != nullptr ? activeWorld->getMainScene() : nullptr;
             Rapture::Viewport *primaryViewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
             m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, levelScene, primaryViewport));
             m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(tabs, services));
@@ -410,7 +472,12 @@ PanelServices AmethystLayer::buildServices(void)
     PanelServices services;
     services.openSecondaryWindow = [this](int32_t width, int32_t height, std::string_view title,
                                           std::function<void(Amethyst::Window &)> build) {
-        openSecondaryWindow(width, height, title, std::move(build));
+        openSecondaryWindow(width, height, title,
+                            [build = std::move(build)](Amethyst::Window &window, const std::function<void()> &close) {
+                                (void)close;
+                                build(window);
+                                return std::shared_ptr<void>{};
+                            });
     };
     services.openFileExplorer = [this](FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm) {
         openFileExplorer(mode, std::move(onConfirm));
@@ -439,8 +506,7 @@ PanelServices AmethystLayer::buildServices(void)
     return services;
 }
 
-void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::string_view title,
-                                        std::function<void(Amethyst::Window &)> build)
+void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::string_view title, SecondaryWindowBuilder build)
 {
     auto &app = Rapture::Application::getInstance();
 
@@ -456,7 +522,8 @@ void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::stri
 
     m_backend.registerWindow(renderWindow.getWindowContext()->getNativeWindowContext(), &context->window);
 
-    build(context->window);
+    std::function<void()> close = [&renderWindow]() { renderWindow.getWindowContext()->requestClose(); };
+    context->content = build(context->window, close);
 
     SecondaryWindowContext *contextPtr = context.get();
     m_secondaryWindows.push_back(std::move(context));
@@ -470,42 +537,20 @@ void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::stri
 
 void AmethystLayer::openFileExplorer(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm)
 {
-    auto &app = Rapture::Application::getInstance();
-
-    Rapture::RenderWindow &renderWindow = app.createSecondaryWindow(880, 560, "Open File");
-    auto swapChain = renderWindow.getSwapChain();
-
-    auto context = std::make_unique<SecondaryWindowContext>();
-    context->renderWindow = &renderWindow;
-
-    glm::vec2 screenSize = {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)};
-    context->window.absoluteSize = screenSize;
-    context->window.absoluteRotation = 0.0f;
-
-    auto fileBrowser = std::make_shared<FileBrowser>(context->window, mode);
-    fileBrowser->onConfirm = std::move(onConfirm);
-
-    m_backend.registerWindow(renderWindow.getWindowContext()->getNativeWindowContext(), &context->window);
-
-    SecondaryWindowContext *contextPtr = context.get();
-    m_secondaryWindows.push_back(std::move(context));
-
-    contextPtr->swapchainRecreatedConn = renderWindow.getSwapChain()->onRecreated.connect(
-        [this, contextPtr]() { onResize(*contextPtr->renderWindow->getSwapChain()); });
-
-    fileBrowser->onClose = [contextPtr]() { contextPtr->renderWindow->getWindowContext()->requestClose(); };
-
-    renderWindow.onFrame = [this, contextPtr](Rapture::RenderWindow &window) { drawSecondaryWindow(*contextPtr, window); };
-    renderWindow.onClose = [this, contextPtr, fileBrowser]() mutable {
-        // Destroy the browser (and its window tick) while its Window is still alive.
-        fileBrowser.reset();
-        closeSecondaryWindow(contextPtr);
-    };
+    openSecondaryWindow(FILE_EXPLORER_WINDOW_WIDTH, FILE_EXPLORER_WINDOW_HEIGHT, "Open File",
+                        [mode, onConfirm = std::move(onConfirm)](Amethyst::Window &window, const std::function<void()> &close) {
+                            auto fileBrowser = std::make_shared<FileBrowser>(window, mode);
+                            fileBrowser->onConfirm = onConfirm;
+                            fileBrowser->onClose = close;
+                            return fileBrowser;
+                        });
 }
 
 void AmethystLayer::openDemoWindow(void)
 {
-    openSecondaryWindow(480, 270, "Demo Window", [](Amethyst::Window &win) {
+    openSecondaryWindow(480, 270, "Demo Window", [](Amethyst::Window &win, const std::function<void()> &close) {
+        (void)close;
+
         auto *background = win.add<Amethyst::Frame>();
         background->setBaseProperties({
             .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
@@ -520,6 +565,7 @@ void AmethystLayer::openDemoWindow(void)
             .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
             .label = "Hello from a second window!",
         });
+        return std::shared_ptr<void>{};
     });
 }
 

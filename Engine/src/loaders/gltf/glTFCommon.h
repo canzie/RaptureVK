@@ -39,13 +39,8 @@ struct glTF_SceneNode {
     AssetRef meshRef;           ///< Mesh asset reference (registered with AssetManager)
     int32_t materialIndex = -1; ///< glTF file material index (-1 if no material)
 
-    glm::vec3 boundingBoxMin = glm::vec3(0.0f);
-    glm::vec3 boundingBoxMax = glm::vec3(0.0f);
-
     std::vector<std::unique_ptr<glTF_SceneNode>> children;
     glTF_SceneNode *parent = nullptr;
-
-    bool hasBoundingBox() const { return glm::any(glm::notEqual(boundingBoxMin, boundingBoxMax)); }
 };
 
 /**

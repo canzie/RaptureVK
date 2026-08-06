@@ -6,6 +6,8 @@
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "materials/Material.h"
+#include "scenes/instances/InstanceRegistry.h"
+#include "utils/EnginePaths.h"
 #include "utils/Timestep.h"
 #include "utils/rp_assert.h"
 
@@ -28,6 +30,8 @@ Application::Application(int width, int height, const char *title) : m_running(t
         return;
     }
     s_instance = this;
+
+    EnginePaths::init();
 
     m_platformContext = PlatformContext::create();
 
@@ -73,30 +77,9 @@ Application::Application(int width, int height, const char *title) : m_running(t
 #endif // RAPTURE_TRACY_PROFILING_ENABLED
 
     JobSystem::init();
+    InstanceRegistry::init();
 
-    m_project = std::make_unique<Project>();
-    auto working_dir = std::filesystem::current_path();
-    auto root_dir = working_dir;
-
-    // Try to find the project root by looking for Engine folder
-    const int max_steps = 4;
-    int steps = 0;
-    while (steps < max_steps) {
-        // Check if Engine directory exists in current path
-        if (std::filesystem::exists(root_dir / "Engine") && std::filesystem::exists(root_dir / "build")) {
-            break;
-        }
-        // Go up one directory
-        auto parent = root_dir.parent_path();
-        if (parent == root_dir) { // We've hit the root
-            break;
-        }
-        root_dir = parent;
-        steps++;
-    }
-
-    m_project->setProjectRootDirectory(root_dir);
-    m_project->setProjectShaderDirectory(root_dir / "Engine/assets/shaders/");
+    m_project = Project::empty();
 
     m_viewportManager = std::make_unique<ViewportManager>(m_vulkanContext->getRenderContext());
 
@@ -111,7 +94,7 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     MaterialManager::init();
 
-    AssetManager::registerAssetDirectory(m_project->getContentDirectory());
+    AssetManager::registerBuiltinAssets();
 
     RP_CORE_INFO("========== Application created ==========");
 }
@@ -135,6 +118,7 @@ Application::~Application()
     // Shutdown the event system and clear all listeners
     EventRegistry::getInstance().shutdown();
 
+    InstanceRegistry::shutdown();
     JobSystem::shutdown();
 
     RP_CORE_INFO("Application shutting down...");
@@ -164,6 +148,41 @@ void Application::pollTelemetry()
         }
     }
 #endif
+}
+
+bool Application::openProject(const std::filesystem::path &projectPath)
+{
+    m_project = std::make_unique<Project>(projectPath.parent_path(), projectPath.stem().string());
+
+    // before the load, so the startup scene's asset is registered by the time the project asks for it
+    AssetManager::registerAssetDirectory(m_project->getContentDirectory());
+
+    if (!m_project->loadProject(projectPath)) {
+        m_project = Project::empty();
+        return false;
+    }
+
+    return true;
+}
+
+std::filesystem::path Application::createProject(const std::filesystem::path &projectDirectory, std::string_view name)
+{
+    // the project only has to exist on disk, loading it seeds the world it starts with
+    Project project(projectDirectory, name);
+    std::filesystem::path projectPath = project.getProjectFilePath();
+
+    if (!project.saveProject(projectPath)) {
+        return {};
+    }
+
+    return projectPath;
+}
+
+void Application::requestRelaunch(const std::filesystem::path &projectPath)
+{
+    m_relaunchRequested = true;
+    m_relaunchProject = projectPath;
+    m_running = false;
 }
 
 void Application::run()

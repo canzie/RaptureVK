@@ -21,6 +21,7 @@ class RenderWindow;
 }
 
 class FileBrowser;
+class ProjectLauncher;
 
 class AmethystLayer : public Rapture::Layer {
   public:
@@ -34,6 +35,29 @@ class AmethystLayer : public Rapture::Layer {
   private:
     void setupMenuBar(glm::vec2 screenSize);
     void setupWorkspaces(glm::vec2 screenSize);
+
+    /**
+     * @brief Points a launcher's actions at this layer
+     * @param launcher The launcher to wire up
+     */
+    void wireLauncher(ProjectLauncher &launcher);
+
+    /**
+     * @brief Opens the launcher in its own window, leaving the open project untouched
+     */
+    void openLauncherWindow();
+
+    /**
+     * @brief Creates a project beside the executable and restarts the editor into it
+     * @param name The new project's name
+     */
+    void createProject(std::string_view name);
+
+    /**
+     * @brief Records a project as the most recent and restarts the editor into it
+     * @param projectPath The project file to open
+     */
+    void launchProject(const std::filesystem::path &projectPath);
     VkDescriptorPool createUiDescriptorPool(void);
     void beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex,
                                const Rapture::SwapChain &swapChain);
@@ -44,10 +68,17 @@ class AmethystLayer : public Rapture::Layer {
         Rapture::RenderWindow *renderWindow = nullptr;
         Amethyst::Window window;
         Rapture::EventConnection swapchainRecreatedConn;
+        // Declared last so it is destroyed while the Window it built into is still alive.
+        std::shared_ptr<void> content;
     };
 
+    /**
+     * @brief Fills a secondary window, returning whatever must stay alive for as long as it is open
+     */
+    using SecondaryWindowBuilder = std::function<std::shared_ptr<void>(Amethyst::Window &, const std::function<void()> &close)>;
+
     PanelServices buildServices(void);
-    void openSecondaryWindow(int32_t width, int32_t height, std::string_view title, std::function<void(Amethyst::Window &)> build);
+    void openSecondaryWindow(int32_t width, int32_t height, std::string_view title, SecondaryWindowBuilder build);
     void openFileExplorer(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm);
     void openDemoWindow(void);
     void drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window);
@@ -64,6 +95,7 @@ class AmethystLayer : public Rapture::Layer {
     Amethyst::Frame *m_backgroundFrame = nullptr;
     Amethyst::MenuBar *m_menuBar = nullptr;
     Amethyst::TabBar *m_workspaceTabBar = nullptr;
+    std::unique_ptr<ProjectLauncher> m_startupLauncher;
     std::unique_ptr<BottomBar> m_bottomBar;
 
     int m_activeWorkspaceIndex = 0;

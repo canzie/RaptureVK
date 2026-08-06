@@ -16,6 +16,7 @@
 #include "materials/MaterialInstance.h"
 #include "materials/MaterialParameters.h"
 #include "textures/Texture.h"
+#include "utils/EnginePaths.h"
 #include "window_context/Application.h"
 
 #include <components/common.h>
@@ -2090,7 +2091,7 @@ void NodeEditorPanel::compileGraph()
         return;
     }
 
-    auto generatedDir = Rapture::Application::getInstance().getProject().getProjectShaderDirectory() / "glsl/generated";
+    auto generatedDir = Rapture::EnginePaths::shaderDirectory() / "glsl/generated";
     graphs.writeGeneratedFiles(generatedDir);
     graphs.notifyShadersOfRegeneration();
 }

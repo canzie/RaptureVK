@@ -15,9 +15,9 @@
 #include "AssetHandle.h"
 
 #include "components/systems/Prefab.h"
-#include "loaders/SceneFileCommon.h"
 #include "materials/MaterialInstance.h"
 #include "meshes/Mesh.h"
+#include "scenes/SceneAsset.h"
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
 
@@ -25,7 +25,7 @@ namespace Rapture {
 
 using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
                                   std::unique_ptr<BaseMaterial>, std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>,
-                                  std::unique_ptr<SceneFileData>, std::unique_ptr<Prefab>>;
+                                  std::unique_ptr<SceneAsset>, std::unique_ptr<Prefab>>;
 
 template <typename T, typename Variant>
 struct IsAssetType;

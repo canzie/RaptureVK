@@ -360,20 +360,21 @@ VkPresentModeKHR SwapChain::chooseSwapPresentMode(const std::vector<VkPresentMod
 
 VkExtent2D SwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
 {
-    if (capabilities.currentExtent.width != (std::numeric_limits<uint32_t>::max)()) {
-        return capabilities.currentExtent;
-    } else {
-        int width, height;
+    VkExtent2D extent = capabilities.currentExtent;
+
+    // a minimized or not yet mapped window reports a zero extent, which every consumer of the
+    // swapchain's size would carry into a zero sized image
+    if (extent.width == (std::numeric_limits<uint32_t>::max)()) {
+        int width = 0;
+        int height = 0;
         m_windowContext->getFramebufferSize(&width, &height);
-
-        VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
-
-        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-        actualExtent.height =
-            std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-
-        return actualExtent;
+        extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
     }
+
+    extent.width = std::clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+    extent.height = std::clamp(extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+    return extent;
 }
 
 } // namespace Rapture

@@ -952,10 +952,9 @@ void Texture::createImage()
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
 
     if (m_spec.width == 0 || m_spec.height == 0 || m_spec.depth == 0) {
-        RP_CORE_ERROR("Invalid texture specification --- dimesnions should be greater than 0! width: {}, "
-                      "height: {}, depth: {}",
-                      m_spec.width, m_spec.height, m_spec.depth);
-        throw std::runtime_error("Invalid texture specification!");
+        RP_CORE_ERROR("every texture dimension must be greater than 0, got {}x{}x{}", m_spec.width, m_spec.height, m_spec.depth);
+        markFailed();
+        return;
     }
 
     VkImageCreateInfo imageInfo{};

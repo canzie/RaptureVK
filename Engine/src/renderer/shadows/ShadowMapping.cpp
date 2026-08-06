@@ -1,4 +1,6 @@
 #include "ShadowMapping.h"
+
+#include "utils/EnginePaths.h"
 #include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
@@ -237,14 +239,13 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
 
     // Get entities with TransformComponent and MeshComponent for rendering
     auto &registry = activeScene.getRegistry();
-    auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
+    auto view = registry.view<TransformComponent, MeshComponent>();
 
     for (auto entity : view) {
         RAPTURE_PROFILE_SCOPE("Draw Shadow Mesh");
 
         auto &transform = view.get<TransformComponent>(entity);
         auto &meshComp = view.get<MeshComponent>(entity);
-        auto &boundingBoxComp = view.get<BoundingBoxComponent>(entity);
 
         // Skip invalid or loading meshes
         if (!meshComp.mesh || meshComp.isLoading) {
@@ -257,10 +258,10 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
         }
 
         // Update world bounding box if transform changed
-        boundingBoxComp.updateWorldBoundingBox(transform);
+        meshComp.updateWorldBoundingBox(transform);
 
         // Perform frustum culling
-        if (m_frustum.testBoundingBox(boundingBoxComp.worldBoundingBox) == FrustumResult::Outside) {
+        if (m_frustum.testBoundingBox(meshComp.worldBoundingBox) == FrustumResult::Outside) {
             continue;
         }
 
@@ -387,10 +388,7 @@ void ShadowMap::createPipeline()
     depthStencil.minDepthBounds = 0.0f;
     depthStencil.maxDepthBounds = 1.0f;
 
-    auto &app = Application::getInstance();
-    auto &project = app.getProject();
-
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     auto asset = AssetManager::importAsset(shaderPath / "SPIRV/shadows/ShadowPass.vs.spv");
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;

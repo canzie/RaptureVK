@@ -57,6 +57,14 @@ class AssetManagerEditor : public AssetManagerBase {
      */
     uint32_t registerAssetDirectory(const std::filesystem::path &directory);
 
+    /**
+     * @brief Replaces an owned asset's contents and rewrites its .rasset in place
+     * @param handle The asset to overwrite, which must already be registered from a file
+     * @param asset The new asset value
+     * @return True if the file now holds the new contents
+     */
+    bool updateAsset(AssetHandle handle, AssetVariant asset);
+
     Asset &importDefaultAsset(AssetType assetType);
 
     Asset &registerVirtualAsset(AssetVariant asset, const std::string &virtualName, AssetType assetType);
@@ -71,6 +79,13 @@ class AssetManagerEditor : public AssetManagerBase {
      * @return The registered asset, or the existing one if the handle is already registered
      */
     Asset &registerReservedAsset(AssetHandle handle, AssetVariant asset, const std::string &name, AssetType assetType);
+
+    /**
+     * @brief Builds every engine builtin, so a scene referencing one resolves it whatever the load order
+     *
+     * Runs once the buffer arenas and the material manager exist, which the builtins allocate from.
+     */
+    void registerBuiltinAssets();
 
     Asset &getVirtualAssetByName(const std::string &virtualName);
     std::vector<AssetHandle> getVirtualAssetsByType(AssetType type) const;

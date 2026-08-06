@@ -1,4 +1,6 @@
 #include "SkyboxPass.h"
+
+#include "utils/EnginePaths.h"
 #include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
 #include "buffers/descriptors/DescriptorManager.h"
@@ -28,8 +30,7 @@ SkyboxPass::SkyboxPass(std::vector<Texture *> depthTextures, VkFormat colorForma
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
-    auto &project = app.getProject();
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";

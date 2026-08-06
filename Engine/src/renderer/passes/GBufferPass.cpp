@@ -1,4 +1,6 @@
 #include "GBufferPass.h"
+
+#include "utils/EnginePaths.h"
 #include "buffers/descriptors/DescriptorManager.h"
 
 #include "asset_manager/AssetImportConfig.h"
@@ -474,10 +476,7 @@ void GBufferPass::createPipeline()
     depthStencil.minDepthBounds = 0.0f;
     depthStencil.maxDepthBounds = 1.0f;
 
-    auto &app = Application::getInstance();
-    auto &project = app.getProject();
-
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
@@ -590,8 +589,7 @@ void GBufferPass::createTerrainPipeline()
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
-    auto &project = app.getProject();
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig terrainShaderConfig;
     terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";

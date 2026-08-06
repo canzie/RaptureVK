@@ -8,6 +8,17 @@
 
 namespace Rapture {
 
+static constexpr std::string_view KEY_LIGHT = "light";
+static constexpr std::string_view KEY_COLOR = "color";
+static constexpr std::string_view KEY_USES_TEMPERATURE = "usesTemperature";
+static constexpr std::string_view KEY_TEMPERATURE = "temperature";
+static constexpr std::string_view KEY_INTENSITY = "intensity";
+static constexpr std::string_view KEY_ACTIVE = "active";
+static constexpr std::string_view KEY_MOBILITY = "mobility";
+static constexpr std::string_view KEY_CASTS_SHADOW = "castsShadow";
+static constexpr std::string_view KEY_SHADOW = "shadow";
+static constexpr std::string_view KEY_RESOLUTION = "resolution";
+
 Light3D::Light3D(Scene &scene, std::string_view name) : Node3D(scene, name) {}
 
 const TypeInfo &Light3D::staticType()
@@ -156,52 +167,74 @@ void Light3D::serialize(WriteNode node) const
 {
     Node3D::serialize(node);
 
-    WriteNode light = node.addObject("light");
-    WriteNode color = light.addArray("color");
+    WriteNode light = node.addObject(KEY_LIGHT);
+    WriteNode color = light.addArray(KEY_COLOR);
     color.append(m_color.x);
     color.append(m_color.y);
     color.append(m_color.z);
-    light.set("usesTemperature", m_usesTemperature);
-    light.set("temperature", m_temperature);
-    light.set("intensity", intensity());
-    light.set("active", isActive());
-    light.set("mobility", static_cast<uint64_t>(mobility()));
-    light.set("castsShadow", castsShadow());
+    light.set(KEY_USES_TEMPERATURE, m_usesTemperature);
+    light.set(KEY_TEMPERATURE, m_temperature);
+    light.set(KEY_INTENSITY, intensity());
+    light.set(KEY_ACTIVE, isActive());
+    light.set(KEY_MOBILITY, static_cast<uint64_t>(mobility()));
+    light.set(KEY_CASTS_SHADOW, castsShadow());
 
     const ShadowComponent *shadow = m_entity.tryGetComponent<ShadowComponent>();
     if (shadow == nullptr) {
         return;
     }
 
-    WriteNode shadowNode = node.addObject("shadow");
-    shadowNode.set("resolution", static_cast<uint64_t>(shadow->resolution));
-    shadowNode.set("active", shadow->isActive);
-    shadowNode.set("mobility", static_cast<uint64_t>(shadow->mobility));
+    WriteNode shadowNode = node.addObject(KEY_SHADOW);
+    shadowNode.set(KEY_RESOLUTION, static_cast<uint64_t>(shadow->resolution));
+    shadowNode.set(KEY_ACTIVE, shadow->isActive);
+    shadowNode.set(KEY_MOBILITY, static_cast<uint64_t>(shadow->mobility));
 }
 
 void Light3D::deserialize(ReadNode node)
 {
     Node3D::deserialize(node);
 
-    ReadNode light = node.child("light");
+    ReadNode light = node.child(KEY_LIGHT);
     if (!light.valid()) {
         return;
     }
 
-    ReadNode color = light.child("color");
+    ReadNode color = light.child(KEY_COLOR);
     if (color.size() == 3) {
         m_color = glm::vec3(static_cast<float>(color.at(0).asF64(m_color.x)), static_cast<float>(color.at(1).asF64(m_color.y)),
                             static_cast<float>(color.at(2).asF64(m_color.z)));
     }
 
-    m_usesTemperature = light.child("usesTemperature").asBool(m_usesTemperature);
-    m_temperature = static_cast<float>(light.child("temperature").asF64(m_temperature));
+    m_usesTemperature = light.child(KEY_USES_TEMPERATURE).asBool(m_usesTemperature);
+    m_temperature = static_cast<float>(light.child(KEY_TEMPERATURE).asF64(m_temperature));
     applyColor();
 
-    setIntensity(static_cast<float>(light.child("intensity").asF64(intensity())));
-    setActive(light.child("active").asBool(isActive()));
-    setMobility(static_cast<Mobility>(light.child("mobility").asU64(static_cast<uint64_t>(mobility()))));
-    setCastsShadow(light.child("castsShadow").asBool(castsShadow()));
+    setIntensity(static_cast<float>(light.child(KEY_INTENSITY).asF64(intensity())));
+    setActive(light.child(KEY_ACTIVE).asBool(isActive()));
+    setMobility(static_cast<Mobility>(light.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(mobility()))));
+
+    // the shadow map is built from the shadow component's construction signal, so the settings go on
+    // the component before shadow casting attaches it
+    bool shouldCastShadow = light.child(KEY_CASTS_SHADOW).asBool(castsShadow());
+    if (shouldCastShadow) {
+        applyShadowSettings(node);
+    }
+    setCastsShadow(shouldCastShadow);
+}
+
+void Light3D::applyShadowSettings(ReadNode node)
+{
+    ReadNode shadowNode = node.child(KEY_SHADOW);
+    if (!shadowNode.valid()) {
+        return;
+    }
+
+    ShadowComponent shadow;
+    shadow.resolution = static_cast<uint32_t>(shadowNode.child(KEY_RESOLUTION).asU64(shadow.resolution));
+    shadow.isActive = shadowNode.child(KEY_ACTIVE).asBool(shadow.isActive);
+    shadow.mobility = static_cast<Mobility>(shadowNode.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(shadow.mobility)));
+
+    m_entity.setComponent<ShadowComponent>(shadow);
 }
 
 } // namespace Rapture

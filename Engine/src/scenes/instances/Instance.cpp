@@ -1,9 +1,15 @@
 #include "Instance.h"
 
 #include "components/Components.h"
+#include "logging/Log.h"
 #include "scenes/Scene.h"
+#include "scenes/instances/InstanceRegistry.h"
 
 namespace Rapture {
+
+static constexpr std::string_view KEY_CLASS = "class";
+static constexpr std::string_view KEY_NAME = "name";
+static constexpr std::string_view KEY_CHILDREN = "children";
 
 Instance::Instance(Scene &scene, std::string_view name) : m_scene(&scene), m_name(name)
 {
@@ -106,14 +112,14 @@ Instance *Instance::findDescendant(std::string_view path) const
 
 void Instance::serialize(WriteNode node) const
 {
-    node.set("class", type().name);
-    node.set("name", std::string_view(m_name));
+    node.set(KEY_CLASS, type().name);
+    node.set(KEY_NAME, std::string_view(m_name));
 
     if (m_children.empty()) {
         return;
     }
 
-    WriteNode children = node.addArray("children");
+    WriteNode children = node.addArray(KEY_CHILDREN);
     for (const auto &child : m_children) {
         child->serialize(children.appendObject());
     }
@@ -121,7 +127,33 @@ void Instance::serialize(WriteNode node) const
 
 void Instance::deserialize(ReadNode node)
 {
-    setName(node.child("name").asString(m_name));
+    setName(node.child(KEY_NAME).asString(m_name));
+}
+
+bool Instance::loadSubtree(Instance &parent, ReadNode node, std::vector<Instance *> &order)
+{
+    std::string_view className = node.child(KEY_CLASS).asString();
+    std::string_view name = node.child(KEY_NAME).asString("Untitled Instance");
+
+    std::unique_ptr<Instance> created = InstanceRegistry::create(className, *parent.scene(), name);
+    if (created == nullptr) {
+        RP_CORE_ERROR("no instance class named '{}', needed by '{}'", className, name);
+        return false;
+    }
+
+    Instance *self = created.get();
+    parent.addChild(std::move(created));
+    order.push_back(self);
+    self->deserialize(node);
+
+    ReadNode children = node.child(KEY_CHILDREN);
+    for (size_t i = 0; i < children.size(); i++) {
+        if (!loadSubtree(*self, children.at(i), order)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 } // namespace Rapture

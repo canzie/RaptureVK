@@ -5,6 +5,11 @@
 
 namespace Rapture {
 
+static constexpr std::string_view KEY_CAMERA = "camera";
+static constexpr std::string_view KEY_FIELD_OF_VIEW = "fieldOfView";
+static constexpr std::string_view KEY_NEAR_PLANE = "nearPlane";
+static constexpr std::string_view KEY_FAR_PLANE = "farPlane";
+
 Camera3D::Camera3D(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
     m_entity.setComponent<CameraComponent>();
@@ -76,24 +81,24 @@ void Camera3D::serialize(WriteNode node) const
 {
     Node3D::serialize(node);
 
-    WriteNode camera = node.addObject("camera");
-    camera.set("fieldOfView", fieldOfView());
-    camera.set("nearPlane", nearPlane());
-    camera.set("farPlane", farPlane());
+    WriteNode camera = node.addObject(KEY_CAMERA);
+    camera.set(KEY_FIELD_OF_VIEW, fieldOfView());
+    camera.set(KEY_NEAR_PLANE, nearPlane());
+    camera.set(KEY_FAR_PLANE, farPlane());
 }
 
 void Camera3D::deserialize(ReadNode node)
 {
     Node3D::deserialize(node);
 
-    ReadNode camera = node.child("camera");
+    ReadNode camera = node.child(KEY_CAMERA);
     if (!camera.valid()) {
         return;
     }
 
-    setFieldOfView(static_cast<float>(camera.child("fieldOfView").asF64(fieldOfView())));
-    setNearPlane(static_cast<float>(camera.child("nearPlane").asF64(nearPlane())));
-    setFarPlane(static_cast<float>(camera.child("farPlane").asF64(farPlane())));
+    setFieldOfView(static_cast<float>(camera.child(KEY_FIELD_OF_VIEW).asF64(fieldOfView())));
+    setNearPlane(static_cast<float>(camera.child(KEY_NEAR_PLANE).asF64(nearPlane())));
+    setFarPlane(static_cast<float>(camera.child(KEY_FAR_PLANE).asF64(farPlane())));
 }
 
 } // namespace Rapture

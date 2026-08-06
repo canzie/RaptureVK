@@ -7,6 +7,7 @@
 #include "logging/Log.h"
 #include "materials/Material.h"
 #include "materials/MaterialInstance.h"
+#include "meshes/MeshPrimitives.h"
 #include "textures/Texture.h"
 #include "utils/UUID.h"
 #include "window_context/Application.h"
@@ -26,6 +27,9 @@ static constexpr double COLD_DRAIN_STOP = 0.75;
 static constexpr double COLD_DRAIN_HARD = 0.90;
 static constexpr uint32_t COLD_DRAIN_CAP_SOFT = 8;
 static constexpr uint32_t COLD_DRAIN_CAP_HARD = 64;
+
+static constexpr float PRIMITIVE_SPHERE_RADIUS = 1.0f;
+static constexpr uint32_t PRIMITIVE_SPHERE_SEGMENTS = 32;
 
 static uint64_t s_hashPath(const std::filesystem::path &path)
 {
@@ -71,6 +75,11 @@ static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &
             return instance->serialize();
         }
         break;
+    case AssetType::SCENE:
+        if (SceneAsset *scene = asset.getUnderlyingAsset<SceneAsset>()) {
+            return scene->serialize();
+        }
+        break;
     default:
         break;
     }
@@ -110,6 +119,12 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
             return true;
         }
         break;
+    case AssetType::SCENE:
+        if (auto scene = SceneAsset::deserialize(payload)) {
+            asset.setAssetVariant(std::move(scene));
+            return true;
+        }
+        break;
     default:
         break;
     }
@@ -138,6 +153,11 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
         payload = instanceData->instance->serialize();
         type = AssetType::MATERIAL_INSTANCE;
         return std::move(instanceData->instance);
+    }
+    if (auto *sceneData = std::get_if<SceneImportData>(&data)) {
+        payload = sceneData->scene->serialize();
+        type = AssetType::SCENE;
+        return std::move(sceneData->scene);
     }
 
     type = AssetType::NONE;
@@ -386,6 +406,8 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
     } else if (extension == ".cubemap") {
         return AssetType::CUBEMAP;
     } else if (extension == ".gltf" || extension == ".glb" || extension == ".fbx") {
+        return AssetType::PREFAB;
+    } else if (extension == ".rscene") {
         return AssetType::SCENE;
     } else if (extension == ".rmat") {
         return AssetType::MATERIAL;
@@ -532,6 +554,18 @@ bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
     return true;
 }
 
+void AssetManagerEditor::registerBuiltinAssets()
+{
+    registerReservedAsset(RE_PRIMITIVE_CUBE_MESH, std::make_unique<Mesh>(Primitives::CreateCube()), "<cube>", AssetType::MESH);
+    registerReservedAsset(RE_PRIMITIVE_SPHERE_MESH,
+                          std::make_unique<Mesh>(Primitives::CreateSphere(PRIMITIVE_SPHERE_RADIUS, PRIMITIVE_SPHERE_SEGMENTS)),
+                          "<sphere>", AssetType::MESH);
+    registerReservedAsset(RE_PRIMITIVE_PLANE_MESH, std::make_unique<Mesh>(Primitives::CreatePlane()), "<plane>", AssetType::MESH);
+
+    importDefaultAsset(AssetType::TEXTURE);
+    importDefaultAsset(AssetType::MATERIAL_INSTANCE);
+}
+
 Asset &AssetManagerEditor::getVirtualAssetByName(const std::string &virtualName)
 {
     for (const auto &[handle, metadata] : m_assetRegistry) {
@@ -620,6 +654,44 @@ void AssetManagerEditor::processPendingWrites()
             ++i;
         }
     }
+}
+
+bool AssetManagerEditor::updateAsset(AssetHandle handle, AssetVariant asset)
+{
+    auto metadataIt = m_assetRegistry.find(handle);
+    if (metadataIt == m_assetRegistry.end()) {
+        RP_CORE_ERROR("cannot update unregistered asset {}", handle);
+        return false;
+    }
+
+    AssetMetadata &metadata = *metadataIt->second;
+    if (metadata.assetPath.empty()) {
+        RP_CORE_ERROR("'{}' has no file to update", metadata.getName());
+        return false;
+    }
+
+    auto loadedIt = m_loadedAssets.find(handle);
+    if (loadedIt == m_loadedAssets.end()) {
+        auto loaded = std::make_unique<Asset>(handle);
+        loadedIt = m_loadedAssets.emplace(handle, std::move(loaded)).first;
+    }
+
+    Asset &loadedAsset = *loadedIt->second;
+    loadedAsset.setAssetVariant(std::move(asset));
+    loadedAsset.status = AssetStatus::LOADED;
+
+    std::vector<uint8_t> payload = s_serializeAsset(loadedAsset, metadata);
+    if (payload.empty()) {
+        RP_CORE_ERROR("Failed to serialize '{}'", metadata.getName());
+        return false;
+    }
+
+    if (!AssetCodec::writeRaptureAsset(metadata.assetPath, handle, metadata, payload)) {
+        RP_CORE_ERROR("Failed to write .rasset for '{}'", metadata.getName());
+        return false;
+    }
+
+    return true;
 }
 
 void AssetManagerEditor::writeRaptureAssetFile(AssetHandle handle, const std::filesystem::path &folder,

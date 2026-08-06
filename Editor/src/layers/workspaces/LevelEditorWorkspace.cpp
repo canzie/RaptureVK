@@ -1,5 +1,6 @@
 #include "LevelEditorWorkspace.h"
 
+#include "layers/panels/AddSceneObjectMenu.h"
 #include "layers/panels/ImagePreviewPanel.h"
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
@@ -8,9 +9,10 @@
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 #include <scenes/Scene.h>
+#include <scenes/instances/Instance.h>
 #include <window_context/Application.h>
 
-#include <filesystem>
+static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
 
 LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::Scene *scene,
                                            Rapture::Viewport *viewport)
@@ -72,8 +74,21 @@ void LevelEditorWorkspace::setupHotbar()
     layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
     layout->innerPadding = Amethyst::UDim::fromOffset(6.0f);
 
+    m_addMenu = m_container->add<Amethyst::ContextMenu>();
+
     Amethyst::UIScope(*m_hotbar).textButton(
-        {.base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(90.0f, 28.0f)},
+        {.base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
+         .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+         .label = "Add"},
+        [this](Amethyst::TextButtonScope &b) {
+            b.component.onMouseButton1ClickCb = [this, button = &b.component]() {
+                showAddMenu(*button);
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
+
+    Amethyst::UIScope(*m_hotbar).textButton(
+        {.base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
          .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
          .label = "Save Scene"},
         [this](Amethyst::TextButtonScope &b) {
@@ -84,6 +99,16 @@ void LevelEditorWorkspace::setupHotbar()
         });
 }
 
+void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
+{
+    if (m_addMenu == nullptr || m_context.scene == nullptr) {
+        return;
+    }
+
+    m_addMenu->setItems(AddSceneObjectMenu::buildItems(m_context.scene->root()));
+    m_addMenu->showAt({button.absolutePosition.x, button.absolutePosition.y + button.absoluteSize.y});
+}
+
 void LevelEditorWorkspace::saveScene()
 {
     Rapture::Scene *scene = m_context.scene;
@@ -92,7 +117,12 @@ void LevelEditorWorkspace::saveScene()
     }
 
     auto &project = Rapture::Application::getInstance().getProject();
-    scene->writeToFile(project.getContentDirectory() / (scene->getSceneName() + ".rscene"));
+    if (!project.getSceneManager().saveScene(*scene, project.getContentDirectory())) {
+        return;
+    }
+
+    project.setStartupScene(scene->sourceAsset());
+    project.saveProject(project.getProjectFilePath());
 }
 
 void LevelEditorWorkspace::saveLayout()

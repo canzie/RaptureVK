@@ -46,5 +46,27 @@ endif()
 
 
 
+# Assets are resolved relative to the executable at runtime. A development build links them back to
+# the source tree so edits apply without rebuilding; an install copies the same layout instead.
+set(EDITOR_ASSET_DIR $<TARGET_FILE_DIR:${EDITOR_NAME}>/assets)
+
+add_custom_command(TARGET ${EDITOR_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${EDITOR_ASSET_DIR}
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${EDITOR_ASSET_DIR}/engine
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/Engine/assets ${EDITOR_ASSET_DIR}/engine
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${EDITOR_ASSET_DIR}/amethyst
+    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/Engine/vendor/Amethyst/backends/shaders ${EDITOR_ASSET_DIR}/amethyst
+    COMMENT "Linking engine assets next to the editor"
+    VERBATIM
+)
+
+foreach(ASSET_SUBDIR fonts themes models textures)
+    add_custom_command(TARGET ${EDITOR_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E rm -f ${EDITOR_ASSET_DIR}/${ASSET_SUBDIR}
+        COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/assets/${ASSET_SUBDIR} ${EDITOR_ASSET_DIR}/${ASSET_SUBDIR}
+        VERBATIM
+    )
+endforeach()
+
 # IDE source organization
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "Source Files" FILES ${EDITOR_SOURCES}) 

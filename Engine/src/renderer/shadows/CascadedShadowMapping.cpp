@@ -1,4 +1,6 @@
 #include "CascadedShadowMapping.h"
+
+#include "utils/EnginePaths.h"
 #include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
@@ -329,13 +331,12 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
     m_rc->descriptorManager->bindSet(2, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
-    auto view = registry.view<TransformComponent, MeshComponent, BoundingBoxComponent>();
+    auto view = registry.view<TransformComponent, MeshComponent>();
 
     // First pass: Populate MDI batches with mesh data
     for (auto entity : view) {
         auto &transform = view.get<TransformComponent>(entity);
         auto &meshComp = view.get<MeshComponent>(entity);
-        auto &boundingBoxComp = view.get<BoundingBoxComponent>(entity);
 
         // Skip invalid or loading meshes
         if (!meshComp.mesh || meshComp.isLoading) {
@@ -348,7 +349,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
         }
 
         // Update world bounding box if transform changed
-        boundingBoxComp.updateWorldBoundingBox(transform);
+        meshComp.updateWorldBoundingBox(transform);
 
         // Get buffer allocation info to determine batch
         auto vboAlloc = meshComp.mesh->getVertexAllocation();
@@ -688,10 +689,7 @@ void CascadedShadowMap::createPipeline()
     depthStencil.minDepthBounds = 0.0f;
     depthStencil.maxDepthBounds = 1.0f;
 
-    auto &app = Application::getInstance();
-    auto &project = app.getProject();
-
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     auto asset = AssetManager::importAsset(shaderPath / "SPIRV/shadows/CascadedShadowPass.vs.spv");
     m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
@@ -800,9 +798,7 @@ void CascadedShadowMap::createTerrainPipeline()
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
-    auto &app = Application::getInstance();
-    auto &project = app.getProject();
-    auto shaderPath = project.getProjectShaderDirectory();
+    auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig terrainShaderConfig;
     terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";

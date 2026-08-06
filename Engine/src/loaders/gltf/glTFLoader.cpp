@@ -390,8 +390,6 @@ bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex)
         primNode->worldTransform = node->worldTransform;
         primNode->meshRef = data.meshRef;
         primNode->materialIndex = data.materialIndex;
-        primNode->boundingBoxMin = data.boundingBoxMin;
-        primNode->boundingBoxMax = data.boundingBoxMax;
 
         node->children.push_back(std::move(primNode));
     }
@@ -528,6 +526,8 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
     params.indexDataSize = static_cast<uint32_t>(indexData.size());
     params.indexCount = indexCount;
     params.indexType = indexType;
+    params.boundsMin = out.boundingBoxMin;
+    params.boundsMax = out.boundingBoxMax;
 
     std::string meshAssetName =
         m_filepath.stem().string() + "_Mesh" + std::to_string(meshIndex) + "_Prim" + std::to_string(primitiveIndex);
@@ -612,8 +612,6 @@ void glTF2Loader::buildPrefab()
         node.name = src->name;
         node.parent = parentIndex;
         node.localTransform = src->localTransform;
-        node.boundingBoxMin = src->boundingBoxMin;
-        node.boundingBoxMax = src->boundingBoxMax;
 
         if (src->meshRef) {
             node.mesh = src->meshRef.get()->getHandle();
