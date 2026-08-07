@@ -21,20 +21,21 @@ struct AssetProvenance {
     std::optional<uint32_t> sourceSubIndex = std::nullopt; // sub-asset index within a container source, e.g. a glTF mesh
 };
 
-enum class AssetType {
-    NONE,
-    TEXTURE,
-    CUBEMAP,
-    SHADER,
-    MATERIAL,
-    MATERIAL_INSTANCE,
-    MESH,
-    PREFAB,
-    ANIMATION,
-    AUDIO,
-    VIDEO,
-    SCENE, // glTF, fbx, etc
-    MODULE
+enum AssetType {
+    ASSET_NONE,
+    ASSET_TEXTURE,
+    ASSET_CUBEMAP,
+    ASSET_SHADER,
+    ASSET_MATERIAL,
+    ASSET_MATERIAL_INSTANCE,
+    ASSET_MESH,
+    ASSET_PREFAB,
+    ASSET_ANIMATION,
+    ASSET_AUDIO,
+    ASSET_VIDEO,
+    ASSET_SCENE,
+    ASSET_MODULE,
+    ASSET_TYPE_COUNT
 };
 
 enum class AssetStorageType {
@@ -59,29 +60,29 @@ enum class AssetEvictionPolicy {
 inline std::string AssetTypeToString(AssetType type)
 {
     switch (type) {
-    case AssetType::TEXTURE:
+    case ASSET_TEXTURE:
         return "Texture";
-    case AssetType::CUBEMAP:
+    case ASSET_CUBEMAP:
         return "Cubemap";
-    case AssetType::SHADER:
+    case ASSET_SHADER:
         return "Shader";
-    case AssetType::MATERIAL:
+    case ASSET_MATERIAL:
         return "Material";
-    case AssetType::MATERIAL_INSTANCE:
+    case ASSET_MATERIAL_INSTANCE:
         return "Material Instance";
-    case AssetType::MESH:
+    case ASSET_MESH:
         return "Mesh";
-    case AssetType::PREFAB:
+    case ASSET_PREFAB:
         return "Prefab";
-    case AssetType::MODULE:
+    case ASSET_MODULE:
         return "Module";
-    case AssetType::ANIMATION:
+    case ASSET_ANIMATION:
         return "Animation";
-    case AssetType::AUDIO:
+    case ASSET_AUDIO:
         return "Audio";
-    case AssetType::VIDEO:
+    case ASSET_VIDEO:
         return "Video";
-    case AssetType::SCENE:
+    case ASSET_SCENE:
         return "Scene";
     default:
         return "Unknown";

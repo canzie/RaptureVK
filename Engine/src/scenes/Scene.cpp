@@ -97,7 +97,7 @@ Entity Scene::createCube(const std::string &name, Mobility mobility)
     entity.addComponent<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_CUBE_MESH), mobility);
 
     // Add a material
-    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL_INSTANCE);
+    auto materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE);
     if (materialRef) {
         entity.addComponent<MaterialComponent>(materialRef);
     }
@@ -146,7 +146,7 @@ Entity Scene::createSphere(const std::string &name, Mobility mobility)
     entity.addComponent<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_SPHERE_MESH), mobility);
 
     // Add a material
-    auto materialRef = AssetManager::importDefaultAsset(AssetType::MATERIAL_INSTANCE);
+    auto materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE);
     if (materialRef) {
         entity.addComponent<MaterialComponent>(materialRef);
     }

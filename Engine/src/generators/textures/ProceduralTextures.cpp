@@ -128,7 +128,7 @@ void ProceduralTexture::initTexture()
         textureName = "procedural_texture_" + std::to_string(s_proceduralTextureCounter++);
     }
 
-    auto asset = AssetManager::registerVirtualAsset(std::move(texture), textureName, AssetType::TEXTURE);
+    auto asset = AssetManager::registerVirtualAsset(std::move(texture), textureName, ASSET_TEXTURE);
     m_texture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
     m_textureAsset = asset;
     m_assets.push_back(asset);

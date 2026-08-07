@@ -42,7 +42,7 @@ struct AssetMetadata {
     static AssetMetadata null;
     static const AssetMetadata const_null;
 
-    AssetType assetType = AssetType::NONE;
+    AssetType assetType = ASSET_NONE;
     AssetStorageType storageType = AssetStorageType::DISK;
 
     AssetImportConfigVariant importConfig = std::monostate();
@@ -63,7 +63,7 @@ struct AssetMetadata {
     const std::string &getName() const { return name; }
     std::filesystem::path getSourcePath() const { return provenance ? provenance->sourcePath : std::filesystem::path{}; }
 
-    operator bool() const { return assetType != AssetType::NONE; }
+    operator bool() const { return assetType != ASSET_NONE; }
 };
 
 class Asset {

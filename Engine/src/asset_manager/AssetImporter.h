@@ -22,11 +22,11 @@ class AssetImporter {
             RP_CORE_WARN("AssetImporter already initialized");
             return;
         }
-        s_assetImporters[AssetType::SHADER] = loadShader;
-        s_assetImporters[AssetType::MATERIAL_INSTANCE] = loadMaterial;
-        s_assetImporters[AssetType::TEXTURE] = loadTexture;
-        s_assetImporters[AssetType::CUBEMAP] = loadCubemap;
-        s_assetImporters[AssetType::SCENE] = loadScene;
+        s_assetImporters[ASSET_SHADER] = loadShader;
+        s_assetImporters[ASSET_MATERIAL_INSTANCE] = loadMaterial;
+        s_assetImporters[ASSET_TEXTURE] = loadTexture;
+        s_assetImporters[ASSET_CUBEMAP] = loadCubemap;
+        s_assetImporters[ASSET_SCENE] = loadScene;
         s_isInitialized = true;
     }
 

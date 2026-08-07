@@ -193,7 +193,7 @@ void MaterialManager::init()
 
     s_surfaceGraphManager = std::make_unique<SurfaceGraphManager>();
 
-    auto asset = AssetManager::importDefaultAsset(AssetType::TEXTURE);
+    auto asset = AssetManager::importDefaultAsset(ASSET_TEXTURE);
     auto defaultTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
     if (defaultTexture && defaultTexture->isReady()) {
         s_defaultTextureIndex = defaultTexture->getBindlessIndex();
@@ -274,9 +274,9 @@ void MaterialManager::writeGraphData(uint32_t uintOffset, const void *data, uint
 
 static void s_createGltfBaseMaterial()
 {
-    AssetPtr<Texture> white(AssetManager::importDefaultAsset(AssetType::TEXTURE));
+    AssetPtr<Texture> white(AssetManager::importDefaultAsset(ASSET_TEXTURE));
     AssetPtr<Texture> flatNormal(AssetManager::registerReservedAsset(
-        RE_FLAT_NORMAL_TEXTURE, Texture::createDefaultFlatNormalTexture(), "<default_flat_normal>", AssetType::TEXTURE));
+        RE_FLAT_NORMAL_TEXTURE, Texture::createDefaultFlatNormalTexture(), "<default_flat_normal>", ASSET_TEXTURE));
 
     using GN = GraphNodeType;
     MaterialGraph graph;
@@ -427,7 +427,7 @@ AssetPtr<BaseMaterial> MaterialManager::createBuiltinMaterial(const std::string 
     }
 
     auto material = std::make_unique<BaseMaterial>(name, graphId, std::move(table), std::move(graph));
-    AssetRef ref = AssetManager::registerReservedAsset(reservedHandle, std::move(material), name, AssetType::MATERIAL);
+    AssetRef ref = AssetManager::registerReservedAsset(reservedHandle, std::move(material), name, ASSET_MATERIAL);
     if (!ref) {
         return {};
     }

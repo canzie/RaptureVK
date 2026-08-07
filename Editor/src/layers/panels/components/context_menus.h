@@ -31,7 +31,7 @@ class AssetContextMenuAID : public AM::ContextMenu::ActionItemData {
 
   public:
     Rapture::AssetHandle assetHandle = Rapture::INVALID_ASSET_HANDLE;
-    Rapture::AssetType assetType = Rapture::AssetType::NONE;
+    Rapture::AssetType assetType = Rapture::ASSET_NONE;
     const Rapture::TypeInfo *moduleClass = nullptr;
     Amethyst::AmTextureId thumbnail = AM::AM_INVALID_TEXTURE;
     std::string name;

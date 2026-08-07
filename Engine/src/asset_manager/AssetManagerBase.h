@@ -1,15 +1,11 @@
-#pragma once
+#ifndef RAPTURE__ASSET_MANAGER_BASE_H
+#define RAPTURE__ASSET_MANAGER_BASE_H
 
 #include "Asset.h"
 #include "AssetImporter.h"
-
-#include <memory>
-#include <unordered_map>
+#include "AssetStorage.h"
 
 namespace Rapture {
-
-using AssetMap = std::unordered_map<AssetHandle, std::unique_ptr<Asset>>;
-using AssetRegistry = std::unordered_map<AssetHandle, std::unique_ptr<AssetMetadata>>;
 
 /*
  @brief Base class for all asset manager implementations
@@ -24,12 +20,12 @@ class AssetManagerBase {
     virtual bool isAssetHandleValid(AssetHandle handle) const = 0;
     virtual const Asset &getAsset(AssetHandle handle) = 0;
 
-    const AssetRegistry &getAssetRegistry() const { return m_assetRegistry; }
-    const AssetMap &getLoadedAssets() const { return m_loadedAssets; }
+    const AssetStorage &getAssets() const { return m_assets; }
 
   protected:
-    AssetMap m_loadedAssets;
-    AssetRegistry m_assetRegistry;
+    AssetStorage m_assets;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__ASSET_MANAGER_BASE_H

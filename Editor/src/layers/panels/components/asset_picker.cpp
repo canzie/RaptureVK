@@ -63,16 +63,13 @@ static int32_t s_nameScore(std::string_view name, std::string_view filter)
 
 static bool s_matches(const AssetQuery &query, Rapture::AssetHandle handle, const Rapture::AssetMetadata &metadata)
 {
-    if (metadata.assetType == Rapture::AssetType::NONE) {
+    if (metadata.assetType == Rapture::ASSET_NONE) {
         return false;
     }
     if (metadata.isDiskAsset() && !query.includeDisk) {
         return false;
     }
     if (metadata.isVirtualAsset() && !query.includeVirtual) {
-        return false;
-    }
-    if (!query.types.empty() && std::find(query.types.begin(), query.types.end(), metadata.assetType) == query.types.end()) {
         return false;
     }
     if (s_nameScore(metadata.name, query.nameFilter) == SCORE_NO_MATCH) {
@@ -84,17 +81,28 @@ static bool s_matches(const AssetQuery &query, Rapture::AssetHandle handle, cons
     return true;
 }
 
+static void s_collectType(const AssetQuery &query, Rapture::AssetType type, std::vector<ScoredAsset> &scored)
+{
+    for (const Rapture::AssetSlot &slot : Rapture::AssetManager::getAssetsOfType(type)) {
+        const Rapture::AssetMetadata &metadata = *slot.metadata;
+        if (!s_matches(query, slot.handle, metadata)) {
+            continue;
+        }
+        scored.push_back({slot.handle, s_nameScore(metadata.name, query.nameFilter), s_toLower(metadata.name)});
+    }
+}
+
 std::vector<Rapture::AssetHandle> AssetQuery_collect(const AssetQuery &query)
 {
     std::vector<ScoredAsset> scored;
-    for (const auto &[handle, metadata] : Rapture::AssetManager::getAssetRegistry()) {
-        if (metadata == nullptr) {
-            continue;
+    if (query.types.empty()) {
+        for (int type = 0; type < Rapture::ASSET_TYPE_COUNT; ++type) {
+            s_collectType(query, static_cast<Rapture::AssetType>(type), scored);
         }
-        if (!s_matches(query, handle, *metadata)) {
-            continue;
+    } else {
+        for (Rapture::AssetType type : query.types) {
+            s_collectType(query, type, scored);
         }
-        scored.push_back({handle, s_nameScore(metadata->name, query.nameFilter), s_toLower(metadata->name)});
     }
 
     std::sort(scored.begin(), scored.end(), [](const ScoredAsset &a, const ScoredAsset &b) {

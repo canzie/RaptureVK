@@ -494,7 +494,7 @@ std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPane
 {
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     switch (type) {
-    case Rapture::AssetType::PREFAB:
+    case Rapture::ASSET_PREFAB:
         items.push_back(Amethyst::makeActionItem("Load in scene", [this, handle]() { s_loadPrefabIntoScene(handle, m_scene); }));
         return items;
     default:
@@ -668,7 +668,7 @@ void ContentBrowserPanel::refreshFileBrowser()
             };
         }
 
-        Rapture::AssetType assetType = metadata != nullptr ? metadata->assetType : Rapture::AssetType::NONE;
+        Rapture::AssetType assetType = metadata != nullptr ? metadata->assetType : Rapture::ASSET_NONE;
         bool isAsset = metadata != nullptr;
         item.action->onMouseButton2DownCb = [this, isDir, isAsset, assetType, assetHandle](int32_t x, int32_t y) {
             std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;

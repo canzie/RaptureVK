@@ -471,7 +471,7 @@ void SpotLight3DEditor::sync(const Rapture::Entity &entity)
 void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::AssetType::MATERIAL_INSTANCE}},
+        s_rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
                          [this](Rapture::AssetHandle handle) {
                              if (m_node != nullptr) {
                                  m_node->setMaterial(handle);

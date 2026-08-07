@@ -1,6 +1,8 @@
-#pragma once
+#ifndef RAPTURE__ASSET_MANAGER_H
+#define RAPTURE__ASSET_MANAGER_H
 
 #include "AssetManagerEditor.h"
+#include "AssetStorage.h"
 
 #include <filesystem>
 #include <memory>
@@ -173,41 +175,32 @@ class AssetManager {
         return s_activeAssetManager->getVirtualAssetsByType(type);
     }
 
-    static const AssetRegistry &getAssetRegistry()
+    /**
+     * @brief The live assets of one type
+     * @param type The type to walk
+     * @return A range over that type's slots
+     */
+    static AssetTypeView getAssetsOfType(AssetType type)
     {
-        if (!s_isInitialized || !s_activeAssetManager) {
+        if (!s_isInitialized || s_activeAssetManager == nullptr) {
             RP_CORE_ERROR("AssetManager not initialized");
-            static AssetRegistry emptyRegistry;
-            return emptyRegistry;
+            return AssetTypeView({}, 0);
         }
-        return s_activeAssetManager->getAssetRegistry();
+        return s_activeAssetManager->getAssets().ofType(type);
     }
 
-    static const AssetMap &getLoadedAssets()
+    /**
+     * @brief Collects the handles of every live asset of one type
+     * @param type The type to collect
+     * @return The handles, in slot order
+     */
+    static std::vector<AssetHandle> getHandlesOfType(AssetType type)
     {
-        if (!s_isInitialized || !s_activeAssetManager) {
-            RP_CORE_ERROR("AssetManager not initialized");
-            static AssetMap emptyMap;
-            return emptyMap;
-        }
-        return s_activeAssetManager->getLoadedAssets();
-    }
-
-    static std::vector<AssetHandle> getTextures()
-    {
-        if (!s_isInitialized || !s_activeAssetManager) {
+        if (!s_isInitialized || s_activeAssetManager == nullptr) {
             RP_CORE_ERROR("AssetManager not initialized");
             return {};
         }
-
-        std::vector<AssetHandle> textures;
-        for (const auto &[handle, metadata] : s_activeAssetManager->getAssetRegistry()) {
-            if (metadata->assetType == AssetType::TEXTURE) {
-                textures.push_back(handle);
-            }
-        }
-
-        return textures;
+        return s_activeAssetManager->getAssets().handlesOfType(type);
     }
 
     static AssetMetadata &getAssetMetadata(AssetHandle handle)
@@ -239,3 +232,5 @@ class AssetManager {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__ASSET_MANAGER_H

@@ -521,7 +521,7 @@ void NodeEditorPanel::rebuildMaterialList()
         return;
     }
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::MATERIAL_INSTANCE)) {
+    for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::ASSET_MATERIAL_INSTANCE)) {
         std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
         items.push_back(Amethyst::makeActionItem(name, [this, handle]() { selectMaterial(handle); }));
     }
@@ -1187,7 +1187,7 @@ void NodeEditorPanel::layoutTexturePins(uint32_t nodeId)
         picker->setText("Select texture");
 
         std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-        for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::TEXTURE)) {
+        for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::ASSET_TEXTURE)) {
             std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
             items.push_back(Amethyst::makeActionItem(name, [this, nodeId, handle, picker, name]() {
                 picker->setText(name);

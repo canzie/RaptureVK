@@ -110,7 +110,7 @@ void ImagePreviewPanel::rebuildSelector()
         return;
     }
 
-    auto handles = Rapture::AssetManager::getVirtualAssetsByType(Rapture::AssetType::TEXTURE);
+    auto handles = Rapture::AssetManager::getVirtualAssetsByType(Rapture::ASSET_TEXTURE);
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     items.reserve(handles.size());

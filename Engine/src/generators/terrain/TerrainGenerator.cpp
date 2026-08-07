@@ -469,7 +469,7 @@ void TerrainGenerator::createTerrainMaterials()
     }
 
     auto instance = std::make_unique<MaterialInstance>(terrainBase, "Terrain");
-    m_material = AssetPtr<MaterialInstance>(AssetManager::registerVirtualAsset(std::move(instance), "Terrain", AssetType::MATERIAL_INSTANCE));
+    m_material = AssetPtr<MaterialInstance>(AssetManager::registerVirtualAsset(std::move(instance), "Terrain", ASSET_MATERIAL_INSTANCE));
 
     SurfaceGraphManager &graphs = MaterialManager::getSurfaceGraphManager();
     uint32_t graphId = graphs.registerGraph(s_buildTerrainGraph());

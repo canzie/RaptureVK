@@ -40,7 +40,7 @@ FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::uniqu
     : m_inputTexture(inputTexture), m_dataType(dataType), m_name(name)
 {
     // Register the texture with the asset manager and keep the AssetRef alive
-    auto asset = AssetManager::registerVirtualAsset(AssetVariant{std::move(flattenedTexture)}, name, AssetType::TEXTURE);
+    auto asset = AssetManager::registerVirtualAsset(AssetVariant{std::move(flattenedTexture)}, name, ASSET_TEXTURE);
     m_flattenedTexture = AssetPtr<Texture>(std::move(asset));
 
     // Add input texture to bindless texture array and get its index

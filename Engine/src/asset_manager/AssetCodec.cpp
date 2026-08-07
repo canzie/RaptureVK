@@ -109,7 +109,7 @@ static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata)
     }
 
     // only a module records a class, so no file written before the type existed is asked to read one
-    if (metadata.assetType == AssetType::MODULE) {
+    if (metadata.assetType == ASSET_MODULE) {
         s_appendString(out, metadata.moduleClass != nullptr ? metadata.moduleClass->name : std::string_view{});
     }
     return out;
@@ -136,7 +136,7 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
         metadata->provenance = std::move(provenance);
     }
 
-    if (metadata->assetType == AssetType::MODULE) {
+    if (metadata->assetType == ASSET_MODULE) {
         std::string className = reader.readString();
         metadata->moduleClass = ModuleRegistry::find(className);
         if (metadata->moduleClass == nullptr) {

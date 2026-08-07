@@ -263,20 +263,17 @@ void TextureGeneratorWorkspace::refreshShaderDropdown()
 {
     if (m_shaderDropdown == nullptr) return;
 
-    const auto &registry = Rapture::AssetManager::getAssetRegistry();
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
 
-    for (const auto &[handle, metaPtr] : registry) {
-        if (!metaPtr || metaPtr->assetType != Rapture::AssetType::SHADER) continue;
-
-        auto assetRef = Rapture::AssetManager::getAsset(handle);
+    // Loading a shader can register further assets, so the handles are collected before anything is loaded
+    for (Rapture::AssetHandle h : Rapture::AssetManager::getHandlesOfType(Rapture::ASSET_SHADER)) {
+        auto assetRef = Rapture::AssetManager::getAsset(h);
         if (!assetRef) continue;
         auto *shader = assetRef.get()->getUnderlyingAsset<Rapture::Shader>();
         if (shader == nullptr || !shader->isReady()) continue;
         if (!shader->hasStage(Rapture::ShaderType::COMPUTE)) continue;
 
-        std::string name = metaPtr->getName();
-        Rapture::AssetHandle h = handle;
+        std::string name = Rapture::AssetManager::getAssetMetadata(h).getName();
         items.push_back(Amethyst::makeActionItem(name, [this, h, name]() {
             m_pendingShaderHandle = h;
             if (m_shaderDropdown != nullptr) m_shaderDropdown->setText(name);
