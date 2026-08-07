@@ -33,7 +33,8 @@ enum class AssetType {
     ANIMATION,
     AUDIO,
     VIDEO,
-    SCENE // glTF, fbx, etc
+    SCENE, // glTF, fbx, etc
+    MODULE
 };
 
 enum class AssetStorageType {
@@ -72,6 +73,8 @@ inline std::string AssetTypeToString(AssetType type)
         return "Mesh";
     case AssetType::PREFAB:
         return "Prefab";
+    case AssetType::MODULE:
+        return "Module";
     case AssetType::ANIMATION:
         return "Animation";
     case AssetType::AUDIO:

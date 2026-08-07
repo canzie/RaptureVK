@@ -35,6 +35,7 @@ std::unique_ptr<ContextMenu::ItemData> AssetContextMenuAID::create(Rapture::Asse
 
     const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(asset);
     item->assetType = metadata.assetType;
+    item->moduleClass = metadata.moduleClass;
     item->name = metadata.name;
 
     return item;
@@ -91,7 +92,7 @@ void AssetContextMenuAIV::bind(ContextMenu::ItemData &item)
     float thumbSize = m_owner->itemHeight - THUMB_INSET;
     m_preview->setBaseProperties({.size = UDim2::fromOffset(thumbSize, thumbSize), .visible = true});
     if (asset.thumbnail == AM_INVALID_TEXTURE) {
-        m_preview->setSvg(Asset_iconForType(asset.assetType));
+        m_preview->setSvg(Asset_iconForType(asset.assetType, asset.moduleClass));
     } else {
         m_preview->setImage(asset.thumbnail);
     }

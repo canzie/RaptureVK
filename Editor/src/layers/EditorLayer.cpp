@@ -1,6 +1,6 @@
 #include "EditorLayer.h"
 
-#include "components/systems/CameraController.h"
+#include "modules/controllers/CameraController.h"
 #include "input/Input.h"
 #include "scenes/Scene.h"
 #include "scenes/instances/Camera3D.h"
@@ -76,7 +76,8 @@ void EditorLayer::syncViewportControls()
         control.camera->setNearPlane(EDITOR_CAMERA_NEAR_PLANE);
         control.camera->setFarPlane(EDITOR_CAMERA_FAR_PLANE);
         viewport->setCamera(control.camera->entity());
-        control.controller = std::make_unique<Rapture::CameraController>(*control.camera);
+        control.controller = std::make_unique<Rapture::CameraController>();
+        control.controller->possess(control.camera.get());
 
         // terrain streaming and the shadow cascades follow whoever is driving the scene
         viewport->getScene()->setActiveController(control.controller.get());

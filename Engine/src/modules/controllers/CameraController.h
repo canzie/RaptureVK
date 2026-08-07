@@ -1,13 +1,12 @@
 #ifndef RAPTURE__CAMERA_CONTROLLER_H
 #define RAPTURE__CAMERA_CONTROLLER_H
 
-#include "input/ControlInput.h"
+#include "modules/controllers/Controller.h"
 
 #include <glm/glm.hpp>
 
 namespace Rapture {
 
-class Camera3D;
 struct TransformComponent;
 
 enum class CameraControlMode {
@@ -18,26 +17,29 @@ enum class CameraControlMode {
 /**
  * @brief Drives a free (spectator/editor) camera entity from ControlInput.
  */
-class CameraController {
+class CameraController : public Controller {
   public:
+    static const TypeInfo &staticType();
+    const TypeInfo &type() const override;
+
     /**
-     * @brief Construct a controller that possesses a camera.
-     * @param camera Camera to drive, which has to outlive the controller.
+     * @brief Takes a camera as both the object this drives and the view it is seen through
+     * @param subject The camera to drive, rejected if it is not a Camera3D
      */
-    explicit CameraController(Camera3D &camera);
+    void possess(Instance *subject) override;
 
     /**
      * @brief Advance the possessed camera from this frame's intent.
      * @param dt Delta time in seconds.
      * @param input Device-agnostic input for this frame.
      */
-    void update(float dt, const ControlInput &input);
+    void update(float dt, const ControlInput &input) override;
 
     /**
-     * @brief The camera this controller possesses.
-     * @return The possessed camera.
+     * @brief Whether the camera wants the cursor captured this frame.
+     * @return True if the cursor should be locked (DISABLED).
      */
-    Camera3D &camera() const { return m_camera; }
+    bool desiresCursorCapture() const override { return m_desiresCapture; }
 
     /**
      * @brief Get the active control mode.
@@ -51,12 +53,10 @@ class CameraController {
      */
     void setMode(CameraControlMode mode);
 
-    /**
-     * @brief Whether the camera wants the cursor captured this frame.
-     * @return True if the cursor should be locked (DISABLED).
-     */
-    bool desiresCursorCapture() const { return m_desiresCapture; }
+    void serialize(WriteNode node) const override;
+    void deserialize(ReadNode node) override;
 
+  public:
     float mouseSensitivity = 0.1f;
     float movementSpeed = 5.0f;
     float orbitSensitivity = 0.3f;
@@ -69,7 +69,7 @@ class CameraController {
     void updateOrbit(const ControlInput &input, TransformComponent &transform);
     void recalcFront();
 
-    Camera3D &m_camera;
+  private:
     CameraControlMode m_mode = CameraControlMode::ORBIT;
 
     float m_yaw = -90.0f;

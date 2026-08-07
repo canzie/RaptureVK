@@ -3,8 +3,8 @@
 
 #include "events/EventSignal.h"
 #include "scenes/entities/Entity.h"
-#include "scenes/instances/TypeInfo.h"
 #include "serialization/SerialDocument.h"
+#include "utils/TypeInfo.h"
 #include "utils/UUID.h"
 
 #include <memory>

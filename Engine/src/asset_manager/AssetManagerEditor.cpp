@@ -80,6 +80,11 @@ static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &
             return scene->serialize();
         }
         break;
+    case AssetType::MODULE:
+        if (ModuleClass *module = asset.getUnderlyingAsset<ModuleClass>()) {
+            return module->toBlob();
+        }
+        break;
     default:
         break;
     }
@@ -125,6 +130,12 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
             return true;
         }
         break;
+    case AssetType::MODULE:
+        if (auto module = ModuleClass::fromBlob(payload)) {
+            asset.setAssetVariant(std::move(module));
+            return true;
+        }
+        break;
     default:
         break;
     }
@@ -158,6 +169,11 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
         payload = sceneData->scene->serialize();
         type = AssetType::SCENE;
         return std::move(sceneData->scene);
+    }
+    if (auto *moduleData = std::get_if<ModuleImportData>(&data)) {
+        payload = moduleData->module->toBlob();
+        type = AssetType::MODULE;
+        return std::move(moduleData->module);
     }
 
     type = AssetType::NONE;
@@ -288,6 +304,11 @@ Asset &AssetManagerEditor::importAsset(AssetImportDataRequest request)
     metadata->storageType = AssetStorageType::DISK;
     metadata->name = request.name;
     metadata->provenance = std::move(request.provenance);
+
+    // recorded on the metadata so a module can be filtered by class while its payload is evicted
+    if (ModuleClass *module = asset->getUnderlyingAsset<ModuleClass>()) {
+        metadata->moduleClass = &module->type();
+    }
 
     return registerImportedAsset(handle, std::move(asset), std::move(metadata), request.output, payload);
 }

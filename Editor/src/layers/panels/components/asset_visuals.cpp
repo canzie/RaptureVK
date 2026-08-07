@@ -2,6 +2,18 @@
 
 #include "Icons.h"
 
+#include "modules/controllers/CameraController.h"
+
+struct ModuleIcon {
+    const Rapture::TypeInfo *moduleClass;
+    const char *svg;
+};
+
+static const ModuleIcon MODULE_ICONS[] = {
+    {&Rapture::CameraController::staticType(), Icons::SVG_CAMERA},
+    {&Rapture::Controller::staticType(), Icons::SVG_CONTROLLER},
+};
+
 Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
 {
     switch (type) {
@@ -26,13 +38,32 @@ Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
         return Amethyst::Color3(0.95f, 0.35f, 0.35f); // red
     case Rapture::AssetType::SCENE:
         return Amethyst::Color3(0.72f, 0.85f, 0.30f); // lime
+    case Rapture::AssetType::MODULE:
+        return Amethyst::Color3(0.93f, 0.52f, 0.42f); // coral
     default:
         return Amethyst::Color3(0.55f, 0.55f, 0.55f); // gray
     }
 }
 
-const char *Asset_iconForType(Rapture::AssetType type)
+static const char *s_moduleIcon(const Rapture::TypeInfo *moduleClass)
 {
+    for (const Rapture::TypeInfo *cls = moduleClass; cls != nullptr; cls = cls->base) {
+        for (const ModuleIcon &icon : MODULE_ICONS) {
+            if (icon.moduleClass == cls) {
+                return icon.svg;
+            }
+        }
+    }
+
+    return Icons::SVG_MODULE;
+}
+
+const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *moduleClass)
+{
+    if (type == Rapture::AssetType::MODULE) {
+        return s_moduleIcon(moduleClass);
+    }
+
     switch (type) {
     case Rapture::AssetType::TEXTURE:
         return Icons::SVG_LAYERS;

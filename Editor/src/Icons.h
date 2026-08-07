@@ -149,6 +149,15 @@ inline constexpr const char *SVG_PREFAB =
     ICON_SVG("<rect x=\"2.5\" y=\"2.5\" width=\"11\" height=\"11\" rx=\"1\" stroke-dasharray=\"3 2\"/>"
              "<path d=\"M8 5.5v5M5.5 8h5\"/>");
 
+inline constexpr const char *SVG_MODULE = ICON_SVG("<rect x=\"5.5\" y=\"3\" width=\"8\" height=\"10\" rx=\"1\"/>"
+                                                   "<path d=\"M5.5 6H2.5M5.5 10H2.5\"/>");
+
+inline constexpr const char *SVG_CONTROLLER =
+    ICON_SVG("<path d=\"M5.5 5.5h5a3.5 3.5 0 013.4 2.7l.6 2.4a1.6 1.6 0 01-2.8 1.4L10.6 10H5.4l-1.1 2a1.6 1.6 0 "
+             "01-2.8-1.4l.6-2.4A3.5 3.5 0 015.5 5.5z\"/>"
+             "<path d=\"M4.8 7.8v1.6M4 8.6h1.6\"/>"
+             "<circle cx=\"11.2\" cy=\"8.6\" r=\".9\" fill=\"#ffffff\" stroke=\"none\"/>");
+
 inline constexpr const char *SVG_GROUP = ICON_SVG("<rect x=\"2\" y=\"3\" width=\"6\" height=\"6\" rx=\".5\"/>"
                                                   "<rect x=\"8\" y=\"7\" width=\"6\" height=\"6\" rx=\".5\"/>");
 

@@ -2,9 +2,11 @@
 
 #include "Asset.h"
 #include "logging/Log.h"
+#include "modules/ModuleRegistry.h"
 
 #include <cstring>
 #include <fstream>
+#include <string_view>
 
 namespace Rapture {
 
@@ -49,7 +51,7 @@ static void s_append(std::vector<uint8_t> &out, const T &value)
     out.insert(out.end(), p, p + sizeof(T));
 }
 
-static void s_appendString(std::vector<uint8_t> &out, const std::string &str)
+static void s_appendString(std::vector<uint8_t> &out, std::string_view str)
 {
     s_append(out, static_cast<uint32_t>(str.size()));
     out.insert(out.end(), str.begin(), str.end());
@@ -105,6 +107,11 @@ static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata)
         s_append(out, static_cast<uint8_t>(hasSubIndex ? 1 : 0));
         s_append(out, hasSubIndex ? *metadata.provenance->sourceSubIndex : uint32_t{0});
     }
+
+    // only a module records a class, so no file written before the type existed is asked to read one
+    if (metadata.assetType == AssetType::MODULE) {
+        s_appendString(out, metadata.moduleClass != nullptr ? metadata.moduleClass->name : std::string_view{});
+    }
     return out;
 }
 
@@ -127,6 +134,14 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
             provenance.sourceSubIndex = subIndex;
         }
         metadata->provenance = std::move(provenance);
+    }
+
+    if (metadata->assetType == AssetType::MODULE) {
+        std::string className = reader.readString();
+        metadata->moduleClass = ModuleRegistry::find(className);
+        if (metadata->moduleClass == nullptr) {
+            RP_CORE_WARN("no module class named '{}', '{}' cannot be loaded", className, metadata->name);
+        }
     }
 
     if (!reader.ok) {

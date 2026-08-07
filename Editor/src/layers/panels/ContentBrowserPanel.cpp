@@ -636,7 +636,7 @@ void ContentBrowserPanel::refreshFileBrowser()
             item.typeBar->setBaseProperties({.visible = false});
             item.type->setBaseProperties({.visible = false});
         } else if (metadata != nullptr) {
-            item.icon->setSvg(Asset_iconForType(metadata->assetType));
+            item.icon->setSvg(Asset_iconForType(metadata->assetType, metadata->moduleClass));
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});
             item.typeBar->setBaseProperties({.visible = true});
             item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(metadata->assetType)});

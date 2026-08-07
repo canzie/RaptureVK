@@ -2,7 +2,7 @@
 
 #include "Icons.h"
 #include "components/Components.h"
-#include "components/systems/CameraController.h"
+#include "modules/controllers/CameraController.h"
 #include "events/GameEvents.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"

@@ -9,7 +9,7 @@ namespace Rapture {
 static constexpr uint8_t MAX_TYPE_DEPTH = 8;
 
 /**
- * @brief Runtime type of an Instance class, holding its ancestry as a chain indexed by depth.
+ * @brief Runtime type of a class, holding its ancestry as a chain indexed by depth.
  *
  * Single inheritance makes an ancestry a straight line, so a subtype test is one depth compare and
  * one pointer compare regardless of how many classes exist.

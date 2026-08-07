@@ -13,7 +13,7 @@ TypeInfo::TypeInfo(std::string_view name, const TypeInfo *base) : name(name), ba
         }
     }
 
-    RP_ASSERT(depth < MAX_TYPE_DEPTH, "instance class hierarchy is deeper than MAX_TYPE_DEPTH");
+    RP_ASSERT(depth < MAX_TYPE_DEPTH, "class hierarchy is deeper than MAX_TYPE_DEPTH");
 
     chain[depth] = this;
 }

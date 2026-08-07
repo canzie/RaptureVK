@@ -17,15 +17,17 @@
 #include "components/systems/Prefab.h"
 #include "materials/MaterialInstance.h"
 #include "meshes/Mesh.h"
+#include "modules/ModuleClass.h"
 #include "scenes/SceneAsset.h"
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
+#include "utils/TypeInfo.h"
 
 namespace Rapture {
 
 using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
                                   std::unique_ptr<BaseMaterial>, std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>,
-                                  std::unique_ptr<SceneAsset>, std::unique_ptr<Prefab>>;
+                                  std::unique_ptr<SceneAsset>, std::unique_ptr<Prefab>, std::unique_ptr<ModuleClass>>;
 
 template <typename T, typename Variant>
 struct IsAssetType;
@@ -52,6 +54,9 @@ struct AssetMetadata {
     std::atomic<uint32_t> useCount{0};
     AssetEvictionPolicy evictionPolicy = AssetEvictionPolicy::EVICT_IMMEDIATE;
     uint64_t sizeHintBytes = 0;
+
+    /// The class a MODULE asset holds, so modules can be filtered by class without being loaded
+    const TypeInfo *moduleClass = nullptr;
 
     bool isDiskAsset() const { return storageType == AssetStorageType::DISK; }
     bool isVirtualAsset() const { return storageType == AssetStorageType::VIRTUAL; }

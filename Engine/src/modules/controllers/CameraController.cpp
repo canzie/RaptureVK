@@ -1,6 +1,7 @@
 #include "CameraController.h"
 
 #include "components/Components.h"
+#include "logging/Log.h"
 #include "scenes/instances/Camera3D.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,8 +12,34 @@ namespace Rapture {
 
 static const glm::vec3 WORLD_UP = glm::vec3(0.0f, 1.0f, 0.0f);
 
-CameraController::CameraController(Camera3D &camera) : m_camera(camera)
+static constexpr std::string_view KEY_MOUSE_SENSITIVITY = "mouseSensitivity";
+static constexpr std::string_view KEY_MOVEMENT_SPEED = "movementSpeed";
+static constexpr std::string_view KEY_ORBIT_SENSITIVITY = "orbitSensitivity";
+static constexpr std::string_view KEY_PAN_SPEED = "panSpeed";
+static constexpr std::string_view KEY_ZOOM_SPEED = "zoomSpeed";
+static constexpr std::string_view KEY_MAX_PITCH = "maxPitch";
+
+const TypeInfo &CameraController::staticType()
 {
+    static const TypeInfo type("CameraController", &Controller::staticType());
+    return type;
+}
+
+const TypeInfo &CameraController::type() const
+{
+    return staticType();
+}
+
+void CameraController::possess(Instance *subject)
+{
+    Camera3D *camera = subject != nullptr ? subject->as<Camera3D>() : nullptr;
+    if (camera == nullptr) {
+        RP_CORE_WARN("a camera controller only drives a Camera3D");
+        return;
+    }
+
+    Controller::possess(camera);
+    setViewCamera(camera);
     recalcFront();
 }
 
@@ -29,7 +56,11 @@ void CameraController::setMode(CameraControlMode mode)
 
 void CameraController::update(float dt, const ControlInput &input)
 {
-    auto [transform, camera] = m_camera.entity().tryGetComponents<TransformComponent, CameraComponent>();
+    if (m_viewCamera == nullptr) {
+        return;
+    }
+
+    auto [transform, camera] = m_viewCamera->entity().tryGetComponents<TransformComponent, CameraComponent>();
     if (transform == nullptr || camera == nullptr) {
         return;
     }
@@ -97,6 +128,30 @@ void CameraController::updateOrbit(const ControlInput &input, TransformComponent
     }
 
     transform.transforms.setTranslation(m_focusPoint - m_front * m_focusDistance);
+}
+
+void CameraController::serialize(WriteNode node) const
+{
+    Controller::serialize(node);
+
+    node.set(KEY_MOUSE_SENSITIVITY, mouseSensitivity);
+    node.set(KEY_MOVEMENT_SPEED, movementSpeed);
+    node.set(KEY_ORBIT_SENSITIVITY, orbitSensitivity);
+    node.set(KEY_PAN_SPEED, panSpeed);
+    node.set(KEY_ZOOM_SPEED, zoomSpeed);
+    node.set(KEY_MAX_PITCH, maxPitch);
+}
+
+void CameraController::deserialize(ReadNode node)
+{
+    Controller::deserialize(node);
+
+    mouseSensitivity = static_cast<float>(node.child(KEY_MOUSE_SENSITIVITY).asF64(mouseSensitivity));
+    movementSpeed = static_cast<float>(node.child(KEY_MOVEMENT_SPEED).asF64(movementSpeed));
+    orbitSensitivity = static_cast<float>(node.child(KEY_ORBIT_SENSITIVITY).asF64(orbitSensitivity));
+    panSpeed = static_cast<float>(node.child(KEY_PAN_SPEED).asF64(panSpeed));
+    zoomSpeed = static_cast<float>(node.child(KEY_ZOOM_SPEED).asF64(zoomSpeed));
+    maxPitch = static_cast<float>(node.child(KEY_MAX_PITCH).asF64(maxPitch));
 }
 
 void CameraController::recalcFront()

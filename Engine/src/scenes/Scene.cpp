@@ -4,7 +4,7 @@
 #include "components/Components.h"
 #include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
-#include "components/systems/CameraController.h"
+#include "modules/controllers/CameraController.h"
 #include "scenes/instances/Camera3D.h"
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
@@ -200,8 +200,9 @@ void Scene::onUpdate(float dt)
 
     glm::vec3 cameraPosition = glm::vec3(0.0f);
     Frustum *frustum = nullptr;
-    if (m_activeController != nullptr) {
-        Entity camera = m_activeController->camera().entity();
+    Camera3D *activeCamera = m_activeController != nullptr ? m_activeController->viewCamera() : nullptr;
+    if (activeCamera != nullptr) {
+        Entity camera = activeCamera->entity();
         auto [cameraTransform, cameraComponent] = camera.tryGetComponents<TransformComponent, CameraComponent>();
         if (cameraTransform && cameraComponent) {
             cameraPosition = cameraTransform->translation();
@@ -249,9 +250,9 @@ void Scene::onUpdate(float dt)
             cascadedShadowView.get<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>(entity);
 
         CascadedShadowMap *cascadedShadowMap = m_renderData->getCascadedShadowMap(static_cast<EntityID>(entity));
-        if (cascadedShadowMap != nullptr && shadow.isActive && m_activeController != nullptr) {
+        if (cascadedShadowMap != nullptr && shadow.isActive && activeCamera != nullptr) {
             // Update the cascaded shadow map view matrices
-            auto cameraComp = m_activeController->camera().entity().tryGetComponent<CameraComponent>();
+            auto cameraComp = activeCamera->entity().tryGetComponent<CameraComponent>();
             if (cameraComp) {
                 cascadedShadowMap->setLambda(shadow.lambda);
                 cascadedShadowMap->setShadowDistance(shadow.shadowDistance);
