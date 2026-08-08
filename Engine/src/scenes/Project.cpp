@@ -1,5 +1,7 @@
 #include "Project.h"
 
+#include "asset_manager/AssetManager.h"
+#include "events/GameEvents.h"
 #include "events/ProjectEvents.h"
 #include "logging/Log.h"
 
@@ -10,8 +12,9 @@ namespace Rapture {
 static constexpr std::string_view KEY_METADATA = "metadata";
 static constexpr std::string_view KEY_FORMAT_VERSION = "formatVersion";
 static constexpr std::string_view KEY_NAME = "name";
-static constexpr std::string_view KEY_INITIAL_WORLD = "initialWorld";
-static constexpr std::string_view KEY_STARTUP_SCENE = "startupScene";
+static constexpr std::string_view KEY_STARTUP_WORLD = "startupWorld";
+
+static constexpr const char *DEFAULT_WORLD_NAME = "DefaultWorld";
 
 std::unique_ptr<Project> Project::empty()
 {
@@ -19,7 +22,7 @@ std::unique_ptr<Project> Project::empty()
 }
 
 Project::Project(const std::filesystem::path &projectDirectory, std::string_view name)
-    : m_config{std::string(name), projectDirectory, "DefaultWorld"}
+    : m_config{std::string(name), projectDirectory}
 {
     RP_CORE_INFO("Opening project '{}' at '{}'", m_config.name, m_config.projectDirectory.string());
 
@@ -28,15 +31,93 @@ Project::Project(const std::filesystem::path &projectDirectory, std::string_view
 
 void Project::createDefaultWorld()
 {
-    World *defaultWorld = m_sceneManager.createWorld(m_config.initialWorldName);
-    auto defaultScene = m_sceneManager.createScene(RAPTURE_DEFAULT_SCENE_NAME);
-    defaultScene->addDefaultContent();
-    m_sceneManager.activateScene(RAPTURE_DEFAULT_SCENE_NAME);
+    World *world = createWorld(DEFAULT_WORLD_NAME);
+    if (world == nullptr) {
+        return;
+    }
 
-    defaultWorld->addScene(RAPTURE_DEFAULT_SCENE_NAME, defaultScene);
-    defaultWorld->setMainScene(RAPTURE_DEFAULT_SCENE_NAME);
+    world->getScene()->addDefaultContent();
+    m_config.startupWorld = m_worlds.back().ref().get()->getHandle();
+    activateWorld(world);
+}
 
-    m_sceneManager.setActiveWorld(m_config.initialWorldName);
+World *Project::createWorld(std::string name)
+{
+    AssetPtr<World> world(AssetManager::importAsset(AssetImportDataRequest{
+        .data = WorldImportData{std::make_unique<World>(name)},
+        .output = getContentDirectory(),
+        .name = name,
+    }));
+    if (!world) {
+        RP_CORE_ERROR("Could not create world '{}'", name);
+        return nullptr;
+    }
+
+    m_worlds.push_back(std::move(world));
+    return m_worlds.back().get();
+}
+
+World *Project::openWorld(AssetHandle handle)
+{
+    if (handle == INVALID_ASSET_HANDLE) {
+        return nullptr;
+    }
+
+    AssetPtr<World> world(AssetManager::getAsset(handle));
+    if (!world) {
+        RP_CORE_ERROR("asset {} is not a world", handle);
+        return nullptr;
+    }
+
+    // the manager hands out one payload per handle, so an already open world comes back as itself
+    for (const AssetPtr<World> &open : m_worlds) {
+        if (open.get() == world.get()) {
+            return open.get();
+        }
+    }
+
+    m_worlds.push_back(std::move(world));
+    return m_worlds.back().get();
+}
+
+void Project::activateWorld(World *world)
+{
+    if (world == nullptr) {
+        return;
+    }
+
+    world->setActive(true);
+    if (Scene *scene = world->getScene()) {
+        scene->active = true;
+    }
+
+    GameEvents::onWorldActivated().publish(world);
+}
+
+void Project::deactivateWorld(World *world)
+{
+    if (world == nullptr) {
+        return;
+    }
+
+    world->setActive(false);
+    if (Scene *scene = world->getScene()) {
+        scene->active = false;
+    }
+}
+
+bool Project::saveWorld(AssetHandle handle)
+{
+    return AssetManager::saveAsset(handle, getContentDirectory());
+}
+
+void Project::onUpdate(float dt)
+{
+    for (const AssetPtr<World> &world : m_worlds) {
+        if (world->isActive()) {
+            world->onUpdate(dt);
+        }
+    }
 }
 
 void Project::createProjectDirectories()
@@ -62,8 +143,7 @@ bool Project::saveProject(const std::filesystem::path &path)
     WriteNode metadata = root.addObject(KEY_METADATA);
     metadata.set(KEY_FORMAT_VERSION, static_cast<uint64_t>(PROJECT_FORMAT_VERSION));
     metadata.set(KEY_NAME, std::string_view(m_config.name));
-    metadata.set(KEY_INITIAL_WORLD, std::string_view(m_config.initialWorldName));
-    metadata.set(KEY_STARTUP_SCENE, m_config.startupScene);
+    metadata.set(KEY_STARTUP_WORLD, m_config.startupWorld);
 
     ProjectEvents::onProjectSerialize().publish(root);
 
@@ -137,33 +217,27 @@ bool Project::loadProject(const std::filesystem::path &path)
     }
 
     m_config.name = metadata.child(KEY_NAME).asString(m_config.name);
-    m_config.initialWorldName = metadata.child(KEY_INITIAL_WORLD).asString(m_config.initialWorldName);
-    m_config.startupScene = metadata.child(KEY_STARTUP_SCENE).asU64(INVALID_ASSET_HANDLE);
+    m_config.startupWorld = metadata.child(KEY_STARTUP_WORLD).asU64(INVALID_ASSET_HANDLE);
 
     ProjectEvents::onProjectRegister().publish(root);
     ProjectEvents::onProjectRegisterComplete().publish();
 
-    openStartupScene();
+    openStartupWorld();
 
     RP_CORE_INFO("Loaded project '{}' from '{}'", m_config.name, path.string());
     return true;
 }
 
-void Project::openStartupScene()
+void Project::openStartupWorld()
 {
-    Scene *scene = m_sceneManager.openScene(m_config.startupScene);
-    if (scene == nullptr) {
-        RP_CORE_WARN("no startup scene to open, starting from an empty one");
+    World *world = openWorld(m_config.startupWorld);
+    if (world == nullptr) {
+        RP_CORE_WARN("no startup world to open, starting from an empty one");
         createDefaultWorld();
         return;
     }
 
-    World *world = m_sceneManager.createWorld(m_config.initialWorldName);
-    world->addScene(scene->getSceneName(), scene);
-    world->setMainScene(scene->getSceneName());
-
-    m_sceneManager.setActiveWorld(m_config.initialWorldName);
-    m_sceneManager.activateScene(scene);
+    activateWorld(world);
 }
 
 } // namespace Rapture

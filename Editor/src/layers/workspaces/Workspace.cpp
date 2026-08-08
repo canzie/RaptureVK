@@ -21,26 +21,37 @@ void Workspace::setupBase(Amethyst::TabBarScope &tabs, std::string_view label)
 {
     tabs.tab([this, label](Amethyst::TabScope &tab) {
         tab.label(iconTabLayoutScope(label));
-        tab.content([this](Amethyst::FrameScope &f) {
-            m_container = &f.component;
-            m_container->addClass("workspace");
-
-            m_hotbar = m_container->add<Amethyst::Frame>();
-            m_hotbar->setBaseProperties({
-                .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
-                .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
-            });
-            m_hotbar->addClass("workspace-hotbar");
-
-            m_dockingLayer = m_container->add<Amethyst::DockingLayer>();
-            m_dockingLayer->setDisplayOrder(1);
-            m_dockingLayer->innerSpacing = EDITOR_DOCK_INNER_SPACING;
-            m_dockingLayer->absolutePosition = {0.0f, EDITOR_CONTENT_TOP + EDITOR_DOCK_SPACING};
-            m_dockingLayer->markDirty();
-
-            m_context.dockingLayer = m_dockingLayer;
-        });
+        tab.content([this](Amethyst::FrameScope &f) { buildContainer(f.component); });
     });
+}
+
+void Workspace::setupBase(Amethyst::TabBar &tabBar, std::string_view label, std::string_view iconSvg)
+{
+    auto content = std::make_unique<Amethyst::Frame>();
+    Amethyst::Frame *container = content.get();
+    tabBar.addTab(std::move(content), iconTabLayout(label, iconSvg));
+    buildContainer(*container);
+}
+
+void Workspace::buildContainer(Amethyst::Frame &container)
+{
+    m_container = &container;
+    m_container->addClass("workspace");
+
+    m_hotbar = m_container->add<Amethyst::Frame>();
+    m_hotbar->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
+        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
+    });
+    m_hotbar->addClass("workspace-hotbar");
+
+    m_dockingLayer = m_container->add<Amethyst::DockingLayer>();
+    m_dockingLayer->setDisplayOrder(1);
+    m_dockingLayer->innerSpacing = EDITOR_DOCK_INNER_SPACING;
+    m_dockingLayer->absolutePosition = {0.0f, EDITOR_CONTENT_TOP + EDITOR_DOCK_SPACING};
+    m_dockingLayer->markDirty();
+
+    m_context.dockingLayer = m_dockingLayer;
 }
 
 void Workspace::addPanel(std::unique_ptr<Panel> panel, Amethyst::DockZone zone)

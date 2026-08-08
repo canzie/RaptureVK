@@ -49,6 +49,57 @@ class AssetContextMenuAIV : public AM::ContextMenu::ActionItemView {
     AM::TextLabel *m_label = nullptr;
 };
 
+/**
+ * @brief How an add menu row draws itself
+ */
+enum AddAssetRowStyle {
+    ADD_ROW_ICON,  // leading icon beside one line of text
+    ADD_ROW_ASSET, // icon in a well carrying the asset type's accent bar
+    ADD_ROW_PLAIN, // text alone
+    ADD_ROW_COUNT
+};
+
+// Add Asset Context Menu Action Item Data
+class AddAssetContextMenuAID : public AM::ContextMenu::ActionItemData {
+  public:
+    static std::unique_ptr<AM::ContextMenu::ItemData> createIconRow(std::string label, std::string svgIcon,
+                                                                    std::function<void()> onActivate);
+
+    /**
+     * @brief A row creating an asset, taking its icon and accent from the type it creates
+     * @param label The row's text
+     * @param assetType The type the row creates
+     * @param onActivate What to run when the row is picked
+     * @return The item, ready to hand to a ContextMenu
+     */
+    static std::unique_ptr<AM::ContextMenu::ItemData> createAssetRow(std::string label, Rapture::AssetType assetType,
+                                                                     std::function<void()> onActivate);
+
+    static std::unique_ptr<AM::ContextMenu::ItemData> createPlainRow(std::string label, std::function<void()> onActivate);
+
+  public:
+    AddAssetRowStyle style = ADD_ROW_PLAIN;
+    std::string label;
+    std::string svgIcon;
+    Rapture::AssetType assetType = Rapture::ASSET_NONE;
+    const Rapture::TypeInfo *moduleClass = nullptr;
+    bool enabled = true;
+};
+
+// Add Asset Context Menu Action Item View
+class AddAssetContextMenuAIV : public AM::ContextMenu::ActionItemView {
+  public:
+    AM::Frame *create(AM::ContextMenu &owner) override;
+    void bind(AM::ContextMenu::ItemData &item) override;
+    float rowHeight(const AM::ContextMenu &owner) const override;
+
+  private:
+    AM::Frame *m_iconWell = nullptr;
+    AM::ImageLabel *m_icon = nullptr;
+    AM::Frame *m_accent = nullptr;
+    AM::TextLabel *m_label = nullptr;
+};
+
 // Viewport Context Menu Toggle Item Data
 class ViewportContextMenuTID : public AM::ContextMenu::ToggleItemData {
   public:

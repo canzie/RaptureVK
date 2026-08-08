@@ -3,6 +3,7 @@
 #include "events/GameEvents.h"
 #include "layers/panels/AddSceneObjectMenu.h"
 #include "layers/panels/components/tab_layouts.h"
+#include "scenes/World.h"
 #include "scenes/entities/Entity.h"
 
 #include <components/common.h>
@@ -90,7 +91,7 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     icon = Icons::SVG_LAYERS;
     attach(tabBar, std::move(root));
 
-    setScene(context.scene);
+    setScene(context.world != nullptr ? context.world->getScene() : nullptr);
 }
 
 OutlinerPanel::~OutlinerPanel()

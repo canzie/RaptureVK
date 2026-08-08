@@ -3,13 +3,18 @@
 #include "asset_manager/AssetManager.h"
 #include "components/systems/Prefab.h"
 #include "layers/panels/components/asset_visuals.h"
+#include "layers/panels/components/context_menus.h"
 #include "logging/Log.h"
+#include "modules/ModuleRegistry.h"
+#include "modules/controllers/CameraController.h"
 #include "scenes/Project.h"
+#include "scenes/World.h"
 #include "scenes/entities/Entity.h"
 #include "window_context/Application.h"
 
 #include <algorithm>
 #include <cctype>
+#include <climits>
 #include <components/common.h>
 #include <components/context_menu_item.h>
 #include <components/extensions/ui_aspect_ratio_constraint.h>
@@ -41,6 +46,57 @@ static constexpr float TILE_ICON_SIZE = 42.0f;
 #define COL_HOVER     Amethyst::Color3::fromHex(0x4d4d4d)
 
 static constexpr float CONTENT_PADDING = 10.0f;
+static constexpr float ADD_MENU_WIDTH = 240.0f;
+
+using MenuItems = std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>>;
+
+// TODO: replace with the asset creation panel these rows will open once it exists
+static void s_createAssetStub(std::string_view what)
+{
+    RP_INFO("creating a {} is not wired up yet", what);
+}
+
+// the file name a .rasset takes from its display name
+static std::string s_assetFileName(std::string_view name)
+{
+    std::string fileName(name);
+    std::replace(fileName.begin(), fileName.end(), ' ', '_');
+    return fileName;
+}
+
+// a module is labelled with the class it holds, every other asset with its type
+static std::string s_typeLabel(Rapture::AssetType type, const Rapture::TypeInfo *moduleClass)
+{
+    if (type == Rapture::ASSET_MODULE && moduleClass != nullptr) {
+        return std::string(moduleClass->name);
+    }
+    return Rapture::AssetTypeToString(type);
+}
+
+static void s_setActive(Amethyst::UIObject &object, bool active)
+{
+    uint16_t state = object.getGuiState();
+    object.setGuiState(active ? static_cast<uint16_t>(state | Amethyst::GUI_STATE_ACTIVE)
+                              : static_cast<uint16_t>(state & ~Amethyst::GUI_STATE_ACTIVE));
+}
+
+static std::string s_uniqueFolderName(const std::filesystem::path &directory)
+{
+    std::string name = "Folder";
+    for (uint32_t suffix = 2; std::filesystem::exists(directory / name); suffix++) {
+        name = "Folder " + std::to_string(suffix);
+    }
+    return name;
+}
+
+static std::string s_uniqueAssetName(const std::filesystem::path &directory, std::string_view baseName)
+{
+    std::string name(baseName);
+    for (uint32_t suffix = 2; std::filesystem::exists(directory / (s_assetFileName(name) + ".rasset")); suffix++) {
+        name = std::string(baseName) + " " + std::to_string(suffix);
+    }
+    return name;
+}
 
 static void s_loadPrefabIntoScene(Rapture::AssetHandle handle, Rapture::Scene *scene)
 {
@@ -51,19 +107,6 @@ static void s_loadPrefabIntoScene(Rapture::AssetHandle handle, Rapture::Scene *s
     if (Rapture::Prefab::instantiate(Rapture::AssetManager::getAsset(handle), scene) == nullptr) {
         RP_WARN("Failed to load prefab into the scene");
     }
-}
-
-static void s_openScene(Rapture::AssetHandle handle)
-{
-    auto &sceneManager = Rapture::Application::getInstance().getProject().getSceneManager();
-
-    Rapture::Scene *scene = sceneManager.openScene(handle);
-    if (scene == nullptr) {
-        RP_WARN("Failed to open the scene");
-        return;
-    }
-
-    sceneManager.activateScene(scene);
 }
 
 static std::string s_normalizeForSearch(std::string_view text)
@@ -87,7 +130,7 @@ ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const Workspa
     : Panel("Content Browser", context)
 {
     m_isDocked = true;
-    m_scene = context.scene;
+    m_scene = context.world != nullptr ? context.world->getScene() : nullptr;
 
     auto root = std::make_unique<Amethyst::Frame>();
     m_root = root.get();
@@ -115,7 +158,7 @@ ContentBrowserPanel::~ContentBrowserPanel()
 void ContentBrowserPanel::setContext(const WorkspaceContext &context)
 {
     Panel::setContext(context);
-    m_scene = context.scene;
+    m_scene = context.world != nullptr ? context.world->getScene() : nullptr;
 }
 
 void ContentBrowserPanel::buildContent()
@@ -181,7 +224,13 @@ void ContentBrowserPanel::setupTopBar()
                             .base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(56.0f, 24.0f)},
                             .label = "+ Add",
                         },
-                        [this](Amethyst::TextButtonScope &b) { m_addBtn = &b.component; });
+                        [this](Amethyst::TextButtonScope &b) {
+                            m_addBtn = &b.component;
+                            m_addBtn->onMouseButton1ClickCb = [this]() {
+                                showAddMenu({m_addBtn->absolutePosition.x, m_addBtn->absolutePosition.y});
+                                return Amethyst::EventResult::CONSUMED;
+                            };
+                        });
                     cluster.textButton(
                         {
                             .classes = {"generic-text-button"},
@@ -437,6 +486,12 @@ void ContentBrowserPanel::setupContentArea()
                 },
                 [this](Amethyst::ScrollingFrameScope &sf) {
                     m_contentContainer = &sf.component;
+                    m_contentContainer->track(m_contentContainer->onInputBeganCb.connect([this](const Amethyst::InputObject &io) {
+                        if (io.type != Amethyst::InputType::MOUSE_BUTTON_2) {
+                            return;
+                        }
+                        showAddMenu(Amethyst::vec2(io.position.x, io.position.y));
+                    }));
                     auto *gridLayout = sf.component.addExtension<Amethyst::UIGridLayout>();
                     gridLayout->cellSize = Amethyst::UDim2::fromOffset(TILE_MIN_WIDTH, TILE_MIN_WIDTH / TILE_ASPECT);
                     gridLayout->cellPadding = Amethyst::UDim2::fromOffset(CONTENT_PADDING, CONTENT_PADDING);
@@ -478,6 +533,209 @@ void ContentBrowserPanel::setupContentArea()
 void ContentBrowserPanel::setupContextMenu()
 {
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
+
+    m_addMenu = m_root->add<Amethyst::ContextMenu>();
+    m_addMenu->addClass("add-asset-menu");
+    m_addMenu->placement = Amethyst::PopupPlacement::ABOVE;
+    m_addMenu->popupWidth = ADD_MENU_WIDTH;
+    // the rows differ in height, which is what the item count caps the menu against
+    m_addMenu->maxVisibleItems = INT_MAX;
+    m_addMenu->setRowFactories({
+        .action = [] { return std::make_unique<AddAssetContextMenuAIV>(); },
+        .separator = [] { return std::make_unique<ViewportContextMenuSIV>(); },
+    });
+}
+
+void ContentBrowserPanel::showAddMenu(Amethyst::vec2 pos)
+{
+    if (m_addMenu == nullptr) {
+        return;
+    }
+    m_addMenu->setItems(buildAddMenuItems());
+    m_addMenu->showAt(pos);
+}
+
+MenuItems ContentBrowserPanel::buildAddMenuItems()
+{
+    MenuItems items;
+
+    items.push_back(ViewportContextMenuSID::create("Folder"));
+    items.push_back(AddAssetContextMenuAID::createIconRow("New Folder", Icons::SVG_FOLDER_PLUS,
+                                                          [this]() { beginCreate(CONTENT_EDIT_FOLDER); }));
+    items.push_back(AddAssetContextMenuAID::createIconRow("Refresh", Icons::SVG_REFRESH, [this]() { refresh(); }));
+
+    items.push_back(ViewportContextMenuSID::create("Create Basic Asset"));
+    items.push_back(
+        AddAssetContextMenuAID::createAssetRow("Module Class", Rapture::ASSET_MODULE, []() { s_createAssetStub("module class"); }));
+    items.push_back(
+        AddAssetContextMenuAID::createAssetRow("Material", Rapture::ASSET_MATERIAL, []() { s_createAssetStub("material"); }));
+    items.push_back(AddAssetContextMenuAID::createAssetRow("World", Rapture::ASSET_WORLD, []() { s_createAssetStub("world"); }));
+
+    items.push_back(ViewportContextMenuSID::create("Create Advanced Asset"));
+    for (auto &advanced : buildAdvancedAddItems()) {
+        items.push_back(std::move(advanced));
+    }
+
+    return items;
+}
+
+MenuItems ContentBrowserPanel::buildAdvancedAddItems()
+{
+    MenuItems controllers;
+    controllers.push_back(AddAssetContextMenuAID::createPlainRow(
+        "Camera Controller", [this]() { beginCreate(CONTENT_EDIT_MODULE, &Rapture::CameraController::staticType()); }));
+
+    MenuItems modules;
+    modules.push_back(Amethyst::makeSubmenuItem("Controllers", std::move(controllers)));
+
+    MenuItems scenes;
+    scenes.push_back(AddAssetContextMenuAID::createPlainRow("Level", []() { s_createAssetStub("level"); }));
+    scenes.push_back(AddAssetContextMenuAID::createPlainRow("Prefab", []() { s_createAssetStub("prefab"); }));
+
+    MenuItems shaders;
+    shaders.push_back(AddAssetContextMenuAID::createPlainRow("Compute Shader", []() { s_createAssetStub("compute shader"); }));
+    shaders.push_back(AddAssetContextMenuAID::createPlainRow("Graphics Shader", []() { s_createAssetStub("graphics shader"); }));
+
+    MenuItems textures;
+    textures.push_back(AddAssetContextMenuAID::createPlainRow("Texture", []() { s_createAssetStub("texture"); }));
+    textures.push_back(AddAssetContextMenuAID::createPlainRow("Cubemap", []() { s_createAssetStub("cubemap"); }));
+
+    MenuItems items;
+    items.push_back(Amethyst::makeSubmenuItem("Modules", std::move(modules)));
+    items.push_back(Amethyst::makeSubmenuItem("Scenes", std::move(scenes)));
+    items.push_back(Amethyst::makeSubmenuItem("Shaders", std::move(shaders)));
+    items.push_back(Amethyst::makeSubmenuItem("Textures", std::move(textures)));
+
+    return items;
+}
+
+void ContentBrowserPanel::beginCreate(ContentEditKind kind, const Rapture::TypeInfo *moduleType)
+{
+    if (kind == CONTENT_EDIT_MODULE && moduleType == nullptr) {
+        RP_ERROR("a module needs a class to create");
+        return;
+    }
+
+    m_edit = {};
+    m_edit.kind = kind;
+    m_edit.moduleType = moduleType;
+    m_edit.initialName = kind == CONTENT_EDIT_FOLDER ? s_uniqueFolderName(m_currentDirectory)
+                                                     : s_uniqueAssetName(m_currentDirectory, moduleType->name);
+    refresh();
+}
+
+void ContentBrowserPanel::beginRename(size_t index, const std::filesystem::path &target)
+{
+    if (index >= m_contentItemPool.size()) {
+        return;
+    }
+
+    m_edit = {};
+    m_edit.kind = CONTENT_EDIT_RENAME;
+    m_edit.itemIndex = index;
+    m_edit.target = target;
+    startEditing(m_contentItemPool[index], target.stem().string());
+}
+
+void ContentBrowserPanel::startEditing(ContentItemComponents &item, const std::string &initialName)
+{
+    if (item.nameInput == nullptr) {
+        item.nameInput = item.footer->add<Amethyst::TextInput>();
+        item.nameInput->addClass("content-browser-card-name-input");
+        item.nameInput->setBaseProperties({
+            .position = Amethyst::UDim2(0.0f, 4.0f, 0.0f, 6.0f),
+            .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 22.0f),
+            .zIndex = 3,
+        });
+        item.nameInput->onEnterPressed = [this]() { commitEdit(); };
+        item.nameInput->onFocusLost = [this]() { commitEdit(); };
+    }
+
+    item.name->setBaseProperties({.visible = false});
+    item.nameInput->setBaseProperties({.visible = true});
+    item.nameInput->setText(initialName);
+    item.nameInput->focus();
+    item.nameInput->selectAll();
+}
+
+void ContentBrowserPanel::commitEdit()
+{
+    if (m_edit.kind == CONTENT_EDIT_NONE) {
+        return;
+    }
+
+    // taken before the work below, so the refresh that follows cannot come back round through onFocusLost
+    ContentEdit edit = m_edit;
+    m_edit = {};
+
+    std::string name;
+    if (edit.itemIndex < m_contentItemPool.size() && m_contentItemPool[edit.itemIndex].nameInput != nullptr) {
+        name = m_contentItemPool[edit.itemIndex].nameInput->getText();
+    }
+
+    if (!name.empty()) {
+        switch (edit.kind) {
+        case CONTENT_EDIT_FOLDER:
+            createFolder(name);
+            break;
+        case CONTENT_EDIT_MODULE:
+            createModule(*edit.moduleType, name);
+            break;
+        case CONTENT_EDIT_RENAME:
+            renameItem(edit.target, name);
+            break;
+        default:
+            break;
+        }
+    }
+
+    refresh();
+}
+
+void ContentBrowserPanel::createModule(const Rapture::TypeInfo &type, std::string_view name)
+{
+    std::unique_ptr<Rapture::ModuleClass> module = Rapture::ModuleRegistry::create(type.name);
+    if (module == nullptr) {
+        RP_ERROR("'{}' is not a registered module class", type.name);
+        return;
+    }
+
+    Rapture::AssetImportDataRequest request;
+    request.data = Rapture::ModuleImportData{std::move(module)};
+    request.output = m_currentDirectory;
+    request.name = std::string(name);
+
+    if (!Rapture::AssetManager::importAsset(std::move(request))) {
+        RP_ERROR("Could not create a '{}' module named '{}' in '{}'", type.name, name, m_currentDirectory.string());
+    }
+}
+
+void ContentBrowserPanel::createFolder(std::string_view name)
+{
+    std::error_code ec;
+    std::filesystem::create_directory(m_currentDirectory / name, ec);
+    if (ec) {
+        RP_ERROR("Could not create '{}': {}", name, ec.message());
+    }
+}
+
+void ContentBrowserPanel::renameItem(const std::filesystem::path &target, std::string_view name)
+{
+    std::filesystem::path renamed = target.parent_path() / (std::string(name) + target.extension().string());
+    if (renamed == target) {
+        return;
+    }
+
+    if (std::filesystem::exists(renamed)) {
+        RP_ERROR("'{}' already exists", renamed.filename().string());
+        return;
+    }
+
+    std::error_code ec;
+    std::filesystem::rename(target, renamed, ec);
+    if (ec) {
+        RP_ERROR("Could not rename '{}': {}", target.filename().string(), ec.message());
+    }
 }
 
 void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items)
@@ -489,17 +747,33 @@ void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::u
     m_contextMenu->showAt(pos);
 }
 
+// the asset types that have a workspace to open in
+static bool s_opensInWorkspace(Rapture::AssetType type)
+{
+    return type == Rapture::ASSET_MODULE || type == Rapture::ASSET_MATERIAL_INSTANCE;
+}
+
 std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPanel::assetActions(Rapture::AssetType type,
                                                                                                 Rapture::AssetHandle handle)
 {
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
+
+    if (s_opensInWorkspace(type)) {
+        items.push_back(Amethyst::makeActionItem("Open", [this, handle]() {
+            if (m_services.openAssetWorkspace) {
+                m_services.openAssetWorkspace(handle);
+            }
+        }));
+    }
+
     switch (type) {
     case Rapture::ASSET_PREFAB:
         items.push_back(Amethyst::makeActionItem("Load in scene", [this, handle]() { s_loadPrefabIntoScene(handle, m_scene); }));
-        return items;
+        break;
     default:
-        return items;
+        break;
     }
+    return items;
 }
 
 void ContentBrowserPanel::rebuildBreadcrumb()
@@ -641,7 +915,7 @@ void ContentBrowserPanel::refreshFileBrowser()
             item.typeBar->setBaseProperties({.visible = true});
             item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(metadata->assetType)});
             item.type->setBaseProperties({.visible = true});
-            item.type->setText(Rapture::AssetTypeToString(metadata->assetType));
+            item.type->setText(s_typeLabel(metadata->assetType, metadata->moduleClass));
         } else {
             item.icon->setSvg(Icons::SVG_SCRIPT);
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});
@@ -654,23 +928,37 @@ void ContentBrowserPanel::refreshFileBrowser()
         item.name->setText(displayName);
 
         size_t itemIndex = index;
+        item.action->onMouseButton1ClickCb = [this, itemIndex]() {
+            selectItem(itemIndex);
+            return Amethyst::EventResult::CONSUMED;
+        };
+
         if (isDir) {
             std::filesystem::path dirPath = entry.path();
-            item.action->onMouseButton1ClickCb = [this, dirPath]() {
+            item.action->onMouseButton1DoubleClickCb = [this, dirPath](int32_t x, int32_t y) {
+                (void)x;
+                (void)y;
                 navigateToDirectory(dirPath);
                 return Amethyst::EventResult::CONSUMED;
             };
-        } else {
-            item.action->onMouseButton1ClickCb = [this, itemIndex, displayName]() {
-                selectItem(itemIndex);
-                RP_INFO("selected '{0}'", displayName);
+        } else if (assetHandle != Rapture::INVALID_ASSET_HANDLE) {
+            item.action->onMouseButton1DoubleClickCb = [this, assetHandle](int32_t x, int32_t y) {
+                (void)x;
+                (void)y;
+                if (m_services.openAssetWorkspace) {
+                    m_services.openAssetWorkspace(assetHandle);
+                }
                 return Amethyst::EventResult::CONSUMED;
             };
+        } else {
+            item.action->onMouseButton1DoubleClickCb = nullptr;
         }
 
         Rapture::AssetType assetType = metadata != nullptr ? metadata->assetType : Rapture::ASSET_NONE;
         bool isAsset = metadata != nullptr;
-        item.action->onMouseButton2DownCb = [this, isDir, isAsset, assetType, assetHandle](int32_t x, int32_t y) {
+        std::filesystem::path itemPath = entry.path();
+        item.action->onMouseButton2DownCb = [this, isDir, isAsset, assetType, assetHandle, itemIndex, itemPath](int32_t x,
+                                                                                                                int32_t y) {
             std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
             if (isAsset) {
                 items = assetActions(assetType, assetHandle);
@@ -680,12 +968,37 @@ void ContentBrowserPanel::refreshFileBrowser()
             if (!items.empty()) {
                 items.push_back(Amethyst::makeSeparatorItem());
             }
-            items.push_back(Amethyst::makeActionItem("Rename", [] {}));
+            items.push_back(
+                Amethyst::makeActionItem("Rename", [this, itemIndex, itemPath]() { beginRename(itemIndex, itemPath); }));
             items.push_back(Amethyst::makeActionItem("Delete", [] {}));
             showContextMenu(Amethyst::vec2(static_cast<float>(x), static_cast<float>(y)), std::move(items));
             return Amethyst::EventResult::CONSUMED;
         };
 
+        index++;
+    }
+
+    if (m_edit.kind == CONTENT_EDIT_FOLDER || m_edit.kind == CONTENT_EDIT_MODULE) {
+        auto &item = acquirePoolItem(index);
+        item.container->setBaseProperties({.layoutOrder = static_cast<uint32_t>(index)});
+        item.action->onMouseButton1ClickCb = nullptr;
+        item.action->onMouseButton2DownCb = nullptr;
+
+        if (m_edit.kind == CONTENT_EDIT_FOLDER) {
+            item.icon->setSvg(Icons::SVG_FOLDER);
+            item.typeBar->setBaseProperties({.visible = false});
+            item.type->setBaseProperties({.visible = false});
+        } else {
+            item.icon->setSvg(Asset_iconForType(Rapture::ASSET_MODULE, m_edit.moduleType));
+            item.icon->setImageStyleProperties({.imageColor = COL_ICON});
+            item.typeBar->setBaseProperties({.visible = true});
+            item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(Rapture::ASSET_MODULE)});
+            item.type->setBaseProperties({.visible = true});
+            item.type->setText(s_typeLabel(Rapture::ASSET_MODULE, m_edit.moduleType));
+        }
+
+        m_edit.itemIndex = index;
+        startEditing(item, m_edit.initialName);
         index++;
     }
 
@@ -809,8 +1122,23 @@ void ContentBrowserPanel::selectItem(size_t index)
      * oldCard.container->setGuiState(oldCard.container->getGuiState() & ~Amethyst::GUI_STATE_ACTIVE);
      */
 
+    if (m_selectedItem < m_contentItemPool.size()) {
+        applyItemSelection(m_contentItemPool[m_selectedItem], false);
+    }
+
     m_selectedItem = index;
+
+    if (m_selectedItem < m_contentItemPool.size()) {
+        applyItemSelection(m_contentItemPool[m_selectedItem], true);
+    }
+
     updateStatus(m_contentItemPool.size());
+}
+
+void ContentBrowserPanel::applyItemSelection(ContentItemComponents &item, bool selected)
+{
+    s_setActive(*item.container, selected);
+    s_setActive(*item.footer, selected);
 }
 
 ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem(size_t index)
@@ -834,7 +1162,8 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
             .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(TILE_FOOTER_HEIGHT + TILE_TYPEBAR_HEIGHT)),
             .zIndex = 1,
         });
-        item.thumbWell->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+        // opaque so a selected card's accent stops at the well rather than running behind the icon
+        item.thumbWell->addClass("content-browser-card-thumb");
 
         auto *thumbAspect = item.thumbWell->addExtension<Amethyst::UIAspectRatioConstraint>();
         thumbAspect->aspectRatio = 1.0f;
@@ -899,6 +1228,13 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
         item.container->setBaseProperties({.visible = true});
         item.attached = true;
     }
+
+    // a pooled tile can come back from having been named or selected, so it starts every refresh showing neither
+    if (item.nameInput != nullptr) {
+        item.nameInput->setBaseProperties({.visible = false});
+    }
+    item.name->setBaseProperties({.visible = true});
+    applyItemSelection(item, index == m_selectedItem);
     return item;
 }
 

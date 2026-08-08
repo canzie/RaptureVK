@@ -11,18 +11,19 @@
 #include <components/ui_scope.h>
 #include <layers/Layer.h>
 #include <scenes/Scene.h>
-#include <scenes/SceneAsset.h>
+#include <serialization/SerialDocument.h>
 #include <scenes/instances/Instance.h>
 #include <window_context/Application.h>
 
 static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
 static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
 
-LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::Scene *scene,
-                                           Rapture::Viewport *viewport)
+LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services,
+                                           Rapture::AssetPtr<Rapture::World> world, Rapture::Viewport *viewport)
+    : m_world(std::move(world))
 {
     m_context.services = services;
-    m_context.scene = scene;
+    m_context.world = m_world.get();
     m_context.viewport = viewport;
     setupBase(tabs, "Level Editor");
 
@@ -97,7 +98,7 @@ void LevelEditorWorkspace::setupHotbar()
          .label = "Save Scene"},
         [this](Amethyst::TextButtonScope &b) {
             b.component.onMouseButton1ClickCb = [this]() {
-                saveScene();
+                saveWorld();
                 return Amethyst::EventResult::CONSUMED;
             };
         });
@@ -121,12 +122,12 @@ void LevelEditorWorkspace::setupHotbar()
 
 void LevelEditorWorkspace::startPlay()
 {
-    Rapture::Scene *scene = m_context.scene;
+    Rapture::Scene *scene = m_world ? m_world->getScene() : nullptr;
     if (scene == nullptr || m_context.viewport == nullptr || isPlaying()) {
         return;
     }
 
-    m_snapshot = std::make_unique<Rapture::SceneAsset>(*scene);
+    m_snapshot = scene->snapshot();
 
     auto &app = Rapture::Application::getInstance();
     if (Rapture::Layer *editor = app.getLayer(EDITOR_LAYER_NAME)) {
@@ -153,8 +154,8 @@ void LevelEditorWorkspace::stopPlay()
     }
 
     // the snapshot outlives the rewind, its document is what the scene is read back out of
-    m_context.scene->restoreFrom(m_snapshot->root());
-    m_snapshot.reset();
+    m_world->getScene()->restoreFrom(m_snapshot.rootView());
+    m_snapshot = Rapture::SerialDocument{};
 
     if (Rapture::Layer *editor = Rapture::Application::getInstance().getLayer(EDITOR_LAYER_NAME)) {
         editor->attach();
@@ -165,27 +166,25 @@ void LevelEditorWorkspace::stopPlay()
 
 void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
 {
-    if (m_addMenu == nullptr || m_context.scene == nullptr) {
+    if (m_addMenu == nullptr || !m_world) {
         return;
     }
 
-    m_addMenu->setItems(AddSceneObjectMenu::buildItems(m_context.scene->root()));
+    m_addMenu->setItems(AddSceneObjectMenu::buildItems(m_world->getScene()->root()));
     m_addMenu->showAt({button.absolutePosition.x, button.absolutePosition.y + button.absoluteSize.y});
 }
 
-void LevelEditorWorkspace::saveScene()
+void LevelEditorWorkspace::saveWorld()
 {
-    Rapture::Scene *scene = m_context.scene;
-    if (scene == nullptr) {
+    if (!m_world) {
         return;
     }
 
     auto &project = Rapture::Application::getInstance().getProject();
-    if (!project.getSceneManager().saveScene(*scene, project.getContentDirectory())) {
+    if (!project.saveWorld(m_world.ref().get()->getHandle())) {
         return;
     }
 
-    project.setStartupScene(scene->sourceAsset());
     project.saveProject(project.getProjectFilePath());
 }
 

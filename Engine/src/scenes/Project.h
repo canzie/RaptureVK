@@ -1,8 +1,8 @@
 #ifndef RAPTURE__PROJECT_H
 #define RAPTURE__PROJECT_H
 
+#include "asset_manager/AssetHandle.h"
 #include "scenes/Scene.h"
-#include "scenes/SceneManager.h"
 #include "scenes/World.h"
 #include "serialization/SerialDocument.h"
 
@@ -19,8 +19,7 @@ struct ProjectConfig {
     std::string name;
     std::filesystem::path projectDirectory;
 
-    std::string initialWorldName;
-    AssetHandle startupScene = INVALID_ASSET_HANDLE;
+    AssetHandle startupWorld = INVALID_ASSET_HANDLE;
 };
 
 class Project {
@@ -48,22 +47,42 @@ class Project {
      */
     void createDefaultWorld();
 
-    SceneManager &getSceneManager() { return m_sceneManager; }
-    const SceneManager &getSceneManager() const { return m_sceneManager; }
+    /**
+     * @brief Opens a world asset, adding it to the worlds this project is running
+     * @param handle The world asset to open
+     * @return The world, or nullptr if the asset could not be read
+     */
+    World *openWorld(AssetHandle handle);
 
-    const std::vector<Scene *> &getActiveScenes() const { return m_sceneManager.getActiveScenes(); }
+    /**
+     * @brief Builds a new empty world and adds it to the worlds this project is running
+     * @param name Name of the world
+     * @return The world
+     */
+    World *createWorld(std::string name);
 
-    void activateScene(Scene *scene) { m_sceneManager.activateScene(scene); }
+    /**
+     * @brief Writes a world back into its asset
+     * @param handle The world asset to write
+     * @return True if the asset now holds the world's contents
+     */
+    bool saveWorld(AssetHandle handle);
 
-    void deactivateScene(Scene *scene) { m_sceneManager.deactivateScene(scene); }
+    /**
+     * @brief Starts running a world and the scene it holds
+     * @param world The world to activate
+     */
+    void activateWorld(World *world);
 
-    World *createWorld(const std::string &name) { return m_sceneManager.createWorld(name); }
+    /**
+     * @brief Stops running a world and the scene it holds
+     * @param world The world to deactivate
+     */
+    void deactivateWorld(World *world);
 
-    World *getWorld(const std::string &name) { return m_sceneManager.getWorld(name); }
+    const std::vector<AssetPtr<World>> &getWorlds() const { return m_worlds; }
 
-    void setActiveWorld(const std::string &name) { m_sceneManager.setActiveWorld(name); }
-
-    World *getActiveWorld() const { return m_sceneManager.getActiveWorld(); }
+    void onUpdate(float dt);
 
     /**
      * @brief Writes the project file, replacing it atomically
@@ -79,8 +98,8 @@ class Project {
      */
     bool loadProject(const std::filesystem::path &path);
 
-    AssetHandle getStartupScene() const { return m_config.startupScene; }
-    void setStartupScene(AssetHandle startupScene) { m_config.startupScene = startupScene; }
+    AssetHandle getStartupWorld() const { return m_config.startupWorld; }
+    void setStartupWorld(AssetHandle startupWorld) { m_config.startupWorld = startupWorld; }
 
     // Project config access
     std::filesystem::path getProjectDirectory() const { return m_config.projectDirectory; }
@@ -94,10 +113,8 @@ class Project {
     std::filesystem::path getContentDirectory() const { return m_config.projectDirectory / "content"; }
     std::filesystem::path getThumbnailDirectory() const { return getCacheDirectory() / "thumbnails"; }
     std::string getProjectName() const { return m_config.name; }
-    std::string getInitialWorldName() const { return m_config.initialWorldName; }
 
     void setProjectName(const std::string &name) { m_config.name = name; }
-    void setInitialWorldName(const std::string &name) { m_config.initialWorldName = name; }
 
     const ProjectConfig &getConfig() const { return m_config; }
 
@@ -110,13 +127,13 @@ class Project {
     void createProjectDirectories();
 
     /**
-     * @brief Opens the configured startup scene and makes it the active world's main scene
+     * @brief Opens the configured startup world and makes it active
      */
-    void openStartupScene();
+    void openStartupWorld();
 
   private:
     ProjectConfig m_config;
-    SceneManager m_sceneManager;
+    std::vector<AssetPtr<World>> m_worlds;
     SerialDocument m_saveFile;
 };
 } // namespace Rapture

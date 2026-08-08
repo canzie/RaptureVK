@@ -33,8 +33,8 @@ enum AssetType {
     ASSET_ANIMATION,
     ASSET_AUDIO,
     ASSET_VIDEO,
-    ASSET_SCENE,
     ASSET_MODULE,
+    ASSET_WORLD,
     ASSET_TYPE_COUNT
 };
 
@@ -82,8 +82,8 @@ inline std::string AssetTypeToString(AssetType type)
         return "Audio";
     case ASSET_VIDEO:
         return "Video";
-    case ASSET_SCENE:
-        return "Scene";
+    case ASSET_WORLD:
+        return "World";
     default:
         return "Unknown";
     }

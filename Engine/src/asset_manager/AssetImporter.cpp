@@ -299,35 +299,4 @@ bool AssetImporter::loadCubemap(Asset &asset, AssetMetadata &metadata)
     return true;
 }
 
-bool AssetImporter::loadScene(Asset &asset, AssetMetadata &metadata)
-{
-    const auto &path = metadata.getSourcePath();
-    if (!std::filesystem::exists(path)) {
-        FILE_NOT_FOUND_ERROR(path);
-        asset.status = AssetStatus::FILE_NOT_FOUND;
-        return false;
-    }
-
-    std::string extension = path.extension().string();
-    for (char &c : extension) {
-        c = std::tolower(c);
-    }
-
-    auto sceneData = std::make_unique<SceneFileData>();
-    sceneData->metadata.sourcePath = path;
-
-    if (extension == ".gltf" || extension == ".glb") {
-        RP_CORE_WARN("glTF loading not yet implemented via asset importer");
-        asset.status = AssetStatus::FAILED;
-        return false;
-    } else if (extension == ".fbx") {
-        RP_CORE_WARN("FBX loading not supported");
-        asset.status = AssetStatus::FAILED;
-        return false;
-    }
-
-    asset.status = AssetStatus::FAILED;
-    return false;
-}
-
 } // namespace Rapture

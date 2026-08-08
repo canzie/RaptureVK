@@ -9,7 +9,6 @@
 #include "events/GameEvents.h"
 #include "LauncherConfig.h"
 #include "scenes/Project.h"
-#include "scenes/SceneManager.h"
 
 #include <filesystem>
 #include <memory>

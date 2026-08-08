@@ -6,14 +6,12 @@
 
 #include "layers/panels/Panel.h"
 #include "layers/panels/component_editors/ComponentEditorBase.h"
+#include "layers/panels/components/property_sections.h"
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
 
 #include <concepts>
-#include <memory>
-#include <typeindex>
-#include <unordered_map>
-#include <vector>
+#include <optional>
 
 class PropertiesPanel : public Panel {
   public:
@@ -33,49 +31,27 @@ class PropertiesPanel : public Panel {
     void setupEntityView(void);
 
     /**
-     * @brief Creates the editor for T if its component is present and missing, reuses it if it
-     * already exists, or destroys it if present is false. Active editors are collected for layout.
+     * @brief Ensures the section for T and points it at the selected entity.
      * @tparam T A ComponentEditorBase-derived editor type.
      * @param present Whether the selected entity has the component this editor edits.
      */
     template <std::derived_from<ComponentEditorBase> T>
     void ensure(bool present)
     {
-        std::type_index key(typeid(T));
-        auto it = m_editors.find(key);
-
-        if (present) {
-            if (it == m_editors.end()) {
-                auto editor = std::make_unique<T>();
-                buildSection(*editor);
-                it = m_editors.emplace(key, std::move(editor)).first;
-            }
-            m_active.push_back(it->second.get());
-        } else if (it != m_editors.end()) {
-            if (it->second->header != nullptr) {
-                m_entityView->removeChild(it->second->header);
-            }
-            m_editors.erase(it);
+        if (T *editor = m_sections->ensure<T>(present)) {
+            editor->entity = m_selectedEntity;
         }
     }
 
-    /**
-     * @brief Builds an editor's collapsible header under the entity view and fills its body.
-     */
-    void buildSection(ComponentEditorBase &editor);
-
     void refresh(void);
-    void relayout(void);
     void showEntity(const Rapture::Entity &entity);
     void showPlaceholder(void);
     void clearSelection(void);
 
+  private:
     Amethyst::TextLabel *m_placeholderText = nullptr;
-    Amethyst::ScrollingFrame *m_entityView = nullptr;
     Amethyst::TextInput *m_searchInput = nullptr;
-
-    std::unordered_map<std::type_index, std::unique_ptr<ComponentEditorBase>> m_editors;
-    std::vector<ComponentEditorBase *> m_active;
+    std::optional<PropertySectionList> m_sections;
 
     Rapture::Scene *m_scene = nullptr;
     Rapture::Entity m_selectedEntity;

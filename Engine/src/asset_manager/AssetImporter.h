@@ -26,7 +26,6 @@ class AssetImporter {
         s_assetImporters[ASSET_MATERIAL_INSTANCE] = loadMaterial;
         s_assetImporters[ASSET_TEXTURE] = loadTexture;
         s_assetImporters[ASSET_CUBEMAP] = loadCubemap;
-        s_assetImporters[ASSET_SCENE] = loadScene;
         s_isInitialized = true;
     }
 
@@ -48,7 +47,6 @@ class AssetImporter {
     static bool loadMaterial(Asset &asset, AssetMetadata &metadata);
     static bool loadTexture(Asset &asset, AssetMetadata &metadata);
     static bool loadCubemap(Asset &asset, AssetMetadata &metadata);
-    static bool loadScene(Asset &asset, AssetMetadata &metadata);
 
   private:
     static bool s_isInitialized;

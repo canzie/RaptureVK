@@ -1,11 +1,15 @@
-#pragma once
+#ifndef RAPTURE__SCENE_H
+#define RAPTURE__SCENE_H
 
 #include "acceleration_structures/TLAS.h"
 #include "asset_manager/AssetCommon.h"
 #include "events/EventSignal.h"
 #include "scenes/entities/EntityCommon.h"
+#include "serialization/SerialDocument.h"
+#include <cstdint>
 #include <entt/entt.hpp>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -17,8 +21,6 @@ class Environment;
 class Instance;
 class SceneRenderData;
 class PhysicsSystem;
-class WriteNode;
-class ReadNode;
 struct RenderContext;
 
 static constexpr uint32_t SCENE_FORMAT_VERSION = 1;
@@ -59,13 +61,6 @@ class Scene {
     const SceneSettings &getSettings() const;
 
     std::string getSceneName() const;
-
-    /**
-     * @brief The scene file this scene was opened from, which saving writes back to
-     * @return The handle, or INVALID_ASSET_HANDLE if this scene has never been saved
-     */
-    AssetHandle sourceAsset() const { return m_sourceAsset; }
-    void setSourceAsset(AssetHandle sourceAsset) { m_sourceAsset = sourceAsset; }
 
     /**
      * @brief The controller currently driving this scene, whose camera scene wide work is done from
@@ -118,6 +113,12 @@ class Scene {
     static std::unique_ptr<Scene> deserialize(ReadNode node);
 
     /**
+     * @brief Captures this scene's current contents into a document it can be restored from
+     * @return The snapshot, which has to outlive the restoreFrom call that reads it
+     */
+    SerialDocument snapshot() const;
+
+    /**
      * @brief Reverts this scene to a snapshot, keeping every instance the snapshot and the scene share
      * @param node Cursor to the scene's object, which has to outlive the call
      * @return True if the scene now matches the snapshot
@@ -146,6 +147,7 @@ class Scene {
 
   public:
     bool locked = false;
+    bool active = false;
 
     /**
      * @brief Fires when instances are added to or removed from this scene, for views mirroring the tree
@@ -164,7 +166,6 @@ class Scene {
 
   private:
     entt::registry m_registry;
-    AssetHandle m_sourceAsset = INVALID_ASSET_HANDLE;
     Environment *m_environment = nullptr;
     std::unique_ptr<SceneRenderData> m_renderData;
     std::unique_ptr<PhysicsSystem> m_physics;
@@ -182,3 +183,5 @@ class Scene {
     friend class Environment;
 };
 } // namespace Rapture
+
+#endif // RAPTURE__SCENE_H

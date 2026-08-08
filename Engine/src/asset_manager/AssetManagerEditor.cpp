@@ -75,14 +75,14 @@ static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &
             return instance->serialize();
         }
         break;
-    case ASSET_SCENE:
-        if (SceneAsset *scene = asset.getUnderlyingAsset<SceneAsset>()) {
-            return scene->serialize();
-        }
-        break;
     case ASSET_MODULE:
         if (ModuleClass *module = asset.getUnderlyingAsset<ModuleClass>()) {
             return module->toBlob();
+        }
+        break;
+    case ASSET_WORLD:
+        if (World *world = asset.getUnderlyingAsset<World>()) {
+            return world->serialize();
         }
         break;
     default:
@@ -124,15 +124,15 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
             return true;
         }
         break;
-    case ASSET_SCENE:
-        if (auto scene = SceneAsset::deserialize(payload)) {
-            asset.setAssetVariant(std::move(scene));
-            return true;
-        }
-        break;
     case ASSET_MODULE:
         if (auto module = ModuleClass::fromBlob(payload)) {
             asset.setAssetVariant(std::move(module));
+            return true;
+        }
+        break;
+    case ASSET_WORLD:
+        if (auto world = World::deserialize(payload)) {
+            asset.setAssetVariant(std::move(world));
             return true;
         }
         break;
@@ -165,15 +165,15 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
         type = ASSET_MATERIAL_INSTANCE;
         return std::move(instanceData->instance);
     }
-    if (auto *sceneData = std::get_if<SceneImportData>(&data)) {
-        payload = sceneData->scene->serialize();
-        type = ASSET_SCENE;
-        return std::move(sceneData->scene);
-    }
     if (auto *moduleData = std::get_if<ModuleImportData>(&data)) {
         payload = moduleData->module->toBlob();
         type = ASSET_MODULE;
         return std::move(moduleData->module);
+    }
+    if (auto *worldData = std::get_if<WorldImportData>(&data)) {
+        payload = worldData->world->serialize();
+        type = ASSET_WORLD;
+        return std::move(worldData->world);
     }
 
     type = ASSET_NONE;
@@ -432,8 +432,6 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
         return ASSET_CUBEMAP;
     } else if (extension == ".gltf" || extension == ".glb" || extension == ".fbx") {
         return ASSET_PREFAB;
-    } else if (extension == ".rscene") {
-        return ASSET_SCENE;
     } else if (extension == ".rmat") {
         return ASSET_MATERIAL;
     } else if (extension == ".spv" || extension == ".glsl") {
@@ -716,6 +714,34 @@ bool AssetManagerEditor::updateAsset(AssetHandle handle, AssetVariant asset)
         return false;
     }
 
+    return true;
+}
+
+bool AssetManagerEditor::saveAsset(AssetHandle handle, const std::filesystem::path &folder)
+{
+    AssetSlot *slot = m_assets.find(handle);
+    if (slot == nullptr || slot->asset == nullptr) {
+        RP_CORE_ERROR("cannot save asset {}, it holds nothing", handle);
+        return false;
+    }
+
+    AssetMetadata &metadata = *slot->metadata;
+    std::vector<uint8_t> payload = s_serializeAsset(*slot->asset, metadata);
+    if (payload.empty()) {
+        RP_CORE_ERROR("Failed to serialize '{}'", metadata.getName());
+        return false;
+    }
+
+    if (metadata.assetPath.empty()) {
+        metadata.storageType = AssetStorageType::DISK;
+        writeRaptureAssetFile(handle, folder, metadata, payload);
+        return !metadata.assetPath.empty();
+    }
+
+    if (!AssetCodec::writeRaptureAsset(metadata.assetPath, handle, metadata, payload)) {
+        RP_CORE_ERROR("Failed to write .rasset for '{}'", metadata.getName());
+        return false;
+    }
     return true;
 }
 

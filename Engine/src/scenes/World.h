@@ -1,89 +1,72 @@
-#pragma once
-#include "Scene.h"
+#ifndef RAPTURE__WORLD_H
+#define RAPTURE__WORLD_H
+
+#include "asset_manager/AssetCommon.h"
+
+#include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace Rapture {
 
+class Scene;
+
+/**
+ * @brief How a world is played.
+ */
+struct WorldData {
+    AssetHandle playerCharacter = INVALID_ASSET_HANDLE;
+    AssetHandle controller = INVALID_ASSET_HANDLE;
+};
+
+/**
+ * @brief One playable space.
+ */
 class World {
   public:
-    World(const std::string &name) : m_name(name), m_isActive(false) {}
+    explicit World(std::string name);
+    ~World();
 
-    ~World()
-    {
-        // Clear all scenes to ensure proper cleanup
-        m_scenes.clear();
-    }
+    World(const World &) = delete;
+    World &operator=(const World &) = delete;
 
-    // World operations
-    void initialize()
-    {
-        // Initialize world resources
-    }
+    Scene *getScene() const { return m_scene.get(); }
 
-    void shutdown()
-    {
-        // Shutdown world resources
-        m_scenes.clear();
-        m_isActive = false;
-    }
+    WorldData &data() { return m_data; }
+    const WorldData &data() const { return m_data; }
 
-    void update(float deltaTime)
-    {
-        // Update all active scenes
-        for (auto &[name, scene] : m_scenes) {
-            scene->onUpdate(deltaTime);
-        }
-    }
+    void onUpdate(float dt);
 
-    // Scene management within a world (scenes are owned by SceneManager, World only references them)
-    void addScene(const std::string &sceneName, Scene *scene) { m_scenes[sceneName] = scene; }
-
-    void removeScene(const std::string &sceneName) { m_scenes.erase(sceneName); }
-
-    Scene *getScene(const std::string &sceneName)
-    {
-        auto it = m_scenes.find(sceneName);
-        if (it != m_scenes.end()) {
-            return it->second;
-        }
-        return nullptr;
-    }
-
-    std::vector<std::string> getSceneNames() const
-    {
-        std::vector<std::string> names;
-        for (auto &[name, _] : m_scenes) {
-            names.push_back(name);
-        }
-        return names;
-    }
-
-    // Set the main scene of this world
-    void setMainScene(const std::string &sceneName)
-    {
-        auto it = m_scenes.find(sceneName);
-        if (it != m_scenes.end()) {
-            m_mainScene = it->second;
-            m_mainSceneName = sceneName;
-        }
-    }
-
-    Scene *getMainScene() const { return m_mainScene; }
-
-    // World state
     bool isActive() const { return m_isActive; }
     void setActive(bool active) { m_isActive = active; }
+
     const std::string &getName() const { return m_name; }
 
+    /**
+     * @brief Serializes this world into a self-contained blob
+     * @return The serialized bytes, empty if the document could not be written
+     */
+    std::vector<uint8_t> serialize() const;
+
+    /**
+     * @brief Rebuilds a world from a blob produced by serialize
+     * @param blob The serialized bytes
+     * @return The world, or nullptr if the blob does not hold a readable document
+     */
+    static std::unique_ptr<World> deserialize(std::span<const uint8_t> blob);
+
   private:
+    World(std::string name, std::unique_ptr<Scene> scene);
+
     std::string m_name;
+    std::unique_ptr<Scene> m_scene;
+    WorldData m_data;
     bool m_isActive = false;
-    std::unordered_map<std::string, Scene *> m_scenes;
-    Scene *m_mainScene = nullptr;
-    std::string m_mainSceneName;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__WORLD_H

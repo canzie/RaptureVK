@@ -84,6 +84,11 @@ class AssetManager {
         return s_activeAssetManager->updateAsset(handle, std::move(asset));
     }
 
+    static bool saveAsset(AssetHandle handle, const std::filesystem::path &folder)
+    {
+        return s_activeAssetManager->saveAsset(handle, folder);
+    }
+
     static AssetHandle registerRaptureAsset(std::filesystem::path path)
     {
         return s_activeAssetManager->registerRaptureAsset(std::move(path));

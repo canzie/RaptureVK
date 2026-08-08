@@ -3,6 +3,7 @@
 #include "EditorLayout.h"
 #include "LauncherConfig.h"
 #include "ProjectLauncher.h"
+#include "asset_manager/AssetManager.h"
 #include "buffers/command_buffers/CommandPool.h"
 #include "layers/panels/FileBrowser.h"
 #include "layers/panels/ImportPanel.h"
@@ -10,6 +11,7 @@
 #include "layers/workspaces/AnimationsWorkspace.h"
 #include "layers/workspaces/LevelEditorWorkspace.h"
 #include "layers/workspaces/MaterialEditorWorkspace.h"
+#include "layers/workspaces/ModuleEditorWorkspace.h"
 #include "layers/workspaces/ScriptingWorkspace.h"
 #include "layers/workspaces/TextureGeneratorWorkspace.h"
 #include "logging/Log.h"
@@ -21,6 +23,7 @@
 #include "viewport/ViewportManager.h"
 #include "window_context/Application.h"
 
+#include <algorithm>
 #include <components/common.h>
 #include <components/extensions/ui_drag_detector.h>
 #include <components/image_label.h>
@@ -147,7 +150,7 @@ void AmethystLayer::onAttach()
     }
 
     setupMenuBar(screenSize);
-    setupWorkspaces(screenSize);
+    setupWorkspaces();
 
     m_bottomBar = std::make_unique<BottomBar>(&m_window, buildServices());
     m_bottomBar->setCurrentWorkspace(m_workspaces.empty() ? nullptr : m_workspaces[m_activeWorkspaceIndex].get());
@@ -299,7 +302,7 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
         });
 }
 
-void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
+void AmethystLayer::setupWorkspaces(void)
 {
     m_workspaces.reserve(5);
 
@@ -322,42 +325,96 @@ void AmethystLayer::setupWorkspaces(glm::vec2 screenSize)
 
             PanelServices services = buildServices();
 
-            // the opened scene is whatever the project's startup scene was, not a fixed name
-            Rapture::World *activeWorld = Rapture::Application::getInstance().getProject().getActiveWorld();
-            Rapture::Scene *levelScene = activeWorld != nullptr ? activeWorld->getMainScene() : nullptr;
+            // TODO: take the open world from the saved editor state instead of the project's startup world
+            auto &project = Rapture::Application::getInstance().getProject();
+            Rapture::AssetPtr<Rapture::World> levelWorld(Rapture::AssetManager::getAsset(project.getStartupWorld()));
             Rapture::Viewport *primaryViewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
-            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, levelScene, primaryViewport));
+            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, std::move(levelWorld), primaryViewport));
             m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(tabs, services));
-            m_workspaces.push_back(std::make_unique<MaterialEditorWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs, services));
             m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(tabs, services));
         });
 
-    glm::vec2 dockSize = {
-        screenSize.x,
-        screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING - EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING,
-    };
     for (auto &ws : m_workspaces) {
-        if (ws->getDockingLayer() != nullptr) {
-            ws->getDockingLayer()->absoluteSize = dockSize;
-            ws->getDockingLayer()->markDirty();
-        }
+        sizeDockingLayer(*ws);
     }
 
     m_workspaces[0]->active = true;
 
     m_workspaceTabBar->onSelectionChanged = [this](int32_t index) {
+        Amethyst::Instance *content = m_workspaceTabBar->getTabContent(index);
         for (auto &ws : m_workspaces) {
-            ws->active = false;
-        }
-        if (index >= 0 && index < static_cast<int32_t>(m_workspaces.size())) {
-            m_workspaces[index]->active = true;
-            if (m_bottomBar != nullptr) {
-                m_bottomBar->setCurrentWorkspace(m_workspaces[index].get());
+            ws->active = ws->getContainer() == content;
+            if (ws->active && m_bottomBar != nullptr) {
+                m_bottomBar->setCurrentWorkspace(ws.get());
             }
         }
         m_activeWorkspaceIndex = index;
     };
+
+    m_workspaceTabBar->onTabClosed = [this](Amethyst::Instance *content) { closeWorkspace(content); };
+}
+
+void AmethystLayer::sizeDockingLayer(Workspace &workspace)
+{
+    Amethyst::DockingLayer *dock = workspace.getDockingLayer();
+    if (dock == nullptr) {
+        return;
+    }
+    dock->absoluteSize = {
+        m_window.absoluteSize.x,
+        m_window.absoluteSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING - EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING,
+    };
+    dock->markDirty();
+}
+
+void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
+{
+    if (handle == Rapture::INVALID_ASSET_HANDLE || m_workspaceTabBar == nullptr) {
+        return;
+    }
+
+    auto open = m_assetWorkspaces.find(handle);
+    if (open != m_assetWorkspaces.end()) {
+        m_workspaceTabBar->select(open->second->getContainer());
+        return;
+    }
+
+    const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(handle);
+    PanelServices services = buildServices();
+    std::unique_ptr<Workspace> workspace;
+
+    switch (metadata.assetType) {
+    case Rapture::ASSET_MODULE:
+        workspace = std::make_unique<ModuleEditorWorkspace>(*m_workspaceTabBar, services, handle);
+        break;
+    case Rapture::ASSET_MATERIAL_INSTANCE:
+        workspace = std::make_unique<MaterialEditorWorkspace>(*m_workspaceTabBar, services, handle);
+        break;
+    default:
+        RP_WARN("'{}' assets have no workspace to open in", Rapture::AssetTypeToString(metadata.assetType));
+        return;
+    }
+
+    sizeDockingLayer(*workspace);
+    m_assetWorkspaces.emplace(handle, workspace.get());
+
+    // held before selecting, so the selection handler can find the workspace the new tab belongs to
+    Amethyst::Frame *container = workspace->getContainer();
+    m_workspaces.push_back(std::move(workspace));
+    m_workspaceTabBar->select(container);
+}
+
+void AmethystLayer::closeWorkspace(Amethyst::Instance *content)
+{
+    auto it = std::find_if(m_workspaces.begin(), m_workspaces.end(),
+                           [content](const std::unique_ptr<Workspace> &ws) { return ws->getContainer() == content; });
+    if (it == m_workspaces.end()) {
+        return;
+    }
+
+    std::erase_if(m_assetWorkspaces, [&it](const auto &entry) { return entry.second == it->get(); });
+    m_workspaces.erase(it);
 }
 
 void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex,
@@ -503,6 +560,7 @@ PanelServices AmethystLayer::buildServices(void)
             }
         });
     };
+    services.openAssetWorkspace = [this](Rapture::AssetHandle handle) { openAssetWorkspace(handle); };
     return services;
 }
 

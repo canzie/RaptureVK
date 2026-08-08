@@ -21,6 +21,9 @@ static constexpr float ICON_INSET = 4.0f;
 static constexpr float ICON_GAP = 10.0f;
 static constexpr float RADIO_DIAMETER_SCALE = 0.4f;
 static constexpr float SEPARATOR_GAP = 8.0f;
+static constexpr float ADD_ASSET_ROW_HEIGHT = 44.0f;
+static constexpr float ADD_ASSET_WELL_SIZE = 32.0f;
+static constexpr float ADD_ASSET_ICON_SIZE = 26.0f;
 
 // TODO: replace with a real measurement once Amethyst exposes text width (e.g. TextLabel::measureText/getTextSize)
 static float s_estimateTextWidth(const std::string &text, float fontSize)
@@ -105,6 +108,124 @@ void AssetContextMenuAIV::bind(ContextMenu::ItemData &item)
         .visible = true,
     });
     m_label->setText(asset.name);
+}
+
+std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createIconRow(std::string label, std::string svgIcon,
+                                                                             std::function<void()> onActivate)
+{
+    auto item = std::make_unique<AddAssetContextMenuAID>();
+    item->style = ADD_ROW_ICON;
+    item->label = std::move(label);
+    item->svgIcon = std::move(svgIcon);
+    item->onActivate = std::move(onActivate);
+
+    return item;
+}
+
+std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createAssetRow(std::string label, Rapture::AssetType assetType,
+                                                                              std::function<void()> onActivate)
+{
+    auto item = std::make_unique<AddAssetContextMenuAID>();
+    item->style = ADD_ROW_ASSET;
+    item->label = std::move(label);
+    item->assetType = assetType;
+    item->onActivate = std::move(onActivate);
+
+    return item;
+}
+
+std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createPlainRow(std::string label, std::function<void()> onActivate)
+{
+    auto item = std::make_unique<AddAssetContextMenuAID>();
+    item->style = ADD_ROW_PLAIN;
+    item->label = std::move(label);
+    item->onActivate = std::move(onActivate);
+
+    return item;
+}
+
+float AddAssetContextMenuAIV::rowHeight(const ContextMenu &owner) const
+{
+    if (m_boundItem == nullptr || m_boundItem->as<AddAssetContextMenuAID>().style != ADD_ROW_ASSET) {
+        return owner.itemHeight;
+    }
+    return ADD_ASSET_ROW_HEIGHT;
+}
+
+Frame *AddAssetContextMenuAIV::create(ContextMenu &owner)
+{
+    Frame *row = ActionItemView::create(owner);
+    auto &addItem = m_boundItem->as<AddAssetContextMenuAID>();
+
+    if (addItem.style == ADD_ROW_ASSET) {
+        m_iconWell = row->add<Frame>();
+        m_iconWell->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
+        m_iconWell->setBaseProperties({
+            .anchorPoint = {0.0f, 0.5f},
+            .interactable = false,
+            .position = UDim2(0.0f, ROW_PADDING, 0.5f, 0.0f),
+            .size = UDim2::fromOffset(ADD_ASSET_WELL_SIZE, ADD_ASSET_WELL_SIZE),
+        });
+
+        m_icon = m_iconWell->add<ImageLabel>();
+        m_icon->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
+        m_icon->setBaseProperties({
+            .anchorPoint = {0.5f, 0.5f},
+            .interactable = false,
+            .position = UDim2::fromScale(0.5f, 0.5f),
+            .size = UDim2::fromOffset(ADD_ASSET_ICON_SIZE, ADD_ASSET_ICON_SIZE),
+        });
+
+        m_accent = m_iconWell->add<Frame>();
+        m_accent->setBaseStyleProperties({.borderPixelSize = 0.0f});
+        m_accent->setBaseProperties({
+            .anchorPoint = {0.0f, 1.0f},
+            .interactable = false,
+            .position = UDim2::fromScale(0.0f, 1.0f),
+            .size = UDim2(1.0f, 0.0f, 0.0f, ACCENT_HEIGHT),
+        });
+    } else if (addItem.style == ADD_ROW_ICON) {
+        m_icon = row->add<ImageLabel>();
+        m_icon->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
+        m_icon->setBaseProperties({.anchorPoint = {0.0f, 0.5f}, .interactable = false});
+    }
+
+    m_label = row->add<TextLabel>();
+    m_label->setTextStyleProperties(owner.getTextStyleProperties());
+    m_label->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
+    m_label->setBaseProperties({.interactable = false, .size = UDim2::fromScale(1.0f, 1.0f)});
+
+    return row;
+}
+
+void AddAssetContextMenuAIV::bind(ContextMenu::ItemData &item)
+{
+    m_boundItem = &item;
+    auto &addItem = item.as<AddAssetContextMenuAID>();
+
+    float labelLeft = ROW_PADDING;
+    if (addItem.style == ADD_ROW_ASSET) {
+        m_icon->setSvg(Asset_iconForType(addItem.assetType, addItem.moduleClass));
+        m_icon->setImageStyleProperties({.imageColor = m_owner->getTextStyleProperties().textColor});
+        m_accent->setBaseStyleProperties({.backgroundColor = Asset_colorForType(addItem.assetType)});
+        labelLeft += ADD_ASSET_WELL_SIZE + ICON_GAP;
+    } else if (addItem.style == ADD_ROW_ICON) {
+        float iconSize = m_owner->itemHeight - ICON_INSET;
+        m_icon->setSvg(addItem.svgIcon);
+        m_icon->setImageStyleProperties({.imageColor = m_owner->getTextStyleProperties().textColor});
+        m_icon->setBaseProperties({
+            .position = UDim2(0.0f, ROW_PADDING, 0.5f, 0.0f),
+            .size = UDim2::fromOffset(iconSize, iconSize),
+        });
+        labelLeft += iconSize + ICON_GAP;
+    }
+
+    m_label->setBaseProperties({
+        .padding =
+            UDim4{UDim::fromOffset(0.0f), UDim::fromOffset(ROW_PADDING), UDim::fromOffset(0.0f), UDim::fromOffset(labelLeft)},
+    });
+    m_label->setText(addItem.label);
+    m_row->setBaseProperties({.interactable = addItem.enabled});
 }
 
 std::unique_ptr<ContextMenu::ItemData> ViewportContextMenuTID::create(std::string label, std::function<void(bool)> cb,

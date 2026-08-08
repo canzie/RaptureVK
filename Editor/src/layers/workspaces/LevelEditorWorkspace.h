@@ -3,17 +3,19 @@
 
 #include "Workspace.h"
 
+#include <asset_manager/AssetHandle.h>
 #include <components/context_menu.h>
 #include <memory>
+#include <scenes/World.h>
+#include <serialization/SerialDocument.h>
 
 namespace Rapture {
 class Layer;
-class SceneAsset;
 } // namespace Rapture
 
 class LevelEditorWorkspace : public Workspace {
   public:
-    LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::Scene *scene,
+    LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::AssetPtr<Rapture::World> world,
                          Rapture::Viewport *viewport);
 
     void saveLayout() override;
@@ -28,11 +30,11 @@ class LevelEditorWorkspace : public Workspace {
     void showAddMenu(Amethyst::TextButton &button);
 
     /**
-     * @brief Saves the workspace's scene into its asset and records it as the project's startup scene
+     * @brief Writes the workspace's world back into its asset
      */
-    void saveScene();
+    void saveWorld();
 
-    bool isPlaying() const { return m_snapshot != nullptr; }
+    bool isPlaying() const { return m_snapshot.rootView().valid(); }
 
     /**
      * @brief Hands the scene over to the play layer, keeping a snapshot to come back to
@@ -48,7 +50,8 @@ class LevelEditorWorkspace : public Workspace {
     Amethyst::ContextMenu *m_addMenu = nullptr;
     Amethyst::TextButton *m_playButton = nullptr;
 
-    std::unique_ptr<Rapture::SceneAsset> m_snapshot;
+    Rapture::AssetPtr<Rapture::World> m_world;
+    Rapture::SerialDocument m_snapshot;
     Rapture::Layer *m_playLayer = nullptr;
 };
 

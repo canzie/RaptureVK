@@ -34,7 +34,7 @@ class MaterialInstance;
  */
 class NodeEditorPanel : public Panel {
   public:
-    NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
+    NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::AssetHandle material);
     ~NodeEditorPanel() override;
     NodeEditorPanel(const NodeEditorPanel &) = delete;
     NodeEditorPanel &operator=(const NodeEditorPanel &) = delete;
@@ -67,7 +67,6 @@ class NodeEditorPanel : public Panel {
   private:
     static constexpr uint32_t INVALID_PIN = UINT32_MAX;
     static constexpr float TEXTURE_PREVIEW_HEIGHT = 120.0f;
-    static constexpr float MATERIAL_BAR_HEIGHT = 34.0f;
 
     /**
      * @brief A single pin socket and the data needed to place and wire it
@@ -143,18 +142,12 @@ class NodeEditorPanel : public Panel {
 
     void setupCanvas(void);
     void setupContextMenu(void);
-    void setupMaterialBar(void);
 
     /**
-     * @brief Repopulates the material dropdown from the loaded material assets
-     */
-    void rebuildMaterialList(void);
-
-    /**
-     * @brief Loads the picked material into the canvas as a graph
+     * @brief Loads this panel's material into the canvas as a graph
      * @param handle The material asset to load
      */
-    void selectMaterial(Rapture::AssetHandle handle);
+    void loadMaterial(Rapture::AssetHandle handle);
 
     /**
      * @brief Rebuilds the canvas from an authored graph, laying its nodes out left to right
@@ -468,8 +461,6 @@ class NodeEditorPanel : public Panel {
      */
     Rapture::MaterialGraph buildGraph(void) const;
 
-    Amethyst::Frame *m_materialBar = nullptr;
-    Amethyst::Dropdown *m_materialDropdown = nullptr;
     Amethyst::Frame *m_canvas = nullptr;
     Amethyst::Frame *m_content = nullptr;
     Amethyst::Frame *m_wireLayer = nullptr;

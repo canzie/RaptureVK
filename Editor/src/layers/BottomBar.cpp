@@ -3,6 +3,8 @@
 #include "layers/EditorLayout.h"
 #include "layers/panels/ContentBrowserPanel.h"
 
+#include <scenes/World.h>
+
 #include <components/common.h>
 #include <components/popup.h>
 #include <components/ui_scope.h>
@@ -11,6 +13,14 @@
 static constexpr float BOTTOM_BAR_PADDING = 4.0f;
 static constexpr float CONTENT_BROWSER_BUTTON_WIDTH = 150.0f;
 static constexpr float SEARCHBAR_CONTAINER_WIDTH = 400.0f;
+
+static Rapture::Scene *s_workspaceScene(Workspace *workspace)
+{
+    if (workspace == nullptr || workspace->getContext().world == nullptr) {
+        return nullptr;
+    }
+    return workspace->getContext().world->getScene();
+}
 
 static bool s_workspaceContainsContentBrowserPanel(Workspace *workspace)
 {
@@ -116,7 +126,7 @@ void BottomBar::setupContentBrowserToggle()
         [this](Amethyst::PopupScope &p) {
             m_contentBrowserPopup = &p.component;
             m_contentBrowserPanel = std::make_unique<ContentBrowserPanel>(p, m_services);
-            m_contentBrowserPanel->setScene(m_currWorkspace != nullptr ? m_currWorkspace->getContext().scene : nullptr);
+            m_contentBrowserPanel->setScene(s_workspaceScene(m_currWorkspace));
             m_contentBrowserPanel->onDockInLayout.detachedOnce([this]() {
                 if (m_currWorkspace != nullptr) {
                     m_currWorkspace->addPanel(std::move(m_contentBrowserPanel), Amethyst::DockZone::BOTTOM);
@@ -131,7 +141,7 @@ void BottomBar::setCurrentWorkspace(Workspace *workspace)
 {
     m_currWorkspace = workspace;
     if (m_contentBrowserPanel != nullptr) {
-        m_contentBrowserPanel->setScene(workspace != nullptr ? workspace->getContext().scene : nullptr);
+        m_contentBrowserPanel->setScene(s_workspaceScene(workspace));
     }
 }
 

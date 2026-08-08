@@ -1,5 +1,6 @@
 #include "MaterialEditorWorkspace.h"
 
+#include "Icons.h"
 #include "layers/panels/NodeEditorPanel.h"
 #include "layers/panels/ViewportPanel.h"
 
@@ -20,10 +21,15 @@
 static const char *s_previewSceneName = "MaterialPreview";
 static const char *s_previewViewportName = "material_preview";
 
-MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services)
+MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
+                                                 Rapture::AssetHandle handle)
+    : m_handle(handle)
 {
     m_context.services = services;
-    setupBase(tabs, "Material Editor");
+
+    // TODO: follow the asset's name once renaming reaches the workspaces an asset is open in
+    setupBase(tabBar, Rapture::AssetManager::getAssetMetadata(handle).getName(), Icons::SVG_MATERIAL);
+
     m_dockingLayer->name = "Material Editor Dock";
     m_dockingLayer->tabBarClasses = {"panel-tab"};
 
@@ -38,11 +44,14 @@ MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, co
             [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { previewTabBar = &tb.component; }); });
 
     if (canvasTabBar != nullptr) {
-        auto panel = std::make_unique<NodeEditorPanel>(canvasTabBar, m_context);
+        auto panel = std::make_unique<NodeEditorPanel>(canvasTabBar, m_context, m_handle);
         m_nodeEditor = panel.get();
         m_materialSelectedConn =
             m_nodeEditor->onMaterialSelectionChanged().connect([this](Rapture::AssetHandle handle) { showMaterialOnSphere(handle); });
         m_panels.push_back(std::move(panel));
+
+        // the panel loaded the material before this connection existed, so the sphere is dressed here
+        showMaterialOnSphere(m_handle);
     }
 
     if (previewTabBar != nullptr) {
@@ -71,18 +80,14 @@ MaterialEditorWorkspace::~MaterialEditorWorkspace()
         m_previewViewport = nullptr;
     }
 
-    if (m_previewScene != nullptr) {
-        app.getProject().getSceneManager().destroyScene(s_previewSceneName);
-        m_previewScene = nullptr;
-    }
+    m_previewScene.reset();
 }
 
 void MaterialEditorWorkspace::setupPreviewScene()
 {
     auto &app = Rapture::Application::getInstance();
-    auto &sceneManager = app.getProject().getSceneManager();
 
-    m_previewScene = sceneManager.createScene(s_previewSceneName);
+    m_previewScene = std::make_unique<Rapture::Scene>(s_previewSceneName);
     m_previewSphere = m_previewScene->createSphere("Preview Sphere");
 
     Rapture::Entity camera = m_previewScene->createEntity("Preview Camera");
@@ -101,7 +106,7 @@ void MaterialEditorWorkspace::setupPreviewScene()
         environment->setSkyIntensity(1.0f);
     }
 
-    sceneManager.activateScene(m_previewScene);
+    m_previewScene->active = true;
 
     auto extent = app.getMainWindow().getSwapChain()->getExtent();
     m_previewViewport = app.getViewportManager().createViewport({
@@ -112,10 +117,9 @@ void MaterialEditorWorkspace::setupPreviewScene()
     });
     m_previewViewport->createRenderer(Rapture::RendererType::DEFERRED);
     m_previewViewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, false);
-    m_previewViewport->setScene(m_previewScene);
+    m_previewViewport->setScene(m_previewScene.get());
     m_previewViewport->setCamera(camera);
 
-    m_context.scene = m_previewScene;
     m_context.viewport = m_previewViewport;
 
     m_previewScene->locked = true;
@@ -163,6 +167,15 @@ void MaterialEditorWorkspace::setupHotbar()
                 return Amethyst::EventResult::CONSUMED;
             };
         });
+}
+
+void MaterialEditorWorkspace::onUpdate(float dt)
+{
+    Workspace::onUpdate(dt);
+
+    if (m_previewScene != nullptr) {
+        m_previewScene->onUpdate(dt);
+    }
 }
 
 void MaterialEditorWorkspace::saveLayout()

@@ -217,11 +217,7 @@ void Application::run()
             }
         }
 
-        for (auto *scene : m_project->getActiveScenes()) {
-            if (scene != nullptr) {
-                scene->onUpdate(Timestep::deltaTime());
-            }
-        }
+        m_project->onUpdate(Timestep::deltaTime());
 
         m_viewportManager->drawAll();
 

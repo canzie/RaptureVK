@@ -20,239 +20,6 @@
 #include <utility>
 #include <vector>
 
-static constexpr float ROW_HEIGHT = 32.0f;
-static constexpr float LABEL_FRAC = 0.4f;
-static constexpr float LABEL_PAD = 12.0f;
-static constexpr float CONTROL_VPAD = 4.0f;
-static constexpr float CONTROL_HPAD = 8.0f;
-
-static float s_tableHeight(uint32_t rows)
-{
-    return static_cast<float>(rows) * ROW_HEIGHT;
-}
-
-static void s_labelCell(Amethyst::UIScope &cell, std::string_view label)
-{
-    cell.textLabel({
-        .classes = {"property-label"},
-        .base = {.position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.0f, 0.0f), .size = Amethyst::UDim2(1.0f, -LABEL_PAD, 1.0f, 0.0f)},
-        .label = std::string(label),
-    });
-}
-
-static float s_fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std::function<void(Amethyst::TableScope &)> &fn)
-{
-    float height = 0.0f;
-    ch.table(
-        {
-            .table =
-                {
-                    .rowHeight = ROW_HEIGHT,
-                    .separatorMode = Amethyst::TableSeparatorMode::BOTH,
-                    .separatorColor = Amethyst::Color4::fromHex(0x181818),
-                    .showHeader = false,
-                    .rowBackgroundColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
-                    .rowAlternateColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
-                    .scrollBarVisibility = Amethyst::ScrollBarVisibility::NEVER,
-                },
-        },
-        [&](Amethyst::TableScope &t) {
-            t.column("", LABEL_FRAC, Amethyst::TableColumnSizing::FIXED);
-            t.column("", 1.0f - LABEL_FRAC);
-            fn(t);
-            height = s_tableHeight(t.component.rowCount());
-            t.component.setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, height)});
-        });
-    return height;
-}
-
-static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min, double max,
-                      const std::function<void(void)> &onChanged)
-{
-    t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([&values, speed, min, max, onChanged](Amethyst::UIScope &cell) {
-            const float w = 1.0f / 3.0f;
-            for (int axis = 0; axis < 3; ++axis) {
-                cell.dragFloat(
-                    {
-                        .classes = {"property-input-field"},
-                        .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                                 .position = Amethyst::UDim2(axis * w, axis == 0 ? CONTROL_HPAD : 2.0f, 0.5f, 0.0f),
-                                 .size = Amethyst::UDim2(w, axis == 2 ? -2.0f - CONTROL_HPAD : -2.0f, 1.0f, -2.0f * CONTROL_VPAD)},
-                        .speed = speed,
-                        .min = min,
-                        .max = max,
-                        .value = &values[axis],
-                    },
-                    [onChanged](Amethyst::DragFloatScope &d) {
-                        d.component.onValueChanged = [onChanged](double) {
-                            if (onChanged) {
-                                onChanged();
-                            }
-                        };
-                    });
-            }
-        });
-    });
-}
-
-static void s_rowSlider(Amethyst::TableScope &t, std::string_view label, float *value, float min, float max,
-                        const std::function<void(float)> &onChanged, std::string format = {})
-{
-    t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, min, max, onChanged, format](Amethyst::UIScope &cell) {
-            cell.sliderFloat(
-                {
-                    .classes = {"property-input-field"},
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
-                    .format = format,
-                    .min = min,
-                    .max = max,
-                    .value = value,
-                },
-                [onChanged](Amethyst::SliderFloatScope &s) {
-                    s.component.onValueChanged = [onChanged](float v) {
-                        if (onChanged) {
-                            onChanged(v);
-                        }
-                    };
-                });
-        });
-    });
-}
-
-static void s_rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool *value, const std::function<void(bool)> &onChanged)
-{
-    t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, onChanged](Amethyst::UIScope &cell) {
-            cell.checkbox({.classes = {"property-input-field"},
-                           .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                                    .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                                    .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
-                           .value = value},
-                          [value, onChanged](Amethyst::CheckboxScope &c) {
-                              c.component.onValueChanged = [onChanged](bool b) {
-                                  if (onChanged) {
-                                      onChanged(b);
-                                  }
-                              };
-                          });
-        });
-    });
-}
-
-static void s_rowColor(Amethyst::TableScope &t, std::string_view label, std::optional<ColorField> &out, const glm::vec3 &initial,
-                       const std::function<void(const glm::vec3 &)> &onChanged)
-{
-    t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([&](Amethyst::UIScope &cell) {
-            cell.frame(
-                {
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
-                    .style = {.backgroundTransparency = 1.0f},
-                },
-                [&](Amethyst::FrameScope &wrap) {
-                    out.emplace(wrap, Amethyst::Color3(initial.x, initial.y, initial.z),
-                                std::vector<std::string>{"property-input-field"});
-                    out->onColorChanged = [onChanged](const Amethyst::Color4 &c) {
-                        if (onChanged) {
-                            onChanged(glm::vec3(c.r, c.g, c.b));
-                        }
-                    };
-                });
-        });
-    });
-}
-
-static void s_rowAssetPicker(Amethyst::TableScope &t, std::string_view label, std::optional<AssetPicker> &out,
-                             AssetPickerConfig config, const std::function<void(Rapture::AssetHandle)> &onSelected)
-{
-    t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([&](Amethyst::UIScope &cell) {
-            cell.frame(
-                {
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
-                    .style = {.backgroundTransparency = 1.0f},
-                },
-                [&](Amethyst::FrameScope &wrap) {
-                    out.emplace(wrap, std::move(config), std::vector<std::string>{"property-input-field"});
-                    out->onAssetSelected = onSelected;
-                });
-        });
-    });
-}
-
-static Amethyst::Dropdown *s_rowDropdown(Amethyst::TableScope &t, std::string_view label, std::string_view current,
-                                         const std::vector<std::string> &options, const std::function<void(int)> &onSelect)
-{
-    Amethyst::Dropdown *dropdown = nullptr;
-    t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([&](Amethyst::UIScope &cell) {
-            cell.dropdown(
-                {
-                    .classes = {"property-input-field"},
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
-                    .text = {.textXAlignment = Amethyst::TextXAlignment::LEFT, .textYAlignment = Amethyst::TextYAlignment::CENTER},
-                    .label = std::string(current),
-                },
-                [&](Amethyst::DropdownScope &d) {
-                    dropdown = &d.component;
-                    for (size_t i = 0; i < options.size(); ++i) {
-                        d.action(options[i], [onSelect, i]() {
-                            if (onSelect) {
-                                onSelect(static_cast<int>(i));
-                            }
-                        });
-                    }
-                });
-        });
-    });
-    return dropdown;
-}
-
-static void s_rowDragFloat(Amethyst::TableScope &t, std::string_view label, double *value, double speed, double min, double max,
-                           std::string format, const std::function<void(double)> &onChanged)
-{
-    t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, speed, min, max, format, onChanged](Amethyst::UIScope &cell) {
-            cell.dragFloat(
-                {
-                    .classes = {"property-input-field"},
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
-                    .format = format,
-                    .speed = speed,
-                    .min = min,
-                    .max = max,
-                    .value = value,
-                },
-                [onChanged](Amethyst::DragFloatScope &d) {
-                    d.component.onValueChanged = [onChanged](double v) {
-                        if (onChanged) {
-                            onChanged(v);
-                        }
-                    };
-                });
-        });
-    });
-}
-
 template <typename T>
 static T *s_instanceAs(const Rapture::Entity &entity)
 {
@@ -264,10 +31,10 @@ static T *s_instanceAs(const Rapture::Entity &entity)
     return instance != nullptr ? instance->as<T>() : nullptr;
 }
 
-static Amethyst::Dropdown *s_rowMobility(Amethyst::TableScope &t, Rapture::Mobility current,
-                                         const std::function<void(Rapture::Mobility)> &onSelect)
+Amethyst::Dropdown *ComponentEditorBase::rowMobility(Amethyst::TableScope &t, Rapture::Mobility current,
+                                                     const std::function<void(Rapture::Mobility)> &onSelect)
 {
-    return s_rowDropdown(t, "Mobility", Rapture::mobilityToString(current), {"Static", "Dynamic"}, [onSelect](int index) {
+    return rowDropdown(t, "Mobility", Rapture::mobilityToString(current), {"Static", "Dynamic"}, [onSelect](int index) {
         if (onSelect) {
             onSelect(static_cast<Rapture::Mobility>(index));
         }
@@ -276,10 +43,10 @@ static Amethyst::Dropdown *s_rowMobility(Amethyst::TableScope &t, Rapture::Mobil
 
 void Node3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowVec3(t, "Translation", m_values[0], 0.1, -100000.0, 100000.0, [this]() { apply(0); });
-        s_rowVec3(t, "Rotation", m_values[1], 0.5, -360.0, 360.0, [this]() { apply(1); });
-        s_rowVec3(t, "Scale", m_values[2], 0.01, -1000.0, 1000.0, [this]() { apply(2); });
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowVec3(t, "Translation", m_values[0], 0.1, -100000.0, 100000.0, [this]() { apply(0); });
+        rowVec3(t, "Rotation", m_values[1], 0.5, -360.0, 360.0, [this]() { apply(1); });
+        rowVec3(t, "Scale", m_values[2], 0.01, -1000.0, 1000.0, [this]() { apply(2); });
     });
 }
 
@@ -320,18 +87,18 @@ void Node3DEditor::sync(const Rapture::Entity &entity)
 
 void Light3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowColor(t, "Color", m_colorField, m_color, [this](const glm::vec3 &c) {
             if (m_node != nullptr) {
                 m_node->setColor(c);
             }
         });
-        s_rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
+        rowSlider(t, "Intensity", &m_intensity, 0.0f, 100.0f, [this](float v) {
             if (m_node != nullptr) {
                 m_node->setIntensity(v);
             }
         });
-        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
+        m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
             if (m_node == nullptr) {
                 return;
             }
@@ -340,22 +107,22 @@ void Light3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }
         });
-        s_rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
+        rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
             if (m_node != nullptr) {
                 m_node->setActive(b);
             }
         });
-        s_rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
+        rowCheckbox(t, "Casts Shadow", &m_castsShadow, [this](bool b) {
             if (m_node != nullptr) {
                 m_node->setCastsShadow(b);
             }
         });
-        s_rowCheckbox(t, "Use Temperature", &m_usesTemperature, [this](bool b) {
+        rowCheckbox(t, "Use Temperature", &m_usesTemperature, [this](bool b) {
             if (m_node != nullptr) {
                 m_node->setUsesTemperature(b);
             }
         });
-        s_rowSlider(
+        rowSlider(
             t, "Temperature", &m_temperature, 1000.0f, 40000.0f,
             [this](float v) {
                 if (m_node != nullptr) {
@@ -392,8 +159,8 @@ void Light3DEditor::sync(const Rapture::Entity &entity)
 
 void DirectionalLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowCheckbox(t, "Atmosphere Sun", &m_atmosphereSun, [this](bool b) {
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowCheckbox(t, "Atmosphere Sun", &m_atmosphereSun, [this](bool b) {
             if (m_node != nullptr) {
                 m_node->setAtmosphereSun(b);
             }
@@ -412,8 +179,8 @@ void DirectionalLight3DEditor::sync(const Rapture::Entity &entity)
 
 void PointLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
             if (m_node != nullptr) {
                 m_node->setRange(v);
             }
@@ -432,13 +199,13 @@ void PointLight3DEditor::sync(const Rapture::Entity &entity)
 
 void SpotLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowSlider(t, "Range", &m_range, 0.0f, 1000.0f, [this](float v) {
             if (m_node != nullptr) {
                 m_node->setRange(v);
             }
         });
-        s_rowSlider(
+        rowSlider(
             t, "Inner Cone", &m_innerConeAngle, 0.0f, 89.0f,
             [this](float v) {
                 if (m_node != nullptr) {
@@ -446,7 +213,7 @@ void SpotLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 }
             },
             "%.1f deg");
-        s_rowSlider(
+        rowSlider(
             t, "Outer Cone", &m_outerConeAngle, 0.0f, 90.0f,
             [this](float v) {
                 if (m_node != nullptr) {
@@ -470,14 +237,14 @@ void SpotLight3DEditor::sync(const Rapture::Entity &entity)
 
 void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
                          [this](Rapture::AssetHandle handle) {
                              if (m_node != nullptr) {
                                  m_node->setMaterial(handle);
                              }
                          });
-        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
+        m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
             if (m_node == nullptr) {
                 return;
             }
@@ -486,12 +253,12 @@ void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }
         });
-        s_rowCheckbox(t, "Visible", &m_isVisible, [this](bool b) {
+        rowCheckbox(t, "Visible", &m_isVisible, [this](bool b) {
             if (m_node != nullptr) {
                 m_node->setVisible(b);
             }
         });
-        s_rowCheckbox(t, "Ray Traced", &m_isRayTraced, [this](bool b) {
+        rowCheckbox(t, "Ray Traced", &m_isRayTraced, [this](bool b) {
             if (m_node != nullptr) {
                 m_node->setRayTraced(b);
             }
@@ -522,18 +289,18 @@ void Mesh3DEditor::sync(const Rapture::Entity &entity)
 
 void Camera3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowSlider(t, "FOV", &m_fieldOfView, 1.0f, 179.0f, [this](float v) {
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowSlider(t, "FOV", &m_fieldOfView, 1.0f, 179.0f, [this](float v) {
             if (m_node != nullptr) {
                 m_node->setFieldOfView(v);
             }
         });
-        s_rowDragFloat(t, "Near Plane", &m_nearPlane, 0.01, 0.001, 10000.0, {}, [this](double v) {
+        rowDragFloat(t, "Near Plane", &m_nearPlane, 0.01, 0.001, 10000.0, {}, [this](double v) {
             if (m_node != nullptr) {
                 m_node->setNearPlane(static_cast<float>(v));
             }
         });
-        s_rowDragFloat(t, "Far Plane", &m_farPlane, 1.0, 0.001, 1000000.0, {}, [this](double v) {
+        rowDragFloat(t, "Far Plane", &m_farPlane, 1.0, 0.001, 1000000.0, {}, [this](double v) {
             if (m_node != nullptr) {
                 m_node->setFarPlane(static_cast<float>(v));
             }
@@ -554,15 +321,15 @@ void Camera3DEditor::sync(const Rapture::Entity &entity)
 
 void ShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::ShadowComponent>()) {
                 return;
             }
             m_entity.getComponent<Rapture::ShadowComponent>().isActive = b;
             m_entity.markDirty();
         });
-        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
+        m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::ShadowComponent>()) {
                 return;
             }
@@ -592,15 +359,15 @@ void ShadowEditor::sync(const Rapture::Entity &entity)
 
 void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
                 return;
             }
             m_entity.getComponent<Rapture::CascadedShadowComponent>().isActive = b;
             m_entity.markDirty();
         });
-        m_mobilityDropdown = s_rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
+        m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
                 return;
             }
@@ -610,7 +377,7 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             }
             m_entity.markDirty();
         });
-        s_rowSlider(t, "Lambda", &m_lambda, 0.0f, 1.0f, [this](float v) {
+        rowSlider(t, "Lambda", &m_lambda, 0.0f, 1.0f, [this](float v) {
             if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
                 return;
             }
@@ -639,36 +406,36 @@ void CascadedShadowEditor::sync(const Rapture::Entity &entity)
 
 void EnvironmentEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
-    m_bodyHeight = s_fieldTable(ch, [this](Amethyst::TableScope &t) {
-        s_rowSlider(t, "Sky Intensity", &m_skyIntensity, 0.0f, 10.0f, [this](float v) {
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowSlider(t, "Sky Intensity", &m_skyIntensity, 0.0f, 10.0f, [this](float v) {
             if (m_node != nullptr) {
                 m_node->setSkyIntensity(v);
             }
         });
-        s_rowCheckbox(t, "Sky Enabled", &m_skyboxEnabled, [this](bool b) {
+        rowCheckbox(t, "Sky Enabled", &m_skyboxEnabled, [this](bool b) {
             if (m_node != nullptr) {
                 m_node->setSkyboxEnabled(b);
             }
         });
-        s_rowCheckbox(t, "Atmosphere Sky", &m_usesAtmosphereSkybox, [this](bool b) {
+        rowCheckbox(t, "Atmosphere Sky", &m_usesAtmosphereSkybox, [this](bool b) {
             if (m_node != nullptr) {
                 m_node->setUsesAtmosphereSkybox(b);
             }
         });
-        s_rowSlider(t, "Time of Day", &m_atmosphere.timeOfDay, 0.0f, 24.0f, [this](float) { pushAtmosphere(); });
-        s_rowSlider(t, "Latitude", &m_atmosphere.latitude, -90.0f, 90.0f, [this](float) { pushAtmosphere(); });
-        s_rowSlider(t, "Longitude", &m_atmosphere.longitude, -180.0f, 180.0f, [this](float) { pushAtmosphere(); });
-        s_rowSlider(t, "Mie", &m_atmosphere.mie, 0.0f, 60.0f, [this](float) { pushAtmosphere(); });
-        s_rowSlider(t, "Mie G", &m_atmosphere.mieG, 0.0f, 0.999f, [this](float) { pushAtmosphere(); });
-        s_rowDragFloat(t, "Sun Intensity", &m_sunIntensity, 0.1, 0.0, 1000.0, {}, [this](double v) {
+        rowSlider(t, "Time of Day", &m_atmosphere.timeOfDay, 0.0f, 24.0f, [this](float) { pushAtmosphere(); });
+        rowSlider(t, "Latitude", &m_atmosphere.latitude, -90.0f, 90.0f, [this](float) { pushAtmosphere(); });
+        rowSlider(t, "Longitude", &m_atmosphere.longitude, -180.0f, 180.0f, [this](float) { pushAtmosphere(); });
+        rowSlider(t, "Mie", &m_atmosphere.mie, 0.0f, 60.0f, [this](float) { pushAtmosphere(); });
+        rowSlider(t, "Mie G", &m_atmosphere.mieG, 0.0f, 0.999f, [this](float) { pushAtmosphere(); });
+        rowDragFloat(t, "Sun Intensity", &m_sunIntensity, 0.1, 0.0, 1000.0, {}, [this](double v) {
             m_atmosphere.sunIntensity = static_cast<float>(v);
             pushAtmosphere();
         });
-        s_rowDragFloat(t, "Camera Altitude", &m_cameraAltitude, 1.0, 0.0, 100000.0, {}, [this](double v) {
+        rowDragFloat(t, "Camera Altitude", &m_cameraAltitude, 1.0, 0.0, 100000.0, {}, [this](double v) {
             m_atmosphere.cameraAltitude = static_cast<float>(v);
             pushAtmosphere();
         });
-        s_rowVec3(t, "Wavelength (nm)", m_wavelengths, 1.0, 380.0, 740.0, [this]() {
+        rowVec3(t, "Wavelength (nm)", m_wavelengths, 1.0, 380.0, 740.0, [this]() {
             m_atmosphere.rayleigh = glm::vec3(Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[0])),
                                               Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[1])),
                                               Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[2])));

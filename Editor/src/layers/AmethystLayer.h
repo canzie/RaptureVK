@@ -15,6 +15,7 @@
 
 #include <glm/vec2.hpp>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace Rapture {
@@ -36,7 +37,7 @@ class AmethystLayer : public Rapture::Layer {
 
   private:
     void setupMenuBar(glm::vec2 screenSize);
-    void setupWorkspaces(glm::vec2 screenSize);
+    void setupWorkspaces(void);
 
     /**
      * @brief Points a launcher's actions at this layer
@@ -80,6 +81,24 @@ class AmethystLayer : public Rapture::Layer {
     using SecondaryWindowBuilder = std::function<std::shared_ptr<void>(Amethyst::Window &, const std::function<void()> &close)>;
 
     PanelServices buildServices(void);
+
+    /**
+     * @brief Opens an asset in a workspace tab of its own, focusing the tab it is already open in.
+     * @param handle The asset to open, whose type picks the workspace it opens in.
+     */
+    void openAssetWorkspace(Rapture::AssetHandle handle);
+
+    /**
+     * @brief Destroys the workspace a closed tab held.
+     * @param content The closed tab's content frame.
+     */
+    void closeWorkspace(Amethyst::Instance *content);
+
+    /**
+     * @brief Sizes a workspace's docking layer to the space below the tab bar.
+     */
+    void sizeDockingLayer(Workspace &workspace);
+
     void openSecondaryWindow(int32_t width, int32_t height, std::string_view title, SecondaryWindowBuilder build);
     void openFileExplorer(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm);
     void openDemoWindow(void);
@@ -102,6 +121,8 @@ class AmethystLayer : public Rapture::Layer {
 
     int m_activeWorkspaceIndex = 0;
     std::vector<std::unique_ptr<Workspace>> m_workspaces;
+    // the asset-backed workspaces among the above, so opening an already open asset focuses its tab
+    std::unordered_map<Rapture::AssetHandle, Workspace *> m_assetWorkspaces;
 
     std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
 

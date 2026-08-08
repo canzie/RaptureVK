@@ -16,9 +16,16 @@ class NodeEditorPanel;
 
 class MaterialEditorWorkspace : public Workspace {
   public:
-    MaterialEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services);
+    /**
+     * @brief Opens a material asset in a tab of its own.
+     * @param tabBar The workspace bar the tab is appended to.
+     * @param services Services the panels are built against.
+     * @param handle The material asset this workspace edits.
+     */
+    MaterialEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::AssetHandle handle);
     ~MaterialEditorWorkspace() override;
 
+    void onUpdate(float dt) override;
     void saveLayout() override;
 
   private:
@@ -33,7 +40,8 @@ class MaterialEditorWorkspace : public Workspace {
 
     NodeEditorPanel *m_nodeEditor = nullptr;
 
-    Rapture::Scene *m_previewScene = nullptr;
+    Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
+    std::unique_ptr<Rapture::Scene> m_previewScene;
     Rapture::Viewport *m_previewViewport = nullptr;
     Rapture::Entity m_previewSphere;
     Rapture::EventConnection m_materialSelectedConn;

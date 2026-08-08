@@ -2,10 +2,10 @@
 #include "Icons.h"
 #include "events/GameEvents.h"
 #include "layers/panels/component_editors/ComponentEditors.h"
-#include "layers/panels/components/header_layouts.h"
 #include "layers/panels/components/tab_layouts.h"
 
 #include "components/Components.h"
+#include "scenes/World.h"
 
 #include <components/common.h>
 #include <components/ui_scope.h>
@@ -15,10 +15,6 @@ static constexpr float SEARCH_BAR_HEIGHT = 28.0f;
 static constexpr float SEARCH_BAR_TOP_PAD = 8.0f;
 static constexpr float CONTENT_OFFSET = SEARCH_BAR_TOP_PAD + SEARCH_BAR_HEIGHT + 8.0f;
 
-static constexpr float HEADER_HEIGHT = 28.0f;
-static constexpr float SECTION_SPACING = 6.0f;
-static constexpr float SECTION_TOP_PAD = 4.0f;
-
 PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Properties", context)
 {
     auto root = std::make_unique<Amethyst::Frame>();
@@ -26,7 +22,6 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
     m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
         m_root = nullptr;
         m_placeholderText = nullptr;
-        m_entityView = nullptr;
         m_searchInput = nullptr;
     });
     m_root->addClass("panel");
@@ -56,7 +51,7 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
         }
     });
 
-    setScene(context.scene);
+    setScene(context.world != nullptr ? context.world->getScene() : nullptr);
 }
 
 PropertiesPanel::~PropertiesPanel()
@@ -189,59 +184,30 @@ void PropertiesPanel::setupPlaceholder()
 
 void PropertiesPanel::setupEntityView()
 {
-    Amethyst::UIScope(*m_root).scrollingFrame(
-        {
-            .classes = {"panel"},
-            .base =
-                {
-                    .clipsDescendants = true,
-                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, CONTENT_OFFSET),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -CONTENT_OFFSET),
-                    .visible = false,
-                },
-            .scroll =
-                {
-                    .scrollAxis = Amethyst::ScrollAxis::Y,
-                    .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
-                    .canvasSize = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, 0.0f)),
-                },
-        },
-        [this](Amethyst::ScrollingFrameScope &sf) { m_entityView = &sf.component; });
-}
-
-void PropertiesPanel::buildSection(ComponentEditorBase &editor)
-{
-    Amethyst::UIScope(*m_entityView)
-        .collapsibleHeader(
-            {
-                .classes = {"component-header"},
-                .base =
-                    {
-                        .position = Amethyst::UDim2::fromOffset(0.0f, SECTION_TOP_PAD),
-                        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT),
-                    },
-                .style = {.backgroundTransparency = 1.0f},
-                .header =
-                    {
-                        .titleStyle = {.fontSize = 13.0f},
-                        .headerHeight = HEADER_HEIGHT,
-                    },
-            },
-            [&](Amethyst::CollapsibleHeaderScope &ch) {
-                editor.header = &ch.component;
-                ch.header(componentHeaderLayout(editor.title(), editor.icon()));
-                editor.buildBody(ch);
-                editor.header->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT + editor.bodyHeight())});
-            });
-
-    editor.header->onToggled = [this](bool) { relayout(); };
+    m_sections.emplace(*m_root, Amethyst::ScrollingFrameProperties{
+                                    .classes = {"panel"},
+                                    .base =
+                                        {
+                                            .clipsDescendants = true,
+                                            .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, CONTENT_OFFSET),
+                                            .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -CONTENT_OFFSET),
+                                            .visible = false,
+                                        },
+                                    .scroll =
+                                        {
+                                            .scrollAxis = Amethyst::ScrollAxis::Y,
+                                            .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
+                                            .canvasSize = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, 0.0f)),
+                                        },
+                                });
 }
 
 void PropertiesPanel::refresh()
 {
-    m_active.clear();
-
-    if (m_selectedEntity.isValid()) {
+    m_sections->refresh([this]() {
+        if (!m_selectedEntity.isValid()) {
+            return;
+        }
         const Rapture::Entity &e = m_selectedEntity;
 
         // Sections come from the instance's class chain, base first, so a Transform sits above the
@@ -259,25 +225,7 @@ void PropertiesPanel::refresh()
 
         ensure<ShadowEditor>(e.hasComponent<Rapture::ShadowComponent>());
         ensure<CascadedShadowEditor>(e.hasComponent<Rapture::CascadedShadowComponent>());
-    }
-
-    relayout();
-}
-
-void PropertiesPanel::relayout()
-{
-    if (m_entityView == nullptr) {
-        return;
-    }
-
-    float y = SECTION_TOP_PAD;
-    for (auto *editor : m_active) {
-        editor->header->setBaseProperties({.position = Amethyst::UDim2::fromOffset(0.0f, y)});
-        bool expanded = static_cast<bool>(editor->header->getCollapsibleHeaderProperties().expanded);
-        y += HEADER_HEIGHT + (expanded ? editor->bodyHeight() : 0.0f) + SECTION_SPACING;
-    }
-
-    m_entityView->setScrollingFrameProperties({.canvasSize = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, y))});
+    });
 }
 
 void PropertiesPanel::setScene(Rapture::Scene *scene)
@@ -293,31 +241,29 @@ void PropertiesPanel::onUpdate(float dt)
 {
     (void)dt;
     if (!m_selectedEntity.isValid()) {
-        if (!m_active.empty()) {
+        if (!m_sections->empty()) {
             clearSelection();
         }
         return;
     }
-    for (auto *editor : m_active) {
-        editor->sync(m_selectedEntity);
-    }
+    m_sections->sync();
 }
 
 void PropertiesPanel::showEntity(const Rapture::Entity &entity)
 {
     m_selectedEntity = entity;
     m_placeholderText->setBaseProperties({.visible = false});
-    m_entityView->setBaseProperties({.visible = true});
+    m_sections->setVisible(true);
     refresh();
 }
 
 void PropertiesPanel::showPlaceholder()
 {
-    if (m_placeholderText == nullptr || m_entityView == nullptr) {
+    if (m_placeholderText == nullptr) {
         return;
     }
     m_placeholderText->setBaseProperties({.visible = true});
-    m_entityView->setBaseProperties({.visible = false});
+    m_sections->setVisible(false);
 }
 
 void PropertiesPanel::clearSelection()

@@ -3,6 +3,7 @@
 
 #include "layers/panels/FileBrowser.h"
 #include <amethyst/Amethyst.h>
+#include <asset_manager/AssetCommon.h>
 #include <filesystem>
 #include <functional>
 #include <string_view>
@@ -11,6 +12,7 @@ namespace Rapture {
 class Texture;
 class Scene;
 class Viewport;
+class World;
 } // namespace Rapture
 
 /**
@@ -21,12 +23,16 @@ struct PanelServices {
         openSecondaryWindow;
     std::function<void(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm)> openFileExplorer;
     std::function<void(const std::filesystem::path &source, const std::filesystem::path &outputFolder)> openImportPanel;
+    /**
+     * @brief Opens an asset in its own workspace tab, focusing the tab it is already open in.
+     */
+    std::function<void(Rapture::AssetHandle)> openAssetWorkspace;
     std::function<Amethyst::AmTextureId(Rapture::Texture *)> registerTexture;
     std::function<void(Amethyst::AmTextureId)> unregisterTexture;
 };
 
 struct WorkspaceContext {
-    Rapture::Scene *scene = nullptr;
+    Rapture::World *world = nullptr;
     Rapture::Viewport *viewport = nullptr;
     Amethyst::DockingLayer *dockingLayer = nullptr;
     PanelServices services;

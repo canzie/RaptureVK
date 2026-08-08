@@ -3,6 +3,7 @@
 
 #include "asset_manager/AssetCommon.h"
 #include "events/EventSignal.h"
+#include "utils/TypeInfo.h"
 #include <amethyst/Amethyst.h>
 #include <components/context_menu.h>
 #include <components/tab_bar.h>
@@ -12,6 +13,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "layers/panels/Panel.h"
@@ -35,6 +37,37 @@ class ContentBrowserPanel : public Panel {
     Rapture::EventSignal<void()> onDockInLayout;
 
   private:
+    struct ContentItemComponents {
+        Amethyst::Frame *container = nullptr;
+        Amethyst::InvisibleButton *action = nullptr;
+        Amethyst::Frame *thumbWell = nullptr;
+        Amethyst::ImageLabel *icon = nullptr;
+        Amethyst::Frame *footer = nullptr;
+        Amethyst::TextLabel *name = nullptr;
+        Amethyst::TextInput *nameInput = nullptr;
+        Amethyst::TextLabel *type = nullptr;
+        Amethyst::Frame *typeBar = nullptr;
+        bool attached = false;
+    };
+
+    // what the name being typed into a tile will do once it is confirmed
+    enum ContentEditKind {
+        CONTENT_EDIT_NONE,
+        CONTENT_EDIT_FOLDER,
+        CONTENT_EDIT_MODULE,
+        CONTENT_EDIT_RENAME,
+        CONTENT_EDIT_COUNT
+    };
+
+    struct ContentEdit {
+        ContentEditKind kind = CONTENT_EDIT_NONE;
+        size_t itemIndex = SIZE_MAX;
+        const Rapture::TypeInfo *moduleType = nullptr;
+        std::filesystem::path target;
+        std::string initialName;
+    };
+
+  private:
     void buildContent(void);
 
     void setupTopBar(void);
@@ -43,6 +76,62 @@ class ContentBrowserPanel : public Panel {
     void setupContextMenu(void);
 
     void showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items);
+
+    /**
+     * @brief The menu items creating a folder or an asset in the current directory
+     * @return The items, ready to hand to a ContextMenu
+     */
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> buildAddMenuItems();
+
+    /**
+     * @brief The submenu items of the advanced section, one per asset category
+     * @return The items, ready to hand to a ContextMenu
+     */
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> buildAdvancedAddItems();
+
+    void showAddMenu(Amethyst::vec2 pos);
+
+    /**
+     * @brief Puts a placeholder tile in the grid for the user to name, which creates nothing until confirmed
+     * @param kind What the confirmed name will create
+     * @param moduleType The class a module holds, ignored by the other kinds
+     */
+    void beginCreate(ContentEditKind kind, const Rapture::TypeInfo *moduleType = nullptr);
+
+    /**
+     * @brief Puts an existing item's tile into its naming state
+     * @param index The item's index in the content pool
+     * @param target The file or folder the name belongs to
+     */
+    void beginRename(size_t index, const std::filesystem::path &target);
+
+    /**
+     * @brief Swaps an item's name label for a field holding that name
+     * @param item The item being named
+     * @param initialName The name the field starts with
+     */
+    void startEditing(ContentItemComponents &item, const std::string &initialName);
+
+    /**
+     * @brief Acts on the name that was typed, doing nothing at all if it is empty
+     */
+    void commitEdit();
+
+    void createFolder(std::string_view name);
+
+    /**
+     * @brief Creates a module asset holding a new instance of a registered class
+     * @param type The class the module holds
+     * @param name The asset's name
+     */
+    void createModule(const Rapture::TypeInfo &type, std::string_view name);
+
+    /**
+     * @brief Renames a file or folder on disk
+     * @param target The path to rename
+     * @param name The name it takes, extension excluded
+     */
+    void renameItem(const std::filesystem::path &target, std::string_view name);
 
     /**
      * @brief The context menu actions specific to an asset type, before the shared rename/delete items
@@ -64,18 +153,6 @@ class ContentBrowserPanel : public Panel {
 
     void onSearchTextChanged(const std::string &text);
 
-    struct ContentItemComponents {
-        Amethyst::Frame *container = nullptr;
-        Amethyst::InvisibleButton *action = nullptr;
-        Amethyst::Frame *thumbWell = nullptr;
-        Amethyst::ImageLabel *icon = nullptr;
-        Amethyst::Frame *footer = nullptr;
-        Amethyst::TextLabel *name = nullptr;
-        Amethyst::TextLabel *type = nullptr;
-        Amethyst::Frame *typeBar = nullptr;
-        bool attached = false;
-    };
-
     ContentItemComponents &acquirePoolItem(size_t index);
     void releasePoolItems(size_t fromIndex);
     void applyItemSelection(ContentItemComponents &item, bool selected);
@@ -94,6 +171,7 @@ class ContentBrowserPanel : public Panel {
     Amethyst::Frame *m_breadcrumbBar = nullptr;
 
     Amethyst::ContextMenu *m_contextMenu = nullptr;
+    Amethyst::ContextMenu *m_addMenu = nullptr;
 
     Amethyst::Frame *m_sideBarPane = nullptr;
     Amethyst::TreeView *m_directoryTree = nullptr;
@@ -106,6 +184,7 @@ class ContentBrowserPanel : public Panel {
 
     std::vector<ContentItemComponents> m_contentItemPool;
     size_t m_selectedItem = SIZE_MAX;
+    ContentEdit m_edit;
 
     bool m_isDocked = false;
     Rapture::Scene *m_scene = nullptr;

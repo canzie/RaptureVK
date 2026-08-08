@@ -348,7 +348,8 @@ static std::unique_ptr<Amethyst::ContextMenu::ItemData> s_categoryToMenuItem(con
                                                                              const SpawnFn &spawn, const TexSpawnFn &spawnTexture,
                                                                              Amethyst::Color3 color);
 
-NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Node Editor", context)
+NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::AssetHandle material)
+    : Panel("Node Editor", context)
 {
     Rapture::GraphDomainRegistry::registerBuiltins();
 
@@ -361,8 +362,6 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
         m_wireLayer = nullptr;
         m_contextMenu = nullptr;
         m_dragWire = nullptr;
-        m_materialBar = nullptr;
-        m_materialDropdown = nullptr;
         m_connecting = false;
         m_selectedNodes.clear();
         m_primaryNodeId = 0;
@@ -370,12 +369,13 @@ NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
     m_root->addClass("panel");
     m_root->setBaseProperties({.clipsDescendants = true});
 
-    setupMaterialBar();
     setupCanvas();
     setupContextMenu();
 
     icon = Icons::SVG_MATERIAL;
     attach(tabBar, std::move(root));
+
+    loadMaterial(material);
 
     m_serializeListener =
         Rapture::ProjectEvents::onProjectSerialize().addListener([this](Rapture::WriteNode &root) { (void)root; });
@@ -398,8 +398,7 @@ void NodeEditorPanel::setupCanvas()
     m_canvas->name = "Canvas";
     m_canvas->setBaseProperties({
         .clipsDescendants = true,
-        .position = Amethyst::UDim2::fromOffset(0.0f, MATERIAL_BAR_HEIGHT),
-        .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -MATERIAL_BAR_HEIGHT),
+        .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, 0.0f),
     });
     m_canvas->setBaseStyleProperties({.backgroundColor = COL_BG, .backgroundTransparency = 0.0f});
 
@@ -475,94 +474,26 @@ void NodeEditorPanel::setupContextMenu()
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
 }
 
-void NodeEditorPanel::setupMaterialBar()
-{
-    m_materialBar = m_root->add<Amethyst::Frame>();
-    m_materialBar->name = "Material Bar";
-    m_materialBar->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, MATERIAL_BAR_HEIGHT), .zIndex = 1});
-    m_materialBar->addClass("panel");
-
-    m_materialDropdown = m_materialBar->add<Amethyst::Dropdown>();
-    m_materialDropdown->setBaseProperties({
-        .position = Amethyst::UDim2::fromOffset(6.0f, 4.0f),
-        .size = Amethyst::UDim2::fromOffset(220.0f, MATERIAL_BAR_HEIGHT - 8.0f),
-    });
-    m_materialDropdown->setText("Select material");
-    rebuildMaterialList();
-
-    auto *refresh = m_materialBar->add<Amethyst::TextButton>();
-    refresh->setText("Refresh");
-    refresh->setBaseProperties({
-        .position = Amethyst::UDim2::fromOffset(232.0f, 4.0f),
-        .size = Amethyst::UDim2::fromOffset(70.0f, MATERIAL_BAR_HEIGHT - 8.0f),
-    });
-    refresh->onMouseButton1ClickCb = [this]() {
-        rebuildMaterialList();
-        return Amethyst::EventResult::CONSUMED;
-    };
-
-    auto *newMaterial = m_materialBar->add<Amethyst::TextButton>();
-    newMaterial->setText("New");
-    newMaterial->setBaseProperties({
-        .position = Amethyst::UDim2::fromOffset(308.0f, 4.0f),
-        .size = Amethyst::UDim2::fromOffset(60.0f, MATERIAL_BAR_HEIGHT - 8.0f),
-    });
-    newMaterial->onMouseButton1ClickCb = [this]() {
-        clearGraph();
-        spawnNode(Rapture::GraphNodeType::SURFACE_OUTPUT, "PBR Surface", COL_CAT_OUTPUT, Amethyst::vec2(60.0f, 60.0f));
-        m_materialDropdown->setText("New Material");
-        return Amethyst::EventResult::CONSUMED;
-    };
-}
-
-void NodeEditorPanel::rebuildMaterialList()
-{
-    if (m_materialDropdown == nullptr) {
-        return;
-    }
-    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    for (Rapture::AssetHandle handle : Rapture::AssetManager::getVirtualAssetsByType(Rapture::ASSET_MATERIAL_INSTANCE)) {
-        std::string name = Rapture::AssetManager::getAssetMetadata(handle).getName();
-        items.push_back(Amethyst::makeActionItem(name, [this, handle]() { selectMaterial(handle); }));
-    }
-    m_materialDropdown->setItems(std::move(items));
-}
-
-void NodeEditorPanel::selectMaterial(Rapture::AssetHandle handle)
+void NodeEditorPanel::loadMaterial(Rapture::AssetHandle handle)
 {
     Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
     if (!ref) {
+        RP_ERROR("Could not open material {}", static_cast<uint64_t>(handle));
         return;
     }
     auto *material = ref.get()->getUnderlyingAsset<Rapture::MaterialInstance>();
     if (material == nullptr) {
+        RP_ERROR("Asset {} holds no material instance", static_cast<uint64_t>(handle));
         return;
     }
     Rapture::BaseMaterial *base = material->getBaseMaterial();
     if (base == nullptr) {
+        RP_ERROR("Material '{}' has no base material", Rapture::AssetManager::getAssetMetadata(handle).getName());
         return;
     }
-    uint32_t newGraphId = base->getGraphId();
-    if (newGraphId != m_selectedGraphId) {
-        bool hadPrevious = m_selectedGraphId != UINT32_MAX;
-        if (hadPrevious) {
-            stashGraph(m_selectedGraphId);
-        }
-        m_selectedGraphId = newGraphId;
 
-        auto it = m_graphViews.find(newGraphId);
-        if (it != m_graphViews.end()) {
-            restoreGraph(it->second);
-            m_graphViews.erase(it);
-        } else {
-            if (hadPrevious) {
-                activateCanvasLayer();
-            }
-            loadGraph(base->getGraph());
-        }
-    }
-
-    m_materialDropdown->setText(Rapture::AssetManager::getAssetMetadata(handle).getName());
+    m_selectedGraphId = base->getGraphId();
+    loadGraph(base->getGraph());
 
     m_onMaterialSelectionChanged.fire(handle);
 }

@@ -65,6 +65,14 @@ class AssetManagerEditor : public AssetManagerBase {
      */
     bool updateAsset(AssetHandle handle, AssetVariant asset);
 
+    /**
+     * @brief Writes a loaded asset back into its file, giving it one if it has none yet
+     * @param handle The asset to write
+     * @param folder Directory an asset with no file yet is written into
+     * @return True if the asset's file now holds its contents
+     */
+    bool saveAsset(AssetHandle handle, const std::filesystem::path &folder);
+
     Asset &importDefaultAsset(AssetType assetType);
 
     Asset &registerVirtualAsset(AssetVariant asset, const std::string &virtualName, AssetType assetType);

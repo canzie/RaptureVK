@@ -7,6 +7,7 @@
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "render_targets/SceneRenderTarget.h"
+#include "scenes/World.h"
 #include "utils/rp_assert.h"
 #include "viewport/Viewport.h"
 
@@ -104,8 +105,8 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
             m_viewport = nullptr;
         } else {
             m_viewport->editorBinding().displayed = true;
-            if (context.scene != nullptr) {
-                m_viewport->setScene(context.scene);
+            if (context.world != nullptr) {
+                m_viewport->setScene(context.world->getScene());
             }
         }
     }

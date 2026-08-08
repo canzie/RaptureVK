@@ -234,6 +234,16 @@ context-menu {
     background-color: @text-3;
 }
 
+.add-asset-menu {
+    text-color: @text-2;
+    background-color: @bg-buttons;
+}
+
+.add-asset-menu#separator {
+    text-color: @text-3;
+    background-color: @text-3;
+}
+
 
 radio-button.viewport-context-menu {
     background-color: @bg-input;
@@ -294,12 +304,33 @@ radio-button.viewport-context-menu:active {
     border-pixel-size: 1px;
 }
 
+.content-browser-card-well:active {
+    border-color: @accent;
+}
+
+.content-browser-card-thumb {
+    background-color: @bg-panel;
+    background-transparency: 0.0;
+}
+
 .content-browser-card-footer {
     background-color: @bg-buttons;
     text-color: @text-1;
     text-x-alignment: center;
     text-y-alignment: center;
     text-truncate: at_end;
+    font-size: 12px;
+}
+
+.content-browser-card-footer:active {
+    background-color: @accent;
+}
+
+.content-browser-card-name-input {
+    background-color: @bg-input;
+    text-color: @text-1;
+    text-x-alignment: center;
+    text-y-alignment: center;
     font-size: 12px;
 }
 

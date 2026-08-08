@@ -182,6 +182,10 @@ void Scene::onUpdate(float dt)
 {
     (void)dt;
 
+    if (!active) {
+        return;
+    }
+
     // Get current frame dimensions for camera updates
     auto &app = Application::getInstance();
     auto swapChain = app.getMainWindow().getSwapChain();
@@ -392,6 +396,15 @@ void Scene::clearInstances()
     while (!m_root->children().empty()) {
         m_root->removeChild(m_root->children().front().get());
     }
+}
+
+SerialDocument Scene::snapshot() const
+{
+    SerialDocument builder;
+    serialize(builder.root());
+
+    // a written document is write mode, so it is parsed back into one that can be read
+    return SerialDocument::parse(builder.toText());
 }
 
 std::unique_ptr<Scene> Scene::deserialize(ReadNode node)
