@@ -18,7 +18,7 @@ class Scene;
  * @brief How a world is played.
  */
 struct WorldData {
-    AssetHandle playerCharacter = INVALID_ASSET_HANDLE;
+    AssetHandle puppet = INVALID_ASSET_HANDLE;
     AssetHandle controller = INVALID_ASSET_HANDLE;
 };
 

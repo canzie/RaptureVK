@@ -12,6 +12,8 @@
 
 namespace Rapture {
 
+class Instance;
+
 /**
  * @brief Base of every authored object that lives in the asset database rather than in a scene.
  *
@@ -35,9 +37,7 @@ class ModuleClass {
     template <typename T>
     bool isA() const
     {
-        const TypeInfo &self = type();
-        const TypeInfo &other = T::staticType();
-        return self.depth >= other.depth && self.chain[other.depth] == &other;
+        return type().isA(T::staticType());
     }
 
     /**

@@ -8,7 +8,7 @@ namespace Rapture {
 
 static constexpr std::string_view KEY_NAME = "name";
 static constexpr std::string_view KEY_SCENE = "scene";
-static constexpr std::string_view KEY_PLAYER_CHARACTER = "playerCharacter";
+static constexpr std::string_view KEY_PUPPET = "puppet";
 static constexpr std::string_view KEY_CONTROLLER = "controller";
 
 World::World(std::string name) : m_name(std::move(name)), m_scene(std::make_unique<Scene>(m_name)) {}
@@ -30,7 +30,7 @@ std::vector<uint8_t> World::serialize() const
     WriteNode root = document.root();
 
     root.set(KEY_NAME, std::string_view(m_name));
-    root.set(KEY_PLAYER_CHARACTER, m_data.playerCharacter);
+    root.set(KEY_PUPPET, m_data.puppet);
     root.set(KEY_CONTROLLER, m_data.controller);
     m_scene->serialize(root.addObject(KEY_SCENE));
 
@@ -60,7 +60,7 @@ std::unique_ptr<World> World::deserialize(std::span<const uint8_t> blob)
     }
 
     std::unique_ptr<World> world(new World(std::string(root.child(KEY_NAME).asString("")), std::move(scene)));
-    world->m_data.playerCharacter = root.child(KEY_PLAYER_CHARACTER).asU64(INVALID_ASSET_HANDLE);
+    world->m_data.puppet = root.child(KEY_PUPPET).asU64(INVALID_ASSET_HANDLE);
     world->m_data.controller = root.child(KEY_CONTROLLER).asU64(INVALID_ASSET_HANDLE);
     return world;
 }

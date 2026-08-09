@@ -2,6 +2,8 @@
 
 #include "logging/Log.h"
 #include "modules/controllers/CameraController.h"
+#include "modules/controllers/PlayerController.h"
+#include "modules/puppets/Puppet.h"
 
 #include <unordered_map>
 
@@ -23,6 +25,8 @@ void ModuleRegistry::init()
     }
 
     add<CameraController>();
+    add<PlayerController>();
+    add<Puppet>();
 
     s_isInitialized = true;
 }

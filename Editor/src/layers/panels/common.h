@@ -32,6 +32,9 @@ struct PanelServices {
 };
 
 struct WorkspaceContext {
+    /// The scene the panels edit, which a workspace without a world still has
+    Rapture::Scene *scene = nullptr;
+    /// Set only by a workspace whose scene belongs to a world
     Rapture::World *world = nullptr;
     Rapture::Viewport *viewport = nullptr;
     Amethyst::DockingLayer *dockingLayer = nullptr;

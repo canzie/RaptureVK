@@ -386,7 +386,10 @@ void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
 
     switch (metadata.assetType) {
     case Rapture::ASSET_MODULE:
-        workspace = std::make_unique<ModuleEditorWorkspace>(*m_workspaceTabBar, services, handle);
+        workspace = ModuleEditorWorkspace::create(*m_workspaceTabBar, services, handle);
+        if (workspace == nullptr) {
+            return;
+        }
         break;
     case Rapture::ASSET_MATERIAL_INSTANCE:
         workspace = std::make_unique<MaterialEditorWorkspace>(*m_workspaceTabBar, services, handle);

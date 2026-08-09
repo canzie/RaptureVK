@@ -113,7 +113,16 @@ struct CameraComponent {
     // Update view matrix from transform component
     void updateViewMatrix(const TransformComponent &transform, const glm::vec3 &front)
     {
-        glm::vec3 position = transform.translation();
+        updateViewMatrix(transform.translation(), front);
+    }
+
+    /**
+     * @brief Rebuilds the view from a position the transform does not hold, for a nested camera
+     * @param position Where the camera sits in the world
+     * @param front The direction it looks along
+     */
+    void updateViewMatrix(const glm::vec3 &position, const glm::vec3 &front)
+    {
         camera.updateViewMatrix(position, front);
         frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
     }

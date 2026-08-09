@@ -125,6 +125,24 @@ class Instance {
         return nullptr;
     }
 
+    /**
+     * @brief Finds the first T anywhere below this instance, depth first
+     * @return The descendant, or nullptr if the subtree holds no T
+     */
+    template <typename T>
+    T *findFirstDescendantOfType() const
+    {
+        for (const auto &child : m_children) {
+            if (T *typed = child->as<T>()) {
+                return typed;
+            }
+            if (T *typed = child->findFirstDescendantOfType<T>()) {
+                return typed;
+            }
+        }
+        return nullptr;
+    }
+
     template <typename T>
     T *findFirstAncestorOfType() const
     {

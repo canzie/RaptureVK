@@ -34,7 +34,7 @@ class LevelEditorWorkspace : public Workspace {
      */
     void saveWorld();
 
-    bool isPlaying() const { return m_snapshot.rootView().valid(); }
+    bool isPlaying() const { return m_playing; }
 
     /**
      * @brief Hands the scene over to the play layer, keeping a snapshot to come back to
@@ -53,6 +53,7 @@ class LevelEditorWorkspace : public Workspace {
     Rapture::AssetPtr<Rapture::World> m_world;
     Rapture::SerialDocument m_snapshot;
     Rapture::Layer *m_playLayer = nullptr;
+    bool m_playing = false;
 };
 
 #endif // RAPTURE__LEVEL_EDITOR_WORKSPACE_H

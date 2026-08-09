@@ -16,10 +16,7 @@ static constexpr float SEARCHBAR_CONTAINER_WIDTH = 400.0f;
 
 static Rapture::Scene *s_workspaceScene(Workspace *workspace)
 {
-    if (workspace == nullptr || workspace->getContext().world == nullptr) {
-        return nullptr;
-    }
-    return workspace->getContext().world->getScene();
+    return workspace != nullptr ? workspace->getContext().scene : nullptr;
 }
 
 static bool s_workspaceContainsContentBrowserPanel(Workspace *workspace)

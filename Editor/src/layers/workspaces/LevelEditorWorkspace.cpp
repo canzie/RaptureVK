@@ -6,6 +6,7 @@
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
+#include "layers/panels/WorldSettingsPanel.h"
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
@@ -13,6 +14,7 @@
 #include <scenes/Scene.h>
 #include <serialization/SerialDocument.h>
 #include <scenes/instances/Instance.h>
+#include <utils/rp_assert.h>
 #include <window_context/Application.h>
 
 static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
@@ -22,8 +24,11 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
                                            Rapture::AssetPtr<Rapture::World> world, Rapture::Viewport *viewport)
     : m_world(std::move(world))
 {
+    RP_ASSERT(m_world, "a level editor has nothing to edit without a world");
+
     m_context.services = services;
     m_context.world = m_world.get();
+    m_context.scene = m_world->getScene();
     m_context.viewport = viewport;
     setupBase(tabs, "Level Editor");
 
@@ -53,6 +58,7 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
     }
     if (propertiesTabBar != nullptr) {
         m_panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar, m_context));
+        m_panels.push_back(std::make_unique<WorldSettingsPanel>(propertiesTabBar, m_context));
         m_panels.push_back(
             std::make_unique<ImagePreviewPanel>(propertiesTabBar, m_context, "Texture Viewer", ImagePreviewMode::ASSET_PICKER));
     }
@@ -95,7 +101,7 @@ void LevelEditorWorkspace::setupHotbar()
     Amethyst::UIScope(*m_hotbar).textButton(
         {.classes = {"generic-text-button"},
          .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
-         .label = "Save Scene"},
+         .label = "Save World"},
         [this](Amethyst::TextButtonScope &b) {
             b.component.onMouseButton1ClickCb = [this]() {
                 saveWorld();
@@ -122,12 +128,13 @@ void LevelEditorWorkspace::setupHotbar()
 
 void LevelEditorWorkspace::startPlay()
 {
-    Rapture::Scene *scene = m_world ? m_world->getScene() : nullptr;
-    if (scene == nullptr || m_context.viewport == nullptr || isPlaying()) {
+    Rapture::Scene *scene = m_world->getScene();
+    if (m_context.viewport == nullptr || isPlaying()) {
         return;
     }
 
     m_snapshot = scene->snapshot();
+    m_playing = true;
 
     auto &app = Rapture::Application::getInstance();
     if (Rapture::Layer *editor = app.getLayer(EDITOR_LAYER_NAME)) {
@@ -156,6 +163,7 @@ void LevelEditorWorkspace::stopPlay()
     // the snapshot outlives the rewind, its document is what the scene is read back out of
     m_world->getScene()->restoreFrom(m_snapshot.rootView());
     m_snapshot = Rapture::SerialDocument{};
+    m_playing = false;
 
     if (Rapture::Layer *editor = Rapture::Application::getInstance().getLayer(EDITOR_LAYER_NAME)) {
         editor->attach();
@@ -166,7 +174,7 @@ void LevelEditorWorkspace::stopPlay()
 
 void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
 {
-    if (m_addMenu == nullptr || !m_world) {
+    if (m_addMenu == nullptr) {
         return;
     }
 
@@ -176,10 +184,6 @@ void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
 
 void LevelEditorWorkspace::saveWorld()
 {
-    if (!m_world) {
-        return;
-    }
-
     auto &project = Rapture::Application::getInstance().getProject();
     if (!project.saveWorld(m_world.ref().get()->getHandle())) {
         return;

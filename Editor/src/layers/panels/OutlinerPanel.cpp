@@ -91,7 +91,7 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     icon = Icons::SVG_LAYERS;
     attach(tabBar, std::move(root));
 
-    setScene(context.world != nullptr ? context.world->getScene() : nullptr);
+    setScene(context.scene);
 }
 
 OutlinerPanel::~OutlinerPanel()

@@ -102,6 +102,23 @@ WriteNode WriteNode::appendArray()
     return WriteNode(m_doc, child);
 }
 
+WriteNode WriteNode::addCopy(std::string_view key, ReadNode source)
+{
+    if (!valid() || !source.valid()) {
+        return WriteNode();
+    }
+    yyjson_mut_doc *doc = s_asMutDoc(m_doc);
+    yyjson_mut_val *child = yyjson_val_mut_copy(doc, s_asVal(source.m_val));
+    if (child == nullptr) {
+        return WriteNode();
+    }
+    yyjson_mut_val *keyVal = yyjson_mut_strncpy(doc, key.data(), key.size());
+    if (!yyjson_mut_obj_add(s_asMutVal(m_node), keyVal, child)) {
+        return WriteNode();
+    }
+    return WriteNode(m_doc, child);
+}
+
 void WriteNode::set(std::string_view key, uint64_t v)
 {
     if (!valid()) {
@@ -349,6 +366,45 @@ SerialDocument SerialDocument::parse(std::string_view text)
         RP_CORE_ERROR("failed to parse document text");
     }
     return out;
+}
+
+SerialDocument SerialDocument::copyOf(ReadNode source)
+{
+    SerialDocument out;
+    if (!source.valid() || out.m_mutDoc == nullptr) {
+        return out;
+    }
+
+    yyjson_mut_doc *builder = s_asMutDoc(out.m_mutDoc);
+    yyjson_mut_val *copy = yyjson_val_mut_copy(builder, s_asVal(source.m_val));
+    if (copy == nullptr) {
+        RP_CORE_ERROR("failed to copy a subtree into a document");
+        return out;
+    }
+
+    yyjson_mut_doc_set_root(builder, copy);
+    out.freeze();
+    return out;
+}
+
+bool SerialDocument::freeze()
+{
+    if (m_doc != nullptr) {
+        return true;
+    }
+    if (m_mutDoc == nullptr) {
+        return false;
+    }
+
+    m_doc = yyjson_mut_doc_imut_copy(s_asMutDoc(m_mutDoc), nullptr);
+    yyjson_mut_doc_free(s_asMutDoc(m_mutDoc));
+    m_mutDoc = nullptr;
+
+    if (m_doc == nullptr) {
+        RP_CORE_ERROR("failed to freeze a written document");
+        return false;
+    }
+    return true;
 }
 
 std::string SerialDocument::toText(bool pretty) const

@@ -22,6 +22,13 @@ struct TypeInfo {
      */
     TypeInfo(std::string_view name, const TypeInfo *base);
 
+    /**
+     * @brief Whether this type is other, or derives from it
+     * @param other The type to test against
+     * @return True if other sits in this type's ancestry
+     */
+    bool isA(const TypeInfo &other) const { return depth >= other.depth && chain[other.depth] == &other; }
+
     std::string_view name;
     const TypeInfo *base;
     uint8_t depth;

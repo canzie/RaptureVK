@@ -42,6 +42,42 @@ void CameraControllerEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
+void PlayerControllerEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowSlider(t, "Movement Speed", &m_movementSpeed, 0.1f, 100.0f, [this](float v) {
+            if (m_controller != nullptr) {
+                m_controller->movementSpeed = v;
+            }
+        });
+        rowSlider(t, "Mouse Sensitivity", &m_mouseSensitivity, 0.01f, 1.0f, [this](float v) {
+            if (m_controller != nullptr) {
+                m_controller->mouseSensitivity = v;
+            }
+        });
+        rowSlider(
+            t, "Max Pitch", &m_maxPitch, 0.0f, 89.9f,
+            [this](float v) {
+                if (m_controller != nullptr) {
+                    m_controller->maxPitch = v;
+                }
+            },
+            "%.1f deg");
+    });
+}
+
+void PlayerControllerEditor::sync(Rapture::ModuleClass *module)
+{
+    m_controller = module != nullptr ? module->as<Rapture::PlayerController>() : nullptr;
+    if (m_controller == nullptr) {
+        return;
+    }
+
+    m_movementSpeed = m_controller->movementSpeed;
+    m_mouseSensitivity = m_controller->mouseSensitivity;
+    m_maxPitch = m_controller->maxPitch;
+}
+
 void CameraControllerEditor::sync(Rapture::ModuleClass *module)
 {
     m_controller = module != nullptr ? module->as<Rapture::CameraController>() : nullptr;

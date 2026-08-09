@@ -120,6 +120,7 @@ void MaterialEditorWorkspace::setupPreviewScene()
     m_previewViewport->setScene(m_previewScene.get());
     m_previewViewport->setCamera(camera);
 
+    m_context.scene = m_previewScene.get();
     m_context.viewport = m_previewViewport;
 
     m_previewScene->locked = true;

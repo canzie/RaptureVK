@@ -106,6 +106,7 @@ void ModulePropertiesPanel::refresh()
         // Sections come from the module's class chain, base first, so a base class sits above the
         // sections its subclasses add.
         ensure<CameraControllerEditor>(m_module->isA<Rapture::CameraController>());
+        ensure<PlayerControllerEditor>(m_module->isA<Rapture::PlayerController>());
     });
 }
 

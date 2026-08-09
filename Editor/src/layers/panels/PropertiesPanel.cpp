@@ -51,7 +51,7 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
         }
     });
 
-    setScene(context.world != nullptr ? context.world->getScene() : nullptr);
+    setScene(context.scene);
 }
 
 PropertiesPanel::~PropertiesPanel()

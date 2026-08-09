@@ -14,6 +14,8 @@ namespace Rapture {
  * A cheap value type (a document pointer + a node pointer) that attaches every
  * operation into the tree immediately. Invalid cursors are safe no-ops.
  */
+class ReadNode;
+
 class WriteNode {
   public:
     WriteNode() = default;
@@ -49,6 +51,14 @@ class WriteNode {
      * @return Cursor to the new element, invalid if this is not an array.
      */
     WriteNode appendArray();
+
+    /**
+     * @brief Deep copy a parsed subtree in as a member of this object node.
+     * @param key Member key on this (object) node.
+     * @param source Cursor to the subtree to copy, which may belong to another document.
+     * @return Cursor to the copy, invalid if the source is unreadable or this is not an object.
+     */
+    WriteNode addCopy(std::string_view key, ReadNode source);
 
     /**
      * @brief Set an unsigned integer member on this object node.
@@ -240,6 +250,7 @@ class ReadNode {
 
   private:
     friend class SerialDocument;
+    friend class WriteNode;
     explicit ReadNode(void *val);
 
     void *m_val = nullptr;
@@ -268,6 +279,24 @@ class SerialDocument {
      * @return A read-mode document, invalid if parsing failed.
      */
     static SerialDocument parse(std::string_view text);
+
+    /**
+     * @brief Open a read-mode document holding a copy of a parsed subtree.
+     * @param source Cursor to the subtree to copy, which the result no longer depends on.
+     * @return A read-mode document rooted at the copy, unreadable if the source is unreadable.
+     */
+    static SerialDocument copyOf(ReadNode source);
+
+    /**
+     * @brief Turn a write-mode document into a read-mode one holding what was written.
+     * @return True if the document can be read from.
+     */
+    bool freeze();
+
+    /**
+     * @brief Whether this document can be read from, so whether rootView returns a live cursor.
+     */
+    bool isReadable() const { return m_doc != nullptr; }
 
     /**
      * @brief Serialize the tree to text.

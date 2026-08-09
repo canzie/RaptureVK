@@ -143,10 +143,7 @@ CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const Second
 
 void SkyboxPass::setSkyboxTexture(Texture *skyboxTexture)
 {
-    if (!skyboxTexture) {
-        RP_CORE_ERROR("Skybox texture is not set!");
-        return;
-    }
+    // null is a scene with no sky, which the pass skips rather than draws
     m_skyboxTexture = skyboxTexture;
     // Re-create descriptor sets with the new texture
 }

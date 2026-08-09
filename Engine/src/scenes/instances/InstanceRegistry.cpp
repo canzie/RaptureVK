@@ -9,6 +9,7 @@
 #include "scenes/instances/PointLight3D.h"
 #include "scenes/instances/PrefabInstance.h"
 #include "scenes/instances/SpotLight3D.h"
+#include "scenes/instances/SpringArm3D.h"
 #include "scenes/instances/StaticMesh3D.h"
 #include "scenes/instances/Terrain3D.h"
 
@@ -29,6 +30,7 @@ void InstanceRegistry::init()
     add<Folder>();
     add<Node3D>();
     add<Camera3D>();
+    add<SpringArm3D>();
     add<StaticMesh3D>();
     add<Terrain3D>();
     add<PrefabInstance>();

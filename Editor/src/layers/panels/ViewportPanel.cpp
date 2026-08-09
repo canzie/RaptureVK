@@ -105,8 +105,8 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
             m_viewport = nullptr;
         } else {
             m_viewport->editorBinding().displayed = true;
-            if (context.world != nullptr) {
-                m_viewport->setScene(context.world->getScene());
+            if (context.scene != nullptr) {
+                m_viewport->setScene(context.scene);
             }
         }
     }

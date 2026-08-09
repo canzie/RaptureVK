@@ -7,6 +7,8 @@
 #include "logging/Log.h"
 #include "modules/ModuleRegistry.h"
 #include "modules/controllers/CameraController.h"
+#include "modules/controllers/PlayerController.h"
+#include "modules/puppets/Puppet.h"
 #include "scenes/Project.h"
 #include "scenes/World.h"
 #include "scenes/entities/Entity.h"
@@ -584,9 +586,16 @@ MenuItems ContentBrowserPanel::buildAdvancedAddItems()
     MenuItems controllers;
     controllers.push_back(AddAssetContextMenuAID::createPlainRow(
         "Camera Controller", [this]() { beginCreate(CONTENT_EDIT_MODULE, &Rapture::CameraController::staticType()); }));
+    controllers.push_back(AddAssetContextMenuAID::createPlainRow(
+        "Player Controller", [this]() { beginCreate(CONTENT_EDIT_MODULE, &Rapture::PlayerController::staticType()); }));
+
+    MenuItems puppets;
+    puppets.push_back(
+        AddAssetContextMenuAID::createPlainRow("Puppet", [this]() { beginCreate(CONTENT_EDIT_MODULE, &Rapture::Puppet::staticType()); }));
 
     MenuItems modules;
     modules.push_back(Amethyst::makeSubmenuItem("Controllers", std::move(controllers)));
+    modules.push_back(Amethyst::makeSubmenuItem("Puppets", std::move(puppets)));
 
     MenuItems scenes;
     scenes.push_back(AddAssetContextMenuAID::createPlainRow("Level", []() { s_createAssetStub("level"); }));
