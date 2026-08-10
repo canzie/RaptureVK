@@ -5,6 +5,7 @@
 
 #include "buffers/descriptors/DescriptorManager.h"
 #include "components/Components.h"
+#include "components/systems/Transforms.h"
 #include "scenes/instances/Environment.h"
 #include "renderer/ImageBasedLighting.h"
 #include "renderer/RenderSettings.h"
@@ -148,7 +149,7 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
     uint32_t cameraSlotIndex = 0;
 
     if (camera.isValid()) {
-        cameraPos = camera.tryGetComponent<TransformComponent>()->translation();
+        cameraPos = transform::translation(camera.tryGetComponent<TransformComponent>()->world);
         auto *cameraComp = camera.tryGetComponent<CameraComponent>();
         if (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) {
             cameraSlotIndex = cameraComp->renderDataSlot;

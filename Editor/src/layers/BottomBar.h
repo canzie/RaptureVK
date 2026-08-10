@@ -26,7 +26,7 @@ class BottomBar {
 
   private:
     PanelServices m_services;
-    Workspace *m_currWorkspace;
+    Workspace *m_currWorkspace = nullptr;
     Amethyst::Window *m_window = nullptr;
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextButton *m_contentBrowserBtn = nullptr;

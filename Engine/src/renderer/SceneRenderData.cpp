@@ -1,6 +1,7 @@
 #include "SceneRenderData.h"
 
 #include "components/Components.h"
+#include "components/systems/Transforms.h"
 #include "events/AssetEvents.h"
 #include "logging/TracyProfiler.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
@@ -485,14 +486,12 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
                 return;
             }
 
-            generation_t gen = transform->getGeneration();
-            if (gen != staticPartition.getLastSeenGeneration(i)) {
-                staticPartition.setLastSeenGeneration(i, gen);
+            auto &data = staticPartition.getSlotData(i);
+            if (data.modelMatrix != transform->world) {
                 AssetEvents::onMeshTransformChanged().publish(entity.getID());
             }
 
-            auto &data = staticPartition.getSlotData(i);
-            data.modelMatrix = transform->transformMatrix();
+            data.modelMatrix = transform->world;
             data.vertexBufferFlags = mesh->mesh->getVertexBuffer()->getBufferLayout().getFlags();
             data.entityId = entity.getID();
             data.materialIndex = 0;
@@ -507,14 +506,12 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
             continue;
         }
 
-        generation_t gen = transform->getGeneration();
-        if (gen != dynamicPartition.getLastSeenGeneration(i)) {
-            dynamicPartition.setLastSeenGeneration(i, gen);
+        auto &data = dynamicPartition.getSlotData(i);
+        if (data.modelMatrix != transform->world) {
             AssetEvents::onMeshTransformChanged().publish(entity.getID());
         }
 
-        auto &data = dynamicPartition.getSlotData(i);
-        data.modelMatrix = transform->transformMatrix();
+        data.modelMatrix = transform->world;
         data.vertexBufferFlags = mesh->mesh->getVertexBuffer()->getBufferLayout().getFlags();
         data.entityId = entity.getID();
         data.materialIndex = 0;
@@ -537,7 +534,7 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
 
         auto &data = partition.getSlotData(i);
 
-        glm::vec3 position = transform->translation();
+        glm::vec3 position = transform::translation(transform->world);
         if (type == LightType::DIRECTIONAL) {
             position = glm::vec3(0.0f);
         }
@@ -545,8 +542,7 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
 
         glm::vec3 direction = glm::vec3(0.0f, 0.0f, -1.0f);
         if (type == LightType::DIRECTIONAL || type == LightType::SPOT) {
-            glm::quat rotationQuat = transform->transforms.getRotationQuat();
-            direction = glm::normalize(rotationQuat * glm::vec3(0, 0, -1));
+            direction = transform::forward(transform->world);
         }
 
         float range = 0.0f;

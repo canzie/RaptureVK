@@ -1,133 +1,67 @@
 #include "Transforms.h"
 
-namespace Rapture {
+#include <glm/gtc/matrix_transform.hpp>
 
-Transforms::Transforms()
-    : m_translation(0.0f, 0.0f, 0.0f), m_rotationV(0.0f, 0.0f, 0.0f), m_rotationQ(1.0f, 0.0f, 0.0f, 0.0f),
-      m_scale(1.0f, 1.0f, 1.0f), m_transform(1.0f)
+namespace Rapture::transform {
+
+glm::mat4 compose(const glm::vec3 &translation, const glm::quat &rotation, const glm::vec3 &scale)
 {
+    glm::mat4 matrix = glm::translate(glm::mat4(1.0f), translation);
+    matrix = matrix * glm::mat4_cast(rotation);
+    return glm::scale(matrix, scale);
 }
 
-Transforms::Transforms(const glm::mat4 &transform) : m_transform(transform)
+glm::mat4 compose(const glm::vec3 &translation, const glm::vec3 &eulerRotation, const glm::vec3 &scale)
 {
-    decomposeTransform();
+    return compose(translation, glm::quat(eulerRotation), scale);
 }
 
-Transforms::Transforms(const glm::vec3 &translation, const glm::vec3 &rotation, const glm::vec3 &scale)
-    : m_translation(translation), m_rotationV(rotation), m_rotationQ(glm::quat(rotation)), m_scale(scale), m_transform(1.0f)
+void decompose(const glm::mat4 &matrix, glm::vec3 &translation, glm::quat &rotation, glm::vec3 &scale)
 {
-    recalculateTransform();
+    translation = glm::vec3(matrix[3]);
+
+    scale.x = glm::length(glm::vec3(matrix[0]));
+    scale.y = glm::length(glm::vec3(matrix[1]));
+    scale.z = glm::length(glm::vec3(matrix[2]));
+
+    glm::vec3 axisX = glm::vec3(matrix[0]) / scale.x;
+    glm::vec3 axisY = glm::vec3(matrix[1]) / scale.y;
+    glm::vec3 axisZ = glm::vec3(matrix[2]) / scale.z;
+    rotation = glm::quat_cast(glm::mat3(axisX, axisY, axisZ));
 }
 
-Transforms::Transforms(const glm::vec3 &translation, const glm::quat &rotation, const glm::vec3 &scale)
-    : m_translation(translation), m_rotationV(glm::eulerAngles(rotation)), m_rotationQ(rotation), m_scale(scale), m_transform(1.0f)
+glm::vec3 translation(const glm::mat4 &matrix)
 {
-    recalculateTransform();
+    return glm::vec3(matrix[3]);
 }
 
-Transforms::~Transforms() {}
-
-void Transforms::setTransform(const glm::mat4 &transform)
+glm::vec3 scale(const glm::mat4 &matrix)
 {
-    m_transform = transform;
-    decomposeTransform();
-    m_generation++;
+    return glm::vec3(glm::length(glm::vec3(matrix[0])), glm::length(glm::vec3(matrix[1])), glm::length(glm::vec3(matrix[2])));
 }
 
-void Transforms::setTranslation(const glm::vec3 &translation)
+glm::quat rotation(const glm::mat4 &matrix)
 {
-    m_translation = translation;
-    recalculateTransform();
-    m_generation++;
+    glm::vec3 axisScale = scale(matrix);
+    glm::vec3 axisX = glm::vec3(matrix[0]) / axisScale.x;
+    glm::vec3 axisY = glm::vec3(matrix[1]) / axisScale.y;
+    glm::vec3 axisZ = glm::vec3(matrix[2]) / axisScale.z;
+    return glm::quat_cast(glm::mat3(axisX, axisY, axisZ));
 }
 
-void Transforms::setRotation(const glm::vec3 &rotation)
+glm::vec3 eulerRotation(const glm::mat4 &matrix)
 {
-    m_rotationQ = glm::quat(rotation);
-    m_rotationV = rotation;
-    recalculateTransform();
-    m_generation++;
+    return glm::eulerAngles(rotation(matrix));
 }
 
-void Transforms::setRotation(const glm::quat &rotation)
+glm::vec3 forward(const glm::mat4 &matrix)
 {
-    m_rotationQ = rotation;
-    m_rotationV = glm::eulerAngles(m_rotationQ);
-    recalculateTransform();
-    m_generation++;
+    return glm::normalize(-glm::vec3(matrix[2]));
 }
 
-void Transforms::setScale(const glm::vec3 &scale)
+glm::mat4 toLocal(const glm::mat4 &parentWorld, const glm::mat4 &world)
 {
-    m_scale = scale;
-    recalculateTransform();
-    m_generation++;
+    return glm::inverse(parentWorld) * world;
 }
 
-glm::mat4 Transforms::recalculateTransform(const glm::vec3 &translation, const glm::vec3 &rotation, const glm::vec3 &scale)
-{
-
-    glm::mat4 transformMatrix = glm::mat4(1.0f);
-    transformMatrix = glm::translate(transformMatrix, translation);
-    transformMatrix = transformMatrix * glm::mat4_cast(glm::quat(rotation));
-    transformMatrix = glm::scale(transformMatrix, scale);
-
-    return transformMatrix;
-}
-
-void Transforms::decomposeTransform(const glm::mat4 &transform, glm::vec3 *translation, glm::vec3 *rotation, glm::vec3 *scale)
-{
-    // 1. Extract translation directly - always accurate and efficient
-    *translation = glm::vec3(transform[3]);
-
-    // 2. Extract scale - use column vector lengths
-    scale->x = glm::length(glm::vec3(transform[0]));
-    scale->y = glm::length(glm::vec3(transform[1]));
-    scale->z = glm::length(glm::vec3(transform[2]));
-
-    // Extract rotation
-    // Remove scale from the matrix
-    glm::mat3 rotationMatrix(glm::vec3(transform[0].x, transform[0].y, transform[0].z) / scale->x,
-                             glm::vec3(transform[1].x, transform[1].y, transform[1].z) / scale->y,
-                             glm::vec3(transform[2].x, transform[2].y, transform[2].z) / scale->z);
-
-    // 6. Extract quaternion from rotation matrix
-    glm::quat rotationQ = glm::quat_cast(glm::mat4(rotationMatrix));
-    *rotation = glm::eulerAngles(rotationQ);
-}
-
-void Transforms::recalculateTransform()
-{
-
-    glm::mat4 transformMatrix = glm::mat4(1.0f);
-    transformMatrix = glm::translate(transformMatrix, m_translation);
-    transformMatrix = transformMatrix * glm::mat4_cast(m_rotationQ);
-    transformMatrix = glm::scale(transformMatrix, m_scale);
-
-    m_transform = transformMatrix;
-}
-
-// extract the translation, rotation, and scale from the transform matrix
-// this updates the translation, rotation, and scale variables
-void Transforms::decomposeTransform()
-{
-    // 1. Extract translation directly - always accurate and efficient
-    m_translation = glm::vec3(m_transform[3]);
-
-    // 2. Extract scale - use column vector lengths
-    m_scale.x = glm::length(glm::vec3(m_transform[0]));
-    m_scale.y = glm::length(glm::vec3(m_transform[1]));
-    m_scale.z = glm::length(glm::vec3(m_transform[2]));
-
-    // Extract rotation
-    // Remove scale from the matrix
-    glm::mat3 rotationMatrix(glm::vec3(m_transform[0].x, m_transform[0].y, m_transform[0].z) / m_scale.x,
-                             glm::vec3(m_transform[1].x, m_transform[1].y, m_transform[1].z) / m_scale.y,
-                             glm::vec3(m_transform[2].x, m_transform[2].y, m_transform[2].z) / m_scale.z);
-
-    // 6. Extract quaternion from rotation matrix
-    m_rotationQ = glm::quat_cast(glm::mat4(rotationMatrix));
-    m_rotationV = glm::eulerAngles(m_rotationQ);
-}
-
-} // namespace Rapture
+} // namespace Rapture::transform

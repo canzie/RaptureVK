@@ -38,27 +38,10 @@ struct TagComponent {
     std::string tag;
 };
 
-// need to store the data in the Transforms class because i want to support
-// getting/setting each individual varaible while keeping the rest consistent
-// e.g. chaning the transformmatrix will update the individual translation, rotation, scale and vice versa
+// local is what the owning instance authored, world is local composed with every ancestor
 struct TransformComponent {
-    Transforms transforms;
-
-    glm::vec3 translation() const { return transforms.getTranslation(); }
-    glm::vec3 rotation() const { return transforms.getRotation(); }
-    glm::vec3 scale() const { return transforms.getScale(); }
-    glm::mat4 transformMatrix() const { return transforms.getTransform(); }
-
-    generation_t getGeneration() const { return transforms.getGeneration(); }
-
-  public:
-    TransformComponent() = default;
-
-    TransformComponent(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale) : transforms(translation, rotation, scale) {}
-
-    TransformComponent(glm::vec3 translation, glm::quat rotation, glm::vec3 scale) : transforms(translation, rotation, scale) {}
-
-    TransformComponent(glm::mat4 transformMatrix) : transforms(transformMatrix) {}
+    glm::mat4 local{1.0f};
+    glm::mat4 world{1.0f};
 };
 
 // Pure camera component - only contains camera-specific data
@@ -93,31 +76,27 @@ struct CameraComponent {
         frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
     }
 
-    // Update view matrix from transform component
+    /**
+     * @brief Rebuilds the view from where a transform sits in the world and the way it faces
+     * @param transform The transform the camera is placed by
+     */
     void updateViewMatrix(const TransformComponent &transform)
     {
-        glm::vec3 position = transform.translation();
-
-        // Calculate forward direction from rotation
-        glm::vec3 eulerAngles = transform.rotation();
-        glm::vec3 front;
-        front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-        front.y = sin(glm::radians(eulerAngles.x));
-        front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-        front = glm::normalize(front);
-
-        camera.updateViewMatrix(position, front);
-        frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
-    }
-
-    // Update view matrix from transform component
-    void updateViewMatrix(const TransformComponent &transform, const glm::vec3 &front)
-    {
-        updateViewMatrix(transform.translation(), front);
+        updateViewMatrix(transform::translation(transform.world), transform::forward(transform.world));
     }
 
     /**
-     * @brief Rebuilds the view from a position the transform does not hold, for a nested camera
+     * @brief Rebuilds the view from where a transform sits in the world, looking along a given direction
+     * @param transform The transform the camera is placed by
+     * @param front The direction it looks along
+     */
+    void updateViewMatrix(const TransformComponent &transform, const glm::vec3 &front)
+    {
+        updateViewMatrix(transform::translation(transform.world), front);
+    }
+
+    /**
+     * @brief Rebuilds the view from a position and direction directly
      * @param position Where the camera sits in the world
      * @param front The direction it looks along
      */
@@ -153,28 +132,19 @@ struct MeshComponent {
      * @brief Replaces the mesh, invalidating the world bounding box the old one produced
      * @param ref Reference to the new mesh
      */
-    void setMesh(AssetRef ref)
-    {
-        mesh = AssetPtr<Mesh>(std::move(ref));
-        m_lastTransformGeneration = 0;
-    }
+    void setMesh(AssetRef ref) { mesh = AssetPtr<Mesh>(std::move(ref)); }
 
     /**
-     * @brief Recomputes the world bounding box from the mesh's bounds when the transform moved
+     * @brief Recomputes the world bounding box from the mesh's bounds
      * @param transform The transform placing this mesh in the world
      */
     void updateWorldBoundingBox(const TransformComponent &transform)
     {
-        generation_t gen = transform.getGeneration();
-        if (gen == m_lastTransformGeneration || !mesh) {
+        if (!mesh) {
             return;
         }
-        m_lastTransformGeneration = gen;
-        worldBoundingBox = BoundingBox(mesh->getBoundsMin(), mesh->getBoundsMax()).transform(transform.transformMatrix());
+        worldBoundingBox = BoundingBox(mesh->getBoundsMin(), mesh->getBoundsMax()).transform(transform.world);
     }
-
-  private:
-    generation_t m_lastTransformGeneration = 0;
 };
 
 struct PrefabComponent {
@@ -301,16 +271,17 @@ struct ShadowComponent {
     bool needsUpdate(const LightComponent &light, const TransformComponent &transform)
     {
         generation_t lGen = light.getGeneration();
-        generation_t tGen = transform.getGeneration();
-        if (lGen == m_lastLightGeneration && tGen == m_lastTransformGeneration) return false;
+        if (lGen == m_lastLightGeneration && transform.world == m_lastWorld) {
+            return false;
+        }
         m_lastLightGeneration = lGen;
-        m_lastTransformGeneration = tGen;
+        m_lastWorld = transform.world;
         return true;
     }
 
   private:
     generation_t m_lastLightGeneration = 0;
-    generation_t m_lastTransformGeneration = 0;
+    glm::mat4 m_lastWorld{1.0f};
 };
 
 struct CascadedShadowComponent {
@@ -331,16 +302,17 @@ struct CascadedShadowComponent {
     bool needsUpdate(const LightComponent &light, const TransformComponent &transform)
     {
         generation_t lGen = light.getGeneration();
-        generation_t tGen = transform.getGeneration();
-        if (lGen == m_lastLightGeneration && tGen == m_lastTransformGeneration) return false;
+        if (lGen == m_lastLightGeneration && transform.world == m_lastWorld) {
+            return false;
+        }
         m_lastLightGeneration = lGen;
-        m_lastTransformGeneration = tGen;
+        m_lastWorld = transform.world;
         return true;
     }
 
   private:
     generation_t m_lastLightGeneration = 0;
-    generation_t m_lastTransformGeneration = 0;
+    glm::mat4 m_lastWorld{1.0f};
 };
 
 } // namespace Rapture

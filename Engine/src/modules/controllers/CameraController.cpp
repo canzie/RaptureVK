@@ -1,6 +1,7 @@
 #include "CameraController.h"
 
 #include "components/Components.h"
+#include "components/systems/Transforms.h"
 #include "logging/Log.h"
 #include "scenes/instances/Camera3D.h"
 
@@ -60,8 +61,8 @@ void CameraController::update(float dt, const ControlInput &input)
         return;
     }
 
-    auto [transform, camera] = m_viewCamera->entity().tryGetComponents<TransformComponent, CameraComponent>();
-    if (transform == nullptr || camera == nullptr) {
+    auto *camera = m_viewCamera->entity().tryGetComponent<CameraComponent>();
+    if (camera == nullptr) {
         return;
     }
 
@@ -70,15 +71,15 @@ void CameraController::update(float dt, const ControlInput &input)
     }
 
     if (m_mode == CameraControlMode::FLY) {
-        updateFly(dt, input, *transform);
+        updateFly(dt, input, *m_viewCamera);
     } else {
-        updateOrbit(input, *transform);
+        updateOrbit(input, *m_viewCamera);
     }
 
-    camera->updateViewMatrix(*transform, m_front);
+    camera->updateViewMatrix(transform::translation(m_viewCamera->worldTransform()), m_front);
 }
 
-void CameraController::updateFly(float dt, const ControlInput &input, TransformComponent &transform)
+void CameraController::updateFly(float dt, const ControlInput &input, Node3D &node)
 {
     m_desiresCapture = true;
 
@@ -90,17 +91,17 @@ void CameraController::updateFly(float dt, const ControlInput &input, TransformC
     glm::vec3 right = glm::normalize(glm::cross(m_front, WORLD_UP));
     float distance = movementSpeed * dt;
 
-    glm::vec3 position = transform.translation();
+    glm::vec3 position = node.position();
     position += right * input.move.x * distance;
     position += WORLD_UP * input.move.y * distance;
     position += m_front * input.move.z * distance;
-    transform.transforms.setTranslation(position);
+    node.setPosition(position);
 }
 
-void CameraController::updateOrbit(const ControlInput &input, TransformComponent &transform)
+void CameraController::updateOrbit(const ControlInput &input, Node3D &node)
 {
     if (m_recenterFocus) {
-        m_focusPoint = transform.translation() + m_front * m_focusDistance;
+        m_focusPoint = node.position() + m_front * m_focusDistance;
         m_recenterFocus = false;
     }
 
@@ -127,7 +128,7 @@ void CameraController::updateOrbit(const ControlInput &input, TransformComponent
         }
     }
 
-    transform.transforms.setTranslation(m_focusPoint - m_front * m_focusDistance);
+    node.setPosition(m_focusPoint - m_front * m_focusDistance);
 }
 
 void CameraController::serialize(WriteNode node) const

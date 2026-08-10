@@ -164,27 +164,22 @@ Instance *Prefab::instantiate(AssetRef prefabRef, Scene *scene, const glm::mat4 
     }
 
     std::vector<Node3D *> instances(nodes.size());
-    std::vector<glm::mat4> worldTransforms(nodes.size());
 
-    // Nodes are pre-order, so a parent is processed before its children. Transforms are flattened
-    // to world here because transform propagation does not exist yet.
+    // Nodes are pre-order, so a parent is processed before its children
     for (size_t i = 0; i < nodes.size(); i++) {
         const Node &node = nodes[i];
-
-        glm::mat4 parentWorld = (node.parent >= 0) ? worldTransforms[node.parent] : rootTransform;
-        worldTransforms[i] = parentWorld * node.localTransform;
 
         Node3D *nodeParent = (node.parent >= 0) ? instances[node.parent] : root;
 
         if (!node.hasMesh()) {
             Node3D *group = nodeParent->add<Node3D>(node.name);
-            group->setLocalTransform(worldTransforms[i]);
+            group->setLocalTransform(node.localTransform);
             instances[i] = group;
             continue;
         }
 
         StaticMesh3D *mesh = nodeParent->add<StaticMesh3D>(node.name);
-        mesh->setLocalTransform(worldTransforms[i]);
+        mesh->setLocalTransform(node.localTransform);
         instances[i] = mesh;
 
         mesh->setMesh(node.mesh);

@@ -7,7 +7,7 @@
 
 namespace Rapture {
 
-struct TransformComponent;
+class Node3D;
 
 enum class CameraControlMode {
     FLY,  // WASD movement with mouse-look, cursor captured
@@ -65,8 +65,8 @@ class CameraController : public Controller {
     float maxPitch = 89.0f;
 
   private:
-    void updateFly(float dt, const ControlInput &input, TransformComponent &transform);
-    void updateOrbit(const ControlInput &input, TransformComponent &transform);
+    void updateFly(float dt, const ControlInput &input, Node3D &node);
+    void updateOrbit(const ControlInput &input, Node3D &node);
     void recalcFront();
 
   private:

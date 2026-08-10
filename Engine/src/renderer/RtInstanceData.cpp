@@ -75,7 +75,7 @@ void RtInstanceData::rebuild(Scene &scene)
         if (view.contains(ent)) {
             auto [meshComp, materialComp, transformComp] = view.get<MeshComponent, MaterialComponent, TransformComponent>(ent);
 
-            info.modelMatrix = transformComp.transformMatrix();
+            info.modelMatrix = transformComp.world;
 
             if (materialComp.material) {
                 info.materialIndex = materialComp.material->getBindlessIndex();
@@ -184,7 +184,7 @@ void RtInstanceData::patchDirty(Scene &scene)
         if (!ent.hasComponent<TransformComponent>()) continue;
 
         uint32_t dst = it->second + static_cast<uint32_t>(TRANSFORM_OFFSET);
-        glm::mat4 model = ent.getComponent<TransformComponent>().transformMatrix();
+        glm::mat4 model = ent.getComponent<TransformComponent>().world;
         m_buffer->addData(&model, sizeof(glm::mat4), dst);
     }
 

@@ -3,11 +3,13 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "components/Components.h"
+#include "components/systems/Transforms.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "modules/controllers/CameraController.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "scenes/World.h"
+#include "scenes/instances/Node3D.h"
 #include "utils/rp_assert.h"
 #include "viewport/Viewport.h"
 
@@ -498,16 +500,19 @@ void ViewportPanel::updateGizmo()
         m_previousSelectedEntity = m_selectedEntity;
     }
 
-    auto [transformComponent, meshComp] = m_selectedEntity.tryGetComponents<Rapture::TransformComponent, Rapture::MeshComponent>();
-    if (!transformComponent) {
-        return;
-    }
+    auto *meshComp = m_selectedEntity.tryGetComponent<Rapture::MeshComponent>();
 
     if (m_viewport == nullptr) {
         return;
     }
     auto *scene = m_viewport->getScene();
     if (scene == nullptr) {
+        return;
+    }
+
+    Rapture::Instance *instance = scene->instanceFor(m_selectedEntity);
+    Rapture::Node3D *node = instance != nullptr ? instance->as<Rapture::Node3D>() : nullptr;
+    if (node == nullptr) {
         return;
     }
 
@@ -519,7 +524,7 @@ void ViewportPanel::updateGizmo()
     auto &camComp = viewCamera.getComponent<Rapture::CameraComponent>();
     glm::mat4 viewMatrix = camComp.camera.getViewMatrix();
     glm::mat4 projectionMatrix = camComp.camera.getProjectionMatrix();
-    glm::mat4 objectTransform = transformComponent->transforms.getTransform();
+    glm::mat4 objectTransform = node->worldTransform();
     glm::vec3 pivot = (meshComp != nullptr && meshComp->mesh)
                           ? Rapture::BoundingBox(meshComp->mesh->getBoundsMin(), meshComp->mesh->getBoundsMax()).getCenter()
                           : glm::vec3(0.0f);
@@ -535,9 +540,10 @@ void ViewportPanel::updateGizmo()
     Amethyst::GizmoResult result = m_gizmo->update(params);
 
     if (result.active) {
-        glm::vec3 position = transformComponent->transforms.getTranslation();
-        glm::quat rotation = transformComponent->transforms.getRotationQuat();
-        glm::vec3 scale = transformComponent->transforms.getScale();
+        glm::vec3 position;
+        glm::quat rotation;
+        glm::vec3 scale;
+        Rapture::transform::decompose(objectTransform, position, rotation, scale);
 
         glm::vec3 deltaPosition(result.deltaPosition.x, result.deltaPosition.y, result.deltaPosition.z);
         glm::vec3 deltaScale(result.deltaScale.x, result.deltaScale.y, result.deltaScale.z);
@@ -558,11 +564,6 @@ void ViewportPanel::updateGizmo()
             }
         }
 
-        transformComponent->transforms.setTranslation(position);
-        transformComponent->transforms.setRotation(rotation);
-        transformComponent->transforms.setScale(scale);
-        transformComponent->transforms.recalculateTransform();
-
-        m_selectedEntity.markDirty();
+        node->setWorldTransform(Rapture::transform::compose(position, rotation, scale));
     }
 }

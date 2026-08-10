@@ -8,6 +8,7 @@
 #include <asset_manager/AssetManager.h>
 #include <components/Components.h>
 #include <components/extensions/ui_list_layout.h>
+#include <components/systems/Transforms.h>
 #include <components/ui_scope.h>
 #include <materials/MaterialInstance.h>
 #include <render_targets/SceneRenderTarget.h>
@@ -91,11 +92,15 @@ void MaterialEditorWorkspace::setupPreviewScene()
     m_previewSphere = m_previewScene->createSphere("Preview Sphere");
 
     Rapture::Entity camera = m_previewScene->createEntity("Preview Camera");
-    camera.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f, 0.0f, 4.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+    auto &cameraTransform = camera.addComponent<Rapture::TransformComponent>();
+    cameraTransform.local = Rapture::transform::compose(glm::vec3(0.0f, 0.0f, 4.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+    cameraTransform.world = cameraTransform.local;
     camera.addComponent<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 100.0f);
 
     Rapture::Entity light = m_previewScene->createEntity("Preview Light");
-    light.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f), glm::vec3(-0.6f, 0.5f, 0.0f), glm::vec3(1.0f));
+    auto &lightTransform = light.addComponent<Rapture::TransformComponent>();
+    lightTransform.local = Rapture::transform::compose(glm::vec3(0.0f), glm::vec3(-0.6f, 0.5f, 0.0f), glm::vec3(1.0f));
+    lightTransform.world = lightTransform.local;
     light.addComponent<Rapture::DirectionalLightComponent>(glm::vec3(1.0f), 3.0f);
 
     Rapture::Environment *environment = m_previewScene->environment();

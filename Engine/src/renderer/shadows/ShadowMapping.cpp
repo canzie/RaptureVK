@@ -4,6 +4,7 @@
 #include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
+#include "components/systems/Transforms.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "renderer/shadows/ShadowCommon.h"
@@ -116,15 +117,14 @@ void ShadowMap::updateViewMatrix(Entity light, const TransformComponent &transfo
 
     ShadowMapData shadowMapData;
 
-    glm::vec3 lightPosition = transformComp.translation();
+    glm::vec3 lightPosition = transform::translation(transformComp.world);
     glm::vec3 lightDirection = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::mat4 lightProj = glm::mat4(1.0f);
 
     // Calculate light direction based on light type
     if (type == LightType::DIRECTIONAL || type == LightType::SPOT) {
         // Calculate light direction from rotation
-        glm::quat rotationQuat = transformComp.transforms.getRotationQuat();
-        lightDirection = glm::normalize(rotationQuat * glm::vec3(0, 0, -1)); // Forward vector
+        lightDirection = transform::forward(transformComp.world);
     } else {
         // Point light - use default direction
         lightDirection = glm::vec3(0.0f, 1.0f, 0.0f); // Down direction
@@ -280,7 +280,7 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
 
         // Push the model matrix as a push constant
         ShadowMappingPushConstants pushConstants{};
-        pushConstants.model = transform.transformMatrix();
+        pushConstants.model = transform.world;
         pushConstants.shadowMatrix = m_lightViewProjection;
 
         // Get push constant stage flags from shader

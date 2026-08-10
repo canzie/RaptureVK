@@ -5,10 +5,12 @@
 #include "asset_manager/AssetImportConfig.h"
 #include "asset_manager/AssetManager.h"
 #include "components/Components.h"
+#include "components/systems/Transforms.h"
 #include "generators/textures/ProceduralTextures.h"
 #include "logging/Log.h"
 #include "renderer/ImageBasedLighting.h"
 #include "scenes/Scene.h"
+#include "scenes/instances/Node3D.h"
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
 #include "window_context/Application.h"
@@ -222,26 +224,28 @@ void Environment::setSkybox(AssetHandle _skybox)
 
 void Environment::update()
 {
-    TransformComponent *sunTransform = nullptr;
+    Node3D *sunNode = nullptr;
     auto sunView = scene()->getRegistry().view<DirectionalLightComponent, TransformComponent>();
     for (auto handle : sunView) {
-        auto [light, transform] = sunView.get<DirectionalLightComponent, TransformComponent>(handle);
-        if (light.atmosphereSunLight) {
-            sunTransform = &transform;
-            break;
+        if (!sunView.get<DirectionalLightComponent>(handle).atmosphereSunLight) {
+            continue;
         }
+
+        Instance *instance = scene()->instanceFor(Entity(handle, scene()));
+        sunNode = instance != nullptr ? instance->as<Node3D>() : nullptr;
+        break;
     }
 
     bool sunParamsChanged = m_atmosphere.timeOfDay != m_lastApplied.timeOfDay || m_atmosphere.latitude != m_lastApplied.latitude ||
                             m_atmosphere.longitude != m_lastApplied.longitude;
 
     glm::vec3 sunDir;
-    if (sunTransform != nullptr) {
+    if (sunNode != nullptr) {
         if (sunParamsChanged) {
             sunDir = sunDirection(m_atmosphere.timeOfDay, m_atmosphere.latitude, m_atmosphere.longitude);
-            sunTransform->transforms.setRotation(s_rotationBetween(glm::vec3(0.0f, 0.0f, -1.0f), -sunDir));
+            sunNode->setRotation(s_rotationBetween(glm::vec3(0.0f, 0.0f, -1.0f), -sunDir));
         } else {
-            sunDir = -glm::normalize(sunTransform->transforms.getRotationQuat() * glm::vec3(0.0f, 0.0f, -1.0f));
+            sunDir = -transform::forward(sunNode->worldTransform());
             glm::vec3 expectedDir = sunDirection(m_lastApplied.timeOfDay, m_lastApplied.latitude, m_lastApplied.longitude);
             if (glm::distance(sunDir, expectedDir) > 1e-4f) {
                 SunAngles angles = sunAnglesFromDirection(sunDir, m_atmosphere);

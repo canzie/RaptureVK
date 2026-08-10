@@ -1,55 +1,81 @@
-#pragma once
-
-#include "components/ComponentsCommon.h"
+#ifndef RAPTURE__TRANSFORMS_H
+#define RAPTURE__TRANSFORMS_H
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-namespace Rapture {
+namespace Rapture::transform {
 
-class Transforms {
+/**
+ * @brief Builds a transform matrix from its parts
+ * @param translation Position
+ * @param rotation Orientation
+ * @param scale Scale along each axis
+ * @return The composed matrix
+ */
+glm::mat4 compose(const glm::vec3 &translation, const glm::quat &rotation, const glm::vec3 &scale);
 
-  public:
-    Transforms();
-    Transforms(const glm::mat4 &transform);
-    Transforms(const glm::vec3 &translation, const glm::vec3 &rotation, const glm::vec3 &scale);
-    Transforms(const glm::vec3 &translation, const glm::quat &rotation, const glm::vec3 &scale);
-    ~Transforms();
+/**
+ * @brief Builds a transform matrix from its parts, taking the rotation as euler angles
+ * @param translation Position
+ * @param eulerRotation Orientation as radians around each axis
+ * @param scale Scale along each axis
+ * @return The composed matrix
+ */
+glm::mat4 compose(const glm::vec3 &translation, const glm::vec3 &eulerRotation, const glm::vec3 &scale);
 
-    glm::mat4 getTransform() const { return m_transform; }
-    glm::vec3 getTranslation() const { return m_translation; }
-    glm::vec3 getRotation() const { return m_rotationV; }
-    glm::quat getRotationQuat() const { return m_rotationQ; }
-    glm::vec3 getScale() const { return m_scale; }
+/**
+ * @brief Splits a transform matrix into its parts
+ * @param matrix The matrix to split
+ * @param translation Receives the position
+ * @param rotation Receives the orientation
+ * @param scale Receives the scale along each axis
+ */
+void decompose(const glm::mat4 &matrix, glm::vec3 &translation, glm::quat &rotation, glm::vec3 &scale);
 
-    glm::mat4 &getTransform() { return m_transform; }
-    glm::vec3 &getTranslation() { return m_translation; }
-    glm::vec3 &getRotation() { return m_rotationV; }
-    glm::quat &getRotationQuat() { return m_rotationQ; }
-    glm::vec3 &getScale() { return m_scale; }
+/**
+ * @brief Reads the position out of a transform matrix
+ * @param matrix The matrix to read
+ * @return The position
+ */
+glm::vec3 translation(const glm::mat4 &matrix);
 
-    generation_t getGeneration() const { return m_generation; }
+/**
+ * @brief Reads the scale out of a transform matrix
+ * @param matrix The matrix to read
+ * @return The scale along each axis
+ */
+glm::vec3 scale(const glm::mat4 &matrix);
 
-    void setTransform(const glm::mat4 &transform);
-    void setTranslation(const glm::vec3 &translation);
-    void setRotation(const glm::vec3 &rotation);
-    void setRotation(const glm::quat &rotation);
-    void setScale(const glm::vec3 &scale);
+/**
+ * @brief Reads the orientation out of a transform matrix
+ * @param matrix The matrix to read
+ * @return The orientation
+ */
+glm::quat rotation(const glm::mat4 &matrix);
 
-    static glm::mat4 recalculateTransform(const glm::vec3 &translation, const glm::vec3 &rotation, const glm::vec3 &scale);
-    static void decomposeTransform(const glm::mat4 &transform, glm::vec3 *translation, glm::vec3 *rotation, glm::vec3 *scale);
+/**
+ * @brief Reads the orientation out of a transform matrix as euler angles
+ * @param matrix The matrix to read
+ * @return The orientation as radians around each axis
+ */
+glm::vec3 eulerRotation(const glm::mat4 &matrix);
 
-    // Recalculate the transform matrix
-    void recalculateTransform();
-    void decomposeTransform();
+/**
+ * @brief The direction a transform faces, its negative z axis
+ * @param matrix The matrix to read
+ * @return The normalized forward direction
+ */
+glm::vec3 forward(const glm::mat4 &matrix);
 
-  private:
-    glm::vec3 m_translation;
-    glm::vec3 m_rotationV;
-    glm::quat m_rotationQ;
-    glm::vec3 m_scale;
-    glm::mat4 m_transform;
+/**
+ * @brief Rebases a world transform onto a parent, giving the local transform that reproduces it
+ * @param parentWorld The parent's world transform
+ * @param world The world transform to rebase
+ * @return The local transform
+ */
+glm::mat4 toLocal(const glm::mat4 &parentWorld, const glm::mat4 &world);
 
-    generation_t m_generation = 1;
-};
-} // namespace Rapture
+} // namespace Rapture::transform
+
+#endif // RAPTURE__TRANSFORMS_H

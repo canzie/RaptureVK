@@ -10,6 +10,7 @@
 #include <asset_manager/AssetManager.h>
 #include <components/Components.h>
 #include <components/extensions/ui_list_layout.h>
+#include <components/systems/Transforms.h>
 #include <components/ui_scope.h>
 #include <logging/Log.h>
 #include <modules/puppets/Puppet.h>
@@ -122,7 +123,9 @@ void ModuleEditorWorkspace::setupScene()
     m_scene->active = true;
 
     Rapture::Entity camera = m_scene->createEntity("Editor Camera");
-    camera.addComponent<Rapture::TransformComponent>(glm::vec3(0.0f, 1.5f, 5.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+    auto &cameraTransform = camera.addComponent<Rapture::TransformComponent>();
+    cameraTransform.local = Rapture::transform::compose(glm::vec3(0.0f, 1.5f, 5.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+    cameraTransform.world = cameraTransform.local;
     camera.addComponent<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 
     auto extent = app.getMainWindow().getSwapChain()->getExtent();

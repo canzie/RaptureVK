@@ -4,6 +4,7 @@
 #include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
+#include "components/systems/Transforms.h"
 #include "modules/controllers/Controller.h"
 #include "generators/terrain/TerrainTypes.h"
 #include "scenes/instances/Camera3D.h"
@@ -432,9 +433,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
     if (Controller *controller = activeScene.activeController()) {
         Camera3D *camera = controller->viewCamera();
         if (camera != nullptr) {
-            if (auto *cameraTransform = camera->entity().tryGetComponent<TransformComponent>()) {
-                cameraPos = cameraTransform->translation();
-            }
+            cameraPos = transform::translation(camera->worldTransform());
         }
     }
 
@@ -457,8 +456,7 @@ std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponen
     }
 
     // Calculate light direction
-    glm::quat rotationQuat = transformComp.transforms.getRotationQuat();
-    glm::vec3 lightDir = glm::normalize(rotationQuat * glm::vec3(0, 0, -1)); // Forward vector
+    glm::vec3 lightDir = transform::forward(transformComp.world);
 
     auto cascadeData = calculateCascades(lightDir, cameraComp.camera.getViewMatrix(), cameraComp.camera.getProjectionMatrix(),
                                          cameraComp.nearPlane, cameraComp.farPlane,

@@ -216,6 +216,15 @@ class Instance {
     Scene *scene() const { return m_scene; }
 
   protected:
+    /**
+     * @brief Called on an instance once it has been linked to a new parent, or unlinked from one.
+     *
+     * The default passes it down the subtree, so a subclass that has no stake in where it sits still
+     * lets the ones below it react.
+     */
+    virtual void onParentChanged();
+
+  protected:
     Entity m_entity;
 
   private:

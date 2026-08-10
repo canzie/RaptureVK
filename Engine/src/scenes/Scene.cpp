@@ -4,10 +4,12 @@
 #include "components/Components.h"
 #include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
+#include "components/systems/Transforms.h"
 #include "modules/controllers/Controller.h"
 #include "scenes/instances/Camera3D.h"
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
+#include "scenes/instances/Node3D.h"
 #include "scenes/instances/StaticMesh3D.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
@@ -92,7 +94,7 @@ Entity Scene::createCube(const std::string &name, Mobility mobility)
     // Add basic name component if you have one
     entity.addComponent<TagComponent>(name);
 
-    entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+    entity.addComponent<TransformComponent>();
 
     entity.addComponent<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_CUBE_MESH), mobility);
 
@@ -141,7 +143,7 @@ Entity Scene::createSphere(const std::string &name, Mobility mobility)
     // Add basic name component if you have one
     entity.addComponent<TagComponent>(name);
 
-    entity.addComponent<TransformComponent>(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+    entity.addComponent<TransformComponent>();
 
     entity.addComponent<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_SPHERE_MESH), mobility);
 
@@ -209,7 +211,7 @@ void Scene::onUpdate(float dt)
         Entity camera = activeCamera->entity();
         auto [cameraTransform, cameraComponent] = camera.tryGetComponents<TransformComponent, CameraComponent>();
         if (cameraTransform && cameraComponent) {
-            cameraPosition = cameraTransform->translation();
+            cameraPosition = transform::translation(activeCamera->worldTransform());
             frustum = &cameraComponent->frustum;
         }
     }
@@ -321,12 +323,12 @@ void Scene::registerRigidBodies()
             auto *meshComp = entity.tryGetComponent<MeshComponent>();
             if (meshComp != nullptr && meshComp->mesh) {
                 BoundingBox bounds(meshComp->mesh->getBoundsMin(), meshComp->mesh->getBoundsMax());
-                glm::vec3 halfExtents = bounds.getExtents() * 0.5f * transform->scale();
+                glm::vec3 halfExtents = bounds.getExtents() * 0.5f * transform::scale(transform->world);
                 config.shape = PhysicsBoxShape{halfExtents};
             }
         }
-        config.position = transform->translation();
-        config.rotation = transform->transforms.getRotationQuat();
+        config.position = transform::translation(transform->world);
+        config.rotation = transform::rotation(transform->world);
         config.motionType = rigidBody->motionType;
         config.friction = rigidBody->friction;
         config.restitution = rigidBody->restitution;
@@ -341,18 +343,14 @@ void Scene::registerRigidBodies()
 void Scene::syncRigidBodyTransforms()
 {
     for (const PhysicsBodyState &state : m_physics->getActiveBodyStates()) {
-        const entt::entity handle = static_cast<entt::entity>(static_cast<uint32_t>(state.userData));
-        if (!m_registry.valid(handle)) {
+        Entity entity(static_cast<uint32_t>(state.userData), this);
+        Instance *instance = instanceFor(entity);
+        Node3D *node = instance != nullptr ? instance->as<Node3D>() : nullptr;
+        if (node == nullptr) {
             continue;
         }
 
-        auto *transform = m_registry.try_get<TransformComponent>(handle);
-        if (transform == nullptr) {
-            continue;
-        }
-
-        transform->transforms.setTranslation(state.position);
-        transform->transforms.setRotation(state.rotation);
+        node->setSimulatedWorldTransform(transform::compose(state.position, state.rotation, node->scale()));
     }
 }
 
@@ -549,7 +547,7 @@ void Scene::registerBLAS(Entity &entity)
 
     TLASInstance instance;
     instance.blas = blas;
-    instance.transform = transform->transformMatrix();
+    instance.transform = transform->world;
     instance.entityID = entity.getID();
     m_tlas->addInstance(instance);
     m_tlasDirty = true;
@@ -582,10 +580,9 @@ void Scene::updateTLAS()
 
         if (entity.isValid()) {
             auto &transform = entity.getComponent<TransformComponent>();
-            generation_t gen = transform.getGeneration();
-            if (gen != instance.lastTransformGeneration) {
-                instance.lastTransformGeneration = gen;
-                instanceUpdates.push_back({instanceIndex, transform.transformMatrix()});
+            if (transform.world != instance.transform) {
+                instance.transform = transform.world;
+                instanceUpdates.push_back({instanceIndex, transform.world});
             }
         }
         instanceIndex++;

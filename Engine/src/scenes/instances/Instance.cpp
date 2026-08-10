@@ -61,7 +61,10 @@ void Instance::addChild(std::unique_ptr<Instance> child)
     }
 
     child->m_parent = this;
+    Instance *adopted = child.get();
     m_children.push_back(std::move(child));
+
+    adopted->onParentChanged();
 }
 
 std::unique_ptr<Instance> Instance::removeChild(Instance *child)
@@ -74,10 +77,19 @@ std::unique_ptr<Instance> Instance::removeChild(Instance *child)
         std::unique_ptr<Instance> owned = std::move(m_children[i]);
         m_children.erase(m_children.begin() + static_cast<ptrdiff_t>(i));
         owned->m_parent = nullptr;
+
+        owned->onParentChanged();
         return owned;
     }
 
     return nullptr;
+}
+
+void Instance::onParentChanged()
+{
+    for (const auto &child : m_children) {
+        child->onParentChanged();
+    }
 }
 
 Instance *Instance::findChild(std::string_view name) const
