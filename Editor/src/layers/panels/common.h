@@ -15,6 +15,8 @@ class Viewport;
 class World;
 } // namespace Rapture
 
+class EntitySelection;
+
 /**
  * @brief Services injected into each panel at construction time.
  */
@@ -37,6 +39,8 @@ struct WorkspaceContext {
     /// Set only by a workspace whose scene belongs to a world
     Rapture::World *world = nullptr;
     Rapture::Viewport *viewport = nullptr;
+    /// Owned by the workspace, so what one workspace selects never reaches the panels of another
+    EntitySelection *selection = nullptr;
     Amethyst::DockingLayer *dockingLayer = nullptr;
     PanelServices services;
 };

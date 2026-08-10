@@ -4,7 +4,7 @@
 #include "buffers/descriptors/DescriptorManager.h"
 
 #include "components/Components.h"
-#include "modules/controllers/CameraController.h"
+#include "modules/controllers/Controller.h"
 #include "generators/terrain/TerrainTypes.h"
 #include "scenes/instances/Camera3D.h"
 #include "logging/Log.h"
@@ -429,7 +429,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
 
     // the chunk grid was generated around the scene's camera, so its LODs have to be picked from there too
     glm::vec3 cameraPos(0.0f);
-    if (CameraController *controller = activeScene.activeController()) {
+    if (Controller *controller = activeScene.activeController()) {
         Camera3D *camera = controller->viewCamera();
         if (camera != nullptr) {
             if (auto *cameraTransform = camera->entity().tryGetComponent<TransformComponent>()) {

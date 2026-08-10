@@ -4,7 +4,7 @@
 #include "components/Components.h"
 #include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
-#include "modules/controllers/CameraController.h"
+#include "modules/controllers/Controller.h"
 #include "scenes/instances/Camera3D.h"
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"

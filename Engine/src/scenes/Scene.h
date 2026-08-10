@@ -15,7 +15,7 @@
 
 namespace Rapture {
 
-class CameraController;
+class Controller;
 class Entity;
 class Environment;
 class Instance;
@@ -66,8 +66,8 @@ class Scene {
      * @brief The controller currently driving this scene, whose camera scene wide work is done from
      * @return The controller, or nullptr if nothing is driving the scene
      */
-    CameraController *activeController() const { return m_activeController; }
-    void setActiveController(CameraController *controller) { m_activeController = controller; }
+    Controller *activeController() const { return m_activeController; }
+    void setActiveController(Controller *controller) { m_activeController = controller; }
 
     /**
      * @brief The scene's environment, owner of skybox generation and image-based lighting
@@ -169,7 +169,7 @@ class Scene {
     Environment *m_environment = nullptr;
     std::unique_ptr<SceneRenderData> m_renderData;
     std::unique_ptr<PhysicsSystem> m_physics;
-    CameraController *m_activeController = nullptr;
+    Controller *m_activeController = nullptr;
     std::vector<entt::entity> m_pendingRigidBodies;
     SceneSettings m_config;
 

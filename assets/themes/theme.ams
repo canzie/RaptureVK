@@ -85,6 +85,11 @@ context-menu {
     menu-separator-color: @border-4;
 }
 
+context-menu#separator {
+    text-color: @text-3;
+    background-color: @text-3;
+}
+
 
 .panel {
     background-color: @bg-panel;

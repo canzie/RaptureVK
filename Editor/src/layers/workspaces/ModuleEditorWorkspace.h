@@ -75,9 +75,13 @@ class ModuleEditorWorkspace : public Workspace {
   private:
     void setupHotbar(void);
     void setupScene(void);
-    // TODO: a scene object panel showing only the module's own tree, with an add menu limited to
-    // what its class can hold
-    void setupPanels(Amethyst::TabBar *propertiesTabBar, Amethyst::TabBar *viewportTabBar);
+
+    /**
+     * @brief Lights the preview scene, kept outside the module's own root so a save cannot take it
+     */
+    void setupLighting(void);
+    // TODO: limit the tree panel's add menu to what the module's class can hold
+    void setupPanels(Amethyst::TabBar *viewportTabBar, Amethyst::TabBar *treeTabBar, Amethyst::TabBar *propertiesTabBar);
 
     /**
      * @brief Takes the authored scene objects back into the module and writes the asset

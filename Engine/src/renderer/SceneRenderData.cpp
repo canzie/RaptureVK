@@ -8,9 +8,11 @@
 #include "scenes/Scene.h"
 #include "scenes/entities/Entity.h"
 
+#include <algorithm>
 #include <cmath>
 #include <entt/entt.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <vector>
 
 namespace Rapture {
 
@@ -633,13 +635,20 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
         CascadedShadowMap *cascadedMap = getCascadedShadowMap(entity.getID());
         if (cascaded != nullptr && cascadedMap != nullptr && cascaded->isActive) {
             data.type = static_cast<int>(Light_getLightType(entity));
-            data.cascadeCount = cascadedMap->getNumCascades();
             data.lightIndex = entity.getID();
             data.textureHandle = cascadedMap->getTextureHandle();
 
-            auto splits = cascadedMap->getCascadeSplits();
-            for (uint8_t c = 0; c < cascadedMap->getNumCascades(); c++) {
-                data.cascadeMatrices[c] = cascadedMap->getLightViewProjections()[c];
+            // both are filled by the first cascade update, which a light packed before its shadow
+            // pass has ever run has not had yet
+            std::vector<glm::mat4> matrices = cascadedMap->getLightViewProjections();
+            std::vector<float> splits = cascadedMap->getCascadeSplits();
+            size_t count = std::min<size_t>(cascadedMap->getNumCascades(), matrices.size());
+            count = std::min<size_t>(count, splits.empty() ? 0 : splits.size() - 1);
+            count = std::min<size_t>(count, MAX_CASCADES);
+
+            data.cascadeCount = static_cast<uint32_t>(count);
+            for (size_t c = 0; c < count; c++) {
+                data.cascadeMatrices[c] = matrices[c];
                 data.cascadeSplitsViewSpace[c] = glm::vec4(splits[c], splits[c + 1], 0.0f, -1.0f);
             }
         }

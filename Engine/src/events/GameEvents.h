@@ -19,9 +19,6 @@ using LayerCommunicationEvent = EventBus<std::string, std::string>;
 using ProjectLoadRequestedEvent = EventBus<std::string>;
 using ProjectLoadedEvent = EventBus<std::string>;
 
-using EntitySelectedEvent = EventBus<Entity>;
-using EntityDeselectedEvent = EventBus<Entity>;
-
 // Global event accessors
 inline SceneLoadRequestedEvent &onSceneLoadRequested()
 {
@@ -61,16 +58,6 @@ inline ProjectLoadRequestedEvent &onProjectLoadRequested()
 inline ProjectLoadedEvent &onProjectLoaded()
 {
     return EventRegistry::getInstance().getEventBus<std::string>("ProjectLoaded");
-}
-
-inline EntitySelectedEvent &onEntitySelected()
-{
-    return EventRegistry::getInstance().getEventBus<Entity>("EntitySelected");
-}
-
-inline EntityDeselectedEvent &onEntityDeselected()
-{
-    return EventRegistry::getInstance().getEventBus<Entity>("EntityDeselected");
 }
 } // namespace GameEvents
 } // namespace Rapture

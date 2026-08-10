@@ -4,6 +4,7 @@
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 
+#include "events/EventSignal.h"
 #include "layers/panels/Panel.h"
 #include "layers/panels/component_editors/ComponentEditorBase.h"
 #include "layers/panels/components/property_sections.h"
@@ -55,8 +56,7 @@ class PropertiesPanel : public Panel {
 
     Rapture::Scene *m_scene = nullptr;
     Rapture::Entity m_selectedEntity;
-    size_t m_entitySelectedListenerID = 0;
-    size_t m_entityDeselectedListenerID = 0;
+    Rapture::EventConnection m_selectionChangedConn;
 };
 
 #endif // RAPTURE__PROPERTIES_PANEL_H

@@ -1,6 +1,6 @@
 #include "PropertiesPanel.h"
+#include "EntitySelection.h"
 #include "Icons.h"
-#include "events/GameEvents.h"
 #include "layers/panels/component_editors/ComponentEditors.h"
 #include "layers/panels/components/tab_layouts.h"
 
@@ -34,30 +34,21 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
     icon = Icons::SVG_PROPERTIES;
     attach(tabBar, std::move(root));
 
-    m_entitySelectedListenerID =
-        Rapture::GameEvents::onEntitySelected().addListener([this](Rapture::Entity entity) {
-            if (!entity.isValid()) {
-                return;
+    if (m_selection != nullptr) {
+        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::Entity entity) {
+            if (entity.isValid()) {
+                showEntity(entity);
+            } else {
+                clearSelection();
             }
-            if (m_scene != nullptr && entity.getScene() != m_scene) {
-                return;
-            }
-            showEntity(entity);
         });
-
-    m_entityDeselectedListenerID = Rapture::GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
-        if (m_selectedEntity == entity) {
-            clearSelection();
-        }
-    });
+    }
 
     setScene(context.scene);
 }
 
 PropertiesPanel::~PropertiesPanel()
 {
-    Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerID);
-    Rapture::GameEvents::onEntityDeselected().removeListener(m_entityDeselectedListenerID);
     if (m_root != nullptr && m_root->parent != nullptr) {
         if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
             tabBar->removeTab(m_root);

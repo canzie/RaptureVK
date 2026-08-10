@@ -1,6 +1,7 @@
 #ifndef RAPTURE__WORKSPACE_H
 #define RAPTURE__WORKSPACE_H
 
+#include "EntitySelection.h"
 #include "layers/panels/Panel.h"
 #include "layers/panels/common.h"
 #include <amethyst/Amethyst.h>
@@ -11,6 +12,7 @@
 
 class Workspace {
   public:
+    Workspace() { m_context.selection = &m_selection; }
     virtual ~Workspace();
 
     Amethyst::DockingLayer *getDockingLayer(void) const { return m_dockingLayer; }
@@ -60,6 +62,7 @@ class Workspace {
     bool focused = false;
 
   protected:
+    EntitySelection m_selection;
     WorkspaceContext m_context;
     Amethyst::Frame *m_container = nullptr;
     Amethyst::Frame *m_hotbar = nullptr;

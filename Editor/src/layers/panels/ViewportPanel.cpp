@@ -1,11 +1,11 @@
 #include "ViewportPanel.h"
 
+#include "EntitySelection.h"
 #include "Icons.h"
 #include "components/Components.h"
-#include "modules/controllers/CameraController.h"
-#include "events/GameEvents.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
+#include "modules/controllers/CameraController.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "scenes/World.h"
 #include "utils/rp_assert.h"
@@ -137,8 +137,8 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
             m_viewportImageDestroyConn =
                 m_viewportImage->onDestroy.connect([this](Amethyst::Instance *) { m_viewportImage = nullptr; });
             m_viewportImage->track(m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
-            m_viewportImage->track(m_viewportImage->onInputBeganCb.connect(
-                [this](const Amethyst::InputObject &input) { onViewportPressed(input); }));
+            m_viewportImage->track(
+                m_viewportImage->onInputBeganCb.connect([this](const Amethyst::InputObject &input) { onViewportPressed(input); }));
         });
 
     m_gizmo = std::make_unique<Amethyst::Gizmo>(m_viewportImage);
@@ -147,15 +147,14 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     buildTransformMenu();
     buildRenderMenu();
 
-    m_entitySelectedListenerId =
-        Rapture::GameEvents::onEntitySelected().addListener([this](Rapture::Entity entity) { m_selectedEntity = entity; });
-
-    m_entityDeselectedListenerId = Rapture::GameEvents::onEntityDeselected().addListener([this](Rapture::Entity entity) {
-        if (m_selectedEntity == entity) {
-            m_selectedEntity = Rapture::Entity();
-            m_gizmo->reset();
-        }
-    });
+    if (m_selection != nullptr) {
+        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::Entity entity) {
+            m_selectedEntity = entity;
+            if (!m_selectedEntity.isValid()) {
+                m_gizmo->reset();
+            }
+        });
+    }
 
     icon = Icons::SVG_VIEWPORT;
     attach(tabBar, std::move(root));
@@ -172,8 +171,6 @@ ViewportPanel::~ViewportPanel()
         m_viewport->editorBinding().displayed = false;
     }
 
-    Rapture::GameEvents::onEntitySelected().removeListener(m_entitySelectedListenerId);
-    Rapture::GameEvents::onEntityDeselected().removeListener(m_entityDeselectedListenerId);
     if (m_root != nullptr && m_root->parent != nullptr) {
         if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
             tabBar->removeTab(m_root);
@@ -287,8 +284,7 @@ void ViewportPanel::buildRenderMenu()
     items.push_back(ViewportContextMenuRID::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
     items.push_back(ViewportContextMenuRID::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
     items.push_back(ViewportContextMenuRID::create("Show Motion Vectors", &m_lightingModeGroup, VLM_MOTION));
-    items.push_back(
-        ViewportContextMenuRID::create("Show Ambient Occlusion", &m_lightingModeGroup, VLM_AMBIENT_OCCLUSION));
+    items.push_back(ViewportContextMenuRID::create("Show Ambient Occlusion", &m_lightingModeGroup, VLM_AMBIENT_OCCLUSION));
 
     auto occlusionToggle = ViewportContextMenuTID::create("Ambient Occlusion", [this](bool on) {
         if (m_viewport != nullptr) {
@@ -482,10 +478,8 @@ void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
     Rapture::EntityID id = s_nearestToCursor(result, px - region.x, py - region.y);
 
     Rapture::Entity picked = id == Rapture::INVALID_ENTITY_ID ? Rapture::Entity() : Rapture::Entity(id, m_viewport->getScene());
-    if (picked.isValid()) {
-        Rapture::GameEvents::onEntitySelected().publish(picked);
-    } else if (m_selectedEntity.isValid()) {
-        Rapture::GameEvents::onEntityDeselected().publish(m_selectedEntity);
+    if (m_selection != nullptr) {
+        m_selection->select(picked);
     }
 }
 
@@ -504,8 +498,7 @@ void ViewportPanel::updateGizmo()
         m_previousSelectedEntity = m_selectedEntity;
     }
 
-    auto [transformComponent, meshComp] =
-        m_selectedEntity.tryGetComponents<Rapture::TransformComponent, Rapture::MeshComponent>();
+    auto [transformComponent, meshComp] = m_selectedEntity.tryGetComponents<Rapture::TransformComponent, Rapture::MeshComponent>();
     if (!transformComponent) {
         return;
     }

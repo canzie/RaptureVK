@@ -2,6 +2,7 @@
 
 #include "layers/PlayLayer.h"
 #include "layers/panels/AddSceneObjectMenu.h"
+#include "layers/panels/components/context_menus.h"
 #include "layers/panels/ImagePreviewPanel.h"
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
@@ -12,7 +13,6 @@
 #include <components/ui_scope.h>
 #include <layers/Layer.h>
 #include <scenes/Scene.h>
-#include <serialization/SerialDocument.h>
 #include <scenes/instances/Instance.h>
 #include <utils/rp_assert.h>
 #include <window_context/Application.h>
@@ -86,6 +86,7 @@ void LevelEditorWorkspace::setupHotbar()
     layout->innerPadding = Amethyst::UDim::fromOffset(6.0f);
 
     m_addMenu = m_container->add<Amethyst::ContextMenu>();
+    m_addMenu->setRowFactories({.separator = [] { return std::make_unique<ViewportContextMenuSIV>(); }});
 
     Amethyst::UIScope(*m_hotbar).textButton(
         {.classes = {"generic-text-button"},
@@ -128,13 +129,9 @@ void LevelEditorWorkspace::setupHotbar()
 
 void LevelEditorWorkspace::startPlay()
 {
-    Rapture::Scene *scene = m_world->getScene();
     if (m_context.viewport == nullptr || isPlaying()) {
         return;
     }
-
-    m_snapshot = scene->snapshot();
-    m_playing = true;
 
     auto &app = Rapture::Application::getInstance();
     if (Rapture::Layer *editor = app.getLayer(EDITOR_LAYER_NAME)) {
@@ -142,7 +139,7 @@ void LevelEditorWorkspace::startPlay()
     }
 
     if (m_playLayer == nullptr) {
-        m_playLayer = app.pushLayer(std::make_unique<PlayLayer>(*scene, *m_context.viewport));
+        m_playLayer = app.pushLayer(std::make_unique<PlayLayer>(*m_world, *m_context.viewport));
     } else {
         m_playLayer->attach();
     }
@@ -160,11 +157,6 @@ void LevelEditorWorkspace::stopPlay()
         m_playLayer->detach();
     }
 
-    // the snapshot outlives the rewind, its document is what the scene is read back out of
-    m_world->getScene()->restoreFrom(m_snapshot.rootView());
-    m_snapshot = Rapture::SerialDocument{};
-    m_playing = false;
-
     if (Rapture::Layer *editor = Rapture::Application::getInstance().getLayer(EDITOR_LAYER_NAME)) {
         editor->attach();
     }
@@ -178,7 +170,7 @@ void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
         return;
     }
 
-    m_addMenu->setItems(AddSceneObjectMenu::buildItems(m_world->getScene()->root()));
+    m_addMenu->setItems(AddSceneObjectMenu_buildItems(m_world->getScene()->root(), m_selection, SCENE_OBJECT_SCOPE_LEVEL));
     m_addMenu->showAt({button.absolutePosition.x, button.absolutePosition.y + button.absoluteSize.y});
 }
 

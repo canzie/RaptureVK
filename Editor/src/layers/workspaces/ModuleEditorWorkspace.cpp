@@ -2,6 +2,8 @@
 
 #include "Icons.h"
 #include "layers/panels/ModulePropertiesPanel.h"
+#include "layers/panels/PropertiesPanel.h"
+#include "layers/panels/SceneObjectTreePanel.h"
 #include "layers/panels/ViewportPanel.h"
 
 #include <asset_manager/Asset.h>
@@ -14,17 +16,20 @@
 #include <render_targets/SceneRenderTarget.h>
 #include <scenes/Scene.h>
 #include <scenes/entities/Entity.h>
+#include <scenes/instances/DirectionalLight3D.h>
 #include <scenes/instances/Node3D.h>
 #include <viewport/ViewportManager.h>
 #include <window_context/Application.h>
 
 static constexpr const char *DOCK_NAME = "Module Editor Dock";
 static constexpr const char *VIEWPORT_NAME = "module_editor";
-static constexpr const char *ROOT_NAME = "Root";
+static constexpr const char *ROOT_NAME = "Scene Root";
 static constexpr float HOTBAR_BUTTON_WIDTH = 80.0f;
+static constexpr float EDITOR_SUN_PITCH = -1.874f;
+static constexpr float EDITOR_SUN_INTENSITY = 3.14f;
 
 std::unique_ptr<ModuleEditorWorkspace> ModuleEditorWorkspace::create(Amethyst::TabBar &tabBar, const PanelServices &services,
-                                                                    Rapture::AssetHandle handle)
+                                                                     Rapture::AssetHandle handle)
 {
     Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
     Rapture::ModuleClass *module = ref ? ref.get()->getUnderlyingAsset<Rapture::ModuleClass>() : nullptr;
@@ -76,6 +81,7 @@ void ModuleEditorWorkspace::build(Amethyst::TabBar &tabBar)
 
     Amethyst::TabBar *propertiesTabBar = nullptr;
     Amethyst::TabBar *viewportTabBar = nullptr;
+    Amethyst::TabBar *treeTabBar = nullptr;
 
     if (m_scene == nullptr) {
         Amethyst::DockScope(*m_dockingLayer).panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; });
@@ -84,10 +90,17 @@ void ModuleEditorWorkspace::build(Amethyst::TabBar &tabBar)
             .split(
                 Amethyst::SplitAxis::VERTICAL, 0.7f,
                 [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
-                [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
+                [&](Amethyst::DockScope &r) {
+                    r.split(
+                        Amethyst::SplitAxis::HORIZONTAL, 0.45f,
+                        [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { treeTabBar = &tb.component; }); },
+                        [&](Amethyst::DockScope &b) {
+                            b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; });
+                        });
+                });
     }
 
-    setupPanels(propertiesTabBar, viewportTabBar);
+    setupPanels(viewportTabBar, treeTabBar, propertiesTabBar);
     setupHotbar();
 
     if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
@@ -104,6 +117,7 @@ void ModuleEditorWorkspace::setupScene()
     auto &app = Rapture::Application::getInstance();
 
     m_scene = std::make_unique<Rapture::Scene>(Rapture::AssetManager::getAssetMetadata(m_handle).getName());
+    setupLighting();
     m_sceneRoot = spawn(*m_scene->root());
     m_scene->active = true;
 
@@ -126,15 +140,33 @@ void ModuleEditorWorkspace::setupScene()
     m_context.viewport = m_viewport;
 }
 
-void ModuleEditorWorkspace::setupPanels(Amethyst::TabBar *propertiesTabBar, Amethyst::TabBar *viewportTabBar)
+void ModuleEditorWorkspace::setupLighting()
+{
+    // parented beside the module's root rather than inside it, so a save never captures it
+    auto *sun = m_scene->root()->add<Rapture::DirectionalLight3D>("Editor Sun");
+    sun->setRotation(glm::vec3(EDITOR_SUN_PITCH, 0.0f, 0.0f));
+    sun->setColor(glm::vec3(1.0f));
+    sun->setIntensity(EDITOR_SUN_INTENSITY);
+    sun->setCastsShadow(true);
+}
+
+void ModuleEditorWorkspace::setupPanels(Amethyst::TabBar *viewportTabBar, Amethyst::TabBar *treeTabBar,
+                                        Amethyst::TabBar *propertiesTabBar)
 {
     if (viewportTabBar != nullptr) {
         m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
+    }
+    if (treeTabBar != nullptr && m_sceneRoot != nullptr) {
+        m_panels.push_back(std::make_unique<SceneObjectTreePanel>(treeTabBar, m_context, m_sceneRoot));
     }
     if (propertiesTabBar != nullptr) {
         auto panel = std::make_unique<ModulePropertiesPanel>(propertiesTabBar, m_context, m_handle);
         m_properties = panel.get();
         m_panels.push_back(std::move(panel));
+
+        if (m_scene != nullptr) {
+            m_panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar, m_context));
+        }
     }
 }
 

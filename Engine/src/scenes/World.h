@@ -2,6 +2,8 @@
 #define RAPTURE__WORLD_H
 
 #include "asset_manager/AssetCommon.h"
+#include "input/ControlInput.h"
+#include "serialization/SerialDocument.h"
 
 #include <cstdint>
 #include <memory>
@@ -12,6 +14,7 @@
 
 namespace Rapture {
 
+class Controller;
 class Scene;
 
 /**
@@ -20,6 +23,15 @@ class Scene;
 struct WorldData {
     AssetHandle puppet = INVALID_ASSET_HANDLE;
     AssetHandle controller = INVALID_ASSET_HANDLE;
+};
+
+/**
+ * @brief Whether a world is being played, and whether it advances while it is.
+ */
+enum class PlayState {
+    STOPPED,
+    PLAYING,
+    PAUSED
 };
 
 /**
@@ -39,6 +51,40 @@ class World {
     const WorldData &data() const { return m_data; }
 
     void onUpdate(float dt);
+
+    /**
+     * @brief Starts advancing this world's scene
+     */
+    void play();
+
+    /**
+     * @brief Holds the scene where it is
+     */
+    void pause();
+
+    /**
+     * @brief Advances the scene again from where pausing left it
+     */
+    void resume();
+
+    /**
+     * @brief Ends the run and rewinds the scene to how it was when the run started
+     */
+    void stop();
+
+    PlayState playState() const { return m_playState; }
+
+    /**
+     * @brief Hands the run the intent its controller drives from on the next update
+     * @param intent Device-agnostic input for this frame
+     */
+    void setIntent(const ControlInput &intent) { m_intent = intent; }
+
+    /**
+     * @brief The controller this world's run is driven by
+     * @return The controller, or nullptr if the world is not being played
+     */
+    Controller *playController() const { return m_playController.get(); }
 
     bool isActive() const { return m_isActive; }
     void setActive(bool active) { m_isActive = active; }
@@ -64,6 +110,12 @@ class World {
     std::string m_name;
     std::unique_ptr<Scene> m_scene;
     WorldData m_data;
+
+    /// What the scene is rewound to on stop, held only for as long as a run is up
+    SerialDocument m_snapshot;
+    std::unique_ptr<Controller> m_playController;
+    ControlInput m_intent;
+    PlayState m_playState = PlayState::STOPPED;
     bool m_isActive = false;
 };
 

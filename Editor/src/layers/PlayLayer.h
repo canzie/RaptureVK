@@ -4,22 +4,27 @@
 #include "layers/Layer.h"
 #include "scenes/entities/Entity.h"
 
+#include <memory>
+
 namespace Rapture {
-class Scene;
+class Input;
 class Viewport;
+class World;
 } // namespace Rapture
 
 /**
- * @brief Runs a scene, driving the simulation and showing it through the camera it plays from.
+ * @brief Runs a world for as long as it is attached, showing it through the camera it plays from.
  */
 class PlayLayer : public Rapture::Layer {
   public:
     /**
-     * @brief Creates a layer that plays a scene
-     * @param scene The scene to run
-     * @param viewport The viewport the scene is played in
+     * @brief Creates a layer that plays a world
+     * @param world The world to run
+     * @param viewport The viewport the world is played in
      */
-    PlayLayer(Rapture::Scene &scene, Rapture::Viewport &viewport);
+    PlayLayer(Rapture::World &world, Rapture::Viewport &viewport);
+
+    ~PlayLayer() override;
 
     void onUpdate(float dt) override;
 
@@ -28,9 +33,11 @@ class PlayLayer : public Rapture::Layer {
     void onDetach() override;
 
   private:
-    Rapture::Scene &m_scene;
+    Rapture::World &m_world;
     Rapture::Viewport &m_viewport;
     Rapture::Entity m_editorCamera;
+    std::unique_ptr<Rapture::Input> m_input;
+    bool m_controlReleased = false;
 };
 
 #endif // RAPTURE__PLAY_LAYER_H

@@ -8,6 +8,7 @@
 #include <components/ui_scope.h>
 #include <components/widgets/gizmo.h>
 
+#include "events/EventSignal.h"
 #include "layers/panels/Panel.h"
 #include "scenes/entities/Entity.h"
 
@@ -108,8 +109,7 @@ class ViewportPanel : public Panel {
 
     Rapture::Entity m_selectedEntity;
     Rapture::Entity m_previousSelectedEntity;
-    size_t m_entitySelectedListenerId = 0;
-    size_t m_entityDeselectedListenerId = 0;
+    Rapture::EventConnection m_selectionChangedConn;
     Amethyst::vec2 m_lastViewportSize = {};
     Amethyst::vec2 m_pendingViewportSize = {};
     float m_resizeStableTime = 0.0f;

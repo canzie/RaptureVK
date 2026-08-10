@@ -114,9 +114,7 @@ bool Project::saveWorld(AssetHandle handle)
 void Project::onUpdate(float dt)
 {
     for (const AssetPtr<World> &world : m_worlds) {
-        if (world->isActive()) {
-            world->onUpdate(dt);
-        }
+        world->onUpdate(dt);
     }
 }
 

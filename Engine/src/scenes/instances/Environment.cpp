@@ -285,7 +285,7 @@ bool Environment::ensureSkyboxGenerator()
     }
 
     ProceduralTextureConfig config;
-    config.name = "atmosphere_skybox";
+    config.name = "atmosphere_skybox_" + std::to_string(static_cast<uint64_t>(id()));
     config.cubemap = true;
     config.format = TextureFormat::RGBA16F;
     config.wrap = TextureWrap::ClampToEdge;

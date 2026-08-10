@@ -1,7 +1,8 @@
 #include "OutlinerPanel.h"
+#include "EntitySelection.h"
 #include "Icons.h"
-#include "events/GameEvents.h"
 #include "layers/panels/AddSceneObjectMenu.h"
+#include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/World.h"
 #include "scenes/entities/Entity.h"
@@ -87,6 +88,7 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
 
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
+    m_contextMenu->setRowFactories({.separator = [] { return std::make_unique<ViewportContextMenuSIV>(); }});
 
     icon = Icons::SVG_LAYERS;
     attach(tabBar, std::move(root));
@@ -221,8 +223,8 @@ Rapture::Instance *OutlinerPanel::instanceForRow(uint32_t row) const
 void OutlinerPanel::onRowClicked(uint32_t row)
 {
     Rapture::Instance *instance = instanceForRow(row);
-    if (instance != nullptr) {
-        Rapture::GameEvents::onEntitySelected().publish(instance->entity());
+    if (instance != nullptr && m_selection != nullptr) {
+        m_selection->select(instance->entity());
     }
 }
 
@@ -236,8 +238,11 @@ void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
     bool hasChildren = !instance->children().empty();
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    items.push_back(Amethyst::makeSubmenuItem("Add", AddSceneObjectMenu::buildItems(instance)));
-    items.push_back(Amethyst::makeSeparatorItem());
+    if (m_selection != nullptr) {
+        items.push_back(Amethyst::makeSubmenuItem(
+            "Add", AddSceneObjectMenu_buildItems(instance, *m_selection, SCENE_OBJECT_SCOPE_LEVEL)));
+    }
+    items.push_back(ViewportContextMenuSID::create());
     items.push_back(Amethyst::makeActionItem("Rename", [this, row, instance]() { startRename(row, instance); }));
     items.push_back(Amethyst::makeActionItem("Delete", [this, instance]() { requestDelete(instance, false); }));
     if (hasChildren) {
@@ -264,7 +269,9 @@ void OutlinerPanel::applyPendingDelete()
         return;
     }
 
-    Rapture::GameEvents::onEntityDeselected().publish(instance->entity());
+    if (m_selection != nullptr && m_selection->entity() == instance->entity()) {
+        m_selection->clear();
+    }
 
     if (keepChildren) {
         Rapture::Instance *parent = instance->parent();
