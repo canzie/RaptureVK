@@ -53,15 +53,6 @@ FetchContent_Declare(
 # Using submodule - custom UI library for editor and in-game UI
 # Located at Engine/vendor/Amethyst (git submodule)
 
-# --- EnTT ---
-FetchContent_Declare(
-    entt
-    GIT_REPOSITORY https://github.com/skypjack/entt.git
-    GIT_TAG v3.13.0
-    GIT_SHALLOW TRUE
-    GIT_PROGRESS TRUE
-)
-
 # --- spdlog ---
 set(SPDLOG_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -183,7 +174,6 @@ message(STATUS "This will only happen once. Subsequent builds will use cached ve
 
 FetchContent_MakeAvailable(glfw)
 FetchContent_MakeAvailable(glm)
-FetchContent_MakeAvailable(entt)
 FetchContent_MakeAvailable(spdlog)
 FetchContent_MakeAvailable(stb)
 FetchContent_MakeAvailable(VulkanMemoryAllocator)
@@ -252,7 +242,6 @@ mark_as_system_includes(glslang-default-resource-limits)
 # Suppress warnings from other vendor libraries
 mark_as_system_includes(glfw)
 mark_as_system_includes(spdlog)
-mark_as_system_includes(EnTT)
 mark_as_system_includes(Jolt)
 
 # ==================== Manual Target Configuration ====================
@@ -330,7 +319,6 @@ target_link_libraries(vendor_libraries INTERFACE
     glm
     amethyst
     amethyst_vk13_glfw
-    EnTT
     spdlog
     stb_image
     vma
@@ -350,7 +338,6 @@ target_link_libraries(vendor_libraries INTERFACE
 target_include_directories(vendor_libraries SYSTEM INTERFACE
     ${glfw_SOURCE_DIR}/include
     ${glm_SOURCE_DIR}
-    ${entt_SOURCE_DIR}/single_include
     ${spdlog_SOURCE_DIR}/include
 )
 
