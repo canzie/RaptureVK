@@ -8,6 +8,7 @@
 #include "events/EventSignal.h"
 #include "scenes/entities/EntityCommon.h"
 #include "serialization/SerialDocument.h"
+#include "utils/FreeList.h"
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -19,7 +20,8 @@ namespace Rapture {
 class Camera3D;
 class Controller;
 class Environment;
-class Instance;
+class SceneComponent;
+class SceneObject;
 class SceneRenderData;
 class PhysicsSystem;
 struct RenderContext;
@@ -92,20 +94,33 @@ class Scene {
      * @brief The hidden root every authored instance lives under
      * @return The root, which is never shown, named or written to a scene file
      */
-    Instance *root() const { return m_root.get(); }
+    SceneObject *root() const { return m_root.get(); }
 
     /**
      * @brief Finds the instance that owns an entity
      * @param entity The entity to look up
      * @return The instance, or nullptr if the entity is not authored
      */
-    Instance *instanceFor(ecs::Entity entity) const;
+    SceneObject *instanceFor(ecs::Entity entity) const;
 
     /**
      * @brief Destroys an instance along with its subtree
      * @param instance The instance to destroy, ignored if it is the root
      */
-    void destroyInstance(Instance *instance);
+    void destroyInstance(SceneObject *instance);
+
+    /**
+     * @brief Takes a slot in the list walked each update
+     * @param component The component to start updating
+     * @return The slot the component was put in
+     */
+    uint32_t addUpdatingComponent(SceneComponent *component);
+
+    /**
+     * @brief Releases a slot in the list walked each update
+     * @param slot The slot to free
+     */
+    void removeUpdatingComponent(uint32_t slot);
 
     /**
      * @brief Writes the scene's settings and its whole instance tree
@@ -196,7 +211,9 @@ class Scene {
     bool m_tlasDirty = false;
 
     // declared last so its subtree tears down before anything destroyEntity touches
-    std::unique_ptr<Instance> m_root;
+    FreeList<SceneComponent *> m_updatingComponents;
+
+    std::unique_ptr<SceneObject> m_root;
 
     friend class Environment;
 };

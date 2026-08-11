@@ -26,7 +26,7 @@ class CameraController : public Controller {
      * @brief Takes a camera as both the object this drives and the view it is seen through
      * @param subject The camera to drive, rejected if it is not a Camera3D
      */
-    void possess(Instance *subject) override;
+    void possess(SceneObject *subject) override;
 
     /**
      * @brief Advance the possessed camera from this frame's intent.

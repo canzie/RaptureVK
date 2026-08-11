@@ -8,6 +8,8 @@
 #include "materials/Material.h"
 #include "materials/MaterialInstance.h"
 #include "meshes/MeshPrimitives.h"
+#include "scenes/instances/Instance.h"
+#include "scenes/instances/InstanceRegistry.h"
 #include "textures/Texture.h"
 #include "utils/UUID.h"
 #include "window_context/Application.h"
@@ -60,9 +62,10 @@ static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &
             return texture->serialize(metadata.getSourcePath().string());
         }
         break;
-    case ASSET_PREFAB:
-        if (Prefab *prefab = asset.getUnderlyingAsset<Prefab>()) {
-            return prefab->serialize();
+    case ASSET_SCENE_OBJECT:
+        if (SerialDocument *document = asset.getUnderlyingAsset<SerialDocument>()) {
+            std::string text = document->toText();
+            return std::vector<uint8_t>(text.begin(), text.end());
         }
         break;
     case ASSET_MATERIAL:
@@ -106,12 +109,15 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
             return true;
         }
         break;
-    case ASSET_PREFAB:
-        if (auto prefab = Prefab::deserialize(payload)) {
-            asset.setAssetVariant(std::move(prefab));
+    case ASSET_SCENE_OBJECT: {
+        std::string_view text(reinterpret_cast<const char *>(payload.data()), payload.size());
+        auto document = std::make_unique<SerialDocument>(SerialDocument::parse(text));
+        if (document->rootView().valid()) {
+            asset.setAssetVariant(std::move(document));
             return true;
         }
         break;
+    }
     case ASSET_MATERIAL:
         if (auto material = BaseMaterial::deserialize(payload)) {
             asset.setAssetVariant(std::move(material));
@@ -150,10 +156,11 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
         type = ASSET_MESH;
         return std::make_unique<Mesh>(meshData->params);
     }
-    if (auto *prefabData = std::get_if<PrefabImportData>(&data)) {
-        payload = prefabData->prefab->serialize();
-        type = ASSET_PREFAB;
-        return std::move(prefabData->prefab);
+    if (auto *sceneObjectData = std::get_if<SceneObjectImportData>(&data)) {
+        std::string text = sceneObjectData->document->toText();
+        payload.assign(text.begin(), text.end());
+        type = ASSET_SCENE_OBJECT;
+        return std::move(sceneObjectData->document);
     }
     if (auto *materialData = std::get_if<BaseMaterialImportData>(&data)) {
         payload = materialData->material->serialize();
@@ -309,9 +316,11 @@ Asset &AssetManagerEditor::importAsset(AssetImportDataRequest request)
     metadata->name = request.name;
     metadata->provenance = std::move(request.provenance);
 
-    // recorded on the metadata so a module can be filtered by class while its payload is evicted
+    // recorded on the metadata so an asset can be filtered by class while its payload is evicted
     if (ModuleClass *module = asset->getUnderlyingAsset<ModuleClass>()) {
-        metadata->moduleClass = &module->type();
+        metadata->authoredClass = &module->type();
+    } else if (SerialDocument *document = asset->getUnderlyingAsset<SerialDocument>()) {
+        metadata->authoredClass = InstanceRegistry::find(Instance::readClassName(document->rootView()));
     }
 
     return registerImportedAsset(handle, std::move(asset), std::move(metadata), request.output, payload);
@@ -431,7 +440,7 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
     } else if (extension == ".cubemap") {
         return ASSET_CUBEMAP;
     } else if (extension == ".gltf" || extension == ".glb" || extension == ".fbx") {
-        return ASSET_PREFAB;
+        return ASSET_SCENE_OBJECT;
     } else if (extension == ".rmat") {
         return ASSET_MATERIAL;
     } else if (extension == ".spv" || extension == ".glsl") {

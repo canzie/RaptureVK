@@ -29,7 +29,7 @@ enum AssetType {
     ASSET_MATERIAL,
     ASSET_MATERIAL_INSTANCE,
     ASSET_MESH,
-    ASSET_PREFAB,
+    ASSET_SCENE_OBJECT,
     ASSET_ANIMATION,
     ASSET_AUDIO,
     ASSET_VIDEO,
@@ -72,8 +72,8 @@ inline std::string AssetTypeToString(AssetType type)
         return "Material Instance";
     case ASSET_MESH:
         return "Mesh";
-    case ASSET_PREFAB:
-        return "Prefab";
+    case ASSET_SCENE_OBJECT:
+        return "Scene Object";
     case ASSET_MODULE:
         return "Module";
     case ASSET_ANIMATION:

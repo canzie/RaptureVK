@@ -1,14 +1,14 @@
 #ifndef RAPTURE__FOLDER_H
 #define RAPTURE__FOLDER_H
 
-#include "scenes/instances/Instance.h"
+#include "scenes/instances/SceneObject.h"
 
 namespace Rapture {
 
 /**
  * @brief Groups instances in the outliner without taking part in transforms.
  */
-class Folder : public Instance {
+class Folder : public SceneObject {
   public:
     Folder(Scene &scene, std::string_view name);
 

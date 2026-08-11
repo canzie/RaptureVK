@@ -31,7 +31,7 @@ const TypeInfo &CameraController::type() const
     return staticType();
 }
 
-void CameraController::possess(Instance *subject)
+void CameraController::possess(SceneObject *subject)
 {
     Camera3D *camera = subject != nullptr ? subject->as<Camera3D>() : nullptr;
     if (camera == nullptr) {

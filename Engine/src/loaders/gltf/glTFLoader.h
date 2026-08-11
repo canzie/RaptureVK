@@ -20,8 +20,10 @@
 namespace Rapture {
 
 struct Counter;
-class Scene;
 class MaterialInstance;
+class Node3D;
+class Scene;
+class SceneObject;
 
 /**
  * @brief Loader for glTF 2.0 format 3D models
@@ -75,7 +77,23 @@ class glTF2Loader {
     bool loadMesh(glTF_SceneNode *node, size_t meshIndex);
     bool decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, PrimitiveData &out);
 
-    void buildPrefab();
+    /**
+     * @brief Builds the scene objects one glTF node subtree describes
+     * @param parent The object the new object is parented to
+     * @param src The glTF node to build from
+     * @return The object built for this node
+     */
+    Node3D *buildSceneObject(SceneObject &parent, glTF_SceneNode *src);
+
+    /**
+     * @brief Imports this file's nodes as a scene object asset, and spawns them if there is a scene
+     *
+     * The objects are built in a scene of their own and serialized from there, so the asset is
+     * written by the same classes that read it back.
+     *
+     * @param scene The scene to spawn the imported objects into, or nullptr to only write the asset
+     */
+    void buildSceneObjectAsset(Scene *scene);
 
     void loadSkin(yyjson_val *skinVal);
     void loadWeights(yyjson_val *weightsVal);

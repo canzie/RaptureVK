@@ -3,12 +3,23 @@
 #include "Asset.h"
 #include "logging/Log.h"
 #include "modules/ModuleRegistry.h"
+#include "scenes/instances/InstanceRegistry.h"
 
 #include <cstring>
 #include <fstream>
 #include <string_view>
 
 namespace Rapture {
+
+/**
+ * @brief Whether an asset type names the authored class it holds
+ * @param type The asset type to test
+ * @return True if the type records a class name in its metadata
+ */
+static bool s_recordsClass(AssetType type)
+{
+    return type == ASSET_MODULE || type == ASSET_SCENE_OBJECT;
+}
 
 static constexpr uint32_t RASSET_MAGIC = 0x54534152; // "RAST"
 static constexpr uint16_t RASSET_VERSION_MAJOR = 1;
@@ -108,9 +119,9 @@ static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata)
         s_append(out, hasSubIndex ? *metadata.provenance->sourceSubIndex : uint32_t{0});
     }
 
-    // only a module records a class, so no file written before the type existed is asked to read one
-    if (metadata.assetType == ASSET_MODULE) {
-        s_appendString(out, metadata.moduleClass != nullptr ? metadata.moduleClass->name : std::string_view{});
+    // only the authored types record a class, so no file written before the type existed is asked to read one
+    if (s_recordsClass(metadata.assetType)) {
+        s_appendString(out, metadata.authoredClass != nullptr ? metadata.authoredClass->name : std::string_view{});
     }
     return out;
 }
@@ -136,11 +147,12 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
         metadata->provenance = std::move(provenance);
     }
 
-    if (metadata->assetType == ASSET_MODULE) {
+    if (s_recordsClass(metadata->assetType)) {
         std::string className = reader.readString();
-        metadata->moduleClass = ModuleRegistry::find(className);
-        if (metadata->moduleClass == nullptr) {
-            RP_CORE_WARN("no module class named '{}', '{}' cannot be loaded", className, metadata->name);
+        metadata->authoredClass = metadata->assetType == ASSET_MODULE ? ModuleRegistry::find(className)
+                                                                      : InstanceRegistry::find(className);
+        if (metadata->authoredClass == nullptr) {
+            RP_CORE_WARN("no class named '{}', '{}' cannot be loaded", className, metadata->name);
         }
     }
 

@@ -1,7 +1,7 @@
 #include "ContentBrowserPanel.h"
 #include "Icons.h"
 #include "asset_manager/AssetManager.h"
-#include "components/systems/Prefab.h"
+#include "scenes/instances/SceneObject.h"
 #include "layers/panels/components/asset_visuals.h"
 #include "layers/panels/components/context_menus.h"
 #include "logging/Log.h"
@@ -66,11 +66,11 @@ static std::string s_assetFileName(std::string_view name)
     return fileName;
 }
 
-// a module is labelled with the class it holds, every other asset with its type
-static std::string s_typeLabel(Rapture::AssetType type, const Rapture::TypeInfo *moduleClass)
+// an authored asset is labelled with the class it holds, every other asset with its type
+static std::string s_typeLabel(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass)
 {
-    if (type == Rapture::ASSET_MODULE && moduleClass != nullptr) {
-        return std::string(moduleClass->name);
+    if (authoredClass != nullptr && (type == Rapture::ASSET_MODULE || type == Rapture::ASSET_SCENE_OBJECT)) {
+        return std::string(authoredClass->name);
     }
     return Rapture::AssetTypeToString(type);
 }
@@ -100,14 +100,22 @@ static std::string s_uniqueAssetName(const std::filesystem::path &directory, std
     return name;
 }
 
-static void s_loadPrefabIntoScene(Rapture::AssetHandle handle, Rapture::Scene *scene)
+static void s_spawnSceneObjectAsset(Rapture::AssetHandle handle, Rapture::Scene *scene)
 {
     if (scene == nullptr) {
-        RP_WARN("No scene to load the prefab into");
+        RP_WARN("No scene to spawn into");
         return;
     }
-    if (Rapture::Prefab::instantiate(Rapture::AssetManager::getAsset(handle), scene) == nullptr) {
-        RP_WARN("Failed to load prefab into the scene");
+
+    Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
+    Rapture::SerialDocument *document = ref ? ref.get()->getUnderlyingAsset<Rapture::SerialDocument>() : nullptr;
+    if (document == nullptr) {
+        RP_WARN("Asset {} holds no scene objects", handle);
+        return;
+    }
+
+    if (Rapture::SceneObject::spawnSubtree(*scene->root(), document->rootView()) == nullptr) {
+        RP_WARN("Failed to spawn asset {} into the scene", handle);
     }
 }
 
@@ -599,7 +607,7 @@ MenuItems ContentBrowserPanel::buildAdvancedAddItems()
 
     MenuItems scenes;
     scenes.push_back(AddAssetContextMenuAID::createPlainRow("Level", []() { s_createAssetStub("level"); }));
-    scenes.push_back(AddAssetContextMenuAID::createPlainRow("Prefab", []() { s_createAssetStub("prefab"); }));
+    scenes.push_back(AddAssetContextMenuAID::createPlainRow("Scene Object", []() { s_createAssetStub("sceneobject"); }));
 
     MenuItems shaders;
     shaders.push_back(AddAssetContextMenuAID::createPlainRow("Compute Shader", []() { s_createAssetStub("compute shader"); }));
@@ -776,8 +784,9 @@ std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPane
     }
 
     switch (type) {
-    case Rapture::ASSET_PREFAB:
-        items.push_back(Amethyst::makeActionItem("Load in scene", [this, handle]() { s_loadPrefabIntoScene(handle, m_scene); }));
+    case Rapture::ASSET_SCENE_OBJECT:
+        items.push_back(
+            Amethyst::makeActionItem("Load in scene", [this, handle]() { s_spawnSceneObjectAsset(handle, m_scene); }));
         break;
     default:
         break;
@@ -919,12 +928,12 @@ void ContentBrowserPanel::refreshFileBrowser()
             item.typeBar->setBaseProperties({.visible = false});
             item.type->setBaseProperties({.visible = false});
         } else if (metadata != nullptr) {
-            item.icon->setSvg(Asset_iconForType(metadata->assetType, metadata->moduleClass));
+            item.icon->setSvg(Asset_iconForType(metadata->assetType, metadata->authoredClass));
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});
             item.typeBar->setBaseProperties({.visible = true});
             item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(metadata->assetType)});
             item.type->setBaseProperties({.visible = true});
-            item.type->setText(s_typeLabel(metadata->assetType, metadata->moduleClass));
+            item.type->setText(s_typeLabel(metadata->assetType, metadata->authoredClass));
         } else {
             item.icon->setSvg(Icons::SVG_SCRIPT);
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});

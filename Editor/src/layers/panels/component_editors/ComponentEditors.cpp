@@ -28,7 +28,7 @@ static T *s_instanceAs(Rapture::Scene *scene, const Rapture::ecs::EntityAccessor
         return nullptr;
     }
 
-    Rapture::Instance *instance = scene->instanceFor(entity.getEntity());
+    Rapture::SceneObject *instance = scene->instanceFor(entity.getEntity());
     return instance != nullptr ? instance->as<T>() : nullptr;
 }
 
@@ -270,9 +270,9 @@ void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             }
 
             if (b) {
-                m_node->addRigidBody();
+                m_node->addComponent<Rapture::RigidBody3D>();
             } else {
-                m_node->removeRigidBody();
+                m_node->removeComponent<Rapture::RigidBody3D>();
             }
 
             if (requestRefresh) {
@@ -292,7 +292,7 @@ void Mesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 
     m_isVisible = m_node->isVisible();
     m_isRayTraced = m_node->isRayTraced();
-    m_hasRigidBody = m_node->rigidBody() != nullptr;
+    m_hasRigidBody = m_node->component<Rapture::RigidBody3D>() != nullptr;
 
     if (previous != m_node) {
         if (m_mobilityDropdown != nullptr) {
@@ -334,12 +334,8 @@ static std::string s_describeShape(const Rapture::PhysicsShape &shape)
 
 Rapture::RigidBody3D *RigidBody3DEditor::resolveBody(const Rapture::ecs::EntityAccessor &entity) const
 {
-    if (Rapture::RigidBody3D *body = s_instanceAs<Rapture::RigidBody3D>(scene, entity)) {
-        return body;
-    }
-
-    Rapture::Mesh3D *mesh = s_instanceAs<Rapture::Mesh3D>(scene, entity);
-    return mesh != nullptr ? mesh->rigidBody() : nullptr;
+    Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(scene, entity);
+    return object != nullptr ? object->component<Rapture::RigidBody3D>() : nullptr;
 }
 
 void RigidBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

@@ -14,11 +14,11 @@
 
 #include "AssetHandle.h"
 
-#include "components/systems/Prefab.h"
 #include "materials/MaterialInstance.h"
 #include "meshes/Mesh.h"
 #include "modules/ModuleClass.h"
 #include "scenes/World.h"
+#include "serialization/SerialDocument.h"
 #include "shaders/Shader.h"
 #include "textures/Texture.h"
 #include "utils/TypeInfo.h"
@@ -27,7 +27,7 @@ namespace Rapture {
 
 using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
                                   std::unique_ptr<BaseMaterial>, std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>,
-                                  std::unique_ptr<Prefab>, std::unique_ptr<ModuleClass>, std::unique_ptr<World>>;
+                                  std::unique_ptr<SerialDocument>, std::unique_ptr<ModuleClass>, std::unique_ptr<World>>;
 
 template <typename T, typename Variant>
 struct IsAssetType;
@@ -55,8 +55,8 @@ struct AssetMetadata {
     AssetEvictionPolicy evictionPolicy = AssetEvictionPolicy::EVICT_IMMEDIATE;
     uint64_t sizeHintBytes = 0;
 
-    /// The class a MODULE asset holds, so modules can be filtered by class without being loaded
-    const TypeInfo *moduleClass = nullptr;
+    /// The class a scene object or module asset holds, so assets can be filtered by class without being loaded
+    const TypeInfo *authoredClass = nullptr;
 
     bool isDiskAsset() const { return storageType == AssetStorageType::DISK; }
     bool isVirtualAsset() const { return storageType == AssetStorageType::VIRTUAL; }

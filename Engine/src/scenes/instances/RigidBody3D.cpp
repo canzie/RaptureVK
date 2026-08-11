@@ -4,6 +4,7 @@
 #include "logging/Log.h"
 #include "physics/PhysicsSystem.h"
 #include "scenes/Scene.h"
+#include "scenes/instances/Node3D.h"
 
 namespace Rapture {
 
@@ -15,6 +16,7 @@ static constexpr std::string_view KEY_HALF_HEIGHT = "halfHeight";
 static constexpr std::string_view KEY_MOTION_TYPE = "motionType";
 static constexpr std::string_view KEY_FRICTION = "friction";
 static constexpr std::string_view KEY_RESTITUTION = "restitution";
+static constexpr std::string_view KEY_LOCAL_TRANSFORM = "localTransform";
 
 static glm::mat4 s_rigidPart(const glm::mat4 &matrix)
 {
@@ -66,22 +68,40 @@ static PhysicsShape s_readShape(ReadNode node, const PhysicsShape &fallback)
                                      static_cast<float>(extents.at(2).asF64(0.5)))};
 }
 
-RigidBody3D::RigidBody3D(Scene &scene, std::string_view name, Node3D *host) : Node3D(scene, name), m_host(host)
+static void s_writeMatrix(WriteNode node, std::string_view key, const glm::mat4 &matrix)
 {
-    rebuild();
+    WriteNode values = node.addArray(key);
+    const float *source = &matrix[0][0];
+    for (size_t i = 0; i < 16; i++) {
+        values.append(source[i]);
+    }
 }
+
+static glm::mat4 s_readMatrix(ReadNode node, const glm::mat4 &fallback)
+{
+    if (node.size() != 16) {
+        return fallback;
+    }
+
+    glm::mat4 matrix(1.0f);
+    float *target = &matrix[0][0];
+    for (size_t i = 0; i < 16; i++) {
+        target[i] = static_cast<float>(node.at(i).asF64(0.0));
+    }
+
+    return matrix;
+}
+
+RigidBody3D::RigidBody3D(Scene &scene, std::string_view name) : SceneComponent(scene, name) {}
 
 RigidBody3D::~RigidBody3D()
 {
-    PhysicsSystem *physics = scene() != nullptr ? scene()->physics() : nullptr;
-    if (physics != nullptr && m_bodyId.isValid()) {
-        physics->removeRigidBody(m_bodyId);
-    }
+    releaseBody();
 }
 
 const TypeInfo &RigidBody3D::staticType()
 {
-    static const TypeInfo type("RigidBody3D", &Node3D::staticType());
+    static const TypeInfo type("RigidBody3D", &SceneComponent::staticType());
     return type;
 }
 
@@ -90,25 +110,57 @@ const TypeInfo &RigidBody3D::type() const
     return staticType();
 }
 
-Node3D *RigidBody3D::target() const
+Node3D *RigidBody3D::node() const
 {
-    return m_host != nullptr ? m_host : const_cast<RigidBody3D *>(this);
+    SceneObject *object = owner();
+    return object != nullptr ? object->as<Node3D>() : nullptr;
 }
 
-glm::mat4 RigidBody3D::offsetTransform() const
+glm::mat4 RigidBody3D::scaledLocalTransform() const
 {
-    if (m_host == nullptr) {
-        return glm::mat4(1.0f);
+    const Node3D *target = node();
+    if (target == nullptr) {
+        return s_rigidPart(m_localTransform);
     }
 
-    const glm::mat4 &local = localTransform();
-    const glm::vec3 hostScale = transform::scale(m_host->worldTransform());
-    return transform::compose(transform::translation(local) * hostScale, transform::rotation(local), glm::vec3(1.0f));
+    const glm::vec3 worldScale = transform::scale(target->worldTransform());
+    return transform::compose(transform::translation(m_localTransform) * worldScale, transform::rotation(m_localTransform),
+                              glm::vec3(1.0f));
 }
 
-glm::mat4 RigidBody3D::bodyTransform(const glm::mat4 &offset) const
+glm::mat4 RigidBody3D::bodyTransform(const glm::mat4 &local) const
 {
-    return s_rigidPart(target()->worldTransform()) * offset;
+    const Node3D *target = node();
+    if (target == nullptr) {
+        return local;
+    }
+
+    return s_rigidPart(target->worldTransform()) * local;
+}
+
+void RigidBody3D::releaseBody()
+{
+    PhysicsSystem *physics = scene() != nullptr ? scene()->physics() : nullptr;
+    if (physics != nullptr && m_bodyId.isValid()) {
+        physics->removeRigidBody(m_bodyId);
+    }
+
+    m_bodyId = PhysicsBodyId();
+}
+
+void RigidBody3D::onAttach()
+{
+    if (node() == nullptr) {
+        RP_CORE_ERROR("'{}' needs an object with a place in the world", name());
+        return;
+    }
+
+    rebuild();
+}
+
+void RigidBody3D::onDetach()
+{
+    releaseBody();
 }
 
 void RigidBody3D::rebuild()
@@ -119,15 +171,16 @@ void RigidBody3D::rebuild()
         return;
     }
 
-    if (m_bodyId.isValid()) {
-        physics->removeRigidBody(m_bodyId);
-        m_bodyId = PhysicsBodyId();
+    if (node() == nullptr) {
+        return;
     }
 
-    const glm::mat4 offset = offsetTransform();
-    m_inverseOffset = glm::inverse(offset);
+    releaseBody();
 
-    const glm::mat4 body = bodyTransform(offset);
+    const glm::mat4 local = scaledLocalTransform();
+    m_inverseLocal = glm::inverse(local);
+
+    const glm::mat4 body = bodyTransform(local);
 
     RigidBodyConfig config;
     config.shape = m_shape;
@@ -143,16 +196,26 @@ void RigidBody3D::rebuild()
 
 void RigidBody3D::applySimulatedTransform(const glm::vec3 &position, const glm::quat &rotation)
 {
-    Node3D *node = target();
-    const glm::mat4 world = transform::compose(position, rotation, glm::vec3(1.0f)) * m_inverseOffset;
+    Node3D *target = node();
+    if (target == nullptr) {
+        return;
+    }
 
-    node->setSimulatedWorldTransform(
-        transform::compose(transform::translation(world), transform::rotation(world), node->scale()));
+    const glm::mat4 world = transform::compose(position, rotation, glm::vec3(1.0f)) * m_inverseLocal;
+
+    target->setSimulatedWorldTransform(
+        transform::compose(transform::translation(world), transform::rotation(world), target->scale()));
 }
 
 void RigidBody3D::setShape(const PhysicsShape &shape)
 {
     m_shape = shape;
+    rebuild();
+}
+
+void RigidBody3D::setLocalTransform(const glm::mat4 &transform)
+{
+    m_localTransform = transform;
     rebuild();
 }
 
@@ -180,10 +243,11 @@ void RigidBody3D::setRestitution(float restitution)
 
 void RigidBody3D::serialize(WriteNode node) const
 {
-    Node3D::serialize(node);
+    SceneComponent::serialize(node);
 
     WriteNode body = node.addObject(KEY_BODY);
     s_writeShape(body, m_shape);
+    s_writeMatrix(body, KEY_LOCAL_TRANSFORM, m_localTransform);
     body.set(KEY_MOTION_TYPE, PhysicsMotionType_toString(m_motionType));
     body.set(KEY_FRICTION, m_friction);
     body.set(KEY_RESTITUTION, m_restitution);
@@ -191,7 +255,7 @@ void RigidBody3D::serialize(WriteNode node) const
 
 void RigidBody3D::deserialize(ReadNode node)
 {
-    Node3D::deserialize(node);
+    SceneComponent::deserialize(node);
 
     ReadNode body = node.child(KEY_BODY);
     if (!body.valid()) {
@@ -199,11 +263,10 @@ void RigidBody3D::deserialize(ReadNode node)
     }
 
     m_shape = s_readShape(body, m_shape);
+    m_localTransform = s_readMatrix(body.child(KEY_LOCAL_TRANSFORM), m_localTransform);
     m_motionType = static_cast<PhysicsMotionType>(body.child(KEY_MOTION_TYPE).asU64(static_cast<uint64_t>(m_motionType)));
     m_friction = static_cast<float>(body.child(KEY_FRICTION).asF64(m_friction));
     m_restitution = static_cast<float>(body.child(KEY_RESTITUTION).asF64(m_restitution));
-
-    rebuild();
 }
 
 } // namespace Rapture

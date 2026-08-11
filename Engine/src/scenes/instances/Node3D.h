@@ -1,7 +1,7 @@
 #ifndef RAPTURE__NODE3D_H
 #define RAPTURE__NODE3D_H
 
-#include "scenes/instances/Instance.h"
+#include "scenes/instances/SceneObject.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -25,7 +25,7 @@ enum TransformDirtyFlag {
 /**
  * @brief An instance with a place in the world.
  */
-class Node3D : public Instance {
+class Node3D : public SceneObject {
   public:
     Node3D(Scene &scene, std::string_view name);
 
@@ -106,7 +106,7 @@ class Node3D : public Instance {
      * @brief Rebuilds every world transform below an instance, walking through instances that have none
      * @param parent The instance whose subtree is rebuilt
      */
-    static void updateDescendantWorldTransforms(const Instance &parent);
+    static void updateDescendantWorldTransforms(const SceneObject &parent);
 
     void resolveRotationAndScale() const;
     void resolveLocal() const;

@@ -22,7 +22,7 @@ class PlayerController : public Controller {
      * @brief Takes a spawned puppet and the camera hanging in it
      * @param subject The puppet root to drive, rejected if it has no place in the world
      */
-    void possess(Instance *subject) override;
+    void possess(SceneObject *subject) override;
 
     /**
      * @brief Walks and turns the possessed puppet from this frame's intent

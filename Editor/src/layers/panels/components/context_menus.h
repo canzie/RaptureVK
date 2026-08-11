@@ -32,7 +32,7 @@ class AssetContextMenuAID : public AM::ContextMenu::ActionItemData {
   public:
     Rapture::AssetHandle assetHandle = Rapture::INVALID_ASSET_HANDLE;
     Rapture::AssetType assetType = Rapture::ASSET_NONE;
-    const Rapture::TypeInfo *moduleClass = nullptr;
+    const Rapture::TypeInfo *authoredClass = nullptr;
     Amethyst::AmTextureId thumbnail = AM::AM_INVALID_TEXTURE;
     std::string name;
 };
@@ -82,7 +82,7 @@ class AddAssetContextMenuAID : public AM::ContextMenu::ActionItemData {
     std::string label;
     std::string svgIcon;
     Rapture::AssetType assetType = Rapture::ASSET_NONE;
-    const Rapture::TypeInfo *moduleClass = nullptr;
+    const Rapture::TypeInfo *authoredClass = nullptr;
     bool enabled = true;
 };
 

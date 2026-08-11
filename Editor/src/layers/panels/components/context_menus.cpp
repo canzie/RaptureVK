@@ -38,7 +38,7 @@ std::unique_ptr<ContextMenu::ItemData> AssetContextMenuAID::create(Rapture::Asse
 
     const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(asset);
     item->assetType = metadata.assetType;
-    item->moduleClass = metadata.moduleClass;
+    item->authoredClass = metadata.authoredClass;
     item->name = metadata.name;
 
     return item;
@@ -95,7 +95,7 @@ void AssetContextMenuAIV::bind(ContextMenu::ItemData &item)
     float thumbSize = m_owner->itemHeight - THUMB_INSET;
     m_preview->setBaseProperties({.size = UDim2::fromOffset(thumbSize, thumbSize), .visible = true});
     if (asset.thumbnail == AM_INVALID_TEXTURE) {
-        m_preview->setSvg(Asset_iconForType(asset.assetType, asset.moduleClass));
+        m_preview->setSvg(Asset_iconForType(asset.assetType, asset.authoredClass));
     } else {
         m_preview->setImage(asset.thumbnail);
     }
@@ -205,7 +205,7 @@ void AddAssetContextMenuAIV::bind(ContextMenu::ItemData &item)
 
     float labelLeft = ROW_PADDING;
     if (addItem.style == ADD_ROW_ASSET) {
-        m_icon->setSvg(Asset_iconForType(addItem.assetType, addItem.moduleClass));
+        m_icon->setSvg(Asset_iconForType(addItem.assetType, addItem.authoredClass));
         m_icon->setImageStyleProperties({.imageColor = m_owner->getTextStyleProperties().textColor});
         m_accent->setBaseStyleProperties({.backgroundColor = Asset_colorForType(addItem.assetType)});
         labelLeft += ADD_ASSET_WELL_SIZE + ICON_GAP;

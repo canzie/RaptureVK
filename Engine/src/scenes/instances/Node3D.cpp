@@ -53,14 +53,14 @@ static glm::quat s_readQuat(ReadNode node, std::string_view key, const glm::quat
 
 static const glm::mat4 MAT4_IDENTITY = glm::mat4(1.0f);
 
-Node3D::Node3D(Scene &scene, std::string_view name) : Instance(scene, name)
+Node3D::Node3D(Scene &scene, std::string_view name) : SceneObject(scene, name)
 {
     m_entity.set<TransformComponent>();
 }
 
 const TypeInfo &Node3D::staticType()
 {
-    static const TypeInfo type("Node3D", &Instance::staticType());
+    static const TypeInfo type("Node3D", &SceneObject::staticType());
     return type;
 }
 
@@ -216,7 +216,7 @@ void Node3D::onParentChanged()
     updateWorldTransform();
 }
 
-void Node3D::updateDescendantWorldTransforms(const Instance &parent)
+void Node3D::updateDescendantWorldTransforms(const SceneObject &parent)
 {
     for (const auto &child : parent.children()) {
         Node3D *node = child->as<Node3D>();
@@ -261,7 +261,7 @@ void Node3D::resolveLocal() const
 
 void Node3D::serialize(WriteNode node) const
 {
-    Instance::serialize(node);
+    SceneObject::serialize(node);
 
     WriteNode transform = node.addObject(KEY_TRANSFORM);
     s_writeVec3(transform, KEY_TRANSLATION, position());
@@ -271,7 +271,7 @@ void Node3D::serialize(WriteNode node) const
 
 void Node3D::deserialize(ReadNode node)
 {
-    Instance::deserialize(node);
+    SceneObject::deserialize(node);
 
     ReadNode transform = node.child(KEY_TRANSFORM);
     if (!transform.valid()) {

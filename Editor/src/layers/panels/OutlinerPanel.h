@@ -36,22 +36,22 @@ class OutlinerPanel : public Panel {
     void onUpdate(float dt) override;
 
   private:
-    void buildInstanceTree(Rapture::Instance *instance, Amethyst::TreeRowScope &rowScope);
+    void buildInstanceTree(Rapture::SceneObject *instance, Amethyst::TreeRowScope &rowScope);
 
     void onRowClicked(uint32_t row);
     void onRowRightClicked(uint32_t row, Amethyst::vec2 pos);
 
-    void requestDelete(Rapture::Instance *instance, bool keepChildren);
+    void requestDelete(Rapture::SceneObject *instance, bool keepChildren);
     void applyPendingDelete(void);
 
     void showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items);
 
-    void startRename(uint32_t row, Rapture::Instance *instance);
-    void buildNameCell(uint32_t row, Rapture::Instance *instance, const std::string &name, bool editing);
-    void onRenameCommitted(Rapture::Instance *instance, const std::string &newName);
+    void startRename(uint32_t row, Rapture::SceneObject *instance);
+    void buildNameCell(uint32_t row, Rapture::SceneObject *instance, const std::string &name, bool editing);
+    void onRenameCommitted(Rapture::SceneObject *instance, const std::string &newName);
     void applyPendingRename(void);
 
-    Rapture::Instance *instanceForRow(uint32_t row) const;
+    Rapture::SceneObject *instanceForRow(uint32_t row) const;
 
   private:
     Amethyst::ScrollingFrame *m_scrollingFrame = nullptr;
@@ -65,14 +65,14 @@ class OutlinerPanel : public Panel {
     /**
      * @brief Maps a TreeView logical row index to its instance, filled in DFS build order during refresh().
      */
-    std::vector<Rapture::Instance *> m_rowInstances;
+    std::vector<Rapture::SceneObject *> m_rowInstances;
 
-    Rapture::Instance *m_renamingInstance = nullptr;
+    Rapture::SceneObject *m_renamingInstance = nullptr;
     uint32_t m_renameRow = 0;
     bool m_pendingRenameCommit = false;
     std::string m_pendingRenameName;
 
-    Rapture::Instance *m_pendingDeleteInstance = nullptr;
+    Rapture::SceneObject *m_pendingDeleteInstance = nullptr;
     bool m_pendingDeleteKeepChildren = false;
 
     Rapture::EventConnection m_hierarchyChangedConn;

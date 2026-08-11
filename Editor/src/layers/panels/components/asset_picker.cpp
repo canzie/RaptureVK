@@ -292,7 +292,7 @@ void AssetPicker::applySelection()
     const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(m_selected);
 
     m_label->setText(metadata.name);
-    m_preview->setSvg(Asset_iconForType(metadata.assetType, metadata.moduleClass));
+    m_preview->setSvg(Asset_iconForType(metadata.assetType, metadata.authoredClass));
     m_typeAccent->setBaseStyleProperties({.backgroundColor = Asset_colorForType(metadata.assetType)});
 }
 

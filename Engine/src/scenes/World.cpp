@@ -6,7 +6,7 @@
 #include "modules/controllers/Controller.h"
 #include "modules/puppets/Puppet.h"
 #include "scenes/Scene.h"
-#include "scenes/instances/Instance.h"
+#include "scenes/instances/SceneObject.h"
 #include "serialization/SerialDocument.h"
 
 namespace Rapture {
@@ -41,7 +41,7 @@ static std::unique_ptr<Controller> s_instantiateController(AssetHandle handle)
     return std::unique_ptr<Controller>(static_cast<Controller *>(module.release()));
 }
 
-static Instance *s_spawnPuppet(AssetHandle handle, Scene &scene)
+static SceneObject *s_spawnPuppet(AssetHandle handle, Scene &scene)
 {
     AssetRef ref = AssetManager::getAsset(handle);
     ModuleClass *module = s_moduleOf(ref);
@@ -87,7 +87,7 @@ void World::play()
     m_snapshot = m_scene->snapshot();
 
     m_playController = s_instantiateController(m_data.controller);
-    Instance *puppetRoot = s_spawnPuppet(m_data.puppet, *m_scene);
+    SceneObject *puppetRoot = s_spawnPuppet(m_data.puppet, *m_scene);
     if (m_playController != nullptr && puppetRoot != nullptr) {
         m_playController->possess(puppetRoot);
         m_scene->setActiveController(m_playController.get());

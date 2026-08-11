@@ -13,7 +13,7 @@ const TypeInfo &Controller::type() const
     return staticType();
 }
 
-void Controller::possess(Instance *subject)
+void Controller::possess(SceneObject *subject)
 {
     m_possessed = subject;
 }

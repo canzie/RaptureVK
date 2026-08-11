@@ -3,7 +3,7 @@
 
 #include "asset_manager/AssetCommon.h"
 #include "asset_manager/AssetHandle.h"
-#include "scenes/instances/Instance.h"
+#include "scenes/instances/SceneObject.h"
 
 #include <glm/glm.hpp>
 
@@ -40,10 +40,10 @@ struct SunAngles {
 /**
  * @brief The scene's sky and atmosphere, and the owner of the derived skybox and image based lighting.
  *
- * Placeless, so it derives from Instance rather than Node3D. A scene holds at most one, which is a
+ * Placeless, so it derives from SceneObject rather than Node3D. A scene holds at most one, which is a
  * consequence of two of them being indistinguishable rather than a rule the tree enforces.
  */
-class Environment : public Instance {
+class Environment : public SceneObject {
   public:
     Environment(Scene &scene, std::string_view name);
     ~Environment() override;

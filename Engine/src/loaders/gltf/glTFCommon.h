@@ -53,7 +53,7 @@ struct glTF_LoadedSceneData {
 
     std::vector<std::unique_ptr<glTF_SceneNode>> rootNodes;
 
-    AssetPtr<Prefab> prefab;
+    AssetRef sceneObject;
 
     SceneFileMetadata metadata;
 };

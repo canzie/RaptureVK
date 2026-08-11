@@ -208,13 +208,13 @@ void ModuleEditorWorkspace::save()
     }
 }
 
-Rapture::Instance *ModuleEditorWorkspace::spawn(Rapture::Instance &parent)
+Rapture::SceneObject *ModuleEditorWorkspace::spawn(Rapture::SceneObject &parent)
 {
     (void)parent;
     return nullptr;
 }
 
-void ModuleEditorWorkspace::capture(const Rapture::Instance &root)
+void ModuleEditorWorkspace::capture(const Rapture::SceneObject &root)
 {
     (void)root;
 }
@@ -239,7 +239,7 @@ PuppetEditorWorkspace::PuppetEditorWorkspace(Amethyst::TabBar &tabBar, const Pan
     build(tabBar);
 }
 
-Rapture::Instance *PuppetEditorWorkspace::spawn(Rapture::Instance &parent)
+Rapture::SceneObject *PuppetEditorWorkspace::spawn(Rapture::SceneObject &parent)
 {
     Rapture::Puppet *puppet = m_module != nullptr ? m_module->as<Rapture::Puppet>() : nullptr;
     if (puppet == nullptr) {
@@ -254,7 +254,7 @@ Rapture::Instance *PuppetEditorWorkspace::spawn(Rapture::Instance &parent)
     return puppet->spawn(parent);
 }
 
-void PuppetEditorWorkspace::capture(const Rapture::Instance &root)
+void PuppetEditorWorkspace::capture(const Rapture::SceneObject &root)
 {
     if (Rapture::Puppet *puppet = m_module != nullptr ? m_module->as<Rapture::Puppet>() : nullptr) {
         puppet->capture(root);

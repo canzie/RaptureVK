@@ -2,8 +2,8 @@
 #define RAPTURE__ASSET_IMPORT_CONFIG_H
 
 #include "AssetCommon.h"
-#include "components/systems/Prefab.h"
 #include "meshes/Mesh.h"
+#include "serialization/SerialDocument.h"
 #include "shaders/Shader.h"
 #include "textures/TextureCommon.h"
 
@@ -38,8 +38,8 @@ struct MeshImportData {
     MeshAllocatorParams params;
 };
 
-struct PrefabImportData {
-    std::unique_ptr<Prefab> prefab;
+struct SceneObjectImportData {
+    std::unique_ptr<SerialDocument> document;
 };
 
 class BaseMaterial;
@@ -65,7 +65,7 @@ struct WorldImportData {
     std::unique_ptr<World> world;
 };
 
-using AssetImportDataVariant = std::variant<std::monostate, MeshImportData, PrefabImportData, BaseMaterialImportData,
+using AssetImportDataVariant = std::variant<std::monostate, MeshImportData, SceneObjectImportData, BaseMaterialImportData,
                                             MaterialInstanceImportData, ModuleImportData, WorldImportData>;
 
 struct AssetImportFileRequest {

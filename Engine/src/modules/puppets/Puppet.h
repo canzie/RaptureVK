@@ -5,7 +5,7 @@
 
 namespace Rapture {
 
-class Instance;
+class SceneObject;
 
 /**
  * @brief The scene objects a controller possesses.
@@ -24,13 +24,13 @@ class Puppet : public ModuleClass {
      * @param parent The scene object the root is parented to, which gains ownership of it
      * @return The spawned root, or nullptr if it could not be read
      */
-    Instance *spawn(Instance &parent) const;
+    SceneObject *spawn(SceneObject &parent) const;
 
     /**
      * @brief Replaces this puppet's scene root with a copy of an authored one
      * @param root The scene object whose subtree becomes this puppet's
      */
-    void capture(const Instance &root);
+    void capture(const SceneObject &root);
 
     bool hasSceneRoot() const { return m_sceneRoot.isReadable(); }
 

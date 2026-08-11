@@ -510,7 +510,7 @@ void ViewportPanel::updateGizmo()
         return;
     }
 
-    Rapture::Instance *instance = scene->instanceFor(m_selectedEntity.getEntity());
+    Rapture::SceneObject *instance = scene->instanceFor(m_selectedEntity.getEntity());
     Rapture::Node3D *node = instance != nullptr ? instance->as<Rapture::Node3D>() : nullptr;
     if (node == nullptr) {
         return;

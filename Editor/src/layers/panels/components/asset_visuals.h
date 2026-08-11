@@ -19,9 +19,9 @@ Amethyst::Color3 Asset_colorForType(Rapture::AssetType type);
 /**
  * @brief Icon standing in for an asset of the given type when it has no thumbnail
  * @param type The asset type
- * @param moduleClass The class a module holds, which picks the icon ahead of the type
+ * @param authoredClass The class a module holds, which picks the icon ahead of the type
  * @return SVG source for that type's icon
  */
-const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *moduleClass = nullptr);
+const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass = nullptr);
 
 #endif // RAPTURE__ASSET_VISUALS_H

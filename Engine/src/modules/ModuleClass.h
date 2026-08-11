@@ -12,7 +12,6 @@
 
 namespace Rapture {
 
-class Instance;
 
 /**
  * @brief Base of every authored object that lives in the asset database rather than in a scene.

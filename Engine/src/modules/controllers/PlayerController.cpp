@@ -29,7 +29,7 @@ const TypeInfo &PlayerController::type() const
     return staticType();
 }
 
-void PlayerController::possess(Instance *subject)
+void PlayerController::possess(SceneObject *subject)
 {
     Node3D *node = subject != nullptr ? subject->as<Node3D>() : nullptr;
     if (node == nullptr) {

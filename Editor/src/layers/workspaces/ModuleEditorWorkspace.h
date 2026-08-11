@@ -8,7 +8,7 @@
 #include <memory>
 
 namespace Rapture {
-class Instance;
+class SceneObject;
 class ModuleClass;
 class Scene;
 class Viewport;
@@ -59,13 +59,13 @@ class ModuleEditorWorkspace : public Workspace {
      * @param parent The scene object they are parented to
      * @return The root of what was put in, or nullptr if the module has none
      */
-    virtual Rapture::Instance *spawn(Rapture::Instance &parent);
+    virtual Rapture::SceneObject *spawn(Rapture::SceneObject &parent);
 
     /**
      * @brief Takes the authored scene objects back into this module
      * @param root The scene object whose subtree the module takes
      */
-    virtual void capture(const Rapture::Instance &root);
+    virtual void capture(const Rapture::SceneObject &root);
 
   protected:
     Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
@@ -93,7 +93,7 @@ class ModuleEditorWorkspace : public Workspace {
 
     std::unique_ptr<Rapture::Scene> m_scene;
     Rapture::Viewport *m_viewport = nullptr;
-    Rapture::Instance *m_sceneRoot = nullptr;
+    Rapture::SceneObject *m_sceneRoot = nullptr;
 };
 
 /**
@@ -105,8 +105,8 @@ class PuppetEditorWorkspace : public ModuleEditorWorkspace {
 
   protected:
     bool usesScene() const override { return true; }
-    Rapture::Instance *spawn(Rapture::Instance &parent) override;
-    void capture(const Rapture::Instance &root) override;
+    Rapture::SceneObject *spawn(Rapture::SceneObject &parent) override;
+    void capture(const Rapture::SceneObject &root) override;
 };
 
 #endif // RAPTURE__MODULE_EDITOR_WORKSPACE_H

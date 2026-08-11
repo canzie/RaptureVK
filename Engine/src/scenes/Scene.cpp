@@ -13,7 +13,7 @@
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
-#include "scenes/instances/Instance.h"
+#include "scenes/instances/SceneObject.h"
 #include "scenes/instances/InstanceRegistry.h"
 
 #include "asset_manager/AssetManager.h"
@@ -47,7 +47,7 @@ Scene::Scene(const std::string &sceneName)
     auto &app = Application::getInstance();
     m_renderData = std::make_unique<SceneRenderData>(app.getVulkanContext().getRenderContext(), *this, app.getFramesInFlight());
 
-    m_root = std::make_unique<Instance>(*this, "Root");
+    m_root = std::make_unique<SceneObject>(*this, "Root");
     m_root->add<Environment>("Environment");
 
     m_physics = std::make_unique<PhysicsSystem>();
@@ -156,10 +156,16 @@ void Scene::stepPhysics(float dt)
 
 void Scene::onUpdate(float dt)
 {
-    (void)dt;
-
     if (!active) {
         return;
+    }
+
+    {
+        RAPTURE_PROFILE_SCOPE("SceneComponents::update");
+        m_updatingComponents.forEach([dt](uint32_t slot, SceneComponent *component) {
+            (void)slot;
+            component->update(dt);
+        });
     }
 
     // Get current frame dimensions for camera updates
@@ -300,19 +306,29 @@ void Scene::syncRigidBodyTransforms()
     }
 }
 
-Instance *Scene::instanceFor(ecs::Entity entity) const
+uint32_t Scene::addUpdatingComponent(SceneComponent *component)
+{
+    return m_updatingComponents.insert(component);
+}
+
+void Scene::removeUpdatingComponent(uint32_t slot)
+{
+    m_updatingComponents.remove(slot);
+}
+
+SceneObject *Scene::instanceFor(ecs::Entity entity) const
 {
     const InstanceComponent *ref = m_registry.tryRead<InstanceComponent>(entity);
     return ref != nullptr ? ref->instance : nullptr;
 }
 
-void Scene::destroyInstance(Instance *instance)
+void Scene::destroyInstance(SceneObject *instance)
 {
     if (instance == nullptr || instance == m_root.get()) {
         return;
     }
 
-    Instance *parent = instance->parent();
+    SceneObject *parent = instance->parent();
     if (parent == nullptr) {
         RP_CORE_ERROR("cannot destroy instance '{}' because it is not parented", instance->name());
         return;
@@ -367,10 +383,10 @@ std::unique_ptr<Scene> Scene::deserialize(ReadNode node)
     // the constructor seeds a default environment, which the document supplies again
     scene->clearInstances();
 
-    std::vector<Instance *> order;
+    std::vector<SceneObject *> order;
     ReadNode instances = node.child(KEY_INSTANCES);
     for (size_t i = 0; i < instances.size(); i++) {
-        if (!Instance::loadSubtree(*scene->m_root, instances.at(i), order)) {
+        if (!SceneObject::loadSubtree(*scene->m_root, instances.at(i), order)) {
             RP_CORE_ERROR("scene '{}' could not be read", scene->m_config.sceneName);
             return nullptr;
         }
@@ -379,7 +395,7 @@ std::unique_ptr<Scene> Scene::deserialize(ReadNode node)
     return scene;
 }
 
-static void s_mapInstancesById(const Instance &parent, std::unordered_map<InstanceId, Instance *> &out)
+static void s_mapInstancesById(const SceneObject &parent, std::unordered_map<InstanceId, SceneObject *> &out)
 {
     for (const auto &child : parent.children()) {
         out.emplace(child->id(), child.get());
@@ -389,13 +405,13 @@ static void s_mapInstancesById(const Instance &parent, std::unordered_map<Instan
 
 // Pre-order, so an instance is under its snapshot parent before its own children come looking for it.
 // Everything the snapshot names leaves the map, so what stays behind is what the scene gained since.
-static bool s_restoreSubtree(Instance &parent, ReadNode instances, std::unordered_map<InstanceId, Instance *> &live)
+static bool s_restoreSubtree(SceneObject &parent, ReadNode instances, std::unordered_map<InstanceId, SceneObject *> &live)
 {
     for (size_t i = 0; i < instances.size(); i++) {
         ReadNode node = instances.at(i);
-        Instance::DocumentHeader header = Instance::readHeader(node);
+        SceneObject::DocumentHeader header = SceneObject::readHeader(node);
 
-        Instance *instance = nullptr;
+        SceneObject *instance = nullptr;
         auto found = live.find(header.id);
 
         if (found != live.end()) {
@@ -406,7 +422,7 @@ static bool s_restoreSubtree(Instance &parent, ReadNode instances, std::unordere
                 parent.addChild(instance->parent()->removeChild(instance));
             }
         } else {
-            std::unique_ptr<Instance> created = InstanceRegistry::create(header.className, *parent.scene(), header.name);
+            std::unique_ptr<SceneObject> created = InstanceRegistry::createObject(header.className, *parent.scene(), header.name);
             if (created == nullptr) {
                 RP_CORE_ERROR("no instance class named '{}', needed by '{}'", header.className, header.name);
                 return false;
@@ -427,10 +443,10 @@ static bool s_restoreSubtree(Instance &parent, ReadNode instances, std::unordere
 }
 
 // an instance the snapshot does not hold cannot hold one it does, so its whole subtree goes with it
-static void s_destroyInstancesNotInSnapshot(Instance &parent, const std::unordered_map<InstanceId, Instance *> &gained)
+static void s_destroyInstancesNotInSnapshot(SceneObject &parent, const std::unordered_map<InstanceId, SceneObject *> &gained)
 {
     for (size_t i = parent.children().size(); i > 0; i--) {
-        Instance *child = parent.children()[i - 1].get();
+        SceneObject *child = parent.children()[i - 1].get();
 
         if (gained.contains(child->id())) {
             parent.removeChild(child);
@@ -461,7 +477,7 @@ bool Scene::restoreFrom(ReadNode node)
     // still be reading those
     Application::getInstance().getVulkanContext().waitIdle();
 
-    std::unordered_map<InstanceId, Instance *> live;
+    std::unordered_map<InstanceId, SceneObject *> live;
     s_mapInstancesById(*m_root, live);
 
     if (!s_restoreSubtree(*m_root, node.child(KEY_INSTANCES), live)) {

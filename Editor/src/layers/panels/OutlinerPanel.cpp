@@ -5,6 +5,7 @@
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/World.h"
+#include "scenes/instances/SceneObject.h"
 #include "ecs/entity_accessor.h"
 
 #include <components/common.h>
@@ -160,7 +161,7 @@ void OutlinerPanel::refresh()
     }
 
     // a rebuilt row starts expanded, so what the user collapsed is carried across by instance
-    std::unordered_set<const Rapture::Instance *> collapsed;
+    std::unordered_set<const Rapture::SceneObject *> collapsed;
     for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
         if (!m_treeView->isExpanded(row)) {
             collapsed.insert(m_rowInstances[row]);
@@ -172,7 +173,7 @@ void OutlinerPanel::refresh()
     m_treeView->clear();
     m_rowInstances.clear();
 
-    Rapture::Instance *sceneRoot = m_scene->root();
+    Rapture::SceneObject *sceneRoot = m_scene->root();
     if (sceneRoot == nullptr) {
         return;
     }
@@ -181,7 +182,7 @@ void OutlinerPanel::refresh()
     tvScope.columnsExplicit = true;
 
     for (const auto &child : sceneRoot->children()) {
-        Rapture::Instance *instance = child.get();
+        Rapture::SceneObject *instance = child.get();
         tvScope.row([this, instance](Amethyst::TreeRowScope &row) { buildInstanceTree(instance, row); });
     }
 
@@ -192,7 +193,7 @@ void OutlinerPanel::refresh()
     }
 }
 
-void OutlinerPanel::buildInstanceTree(Rapture::Instance *instance, Amethyst::TreeRowScope &rowScope)
+void OutlinerPanel::buildInstanceTree(Rapture::SceneObject *instance, Amethyst::TreeRowScope &rowScope)
 {
     if (instance == nullptr) {
         return;
@@ -207,12 +208,12 @@ void OutlinerPanel::buildInstanceTree(Rapture::Instance *instance, Amethyst::Tre
     rowScope.cell([typeName](Amethyst::UIScope &s) { s_nameLabel(s, typeName, "treeview-secondary-column"); });
 
     for (const auto &child : instance->children()) {
-        Rapture::Instance *childInstance = child.get();
+        Rapture::SceneObject *childInstance = child.get();
         rowScope.row([this, childInstance](Amethyst::TreeRowScope &childRow) { buildInstanceTree(childInstance, childRow); });
     }
 }
 
-Rapture::Instance *OutlinerPanel::instanceForRow(uint32_t row) const
+Rapture::SceneObject *OutlinerPanel::instanceForRow(uint32_t row) const
 {
     if (m_scene == nullptr || row >= m_rowInstances.size()) {
         return nullptr;
@@ -222,7 +223,7 @@ Rapture::Instance *OutlinerPanel::instanceForRow(uint32_t row) const
 
 void OutlinerPanel::onRowClicked(uint32_t row)
 {
-    Rapture::Instance *instance = instanceForRow(row);
+    Rapture::SceneObject *instance = instanceForRow(row);
     if (instance != nullptr && m_selection != nullptr) {
         m_selection->select(instance->accessor());
     }
@@ -230,7 +231,7 @@ void OutlinerPanel::onRowClicked(uint32_t row)
 
 void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
 {
-    Rapture::Instance *instance = instanceForRow(row);
+    Rapture::SceneObject *instance = instanceForRow(row);
     if (instance == nullptr) {
         return;
     }
@@ -252,7 +253,7 @@ void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
     showContextMenu(pos, std::move(items));
 }
 
-void OutlinerPanel::requestDelete(Rapture::Instance *instance, bool keepChildren)
+void OutlinerPanel::requestDelete(Rapture::SceneObject *instance, bool keepChildren)
 {
     m_pendingDeleteInstance = instance;
     m_pendingDeleteKeepChildren = keepChildren;
@@ -260,7 +261,7 @@ void OutlinerPanel::requestDelete(Rapture::Instance *instance, bool keepChildren
 
 void OutlinerPanel::applyPendingDelete()
 {
-    Rapture::Instance *instance = m_pendingDeleteInstance;
+    Rapture::SceneObject *instance = m_pendingDeleteInstance;
     bool keepChildren = m_pendingDeleteKeepChildren;
     m_pendingDeleteInstance = nullptr;
     m_pendingDeleteKeepChildren = false;
@@ -274,9 +275,9 @@ void OutlinerPanel::applyPendingDelete()
     }
 
     if (keepChildren) {
-        Rapture::Instance *parent = instance->parent();
+        Rapture::SceneObject *parent = instance->parent();
         while (parent != nullptr && !instance->children().empty()) {
-            Rapture::Instance *child = instance->children().front().get();
+            Rapture::SceneObject *child = instance->children().front().get();
             parent->addChild(instance->removeChild(child));
         }
     }
@@ -296,7 +297,7 @@ void OutlinerPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::unique_
     m_contextMenu->showAt(pos);
 }
 
-void OutlinerPanel::buildNameCell(uint32_t row, Rapture::Instance *instance, const std::string &name, bool editing)
+void OutlinerPanel::buildNameCell(uint32_t row, Rapture::SceneObject *instance, const std::string &name, bool editing)
 {
     if (m_treeView == nullptr) {
         return;
@@ -330,7 +331,7 @@ void OutlinerPanel::buildNameCell(uint32_t row, Rapture::Instance *instance, con
     }
 }
 
-void OutlinerPanel::startRename(uint32_t row, Rapture::Instance *instance)
+void OutlinerPanel::startRename(uint32_t row, Rapture::SceneObject *instance)
 {
     if (instanceForRow(row) != instance) {
         return;
@@ -341,7 +342,7 @@ void OutlinerPanel::startRename(uint32_t row, Rapture::Instance *instance)
     buildNameCell(row, instance, std::string(instance->name()), true);
 }
 
-void OutlinerPanel::onRenameCommitted(Rapture::Instance *instance, const std::string &newName)
+void OutlinerPanel::onRenameCommitted(Rapture::SceneObject *instance, const std::string &newName)
 {
     if (m_renamingInstance != instance) {
         return;
@@ -354,7 +355,7 @@ void OutlinerPanel::applyPendingRename()
 {
     m_pendingRenameCommit = false;
 
-    Rapture::Instance *instance = m_renamingInstance;
+    Rapture::SceneObject *instance = m_renamingInstance;
     uint32_t row = m_renameRow;
     m_renamingInstance = nullptr;
     m_renameInput = nullptr;

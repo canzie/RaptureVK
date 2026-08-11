@@ -1,7 +1,7 @@
 #include "Puppet.h"
 
 #include "logging/Log.h"
-#include "scenes/instances/Instance.h"
+#include "scenes/instances/SceneObject.h"
 
 #include <vector>
 
@@ -20,33 +20,17 @@ const TypeInfo &Puppet::type() const
     return staticType();
 }
 
-Instance *Puppet::spawn(Instance &parent) const
+SceneObject *Puppet::spawn(SceneObject &parent) const
 {
-    if (parent.scene() == nullptr) {
-        RP_CORE_ERROR("a puppet spawns into a scene, and '{}' is in none", parent.name());
-        return nullptr;
-    }
-
     if (!hasSceneRoot()) {
         RP_CORE_WARN("puppet holds nothing to spawn");
         return nullptr;
     }
 
-    std::vector<Instance *> order;
-    if (!Instance::loadSubtree(parent, m_sceneRoot.rootView(), order) || order.empty()) {
-        RP_CORE_ERROR("puppet scene root could not be read into the scene");
-        return nullptr;
-    }
-
-    // what spawned is its own object, not the one it was read from
-    for (Instance *instance : order) {
-        instance->remintId();
-    }
-
-    return order.front();
+    return SceneObject::spawnSubtree(parent, m_sceneRoot.rootView());
 }
 
-void Puppet::capture(const Instance &root)
+void Puppet::capture(const SceneObject &root)
 {
     SerialDocument sceneRoot;
     root.serialize(sceneRoot.root());

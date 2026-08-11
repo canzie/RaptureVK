@@ -152,19 +152,6 @@ struct MeshComponent {
     }
 };
 
-struct PrefabComponent {
-    AssetPtr<Prefab> sourcePrefab;
-    bool autoInherit = true;
-    std::unordered_map<uint32_t, AssetHandle> materialOverrides; // prefab node index -> material
-
-    PrefabComponent() = default;
-
-    PrefabComponent(AssetRef ref) : sourcePrefab(std::move(ref)) {}
-
-  private:
-    EventConnection m_structureChangedConnection;
-};
-
 struct LightComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_LIGHT_PARAMS);
 

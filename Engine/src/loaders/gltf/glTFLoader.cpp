@@ -16,6 +16,9 @@
 
 #include "asset_manager/AssetManager.h"
 #include "asset_manager/ReservedAssets.h"
+#include "scenes/Scene.h"
+#include "scenes/instances/Node3D.h"
+#include "scenes/instances/StaticMesh3D.h"
 #include "buffers/BufferLayout.h"
 #include "components/Components.h"
 #include "materials/Material.h"
@@ -278,11 +281,7 @@ bool glTF2Loader::load(Scene *scene, int32_t sceneIndex)
     m_isInitialized = true;
     m_isLoaded = true;
 
-    buildPrefab();
-
-    if (scene) {
-        Prefab::instantiate(m_loadedData->prefab.ref(), scene);
-    }
+    buildSceneObjectAsset(scene);
 
     return true;
 }
@@ -600,49 +599,67 @@ glm::mat4 glTF2Loader::getNodeTransform(yyjson_val *nodeVal)
     return transformMatrix;
 }
 
-void glTF2Loader::buildPrefab()
+Node3D *glTF2Loader::buildSceneObject(SceneObject &parent, glTF_SceneNode *src)
 {
-    std::vector<Prefab::Node> nodes;
+    Node3D *node = nullptr;
 
-    std::function<void(glTF_SceneNode *, int32_t)> flatten = [&](glTF_SceneNode *src, int32_t parentIndex) {
-        int32_t myIndex = static_cast<int32_t>(nodes.size());
-
-        Prefab::Node node;
-        node.name = src->name;
-        node.parent = parentIndex;
-        node.localTransform = src->localTransform;
-
-        if (src->meshRef) {
-            node.mesh = src->meshRef.get()->getHandle();
-        }
+    if (src->meshRef) {
+        StaticMesh3D *mesh = parent.add<StaticMesh3D>(src->name);
+        mesh->setMesh(src->meshRef.get()->getHandle());
 
         if (src->materialIndex >= 0) {
             auto matIt = m_loadedData->materials.find(static_cast<size_t>(src->materialIndex));
             if (matIt != m_loadedData->materials.end() && matIt->second) {
-                node.material = matIt->second.get()->getHandle();
+                mesh->setMaterial(matIt->second.get()->getHandle());
             }
         }
 
-        nodes.push_back(std::move(node));
-
-        for (auto &child : src->children) {
-            flatten(child.get(), myIndex);
-        }
-    };
-
-    for (auto &rootNode : m_loadedData->rootNodes) {
-        flatten(rootNode.get(), -1);
+        mesh->setRayTraced(true);
+        node = mesh;
+    } else {
+        node = parent.add<Node3D>(src->name);
     }
 
-    std::string prefabName = m_name.empty() ? m_filepath.stem().string() : m_name;
+    node->setLocalTransform(src->localTransform);
 
-    auto prefab = std::make_unique<Prefab>();
-    prefab->setName(prefabName);
-    prefab->setNodes(std::move(nodes));
+    for (auto &child : src->children) {
+        buildSceneObject(*node, child.get());
+    }
+
+    return node;
+}
+
+void glTF2Loader::buildSceneObjectAsset(Scene *scene)
+{
+    std::string assetName = m_name.empty() ? m_filepath.stem().string() : m_name;
+
+    Scene authoring(assetName);
+    SceneObject *root = nullptr;
+
+    if (m_loadedData->rootNodes.size() == 1) {
+        root = buildSceneObject(*authoring.root(), m_loadedData->rootNodes.front().get());
+    } else {
+        // one file is one asset, so several roots get a node holding them
+        Node3D *group = authoring.root()->add<Node3D>(assetName);
+        for (auto &rootNode : m_loadedData->rootNodes) {
+            buildSceneObject(*group, rootNode.get());
+        }
+        root = group;
+    }
+
+    SerialDocument document;
+    root->serialize(document.root());
+    document.freeze();
+
+    if (scene != nullptr) {
+        SceneObject::spawnSubtree(*scene->root(), document.rootView());
+    }
 
     AssetRef ref = AssetManager::importAsset(
-        AssetImportDataRequest{.data = PrefabImportData{std::move(prefab)}, .output = m_outputFolder, .name = prefabName});
-    m_loadedData->prefab = AssetPtr<Prefab>(std::move(ref));
+        AssetImportDataRequest{.data = SceneObjectImportData{std::make_unique<SerialDocument>(std::move(document))},
+                               .output = m_outputFolder,
+                               .name = assetName});
+    m_loadedData->sceneObject = std::move(ref);
 }
 
 void glTF2Loader::loadAccessor(yyjson_val *accessorVal, std::vector<unsigned char> &dataVec)

@@ -6,7 +6,7 @@
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/Scene.h"
-#include "scenes/instances/Instance.h"
+#include "scenes/instances/SceneObject.h"
 
 #include <components/common.h>
 #include <components/context_menu_item.h>
@@ -24,7 +24,7 @@ static constexpr float HEADER_PAD = 6.0f;
 static constexpr float CONTENT_OFFSET = HEADER_HEIGHT + (HEADER_PAD * 2.0f);
 static constexpr float ADD_BUTTON_WIDTH = 64.0f;
 
-SceneObjectTreePanel::SceneObjectTreePanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::Instance *root)
+SceneObjectTreePanel::SceneObjectTreePanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::SceneObject *root)
     : Panel("Scene Objects", context), m_scene(context.scene), m_rootObject(root)
 {
     auto rootFrame = std::make_unique<Amethyst::Frame>();
@@ -152,7 +152,7 @@ void SceneObjectTreePanel::refresh()
     }
 
     // a rebuilt row starts expanded, so what the user collapsed is carried across by scene object
-    std::unordered_set<const Rapture::Instance *> collapsed;
+    std::unordered_set<const Rapture::SceneObject *> collapsed;
     for (uint32_t row = 0; row < m_rowObjects.size(); row++) {
         if (!m_treeView->isExpanded(row)) {
             collapsed.insert(m_rowObjects[row]);
@@ -177,7 +177,7 @@ void SceneObjectTreePanel::refresh()
     }
 }
 
-void SceneObjectTreePanel::buildSubtree(Rapture::Instance *instance, Amethyst::TreeRowScope &rowScope)
+void SceneObjectTreePanel::buildSubtree(Rapture::SceneObject *instance, Amethyst::TreeRowScope &rowScope)
 {
     if (instance == nullptr) {
         return;
@@ -200,12 +200,12 @@ void SceneObjectTreePanel::buildSubtree(Rapture::Instance *instance, Amethyst::T
     });
 
     for (const auto &child : instance->children()) {
-        Rapture::Instance *childObject = child.get();
+        Rapture::SceneObject *childObject = child.get();
         rowScope.row([this, childObject](Amethyst::TreeRowScope &childRow) { buildSubtree(childObject, childRow); });
     }
 }
 
-Rapture::Instance *SceneObjectTreePanel::instanceForRow(uint32_t row) const
+Rapture::SceneObject *SceneObjectTreePanel::instanceForRow(uint32_t row) const
 {
     if (row >= m_rowObjects.size()) {
         return nullptr;
@@ -213,10 +213,10 @@ Rapture::Instance *SceneObjectTreePanel::instanceForRow(uint32_t row) const
     return m_rowObjects[row];
 }
 
-Rapture::Instance *SceneObjectTreePanel::addTarget() const
+Rapture::SceneObject *SceneObjectTreePanel::addTarget() const
 {
     if (m_treeView != nullptr && m_treeView->selectedRow != Amethyst::TreeView::NO_ROW_SELECTION) {
-        if (Rapture::Instance *selected = instanceForRow(static_cast<uint32_t>(m_treeView->selectedRow))) {
+        if (Rapture::SceneObject *selected = instanceForRow(static_cast<uint32_t>(m_treeView->selectedRow))) {
             return selected;
         }
     }
@@ -235,7 +235,7 @@ void SceneObjectTreePanel::showAddMenu(Amethyst::vec2 pos)
 
 void SceneObjectTreePanel::onRowClicked(uint32_t row)
 {
-    Rapture::Instance *instance = instanceForRow(row);
+    Rapture::SceneObject *instance = instanceForRow(row);
     if (instance != nullptr && m_selection != nullptr) {
         m_selection->select(instance->accessor());
     }
@@ -243,7 +243,7 @@ void SceneObjectTreePanel::onRowClicked(uint32_t row)
 
 void SceneObjectTreePanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
 {
-    Rapture::Instance *instance = instanceForRow(row);
+    Rapture::SceneObject *instance = instanceForRow(row);
     if (instance == nullptr || m_contextMenu == nullptr || m_selection == nullptr) {
         return;
     }
@@ -261,14 +261,14 @@ void SceneObjectTreePanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
     m_contextMenu->showAt(pos);
 }
 
-void SceneObjectTreePanel::requestDelete(Rapture::Instance *instance)
+void SceneObjectTreePanel::requestDelete(Rapture::SceneObject *instance)
 {
     m_pendingDeleteObject = instance;
 }
 
 void SceneObjectTreePanel::applyPendingDelete()
 {
-    Rapture::Instance *instance = m_pendingDeleteObject;
+    Rapture::SceneObject *instance = m_pendingDeleteObject;
     m_pendingDeleteObject = nullptr;
 
     if (m_scene == nullptr || instance == nullptr || instance == m_rootObject) {

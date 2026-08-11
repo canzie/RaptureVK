@@ -174,7 +174,7 @@ float Environment::wavelengthNm(float rayleighCoefficient)
     return static_cast<float>(550.0 * std::pow(13.5 / rayleighCoefficient, 0.25));
 }
 
-Environment::Environment(Scene &scene, std::string_view name) : Instance(scene, name)
+Environment::Environment(Scene &scene, std::string_view name) : SceneObject(scene, name)
 {
     m_lastApplied.timeOfDay = -1.0f;
     m_ibl = std::make_unique<ImageBasedLighting>();
@@ -190,7 +190,7 @@ Environment::~Environment()
 
 const TypeInfo &Environment::staticType()
 {
-    static const TypeInfo type("Environment", &Instance::staticType());
+    static const TypeInfo type("Environment", &SceneObject::staticType());
     return type;
 }
 
@@ -230,7 +230,7 @@ void Environment::update()
             continue;
         }
 
-        Instance *instance = scene()->instanceFor(entity);
+        SceneObject *instance = scene()->instanceFor(entity);
         sunNode = instance != nullptr ? instance->as<Node3D>() : nullptr;
         break;
     }
@@ -306,7 +306,7 @@ bool Environment::ensureSkyboxGenerator()
 
 void Environment::serialize(WriteNode node) const
 {
-    Instance::serialize(node);
+    SceneObject::serialize(node);
 
     WriteNode sky = node.addObject(KEY_SKY);
     // a generated skybox has a handle minted this run, the atmosphere settings below rebuild it instead
@@ -335,7 +335,7 @@ void Environment::serialize(WriteNode node) const
 
 void Environment::deserialize(ReadNode node)
 {
-    Instance::deserialize(node);
+    SceneObject::deserialize(node);
 
     ReadNode sky = node.child(KEY_SKY);
     if (sky.valid()) {

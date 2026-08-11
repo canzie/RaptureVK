@@ -10,13 +10,13 @@
 static bool s_isPuppetModule(Rapture::AssetHandle handle, const Rapture::AssetMetadata &metadata)
 {
     (void)handle;
-    return metadata.moduleClass != nullptr && metadata.moduleClass->isA(Rapture::Puppet::staticType());
+    return metadata.authoredClass != nullptr && metadata.authoredClass->isA(Rapture::Puppet::staticType());
 }
 
 static bool s_isPlayerControllerModule(Rapture::AssetHandle handle, const Rapture::AssetMetadata &metadata)
 {
     (void)handle;
-    return metadata.moduleClass != nullptr && metadata.moduleClass->isA(Rapture::PlayerController::staticType());
+    return metadata.authoredClass != nullptr && metadata.authoredClass->isA(Rapture::PlayerController::staticType());
 }
 
 void WorldPlaySection::buildBody(Amethyst::CollapsibleHeaderScope &ch)

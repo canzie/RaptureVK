@@ -7,7 +7,7 @@
 namespace Rapture {
 
 class Camera3D;
-class Instance;
+class SceneObject;
 
 /**
  * @brief Base of the modules that drive a scene object from per-frame input.
@@ -24,7 +24,7 @@ class Controller : public ModuleClass {
      * @brief Hands this controller the scene object it drives
      * @param subject The object to drive, which has to outlive the possession
      */
-    virtual void possess(Instance *subject);
+    virtual void possess(SceneObject *subject);
 
     /**
      * @brief Releases the possessed object, leaving this controller driving nothing
@@ -43,7 +43,7 @@ class Controller : public ModuleClass {
      */
     virtual bool desiresCursorCapture() const { return false; }
 
-    Instance *possessed() const { return m_possessed; }
+    SceneObject *possessed() const { return m_possessed; }
 
     /**
      * @brief The camera the viewport this controller drives renders through
@@ -53,7 +53,7 @@ class Controller : public ModuleClass {
     void setViewCamera(Camera3D *camera) { m_viewCamera = camera; }
 
   protected:
-    Instance *m_possessed = nullptr;
+    SceneObject *m_possessed = nullptr;
     Camera3D *m_viewCamera = nullptr;
 };
 

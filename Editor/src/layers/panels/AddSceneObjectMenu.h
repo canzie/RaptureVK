@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace Rapture {
-class Instance;
+class SceneObject;
 }
 
 class EntitySelection;
@@ -29,6 +29,6 @@ enum SceneObjectScope {
  * @return The items, ready to hand to a ContextMenu
  */
 std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>>
-AddSceneObjectMenu_buildItems(Rapture::Instance *parent, EntitySelection &selection, SceneObjectScope scope);
+AddSceneObjectMenu_buildItems(Rapture::SceneObject *parent, EntitySelection &selection, SceneObjectScope scope);
 
 #endif // RAPTURE__ADD_SCENE_OBJECT_MENU_H

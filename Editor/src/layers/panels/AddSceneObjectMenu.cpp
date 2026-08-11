@@ -9,7 +9,6 @@
 #include "scenes/instances/Folder.h"
 #include "scenes/instances/Node3D.h"
 #include "scenes/instances/PointLight3D.h"
-#include "scenes/instances/PrefabInstance.h"
 #include "scenes/instances/SpotLight3D.h"
 #include "scenes/instances/SpringArm3D.h"
 #include "scenes/instances/StaticMesh3D.h"
@@ -24,7 +23,7 @@
 
 using MenuItem = std::unique_ptr<Amethyst::ContextMenu::ItemData>;
 
-static void s_announce(Rapture::Instance *added, EntitySelection &selection)
+static void s_announce(Rapture::SceneObject *added, EntitySelection &selection)
 {
     added->scene()->onHierarchyChanged.fire();
     selection.select(added->accessor());
@@ -42,7 +41,7 @@ static void s_append(std::vector<MenuItem> &items, uint32_t entryScopes, SceneOb
 /**
  * @brief Appends a mesh the user can drop in without picking an asset first
  */
-static void s_appendPrimitive(std::vector<MenuItem> &items, SceneObjectScope scope, Rapture::Instance *parent,
+static void s_appendPrimitive(std::vector<MenuItem> &items, SceneObjectScope scope, Rapture::SceneObject *parent,
                               EntitySelection &selection, std::string label, Rapture::AssetHandle mesh)
 {
     std::string name = label;
@@ -58,7 +57,7 @@ static void s_appendPrimitive(std::vector<MenuItem> &items, SceneObjectScope sco
  * @brief Appends a class under a label of its own, constructed with nothing set on it
  */
 template <typename T>
-static void s_appendNamed(std::vector<MenuItem> &items, uint32_t entryScopes, SceneObjectScope scope, Rapture::Instance *parent,
+static void s_appendNamed(std::vector<MenuItem> &items, uint32_t entryScopes, SceneObjectScope scope, Rapture::SceneObject *parent,
                           EntitySelection &selection, std::string label, std::string_view name)
 {
     s_append(items, entryScopes, scope, std::move(label),
@@ -69,7 +68,7 @@ static void s_appendNamed(std::vector<MenuItem> &items, uint32_t entryScopes, Sc
  * @brief Appends a class under its own name, constructed with nothing set on it
  */
 template <typename T>
-static void s_appendClass(std::vector<MenuItem> &items, uint32_t entryScopes, SceneObjectScope scope, Rapture::Instance *parent,
+static void s_appendClass(std::vector<MenuItem> &items, uint32_t entryScopes, SceneObjectScope scope, Rapture::SceneObject *parent,
                           EntitySelection &selection)
 {
     s_appendNamed<T>(items, entryScopes, scope, parent, selection, std::string(T::staticType().name), T::staticType().name);
@@ -92,7 +91,7 @@ static void s_appendSubmenu(std::vector<MenuItem> &items, std::string label, std
  */
 template <typename T>
 static void s_appendClassSubmenu(std::vector<MenuItem> &items, uint32_t entryScopes, SceneObjectScope scope,
-                                 Rapture::Instance *parent, EntitySelection &selection, std::vector<MenuItem> subclasses)
+                                 Rapture::SceneObject *parent, EntitySelection &selection, std::vector<MenuItem> subclasses)
 {
     std::function<void()> onActivate;
     if ((entryScopes & scope) != 0) {
@@ -120,12 +119,11 @@ static void s_appendSection(std::vector<MenuItem> &items, std::string label, std
 /**
  * @brief The Node3D subtree, each class nested under the one it derives from
  */
-static std::vector<MenuItem> s_buildNode3DItems(SceneObjectScope scope, Rapture::Instance *parent, EntitySelection &selection)
+static std::vector<MenuItem> s_buildNode3DItems(SceneObjectScope scope, Rapture::SceneObject *parent, EntitySelection &selection)
 {
     std::vector<MenuItem> items;
     s_appendClass<Rapture::Camera3D>(items, SCENE_OBJECT_SCOPE_ALL, scope, parent, selection);
     s_appendClass<Rapture::SpringArm3D>(items, SCENE_OBJECT_SCOPE_ALL, scope, parent, selection);
-    s_appendClass<Rapture::PrefabInstance>(items, SCENE_OBJECT_SCOPE_ALL, scope, parent, selection);
     s_appendClass<Rapture::Terrain3D>(items, SCENE_OBJECT_SCOPE_LEVEL, scope, parent, selection);
 
     // Mesh3D and Light3D are not registered, so they open their subclasses without adding anything
@@ -142,7 +140,7 @@ static std::vector<MenuItem> s_buildNode3DItems(SceneObjectScope scope, Rapture:
     return items;
 }
 
-std::vector<MenuItem> AddSceneObjectMenu_buildItems(Rapture::Instance *parent, EntitySelection &selection, SceneObjectScope scope)
+std::vector<MenuItem> AddSceneObjectMenu_buildItems(Rapture::SceneObject *parent, EntitySelection &selection, SceneObjectScope scope)
 {
     std::vector<MenuItem> meshes;
     s_appendPrimitive(meshes, scope, parent, selection, "Cube", Rapture::RE_PRIMITIVE_CUBE_MESH);

@@ -5,7 +5,7 @@
 #include "modules/controllers/CameraController.h"
 
 struct ModuleIcon {
-    const Rapture::TypeInfo *moduleClass;
+    const Rapture::TypeInfo *authoredClass;
     const char *svg;
 };
 
@@ -28,7 +28,7 @@ Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
         return Amethyst::Color3(0.68f, 0.45f, 0.95f); // violet
     case Rapture::ASSET_MESH:
         return Amethyst::Color3(0.95f, 0.60f, 0.25f); // orange
-    case Rapture::ASSET_PREFAB:
+    case Rapture::ASSET_SCENE_OBJECT:
         return Amethyst::Color3(0.50f, 0.50f, 0.95f); // periwinkle
     case Rapture::ASSET_ANIMATION:
         return Amethyst::Color3(0.95f, 0.82f, 0.30f); // yellow
@@ -45,11 +45,11 @@ Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
     }
 }
 
-static const char *s_moduleIcon(const Rapture::TypeInfo *moduleClass)
+static const char *s_moduleIcon(const Rapture::TypeInfo *authoredClass)
 {
-    for (const Rapture::TypeInfo *cls = moduleClass; cls != nullptr; cls = cls->base) {
+    for (const Rapture::TypeInfo *cls = authoredClass; cls != nullptr; cls = cls->base) {
         for (const ModuleIcon &icon : MODULE_ICONS) {
-            if (icon.moduleClass == cls) {
+            if (icon.authoredClass == cls) {
                 return icon.svg;
             }
         }
@@ -58,10 +58,10 @@ static const char *s_moduleIcon(const Rapture::TypeInfo *moduleClass)
     return Icons::SVG_MODULE;
 }
 
-const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *moduleClass)
+const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass)
 {
     if (type == Rapture::ASSET_MODULE) {
-        return s_moduleIcon(moduleClass);
+        return s_moduleIcon(authoredClass);
     }
 
     switch (type) {
@@ -76,7 +76,7 @@ const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *
         return Icons::SVG_MATERIAL;
     case Rapture::ASSET_MESH:
         return Icons::SVG_MESH;
-    case Rapture::ASSET_PREFAB:
+    case Rapture::ASSET_SCENE_OBJECT:
         return Icons::SVG_CUBE;
     case Rapture::ASSET_ANIMATION:
         return Icons::SVG_PLAY;

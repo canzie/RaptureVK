@@ -1,17 +1,13 @@
 #ifndef RAPTURE__INSTANCE_H
 #define RAPTURE__INSTANCE_H
 
-#include "ecs/entity_accessor.h"
 #include "events/EventSignal.h"
 #include "serialization/SerialDocument.h"
 #include "utils/TypeInfo.h"
 #include "utils/UUID.h"
 
-#include <memory>
-#include <span>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace Rapture {
 
@@ -27,9 +23,9 @@ static constexpr InstanceId INVALID_INSTANCE_ID = 0;
 /**
  * @brief Base of every authored object in a scene.
  *
- * An instance owns an entity and holds its place in the scene tree. Subclasses attach the
- * components their class is made of in their constructor, and never cache a pointer into
- * component storage.
+ * Carries the identity an authored object is referred to by and the document pair it is written
+ * through. What it is made of and where it sits are the two branches below it, SceneObject and
+ * SceneComponent.
  */
 class Instance {
   public:
@@ -74,88 +70,7 @@ class Instance {
     }
 
     /**
-     * @brief Creates a T and parents it to this instance
-     * @param name Name for the new child
-     * @return The child, owned by this instance
-     */
-    template <typename T>
-    T *add(std::string_view name)
-    {
-        auto child = std::make_unique<T>(*m_scene, name);
-        T *raw = child.get();
-        addChild(std::move(child));
-        return raw;
-    }
-
-    /**
-     * @brief Takes ownership of a child and links it to this instance
-     * @param child The child to adopt
-     */
-    void addChild(std::unique_ptr<Instance> child);
-
-    /**
-     * @brief Unlinks a child and hands its ownership back
-     * @param child The child to release
-     * @return The child, or nullptr if it is not a child of this instance
-     */
-    std::unique_ptr<Instance> removeChild(Instance *child);
-
-    /**
-     * @brief Finds a direct child by name
-     * @param name The child's name
-     * @return The child, or nullptr if no child has that name
-     */
-    Instance *findChild(std::string_view name) const;
-
-    /**
-     * @brief Finds a descendant by a slash separated path, for example "Door/Handle"
-     * @param path Names from this instance down, separated by slashes
-     * @return The descendant, or nullptr if any step is missing
-     */
-    Instance *findDescendant(std::string_view path) const;
-
-    template <typename T>
-    T *findFirstChildOfType() const
-    {
-        for (const auto &child : m_children) {
-            if (T *typed = child->as<T>()) {
-                return typed;
-            }
-        }
-        return nullptr;
-    }
-
-    /**
-     * @brief Finds the first T anywhere below this instance, depth first
-     * @return The descendant, or nullptr if the subtree holds no T
-     */
-    template <typename T>
-    T *findFirstDescendantOfType() const
-    {
-        for (const auto &child : m_children) {
-            if (T *typed = child->as<T>()) {
-                return typed;
-            }
-            if (T *typed = child->findFirstDescendantOfType<T>()) {
-                return typed;
-            }
-        }
-        return nullptr;
-    }
-
-    template <typename T>
-    T *findFirstAncestorOfType() const
-    {
-        for (Instance *node = m_parent; node != nullptr; node = node->m_parent) {
-            if (T *typed = node->as<T>()) {
-                return typed;
-            }
-        }
-        return nullptr;
-    }
-
-    /**
-     * @brief Writes this instance and its subtree
+     * @brief Writes this instance's class and the fields its class declares
      * @param node Cursor to write this instance's object into
      */
     virtual void serialize(WriteNode node) const;
@@ -167,38 +82,16 @@ class Instance {
     virtual void deserialize(ReadNode node);
 
     /**
-     * @brief What a document says an instance is, readable before there is an instance to read into
-     */
-    struct DocumentHeader {
-        std::string_view className;
-        std::string_view name;
-        InstanceId id = INVALID_INSTANCE_ID;
-        ReadNode children;
-    };
-
-    /**
-     * @brief Reads an instance's header out of a document
+     * @brief Reads the class a document names, before there is an instance to read into
      * @param node Cursor to the instance's object
-     * @return The header
+     * @return The class name, empty if the document names none
      */
-    static DocumentHeader readHeader(ReadNode node);
+    static std::string_view readClassName(ReadNode node);
 
     /**
-     * @brief Creates the instance a document names, parents it and reads its subtree
-     * @param parent The instance the new instance is added to
-     * @param node Cursor to the instance's object
-     * @param order Receives every instance created, in the order serialize wrote them
-     * @return True if the whole subtree was read
-     */
-    static bool loadSubtree(Instance &parent, ReadNode node, std::vector<Instance *> &order);
-
-    /**
-     * @brief Fires as this instance is destroyed, before its subtree is torn down
+     * @brief Fires as this instance is destroyed, before anything it owns is torn down
      */
     EventSignal<void(Instance *)> onDestroy;
-
-    Instance *parent() const { return m_parent; }
-    std::span<const std::unique_ptr<Instance>> children() const { return m_children; }
 
     /**
      * @brief This instance's stable identity, what another instance stores to refer to it
@@ -211,41 +104,19 @@ class Instance {
     void remintId();
 
     std::string_view name() const { return m_name; }
-    void setName(std::string_view name);
-    ecs::Entity entity() const { return m_entity.getEntity(); }
 
     /**
-     * @brief This instance's entity bound to the registry that resolves it
-     * @return The accessor, invalid if this instance has no entity
+     * @brief Renames this instance
+     * @param name The new name
      */
-    const ecs::EntityAccessor &accessor() const { return m_entity; }
+    virtual void setName(std::string_view name);
+
     Scene *scene() const { return m_scene; }
-
-  protected:
-    /**
-     * @brief Called on an instance once it has been linked to a new parent, or unlinked from one.
-     *
-     * The default passes it down the subtree, so a subclass that has no stake in where it sits still
-     * lets the ones below it react.
-     */
-    virtual void onParentChanged();
-
-  protected:
-    ecs::EntityAccessor m_entity;
 
   private:
     Scene *m_scene;
     InstanceId m_id;
-    Instance *m_parent = nullptr;
-    std::vector<std::unique_ptr<Instance>> m_children;
     std::string m_name;
-};
-
-/**
- * @brief Back reference from an entity to the instance that owns it
- */
-struct InstanceComponent {
-    Instance *instance = nullptr;
 };
 
 } // namespace Rapture
