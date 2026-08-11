@@ -51,7 +51,6 @@ uint32_t RenderPartition<T>::allocateSlot(EntityID entityId)
     uint32_t denseIndex = static_cast<uint32_t>(m_data.size());
     m_data.emplace_back();
     m_denseToEntityId.push_back(entityId);
-    m_lastSeenGenerations.push_back(0);
 
     for (auto &bf : m_dirtyBitfields) {
         bf.resize(denseIndex + 1);
@@ -73,7 +72,6 @@ void RenderPartition<T>::freeSlot(uint32_t denseIndex)
     if (denseIndex != lastIndex) {
         m_data[denseIndex] = m_data[lastIndex];
         m_denseToEntityId[denseIndex] = m_denseToEntityId[lastIndex];
-        m_lastSeenGenerations[denseIndex] = m_lastSeenGenerations[lastIndex];
 
         if (m_onSwap) {
             m_onSwap(m_denseToEntityId[denseIndex], denseIndex);
@@ -86,7 +84,6 @@ void RenderPartition<T>::freeSlot(uint32_t denseIndex)
 
     m_data.pop_back();
     m_denseToEntityId.pop_back();
-    m_lastSeenGenerations.pop_back();
 
     for (auto &bf : m_dirtyBitfields) {
         bf.resize(static_cast<uint32_t>(m_data.size()));
@@ -153,18 +150,6 @@ template <typename T>
 void RenderPartition<T>::clearDirty(uint32_t frameIndex)
 {
     m_dirtyBitfields[frameIndex].clearAll();
-}
-
-template <typename T>
-generation_t RenderPartition<T>::getLastSeenGeneration(uint32_t denseIndex) const
-{
-    return m_lastSeenGenerations[denseIndex];
-}
-
-template <typename T>
-void RenderPartition<T>::setLastSeenGeneration(uint32_t denseIndex, generation_t gen)
-{
-    m_lastSeenGenerations[denseIndex] = gen;
 }
 
 template <typename T>

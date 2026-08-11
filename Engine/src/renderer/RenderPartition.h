@@ -156,20 +156,6 @@ class RenderPartition {
     void clearDirty(uint32_t frameIndex);
 
     /**
-     * @brief Get the last observed generation for a slot
-     * @param denseIndex Slot to query
-     * @return Generation counter from the last update
-     */
-    generation_t getLastSeenGeneration(uint32_t denseIndex) const;
-
-    /**
-     * @brief Store the current generation for a slot
-     * @param denseIndex Slot to update
-     * @param gen Current generation value
-     */
-    void setLastSeenGeneration(uint32_t denseIndex, generation_t gen);
-
-    /**
      * @brief Fire swap callback for every entry so components can recompute their renderDataSlot
      */
     void notifyAllSwaps();
@@ -183,7 +169,6 @@ class RenderPartition {
     std::vector<T> m_data;
     std::vector<EntityID> m_denseToEntityId;
     std::vector<DirtyBitfield> m_dirtyBitfields;
-    std::vector<generation_t> m_lastSeenGenerations;
     SwapCallback m_onSwap;
     uint32_t m_frameCount = 0;
 };

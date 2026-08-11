@@ -3,7 +3,6 @@
 
 #include "BLAS.h"
 #include "buffers/Buffers.h"
-#include "components/ComponentsCommon.h"
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -21,7 +20,6 @@ struct TLASInstance {
     uint32_t shaderBindingTableRecordOffset = 0;
     VkGeometryInstanceFlagsKHR flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     uint32_t entityID = 0;
-    generation_t lastTransformGeneration = 0;
 };
 
 class TLAS : public std::enable_shared_from_this<TLAS> {
