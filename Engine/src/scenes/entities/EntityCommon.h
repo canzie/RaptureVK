@@ -5,11 +5,6 @@
 
 namespace Rapture {
 
-// TODO: temporary alias, call sites should say ecs::Entity
-using EntityID = ecs::Entity;
-
-inline constexpr EntityID INVALID_ENTITY_ID = ecs::ENTITY_NULL;
-
 enum Mobility {
     MOBILITY_STATIC = 0,
     MOBILITY_DYNAMIC,

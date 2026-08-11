@@ -83,17 +83,21 @@ static JPH::EMotionType s_toJoltMotionType(PhysicsMotionType type)
     }
 }
 
+// A shape thinner than this has no volume, so a dynamic body built from it would have no mass. Flat
+// geometry reaches here whenever a box is derived from the bounds of a plane.
+static constexpr float MIN_SHAPE_EXTENT = JPH::cDefaultConvexRadius;
+
 static JPH::ShapeRefC s_createShape(const PhysicsShape &shape)
 {
     return std::visit(
         [](const auto &s) -> JPH::ShapeRefC {
             using T = std::decay_t<decltype(s)>;
             if constexpr (std::is_same_v<T, PhysicsBoxShape>) {
-                return new JPH::BoxShape(s_glmToJolt(s.halfExtents));
+                return new JPH::BoxShape(s_glmToJolt(glm::max(s.halfExtents, glm::vec3(MIN_SHAPE_EXTENT))));
             } else if constexpr (std::is_same_v<T, PhysicsSphereShape>) {
-                return new JPH::SphereShape(s.radius);
+                return new JPH::SphereShape(std::max(s.radius, MIN_SHAPE_EXTENT));
             } else if constexpr (std::is_same_v<T, PhysicsCapsuleShape>) {
-                return new JPH::CapsuleShape(s.halfHeight, s.radius);
+                return new JPH::CapsuleShape(std::max(s.halfHeight, MIN_SHAPE_EXTENT), std::max(s.radius, MIN_SHAPE_EXTENT));
             } else {
                 static_assert(sizeof(T) == 0, "Unhandled physics shape type");
                 return JPH::ShapeRefC{};

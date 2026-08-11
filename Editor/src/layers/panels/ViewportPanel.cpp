@@ -48,11 +48,11 @@ static constexpr uint32_t PICK_APERTURE = 11;
  * @param result The region's hits
  * @param cursorX Cursor x within the region
  * @param cursorY Cursor y within the region
- * @return The entity, or INVALID_ENTITY_ID where the region was empty
+ * @return The entity, or ecs::ENTITY_NULL where the region was empty
  */
-static Rapture::EntityID s_nearestToCursor(const Rapture::SceneQueryResult &result, uint32_t cursorX, uint32_t cursorY)
+static Rapture::ecs::Entity s_nearestToCursor(const Rapture::SceneQueryResult &result, uint32_t cursorX, uint32_t cursorY)
 {
-    Rapture::EntityID best = Rapture::INVALID_ENTITY_ID;
+    Rapture::ecs::Entity best = Rapture::ecs::ENTITY_NULL;
     int32_t bestDistance = INT32_MAX;
     float bestDepth = 0.0f;
 
@@ -477,9 +477,9 @@ void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
     region.height = std::min(PICK_APERTURE, m_viewport->getHeight() - region.y);
 
     Rapture::SceneQueryResult result = m_viewport->queryRegion(region);
-    Rapture::EntityID id = s_nearestToCursor(result, px - region.x, py - region.y);
+    Rapture::ecs::Entity id = s_nearestToCursor(result, px - region.x, py - region.y);
 
-    Rapture::ecs::EntityAccessor picked = id == Rapture::INVALID_ENTITY_ID ? Rapture::ecs::EntityAccessor() : Rapture::ecs::EntityAccessor(id, &m_viewport->getScene()->getRegistry());
+    Rapture::ecs::EntityAccessor picked = id == Rapture::ecs::ENTITY_NULL ? Rapture::ecs::EntityAccessor() : Rapture::ecs::EntityAccessor(id, &m_viewport->getScene()->getRegistry());
     if (m_selection != nullptr) {
         m_selection->select(picked);
     }

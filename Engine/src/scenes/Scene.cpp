@@ -1,7 +1,6 @@
 #include "Scene.h"
 
 #include "components/Components.h"
-#include "components/RigidBodyComponent.h"
 #include "components/TerrainComponent.h"
 #include "components/systems/Transforms.h"
 #include "modules/controllers/Controller.h"
@@ -9,6 +8,7 @@
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
 #include "scenes/instances/Node3D.h"
+#include "scenes/instances/RigidBody3D.h"
 #include "scenes/instances/StaticMesh3D.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
@@ -51,7 +51,6 @@ Scene::Scene(const std::string &sceneName)
     m_root->add<Environment>("Environment");
 
     m_physics = std::make_unique<PhysicsSystem>();
-    m_registry.onConstruct<RigidBodyComponent>([this](ecs::Entity entity) { onRigidBodyConstructed(entity); });
 }
 
 Scene::~Scene() = default;
@@ -151,7 +150,6 @@ void Scene::stepPhysics(float dt)
         return;
     }
 
-    registerRigidBodies();
     m_physics->onUpdate(dt);
     syncRigidBodyTransforms();
 }
@@ -290,61 +288,15 @@ std::string Scene::getSceneName() const
     return m_config.sceneName;
 }
 
-void Scene::onRigidBodyConstructed(ecs::Entity entity)
-{
-    m_pendingRigidBodies.push_back(entity);
-}
-
-void Scene::registerRigidBodies()
-{
-    if (m_pendingRigidBodies.empty()) {
-        return;
-    }
-
-    for (ecs::Entity entity : m_pendingRigidBodies) {
-        if (!m_registry.hasAll<RigidBodyComponent, TransformComponent>(entity)) {
-            continue;
-        }
-
-        const TransformComponent &transform = m_registry.read<TransformComponent>(entity);
-        auto rigidBody = m_registry.write<RigidBodyComponent>(entity);
-        if (rigidBody->bodyId.isValid()) {
-            continue;
-        }
-
-        RigidBodyConfig config;
-        config.shape = rigidBody->shape;
-        if (rigidBody->shapeFromBounds) {
-            const MeshComponent *mesh = m_registry.tryRead<MeshComponent>(entity);
-            if (mesh != nullptr && mesh->mesh) {
-                BoundingBox bounds(mesh->mesh->getBoundsMin(), mesh->mesh->getBoundsMax());
-                glm::vec3 halfExtents = bounds.getExtents() * 0.5f * transform::scale(transform.world);
-                config.shape = PhysicsBoxShape{halfExtents};
-            }
-        }
-        config.position = transform::translation(transform.world);
-        config.rotation = transform::rotation(transform.world);
-        config.motionType = rigidBody->motionType;
-        config.friction = rigidBody->friction;
-        config.restitution = rigidBody->restitution;
-        config.startActive = rigidBody->startActive;
-
-        rigidBody->bodyId = m_physics->createRigidBody(config, static_cast<uint64_t>(entity));
-    }
-
-    m_pendingRigidBodies.clear();
-}
-
 void Scene::syncRigidBodyTransforms()
 {
     for (const PhysicsBodyState &state : m_physics->getActiveBodyStates()) {
-        Instance *instance = instanceFor(static_cast<ecs::Entity>(state.userData));
-        Node3D *node = instance != nullptr ? instance->as<Node3D>() : nullptr;
-        if (node == nullptr) {
+        RigidBody3D *body = reinterpret_cast<RigidBody3D *>(state.userData);
+        if (body == nullptr) {
             continue;
         }
 
-        node->setSimulatedWorldTransform(transform::compose(state.position, state.rotation, node->scale()));
+        body->applySimulatedTransform(state.position, state.rotation);
     }
 }
 
@@ -504,6 +456,10 @@ bool Scene::restoreFrom(ReadNode node)
 
     m_config.sceneName = std::string(node.child(KEY_NAME).asString(m_config.sceneName));
     m_config.frustumCullingEnabled = node.child(KEY_FRUSTUM_CULLING).asBool(m_config.frustumCullingEnabled);
+
+    // instances dropped below take their GPU resources with them, and frames already submitted may
+    // still be reading those
+    Application::getInstance().getVulkanContext().waitIdle();
 
     std::unordered_map<InstanceId, Instance *> live;
     s_mapInstancesById(*m_root, live);

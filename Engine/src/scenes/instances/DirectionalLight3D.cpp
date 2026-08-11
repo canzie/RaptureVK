@@ -119,6 +119,14 @@ void DirectionalLight3D::applyShadowSettings(ReadNode node)
     shadow.isActive = shadowNode.child(KEY_ACTIVE).asBool(shadow.isActive);
     shadow.mobility = static_cast<Mobility>(shadowNode.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(shadow.mobility)));
 
+    // the cascades are built on construction, so the settings they are built from only take effect if
+    // the component is detached and reattached
+    const CascadedShadowComponent *current = m_entity.tryRead<CascadedShadowComponent>();
+    if (current != nullptr && (current->resolution != shadow.resolution || current->numCascades != shadow.numCascades ||
+                               current->lambda != shadow.lambda)) {
+        m_entity.tryRemove<CascadedShadowComponent>();
+    }
+
     m_entity.set<CascadedShadowComponent>(shadow);
 }
 

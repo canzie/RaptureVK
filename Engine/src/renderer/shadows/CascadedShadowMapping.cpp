@@ -86,7 +86,20 @@ void CascadedShadowMap::setupCommandResources()
     m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
-CascadedShadowMap::~CascadedShadowMap() {}
+CascadedShadowMap::~CascadedShadowMap()
+{
+    auto cascadeSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
+    auto binding = cascadeSet ? cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO) : nullptr;
+    if (binding == nullptr) {
+        return;
+    }
+
+    for (uint32_t index : m_cascadeMatricesIndices) {
+        if (index != UINT32_MAX) {
+            binding->free(index);
+        }
+    }
+}
 
 void CascadedShadowMap::enableDebugTexture(bool enabled)
 {
@@ -306,6 +319,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
     }
 
     auto &registry = activeScene.getRegistry();
+    SceneRenderData *renderData = activeScene.getRenderData();
 
     auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash, currentFrame);
     auto commandBuffer = pool->getSecondaryCommandBuffer();
@@ -369,7 +383,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
                                                         meshComp.mesh->getIndexBuffer()->getIndexType());
 
         // Add mesh to batch (materialIndex = 0 for shadow pass)
-        batch->addObject(*meshComp.mesh, meshComp.renderDataSlot, 0);
+        batch->addObject(*meshComp.mesh, renderData->getMeshSlot(entity), 0);
     }
 
     // Second pass: Upload batch data and render using MDI
@@ -954,7 +968,7 @@ void CascadedShadowMap::createUniformBuffers()
     auto binding = cascadeSet ? cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO) : nullptr;
 
     m_cascadeMatricesBuffers.resize(m_framesInFlight);
-    m_cascadeMatricesIndices.resize(m_framesInFlight, 0);
+    m_cascadeMatricesIndices.resize(m_framesInFlight, UINT32_MAX);
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
         m_cascadeMatricesBuffers[i] = std::make_shared<UniformBuffer>(sizeof(CSMData), BufferUsage::STREAM, m_allocator, nullptr);
         if (binding) {

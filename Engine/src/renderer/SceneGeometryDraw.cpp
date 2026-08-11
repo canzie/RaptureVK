@@ -5,6 +5,7 @@
 #include "logging/TracyProfiler.h"
 #include "meshes/Mesh.h"
 #include "renderer/Frustum.h"
+#include "renderer/SceneRenderData.h"
 #include "scenes/Scene.h"
 #include "window_context/Application.h"
 
@@ -36,6 +37,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
     populated.clear();
 
     auto &registry = scene.getRegistry();
+    SceneRenderData *renderData = scene.getRenderData();
 
     for (auto [entity, transform, meshComp, materialComp] :
          registry.read<TransformComponent, MeshComponent, MaterialComponent>()) {
@@ -66,7 +68,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
         MDIBatch *batch = batchMap.obtainBatch(vboAlloc, iboAlloc, mesh->getVertexBuffer()->getBufferLayout(),
                                                mesh->getIndexBuffer()->getIndexType());
 
-        uint32_t meshSlotIndex = meshComp.renderDataSlot;
+        uint32_t meshSlotIndex = renderData->getMeshSlot(entity);
         uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
 
         batch->addObject(*mesh, meshSlotIndex, materialIndex);

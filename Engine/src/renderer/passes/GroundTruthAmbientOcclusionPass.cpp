@@ -155,7 +155,7 @@ void GroundTruthAmbientOcclusionPass::record(const RenderPassContext &context, C
     }
 
     auto &renderData = *(context.scene->getRenderData());
-    auto *cameraComp = context.camera.isValid() ? context.camera.tryRead<CameraComponent>() : nullptr;
+    uint32_t cameraSlot = renderData.getCameraSlot(context.camera.getEntity());
 
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_pipeline);
@@ -164,8 +164,7 @@ void GroundTruthAmbientOcclusionPass::record(const RenderPassContext &context, C
 
     OcclusionPushConstants pushConstants{};
     pushConstants.cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(context.frameInFlight);
-    pushConstants.cameraSlotIndex =
-        (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
+    pushConstants.cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
     pushConstants.depthTextureIndex = context.targets->depthStencil->getBindlessIndex();
     pushConstants.normalTextureIndex = context.targets->gbufferNormalMotion->getBindlessIndex();
     pushConstants.outputSize = glm::ivec2(m_width, m_height);

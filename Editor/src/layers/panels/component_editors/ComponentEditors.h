@@ -11,6 +11,7 @@
 #include "scenes/instances/Environment.h"
 #include "scenes/instances/Mesh3D.h"
 #include "scenes/instances/PointLight3D.h"
+#include "scenes/instances/RigidBody3D.h"
 #include "scenes/instances/SpotLight3D.h"
 
 #include <glm/glm.hpp>
@@ -115,9 +116,32 @@ class Mesh3DEditor : public ComponentEditorBase {
   private:
     bool m_isVisible = true;
     bool m_isRayTraced = false;
+    bool m_hasRigidBody = false;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
     std::optional<AssetPicker> m_materialPicker;
     Rapture::Mesh3D *m_node = nullptr;
+};
+
+class RigidBody3DEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Rigid Body"; }
+    const char *icon() const override { return ""; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
+
+  private:
+    /**
+     * @brief The body of the selected object, whether it stands on its own or a mesh holds it
+     * @param entity The selected entity
+     * @return The body, or nullptr if the selection has none
+     */
+    Rapture::RigidBody3D *resolveBody(const Rapture::ecs::EntityAccessor &entity) const;
+
+    float m_friction = 0.2f;
+    float m_restitution = 0.0f;
+    Amethyst::Dropdown *m_motionTypeDropdown = nullptr;
+    Amethyst::TextLabel *m_shapeText = nullptr;
+    Rapture::RigidBody3D *m_node = nullptr;
 };
 
 class Camera3DEditor : public ComponentEditorBase {

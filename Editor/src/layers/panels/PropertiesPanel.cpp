@@ -204,15 +204,22 @@ void PropertiesPanel::refresh()
         // Sections come from the instance's class chain, base first, so a Transform sits above the
         // sections its subclasses add.
         Rapture::Instance *instance = m_scene != nullptr ? m_scene->instanceFor(e.getEntity()) : nullptr;
-        ensure<Node3DEditor>(instance != nullptr && instance->isA<Rapture::Node3D>());
-        ensure<Mesh3DEditor>(instance != nullptr && instance->isA<Rapture::Mesh3D>());
-        ensure<Light3DEditor>(instance != nullptr && instance->isA<Rapture::Light3D>());
-        ensure<DirectionalLight3DEditor>(instance != nullptr && instance->isA<Rapture::DirectionalLight3D>());
-        ensure<PointLight3DEditor>(instance != nullptr && instance->isA<Rapture::PointLight3D>());
-        ensure<SpotLight3DEditor>(instance != nullptr && instance->isA<Rapture::SpotLight3D>());
-        ensure<Camera3DEditor>(instance != nullptr && instance->isA<Rapture::Camera3D>());
+        if (instance == nullptr) {
+            return;
+        }
 
-        ensure<EnvironmentEditor>(instance != nullptr && instance->isA<Rapture::Environment>());
+        Rapture::Mesh3D *mesh = instance->as<Rapture::Mesh3D>();
+
+        ensure<Node3DEditor>(instance->isA<Rapture::Node3D>());
+        ensure<Mesh3DEditor>(mesh != nullptr);
+        ensure<RigidBody3DEditor>(instance->isA<Rapture::RigidBody3D>() || (mesh != nullptr && mesh->rigidBody() != nullptr));
+        ensure<Light3DEditor>(instance->isA<Rapture::Light3D>());
+        ensure<DirectionalLight3DEditor>(instance->isA<Rapture::DirectionalLight3D>());
+        ensure<PointLight3DEditor>(instance->isA<Rapture::PointLight3D>());
+        ensure<SpotLight3DEditor>(instance->isA<Rapture::SpotLight3D>());
+        ensure<Camera3DEditor>(instance->isA<Rapture::Camera3D>());
+
+        ensure<EnvironmentEditor>(instance->isA<Rapture::Environment>());
 
         ensure<ShadowEditor>(e.has<Rapture::ShadowComponent>());
         ensure<CascadedShadowEditor>(e.has<Rapture::CascadedShadowComponent>());
@@ -237,6 +244,11 @@ void PropertiesPanel::onUpdate(float dt)
         }
         return;
     }
+
+    if (m_sections->consumeRefreshRequest()) {
+        refresh();
+    }
+
     m_sections->sync();
 }
 

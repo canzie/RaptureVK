@@ -31,36 +31,30 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
 
     ecs::Registry &registry = m_scene->getRegistry();
 
-    // a slot is bookkeeping about where the data went, not a change to the data, so it announces nothing
     auto meshSwapCb = [this, &registry](ecs::Entity entity, uint32_t newSlot) {
-        if (!registry.has<MeshComponent>(entity)) {
-            return;
+        const MeshComponent *mesh = registry.tryRead<MeshComponent>(entity);
+        if (mesh != nullptr) {
+            m_meshSlots[entity] = m_meshes.getGlobalSlot(mesh->mobility, newSlot);
         }
-        auto mesh = registry.write<MeshComponent>(entity, 0);
-        mesh->renderDataSlot = m_meshes.getGlobalSlot(mesh->mobility, newSlot);
     };
     auto lightSwapCb = [this, &registry](ecs::Entity entity, uint32_t newSlot) {
-        LightComponent *light = Light_tryWriteLight(ecs::EntityAccessor(entity, &registry), 0);
+        const LightComponent *light = Light_tryReadLight(ecs::EntityAccessor(entity, &registry));
         if (light != nullptr) {
-            light->renderDataSlot = m_lights.getGlobalSlot(light->mobility, newSlot);
+            m_lightSlots[entity] = m_lights.getGlobalSlot(light->mobility, newSlot);
         }
     };
     auto cameraSwapCb = [this, &registry](ecs::Entity entity, uint32_t newSlot) {
-        if (!registry.has<CameraComponent>(entity)) {
-            return;
+        if (registry.has<CameraComponent>(entity)) {
+            m_cameraSlots[entity] = m_cameras.getGlobalSlot(MOBILITY_DYNAMIC, newSlot);
         }
-        auto camera = registry.write<CameraComponent>(entity, 0);
-        camera->renderDataSlot = m_cameras.getGlobalSlot(MOBILITY_DYNAMIC, newSlot);
     };
     auto shadowSwapCb = [this, &registry](ecs::Entity entity, uint32_t newSlot) {
-        if (registry.has<ShadowComponent>(entity)) {
-            auto shadow = registry.write<ShadowComponent>(entity, 0);
-            shadow->renderDataSlot = m_shadows.getGlobalSlot(shadow->mobility, newSlot);
+        if (const ShadowComponent *shadow = registry.tryRead<ShadowComponent>(entity)) {
+            m_shadowSlots[entity] = m_shadows.getGlobalSlot(shadow->mobility, newSlot);
             return;
         }
-        if (registry.has<CascadedShadowComponent>(entity)) {
-            auto cascaded = registry.write<CascadedShadowComponent>(entity, 0);
-            cascaded->renderDataSlot = m_shadows.getGlobalSlot(cascaded->mobility, newSlot);
+        if (const CascadedShadowComponent *cascaded = registry.tryRead<CascadedShadowComponent>(entity)) {
+            m_shadowSlots[entity] = m_shadows.getGlobalSlot(cascaded->mobility, newSlot);
         }
     };
 
@@ -133,36 +127,31 @@ void SceneRenderData::connectLightSignals(ecs::Registry &registry)
 
 SceneRenderData::~SceneRenderData() = default;
 
-void SceneRenderData::onMeshAdded(EntityID entityId)
+void SceneRenderData::onMeshAdded(ecs::Entity entityId)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    if (!registry.has<MeshComponent>(entityId)) {
+    const MeshComponent *mesh = m_scene->getRegistry().tryRead<MeshComponent>(entityId);
+    if (mesh == nullptr) {
         return;
     }
 
-    auto mesh = registry.write<MeshComponent>(entityId, 0);
     uint32_t localSlot = m_meshes.getPartition(mesh->mobility).allocateSlot(entityId);
-    mesh->renderDataSlot = m_meshes.getGlobalSlot(mesh->mobility, localSlot);
+    m_meshSlots[entityId] = m_meshes.getGlobalSlot(mesh->mobility, localSlot);
 }
 
-void SceneRenderData::onMeshRemoved(EntityID entityId)
+void SceneRenderData::onMeshRemoved(ecs::Entity entityId)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    if (!registry.has<MeshComponent>(entityId)) {
+    const MeshComponent *mesh = m_scene->getRegistry().tryRead<MeshComponent>(entityId);
+    uint32_t globalSlot = getMeshSlot(entityId);
+    if (mesh == nullptr || globalSlot == UINT32_MAX) {
         return;
     }
 
-    auto mesh = registry.write<MeshComponent>(entityId, 0);
-    if (mesh->renderDataSlot == UINT32_MAX) {
-        return;
-    }
-
-    uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, mesh->renderDataSlot);
+    uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, globalSlot);
     m_meshes.getPartition(mesh->mobility).freeSlot(localSlot);
-    mesh->renderDataSlot = UINT32_MAX;
+    m_meshSlots.erase(entityId);
 }
 
-void SceneRenderData::setMeshMobility(EntityID entityId, Mobility mobility)
+void SceneRenderData::setMeshMobility(ecs::Entity entityId, Mobility mobility)
 {
     ecs::Registry &registry = m_scene->getRegistry();
     const MeshComponent *mesh = registry.tryRead<MeshComponent>(entityId);
@@ -177,7 +166,7 @@ void SceneRenderData::setMeshMobility(EntityID entityId, Mobility mobility)
     onMeshAdded(entityId);
 }
 
-void SceneRenderData::setLightMobility(EntityID entityId, Mobility mobility)
+void SceneRenderData::setLightMobility(ecs::Entity entityId, Mobility mobility)
 {
     ecs::EntityAccessor entity(entityId, &m_scene->getRegistry());
     const LightComponent *light = Light_tryReadLight(entity);
@@ -190,7 +179,7 @@ void SceneRenderData::setLightMobility(EntityID entityId, Mobility mobility)
     onLightAdded(entityId);
 }
 
-void SceneRenderData::setShadowMobility(EntityID entityId, Mobility mobility)
+void SceneRenderData::setShadowMobility(ecs::Entity entityId, Mobility mobility)
 {
     ecs::Registry &registry = m_scene->getRegistry();
     const ShadowComponent *shadow = registry.tryRead<ShadowComponent>(entityId);
@@ -203,7 +192,7 @@ void SceneRenderData::setShadowMobility(EntityID entityId, Mobility mobility)
     onShadowAdded(entityId);
 }
 
-void SceneRenderData::setCascadedShadowMobility(EntityID entityId, Mobility mobility)
+void SceneRenderData::setCascadedShadowMobility(ecs::Entity entityId, Mobility mobility)
 {
     ecs::Registry &registry = m_scene->getRegistry();
     const CascadedShadowComponent *shadow = registry.tryRead<CascadedShadowComponent>(entityId);
@@ -216,114 +205,99 @@ void SceneRenderData::setCascadedShadowMobility(EntityID entityId, Mobility mobi
     onCascadedShadowAdded(entityId);
 }
 
-void SceneRenderData::onLightAdded(EntityID entityId)
+void SceneRenderData::onLightAdded(ecs::Entity entityId)
 {
-    LightComponent *light = Light_tryWriteLight(ecs::EntityAccessor(entityId, &m_scene->getRegistry()), 0);
+    const LightComponent *light = Light_tryReadLight(ecs::EntityAccessor(entityId, &m_scene->getRegistry()));
     if (light == nullptr) {
         return;
     }
     uint32_t localSlot = m_lights.getPartition(light->mobility).allocateSlot(entityId);
-    light->renderDataSlot = m_lights.getGlobalSlot(light->mobility, localSlot);
+    m_lightSlots[entityId] = m_lights.getGlobalSlot(light->mobility, localSlot);
 }
 
-void SceneRenderData::onLightRemoved(EntityID entityId)
+void SceneRenderData::onLightRemoved(ecs::Entity entityId)
 {
-    LightComponent *light = Light_tryWriteLight(ecs::EntityAccessor(entityId, &m_scene->getRegistry()), 0);
-    if (light == nullptr || light->renderDataSlot == UINT32_MAX) {
+    const LightComponent *light = Light_tryReadLight(ecs::EntityAccessor(entityId, &m_scene->getRegistry()));
+    uint32_t globalSlot = getLightSlot(entityId);
+    if (light == nullptr || globalSlot == UINT32_MAX) {
         return;
     }
-    uint32_t localSlot = m_lights.getLocalSlot(light->mobility, light->renderDataSlot);
+    uint32_t localSlot = m_lights.getLocalSlot(light->mobility, globalSlot);
     m_lights.getPartition(light->mobility).freeSlot(localSlot);
-    light->renderDataSlot = UINT32_MAX;
+    m_lightSlots.erase(entityId);
 }
 
-void SceneRenderData::onCameraAdded(EntityID entityId)
+void SceneRenderData::onCameraAdded(ecs::Entity entityId)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    if (!registry.has<CameraComponent>(entityId)) {
+    if (!m_scene->getRegistry().has<CameraComponent>(entityId)) {
         return;
     }
 
     uint32_t localSlot = m_cameras.getPartition(MOBILITY_DYNAMIC).allocateSlot(entityId);
-    registry.write<CameraComponent>(entityId, 0)->renderDataSlot = m_cameras.getGlobalSlot(MOBILITY_DYNAMIC, localSlot);
+    m_cameraSlots[entityId] = m_cameras.getGlobalSlot(MOBILITY_DYNAMIC, localSlot);
 }
 
-void SceneRenderData::onCameraRemoved(EntityID entityId)
+void SceneRenderData::onCameraRemoved(ecs::Entity entityId)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    if (!registry.has<CameraComponent>(entityId)) {
+    uint32_t globalSlot = getCameraSlot(entityId);
+    if (globalSlot == UINT32_MAX) {
         return;
     }
 
-    auto camera = registry.write<CameraComponent>(entityId, 0);
-    if (camera->renderDataSlot == UINT32_MAX) {
-        return;
-    }
-
-    uint32_t localSlot = m_cameras.getLocalSlot(MOBILITY_DYNAMIC, camera->renderDataSlot);
+    uint32_t localSlot = m_cameras.getLocalSlot(MOBILITY_DYNAMIC, globalSlot);
     m_cameras.getPartition(MOBILITY_DYNAMIC).freeSlot(localSlot);
-    camera->renderDataSlot = UINT32_MAX;
+    m_cameraSlots.erase(entityId);
 }
 
-void SceneRenderData::onShadowAdded(EntityID entityId)
+void SceneRenderData::onShadowAdded(ecs::Entity entityId)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    if (!registry.has<ShadowComponent>(entityId)) {
+    const ShadowComponent *shadow = m_scene->getRegistry().tryRead<ShadowComponent>(entityId);
+    if (shadow == nullptr) {
         return;
     }
 
-    auto shadow = registry.write<ShadowComponent>(entityId, 0);
     uint32_t localSlot = m_shadows.getPartition(shadow->mobility).allocateSlot(entityId);
-    shadow->renderDataSlot = m_shadows.getGlobalSlot(shadow->mobility, localSlot);
+    m_shadowSlots[entityId] = m_shadows.getGlobalSlot(shadow->mobility, localSlot);
 }
 
-void SceneRenderData::onShadowRemoved(EntityID entityId)
+void SceneRenderData::onShadowRemoved(ecs::Entity entityId)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    if (!registry.has<ShadowComponent>(entityId)) {
+    const ShadowComponent *shadow = m_scene->getRegistry().tryRead<ShadowComponent>(entityId);
+    uint32_t globalSlot = getShadowSlot(entityId);
+    if (shadow == nullptr || globalSlot == UINT32_MAX) {
         return;
     }
 
-    auto shadow = registry.write<ShadowComponent>(entityId, 0);
-    if (shadow->renderDataSlot == UINT32_MAX) {
-        return;
-    }
-
-    uint32_t localSlot = m_shadows.getLocalSlot(shadow->mobility, shadow->renderDataSlot);
+    uint32_t localSlot = m_shadows.getLocalSlot(shadow->mobility, globalSlot);
     m_shadows.getPartition(shadow->mobility).freeSlot(localSlot);
-    shadow->renderDataSlot = UINT32_MAX;
+    m_shadowSlots.erase(entityId);
 }
 
-void SceneRenderData::onCascadedShadowAdded(EntityID entityId)
+void SceneRenderData::onCascadedShadowAdded(ecs::Entity entityId)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    if (!registry.has<CascadedShadowComponent>(entityId)) {
+    const CascadedShadowComponent *shadow = m_scene->getRegistry().tryRead<CascadedShadowComponent>(entityId);
+    if (shadow == nullptr) {
         return;
     }
 
-    auto shadow = registry.write<CascadedShadowComponent>(entityId, 0);
     uint32_t localSlot = m_shadows.getPartition(shadow->mobility).allocateSlot(entityId);
-    shadow->renderDataSlot = m_shadows.getGlobalSlot(shadow->mobility, localSlot);
+    m_shadowSlots[entityId] = m_shadows.getGlobalSlot(shadow->mobility, localSlot);
 }
 
-void SceneRenderData::onCascadedShadowRemoved(EntityID entityId)
+void SceneRenderData::onCascadedShadowRemoved(ecs::Entity entityId)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    if (!registry.has<CascadedShadowComponent>(entityId)) {
+    const CascadedShadowComponent *shadow = m_scene->getRegistry().tryRead<CascadedShadowComponent>(entityId);
+    uint32_t globalSlot = getShadowSlot(entityId);
+    if (shadow == nullptr || globalSlot == UINT32_MAX) {
         return;
     }
 
-    auto shadow = registry.write<CascadedShadowComponent>(entityId, 0);
-    if (shadow->renderDataSlot == UINT32_MAX) {
-        return;
-    }
-
-    uint32_t localSlot = m_shadows.getLocalSlot(shadow->mobility, shadow->renderDataSlot);
+    uint32_t localSlot = m_shadows.getLocalSlot(shadow->mobility, globalSlot);
     m_shadows.getPartition(shadow->mobility).freeSlot(localSlot);
-    shadow->renderDataSlot = UINT32_MAX;
+    m_shadowSlots.erase(entityId);
 }
 
-void SceneRenderData::createShadowMap(EntityID entityId)
+void SceneRenderData::createShadowMap(ecs::Entity entityId)
 {
     const ShadowComponent *shadow = m_scene->getRegistry().tryRead<ShadowComponent>(entityId);
     if (shadow == nullptr) {
@@ -334,12 +308,12 @@ void SceneRenderData::createShadowMap(EntityID entityId)
     m_shadowMaps[entityId] = std::make_unique<ShadowMap>(resolution, resolution);
 }
 
-void SceneRenderData::destroyShadowMap(EntityID entityId)
+void SceneRenderData::destroyShadowMap(ecs::Entity entityId)
 {
     m_shadowMaps.erase(entityId);
 }
 
-void SceneRenderData::createCascadedShadowMap(EntityID entityId)
+void SceneRenderData::createCascadedShadowMap(ecs::Entity entityId)
 {
     const CascadedShadowComponent *shadow = m_scene->getRegistry().tryRead<CascadedShadowComponent>(entityId);
     if (shadow == nullptr) {
@@ -352,25 +326,51 @@ void SceneRenderData::createCascadedShadowMap(EntityID entityId)
     m_cascadedShadowMaps[entityId] = std::move(map);
 }
 
-void SceneRenderData::destroyCascadedShadowMap(EntityID entityId)
+void SceneRenderData::destroyCascadedShadowMap(ecs::Entity entityId)
 {
     m_cascadedShadowMaps.erase(entityId);
 }
 
-ShadowMap *SceneRenderData::getShadowMap(EntityID entityId) const
+static uint32_t s_lookupSlot(const std::unordered_map<ecs::Entity, uint32_t> &slots, ecs::Entity entityId)
+{
+    auto it = slots.find(entityId);
+    return it != slots.end() ? it->second : UINT32_MAX;
+}
+
+uint32_t SceneRenderData::getMeshSlot(ecs::Entity entityId) const
+{
+    return s_lookupSlot(m_meshSlots, entityId);
+}
+
+uint32_t SceneRenderData::getLightSlot(ecs::Entity entityId) const
+{
+    return s_lookupSlot(m_lightSlots, entityId);
+}
+
+uint32_t SceneRenderData::getCameraSlot(ecs::Entity entityId) const
+{
+    return s_lookupSlot(m_cameraSlots, entityId);
+}
+
+uint32_t SceneRenderData::getShadowSlot(ecs::Entity entityId) const
+{
+    return s_lookupSlot(m_shadowSlots, entityId);
+}
+
+ShadowMap *SceneRenderData::getShadowMap(ecs::Entity entityId) const
 {
     auto it = m_shadowMaps.find(entityId);
     return it != m_shadowMaps.end() ? it->second.get() : nullptr;
 }
 
-CascadedShadowMap *SceneRenderData::getCascadedShadowMap(EntityID entityId) const
+CascadedShadowMap *SceneRenderData::getCascadedShadowMap(ecs::Entity entityId) const
 {
     auto it = m_cascadedShadowMaps.find(entityId);
     return it != m_cascadedShadowMaps.end() ? it->second.get() : nullptr;
 }
 
 void SceneRenderData::consumeChanges(StoreBookmarks &bookmarks, SceneChannel paramsChannel,
-                                     const std::function<void(EntityID)> &repackEntity, const std::function<void()> &repackAll)
+                                     const std::function<void(ecs::Entity)> &repackEntity, const std::function<void()> &repackAll)
 {
     ecs::Journal &journal = m_scene->getRegistry().getJournal();
 
@@ -382,10 +382,10 @@ void SceneRenderData::consumeChanges(StoreBookmarks &bookmarks, SceneChannel par
         return;
     }
 
-    for (EntityID entity : transforms) {
+    for (ecs::Entity entity : transforms) {
         repackEntity(entity);
     }
-    for (EntityID entity : params) {
+    for (ecs::Entity entity : params) {
         repackEntity(entity);
     }
 }
@@ -411,7 +411,7 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
 
     auto packMesh = [this](RenderPartition<MeshGPUData> &partition, uint32_t i) {
         ecs::Registry &registry = m_scene->getRegistry();
-        EntityID entityId = partition.getEntityId(i);
+        ecs::Entity entityId = partition.getEntityId(i);
 
         const TransformComponent *transform = registry.tryRead<TransformComponent>(entityId);
         const MeshComponent *mesh = registry.tryRead<MeshComponent>(entityId);
@@ -434,14 +434,15 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
 
     ecs::Registry &registry = m_scene->getRegistry();
 
-    auto repackEntity = [&](EntityID entityId) {
+    auto repackEntity = [&](ecs::Entity entityId) {
         const MeshComponent *mesh = registry.tryRead<MeshComponent>(entityId);
-        if (mesh == nullptr || mesh->renderDataSlot == UINT32_MAX) {
+        uint32_t globalSlot = getMeshSlot(entityId);
+        if (mesh == nullptr || globalSlot == UINT32_MAX) {
             return;
         }
 
         auto &partition = m_meshes.getPartition(mesh->mobility);
-        uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, mesh->renderDataSlot);
+        uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, globalSlot);
         packMesh(partition, localSlot);
         partition.markDirty(frameIndex, localSlot);
     };
@@ -465,7 +466,7 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
 
     auto packLight = [&](RenderPartition<LightGPUData> &partition, uint32_t i) {
         ecs::Registry &registry = m_scene->getRegistry();
-        EntityID entityId = partition.getEntityId(i);
+        ecs::Entity entityId = partition.getEntityId(i);
         ecs::EntityAccessor entity(entityId, &registry);
 
         const TransformComponent *transform = registry.tryRead<TransformComponent>(entityId);
@@ -513,14 +514,15 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
 
     ecs::Registry &registry = m_scene->getRegistry();
 
-    auto repackEntity = [&](EntityID entityId) {
+    auto repackEntity = [&](ecs::Entity entityId) {
         const LightComponent *light = Light_tryReadLight(ecs::EntityAccessor(entityId, &registry));
-        if (light == nullptr || light->renderDataSlot == UINT32_MAX) {
+        uint32_t globalSlot = getLightSlot(entityId);
+        if (light == nullptr || globalSlot == UINT32_MAX) {
             return;
         }
 
         auto &partition = m_lights.getPartition(light->mobility);
-        uint32_t localSlot = m_lights.getLocalSlot(light->mobility, light->renderDataSlot);
+        uint32_t localSlot = m_lights.getLocalSlot(light->mobility, globalSlot);
         packLight(partition, localSlot);
         partition.markDirty(frameIndex, localSlot);
     };
@@ -547,7 +549,7 @@ void SceneRenderData::updateCameras(uint32_t frameIndex)
     auto &partition = m_cameras.getPartition(MOBILITY_DYNAMIC);
 
     for (uint32_t i = 0; i < partition.getCount(); i++) {
-        EntityID entityId = partition.getEntityId(i);
+        ecs::Entity entityId = partition.getEntityId(i);
         if (!registry.hasAll<TransformComponent, CameraComponent>(entityId)) {
             continue;
         }
@@ -579,7 +581,7 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
 
     auto packShadow = [&](RenderPartition<ShadowGPUData> &partition, uint32_t i) {
         ecs::Registry &registry = m_scene->getRegistry();
-        EntityID entityId = partition.getEntityId(i);
+        ecs::Entity entityId = partition.getEntityId(i);
         ecs::EntityAccessor entity(entityId, &registry);
 
         if (Light_tryReadLight(entity) == nullptr) {
@@ -630,16 +632,16 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
 
     ecs::Registry &registry = m_scene->getRegistry();
 
-    auto repackEntity = [&](EntityID entityId) {
+    auto repackEntity = [&](ecs::Entity entityId) {
         Mobility mobility = MOBILITY_DYNAMIC;
-        uint32_t globalSlot = UINT32_MAX;
+        uint32_t globalSlot = getShadowSlot(entityId);
 
         if (const ShadowComponent *shadow = registry.tryRead<ShadowComponent>(entityId)) {
             mobility = shadow->mobility;
-            globalSlot = shadow->renderDataSlot;
         } else if (const CascadedShadowComponent *cascaded = registry.tryRead<CascadedShadowComponent>(entityId)) {
             mobility = cascaded->mobility;
-            globalSlot = cascaded->renderDataSlot;
+        } else {
+            return;
         }
 
         if (globalSlot == UINT32_MAX) {

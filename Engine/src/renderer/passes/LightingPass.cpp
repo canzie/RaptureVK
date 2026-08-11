@@ -150,9 +150,9 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
 
     if (camera.isValid()) {
         cameraPos = transform::translation(camera.tryRead<TransformComponent>()->world);
-        auto *cameraComp = camera.tryRead<CameraComponent>();
-        if (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) {
-            cameraSlotIndex = cameraComp->renderDataSlot;
+        uint32_t cameraSlot = activeScene.getRenderData()->getCameraSlot(camera.getEntity());
+        if (cameraSlot != UINT32_MAX) {
+            cameraSlotIndex = cameraSlot;
         }
     } else {
         RP_CORE_WARN("No main camera found!");

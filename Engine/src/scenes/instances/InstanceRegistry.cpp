@@ -8,6 +8,7 @@
 #include "scenes/instances/Node3D.h"
 #include "scenes/instances/PointLight3D.h"
 #include "scenes/instances/PrefabInstance.h"
+#include "scenes/instances/RigidBody3D.h"
 #include "scenes/instances/SpotLight3D.h"
 #include "scenes/instances/SpringArm3D.h"
 #include "scenes/instances/StaticMesh3D.h"
@@ -33,6 +34,7 @@ void InstanceRegistry::init()
     add<SpringArm3D>();
     add<StaticMesh3D>();
     add<Terrain3D>();
+    add<RigidBody3D>();
     add<PrefabInstance>();
     add<DirectionalLight3D>();
     add<PointLight3D>();

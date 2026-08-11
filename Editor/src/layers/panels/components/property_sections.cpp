@@ -107,6 +107,27 @@ void PropertySection::rowSlider(Amethyst::TableScope &t, std::string_view label,
     });
 }
 
+Amethyst::TextLabel *PropertySection::rowText(Amethyst::TableScope &t, std::string_view label, std::string_view value)
+{
+    Amethyst::TextLabel *result = nullptr;
+
+    t.row([&](Amethyst::TableRowScope &tr) {
+        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
+        tr.cell([value, &result](Amethyst::UIScope &cell) {
+            cell.textLabel(
+                {
+                    .classes = {"property-label"},
+                    .base = {.position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.0f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -CONTROL_HPAD, 1.0f, 0.0f)},
+                    .label = std::string(value),
+                },
+                [&result](Amethyst::TextLabelScope &tl) { result = &tl.component; });
+        });
+    });
+
+    return result;
+}
+
 void PropertySection::rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool *value,
                                   const std::function<void(bool)> &onChanged)
 {
@@ -257,11 +278,20 @@ void PropertySectionList::refresh(const std::function<void()> &fn)
     relayout();
 }
 
+bool PropertySectionList::consumeRefreshRequest()
+{
+    const bool requested = m_refreshRequested;
+    m_refreshRequested = false;
+    return requested;
+}
+
 void PropertySectionList::buildSection(PropertySection &section)
 {
     if (m_view == nullptr) {
         return;
     }
+
+    section.requestRefresh = [this]() { m_refreshRequested = true; };
 
     Amethyst::UIScope(*m_view).collapsibleHeader(
         {

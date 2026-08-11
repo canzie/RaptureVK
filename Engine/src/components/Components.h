@@ -59,8 +59,6 @@ struct CameraComponent {
     float nearPlane;
     float farPlane;
 
-    // slot into the SSBO where the camera metadata lives
-    uint32_t renderDataSlot = UINT32_MAX;
     // whether the slot holds matrices from a previous update, so prevViewProj can carry them
     bool hasRenderData = false;
 
@@ -129,8 +127,6 @@ struct MeshComponent {
     bool isLoading = true;
     Mobility mobility = MOBILITY_STATIC;
     bool isEnabled = true;
-    // slot into the SSBO where the mesh metadata lives
-    uint32_t renderDataSlot = UINT32_MAX;
     BoundingBox worldBoundingBox;
 
     MeshComponent() = default;
@@ -178,9 +174,6 @@ struct LightComponent {
     bool isActive = true;
     Mobility mobility = MOBILITY_STATIC;
     bool castsShadow = false;
-
-    // slot into the SSBO where the light metadata lives
-    uint32_t renderDataSlot = UINT32_MAX;
 
     void setColor(const glm::vec3 &c) { color = c; }
 
@@ -277,7 +270,6 @@ struct ShadowComponent {
     uint32_t resolution = 1024;
     bool isActive = true;
     Mobility mobility = MOBILITY_DYNAMIC;
-    uint32_t renderDataSlot = UINT32_MAX;
 
     ShadowComponent() = default;
     explicit ShadowComponent(uint32_t resolution) : resolution(resolution) {}
@@ -293,7 +285,6 @@ struct CascadedShadowComponent {
     float shadowDistance = 80.0f;
     bool isActive = true;
     Mobility mobility = MOBILITY_DYNAMIC;
-    uint32_t renderDataSlot = UINT32_MAX;
 
     CascadedShadowComponent() = default;
     CascadedShadowComponent(uint32_t resolution, uint8_t numCascades, float lambda)

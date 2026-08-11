@@ -203,7 +203,8 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
     auto &renderData = *(activeScene.getRenderData());
     uint32_t meshSSBOIndex = renderData.getMeshes().getDescriptorIndex(currentFrame);
     uint32_t cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrame);
-    uint32_t cameraSlotIndex = (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
+    uint32_t cameraSlot = renderData.getCameraSlot(camera.getEntity());
+    uint32_t cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
 
     for (MDIBatch *batch : m_geometry->batches(currentFrame)) {
         RAPTURE_PROFILE_SCOPE("Draw Batch");
@@ -701,7 +702,8 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &act
         TerrainGBufferPushConstants pc{};
         auto &terrainRenderData = *(activeScene.getRenderData());
         pc.cameraSSBOIndex = terrainRenderData.getCameras().getDescriptorIndex(currentFrame);
-        pc.cameraSlotIndex = (cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
+        uint32_t cameraSlot = terrainRenderData.getCameraSlot(camera.getEntity());
+        pc.cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
         pc.chunkDataBufferIndex = chunkDataBufferIndex;
         pc.continentalnessIndex = continentalnessIndex;
         pc.erosionIndex = erosionIndex;

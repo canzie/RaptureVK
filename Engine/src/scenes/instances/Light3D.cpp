@@ -230,6 +230,13 @@ void Light3D::applyShadowSettings(ReadNode node)
     shadow.isActive = shadowNode.child(KEY_ACTIVE).asBool(shadow.isActive);
     shadow.mobility = static_cast<Mobility>(shadowNode.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(shadow.mobility)));
 
+    // the shadow map is sized on construction, so a new resolution only takes effect if the component
+    // is detached and reattached
+    const ShadowComponent *current = m_entity.tryRead<ShadowComponent>();
+    if (current != nullptr && current->resolution != shadow.resolution) {
+        m_entity.tryRemove<ShadowComponent>();
+    }
+
     m_entity.set<ShadowComponent>(shadow);
 }
 

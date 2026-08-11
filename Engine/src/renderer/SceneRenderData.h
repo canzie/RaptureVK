@@ -49,42 +49,70 @@ class SceneRenderData {
      * @param entityId The entity whose mesh is changing mobility
      * @param mobility The mobility to move to
      */
-    void setMeshMobility(EntityID entityId, Mobility mobility);
+    void setMeshMobility(ecs::Entity entityId, Mobility mobility);
 
     /**
      * @brief Moves a light's slot into the partition its new mobility belongs to
      * @param entityId The entity whose light is changing mobility
      * @param mobility The mobility to move to
      */
-    void setLightMobility(EntityID entityId, Mobility mobility);
+    void setLightMobility(ecs::Entity entityId, Mobility mobility);
 
     /**
      * @brief Moves a shadow's slot into the partition its new mobility belongs to
      * @param entityId The entity whose shadow is changing mobility
      * @param mobility The mobility to move to
      */
-    void setShadowMobility(EntityID entityId, Mobility mobility);
+    void setShadowMobility(ecs::Entity entityId, Mobility mobility);
 
     /**
      * @brief Moves a cascaded shadow's slot into the partition its new mobility belongs to
      * @param entityId The entity whose cascaded shadow is changing mobility
      * @param mobility The mobility to move to
      */
-    void setCascadedShadowMobility(EntityID entityId, Mobility mobility);
+    void setCascadedShadowMobility(ecs::Entity entityId, Mobility mobility);
+
+    /**
+     * @brief Where an entity's mesh data was packed
+     * @param entityId Entity holding the MeshComponent
+     * @return The slot, or UINT32_MAX if the entity owns none
+     */
+    uint32_t getMeshSlot(ecs::Entity entityId) const;
+
+    /**
+     * @brief Where an entity's light data was packed
+     * @param entityId Entity holding a light component
+     * @return The slot, or UINT32_MAX if the entity owns none
+     */
+    uint32_t getLightSlot(ecs::Entity entityId) const;
+
+    /**
+     * @brief Where an entity's camera data was packed
+     * @param entityId Entity holding the CameraComponent
+     * @return The slot, or UINT32_MAX if the entity owns none
+     */
+    uint32_t getCameraSlot(ecs::Entity entityId) const;
+
+    /**
+     * @brief Where an entity's shadow data was packed, whether cascaded or not
+     * @param entityId Entity holding a shadow component
+     * @return The slot, or UINT32_MAX if the entity owns none
+     */
+    uint32_t getShadowSlot(ecs::Entity entityId) const;
 
     /**
      * @brief Get the shadow map owned on behalf of an entity
      * @param entityId Entity holding the ShadowComponent
      * @return The shadow map, or nullptr if the entity has none
      */
-    ShadowMap *getShadowMap(EntityID entityId) const;
+    ShadowMap *getShadowMap(ecs::Entity entityId) const;
 
     /**
      * @brief Get the cascaded shadow map owned on behalf of an entity
      * @param entityId Entity holding the CascadedShadowComponent
      * @return The cascaded shadow map, or nullptr if the entity has none
      */
-    CascadedShadowMap *getCascadedShadowMap(EntityID entityId) const;
+    CascadedShadowMap *getCascadedShadowMap(ecs::Entity entityId) const;
 
     GPUDataStore<MeshGPUData> &getMeshes() { return m_meshes; }
     GPUDataStore<LightGPUData> &getLights() { return m_lights; }
@@ -103,21 +131,21 @@ class SceneRenderData {
     template <typename T>
     void connectLightSignals(ecs::Registry &registry);
 
-    void onMeshAdded(EntityID entityId);
-    void onMeshRemoved(EntityID entityId);
-    void onLightAdded(EntityID entityId);
-    void onLightRemoved(EntityID entityId);
-    void onCameraAdded(EntityID entityId);
-    void onCameraRemoved(EntityID entityId);
-    void onShadowAdded(EntityID entityId);
-    void onShadowRemoved(EntityID entityId);
-    void onCascadedShadowAdded(EntityID entityId);
-    void onCascadedShadowRemoved(EntityID entityId);
+    void onMeshAdded(ecs::Entity entityId);
+    void onMeshRemoved(ecs::Entity entityId);
+    void onLightAdded(ecs::Entity entityId);
+    void onLightRemoved(ecs::Entity entityId);
+    void onCameraAdded(ecs::Entity entityId);
+    void onCameraRemoved(ecs::Entity entityId);
+    void onShadowAdded(ecs::Entity entityId);
+    void onShadowRemoved(ecs::Entity entityId);
+    void onCascadedShadowAdded(ecs::Entity entityId);
+    void onCascadedShadowRemoved(ecs::Entity entityId);
 
-    void createShadowMap(EntityID entityId);
-    void destroyShadowMap(EntityID entityId);
-    void createCascadedShadowMap(EntityID entityId);
-    void destroyCascadedShadowMap(EntityID entityId);
+    void createShadowMap(ecs::Entity entityId);
+    void destroyShadowMap(ecs::Entity entityId);
+    void createCascadedShadowMap(ecs::Entity entityId);
+    void destroyCascadedShadowMap(ecs::Entity entityId);
 
     void updateMeshes(uint32_t frameIndex);
     void updateLights(uint32_t frameIndex);
@@ -129,8 +157,15 @@ class SceneRenderData {
     GPUDataStore<CameraGPUData> m_cameras;
     GPUDataStore<ShadowGPUData> m_shadows;
 
-    std::unordered_map<EntityID, std::unique_ptr<ShadowMap>> m_shadowMaps;
-    std::unordered_map<EntityID, std::unique_ptr<CascadedShadowMap>> m_cascadedShadowMaps;
+    // where each entity's data landed in its store, held here rather than on the component so that
+    // overwriting a component cannot lose the slot it was handed
+    std::unordered_map<ecs::Entity, uint32_t> m_meshSlots;
+    std::unordered_map<ecs::Entity, uint32_t> m_lightSlots;
+    std::unordered_map<ecs::Entity, uint32_t> m_cameraSlots;
+    std::unordered_map<ecs::Entity, uint32_t> m_shadowSlots;
+
+    std::unordered_map<ecs::Entity, std::unique_ptr<ShadowMap>> m_shadowMaps;
+    std::unordered_map<ecs::Entity, std::unique_ptr<CascadedShadowMap>> m_cascadedShadowMaps;
 
     RenderContext m_renderContext;
     Scene *m_scene = nullptr;
@@ -153,7 +188,7 @@ class SceneRenderData {
      * @param repackAll Repacks every slot, used when the reader fell too far behind
      */
     void consumeChanges(StoreBookmarks &bookmarks, SceneChannel paramsChannel,
-                        const std::function<void(EntityID)> &repackEntity, const std::function<void()> &repackAll);
+                        const std::function<void(ecs::Entity)> &repackEntity, const std::function<void()> &repackAll);
 
     std::vector<ecs::SignalConnection> m_connections;
 

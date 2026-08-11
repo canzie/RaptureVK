@@ -170,8 +170,9 @@ class Scene {
      */
     void updateShadowViews(const glm::vec3 &cameraPosition, Camera3D *activeCamera);
 
-    void onRigidBodyConstructed(ecs::Entity entity);
-    void registerRigidBodies();
+    /**
+     * @brief Hands every body the simulation moved this step back to the node it drives
+     */
     void syncRigidBodyTransforms();
 
     /**
@@ -185,7 +186,6 @@ class Scene {
     std::unique_ptr<SceneRenderData> m_renderData;
     std::unique_ptr<PhysicsSystem> m_physics;
     Controller *m_activeController = nullptr;
-    std::vector<ecs::Entity> m_pendingRigidBodies;
     SceneSettings m_config;
 
     // this scene's own position in the channels that stale a shadow map's view matrix

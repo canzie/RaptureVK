@@ -74,12 +74,12 @@ class DirtyBitfield {
  * @brief Dense slot map with per-frame dirty tracking for GPU data
  *
  * Packed array of T (SSBO contents) with O(1) add/remove via swap-and-pop.
- * Sparse array maps EntityID to dense index. One dirty bitfield per frame in flight.
+ * Sparse array maps ecs::Entity to dense index. One dirty bitfield per frame in flight.
  */
 template <typename T>
 class RenderPartition {
   public:
-    using SwapCallback = std::function<void(EntityID entityId, uint32_t newDenseIndex)>;
+    using SwapCallback = std::function<void(ecs::Entity entityId, uint32_t newDenseIndex)>;
 
     /**
      * @brief Initialize dirty bitfields and swap callback
@@ -93,7 +93,7 @@ class RenderPartition {
      * @param entityId Entity to associate with this slot
      * @return Dense index of the new slot
      */
-    uint32_t allocateSlot(EntityID entityId);
+    uint32_t allocateSlot(ecs::Entity entityId);
 
     /**
      * @brief Free a slot via swap-and-pop
@@ -114,7 +114,7 @@ class RenderPartition {
      * @param denseIndex Index into the packed array
      * @return The entity ID at that slot
      */
-    EntityID getEntityId(uint32_t denseIndex) const;
+    ecs::Entity getEntityId(uint32_t denseIndex) const;
 
     /**
      * @brief Get the number of active slots
@@ -163,7 +163,7 @@ class RenderPartition {
     void clearDirty(uint32_t frameIndex);
 
     /**
-     * @brief Fire swap callback for every entry so components can recompute their renderDataSlot
+     * @brief Fire swap callback for every entry so its owner can recompute where its data landed
      */
     void notifyAllSwaps();
 
@@ -174,7 +174,7 @@ class RenderPartition {
 
   private:
     std::vector<T> m_data;
-    std::vector<EntityID> m_denseToEntityId;
+    std::vector<ecs::Entity> m_denseToEntityId;
     std::vector<DirtyBitfield> m_dirtyBitfields;
     SwapCallback m_onSwap;
     uint32_t m_frameCount = 0;
@@ -189,7 +189,7 @@ class RenderPartition {
  * capacity resize (rare), not on every static add/remove.
  *
  * If per-mobility SSBOs are ever needed (e.g. GPU_ONLY for statics), the
- * renderDataSlot can encode both SSBO index and slot via bit packing
+ * global slot can encode both SSBO index and slot via bit packing
  * (upper bits = SSBO index, lower bits = slot within that SSBO)
  */
 template <typename T>

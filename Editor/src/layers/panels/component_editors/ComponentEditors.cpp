@@ -7,6 +7,7 @@
 #include "scenes/Scene.h"
 
 #include <algorithm>
+#include <cstdio>
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -263,6 +264,21 @@ void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 m_node->setRayTraced(b);
             }
         });
+        rowCheckbox(t, "Rigid Body", &m_hasRigidBody, [this](bool b) {
+            if (m_node == nullptr) {
+                return;
+            }
+
+            if (b) {
+                m_node->addRigidBody();
+            } else {
+                m_node->removeRigidBody();
+            }
+
+            if (requestRefresh) {
+                requestRefresh();
+            }
+        });
     });
 }
 
@@ -276,6 +292,7 @@ void Mesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 
     m_isVisible = m_node->isVisible();
     m_isRayTraced = m_node->isRayTraced();
+    m_hasRigidBody = m_node->rigidBody() != nullptr;
 
     if (previous != m_node) {
         if (m_mobilityDropdown != nullptr) {
@@ -283,6 +300,94 @@ void Mesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
         }
         if (m_materialPicker.has_value()) {
             m_materialPicker->setAsset(m_node->material());
+        }
+    }
+}
+
+// TODO: add kinematic once the simulation stops writing active bodies back onto their node, which is
+// the one direction a kinematic body must not be driven in
+static constexpr Rapture::PhysicsMotionType SELECTABLE_MOTION_TYPES[] = {Rapture::PHYSICS_MOTION_STATIC,
+                                                                        Rapture::PHYSICS_MOTION_DYNAMIC};
+
+static std::string s_describeShape(const Rapture::PhysicsShape &shape)
+{
+    char buffer[64] = {};
+
+    if (const auto *box = std::get_if<Rapture::PhysicsBoxShape>(&shape)) {
+        std::snprintf(buffer, sizeof(buffer), "Box %.2f, %.2f, %.2f", box->halfExtents.x * 2.0f, box->halfExtents.y * 2.0f,
+                      box->halfExtents.z * 2.0f);
+        return buffer;
+    }
+
+    if (const auto *sphere = std::get_if<Rapture::PhysicsSphereShape>(&shape)) {
+        std::snprintf(buffer, sizeof(buffer), "Sphere r %.2f", sphere->radius);
+        return buffer;
+    }
+
+    if (const auto *capsule = std::get_if<Rapture::PhysicsCapsuleShape>(&shape)) {
+        std::snprintf(buffer, sizeof(buffer), "Capsule r %.2f, h %.2f", capsule->radius, capsule->halfHeight * 2.0f);
+        return buffer;
+    }
+
+    return "None";
+}
+
+Rapture::RigidBody3D *RigidBody3DEditor::resolveBody(const Rapture::ecs::EntityAccessor &entity) const
+{
+    if (Rapture::RigidBody3D *body = s_instanceAs<Rapture::RigidBody3D>(scene, entity)) {
+        return body;
+    }
+
+    Rapture::Mesh3D *mesh = s_instanceAs<Rapture::Mesh3D>(scene, entity);
+    return mesh != nullptr ? mesh->rigidBody() : nullptr;
+}
+
+void RigidBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        m_shapeText = rowText(t, "Shape", "None");
+        m_motionTypeDropdown =
+            rowDropdown(t, "Motion", Rapture::PhysicsMotionType_toString(Rapture::PHYSICS_MOTION_DYNAMIC), {"Static", "Dynamic"},
+                        [this](int index) {
+                            if (m_node == nullptr) {
+                                return;
+                            }
+                            const Rapture::PhysicsMotionType motionType = SELECTABLE_MOTION_TYPES[index];
+                            m_node->setMotionType(motionType);
+                            if (m_motionTypeDropdown != nullptr) {
+                                m_motionTypeDropdown->setText(std::string(Rapture::PhysicsMotionType_toString(motionType)));
+                            }
+                        });
+        rowSlider(t, "Friction", &m_friction, 0.0f, 1.0f, [this](float v) {
+            if (m_node != nullptr) {
+                m_node->setFriction(v);
+            }
+        });
+        rowSlider(t, "Restitution", &m_restitution, 0.0f, 1.0f, [this](float v) {
+            if (m_node != nullptr) {
+                m_node->setRestitution(v);
+            }
+        });
+    });
+}
+
+void RigidBody3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
+{
+    Rapture::RigidBody3D *previous = m_node;
+    m_node = resolveBody(entity);
+    if (m_node == nullptr) {
+        return;
+    }
+
+    m_friction = m_node->friction();
+    m_restitution = m_node->restitution();
+
+    if (previous != m_node) {
+        if (m_shapeText != nullptr) {
+            m_shapeText->setText(s_describeShape(m_node->shape()));
+        }
+        if (m_motionTypeDropdown != nullptr) {
+            m_motionTypeDropdown->setText(std::string(Rapture::PhysicsMotionType_toString(m_node->motionType())));
         }
     }
 }

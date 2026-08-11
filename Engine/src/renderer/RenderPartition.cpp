@@ -46,7 +46,7 @@ void RenderPartition<T>::init(uint32_t frameCount, SwapCallback onSwap)
 }
 
 template <typename T>
-uint32_t RenderPartition<T>::allocateSlot(EntityID entityId)
+uint32_t RenderPartition<T>::allocateSlot(ecs::Entity entityId)
 {
     uint32_t denseIndex = static_cast<uint32_t>(m_data.size());
     m_data.emplace_back();
@@ -103,7 +103,7 @@ const T &RenderPartition<T>::getSlotData(uint32_t denseIndex) const
 }
 
 template <typename T>
-EntityID RenderPartition<T>::getEntityId(uint32_t denseIndex) const
+ecs::Entity RenderPartition<T>::getEntityId(uint32_t denseIndex) const
 {
     return m_denseToEntityId[denseIndex];
 }

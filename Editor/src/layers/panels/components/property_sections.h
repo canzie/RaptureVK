@@ -99,6 +99,15 @@ class PropertySection {
     void rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool *value, const std::function<void(bool)> &onChanged);
 
     /**
+     * @brief Adds a row that shows a value without offering a way to change it.
+     * @param t Scope of the table the row is added to.
+     * @param label Text shown in the row's label column.
+     * @param value Text shown in the row's value column.
+     * @return The value label, so its text can be updated as the subject changes.
+     */
+    Amethyst::TextLabel *rowText(Amethyst::TableScope &t, std::string_view label, std::string_view value);
+
+    /**
      * @brief Adds a row holding a colour swatch and its picker.
      * @param t Scope of the table the row is added to.
      * @param label Text shown in the row's label column.
@@ -148,6 +157,12 @@ class PropertySection {
 
   public:
     Amethyst::CollapsibleHeader *header = nullptr;
+
+    /**
+     * @brief Asks the list to work out which sections the subject has again, for a control that
+     * adds or removes a facet rather than editing one.
+     */
+    std::function<void()> requestRefresh;
 
   protected:
     float m_bodyHeight = 0.0f;
@@ -222,6 +237,15 @@ class PropertySectionList {
 
     bool empty() const { return m_active.empty(); }
 
+    /**
+     * @brief Takes the pending refresh request, if a section made one since this was last called.
+     *
+     * A section cannot refresh the list from inside its own widget's callback, because that would
+     * destroy the widget mid event, so the request is picked up on the next update instead.
+     * @return True if a refresh was asked for
+     */
+    bool consumeRefreshRequest();
+
   private:
     void buildSection(PropertySection &section);
     void destroySection(PropertySection &section);
@@ -231,6 +255,7 @@ class PropertySectionList {
     Amethyst::EventConnection m_viewDestroyConn;
     std::unordered_map<std::type_index, std::unique_ptr<PropertySection>> m_sections;
     std::vector<PropertySection *> m_active;
+    bool m_refreshRequested = false;
 };
 
 #endif // RAPTURE__PROPERTY_SECTIONS_H

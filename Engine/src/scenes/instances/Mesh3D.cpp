@@ -2,9 +2,12 @@
 
 #include "asset_manager/AssetManager.h"
 #include "components/Components.h"
+#include "components/systems/BoundingBox.h"
+#include "components/systems/Transforms.h"
 #include "logging/Log.h"
 #include "renderer/SceneRenderData.h"
 #include "scenes/Scene.h"
+#include "scenes/instances/RigidBody3D.h"
 
 namespace Rapture {
 
@@ -13,12 +16,16 @@ static constexpr std::string_view KEY_MATERIAL = "material";
 static constexpr std::string_view KEY_VISIBLE = "visible";
 static constexpr std::string_view KEY_MOBILITY = "mobility";
 static constexpr std::string_view KEY_RAY_TRACED = "rayTraced";
+static constexpr std::string_view KEY_RIGID_BODY = "rigidBody";
+static constexpr std::string_view RIGID_BODY_NAME = "RigidBody";
 
 Mesh3D::Mesh3D(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
     m_entity.set<MeshComponent>();
     m_entity.set<MaterialComponent>();
 }
+
+Mesh3D::~Mesh3D() = default;
 
 const TypeInfo &Mesh3D::staticType()
 {
@@ -151,6 +158,28 @@ void Mesh3D::setRayTraced(bool rayTraced)
     scene()->registerBLAS(m_entity.getEntity());
 }
 
+RigidBody3D *Mesh3D::addRigidBody()
+{
+    if (m_rigidBody != nullptr) {
+        return m_rigidBody.get();
+    }
+
+    m_rigidBody = std::make_unique<RigidBody3D>(*scene(), RIGID_BODY_NAME, this);
+
+    const BoundingBox bounds(boundsMin(), boundsMax());
+    const glm::vec3 worldScale = transform::scale(worldTransform());
+
+    m_rigidBody->setPosition(bounds.getCenter());
+    m_rigidBody->setShape(PhysicsBoxShape{bounds.getExtents() * 0.5f * worldScale});
+
+    return m_rigidBody.get();
+}
+
+void Mesh3D::removeRigidBody()
+{
+    m_rigidBody.reset();
+}
+
 void Mesh3D::serialize(WriteNode node) const
 {
     Node3D::serialize(node);
@@ -161,6 +190,10 @@ void Mesh3D::serialize(WriteNode node) const
     mesh.set(KEY_VISIBLE, isVisible());
     mesh.set(KEY_MOBILITY, static_cast<uint64_t>(mobility()));
     mesh.set(KEY_RAY_TRACED, isRayTraced());
+
+    if (m_rigidBody != nullptr) {
+        m_rigidBody->serialize(mesh.addObject(KEY_RIGID_BODY));
+    }
 }
 
 void Mesh3D::deserialize(ReadNode node)
@@ -186,6 +219,11 @@ void Mesh3D::deserialize(ReadNode node)
 
     setVisible(mesh.child(KEY_VISIBLE).asBool(isVisible()));
     setRayTraced(mesh.child(KEY_RAY_TRACED).asBool(isRayTraced()));
+
+    ReadNode rigidBody = mesh.child(KEY_RIGID_BODY);
+    if (rigidBody.valid()) {
+        addRigidBody()->deserialize(rigidBody);
+    }
 }
 
 } // namespace Rapture

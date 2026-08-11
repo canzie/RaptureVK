@@ -81,7 +81,10 @@ class Registry {
     }
 
     /**
-     * @brief Attaches a component, replacing it if the entity already has one.
+     * @brief Attaches a component, overwriting it if the entity already has one.
+     *
+     * Overwriting is a write, not a detach and reattach, so a listener holding a resource keyed on
+     * the entity keeps it rather than tearing it down and building an identical one.
      * @param entity Entity to attach to, must be alive.
      * @param args Arguments forwarded to T's constructor.
      * @return Reference to the component, void for empty components.
@@ -89,10 +92,16 @@ class Registry {
     template <typename T, typename... Args>
     decltype(auto) set(Entity entity, Args &&...args)
     {
-        if (has<T>(entity)) {
-            remove<T>(entity);
+        if (!has<T>(entity)) {
+            return add<T>(entity, std::forward<Args>(args)...);
         }
-        return add<T>(entity, std::forward<Args>(args)...);
+
+        if constexpr (!ComponentPool<T>::IS_EMPTY) {
+            ComponentPool<T> *pool = getPool<T>();
+            pool->get(entity) = T(std::forward<Args>(args)...);
+            m_journal.record(entity, COMPONENT_CHANNELS<T>);
+            return pool->get(entity);
+        }
     }
 
     /**

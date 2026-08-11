@@ -40,7 +40,7 @@ struct SceneQuery {
  * @brief One entity covering one pixel of a scene query
  */
 struct SceneQueryHit {
-    EntityID entity = INVALID_ENTITY_ID;
+    ecs::Entity entity = ecs::ENTITY_NULL;
     float depth = 0.0f;
 };
 

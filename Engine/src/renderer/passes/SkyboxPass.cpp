@@ -107,12 +107,11 @@ CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const Second
     vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), m_skyboxIndexBuffer->getBufferVk(), 0, VK_INDEX_TYPE_UINT32);
 
     auto &renderData = *(activeScene.getRenderData());
-    auto *cameraComp = camera.isValid() ? camera.tryRead<CameraComponent>() : nullptr;
+    uint32_t cameraSlot = renderData.getCameraSlot(camera.getEntity());
 
     SkyboxPushConstants pushConstants{};
     pushConstants.cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(frameInFlightIndex);
-    pushConstants.cameraSlotIndex =
-        (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) ? cameraComp->renderDataSlot : 0;
+    pushConstants.cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
     pushConstants.skyboxTextureIndex = m_skyboxTexture->getBindlessIndex();
     pushConstants.skyIntensity = m_skyIntensity;
 
