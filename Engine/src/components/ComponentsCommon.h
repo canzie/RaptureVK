@@ -6,8 +6,6 @@
 
 namespace Rapture {
 
-using generation_t = uint64_t;
-
 // Light types for the LightComponent
 enum class LightType {
     POINT = 0,

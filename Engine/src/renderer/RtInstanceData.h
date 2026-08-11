@@ -47,7 +47,6 @@ class RtInstanceData {
     uint32_t getInstanceCount() const { return m_instanceCount; }
 
     void markMaterialDirty(MaterialInstance *material);
-    void markTransformDirty(uint32_t entityID);
 
   private:
     void rebuild(Scene& scene);
@@ -60,7 +59,9 @@ class RtInstanceData {
     VmaAllocator m_allocator;
 
     std::unordered_set<MaterialInstance *> m_dirtyMaterials;
-    std::unordered_set<uint32_t> m_dirtyTransforms;
+
+    // one buffer, so one position in the transform channel
+    ecs::Bookmark m_transformBookmark;
 
     std::unordered_map<MaterialInstance *, std::vector<uint32_t>> m_materialToOffsets;
     std::unordered_map<uint32_t, uint32_t> m_entityToOffset;

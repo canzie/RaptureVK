@@ -6,7 +6,6 @@
 
 #include "layers/panels/components/property_sections.h"
 #include "ecs/entity_accessor.h"
-#include "renderer/SceneRenderData.h"
 #include "scenes/Scene.h"
 #include "scenes/entities/EntityCommon.h"
 
@@ -35,16 +34,6 @@ class ComponentEditorBase : public PropertySection {
                                     const std::function<void(Rapture::Mobility)> &onSelect);
 
   protected:
-    /**
-     * @brief Marks the edited entity's render slots for re-upload.
-     */
-    void markRenderDataDirty()
-    {
-        if (scene != nullptr && scene->getRenderData() != nullptr) {
-            scene->getRenderData()->markDirty(entity.getEntity());
-        }
-    }
-
   public:
     Rapture::ecs::EntityAccessor entity;
     Rapture::Scene *scene = nullptr;

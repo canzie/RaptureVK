@@ -41,7 +41,6 @@ void PointLight3D::setRange(float range)
     auto light = m_entity.write<PointLightComponent>();
 
     light->range = range;
-    markRenderDataDirty();
 }
 
 void PointLight3D::setCastsShadow(bool castsShadow)

@@ -136,6 +136,13 @@ class RenderPartition {
     void markDirtyAllFrames(uint32_t denseIndex);
 
     /**
+     * @brief Mark a slot dirty for one frame, for a repack that only that frame's buffer has missed
+     * @param frameIndex Frame whose buffer is stale
+     * @param denseIndex Slot to mark
+     */
+    void markDirty(uint32_t frameIndex, uint32_t denseIndex);
+
+    /**
      * @brief Check if any slot is dirty for a given frame
      * @param frameIndex Frame to check
      * @return True if at least one slot needs re-upload

@@ -135,6 +135,12 @@ void RenderPartition<T>::markDirtyAllFrames(uint32_t denseIndex)
 }
 
 template <typename T>
+void RenderPartition<T>::markDirty(uint32_t frameIndex, uint32_t denseIndex)
+{
+    m_dirtyBitfields[frameIndex].set(denseIndex);
+}
+
+template <typename T>
 bool RenderPartition<T>::hasDirty(uint32_t frameIndex) const
 {
     return m_dirtyBitfields[frameIndex].hasAnyDirty();
@@ -219,9 +225,10 @@ void GPUDataStore<T>::upload(uint32_t frameIndex)
         m_partitions[MOBILITY_STATIC].clearDirty(frameIndex);
     }
 
-    if (dynamicCount > 0) {
+    if (dynamicCount > 0 && m_partitions[MOBILITY_DYNAMIC].hasDirty(frameIndex)) {
         ssbo->addData(m_partitions[MOBILITY_DYNAMIC].getData(), static_cast<VkDeviceSize>(dynamicCount) * sizeof(T),
                       static_cast<VkDeviceSize>(m_staticCapacity) * sizeof(T));
+        m_partitions[MOBILITY_DYNAMIC].clearDirty(frameIndex);
     }
 }
 

@@ -53,7 +53,6 @@ void Mesh3D::setMesh(AssetHandle _mesh)
     component->setMesh(std::move(ref));
     component->isLoading = false;
     m_mesh = _mesh;
-    markRenderDataDirty();
 }
 
 void Mesh3D::setMaterial(AssetHandle _material)
@@ -75,7 +74,6 @@ void Mesh3D::setMaterial(AssetHandle _material)
 
     component->material = AssetPtr<MaterialInstance>(std::move(ref));
     m_material = _material;
-    markRenderDataDirty();
 }
 
 bool Mesh3D::isVisible() const
@@ -92,7 +90,6 @@ void Mesh3D::setVisible(bool visible)
     auto component = m_entity.write<MeshComponent>();
 
     component->isEnabled = visible;
-    markRenderDataDirty();
 }
 
 Mobility Mesh3D::mobility() const
@@ -108,7 +105,6 @@ void Mesh3D::setMobility(Mobility mobility)
     }
 
     scene()->getRenderData()->setMeshMobility(m_entity.getEntity(), mobility);
-    markRenderDataDirty();
 }
 
 glm::vec3 Mesh3D::boundsMin() const

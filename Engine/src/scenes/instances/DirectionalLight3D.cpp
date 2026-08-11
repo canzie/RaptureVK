@@ -50,7 +50,6 @@ void DirectionalLight3D::setAtmosphereSun(bool atmosphereSun)
     auto light = m_entity.write<DirectionalLightComponent>();
 
     light->atmosphereSunLight = atmosphereSun;
-    markRenderDataDirty();
 }
 
 void DirectionalLight3D::setCastsShadow(bool castsShadow)

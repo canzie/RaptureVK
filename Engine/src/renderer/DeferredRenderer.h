@@ -71,6 +71,11 @@ class DeferredRenderer : public Renderer {
     std::unique_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
     std::unique_ptr<RtInstanceData> m_rtInstanceData;
 
+    // this renderer's own position, so another view consuming the same change cannot hide it
+    ecs::Bookmark m_shadowTransformBookmark;
+    ecs::Bookmark m_shadowLightBookmark;
+    ecs::Bookmark m_shadowSettingsBookmark;
+
     EventConnection m_swapchainRecreatedConn;
 
     bool m_giActive = true;

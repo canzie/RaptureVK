@@ -182,36 +182,18 @@ struct LightComponent {
     // slot into the SSBO where the light metadata lives
     uint32_t renderDataSlot = UINT32_MAX;
 
-    generation_t getGeneration() const { return m_generation; }
+    void setColor(const glm::vec3 &c) { color = c; }
 
-    void setColor(const glm::vec3 &c)
-    {
-        color = c;
-        m_generation++;
-    }
+    void setIntensity(float i) { intensity = i; }
 
-    void setIntensity(float i)
-    {
-        intensity = i;
-        m_generation++;
-    }
-    void setActive(bool active)
-    {
-        isActive = active;
-        m_generation++;
-    }
-    void setCastsShadow(bool casts)
-    {
-        castsShadow = casts;
-        m_generation++;
-    }
+    void setActive(bool active) { isActive = active; }
+
+    void setCastsShadow(bool casts) { castsShadow = casts; }
 
   protected:
     LightComponent() = default;
     LightComponent(const glm::vec3 &color, float intensity) : color(color), intensity(intensity) {}
 
-  private:
-    generation_t m_generation = 1;
 };
 
 struct DirectionalLightComponent : public LightComponent {
@@ -300,20 +282,6 @@ struct ShadowComponent {
     ShadowComponent() = default;
     explicit ShadowComponent(uint32_t resolution) : resolution(resolution) {}
 
-    bool needsUpdate(const LightComponent &light, const TransformComponent &transform)
-    {
-        generation_t lGen = light.getGeneration();
-        if (lGen == m_lastLightGeneration && transform.world == m_lastWorld) {
-            return false;
-        }
-        m_lastLightGeneration = lGen;
-        m_lastWorld = transform.world;
-        return true;
-    }
-
-  private:
-    generation_t m_lastLightGeneration = 0;
-    glm::mat4 m_lastWorld{1.0f};
 };
 
 struct CascadedShadowComponent {
@@ -333,20 +301,6 @@ struct CascadedShadowComponent {
     {
     }
 
-    bool needsUpdate(const LightComponent &light, const TransformComponent &transform)
-    {
-        generation_t lGen = light.getGeneration();
-        if (lGen == m_lastLightGeneration && transform.world == m_lastWorld) {
-            return false;
-        }
-        m_lastLightGeneration = lGen;
-        m_lastWorld = transform.world;
-        return true;
-    }
-
-  private:
-    generation_t m_lastLightGeneration = 0;
-    glm::mat4 m_lastWorld{1.0f};
 };
 
 } // namespace Rapture

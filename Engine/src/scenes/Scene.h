@@ -16,6 +16,7 @@
 
 namespace Rapture {
 
+class Camera3D;
 class Controller;
 class Environment;
 class Instance;
@@ -162,6 +163,13 @@ class Scene {
     EventSignal<void()> onHierarchyChanged;
 
   private:
+    /**
+     * @brief Re-aims the shadow maps whose light or transform changed since this scene last looked
+     * @param cameraPosition Where the directional shadow volume is centred
+     * @param activeCamera The camera the cascade splits are built from, may be nullptr
+     */
+    void updateShadowViews(const glm::vec3 &cameraPosition, Camera3D *activeCamera);
+
     void onRigidBodyConstructed(ecs::Entity entity);
     void registerRigidBodies();
     void syncRigidBodyTransforms();
@@ -179,6 +187,10 @@ class Scene {
     Controller *m_activeController = nullptr;
     std::vector<ecs::Entity> m_pendingRigidBodies;
     SceneSettings m_config;
+
+    // this scene's own position in the channels that stale a shadow map's view matrix
+    ecs::Bookmark m_shadowTransformBookmark;
+    ecs::Bookmark m_shadowLightBookmark;
 
     std::shared_ptr<TLAS> m_tlas;
     bool m_tlasDirty = false;

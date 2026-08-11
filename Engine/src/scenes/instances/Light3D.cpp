@@ -57,7 +57,6 @@ void Light3D::setIntensity(float intensity)
     }
 
     light->setIntensity(intensity);
-    markRenderDataDirty();
 }
 
 bool Light3D::usesTemperature() const
@@ -127,7 +126,6 @@ void Light3D::setActive(bool active)
     }
 
     light->setActive(active);
-    markRenderDataDirty();
 }
 
 Mobility Light3D::mobility() const
@@ -143,7 +141,6 @@ void Light3D::setMobility(Mobility mobility)
     }
 
     scene()->getRenderData()->setLightMobility(m_entity.getEntity(), mobility);
-    markRenderDataDirty();
 }
 
 bool Light3D::castsShadow() const
@@ -160,7 +157,6 @@ void Light3D::applyColor()
     }
 
     light->setColor(m_usesTemperature ? m_color * kelvinToRgb(m_temperature) : m_color);
-    markRenderDataDirty();
 }
 
 void Light3D::serialize(WriteNode node) const

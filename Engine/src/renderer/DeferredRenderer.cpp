@@ -17,6 +17,7 @@
 #include "renderer/shadows/ShadowMapping.h"
 #include "scenes/instances/Environment.h"
 #include <cstdio>
+#include <unordered_set>
 
 namespace Rapture {
 
@@ -349,15 +350,28 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Shadow Maps");
 
-            for (auto [entity, transformComp, shadowComp] : registry.mutableView<TransformComponent, ShadowComponent>()) {
+            ecs::Journal &journal = registry.getJournal();
+            ecs::Batch shadowTransforms = journal.readSince(CHANNEL_TRANSFORM_WORLD, m_shadowTransformBookmark);
+            ecs::Batch shadowLights = journal.readSince(CHANNEL_LIGHT_PARAMS, m_shadowLightBookmark);
+            ecs::Batch shadowSettings = journal.readSince(CHANNEL_SHADOW_SETTINGS, m_shadowSettingsBookmark);
+
+            bool renderEveryShadow =
+                shadowTransforms.needsRebuild() || shadowLights.needsRebuild() || shadowSettings.needsRebuild();
+
+            std::unordered_set<ecs::Entity> staleShadows;
+            if (!renderEveryShadow) {
+                staleShadows.insert(shadowTransforms.begin(), shadowTransforms.end());
+                staleShadows.insert(shadowLights.begin(), shadowLights.end());
+                staleShadows.insert(shadowSettings.begin(), shadowSettings.end());
+            }
+
+            for (auto [entity, shadowComp] : registry.read<ShadowComponent>().with<TransformComponent>()) {
                 ecs::EntityAccessor lightEntity(entity, &registry);
-                const LightComponent *light = Light_tryReadLight(lightEntity);
-                if (light == nullptr) {
+                if (Light_tryReadLight(lightEntity) == nullptr) {
                     continue;
                 }
 
-                bool shouldUpdateShadow =
-                    shadowComp.needsUpdate(*light, transformComp) || Light_getLightType(lightEntity) == LightType::DIRECTIONAL;
+                bool shouldUpdateShadow = renderEveryShadow || staleShadows.count(entity) != 0;
 
                 ShadowMap *shadowMap = renderData != nullptr ? renderData->getShadowMap(entity) : nullptr;
                 if (shadowMap != nullptr && shouldUpdateShadow) {
@@ -370,10 +384,10 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
                 }
             }
 
+            // a cascade follows the camera, so it is re-rendered every frame regardless
             for (auto [entity, lightComp, transformComp, shadowComp] :
-                 registry.mutableView<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>()) {
-                bool shouldUpdateShadow = shadowComp.needsUpdate(lightComp, transformComp) ||
-                                          Light_getLightType(ecs::EntityAccessor(entity, &registry)) == LightType::DIRECTIONAL;
+                 registry.read<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>()) {
+                bool shouldUpdateShadow = true;
 
                 CascadedShadowMap *cascadedShadowMap = renderData != nullptr ? renderData->getCascadedShadowMap(entity) : nullptr;
                 if (cascadedShadowMap != nullptr && shouldUpdateShadow) {

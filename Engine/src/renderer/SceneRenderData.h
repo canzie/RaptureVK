@@ -1,12 +1,14 @@
 #ifndef RAPTURE__SCENERENDERDATA_H
 #define RAPTURE__SCENERENDERDATA_H
 
+#include "components/ChangeChannels.h"
 #include "GPUDataStructs.h"
 #include "RenderPartition.h"
 
 #include "ecs/registry.h"
 #include "window_context/vulkan_context/RenderContext.h"
 
+#include <functional>
 #include <memory>
 #include <unordered_map>
 
@@ -41,12 +43,6 @@ class SceneRenderData {
      * @param frameIndex Current frame in flight index
      */
     void onUpdate(uint32_t frameIndex);
-
-    /**
-     * @brief Mark an entity's render slots dirty so they re-upload next frame
-     * @param entityId Entity whose mesh/light/shadow slots should be re-uploaded
-     */
-    void markDirty(EntityID entityId);
 
     /**
      * @brief Moves a mesh's slot into the partition its new mobility belongs to
@@ -140,7 +136,31 @@ class SceneRenderData {
     Scene *m_scene = nullptr;
     uint32_t m_frameCount = 0;
 
+    /**
+     * @brief One store's position in the channels it mirrors, for one frame's buffer
+     */
+    struct StoreBookmarks {
+        ecs::Bookmark transform;
+        ecs::Bookmark params;
+    };
+
+    /**
+     * @brief Pulls both channels a store mirrors and repacks whatever they name
+     * @param bookmarks This frame's position in both channels
+     * @param paramsChannel The channel carrying this store's own parameters
+     * @param frameIndex Frame whose buffer is being brought up to date
+     * @param repackEntity Repacks one entity's slot, called only for entities that own one
+     * @param repackAll Repacks every slot, used when the reader fell too far behind
+     */
+    void consumeChanges(StoreBookmarks &bookmarks, SceneChannel paramsChannel,
+                        const std::function<void(EntityID)> &repackEntity, const std::function<void()> &repackAll);
+
     std::vector<ecs::SignalConnection> m_connections;
+
+    std::vector<StoreBookmarks> m_meshBookmarks;
+    std::vector<StoreBookmarks> m_lightBookmarks;
+    std::vector<StoreBookmarks> m_cameraBookmarks;
+    std::vector<StoreBookmarks> m_shadowBookmarks;
 };
 
 } // namespace Rapture

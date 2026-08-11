@@ -2,7 +2,6 @@
 
 #include "components/Components.h"
 #include "logging/Log.h"
-#include "renderer/SceneRenderData.h"
 #include "scenes/Scene.h"
 #include "scenes/instances/InstanceRegistry.h"
 
@@ -44,14 +43,6 @@ const TypeInfo &Instance::staticType()
 const TypeInfo &Instance::type() const
 {
     return staticType();
-}
-
-void Instance::markRenderDataDirty()
-{
-    SceneRenderData *renderData = m_scene != nullptr ? m_scene->getRenderData() : nullptr;
-    if (renderData != nullptr) {
-        renderData->markDirty(m_entity.getEntity());
-    }
 }
 
 void Instance::setName(std::string_view name)

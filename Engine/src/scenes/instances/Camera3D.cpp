@@ -40,7 +40,6 @@ void Camera3D::setFieldOfView(float degrees)
     auto camera = m_entity.write<CameraComponent>();
 
     camera->updateProjectionMatrix(degrees, camera->aspectRatio, camera->nearPlane, camera->farPlane);
-    markRenderDataDirty();
 }
 
 float Camera3D::nearPlane() const
@@ -57,7 +56,6 @@ void Camera3D::setNearPlane(float nearPlane)
     auto camera = m_entity.write<CameraComponent>();
 
     camera->updateProjectionMatrix(camera->fov, camera->aspectRatio, nearPlane, camera->farPlane);
-    markRenderDataDirty();
 }
 
 float Camera3D::farPlane() const
@@ -74,7 +72,6 @@ void Camera3D::setFarPlane(float farPlane)
     auto camera = m_entity.write<CameraComponent>();
 
     camera->updateProjectionMatrix(camera->fov, camera->aspectRatio, camera->nearPlane, farPlane);
-    markRenderDataDirty();
 }
 
 void Camera3D::serialize(WriteNode node) const

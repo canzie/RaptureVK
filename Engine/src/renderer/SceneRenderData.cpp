@@ -3,7 +3,6 @@
 #include "components/Components.h"
 #include "components/systems/Transforms.h"
 #include "ecs/entity_accessor.h"
-#include "events/AssetEvents.h"
 #include "logging/TracyProfiler.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
@@ -23,6 +22,12 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
     m_lights.init(frameCount, &m_renderContext, DescriptorSetBindingLocation::LIGHT_DATA_SSBO);
     m_cameras.init(frameCount, &m_renderContext, DescriptorSetBindingLocation::CAMERA_DATA_SSBO);
     m_shadows.init(frameCount, &m_renderContext, DescriptorSetBindingLocation::SHADOW_DATA_SSBO);
+
+    // a bookmark belongs to a destination, and every frame in flight has its own buffer
+    m_meshBookmarks.resize(frameCount);
+    m_lightBookmarks.resize(frameCount);
+    m_cameraBookmarks.resize(frameCount);
+    m_shadowBookmarks.resize(frameCount);
 
     ecs::Registry &registry = m_scene->getRegistry();
 
@@ -364,33 +369,24 @@ CascadedShadowMap *SceneRenderData::getCascadedShadowMap(EntityID entityId) cons
     return it != m_cascadedShadowMaps.end() ? it->second.get() : nullptr;
 }
 
-void SceneRenderData::markDirty(EntityID entityId)
+void SceneRenderData::consumeChanges(StoreBookmarks &bookmarks, SceneChannel paramsChannel,
+                                     const std::function<void(EntityID)> &repackEntity, const std::function<void()> &repackAll)
 {
-    ecs::Registry &registry = m_scene->getRegistry();
-    ecs::EntityAccessor entity(entityId, &registry);
+    ecs::Journal &journal = m_scene->getRegistry().getJournal();
 
-    const MeshComponent *mesh = registry.tryRead<MeshComponent>(entityId);
-    if (mesh != nullptr && mesh->renderDataSlot != UINT32_MAX) {
-        uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, mesh->renderDataSlot);
-        m_meshes.getPartition(mesh->mobility).markDirtyAllFrames(localSlot);
+    ecs::Batch transforms = journal.readSince(CHANNEL_TRANSFORM_WORLD, bookmarks.transform);
+    ecs::Batch params = journal.readSince(paramsChannel, bookmarks.params);
+
+    if (transforms.needsRebuild() || params.needsRebuild()) {
+        repackAll();
+        return;
     }
 
-    const LightComponent *light = Light_tryReadLight(entity);
-    if (light != nullptr && light->renderDataSlot != UINT32_MAX) {
-        uint32_t localSlot = m_lights.getLocalSlot(light->mobility, light->renderDataSlot);
-        m_lights.getPartition(light->mobility).markDirtyAllFrames(localSlot);
+    for (EntityID entity : transforms) {
+        repackEntity(entity);
     }
-
-    const ShadowComponent *shadow = registry.tryRead<ShadowComponent>(entityId);
-    if (shadow != nullptr && shadow->renderDataSlot != UINT32_MAX) {
-        uint32_t localSlot = m_shadows.getLocalSlot(shadow->mobility, shadow->renderDataSlot);
-        m_shadows.getPartition(shadow->mobility).markDirtyAllFrames(localSlot);
-    }
-
-    const CascadedShadowComponent *cascaded = registry.tryRead<CascadedShadowComponent>(entityId);
-    if (cascaded != nullptr && cascaded->renderDataSlot != UINT32_MAX) {
-        uint32_t localSlot = m_shadows.getLocalSlot(cascaded->mobility, cascaded->renderDataSlot);
-        m_shadows.getPartition(cascaded->mobility).markDirtyAllFrames(localSlot);
+    for (EntityID entity : params) {
+        repackEntity(entity);
     }
 }
 
@@ -424,25 +420,43 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
         }
 
         MeshGPUData &data = partition.getSlotData(i);
-        if (data.modelMatrix != transform->world) {
-            AssetEvents::onMeshTransformChanged().publish(entityId);
-        }
-
         data.modelMatrix = transform->world;
         data.vertexBufferFlags = mesh->mesh->getVertexBuffer()->getBufferLayout().getFlags();
         data.entityId = entityId;
         data.materialIndex = 0;
     };
 
-    auto &staticPartition = m_meshes.getPartition(MOBILITY_STATIC);
-    if (staticPartition.hasDirty(frameIndex)) {
-        staticPartition.forEachDirty(frameIndex, [&](uint32_t i) { packMesh(staticPartition, i); });
+    // a slot the partition moved needs repacking whether or not its entity changed
+    for (uint32_t m = 0; m < MOBILITY_COUNT; m++) {
+        auto &partition = m_meshes.getPartition(static_cast<Mobility>(m));
+        partition.forEachDirty(frameIndex, [&](uint32_t i) { packMesh(partition, i); });
     }
 
-    auto &dynamicPartition = m_meshes.getPartition(MOBILITY_DYNAMIC);
-    for (uint32_t i = 0; i < dynamicPartition.getCount(); i++) {
-        packMesh(dynamicPartition, i);
-    }
+    ecs::Registry &registry = m_scene->getRegistry();
+
+    auto repackEntity = [&](EntityID entityId) {
+        const MeshComponent *mesh = registry.tryRead<MeshComponent>(entityId);
+        if (mesh == nullptr || mesh->renderDataSlot == UINT32_MAX) {
+            return;
+        }
+
+        auto &partition = m_meshes.getPartition(mesh->mobility);
+        uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, mesh->renderDataSlot);
+        packMesh(partition, localSlot);
+        partition.markDirty(frameIndex, localSlot);
+    };
+
+    auto repackAll = [&]() {
+        for (uint32_t m = 0; m < MOBILITY_COUNT; m++) {
+            auto &partition = m_meshes.getPartition(static_cast<Mobility>(m));
+            for (uint32_t i = 0; i < partition.getCount(); i++) {
+                packMesh(partition, i);
+                partition.markDirty(frameIndex, i);
+            }
+        }
+    };
+
+    consumeChanges(m_meshBookmarks[frameIndex], CHANNEL_MESH_BINDING, repackEntity, repackAll);
 }
 
 void SceneRenderData::updateLights(uint32_t frameIndex)
@@ -492,15 +506,36 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
         data.spotAngles = glm::vec4(innerCos, outerCos, static_cast<float>(entityId), 0.0f);
     };
 
-    auto &staticPartition = m_lights.getPartition(MOBILITY_STATIC);
-    if (staticPartition.hasDirty(frameIndex)) {
-        staticPartition.forEachDirty(frameIndex, [&](uint32_t i) { packLight(staticPartition, i); });
+    for (uint32_t m = 0; m < MOBILITY_COUNT; m++) {
+        auto &partition = m_lights.getPartition(static_cast<Mobility>(m));
+        partition.forEachDirty(frameIndex, [&](uint32_t i) { packLight(partition, i); });
     }
 
-    auto &dynamicPartition = m_lights.getPartition(MOBILITY_DYNAMIC);
-    for (uint32_t i = 0; i < dynamicPartition.getCount(); i++) {
-        packLight(dynamicPartition, i);
-    }
+    ecs::Registry &registry = m_scene->getRegistry();
+
+    auto repackEntity = [&](EntityID entityId) {
+        const LightComponent *light = Light_tryReadLight(ecs::EntityAccessor(entityId, &registry));
+        if (light == nullptr || light->renderDataSlot == UINT32_MAX) {
+            return;
+        }
+
+        auto &partition = m_lights.getPartition(light->mobility);
+        uint32_t localSlot = m_lights.getLocalSlot(light->mobility, light->renderDataSlot);
+        packLight(partition, localSlot);
+        partition.markDirty(frameIndex, localSlot);
+    };
+
+    auto repackAll = [&]() {
+        for (uint32_t m = 0; m < MOBILITY_COUNT; m++) {
+            auto &partition = m_lights.getPartition(static_cast<Mobility>(m));
+            for (uint32_t i = 0; i < partition.getCount(); i++) {
+                packLight(partition, i);
+                partition.markDirty(frameIndex, i);
+            }
+        }
+    };
+
+    consumeChanges(m_lightBookmarks[frameIndex], CHANNEL_LIGHT_PARAMS, repackEntity, repackAll);
 }
 
 void SceneRenderData::updateCameras(uint32_t frameIndex)
@@ -531,6 +566,10 @@ void SceneRenderData::updateCameras(uint32_t frameIndex)
         // A slot that has never been updated holds a zero matrix, which would reproject to w = 0
         data.prevViewProj = camera->hasRenderData ? previousViewProj : (data.projection * data.view);
         camera->hasRenderData = true;
+
+        // prevViewProj is per frame state rather than a mirror of the component, so a camera is
+        // repacked every frame instead of when something announces a change
+        partition.markDirty(frameIndex, i);
     }
 }
 
@@ -584,15 +623,46 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
         }
     };
 
-    auto &dynamicPartition = m_shadows.getPartition(MOBILITY_DYNAMIC);
-    for (uint32_t i = 0; i < dynamicPartition.getCount(); i++) {
-        packShadow(dynamicPartition, i);
+    for (uint32_t m = 0; m < MOBILITY_COUNT; m++) {
+        auto &partition = m_shadows.getPartition(static_cast<Mobility>(m));
+        partition.forEachDirty(frameIndex, [&](uint32_t i) { packShadow(partition, i); });
     }
 
-    auto &staticPartition = m_shadows.getPartition(MOBILITY_STATIC);
-    if (staticPartition.hasDirty(frameIndex)) {
-        staticPartition.forEachDirty(frameIndex, [&](uint32_t i) { packShadow(staticPartition, i); });
-    }
+    ecs::Registry &registry = m_scene->getRegistry();
+
+    auto repackEntity = [&](EntityID entityId) {
+        Mobility mobility = MOBILITY_DYNAMIC;
+        uint32_t globalSlot = UINT32_MAX;
+
+        if (const ShadowComponent *shadow = registry.tryRead<ShadowComponent>(entityId)) {
+            mobility = shadow->mobility;
+            globalSlot = shadow->renderDataSlot;
+        } else if (const CascadedShadowComponent *cascaded = registry.tryRead<CascadedShadowComponent>(entityId)) {
+            mobility = cascaded->mobility;
+            globalSlot = cascaded->renderDataSlot;
+        }
+
+        if (globalSlot == UINT32_MAX) {
+            return;
+        }
+
+        auto &partition = m_shadows.getPartition(mobility);
+        uint32_t localSlot = m_shadows.getLocalSlot(mobility, globalSlot);
+        packShadow(partition, localSlot);
+        partition.markDirty(frameIndex, localSlot);
+    };
+
+    auto repackAll = [&]() {
+        for (uint32_t m = 0; m < MOBILITY_COUNT; m++) {
+            auto &partition = m_shadows.getPartition(static_cast<Mobility>(m));
+            for (uint32_t i = 0; i < partition.getCount(); i++) {
+                packShadow(partition, i);
+                partition.markDirty(frameIndex, i);
+            }
+        }
+    };
+
+    consumeChanges(m_shadowBookmarks[frameIndex], CHANNEL_SHADOW_SETTINGS, repackEntity, repackAll);
 }
 
 } // namespace Rapture

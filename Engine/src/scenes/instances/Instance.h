@@ -223,11 +223,6 @@ class Instance {
 
   protected:
     /**
-     * @brief Marks this instance's render slots for re-upload
-     */
-    void markRenderDataDirty();
-
-    /**
      * @brief Called on an instance once it has been linked to a new parent, or unlinked from one.
      *
      * The default passes it down the subtree, so a subclass that has no stake in where it sits still

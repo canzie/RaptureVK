@@ -43,7 +43,6 @@ void SpotLight3D::setRange(float range)
     auto light = m_entity.write<SpotLightComponent>();
 
     light->range = range;
-    markRenderDataDirty();
 }
 
 float SpotLight3D::innerConeAngle() const
@@ -60,7 +59,6 @@ void SpotLight3D::setInnerConeAngle(float radians)
     auto light = m_entity.write<SpotLightComponent>();
 
     light->innerConeAngle = radians;
-    markRenderDataDirty();
 }
 
 float SpotLight3D::outerConeAngle() const
@@ -77,7 +75,6 @@ void SpotLight3D::setOuterConeAngle(float radians)
     auto light = m_entity.write<SpotLightComponent>();
 
     light->outerConeAngle = radians;
-    markRenderDataDirty();
 }
 
 void SpotLight3D::setCastsShadow(bool castsShadow)

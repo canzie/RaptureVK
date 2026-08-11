@@ -22,11 +22,6 @@ RtInstanceData::RtInstanceData(const RenderContext &renderContext)
     AssetEvents::onMaterialInstanceChanged().addListener([this](MaterialInstance *mat) {
         if (mat) m_dirtyMaterials.insert(mat);
     });
-
-    AssetEvents::onMeshTransformChanged().addListener([this](EntityID ent) {
-        (void)ent;
-        if (ent) m_dirtyTransforms.insert(ent);
-    });
 }
 
 RtInstanceData::~RtInstanceData() {}
@@ -34,11 +29,6 @@ RtInstanceData::~RtInstanceData() {}
 void RtInstanceData::markMaterialDirty(MaterialInstance *material)
 {
     if (material) m_dirtyMaterials.insert(material);
-}
-
-void RtInstanceData::markTransformDirty(uint32_t entityID)
-{
-    m_dirtyTransforms.insert(entityID);
 }
 
 void RtInstanceData::update(Scene &scene)
@@ -140,17 +130,15 @@ void RtInstanceData::rebuild(Scene &scene)
     }
 
     m_dirtyMaterials.clear();
-    m_dirtyTransforms.clear();
+
+    // a rebuild wrote every transform, so the bookmark advances past everything recorded so far
+    scene.getRegistry().getJournal().readSince(CHANNEL_TRANSFORM_WORLD, m_transformBookmark);
 
     RP_CORE_INFO("RtInstanceData: rebuilt {} instances", infos.size());
 }
 
 void RtInstanceData::patchDirty(Scene &scene)
 {
-    if (m_dirtyMaterials.empty() && m_dirtyTransforms.empty()) {
-        return;
-    }
-
     if (!m_buffer) return;
 
     constexpr size_t MAT_START = offsetof(RtInstanceInfo, materialIndex);
@@ -178,7 +166,15 @@ void RtInstanceData::patchDirty(Scene &scene)
     }
 
     ecs::Registry &reg = scene.getRegistry();
-    for (ecs::Entity entity : m_dirtyTransforms) {
+    ecs::Batch changed = reg.getJournal().readSince(CHANNEL_TRANSFORM_WORLD, m_transformBookmark);
+
+    if (changed.needsRebuild()) {
+        rebuild(scene);
+        return;
+    }
+
+    for (ecs::Entity entity : changed) {
+        // most of what changed is not in the acceleration structure
         auto it = m_entityToOffset.find(entity);
         if (it == m_entityToOffset.end()) continue;
 
@@ -191,7 +187,6 @@ void RtInstanceData::patchDirty(Scene &scene)
     }
 
     m_dirtyMaterials.clear();
-    m_dirtyTransforms.clear();
 }
 
 } // namespace Rapture

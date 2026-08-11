@@ -176,7 +176,6 @@ void Node3D::setSimulatedWorldTransform(const glm::mat4 &transform)
     }
 
     m_dirtyMask = TRANSFORM_DIRTY_ROTATION_AND_SCALE;
-    markRenderDataDirty();
 
     updateDescendantWorldTransforms(*this);
 }
@@ -208,8 +207,6 @@ void Node3D::updateWorldTransform()
         const Node3D *parent = parentNode();
         component->world = parent != nullptr ? parent->worldTransform() * component->local : component->local;
     }
-
-    markRenderDataDirty();
 
     updateDescendantWorldTransforms(*this);
 }

@@ -25,6 +25,7 @@
 #include "window_context/Application.h"
 
 #include <memory>
+#include <unordered_set>
 #include <unordered_map>
 
 namespace Rapture {
@@ -200,35 +201,7 @@ void Scene::onUpdate(float dt)
         m_environment->update();
     }
 
-    // TODO: needsUpdate is what the journal replaces, so this loop stops being a per frame sweep
-    for (auto [entity, shadow] : m_registry.mutableView<ShadowComponent>().with<TransformComponent>()) {
-        ecs::EntityAccessor accessor(entity, &m_registry);
-        const LightComponent *light = Light_tryReadLight(accessor);
-        if (light == nullptr) {
-            continue;
-        }
-
-        const TransformComponent &transform = m_registry.read<TransformComponent>(entity);
-        ShadowMap *shadowMap = m_renderData->getShadowMap(entity);
-        if (shadowMap != nullptr && shadow.isActive && shadow.needsUpdate(*light, transform)) {
-            shadowMap->updateViewMatrix(accessor, transform, cameraPosition);
-        }
-    }
-
-    for (auto [entity, light, transform, shadow] :
-         m_registry.read<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>()) {
-        CascadedShadowMap *cascadedShadowMap = m_renderData->getCascadedShadowMap(entity);
-        if (cascadedShadowMap == nullptr || !shadow.isActive || activeCamera == nullptr) {
-            continue;
-        }
-
-        const CameraComponent *camera = m_registry.tryRead<CameraComponent>(activeCamera->entity());
-        if (camera != nullptr) {
-            cascadedShadowMap->setLambda(shadow.lambda);
-            cascadedShadowMap->setShadowDistance(shadow.shadowDistance);
-            cascadedShadowMap->updateViewMatrix(light, transform, *camera);
-        }
-    }
+    updateShadowViews(cameraPosition, activeCamera);
 
     m_renderData->onUpdate(frameCounter);
 
@@ -240,6 +213,66 @@ void Scene::onUpdate(float dt)
     }
 
     updateTLAS();
+}
+
+void Scene::updateShadowViews(const glm::vec3 &cameraPosition, Camera3D *activeCamera)
+{
+    ecs::Journal &journal = m_registry.getJournal();
+    ecs::Batch transforms = journal.readSince(CHANNEL_TRANSFORM_WORLD, m_shadowTransformBookmark);
+    ecs::Batch lights = journal.readSince(CHANNEL_LIGHT_PARAMS, m_shadowLightBookmark);
+
+    bool rebuildAll = transforms.needsRebuild() || lights.needsRebuild();
+
+    std::unordered_set<ecs::Entity> changed;
+    if (!rebuildAll) {
+        changed.insert(transforms.begin(), transforms.end());
+        changed.insert(lights.begin(), lights.end());
+    }
+
+    for (auto [entity, shadow] : m_registry.read<ShadowComponent>().with<TransformComponent>()) {
+        if (!shadow.isActive || (!rebuildAll && changed.count(entity) == 0)) {
+            continue;
+        }
+
+        ecs::EntityAccessor accessor(entity, &m_registry);
+        if (Light_tryReadLight(accessor) == nullptr) {
+            continue;
+        }
+
+        ShadowMap *shadowMap = m_renderData->getShadowMap(entity);
+        if (shadowMap == nullptr) {
+            continue;
+        }
+
+        shadowMap->updateViewMatrix(accessor, m_registry.read<TransformComponent>(entity), cameraPosition);
+
+        // the shadow row mirrors the map's matrices, which no component write announces
+        journal.record(entity, ecs::ChannelBit(CHANNEL_SHADOW_SETTINGS));
+    }
+
+    if (activeCamera == nullptr) {
+        return;
+    }
+
+    const CameraComponent *camera = m_registry.tryRead<CameraComponent>(activeCamera->entity());
+    if (camera == nullptr) {
+        return;
+    }
+
+    // a cascade split follows the camera, so it is rebuilt every frame rather than on a change
+    for (auto [entity, light, transform, shadow] :
+         m_registry.read<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>()) {
+        CascadedShadowMap *cascadedShadowMap = m_renderData->getCascadedShadowMap(entity);
+        if (cascadedShadowMap == nullptr || !shadow.isActive) {
+            continue;
+        }
+
+        cascadedShadowMap->setLambda(shadow.lambda);
+        cascadedShadowMap->setShadowDistance(shadow.shadowDistance);
+        cascadedShadowMap->updateViewMatrix(light, transform, *camera);
+
+        journal.record(entity, ecs::ChannelBit(CHANNEL_SHADOW_SETTINGS));
+    }
 }
 
 SceneSettings &Scene::getSettings()
