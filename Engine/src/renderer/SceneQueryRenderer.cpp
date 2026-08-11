@@ -1,7 +1,7 @@
 #include "renderer/SceneQueryRenderer.h"
 
-#include "utils/EnginePaths.h"
 #include "buffers/descriptors/DescriptorManager.h"
+#include "utils/EnginePaths.h"
 
 #include "components/Components.h"
 #include "logging/Log.h"
@@ -120,7 +120,7 @@ SceneQueryRenderer::~SceneQueryRenderer()
     }
 }
 
-SceneQueryResult SceneQueryRenderer::query(Scene &scene, Entity camera, uint32_t viewportWidth, uint32_t viewportHeight,
+SceneQueryResult SceneQueryRenderer::query(Scene &scene, ecs::EntityAccessor camera, uint32_t viewportWidth, uint32_t viewportHeight,
                                            const SceneQuery &region)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -136,8 +136,8 @@ SceneQueryResult SceneQueryRenderer::query(Scene &scene, Entity camera, uint32_t
     }
 
     if (region.x + region.width > viewportWidth || region.y + region.height > viewportHeight) {
-        RP_CORE_ERROR("Scene query region {}x{} at ({}, {}) lies outside the {}x{} viewport", region.width, region.height,
-                      region.x, region.y, viewportWidth, viewportHeight);
+        RP_CORE_ERROR("Scene query region {}x{} at ({}, {}) lies outside the {}x{} viewport", region.width, region.height, region.x,
+                      region.y, viewportWidth, viewportHeight);
         return {};
     }
 
@@ -145,7 +145,7 @@ SceneQueryResult SceneQueryRenderer::query(Scene &scene, Entity camera, uint32_t
         return {};
     }
 
-    CameraComponent *cameraComp = camera.isValid() ? camera.tryGetComponent<CameraComponent>() : nullptr;
+    const CameraComponent *cameraComp = camera.isValid() ? camera.tryRead<CameraComponent>() : nullptr;
     if (cameraComp == nullptr) {
         RP_CORE_ERROR("Scene query needs a camera to render from");
         return {};
@@ -229,8 +229,8 @@ bool SceneQueryRenderer::resizeBuffers(uint32_t pixelCount, uint32_t maxLayers)
     return true;
 }
 
-void SceneQueryRenderer::recordQuery(CommandBuffer *commandBuffer, Scene &scene, const glm::mat4 &viewProj,
-                                     uint32_t viewportWidth, uint32_t viewportHeight, const SceneQuery &region)
+void SceneQueryRenderer::recordQuery(CommandBuffer *commandBuffer, Scene &scene, const glm::mat4 &viewProj, uint32_t viewportWidth,
+                                     uint32_t viewportHeight, const SceneQuery &region)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -316,8 +316,8 @@ void SceneQueryRenderer::recordQuery(CommandBuffer *commandBuffer, Scene &scene,
     readBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     readBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     readBarrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &readBarrier, 0, nullptr,
-                         0, nullptr);
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &readBarrier, 0, nullptr, 0,
+                         nullptr);
 }
 
 SceneQueryResult SceneQueryRenderer::readBack(const SceneQuery &region)

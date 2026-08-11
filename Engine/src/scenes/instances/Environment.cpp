@@ -225,13 +225,12 @@ void Environment::setSkybox(AssetHandle _skybox)
 void Environment::update()
 {
     Node3D *sunNode = nullptr;
-    auto sunView = scene()->getRegistry().view<DirectionalLightComponent, TransformComponent>();
-    for (auto handle : sunView) {
-        if (!sunView.get<DirectionalLightComponent>(handle).atmosphereSunLight) {
+    for (auto [entity, light] : scene()->getRegistry().read<DirectionalLightComponent>().with<TransformComponent>()) {
+        if (!light.atmosphereSunLight) {
             continue;
         }
 
-        Instance *instance = scene()->instanceFor(Entity(handle, scene()));
+        Instance *instance = scene()->instanceFor(entity);
         sunNode = instance != nullptr ? instance->as<Node3D>() : nullptr;
         break;
     }

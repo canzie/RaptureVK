@@ -2,7 +2,7 @@
 #define RAPTURE__PLAY_LAYER_H
 
 #include "layers/Layer.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 #include <memory>
 
@@ -35,7 +35,7 @@ class PlayLayer : public Rapture::Layer {
   private:
     Rapture::World &m_world;
     Rapture::Viewport &m_viewport;
-    Rapture::Entity m_editorCamera;
+    Rapture::ecs::EntityAccessor m_editorCamera;
     std::unique_ptr<Rapture::Input> m_input;
     bool m_controlReleased = false;
 };

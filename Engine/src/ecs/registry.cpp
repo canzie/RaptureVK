@@ -41,7 +41,7 @@ void Registry::destroy(Entity entity)
     while (remaining != 0) {
         uint32_t typeId = static_cast<uint32_t>(std::countr_zero(remaining));
         remaining &= remaining - 1;
-        m_pools[typeId]->getDestroySignal().fire(*this, entity);
+        m_pools[typeId]->getDestroySignal().fire(entity);
     }
 
     remaining = attached;

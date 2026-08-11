@@ -1,8 +1,8 @@
 #ifndef RAPTURE__INSTANCE_H
 #define RAPTURE__INSTANCE_H
 
+#include "ecs/entity_accessor.h"
 #include "events/EventSignal.h"
-#include "scenes/entities/Entity.h"
 #include "serialization/SerialDocument.h"
 #include "utils/TypeInfo.h"
 #include "utils/UUID.h"
@@ -212,10 +212,21 @@ class Instance {
 
     std::string_view name() const { return m_name; }
     void setName(std::string_view name);
-    Entity entity() const { return m_entity; }
+    ecs::Entity entity() const { return m_entity.getEntity(); }
+
+    /**
+     * @brief This instance's entity bound to the registry that resolves it
+     * @return The accessor, invalid if this instance has no entity
+     */
+    const ecs::EntityAccessor &accessor() const { return m_entity; }
     Scene *scene() const { return m_scene; }
 
   protected:
+    /**
+     * @brief Marks this instance's render slots for re-upload
+     */
+    void markRenderDataDirty();
+
     /**
      * @brief Called on an instance once it has been linked to a new parent, or unlinked from one.
      *
@@ -225,7 +236,7 @@ class Instance {
     virtual void onParentChanged();
 
   protected:
-    Entity m_entity;
+    ecs::EntityAccessor m_entity;
 
   private:
     Scene *m_scene;

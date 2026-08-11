@@ -16,7 +16,7 @@
 #include <modules/puppets/Puppet.h>
 #include <render_targets/SceneRenderTarget.h>
 #include <scenes/Scene.h>
-#include <scenes/entities/Entity.h>
+#include <ecs/entity_accessor.h>
 #include <scenes/instances/DirectionalLight3D.h>
 #include <scenes/instances/Node3D.h>
 #include <viewport/ViewportManager.h>
@@ -122,11 +122,11 @@ void ModuleEditorWorkspace::setupScene()
     m_sceneRoot = spawn(*m_scene->root());
     m_scene->active = true;
 
-    Rapture::Entity camera = m_scene->createEntity("Editor Camera");
-    auto &cameraTransform = camera.addComponent<Rapture::TransformComponent>();
+    Rapture::ecs::EntityAccessor camera = m_scene->createEntity("Editor Camera");
+    auto &cameraTransform = camera.add<Rapture::TransformComponent>();
     cameraTransform.local = Rapture::transform::compose(glm::vec3(0.0f, 1.5f, 5.0f), glm::vec3(0.0f), glm::vec3(1.0f));
     cameraTransform.world = cameraTransform.local;
-    camera.addComponent<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+    camera.add<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 
     auto extent = app.getMainWindow().getSwapChain()->getExtent();
     m_viewport = app.getViewportManager().createViewport({

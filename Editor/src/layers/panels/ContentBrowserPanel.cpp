@@ -11,7 +11,7 @@
 #include "modules/puppets/Puppet.h"
 #include "scenes/Project.h"
 #include "scenes/World.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 #include "window_context/Application.h"
 
 #include <algorithm>

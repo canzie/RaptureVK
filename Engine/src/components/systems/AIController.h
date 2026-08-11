@@ -1,7 +1,7 @@
 #ifndef RAPTURE__AI_CONTROLLER_H
 #define RAPTURE__AI_CONTROLLER_H
 
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 namespace Rapture {
 
@@ -19,18 +19,18 @@ class AIController {
      * @brief Possess a pawn for this controller to drive
      * @param pawn Pawn entity, needs a Transform
      */
-    void possess(Entity pawn) { m_pawn = pawn; }
+    void possess(ecs::EntityAccessor pawn) { m_pawn = pawn; }
 
     /**
      * @brief Release the currently possessed pawn
      */
-    void unpossess() { m_pawn = Entity(); }
+    void unpossess() { m_pawn = ecs::EntityAccessor(); }
 
     /**
      * @brief Get the currently possessed pawn
      * @return The possessed pawn, or an invalid Entity if none
      */
-    Entity getPossessed() const { return m_pawn; }
+    ecs::EntityAccessor getPossessed() const { return m_pawn; }
 
     /**
      * @brief Advance the possessed pawn from AI logic
@@ -39,7 +39,7 @@ class AIController {
     void update(float dt);
 
   private:
-    Entity m_pawn;
+    ecs::EntityAccessor m_pawn;
 };
 
 } // namespace Rapture

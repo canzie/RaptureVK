@@ -85,10 +85,10 @@ void PlayerController::updateViewCamera()
         return;
     }
 
-    auto *cameraComponent = camera->entity().tryGetComponent<CameraComponent>();
-    if (cameraComponent == nullptr) {
+    if (!camera->accessor().has<CameraComponent>()) {
         return;
     }
+    auto cameraComponent = camera->accessor().write<CameraComponent>();
 
     // the camera hangs under the arm, so where it ends up is only in its world transform
     glm::mat4 world = camera->worldTransform();

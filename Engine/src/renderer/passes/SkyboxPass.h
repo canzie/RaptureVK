@@ -14,7 +14,7 @@
 #include "textures/Texture.h"
 #include "window_context/Application.h"
 
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 #include <memory>
 #include <vector>

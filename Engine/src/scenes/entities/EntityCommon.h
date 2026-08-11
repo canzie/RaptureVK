@@ -1,12 +1,14 @@
-#pragma once
+#ifndef RAPTURE__ENTITYCOMMON_H
+#define RAPTURE__ENTITYCOMMON_H
 
-#include <cstdint>
+#include "ecs/common.h"
 
 namespace Rapture {
 
-using EntityID = uint32_t;
+// TODO: temporary alias, call sites should say ecs::Entity
+using EntityID = ecs::Entity;
 
-static constexpr EntityID INVALID_ENTITY_ID = UINT32_MAX;
+inline constexpr EntityID INVALID_ENTITY_ID = ecs::ENTITY_NULL;
 
 enum Mobility {
     MOBILITY_STATIC = 0,
@@ -21,3 +23,5 @@ inline const char *mobilityToString(Mobility mobility)
 }
 
 } // namespace Rapture
+
+#endif // RAPTURE__ENTITYCOMMON_H

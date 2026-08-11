@@ -17,7 +17,6 @@
 namespace Rapture {
 
 class Scene;
-class Entity;
 class Instance;
 
 /**

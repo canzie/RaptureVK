@@ -9,7 +9,6 @@
 #include "buffers/descriptors/DescriptorManager.h"
 #include "buffers/descriptors/DescriptorSet.h"
 #include "components/Components.h"
-#include "components/IndirectLightingComponent.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/gi/ddgi/DDGICommon.h"
 #include "scenes/Scene.h"
@@ -444,49 +443,6 @@ void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer, uint32_t fra
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
     vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &offsetReadBarrier);
-}
-
-void DynamicDiffuseGI::updateFromIndirectLightingComponent(Scene &scene)
-{
-    // Query for IndirectLightingComponent
-    auto view = scene.getRegistry().view<IndirectLightingComponent>();
-    if (view.empty()) {
-        return; // No indirect lighting component - use current settings
-    }
-
-    auto &ilComp = view.get<IndirectLightingComponent>(*view.begin());
-
-    // Only update if DDGI technique is selected and enabled
-    if (!ilComp.isDDGI() || ilComp.isDisabled()) {
-        return;
-    }
-
-    auto *ddgiSettings = ilComp.getDDGISettings();
-    if (!ddgiSettings) {
-        return;
-    }
-
-    if (m_ProbeVolume.gridDimensions != ddgiSettings->probeCount) {
-        m_ProbeVolume.gridDimensions = ddgiSettings->probeCount;
-        m_isVolumeDirty = true;
-    }
-
-    if (m_ProbeVolume.spacing != ddgiSettings->probeSpacing) {
-        m_ProbeVolume.spacing = ddgiSettings->probeSpacing;
-        m_isVolumeDirty = true;
-    }
-
-    if (m_ProbeVolume.origin != ddgiSettings->gridOrigin) {
-        m_ProbeVolume.origin = ddgiSettings->gridOrigin;
-        m_isVolumeDirty = true;
-    }
-
-    if (m_ProbeVolume.probeNumRays != static_cast<int>(ddgiSettings->raysPerProbe)) {
-        m_ProbeVolume.probeNumRays = static_cast<int>(ddgiSettings->raysPerProbe);
-        m_isVolumeDirty = true;
-    }
-
-    // Note: intensity and visualizeProbes can be used by renderer, not stored in ProbeVolume
 }
 
 void DynamicDiffuseGI::updateSkybox(Scene &scene)

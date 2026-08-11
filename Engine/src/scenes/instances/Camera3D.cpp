@@ -12,7 +12,7 @@ static constexpr std::string_view KEY_FAR_PLANE = "farPlane";
 
 Camera3D::Camera3D(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
-    m_entity.setComponent<CameraComponent>();
+    m_entity.set<CameraComponent>();
 }
 
 const TypeInfo &Camera3D::staticType()
@@ -28,53 +28,53 @@ const TypeInfo &Camera3D::type() const
 
 float Camera3D::fieldOfView() const
 {
-    const auto *camera = m_entity.tryGetComponent<CameraComponent>();
+    const auto *camera = m_entity.tryRead<CameraComponent>();
     return camera != nullptr ? camera->fov : 0.0f;
 }
 
 void Camera3D::setFieldOfView(float degrees)
 {
-    auto *camera = m_entity.tryGetComponent<CameraComponent>();
-    if (camera == nullptr) {
+    if (!m_entity.has<CameraComponent>()) {
         return;
     }
+    auto camera = m_entity.write<CameraComponent>();
 
     camera->updateProjectionMatrix(degrees, camera->aspectRatio, camera->nearPlane, camera->farPlane);
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 float Camera3D::nearPlane() const
 {
-    const auto *camera = m_entity.tryGetComponent<CameraComponent>();
+    const auto *camera = m_entity.tryRead<CameraComponent>();
     return camera != nullptr ? camera->nearPlane : 0.0f;
 }
 
 void Camera3D::setNearPlane(float nearPlane)
 {
-    auto *camera = m_entity.tryGetComponent<CameraComponent>();
-    if (camera == nullptr) {
+    if (!m_entity.has<CameraComponent>()) {
         return;
     }
+    auto camera = m_entity.write<CameraComponent>();
 
     camera->updateProjectionMatrix(camera->fov, camera->aspectRatio, nearPlane, camera->farPlane);
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 float Camera3D::farPlane() const
 {
-    const auto *camera = m_entity.tryGetComponent<CameraComponent>();
+    const auto *camera = m_entity.tryRead<CameraComponent>();
     return camera != nullptr ? camera->farPlane : 0.0f;
 }
 
 void Camera3D::setFarPlane(float farPlane)
 {
-    auto *camera = m_entity.tryGetComponent<CameraComponent>();
-    if (camera == nullptr) {
+    if (!m_entity.has<CameraComponent>()) {
         return;
     }
+    auto camera = m_entity.write<CameraComponent>();
 
     camera->updateProjectionMatrix(camera->fov, camera->aspectRatio, camera->nearPlane, farPlane);
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 void Camera3D::serialize(WriteNode node) const

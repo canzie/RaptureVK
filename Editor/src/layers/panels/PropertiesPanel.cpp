@@ -35,7 +35,7 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
     attach(tabBar, std::move(root));
 
     if (m_selection != nullptr) {
-        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::Entity entity) {
+        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {
             if (entity.isValid()) {
                 showEntity(entity);
             } else {
@@ -199,11 +199,11 @@ void PropertiesPanel::refresh()
         if (!m_selectedEntity.isValid()) {
             return;
         }
-        const Rapture::Entity &e = m_selectedEntity;
+        const Rapture::ecs::EntityAccessor &e = m_selectedEntity;
 
         // Sections come from the instance's class chain, base first, so a Transform sits above the
         // sections its subclasses add.
-        Rapture::Instance *instance = m_scene != nullptr ? m_scene->instanceFor(e) : nullptr;
+        Rapture::Instance *instance = m_scene != nullptr ? m_scene->instanceFor(e.getEntity()) : nullptr;
         ensure<Node3DEditor>(instance != nullptr && instance->isA<Rapture::Node3D>());
         ensure<Mesh3DEditor>(instance != nullptr && instance->isA<Rapture::Mesh3D>());
         ensure<Light3DEditor>(instance != nullptr && instance->isA<Rapture::Light3D>());
@@ -214,8 +214,8 @@ void PropertiesPanel::refresh()
 
         ensure<EnvironmentEditor>(instance != nullptr && instance->isA<Rapture::Environment>());
 
-        ensure<ShadowEditor>(e.hasComponent<Rapture::ShadowComponent>());
-        ensure<CascadedShadowEditor>(e.hasComponent<Rapture::CascadedShadowComponent>());
+        ensure<ShadowEditor>(e.has<Rapture::ShadowComponent>());
+        ensure<CascadedShadowEditor>(e.has<Rapture::CascadedShadowComponent>());
     });
 }
 
@@ -223,7 +223,7 @@ void PropertiesPanel::setScene(Rapture::Scene *scene)
 {
     m_scene = scene;
     if (m_scene == nullptr) {
-        m_selectedEntity = Rapture::Entity{};
+        m_selectedEntity = Rapture::ecs::EntityAccessor{};
         showPlaceholder();
     }
 }
@@ -240,7 +240,7 @@ void PropertiesPanel::onUpdate(float dt)
     m_sections->sync();
 }
 
-void PropertiesPanel::showEntity(const Rapture::Entity &entity)
+void PropertiesPanel::showEntity(const Rapture::ecs::EntityAccessor &entity)
 {
     m_selectedEntity = entity;
     m_placeholderText->setBaseProperties({.visible = false});
@@ -259,7 +259,7 @@ void PropertiesPanel::showPlaceholder()
 
 void PropertiesPanel::clearSelection()
 {
-    m_selectedEntity = Rapture::Entity{};
+    m_selectedEntity = Rapture::ecs::EntityAccessor{};
     refresh();
     showPlaceholder();
 }

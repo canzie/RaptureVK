@@ -155,7 +155,7 @@ void GroundTruthAmbientOcclusionPass::record(const RenderPassContext &context, C
     }
 
     auto &renderData = *(context.scene->getRenderData());
-    auto *cameraComp = context.camera.isValid() ? context.camera.tryGetComponent<CameraComponent>() : nullptr;
+    auto *cameraComp = context.camera.isValid() ? context.camera.tryRead<CameraComponent>() : nullptr;
 
     m_pipeline->bind(commandBuffer->getCommandBufferVk());
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_pipeline);

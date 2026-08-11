@@ -35,7 +35,7 @@ class BasicView {
      * @param pools One pool per requested component type, any of which may be nullptr.
      */
     BasicView(const std::vector<EntityRecord> *records, PoolPointer<Ts>... pools)
-        requires(!MUTABLE)
+    requires(!MUTABLE)
         : m_pools(pools...), m_records(records), m_include(ComponentBits<Ts...>())
     {
         selectDriver(pools...);
@@ -48,7 +48,7 @@ class BasicView {
      * @param pools One pool per requested component type, any of which may be nullptr.
      */
     BasicView(const std::vector<EntityRecord> *records, Journal *journal, PoolPointer<Ts>... pools)
-        requires(MUTABLE)
+    requires(MUTABLE)
         : m_pools(pools...), m_records(records), m_journal(journal), m_include(ComponentBits<Ts...>())
     {
         selectDriver(pools...);
@@ -56,24 +56,26 @@ class BasicView {
 
     /**
      * @brief Requires a component the view does not access, such as a tag.
-     * @return This view, so filters can be chained onto construction.
+     * @return A copy of this view with the filter applied, safe to iterate as a temporary.
      */
     template <typename... Fs>
-    BasicView &with()
+    BasicView with() const
     {
-        m_include |= ComponentBits<Fs...>();
-        return *this;
+        BasicView filtered = *this;
+        filtered.m_include |= ComponentBits<Fs...>();
+        return filtered;
     }
 
     /**
      * @brief Rejects entities holding any of the listed components.
-     * @return This view, so filters can be chained onto construction.
+     * @return A copy of this view with the filter applied, safe to iterate as a temporary.
      */
     template <typename... Fs>
-    BasicView &without()
+    BasicView without() const
     {
-        m_exclude |= ComponentBits<Fs...>();
-        return *this;
+        BasicView filtered = *this;
+        filtered.m_exclude |= ComponentBits<Fs...>();
+        return filtered;
     }
 
     class Iterator {
@@ -92,8 +94,13 @@ class BasicView {
         ValueType operator*() const
         {
             Entity entity = (*m_view->m_driver)[m_index];
-            return std::apply([entity](auto *...pools) { return ValueType(entity, pools->get(entity)...); },
-                              m_view->m_pools);
+
+            // a single pool is always the driver, so its dense position is the one being iterated
+            if constexpr (sizeof...(Ts) == 1) {
+                return ValueType(entity, std::get<0>(m_view->m_pools)->atDense(m_index));
+            } else {
+                return std::apply([entity](auto *...pools) { return ValueType(entity, pools->get(entity)...); }, m_view->m_pools);
+            }
         }
 
       private:
@@ -119,7 +126,7 @@ class BasicView {
     Iterator end() const { return Iterator(this, m_driverSize); }
 
   private:
-    static constexpr ChangeMask CHANGE_CHANNELS = (ChangeMask(0) | ... | ComponentTraits<Ts>::CHANGE_CHANNELS);
+    static constexpr ChangeMask CHANGE_CHANNELS = (ChangeMask(0) | ... | COMPONENT_CHANNELS<Ts>);
 
     /**
      * @brief Picks the smallest pool to drive iteration, or none if any pool is missing.

@@ -91,11 +91,11 @@ class GBufferPass : public RenderPass {
     void setupCommandResources();
 
     // Record terrain rendering only
-    void recordTerrainCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera, TerrainGenerator &terrain,
+    void recordTerrainCommands(CommandBuffer *secondaryCb, Scene &activeScene, ecs::EntityAccessor camera, TerrainGenerator &terrain,
                                uint32_t currentFrame);
 
     // Record entity rendering only
-    void recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera, uint32_t currentFrame);
+    void recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, ecs::EntityAccessor camera, uint32_t currentFrame);
 
     void transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame);
 

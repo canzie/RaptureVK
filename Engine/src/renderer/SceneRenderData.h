@@ -4,6 +4,7 @@
 #include "GPUDataStructs.h"
 #include "RenderPartition.h"
 
+#include "ecs/registry.h"
 #include "window_context/vulkan_context/RenderContext.h"
 
 #include <memory>
@@ -99,6 +100,13 @@ class SceneRenderData {
     const GPUDataStore<ShadowGPUData> &getShadows() const { return m_shadows; }
 
   private:
+    /**
+     * @brief Subscribes to one concrete light type appearing and leaving
+     * @param registry The registry holding the lights
+     */
+    template <typename T>
+    void connectLightSignals(ecs::Registry &registry);
+
     void onMeshAdded(EntityID entityId);
     void onMeshRemoved(EntityID entityId);
     void onLightAdded(EntityID entityId);
@@ -132,8 +140,7 @@ class SceneRenderData {
     Scene *m_scene = nullptr;
     uint32_t m_frameCount = 0;
 
-    struct SignalBridge;
-    std::unique_ptr<SignalBridge> m_signalBridge;
+    std::vector<ecs::SignalConnection> m_connections;
 };
 
 } // namespace Rapture

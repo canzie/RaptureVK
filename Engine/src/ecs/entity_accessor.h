@@ -21,6 +21,11 @@ class EntityAccessor {
 
     Entity getEntity() const { return m_entity; }
 
+    bool operator==(const EntityAccessor &other) const
+    {
+        return m_entity == other.m_entity && m_registry == other.m_registry;
+    }
+
     /**
      * @brief Attaches a component to this entity.
      * @param args Arguments forwarded to T's constructor.
@@ -32,16 +37,49 @@ class EntityAccessor {
         return m_registry->add<T>(m_entity, std::forward<Args>(args)...);
     }
 
+    /**
+     * @brief Attaches a component, replacing it if this entity already has one.
+     * @param args Arguments forwarded to T's constructor.
+     * @return Reference to the component, void for empty components.
+     */
+    template <typename T, typename... Args>
+    decltype(auto) set(Args &&...args)
+    {
+        return m_registry->set<T>(m_entity, std::forward<Args>(args)...);
+    }
+
     template <typename T>
     void remove()
     {
         m_registry->remove<T>(m_entity);
     }
 
+    /**
+     * @brief Detaches a component this entity may not have.
+     * @return True if a component was removed.
+     */
+    template <typename T>
+    bool tryRemove()
+    {
+        return m_registry != nullptr && m_registry->tryRemove<T>(m_entity);
+    }
+
     template <typename T>
     bool has() const
     {
         return m_registry != nullptr && m_registry->has<T>(m_entity);
+    }
+
+    template <typename... Ts>
+    bool hasAll() const
+    {
+        return m_registry != nullptr && m_registry->hasAll<Ts...>(m_entity);
+    }
+
+    template <typename... Ts>
+    bool hasAny() const
+    {
+        return m_registry != nullptr && m_registry->hasAny<Ts...>(m_entity);
     }
 
     /**
@@ -69,12 +107,23 @@ class EntityAccessor {
 
     /**
      * @brief Mutable access to a component this entity is known to hold.
-     * @return Reference to the component.
+     * @return Scope that records the component's declared channels when it ends.
      */
     template <typename T>
-    T &write()
+    WriteScope<T> write() const
     {
         return m_registry->write<T>(m_entity);
+    }
+
+    /**
+     * @brief Mutable access recording something other than the component's declared channels.
+     * @param channels Channels to record on when the scope ends.
+     * @return Scope over the component.
+     */
+    template <typename T>
+    WriteScope<T> write(ChangeMask channels) const
+    {
+        return m_registry->write<T>(m_entity, channels);
     }
 
   private:

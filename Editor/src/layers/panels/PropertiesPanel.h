@@ -9,7 +9,7 @@
 #include "layers/panels/component_editors/ComponentEditorBase.h"
 #include "layers/panels/components/property_sections.h"
 #include "scenes/Scene.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 #include <concepts>
 #include <optional>
@@ -41,11 +41,12 @@ class PropertiesPanel : public Panel {
     {
         if (T *editor = m_sections->ensure<T>(present)) {
             editor->entity = m_selectedEntity;
+            editor->scene = m_scene;
         }
     }
 
     void refresh(void);
-    void showEntity(const Rapture::Entity &entity);
+    void showEntity(const Rapture::ecs::EntityAccessor &entity);
     void showPlaceholder(void);
     void clearSelection(void);
 
@@ -55,7 +56,7 @@ class PropertiesPanel : public Panel {
     std::optional<PropertySectionList> m_sections;
 
     Rapture::Scene *m_scene = nullptr;
-    Rapture::Entity m_selectedEntity;
+    Rapture::ecs::EntityAccessor m_selectedEntity;
     Rapture::EventConnection m_selectionChangedConn;
 };
 

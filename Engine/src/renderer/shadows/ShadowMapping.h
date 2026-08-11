@@ -17,6 +17,8 @@
 
 #include "window_context/vulkan_context/RenderContext.h"
 
+#include "ecs/entity_accessor.h"
+
 #include <glm/glm.hpp>
 #include <memory>
 
@@ -24,7 +26,6 @@ namespace Rapture {
 
 // Forward declarations
 struct TransformComponent;
-class Entity;
 
 class ShadowMap {
   public:
@@ -35,7 +36,7 @@ class ShadowMap {
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 
-    void updateViewMatrix(Entity light, const TransformComponent &transformComp, const glm::vec3 &cameraPosition);
+    void updateViewMatrix(ecs::EntityAccessor light, const TransformComponent &transformComp, const glm::vec3 &cameraPosition);
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTexture; }
 

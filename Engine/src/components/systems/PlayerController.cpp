@@ -2,14 +2,14 @@
 
 namespace Rapture {
 
-void PlayerController::possess(Entity pawn)
+void PlayerController::possess(ecs::EntityAccessor pawn)
 {
     m_pawn = pawn;
 }
 
 void PlayerController::unpossess()
 {
-    m_pawn = Entity();
+    m_pawn = ecs::EntityAccessor();
 }
 
 void PlayerController::update(float dt, const ControlInput &input)

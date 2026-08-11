@@ -51,7 +51,7 @@ SceneObjectTreePanel::SceneObjectTreePanel(Amethyst::TabBar *tabBar, const Works
     }
 
     if (m_selection != nullptr) {
-        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::Entity entity) { selectRowFor(entity); });
+        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) { selectRowFor(entity); });
     }
 
     icon = Icons::SVG_SCENE;
@@ -237,7 +237,7 @@ void SceneObjectTreePanel::onRowClicked(uint32_t row)
 {
     Rapture::Instance *instance = instanceForRow(row);
     if (instance != nullptr && m_selection != nullptr) {
-        m_selection->select(instance->entity());
+        m_selection->select(instance->accessor());
     }
 }
 
@@ -275,7 +275,7 @@ void SceneObjectTreePanel::applyPendingDelete()
         return;
     }
 
-    if (m_selection != nullptr && m_selection->entity() == instance->entity()) {
+    if (m_selection != nullptr && m_selection->entity().getEntity() == instance->entity()) {
         m_selection->clear();
     }
 
@@ -285,7 +285,7 @@ void SceneObjectTreePanel::applyPendingDelete()
     refresh();
 }
 
-void SceneObjectTreePanel::selectRowFor(Rapture::Entity entity)
+void SceneObjectTreePanel::selectRowFor(Rapture::ecs::EntityAccessor entity)
 {
     if (m_treeView == nullptr) {
         return;
@@ -294,7 +294,7 @@ void SceneObjectTreePanel::selectRowFor(Rapture::Entity entity)
     int32_t found = Amethyst::TreeView::NO_ROW_SELECTION;
     if (entity.isValid()) {
         for (uint32_t row = 0; row < m_rowObjects.size(); row++) {
-            if (m_rowObjects[row]->entity() == entity) {
+            if (m_rowObjects[row]->entity() == entity.getEntity()) {
                 found = static_cast<int32_t>(row);
                 break;
             }

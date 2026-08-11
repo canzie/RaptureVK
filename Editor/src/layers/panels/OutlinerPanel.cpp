@@ -5,7 +5,7 @@
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/World.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 #include <components/common.h>
 #include <components/context_menu_item.h>
@@ -224,7 +224,7 @@ void OutlinerPanel::onRowClicked(uint32_t row)
 {
     Rapture::Instance *instance = instanceForRow(row);
     if (instance != nullptr && m_selection != nullptr) {
-        m_selection->select(instance->entity());
+        m_selection->select(instance->accessor());
     }
 }
 
@@ -269,7 +269,7 @@ void OutlinerPanel::applyPendingDelete()
         return;
     }
 
-    if (m_selection != nullptr && m_selection->entity() == instance->entity()) {
+    if (m_selection != nullptr && m_selection->entity().getEntity() == instance->entity()) {
         m_selection->clear();
     }
 

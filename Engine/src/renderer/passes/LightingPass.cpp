@@ -104,7 +104,7 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
     RAPTURE_PROFILE_FUNCTION();
 
     Scene &activeScene = *context.scene;
-    Entity camera = context.camera;
+    ecs::EntityAccessor camera = context.camera;
     Texture *target = context.targets->sceneColorHdr;
     uint32_t frameIndex = context.frameInFlight;
     uint32_t lightingFlags = context.settings->flags;
@@ -149,8 +149,8 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
     uint32_t cameraSlotIndex = 0;
 
     if (camera.isValid()) {
-        cameraPos = transform::translation(camera.tryGetComponent<TransformComponent>()->world);
-        auto *cameraComp = camera.tryGetComponent<CameraComponent>();
+        cameraPos = transform::translation(camera.tryRead<TransformComponent>()->world);
+        auto *cameraComp = camera.tryRead<CameraComponent>();
         if (cameraComp != nullptr && cameraComp->renderDataSlot != UINT32_MAX) {
             cameraSlotIndex = cameraComp->renderDataSlot;
         }

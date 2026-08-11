@@ -24,7 +24,8 @@
 #include "meshes/Mesh.h"
 
 #include "asset_manager/AssetManager.h"
-#include "scenes/entities/Entity.h"
+#include "components/ChangeChannels.h"
+#include "ecs/entity_accessor.h"
 #include "scenes/entities/EntityCommon.h"
 #include "textures/Texture.h"
 
@@ -40,12 +41,16 @@ struct TagComponent {
 
 // local is what the owning instance authored, world is local composed with every ancestor
 struct TransformComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_TRANSFORM_WORLD);
+
     glm::mat4 local{1.0f};
     glm::mat4 world{1.0f};
 };
 
 // Pure camera component - only contains camera-specific data
 struct CameraComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_CAMERA_PARAMS);
+
     PerspectiveCamera camera;
     Frustum frustum;
 
@@ -108,6 +113,8 @@ struct CameraComponent {
 };
 
 struct MaterialComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MATERIAL_BINDING);
+
     AssetPtr<MaterialInstance> material;
 
     MaterialComponent() = default;
@@ -116,6 +123,8 @@ struct MaterialComponent {
 };
 
 struct MeshComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MESH_BINDING);
+
     AssetPtr<Mesh> mesh;
     bool isLoading = true;
     Mobility mobility = MOBILITY_STATIC;
@@ -161,6 +170,7 @@ struct PrefabComponent {
 };
 
 struct LightComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_LIGHT_PARAMS);
 
     glm::vec3 color = glm::vec3(1.0f, 0.8f, 0.6f); // Light color (default: warm white?) #FFDDAA
     float intensity = 1.0f;                        // Light intensity multiplier
@@ -231,27 +241,47 @@ struct SpotLightComponent : public LightComponent {
     }
 };
 
-inline LightType Light_getLightType(Entity e)
+inline LightType Light_getLightType(const ecs::EntityAccessor &entity)
 {
-    if (e.hasComponent<DirectionalLightComponent>()) {
+    if (entity.has<DirectionalLightComponent>()) {
         return LightType::DIRECTIONAL;
     }
-    if (e.hasComponent<SpotLightComponent>()) {
+    if (entity.has<SpotLightComponent>()) {
         return LightType::SPOT;
     }
     return LightType::POINT;
 }
 
-inline LightComponent *Light_tryGetLight(Entity e)
+/**
+ * @brief Mutable access to whichever concrete light an entity carries
+ * @param entity The entity to write to
+ * @param channels Channels the write announces, zero for bookkeeping that is not a change
+ * @return The light, or nullptr if the entity carries none
+ */
+inline LightComponent *Light_tryWriteLight(const ecs::EntityAccessor &entity, ecs::ChangeMask channels)
 {
-    if (auto *d = e.tryGetComponent<DirectionalLightComponent>()) {
-        return d;
+    if (entity.has<DirectionalLightComponent>()) {
+        return &*entity.write<DirectionalLightComponent>(channels);
     }
-    if (auto *p = e.tryGetComponent<PointLightComponent>()) {
-        return p;
+    if (entity.has<PointLightComponent>()) {
+        return &*entity.write<PointLightComponent>(channels);
     }
-    if (auto *s = e.tryGetComponent<SpotLightComponent>()) {
-        return s;
+    if (entity.has<SpotLightComponent>()) {
+        return &*entity.write<SpotLightComponent>(channels);
+    }
+    return nullptr;
+}
+
+inline const LightComponent *Light_tryReadLight(const ecs::EntityAccessor &entity)
+{
+    if (const auto *directional = entity.tryRead<DirectionalLightComponent>()) {
+        return directional;
+    }
+    if (const auto *point = entity.tryRead<PointLightComponent>()) {
+        return point;
+    }
+    if (const auto *spot = entity.tryRead<SpotLightComponent>()) {
+        return spot;
     }
     return nullptr;
 }
@@ -260,6 +290,8 @@ inline LightComponent *Light_tryGetLight(Entity e)
 struct RayTracedComponent {};
 
 struct ShadowComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_SHADOW_SETTINGS);
+
     uint32_t resolution = 1024;
     bool isActive = true;
     Mobility mobility = MOBILITY_DYNAMIC;
@@ -285,6 +317,8 @@ struct ShadowComponent {
 };
 
 struct CascadedShadowComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_SHADOW_SETTINGS);
+
     uint32_t resolution = 2048;
     uint8_t numCascades = 4;
     float lambda = 0.8f;

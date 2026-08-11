@@ -5,7 +5,9 @@
 #include <components/ui_scope.h>
 
 #include "layers/panels/components/property_sections.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
+#include "renderer/SceneRenderData.h"
+#include "scenes/Scene.h"
 #include "scenes/entities/EntityCommon.h"
 
 /**
@@ -19,7 +21,7 @@ class ComponentEditorBase : public PropertySection {
      * @brief Pushes the entity's component data into the bound widget buffers.
      * @param entity The entity this section edits.
      */
-    virtual void sync(const Rapture::Entity &entity) = 0;
+    virtual void sync(const Rapture::ecs::EntityAccessor &entity) = 0;
 
   protected:
     /**
@@ -32,8 +34,20 @@ class ComponentEditorBase : public PropertySection {
     Amethyst::Dropdown *rowMobility(Amethyst::TableScope &t, Rapture::Mobility current,
                                     const std::function<void(Rapture::Mobility)> &onSelect);
 
+  protected:
+    /**
+     * @brief Marks the edited entity's render slots for re-upload.
+     */
+    void markRenderDataDirty()
+    {
+        if (scene != nullptr && scene->getRenderData() != nullptr) {
+            scene->getRenderData()->markDirty(entity.getEntity());
+        }
+    }
+
   public:
-    Rapture::Entity entity;
+    Rapture::ecs::EntityAccessor entity;
+    Rapture::Scene *scene = nullptr;
 };
 
 #endif // RAPTURE__COMPONENT_EDITOR_BASE_H

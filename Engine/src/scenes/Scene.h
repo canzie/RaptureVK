@@ -3,11 +3,12 @@
 
 #include "acceleration_structures/TLAS.h"
 #include "asset_manager/AssetCommon.h"
+#include "components/ChangeChannels.h"
+#include "ecs/entity_accessor.h"
 #include "events/EventSignal.h"
 #include "scenes/entities/EntityCommon.h"
 #include "serialization/SerialDocument.h"
 #include <cstdint>
-#include <entt/entt.hpp>
 #include <memory>
 #include <span>
 #include <string>
@@ -16,7 +17,6 @@
 namespace Rapture {
 
 class Controller;
-class Entity;
 class Environment;
 class Instance;
 class SceneRenderData;
@@ -35,16 +35,16 @@ class Scene {
     Scene(const std::string &sceneName = "Untitled Scene");
     ~Scene();
 
-    Entity createEntity(const std::string &name = "Untitled Entity");
-    Entity createCube(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
-    Entity createSphere(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
+    ecs::EntityAccessor createEntity(const std::string &name = "Untitled Entity");
+    ecs::EntityAccessor createCube(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
+    ecs::EntityAccessor createSphere(const std::string &name = "Untitled Entity", Mobility mobility = MOBILITY_STATIC);
 
     /**
      * @brief Fills a newly created scene with a sun, a sky and a floor
      */
     void addDefaultContent();
 
-    void destroyEntity(Entity entity);
+    void destroyEntity(ecs::Entity entity);
 
     void onUpdate(float dt);
 
@@ -54,8 +54,15 @@ class Scene {
      */
     void stepPhysics(float dt);
 
-    entt::registry &getRegistry() { return m_registry; }
-    const entt::registry &getRegistry() const { return m_registry; }
+    ecs::Registry &getRegistry() { return m_registry; }
+    const ecs::Registry &getRegistry() const { return m_registry; }
+
+    /**
+     * @brief Binds an entity of this scene to the registry that resolves it
+     * @param entity The entity to wrap
+     * @return An accessor, invalid if the entity is not alive in this scene
+     */
+    ecs::EntityAccessor accessor(ecs::Entity entity) { return ecs::EntityAccessor(entity, &m_registry); }
 
     SceneSettings &getSettings();
     const SceneSettings &getSettings() const;
@@ -91,7 +98,7 @@ class Scene {
      * @param entity The entity to look up
      * @return The instance, or nullptr if the entity is not authored
      */
-    Instance *instanceFor(Entity entity) const;
+    Instance *instanceFor(ecs::Entity entity) const;
 
     /**
      * @brief Destroys an instance along with its subtree
@@ -125,7 +132,7 @@ class Scene {
      */
     bool restoreFrom(ReadNode node);
 
-    void registerBLAS(Entity &entity);
+    void registerBLAS(ecs::Entity entity);
 
     void buildTLAS();
     std::shared_ptr<TLAS> getTLAS()
@@ -155,7 +162,7 @@ class Scene {
     EventSignal<void()> onHierarchyChanged;
 
   private:
-    void onRigidBodyConstructed(entt::registry &registry, entt::entity entity);
+    void onRigidBodyConstructed(ecs::Entity entity);
     void registerRigidBodies();
     void syncRigidBodyTransforms();
 
@@ -165,12 +172,12 @@ class Scene {
     void clearInstances();
 
   private:
-    entt::registry m_registry;
+    ecs::Registry m_registry{CHANNEL_COUNT};
     Environment *m_environment = nullptr;
     std::unique_ptr<SceneRenderData> m_renderData;
     std::unique_ptr<PhysicsSystem> m_physics;
     Controller *m_activeController = nullptr;
-    std::vector<entt::entity> m_pendingRigidBodies;
+    std::vector<ecs::Entity> m_pendingRigidBodies;
     SceneSettings m_config;
 
     std::shared_ptr<TLAS> m_tlas;
@@ -179,7 +186,6 @@ class Scene {
     // declared last so its subtree tears down before anything destroyEntity touches
     std::unique_ptr<Instance> m_root;
 
-    friend class Entity;
     friend class Environment;
 };
 } // namespace Rapture

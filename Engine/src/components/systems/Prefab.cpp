@@ -2,10 +2,9 @@
 
 #include "asset_manager/AssetManager.h"
 #include "components/Components.h"
-#include "components/HierarchyComponent.h"
 #include "logging/Log.h"
 #include "scenes/Scene.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 #include "scenes/instances/PrefabInstance.h"
 #include "scenes/instances/StaticMesh3D.h"
 

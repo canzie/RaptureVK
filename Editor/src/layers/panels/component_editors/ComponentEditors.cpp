@@ -21,13 +21,13 @@
 #include <vector>
 
 template <typename T>
-static T *s_instanceAs(const Rapture::Entity &entity)
+static T *s_instanceAs(Rapture::Scene *scene, const Rapture::ecs::EntityAccessor &entity)
 {
-    if (!entity.isValid() || entity.getScene() == nullptr) {
+    if (!entity.isValid() || scene == nullptr) {
         return nullptr;
     }
 
-    Rapture::Instance *instance = entity.getScene()->instanceFor(entity);
+    Rapture::Instance *instance = scene->instanceFor(entity.getEntity());
     return instance != nullptr ? instance->as<T>() : nullptr;
 }
 
@@ -65,9 +65,9 @@ void Node3DEditor::apply(int row)
     }
 }
 
-void Node3DEditor::sync(const Rapture::Entity &entity)
+void Node3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::Node3D>(entity);
+    m_node = s_instanceAs<Rapture::Node3D>(scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -133,10 +133,10 @@ void Light3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
-void Light3DEditor::sync(const Rapture::Entity &entity)
+void Light3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
     Rapture::Light3D *previous = m_node;
-    m_node = s_instanceAs<Rapture::Light3D>(entity);
+    m_node = s_instanceAs<Rapture::Light3D>(scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -168,9 +168,9 @@ void DirectionalLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
-void DirectionalLight3DEditor::sync(const Rapture::Entity &entity)
+void DirectionalLight3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::DirectionalLight3D>(entity);
+    m_node = s_instanceAs<Rapture::DirectionalLight3D>(scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -188,9 +188,9 @@ void PointLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
-void PointLight3DEditor::sync(const Rapture::Entity &entity)
+void PointLight3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::PointLight3D>(entity);
+    m_node = s_instanceAs<Rapture::PointLight3D>(scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -224,9 +224,9 @@ void SpotLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
-void SpotLight3DEditor::sync(const Rapture::Entity &entity)
+void SpotLight3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::SpotLight3D>(entity);
+    m_node = s_instanceAs<Rapture::SpotLight3D>(scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -266,10 +266,10 @@ void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
-void Mesh3DEditor::sync(const Rapture::Entity &entity)
+void Mesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
     Rapture::Mesh3D *previous = m_node;
-    m_node = s_instanceAs<Rapture::Mesh3D>(entity);
+    m_node = s_instanceAs<Rapture::Mesh3D>(scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -308,9 +308,9 @@ void Camera3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
-void Camera3DEditor::sync(const Rapture::Entity &entity)
+void Camera3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::Camera3D>(entity);
+    m_node = s_instanceAs<Rapture::Camera3D>(scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -323,33 +323,33 @@ void ShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
         rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::ShadowComponent>()) {
+            if (!m_entity.isValid() || !m_entity.has<Rapture::ShadowComponent>()) {
                 return;
             }
-            m_entity.getComponent<Rapture::ShadowComponent>().isActive = b;
-            m_entity.markDirty();
+            m_entity.write<Rapture::ShadowComponent>()->isActive = b;
+            markRenderDataDirty();
         });
         m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::ShadowComponent>()) {
+            if (!m_entity.isValid() || !m_entity.has<Rapture::ShadowComponent>()) {
                 return;
             }
-            m_entity.getScene()->getRenderData()->setShadowMobility(m_entity.getID(), m);
+            scene->getRenderData()->setShadowMobility(m_entity.getEntity(), m);
             if (m_mobilityDropdown != nullptr) {
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }
-            m_entity.markDirty();
+            markRenderDataDirty();
         });
     });
 }
 
-void ShadowEditor::sync(const Rapture::Entity &entity)
+void ShadowEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
     bool entityChanged = !(entity == m_entity);
     m_entity = entity;
-    if (!entity.hasComponent<Rapture::ShadowComponent>()) {
+    if (!entity.has<Rapture::ShadowComponent>()) {
         return;
     }
-    const auto &sc = entity.getComponent<Rapture::ShadowComponent>();
+    const auto &sc = entity.read<Rapture::ShadowComponent>();
     m_isActive = sc.isActive;
 
     if (entityChanged && m_mobilityDropdown != nullptr) {
@@ -361,41 +361,41 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
         rowCheckbox(t, "Active", &m_isActive, [this](bool b) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
+            if (!m_entity.isValid() || !m_entity.has<Rapture::CascadedShadowComponent>()) {
                 return;
             }
-            m_entity.getComponent<Rapture::CascadedShadowComponent>().isActive = b;
-            m_entity.markDirty();
+            m_entity.write<Rapture::CascadedShadowComponent>()->isActive = b;
+            markRenderDataDirty();
         });
         m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
+            if (!m_entity.isValid() || !m_entity.has<Rapture::CascadedShadowComponent>()) {
                 return;
             }
-            m_entity.getScene()->getRenderData()->setCascadedShadowMobility(m_entity.getID(), m);
+            scene->getRenderData()->setCascadedShadowMobility(m_entity.getEntity(), m);
             if (m_mobilityDropdown != nullptr) {
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }
-            m_entity.markDirty();
+            markRenderDataDirty();
         });
         rowSlider(t, "Lambda", &m_lambda, 0.0f, 1.0f, [this](float v) {
-            if (!m_entity.isValid() || !m_entity.hasComponent<Rapture::CascadedShadowComponent>()) {
+            if (!m_entity.isValid() || !m_entity.has<Rapture::CascadedShadowComponent>()) {
                 return;
             }
-            auto &csc = m_entity.getComponent<Rapture::CascadedShadowComponent>();
-            csc.lambda = std::clamp(v, 0.0f, 1.0f);
-            m_entity.markDirty();
+            auto csc = m_entity.write<Rapture::CascadedShadowComponent>();
+            csc->lambda = std::clamp(v, 0.0f, 1.0f);
+            markRenderDataDirty();
         });
     });
 }
 
-void CascadedShadowEditor::sync(const Rapture::Entity &entity)
+void CascadedShadowEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
     bool entityChanged = !(entity == m_entity);
     m_entity = entity;
-    if (!entity.hasComponent<Rapture::CascadedShadowComponent>()) {
+    if (!entity.has<Rapture::CascadedShadowComponent>()) {
         return;
     }
-    const auto &csc = entity.getComponent<Rapture::CascadedShadowComponent>();
+    const auto &csc = entity.read<Rapture::CascadedShadowComponent>();
     m_isActive = csc.isActive;
     m_lambda = csc.lambda;
 
@@ -444,9 +444,9 @@ void EnvironmentEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     });
 }
 
-void EnvironmentEditor::sync(const Rapture::Entity &entity)
+void EnvironmentEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::Environment>(entity);
+    m_node = s_instanceAs<Rapture::Environment>(scene, entity);
     if (m_node == nullptr) {
         return;
     }

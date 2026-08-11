@@ -8,7 +8,6 @@
 
 #include "components/TerrainComponent.h"
 #include "jobs/InplaceFunction.h"
-#include "scenes/instances/Environment.h"
 #include "jobs/Job.h"
 #include "jobs/JobCommon.h"
 #include "jobs/JobSystem.h"
@@ -16,6 +15,7 @@
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowCommon.h"
 #include "renderer/shadows/ShadowMapping.h"
+#include "scenes/instances/Environment.h"
 #include <cstdio>
 
 namespace Rapture {
@@ -62,7 +62,7 @@ DeferredRenderer::~DeferredRenderer()
     m_swapChain.reset();
 }
 
-void DeferredRenderer::drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings)
+void DeferredRenderer::drawFrame(Scene &activeScene, ecs::EntityAccessor camera, const RenderSettings &settings)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -200,9 +200,9 @@ void DeferredRenderer::createRenderTarget()
     if (m_config.targetType == SceneRenderTarget::TargetType::OFFSCREEN) {
         // Create offscreen render target for Editor mode
         // Use BGRA8 SRGB format (matches typical swapchain format)
-        m_sceneRenderTarget = std::make_unique<SceneRenderTarget>(
-            static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), Application::getInstance().getFramesInFlight(),
-            TextureFormat::RGBA16F, m_config.allowReadback);
+        m_sceneRenderTarget = std::make_unique<SceneRenderTarget>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height),
+                                                                  Application::getInstance().getFramesInFlight(),
+                                                                  TextureFormat::RGBA16F, m_config.allowReadback);
         RP_CORE_INFO("Created OFFSCREEN render target for Editor mode");
     } else {
         // Create swapchain-backed render target for Standalone mode
@@ -227,7 +227,7 @@ void DeferredRenderer::createSceneColorTextures()
     }
 }
 
-RenderPassContext DeferredRenderer::buildPassContext(Scene &activeScene, Entity camera, uint32_t imageIndex,
+RenderPassContext DeferredRenderer::buildPassContext(Scene &activeScene, ecs::EntityAccessor camera, uint32_t imageIndex,
                                                      const RenderSettings &settings)
 {
     m_passTargets.gbufferNormalMotion = m_gbufferPass->getNormalTexture(m_currentFrame);
@@ -268,8 +268,8 @@ void DeferredRenderer::recreateRenderPasses()
 
     m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, framesInFlight);
 
-    m_ambientOcclusionPass = std::make_unique<GroundTruthAmbientOcclusionPass>(
-        static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), framesInFlight);
+    m_ambientOcclusionPass = std::make_unique<GroundTruthAmbientOcclusionPass>(static_cast<uint32_t>(m_width),
+                                                                               static_cast<uint32_t>(m_height), framesInFlight);
 
     m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_dynamicDiffuseGI.get(), hdrFormat);
 
@@ -313,8 +313,8 @@ void DeferredRenderer::setupCommandResources()
     m_commandPoolHash = m_renderContext.commandPoolManager->createCommandPool(config);
 }
 
-void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, uint32_t imageIndex,
-                                           const RenderSettings &settings)
+void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, ecs::EntityAccessor camera,
+                                           uint32_t imageIndex, const RenderSettings &settings)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -337,34 +337,29 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         auto &registry = activeScene.getRegistry();
         SceneRenderData *renderData = activeScene.getRenderData();
-        auto lightView = registry.view<TransformComponent, ShadowComponent>();
-        auto cascadedShadowView = registry.view<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>();
 
         TerrainGenerator *terrain = nullptr;
-        auto terrainView = registry.view<TerrainComponent>();
-        if (!terrainView.empty()) {
-            auto &terrainComp = terrainView.get<TerrainComponent>(*terrainView.begin());
+        for (auto [entity, terrainComp] : registry.read<TerrainComponent>()) {
             if (terrainComp.generator && terrainComp.isEnabled && terrainComp.generator->isInitialized()) {
                 terrain = terrainComp.generator.get();
             }
+            break;
         }
 
         {
             RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Shadow Maps");
 
-            for (auto entity : lightView) {
-                Entity lightEntity(entity, &activeScene);
-                auto *light = Light_tryGetLight(lightEntity);
+            for (auto [entity, transformComp, shadowComp] : registry.mutableView<TransformComponent, ShadowComponent>()) {
+                ecs::EntityAccessor lightEntity(entity, &registry);
+                const LightComponent *light = Light_tryReadLight(lightEntity);
                 if (light == nullptr) {
                     continue;
                 }
-                auto &transformComp = lightView.get<TransformComponent>(entity);
-                auto &shadowComp = lightView.get<ShadowComponent>(entity);
 
                 bool shouldUpdateShadow =
                     shadowComp.needsUpdate(*light, transformComp) || Light_getLightType(lightEntity) == LightType::DIRECTIONAL;
 
-                ShadowMap *shadowMap = renderData != nullptr ? renderData->getShadowMap(lightEntity.getID()) : nullptr;
+                ShadowMap *shadowMap = renderData != nullptr ? renderData->getShadowMap(entity) : nullptr;
                 if (shadowMap != nullptr && shouldUpdateShadow) {
                     auto shadowBuffer = shadowMap->recordSecondary(activeScene, m_currentFrame);
                     if (shadowBuffer) {
@@ -375,17 +370,12 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
                 }
             }
 
-            for (auto entity : cascadedShadowView) {
-                Entity lightEntity(entity, &activeScene);
-                auto &lightComp = cascadedShadowView.get<DirectionalLightComponent>(entity);
-                auto &transformComp = cascadedShadowView.get<TransformComponent>(entity);
-                auto &shadowComp = cascadedShadowView.get<CascadedShadowComponent>(entity);
+            for (auto [entity, lightComp, transformComp, shadowComp] :
+                 registry.mutableView<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>()) {
+                bool shouldUpdateShadow = shadowComp.needsUpdate(lightComp, transformComp) ||
+                                          Light_getLightType(ecs::EntityAccessor(entity, &registry)) == LightType::DIRECTIONAL;
 
-                bool shouldUpdateShadow =
-                    shadowComp.needsUpdate(lightComp, transformComp) || Light_getLightType(lightEntity) == LightType::DIRECTIONAL;
-
-                CascadedShadowMap *cascadedShadowMap =
-                    renderData != nullptr ? renderData->getCascadedShadowMap(lightEntity.getID()) : nullptr;
+                CascadedShadowMap *cascadedShadowMap = renderData != nullptr ? renderData->getCascadedShadowMap(entity) : nullptr;
                 if (cascadedShadowMap != nullptr && shouldUpdateShadow) {
                     auto shadowBuffer = cascadedShadowMap->recordSecondary(activeScene, m_currentFrame, terrain);
                     if (shadowBuffer) {

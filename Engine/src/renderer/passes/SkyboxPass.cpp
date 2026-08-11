@@ -53,7 +53,7 @@ SkyboxPass::~SkyboxPass()
 CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     Scene &activeScene = *context.scene;
-    Entity camera = context.camera;
+    ecs::EntityAccessor camera = context.camera;
     Texture *target = context.targets->sceneColorHdr;
     uint32_t frameInFlightIndex = context.frameInFlight;
 
@@ -107,7 +107,7 @@ CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const Second
     vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), m_skyboxIndexBuffer->getBufferVk(), 0, VK_INDEX_TYPE_UINT32);
 
     auto &renderData = *(activeScene.getRenderData());
-    auto *cameraComp = camera.isValid() ? camera.tryGetComponent<CameraComponent>() : nullptr;
+    auto *cameraComp = camera.isValid() ? camera.tryRead<CameraComponent>() : nullptr;
 
     SkyboxPushConstants pushConstants{};
     pushConstants.cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(frameInFlightIndex);

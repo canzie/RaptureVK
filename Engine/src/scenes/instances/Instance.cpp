@@ -2,6 +2,7 @@
 
 #include "components/Components.h"
 #include "logging/Log.h"
+#include "renderer/SceneRenderData.h"
 #include "scenes/Scene.h"
 #include "scenes/instances/InstanceRegistry.h"
 
@@ -15,7 +16,7 @@ static constexpr std::string_view KEY_CHILDREN = "children";
 Instance::Instance(Scene &scene, std::string_view name) : m_scene(&scene), m_id(UUIDGenerator::Generate()), m_name(name)
 {
     m_entity = scene.createEntity(m_name);
-    m_entity.setComponent<InstanceComponent>(this);
+    m_entity.set<InstanceComponent>(this);
 }
 
 void Instance::remintId()
@@ -29,8 +30,8 @@ Instance::~Instance()
 
     m_children.clear();
 
-    if (m_entity.isValid()) {
-        m_entity.destroy();
+    if (m_entity.isValid() && m_scene != nullptr) {
+        m_scene->destroyEntity(m_entity.getEntity());
     }
 }
 
@@ -45,12 +46,20 @@ const TypeInfo &Instance::type() const
     return staticType();
 }
 
+void Instance::markRenderDataDirty()
+{
+    SceneRenderData *renderData = m_scene != nullptr ? m_scene->getRenderData() : nullptr;
+    if (renderData != nullptr) {
+        renderData->markDirty(m_entity.getEntity());
+    }
+}
+
 void Instance::setName(std::string_view name)
 {
     m_name = name;
 
-    if (auto *tag = m_entity.tryGetComponent<TagComponent>()) {
-        tag->tag = m_name;
+    if (m_entity.has<TagComponent>()) {
+        m_entity.write<TagComponent>()->tag = m_name;
     }
 }
 

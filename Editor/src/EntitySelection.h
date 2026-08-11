@@ -2,7 +2,7 @@
 #define RAPTURE__ENTITY_SELECTION_H
 
 #include "events/EventSignal.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 /**
  * @brief The entity a workspace has selected.
@@ -16,24 +16,24 @@ class EntitySelection {
      * @brief Selects an entity, firing onChanged when it differs from the current one
      * @param entity The entity to select, invalid to select nothing
      */
-    void select(Rapture::Entity entity);
+    void select(Rapture::ecs::EntityAccessor entity);
 
     /**
      * @brief Selects nothing
      */
-    void clear(void) { select(Rapture::Entity()); }
+    void clear(void) { select(Rapture::ecs::EntityAccessor()); }
 
-    Rapture::Entity entity() const { return m_entity; }
+    Rapture::ecs::EntityAccessor entity() const { return m_entity; }
     bool has() const { return m_entity.isValid(); }
 
   public:
     /**
      * @brief Fires with the newly selected entity, which is invalid when the selection was cleared
      */
-    Rapture::EventSignal<void(Rapture::Entity)> onChanged;
+    Rapture::EventSignal<void(Rapture::ecs::EntityAccessor)> onChanged;
 
   private:
-    Rapture::Entity m_entity;
+    Rapture::ecs::EntityAccessor m_entity;
 };
 
 #endif // RAPTURE__ENTITY_SELECTION_H

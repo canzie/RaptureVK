@@ -9,7 +9,7 @@
 #include "generators/terrain/TerrainTypes.h"
 #include "logging/TracyProfiler.h"
 #include "renderer/SceneRenderData.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 #include "window_context/Application.h"
 
 #include <cstdint>
@@ -128,7 +128,7 @@ CommandBuffer *GBufferPass::record(const RenderPassContext &context, const Secon
     RAPTURE_PROFILE_FUNCTION();
 
     Scene &activeScene = *context.scene;
-    Entity camera = context.camera;
+    ecs::EntityAccessor camera = context.camera;
     TerrainGenerator *terrain = context.terrain;
     uint32_t currentFrame = context.frameInFlight;
 
@@ -161,7 +161,7 @@ CommandBuffer *GBufferPass::record(const RenderPassContext &context, const Secon
     return commandBuffer;
 }
 
-void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, Entity camera, uint32_t currentFrame)
+void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, ecs::EntityAccessor camera, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -181,10 +181,10 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
     scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
     vkCmdSetScissor(secondaryCb->getCommandBufferVk(), 0, 1, &scissor);
 
-    CameraComponent *cameraComp = nullptr;
+    const CameraComponent *cameraComp = nullptr;
 
     if (camera.isValid()) {
-        cameraComp = camera.tryGetComponent<CameraComponent>();
+        cameraComp = camera.tryRead<CameraComponent>();
     }
 
     const Frustum *frustum = nullptr;
@@ -619,7 +619,7 @@ void GBufferPass::createTerrainPipeline()
     RP_CORE_TRACE("GBufferPass: Terrain pipeline created");
 }
 
-void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, TerrainGenerator &terrain,
+void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &activeScene, ecs::EntityAccessor camera, TerrainGenerator &terrain,
                                         uint32_t currentFrame)
 {
     (void)activeScene;
@@ -633,7 +633,7 @@ void GBufferPass::recordTerrainCommands(CommandBuffer *commandBuffer, Scene &act
         return;
     }
 
-    auto *cameraComp = camera.tryGetComponent<CameraComponent>();
+    auto *cameraComp = camera.tryRead<CameraComponent>();
     if (cameraComp == nullptr) {
         return;
     }

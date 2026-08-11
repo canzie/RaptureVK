@@ -16,8 +16,8 @@ static constexpr std::string_view KEY_RAY_TRACED = "rayTraced";
 
 Mesh3D::Mesh3D(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
-    m_entity.setComponent<MeshComponent>();
-    m_entity.setComponent<MaterialComponent>();
+    m_entity.set<MeshComponent>();
+    m_entity.set<MaterialComponent>();
 }
 
 const TypeInfo &Mesh3D::staticType()
@@ -45,15 +45,15 @@ void Mesh3D::setMesh(AssetHandle _mesh)
 
     // Assigned in place because replacing the component would drop its render data slot, which is
     // only handed out by the construction signal.
-    auto *component = m_entity.tryGetComponent<MeshComponent>();
-    if (component == nullptr) {
+    if (!m_entity.has<MeshComponent>()) {
         return;
     }
+    auto component = m_entity.write<MeshComponent>();
 
     component->setMesh(std::move(ref));
     component->isLoading = false;
     m_mesh = _mesh;
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 void Mesh3D::setMaterial(AssetHandle _material)
@@ -68,78 +68,78 @@ void Mesh3D::setMaterial(AssetHandle _material)
         return;
     }
 
-    auto *component = m_entity.tryGetComponent<MaterialComponent>();
-    if (component == nullptr) {
+    if (!m_entity.has<MaterialComponent>()) {
         return;
     }
+    auto component = m_entity.write<MaterialComponent>();
 
     component->material = AssetPtr<MaterialInstance>(std::move(ref));
     m_material = _material;
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 bool Mesh3D::isVisible() const
 {
-    const auto *component = m_entity.tryGetComponent<MeshComponent>();
+    const auto *component = m_entity.tryRead<MeshComponent>();
     return component != nullptr ? component->isEnabled : false;
 }
 
 void Mesh3D::setVisible(bool visible)
 {
-    auto *component = m_entity.tryGetComponent<MeshComponent>();
-    if (component == nullptr) {
+    if (!m_entity.has<MeshComponent>()) {
         return;
     }
+    auto component = m_entity.write<MeshComponent>();
 
     component->isEnabled = visible;
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 Mobility Mesh3D::mobility() const
 {
-    const auto *component = m_entity.tryGetComponent<MeshComponent>();
+    const auto *component = m_entity.tryRead<MeshComponent>();
     return component != nullptr ? component->mobility : MOBILITY_STATIC;
 }
 
 void Mesh3D::setMobility(Mobility mobility)
 {
-    if (!m_entity.hasComponent<MeshComponent>()) {
+    if (!m_entity.has<MeshComponent>()) {
         return;
     }
 
-    scene()->getRenderData()->setMeshMobility(m_entity.getID(), mobility);
-    m_entity.markDirty();
+    scene()->getRenderData()->setMeshMobility(m_entity.getEntity(), mobility);
+    markRenderDataDirty();
 }
 
 glm::vec3 Mesh3D::boundsMin() const
 {
-    const auto *component = m_entity.tryGetComponent<MeshComponent>();
+    const auto *component = m_entity.tryRead<MeshComponent>();
     return (component != nullptr && component->mesh) ? component->mesh->getBoundsMin() : glm::vec3(0.0f);
 }
 
 glm::vec3 Mesh3D::boundsMax() const
 {
-    const auto *component = m_entity.tryGetComponent<MeshComponent>();
+    const auto *component = m_entity.tryRead<MeshComponent>();
     return (component != nullptr && component->mesh) ? component->mesh->getBoundsMax() : glm::vec3(0.0f);
 }
 
 bool Mesh3D::isRayTraced() const
 {
-    return m_entity.hasComponent<RayTracedComponent>();
+    return m_entity.has<RayTracedComponent>();
 }
 
 void Mesh3D::setRayTraced(bool rayTraced)
 {
     if (!rayTraced) {
-        m_entity.tryRemoveComponent<RayTracedComponent>();
+        m_entity.tryRemove<RayTracedComponent>();
         return;
     }
 
-    if (m_entity.hasComponent<RayTracedComponent>()) {
+    if (m_entity.has<RayTracedComponent>()) {
         return;
     }
 
-    auto *component = m_entity.tryGetComponent<MeshComponent>();
+    const MeshComponent *component = m_entity.tryRead<MeshComponent>();
     if (component == nullptr || !component->mesh) {
         RP_CORE_ERROR("'{}' cannot be ray traced before it has a mesh", name());
         return;
@@ -150,10 +150,9 @@ void Mesh3D::setRayTraced(bool rayTraced)
         return;
     }
 
-    m_entity.addComponent<RayTracedComponent>();
+    m_entity.add<RayTracedComponent>();
 
-    Entity self = m_entity;
-    scene()->registerBLAS(self);
+    scene()->registerBLAS(m_entity.getEntity());
 }
 
 void Mesh3D::serialize(WriteNode node) const

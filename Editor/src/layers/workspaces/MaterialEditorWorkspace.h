@@ -5,7 +5,7 @@
 
 #include <asset_manager/AssetCommon.h>
 #include <events/EventSignal.h>
-#include <scenes/entities/Entity.h>
+#include <ecs/entity_accessor.h>
 
 namespace Rapture {
 class Scene;
@@ -43,7 +43,7 @@ class MaterialEditorWorkspace : public Workspace {
     Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
     std::unique_ptr<Rapture::Scene> m_previewScene;
     Rapture::Viewport *m_previewViewport = nullptr;
-    Rapture::Entity m_previewSphere;
+    Rapture::ecs::EntityAccessor m_previewSphere;
     Rapture::EventConnection m_materialSelectedConn;
 };
 

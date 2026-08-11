@@ -19,7 +19,7 @@ void Viewport::setScene(Scene *scene)
     m_scene = scene;
 }
 
-void Viewport::setCamera(Entity camera)
+void Viewport::setCamera(ecs::EntityAccessor camera)
 {
     m_camera = camera;
 }
@@ -83,10 +83,10 @@ void Viewport::resize(uint32_t width, uint32_t height)
     if (height == 0 || !m_camera.isValid()) {
         return;
     }
-    auto *cc = m_camera.tryGetComponent<CameraComponent>();
-    if (cc != nullptr) {
+    if (m_camera.has<CameraComponent>()) {
+        auto camera = m_camera.write<CameraComponent>();
         float aspect = static_cast<float>(width) / static_cast<float>(height);
-        cc->updateProjectionMatrix(cc->fov, aspect, cc->nearPlane, cc->farPlane);
+        camera->updateProjectionMatrix(camera->fov, aspect, camera->nearPlane, camera->farPlane);
     }
 }
 

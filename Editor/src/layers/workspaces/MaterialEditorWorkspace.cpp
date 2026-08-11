@@ -14,7 +14,7 @@
 #include <render_targets/SceneRenderTarget.h>
 #include <scenes/Scene.h>
 #include <utils/EnginePaths.h>
-#include <scenes/entities/Entity.h>
+#include <ecs/entity_accessor.h>
 #include <scenes/instances/Environment.h>
 #include <viewport/ViewportManager.h>
 #include <window_context/Application.h>
@@ -91,17 +91,17 @@ void MaterialEditorWorkspace::setupPreviewScene()
     m_previewScene = std::make_unique<Rapture::Scene>(s_previewSceneName);
     m_previewSphere = m_previewScene->createSphere("Preview Sphere");
 
-    Rapture::Entity camera = m_previewScene->createEntity("Preview Camera");
-    auto &cameraTransform = camera.addComponent<Rapture::TransformComponent>();
+    Rapture::ecs::EntityAccessor camera = m_previewScene->createEntity("Preview Camera");
+    auto &cameraTransform = camera.add<Rapture::TransformComponent>();
     cameraTransform.local = Rapture::transform::compose(glm::vec3(0.0f, 0.0f, 4.0f), glm::vec3(0.0f), glm::vec3(1.0f));
     cameraTransform.world = cameraTransform.local;
-    camera.addComponent<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 100.0f);
+    camera.add<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 100.0f);
 
-    Rapture::Entity light = m_previewScene->createEntity("Preview Light");
-    auto &lightTransform = light.addComponent<Rapture::TransformComponent>();
+    Rapture::ecs::EntityAccessor light = m_previewScene->createEntity("Preview Light");
+    auto &lightTransform = light.add<Rapture::TransformComponent>();
     lightTransform.local = Rapture::transform::compose(glm::vec3(0.0f), glm::vec3(-0.6f, 0.5f, 0.0f), glm::vec3(1.0f));
     lightTransform.world = lightTransform.local;
-    light.addComponent<Rapture::DirectionalLightComponent>(glm::vec3(1.0f), 3.0f);
+    light.add<Rapture::DirectionalLightComponent>(glm::vec3(1.0f), 3.0f);
 
     Rapture::Environment *environment = m_previewScene->environment();
     auto skyboxPath = Rapture::EnginePaths::assetDirectory() / "textures/cubemaps/default.cubemap";
@@ -142,12 +142,11 @@ void MaterialEditorWorkspace::showMaterialOnSphere(Rapture::AssetHandle handle)
         return;
     }
 
-    auto *materialComp = m_previewSphere.tryGetComponent<Rapture::MaterialComponent>();
-    if (materialComp == nullptr) {
-        m_previewSphere.addComponent<Rapture::MaterialComponent>(std::move(ref));
+    if (!m_previewSphere.has<Rapture::MaterialComponent>()) {
+        m_previewSphere.add<Rapture::MaterialComponent>(std::move(ref));
         return;
     }
-    materialComp->material = Rapture::AssetPtr<Rapture::MaterialInstance>(std::move(ref));
+    m_previewSphere.write<Rapture::MaterialComponent>()->material = Rapture::AssetPtr<Rapture::MaterialInstance>(std::move(ref));
 }
 
 void MaterialEditorWorkspace::setupHotbar()

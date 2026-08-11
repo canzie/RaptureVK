@@ -1,5 +1,4 @@
 #include "Scene.h"
-#include "entities/Entity.h"
 
 #include "components/Components.h"
 #include "components/RigidBodyComponent.h"
@@ -51,57 +50,39 @@ Scene::Scene(const std::string &sceneName)
     m_root->add<Environment>("Environment");
 
     m_physics = std::make_unique<PhysicsSystem>();
-    m_registry.on_construct<RigidBodyComponent>().connect<&Scene::onRigidBodyConstructed>(this);
+    m_registry.onConstruct<RigidBodyComponent>([this](ecs::Entity entity) { onRigidBodyConstructed(entity); });
 }
 
-Scene::~Scene()
-{
-    // EnTT registry will automatically clean up all entities and components
-}
+Scene::~Scene() = default;
 
-Entity Scene::createEntity(const std::string &name)
+ecs::EntityAccessor Scene::createEntity(const std::string &name)
 {
     if (locked) {
         RP_CORE_WARN("Cannot create entity in locked scene '{}'", getSceneName());
-        return Entity::null();
+        return ecs::EntityAccessor();
     }
 
-    // Create entity in the registry
-    entt::entity handle = m_registry.create();
-
-    // Create Entity wrapper
-    Entity entity(handle, this);
-
-    // Add basic name component if you have one
-    entity.addComponent<TagComponent>(name);
+    ecs::EntityAccessor entity(m_registry.create(), &m_registry);
+    entity.add<TagComponent>(name);
 
     return entity;
 }
 
-Entity Scene::createCube(const std::string &name, Mobility mobility)
+ecs::EntityAccessor Scene::createCube(const std::string &name, Mobility mobility)
 {
     if (locked) {
         RP_CORE_WARN("Cannot create entity in locked scene '{}'", getSceneName());
-        return Entity::null();
+        return ecs::EntityAccessor();
     }
 
-    // Create entity in the registry
-    entt::entity handle = m_registry.create();
+    ecs::EntityAccessor entity(m_registry.create(), &m_registry);
+    entity.add<TagComponent>(name);
+    entity.add<TransformComponent>();
+    entity.add<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_CUBE_MESH), mobility);
 
-    // Create Entity wrapper
-    Entity entity(handle, this);
-
-    // Add basic name component if you have one
-    entity.addComponent<TagComponent>(name);
-
-    entity.addComponent<TransformComponent>();
-
-    entity.addComponent<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_CUBE_MESH), mobility);
-
-    // Add a material
     auto materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE);
     if (materialRef) {
-        entity.addComponent<MaterialComponent>(materialRef);
+        entity.add<MaterialComponent>(materialRef);
     }
 
     return entity;
@@ -127,46 +108,40 @@ void Scene::addDefaultContent()
     }
 }
 
-Entity Scene::createSphere(const std::string &name, Mobility mobility)
+ecs::EntityAccessor Scene::createSphere(const std::string &name, Mobility mobility)
 {
     if (locked) {
         RP_CORE_WARN("Cannot create entity in locked scene '{}'", getSceneName());
-        return Entity::null();
+        return ecs::EntityAccessor();
     }
 
-    // Create entity in the registry
-    entt::entity handle = m_registry.create();
+    ecs::EntityAccessor entity(m_registry.create(), &m_registry);
+    entity.add<TagComponent>(name);
+    entity.add<TransformComponent>();
+    entity.add<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_SPHERE_MESH), mobility);
 
-    // Create Entity wrapper
-    Entity entity(handle, this);
-
-    // Add basic name component if you have one
-    entity.addComponent<TagComponent>(name);
-
-    entity.addComponent<TransformComponent>();
-
-    entity.addComponent<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_SPHERE_MESH), mobility);
-
-    // Add a material
     auto materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE);
     if (materialRef) {
-        entity.addComponent<MaterialComponent>(materialRef);
+        entity.add<MaterialComponent>(materialRef);
     }
 
     return entity;
 }
 
-void Scene::destroyEntity(Entity entity)
+void Scene::destroyEntity(ecs::Entity entity)
 {
-    if (entity.isValid() && entity.getScene() == this) {
-        if (entity.hasComponent<RayTracedComponent>()) {
-            if (m_tlas != nullptr) {
-                m_tlas->removeInstance(entity.getID());
-            }
-            m_tlasDirty = true;
-        }
-        m_registry.destroy(entity.getHandle());
+    if (!m_registry.isValid(entity)) {
+        return;
     }
+
+    if (m_registry.has<RayTracedComponent>(entity)) {
+        if (m_tlas != nullptr) {
+            m_tlas->removeInstance(entity);
+        }
+        m_tlasDirty = true;
+    }
+
+    m_registry.destroy(entity);
 }
 
 void Scene::stepPhysics(float dt)
@@ -195,11 +170,7 @@ void Scene::onUpdate(float dt)
 
     {
         RAPTURE_PROFILE_SCOPE("OldPerEntity::updateMeshes");
-        auto meshView = m_registry.view<TransformComponent, MeshComponent, MaterialComponent, TagComponent>();
-        for (auto entity : meshView) {
-            auto [transform, mesh, material, tag] =
-                meshView.get<TransformComponent, MeshComponent, MaterialComponent, TagComponent>(entity);
-
+        for (auto [entity, material] : m_registry.read<MaterialComponent>().with<TransformComponent, MeshComponent>()) {
             material.material->updatePendingTextures();
         }
     }
@@ -208,19 +179,17 @@ void Scene::onUpdate(float dt)
     Frustum *frustum = nullptr;
     Camera3D *activeCamera = m_activeController != nullptr ? m_activeController->viewCamera() : nullptr;
     if (activeCamera != nullptr) {
-        Entity camera = activeCamera->entity();
-        auto [cameraTransform, cameraComponent] = camera.tryGetComponents<TransformComponent, CameraComponent>();
-        if (cameraTransform && cameraComponent) {
+        ecs::Entity camera = activeCamera->entity();
+        if (m_registry.hasAll<TransformComponent, CameraComponent>(camera)) {
             cameraPosition = transform::translation(activeCamera->worldTransform());
-            frustum = &cameraComponent->frustum;
+            // the frustum holds GPU upload state, so touching it is bookkeeping rather than a camera change
+            frustum = &m_registry.write<CameraComponent>(camera, 0)->frustum;
         }
     }
 
     // the chunk grid is scene wide, so it follows one camera rather than each view that draws it
     if (frustum != nullptr) {
-        auto terrainView = m_registry.view<TerrainComponent>();
-        for (auto entity : terrainView) {
-            auto &terrain = terrainView.get<TerrainComponent>(entity);
+        for (auto [entity, terrain] : m_registry.mutableView<TerrainComponent>()) {
             if (terrain.generator && terrain.isEnabled && terrain.generator->isInitialized()) {
                 terrain.generator->update(cameraPosition, *frustum, frameCounter);
             }
@@ -231,39 +200,33 @@ void Scene::onUpdate(float dt)
         m_environment->update();
     }
 
-    // Update regular shadow maps
-    auto shadowView = m_registry.view<TransformComponent, ShadowComponent>();
-    for (auto entityHandle : shadowView) {
-        Entity entity(entityHandle, this);
-        auto *light = Light_tryGetLight(entity);
+    // TODO: needsUpdate is what the journal replaces, so this loop stops being a per frame sweep
+    for (auto [entity, shadow] : m_registry.mutableView<ShadowComponent>().with<TransformComponent>()) {
+        ecs::EntityAccessor accessor(entity, &m_registry);
+        const LightComponent *light = Light_tryReadLight(accessor);
         if (light == nullptr) {
             continue;
         }
-        auto [transform, shadow] = shadowView.get<TransformComponent, ShadowComponent>(entityHandle);
 
-        ShadowMap *shadowMap = m_renderData->getShadowMap(entity.getID());
+        const TransformComponent &transform = m_registry.read<TransformComponent>(entity);
+        ShadowMap *shadowMap = m_renderData->getShadowMap(entity);
         if (shadowMap != nullptr && shadow.isActive && shadow.needsUpdate(*light, transform)) {
-
-            // Update the shadow map view matrix
-            shadowMap->updateViewMatrix(entity, transform, cameraPosition);
+            shadowMap->updateViewMatrix(accessor, transform, cameraPosition);
         }
     }
 
-    // Update cascaded shadow maps
-    auto cascadedShadowView = m_registry.view<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>();
-    for (auto entity : cascadedShadowView) {
-        auto [light, transform, shadow] =
-            cascadedShadowView.get<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>(entity);
+    for (auto [entity, light, transform, shadow] :
+         m_registry.read<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>()) {
+        CascadedShadowMap *cascadedShadowMap = m_renderData->getCascadedShadowMap(entity);
+        if (cascadedShadowMap == nullptr || !shadow.isActive || activeCamera == nullptr) {
+            continue;
+        }
 
-        CascadedShadowMap *cascadedShadowMap = m_renderData->getCascadedShadowMap(static_cast<EntityID>(entity));
-        if (cascadedShadowMap != nullptr && shadow.isActive && activeCamera != nullptr) {
-            // Update the cascaded shadow map view matrices
-            auto cameraComp = activeCamera->entity().tryGetComponent<CameraComponent>();
-            if (cameraComp) {
-                cascadedShadowMap->setLambda(shadow.lambda);
-                cascadedShadowMap->setShadowDistance(shadow.shadowDistance);
-                cascadedShadowMap->updateViewMatrix(light, transform, *cameraComp);
-            }
+        const CameraComponent *camera = m_registry.tryRead<CameraComponent>(activeCamera->entity());
+        if (camera != nullptr) {
+            cascadedShadowMap->setLambda(shadow.lambda);
+            cascadedShadowMap->setShadowDistance(shadow.shadowDistance);
+            cascadedShadowMap->updateViewMatrix(light, transform, *camera);
         }
     }
 
@@ -294,9 +257,8 @@ std::string Scene::getSceneName() const
     return m_config.sceneName;
 }
 
-void Scene::onRigidBodyConstructed(entt::registry &registry, entt::entity entity)
+void Scene::onRigidBodyConstructed(ecs::Entity entity)
 {
-    (void)registry;
     m_pendingRigidBodies.push_back(entity);
 }
 
@@ -306,35 +268,35 @@ void Scene::registerRigidBodies()
         return;
     }
 
-    for (entt::entity handle : m_pendingRigidBodies) {
-        if (!m_registry.valid(handle)) {
+    for (ecs::Entity entity : m_pendingRigidBodies) {
+        if (!m_registry.hasAll<RigidBodyComponent, TransformComponent>(entity)) {
             continue;
         }
 
-        Entity entity(handle, this);
-        auto [rigidBody, transform] = entity.tryGetComponents<RigidBodyComponent, TransformComponent>();
-        if (rigidBody == nullptr || transform == nullptr || rigidBody->bodyId.isValid()) {
+        const TransformComponent &transform = m_registry.read<TransformComponent>(entity);
+        auto rigidBody = m_registry.write<RigidBodyComponent>(entity);
+        if (rigidBody->bodyId.isValid()) {
             continue;
         }
 
         RigidBodyConfig config;
         config.shape = rigidBody->shape;
         if (rigidBody->shapeFromBounds) {
-            auto *meshComp = entity.tryGetComponent<MeshComponent>();
-            if (meshComp != nullptr && meshComp->mesh) {
-                BoundingBox bounds(meshComp->mesh->getBoundsMin(), meshComp->mesh->getBoundsMax());
-                glm::vec3 halfExtents = bounds.getExtents() * 0.5f * transform::scale(transform->world);
+            const MeshComponent *mesh = m_registry.tryRead<MeshComponent>(entity);
+            if (mesh != nullptr && mesh->mesh) {
+                BoundingBox bounds(mesh->mesh->getBoundsMin(), mesh->mesh->getBoundsMax());
+                glm::vec3 halfExtents = bounds.getExtents() * 0.5f * transform::scale(transform.world);
                 config.shape = PhysicsBoxShape{halfExtents};
             }
         }
-        config.position = transform::translation(transform->world);
-        config.rotation = transform::rotation(transform->world);
+        config.position = transform::translation(transform.world);
+        config.rotation = transform::rotation(transform.world);
         config.motionType = rigidBody->motionType;
         config.friction = rigidBody->friction;
         config.restitution = rigidBody->restitution;
         config.startActive = rigidBody->startActive;
 
-        rigidBody->bodyId = m_physics->createRigidBody(config, static_cast<uint64_t>(handle));
+        rigidBody->bodyId = m_physics->createRigidBody(config, static_cast<uint64_t>(entity));
     }
 
     m_pendingRigidBodies.clear();
@@ -343,8 +305,7 @@ void Scene::registerRigidBodies()
 void Scene::syncRigidBodyTransforms()
 {
     for (const PhysicsBodyState &state : m_physics->getActiveBodyStates()) {
-        Entity entity(static_cast<uint32_t>(state.userData), this);
-        Instance *instance = instanceFor(entity);
+        Instance *instance = instanceFor(static_cast<ecs::Entity>(state.userData));
         Node3D *node = instance != nullptr ? instance->as<Node3D>() : nullptr;
         if (node == nullptr) {
             continue;
@@ -354,9 +315,9 @@ void Scene::syncRigidBodyTransforms()
     }
 }
 
-Instance *Scene::instanceFor(Entity entity) const
+Instance *Scene::instanceFor(ecs::Entity entity) const
 {
-    const auto *ref = entity.tryGetComponent<InstanceComponent>();
+    const InstanceComponent *ref = m_registry.tryRead<InstanceComponent>(entity);
     return ref != nullptr ? ref->instance : nullptr;
 }
 
@@ -526,15 +487,15 @@ bool Scene::restoreFrom(ReadNode node)
     return true;
 }
 
-void Scene::registerBLAS(Entity &entity)
+void Scene::registerBLAS(ecs::Entity entity)
 {
-
     if (!m_tlas) {
         m_tlas = std::make_unique<TLAS>();
     }
 
-    auto [mesh, transform] = entity.tryGetComponents<MeshComponent, TransformComponent>();
-    if (!entity.hasComponent<RayTracedComponent>() || mesh == nullptr || transform == nullptr || !mesh->mesh) {
+    const MeshComponent *mesh = m_registry.tryRead<MeshComponent>(entity);
+    const TransformComponent *transform = m_registry.tryRead<TransformComponent>(entity);
+    if (!m_registry.has<RayTracedComponent>(entity) || mesh == nullptr || transform == nullptr || !mesh->mesh) {
         RP_CORE_ERROR("Entity cannot be ray traced");
         return;
     }
@@ -548,7 +509,7 @@ void Scene::registerBLAS(Entity &entity)
     TLASInstance instance;
     instance.blas = blas;
     instance.transform = transform->world;
-    instance.entityID = entity.getID();
+    instance.entityID = entity;
     m_tlas->addInstance(instance);
     m_tlasDirty = true;
 }
@@ -576,14 +537,11 @@ void Scene::updateTLAS()
     int instanceIndex = 0;
 
     for (auto &instance : instances) {
-        auto entity = Entity(instance.entityID, this);
+        const TransformComponent *transform = m_registry.tryRead<TransformComponent>(instance.entityID);
 
-        if (entity.isValid()) {
-            auto &transform = entity.getComponent<TransformComponent>();
-            if (transform.world != instance.transform) {
-                instance.transform = transform.world;
-                instanceUpdates.push_back({instanceIndex, transform.world});
-            }
+        if (transform != nullptr && transform->world != instance.transform) {
+            instance.transform = transform->world;
+            instanceUpdates.push_back({instanceIndex, transform->world});
         }
         instanceIndex++;
     }

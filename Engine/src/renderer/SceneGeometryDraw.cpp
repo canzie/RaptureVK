@@ -36,14 +36,10 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
     populated.clear();
 
     auto &registry = scene.getRegistry();
-    auto view = registry.view<TransformComponent, MeshComponent, MaterialComponent>();
 
-    for (auto entity : view) {
+    for (auto [entity, transform, meshComp, materialComp] :
+         registry.read<TransformComponent, MeshComponent, MaterialComponent>()) {
         RAPTURE_PROFILE_SCOPE("Populate Batch");
-
-        auto &transform = view.get<TransformComponent>(entity);
-        auto &meshComp = view.get<MeshComponent>(entity);
-        auto &materialComp = view.get<MaterialComponent>(entity);
 
         if (!meshComp.mesh || meshComp.isLoading) {
             continue;
@@ -54,7 +50,8 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
             continue;
         }
 
-        meshComp.updateWorldBoundingBox(transform);
+        // a bounding box derived from the transform is a cache, not a change to the mesh
+        registry.write<MeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
 
         if (frustum != nullptr && frustum->testBoundingBox(meshComp.worldBoundingBox) == FrustumResult::Outside) {
             continue;

@@ -79,14 +79,14 @@ void ComponentSignal::disconnect(uint32_t slotId)
     }
 }
 
-void ComponentSignal::fire(Registry &registry, Entity entity)
+void ComponentSignal::fire(Entity entity)
 {
     m_fireDepth++;
 
     size_t count = m_slots.size();
     for (size_t i = 0; i < count; i++) {
         if (m_slots[i].callback != nullptr) {
-            m_slots[i].callback(registry, entity);
+            m_slots[i].callback(entity);
         }
     }
 

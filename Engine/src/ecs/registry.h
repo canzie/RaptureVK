@@ -73,11 +73,41 @@ class Registry {
 
         ComponentPool<T> &pool = assurePool<T>();
         pool.emplace(entity, std::forward<Args>(args)...);
-        pool.getConstructSignal().fire(*this, entity);
+        pool.getConstructSignal().fire(entity);
 
         if constexpr (!ComponentPool<T>::IS_EMPTY) {
             return pool.get(entity);
         }
+    }
+
+    /**
+     * @brief Attaches a component, replacing it if the entity already has one.
+     * @param entity Entity to attach to, must be alive.
+     * @param args Arguments forwarded to T's constructor.
+     * @return Reference to the component, void for empty components.
+     */
+    template <typename T, typename... Args>
+    decltype(auto) set(Entity entity, Args &&...args)
+    {
+        if (has<T>(entity)) {
+            remove<T>(entity);
+        }
+        return add<T>(entity, std::forward<Args>(args)...);
+    }
+
+    /**
+     * @brief Detaches a component from an entity that may not have one.
+     * @param entity Entity to detach from.
+     * @return True if a component was removed.
+     */
+    template <typename T>
+    bool tryRemove(Entity entity)
+    {
+        if (!has<T>(entity)) {
+            return false;
+        }
+        remove<T>(entity);
+        return true;
     }
 
     /**
@@ -90,7 +120,7 @@ class Registry {
         RP_ASSERT(has<T>(entity), "entity does not have this component");
 
         ComponentPool<T> *pool = getPool<T>();
-        pool->getDestroySignal().fire(*this, entity);
+        pool->getDestroySignal().fire(entity);
 
         m_records[EntityIndex(entity)].components &= ~ComponentBit<T>();
         pool->remove(entity);
@@ -99,21 +129,41 @@ class Registry {
     /**
      * @brief Subscribes to T being attached to any entity, after the entity is complete.
      * @param callback Handler receiving the registry and the entity.
-     * @return Connection that unsubscribes when destroyed.
      */
     template <typename T>
-    SignalConnection onConstruct(ComponentSignal::Callback callback)
+    void onConstruct(ComponentSignal::Callback callback)
     {
-        return assurePool<T>().getConstructSignal().connect(std::move(callback));
+        m_ownedConnections.push_back(assurePool<T>().getConstructSignal().connect(std::move(callback)));
     }
 
     /**
      * @brief Subscribes to T leaving any entity, while the component can still be read.
      * @param callback Handler receiving the registry and the entity.
+     */
+    template <typename T>
+    void onDestroy(ComponentSignal::Callback callback)
+    {
+        m_ownedConnections.push_back(assurePool<T>().getDestroySignal().connect(std::move(callback)));
+    }
+
+    /**
+     * @brief Subscribes to T being attached, for a subscriber that can outlive its own interest.
+     * @param callback Handler receiving the registry and the entity.
      * @return Connection that unsubscribes when destroyed.
      */
     template <typename T>
-    SignalConnection onDestroy(ComponentSignal::Callback callback)
+    SignalConnection onConstructScoped(ComponentSignal::Callback callback)
+    {
+        return assurePool<T>().getConstructSignal().connect(std::move(callback));
+    }
+
+    /**
+     * @brief Subscribes to T leaving, for a subscriber that can outlive its own interest.
+     * @param callback Handler receiving the registry and the entity.
+     * @return Connection that unsubscribes when destroyed.
+     */
+    template <typename T>
+    SignalConnection onDestroyScoped(ComponentSignal::Callback callback)
     {
         return assurePool<T>().getDestroySignal().connect(std::move(callback));
     }
@@ -145,6 +195,20 @@ class Registry {
         }
         ComponentMask required = ComponentBits<Ts...>();
         return (m_records[EntityIndex(entity)].components & required) == required;
+    }
+
+    /**
+     * @brief Tests whether an entity holds any of the listed components.
+     * @param entity Entity to test.
+     * @return True if the entity is alive and holds at least one of Ts.
+     */
+    template <typename... Ts>
+    bool hasAny(Entity entity) const
+    {
+        if (!isValid(entity)) {
+            return false;
+        }
+        return (m_records[EntityIndex(entity)].components & ComponentBits<Ts...>()) != 0;
     }
 
     /**
@@ -183,7 +247,7 @@ class Registry {
     template <typename T>
     WriteScope<T> write(Entity entity)
     {
-        return write<T>(entity, ComponentTraits<T>::CHANGE_CHANNELS);
+        return write<T>(entity, COMPONENT_CHANNELS<T>);
     }
 
     /**
@@ -273,6 +337,7 @@ class Registry {
   private:
     std::vector<EntityRecord> m_records;
     std::vector<std::unique_ptr<ComponentPoolBase>> m_pools;
+    std::vector<SignalConnection> m_ownedConnections;
     Journal m_journal;
     uint32_t m_freeHead = ENTITY_FREE_LIST_END;
     uint32_t m_aliveCount = 0;

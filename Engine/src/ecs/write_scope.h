@@ -3,18 +3,27 @@
 
 #include "journal.h"
 
+#include <concepts>
+
 namespace Rapture {
 namespace ecs {
 
 /**
- * @brief Channels a component type invalidates when written, specialize per component type.
- *
- * The default records nothing, so a component only enters the journal once it says it should.
+ * @brief Satisfied by a component that declares what its writes invalidate.
  */
 template <typename T>
-struct ComponentTraits {
-    static constexpr ChangeMask CHANGE_CHANNELS = 0;
+concept DeclaresChannels = requires {
+    { T::CHANGE_CHANNELS } -> std::convertible_to<ChangeMask>;
 };
+
+/**
+ * @brief Channels a component type invalidates when written, zero unless it declares any.
+ */
+template <typename T>
+inline constexpr ChangeMask COMPONENT_CHANNELS = 0;
+
+template <DeclaresChannels T>
+inline constexpr ChangeMask COMPONENT_CHANNELS<T> = T::CHANGE_CHANNELS;
 
 /**
  * @brief Mutable access to one component, recorded in the journal when it goes out of scope.

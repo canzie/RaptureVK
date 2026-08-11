@@ -26,7 +26,7 @@ class DeferredRenderer : public Renderer {
     DeferredRenderer(RenderContext renderContext, const RendererConfig &config);
     ~DeferredRenderer() override;
 
-    void drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings) override;
+    void drawFrame(Scene &activeScene, ecs::EntityAccessor camera, const RenderSettings &settings) override;
     void onSwapChainRecreated() override;
     void resizeRenderTarget(uint32_t width, uint32_t height) override;
 
@@ -47,9 +47,10 @@ class DeferredRenderer : public Renderer {
      * @param settings Display overrides for this view
      * @return The context for this frame
      */
-    RenderPassContext buildPassContext(Scene &activeScene, Entity camera, uint32_t imageIndex, const RenderSettings &settings);
+    RenderPassContext buildPassContext(Scene &activeScene, ecs::EntityAccessor camera, uint32_t imageIndex,
+                                       const RenderSettings &settings);
 
-    void recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, Entity camera, uint32_t imageIndex,
+    void recordCommandBuffer(CommandBuffer *commandBuffer, Scene &activeScene, ecs::EntityAccessor camera, uint32_t imageIndex,
                              const RenderSettings &settings);
 
   private:

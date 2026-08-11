@@ -64,7 +64,6 @@ class DynamicDiffuseGI {
 
     void updateSkybox(Scene &scene);
     void updateProbeVolume(uint32_t frameIndex);
-    void updateFromIndirectLightingComponent(Scene &scene);
 
     // Get bindless indices for probe textures
     uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }

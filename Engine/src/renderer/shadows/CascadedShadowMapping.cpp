@@ -1,17 +1,17 @@
 #include "CascadedShadowMapping.h"
 
-#include "utils/EnginePaths.h"
 #include "buffers/descriptors/DescriptorManager.h"
+#include "utils/EnginePaths.h"
 
 #include "components/Components.h"
 #include "components/systems/Transforms.h"
-#include "modules/controllers/Controller.h"
 #include "generators/terrain/TerrainTypes.h"
-#include "scenes/instances/Camera3D.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
+#include "modules/controllers/Controller.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/ShadowCommon.h"
+#include "scenes/instances/Camera3D.h"
 #include "window_context/Application.h"
 
 #include <algorithm>
@@ -339,12 +339,8 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
     m_rc->descriptorManager->bindSet(2, commandBuffer, m_pipeline);
 
     // Get entities with TransformComponent and MeshComponent for rendering
-    auto view = registry.view<TransformComponent, MeshComponent>();
-
     // First pass: Populate MDI batches with mesh data
-    for (auto entity : view) {
-        auto &transform = view.get<TransformComponent>(entity);
-        auto &meshComp = view.get<MeshComponent>(entity);
+    for (auto [entity, transform, meshComp] : registry.read<TransformComponent, MeshComponent>()) {
 
         // Skip invalid or loading meshes
         if (!meshComp.mesh || meshComp.isLoading) {
@@ -357,7 +353,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
         }
 
         // Update world bounding box if transform changed
-        meshComp.updateWorldBoundingBox(transform);
+        registry.write<MeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
 
         // Get buffer allocation info to determine batch
         auto vboAlloc = meshComp.mesh->getVertexAllocation();

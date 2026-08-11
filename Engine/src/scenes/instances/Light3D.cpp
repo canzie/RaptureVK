@@ -45,19 +45,19 @@ void Light3D::setColor(const glm::vec3 &color)
 
 float Light3D::intensity() const
 {
-    const LightComponent *light = Light_tryGetLight(m_entity);
+    const LightComponent *light = Light_tryReadLight(m_entity);
     return light != nullptr ? light->intensity : 1.0f;
 }
 
 void Light3D::setIntensity(float intensity)
 {
-    LightComponent *light = Light_tryGetLight(m_entity);
+    LightComponent *light = Light_tryWriteLight(m_entity, ecs::ChannelBit(CHANNEL_LIGHT_PARAMS));
     if (light == nullptr) {
         return;
     }
 
     light->setIntensity(intensity);
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 bool Light3D::usesTemperature() const
@@ -115,52 +115,52 @@ glm::vec3 Light3D::kelvinToRgb(float kelvin)
 
 bool Light3D::isActive() const
 {
-    const LightComponent *light = Light_tryGetLight(m_entity);
+    const LightComponent *light = Light_tryReadLight(m_entity);
     return light != nullptr ? light->isActive : false;
 }
 
 void Light3D::setActive(bool active)
 {
-    LightComponent *light = Light_tryGetLight(m_entity);
+    LightComponent *light = Light_tryWriteLight(m_entity, ecs::ChannelBit(CHANNEL_LIGHT_PARAMS));
     if (light == nullptr) {
         return;
     }
 
     light->setActive(active);
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 Mobility Light3D::mobility() const
 {
-    const LightComponent *light = Light_tryGetLight(m_entity);
+    const LightComponent *light = Light_tryReadLight(m_entity);
     return light != nullptr ? light->mobility : MOBILITY_STATIC;
 }
 
 void Light3D::setMobility(Mobility mobility)
 {
-    if (Light_tryGetLight(m_entity) == nullptr) {
+    if (Light_tryReadLight(m_entity) == nullptr) {
         return;
     }
 
-    scene()->getRenderData()->setLightMobility(m_entity.getID(), mobility);
-    m_entity.markDirty();
+    scene()->getRenderData()->setLightMobility(m_entity.getEntity(), mobility);
+    markRenderDataDirty();
 }
 
 bool Light3D::castsShadow() const
 {
-    const LightComponent *light = Light_tryGetLight(m_entity);
+    const LightComponent *light = Light_tryReadLight(m_entity);
     return light != nullptr ? light->castsShadow : false;
 }
 
 void Light3D::applyColor()
 {
-    LightComponent *light = Light_tryGetLight(m_entity);
+    LightComponent *light = Light_tryWriteLight(m_entity, ecs::ChannelBit(CHANNEL_LIGHT_PARAMS));
     if (light == nullptr) {
         return;
     }
 
     light->setColor(m_usesTemperature ? m_color * kelvinToRgb(m_temperature) : m_color);
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 void Light3D::serialize(WriteNode node) const
@@ -179,7 +179,7 @@ void Light3D::serialize(WriteNode node) const
     light.set(KEY_MOBILITY, static_cast<uint64_t>(mobility()));
     light.set(KEY_CASTS_SHADOW, castsShadow());
 
-    const ShadowComponent *shadow = m_entity.tryGetComponent<ShadowComponent>();
+    const ShadowComponent *shadow = m_entity.tryRead<ShadowComponent>();
     if (shadow == nullptr) {
         return;
     }
@@ -234,7 +234,7 @@ void Light3D::applyShadowSettings(ReadNode node)
     shadow.isActive = shadowNode.child(KEY_ACTIVE).asBool(shadow.isActive);
     shadow.mobility = static_cast<Mobility>(shadowNode.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(shadow.mobility)));
 
-    m_entity.setComponent<ShadowComponent>(shadow);
+    m_entity.set<ShadowComponent>(shadow);
 }
 
 } // namespace Rapture

@@ -2,6 +2,7 @@
 
 #include "components/Components.h"
 #include "components/systems/Transforms.h"
+#include "renderer/SceneRenderData.h"
 #include "scenes/Scene.h"
 
 namespace Rapture {
@@ -54,7 +55,7 @@ static const glm::mat4 MAT4_IDENTITY = glm::mat4(1.0f);
 
 Node3D::Node3D(Scene &scene, std::string_view name) : Instance(scene, name)
 {
-    m_entity.setComponent<TransformComponent>();
+    m_entity.set<TransformComponent>();
 }
 
 const TypeInfo &Node3D::staticType()
@@ -82,13 +83,11 @@ void Node3D::setPosition(const glm::vec3 &position)
 {
     resolveLocal();
 
-    Entity entity = m_entity;
-    auto *component = entity.tryGetComponent<TransformComponent>();
-    if (component == nullptr) {
+    if (!m_entity.has<TransformComponent>()) {
         return;
     }
 
-    component->local[3] = glm::vec4(position, 1.0f);
+    m_entity.write<TransformComponent>()->local[3] = glm::vec4(position, 1.0f);
     updateWorldTransform();
 }
 
@@ -137,25 +136,23 @@ const glm::mat4 &Node3D::localTransform() const
 {
     resolveLocal();
 
-    const auto *component = m_entity.tryGetComponent<TransformComponent>();
+    const auto *component = m_entity.tryRead<TransformComponent>();
     return component != nullptr ? component->local : MAT4_IDENTITY;
 }
 
 void Node3D::setLocalTransform(const glm::mat4 &transform)
 {
-    Entity entity = m_entity;
-    auto *component = entity.tryGetComponent<TransformComponent>();
-    if (component == nullptr) {
+    if (!m_entity.has<TransformComponent>()) {
         return;
     }
 
-    component->local = transform;
+    m_entity.write<TransformComponent>()->local = transform;
     markLocalWritten();
 }
 
 const glm::mat4 &Node3D::worldTransform() const
 {
-    const auto *component = m_entity.tryGetComponent<TransformComponent>();
+    const auto *component = m_entity.tryRead<TransformComponent>();
     return component != nullptr ? component->world : MAT4_IDENTITY;
 }
 
@@ -167,18 +164,19 @@ void Node3D::setWorldTransform(const glm::mat4 &transform)
 
 void Node3D::setSimulatedWorldTransform(const glm::mat4 &transform)
 {
-    Entity entity = m_entity;
-    auto *component = entity.tryGetComponent<TransformComponent>();
-    if (component == nullptr) {
+    if (!m_entity.has<TransformComponent>()) {
         return;
     }
 
-    const Node3D *parent = parentNode();
-    component->world = transform;
-    component->local = parent != nullptr ? transform::toLocal(parent->worldTransform(), transform) : transform;
+    {
+        auto component = m_entity.write<TransformComponent>();
+        const Node3D *parent = parentNode();
+        component->world = transform;
+        component->local = parent != nullptr ? transform::toLocal(parent->worldTransform(), transform) : transform;
+    }
 
     m_dirtyMask = TRANSFORM_DIRTY_ROTATION_AND_SCALE;
-    entity.markDirty();
+    markRenderDataDirty();
 
     updateDescendantWorldTransforms(*this);
 }
@@ -201,15 +199,17 @@ void Node3D::updateWorldTransform()
 {
     resolveLocal();
 
-    Entity entity = m_entity;
-    auto *component = entity.tryGetComponent<TransformComponent>();
-    if (component == nullptr) {
+    if (!m_entity.has<TransformComponent>()) {
         return;
     }
 
-    const Node3D *parent = parentNode();
-    component->world = parent != nullptr ? parent->worldTransform() * component->local : component->local;
-    entity.markDirty();
+    {
+        auto component = m_entity.write<TransformComponent>();
+        const Node3D *parent = parentNode();
+        component->world = parent != nullptr ? parent->worldTransform() * component->local : component->local;
+    }
+
+    markRenderDataDirty();
 
     updateDescendantWorldTransforms(*this);
 }
@@ -238,7 +238,7 @@ void Node3D::resolveRotationAndScale() const
         return;
     }
 
-    const auto *component = m_entity.tryGetComponent<TransformComponent>();
+    const auto *component = m_entity.tryRead<TransformComponent>();
     if (component != nullptr) {
         m_rotation = transform::rotation(component->local);
         m_eulerRotation = glm::eulerAngles(m_rotation);
@@ -254,9 +254,8 @@ void Node3D::resolveLocal() const
         return;
     }
 
-    Entity entity = m_entity;
-    auto *component = entity.tryGetComponent<TransformComponent>();
-    if (component != nullptr) {
+    if (m_entity.has<TransformComponent>()) {
+        auto component = m_entity.write<TransformComponent>();
         component->local = transform::compose(transform::translation(component->local), m_rotation, m_scale);
     }
 

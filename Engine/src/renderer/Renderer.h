@@ -5,7 +5,7 @@
 #include "render_targets/SceneRenderTarget.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "renderer/RenderSettings.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 #include "window_context/vulkan_context/RenderContext.h"
 #include "window_context/vulkan_context/VulkanQueue.h"
 
@@ -32,7 +32,7 @@ class Renderer {
     Renderer(const Renderer &) = delete;
     Renderer &operator=(const Renderer &) = delete;
 
-    virtual void drawFrame(Scene &activeScene, Entity camera, const RenderSettings &settings) = 0;
+    virtual void drawFrame(Scene &activeScene, ecs::EntityAccessor camera, const RenderSettings &settings) = 0;
     virtual void onSwapChainRecreated() = 0;
 
     /**

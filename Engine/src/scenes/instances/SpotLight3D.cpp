@@ -14,7 +14,7 @@ static constexpr std::string_view KEY_OUTER_CONE_ANGLE = "outerConeAngle";
 
 SpotLight3D::SpotLight3D(Scene &scene, std::string_view name) : Light3D(scene, name)
 {
-    m_entity.setComponent<SpotLightComponent>();
+    m_entity.set<SpotLightComponent>();
     applyColor();
 }
 
@@ -31,71 +31,71 @@ const TypeInfo &SpotLight3D::type() const
 
 float SpotLight3D::range() const
 {
-    const auto *light = m_entity.tryGetComponent<SpotLightComponent>();
+    const auto *light = m_entity.tryRead<SpotLightComponent>();
     return light != nullptr ? light->range : 0.0f;
 }
 
 void SpotLight3D::setRange(float range)
 {
-    auto *light = m_entity.tryGetComponent<SpotLightComponent>();
-    if (light == nullptr) {
+    if (!m_entity.has<SpotLightComponent>()) {
         return;
     }
+    auto light = m_entity.write<SpotLightComponent>();
 
     light->range = range;
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 float SpotLight3D::innerConeAngle() const
 {
-    const auto *light = m_entity.tryGetComponent<SpotLightComponent>();
+    const auto *light = m_entity.tryRead<SpotLightComponent>();
     return light != nullptr ? light->innerConeAngle : 0.0f;
 }
 
 void SpotLight3D::setInnerConeAngle(float radians)
 {
-    auto *light = m_entity.tryGetComponent<SpotLightComponent>();
-    if (light == nullptr) {
+    if (!m_entity.has<SpotLightComponent>()) {
         return;
     }
+    auto light = m_entity.write<SpotLightComponent>();
 
     light->innerConeAngle = radians;
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 float SpotLight3D::outerConeAngle() const
 {
-    const auto *light = m_entity.tryGetComponent<SpotLightComponent>();
+    const auto *light = m_entity.tryRead<SpotLightComponent>();
     return light != nullptr ? light->outerConeAngle : 0.0f;
 }
 
 void SpotLight3D::setOuterConeAngle(float radians)
 {
-    auto *light = m_entity.tryGetComponent<SpotLightComponent>();
-    if (light == nullptr) {
+    if (!m_entity.has<SpotLightComponent>()) {
         return;
     }
+    auto light = m_entity.write<SpotLightComponent>();
 
     light->outerConeAngle = radians;
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 void SpotLight3D::setCastsShadow(bool castsShadow)
 {
-    auto *light = m_entity.tryGetComponent<SpotLightComponent>();
-    if (light == nullptr) {
+    if (!m_entity.has<SpotLightComponent>()) {
         return;
     }
+    auto light = m_entity.write<SpotLightComponent>();
 
     light->setCastsShadow(castsShadow);
 
     if (!castsShadow) {
-        m_entity.tryRemoveComponent<ShadowComponent>();
+        m_entity.tryRemove<ShadowComponent>();
         return;
     }
 
-    if (!m_entity.hasComponent<ShadowComponent>()) {
-        m_entity.setComponent<ShadowComponent>(SHADOW_MAP_SIZE);
+    if (!m_entity.has<ShadowComponent>()) {
+        m_entity.set<ShadowComponent>(SHADOW_MAP_SIZE);
     }
 }
 

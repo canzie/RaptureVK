@@ -150,7 +150,7 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     buildRenderMenu();
 
     if (m_selection != nullptr) {
-        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::Entity entity) {
+        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {
             m_selectedEntity = entity;
             if (!m_selectedEntity.isValid()) {
                 m_gizmo->reset();
@@ -479,7 +479,7 @@ void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
     Rapture::SceneQueryResult result = m_viewport->queryRegion(region);
     Rapture::EntityID id = s_nearestToCursor(result, px - region.x, py - region.y);
 
-    Rapture::Entity picked = id == Rapture::INVALID_ENTITY_ID ? Rapture::Entity() : Rapture::Entity(id, m_viewport->getScene());
+    Rapture::ecs::EntityAccessor picked = id == Rapture::INVALID_ENTITY_ID ? Rapture::ecs::EntityAccessor() : Rapture::ecs::EntityAccessor(id, &m_viewport->getScene()->getRegistry());
     if (m_selection != nullptr) {
         m_selection->select(picked);
     }
@@ -490,7 +490,7 @@ void ViewportPanel::updateGizmo()
     if (!m_selectedEntity.isValid()) {
         if (m_previousSelectedEntity.isValid()) {
             m_gizmo->reset();
-            m_previousSelectedEntity = Rapture::Entity();
+            m_previousSelectedEntity = Rapture::ecs::EntityAccessor();
         }
         return;
     }
@@ -500,7 +500,7 @@ void ViewportPanel::updateGizmo()
         m_previousSelectedEntity = m_selectedEntity;
     }
 
-    auto *meshComp = m_selectedEntity.tryGetComponent<Rapture::MeshComponent>();
+    const auto *meshComp = m_selectedEntity.tryRead<Rapture::MeshComponent>();
 
     if (m_viewport == nullptr) {
         return;
@@ -510,18 +510,18 @@ void ViewportPanel::updateGizmo()
         return;
     }
 
-    Rapture::Instance *instance = scene->instanceFor(m_selectedEntity);
+    Rapture::Instance *instance = scene->instanceFor(m_selectedEntity.getEntity());
     Rapture::Node3D *node = instance != nullptr ? instance->as<Rapture::Node3D>() : nullptr;
     if (node == nullptr) {
         return;
     }
 
     auto viewCamera = m_viewport->getCamera();
-    if (!viewCamera) {
+    if (!viewCamera.isValid()) {
         return;
     }
 
-    auto &camComp = viewCamera.getComponent<Rapture::CameraComponent>();
+    const auto &camComp = viewCamera.read<Rapture::CameraComponent>();
     glm::mat4 viewMatrix = camComp.camera.getViewMatrix();
     glm::mat4 projectionMatrix = camComp.camera.getProjectionMatrix();
     glm::mat4 objectTransform = node->worldTransform();

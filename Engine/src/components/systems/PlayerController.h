@@ -2,7 +2,7 @@
 #define RAPTURE__PLAYER_CONTROLLER_H
 
 #include "input/ControlInput.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 namespace Rapture {
 
@@ -21,7 +21,7 @@ class PlayerController {
      * @brief Possess a pawn for this controller to drive
      * @param pawn Pawn entity, needs a Transform
      */
-    void possess(Entity pawn);
+    void possess(ecs::EntityAccessor pawn);
 
     /**
      * @brief Release the currently possessed pawn
@@ -32,13 +32,13 @@ class PlayerController {
      * @brief Get the currently possessed pawn
      * @return The possessed pawn, or an invalid Entity if none
      */
-    Entity getPossessed() const { return m_pawn; }
+    ecs::EntityAccessor getPossessed() const { return m_pawn; }
 
     /**
      * @brief Set the camera this controller's look input drives
      * @param camera Camera entity
      */
-    void setCamera(Entity camera) { m_camera = camera; }
+    void setCamera(ecs::EntityAccessor camera) { m_camera = camera; }
 
     /**
      * @brief Advance the possessed pawn from this frame's intent
@@ -51,8 +51,8 @@ class PlayerController {
     float lookSensitivity = 0.2f;
 
   private:
-    Entity m_pawn;
-    Entity m_camera;
+    ecs::EntityAccessor m_pawn;
+    ecs::EntityAccessor m_camera;
 };
 
 } // namespace Rapture

@@ -4,8 +4,8 @@
 #include "asset_manager/AssetManager.h"
 #include "buffers/StorageBuffer.h"
 #include "buffers/command_buffers/CommandPool.h"
+#include "ecs/entity_accessor.h"
 #include "renderer/SceneGeometryDraw.h"
-#include "scenes/entities/Entity.h"
 #include "window_context/vulkan_context/RenderContext.h"
 
 #include <glm/glm.hpp>
@@ -106,8 +106,7 @@ class SceneQueryRenderer {
      * @param region The region to cover
      * @return The region's hits, empty where the query could not be rendered
      */
-    SceneQueryResult query(Scene &scene, Entity camera, uint32_t viewportWidth, uint32_t viewportHeight,
-                           const SceneQuery &region);
+    SceneQueryResult query(Scene &scene, ecs::EntityAccessor camera, uint32_t viewportWidth, uint32_t viewportHeight, const SceneQuery &region);
 
   private:
     void createPipeline();

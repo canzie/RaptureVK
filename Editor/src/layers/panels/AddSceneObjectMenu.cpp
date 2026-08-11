@@ -27,7 +27,7 @@ using MenuItem = std::unique_ptr<Amethyst::ContextMenu::ItemData>;
 static void s_announce(Rapture::Instance *added, EntitySelection &selection)
 {
     added->scene()->onHierarchyChanged.fire();
-    selection.select(added->entity());
+    selection.select(added->accessor());
 }
 
 static void s_append(std::vector<MenuItem> &items, uint32_t entryScopes, SceneObjectScope scope, std::string label,

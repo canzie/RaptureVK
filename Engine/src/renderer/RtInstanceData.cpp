@@ -10,7 +10,7 @@
 #include "materials/MaterialInstance.h"
 #include "materials/MaterialParameters.h"
 #include "meshes/Mesh.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 #include "window_context/Application.h"
 
 namespace Rapture {
@@ -59,23 +59,25 @@ void RtInstanceData::rebuild(Scene &scene)
 {
     auto tlas = scene.getTLAS();
     auto &tlasInstances = tlas->getInstances();
-    auto &reg = scene.getRegistry();
-    auto view = reg.view<MaterialComponent, MeshComponent, TransformComponent>(
-        entt::exclude<DirectionalLightComponent, PointLightComponent, SpotLightComponent>);
+    ecs::Registry &reg = scene.getRegistry();
+
+    auto isDrawable = [&reg](ecs::Entity entity) {
+        return reg.hasAll<MaterialComponent, MeshComponent, TransformComponent>(entity);
+    };
 
     std::vector<RtInstanceInfo> infos(tlas->getInstanceCount());
 
     for (uint32_t i = 0; i < tlasInstances.size(); ++i) {
         auto &inst = tlasInstances[i];
-        Entity ent = Entity(inst.entityID, &scene);
 
         RtInstanceInfo &info = infos[i];
         info = {};
 
-        if (view.contains(ent)) {
-            auto [meshComp, materialComp, transformComp] = view.get<MeshComponent, MaterialComponent, TransformComponent>(ent);
+        if (isDrawable(inst.entityID)) {
+            const MeshComponent &meshComp = reg.read<MeshComponent>(inst.entityID);
+            const MaterialComponent &materialComp = reg.read<MaterialComponent>(inst.entityID);
 
-            info.modelMatrix = transformComp.world;
+            info.modelMatrix = reg.read<TransformComponent>(inst.entityID).world;
 
             if (materialComp.material) {
                 info.materialIndex = materialComp.material->getBindlessIndex();
@@ -119,11 +121,11 @@ void RtInstanceData::rebuild(Scene &scene)
     m_entityToOffset.clear();
 
     for (uint32_t idx = 0; idx < infos.size(); ++idx) {
-        Entity ent = Entity(tlasInstances[idx].entityID, &scene);
-        if (view.contains(ent)) {
-            auto &materialComp = view.get<MaterialComponent>(ent);
+        ecs::Entity entity = tlasInstances[idx].entityID;
+        if (isDrawable(entity)) {
+            const MaterialComponent &materialComp = reg.read<MaterialComponent>(entity);
             if (materialComp.material) {
-                m_entityToOffset[ent.getID()] = idx * static_cast<uint32_t>(sizeof(RtInstanceInfo));
+                m_entityToOffset[entity] = idx * static_cast<uint32_t>(sizeof(RtInstanceInfo));
                 m_materialToOffsets[materialComp.material.get()].push_back(idx * static_cast<uint32_t>(sizeof(RtInstanceInfo)));
             }
         }
@@ -175,16 +177,16 @@ void RtInstanceData::patchDirty(Scene &scene)
         }
     }
 
-    // auto &reg = scene->getRegistry();
-    for (uint32_t entID : m_dirtyTransforms) {
-        auto it = m_entityToOffset.find(entID);
+    ecs::Registry &reg = scene.getRegistry();
+    for (ecs::Entity entity : m_dirtyTransforms) {
+        auto it = m_entityToOffset.find(entity);
         if (it == m_entityToOffset.end()) continue;
 
-        Entity ent = Entity(entID, &scene);
-        if (!ent.hasComponent<TransformComponent>()) continue;
+        const TransformComponent *transform = reg.tryRead<TransformComponent>(entity);
+        if (transform == nullptr) continue;
 
         uint32_t dst = it->second + static_cast<uint32_t>(TRANSFORM_OFFSET);
-        glm::mat4 model = ent.getComponent<TransformComponent>().world;
+        glm::mat4 model = transform->world;
         m_buffer->addData(&model, sizeof(glm::mat4), dst);
     }
 

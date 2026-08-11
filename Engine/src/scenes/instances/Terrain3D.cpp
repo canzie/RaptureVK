@@ -30,7 +30,7 @@ static TerrainConfig s_defaultConfig()
 
 Terrain3D::Terrain3D(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
-    m_entity.setComponent<TerrainComponent>(s_defaultConfig()).isEnabled = true;
+    m_entity.set<TerrainComponent>(s_defaultConfig()).isEnabled = true;
 }
 
 const TypeInfo &Terrain3D::staticType()
@@ -48,7 +48,7 @@ const TerrainConfig &Terrain3D::config() const
 {
     static const TerrainConfig s_empty;
 
-    const auto *terrain = m_entity.tryGetComponent<TerrainComponent>();
+    const auto *terrain = m_entity.tryRead<TerrainComponent>();
     if (terrain == nullptr || terrain->generator == nullptr) {
         return s_empty;
     }
@@ -58,26 +58,26 @@ const TerrainConfig &Terrain3D::config() const
 void Terrain3D::setConfig(const TerrainConfig &config)
 {
     // rebuilding runs the whole generator init again, so an unchanged config keeps the one already built
-    if (m_entity.hasComponent<TerrainComponent>() && this->config() == config) {
+    if (m_entity.has<TerrainComponent>() && this->config() == config) {
         return;
     }
 
     bool enabled = isEnabled();
-    m_entity.setComponent<TerrainComponent>(config).isEnabled = enabled;
+    m_entity.set<TerrainComponent>(config).isEnabled = enabled;
 }
 
 bool Terrain3D::isEnabled() const
 {
-    const auto *terrain = m_entity.tryGetComponent<TerrainComponent>();
+    const auto *terrain = m_entity.tryRead<TerrainComponent>();
     return terrain != nullptr && terrain->isEnabled;
 }
 
 void Terrain3D::setEnabled(bool enabled)
 {
-    auto *terrain = m_entity.tryGetComponent<TerrainComponent>();
-    if (terrain == nullptr) {
+    if (!m_entity.has<TerrainComponent>()) {
         return;
     }
+    auto terrain = m_entity.write<TerrainComponent>();
     terrain->isEnabled = enabled;
 }
 

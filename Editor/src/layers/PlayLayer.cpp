@@ -41,7 +41,7 @@ void PlayLayer::onAttach()
         return;
     }
 
-    m_viewport.setCamera(playCamera->entity());
+    m_viewport.setCamera(playCamera->accessor());
 }
 
 void PlayLayer::onDetach()
@@ -51,7 +51,7 @@ void PlayLayer::onDetach()
     m_input.reset();
 
     m_viewport.setCamera(m_editorCamera);
-    m_editorCamera = Rapture::Entity::null();
+    m_editorCamera = Rapture::ecs::EntityAccessor();
 
     m_world.stop();
 }

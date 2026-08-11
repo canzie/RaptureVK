@@ -1,7 +1,7 @@
 #include "ShadowMapping.h"
 
-#include "utils/EnginePaths.h"
 #include "buffers/descriptors/DescriptorManager.h"
+#include "utils/EnginePaths.h"
 
 #include "components/Components.h"
 #include "components/systems/Transforms.h"
@@ -101,17 +101,18 @@ void ShadowMap::transitionToShaderReadableLayout(CommandBuffer *commandBuffer)
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void ShadowMap::updateViewMatrix(Entity light, const TransformComponent &transformComp, const glm::vec3 &cameraPosition)
+void ShadowMap::updateViewMatrix(ecs::EntityAccessor light, const TransformComponent &transformComp,
+                                 const glm::vec3 &cameraPosition)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     LightType type = Light_getLightType(light);
     float range = 0.0f;
     float outerConeAngle = 0.0f;
-    if (auto *spot = light.tryGetComponent<SpotLightComponent>()) {
+    if (auto *spot = light.tryRead<SpotLightComponent>()) {
         range = spot->range;
         outerConeAngle = spot->outerConeAngle;
-    } else if (auto *point = light.tryGetComponent<PointLightComponent>()) {
+    } else if (auto *point = light.tryRead<PointLightComponent>()) {
         range = point->range;
     }
 
@@ -239,13 +240,8 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
 
     // Get entities with TransformComponent and MeshComponent for rendering
     auto &registry = activeScene.getRegistry();
-    auto view = registry.view<TransformComponent, MeshComponent>();
-
-    for (auto entity : view) {
+    for (auto [entity, transform, meshComp] : registry.read<TransformComponent, MeshComponent>()) {
         RAPTURE_PROFILE_SCOPE("Draw Shadow Mesh");
-
-        auto &transform = view.get<TransformComponent>(entity);
-        auto &meshComp = view.get<MeshComponent>(entity);
 
         // Skip invalid or loading meshes
         if (!meshComp.mesh || meshComp.isLoading) {
@@ -258,7 +254,7 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
         }
 
         // Update world bounding box if transform changed
-        meshComp.updateWorldBoundingBox(transform);
+        registry.write<MeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
 
         // Perform frustum culling
         if (m_frustum.testBoundingBox(meshComp.worldBoundingBox) == FrustumResult::Outside) {

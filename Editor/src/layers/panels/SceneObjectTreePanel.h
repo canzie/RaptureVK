@@ -8,7 +8,7 @@
 
 #include "events/EventSignal.h"
 #include "layers/panels/Panel.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 #include <cstdint>
 #include <vector>
@@ -65,7 +65,7 @@ class SceneObjectTreePanel : public Panel {
     void requestDelete(Rapture::Instance *instance);
     void applyPendingDelete(void);
 
-    void selectRowFor(Rapture::Entity entity);
+    void selectRowFor(Rapture::ecs::EntityAccessor entity);
 
     Rapture::Instance *instanceForRow(uint32_t row) const;
 

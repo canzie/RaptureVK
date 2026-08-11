@@ -75,7 +75,7 @@ void EditorLayer::syncViewportControls()
         control.camera->setFieldOfView(EDITOR_CAMERA_FOV);
         control.camera->setNearPlane(EDITOR_CAMERA_NEAR_PLANE);
         control.camera->setFarPlane(EDITOR_CAMERA_FAR_PLANE);
-        viewport->setCamera(control.camera->entity());
+        viewport->setCamera(control.camera->accessor());
         control.controller = std::make_unique<Rapture::CameraController>();
         control.controller->possess(control.camera.get());
 

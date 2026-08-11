@@ -12,7 +12,7 @@ static constexpr std::string_view KEY_RANGE = "range";
 
 PointLight3D::PointLight3D(Scene &scene, std::string_view name) : Light3D(scene, name)
 {
-    m_entity.setComponent<PointLightComponent>();
+    m_entity.set<PointLightComponent>();
     applyColor();
 }
 
@@ -29,37 +29,37 @@ const TypeInfo &PointLight3D::type() const
 
 float PointLight3D::range() const
 {
-    const auto *light = m_entity.tryGetComponent<PointLightComponent>();
+    const auto *light = m_entity.tryRead<PointLightComponent>();
     return light != nullptr ? light->range : 0.0f;
 }
 
 void PointLight3D::setRange(float range)
 {
-    auto *light = m_entity.tryGetComponent<PointLightComponent>();
-    if (light == nullptr) {
+    if (!m_entity.has<PointLightComponent>()) {
         return;
     }
+    auto light = m_entity.write<PointLightComponent>();
 
     light->range = range;
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 void PointLight3D::setCastsShadow(bool castsShadow)
 {
-    auto *light = m_entity.tryGetComponent<PointLightComponent>();
-    if (light == nullptr) {
+    if (!m_entity.has<PointLightComponent>()) {
         return;
     }
+    auto light = m_entity.write<PointLightComponent>();
 
     light->setCastsShadow(castsShadow);
 
     if (!castsShadow) {
-        m_entity.tryRemoveComponent<ShadowComponent>();
+        m_entity.tryRemove<ShadowComponent>();
         return;
     }
 
-    if (!m_entity.hasComponent<ShadowComponent>()) {
-        m_entity.setComponent<ShadowComponent>(SHADOW_MAP_SIZE);
+    if (!m_entity.has<ShadowComponent>()) {
+        m_entity.set<ShadowComponent>(SHADOW_MAP_SIZE);
     }
 }
 

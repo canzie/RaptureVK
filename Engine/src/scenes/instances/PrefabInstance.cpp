@@ -12,7 +12,7 @@ static constexpr std::string_view KEY_SOURCE = "source";
 
 PrefabInstance::PrefabInstance(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
-    m_entity.setComponent<PrefabComponent>();
+    m_entity.set<PrefabComponent>();
 }
 
 const TypeInfo &PrefabInstance::staticType()
@@ -38,10 +38,10 @@ void PrefabInstance::setPrefab(AssetHandle _prefab)
         return;
     }
 
-    auto *component = m_entity.tryGetComponent<PrefabComponent>();
-    if (component == nullptr) {
+    if (!m_entity.has<PrefabComponent>()) {
         return;
     }
+    auto component = m_entity.write<PrefabComponent>();
 
     component->sourcePrefab = AssetPtr<Prefab>(std::move(ref));
     m_prefab = _prefab;

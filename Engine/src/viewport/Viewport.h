@@ -7,7 +7,7 @@
 #include "renderer/SceneQueryRenderer.h"
 #include "renderer/common.h"
 #include "scenes/Scene.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 #include "window_context/vulkan_context/RenderContext.h"
 
 #include <cstdint>
@@ -42,8 +42,8 @@ class Viewport {
     void setScene(Scene *scene);
     Scene *getScene() const { return m_scene; }
 
-    void setCamera(Entity camera);
-    Entity getCamera() const { return m_camera; }
+    void setCamera(ecs::EntityAccessor camera);
+    ecs::EntityAccessor getCamera() const { return m_camera; }
 
     /**
      * @brief Editor-only conveniences attached to this viewport, not required for rendering
@@ -108,7 +108,7 @@ class Viewport {
     RendererType m_rendererType = RendererType::DEFERRED;
 
     Scene *m_scene = nullptr;
-    Entity m_camera;
+    ecs::EntityAccessor m_camera;
     EditorBinding m_editorBinding;
     RenderSettings m_renderSettings;
 

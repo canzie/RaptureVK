@@ -45,7 +45,7 @@ class SignalConnection {
  */
 class ComponentSignal {
   public:
-    using Callback = std::function<void(Registry &registry, Entity entity)>;
+    using Callback = std::function<void(Entity entity)>;
 
     /**
      * @brief Subscribes to this signal.
@@ -62,10 +62,9 @@ class ComponentSignal {
 
     /**
      * @brief Runs every handler.
-     * @param registry Registry the entity belongs to.
      * @param entity Entity the component was attached to or is about to leave.
      */
-    void fire(Registry &registry, Entity entity);
+    void fire(Entity entity);
 
     bool isEmpty() const;
 

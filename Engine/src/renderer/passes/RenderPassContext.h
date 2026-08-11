@@ -1,7 +1,7 @@
 #ifndef RAPTURE__RENDER_PASS_CONTEXT_H
 #define RAPTURE__RENDER_PASS_CONTEXT_H
 
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 #include <cstdint>
 
@@ -38,7 +38,7 @@ struct RenderPassTargets {
  */
 struct RenderPassContext {
     Scene *scene = nullptr;
-    Entity camera;
+    ecs::EntityAccessor camera;
     SceneRenderTarget *renderTarget = nullptr;
     const RenderPassTargets *targets = nullptr;
     const RenderSettings *settings = nullptr;

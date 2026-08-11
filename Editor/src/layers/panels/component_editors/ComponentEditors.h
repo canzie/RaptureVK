@@ -21,7 +21,7 @@ class Node3DEditor : public ComponentEditorBase {
     const char *title() const override { return "Transform"; }
     const char *icon() const override { return Icons::SVG_TRANSFORM; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     void apply(int row);
@@ -35,7 +35,7 @@ class Light3DEditor : public ComponentEditorBase {
     const char *title() const override { return "Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     glm::vec3 m_color = glm::vec3(1.0f);
@@ -55,7 +55,7 @@ class DirectionalLight3DEditor : public ComponentEditorBase {
     const char *title() const override { return "Directional Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     bool m_atmosphereSun = false;
@@ -67,7 +67,7 @@ class PointLight3DEditor : public ComponentEditorBase {
     const char *title() const override { return "Point Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     float m_range = 10.0f;
@@ -79,7 +79,7 @@ class SpotLight3DEditor : public ComponentEditorBase {
     const char *title() const override { return "Spot Light"; }
     const char *icon() const override { return Icons::SVG_LIGHT; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     float m_range = 10.0f;
@@ -98,7 +98,7 @@ class StubEditor : public ComponentEditorBase {
     const char *icon() const override { return m_icon; }
     float bodyHeight() const override { return 36.0f; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override { (void)entity; }
+    void sync(const Rapture::ecs::EntityAccessor &entity) override { (void)entity; }
 
   private:
     const char *m_title;
@@ -110,7 +110,7 @@ class Mesh3DEditor : public ComponentEditorBase {
     const char *title() const override { return "Mesh"; }
     const char *icon() const override { return Icons::SVG_MESH; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     bool m_isVisible = true;
@@ -125,7 +125,7 @@ class Camera3DEditor : public ComponentEditorBase {
     const char *title() const override { return "Camera"; }
     const char *icon() const override { return Icons::SVG_CAMERA; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     float m_fieldOfView = 45.0f;
@@ -139,12 +139,12 @@ class ShadowEditor : public ComponentEditorBase {
     const char *title() const override { return "Shadow"; }
     const char *icon() const override { return ""; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     bool m_isActive = true;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
-    Rapture::Entity m_entity;
+    Rapture::ecs::EntityAccessor m_entity;
 };
 
 class CascadedShadowEditor : public ComponentEditorBase {
@@ -152,13 +152,13 @@ class CascadedShadowEditor : public ComponentEditorBase {
     const char *title() const override { return "Cascaded Shadow"; }
     const char *icon() const override { return ""; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     bool m_isActive = true;
     float m_lambda = 0.5f;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
-    Rapture::Entity m_entity;
+    Rapture::ecs::EntityAccessor m_entity;
 };
 
 class EnvironmentEditor : public ComponentEditorBase {
@@ -166,7 +166,7 @@ class EnvironmentEditor : public ComponentEditorBase {
     const char *title() const override { return "Environment"; }
     const char *icon() const override { return ""; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
-    void sync(const Rapture::Entity &entity) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
 
   private:
     void pushAtmosphere();

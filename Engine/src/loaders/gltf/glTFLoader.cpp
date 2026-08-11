@@ -18,7 +18,6 @@
 #include "asset_manager/ReservedAssets.h"
 #include "buffers/BufferLayout.h"
 #include "components/Components.h"
-#include "components/HierarchyComponent.h"
 #include "materials/Material.h"
 #include "materials/MaterialInstance.h"
 #include "materials/MaterialParameters.h"
@@ -26,7 +25,7 @@
 #include "materials/graph/MaterialGraphCompiler.h"
 #include "materials/graph/SurfaceGraphManager.h"
 #include "meshes/Mesh.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 namespace Rapture {
 

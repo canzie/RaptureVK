@@ -61,10 +61,10 @@ void CameraController::update(float dt, const ControlInput &input)
         return;
     }
 
-    auto *camera = m_viewCamera->entity().tryGetComponent<CameraComponent>();
-    if (camera == nullptr) {
+    if (!m_viewCamera->accessor().has<CameraComponent>()) {
         return;
     }
+    auto camera = m_viewCamera->accessor().write<CameraComponent>();
 
     if (input.releaseControl) {
         setMode(CameraControlMode::ORBIT);

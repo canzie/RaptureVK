@@ -10,7 +10,7 @@
 #include "buffers/command_buffers/CommandPool.h"
 #include "buffers/descriptors/DescriptorSet.h"
 #include "scenes/Scene.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 #include "renderer/passes/RenderPass.h"
 #include "textures/Texture.h"

@@ -9,7 +9,6 @@ namespace Rapture {
 
 class Scene;
 class World;
-class Entity;
 class SwapChain;
 
 using EventListenerId = size_t;

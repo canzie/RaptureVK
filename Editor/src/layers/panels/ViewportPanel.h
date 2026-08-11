@@ -10,7 +10,7 @@
 
 #include "events/EventSignal.h"
 #include "layers/panels/Panel.h"
-#include "scenes/entities/Entity.h"
+#include "ecs/entity_accessor.h"
 
 #include <cstdint>
 #include <math/math.h>
@@ -107,8 +107,8 @@ class ViewportPanel : public Panel {
     Amethyst::GizmoOperation m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE;
     Amethyst::GizmoSpace m_gizmoSpace = Amethyst::GizmoSpace::WORLD;
 
-    Rapture::Entity m_selectedEntity;
-    Rapture::Entity m_previousSelectedEntity;
+    Rapture::ecs::EntityAccessor m_selectedEntity;
+    Rapture::ecs::EntityAccessor m_previousSelectedEntity;
     Rapture::EventConnection m_selectionChangedConn;
     Amethyst::vec2 m_lastViewportSize = {};
     Amethyst::vec2 m_pendingViewportSize = {};

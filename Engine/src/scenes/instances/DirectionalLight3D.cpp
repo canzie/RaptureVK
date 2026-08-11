@@ -21,7 +21,7 @@ static constexpr std::string_view KEY_MOBILITY = "mobility";
 
 DirectionalLight3D::DirectionalLight3D(Scene &scene, std::string_view name) : Light3D(scene, name)
 {
-    m_entity.setComponent<DirectionalLightComponent>();
+    m_entity.set<DirectionalLightComponent>();
     applyColor();
 }
 
@@ -38,37 +38,37 @@ const TypeInfo &DirectionalLight3D::type() const
 
 bool DirectionalLight3D::isAtmosphereSun() const
 {
-    const auto *light = m_entity.tryGetComponent<DirectionalLightComponent>();
+    const auto *light = m_entity.tryRead<DirectionalLightComponent>();
     return light != nullptr ? light->atmosphereSunLight : false;
 }
 
 void DirectionalLight3D::setAtmosphereSun(bool atmosphereSun)
 {
-    auto *light = m_entity.tryGetComponent<DirectionalLightComponent>();
-    if (light == nullptr) {
+    if (!m_entity.has<DirectionalLightComponent>()) {
         return;
     }
+    auto light = m_entity.write<DirectionalLightComponent>();
 
     light->atmosphereSunLight = atmosphereSun;
-    m_entity.markDirty();
+    markRenderDataDirty();
 }
 
 void DirectionalLight3D::setCastsShadow(bool castsShadow)
 {
-    auto *light = m_entity.tryGetComponent<DirectionalLightComponent>();
-    if (light == nullptr) {
+    if (!m_entity.has<DirectionalLightComponent>()) {
         return;
     }
+    auto light = m_entity.write<DirectionalLightComponent>();
 
     light->setCastsShadow(castsShadow);
 
     if (!castsShadow) {
-        m_entity.tryRemoveComponent<CascadedShadowComponent>();
+        m_entity.tryRemove<CascadedShadowComponent>();
         return;
     }
 
-    if (!m_entity.hasComponent<CascadedShadowComponent>()) {
-        m_entity.setComponent<CascadedShadowComponent>(CASCADED_SHADOW_MAP_SIZE, CASCADE_COUNT, CASCADE_LAMBDA);
+    if (!m_entity.has<CascadedShadowComponent>()) {
+        m_entity.set<CascadedShadowComponent>(CASCADED_SHADOW_MAP_SIZE, CASCADE_COUNT, CASCADE_LAMBDA);
     }
 }
 
@@ -79,7 +79,7 @@ void DirectionalLight3D::serialize(WriteNode node) const
     WriteNode light = node.addObject(KEY_DIRECTIONAL_LIGHT);
     light.set(KEY_ATMOSPHERE_SUN, isAtmosphereSun());
 
-    const CascadedShadowComponent *shadow = m_entity.tryGetComponent<CascadedShadowComponent>();
+    const CascadedShadowComponent *shadow = m_entity.tryRead<CascadedShadowComponent>();
     if (shadow == nullptr) {
         return;
     }
@@ -120,7 +120,7 @@ void DirectionalLight3D::applyShadowSettings(ReadNode node)
     shadow.isActive = shadowNode.child(KEY_ACTIVE).asBool(shadow.isActive);
     shadow.mobility = static_cast<Mobility>(shadowNode.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(shadow.mobility)));
 
-    m_entity.setComponent<CascadedShadowComponent>(shadow);
+    m_entity.set<CascadedShadowComponent>(shadow);
 }
 
 } // namespace Rapture
