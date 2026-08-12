@@ -6,9 +6,11 @@
 #include "components/ChangeChannels.h"
 #include "ecs/entity_accessor.h"
 #include "events/EventSignal.h"
+#include "scenes/TickPhase.h"
 #include "scenes/entities/EntityCommon.h"
 #include "serialization/SerialDocument.h"
 #include "utils/FreeList.h"
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -20,6 +22,7 @@ namespace Rapture {
 class Camera3D;
 class Controller;
 class Environment;
+class Instance;
 class SceneComponent;
 class SceneObject;
 class SceneRenderData;
@@ -110,17 +113,31 @@ class Scene {
     void destroyInstance(SceneObject *instance);
 
     /**
-     * @brief Takes a slot in the list walked each update
-     * @param component The component to start updating
-     * @return The slot the component was put in
+     * @brief A slot in none of the tick lists
      */
-    uint32_t addUpdatingComponent(SceneComponent *component);
+    static constexpr uint32_t INVALID_TICK_SLOT = UINT32_MAX;
 
     /**
-     * @brief Releases a slot in the list walked each update
-     * @param slot The slot to free
+     * @brief Takes a slot in the list walked during one phase of each update
+     * @param instance The instance to start ticking
+     * @param phase The phase to tick it in
+     * @return The slot the instance was put in
      */
-    void removeUpdatingComponent(uint32_t slot);
+    uint32_t registerTick(Instance *instance, TickPhase phase);
+
+    /**
+     * @brief Releases a slot in a phase's tick list
+     * @param slot The slot to free
+     * @param phase The phase the slot was taken in
+     */
+    void unregisterTick(uint32_t slot, TickPhase phase);
+
+    /**
+     * @brief Updates every instance registered in one phase
+     * @param phase The phase to run
+     * @param dt Seconds since the last update
+     */
+    void runTickPhase(TickPhase phase, float dt);
 
     /**
      * @brief Writes the scene's settings and its whole instance tree
@@ -210,9 +227,9 @@ class Scene {
     std::shared_ptr<TLAS> m_tlas;
     bool m_tlasDirty = false;
 
-    // declared last so its subtree tears down before anything destroyEntity touches
-    FreeList<SceneComponent *> m_updatingComponents;
+    std::array<FreeList<Instance *>, TICK_COUNT> m_ticking;
 
+    // declared last so its subtree tears down before anything destroyEntity touches
     std::unique_ptr<SceneObject> m_root;
 
     friend class Environment;

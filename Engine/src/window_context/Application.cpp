@@ -6,7 +6,6 @@
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
 #include "materials/Material.h"
-#include "modules/ModuleRegistry.h"
 #include "scenes/instances/InstanceRegistry.h"
 #include "utils/EnginePaths.h"
 #include "utils/Timestep.h"
@@ -79,7 +78,6 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     JobSystem::init();
     InstanceRegistry::init();
-    ModuleRegistry::init();
 
     m_project = Project::empty();
 
@@ -120,7 +118,6 @@ Application::~Application()
     // Shutdown the event system and clear all listeners
     EventRegistry::getInstance().shutdown();
 
-    ModuleRegistry::shutdown();
     InstanceRegistry::shutdown();
     JobSystem::shutdown();
 

@@ -5,11 +5,16 @@
 #include "layers/panels/components/asset_visuals.h"
 #include "layers/panels/components/context_menus.h"
 #include "logging/Log.h"
-#include "modules/ModuleRegistry.h"
-#include "modules/controllers/CameraController.h"
-#include "modules/controllers/PlayerController.h"
-#include "modules/puppets/Puppet.h"
 #include "scenes/Project.h"
+#include "scenes/instances/Camera3D.h"
+#include "scenes/instances/DirectionalLight3D.h"
+#include "scenes/instances/InstanceRegistry.h"
+#include "scenes/instances/PointLight3D.h"
+#include "scenes/instances/SpotLight3D.h"
+#include "scenes/instances/SpringArm3D.h"
+#include "scenes/instances/StaticMesh3D.h"
+#include "scenes/instances/controllers/CameraController.h"
+#include "scenes/instances/controllers/PlayerController.h"
 #include "scenes/World.h"
 #include "ecs/entity_accessor.h"
 #include "window_context/Application.h"
@@ -69,7 +74,7 @@ static std::string s_assetFileName(std::string_view name)
 // an authored asset is labelled with the class it holds, every other asset with its type
 static std::string s_typeLabel(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass)
 {
-    if (authoredClass != nullptr && (type == Rapture::ASSET_MODULE || type == Rapture::ASSET_SCENE_OBJECT)) {
+    if (authoredClass != nullptr && type == Rapture::ASSET_SCENE_OBJECT) {
         return std::string(authoredClass->name);
     }
     return Rapture::AssetTypeToString(type);
@@ -576,8 +581,6 @@ MenuItems ContentBrowserPanel::buildAddMenuItems()
 
     items.push_back(ViewportContextMenuSID::create("Create Basic Asset"));
     items.push_back(
-        AddAssetContextMenuAID::createAssetRow("Module Class", Rapture::ASSET_MODULE, []() { s_createAssetStub("module class"); }));
-    items.push_back(
         AddAssetContextMenuAID::createAssetRow("Material", Rapture::ASSET_MATERIAL, []() { s_createAssetStub("material"); }));
     items.push_back(AddAssetContextMenuAID::createAssetRow("World", Rapture::ASSET_WORLD, []() { s_createAssetStub("world"); }));
 
@@ -591,23 +594,28 @@ MenuItems ContentBrowserPanel::buildAddMenuItems()
 
 MenuItems ContentBrowserPanel::buildAdvancedAddItems()
 {
+    // a row is labelled with the class it creates, so a class is named once and never relabelled
+    auto appendClass = [this](MenuItems &into, const Rapture::TypeInfo &type) {
+        into.push_back(AddAssetContextMenuAID::createPlainRow(
+            std::string(type.name), [this, &type]() { beginCreate(CONTENT_EDIT_SCENE_OBJECT, &type); }));
+    };
+
     MenuItems controllers;
-    controllers.push_back(AddAssetContextMenuAID::createPlainRow(
-        "Camera Controller", [this]() { beginCreate(CONTENT_EDIT_MODULE, &Rapture::CameraController::staticType()); }));
-    controllers.push_back(AddAssetContextMenuAID::createPlainRow(
-        "Player Controller", [this]() { beginCreate(CONTENT_EDIT_MODULE, &Rapture::PlayerController::staticType()); }));
+    appendClass(controllers, Rapture::CameraController::staticType());
+    appendClass(controllers, Rapture::PlayerController::staticType());
 
-    MenuItems puppets;
-    puppets.push_back(
-        AddAssetContextMenuAID::createPlainRow("Puppet", [this]() { beginCreate(CONTENT_EDIT_MODULE, &Rapture::Puppet::staticType()); }));
-
-    MenuItems modules;
-    modules.push_back(Amethyst::makeSubmenuItem("Controllers", std::move(controllers)));
-    modules.push_back(Amethyst::makeSubmenuItem("Puppets", std::move(puppets)));
+    MenuItems lights;
+    appendClass(lights, Rapture::DirectionalLight3D::staticType());
+    appendClass(lights, Rapture::PointLight3D::staticType());
+    appendClass(lights, Rapture::SpotLight3D::staticType());
 
     MenuItems scenes;
     scenes.push_back(AddAssetContextMenuAID::createPlainRow("Level", []() { s_createAssetStub("level"); }));
-    scenes.push_back(AddAssetContextMenuAID::createPlainRow("Scene Object", []() { s_createAssetStub("sceneobject"); }));
+    appendClass(scenes, Rapture::StaticMesh3D::staticType());
+    appendClass(scenes, Rapture::Camera3D::staticType());
+    appendClass(scenes, Rapture::SpringArm3D::staticType());
+    scenes.push_back(Amethyst::makeSubmenuItem("Lights", std::move(lights)));
+    scenes.push_back(Amethyst::makeSubmenuItem("Controllers", std::move(controllers)));
 
     MenuItems shaders;
     shaders.push_back(AddAssetContextMenuAID::createPlainRow("Compute Shader", []() { s_createAssetStub("compute shader"); }));
@@ -618,7 +626,6 @@ MenuItems ContentBrowserPanel::buildAdvancedAddItems()
     textures.push_back(AddAssetContextMenuAID::createPlainRow("Cubemap", []() { s_createAssetStub("cubemap"); }));
 
     MenuItems items;
-    items.push_back(Amethyst::makeSubmenuItem("Modules", std::move(modules)));
     items.push_back(Amethyst::makeSubmenuItem("Scenes", std::move(scenes)));
     items.push_back(Amethyst::makeSubmenuItem("Shaders", std::move(shaders)));
     items.push_back(Amethyst::makeSubmenuItem("Textures", std::move(textures)));
@@ -626,18 +633,18 @@ MenuItems ContentBrowserPanel::buildAdvancedAddItems()
     return items;
 }
 
-void ContentBrowserPanel::beginCreate(ContentEditKind kind, const Rapture::TypeInfo *moduleType)
+void ContentBrowserPanel::beginCreate(ContentEditKind kind, const Rapture::TypeInfo *objectClass)
 {
-    if (kind == CONTENT_EDIT_MODULE && moduleType == nullptr) {
-        RP_ERROR("a module needs a class to create");
+    if (kind == CONTENT_EDIT_SCENE_OBJECT && objectClass == nullptr) {
+        RP_ERROR("a scene object asset needs a class to create");
         return;
     }
 
     m_edit = {};
     m_edit.kind = kind;
-    m_edit.moduleType = moduleType;
+    m_edit.objectClass = objectClass;
     m_edit.initialName = kind == CONTENT_EDIT_FOLDER ? s_uniqueFolderName(m_currentDirectory)
-                                                     : s_uniqueAssetName(m_currentDirectory, moduleType->name);
+                                                     : s_uniqueAssetName(m_currentDirectory, objectClass->name);
     refresh();
 }
 
@@ -695,8 +702,8 @@ void ContentBrowserPanel::commitEdit()
         case CONTENT_EDIT_FOLDER:
             createFolder(name);
             break;
-        case CONTENT_EDIT_MODULE:
-            createModule(*edit.moduleType, name);
+        case CONTENT_EDIT_SCENE_OBJECT:
+            createSceneObject(*edit.objectClass, name);
             break;
         case CONTENT_EDIT_RENAME:
             renameItem(edit.target, name);
@@ -709,21 +716,28 @@ void ContentBrowserPanel::commitEdit()
     refresh();
 }
 
-void ContentBrowserPanel::createModule(const Rapture::TypeInfo &type, std::string_view name)
+void ContentBrowserPanel::createSceneObject(const Rapture::TypeInfo &type, std::string_view name)
 {
-    std::unique_ptr<Rapture::ModuleClass> module = Rapture::ModuleRegistry::create(type.name);
-    if (module == nullptr) {
-        RP_ERROR("'{}' is not a registered module class", type.name);
+    // objects only exist inside a scene, so the asset is written from one built to be thrown away
+    Rapture::Scene authoring{std::string(name)};
+    Rapture::SceneObject *root = Rapture::InstanceRegistry::createObject(type.name, authoring, name).release();
+    if (root == nullptr) {
+        RP_ERROR("'{}' is not a registered scene object class", type.name);
         return;
     }
+    authoring.root()->addChild(std::unique_ptr<Rapture::SceneObject>(root));
+
+    auto document = std::make_unique<Rapture::SerialDocument>();
+    root->serialize(document->root());
+    document->freeze();
 
     Rapture::AssetImportDataRequest request;
-    request.data = Rapture::ModuleImportData{std::move(module)};
+    request.data = Rapture::SceneObjectImportData{std::move(document)};
     request.output = m_currentDirectory;
     request.name = std::string(name);
 
     if (!Rapture::AssetManager::importAsset(std::move(request))) {
-        RP_ERROR("Could not create a '{}' module named '{}' in '{}'", type.name, name, m_currentDirectory.string());
+        RP_ERROR("Could not create a '{}' named '{}' in '{}'", type.name, name, m_currentDirectory.string());
     }
 }
 
@@ -767,7 +781,7 @@ void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::u
 // the asset types that have a workspace to open in
 static bool s_opensInWorkspace(Rapture::AssetType type)
 {
-    return type == Rapture::ASSET_MODULE || type == Rapture::ASSET_MATERIAL_INSTANCE;
+    return type == Rapture::ASSET_SCENE_OBJECT || type == Rapture::ASSET_MATERIAL_INSTANCE;
 }
 
 std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPanel::assetActions(Rapture::AssetType type,
@@ -996,7 +1010,7 @@ void ContentBrowserPanel::refreshFileBrowser()
         index++;
     }
 
-    if (m_edit.kind == CONTENT_EDIT_FOLDER || m_edit.kind == CONTENT_EDIT_MODULE) {
+    if (m_edit.kind == CONTENT_EDIT_FOLDER || m_edit.kind == CONTENT_EDIT_SCENE_OBJECT) {
         auto &item = acquirePoolItem(index);
         item.container->setBaseProperties({.layoutOrder = static_cast<uint32_t>(index)});
         item.action->onMouseButton1ClickCb = nullptr;
@@ -1007,12 +1021,12 @@ void ContentBrowserPanel::refreshFileBrowser()
             item.typeBar->setBaseProperties({.visible = false});
             item.type->setBaseProperties({.visible = false});
         } else {
-            item.icon->setSvg(Asset_iconForType(Rapture::ASSET_MODULE, m_edit.moduleType));
+            item.icon->setSvg(Asset_iconForType(Rapture::ASSET_SCENE_OBJECT, m_edit.objectClass));
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});
             item.typeBar->setBaseProperties({.visible = true});
-            item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(Rapture::ASSET_MODULE)});
+            item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(Rapture::ASSET_SCENE_OBJECT)});
             item.type->setBaseProperties({.visible = true});
-            item.type->setText(s_typeLabel(Rapture::ASSET_MODULE, m_edit.moduleType));
+            item.type->setText(s_typeLabel(Rapture::ASSET_SCENE_OBJECT, m_edit.objectClass));
         }
 
         m_edit.itemIndex = index;

@@ -2,6 +2,7 @@
 #define RAPTURE__ASSETCOMMON_H
 
 #include "utils/UUID.h"
+#include "utils/rp_assert.h"
 
 #include <filesystem>
 #include <optional>
@@ -33,7 +34,6 @@ enum AssetType {
     ASSET_ANIMATION,
     ASSET_AUDIO,
     ASSET_VIDEO,
-    ASSET_MODULE,
     ASSET_WORLD,
     ASSET_TYPE_COUNT
 };
@@ -57,6 +57,74 @@ enum class AssetEvictionPolicy {
     EVICT_HINT_LAST  // "keep loaded" hint, evicted last under pressure, never a guarantee
 };
 
+/**
+ * @brief Packs four characters into the code a type is written as
+ * @param code The four characters, as a string literal
+ * @return The packed code
+ */
+inline constexpr uint32_t Asset_fourCC(const char (&code)[5])
+{
+    return static_cast<uint32_t>(code[0]) | (static_cast<uint32_t>(code[1]) << 8) | (static_cast<uint32_t>(code[2]) << 16) |
+           (static_cast<uint32_t>(code[3]) << 24);
+}
+
+struct AssetTypeCode {
+    AssetType type;
+    uint32_t code;
+};
+
+/**
+ * @brief What each asset type is written as on disk.
+ *
+ * A code is the type's identity in a file rather than its place in the enum, so the enum is free to
+ * gain, lose and reorder entries. A code is never reused for a different type.
+ */
+inline constexpr AssetTypeCode ASSET_TYPE_CODES[] = {
+    {ASSET_TEXTURE, Asset_fourCC("TEX ")},
+    {ASSET_CUBEMAP, Asset_fourCC("CUBE")},
+    {ASSET_SHADER, Asset_fourCC("SHDR")},
+    {ASSET_MATERIAL, Asset_fourCC("MTL ")},
+    {ASSET_MATERIAL_INSTANCE, Asset_fourCC("MTLI")},
+    {ASSET_MESH, Asset_fourCC("MESH")},
+    {ASSET_SCENE_OBJECT, Asset_fourCC("SOBJ")},
+    {ASSET_ANIMATION, Asset_fourCC("ANIM")},
+    {ASSET_AUDIO, Asset_fourCC("AUD ")},
+    {ASSET_VIDEO, Asset_fourCC("VID ")},
+    {ASSET_WORLD, Asset_fourCC("WRLD")},
+};
+
+/**
+ * @brief The code a type is written as
+ * @param type The type to look up
+ * @return The code
+ */
+inline uint32_t AssetTypeToCode(AssetType type)
+{
+    for (const AssetTypeCode &entry : ASSET_TYPE_CODES) {
+        if (entry.type == type) {
+            return entry.code;
+        }
+    }
+
+    RP_ASSERT(false, "asset type {} has no code to be written as", static_cast<int>(type));
+    RP_UNREACHABLE();
+}
+
+/**
+ * @brief The type a code names
+ * @param code The code read from a file
+ * @return The type, or ASSET_NONE if no type is written as that code
+ */
+inline AssetType AssetTypeFromCode(uint32_t code)
+{
+    for (const AssetTypeCode &entry : ASSET_TYPE_CODES) {
+        if (entry.code == code) {
+            return entry.type;
+        }
+    }
+    return ASSET_NONE;
+}
+
 inline std::string AssetTypeToString(AssetType type)
 {
     switch (type) {
@@ -74,8 +142,6 @@ inline std::string AssetTypeToString(AssetType type)
         return "Mesh";
     case ASSET_SCENE_OBJECT:
         return "Scene Object";
-    case ASSET_MODULE:
-        return "Module";
     case ASSET_ANIMATION:
         return "Animation";
     case ASSET_AUDIO:

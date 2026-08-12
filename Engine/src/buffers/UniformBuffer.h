@@ -2,6 +2,7 @@
 
 
 #include "buffers/Buffers.h"
+#include "buffers/descriptors/DescriptorSet.h"
 
 
 namespace Rapture {
@@ -26,12 +27,17 @@ class UniformBuffer : public Buffer {
 
         virtual void addDataGPU(void* data, VkDeviceSize size, VkDeviceSize offset) override;
 
-
+        /**
+         * @brief Records the array slot this buffer was written into, which it releases when it dies
+         * @param location The binding the slot belongs to
+         * @param index The slot within that binding's array
+         */
+        void setDescriptorSlot(DescriptorSetBindingLocation location, uint32_t index);
 
     private:
 
-        
-        
+        DescriptorSetBindingLocation m_bindingLocation = DescriptorSetBindingLocation::NONE;
+        uint32_t m_bindlessIndex = UINT32_MAX;
 };
 
 

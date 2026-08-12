@@ -2,10 +2,12 @@
 #define RAPTURE__INSTANCE_H
 
 #include "events/EventSignal.h"
+#include "scenes/TickPhase.h"
 #include "serialization/SerialDocument.h"
 #include "utils/TypeInfo.h"
 #include "utils/UUID.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -89,6 +91,31 @@ class Instance {
     static std::string_view readClassName(ReadNode node);
 
     /**
+     * @brief Whether this instance is updated each frame
+     */
+    bool isTickEnabled() const;
+
+    /**
+     * @brief Puts this instance into or takes it out of its scene's tick list
+     * @param enabled Whether the instance should be updated
+     */
+    void setTickEnabled(bool enabled);
+
+    TickPhase tickPhase() const { return m_tickPhase; }
+
+    /**
+     * @brief Moves this instance to another phase, leaving it updating if it already was
+     * @param phase The phase to update in
+     */
+    void setTickPhase(TickPhase phase);
+
+    /**
+     * @brief Advances this instance, only called while updating is enabled
+     * @param dt Seconds since the last update
+     */
+    virtual void onUpdate(float dt);
+
+    /**
      * @brief Fires as this instance is destroyed, before anything it owns is torn down
      */
     EventSignal<void(Instance *)> onDestroy;
@@ -117,6 +144,8 @@ class Instance {
     Scene *m_scene;
     InstanceId m_id;
     std::string m_name;
+    TickPhase m_tickPhase = TICK_PRE_PHYSICS;
+    uint32_t m_tickSlot;
 };
 
 } // namespace Rapture

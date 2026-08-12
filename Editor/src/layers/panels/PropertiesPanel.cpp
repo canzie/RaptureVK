@@ -220,6 +220,9 @@ void PropertiesPanel::refresh()
         ensure<SpotLight3DEditor>(instance->isA<Rapture::SpotLight3D>());
         ensure<Camera3DEditor>(instance->isA<Rapture::Camera3D>());
 
+        ensure<CameraControllerEditor>(instance->isA<Rapture::CameraController>());
+        ensure<PlayerControllerEditor>(instance->isA<Rapture::PlayerController>());
+
         ensure<EnvironmentEditor>(instance->isA<Rapture::Environment>());
 
         ensure<ShadowEditor>(e.has<Rapture::ShadowComponent>());

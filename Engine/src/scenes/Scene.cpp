@@ -3,7 +3,7 @@
 #include "components/Components.h"
 #include "components/TerrainComponent.h"
 #include "components/systems/Transforms.h"
-#include "modules/controllers/Controller.h"
+#include "scenes/instances/controllers/Controller.h"
 #include "scenes/instances/Camera3D.h"
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
@@ -156,16 +156,10 @@ void Scene::stepPhysics(float dt)
 
 void Scene::onUpdate(float dt)
 {
+    (void)dt;
+
     if (!active) {
         return;
-    }
-
-    {
-        RAPTURE_PROFILE_SCOPE("SceneComponents::update");
-        m_updatingComponents.forEach([dt](uint32_t slot, SceneComponent *component) {
-            (void)slot;
-            component->update(dt);
-        });
     }
 
     // Get current frame dimensions for camera updates
@@ -306,14 +300,24 @@ void Scene::syncRigidBodyTransforms()
     }
 }
 
-uint32_t Scene::addUpdatingComponent(SceneComponent *component)
+uint32_t Scene::registerTick(Instance *instance, TickPhase phase)
 {
-    return m_updatingComponents.insert(component);
+    return m_ticking[phase].insert(instance);
 }
 
-void Scene::removeUpdatingComponent(uint32_t slot)
+void Scene::runTickPhase(TickPhase phase, float dt)
 {
-    m_updatingComponents.remove(slot);
+    RAPTURE_PROFILE_SCOPE("Scene::runTickPhase");
+
+    m_ticking[phase].forEach([dt](uint32_t slot, Instance *instance) {
+        (void)slot;
+        instance->onUpdate(dt);
+    });
+}
+
+void Scene::unregisterTick(uint32_t slot, TickPhase phase)
+{
+    m_ticking[phase].remove(slot);
 }
 
 SceneObject *Scene::instanceFor(ecs::Entity entity) const

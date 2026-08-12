@@ -83,7 +83,7 @@ extern "C" void fiberEntryPointImpl()
     fiber->finished = true;
     fiber->switchToScheduler();
 
-    __builtin_unreachable();
+    RP_UNREACHABLE();
 }
 
 void Fiber::switchTo()

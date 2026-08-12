@@ -78,11 +78,6 @@ static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &
             return instance->serialize();
         }
         break;
-    case ASSET_MODULE:
-        if (ModuleClass *module = asset.getUnderlyingAsset<ModuleClass>()) {
-            return module->toBlob();
-        }
-        break;
     case ASSET_WORLD:
         if (World *world = asset.getUnderlyingAsset<World>()) {
             return world->serialize();
@@ -130,12 +125,6 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
             return true;
         }
         break;
-    case ASSET_MODULE:
-        if (auto module = ModuleClass::fromBlob(payload)) {
-            asset.setAssetVariant(std::move(module));
-            return true;
-        }
-        break;
     case ASSET_WORLD:
         if (auto world = World::deserialize(payload)) {
             asset.setAssetVariant(std::move(world));
@@ -171,11 +160,6 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
         payload = instanceData->instance->serialize();
         type = ASSET_MATERIAL_INSTANCE;
         return std::move(instanceData->instance);
-    }
-    if (auto *moduleData = std::get_if<ModuleImportData>(&data)) {
-        payload = moduleData->module->toBlob();
-        type = ASSET_MODULE;
-        return std::move(moduleData->module);
     }
     if (auto *worldData = std::get_if<WorldImportData>(&data)) {
         payload = worldData->world->serialize();
@@ -317,9 +301,7 @@ Asset &AssetManagerEditor::importAsset(AssetImportDataRequest request)
     metadata->provenance = std::move(request.provenance);
 
     // recorded on the metadata so an asset can be filtered by class while its payload is evicted
-    if (ModuleClass *module = asset->getUnderlyingAsset<ModuleClass>()) {
-        metadata->authoredClass = &module->type();
-    } else if (SerialDocument *document = asset->getUnderlyingAsset<SerialDocument>()) {
+    if (SerialDocument *document = asset->getUnderlyingAsset<SerialDocument>()) {
         metadata->authoredClass = InstanceRegistry::find(Instance::readClassName(document->rootView()));
     }
 

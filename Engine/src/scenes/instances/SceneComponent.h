@@ -4,8 +4,6 @@
 #include "ecs/entity_accessor.h"
 #include "scenes/instances/Instance.h"
 
-#include <cstdint>
-
 namespace Rapture {
 
 class SceneObject;
@@ -38,23 +36,6 @@ class SceneComponent : public Instance {
     ecs::EntityAccessor ownerEntity() const;
 
     /**
-     * @brief Whether this component is updated each frame
-     */
-    bool isUpdateEnabled() const { return m_updateSlot != INVALID_UPDATE_SLOT; }
-
-    /**
-     * @brief Puts this component into or takes it out of its scene's update list
-     * @param enabled Whether the component should be updated
-     */
-    void setUpdateEnabled(bool enabled);
-
-    /**
-     * @brief Advances this component, only called while updating is enabled
-     * @param dt Seconds since the last update
-     */
-    virtual void update(float dt);
-
-    /**
      * @brief Binds this component to the object it was attached to and runs onAttach
      * @param owner The object taking this component on
      */
@@ -77,10 +58,7 @@ class SceneComponent : public Instance {
     virtual void onDetach();
 
   private:
-    static constexpr uint32_t INVALID_UPDATE_SLOT = UINT32_MAX;
-
     SceneObject *m_owner = nullptr;
-    uint32_t m_updateSlot = INVALID_UPDATE_SLOT;
 };
 
 } // namespace Rapture

@@ -115,6 +115,8 @@ class DescriptorSet {
 
     VkDescriptorSetLayout getLayout() const { return m_layout; }
 
+    uint32_t getSetNumber() const { return m_setNumber; }
+
     // Typed getBinding methods for compile-time type safety
     std::shared_ptr<DescriptorBindingUniformBuffer> getUniformBufferBinding(DescriptorSetBindingLocation location)
     {

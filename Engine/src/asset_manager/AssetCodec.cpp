@@ -2,7 +2,6 @@
 
 #include "Asset.h"
 #include "logging/Log.h"
-#include "modules/ModuleRegistry.h"
 #include "scenes/instances/InstanceRegistry.h"
 
 #include <cstring>
@@ -18,7 +17,7 @@ namespace Rapture {
  */
 static bool s_recordsClass(AssetType type)
 {
-    return type == ASSET_MODULE || type == ASSET_SCENE_OBJECT;
+    return type == ASSET_SCENE_OBJECT;
 }
 
 static constexpr uint32_t RASSET_MAGIC = 0x54534152; // "RAST"
@@ -33,7 +32,7 @@ struct RaptureAssetHeader {
     uint32_t magic = RASSET_MAGIC;
     uint32_t version = RASSET_VERSION;
     uint64_t uuid = 0;
-    uint32_t assetType = 0;
+    uint32_t assetTypeCode = 0;
     uint32_t flags = 0;
     uint64_t metadataSize = 0;
     uint64_t payloadSize = 0;
@@ -104,7 +103,7 @@ struct ByteReader {
 static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata)
 {
     std::vector<uint8_t> out;
-    s_append(out, static_cast<uint32_t>(metadata.assetType));
+    s_append(out, AssetTypeToCode(metadata.assetType));
     s_append(out, static_cast<uint32_t>(metadata.storageType));
     s_append(out, static_cast<uint32_t>(metadata.evictionPolicy));
     s_append(out, metadata.sizeHintBytes);
@@ -130,7 +129,7 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
 {
     ByteReader reader{bytes.data(), bytes.size()};
     auto metadata = std::make_unique<AssetMetadata>();
-    metadata->assetType = static_cast<AssetType>(reader.read<uint32_t>());
+    metadata->assetType = AssetTypeFromCode(reader.read<uint32_t>());
     metadata->storageType = static_cast<AssetStorageType>(reader.read<uint32_t>());
     metadata->evictionPolicy = static_cast<AssetEvictionPolicy>(reader.read<uint32_t>());
     metadata->sizeHintBytes = reader.read<uint64_t>();
@@ -149,8 +148,7 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
 
     if (s_recordsClass(metadata->assetType)) {
         std::string className = reader.readString();
-        metadata->authoredClass = metadata->assetType == ASSET_MODULE ? ModuleRegistry::find(className)
-                                                                      : InstanceRegistry::find(className);
+        metadata->authoredClass = InstanceRegistry::find(className);
         if (metadata->authoredClass == nullptr) {
             RP_CORE_WARN("no class named '{}', '{}' cannot be loaded", className, metadata->name);
         }
@@ -169,7 +167,7 @@ bool AssetCodec::writeRaptureAsset(const std::filesystem::path &path, AssetHandl
 
     RaptureAssetHeader header;
     header.uuid = uuid;
-    header.assetType = static_cast<uint32_t>(metadata.assetType);
+    header.assetTypeCode = AssetTypeToCode(metadata.assetType);
     header.metadataSize = metadataBytes.size();
     header.payloadSize = payload.size();
     header.metadataChecksum = s_checksum(metadataBytes);

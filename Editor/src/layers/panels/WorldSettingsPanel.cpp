@@ -1,35 +1,37 @@
 #include "WorldSettingsPanel.h"
 
 #include "asset_manager/Asset.h"
-#include "modules/controllers/PlayerController.h"
-#include "modules/puppets/Puppet.h"
 #include "scenes/World.h"
+#include "scenes/instances/Node3D.h"
+#include "scenes/instances/controllers/Controller.h"
 
 #include <components/common.h>
 
-static bool s_isPuppetModule(Rapture::AssetHandle handle, const Rapture::AssetMetadata &metadata)
+// a puppet is any scene object with a place in the world, which is all a controller can drive
+static bool s_isPuppetAsset(Rapture::AssetHandle handle, const Rapture::AssetMetadata &metadata)
 {
     (void)handle;
-    return metadata.authoredClass != nullptr && metadata.authoredClass->isA(Rapture::Puppet::staticType());
+    return metadata.authoredClass != nullptr && metadata.authoredClass->isA(Rapture::Node3D::staticType());
 }
 
-static bool s_isPlayerControllerModule(Rapture::AssetHandle handle, const Rapture::AssetMetadata &metadata)
+static bool s_isControllerAsset(Rapture::AssetHandle handle, const Rapture::AssetMetadata &metadata)
 {
     (void)handle;
-    return metadata.authoredClass != nullptr && metadata.authoredClass->isA(Rapture::PlayerController::staticType());
+    return metadata.authoredClass != nullptr && metadata.authoredClass->isA(Rapture::Controller::staticType());
 }
 
 void WorldPlaySection::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        rowAssetPicker(t, "Puppet", m_puppetPicker, {.types = {Rapture::ASSET_MODULE}, .predicate = s_isPuppetModule},
+        rowAssetPicker(t, "Puppet", m_puppetPicker,
+                       {.types = {Rapture::ASSET_SCENE_OBJECT}, .predicate = s_isPuppetAsset},
                        [this](Rapture::AssetHandle handle) {
                            if (world != nullptr) {
                                world->data().puppet = handle;
                            }
                        });
         rowAssetPicker(t, "Controller", m_controllerPicker,
-                       {.types = {Rapture::ASSET_MODULE}, .predicate = s_isPlayerControllerModule},
+                       {.types = {Rapture::ASSET_SCENE_OBJECT}, .predicate = s_isControllerAsset},
                        [this](Rapture::AssetHandle handle) {
                            if (world != nullptr) {
                                world->data().controller = handle;

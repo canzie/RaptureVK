@@ -84,7 +84,7 @@ class World {
      * @brief The controller this world's run is driven by
      * @return The controller, or nullptr if the world is not being played
      */
-    Controller *playController() const { return m_playController.get(); }
+    Controller *playController() const { return m_playController; }
 
     bool isActive() const { return m_isActive; }
     void setActive(bool active) { m_isActive = active; }
@@ -113,7 +113,9 @@ class World {
 
     /// What the scene is rewound to on stop, held only for as long as a run is up
     SerialDocument m_snapshot;
-    std::unique_ptr<Controller> m_playController;
+
+    /// Spawned into the scene on play and destroyed by the rewind on stop, so only borrowed here
+    Controller *m_playController = nullptr;
     ControlInput m_intent;
     PlayState m_playState = PlayState::STOPPED;
     bool m_isActive = false;

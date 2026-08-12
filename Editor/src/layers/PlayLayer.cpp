@@ -2,7 +2,7 @@
 
 #include "input/Input.h"
 #include "logging/Log.h"
-#include "modules/controllers/Controller.h"
+#include "scenes/instances/controllers/Controller.h"
 #include "scenes/World.h"
 #include "scenes/instances/Camera3D.h"
 #include "viewport/Viewport.h"

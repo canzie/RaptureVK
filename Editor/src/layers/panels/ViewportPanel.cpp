@@ -6,7 +6,7 @@
 #include "components/systems/Transforms.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
-#include "modules/controllers/CameraController.h"
+#include "scenes/instances/controllers/CameraController.h"
 #include "render_targets/SceneRenderTarget.h"
 #include "scenes/World.h"
 #include "scenes/instances/Node3D.h"

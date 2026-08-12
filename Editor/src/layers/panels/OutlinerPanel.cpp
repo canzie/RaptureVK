@@ -6,6 +6,7 @@
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/World.h"
 #include "scenes/instances/SceneObject.h"
+#include "scenes/instances/scene_components/VisibilityComponent.h"
 #include "ecs/entity_accessor.h"
 
 #include <components/common.h>
@@ -17,6 +18,12 @@
 #include <unordered_set>
 
 #define COL_MENU_HOVER Amethyst::Color3::fromHex(0x4772b3)
+
+static bool s_showsInOutliner(const Rapture::SceneObject *object)
+{
+    Rapture::VisibilityComponent *visibility = object->component<Rapture::VisibilityComponent>();
+    return visibility == nullptr || visibility->inOutliner;
+}
 
 static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::string_view className)
 {
@@ -183,6 +190,9 @@ void OutlinerPanel::refresh()
 
     for (const auto &child : sceneRoot->children()) {
         Rapture::SceneObject *instance = child.get();
+        if (!s_showsInOutliner(instance)) {
+            continue;
+        }
         tvScope.row([this, instance](Amethyst::TreeRowScope &row) { buildInstanceTree(instance, row); });
     }
 
@@ -209,6 +219,9 @@ void OutlinerPanel::buildInstanceTree(Rapture::SceneObject *instance, Amethyst::
 
     for (const auto &child : instance->children()) {
         Rapture::SceneObject *childInstance = child.get();
+        if (!s_showsInOutliner(childInstance)) {
+            continue;
+        }
         rowScope.row([this, childInstance](Amethyst::TreeRowScope &childRow) { buildInstanceTree(childInstance, childRow); });
     }
 }

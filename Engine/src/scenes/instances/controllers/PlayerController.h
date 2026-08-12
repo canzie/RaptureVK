@@ -1,7 +1,7 @@
 #ifndef RAPTURE__PLAYER_CONTROLLER_H
 #define RAPTURE__PLAYER_CONTROLLER_H
 
-#include "modules/controllers/Controller.h"
+#include "scenes/instances/controllers/Controller.h"
 
 namespace Rapture {
 
@@ -15,6 +15,8 @@ class SpringArm3D;
  */
 class PlayerController : public Controller {
   public:
+    PlayerController(Scene &scene, std::string_view name);
+
     static const TypeInfo &staticType();
     const TypeInfo &type() const override;
 
@@ -27,9 +29,8 @@ class PlayerController : public Controller {
     /**
      * @brief Walks and turns the possessed puppet from this frame's intent
      * @param dt Seconds since the last update
-     * @param input Device-agnostic input for this frame
      */
-    void update(float dt, const ControlInput &input) override;
+    void onUpdate(float dt) override;
 
     bool desiresCursorCapture() const override { return true; }
 

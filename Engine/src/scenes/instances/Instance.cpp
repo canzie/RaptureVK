@@ -8,11 +8,53 @@ static constexpr std::string_view KEY_CLASS = "class";
 static constexpr std::string_view KEY_ID = "id";
 static constexpr std::string_view KEY_NAME = "name";
 
-Instance::Instance(Scene &scene, std::string_view name) : m_scene(&scene), m_id(UUIDGenerator::Generate()), m_name(name) {}
+Instance::Instance(Scene &scene, std::string_view name)
+    : m_scene(&scene), m_id(UUIDGenerator::Generate()), m_name(name), m_tickSlot(Scene::INVALID_TICK_SLOT)
+{
+}
 
 Instance::~Instance()
 {
+    setTickEnabled(false);
     onDestroy.fire(this);
+}
+
+bool Instance::isTickEnabled() const
+{
+    return m_tickSlot != Scene::INVALID_TICK_SLOT;
+}
+
+void Instance::setTickEnabled(bool enabled)
+{
+    if (isTickEnabled() == enabled || m_scene == nullptr) {
+        return;
+    }
+
+    if (enabled) {
+        m_tickSlot = m_scene->registerTick(this, m_tickPhase);
+        return;
+    }
+
+    m_scene->unregisterTick(m_tickSlot, m_tickPhase);
+    m_tickSlot = Scene::INVALID_TICK_SLOT;
+}
+
+void Instance::setTickPhase(TickPhase phase)
+{
+    if (m_tickPhase == phase) {
+        return;
+    }
+
+    // the slot is a place in the old phase's list, so a move out and back in is what changes phase
+    bool wasEnabled = isTickEnabled();
+    setTickEnabled(false);
+    m_tickPhase = phase;
+    setTickEnabled(wasEnabled);
+}
+
+void Instance::onUpdate(float dt)
+{
+    (void)dt;
 }
 
 void Instance::remintId()

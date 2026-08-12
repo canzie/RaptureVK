@@ -3,8 +3,32 @@
 
 #include <cstdlib>
 #include <format>
+#include <version>
 
 #include "logging/Log.h"
+
+#if defined(__cpp_lib_unreachable) && __cpp_lib_unreachable >= 202202L
+
+#include <utility>
+
+/**
+ * @brief Marks a point control flow cannot reach, so the compiler may drop the path leading to it
+ */
+#define RP_UNREACHABLE() std::unreachable()
+
+#elif defined(__GNUC__) || defined(__clang__)
+
+#define RP_UNREACHABLE() __builtin_unreachable()
+
+#elif defined(_MSC_VER)
+
+#define RP_UNREACHABLE() __assume(0)
+
+#else
+
+#define RP_UNREACHABLE() ((void)0)
+
+#endif // __cpp_lib_unreachable
 
 #ifdef NDEBUG
 

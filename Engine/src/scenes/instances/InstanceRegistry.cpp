@@ -12,6 +12,9 @@
 #include "scenes/instances/SpringArm3D.h"
 #include "scenes/instances/StaticMesh3D.h"
 #include "scenes/instances/Terrain3D.h"
+#include "scenes/instances/controllers/CameraController.h"
+#include "scenes/instances/controllers/PlayerController.h"
+#include "scenes/instances/scene_components/VisibilityComponent.h"
 
 #include <unordered_map>
 #include <vector>
@@ -41,8 +44,11 @@ void InstanceRegistry::init()
     addObject<PointLight3D>();
     addObject<SpotLight3D>();
     addObject<Environment>();
+    addObject<CameraController>();
+    addObject<PlayerController>();
 
     addComponent<RigidBody3D>();
+    addComponent<VisibilityComponent>();
 
     s_isInitialized = true;
 }

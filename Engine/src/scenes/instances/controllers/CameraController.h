@@ -1,7 +1,7 @@
 #ifndef RAPTURE__CAMERA_CONTROLLER_H
 #define RAPTURE__CAMERA_CONTROLLER_H
 
-#include "modules/controllers/Controller.h"
+#include "scenes/instances/controllers/Controller.h"
 
 #include <glm/glm.hpp>
 
@@ -19,6 +19,8 @@ enum class CameraControlMode {
  */
 class CameraController : public Controller {
   public:
+    CameraController(Scene &scene, std::string_view name);
+
     static const TypeInfo &staticType();
     const TypeInfo &type() const override;
 
@@ -29,11 +31,10 @@ class CameraController : public Controller {
     void possess(SceneObject *subject) override;
 
     /**
-     * @brief Advance the possessed camera from this frame's intent.
+     * @brief Advance the possessed camera from the intent this controller was last handed
      * @param dt Delta time in seconds.
-     * @param input Device-agnostic input for this frame.
      */
-    void update(float dt, const ControlInput &input) override;
+    void onUpdate(float dt) override;
 
     /**
      * @brief Whether the camera wants the cursor captured this frame.
@@ -65,8 +66,8 @@ class CameraController : public Controller {
     float maxPitch = 89.0f;
 
   private:
-    void updateFly(float dt, const ControlInput &input, Node3D &node);
-    void updateOrbit(const ControlInput &input, Node3D &node);
+    void updateFly(float dt, Node3D &node);
+    void updateOrbit(Node3D &node);
     void recalcFront();
 
   private:

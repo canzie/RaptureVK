@@ -8,7 +8,7 @@
 #include "generators/terrain/TerrainTypes.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
-#include "modules/controllers/Controller.h"
+#include "scenes/instances/controllers/Controller.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/ShadowCommon.h"
 #include "scenes/instances/Camera3D.h"
@@ -86,20 +86,7 @@ void CascadedShadowMap::setupCommandResources()
     m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
-CascadedShadowMap::~CascadedShadowMap()
-{
-    auto cascadeSet = m_rc->descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO);
-    auto binding = cascadeSet ? cascadeSet->getUniformBufferBinding(DescriptorSetBindingLocation::CASCADE_MATRICES_UBO) : nullptr;
-    if (binding == nullptr) {
-        return;
-    }
-
-    for (uint32_t index : m_cascadeMatricesIndices) {
-        if (index != UINT32_MAX) {
-            binding->free(index);
-        }
-    }
-}
+CascadedShadowMap::~CascadedShadowMap() = default;
 
 void CascadedShadowMap::enableDebugTexture(bool enabled)
 {

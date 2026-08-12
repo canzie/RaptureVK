@@ -1,5 +1,6 @@
 #include "UniformBuffer.h"
 
+#include "buffers/descriptors/DescriptorManager.h"
 #include "logging/Log.h"
 #include "window_context/Application.h"
 
@@ -21,7 +22,27 @@ UniformBuffer::UniformBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator 
     }
 }
 
-UniformBuffer::~UniformBuffer() {}
+UniformBuffer::~UniformBuffer()
+{
+    if (m_bindlessIndex == UINT32_MAX || m_bindingLocation == DescriptorSetBindingLocation::NONE) {
+        return;
+    }
+
+    auto &rc = Application::getInstance().getVulkanContext().getRenderContext();
+    auto set = rc.descriptorManager->getDescriptorSet(m_bindingLocation);
+    if (set) {
+        auto binding = set->getUniformBufferBinding(m_bindingLocation);
+        if (binding) {
+            binding->free(m_bindlessIndex);
+        }
+    }
+}
+
+void UniformBuffer::setDescriptorSlot(DescriptorSetBindingLocation location, uint32_t index)
+{
+    m_bindingLocation = location;
+    m_bindlessIndex = index;
+}
 
 VkBufferUsageFlags UniformBuffer::getBufferUsage()
 {

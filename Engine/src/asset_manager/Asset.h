@@ -16,7 +16,6 @@
 
 #include "materials/MaterialInstance.h"
 #include "meshes/Mesh.h"
-#include "modules/ModuleClass.h"
 #include "scenes/World.h"
 #include "serialization/SerialDocument.h"
 #include "shaders/Shader.h"
@@ -27,7 +26,7 @@ namespace Rapture {
 
 using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
                                   std::unique_ptr<BaseMaterial>, std::unique_ptr<MaterialInstance>, std::unique_ptr<Mesh>,
-                                  std::unique_ptr<SerialDocument>, std::unique_ptr<ModuleClass>, std::unique_ptr<World>>;
+                                  std::unique_ptr<SerialDocument>, std::unique_ptr<World>>;
 
 template <typename T, typename Variant>
 struct IsAssetType;

@@ -53,12 +53,6 @@ struct MaterialInstanceImportData {
     std::unique_ptr<MaterialInstance> instance;
 };
 
-class ModuleClass;
-
-struct ModuleImportData {
-    std::unique_ptr<ModuleClass> module;
-};
-
 class World;
 
 struct WorldImportData {
@@ -66,7 +60,7 @@ struct WorldImportData {
 };
 
 using AssetImportDataVariant = std::variant<std::monostate, MeshImportData, SceneObjectImportData, BaseMaterialImportData,
-                                            MaterialInstanceImportData, ModuleImportData, WorldImportData>;
+                                            MaterialInstanceImportData, WorldImportData>;
 
 struct AssetImportFileRequest {
     std::filesystem::path source;

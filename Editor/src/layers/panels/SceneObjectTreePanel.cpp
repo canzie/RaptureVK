@@ -7,6 +7,7 @@
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/Scene.h"
 #include "scenes/instances/SceneObject.h"
+#include "scenes/instances/scene_components/VisibilityComponent.h"
 
 #include <components/common.h>
 #include <components/context_menu_item.h>
@@ -18,6 +19,12 @@
 #include <unordered_set>
 
 #define COL_MENU_HOVER Amethyst::Color3::fromHex(0x4772b3)
+
+static bool s_showsInOutliner(const Rapture::SceneObject *object)
+{
+    Rapture::VisibilityComponent *visibility = object->component<Rapture::VisibilityComponent>();
+    return visibility == nullptr || visibility->inOutliner;
+}
 
 static constexpr float HEADER_HEIGHT = 26.0f;
 static constexpr float HEADER_PAD = 6.0f;
@@ -201,6 +208,9 @@ void SceneObjectTreePanel::buildSubtree(Rapture::SceneObject *instance, Amethyst
 
     for (const auto &child : instance->children()) {
         Rapture::SceneObject *childObject = child.get();
+        if (!s_showsInOutliner(childObject)) {
+            continue;
+        }
         rowScope.row([this, childObject](Amethyst::TreeRowScope &childRow) { buildSubtree(childObject, childRow); });
     }
 }
@@ -229,7 +239,7 @@ void SceneObjectTreePanel::showAddMenu(Amethyst::vec2 pos)
         return;
     }
 
-    m_contextMenu->setItems(AddSceneObjectMenu_buildItems(addTarget(), *m_selection, SCENE_OBJECT_SCOPE_MODULE));
+    m_contextMenu->setItems(AddSceneObjectMenu_buildItems(addTarget(), *m_selection, SCENE_OBJECT_SCOPE_ASSET));
     m_contextMenu->showAt(pos);
 }
 
@@ -249,9 +259,9 @@ void SceneObjectTreePanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
     }
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items =
-        AddSceneObjectMenu_buildItems(instance, *m_selection, SCENE_OBJECT_SCOPE_MODULE);
+        AddSceneObjectMenu_buildItems(instance, *m_selection, SCENE_OBJECT_SCOPE_ASSET);
 
-    // the root is what the module is authored into, so it stays
+    // the root is what the asset is authored into, so it stays
     if (instance != m_rootObject) {
         items.push_back(ViewportContextMenuSID::create());
         items.push_back(Amethyst::makeActionItem("Delete", [this, instance]() { requestDelete(instance); }));

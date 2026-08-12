@@ -2,9 +2,15 @@
 
 namespace Rapture {
 
+Controller::Controller(Scene &scene, std::string_view name) : SceneObject(scene, name)
+{
+    setTickPhase(TICK_INPUT);
+    setTickEnabled(true);
+}
+
 const TypeInfo &Controller::staticType()
 {
-    static const TypeInfo type("Controller", &ModuleClass::staticType());
+    static const TypeInfo type("Controller", &SceneObject::staticType());
     return type;
 }
 

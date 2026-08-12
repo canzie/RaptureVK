@@ -59,6 +59,8 @@ uint32_t DescriptorBindingUniformBuffer::add(UniformBuffer &resource)
             return UINT32_MAX;
         }
         m_isAllocated[index] = true;
+
+        resource.setDescriptorSlot(static_cast<DescriptorSetBindingLocation>(m_set->getSetNumber() * 100 + m_binding), index);
     }
 
     VkDescriptorBufferInfo bufferInfo = resource.getDescriptorBufferInfo();

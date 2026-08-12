@@ -18,6 +18,8 @@ static constexpr std::string_view KEY_MOVEMENT_SPEED = "movementSpeed";
 static constexpr std::string_view KEY_MOUSE_SENSITIVITY = "mouseSensitivity";
 static constexpr std::string_view KEY_MAX_PITCH = "maxPitch";
 
+PlayerController::PlayerController(Scene &scene, std::string_view name) : Controller(scene, name) {}
+
 const TypeInfo &PlayerController::staticType()
 {
     static const TypeInfo type("PlayerController", &Controller::staticType());
@@ -50,22 +52,22 @@ void PlayerController::possess(SceneObject *subject)
     }
 }
 
-void PlayerController::update(float dt, const ControlInput &input)
+void PlayerController::onUpdate(float dt)
 {
     Node3D *subject = m_possessed != nullptr ? m_possessed->as<Node3D>() : nullptr;
     if (subject == nullptr) {
         return;
     }
 
-    m_yaw += input.look.x * mouseSensitivity;
-    m_pitch = glm::clamp(m_pitch - input.look.y * mouseSensitivity, -maxPitch, maxPitch);
+    m_yaw += m_intent.look.x * mouseSensitivity;
+    m_pitch = glm::clamp(m_pitch - m_intent.look.y * mouseSensitivity, -maxPitch, maxPitch);
 
     float yaw = glm::radians(m_yaw);
     glm::vec3 forward = glm::vec3(std::cos(yaw), 0.0f, std::sin(yaw));
     glm::vec3 right = glm::cross(forward, WORLD_UP);
 
     glm::vec3 position = subject->position();
-    position += (right * input.move.x + forward * input.move.z) * (movementSpeed * dt);
+    position += (right * m_intent.move.x + forward * m_intent.move.z) * (movementSpeed * dt);
     subject->setPosition(position);
 
     // a puppet faces down its own -Z, so the turn is the one taking -Z onto the walk direction

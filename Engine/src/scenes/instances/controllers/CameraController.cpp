@@ -20,6 +20,8 @@ static constexpr std::string_view KEY_PAN_SPEED = "panSpeed";
 static constexpr std::string_view KEY_ZOOM_SPEED = "zoomSpeed";
 static constexpr std::string_view KEY_MAX_PITCH = "maxPitch";
 
+CameraController::CameraController(Scene &scene, std::string_view name) : Controller(scene, name) {}
+
 const TypeInfo &CameraController::staticType()
 {
     static const TypeInfo type("CameraController", &Controller::staticType());
@@ -55,7 +57,7 @@ void CameraController::setMode(CameraControlMode mode)
     }
 }
 
-void CameraController::update(float dt, const ControlInput &input)
+void CameraController::onUpdate(float dt)
 {
     if (m_viewCamera == nullptr) {
         return;
@@ -66,25 +68,25 @@ void CameraController::update(float dt, const ControlInput &input)
     }
     auto camera = m_viewCamera->accessor().write<CameraComponent>();
 
-    if (input.releaseControl) {
+    if (m_intent.releaseControl) {
         setMode(CameraControlMode::ORBIT);
     }
 
     if (m_mode == CameraControlMode::FLY) {
-        updateFly(dt, input, *m_viewCamera);
+        updateFly(dt, *m_viewCamera);
     } else {
-        updateOrbit(input, *m_viewCamera);
+        updateOrbit(*m_viewCamera);
     }
 
     camera->updateViewMatrix(transform::translation(m_viewCamera->worldTransform()), m_front);
 }
 
-void CameraController::updateFly(float dt, const ControlInput &input, Node3D &node)
+void CameraController::updateFly(float dt, Node3D &node)
 {
     m_desiresCapture = true;
 
-    m_yaw += input.look.x * mouseSensitivity;
-    m_pitch -= input.look.y * mouseSensitivity;
+    m_yaw += m_intent.look.x * mouseSensitivity;
+    m_pitch -= m_intent.look.y * mouseSensitivity;
     m_pitch = glm::clamp(m_pitch, -maxPitch, maxPitch);
     recalcFront();
 
@@ -92,37 +94,37 @@ void CameraController::updateFly(float dt, const ControlInput &input, Node3D &no
     float distance = movementSpeed * dt;
 
     glm::vec3 position = node.position();
-    position += right * input.move.x * distance;
-    position += WORLD_UP * input.move.y * distance;
-    position += m_front * input.move.z * distance;
+    position += right * m_intent.move.x * distance;
+    position += WORLD_UP * m_intent.move.y * distance;
+    position += m_front * m_intent.move.z * distance;
     node.setPosition(position);
 }
 
-void CameraController::updateOrbit(const ControlInput &input, Node3D &node)
+void CameraController::updateOrbit(Node3D &node)
 {
     if (m_recenterFocus) {
         m_focusPoint = node.position() + m_front * m_focusDistance;
         m_recenterFocus = false;
     }
 
-    m_desiresCapture = input.orbit;
+    m_desiresCapture = m_intent.orbit;
 
-    if (input.orbit) {
+    if (m_intent.orbit) {
         glm::vec3 right = glm::normalize(glm::cross(m_front, WORLD_UP));
         glm::vec3 up = glm::normalize(glm::cross(right, m_front));
-        if (input.pan) {
+        if (m_intent.pan) {
             float scale = panSpeed * m_focusDistance;
-            m_focusPoint += (-right * input.look.x + up * input.look.y) * scale;
+            m_focusPoint += (-right * m_intent.look.x + up * m_intent.look.y) * scale;
         } else {
-            m_yaw += input.look.x * orbitSensitivity;
-            m_pitch -= input.look.y * orbitSensitivity;
+            m_yaw += m_intent.look.x * orbitSensitivity;
+            m_pitch -= m_intent.look.y * orbitSensitivity;
             m_pitch = glm::clamp(m_pitch, -maxPitch, maxPitch);
             recalcFront();
         }
     }
 
-    if (input.zoom != 0.0f) {
-        m_focusDistance *= (1.0f - input.zoom * zoomSpeed);
+    if (m_intent.zoom != 0.0f) {
+        m_focusDistance *= (1.0f - m_intent.zoom * zoomSpeed);
         if (m_focusDistance < 0.1f) {
             m_focusDistance = 0.1f;
         }
