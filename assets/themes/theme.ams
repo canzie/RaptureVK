@@ -20,14 +20,19 @@
 @property border-3 #343434
 @property border-4 #414141
 
-@property fill-1 #5A5A5A
-@property fill-2 rgba(238, 238, 238, 64)
-
 @property accent          #4772B3
 @property accent-contrast #FFFFFF
+
 // @property accent-hover    #
 // @property accent-light    #
 // @property accent-dark     #
+
+@property status-error   #BF616A
+@property status-warning #D08770
+@property status-success #A3BE8C
+@property status-info    #A3BE8C
+
+@property type-folder #EBCB8B
 
 
 @property white #FFFFFF
@@ -222,6 +227,14 @@ context-menu#separator {
 
 .treeview-secondary-column {
     text-color: @text-2;
+}
+
+.treeview-icon {
+    image-color: @text-3;
+}
+
+.treeview-icon-folder {
+    image-color: @type-folder;
 }
 
 .graph-node-body {

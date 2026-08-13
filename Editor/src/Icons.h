@@ -145,12 +145,9 @@ inline constexpr const char *SVG_SCRIPT =
              "<path d=\"M9.5 2.5V5h3\"/>"
              "<path d=\"M5.5 8h5M5.5 10h4\"/>");
 
-inline constexpr const char *SVG_PREFAB =
-    ICON_SVG("<rect x=\"2.5\" y=\"2.5\" width=\"11\" height=\"11\" rx=\"1\" stroke-dasharray=\"3 2\"/>"
-             "<path d=\"M8 5.5v5M5.5 8h5\"/>");
-
-inline constexpr const char *SVG_MODULE = ICON_SVG("<rect x=\"5.5\" y=\"3\" width=\"8\" height=\"10\" rx=\"1\"/>"
-                                                   "<path d=\"M5.5 6H2.5M5.5 10H2.5\"/>");
+inline constexpr const char *SVG_WORLD = ICON_SVG("<circle cx=\"8\" cy=\"8\" r=\"5.75\"/>"
+                                                  "<path d=\"M2.25 8h11.5\"/>"
+                                                  "<path d=\"M8 2.25a9 9 0 010 11.5a9 9 0 010-11.5z\"/>");
 
 inline constexpr const char *SVG_CONTROLLER =
     ICON_SVG("<path d=\"M5.5 5.5h5a3.5 3.5 0 013.4 2.7l.6 2.4a1.6 1.6 0 01-2.8 1.4L10.6 10H5.4l-1.1 2a1.6 1.6 0 "
@@ -180,16 +177,16 @@ inline constexpr const char *SVG_BUILD = ICON_SVG("<path d=\"M3 13L13 3\"/>"
 
 inline constexpr const char *SVG_SETTINGS = ICON_SVG(
     "<g fill=\"#ffffff\" stroke=\"none\">"
-    "<path fill-rule=\"evenodd\" d=\"M8 3.6A4.4 4.4 0 108 12.4 4.4 4.4 0 008 3.6Zm0 2.2A2.2 2.2 0 118 10.2 2.2 2.2 0 018 5.8Z\"/>"
+    "<path fill-rule=\"evenodd\" d=\"M8 3.4A4.6 4.6 0 108 12.6 4.6 4.6 0 008 3.4Zm0 2.7A1.9 1.9 0 118 9.9 1.9 1.9 0 018 6.1Z\"/>"
     "<g>"
-    "<rect x=\"7.1\" y=\"0.8\" width=\"1.8\" height=\"2.8\" rx=\"0.4\"/>"
-    "<rect x=\"7.1\" y=\"12.4\" width=\"1.8\" height=\"2.8\" rx=\"0.4\"/>"
-    "<rect x=\"0.8\" y=\"7.1\" width=\"2.8\" height=\"1.8\" rx=\"0.4\"/>"
-    "<rect x=\"12.4\" y=\"7.1\" width=\"2.8\" height=\"1.8\" rx=\"0.4\"/>"
-    "<rect x=\"7.1\" y=\"0.8\" width=\"1.8\" height=\"2.8\" rx=\"0.4\" transform=\"rotate(45 8 8)\"/>"
-    "<rect x=\"7.1\" y=\"0.8\" width=\"1.8\" height=\"2.8\" rx=\"0.4\" transform=\"rotate(-45 8 8)\"/>"
-    "<rect x=\"7.1\" y=\"12.4\" width=\"1.8\" height=\"2.8\" rx=\"0.4\" transform=\"rotate(45 8 8)\"/>"
-    "<rect x=\"7.1\" y=\"12.4\" width=\"1.8\" height=\"2.8\" rx=\"0.4\" transform=\"rotate(-45 8 8)\"/>"
+    "<rect x=\"6.7\" y=\"2.1\" width=\"2.6\" height=\"1.5\" rx=\"0.35\"/>"
+    "<rect x=\"6.7\" y=\"12.4\" width=\"2.6\" height=\"1.5\" rx=\"0.35\"/>"
+    "<rect x=\"2.1\" y=\"6.7\" width=\"1.5\" height=\"2.6\" rx=\"0.35\"/>"
+    "<rect x=\"12.4\" y=\"6.7\" width=\"1.5\" height=\"2.6\" rx=\"0.35\"/>"
+    "<rect x=\"6.7\" y=\"2.1\" width=\"2.6\" height=\"1.5\" rx=\"0.35\" transform=\"rotate(45 8 8)\"/>"
+    "<rect x=\"6.7\" y=\"2.1\" width=\"2.6\" height=\"1.5\" rx=\"0.35\" transform=\"rotate(-45 8 8)\"/>"
+    "<rect x=\"6.7\" y=\"12.4\" width=\"2.6\" height=\"1.5\" rx=\"0.35\" transform=\"rotate(45 8 8)\"/>"
+    "<rect x=\"6.7\" y=\"12.4\" width=\"2.6\" height=\"1.5\" rx=\"0.35\" transform=\"rotate(-45 8 8)\"/>"
     "</g></g>");
 
 inline constexpr const char *SVG_PROPERTIES = ICON_SVG("<path d=\"M2 5h12M2 8h12M2 11h12\"/>"

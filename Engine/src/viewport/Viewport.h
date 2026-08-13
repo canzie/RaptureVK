@@ -30,6 +30,17 @@ struct ViewportConfig {
     bool enableAccelerationStructures = true;
 };
 
+using ViewportId = uint32_t;
+static constexpr ViewportId INVALID_VIEWPORT_ID = 0;
+
+class Viewport;
+
+struct ViewportContext {
+    ViewportId id = INVALID_VIEWPORT_ID;
+    std::string displayName;
+    Viewport *viewport = nullptr;
+};
+
 class Viewport {
   public:
     Viewport(const ViewportConfig &config, RenderContext renderContext);
@@ -93,6 +104,7 @@ class Viewport {
      */
     uint32_t getLastRenderedFrameIndex() const;
 
+    ViewportId getId() const { return m_id; }
     const std::string &getName() const { return m_config.name; }
     uint32_t getWidth() const { return m_config.width; }
     uint32_t getHeight() const { return m_config.height; }
@@ -100,6 +112,9 @@ class Viewport {
     void setActive(bool active) { m_active = active; }
 
   private:
+    inline static ViewportId s_nextId = 1;
+
+    const ViewportId m_id = s_nextId++;
     ViewportConfig m_config;
     RenderContext m_renderContext;
 

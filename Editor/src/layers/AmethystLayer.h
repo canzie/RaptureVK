@@ -23,6 +23,8 @@ class SwapChain;
 class RenderWindow;
 }
 
+class EditorState;
+struct EditorWorkspaceState;
 class FileBrowser;
 class ProjectLauncher;
 
@@ -38,6 +40,35 @@ class AmethystLayer : public Rapture::Layer {
   private:
     void setupMenuBar(glm::vec2 screenSize);
     void setupWorkspaces(void);
+
+    /**
+     * @brief Opens a level editor on the project's startup world
+     */
+    void openLevelEditor(void);
+
+    /**
+     * @brief Reopens one workspace the editor had open, warning when this build cannot
+     * @param entry The stored workspace to reopen
+     */
+    void openStoredWorkspace(const EditorWorkspaceState &entry);
+
+    /**
+     * @brief The asset a workspace is editing
+     * @param workspace The workspace to look up
+     * @return Its asset, invalid when it edits no single asset
+     */
+    Rapture::AssetHandle assetHandleFor(const Workspace &workspace) const;
+
+    /**
+     * @brief Selects the workspace tab that was in front, falling back to the level editor
+     * @param state The state the open workspaces were restored from
+     */
+    void restoreActiveWorkspace(const EditorState &state);
+
+    /**
+     * @brief Writes which workspaces are open into the project, then saves it
+     */
+    void storeEditorState(void);
 
     /**
      * @brief Points a launcher's actions at this layer

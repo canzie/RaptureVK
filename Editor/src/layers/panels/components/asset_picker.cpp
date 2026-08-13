@@ -12,7 +12,6 @@
 #include <utility>
 
 static constexpr float FACE_PADDING = 4.0f;
-static constexpr float PREVIEW_SIZE = 18.0f;
 static constexpr float PREVIEW_GAP = 6.0f;
 static constexpr float ACCENT_HEIGHT = 2.0f;
 static constexpr float ARROW_SIZE = 10.0f;
@@ -181,7 +180,7 @@ void AssetPicker::buildFace(Amethyst::UIScope &parent)
                             .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
                             .interactable = false,
                             .position = Amethyst::UDim2(0.0f, FACE_PADDING, 0.5f, 0.0f),
-                            .size = Amethyst::UDim2::fromOffset(PREVIEW_SIZE, PREVIEW_SIZE),
+                            .size = Amethyst::UDim2::fromOffset(m_config.previewSize, m_config.previewSize),
                         },
                 },
                 [this](Amethyst::ImageLabelScope &il) {
@@ -200,7 +199,7 @@ void AssetPicker::buildFace(Amethyst::UIScope &parent)
                         [this](Amethyst::FrameScope &accent) { m_typeAccent = &accent.component; });
                 });
 
-            float textLeft = FACE_PADDING + PREVIEW_SIZE + PREVIEW_GAP;
+            float textLeft = FACE_PADDING + m_config.previewSize + PREVIEW_GAP;
             float textRight = FACE_PADDING + ARROW_SIZE + ARROW_GAP;
 
             f.textLabel(

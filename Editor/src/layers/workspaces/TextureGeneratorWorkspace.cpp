@@ -24,10 +24,11 @@ static void s_addPlaceholderTab(Amethyst::TabBar *tabBar, std::string_view name)
     tabBar->addTab(std::move(root), iconTabLayout(name));
 }
 
-TextureGeneratorWorkspace::TextureGeneratorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services)
+TextureGeneratorWorkspace::TextureGeneratorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services)
+    : Workspace(staticKind())
 {
     m_context.services = services;
-    setupBase(tabs, "Texture Generator");
+    setupBase(tabBar, "Texture Generator", {});
     m_dockingLayer->name = "Texture Generator Dock";
     m_dockingLayer->tabBarClasses = {"panel-tab"};
 

@@ -26,10 +26,12 @@ struct TextureGeneratorInstance {
  */
 class TextureGeneratorWorkspace : public Workspace {
   public:
-    TextureGeneratorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services);
+    TextureGeneratorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services);
     ~TextureGeneratorWorkspace() override = default;
 
     void saveLayout() override;
+
+    static constexpr std::string_view staticKind() { return "textureGenerator"; }
 
   private:
     void setupHotbar();

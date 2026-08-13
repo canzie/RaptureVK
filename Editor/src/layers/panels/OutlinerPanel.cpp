@@ -2,6 +2,7 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "layers/panels/AddSceneObjectMenu.h"
+#include "layers/panels/components/asset_visuals.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scenes/World.h"
@@ -19,15 +20,35 @@
 
 #define COL_MENU_HOVER Amethyst::Color3::fromHex(0x4772b3)
 
+static constexpr float ROW_ICON_SIZE = 13.0f;
+static constexpr float ROW_ICON_PAD = 2.0f;
+static constexpr float ROW_ICON_GAP = 5.0f;
+
 static bool s_showsInOutliner(const Rapture::SceneObject *object)
 {
     Rapture::VisibilityComponent *visibility = object->component<Rapture::VisibilityComponent>();
     return visibility == nullptr || visibility->inOutliner;
 }
 
-static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::string_view className)
+static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::string_view className,
+                        const SceneObjectIcon *icon = nullptr)
 {
-    Amethyst::UDim4 pd = {.left = Amethyst::UDim::fromOffset(2.0f)};
+    float textLeft = 2.0f;
+
+    if (icon != nullptr) {
+        s.imageLabel({
+            .classes = {std::string(icon->styleClass)},
+            .base = {.anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+                     .interactable = false,
+                     .position = Amethyst::UDim2(0.0f, ROW_ICON_PAD, 0.5f, 0.0f),
+                     .size = Amethyst::UDim2::fromOffset(ROW_ICON_SIZE, ROW_ICON_SIZE)},
+            .style = {.backgroundTransparency = 1.0f},
+            .svg = icon->svg,
+        });
+        textLeft = ROW_ICON_PAD + ROW_ICON_SIZE + ROW_ICON_GAP;
+    }
+
+    Amethyst::UDim4 pd = {.left = Amethyst::UDim::fromOffset(textLeft)};
     s.textLabel(
         {
             .classes = {std::string(className)},
@@ -214,7 +235,8 @@ void OutlinerPanel::buildInstanceTree(Rapture::SceneObject *instance, Amethyst::
     std::string instanceName(instance->name());
     std::string typeName(instance->type().name);
 
-    rowScope.cell([instanceName](Amethyst::UIScope &s) { s_nameLabel(s, instanceName, "treeview-primary-column"); });
+    SceneObjectIcon icon = SceneObject_iconForClass(&instance->type());
+    rowScope.cell([instanceName, icon](Amethyst::UIScope &s) { s_nameLabel(s, instanceName, "treeview-primary-column", &icon); });
     rowScope.cell([typeName](Amethyst::UIScope &s) { s_nameLabel(s, typeName, "treeview-secondary-column"); });
 
     for (const auto &child : instance->children()) {

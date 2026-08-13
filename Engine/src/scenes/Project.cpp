@@ -13,6 +13,7 @@ static constexpr std::string_view KEY_METADATA = "metadata";
 static constexpr std::string_view KEY_FORMAT_VERSION = "formatVersion";
 static constexpr std::string_view KEY_NAME = "name";
 static constexpr std::string_view KEY_STARTUP_WORLD = "startupWorld";
+static constexpr std::string_view KEY_EDITOR = "editor";
 
 static constexpr const char *DEFAULT_WORLD_NAME = "DefaultWorld";
 
@@ -143,6 +144,10 @@ bool Project::saveProject(const std::filesystem::path &path)
     metadata.set(KEY_NAME, std::string_view(m_config.name));
     metadata.set(KEY_STARTUP_WORLD, m_config.startupWorld);
 
+    if (m_editorSection.isReadable()) {
+        root.addCopy(KEY_EDITOR, m_editorSection.rootView());
+    }
+
     ProjectEvents::onProjectSerialize().publish(root);
 
     std::string text = doc.toText(true);
@@ -216,6 +221,8 @@ bool Project::loadProject(const std::filesystem::path &path)
 
     m_config.name = metadata.child(KEY_NAME).asString(m_config.name);
     m_config.startupWorld = metadata.child(KEY_STARTUP_WORLD).asU64(INVALID_ASSET_HANDLE);
+
+    m_editorSection = SerialDocument::copyOf(root.child(KEY_EDITOR));
 
     ProjectEvents::onProjectRegister().publish(root);
     ProjectEvents::onProjectRegisterComplete().publish();

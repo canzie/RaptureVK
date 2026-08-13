@@ -6,10 +6,13 @@
 #include <components/common.h>
 
 static constexpr float ROW_HEIGHT = 32.0f;
+static constexpr float PICKER_ROW_HEIGHT = 52.0f;
+static constexpr float PICKER_PREVIEW_SIZE = 28.0f;
 static constexpr float LABEL_FRAC = 0.4f;
 static constexpr float LABEL_PAD = 12.0f;
 static constexpr float CONTROL_VPAD = 4.0f;
 static constexpr float CONTROL_HPAD = 8.0f;
+static constexpr float CONTROL_GAP = 2.0f;
 
 static constexpr float HEADER_HEIGHT = 28.0f;
 static constexpr float SECTION_SPACING = 6.0f;
@@ -43,7 +46,7 @@ void PropertySection::fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std
             t.column("", LABEL_FRAC, Amethyst::TableColumnSizing::FIXED);
             t.column("", 1.0f - LABEL_FRAC);
             fn(t);
-            m_bodyHeight = static_cast<float>(t.component.rowCount()) * ROW_HEIGHT;
+            m_bodyHeight = t.component.contentHeight();
             t.component.setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, m_bodyHeight)});
         });
 }
@@ -56,12 +59,16 @@ void PropertySection::rowVec3(Amethyst::TableScope &t, std::string_view label, d
         tr.cell([&values, speed, min, max, onChanged](Amethyst::UIScope &cell) {
             const float w = 1.0f / 3.0f;
             for (int axis = 0; axis < 3; ++axis) {
+                // the outer edges take the control padding, the inner ones half the gutter each
+                float leftInset = axis == 0 ? CONTROL_HPAD : CONTROL_GAP * 0.5f;
+                float rightInset = axis == 2 ? CONTROL_HPAD : CONTROL_GAP * 0.5f;
+
                 cell.dragFloat(
                     {
                         .classes = {"property-input-field"},
                         .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                                 .position = Amethyst::UDim2(axis * w, axis == 0 ? CONTROL_HPAD : 2.0f, 0.5f, 0.0f),
-                                 .size = Amethyst::UDim2(w, axis == 2 ? -2.0f - CONTROL_HPAD : -2.0f, 1.0f, -2.0f * CONTROL_VPAD)},
+                                 .position = Amethyst::UDim2(axis * w, leftInset, 0.5f, 0.0f),
+                                 .size = Amethyst::UDim2(w, -(leftInset + rightInset), 1.0f, -2.0f * CONTROL_VPAD)},
                         .speed = speed,
                         .min = min,
                         .max = max,
@@ -179,7 +186,9 @@ void PropertySection::rowColor(Amethyst::TableScope &t, std::string_view label, 
 void PropertySection::rowAssetPicker(Amethyst::TableScope &t, std::string_view label, std::optional<AssetPicker> &out,
                                      AssetPickerConfig config, const std::function<void(Rapture::AssetHandle)> &onSelected)
 {
-    t.row([&](Amethyst::TableRowScope &tr) {
+    config.previewSize = PICKER_PREVIEW_SIZE;
+
+    t.row(PICKER_ROW_HEIGHT, [&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
         tr.cell([&](Amethyst::UIScope &cell) {
             cell.frame(

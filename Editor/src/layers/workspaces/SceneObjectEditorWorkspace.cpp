@@ -45,7 +45,7 @@ std::unique_ptr<SceneObjectEditorWorkspace> SceneObjectEditorWorkspace::create(A
 }
 
 SceneObjectEditorWorkspace::SceneObjectEditorWorkspace(const PanelServices &services, Rapture::AssetHandle handle)
-    : m_handle(handle)
+    : Workspace(staticKind()), m_handle(handle)
 {
     m_context.services = services;
 
@@ -57,10 +57,8 @@ SceneObjectEditorWorkspace::~SceneObjectEditorWorkspace()
 {
     m_panels.clear();
 
-    if (m_viewport != nullptr) {
-        Rapture::Application::getInstance().getViewportManager().destroyViewport(VIEWPORT_NAME);
-        m_viewport = nullptr;
-    }
+    Rapture::Application::getInstance().getViewportManager().destroyViewport(m_viewport);
+    m_viewport = {};
 
     m_scene.reset();
 }
@@ -126,12 +124,12 @@ void SceneObjectEditorWorkspace::setupScene()
         .width = extent.width,
         .height = extent.height,
     });
-    m_viewport->createRenderer(Rapture::RendererType::DEFERRED);
-    m_viewport->setScene(m_scene.get());
-    m_viewport->setCamera(camera);
+    m_viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
+    m_viewport.viewport->setScene(m_scene.get());
+    m_viewport.viewport->setCamera(camera);
 
     m_context.scene = m_scene.get();
-    m_context.viewport = m_viewport;
+    m_context.viewport = m_viewport.viewport;
 }
 
 void SceneObjectEditorWorkspace::setupLighting()

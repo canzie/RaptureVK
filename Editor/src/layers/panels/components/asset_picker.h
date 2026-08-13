@@ -39,6 +39,7 @@ struct AssetPickerConfig {
     float rowHeight = 47.0f;
     int32_t maxVisibleRows = 10;
     float popupWidth = 0.0f; // 0 = match the picker's own width
+    float previewSize = 18.0f;
 };
 
 /**

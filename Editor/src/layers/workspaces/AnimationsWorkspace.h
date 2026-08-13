@@ -5,9 +5,15 @@
 
 class AnimationsWorkspace : public Workspace {
   public:
-    AnimationsWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services) { m_context.services = services; setupBase(tabs, "Animations"); }
+    AnimationsWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services) : Workspace(staticKind())
+    {
+        m_context.services = services;
+        setupBase(tabBar, "Animations", {});
+    }
 
     void saveLayout() override {}
+
+    static constexpr std::string_view staticKind() { return "animations"; }
 };
 
 #endif // RAPTURE__ANIMATIONS_WORKSPACE_H

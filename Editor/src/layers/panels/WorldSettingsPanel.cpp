@@ -69,7 +69,7 @@ WorldSettingsPanel::WorldSettingsPanel(Amethyst::TabBar *tabBar, const Workspace
     setupPlaceholder();
     setupWorldView();
 
-    icon = Icons::SVG_SETTINGS;
+    icon = Icons::SVG_WORLD;
     attach(tabBar, std::move(root));
 
     m_placeholderText->setBaseProperties({.visible = m_world == nullptr});

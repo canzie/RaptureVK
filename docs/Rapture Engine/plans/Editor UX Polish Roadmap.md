@@ -1,89 +1,127 @@
 # Editor UX Polish Roadmap
 
-Snapshot 2026-07-04. Goal: assets can now be imported from the GUI, but the editing loop around them is rough. Before adding new features, round out the existing experience so it feels complete. Ordered by priority; the first two are specced in detail, the rest are roadmap.
+Snapshot 2026-08-13, replacing the 2026-07-04 version. Phase 1 of [[Asset & Editor Roadmap]] is "editor / UI work" — this is what that actually means now.
 
-Guiding principle: make the current import/edit loop feel finished before building anything new.
+Guiding principle is unchanged: make the current loop feel finished before building anything new.
 
----
+**Next up: #5, editor state persistence.** Thumbnails (#1) is the highest-value item but was stopped midway once already and needs a design settled before more code goes in, so it does not go first.
 
-## 1. Outliner context menu (rename / delete / delete-keep-children)
+## Corrections to the 2026-07-04 snapshot
 
-**Where**: `Editor/src/layers/panels/OutlinerPanel.{h,cpp}`
+The old doc's first three items are largely done and its claims no longer hold:
 
-Currently the outliner rows are plain `textButton`s with a left-click select (`s_onEntityClicked`, `OutlinerPanel.cpp:12`). There is no right-click menu. The content browser already demonstrates the pattern to copy — `Amethyst::ContextMenu` owned by the panel, shown via `showContextMenu(pos, items)` (`ContentBrowserPanel.cpp:529-541`), triggered from an `onMouseButton2DownCb` on the row's action component.
+- **Outliner context menu (old #1) — DONE.** `OutlinerPanel.cpp` has a `m_contextMenu`, a `m_renameInput`, and visibility filtering through `VisibilityComponent::inOutliner`.
+- **TLAS-in-import (old #3) — DONE.** The old doc quoted a `scene->buildTLAS()` hack in `ImportPanel.cpp`. There is no TLAS reference anywhere in `Editor/` any more. The import panel is also no longer a yes/no dialog: it has an output-name input and a "place in its own subfolder" checkbox (`ImportPanel.cpp:142-175`). Only the `AssetImportConfig.h` options half is still open, and it is now bottom of the list.
+- **Jolt physics (old #4) — DONE**, see [[project_physics_jolt]].
+- **Asset deletion / eviction (old "deletion is its own design thread") — DONE**, see [[project_asset_eviction]].
 
-- [ ] Add `Amethyst::ContextMenu *m_contextMenu` to the panel, created once in the ctor (mirror `setupContextMenu`)
-- [ ] On each entity row, set `onMouseButton2DownCb` to select the entity, then `showContextMenu` with the items below
-- [ ] **Rename** — inline rename of the `TagComponent::tag`. Simplest first pass: a small popup/text input seeded with the current name; on commit write the tag and `refresh()`. (If inline tree-cell editing is too fiddly, a tiny rename popup is fine.)
-- [ ] **Delete** — delete entity *and* its subtree. Use `destroyHierarchy(entity)` (`HierarchyComponent.h:86`), NOT `entity.destroy()` directly (see gotcha)
-- [ ] **Delete (keep children)** — reparent children up, then delete just this entity:
-  1. capture `parent = hier.parent` (may be invalid = root)
-  2. for each `child` in a *copy* of `hier.children`: `setParent(child, parent)` (`HierarchyComponent.h:46`) — moves child under the grandparent, or to root if parent invalid
-  3. `removeFromParent(entity)` then `entity.destroy()`
-- [ ] `refresh()` the tree after any mutation, and clear the selection if the deleted entity was selected
-
-**Gotcha (verified)**: `Scene::destroyEntity` (`Scene.cpp:107`) only calls `m_registry.destroy(handle)` — it does **not** touch `HierarchyComponent`. Calling it on an entity that is in a parent's `children` vector, or that has children, leaves dangling `Entity` handles that later `isValid()`-check-fail or crash traversal. Always go through `destroyHierarchy` / `removeFromParent` / `setParent` so both sides of the parent↔child link stay consistent. The environment entity cannot be destroyed (guarded in `destroyEntity`) — the menu should not offer delete for it.
+Everything below is verified against the source at the time of writing.
 
 ---
 
-## 2. Make the content browser context-menu actions work
+## 1. Thumbnails — needs a design before more code
 
-**Where**: `Editor/src/layers/panels/ContentBrowserPanel.cpp` (asset menu `:667-675`, file menu `:737-744`)
+Highest value, but **an attempt was already started and stopped midway**, so the next move is settling the design, not resuming. See [[project_thumbnails]] for what landed (`ViewportConfig`/`RendererConfig`, `allowReadback` on offscreen targets, `enableAccelerationStructures` gating) versus what was never begun. Justification is in [[Asset Metadata]]: Sponza's content browser is 103 entries named `Sponza_Node_Primitive_0..102`, so for unnamed glTF content a thumbnail is the *only* affordance — no text search can find the curtain.
 
-Both menus currently push items with empty lambdas (`ContextMenuItem::action("Open", [] {})`). Wire them up.
+**The consumer side already exists.** `AssetContextMenuAID` carries a `thumbnail` field and `AssetContextMenuAIV::bind` (`context_menus.cpp:96-101`) already branches on it, falling back to the type SVG when it is `AM_INVALID_TEXTURE`. Picker and dropdown rows light up the moment something produces the texture. What is missing is only the producer.
 
-**Asset browser (`refreshAssetBrowser`, `:636`)** — the loop already has `handle` + `metadata`; capture them into the lambdas.
-- [ ] **Open** — dispatch by `metadata->assetType`:
-  - Mesh / model → instantiate into the active scene (same end state as import, minus the file load). Needs a scene-insert path from an already-loaded asset handle.
-  - Material → open the material editor workspace (see `Editor/src/layers/workspaces/MaterialEditorWorkspace.h`)
-  - Other types → no-op for now (leave the item out rather than showing a dead "Open")
-- [ ] **Rename** — rename the asset's registry name (`metadata->getName()`); refresh
-- [ ] **Delete** — remove from the asset registry. Depends on AssetManager having an unload/evict path — it currently does **not** (see `Improvements.md` → Resource Cleanup). May need a minimal "remove metadata entry" first, full GPU eviction later. Flag this dependency; do not fake it.
+**Leading approach: a dedicated lightweight renderer, not the deferred path.** A full `DeferredRenderer` for a 64px image is a lot of machinery — G-buffer, lighting, composite, GI — for something that wants one lit view of one asset. The precedent is `SceneQueryRenderer` (`Engine/src/renderer/SceneQueryRenderer.{h,cpp}`), which is exactly this shape: its own `CommandPool`, its own pipeline, its own readback buffer, driven through the shared `SceneGeometryDraw`, entirely outside the frame graph. A thumbnail renderer copies that structure and swaps the query readback for a colour-target readback.
 
-**File browser (`refreshFileBrowser`, `:684`)** — Import already exists as a menu item on files.
-- [ ] **Import** — reuse the existing `ImportPanel` flow instead of a stub
-- [ ] **Rename / Delete** — filesystem rename / delete of the actual file (with the usual "are you sure" for delete)
+This supersedes the render-at-import wording in [[Asset Metadata]] for meshes and materials. Import-time capture only works for things being decoded anyway, and cannot produce a thumbnail for a material or a scene object, which have nothing to decode. Cache location stays as specced: `cache/thumbs/<uuid>`, derived data, deletable, never in the `.rapt`.
 
-Note: opening a mesh into the scene shares the TLAS-rebuild problem below — route both through the same insert-then-rebuild path so we only fix it once.
+Not locked — the renderer shape is the open question, the cache and consumer sides are settled.
+
+## 2. Asset picker
+
+Two separate problems in `Editor/src/layers/panels/components/asset_picker.{h,cpp}`.
+
+**Taller picker rows — DONE 2026-08-13.** The picker root is sized `UDim2::fromScale(1.0f, 1.0f)` (`asset_picker.cpp:170`), so its height comes from the property table row it sits in. That row height could not be set per row: `Table` was uniform-stride by construction, positioning every row from `vi * rowStride`.
+
+`Table` now takes a height at row creation — `addRow(float height = 0.0f)` plus a `row(height, fn)` scope overload, 0 meaning inherit the table's `rowHeight`. Heights are stored as sparse overrides (`vector<pair<uint32_t, float>>`), so a uniform table allocates nothing, and the old `m_computedRowHeight` / `vi * rowStride` math is gone: `arrange()` and `updateSeparators()` already walked rows in order, so each carries a running `y`. New `Table::contentHeight()` sums the alive rows, which `PropertySection::fieldTable` now uses instead of `rowCount() * ROW_HEIGHT`.
+
+Side effect worth remembering: the old multiply ignored row separators, so section bodies were about 1px per row shorter than the table's own canvas. They are now correct, and therefore slightly taller than before.
+
+The picker row is 52px with a 28px preview (`PICKER_ROW_HEIGHT`, `PICKER_PREVIEW_SIZE`), and `AssetPickerConfig::previewSize` replaced the hardcoded `PREVIEW_SIZE` so the label's left offset follows the icon.
+
+**Bug: opening the dropdown a second time loses the icons.** `open()` calls `rebuildItems()` on every open (`asset_picker.cpp:153`), which builds fresh `AssetContextMenuAID` items and hands them to `m_menu->setItems()`. `buildMenu()` early-returns when `m_menu` already exists (`asset_picker.cpp:246-249`), so the menu and its pooled row views outlive the items they were bound to. `bind()` does call `setSvg` on every bind, so the row is asking for the icon — the failure is somewhere in row reuse or SVG texture lifetime across `setItems()`, most likely on the Amethyst side. Not diagnosed yet.
+
+## 3. World icon — DONE 2026-08-13
+
+`WorldSettingsPanel.cpp:72` used `Icons::SVG_SETTINGS`, a filled ring with radiating rectangular teeth that reads as a sun at 16px. Replaced with a new `Icons::SVG_WORLD` globe. The dead `SVG_MODULE` and `SVG_PREFAB` icons were removed at the same time, along with `components/searchbar.h`, which declared a `searchbar()` that was never implemented or included anywhere.
+
+## 4. Workspaces should not all open at startup
+
+`AmethystLayer::setupWorkspaces` constructs all four unconditionally (`AmethystLayer.cpp:332-335`): Level Editor, Texture Generator, Scripting, Animations. Only the level editor earns a tab on launch. The other three should open on demand, the way `SceneObjectEditorWorkspace` and `MaterialEditorWorkspace` already do.
+
+Feeds directly into #5 — "which workspaces are open" is part of the state that should be restored, not hardcoded.
+
+## 5. Real editor state persistence
+
+What exists today saves only dock split geometry. `saveLayout()` writes `m_dockingLayer->saveConfig()` into the `Amethyst::LayoutConfig` singleton keyed by dock name (`LevelEditorWorkspace.cpp:187-190`), and each workspace independently calls `LayoutConfig::instance().loadFromFile("layout.conf")` from its own constructor (`LevelEditorWorkspace.cpp:82`). `ScriptingWorkspace` and `AnimationsWorkspace` override `saveLayout()` to do nothing at all (`ScriptingWorkspace.h:10`, `AnimationsWorkspace.h:10`).
+
+So the splits come back but nothing else does. **Which panels were open is not saved** — every panel is constructed unconditionally in the workspace constructor (`LevelEditorWorkspace.cpp:56-67`), so closing one is forgotten on restart. Neither is the open world; `AmethystLayer.cpp:328` carries the TODO for exactly that, falling back to the project's startup world.
+
+Wanted: one editor-state file covering open workspaces, open panels per workspace, the active workspace, and the open world, loaded once rather than per-workspace-constructor. `LauncherConfig` is the precedent for editor-owned settings that outlive a project, but this state is per-project, so it belongs beside the project rather than beside the executable.
+
+## 6. Project settings menu
+
+No project settings UI exists. It should not be a dockable panel — it is a modal-ish thing you open, change, and close, so the precedent is `ImportPanel` rather than anything in the dock.
+
+## 7. Bug: two white lines around the content browser search bar
+
+1px white lines above and below the search bar's container. Cause unknown.
+
+Ruled out so far:
+- `.content-browser-section` (`theme.ams:286-288`) sets only `background-color: @bg-panel`, no border.
+- `.searchbar` (`theme.ams:182-192`) has a 1px border, but `@border-3` is `#343434`, not white.
+- Amethyst's style defaults are not the source: `borderPixelSize` default-initialises to `0`, and `Color3`'s default constructor is black (`libamethyst/src/modules/color.h:47`), so an unstyled frame is black, not white.
+
+The section frame is built at `ContentBrowserPanel.cpp:432-441` inside a `UIListLayout`-driven `m_contentPane`. Next thing to check is what shows through between list-layout slots.
 
 ---
 
-## 3. Expand the import panel + fix TLAS-in-import
+## 8. UI scaling — approach undecided
 
-**Where**: `Editor/src/layers/panels/ImportPanel.{h,cpp}`, `Engine/src/asset_manager/`
+A scale factor for the whole editor, so the UI is usable at different display densities. **Which side it lives on is not decided**, both options below are live.
 
-Right now import is yes/no only (`doImport`, `ImportPanel.cpp:143`) and the panel manually rebuilds the TLAS afterward with a self-admitted hack:
+The one thing that is settled: **marking the window dirty does not apply a scale by itself.** `UDim::resolve` is `scale * parentSize + offset` (`libamethyst/src/components/common.h:78`, with `UDim2` at `:100` and `UDim4` at `:120`), and `offset` is stored in the component's properties, baked at construction from constants like `ROW_ICON_SIZE = 13.0f`. A relayout re-runs the same arithmetic over the same stored numbers and produces a pixel-identical result. Whatever the approach, something has to change the numbers or the point they are consumed at.
 
-```
-// ImportPanel.cpp:157
-// TODO: having to manually rebuild the TLAS here is shit, the loader should handle this.
-scene->buildTLAS();
-```
+### Option A — editor side, rebuild the tree
 
-- [ ] Move TLAS build/update out of the UI: the loader / scene-insert path should mark the TLAS dirty and let the scene rebuild once per frame if dirty, instead of the panel calling `scene->buildTLAS()` explicitly. Any mesh-add path (import *and* "Open from content browser") benefits.
-- [ ] Add real import options (`AssetImportConfig.h` already exists) — e.g. scale, generate colliders, import materials/textures y/n, merge meshes, target parent entity. Surface them in the panel and pass through to the loader.
+Constants read a scale config at construction; changing the scale tears down and rebuilds the workspaces. Nothing in Amethyst changes.
 
----
+The teardown machinery already exists and is exercised whenever a workspace tab is closed: `AmethystLayer::closeWorkspace` (`AmethystLayer.cpp:411`) erases the workspace, and `Workspace::~Workspace` sets `m_teardown` to break the panel-dtor / `onDestroy` cycle (`Workspace.cpp:8-11`, `:64-65`). A rebuild is `saveLayout()` on each workspace, clear `m_workspaces`, run `setupWorkspaces()` again.
 
-## 4+. Bigger items (roadmap, not yet specced)
+What it needs:
+- Rebuild drained on a frame boundary, not inside the callback that changed the scale — the same reason `OutlinerPanel` defers through `m_pendingRefresh`, since the signal arrives from inside a context menu callback.
+- `setupWorkspaces()` builds `m_workspaceTabBar` itself (`AmethystLayer.cpp:309-336`), so calling it twice creates two. Split that out or tear the tab bar down too.
+- A `waitIdle` at the engine choke point before dropping viewport panels, which own GPU resources.
+- Dock layout already round-trips through `saveLayout()` / `applyConfig`, and selection lives in `EntitySelection` outside the tree, so both survive a rebuild for free.
 
-- [ ] **Drag assets into the editor/viewport** — drag from content browser → drop into viewport/outliner to instantiate. Depends on #2's scene-insert path.
-- [ ] **Jolt physics** — replace shelved Entropy (`Improvements.md` → Physics is SHELVED for exactly this). Needed for mouse ray-casts (click-to-pick in viewport) and general physics.
-- [ ] **Selection outline** — fix the stencil-buffer border (`Engine/src/renderer/passes/StencilBorderPass`, see [[StencilBorderPass]]) or replace with another method (jump-flood outline, etc.).
-- [ ] **Material system overhaul + node editor** — full rework of [[Material]] / [[MaterialData]] / [[MaterialInstance]], culminating in a material node editor. Largest item; do last.
+Cost: every pixel constant becomes scale-aware. `ROW_HEIGHT`, `PICKER_ROW_HEIGHT`, `CONTROL_HPAD`, `ROW_ICON_SIZE`, `EDITOR_MENU_BAR_HEIGHT` and the rest are `static constexpr float` today, so this touches every panel file.
 
----
+Gap: **theme-set font sizes do not scale this way.** Sizes the editor sets inline (`.fontSize = 12.0f`) scale fine, but `theme.ams` also sets them on classes (`.searchbar { font-size: 13px }`) and those come from the parser. Staying editor-side means scaling px values as the theme is loaded.
 
-## Deletion is its own design thread (biggest cost)
+### Option B — Amethyst side, scale in resolve()
 
-Deletion has never been looked at, so it is the deepest part of this work and the one most likely to be done wrong if rushed. Do it once, cleanly, not as per-call-site hacks. Two distinct kinds:
+Multiply `offset` by a global factor at the one place offsets become pixels — the three `resolve()` functions in `common.h`. Dirty-the-window then genuinely works, because the multiply happens during layout rather than at construction.
 
-- **Entity deletion** (outliner, #1) — hierarchy-aware. `Scene::destroyEntity` (`Scene.cpp:107`) only drops the entt handle and leaves dangling `Entity` handles in parent/child links. Every entity delete must go through `destroyHierarchy` / `removeFromParent` / `setParent`. This part is achievable now.
-- **Asset deletion / eviction** (content browser, #2) — has **no** engine support yet. AssetManager loads and never frees (`Improvements.md` → Resource Cleanup / Asset System). Doing it *cleanly* needs: (a) an AssetManager evict/unload path, (b) `AssetRef` use-count checks so we don't delete a referenced asset, and (c) deferred GPU destruction so a resource survives until all in-flight frames stop referencing it. That is a real subsystem, not a one-liner.
+The layout half is about three lines. The tail is the cost: **text does not go through UDim.** `fontSize` is a plain float that becomes `pixelSize` directly and drives atlas rasterization (`text_label.cpp:127`), so scaled boxes would keep unscaled text. Same for every other non-UDim pixel value — `borderPixelSize`, `cornerRadius`, `separatorWidth`, `Table::rowHeight`, `headerHeight`, `disclosureTriangleSize`, TabBar `barThickness`, SVG raster size. Each needs the factor applied where it is consumed.
 
-**Plan**: for the first pass, scope content-browser "Delete" to removing the registry entry (and guard against deleting an in-use asset), and split the full evict + deferred-GPU-destruction work out as its own task. Don't fake full deletion in the menu handler.
+### Related, and smaller than either
 
-## Cross-cutting notes
+**Theme changes have the same staleness problem.** `resolveStyle()` runs only from property setters and when `effectiveGuiState()` changes (`ui_object.cpp:237-239`); there is no theme-version counter, so a live theme reload would not re-resolve colours. Fix is a version int next to `m_lastResolvedGuiState`, compared the same way. Worth doing regardless of which scaling option wins.
 
-- The content browser is the reference for context menus, item pooling, and selection — mirror it, don't reinvent.
-- Anything that adds a mesh to the scene must share one "insert + mark TLAS dirty" path (#3). Import, content-browser Open, and drag-drop all hit it.
+## 9. Raised 2026-08-13, not yet specced
+
+**A proper header for `TreeView` and `Table`.** Both draw headers today — `Table` has `showHeader` / `headerHeight` / `arrangeHeader`, and the outliner turns its on with three columns (`OutlinerPanel.cpp:84-90`) — but they were not designed, they were made to work. No design yet for what a real one is: sort affordances, resize handles, alignment, styling.
+
+**Resetting a value back to its default.** Wanted at least for transforms. Undecided where the affordance lives: per-row (a revert arrow appearing on hover, `Icons::SVG_RESET` already exists), per-section on the collapsible header, or in a row context menu. Needs a source of truth for "default" first — for a transform that is identity, but for a component field in general it is whatever the class constructs with.
+
+## Bottom of the list
+
+Wanted, but explicitly deprioritised.
+
+**Content browser sort / filter.** Search is already in; sort, filter and a refresh/rescan button are not (see [[Asset & Editor Roadmap]] #3). **There is no design for this yet** — that comes before any implementation.
+
+**Import panel options.** Surface `AssetImportConfig.h` in the panel: scale, generate colliders, import materials/textures, merge meshes, target parent. The panel already has real fields to grow from.

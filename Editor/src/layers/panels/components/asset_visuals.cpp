@@ -2,16 +2,37 @@
 
 #include "Icons.h"
 
+#include "scenes/instances/Camera3D.h"
+#include "scenes/instances/Environment.h"
+#include "scenes/instances/Folder.h"
+#include "scenes/instances/Light3D.h"
+#include "scenes/instances/Mesh3D.h"
+#include "scenes/instances/Node3D.h"
+#include "scenes/instances/SpringArm3D.h"
+#include "scenes/instances/Terrain3D.h"
 #include "scenes/instances/controllers/CameraController.h"
+
+static constexpr const char *ICON_CLASS_DEFAULT = "treeview-icon";
+static constexpr const char *ICON_CLASS_FOLDER = "treeview-icon-folder";
 
 struct AuthoredIcon {
     const Rapture::TypeInfo *authoredClass;
     const char *svg;
+    const char *styleClass = ICON_CLASS_DEFAULT;
 };
 
+// most derived first, the lookup walks a class up its bases and takes the first match at each level
 static const AuthoredIcon AUTHORED_ICONS[] = {
     {&Rapture::CameraController::staticType(), Icons::SVG_CAMERA},
     {&Rapture::Controller::staticType(), Icons::SVG_CONTROLLER},
+    {&Rapture::Folder::staticType(), Icons::SVG_FOLDER, ICON_CLASS_FOLDER},
+    {&Rapture::Environment::staticType(), Icons::SVG_WORLD},
+    {&Rapture::Camera3D::staticType(), Icons::SVG_CAMERA},
+    {&Rapture::SpringArm3D::staticType(), Icons::SVG_LINK},
+    {&Rapture::Terrain3D::staticType(), Icons::SVG_GRID},
+    {&Rapture::Mesh3D::staticType(), Icons::SVG_MESH},
+    {&Rapture::Light3D::staticType(), Icons::SVG_LIGHT},
+    {&Rapture::Node3D::staticType(), Icons::SVG_TRANSFORM},
 };
 
 Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
@@ -43,23 +64,23 @@ Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
     }
 }
 
-static const char *s_authoredIcon(const Rapture::TypeInfo *authoredClass)
+SceneObjectIcon SceneObject_iconForClass(const Rapture::TypeInfo *authoredClass)
 {
     for (const Rapture::TypeInfo *cls = authoredClass; cls != nullptr; cls = cls->base) {
         for (const AuthoredIcon &icon : AUTHORED_ICONS) {
             if (icon.authoredClass == cls) {
-                return icon.svg;
+                return {icon.svg, icon.styleClass};
             }
         }
     }
 
-    return Icons::SVG_CUBE;
+    return {Icons::SVG_CUBE, ICON_CLASS_DEFAULT};
 }
 
 const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass)
 {
     if (type == Rapture::ASSET_SCENE_OBJECT) {
-        return s_authoredIcon(authoredClass);
+        return SceneObject_iconForClass(authoredClass).svg;
     }
 
     switch (type) {

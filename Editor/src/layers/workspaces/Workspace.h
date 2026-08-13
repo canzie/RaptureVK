@@ -12,7 +12,7 @@
 
 class Workspace {
   public:
-    Workspace() { m_context.selection = &m_selection; }
+    explicit Workspace(std::string_view kind) : kind(kind) { m_context.selection = &m_selection; }
     virtual ~Workspace();
 
     Amethyst::DockingLayer *getDockingLayer(void) const { return m_dockingLayer; }
@@ -33,6 +33,10 @@ class Workspace {
 
     virtual void onUpdate(float dt);
     virtual void saveLayout(void) = 0;
+
+  public:
+    // stable name for what this workspace edits, written to and read back from the editor's stored state
+    const std::string_view kind;
 
   protected:
     /**

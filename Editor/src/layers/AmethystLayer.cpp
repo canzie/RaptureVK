@@ -1,6 +1,7 @@
 #include "AmethystLayer.h"
 
 #include "EditorLayout.h"
+#include "EditorState.h"
 #include "LauncherConfig.h"
 #include "ProjectLauncher.h"
 #include "asset_manager/AssetManager.h"
@@ -207,6 +208,82 @@ void AmethystLayer::onDetach()
     for (auto &ws : m_workspaces) {
         ws->saveLayout();
     }
+
+    storeEditorState();
+}
+
+void AmethystLayer::openLevelEditor()
+{
+    openAssetWorkspace(Rapture::Application::getInstance().getProject().getStartupWorld());
+}
+
+void AmethystLayer::openStoredWorkspace(const EditorWorkspaceState &entry)
+{
+    if (entry.handle != Rapture::INVALID_ASSET_HANDLE) {
+        openAssetWorkspace(entry.handle);
+        return;
+    }
+
+    PanelServices services = buildServices();
+
+    if (entry.kind == LevelEditorWorkspace::staticKind()) {
+        openLevelEditor();
+    } else if (entry.kind == TextureGeneratorWorkspace::staticKind()) {
+        m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(*m_workspaceTabBar, services));
+    } else if (entry.kind == ScriptingWorkspace::staticKind()) {
+        m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(*m_workspaceTabBar, services));
+    } else if (entry.kind == AnimationsWorkspace::staticKind()) {
+        m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(*m_workspaceTabBar, services));
+    } else {
+        RP_WARN("dropping stored workspace '{}', this build has no such workspace", entry.kind);
+    }
+}
+
+Rapture::AssetHandle AmethystLayer::assetHandleFor(const Workspace &workspace) const
+{
+    for (const auto &[handle, assetWorkspace] : m_assetWorkspaces) {
+        if (assetWorkspace == &workspace) {
+            return handle;
+        }
+    }
+    return Rapture::INVALID_ASSET_HANDLE;
+}
+
+void AmethystLayer::restoreActiveWorkspace(const EditorState &state)
+{
+    const EditorWorkspaceState *wanted = nullptr;
+    for (const EditorWorkspaceState &entry : state.workspaces) {
+        if (entry.active) {
+            wanted = &entry;
+            break;
+        }
+    }
+
+    Workspace *target = m_workspaces.front().get();
+    if (wanted != nullptr) {
+        for (auto &ws : m_workspaces) {
+            if (ws->kind == wanted->kind && assetHandleFor(*ws) == wanted->handle) {
+                target = ws.get();
+                break;
+            }
+        }
+    }
+
+    m_workspaceTabBar->select(target->getContainer());
+}
+
+void AmethystLayer::storeEditorState()
+{
+    EditorState state;
+    state.workspaces.reserve(m_workspaces.size());
+
+    for (const auto &ws : m_workspaces) {
+        state.workspaces.push_back({std::string(ws->kind), ws->active, assetHandleFor(*ws)});
+    }
+
+    auto &project = Rapture::Application::getInstance().getProject();
+    state.store(project);
+    project.saveProject(project.getProjectFilePath());
 }
 
 void AmethystLayer::onUpdate(float dt)
@@ -304,7 +381,8 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
 
 void AmethystLayer::setupWorkspaces(void)
 {
-    m_workspaces.reserve(5);
+    EditorState state = EditorState::load(Rapture::Application::getInstance().getProject());
+    m_workspaces.reserve(state.workspaces.size() + 1);
 
     Amethyst::UIScope(m_window).tabBar(
         {
@@ -320,26 +398,23 @@ void AmethystLayer::setupWorkspaces(void)
                     .barThickness = EDITOR_WORKSPACE_TAB_HEIGHT,
                 },
         },
-        [this](Amethyst::TabBarScope &tabs) {
-            m_workspaceTabBar = &tabs.component;
+        [this](Amethyst::TabBarScope &tabs) { m_workspaceTabBar = &tabs.component; });
 
-            PanelServices services = buildServices();
+    bool hasLevelEditor = false;
+    for (const EditorWorkspaceState &entry : state.workspaces) {
+        hasLevelEditor = hasLevelEditor || entry.kind == LevelEditorWorkspace::staticKind();
+        openStoredWorkspace(entry);
+    }
 
-            // TODO: take the open world from the saved editor state instead of the project's startup world
-            auto &project = Rapture::Application::getInstance().getProject();
-            Rapture::AssetPtr<Rapture::World> levelWorld(Rapture::AssetManager::getAsset(project.getStartupWorld()));
-            Rapture::Viewport *primaryViewport = Rapture::Application::getInstance().getViewportManager().getPrimaryViewport();
-            m_workspaces.push_back(std::make_unique<LevelEditorWorkspace>(tabs, services, std::move(levelWorld), primaryViewport));
-            m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(tabs, services));
-            m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(tabs, services));
-            m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(tabs, services));
-        });
+    if (!hasLevelEditor) {
+        openLevelEditor();
+    }
 
     for (auto &ws : m_workspaces) {
         sizeDockingLayer(*ws);
     }
 
-    m_workspaces[0]->active = true;
+    restoreActiveWorkspace(state);
 
     m_workspaceTabBar->onSelectionChanged = [this](int32_t index) {
         Amethyst::Instance *content = m_workspaceTabBar->getTabContent(index);
@@ -394,6 +469,15 @@ void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
     case Rapture::ASSET_MATERIAL_INSTANCE:
         workspace = std::make_unique<MaterialEditorWorkspace>(*m_workspaceTabBar, services, handle);
         break;
+    case Rapture::ASSET_WORLD: {
+        Rapture::AssetPtr<Rapture::World> world(Rapture::AssetManager::getAsset(handle));
+        if (!world) {
+            RP_WARN("world '{}' could not be loaded, not opening a level editor for it", metadata.getName());
+            return;
+        }
+        workspace = std::make_unique<LevelEditorWorkspace>(*m_workspaceTabBar, services, std::move(world));
+        break;
+    }
     default:
         RP_WARN("'{}' assets have no workspace to open in", Rapture::AssetTypeToString(metadata.assetType));
         return;

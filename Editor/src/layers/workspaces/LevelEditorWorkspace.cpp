@@ -18,19 +18,21 @@
 #include <window_context/Application.h>
 
 static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
+static constexpr uint32_t INITIAL_VIEWPORT_WIDTH = 1280;
+static constexpr uint32_t INITIAL_VIEWPORT_HEIGHT = 720;
 static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
 
-LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services,
-                                           Rapture::AssetPtr<Rapture::World> world, Rapture::Viewport *viewport)
-    : m_world(std::move(world))
+LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
+                                           Rapture::AssetPtr<Rapture::World> world)
+    : Workspace(staticKind()), m_world(std::move(world))
 {
     RP_ASSERT(m_world, "a level editor has nothing to edit without a world");
 
     m_context.services = services;
     m_context.world = m_world.get();
     m_context.scene = m_world->getScene();
-    m_context.viewport = viewport;
-    setupBase(tabs, "Level Editor");
+    setupViewport();
+    setupBase(tabBar, "Level Editor", {});
 
     m_dockingLayer->name = "Editor Dock";
     m_dockingLayer->tabBarClasses = {"panel", "panel-tab"};
@@ -72,6 +74,28 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const Pa
             }
         }
     }
+}
+
+LevelEditorWorkspace::~LevelEditorWorkspace()
+{
+    m_panels.clear();
+    Rapture::Application::getInstance().getViewportManager().destroyViewport(m_viewport);
+}
+
+void LevelEditorWorkspace::setupViewport()
+{
+    auto &app = Rapture::Application::getInstance();
+
+    m_viewport = app.getViewportManager().createViewport({
+        .name = m_world->getName(),
+        .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
+        .width = INITIAL_VIEWPORT_WIDTH,
+        .height = INITIAL_VIEWPORT_HEIGHT,
+    });
+    m_viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
+    m_viewport.viewport->setScene(m_context.scene);
+
+    m_context.viewport = m_viewport.viewport;
 }
 
 void LevelEditorWorkspace::setupHotbar()

@@ -7,6 +7,7 @@
 #include <components/context_menu.h>
 #include <memory>
 #include <scenes/World.h>
+#include <viewport/Viewport.h>
 
 namespace Rapture {
 class Layer;
@@ -14,12 +15,19 @@ class Layer;
 
 class LevelEditorWorkspace : public Workspace {
   public:
-    LevelEditorWorkspace(Amethyst::TabBarScope &tabs, const PanelServices &services, Rapture::AssetPtr<Rapture::World> world,
-                         Rapture::Viewport *viewport);
+    LevelEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::AssetPtr<Rapture::World> world);
+    ~LevelEditorWorkspace() override;
 
     void saveLayout() override;
 
+    static constexpr std::string_view staticKind() { return "levelEditor"; }
+
   private:
+    /**
+     * @brief Creates the viewport this workspace draws its world into
+     */
+    void setupViewport();
+
     void setupHotbar();
 
     /**
@@ -51,6 +59,7 @@ class LevelEditorWorkspace : public Workspace {
 
     Rapture::AssetPtr<Rapture::World> m_world;
     Rapture::Layer *m_playLayer = nullptr;
+    Rapture::ViewportContext m_viewport;
 };
 
 #endif // RAPTURE__LEVEL_EDITOR_WORKSPACE_H

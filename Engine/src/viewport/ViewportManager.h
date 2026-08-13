@@ -21,14 +21,15 @@ class ViewportManager {
     /**
      * @brief Create a new viewport
      * @param config Creation-time configuration for the viewport and its render target
-     * @return Non-owning pointer to the created viewport
+     * @return What identifies the created viewport, and the viewport itself
      */
-    Viewport *createViewport(const ViewportConfig &config);
+    ViewportContext createViewport(const ViewportConfig &config);
 
-    void destroyViewport(const std::string &name);
-
-    Viewport *getViewport(const std::string &name);
-    Viewport *getPrimaryViewport() { return m_primaryViewport; }
+    /**
+     * @brief Destroy the viewport a context refers to, doing nothing when it refers to none
+     * @param context What createViewport handed back
+     */
+    void destroyViewport(const ViewportContext &context);
 
     void drawAll();
 
@@ -39,7 +40,6 @@ class ViewportManager {
   private:
     RenderContext m_renderContext;
     std::vector<std::unique_ptr<Viewport>> m_viewports;
-    Viewport *m_primaryViewport = nullptr;
 };
 
 } // namespace Rapture

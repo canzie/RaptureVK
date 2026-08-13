@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace Rapture {
@@ -118,6 +119,18 @@ class Project {
 
     const ProjectConfig &getConfig() const { return m_config; }
 
+    /**
+     * @brief The editor's own state, stored in the project file but never read by it
+     * @return Cursor to the section root, invalid when the project holds none
+     */
+    ReadNode getEditorSection() const { return m_editorSection.rootView(); }
+
+    /**
+     * @brief Replaces the editor's state, to be written out with the project
+     * @param section A readable document holding whatever the editor wants back
+     */
+    void setEditorSection(SerialDocument section) { m_editorSection = std::move(section); }
+
   private:
     Project() = default;
 
@@ -133,6 +146,7 @@ class Project {
 
   private:
     ProjectConfig m_config;
+    SerialDocument m_editorSection;
     std::vector<AssetPtr<World>> m_worlds;
     SerialDocument m_saveFile;
 };

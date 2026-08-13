@@ -24,7 +24,7 @@ static const char *s_previewViewportName = "material_preview";
 
 MaterialEditorWorkspace::MaterialEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
                                                  Rapture::AssetHandle handle)
-    : m_handle(handle)
+    : Workspace(staticKind()), m_handle(handle)
 {
     m_context.services = services;
 
@@ -76,10 +76,8 @@ MaterialEditorWorkspace::~MaterialEditorWorkspace()
 
     auto &app = Rapture::Application::getInstance();
 
-    if (m_previewViewport != nullptr) {
-        app.getViewportManager().destroyViewport(s_previewViewportName);
-        m_previewViewport = nullptr;
-    }
+    app.getViewportManager().destroyViewport(m_previewViewport);
+    m_previewViewport = {};
 
     m_previewScene.reset();
 }
@@ -120,13 +118,13 @@ void MaterialEditorWorkspace::setupPreviewScene()
         .width = extent.width,
         .height = extent.height,
     });
-    m_previewViewport->createRenderer(Rapture::RendererType::DEFERRED);
-    m_previewViewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, false);
-    m_previewViewport->setScene(m_previewScene.get());
-    m_previewViewport->setCamera(camera);
+    m_previewViewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
+    m_previewViewport.viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, false);
+    m_previewViewport.viewport->setScene(m_previewScene.get());
+    m_previewViewport.viewport->setCamera(camera);
 
     m_context.scene = m_previewScene.get();
-    m_context.viewport = m_previewViewport;
+    m_context.viewport = m_previewViewport.viewport;
 
     m_previewScene->locked = true;
 }

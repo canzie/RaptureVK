@@ -5,6 +5,8 @@
 
 #include <asset_manager/AssetCommon.h>
 #include <asset_manager/AssetHandle.h>
+#include <viewport/Viewport.h>
+
 #include <memory>
 
 namespace Rapture {
@@ -37,6 +39,8 @@ class SceneObjectEditorWorkspace : public Workspace {
 
     void onUpdate(float dt) override;
     void saveLayout() override;
+
+    static constexpr std::string_view staticKind() { return "sceneObjectEditor"; }
 
   private:
     SceneObjectEditorWorkspace(const PanelServices &services, Rapture::AssetHandle handle);
@@ -73,7 +77,7 @@ class SceneObjectEditorWorkspace : public Workspace {
     Rapture::SerialDocument *m_document = nullptr;
 
     std::unique_ptr<Rapture::Scene> m_scene;
-    Rapture::Viewport *m_viewport = nullptr;
+    Rapture::ViewportContext m_viewport;
     Rapture::SceneObject *m_sceneRoot = nullptr;
 };
 
