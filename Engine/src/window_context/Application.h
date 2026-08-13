@@ -116,7 +116,7 @@ class Application {
      * @brief Frames elapsed since startup, never wrapping.
      * @return The frame number.
      */
-    uint64_t getFrameCount() const { return m_frameCount; }
+    uint64_t getMonotonicFrameCount() const { return m_frameCount; }
 
     static Application &getInstance() { return *s_instance; }
     static const RenderContext &getRenderContext() { return s_instance->m_vulkanContext->getRenderContext(); }

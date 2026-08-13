@@ -31,6 +31,7 @@ void Viewport::createRenderer(RendererType type)
 
     RendererConfig rendererConfig{
         .targetType = m_config.targetType,
+        .framesInFlight = m_config.framesInFlight,
         .allowReadback = m_config.allowReadback,
         .enableAccelerationStructures = m_config.enableAccelerationStructures,
     };
@@ -51,7 +52,7 @@ void Viewport::createRenderer(RendererType type)
 
 void Viewport::drawFrame()
 {
-    if (!m_active || m_renderer == nullptr || m_scene == nullptr) {
+    if (m_renderer == nullptr || m_scene == nullptr) {
         return;
     }
 

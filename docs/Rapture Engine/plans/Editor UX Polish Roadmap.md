@@ -4,7 +4,7 @@ Snapshot 2026-08-13, replacing the 2026-07-04 version. Phase 1 of [[Asset & Edit
 
 Guiding principle is unchanged: make the current loop feel finished before building anything new.
 
-**Next up: #5, editor state persistence.** Thumbnails (#1) is the highest-value item but was stopped midway once already and needs a design settled before more code goes in, so it does not go first.
+**Next up: #1, thumbnails.** #5 (editor state persistence) and #4 (workspaces on demand) landed 2026-08-13.
 
 ## Corrections to the 2026-07-04 snapshot
 
@@ -19,17 +19,109 @@ Everything below is verified against the source at the time of writing.
 
 ---
 
-## 1. Thumbnails — needs a design before more code
+## 1. Thumbnails
 
-Highest value, but **an attempt was already started and stopped midway**, so the next move is settling the design, not resuming. See [[project_thumbnails]] for what landed (`ViewportConfig`/`RendererConfig`, `allowReadback` on offscreen targets, `enableAccelerationStructures` gating) versus what was never begun. Justification is in [[Asset Metadata]]: Sponza's content browser is 103 entries named `Sponza_Node_Primitive_0..102`, so for unnamed glTF content a thumbnail is the *only* affordance — no text search can find the curtain.
+Highest value. **An attempt was already started and stopped midway**, see [[project_thumbnails]] for what landed (`ViewportConfig`/`RendererConfig`, `allowReadback` on offscreen targets, `enableAccelerationStructures` gating) versus what was never begun. Justification is in [[Asset Metadata]]: Sponza's content browser is 103 entries named `Sponza_Node_Primitive_0..102`, so for unnamed glTF content a thumbnail is the *only* affordance — no text search can find the curtain.
 
 **The consumer side already exists.** `AssetContextMenuAID` carries a `thumbnail` field and `AssetContextMenuAIV::bind` (`context_menus.cpp:96-101`) already branches on it, falling back to the type SVG when it is `AM_INVALID_TEXTURE`. Picker and dropdown rows light up the moment something produces the texture. What is missing is only the producer.
 
-**Leading approach: a dedicated lightweight renderer, not the deferred path.** A full `DeferredRenderer` for a 64px image is a lot of machinery — G-buffer, lighting, composite, GI — for something that wants one lit view of one asset. The precedent is `SceneQueryRenderer` (`Engine/src/renderer/SceneQueryRenderer.{h,cpp}`), which is exactly this shape: its own `CommandPool`, its own pipeline, its own readback buffer, driven through the shared `SceneGeometryDraw`, entirely outside the frame graph. A thumbnail renderer copies that structure and swaps the query readback for a colour-target readback.
+### Reuse `DeferredRenderer`, do not write a thumbnail renderer
 
-This supersedes the render-at-import wording in [[Asset Metadata]] for meshes and materials. Import-time capture only works for things being decoded anyway, and cannot produce a thumbnail for a material or a scene object, which have nothing to decode. Cache location stays as specced: `cache/thumbs/<uuid>`, derived data, deletable, never in the `.rapt`.
+A dedicated lightweight renderer was considered on the grounds that the deferred path is heavy for a 64px image, with `SceneQueryRenderer` as the precedent. That precedent does not carry: `SceneQueryRenderer` is 439 lines *because it does no shading*, writing entity id and depth into an SSBO with no materials, lights or IBL. A thumbnail must be shaded, and shading is split across `GBufferPass.cpp` (735 lines of bindless material fetch) and `LightingPass.cpp` (359 lines of OpenPBR, IBL and lights). A forward thumbnail shader duplicates both, and the node-graph codegen in [[project_material_overhaul]] would then need a second output layout so thumbnails do not disagree with the material editor.
 
-Not locked — the renderer shape is the open question, the cache and consumer sides are settled.
+The cost being avoided is largely not there. At 256² the pass chain covers ~65k pixels, and the expensive parts are already switchable: `RendererConfig::enableAccelerationStructures = false` skips `RtInstanceData` and `DynamicDiffuseGI` at construction, and `RENDER_USE_GLOBAL_ILLUMINATION` is per view. `MaterialEditorWorkspace.cpp:121-123` runs this exact configuration for its material ball today. One persistent 256² viewport is reused for every asset.
+
+A dedicated renderer becomes the right call if thumbnails ever need bulk generation at import time, or generation off the main thread. Neither is true now.
+
+### Getting the image out needs no renderer changes
+
+`Renderer::getSceneRenderTarget().getTexture(getLastRenderedFrameIndex())` is the composited image. `Texture::readbackData()` (`Texture.cpp:670`) transitions `SHADER_READ_ONLY → TRANSFER_SRC`, copies to a staging buffer and transitions back — which is the layout the renderer already leaves an offscreen target in after `transitionToShaderReadLayout`. With `allowReadback = true` this works untouched.
+
+The offscreen target is `TextureFormat::RGBA16F` (`DeferredRenderer.cpp:204-206`), but `Composite.fs.glsl:19-27` has already applied exposure, `GT7ToneMapping` and optional sRGB encode, so the stored values are display-referred. CPU side is a half to float widen and a clamp to 8 bit, no tonemapping.
+
+`readbackData()` ends in `graphicsQueue->waitIdle()` (carries its own TODO to become a fence wait). That queue stall, not the renderer, is the real cost — so generation is main thread and rate limited to one per frame.
+
+### Render settings and lighting
+
+GI off, ambient occlusion on, acceleration structures off at construction.
+
+There is no flat ambient colour term in the engine. Ambient today means IBL from `Environment`'s skybox (`setSkybox` + `skyIntensity`) plus `GroundTruthAmbientOcclusionPass`, and `LightingPass.cpp:177` pulls `environment->getImageBasedLighting()` independently of whether `SkyboxPass` draws that cubemap — which is what makes "lit by the environment, black background" possible at all.
+
+A constant ambient would be enough for meshes and scene objects, which are staged with a clay material and so only have a diffuse response. It is not enough for materials: a metal has almost no diffuse response and is nearly all specular reflection of its surroundings, so with no environment a metal ball is black with two or three pinprick highlights. Since materials are the main reason thumbnails are wanted, IBL from a small studio cubemap is the recommendation. `MaterialEditorWorkspace.cpp:105-110` already loads `default.cubemap` for exactly this.
+
+A single overhead sun leaves half of a sphere black. The rig that avoids it puts the key **over the camera's shoulder** rather than above the subject, so the lit side faces the viewer:
+
+- **Key** — directional, roughly 30–45° up and 30° to one side of the camera axis. Does the shaping.
+- **Fill** — opposite side at 20–30% of the key, keeps the dark side readable without flattening it.
+- **Rim** — behind and above, catches the silhouette edge so the subject separates from a flat background. Matters more here than usual, given the background is plain.
+
+With IBL supplying ambient, key plus rim is often enough. `DeferredLighting.fs.glsl:509-510` loops over `lightStaticCount + lightDynamicCount`, so this is three `DirectionalLightComponent`s and no shader change.
+
+### Background
+
+**Plain for now.** A checkerboard of `#1A1A1A` and `#414141` is wanted eventually, but neither route there is worth taking yet.
+
+There is no coverage mask coming out of the renderer — `Composite.fs.glsl:27` writes `vec4(color, 1.0)` and `GBufferPass.cpp:247` clears to `(0,0,0,1)`. The two routes were an emissive camera-facing checker quad in the scratch scene, which needs no renderer changes, and coverage into alpha, which stores thumbnails transparent and lets the editor draw the backdrop. The second is the better end state, since restyling the background would not mean regenerating every thumbnail, but it touches `Composite.fs.glsl` and the lighting pass. Revisit it when a forward renderer exists, where coverage in alpha falls out naturally rather than being retrofitted onto the deferred composite.
+
+Plain is close to free: `DeferredLighting.fs.glsl:435-437` already writes `vec4(0.0, 0.0, 0.0, 1.0)` for pixels with no geometry.
+
+**Blocker: the skybox would still draw over it.** The scratch scene needs a skybox for IBL but must not render it, or the cubemap becomes the background. `Environment::isSkyboxEnabled()` is exactly that switch, and the World Settings checkbox already drives it (`ComponentEditors.cpp:513`, read back at `:551`), but `DeferredRenderer::recordCommandBuffer` never reads it — `DeferredRenderer.cpp:323-329` only checks `m_skyboxPass->hasActiveSkybox()`. So the checkbox is inert today. Honouring the flag is a prerequisite here and a standalone bug fix.
+
+### Per type staging
+
+One scratch scene, restaged per asset.
+
+| Type | Staging |
+| --- | --- |
+| Texture | no 3D at all, a separate path that downscales and encodes |
+| Cubemap | octahedral projection, which makes it 2D like a texture — the oct mapping is already in `ddgi/IrradianceCommon.glsl` |
+| Material / instance | sphere, `MaterialEditorWorkspace::showMaterialOnSphere` is the precedent |
+| Mesh | default material, framed to bounds |
+| Scene object | instantiate the subtree, framed to bounds |
+| World | its own camera where it has one, otherwise framed to bounds |
+
+Not a checkerboard material for meshes — a checkerboard reads as *missing texture* in every other tool. `RE_DEFAULT_MATERIAL_INSTANCE` (`ReservedAssets.h:16`) is the neutral clay option, and for a mesh the thumbnail carries the silhouette, not the surface.
+
+### Framing
+
+One shared helper across mesh, scene object and world, so every thumbnail is shot the same way. Fixed camera direction, 3/4 view and slightly above, $\hat{d} = \text{normalize}(1, 0.6, 1)$ from the bounds centre.
+
+Union the staged bounds into a centre $c$ and radius $r$. A thumbnail is square, so the horizontal and vertical half-angles are equal, and with vertical FOV $\theta$ the distance at which the bounding sphere exactly touches the frustum edges is
+
+$$d = \frac{r}{\sin(\theta/2)}$$
+
+Pad it so nothing kisses the border, $d' = 1.1\,d$, and fit the planes around the result:
+
+$$n = \max(0.01,\; d' - r), \qquad f = d' + r$$
+
+Camera sits at $c + \hat{d}\,d'$ looking at $c$. A non-square target would need $d = r / \sin(\min(\theta_x, \theta_y)/2)$, which does not come up here.
+
+**Bounds cannot come from `MeshComponent::worldBoundingBox`.** That field is only refreshed during a render — `SceneGeometryDraw.cpp:56` and the two shadow passes — so it is stale or unset before the first frame, which is exactly when framing needs it. Compute it directly from `mesh->getBoundsMin()` / `getBoundsMax()` transformed by `transform.world`, which is what `MeshComponent::updateWorldBoundingBox` does anyway (`Components.h:146-151`).
+
+### Cache
+
+This supersedes the render-at-import wording in [[Asset Metadata]] for meshes and materials. Import-time capture only works for things being decoded anyway, and cannot produce a thumbnail for a material or a scene object, which have nothing to decode.
+
+Cache location is `Project::getThumbnailDirectory()` (`Project.h:115`), which resolves to `<cache>/thumbnails` and is created in `Project.cpp:126` — note the directory is `thumbnails`, not the `thumbs` the older docs say. Derived data, deletable, never in the `.rapt`.
+
+### What the engine actually needs
+
+Verified against source. Two real renderer changes, both small.
+
+1. **Honour `Environment::isSkyboxEnabled()`** — `DeferredRenderer.cpp:323-329`, as above. Also un-breaks the World Settings checkbox.
+2. **Split render-on-demand from render-every-frame** — `ViewportManager::drawAll()` (`ViewportManager.cpp:28-33`) renders every viewport unconditionally, while `Viewport::drawFrame()` (`Viewport.cpp:52-59`) is what early-returns on `!m_active`. A thumbnail viewport wants the inverse: skipped by the frame loop, rendered when asked. Move the `m_active` check from `drawFrame` into `drawAll`; `drawFrame` has one caller today (`ViewportManager.cpp:31`).
+
+Needed but outside the renderer:
+
+3. **`STB_IMAGE_WRITE_IMPLEMENTATION` in a translation unit** — the header is vendored at `Engine/vendor/_deps/stb-src/stb_image_write.h`, but nothing in `Engine/src` or `Editor/src` defines the macro, so no PNG writer is linked.
+4. **Cubemap to octahedral compute shader** — nothing comparable exists. `Generators/` holds `IrradianceConvolution.cs.glsl` and `SpecularPrefilter.cs.glsl`, both cubemap to cubemap. The only genuinely new GPU work here, and it serves cubemap thumbnails alone, so it goes last.
+
+Already present and needing no change: readback (`Texture::readbackData()`, `Texture.cpp:670`), `allowReadback` plumbed `ViewportConfig` to `RendererConfig` to `SceneRenderTarget.cpp:61`, acceleration-structure gating (`Renderer.h:24`), per-view GI flag, multiple directional lights, `Viewport::setCamera`, `RE_DEFAULT_MATERIAL_INSTANCE` (`ReservedAssets.h:16`), `PanelServices::registerTexture` (`common.h:32`), `stb_image_resize2.h` for CPU downscale, and `Project::getThumbnailDirectory()` (`Project.h:115`).
+
+### Still open
+
+- Flat ambient versus IBL — recommendation above is IBL, on the strength of the metal case.
+- Whether the background ever becomes a checkerboard, and by which of the two routes.
 
 ## 2. Asset picker
 

@@ -28,6 +28,9 @@ void ViewportManager::destroyViewport(const ViewportContext &context)
 void ViewportManager::drawAll()
 {
     for (auto &vp : m_viewports) {
+        if (!vp->isActive()) {
+            continue;
+        }
         vp->drawFrame();
     }
 }

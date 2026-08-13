@@ -26,6 +26,7 @@ struct ViewportConfig {
     SceneRenderTarget::TargetType targetType;
     uint32_t width;
     uint32_t height;
+    uint32_t framesInFlight;
     bool allowReadback = false;
     bool enableAccelerationStructures = true;
 };

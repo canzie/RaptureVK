@@ -20,6 +20,7 @@ class Scene;
  */
 struct RendererConfig {
     SceneRenderTarget::TargetType targetType;
+    uint32_t framesInFlight;
     bool allowReadback = false;
     bool enableAccelerationStructures = true;
 };

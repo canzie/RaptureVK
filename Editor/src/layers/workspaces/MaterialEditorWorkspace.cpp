@@ -117,6 +117,7 @@ void MaterialEditorWorkspace::setupPreviewScene()
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = extent.width,
         .height = extent.height,
+        .framesInFlight = app.getFramesInFlight(),
     });
     m_previewViewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
     m_previewViewport.viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, false);

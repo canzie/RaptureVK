@@ -123,6 +123,7 @@ void SceneObjectEditorWorkspace::setupScene()
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = extent.width,
         .height = extent.height,
+        .framesInFlight = app.getFramesInFlight(),
     });
     m_viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
     m_viewport.viewport->setScene(m_scene.get());

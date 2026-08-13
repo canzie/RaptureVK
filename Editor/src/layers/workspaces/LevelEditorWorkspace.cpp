@@ -91,6 +91,7 @@ void LevelEditorWorkspace::setupViewport()
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = INITIAL_VIEWPORT_WIDTH,
         .height = INITIAL_VIEWPORT_HEIGHT,
+        .framesInFlight = app.getFramesInFlight(),
     });
     m_viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
     m_viewport.viewport->setScene(m_context.scene);

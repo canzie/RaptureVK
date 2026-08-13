@@ -33,7 +33,7 @@ DeferredRenderer::DeferredRenderer(RenderContext renderContext, const RendererCo
 
     if (m_config.enableAccelerationStructures) {
         m_rtInstanceData = std::make_unique<RtInstanceData>(m_renderContext);
-        m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(Application::getInstance().getFramesInFlight());
+        m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(m_config.framesInFlight);
     }
 
     recreateRenderPasses();
@@ -72,7 +72,7 @@ void DeferredRenderer::drawFrame(Scene &activeScene, ecs::EntityAccessor camera,
         processPendingViewportResize();
     }
 
-    m_currentFrame = Application::getInstance().getFrameInFlightIndex();
+    m_currentFrame = static_cast<uint32_t>(Application::getInstance().getMonotonicFrameCount() % m_config.framesInFlight);
 
     m_giActive = m_config.enableAccelerationStructures && settings.useGlobalIllumination();
     m_lightingFlags = settings.flags;
@@ -202,8 +202,8 @@ void DeferredRenderer::createRenderTarget()
         // Create offscreen render target for Editor mode
         // Use BGRA8 SRGB format (matches typical swapchain format)
         m_sceneRenderTarget = std::make_unique<SceneRenderTarget>(static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height),
-                                                                  Application::getInstance().getFramesInFlight(),
-                                                                  TextureFormat::RGBA16F, m_config.allowReadback);
+                                                                  m_config.framesInFlight, TextureFormat::RGBA16F,
+                                                                  m_config.allowReadback);
         RP_CORE_INFO("Created OFFSCREEN render target for Editor mode");
     } else {
         // Create swapchain-backed render target for Standalone mode
@@ -223,7 +223,7 @@ void DeferredRenderer::createSceneColorTextures()
     spec.type = TextureType::TEXTURE2D;
     spec.srgb = false;
 
-    for (uint32_t i = 0; i < Application::getInstance().getFramesInFlight(); i++) {
+    for (uint32_t i = 0; i < m_config.framesInFlight; i++) {
         m_sceneColorHdrTextures.push_back(std::make_unique<Texture>(spec));
     }
 }
@@ -265,7 +265,7 @@ void DeferredRenderer::recreateRenderPasses()
     createSceneColorTextures();
     VkFormat hdrFormat = m_sceneColorHdrTextures[0]->getFormat();
 
-    const uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
+    const uint32_t framesInFlight = m_config.framesInFlight;
 
     m_gbufferPass = std::make_unique<GBufferPass>(m_width, m_height, framesInFlight);
 
@@ -322,9 +322,8 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
     Environment *environment = activeScene.environment();
     if (environment != nullptr) {
-        if (!m_skyboxPass->hasActiveSkybox()) {
-            m_skyboxPass->setSkyboxTexture(environment->skyboxTexture());
-        }
+        Texture *skybox = environment->isSkyboxEnabled() ? environment->skyboxTexture() : nullptr;
+        m_skyboxPass->setSkyboxTexture(skybox);
         m_skyboxPass->setSkyIntensity(environment->skyIntensity());
     }
 
@@ -408,7 +407,9 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
         RenderPassContext context = buildPassContext(activeScene, camera, imageIndex, settings);
         context.terrain = terrain;
 
-        s_cmdCounter.increment(3); // GBuffer, Lighting, Skybox
+        const bool drawSkybox = m_skyboxPass->hasActiveSkybox();
+
+        s_cmdCounter.increment(drawSkybox ? 3 : 2); // GBuffer, Lighting, Skybox
 
         JobSystem &system = jobs();
 
@@ -422,7 +423,6 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
 
         // Inheritance is resolved here rather than inside the jobs, since it fills each pass's cached attachments
         SecondaryBufferInheritance lightingInheritance = m_lightingPass->getInheritance(context);
-        SecondaryBufferInheritance skyboxInheritance = m_skyboxPass->getInheritance(context);
 
         system.run(JobDeclaration(
             [&gbufferBuffer, &context, gbufferInheritance, gbufferPass = m_gbufferPass.get()](JobContext &ctx) {
@@ -438,12 +438,16 @@ void DeferredRenderer::recordCommandBuffer(CommandBuffer *commandBuffer, Scene &
             },
             JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "LIGHTING"));
 
-        system.run(JobDeclaration(
-            [&skyboxBuffer, &context, skyboxInheritance, skyboxPass = m_skyboxPass.get()](JobContext &ctx) {
-                (void)ctx;
-                skyboxBuffer = skyboxPass->record(context, skyboxInheritance);
-            },
-            JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SKYBOX"));
+        if (drawSkybox) {
+            SecondaryBufferInheritance skyboxInheritance = m_skyboxPass->getInheritance(context);
+
+            system.run(JobDeclaration(
+                [&skyboxBuffer, &context, skyboxInheritance, skyboxPass = m_skyboxPass.get()](JobContext &ctx) {
+                    (void)ctx;
+                    skyboxBuffer = skyboxPass->record(context, skyboxInheritance);
+                },
+                JobPriority::HIGH, QueueAffinity::ANY, &s_cmdCounter, "SKYBOX"));
+        }
 
         {
 
