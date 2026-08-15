@@ -14,8 +14,8 @@ static constexpr float CONTROL_VPAD = 4.0f;
 static constexpr float CONTROL_HPAD = 8.0f;
 static constexpr float CONTROL_GAP = 2.0f;
 
-static constexpr float HEADER_HEIGHT = 28.0f;
-static constexpr float SECTION_SPACING = 6.0f;
+static constexpr float HEADER_HEIGHT = PropertySection::HEADER_HEIGHT;
+static constexpr float SECTION_SPACING = PropertySection::SECTION_SPACING;
 static constexpr float SECTION_TOP_PAD = 4.0f;
 
 static void s_labelCell(Amethyst::UIScope &cell, std::string_view label)
@@ -301,6 +301,7 @@ void PropertySectionList::buildSection(PropertySection &section)
     }
 
     section.requestRefresh = [this]() { m_refreshRequested = true; };
+    section.requestRelayout = [this]() { relayout(); };
 
     Amethyst::UIScope(*m_view).collapsibleHeader(
         {
@@ -343,9 +344,15 @@ void PropertySectionList::relayout()
 
     float y = SECTION_TOP_PAD;
     for (PropertySection *section : m_active) {
-        section->header->setBaseProperties({.position = Amethyst::UDim2::fromOffset(0.0f, y)});
         bool expanded = static_cast<bool>(section->header->getCollapsibleHeaderProperties().expanded);
-        y += HEADER_HEIGHT + (expanded ? section->bodyHeight() : 0.0f) + SECTION_SPACING;
+        float bodyHeight = expanded ? section->bodyHeight() : 0.0f;
+
+        section->header->setBaseProperties({
+            .position = Amethyst::UDim2::fromOffset(0.0f, y),
+            .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT + bodyHeight),
+        });
+
+        y += HEADER_HEIGHT + bodyHeight + SECTION_SPACING;
     }
 
     m_view->setScrollingFrameProperties({.canvasSize = Amethyst::UDim2(glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, y))});

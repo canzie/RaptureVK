@@ -2,6 +2,7 @@
 
 #include "logging/Log.h"
 #include "scenes/instances/Camera3D.h"
+#include "scenes/instances/CharacterBody3D.h"
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
 #include "scenes/instances/Folder.h"
@@ -47,6 +48,7 @@ void InstanceRegistry::init()
     addObject<CameraController>();
     addObject<PlayerController>();
 
+    addComponent<CharacterBody3D>();
     addComponent<RigidBody3D>();
     addComponent<VisibilityComponent>();
 

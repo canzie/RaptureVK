@@ -50,11 +50,31 @@ void Mesh3D::setMesh(AssetHandle _mesh)
     if (!m_entity.has<MeshComponent>()) {
         return;
     }
-    auto component = m_entity.write<MeshComponent>();
 
-    component->setMesh(std::move(ref));
-    component->isLoading = false;
+    {
+        auto component = m_entity.write<MeshComponent>();
+
+        component->setMesh(std::move(ref));
+        component->isLoading = false;
+    }
     m_mesh = _mesh;
+
+    if (m_entity.has<RayTracedComponent>()) {
+        rebuildAccelerationStructure();
+    }
+}
+
+void Mesh3D::rebuildAccelerationStructure()
+{
+    const MeshComponent *component = m_entity.tryRead<MeshComponent>();
+    if (component == nullptr || !component->mesh || !component->mesh->buildBLAS()) {
+        RP_CORE_ERROR("'{}' left ray tracing because its mesh has no acceleration structure", name());
+        m_entity.tryRemove<RayTracedComponent>();
+        scene()->unregisterBLAS(m_entity.getEntity());
+        return;
+    }
+
+    scene()->registerBLAS(m_entity.getEntity());
 }
 
 void Mesh3D::setMaterial(AssetHandle _material)
@@ -129,7 +149,9 @@ bool Mesh3D::isRayTraced() const
 void Mesh3D::setRayTraced(bool rayTraced)
 {
     if (!rayTraced) {
-        m_entity.tryRemove<RayTracedComponent>();
+        if (m_entity.tryRemove<RayTracedComponent>()) {
+            scene()->unregisterBLAS(m_entity.getEntity());
+        }
         return;
     }
 

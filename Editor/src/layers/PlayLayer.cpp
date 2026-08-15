@@ -21,6 +21,7 @@ static Rapture::ControlInput s_mapPlayerInput(const Rapture::Input &input)
     intent.move.x = (input.isKeyPressed(KEY_D) ? 1.0f : 0.0f) - (input.isKeyPressed(KEY_A) ? 1.0f : 0.0f);
     intent.move.z = (input.isKeyPressed(KEY_W) ? 1.0f : 0.0f) - (input.isKeyPressed(KEY_S) ? 1.0f : 0.0f);
     intent.look = input.mouseDelta();
+    intent.jump = input.isKeyPressed(KEY_SPACE);
     intent.releaseControl = input.isKeyPressed(KEY_ESCAPE);
     return intent;
 }

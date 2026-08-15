@@ -124,6 +124,7 @@ void SceneObjectEditorWorkspace::setupScene()
         .width = extent.width,
         .height = extent.height,
         .framesInFlight = app.getFramesInFlight(),
+        .enableAccelerationStructures = false,
     });
     m_viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
     m_viewport.viewport->setScene(m_scene.get());

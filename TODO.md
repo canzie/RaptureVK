@@ -10,8 +10,6 @@ servers
         - hsv/hsl preference
         - couple sizings like gaps/borders/corners
         - an actual settings/preferences panel to open
-    - drag/drop assets into the viewport
-    - ability to hot reload an ams file, and update the actual stuff, pretty sure marking the window dirty and updating the style maps and invalidating cache is all it takes.
     - make the gizmo support discrete steps, also the gizmo direction maybe be cooked.
     - check all the clears done, and which ones are redundant.
 
@@ -36,7 +34,6 @@ servers
 
 ### Engine Architecture
 
-    - Add a concept of ownership, can be something like ENGINE, EDITOR, DEVELEOPER, USER. these could then be used for modify access to things like internal assets
 
 - Make rendering things like bounds easier
 - optimise the shadow passes
@@ -45,16 +42,37 @@ servers
 - shader/pipeline hot reloading
 - parallise/jobify shader compilation (note, current stack size is too small for
   this, maybe spawn another process and use gslang exec???)
-  - the asset importer in the editor will be able to set these options and they
-    can be either metadata or ...
-    - editor settings could be static/dynamic, prefab options?
-    - animation options etc (once they exist)
-    - checkox for importing material from gltf and auto making the materials and
-      applying them
 - pre generated normals?
 - virtual texturing??? like decima i guess
 
 ---
+
+- fix physics issue with bounding boxes and stuff
+    - character body
+    - make a panel for character body settings
+    - make a new panel for the scene object tree where components can be authored, also check if we should allow this sort of inline?
+    - can give static meshes a default rigid body maybe?
+- parse animations from gltf
+- parse bones
+- add some macros for compiling gbuffer vertex shader with joints/weights
+    - create an ecs component to query all meshes with bones/skeleton references
+- skeleton asset i guess
+- animation events
+- editor side of this, including a timeline for the animation and a panel to view skeletons? or skeletal meshes maybe? or maybe just a skeleton panel with a mesh preview?
+- get lua in for something basic, then get a basic text editor in the engine, nothing fancy, then check for highlighting.
+- have a talk about extensions/plugins
+- plan out undo/redo 
+- auto save
+- editor settings
+- project settings
+- a way to check if something is dirty, like if a scene objects wasnt saved yet, then show a little circle on the workspace tab
+- snapping, copy pasting scene objects, shortcuts for all kind of stuff.
+- selection border
+- auto sizing tab bar width based on content In it
+- snapping when sizing/using gizmo, snapping when moving items, like corner snapping, or like when free moving a cube make it so it gets placed on floor behind/below it, so it drags over the floor instead of trough?
+- forward+ renderer ontop for blended materials
+- add support for masked objects in gbuffer pass (like folliage)
+- audio.
 
 # features / stuff to add
 

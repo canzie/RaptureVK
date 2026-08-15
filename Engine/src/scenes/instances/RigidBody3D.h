@@ -1,11 +1,12 @@
 #ifndef RAPTURE__RIGID_BODY3D_H
 #define RAPTURE__RIGID_BODY3D_H
 
-#include "physics/Common.h"
-#include "scenes/instances/SceneComponent.h"
+#include "physics/RigidBody.h"
+#include "scenes/instances/PhysicsBody3D.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <memory>
 
 namespace Rapture {
 
@@ -16,7 +17,7 @@ class Node3D;
  *
  * The body sits at its object's world transform composed with its own local transform.
  */
-class RigidBody3D : public SceneComponent {
+class RigidBody3D : public PhysicsBody3D {
   public:
     RigidBody3D(Scene &scene, std::string_view name);
     ~RigidBody3D() override;
@@ -24,20 +25,17 @@ class RigidBody3D : public SceneComponent {
     static const TypeInfo &staticType();
     const TypeInfo &type() const override;
 
-    /**
-     * @brief Hands a simulated transform to the object this body drives
-     * @param position Where the simulation put the body
-     * @param rotation How the simulation oriented the body
-     */
-    void applySimulatedTransform(const glm::vec3 &position, const glm::quat &rotation);
+    void applySimulatedTransform(const glm::vec3 &position, const glm::quat &rotation) override;
+
+    void setVelocity(const glm::vec3 &velocity) override;
 
     /**
      * @brief Recreates the body from the current settings, at the transform its object sits at now
      */
     void rebuild();
 
-    const PhysicsShape &shape() const { return m_shape; }
-    void setShape(const PhysicsShape &shape);
+    const physics::CollisionShape &shape() const { return m_shape; }
+    void setShape(const physics::CollisionShape &shape);
 
     /**
      * @brief This body's transform relative to the object it is part of
@@ -45,8 +43,8 @@ class RigidBody3D : public SceneComponent {
     const glm::mat4 &localTransform() const { return m_localTransform; }
     void setLocalTransform(const glm::mat4 &transform);
 
-    PhysicsMotionType motionType() const { return m_motionType; }
-    void setMotionType(PhysicsMotionType motionType);
+    physics::MotionType motionType() const { return m_motionType; }
+    void setMotionType(physics::MotionType motionType);
 
     float friction() const { return m_friction; }
     void setFriction(float friction);
@@ -60,7 +58,7 @@ class RigidBody3D : public SceneComponent {
      */
     Node3D *node() const;
 
-    PhysicsBodyId bodyId() const { return m_bodyId; }
+    physics::RigidBody *body() const { return m_body.get(); }
 
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
@@ -89,14 +87,14 @@ class RigidBody3D : public SceneComponent {
     void releaseBody();
 
   private:
-    PhysicsShape m_shape = PhysicsBoxShape{};
+    physics::CollisionShape m_shape = physics::BoxShape{};
     glm::mat4 m_localTransform{1.0f};
-    PhysicsMotionType m_motionType = PHYSICS_MOTION_DYNAMIC;
+    physics::MotionType m_motionType = physics::MOTION_DYNAMIC;
     float m_friction = 0.2f;
     float m_restitution = 0.0f;
     bool m_startActive = true;
 
-    PhysicsBodyId m_bodyId;
+    std::unique_ptr<physics::RigidBody> m_body;
     glm::mat4 m_inverseLocal{1.0f};
 };
 

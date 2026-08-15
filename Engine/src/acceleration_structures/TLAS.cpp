@@ -89,6 +89,11 @@ void TLAS::removeInstance(uint32_t entityID)
     if (it != m_instances.end()) {
         m_instances.erase(it, m_instances.end());
         m_needsRebuild = true;
+
+        // an empty structure is never rebuilt, so the one still standing describes instances that are gone
+        if (m_instances.empty()) {
+            m_isBuilt = false;
+        }
     }
 }
 

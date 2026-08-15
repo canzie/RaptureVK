@@ -296,6 +296,29 @@ radio-button.viewport-context-menu:active {
 }
 
 
+.segment-control {
+    background-color: @bg-input;
+    text-color: @text-2;
+    border-pixel-size: 1px;
+    border-color: @border-1;
+    border-mode: outline;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    font-size: 12px;
+    corner-radius: 2px;
+}
+
+.segment-control:hover {
+    text-color: @text-1;
+    border-color: @border-2;
+}
+
+.segment-control:active {
+    background-color: @accent;
+    text-color: @text-1;
+    border-color: @border-2;
+}
+
 .content-browser-section {
     background-color: @bg-panel;
 }

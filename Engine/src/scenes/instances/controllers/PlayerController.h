@@ -5,6 +5,8 @@
 
 namespace Rapture {
 
+class CharacterBody3D;
+class PhysicsBody3D;
 class SpringArm3D;
 
 /**
@@ -32,6 +34,8 @@ class PlayerController : public Controller {
      */
     void onUpdate(float dt) override;
 
+    void updateViewCamera() override;
+
     bool desiresCursorCapture() const override { return true; }
 
     void serialize(WriteNode node) const override;
@@ -43,17 +47,17 @@ class PlayerController : public Controller {
     float maxPitch = 89.0f;
 
   private:
-    /**
-     * @brief Rebuilds the view matrix from where the camera ended up this frame
-     */
-    void updateViewCamera();
-
-  private:
     float m_yaw = -90.0f;
     float m_pitch = 0.0f;
 
     /// The arm the camera hangs from, which pitch turns, null when the puppet has none
     SpringArm3D *m_cameraArm = nullptr;
+
+    /// The body the puppet moves on, null when the puppet is walked by writing its transform
+    PhysicsBody3D *m_body = nullptr;
+
+    /// The body the puppet jumps on, null when its body cannot jump
+    CharacterBody3D *m_characterBody = nullptr;
 };
 
 } // namespace Rapture

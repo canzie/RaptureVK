@@ -6,6 +6,7 @@
 #include "serialization/SerialDocument.h"
 
 #include <cstdint>
+#include <glm/glm.hpp>
 #include <memory>
 #include <span>
 #include <string>
@@ -23,6 +24,7 @@ class Scene;
 struct WorldData {
     AssetHandle puppet = INVALID_ASSET_HANDLE;
     AssetHandle controller = INVALID_ASSET_HANDLE;
+    glm::vec3 gravity{0.0f, -9.81f, 0.0f};
 };
 
 /**
@@ -49,6 +51,14 @@ class World {
 
     WorldData &data() { return m_data; }
     const WorldData &data() const { return m_data; }
+
+    const glm::vec3 &gravity() const { return m_data.gravity; }
+
+    /**
+     * @brief Sets what everything in this world falls under, taking effect on a run already up
+     * @param gravity Acceleration in world space
+     */
+    void setGravity(const glm::vec3 &gravity);
 
     void onUpdate(float dt);
 
@@ -107,6 +117,12 @@ class World {
   private:
     World(std::string name, std::unique_ptr<Scene> scene);
 
+    /**
+     * @brief Hands this world's gravity to the simulation its scene runs
+     */
+    void applyGravity();
+
+  private:
     std::string m_name;
     std::unique_ptr<Scene> m_scene;
     WorldData m_data;

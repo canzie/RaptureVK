@@ -118,6 +118,7 @@ void MaterialEditorWorkspace::setupPreviewScene()
         .width = extent.width,
         .height = extent.height,
         .framesInFlight = app.getFramesInFlight(),
+        .enableAccelerationStructures = false,
     });
     m_previewViewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
     m_previewViewport.viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, false);

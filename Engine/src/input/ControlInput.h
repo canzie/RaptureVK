@@ -15,6 +15,7 @@ struct ControlInput {
     glm::vec2 look = {0.0f, 0.0f};       ///< Look delta; x = right positive, y = down positive
     glm::vec3 move = {0.0f, 0.0f, 0.0f}; ///< Movement axes in [-1, 1]: x = strafe, y = up, z = forward
     float zoom = 0.0f;                   ///< Zoom / dolly amount this frame
+    bool jump = false;                   ///< Leave the ground
     bool orbit = false;                  ///< Engage orbit-around-focus
     bool pan = false;                    ///< Engage screen-space pan
     bool releaseControl = false;         ///< Request handing control back to the editor

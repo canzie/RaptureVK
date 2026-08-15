@@ -90,8 +90,11 @@ void Camera3D::deserialize(ReadNode node)
 
     ReadNode camera = node.child(KEY_CAMERA);
     if (!camera.valid()) {
+        RP_CORE_WARN("'{}' holds no camera settings", name());
         return;
     }
+
+    RP_CORE_WARN("'{}' read fov {}", name(), camera.child(KEY_FIELD_OF_VIEW).asF64(-1.0));
 
     setFieldOfView(static_cast<float>(camera.child(KEY_FIELD_OF_VIEW).asF64(fieldOfView())));
     setNearPlane(static_cast<float>(camera.child(KEY_NEAR_PLANE).asF64(nearPlane())));

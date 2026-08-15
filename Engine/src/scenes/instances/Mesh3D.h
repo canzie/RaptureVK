@@ -47,6 +47,13 @@ class Mesh3D : public Node3D {
     Mesh3D(Scene &scene, std::string_view name);
 
   private:
+    /**
+     * @brief Points this mesh's TLAS instance at the acceleration structure of the mesh it now holds,
+     * dropping it out of ray tracing if that mesh has none
+     */
+    void rebuildAccelerationStructure();
+
+  private:
     AssetHandle m_mesh = INVALID_ASSET_HANDLE;
     AssetHandle m_material = INVALID_ASSET_HANDLE;
 };

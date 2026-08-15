@@ -3,6 +3,7 @@
 #include "asset_manager/Asset.h"
 #include "asset_manager/AssetManager.h"
 #include "logging/Log.h"
+#include "physics/PhysicsSystem.h"
 #include "scenes/Scene.h"
 #include "scenes/instances/SceneObject.h"
 #include "scenes/instances/controllers/Controller.h"
@@ -14,6 +15,7 @@ static constexpr std::string_view KEY_NAME = "name";
 static constexpr std::string_view KEY_SCENE = "scene";
 static constexpr std::string_view KEY_PUPPET = "puppet";
 static constexpr std::string_view KEY_CONTROLLER = "controller";
+static constexpr std::string_view KEY_GRAVITY = "gravity";
 
 /**
  * @brief Reads a scene object asset into a scene as its own objects
@@ -60,12 +62,30 @@ void World::onUpdate(float dt)
     m_scene->onUpdate(dt);
 }
 
+void World::setGravity(const glm::vec3 &gravity)
+{
+    m_data.gravity = gravity;
+    applyGravity();
+}
+
+void World::applyGravity()
+{
+    PhysicsSystem *physicsSystem = m_scene != nullptr ? m_scene->physicsSystem() : nullptr;
+    if (physicsSystem == nullptr) {
+        return;
+    }
+
+    physicsSystem->setGravity(m_data.gravity);
+}
+
 void World::play()
 {
     if (m_playState != PlayState::STOPPED) {
         RP_CORE_WARN("'{}' is already being played", m_name);
         return;
     }
+
+    applyGravity();
 
     // taken before anything is spawned, so the rewind on stop is what clears the run
     m_snapshot = m_scene->snapshot();
@@ -141,6 +161,12 @@ std::vector<uint8_t> World::serialize() const
     root.set(KEY_NAME, std::string_view(m_name));
     root.set(KEY_PUPPET, m_data.puppet);
     root.set(KEY_CONTROLLER, m_data.controller);
+
+    WriteNode gravity = root.addArray(KEY_GRAVITY);
+    gravity.append(m_data.gravity.x);
+    gravity.append(m_data.gravity.y);
+    gravity.append(m_data.gravity.z);
+
     m_scene->serialize(root.addObject(KEY_SCENE));
 
     std::string text = document.toText();
@@ -171,6 +197,13 @@ std::unique_ptr<World> World::deserialize(std::span<const uint8_t> blob)
     std::unique_ptr<World> world(new World(std::string(root.child(KEY_NAME).asString("")), std::move(scene)));
     world->m_data.puppet = root.child(KEY_PUPPET).asU64(INVALID_ASSET_HANDLE);
     world->m_data.controller = root.child(KEY_CONTROLLER).asU64(INVALID_ASSET_HANDLE);
+
+    ReadNode gravity = root.child(KEY_GRAVITY);
+    if (gravity.size() == 3) {
+        world->m_data.gravity = glm::vec3(static_cast<float>(gravity.at(0).asF64(0.0)), static_cast<float>(gravity.at(1).asF64(0.0)),
+                                          static_cast<float>(gravity.at(2).asF64(0.0)));
+    }
+
     return world;
 }
 

@@ -36,6 +36,8 @@ class CameraController : public Controller {
      */
     void onUpdate(float dt) override;
 
+    void updateViewCamera() override;
+
     /**
      * @brief Whether the camera wants the cursor captured this frame.
      * @return True if the cursor should be locked (DISABLED).

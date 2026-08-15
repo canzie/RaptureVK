@@ -37,6 +37,11 @@ void WorldPlaySection::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                                world->data().controller = handle;
                            }
                        });
+        rowDragFloat(t, "Gravity", &m_gravity, 0.05, -1000.0, 1000.0, {}, [this](double v) {
+            if (world != nullptr) {
+                world->setGravity(glm::vec3(0.0f, static_cast<float>(v), 0.0f));
+            }
+        });
     });
 }
 
@@ -52,6 +57,8 @@ void WorldPlaySection::sync()
     if (m_controllerPicker.has_value()) {
         m_controllerPicker->setAsset(world->data().controller);
     }
+
+    m_gravity = world->gravity().y;
 }
 
 WorldSettingsPanel::WorldSettingsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context)

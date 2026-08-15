@@ -156,6 +156,13 @@ class PropertySection {
                       std::string format, const std::function<void(double)> &onChanged);
 
   public:
+    /// Height of the bar a section is collapsed down to
+    static constexpr float HEADER_HEIGHT = 28.0f;
+
+    /// Gap left between one section and the next
+    static constexpr float SECTION_SPACING = 6.0f;
+
+  public:
     Amethyst::CollapsibleHeader *header = nullptr;
 
     /**
@@ -163,6 +170,11 @@ class PropertySection {
      * adds or removes a facet rather than editing one.
      */
     std::function<void()> requestRefresh;
+
+    /**
+     * @brief Asks the list to stack its sections again, for a section whose height changed.
+     */
+    std::function<void()> requestRelayout;
 
   protected:
     float m_bodyHeight = 0.0f;

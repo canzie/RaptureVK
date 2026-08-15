@@ -81,6 +81,18 @@ void CameraController::onUpdate(float dt)
     camera->updateViewMatrix(transform::translation(m_viewCamera->worldTransform()), m_front);
 }
 
+void CameraController::updateViewCamera()
+{
+    if (m_viewCamera == nullptr || !m_viewCamera->accessor().has<CameraComponent>()) {
+        return;
+    }
+
+    // this controller aims itself rather than the object it sits on, so where it looks is m_front
+    // and not anything the transform carries
+    m_viewCamera->accessor().write<CameraComponent>()->updateViewMatrix(
+        transform::translation(m_viewCamera->worldTransform()), m_front);
+}
+
 void CameraController::updateFly(float dt, Node3D &node)
 {
     m_desiresCapture = true;

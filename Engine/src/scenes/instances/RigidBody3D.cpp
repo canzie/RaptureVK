@@ -2,17 +2,13 @@
 
 #include "components/systems/Transforms.h"
 #include "logging/Log.h"
-#include "physics/PhysicsSystem.h"
+#include "physics/Serialization.h"
 #include "scenes/Scene.h"
 #include "scenes/instances/Node3D.h"
 
 namespace Rapture {
 
 static constexpr std::string_view KEY_BODY = "body";
-static constexpr std::string_view KEY_SHAPE = "shape";
-static constexpr std::string_view KEY_HALF_EXTENTS = "halfExtents";
-static constexpr std::string_view KEY_RADIUS = "radius";
-static constexpr std::string_view KEY_HALF_HEIGHT = "halfHeight";
 static constexpr std::string_view KEY_MOTION_TYPE = "motionType";
 static constexpr std::string_view KEY_FRICTION = "friction";
 static constexpr std::string_view KEY_RESTITUTION = "restitution";
@@ -21,51 +17,6 @@ static constexpr std::string_view KEY_LOCAL_TRANSFORM = "localTransform";
 static glm::mat4 s_rigidPart(const glm::mat4 &matrix)
 {
     return transform::compose(transform::translation(matrix), transform::rotation(matrix), glm::vec3(1.0f));
-}
-
-static void s_writeShape(WriteNode node, const PhysicsShape &shape)
-{
-    node.set(KEY_SHAPE, PhysicsShape_toString(PhysicsShape_typeOf(shape)));
-
-    if (const auto *box = std::get_if<PhysicsBoxShape>(&shape)) {
-        WriteNode extents = node.addArray(KEY_HALF_EXTENTS);
-        extents.append(box->halfExtents.x);
-        extents.append(box->halfExtents.y);
-        extents.append(box->halfExtents.z);
-        return;
-    }
-
-    if (const auto *sphere = std::get_if<PhysicsSphereShape>(&shape)) {
-        node.set(KEY_RADIUS, sphere->radius);
-        return;
-    }
-
-    if (const auto *capsule = std::get_if<PhysicsCapsuleShape>(&shape)) {
-        node.set(KEY_RADIUS, capsule->radius);
-        node.set(KEY_HALF_HEIGHT, capsule->halfHeight);
-    }
-}
-
-static PhysicsShape s_readShape(ReadNode node, const PhysicsShape &fallback)
-{
-    const PhysicsShapeType type = PhysicsShape_fromString(node.child(KEY_SHAPE).asString(), PhysicsShape_typeOf(fallback));
-
-    if (type == PHYSICS_SHAPE_SPHERE) {
-        return PhysicsSphereShape{static_cast<float>(node.child(KEY_RADIUS).asF64(0.5))};
-    }
-
-    if (type == PHYSICS_SHAPE_CAPSULE) {
-        return PhysicsCapsuleShape{static_cast<float>(node.child(KEY_HALF_HEIGHT).asF64(0.5)),
-                                   static_cast<float>(node.child(KEY_RADIUS).asF64(0.5))};
-    }
-
-    ReadNode extents = node.child(KEY_HALF_EXTENTS);
-    if (extents.size() != 3) {
-        return PhysicsBoxShape{};
-    }
-
-    return PhysicsBoxShape{glm::vec3(static_cast<float>(extents.at(0).asF64(0.5)), static_cast<float>(extents.at(1).asF64(0.5)),
-                                     static_cast<float>(extents.at(2).asF64(0.5)))};
 }
 
 static void s_writeMatrix(WriteNode node, std::string_view key, const glm::mat4 &matrix)
@@ -92,7 +43,7 @@ static glm::mat4 s_readMatrix(ReadNode node, const glm::mat4 &fallback)
     return matrix;
 }
 
-RigidBody3D::RigidBody3D(Scene &scene, std::string_view name) : SceneComponent(scene, name) {}
+RigidBody3D::RigidBody3D(Scene &scene, std::string_view name) : PhysicsBody3D(scene, name) {}
 
 RigidBody3D::~RigidBody3D()
 {
@@ -101,7 +52,7 @@ RigidBody3D::~RigidBody3D()
 
 const TypeInfo &RigidBody3D::staticType()
 {
-    static const TypeInfo type("RigidBody3D", &SceneComponent::staticType());
+    static const TypeInfo type("RigidBody3D", &PhysicsBody3D::staticType());
     return type;
 }
 
@@ -140,12 +91,7 @@ glm::mat4 RigidBody3D::bodyTransform(const glm::mat4 &local) const
 
 void RigidBody3D::releaseBody()
 {
-    PhysicsSystem *physics = scene() != nullptr ? scene()->physics() : nullptr;
-    if (physics != nullptr && m_bodyId.isValid()) {
-        physics->removeRigidBody(m_bodyId);
-    }
-
-    m_bodyId = PhysicsBodyId();
+    m_body.reset();
 }
 
 void RigidBody3D::onAttach()
@@ -165,15 +111,13 @@ void RigidBody3D::onDetach()
 
 void RigidBody3D::rebuild()
 {
-    PhysicsSystem *physics = scene() != nullptr ? scene()->physics() : nullptr;
-    if (physics == nullptr) {
-        RP_CORE_ERROR("'{}' cannot join a scene that has no simulation", name());
-        return;
-    }
-
     if (node() == nullptr) {
         return;
     }
+
+    // a rebuild is a new body standing where the old one did, so the motion it had is carried over
+    // rather than dropping back to rest
+    const glm::vec3 carriedVelocity = m_body != nullptr ? m_body->linearVelocity() : glm::vec3(0.0f);
 
     releaseBody();
 
@@ -182,8 +126,8 @@ void RigidBody3D::rebuild()
 
     const glm::mat4 body = bodyTransform(local);
 
-    RigidBodyConfig config;
-    config.shape = m_shape;
+    physics::RigidBodyConfig config;
+    config.shape = physics::CollisionShape_scaled(m_shape, transform::scale(node()->worldTransform()));
     config.position = transform::translation(body);
     config.rotation = transform::rotation(body);
     config.motionType = m_motionType;
@@ -191,7 +135,21 @@ void RigidBody3D::rebuild()
     config.restitution = m_restitution;
     config.startActive = m_startActive;
 
-    m_bodyId = physics->createRigidBody(config, reinterpret_cast<uint64_t>(this));
+    m_body = createRigidBody(config);
+    if (m_body == nullptr) {
+        return;
+    }
+
+    m_body->setLinearVelocity(carriedVelocity);
+}
+
+void RigidBody3D::setVelocity(const glm::vec3 &velocity)
+{
+    if (m_body == nullptr) {
+        return;
+    }
+
+    m_body->setLinearVelocity(velocity);
 }
 
 void RigidBody3D::applySimulatedTransform(const glm::vec3 &position, const glm::quat &rotation)
@@ -207,7 +165,7 @@ void RigidBody3D::applySimulatedTransform(const glm::vec3 &position, const glm::
         transform::compose(transform::translation(world), transform::rotation(world), target->scale()));
 }
 
-void RigidBody3D::setShape(const PhysicsShape &shape)
+void RigidBody3D::setShape(const physics::CollisionShape &shape)
 {
     m_shape = shape;
     rebuild();
@@ -219,7 +177,7 @@ void RigidBody3D::setLocalTransform(const glm::mat4 &transform)
     rebuild();
 }
 
-void RigidBody3D::setMotionType(PhysicsMotionType motionType)
+void RigidBody3D::setMotionType(physics::MotionType motionType)
 {
     if (m_motionType == motionType) {
         return;
@@ -232,13 +190,17 @@ void RigidBody3D::setMotionType(PhysicsMotionType motionType)
 void RigidBody3D::setFriction(float friction)
 {
     m_friction = friction;
-    rebuild();
+    if (m_body != nullptr) {
+        m_body->setFriction(friction);
+    }
 }
 
 void RigidBody3D::setRestitution(float restitution)
 {
     m_restitution = restitution;
-    rebuild();
+    if (m_body != nullptr) {
+        m_body->setRestitution(restitution);
+    }
 }
 
 void RigidBody3D::serialize(WriteNode node) const
@@ -246,9 +208,9 @@ void RigidBody3D::serialize(WriteNode node) const
     SceneComponent::serialize(node);
 
     WriteNode body = node.addObject(KEY_BODY);
-    s_writeShape(body, m_shape);
+    physics::CollisionShape_serialize(body, m_shape);
     s_writeMatrix(body, KEY_LOCAL_TRANSFORM, m_localTransform);
-    body.set(KEY_MOTION_TYPE, PhysicsMotionType_toString(m_motionType));
+    body.set(KEY_MOTION_TYPE, physics::MotionType_toString(m_motionType));
     body.set(KEY_FRICTION, m_friction);
     body.set(KEY_RESTITUTION, m_restitution);
 }
@@ -262,9 +224,9 @@ void RigidBody3D::deserialize(ReadNode node)
         return;
     }
 
-    m_shape = s_readShape(body, m_shape);
+    m_shape = physics::CollisionShape_deserialize(body, m_shape);
     m_localTransform = s_readMatrix(body.child(KEY_LOCAL_TRANSFORM), m_localTransform);
-    m_motionType = static_cast<PhysicsMotionType>(body.child(KEY_MOTION_TYPE).asU64(static_cast<uint64_t>(m_motionType)));
+    m_motionType = physics::MotionType_fromString(body.child(KEY_MOTION_TYPE).asString(), m_motionType);
     m_friction = static_cast<float>(body.child(KEY_FRICTION).asF64(m_friction));
     m_restitution = static_cast<float>(body.child(KEY_RESTITUTION).asF64(m_restitution));
 }

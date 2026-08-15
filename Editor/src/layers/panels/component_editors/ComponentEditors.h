@@ -6,13 +6,16 @@
 #include "components/Components.h"
 #include "layers/panels/components/asset_picker.h"
 #include "layers/panels/components/color_field.h"
+#include "layers/panels/components/segmented_control.h"
 #include "scenes/instances/Camera3D.h"
+#include "scenes/instances/CharacterBody3D.h"
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
 #include "scenes/instances/Mesh3D.h"
 #include "scenes/instances/PointLight3D.h"
 #include "scenes/instances/RigidBody3D.h"
 #include "scenes/instances/SpotLight3D.h"
+#include "scenes/instances/SpringArm3D.h"
 #include "scenes/instances/controllers/CameraController.h"
 #include "scenes/instances/controllers/PlayerController.h"
 
@@ -118,10 +121,43 @@ class Mesh3DEditor : public ComponentEditorBase {
   private:
     bool m_isVisible = true;
     bool m_isRayTraced = false;
-    bool m_hasRigidBody = false;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
+    std::optional<AssetPicker> m_meshPicker;
     std::optional<AssetPicker> m_materialPicker;
     Rapture::Mesh3D *m_node = nullptr;
+};
+
+/**
+ * @brief The section that picks which body an object simulates with, holding that body's own section.
+ */
+class PhysicsEditor : public ComponentEditorBase {
+  public:
+    enum PhysicsBodyKind {
+        PHYSICS_BODY_NONE,
+        PHYSICS_BODY_RIGID,
+        PHYSICS_BODY_CHARACTER,
+        PHYSICS_BODY_COUNT
+    };
+
+    const char *title() const override { return "Physics"; }
+    const char *icon() const override { return ""; }
+    float bodyHeight() const override;
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
+    void setSubject(Rapture::Scene *scene, const Rapture::ecs::EntityAccessor &entity) override;
+
+  private:
+    /**
+     * @brief Replaces the nested section with the one editing the given kind of body
+     * @param kind The kind of body the owner now has
+     */
+    void buildPhysicsSubEditor(PhysicsBodyKind kind);
+
+    SegmentedControl *m_physicsSubSelector = nullptr;
+    std::unique_ptr<ComponentEditorBase> m_physicsSubEditor;
+    Amethyst::CollapsibleHeader *m_physicsSubHeader = nullptr;
+    PhysicsBodyKind m_builtKind = PHYSICS_BODY_NONE;
+    Rapture::SceneObject *m_owner = nullptr;
 };
 
 class RigidBody3DEditor : public ComponentEditorBase {
@@ -142,8 +178,45 @@ class RigidBody3DEditor : public ComponentEditorBase {
     float m_friction = 0.2f;
     float m_restitution = 0.0f;
     Amethyst::Dropdown *m_motionTypeDropdown = nullptr;
-    Amethyst::TextLabel *m_shapeText = nullptr;
-    Rapture::RigidBody3D *m_node = nullptr;
+    Amethyst::Dropdown *m_shapeDropdown = nullptr;
+    Rapture::RigidBody3D *m_rigidBody = nullptr;
+};
+
+class CharacterBody3DEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Character Body"; }
+    const char *icon() const override { return ""; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
+
+  private:
+    /**
+     * @brief The body of the selected object, whether it stands on its own or a mesh holds it
+     * @param entity The selected entity
+     * @return The body, or nullptr if the selection has none
+     */
+    Rapture::CharacterBody3D *resolveBody(const Rapture::ecs::EntityAccessor &entity) const;
+
+    double m_shapeOffset[3] = {};
+    float m_mass = 70.0f;
+    float m_maxSlopeAngle = 50.0f;
+    float m_stepUp = 0.4f;
+    float m_stepDown = 0.5f;
+    float m_jumpSpeed = 4.0f;
+    Amethyst::Dropdown *m_shapeDropdown = nullptr;
+    Rapture::CharacterBody3D *m_characterBody = nullptr;
+};
+
+class SpringArm3DEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Spring Arm"; }
+    const char *icon() const override { return Icons::SVG_LINK; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
+
+  private:
+    double m_length = 4.0;
+    Rapture::SpringArm3D *m_node = nullptr;
 };
 
 class Camera3DEditor : public ComponentEditorBase {
@@ -170,7 +243,6 @@ class ShadowEditor : public ComponentEditorBase {
   private:
     bool m_isActive = true;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
-    Rapture::ecs::EntityAccessor m_entity;
 };
 
 class CascadedShadowEditor : public ComponentEditorBase {
@@ -184,7 +256,6 @@ class CascadedShadowEditor : public ComponentEditorBase {
     bool m_isActive = true;
     float m_lambda = 0.5f;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
-    Rapture::ecs::EntityAccessor m_entity;
 };
 
 class EnvironmentEditor : public ComponentEditorBase {

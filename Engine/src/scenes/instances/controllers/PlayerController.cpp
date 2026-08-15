@@ -3,7 +3,9 @@
 #include "components/Components.h"
 #include "logging/Log.h"
 #include "scenes/instances/Camera3D.h"
+#include "scenes/instances/CharacterBody3D.h"
 #include "scenes/instances/Node3D.h"
+#include "scenes/instances/PhysicsBody3D.h"
 #include "scenes/instances/SpringArm3D.h"
 
 #include <glm/gtc/quaternion.hpp>
@@ -41,6 +43,9 @@ void PlayerController::possess(SceneObject *subject)
 
     Controller::possess(node);
 
+    m_body = node->component<PhysicsBody3D>();
+    m_characterBody = m_body != nullptr ? m_body->as<CharacterBody3D>() : nullptr;
+
     m_cameraArm = node->findFirstDescendantOfType<SpringArm3D>();
     if (m_cameraArm != nullptr) {
         m_cameraArm->applyLength();
@@ -66,18 +71,22 @@ void PlayerController::onUpdate(float dt)
     glm::vec3 forward = glm::vec3(std::cos(yaw), 0.0f, std::sin(yaw));
     glm::vec3 right = glm::cross(forward, WORLD_UP);
 
-    glm::vec3 position = subject->position();
-    position += (right * m_intent.move.x + forward * m_intent.move.z) * (movementSpeed * dt);
-    subject->setPosition(position);
+    const glm::vec3 walk = (right * m_intent.move.x + forward * m_intent.move.z) * movementSpeed;
+    if (m_body != nullptr) {
+        m_body->setVelocity(walk);
+        if (m_intent.jump && m_characterBody != nullptr) {
+            m_characterBody->jump();
+        }
+    } else {
+        subject->setPosition(subject->position() + walk * dt);
+    }
 
     // a puppet faces down its own -Z, so the turn is the one taking -Z onto the walk direction
     subject->setRotation(glm::angleAxis(std::atan2(-forward.x, -forward.z), WORLD_UP));
 
     if (m_cameraArm != nullptr) {
-        m_cameraArm->setRotation(glm::angleAxis(glm::radians(-m_pitch), glm::vec3(1.0f, 0.0f, 0.0f)));
+        m_cameraArm->setRotation(glm::angleAxis(glm::radians(m_pitch), glm::vec3(1.0f, 0.0f, 0.0f)));
     }
-
-    updateViewCamera();
 }
 
 void PlayerController::updateViewCamera()

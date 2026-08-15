@@ -213,11 +213,12 @@ void PropertiesPanel::refresh()
 
         ensure<Node3DEditor>(instance->isA<Rapture::Node3D>());
         ensure<Mesh3DEditor>(mesh != nullptr);
-        ensure<RigidBody3DEditor>(instance->component<Rapture::RigidBody3D>() != nullptr);
+        ensure<PhysicsEditor>(mesh != nullptr || instance->component<Rapture::PhysicsBody3D>() != nullptr);
         ensure<Light3DEditor>(instance->isA<Rapture::Light3D>());
         ensure<DirectionalLight3DEditor>(instance->isA<Rapture::DirectionalLight3D>());
         ensure<PointLight3DEditor>(instance->isA<Rapture::PointLight3D>());
         ensure<SpotLight3DEditor>(instance->isA<Rapture::SpotLight3D>());
+        ensure<SpringArm3DEditor>(instance->isA<Rapture::SpringArm3D>());
         ensure<Camera3DEditor>(instance->isA<Rapture::Camera3D>());
 
         ensure<CameraControllerEditor>(instance->isA<Rapture::CameraController>());

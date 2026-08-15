@@ -1,13 +1,13 @@
 #include "ComponentEditors.h"
 
 #include "components/Components.h"
-#include "scenes/instances/Environment.h"
+#include "layers/panels/components/header_layouts.h"
 #include "logging/Log.h"
 #include "renderer/SceneRenderData.h"
 #include "scenes/Scene.h"
+#include "scenes/instances/Environment.h"
 
 #include <algorithm>
-#include <cstdio>
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -68,7 +68,7 @@ void Node3DEditor::apply(int row)
 
 void Node3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::Node3D>(scene, entity);
+    m_node = s_instanceAs<Rapture::Node3D>(m_scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -137,7 +137,7 @@ void Light3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 void Light3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
     Rapture::Light3D *previous = m_node;
-    m_node = s_instanceAs<Rapture::Light3D>(scene, entity);
+    m_node = s_instanceAs<Rapture::Light3D>(m_scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -171,7 +171,7 @@ void DirectionalLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void DirectionalLight3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::DirectionalLight3D>(scene, entity);
+    m_node = s_instanceAs<Rapture::DirectionalLight3D>(m_scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -191,7 +191,7 @@ void PointLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void PointLight3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::PointLight3D>(scene, entity);
+    m_node = s_instanceAs<Rapture::PointLight3D>(m_scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -227,7 +227,7 @@ void SpotLight3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void SpotLight3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::SpotLight3D>(scene, entity);
+    m_node = s_instanceAs<Rapture::SpotLight3D>(m_scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -236,15 +236,66 @@ void SpotLight3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
     m_outerConeAngle = glm::degrees(m_node->outerConeAngle());
 }
 
+using PhysicsBodyKind = PhysicsEditor::PhysicsBodyKind;
+
+static std::string_view s_physicsBodyLabel(PhysicsBodyKind kind)
+{
+    switch (kind) {
+    case PhysicsEditor::PHYSICS_BODY_RIGID:
+        return "Rigid Body";
+    case PhysicsEditor::PHYSICS_BODY_CHARACTER:
+        return "Character Body";
+    default:
+        return "None";
+    }
+}
+
+static PhysicsBodyKind s_physicsBodyOf(const Rapture::SceneObject *node)
+{
+    if (node->component<Rapture::RigidBody3D>() != nullptr) {
+        return PhysicsEditor::PHYSICS_BODY_RIGID;
+    }
+    if (node->component<Rapture::CharacterBody3D>() != nullptr) {
+        return PhysicsEditor::PHYSICS_BODY_CHARACTER;
+    }
+    return PhysicsEditor::PHYSICS_BODY_NONE;
+}
+
+static void s_setPhysicsBody(Rapture::SceneObject *node, PhysicsBodyKind kind)
+{
+    // adding the kind it already has would attach a second body of that kind
+    if (s_physicsBodyOf(node) == kind) {
+        return;
+    }
+
+    if (kind != PhysicsEditor::PHYSICS_BODY_RIGID) {
+        node->removeComponent<Rapture::RigidBody3D>();
+    }
+    if (kind != PhysicsEditor::PHYSICS_BODY_CHARACTER) {
+        node->removeComponent<Rapture::CharacterBody3D>();
+    }
+
+    if (kind == PhysicsEditor::PHYSICS_BODY_RIGID) {
+        node->addComponent<Rapture::RigidBody3D>();
+    } else if (kind == PhysicsEditor::PHYSICS_BODY_CHARACTER) {
+        node->addComponent<Rapture::CharacterBody3D>();
+    }
+}
+
 void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowAssetPicker(t, "Mesh", m_meshPicker, {.types = {Rapture::ASSET_MESH}}, [this](Rapture::AssetHandle handle) {
+            if (m_node != nullptr) {
+                m_node->setMesh(handle);
+            }
+        });
         rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
-                         [this](Rapture::AssetHandle handle) {
-                             if (m_node != nullptr) {
-                                 m_node->setMaterial(handle);
-                             }
-                         });
+                       [this](Rapture::AssetHandle handle) {
+                           if (m_node != nullptr) {
+                               m_node->setMaterial(handle);
+                           }
+                       });
         m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
             if (m_node == nullptr) {
                 return;
@@ -264,39 +315,26 @@ void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 m_node->setRayTraced(b);
             }
         });
-        rowCheckbox(t, "Rigid Body", &m_hasRigidBody, [this](bool b) {
-            if (m_node == nullptr) {
-                return;
-            }
-
-            if (b) {
-                m_node->addComponent<Rapture::RigidBody3D>();
-            } else {
-                m_node->removeComponent<Rapture::RigidBody3D>();
-            }
-
-            if (requestRefresh) {
-                requestRefresh();
-            }
-        });
     });
 }
 
 void Mesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
     Rapture::Mesh3D *previous = m_node;
-    m_node = s_instanceAs<Rapture::Mesh3D>(scene, entity);
+    m_node = s_instanceAs<Rapture::Mesh3D>(m_scene, entity);
     if (m_node == nullptr) {
         return;
     }
 
     m_isVisible = m_node->isVisible();
     m_isRayTraced = m_node->isRayTraced();
-    m_hasRigidBody = m_node->component<Rapture::RigidBody3D>() != nullptr;
 
     if (previous != m_node) {
         if (m_mobilityDropdown != nullptr) {
             m_mobilityDropdown->setText(Rapture::mobilityToString(m_node->mobility()));
+        }
+        if (m_meshPicker.has_value()) {
+            m_meshPicker->setAsset(m_node->mesh());
         }
         if (m_materialPicker.has_value()) {
             m_materialPicker->setAsset(m_node->material());
@@ -306,62 +344,207 @@ void Mesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 
 // TODO: add kinematic once the simulation stops writing active bodies back onto their node, which is
 // the one direction a kinematic body must not be driven in
-static constexpr Rapture::PhysicsMotionType SELECTABLE_MOTION_TYPES[] = {Rapture::PHYSICS_MOTION_STATIC,
-                                                                        Rapture::PHYSICS_MOTION_DYNAMIC};
+static constexpr Rapture::physics::MotionType SELECTABLE_MOTION_TYPES[] = {Rapture::physics::MOTION_STATIC,
+                                                                           Rapture::physics::MOTION_DYNAMIC};
 
-static std::string s_describeShape(const Rapture::PhysicsShape &shape)
+static std::vector<std::string> s_shapeOptions()
 {
-    char buffer[64] = {};
-
-    if (const auto *box = std::get_if<Rapture::PhysicsBoxShape>(&shape)) {
-        std::snprintf(buffer, sizeof(buffer), "Box %.2f, %.2f, %.2f", box->halfExtents.x * 2.0f, box->halfExtents.y * 2.0f,
-                      box->halfExtents.z * 2.0f);
-        return buffer;
+    std::vector<std::string> options;
+    for (uint32_t type = 0; type < Rapture::physics::COLLISION_SHAPE_COUNT; ++type) {
+        options.emplace_back(Rapture::physics::CollisionShape_toString(static_cast<Rapture::physics::CollisionShapeType>(type)));
     }
-
-    if (const auto *sphere = std::get_if<Rapture::PhysicsSphereShape>(&shape)) {
-        std::snprintf(buffer, sizeof(buffer), "Sphere r %.2f", sphere->radius);
-        return buffer;
-    }
-
-    if (const auto *capsule = std::get_if<Rapture::PhysicsCapsuleShape>(&shape)) {
-        std::snprintf(buffer, sizeof(buffer), "Capsule r %.2f, h %.2f", capsule->radius, capsule->halfHeight * 2.0f);
-        return buffer;
-    }
-
-    return "None";
+    return options;
 }
 
 Rapture::RigidBody3D *RigidBody3DEditor::resolveBody(const Rapture::ecs::EntityAccessor &entity) const
 {
-    Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(scene, entity);
+    Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(m_scene, entity);
     return object != nullptr ? object->component<Rapture::RigidBody3D>() : nullptr;
+}
+
+void PhysicsEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    std::vector<std::string> options;
+    for (uint32_t kind = 0; kind < PHYSICS_BODY_COUNT; ++kind) {
+        options.emplace_back(s_physicsBodyLabel(static_cast<PhysicsBodyKind>(kind)));
+    }
+
+    auto *layout = ch.component.addExtension<Amethyst::UIListLayout>();
+    layout->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
+    layout->innerPadding = Amethyst::UDim::fromOffset(SECTION_SPACING);
+
+    m_physicsSubSelector = ch.component.add<SegmentedControl>(options, SegmentedSelection::SINGLE);
+    m_physicsSubSelector->setBaseProperties({
+        .padding = Amethyst::UDim4{.top = Amethyst::UDim::fromOffset(10.0f),
+                                   .right = Amethyst::UDim::fromScale(0.05f),
+                                   .bottom = Amethyst::UDim::fromOffset(10.0f),
+                                   .left = Amethyst::UDim::fromScale(0.05f)},
+        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, 50.0f),
+    });
+    m_physicsSubSelector->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+
+    m_physicsSubSelector->onChanged = [this](int32_t index, bool selected) {
+        const PhysicsBodyKind kind = static_cast<PhysicsBodyKind>(index);
+
+        // sync selects the option the object already has, which must not be taken for a change
+        if (m_owner == nullptr || !selected || s_physicsBodyOf(m_owner) == kind) {
+            return;
+        }
+
+        s_setPhysicsBody(m_owner, kind);
+    };
+}
+
+void PhysicsEditor::buildPhysicsSubEditor(PhysicsBodyKind kind)
+{
+    if (header == nullptr) {
+        return;
+    }
+
+    if (m_physicsSubHeader != nullptr) {
+        header->removeChild(m_physicsSubHeader);
+        m_physicsSubHeader = nullptr;
+        header->markDirty();
+    }
+    m_physicsSubEditor.reset();
+    m_builtKind = kind;
+
+    switch (kind) {
+    case PHYSICS_BODY_RIGID: {
+        m_physicsSubEditor = std::make_unique<RigidBody3DEditor>();
+        break;
+    }
+    case PHYSICS_BODY_CHARACTER: {
+        m_physicsSubEditor = std::make_unique<CharacterBody3DEditor>();
+        break;
+    }
+    case PHYSICS_BODY_NONE: {
+        return;
+    }
+    default: {
+        RP_ERROR("physics body kind {} has no editor", static_cast<uint32_t>(kind));
+        return;
+    }
+    }
+
+    m_physicsSubEditor->setSubject(m_scene, m_entity);
+
+    Amethyst::CollapsibleHeaderScope scope(*header);
+    scope.collapsibleHeader(
+        {
+            .classes = {"component-header"},
+            .base = {.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT)},
+            .style = {.backgroundTransparency = 1.0f},
+            .header =
+                {
+                    .titleStyle = {.fontSize = 13.0f},
+                    .headerHeight = HEADER_HEIGHT,
+                },
+        },
+        [this](Amethyst::CollapsibleHeaderScope &nested) {
+            m_physicsSubHeader = &nested.component;
+            nested.header(componentHeaderLayout(m_physicsSubEditor->title(), m_physicsSubEditor->icon()));
+            m_physicsSubEditor->buildBody(nested);
+            m_physicsSubHeader->setBaseProperties(
+                {.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT + m_physicsSubEditor->bodyHeight())});
+        });
+
+    m_physicsSubHeader->onToggled = [this](bool) {
+        if (requestRelayout != nullptr) {
+            requestRelayout();
+        }
+    };
+
+    header->markDirty();
+}
+
+float PhysicsEditor::bodyHeight() const
+{
+    if (m_physicsSubSelector == nullptr) {
+        return 0.0f;
+    }
+
+    float height = m_physicsSubSelector->getBaseProperties().size.offset.y;
+    if (m_physicsSubEditor == nullptr || m_physicsSubHeader == nullptr) {
+        return height;
+    }
+
+    height += HEADER_HEIGHT + SECTION_SPACING;
+    if (static_cast<bool>(m_physicsSubHeader->getCollapsibleHeaderProperties().expanded)) {
+        height += m_physicsSubEditor->bodyHeight();
+    }
+
+    return height;
+}
+
+void PhysicsEditor::sync(const Rapture::ecs::EntityAccessor &entity)
+{
+    m_owner = s_instanceAs<Rapture::SceneObject>(m_scene, entity);
+    if (m_owner == nullptr) {
+        return;
+    }
+
+    const PhysicsBodyKind kind = s_physicsBodyOf(m_owner);
+
+    if (m_physicsSubSelector != nullptr) {
+        m_physicsSubSelector->select(static_cast<int32_t>(kind));
+    }
+
+    if (kind != m_builtKind) {
+        buildPhysicsSubEditor(kind);
+        if (requestRelayout != nullptr) {
+            requestRelayout();
+        }
+    }
+
+    if (m_physicsSubEditor != nullptr) {
+        m_physicsSubEditor->sync();
+    }
+}
+
+void PhysicsEditor::setSubject(Rapture::Scene *scene, const Rapture::ecs::EntityAccessor &entity)
+{
+    ComponentEditorBase::setSubject(scene, entity);
+
+    if (m_physicsSubEditor != nullptr) {
+        m_physicsSubEditor->setSubject(scene, entity);
+    }
 }
 
 void RigidBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        m_shapeText = rowText(t, "Shape", "None");
+        m_shapeDropdown = rowDropdown(t, "Shape", Rapture::physics::CollisionShape_toString(Rapture::physics::COLLISION_SHAPE_BOX),
+                                      s_shapeOptions(), [this](int index) {
+                                          if (m_rigidBody == nullptr) {
+                                              return;
+                                          }
+                                          const auto type = static_cast<Rapture::physics::CollisionShapeType>(index);
+                                          m_rigidBody->setShape(Rapture::physics::CollisionShape_ofType(type));
+                                          if (m_shapeDropdown != nullptr) {
+                                              m_shapeDropdown->setText(std::string(Rapture::physics::CollisionShape_toString(type)));
+                                          }
+                                      });
         m_motionTypeDropdown =
-            rowDropdown(t, "Motion", Rapture::PhysicsMotionType_toString(Rapture::PHYSICS_MOTION_DYNAMIC), {"Static", "Dynamic"},
+            rowDropdown(t, "Motion", Rapture::physics::MotionType_toString(Rapture::physics::MOTION_DYNAMIC), {"Static", "Dynamic"},
                         [this](int index) {
-                            if (m_node == nullptr) {
+                            if (m_rigidBody == nullptr) {
                                 return;
                             }
-                            const Rapture::PhysicsMotionType motionType = SELECTABLE_MOTION_TYPES[index];
-                            m_node->setMotionType(motionType);
+                            const Rapture::physics::MotionType motionType = SELECTABLE_MOTION_TYPES[index];
+                            m_rigidBody->setMotionType(motionType);
                             if (m_motionTypeDropdown != nullptr) {
-                                m_motionTypeDropdown->setText(std::string(Rapture::PhysicsMotionType_toString(motionType)));
+                                m_motionTypeDropdown->setText(std::string(Rapture::physics::MotionType_toString(motionType)));
                             }
                         });
         rowSlider(t, "Friction", &m_friction, 0.0f, 1.0f, [this](float v) {
-            if (m_node != nullptr) {
-                m_node->setFriction(v);
+            if (m_rigidBody != nullptr) {
+                m_rigidBody->setFriction(v);
             }
         });
         rowSlider(t, "Restitution", &m_restitution, 0.0f, 1.0f, [this](float v) {
-            if (m_node != nullptr) {
-                m_node->setRestitution(v);
+            if (m_rigidBody != nullptr) {
+                m_rigidBody->setRestitution(v);
             }
         });
     });
@@ -369,23 +552,127 @@ void RigidBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void RigidBody3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    Rapture::RigidBody3D *previous = m_node;
-    m_node = resolveBody(entity);
-    if (m_node == nullptr) {
+    Rapture::RigidBody3D *previous = m_rigidBody;
+    m_rigidBody = resolveBody(entity);
+    if (m_rigidBody == nullptr) {
         return;
     }
 
-    m_friction = m_node->friction();
-    m_restitution = m_node->restitution();
+    m_friction = m_rigidBody->friction();
+    m_restitution = m_rigidBody->restitution();
 
-    if (previous != m_node) {
-        if (m_shapeText != nullptr) {
-            m_shapeText->setText(s_describeShape(m_node->shape()));
+    if (previous != m_rigidBody) {
+        if (m_shapeDropdown != nullptr) {
+            m_shapeDropdown->setText(std::string(
+                Rapture::physics::CollisionShape_toString(Rapture::physics::CollisionShape_typeOf(m_rigidBody->shape()))));
         }
         if (m_motionTypeDropdown != nullptr) {
-            m_motionTypeDropdown->setText(std::string(Rapture::PhysicsMotionType_toString(m_node->motionType())));
+            m_motionTypeDropdown->setText(std::string(Rapture::physics::MotionType_toString(m_rigidBody->motionType())));
         }
     }
+}
+
+Rapture::CharacterBody3D *CharacterBody3DEditor::resolveBody(const Rapture::ecs::EntityAccessor &entity) const
+{
+    Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(m_scene, entity);
+    return object != nullptr ? object->component<Rapture::CharacterBody3D>() : nullptr;
+}
+
+void CharacterBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        m_shapeDropdown = rowDropdown(t, "Shape", Rapture::physics::CollisionShape_toString(Rapture::physics::COLLISION_SHAPE_CAPSULE),
+                                      s_shapeOptions(), [this](int index) {
+                                          if (m_characterBody == nullptr) {
+                                              return;
+                                          }
+                                          const auto type = static_cast<Rapture::physics::CollisionShapeType>(index);
+                                          m_characterBody->setShape(Rapture::physics::CollisionShape_ofType(type));
+                                          if (m_shapeDropdown != nullptr) {
+                                              m_shapeDropdown->setText(std::string(Rapture::physics::CollisionShape_toString(type)));
+                                          }
+                                      });
+        rowVec3(t, "Shape Offset", m_shapeOffset, 0.01, -100.0, 100.0, [this]() {
+            if (m_characterBody != nullptr) {
+                m_characterBody->setShapeOffset(glm::vec3(static_cast<float>(m_shapeOffset[0]),
+                                                          static_cast<float>(m_shapeOffset[1]),
+                                                          static_cast<float>(m_shapeOffset[2])));
+            }
+        });
+        rowSlider(t, "Mass", &m_mass, 1.0f, 500.0f, [this](float v) {
+            if (m_characterBody != nullptr) {
+                m_characterBody->setMass(v);
+            }
+        });
+        rowSlider(
+            t, "Max Slope", &m_maxSlopeAngle, 0.0f, 90.0f,
+            [this](float v) {
+                if (m_characterBody != nullptr) {
+                    m_characterBody->setMaxSlopeAngle(glm::radians(v));
+                }
+            },
+            "%.0f deg");
+        rowSlider(t, "Step Up", &m_stepUp, 0.0f, 2.0f, [this](float v) {
+            if (m_characterBody != nullptr) {
+                m_characterBody->setStepUp(v);
+            }
+        });
+        rowSlider(t, "Step Down", &m_stepDown, 0.0f, 2.0f, [this](float v) {
+            if (m_characterBody != nullptr) {
+                m_characterBody->setStepDown(v);
+            }
+        });
+        rowSlider(t, "Jump Speed", &m_jumpSpeed, 0.0f, 20.0f, [this](float v) {
+            if (m_characterBody != nullptr) {
+                m_characterBody->setJumpSpeed(v);
+            }
+        });
+    });
+}
+
+void CharacterBody3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
+{
+    Rapture::CharacterBody3D *previous = m_characterBody;
+    m_characterBody = resolveBody(entity);
+    if (m_characterBody == nullptr) {
+        return;
+    }
+
+    const glm::vec3 offset = m_characterBody->shapeOffset();
+    m_shapeOffset[0] = offset.x;
+    m_shapeOffset[1] = offset.y;
+    m_shapeOffset[2] = offset.z;
+
+    m_mass = m_characterBody->mass();
+    m_maxSlopeAngle = glm::degrees(m_characterBody->maxSlopeAngle());
+    m_stepUp = m_characterBody->stepUp();
+    m_stepDown = m_characterBody->stepDown();
+    m_jumpSpeed = m_characterBody->jumpSpeed();
+
+    if (previous != m_characterBody && m_shapeDropdown != nullptr) {
+        m_shapeDropdown->setText(std::string(
+            Rapture::physics::CollisionShape_toString(Rapture::physics::CollisionShape_typeOf(m_characterBody->shape()))));
+    }
+}
+
+void SpringArm3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowDragFloat(t, "Length", &m_length, 0.05, 0.0, 1000.0, {}, [this](double v) {
+            if (m_node != nullptr) {
+                m_node->setLength(static_cast<float>(v));
+            }
+        });
+    });
+}
+
+void SpringArm3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
+{
+    m_node = s_instanceAs<Rapture::SpringArm3D>(m_scene, entity);
+    if (m_node == nullptr) {
+        return;
+    }
+    m_length = m_node->length();
 }
 
 void Camera3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
@@ -411,7 +698,7 @@ void Camera3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void Camera3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::Camera3D>(scene, entity);
+    m_node = s_instanceAs<Rapture::Camera3D>(m_scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -433,7 +720,7 @@ void ShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             if (!m_entity.isValid() || !m_entity.has<Rapture::ShadowComponent>()) {
                 return;
             }
-            scene->getRenderData()->setShadowMobility(m_entity.getEntity(), m);
+            m_scene->getRenderData()->setShadowMobility(m_entity.getEntity(), m);
             if (m_mobilityDropdown != nullptr) {
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }
@@ -443,8 +730,7 @@ void ShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void ShadowEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    bool entityChanged = !(entity == m_entity);
-    m_entity = entity;
+    bool entityChanged = subjectChanged();
     if (!entity.has<Rapture::ShadowComponent>()) {
         return;
     }
@@ -469,7 +755,7 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             if (!m_entity.isValid() || !m_entity.has<Rapture::CascadedShadowComponent>()) {
                 return;
             }
-            scene->getRenderData()->setCascadedShadowMobility(m_entity.getEntity(), m);
+            m_scene->getRenderData()->setCascadedShadowMobility(m_entity.getEntity(), m);
             if (m_mobilityDropdown != nullptr) {
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }
@@ -486,8 +772,7 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void CascadedShadowEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    bool entityChanged = !(entity == m_entity);
-    m_entity = entity;
+    bool entityChanged = subjectChanged();
     if (!entity.has<Rapture::CascadedShadowComponent>()) {
         return;
     }
@@ -542,7 +827,7 @@ void EnvironmentEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void EnvironmentEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_node = s_instanceAs<Rapture::Environment>(scene, entity);
+    m_node = s_instanceAs<Rapture::Environment>(m_scene, entity);
     if (m_node == nullptr) {
         return;
     }
@@ -624,7 +909,7 @@ void CameraControllerEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void CameraControllerEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_controller = s_instanceAs<Rapture::CameraController>(scene, entity);
+    m_controller = s_instanceAs<Rapture::CameraController>(m_scene, entity);
     if (m_controller == nullptr) {
         return;
     }
@@ -663,7 +948,7 @@ void PlayerControllerEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void PlayerControllerEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    m_controller = s_instanceAs<Rapture::PlayerController>(scene, entity);
+    m_controller = s_instanceAs<Rapture::PlayerController>(m_scene, entity);
     if (m_controller == nullptr) {
         return;
     }

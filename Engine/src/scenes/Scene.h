@@ -6,6 +6,7 @@
 #include "components/ChangeChannels.h"
 #include "ecs/entity_accessor.h"
 #include "events/EventSignal.h"
+#include "physics/Common.h"
 #include "scenes/TickPhase.h"
 #include "scenes/entities/EntityCommon.h"
 #include "serialization/SerialDocument.h"
@@ -91,7 +92,7 @@ class Scene {
     /**
      * @brief The scene's rigid body physics simulation.
      */
-    PhysicsSystem *physics() const { return m_physics.get(); }
+    PhysicsSystem *physicsSystem() const { return m_physics.get(); }
 
     /**
      * @brief The hidden root every authored instance lives under
@@ -165,7 +166,17 @@ class Scene {
      */
     bool restoreFrom(ReadNode node);
 
+    /**
+     * @brief Puts an entity's mesh into the TLAS, replacing the instance it already had
+     * @param entity The entity to trace against
+     */
     void registerBLAS(ecs::Entity entity);
+
+    /**
+     * @brief Takes an entity's mesh out of the TLAS
+     * @param entity The entity to stop tracing against
+     */
+    void unregisterBLAS(ecs::Entity entity);
 
     void buildTLAS();
     std::shared_ptr<TLAS> getTLAS()
@@ -205,7 +216,7 @@ class Scene {
     /**
      * @brief Hands every body the simulation moved this step back to the node it drives
      */
-    void syncRigidBodyTransforms();
+    void syncSimulatedTransforms();
 
     /**
      * @brief Destroys every instance under the root, leaving the root itself
@@ -217,6 +228,7 @@ class Scene {
     Environment *m_environment = nullptr;
     std::unique_ptr<SceneRenderData> m_renderData;
     std::unique_ptr<PhysicsSystem> m_physics;
+    std::vector<physics::BodyState> m_simulatedStates;
     Controller *m_activeController = nullptr;
     SceneSettings m_config;
 

@@ -8,98 +8,90 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#include "physics/Common.h"
+#include "physics/Internal.h"
 
 namespace Rapture {
 
+namespace physics {
+class CharacterBody;
+class RigidBody;
+} // namespace physics
+
 /**
- * @brief Rigid body physics simulation.
- *
- * Wraps the underlying physics library so no third party primitive leaks into
- * the rest of the engine. Create bodies, step the simulation and read results
- * back in engine terms (glm and PhysicsBodyId).
+ * @brief A world of bodies and the simulation that moves them.
  */
 class PhysicsSystem {
   public:
-    explicit PhysicsSystem(const PhysicsConfig &config = {});
+    explicit PhysicsSystem(const physics::SystemConfig &config = {});
     ~PhysicsSystem();
 
     PhysicsSystem(const PhysicsSystem &) = delete;
     PhysicsSystem &operator=(const PhysicsSystem &) = delete;
 
     /**
-     * @brief Advance the simulation by a time step.
-     * @param deltaTime Elapsed time in seconds.
+     * @brief Advances the simulation
+     * @param deltaTime Elapsed time in seconds
      */
     void onUpdate(float deltaTime);
 
     /**
-     * @brief Create a rigid body and add it to the simulation.
-     * @param config Body shape, transform and material parameters.
-     * @param userData Opaque value stored on the body, returned in PhysicsBodyState.
-     * @return Handle to the new body, or an invalid handle on failure.
+     * @brief Adds a rigid body to the simulation
+     * @param config What the body is built from
+     * @param owner What the body moves, carried back on its state and never read here, which must outlive the body
+     * @return The body, or nullptr if it could not be created
      */
-    PhysicsBodyId createRigidBody(const RigidBodyConfig &config, uint64_t userData = 0);
+    std::unique_ptr<physics::RigidBody> createRigidBody(const physics::RigidBodyConfig &config, void *owner);
 
     /**
-     * @brief Get the state of every currently active (awake) body.
-     * @return Reference to an internal list, valid until the next call.
+     * @brief Adds a character body to the simulation
+     * @param config What the body is built from
+     * @param owner What the body walks, carried back on its state and never read here, which must outlive the body
+     * @return The body, or nullptr if it could not be created
      */
-    const std::vector<PhysicsBodyState> &getActiveBodyStates();
+    std::unique_ptr<physics::CharacterBody> createCharacterBody(const physics::CharacterBodyConfig &config, void *owner);
 
     /**
-     * @brief Remove a body from the simulation and destroy it.
-     * @param body Handle returned by createRigidBody.
+     * @brief Collects the state of every body that may have moved
+     * @param outStates Receives one entry per awake rigid body and one per character body, replacing what it held
      */
-    void removeRigidBody(PhysicsBodyId body);
+    void getSimulatedStates(std::vector<physics::BodyState> &outStates) const;
 
-    /**
-     * @brief Read a body's world space position and orientation.
-     * @param body Body to query.
-     * @param outPosition Receives the world space position.
-     * @param outRotation Receives the world space orientation.
-     */
-    void getBodyTransform(PhysicsBodyId body, glm::vec3 &outPosition, glm::quat &outRotation) const;
-
-    /**
-     * @brief Set a body's linear velocity.
-     * @param body Body to modify.
-     * @param velocity Linear velocity in world space.
-     */
-    void setLinearVelocity(PhysicsBodyId body, const glm::vec3 &velocity);
-
-    /**
-     * @brief Get a body's linear velocity.
-     * @param body Body to query.
-     * @return Linear velocity in world space, or zero for an invalid handle.
-     */
-    glm::vec3 getLinearVelocity(PhysicsBodyId body) const;
-
-    /**
-     * @brief Check whether a body is currently active (awake).
-     * @param body Body to query.
-     * @return True if the body is simulating.
-     */
-    bool isActive(PhysicsBodyId body) const;
-
-    /**
-     * @brief Set the world gravity vector.
-     * @param gravity Gravity acceleration in world space.
-     */
     void setGravity(const glm::vec3 &gravity);
+    glm::vec3 getGravity() const;
 
     /**
-     * @brief Cast a ray against the simulation and return the closest hit.
-     * @param origin Ray start in world space.
-     * @param direction Unit ray direction in world space.
-     * @param maxDistance Maximum distance to test along the direction.
-     * @return The closest hit; its hit field is false when nothing was struck.
+     * @brief Casts a ray against the simulation
+     * @param origin Ray start in world space
+     * @param direction Unit ray direction in world space
+     * @param maxDistance Furthest distance tested along the direction
+     * @return The closest hit, whose hit field is false when nothing was struck
      */
-    PhysicsRaycastHit raycast(const glm::vec3 &origin, const glm::vec3 &direction, float maxDistance) const;
+    physics::RaycastResult raycast(const glm::vec3 &origin, const glm::vec3 &direction, float maxDistance) const;
+
+    JPH::BodyInterface &bodyInterface() const { return *m_bodyInterface; }
+    FreeList<physics::CharacterRecord> &characterRecords() { return m_characterRecords; }
+    const FreeList<physics::CharacterRecord> &characterRecords() const { return m_characterRecords; }
 
   private:
-    struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    /**
+     * @brief Sweeps every character body through the world
+     * @param deltaTime Length of the step in seconds
+     */
+    void stepCharacters(float deltaTime);
+
+  private:
+    physics::BroadPhaseLayerInterfaceImpl m_broadPhaseLayerInterface;
+    physics::ObjectVsBroadPhaseLayerFilterImpl m_objectVsBroadPhaseLayerFilter;
+    physics::ObjectLayerPairFilterImpl m_objectLayerPairFilter;
+    std::unique_ptr<JPH::TempAllocatorImpl> m_tempAllocator;
+    JPH::JobSystemThreadPool m_jobSystem;
+    JPH::PhysicsSystem m_physicsSystem;
+    JPH::BodyInterface *m_bodyInterface = nullptr;
+    FreeList<physics::CharacterRecord> m_characterRecords;
+
+    float m_fixedTimeStep;
+    uint32_t m_maxStepsPerUpdate;
+    float m_accumulator = 0.0f;
 };
 
 } // namespace Rapture

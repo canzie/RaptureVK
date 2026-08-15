@@ -30,6 +30,7 @@ class WorldPlaySection : public PropertySection {
   private:
     std::optional<AssetPicker> m_puppetPicker;
     std::optional<AssetPicker> m_controllerPicker;
+    double m_gravity = -9.81;
 };
 
 /**

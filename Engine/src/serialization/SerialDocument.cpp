@@ -269,6 +269,16 @@ double ReadNode::asF64(double fallback) const
     if (yyjson_is_num(val)) {
         return yyjson_get_num(val);
     }
+
+    // a document that has not been through text still holds what s_floatVal wrote
+    if (yyjson_is_raw(val)) {
+        const char *text = yyjson_get_raw(val);
+        double parsed = 0.0;
+        if (std::from_chars(text, text + yyjson_get_len(val), parsed).ec == std::errc()) {
+            return parsed;
+        }
+    }
+
     return fallback;
 }
 

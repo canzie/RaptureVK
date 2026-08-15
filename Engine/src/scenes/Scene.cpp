@@ -8,7 +8,7 @@
 #include "scenes/instances/DirectionalLight3D.h"
 #include "scenes/instances/Environment.h"
 #include "scenes/instances/Node3D.h"
-#include "scenes/instances/RigidBody3D.h"
+#include "scenes/instances/PhysicsBody3D.h"
 #include "scenes/instances/StaticMesh3D.h"
 #include "renderer/SceneRenderData.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
@@ -135,10 +135,7 @@ void Scene::destroyEntity(ecs::Entity entity)
     }
 
     if (m_registry.has<RayTracedComponent>(entity)) {
-        if (m_tlas != nullptr) {
-            m_tlas->removeInstance(entity);
-        }
-        m_tlasDirty = true;
+        unregisterBLAS(entity);
     }
 
     m_registry.destroy(entity);
@@ -151,7 +148,7 @@ void Scene::stepPhysics(float dt)
     }
 
     m_physics->onUpdate(dt);
-    syncRigidBodyTransforms();
+    syncSimulatedTransforms();
 }
 
 void Scene::onUpdate(float dt)
@@ -170,12 +167,20 @@ void Scene::onUpdate(float dt)
     {
         RAPTURE_PROFILE_SCOPE("OldPerEntity::updateMeshes");
         for (auto [entity, material] : m_registry.read<MaterialComponent>().with<TransformComponent, MeshComponent>()) {
+            if (!material.material) {
+                continue;
+            }
             material.material->updatePendingTextures();
         }
     }
 
     glm::vec3 cameraPosition = glm::vec3(0.0f);
     Frustum *frustum = nullptr;
+
+    if (m_activeController != nullptr) {
+        m_activeController->updateViewCamera();
+    }
+
     Camera3D *activeCamera = m_activeController != nullptr ? m_activeController->viewCamera() : nullptr;
     if (activeCamera != nullptr) {
         ecs::Entity camera = activeCamera->entity();
@@ -288,10 +293,12 @@ std::string Scene::getSceneName() const
     return m_config.sceneName;
 }
 
-void Scene::syncRigidBodyTransforms()
+void Scene::syncSimulatedTransforms()
 {
-    for (const PhysicsBodyState &state : m_physics->getActiveBodyStates()) {
-        RigidBody3D *body = reinterpret_cast<RigidBody3D *>(state.userData);
+    m_physics->getSimulatedStates(m_simulatedStates);
+
+    for (const physics::BodyState &state : m_simulatedStates) {
+        PhysicsBody3D *body = static_cast<PhysicsBody3D *>(state.owner);
         if (body == nullptr) {
             continue;
         }
@@ -515,11 +522,23 @@ void Scene::registerBLAS(ecs::Entity entity)
         return;
     }
 
+    m_tlas->removeInstance(entity);
+
     TLASInstance instance;
     instance.blas = blas;
     instance.transform = transform->world;
     instance.entityID = entity;
     m_tlas->addInstance(instance);
+    m_tlasDirty = true;
+}
+
+void Scene::unregisterBLAS(ecs::Entity entity)
+{
+    if (m_tlas == nullptr) {
+        return;
+    }
+
+    m_tlas->removeInstance(entity);
     m_tlasDirty = true;
 }
 
