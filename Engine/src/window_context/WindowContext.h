@@ -127,6 +127,12 @@ class WindowContext {
     virtual glm::vec2 getCursorPosition() const = 0;
 
     /**
+     * @brief Get how many framebuffer pixels the window puts in a window pixel.
+     * @return Scale on each axis, one on a display that does not scale.
+     */
+    virtual glm::vec2 getContentScale() const = 0;
+
+    /**
      * @brief Create a new platform window.
      * @param platform Shared platform context; must outlive this window.
      * @param width Initial width.

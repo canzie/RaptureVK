@@ -21,7 +21,7 @@
 namespace Rapture {
 class SwapChain;
 class RenderWindow;
-}
+} // namespace Rapture
 
 class EditorState;
 struct EditorWorkspaceState;
@@ -113,6 +113,8 @@ class AmethystLayer : public Rapture::Layer {
 
     PanelServices buildServices(void);
 
+    void updateShortcuts();
+
     /**
      * @brief Opens an asset in a workspace tab of its own, focusing the tab it is already open in.
      * @param handle The asset to open, whose type picks the workspace it opens in.
@@ -146,6 +148,8 @@ class AmethystLayer : public Rapture::Layer {
     Amethyst::Window m_window;
     Amethyst::Frame *m_backgroundFrame = nullptr;
     Amethyst::MenuBar *m_menuBar = nullptr;
+    ShortcutRegistry m_shortcutRegistry;
+    std::unique_ptr<Rapture::Input> m_input;
     Amethyst::TabBar *m_workspaceTabBar = nullptr;
     std::unique_ptr<ProjectLauncher> m_startupLauncher;
     std::unique_ptr<BottomBar> m_bottomBar;
@@ -158,7 +162,6 @@ class AmethystLayer : public Rapture::Layer {
     std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
 
     Rapture::EventConnection m_mainSwapchainRecreatedConn;
-
 };
 
 #endif // RAPTURE__AMETHYST_LAYER_H

@@ -36,6 +36,7 @@ class GlfwWindowContext : public WindowContext {
     CursorMode getCursorMode() const override;
 
     bool isKeyPressed(KeyCode key) const override;
+    glm::vec2 getContentScale() const override;
     bool isMouseButtonPressed(MouseButton button) const override;
     glm::vec2 getCursorPosition() const override;
 

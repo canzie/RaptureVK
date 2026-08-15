@@ -279,7 +279,9 @@ radio-button.viewport-context-menu:active {
 
 .generic-text-button {
     background-color: @bg-buttons;
+    background-transparency: 0.0;
     text-color: @text-2;
+    image-color: @text-2;
     border-pixel-size: 1px;
     border-color: @border-1;
     border-mode: outline;
@@ -293,6 +295,14 @@ radio-button.viewport-context-menu:active {
     background-color: @bg-buttons;
     text-color: @text-1;
     border-color: @border-2;
+}
+
+.play-button {
+    image-color: @status-success;
+}
+
+.play-button:active {
+    image-color: @status-error;
 }
 
 

@@ -66,6 +66,9 @@ class ViewportPanel : public Panel {
         m_gizmoSpaceGroup.value = static_cast<int32_t>(space);
     }
 
+  public:
+    Rapture::EventSignal<void()> onImageClicked;
+
   private:
     void updateGizmo(void);
 

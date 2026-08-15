@@ -74,7 +74,7 @@ inline constexpr const char *SVG_PAUSE = ICON_SVG("<g fill=\"#ffffff\" stroke=\"
 inline constexpr const char *SVG_STOP =
     ICON_SVG("<rect x=\"4\" y=\"4\" width=\"8\" height=\"8\" rx=\"1\" fill=\"#ffffff\" stroke=\"none\"/>");
 
-inline constexpr const char *SVG_STEP = ICON_SVG("<path d=\"M5 3.5v9l5-4.5-5-4.5z\" fill=\"#ffffff\" stroke=\"none\"/>"
+inline constexpr const char *SVG_FRAME_ADVANCE = ICON_SVG("<path d=\"M5 3.5v9l5-4.5-5-4.5z\" fill=\"#ffffff\" stroke=\"none\"/>"
                                                  "<path d=\"M11 3.5v9\"/>");
 
 inline constexpr const char *SVG_CARET_DOWN = ICON_SVG("<path d=\"M4 6l4 4 4-4\"/>");

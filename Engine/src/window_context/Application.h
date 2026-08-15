@@ -35,6 +35,11 @@ class Application {
      */
     void requestRelaunch(const std::filesystem::path &projectPath = {});
 
+    /**
+     * @brief Stops the run loop, ending the process once the frame it is in is done
+     */
+    void close() { m_running = false; }
+
     bool isRelaunchRequested() const { return m_relaunchRequested; }
     const std::filesystem::path &getRelaunchProject() const { return m_relaunchProject; }
 

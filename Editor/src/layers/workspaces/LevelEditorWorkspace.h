@@ -5,13 +5,12 @@
 
 #include <asset_manager/AssetHandle.h>
 #include <components/context_menu.h>
+#include <events/EventSignal.h>
 #include <memory>
 #include <scenes/World.h>
 #include <viewport/Viewport.h>
 
-namespace Rapture {
-class Layer;
-} // namespace Rapture
+class PlayLayer;
 
 class LevelEditorWorkspace : public Workspace {
   public:
@@ -29,6 +28,11 @@ class LevelEditorWorkspace : public Workspace {
     void setupViewport();
 
     void setupHotbar();
+
+    /**
+     * @brief Offers this workspace's commands for as long as the cursor is over it
+     */
+    void setupShortcuts();
 
     /**
      * @brief Opens the add menu under the hotbar button, adding to the root of the scene
@@ -53,12 +57,25 @@ class LevelEditorWorkspace : public Workspace {
      */
     void stopPlay();
 
+    /**
+     * @brief Holds the world where it is, or lets it carry on from there
+     */
+    void togglePause();
+
+    /**
+     * @brief Puts the play and pause buttons into the look of the state the world is in
+     */
+    void syncPlayButtons();
+
   private:
     Amethyst::ContextMenu *m_addMenu = nullptr;
-    Amethyst::TextButton *m_playButton = nullptr;
+    Amethyst::ImageButton *m_playButton = nullptr;
+    Amethyst::ImageButton *m_pauseButton = nullptr;
+    Amethyst::ImageButton *m_stepButton = nullptr;
 
     Rapture::AssetPtr<Rapture::World> m_world;
-    Rapture::Layer *m_playLayer = nullptr;
+    PlayLayer *m_playLayer = nullptr;
+    Rapture::EventConnection m_viewportClickedConn;
     Rapture::ViewportContext m_viewport;
 };
 

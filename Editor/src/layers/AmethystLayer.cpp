@@ -99,6 +99,7 @@ void AmethystLayer::onAttach()
     auto &window = app.getWindowContext();
     auto swapChain = app.getMainWindow().getSwapChain();
 
+    m_input = std::make_unique<Rapture::Input>(&window);
     m_uiDescriptorPool = createUiDescriptorPool();
 
     auto amethystShaders = Rapture::EnginePaths::assetDirectory() / "amethyst/spirv";
@@ -298,6 +299,8 @@ void AmethystLayer::onUpdate(float dt)
         return;
     }
 
+    updateShortcuts();
+
     for (auto &ws : m_workspaces) {
         ws->onUpdate(dt);
     }
@@ -343,6 +346,8 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
         },
         [this](Amethyst::MenuBarScope &mb) {
             m_menuBar = &mb.component;
+            m_shortcutRegistry.registerShortcut(EDITOR_COMMAND_EXIT, {Rapture::KEY_Q, SHORTCUT_MOD_CONTROL}, m_backgroundFrame,
+                                                [] { Rapture::Application::getInstance().close(); });
             mb.menuItem("File", [this](Amethyst::DropdownScope &d) {
                 d.action("New Scene", [] {});
                 d.action("Open Scene", [] {});
@@ -352,7 +357,7 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
                 d.action("Open Project", [this] { openLauncherWindow(); });
                 d.action("Save Project", [] { s_saveProject(); });
                 d.separator();
-                d.action("Exit", [] {});
+                d.action("Exit", [] { Rapture::Application::getInstance().close(); });
             });
             mb.menuItem("Edit", [](Amethyst::DropdownScope &d) {
                 d.action("Undo", [] {});
@@ -611,6 +616,15 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
     }
 }
 
+void AmethystLayer::updateShortcuts()
+{
+    auto &windowContext = Rapture::Application::getInstance().getWindowContext();
+
+    // the cursor comes back in window pixels while the UI is placed in framebuffer ones
+    const glm::vec2 cursor = windowContext.getCursorPosition() * windowContext.getContentScale();
+    m_shortcutRegistry.onUpdate(*m_input, cursor);
+}
+
 PanelServices AmethystLayer::buildServices(void)
 {
     PanelServices services;
@@ -631,6 +645,10 @@ PanelServices AmethystLayer::buildServices(void)
         return m_backend.registerTexture(tex->getImageView(), tex->getSampler().getSamplerVk());
     };
     services.unregisterTexture = [this](Amethyst::AmTextureId id) { m_backend.unregisterTexture(id); };
+    services.registerShortcut = [this](EditorCommand command, Shortcut defaultShortcut, Amethyst::UIObject *root,
+                                       std::function<void()> action) {
+        m_shortcutRegistry.registerShortcut(command, defaultShortcut, root, std::move(action));
+    };
     services.openImportPanel = [this](const std::filesystem::path &source, const std::filesystem::path &outputFolder) {
         struct Session {
             std::unique_ptr<ImportPanel> panel;

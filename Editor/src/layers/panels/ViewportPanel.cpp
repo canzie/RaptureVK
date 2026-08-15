@@ -464,6 +464,8 @@ void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
         return;
     }
 
+    onImageClicked.fire();
+
     uint32_t px = static_cast<uint32_t>(u * static_cast<float>(m_viewport->getWidth()));
     uint32_t py = static_cast<uint32_t>(v * static_cast<float>(m_viewport->getHeight()));
 

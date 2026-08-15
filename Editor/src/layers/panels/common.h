@@ -1,6 +1,7 @@
 #ifndef RAPTURE__PANELS_COMMON_H
 #define RAPTURE__PANELS_COMMON_H
 
+#include "ShortcutRegistry.h"
 #include "layers/panels/FileBrowser.h"
 #include <amethyst/Amethyst.h>
 #include <asset_manager/AssetCommon.h>
@@ -31,6 +32,7 @@ struct PanelServices {
     std::function<void(Rapture::AssetHandle)> openAssetWorkspace;
     std::function<Amethyst::AmTextureId(Rapture::Texture *)> registerTexture;
     std::function<void(Amethyst::AmTextureId)> unregisterTexture;
+    std::function<void(EditorCommand, Shortcut, Amethyst::UIObject *, std::function<void()>)> registerShortcut;
 };
 
 struct WorkspaceContext {

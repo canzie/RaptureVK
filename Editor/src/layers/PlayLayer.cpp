@@ -22,7 +22,6 @@ static Rapture::ControlInput s_mapPlayerInput(const Rapture::Input &input)
     intent.move.z = (input.isKeyPressed(KEY_W) ? 1.0f : 0.0f) - (input.isKeyPressed(KEY_S) ? 1.0f : 0.0f);
     intent.look = input.mouseDelta();
     intent.jump = input.isKeyPressed(KEY_SPACE);
-    intent.releaseControl = input.isKeyPressed(KEY_ESCAPE);
     return intent;
 }
 
@@ -64,9 +63,6 @@ void PlayLayer::onUpdate(float dt)
     m_input->onUpdate();
 
     Rapture::ControlInput mapped = s_mapPlayerInput(*m_input);
-    if (mapped.releaseControl) {
-        m_controlReleased = true;
-    }
 
     // handed a blank intent rather than none, so the puppet stops where it was instead of drifting
     Rapture::ControlInput intent;

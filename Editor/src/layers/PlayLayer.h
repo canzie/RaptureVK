@@ -28,6 +28,16 @@ class PlayLayer : public Rapture::Layer {
 
     void onUpdate(float dt) override;
 
+    /**
+     * @brief Hands control of the puppet back after it was released
+     */
+    void takeControl() { m_controlReleased = false; }
+
+    /**
+     * @brief Hands control of the puppet over to the editor, or takes it back
+     */
+    void toggleControl() { m_controlReleased = !m_controlReleased; }
+
   protected:
     void onAttach() override;
     void onDetach() override;

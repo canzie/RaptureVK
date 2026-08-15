@@ -1,5 +1,6 @@
 #include "LevelEditorWorkspace.h"
 
+#include "Icons.h"
 #include "layers/PlayLayer.h"
 #include "layers/panels/AddSceneObjectMenu.h"
 #include "layers/panels/components/context_menus.h"
@@ -9,6 +10,7 @@
 #include "layers/panels/ViewportPanel.h"
 #include "layers/panels/WorldSettingsPanel.h"
 
+#include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 #include <layers/Layer.h>
@@ -21,6 +23,12 @@ static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
 static constexpr uint32_t INITIAL_VIEWPORT_WIDTH = 1280;
 static constexpr uint32_t INITIAL_VIEWPORT_HEIGHT = 720;
 static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
+
+static void s_setButtonGuiState(Amethyst::ImageButton &button, uint16_t state, bool on)
+{
+    const uint16_t current = button.getGuiState();
+    button.setGuiState(static_cast<uint16_t>(on ? (current | state) : (current & ~state)));
+}
 
 LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
                                            Rapture::AssetPtr<Rapture::World> world)
@@ -53,7 +61,13 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBar &tabBar, const Panel
             });
 
     if (viewportTabBar != nullptr) {
-        m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
+        auto viewportPanel = std::make_unique<ViewportPanel>(viewportTabBar, m_context);
+        m_viewportClickedConn = viewportPanel->onImageClicked.connect([this]() {
+            if (m_playLayer != nullptr && isPlaying()) {
+                m_playLayer->takeControl();
+            }
+        });
+        m_panels.push_back(std::move(viewportPanel));
     }
     if (outlinerTabBar != nullptr) {
         m_panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar, m_context));
@@ -66,6 +80,7 @@ LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBar &tabBar, const Panel
     }
 
     setupHotbar();
+    setupShortcuts();
 
     if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
         if (auto *entry = Amethyst::LayoutConfig::instance().get("Editor Dock")) {
@@ -135,12 +150,15 @@ void LevelEditorWorkspace::setupHotbar()
             };
         });
 
-    Amethyst::UIScope(*m_hotbar).textButton(
-        {.classes = {"generic-text-button"},
-         .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
-         .label = "Play"},
-        [this](Amethyst::TextButtonScope &b) {
+    Amethyst::UIScope(*m_hotbar).imageButton(
+        {
+            .classes = {"generic-text-button", "play-button"},
+            .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, 0.0f, 0.9f, 0.0f)},
+            .svg = Icons::SVG_PLAY,
+        },
+        [this](Amethyst::ImageButtonScope &b) {
             m_playButton = &b.component;
+            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
             b.component.onMouseButton1ClickCb = [this]() {
                 if (isPlaying()) {
                     stopPlay();
@@ -150,6 +168,71 @@ void LevelEditorWorkspace::setupHotbar()
                 return Amethyst::EventResult::CONSUMED;
             };
         });
+
+    Amethyst::UIScope(*m_hotbar).imageButton(
+        {
+            .classes = {"generic-text-button"},
+            .base = {.layoutOrder = 3, .size = Amethyst::UDim2(0.0f, 0.0f, 0.9f, 0.0f)},
+            .svg = Icons::SVG_PAUSE,
+        },
+        [this](Amethyst::ImageButtonScope &b) {
+            m_pauseButton = &b.component;
+            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
+            b.component.onMouseButton1ClickCb = [this]() {
+                togglePause();
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
+
+    Amethyst::UIScope(*m_hotbar).imageButton(
+        {
+            .classes = {"generic-text-button"},
+            .base = {.layoutOrder = 4, .size = Amethyst::UDim2(0.0f, 0.0f, 0.9f, 0.0f)},
+            .svg = Icons::SVG_FRAME_ADVANCE,
+        },
+        [this](Amethyst::ImageButtonScope &b) {
+            m_stepButton = &b.component;
+            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
+        });
+}
+
+void LevelEditorWorkspace::setupShortcuts()
+{
+    const PanelServices &services = m_context.services;
+
+    services.registerShortcut(EDITOR_COMMAND_PLAY_MODE_TOGGLE_CONTROL, {Rapture::KEY_F8}, m_container, [this]() {
+        if (m_playLayer != nullptr && isPlaying()) {
+            m_playLayer->toggleControl();
+        }
+    });
+
+    services.registerShortcut(EDITOR_COMMAND_PLAY_MODE_STOP, {Rapture::KEY_ESCAPE}, m_container, [this]() { stopPlay(); });
+}
+
+void LevelEditorWorkspace::togglePause()
+{
+    if (!isPlaying()) {
+        return;
+    }
+
+    if (m_world->playState() == Rapture::PlayState::PAUSED) {
+        m_world->resume();
+    } else {
+        m_world->pause();
+    }
+
+    syncPlayButtons();
+}
+
+void LevelEditorWorkspace::syncPlayButtons()
+{
+    const bool playing = isPlaying();
+    m_playButton->setSvg(playing ? Icons::SVG_STOP : Icons::SVG_PLAY);
+    s_setButtonGuiState(*m_playButton, Amethyst::GUI_STATE_ACTIVE, playing);
+
+    const bool paused = m_world->playState() == Rapture::PlayState::PAUSED;
+    m_pauseButton->setSvg(paused ? Icons::SVG_PLAY : Icons::SVG_PAUSE);
+    s_setButtonGuiState(*m_pauseButton, Amethyst::GUI_STATE_ACTIVE, paused);
 }
 
 void LevelEditorWorkspace::startPlay()
@@ -164,12 +247,12 @@ void LevelEditorWorkspace::startPlay()
     }
 
     if (m_playLayer == nullptr) {
-        m_playLayer = app.pushLayer(std::make_unique<PlayLayer>(*m_world, *m_context.viewport));
+        m_playLayer = static_cast<PlayLayer *>(app.pushLayer(std::make_unique<PlayLayer>(*m_world, *m_context.viewport)));
     } else {
         m_playLayer->attach();
     }
 
-    m_playButton->setText("Stop");
+    syncPlayButtons();
 }
 
 void LevelEditorWorkspace::stopPlay()
@@ -186,7 +269,7 @@ void LevelEditorWorkspace::stopPlay()
         editor->attach();
     }
 
-    m_playButton->setText("Play");
+    syncPlayButtons();
 }
 
 void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
