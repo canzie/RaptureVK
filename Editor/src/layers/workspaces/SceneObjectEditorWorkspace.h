@@ -3,9 +3,9 @@
 
 #include "Workspace.h"
 
-#include <asset_manager/AssetCommon.h>
-#include <asset_manager/AssetHandle.h>
-#include <viewport/Viewport.h>
+#include <assets/asset_manager/AssetCommon.h>
+#include <assets/asset_manager/AssetHandle.h>
+#include <renderer/viewport/Viewport.h>
 
 #include <memory>
 

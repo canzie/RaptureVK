@@ -1,7 +1,7 @@
 #ifndef RAPTURE__PHYSICS_COMMON_H
 #define RAPTURE__PHYSICS_COMMON_H
 
-#include "logging/Log.h"
+#include "core/utils/Log.h"
 
 #include <algorithm>
 #include <cstdint>

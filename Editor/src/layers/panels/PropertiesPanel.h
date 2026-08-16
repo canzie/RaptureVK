@@ -4,12 +4,12 @@
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 
-#include "events/EventSignal.h"
+#include "core/events/EventSignal.h"
 #include "layers/panels/Panel.h"
 #include "layers/panels/component_editors/ComponentEditorBase.h"
 #include "layers/panels/components/property_sections.h"
-#include "scenes/Scene.h"
-#include "ecs/entity_accessor.h"
+#include "scene/Scene.h"
+#include "core/ecs/entity_accessor.h"
 
 #include <concepts>
 #include <optional>

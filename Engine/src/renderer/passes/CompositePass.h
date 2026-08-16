@@ -1,12 +1,12 @@
 #ifndef RAPTURE__COMPOSITE_PASS_H
 #define RAPTURE__COMPOSITE_PASS_H
 
-#include "asset_manager/AssetHandle.h"
-#include "buffers/command_buffers/CommandBuffer.h"
-#include "pipelines/GraphicsPipeline.h"
+#include "assets/asset_manager/AssetHandle.h"
+#include "gpu/command_buffers/CommandBuffer.h"
+#include "gpu/pipelines/GraphicsPipeline.h"
 #include "renderer/passes/RenderPass.h"
-#include "shaders/Shader.h"
-#include "window_context/vulkan_context/RenderContext.h"
+#include "gpu/shaders/Shader.h"
+#include "gpu/vulkan_context/RenderContext.h"
 
 #include <cstdint>
 #include <memory>

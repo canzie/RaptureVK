@@ -1,10 +1,10 @@
 #include "Frustum.h"
 
-#include "buffers/StorageBuffer.h"
-#include "components/systems/BoundingBox.h"
-#include "logging/Log.h"
-#include "logging/TracyProfiler.h"
-#include "window_context/Application.h"
+#include "app/Application.h"
+#include "core/utils/Log.h"
+#include "core/utils/TracyProfiler.h"
+#include "gpu/buffers/StorageBuffer.h"
+#include "scene/systems/BoundingBox.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 

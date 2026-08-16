@@ -2,15 +2,15 @@
 
 #include "Icons.h"
 
-#include "scenes/instances/Camera3D.h"
-#include "scenes/instances/Environment.h"
-#include "scenes/instances/Folder.h"
-#include "scenes/instances/Light3D.h"
-#include "scenes/instances/Mesh3D.h"
-#include "scenes/instances/Node3D.h"
-#include "scenes/instances/SpringArm3D.h"
-#include "scenes/instances/Terrain3D.h"
-#include "scenes/instances/controllers/CameraController.h"
+#include "scene/instances/Camera3D.h"
+#include "scene/instances/Environment.h"
+#include "scene/instances/Folder.h"
+#include "scene/instances/Light3D.h"
+#include "scene/instances/Mesh3D.h"
+#include "scene/instances/Node3D.h"
+#include "scene/instances/SpringArm3D.h"
+#include "scene/instances/Terrain3D.h"
+#include "scene/instances/controllers/CameraController.h"
 
 static constexpr const char *ICON_CLASS_DEFAULT = "treeview-icon";
 static constexpr const char *ICON_CLASS_FOLDER = "treeview-icon-folder";

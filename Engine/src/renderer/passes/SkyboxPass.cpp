@@ -1,14 +1,14 @@
 #include "SkyboxPass.h"
 
-#include "utils/EnginePaths.h"
-#include "asset_manager/AssetImportConfig.h"
-#include "asset_manager/AssetManager.h"
-#include "buffers/descriptors/DescriptorManager.h"
-#include "components/Components.h"
-#include "logging/Log.h"
-#include "renderer/SceneRenderData.h"
-#include "textures/TextureCommon.h"
-#include "window_context/Application.h"
+#include "core/utils/EnginePaths.h"
+#include "assets/asset_manager/AssetImportConfig.h"
+#include "assets/asset_manager/AssetManager.h"
+#include "gpu/descriptors/DescriptorManager.h"
+#include "scene/components/Components.h"
+#include "core/utils/Log.h"
+#include "scene/render_data/SceneRenderData.h"
+#include "gpu/textures/TextureCommon.h"
+#include "app/Application.h"
 
 namespace Rapture {
 

@@ -3,7 +3,7 @@
 
 #include "layers/panels/Panel.h"
 
-#include "asset_manager/AssetCommon.h"
+#include "assets/asset_manager/AssetCommon.h"
 
 #include <amethyst/Amethyst.h>
 

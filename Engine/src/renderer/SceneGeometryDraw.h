@@ -1,9 +1,9 @@
 #ifndef RAPTURE__SCENE_GEOMETRY_DRAW_H
 #define RAPTURE__SCENE_GEOMETRY_DRAW_H
 
-#include "buffers/command_buffers/CommandBuffer.h"
+#include "gpu/command_buffers/CommandBuffer.h"
+#include "gpu/vulkan_context/RenderContext.h"
 #include "renderer/MDIBatch.h"
-#include "window_context/vulkan_context/RenderContext.h"
 
 #include <cstdint>
 #include <memory>

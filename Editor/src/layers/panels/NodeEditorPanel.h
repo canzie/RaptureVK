@@ -4,13 +4,13 @@
 #include <amethyst/Amethyst.h>
 #include <components/shape.h>
 
-#include "asset_manager/AssetCommon.h"
-#include "events/EventSignal.h"
-#include "events/ProjectEvents.h"
+#include "assets/asset_manager/AssetCommon.h"
+#include "core/events/EventSignal.h"
+#include "core/events/ProjectEvents.h"
 #include "layers/panels/Panel.h"
-#include "materials/graph/MaterialGraph.h"
-#include "materials/graph/MaterialGraphTypes.h"
-#include "utils/FreeList.h"
+#include "assets/materials/graph/MaterialGraph.h"
+#include "assets/materials/graph/MaterialGraphTypes.h"
+#include "core/utils/FreeList.h"
 
 namespace Rapture {
 class ProceduralTexture;

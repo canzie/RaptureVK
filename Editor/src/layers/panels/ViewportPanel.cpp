@@ -2,16 +2,16 @@
 
 #include "EntitySelection.h"
 #include "Icons.h"
-#include "components/Components.h"
-#include "components/systems/Transforms.h"
+#include "scene/components/Components.h"
+#include "scene/systems/Transforms.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
-#include "scenes/instances/controllers/CameraController.h"
-#include "render_targets/SceneRenderTarget.h"
-#include "scenes/World.h"
-#include "scenes/instances/Node3D.h"
-#include "utils/rp_assert.h"
-#include "viewport/Viewport.h"
+#include "scene/instances/controllers/CameraController.h"
+#include "gpu/render_targets/SceneRenderTarget.h"
+#include "scene/World.h"
+#include "scene/instances/Node3D.h"
+#include "core/utils/rp_assert.h"
+#include "renderer/viewport/Viewport.h"
 
 #include <components/canvas.h>
 #include <components/checkbox.h>
@@ -20,7 +20,7 @@
 #include <components/input_events.h>
 #include <components/ui_scope.h>
 
-#include "logging/Log.h"
+#include "core/utils/Log.h"
 #include "renderer/RenderSettings.h"
 
 #include <algorithm>

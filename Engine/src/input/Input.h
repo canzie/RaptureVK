@@ -2,7 +2,7 @@
 #define RAPTURE__INPUT_H
 
 #include "input/InputCodes.h"
-#include "window_context/WindowContext.h"
+#include "platform/WindowContext.h"
 
 #include <glm/glm.hpp>
 

@@ -1,0 +1,37 @@
+#pragma once
+
+#include "gpu/buffers/Buffers.h"
+#include "gpu/descriptors/DescriptorSet.h"
+
+namespace Rapture {
+
+// pretty much a standard buffer with the functionaliy of being able to
+// - create a descriptor set
+// - setup the VkDescriptorBufferInfo and VkWriteDescriptorSet
+// - return the offset and size for a suballocation
+// this alloction data will be stored in the instanced material (VmaAllocationInfo)
+// it can then do a simple addData with the correct offset and size to update any data
+
+class UniformBuffer : public Buffer {
+  public:
+    UniformBuffer(VkDeviceSize size, BufferUsage usage, VmaAllocator allocator, void *data = nullptr);
+    ~UniformBuffer();
+
+    virtual VkBufferUsageFlags getBufferUsage() override;
+    virtual VkMemoryPropertyFlags getMemoryPropertyFlags() override;
+
+    virtual void addDataGPU(void *data, VkDeviceSize size, VkDeviceSize offset) override;
+
+    /**
+     * @brief Records the array slot this buffer was written into, which it releases when it dies
+     * @param location The binding the slot belongs to
+     * @param index The slot within that binding's array
+     */
+    void setDescriptorSlot(DescriptorSetBindingLocation location, uint32_t index);
+
+  private:
+    DescriptorSetBindingLocation m_bindingLocation = DescriptorSetBindingLocation::NONE;
+    uint32_t m_bindlessIndex = UINT32_MAX;
+};
+
+} // namespace Rapture

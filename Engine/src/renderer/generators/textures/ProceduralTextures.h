@@ -1,0 +1,429 @@
+#ifndef RAPTURE__PROCEDURAL_TEXTURES_H
+#define RAPTURE__PROCEDURAL_TEXTURES_H
+
+#include "assets/asset_manager/Asset.h"
+#include "gpu/command_buffers/CommandBuffer.h"
+#include "gpu/command_buffers/CommandPool.h"
+#include "gpu/descriptors/DescriptorSet.h"
+#include "gpu/pipelines/ComputePipeline.h"
+#include "gpu/shaders/Shader.h"
+#include "gpu/shaders/ShaderReflections.h"
+#include "gpu/textures/Texture.h"
+
+#include <glm/glm.hpp>
+
+#include <cstring>
+#include <memory>
+#include <string>
+
+namespace Rapture {
+
+/**
+ * @brief Configuration for creating procedural textures.
+ *
+ * Specifies the output texture format, filtering, and wrapping modes.
+ * By default creates an RGBA8 texture suitable for most procedural content.
+ */
+struct ProceduralTextureConfig {
+    bool cubemap = false;
+    TextureFormat format = TextureFormat::RGBA8;
+    TextureFilter filter = TextureFilter::Linear;
+    TextureWrap wrap = TextureWrap::Repeat;
+    bool srgb = false;
+    std::string name = ""; ///< Optional name for registering with AssetManager. Empty = auto-generated.
+};
+
+/**
+ * @brief Push constant data for white noise generation.
+ */
+struct WhiteNoisePushConstants {
+    uint32_t seed;
+};
+
+/**
+ * @brief Push constant data for Perlin noise generation.
+ */
+struct PerlinNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    uint32_t seed = 0;
+};
+
+struct SimplexNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    uint32_t seed = 0;
+};
+
+struct RidgedNoisePushConstants {
+    int32_t octaves = 1;
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
+    float scale = 8.0f;
+    float ridgeExponent = 0.8;
+    float amplitudeMultiplier = 0.5;
+    uint32_t seed = 0;
+};
+
+/**
+ * @brief Push constant data for atmospheric scattering.
+ *
+ * Based on GPU Gems 2 Chapter 16 "Accurate Atmospheric Scattering" by Sean O'Neil.
+ * Total size: 96 bytes. Each vec3+float pair is 16-byte aligned.
+ */
+struct AtmospherePushConstants {
+    glm::vec3 cameraPos; ///< Camera position (normalized, e.g., 0, 1.001, 0)
+    float innerRadius;   ///< Planet radius (e.g., 1.0)
+
+    glm::vec3 sunDirection; ///< Sun direction (normalized)
+    float outerRadius;      ///< Atmosphere outer radius (e.g., 1.025)
+
+    glm::vec3 cameraDir; ///< Camera forward direction
+    float scaleDepth;    ///< Scale depth (~0.25)
+
+    glm::vec3 cameraUp; ///< Camera up vector
+    float kr;           ///< Rayleigh constant (~0.0025)
+
+    glm::vec3 invWavelength; ///< 1/pow(wavelength,4) for RGB
+    float km;                ///< Mie constant (~0.001)
+
+    float eSun;           ///< Sun intensity
+    float g;              ///< Mie phase asymmetry
+    float fovY;           ///< Field of view (radians)
+    float cameraAltitude; ///< Camera altitude above planet surface (added to innerRadius)
+};
+
+static_assert(sizeof(AtmospherePushConstants) == 96, "AtmospherePushConstants size must be 96 bytes");
+
+/**
+ * @brief A reflected, editable push-constant parameter of a generator's shader
+ */
+struct ProceduralParameter {
+    std::string name;
+    std::string displayName;
+    PushConstantMemberInfo::BaseType type = PushConstantMemberInfo::BaseType::UNKNOWN;
+    uint32_t offset = 0;
+    bool hasRange = false;
+    float minValue = 0.0f;
+    float maxValue = 1.0f;
+    bool hidden = false;
+    bool isColor = false;
+};
+
+/**
+ * @brief Generates textures using compute shaders.
+ *
+ * ProceduralTexture provides a flexible system for generating textures via compute shaders.
+ * It supports any compute shader that writes to a storage image at set 4, binding 0.
+ *
+ * The system verifies that push constant struct sizes match the shader's expected size
+ * at runtime. Textures are always 1024x1024 in the current implementation.
+ *
+ * @note Sets 0-3 are reserved by the engine. Custom shaders must use set 4, binding 0
+ *       for the output storage image.
+ *
+ * Usage example:
+ * @code
+ * // Create a procedural texture generator
+ * ProceduralTexture generator("glsl/Generators/PerlinNoise.cs.glsl");
+ *
+ * // Set push constants before generating
+ * PerlinNoisePushConstants pc{.octaves = 4, .scale = 10.0f};
+ * generator.setPushConstants(pc);
+ *
+ * // Generate the texture (records commands to the provided command buffer)
+ * generator.generate(commandBuffer);
+ *
+ * // Get the resulting texture
+ * auto texture = generator.getTexture();
+ * @endcode
+ *
+ * For common procedural textures, use the static helper methods:
+ * @code
+ * auto noiseTexture = ProceduralTexture::generateWhiteNoise(commandBuffer, seed);
+ * @endcode
+ */
+class ProceduralTexture {
+  public:
+    /**
+     * @brief Creates a procedural texture generator from a shader path.
+     *
+     * @param shaderPath Path to the compute shader (.glsl or .spv), relative to shader directory.
+     * @param config Optional texture configuration.
+     */
+    ProceduralTexture(const std::string &shaderPath, const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Creates a procedural texture generator from an existing shader asset.
+     *
+     * @param shaderHandle Asset handle to a pre-loaded compute shader.
+     * @param config Optional texture configuration.
+     */
+    ProceduralTexture(const AssetHandle &shaderHandle, const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Creates a procedural texture generator with an existing output texture.
+     *
+     * Use this constructor when you want to regenerate into an existing texture,
+     * such as for animated procedural textures.
+     *
+     * @param shaderPath Path to the compute shader (.glsl or .spv), relative to shader directory.
+     * @param outputTexture Existing texture to write into. Must have storageImage = true.
+     */
+    ProceduralTexture(const std::string &shaderPath, Texture &outputTexture);
+
+    /**
+     * @brief Creates a procedural texture generator that regenerates into an existing texture.
+     *
+     * @param shaderHandle Asset handle to a pre-loaded compute shader.
+     * @param outputTexture Existing texture to write into. Must have storageImage = true.
+     */
+    ProceduralTexture(const AssetHandle &shaderHandle, Texture &outputTexture);
+
+    ~ProceduralTexture();
+
+    /**
+     * @brief Sets the push constant data for the shader.
+     *
+     * Call this before generate() to set shader parameters. The struct size
+     * must match the shader's push_constant layout size.
+     *
+     * @tparam T Push constant struct type.
+     * @param pushConstants Push constant values to use.
+     * @return true if the size matches the shader's push constant layout, false otherwise.
+     */
+    template <typename T>
+    bool setPushConstants(const T &pushConstants)
+    {
+        if (!verifyPushConstantSize(sizeof(T))) {
+            return false;
+        }
+        m_pushConstantData.resize(sizeof(T));
+        std::memcpy(m_pushConstantData.data(), &pushConstants, sizeof(T));
+        return true;
+    }
+
+    bool setPushConstantsRaw(const void *data, size_t size)
+    {
+        if (!verifyPushConstantSize(size)) {
+            return false;
+        }
+        m_pushConstantData.resize(size);
+        std::memcpy(m_pushConstantData.data(), data, size);
+        return true;
+    }
+
+    /**
+     * @brief Generates the texture.
+     *
+     * Records compute commands, submits to the GPU, and waits for completion.
+     * The texture will be transitioned to GENERAL layout for writing, then to
+     * SHADER_READ_ONLY_OPTIMAL after generation.
+     *
+     * This method is self-contained and can be called from any thread.
+     * Only the calling thread will block while waiting for GPU completion.
+     */
+    void generate();
+
+    /**
+     * @brief Gets the generated texture.
+     *
+     * @return Shared pointer to the output texture. The texture is created during
+     *         construction but only filled after generate() is called and the
+     *         command buffer is submitted.
+     */
+    Texture &getTexture() const { return *m_texture; }
+    Shader &getShader() const { return *m_shader; }
+
+    AssetPtr<Texture> getTextureAsset() const { return AssetPtr<Texture>(m_textureAsset); }
+
+    /**
+     * @brief Checks if the generator was initialized successfully.
+     *
+     * @return true if the shader was loaded and pipeline created successfully.
+     */
+    bool isValid() const { return m_isValid; }
+
+    /**
+     * @brief Gets the expected push constant size from the shader.
+     *
+     * @return Size in bytes of the shader's push constant block, or 0 if none.
+     */
+    size_t getExpectedPushConstantSize() const { return m_expectedPushConstantSize; }
+
+    /**
+     * @brief The reflected, editable parameters of this generator's shader
+     * @return The parameter descriptors, in push-constant declaration order
+     */
+    const std::vector<ProceduralParameter> &getParameters() const { return m_parameters; }
+
+    /**
+     * @brief Stores a float parameter's value into the push-constant buffer
+     * @param index The parameter index into getParameters
+     * @param value The value to store
+     */
+    void setParameterFloat(size_t index, double value);
+
+    /**
+     * @brief Reads a float parameter's value from the push-constant buffer
+     * @param index The parameter index into getParameters
+     * @return The stored value, or 0 if the index is out of range
+     */
+    double getParameterFloat(size_t index) const;
+
+    /**
+     * @brief Stores an integer parameter's value into the push-constant buffer
+     * @param index The parameter index into getParameters
+     * @param value The value to store
+     */
+    void setParameterInt(size_t index, int64_t value);
+
+    /**
+     * @brief Reads an integer parameter's value from the push-constant buffer
+     * @param index The parameter index into getParameters
+     * @return The stored value, or 0 if the index is out of range
+     */
+    int64_t getParameterInt(size_t index) const;
+
+    /**
+     * @brief Creates a persistent white noise generator that can be regenerated on demand
+     * @param config Optional texture configuration
+     * @return The generator, or nullptr if the shader or pipeline failed to initialise
+     */
+    static std::unique_ptr<ProceduralTexture> createWhiteNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Creates a persistent Perlin noise generator that can be regenerated on demand
+     * @param config Optional texture configuration
+     * @return The generator, or nullptr if the shader or pipeline failed to initialise
+     */
+    static std::unique_ptr<ProceduralTexture> createPerlinNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Creates a persistent simplex noise generator that can be regenerated on demand
+     * @param config Optional texture configuration
+     * @return The generator, or nullptr if the shader or pipeline failed to initialise
+     */
+    static std::unique_ptr<ProceduralTexture> createSimplexNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Creates a persistent ridged noise generator that can be regenerated on demand
+     * @param config Optional texture configuration
+     * @return The generator, or nullptr if the shader or pipeline failed to initialise
+     */
+    static std::unique_ptr<ProceduralTexture> createRidgedNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates a white noise texture.
+     *
+     * Static helper method that creates a one-shot white noise texture.
+     * Uses the built-in WhiteNoise.cs.glsl shader. Handles command buffer
+     * creation and submission internally.
+     *
+     * @param seed Random seed for noise generation.
+     * @param config Optional texture configuration.
+     * @return Shared pointer to the generated texture.
+     */
+    static AssetPtr<Texture> generateWhiteNoise(uint32_t seed = 0,
+                                                const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates a Perlin noise texture.
+     *
+     * @param params Perlin noise parameters (octaves, persistence, lacunarity, scale, seed).
+     * @param config Optional texture configuration.
+     * @return Shared pointer to the generated texture.
+     */
+    static AssetPtr<Texture> generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
+                                                 const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    static AssetPtr<Texture> generateSimplexNoise(const SimplexNoisePushConstants &params = SimplexNoisePushConstants(),
+                                                  const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    static AssetPtr<Texture> generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
+                                                 const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates an atmospheric scattering texture.
+     *
+     * Static helper method that creates an equirectangular panoramic texture
+     * with realistic atmospheric scattering using Rayleigh and Mie scattering.
+     * The texture can be used as a skybox or converted to a cubemap.
+     *
+     * Uses the built-in Atmosphere.cs.glsl shader with physically-based
+     * atmospheric scattering. The sun position is calculated from the time
+     * of day parameter.
+     *
+     * @param timeOfDay Time in hours (0.0 to 24.0, e.g., 14.5 = 2:30 PM).
+     *                  6.0 = sunrise, 12.0 = noon, 18.0 = sunset, 0.0 = midnight.
+     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
+     * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
+     * @return Shared pointer to the generated panoramic texture.
+     */
+    static AssetPtr<Texture> generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
+                                                const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Generates an atmospheric scattering cubemap usable as a skybox.
+     *
+     * Renders all six cube faces in a single compute dispatch via the OUTPUT_CUBEMAP
+     * variant of the Atmosphere shader. cameraDir/cameraUp/fovY in the push constants
+     * are ignored; each face fixes its own 90 degree view.
+     *
+     * @param timeOfDay Time in hours (0.0 to 24.0). 6.0 = sunrise, 12.0 = noon, 18.0 = sunset.
+     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
+     * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
+     * @return Pointer to the generated TEXTURECUBE texture.
+     */
+    static AssetPtr<Texture> generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params = nullptr,
+                                                       const ProceduralTextureConfig &config = ProceduralTextureConfig());
+
+    /**
+     * @brief Re-renders an atmosphere cubemap into an existing texture in place.
+     *
+     * Reuses cube, so no new texture is allocated. Use this to update a skybox
+     * when its time of day changes.
+     *
+     * @param cube Existing TEXTURECUBE storage texture, e.g. one returned by generateAtmosphereCubemap.
+     * @param timeOfDay Time in hours (0.0 to 24.0).
+     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
+     */
+    static void regenerateAtmosphereCubemap(Texture &cube, float timeOfDay, const AtmospherePushConstants *params = nullptr);
+
+  private:
+    void initFromShaderPath(const std::string &shaderPath, bool createTexture = true);
+    void initFromShaderHandle(const AssetHandle &shaderHandle, bool createTexture = true);
+    void initPipeline();
+    void initDescriptorSet();
+    void initTexture();
+    void initCommandBuffer();
+    void extractExpectedPushConstantSize();
+    bool verifyPushConstantSize(size_t providedSize);
+    void reflectParameters();
+
+    Shader *m_shader;
+    std::shared_ptr<ComputePipeline> m_pipeline;
+    std::shared_ptr<DescriptorSet> m_descriptorSet;
+    Texture *m_texture;
+    AssetRef m_textureAsset;
+    CommandPoolHash m_commandPoolHash = 0;
+
+    std::vector<uint8_t> m_pushConstantData;
+    std::vector<ProceduralParameter> m_parameters;
+    size_t m_expectedPushConstantSize = 0;
+    ProceduralTextureConfig m_config;
+    bool m_isValid = false;
+
+    std::vector<AssetRef> m_assets;
+
+    static constexpr uint32_t TEXTURE_SIZE = 1024;
+    static constexpr uint32_t WORKGROUP_SIZE = 8;
+};
+
+} // namespace Rapture
+
+#endif // RAPTURE__PROCEDURAL_TEXTURES_H

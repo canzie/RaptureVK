@@ -1,9 +1,9 @@
 #include "ImagePreviewPanel.h"
 
-#include "asset_manager/Asset.h"
-#include "asset_manager/AssetManager.h"
-#include "logging/Log.h"
-#include "textures/Texture.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/asset_manager/AssetManager.h"
+#include "core/utils/Log.h"
+#include "gpu/textures/Texture.h"
 
 #include <components/context_menu_item.h>
 #include <components/ui_scope.h>

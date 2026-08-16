@@ -1,8 +1,8 @@
 #include "ComputePass.h"
 
-#include "buffers/command_buffers/CommandBuffer.h"
-#include "logging/TracyProfiler.h"
-#include "textures/Texture.h"
+#include "gpu/command_buffers/CommandBuffer.h"
+#include "core/utils/TracyProfiler.h"
+#include "gpu/textures/Texture.h"
 
 namespace Rapture {
 

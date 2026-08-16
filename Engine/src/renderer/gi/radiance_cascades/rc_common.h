@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 
-#include "logging/Log.h"
+#include "core/utils/Log.h"
 
 namespace Rapture {
 

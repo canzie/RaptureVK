@@ -1,7 +1,7 @@
 #ifndef RAPTURE__TEST_LAYER_H
 #define RAPTURE__TEST_LAYER_H
 
-#include "layers/Layer.h"
+#include "app/Layer.h"
 
 #include <cstdint>
 

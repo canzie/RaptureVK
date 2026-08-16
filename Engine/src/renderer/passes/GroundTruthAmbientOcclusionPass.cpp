@@ -1,18 +1,18 @@
 #include "GroundTruthAmbientOcclusionPass.h"
 
-#include "utils/EnginePaths.h"
+#include "core/utils/EnginePaths.h"
 
-#include "asset_manager/AssetImportConfig.h"
-#include "asset_manager/AssetManager.h"
-#include "buffers/command_buffers/CommandBuffer.h"
-#include "buffers/descriptors/DescriptorManager.h"
-#include "components/Components.h"
-#include "logging/Log.h"
-#include "logging/TracyProfiler.h"
-#include "renderer/SceneRenderData.h"
-#include "scenes/Scene.h"
-#include "utils/rp_assert.h"
-#include "window_context/Application.h"
+#include "assets/asset_manager/AssetImportConfig.h"
+#include "assets/asset_manager/AssetManager.h"
+#include "gpu/command_buffers/CommandBuffer.h"
+#include "gpu/descriptors/DescriptorManager.h"
+#include "scene/components/Components.h"
+#include "core/utils/Log.h"
+#include "core/utils/TracyProfiler.h"
+#include "scene/render_data/SceneRenderData.h"
+#include "scene/Scene.h"
+#include "core/utils/rp_assert.h"
+#include "app/Application.h"
 
 #include <glm/glm.hpp>
 

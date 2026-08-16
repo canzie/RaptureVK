@@ -1,13 +1,13 @@
 #include "renderer/SceneGeometryDraw.h"
 
-#include "components/Components.h"
-#include "logging/Log.h"
-#include "logging/TracyProfiler.h"
-#include "meshes/Mesh.h"
+#include "app/Application.h"
+#include "assets/meshes/Mesh.h"
+#include "core/utils/Log.h"
+#include "core/utils/TracyProfiler.h"
 #include "renderer/Frustum.h"
-#include "renderer/SceneRenderData.h"
-#include "scenes/Scene.h"
-#include "window_context/Application.h"
+#include "scene/Scene.h"
+#include "scene/components/Components.h"
+#include "scene/render_data/SceneRenderData.h"
 
 namespace Rapture {
 
@@ -39,8 +39,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
     auto &registry = scene.getRegistry();
     SceneRenderData *renderData = scene.getRenderData();
 
-    for (auto [entity, transform, meshComp, materialComp] :
-         registry.read<TransformComponent, MeshComponent, MaterialComponent>()) {
+    for (auto [entity, transform, meshComp, materialComp] : registry.read<TransformComponent, MeshComponent, MaterialComponent>()) {
         RAPTURE_PROFILE_SCOPE("Populate Batch");
 
         if (!meshComp.mesh || meshComp.isLoading) {

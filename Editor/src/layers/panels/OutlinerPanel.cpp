@@ -5,10 +5,10 @@
 #include "layers/panels/components/asset_visuals.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
-#include "scenes/World.h"
-#include "scenes/instances/SceneObject.h"
-#include "scenes/instances/scene_components/VisibilityComponent.h"
-#include "ecs/entity_accessor.h"
+#include "scene/World.h"
+#include "scene/instances/SceneObject.h"
+#include "scene/instances/scene_components/VisibilityComponent.h"
+#include "core/ecs/entity_accessor.h"
 
 #include <components/common.h>
 #include <components/context_menu_item.h>

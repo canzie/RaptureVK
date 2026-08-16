@@ -13,11 +13,11 @@
 #include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
-#include <layers/Layer.h>
-#include <scenes/Scene.h>
-#include <scenes/instances/Instance.h>
-#include <utils/rp_assert.h>
-#include <window_context/Application.h>
+#include <app/Layer.h>
+#include <scene/Scene.h>
+#include <scene/instances/Instance.h>
+#include <core/utils/rp_assert.h>
+#include <app/Application.h>
 
 static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
 static constexpr uint32_t INITIAL_VIEWPORT_WIDTH = 1280;

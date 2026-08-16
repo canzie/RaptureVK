@@ -1,14 +1,14 @@
 #include "layers/EditorLayer.h"
 #include "layers/AmethystLayer.h"
 #include "layers/TestLayer.h"
-#include "logging/Log.h"
-#include "window_context/Application.h"
+#include "core/utils/Log.h"
+#include "app/Application.h"
 
 #include "EntryPoint.h"
-#include "events/Events.h"
-#include "events/GameEvents.h"
+#include "core/events/Events.h"
+#include "core/events/GameEvents.h"
 #include "LauncherConfig.h"
-#include "scenes/Project.h"
+#include "scene/Project.h"
 
 #include <filesystem>
 #include <memory>

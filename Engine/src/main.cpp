@@ -1,6 +1,6 @@
-#include "logging/Log.h"
-#include "render_targets/swap_chains/SwapChain.h"
-#include "window_context/Application.h"
+#include "app/Application.h"
+#include "core/utils/Log.h"
+#include "gpu/swap_chains/SwapChain.h"
 
 int main()
 {

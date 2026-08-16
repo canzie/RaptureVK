@@ -1,7 +1,7 @@
 #ifndef RAPTURE__EDITOR_LAYER_H
 #define RAPTURE__EDITOR_LAYER_H
 
-#include "layers/Layer.h"
+#include "app/Layer.h"
 
 #include <memory>
 #include <unordered_map>

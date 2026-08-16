@@ -1,8 +1,8 @@
 #include "TestLayer.h"
 
-#include "logging/Log.h"
-#include "window_context/Application.h"
-#include "window_context/Telemetry.h"
+#include "core/utils/Log.h"
+#include "app/Application.h"
+#include "core/utils/Telemetry.h"
 
 static constexpr float REPORT_INTERVAL = 1.0f;
 static constexpr double BYTES_PER_MB = 1024.0 * 1024.0;

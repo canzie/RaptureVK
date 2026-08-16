@@ -1,7 +1,7 @@
 #include "layers/panels/components/header_layouts.h"
 
 #include "Icons.h"
-#include "logging/Log.h"
+#include "core/utils/Log.h"
 
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>

@@ -48,7 +48,7 @@ servers
 ---
 
 - make a new panel for the scene object tree where components can be authored, also check if we should allow this sort of inline?
-- parse animations from gltf
+- parseanimations from gltf
 - parse bones
 - add some macros for compiling gbuffer vertex shader with joints/weights
     - create an ecs component to query all meshes with bones/skeleton references

@@ -1,9 +1,10 @@
 #include "renderer/MDIBatch.h"
-#include "buffers/Buffers.h"
-#include "buffers/descriptors/DescriptorManager.h"
-#include "logging/Log.h"
-#include "meshes/Mesh.h"
-#include "window_context/Application.h"
+
+#include "app/Application.h"
+#include "assets/meshes/Mesh.h"
+#include "core/utils/Log.h"
+#include "gpu/buffers/Buffers.h"
+#include "gpu/descriptors/DescriptorManager.h"
 
 namespace Rapture {
 static constexpr uint32_t INITIAL_BATCH_SIZE = 128;

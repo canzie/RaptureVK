@@ -1,7 +1,7 @@
 #include "ShortcutRegistry.h"
 
-#include <logging/Log.h>
-#include <utils/rp_assert.h>
+#include <core/utils/Log.h>
+#include <core/utils/rp_assert.h>
 
 static bool s_isModifierDown(const Rapture::Input &input, Rapture::KeyCode left, Rapture::KeyCode right)
 {

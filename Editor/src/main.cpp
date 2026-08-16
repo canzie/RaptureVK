@@ -1,8 +1,8 @@
 #include "EntryPoint.h"
-#include "logging/Log.h"
-#include "render_targets/swap_chains/SwapChain.h"
-#include "utils/EnginePaths.h"
-#include "window_context/Application.h"
+#include "core/utils/Log.h"
+#include "gpu/swap_chains/SwapChain.h"
+#include "core/utils/EnginePaths.h"
+#include "app/Application.h"
 
 #include <cerrno>
 #include <cstring>

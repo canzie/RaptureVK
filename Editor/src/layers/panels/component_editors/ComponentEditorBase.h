@@ -5,9 +5,9 @@
 #include <components/ui_scope.h>
 
 #include "layers/panels/components/property_sections.h"
-#include "ecs/entity_accessor.h"
-#include "scenes/Scene.h"
-#include "scenes/entities/EntityCommon.h"
+#include "core/ecs/entity_accessor.h"
+#include "scene/Scene.h"
+#include "scene/EntityCommon.h"
 
 /**
  * @brief A property section that edits one component of the selected entity.

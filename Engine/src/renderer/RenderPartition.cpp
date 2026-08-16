@@ -1,10 +1,10 @@
 #include "RenderPartition.h"
 #include "GPUDataStructs.h"
 
-#include "buffers/StorageBuffer.h"
-#include "buffers/descriptors/DescriptorManager.h"
-#include "window_context/vulkan_context/RenderContext.h"
-#include "window_context/vulkan_context/VulkanContext.h"
+#include "gpu/buffers/StorageBuffer.h"
+#include "gpu/descriptors/DescriptorManager.h"
+#include "gpu/vulkan_context/RenderContext.h"
+#include "gpu/vulkan_context/VulkanContext.h"
 
 #include <cstring>
 

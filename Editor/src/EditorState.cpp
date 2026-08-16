@@ -1,7 +1,7 @@
 #include "EditorState.h"
 
-#include "logging/Log.h"
-#include "scenes/Project.h"
+#include "core/utils/Log.h"
+#include "scene/Project.h"
 
 #include <utility>
 

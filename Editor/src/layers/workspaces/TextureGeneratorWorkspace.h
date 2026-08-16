@@ -2,8 +2,8 @@
 #define RAPTURE__TEXTURE_GENERATOR_WORKSPACE_H
 
 #include "Workspace.h"
-#include "asset_manager/AssetCommon.h"
-#include "generators/textures/ProceduralTextures.h"
+#include "assets/asset_manager/AssetCommon.h"
+#include "renderer/generators/textures/ProceduralTextures.h"
 
 #include <amethyst/Amethyst.h>
 

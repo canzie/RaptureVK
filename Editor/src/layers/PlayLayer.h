@@ -1,8 +1,8 @@
 #ifndef RAPTURE__PLAY_LAYER_H
 #define RAPTURE__PLAY_LAYER_H
 
-#include "layers/Layer.h"
-#include "ecs/entity_accessor.h"
+#include "app/Layer.h"
+#include "core/ecs/entity_accessor.h"
 
 #include <memory>
 

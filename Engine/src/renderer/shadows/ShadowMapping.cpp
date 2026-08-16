@@ -1,14 +1,14 @@
 #include "ShadowMapping.h"
 
-#include "buffers/descriptors/DescriptorManager.h"
-#include "utils/EnginePaths.h"
+#include "gpu/descriptors/DescriptorManager.h"
+#include "core/utils/EnginePaths.h"
 
-#include "components/Components.h"
-#include "components/systems/Transforms.h"
-#include "logging/Log.h"
-#include "logging/TracyProfiler.h"
+#include "scene/components/Components.h"
+#include "scene/systems/Transforms.h"
+#include "core/utils/Log.h"
+#include "core/utils/TracyProfiler.h"
 #include "renderer/shadows/ShadowCommon.h"
-#include "window_context/Application.h"
+#include "app/Application.h"
 
 namespace Rapture {
 

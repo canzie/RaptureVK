@@ -1,8 +1,8 @@
 #include "context_menus.h"
 
 #include "amethyst/icons.h"
-#include "asset_manager/AssetCommon.h"
-#include "asset_manager/AssetManager.h"
+#include "assets/asset_manager/AssetCommon.h"
+#include "assets/asset_manager/AssetManager.h"
 #include "asset_visuals.h"
 #include "components/context_menu.h"
 

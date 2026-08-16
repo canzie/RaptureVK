@@ -1,9 +1,9 @@
 #ifndef RAPTURE__CONTENT_BROWSER_PANEL_H
 #define RAPTURE__CONTENT_BROWSER_PANEL_H
 
-#include "asset_manager/AssetCommon.h"
-#include "events/EventSignal.h"
-#include "utils/TypeInfo.h"
+#include "assets/asset_manager/AssetCommon.h"
+#include "core/events/EventSignal.h"
+#include "core/utils/TypeInfo.h"
 #include <amethyst/Amethyst.h>
 #include <components/context_menu.h>
 #include <components/tab_bar.h>

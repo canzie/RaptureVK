@@ -1,8 +1,8 @@
 #include "ImportPanel.h"
 
-#include "asset_manager/AssetManager.h"
-#include "loaders/gltf/glTFLoader.h"
-#include "logging/Log.h"
+#include "assets/asset_manager/AssetManager.h"
+#include "assets/loaders/gltf/glTFLoader.h"
+#include "core/utils/Log.h"
 
 #include <components/checkbox.h>
 #include <components/extensions/ui_drag_detector.h>

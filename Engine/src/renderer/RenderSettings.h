@@ -26,8 +26,8 @@ enum RenderSettingFlags {
  * @brief Per-view, non-destructive render display overrides consumed by the renderer.
  */
 struct RenderSettings {
-    uint32_t flags = RENDER_USE_GLOBAL_ILLUMINATION | RENDER_SHOW_DIRECT | RENDER_SHOW_INDIRECT |
-                     RENDER_MODULATE_INDIRECT | RENDER_USE_AMBIENT_OCCLUSION;
+    uint32_t flags = RENDER_USE_GLOBAL_ILLUMINATION | RENDER_SHOW_DIRECT | RENDER_SHOW_INDIRECT | RENDER_MODULATE_INDIRECT |
+                     RENDER_USE_AMBIENT_OCCLUSION;
 
     bool useGlobalIllumination() const { return (flags & RENDER_USE_GLOBAL_ILLUMINATION) != 0u; }
     bool useDirectLighting() const { return (flags & RENDER_SHOW_DIRECT) != 0u; }

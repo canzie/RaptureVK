@@ -1,7 +1,7 @@
 #ifndef RAPTURE__RENDER_PASS_H
 #define RAPTURE__RENDER_PASS_H
 
-#include "buffers/command_buffers/CommandBuffer.h"
+#include "gpu/command_buffers/CommandBuffer.h"
 #include "renderer/passes/RenderPassContext.h"
 
 #include <glm/glm.hpp>

@@ -1,7 +1,7 @@
 #ifndef RAPTURE__ASSET_PICKER_H
 #define RAPTURE__ASSET_PICKER_H
 
-#include "asset_manager/AssetCommon.h"
+#include "assets/asset_manager/AssetCommon.h"
 
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>

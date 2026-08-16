@@ -1,5 +1,5 @@
-#include "logging/Log.h"
-#include "window_context/Application.h"
+#include "app/Application.h"
+#include "core/utils/Log.h"
 
 namespace Rapture {
 

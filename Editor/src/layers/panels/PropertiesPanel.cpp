@@ -4,9 +4,9 @@
 #include "layers/panels/component_editors/ComponentEditors.h"
 #include "layers/panels/components/tab_layouts.h"
 
-#include "components/Components.h"
-#include "scenes/World.h"
-#include "scenes/instances/SceneObject.h"
+#include "scene/components/Components.h"
+#include "scene/World.h"
+#include "scene/instances/SceneObject.h"
 
 #include <components/common.h>
 #include <components/ui_scope.h>

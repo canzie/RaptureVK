@@ -1,13 +1,13 @@
 #ifndef RAPTURE__RENDERER_H
 #define RAPTURE__RENDERER_H
 
-#include "buffers/command_buffers/CommandPool.h"
-#include "render_targets/SceneRenderTarget.h"
-#include "render_targets/swap_chains/SwapChain.h"
+#include "core/ecs/entity_accessor.h"
+#include "gpu/command_buffers/CommandPool.h"
+#include "gpu/render_targets/SceneRenderTarget.h"
+#include "gpu/swap_chains/SwapChain.h"
+#include "gpu/vulkan_context/RenderContext.h"
+#include "gpu/vulkan_context/VulkanQueue.h"
 #include "renderer/RenderSettings.h"
-#include "ecs/entity_accessor.h"
-#include "window_context/vulkan_context/RenderContext.h"
-#include "window_context/vulkan_context/VulkanQueue.h"
 
 #include <memory>
 

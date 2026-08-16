@@ -5,21 +5,21 @@
 #include "layers/panels/SceneObjectTreePanel.h"
 #include "layers/panels/ViewportPanel.h"
 
-#include <asset_manager/Asset.h>
-#include <asset_manager/AssetManager.h>
-#include <components/Components.h>
+#include <assets/asset_manager/Asset.h>
+#include <assets/asset_manager/AssetManager.h>
+#include <scene/components/Components.h>
 #include <components/extensions/ui_list_layout.h>
-#include <components/systems/Transforms.h>
+#include <scene/systems/Transforms.h>
 #include <components/ui_scope.h>
-#include <ecs/entity_accessor.h>
-#include <logging/Log.h>
-#include <render_targets/SceneRenderTarget.h>
-#include <scenes/Scene.h>
-#include <scenes/instances/DirectionalLight3D.h>
-#include <scenes/instances/Node3D.h>
-#include <serialization/SerialDocument.h>
-#include <viewport/ViewportManager.h>
-#include <window_context/Application.h>
+#include <core/ecs/entity_accessor.h>
+#include <core/utils/Log.h>
+#include <gpu/render_targets/SceneRenderTarget.h>
+#include <scene/Scene.h>
+#include <scene/instances/DirectionalLight3D.h>
+#include <scene/instances/Node3D.h>
+#include <core/serialization/SerialDocument.h>
+#include <renderer/viewport/ViewportManager.h>
+#include <app/Application.h>
 
 static constexpr const char *DOCK_NAME = "Scene Object Editor Dock";
 static constexpr const char *VIEWPORT_NAME = "scene_object_editor";

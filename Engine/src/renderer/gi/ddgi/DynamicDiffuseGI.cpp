@@ -1,23 +1,23 @@
 #include "DynamicDiffuseGI.h"
 
-#include "utils/EnginePaths.h"
+#include "core/utils/EnginePaths.h"
 
-#include "asset_manager/Asset.h"
-#include "asset_manager/AssetManager.h"
-#include "buffers/command_buffers/CommandPool.h"
-#include "buffers/descriptors/DescriptorBinding.h"
-#include "buffers/descriptors/DescriptorManager.h"
-#include "buffers/descriptors/DescriptorSet.h"
-#include "components/Components.h"
-#include "renderer/SceneRenderData.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/asset_manager/AssetManager.h"
+#include "gpu/command_buffers/CommandPool.h"
+#include "gpu/descriptors/DescriptorBinding.h"
+#include "gpu/descriptors/DescriptorManager.h"
+#include "gpu/descriptors/DescriptorSet.h"
+#include "scene/components/Components.h"
+#include "scene/render_data/SceneRenderData.h"
 #include "renderer/gi/ddgi/DDGICommon.h"
-#include "scenes/Scene.h"
-#include "scenes/instances/Environment.h"
-#include "textures/Texture.h"
-#include "textures/TextureCommon.h"
-#include "window_context/Application.h"
+#include "scene/Scene.h"
+#include "scene/instances/Environment.h"
+#include "gpu/textures/Texture.h"
+#include "gpu/textures/TextureCommon.h"
+#include "app/Application.h"
 
-#include "logging/TracyProfiler.h"
+#include "core/utils/TracyProfiler.h"
 
 #include <cmath>
 #include <glm/gtc/constants.hpp>

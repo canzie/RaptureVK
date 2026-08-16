@@ -1,7 +1,7 @@
 #ifndef RAPTURE__RENDER_PASS_CONTEXT_H
 #define RAPTURE__RENDER_PASS_CONTEXT_H
 
-#include "ecs/entity_accessor.h"
+#include "core/ecs/entity_accessor.h"
 
 #include <cstdint>
 

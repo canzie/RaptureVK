@@ -6,9 +6,9 @@
 #include <components/tree_view.h>
 #include <components/ui_scope.h>
 
-#include "events/EventSignal.h"
+#include "core/events/EventSignal.h"
 #include "layers/panels/Panel.h"
-#include "ecs/entity_accessor.h"
+#include "core/ecs/entity_accessor.h"
 
 #include <cstdint>
 #include <vector>

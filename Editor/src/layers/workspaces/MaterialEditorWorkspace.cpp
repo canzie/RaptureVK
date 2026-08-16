@@ -4,20 +4,20 @@
 #include "layers/panels/NodeEditorPanel.h"
 #include "layers/panels/ViewportPanel.h"
 
-#include <asset_manager/Asset.h>
-#include <asset_manager/AssetManager.h>
-#include <components/Components.h>
+#include <assets/asset_manager/Asset.h>
+#include <assets/asset_manager/AssetManager.h>
+#include <scene/components/Components.h>
 #include <components/extensions/ui_list_layout.h>
-#include <components/systems/Transforms.h>
+#include <scene/systems/Transforms.h>
 #include <components/ui_scope.h>
-#include <materials/MaterialInstance.h>
-#include <render_targets/SceneRenderTarget.h>
-#include <scenes/Scene.h>
-#include <utils/EnginePaths.h>
-#include <ecs/entity_accessor.h>
-#include <scenes/instances/Environment.h>
-#include <viewport/ViewportManager.h>
-#include <window_context/Application.h>
+#include <assets/materials/MaterialInstance.h>
+#include <gpu/render_targets/SceneRenderTarget.h>
+#include <scene/Scene.h>
+#include <core/utils/EnginePaths.h>
+#include <core/ecs/entity_accessor.h>
+#include <scene/instances/Environment.h>
+#include <renderer/viewport/ViewportManager.h>
+#include <app/Application.h>
 
 static const char *s_previewSceneName = "MaterialPreview";
 static const char *s_previewViewportName = "material_preview";

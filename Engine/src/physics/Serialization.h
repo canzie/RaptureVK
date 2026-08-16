@@ -2,7 +2,7 @@
 #define RAPTURE__PHYSICS_SERIALIZATION_H
 
 #include "physics/Common.h"
-#include "serialization/SerialDocument.h"
+#include "core/serialization/SerialDocument.h"
 
 namespace Rapture {
 namespace physics {

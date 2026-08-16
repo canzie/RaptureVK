@@ -1,28 +1,28 @@
 #ifndef RAPTURE__CASCADEDSHADOWMAPPING_H
 #define RAPTURE__CASCADEDSHADOWMAPPING_H
 
-#include "asset_manager/AssetManager.h"
-#include "pipelines/GraphicsPipeline.h"
-#include "shaders/Shader.h"
-#include "textures/Texture.h"
-#include "utils/TextureFlattener.h"
+#include "assets/asset_manager/AssetManager.h"
+#include "gpu/pipelines/GraphicsPipeline.h"
+#include "gpu/shaders/Shader.h"
+#include "gpu/textures/Texture.h"
+#include "core/utils/TextureFlattener.h"
 
-#include "buffers/UniformBuffer.h"
-#include "buffers/command_buffers/CommandBuffer.h"
-#include "buffers/command_buffers/CommandPool.h"
-#include "buffers/descriptors/DescriptorBinding.h"
-#include "buffers/descriptors/DescriptorManager.h"
-#include "buffers/descriptors/DescriptorSet.h"
+#include "gpu/buffers/UniformBuffer.h"
+#include "gpu/command_buffers/CommandBuffer.h"
+#include "gpu/command_buffers/CommandPool.h"
+#include "gpu/descriptors/DescriptorBinding.h"
+#include "gpu/descriptors/DescriptorManager.h"
+#include "gpu/descriptors/DescriptorSet.h"
 
-#include "generators/terrain/TerrainCuller.h"
-#include "generators/terrain/TerrainGenerator.h"
+#include "renderer/generators/terrain/TerrainCuller.h"
+#include "renderer/generators/terrain/TerrainGenerator.h"
 #include "renderer/Frustum.h"
 
 #include "renderer/MDIBatch.h"
 
-#include "scenes/Scene.h"
+#include "scene/Scene.h"
 
-#include "window_context/vulkan_context/RenderContext.h"
+#include "gpu/vulkan_context/RenderContext.h"
 
 #include <array>
 #include <glm/glm.hpp>

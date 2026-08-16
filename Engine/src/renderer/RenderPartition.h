@@ -1,9 +1,9 @@
 #ifndef RAPTURE__RENDERPARTITION_H
 #define RAPTURE__RENDERPARTITION_H
 
-#include "buffers/descriptors/DescriptorSet.h"
-#include "components/ComponentsCommon.h"
-#include "scenes/entities/EntityCommon.h"
+#include "gpu/descriptors/DescriptorSet.h"
+#include "scene/EntityCommon.h"
+#include "scene/components/ComponentsCommon.h"
 
 #include <array>
 #include <cstdint>

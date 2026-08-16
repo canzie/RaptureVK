@@ -1,11 +1,11 @@
 #include "ComponentEditors.h"
 
-#include "components/Components.h"
+#include "scene/components/Components.h"
 #include "layers/panels/components/header_layouts.h"
-#include "logging/Log.h"
-#include "renderer/SceneRenderData.h"
-#include "scenes/Scene.h"
-#include "scenes/instances/Environment.h"
+#include "core/utils/Log.h"
+#include "scene/render_data/SceneRenderData.h"
+#include "scene/Scene.h"
+#include "scene/instances/Environment.h"
 
 #include <algorithm>
 

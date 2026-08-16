@@ -1,8 +1,8 @@
 #include "LauncherConfig.h"
 
-#include "logging/Log.h"
-#include "serialization/SerialDocument.h"
-#include "utils/EnginePaths.h"
+#include "core/utils/Log.h"
+#include "core/serialization/SerialDocument.h"
+#include "core/utils/EnginePaths.h"
 
 #include <algorithm>
 #include <fstream>

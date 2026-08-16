@@ -1,12 +1,12 @@
 #include "PlayLayer.h"
 
 #include "input/Input.h"
-#include "logging/Log.h"
-#include "scenes/instances/controllers/Controller.h"
-#include "scenes/World.h"
-#include "scenes/instances/Camera3D.h"
-#include "viewport/Viewport.h"
-#include "window_context/Application.h"
+#include "core/utils/Log.h"
+#include "scene/instances/controllers/Controller.h"
+#include "scene/World.h"
+#include "scene/instances/Camera3D.h"
+#include "renderer/viewport/Viewport.h"
+#include "app/Application.h"
 
 PlayLayer::PlayLayer(Rapture::World &world, Rapture::Viewport &viewport) : Layer("Play Layer"), m_world(world), m_viewport(viewport)
 {

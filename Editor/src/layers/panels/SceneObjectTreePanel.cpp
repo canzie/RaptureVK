@@ -5,9 +5,9 @@
 #include "layers/panels/AddSceneObjectMenu.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
-#include "scenes/Scene.h"
-#include "scenes/instances/SceneObject.h"
-#include "scenes/instances/scene_components/VisibilityComponent.h"
+#include "scene/Scene.h"
+#include "scene/instances/SceneObject.h"
+#include "scene/instances/scene_components/VisibilityComponent.h"
 
 #include <components/common.h>
 #include <components/context_menu_item.h>

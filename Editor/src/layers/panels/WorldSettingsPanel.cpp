@@ -1,9 +1,9 @@
 #include "WorldSettingsPanel.h"
 
-#include "asset_manager/Asset.h"
-#include "scenes/World.h"
-#include "scenes/instances/Node3D.h"
-#include "scenes/instances/controllers/Controller.h"
+#include "assets/asset_manager/Asset.h"
+#include "scene/World.h"
+#include "scene/instances/Node3D.h"
+#include "scene/instances/controllers/Controller.h"
 
 #include <components/common.h>
 

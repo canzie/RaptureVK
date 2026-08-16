@@ -3,8 +3,8 @@
 #include "layers/panels/components/color_field.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "layers/workspaces/TextureGeneratorWorkspace.h"
-#include "shaders/Shader.h"
-#include "shaders/ShaderReflections.h"
+#include "gpu/shaders/Shader.h"
+#include "gpu/shaders/ShaderReflections.h"
 
 #include <components/common.h>
 #include <components/table.h>

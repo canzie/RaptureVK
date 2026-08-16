@@ -1,8 +1,8 @@
 #include "Renderer.h"
 
-#include "utils/rp_assert.h"
-#include "window_context/Application.h"
-#include "window_context/vulkan_context/VulkanContext.h"
+#include "app/Application.h"
+#include "core/utils/rp_assert.h"
+#include "gpu/vulkan_context/VulkanContext.h"
 
 namespace Rapture {
 

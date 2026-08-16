@@ -1,12 +1,12 @@
 #include "EditorLayer.h"
 
-#include "scenes/instances/controllers/CameraController.h"
+#include "scene/instances/controllers/CameraController.h"
 #include "input/Input.h"
-#include "scenes/Scene.h"
-#include "scenes/instances/Camera3D.h"
-#include "viewport/Viewport.h"
-#include "viewport/ViewportManager.h"
-#include "window_context/Application.h"
+#include "scene/Scene.h"
+#include "scene/instances/Camera3D.h"
+#include "renderer/viewport/Viewport.h"
+#include "renderer/viewport/ViewportManager.h"
+#include "app/Application.h"
 
 #include <glm/glm.hpp>
 

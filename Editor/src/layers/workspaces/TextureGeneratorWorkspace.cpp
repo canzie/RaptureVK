@@ -1,12 +1,12 @@
 #include "TextureGeneratorWorkspace.h"
 
-#include "asset_manager/AssetManager.h"
+#include "assets/asset_manager/AssetManager.h"
 #include "layers/panels/ImagePreviewPanel.h"
 #include "layers/panels/ShaderInputsPanel.h"
 #include "layers/panels/components/tab_layouts.h"
-#include "logging/Log.h"
-#include "shaders/Shader.h"
-#include "shaders/ShaderCommon.h"
+#include "core/utils/Log.h"
+#include "gpu/shaders/Shader.h"
+#include "gpu/shaders/ShaderCommon.h"
 
 #include <components/context_menu_item.h>
 #include <components/extensions/ui_list_layout.h>

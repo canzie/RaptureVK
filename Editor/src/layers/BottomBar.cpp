@@ -3,7 +3,7 @@
 #include "layers/EditorLayout.h"
 #include "layers/panels/ContentBrowserPanel.h"
 
-#include <scenes/World.h>
+#include <scene/World.h>
 
 #include <components/common.h>
 #include <components/popup.h>

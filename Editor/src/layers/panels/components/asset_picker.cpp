@@ -1,7 +1,7 @@
 #include "asset_picker.h"
 
 #include "Icons.h"
-#include "asset_manager/AssetManager.h"
+#include "assets/asset_manager/AssetManager.h"
 #include "asset_visuals.h"
 #include "context_menus.h"
 

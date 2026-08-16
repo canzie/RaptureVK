@@ -1,14 +1,14 @@
 #include "CompositePass.h"
 
-#include "utils/EnginePaths.h"
-#include "window_context/Application.h"
+#include "core/utils/EnginePaths.h"
+#include "app/Application.h"
 
-#include "asset_manager/AssetManager.h"
-#include "buffers/descriptors/DescriptorManager.h"
-#include "textures/Texture.h"
+#include "assets/asset_manager/AssetManager.h"
+#include "gpu/descriptors/DescriptorManager.h"
+#include "gpu/textures/Texture.h"
 
-#include "logging/Log.h"
-#include "logging/TracyProfiler.h"
+#include "core/utils/Log.h"
+#include "core/utils/TracyProfiler.h"
 
 #include <thread>
 

@@ -1,8 +1,8 @@
 #ifndef RAPTURE__ENTITY_SELECTION_H
 #define RAPTURE__ENTITY_SELECTION_H
 
-#include "events/EventSignal.h"
-#include "ecs/entity_accessor.h"
+#include "core/events/EventSignal.h"
+#include "core/ecs/entity_accessor.h"
 
 /**
  * @brief The entity a workspace has selected.

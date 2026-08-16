@@ -1,12 +1,12 @@
 #ifndef RAPTURE__GROUND_TRUTH_AMBIENT_OCCLUSION_PASS_H
 #define RAPTURE__GROUND_TRUTH_AMBIENT_OCCLUSION_PASS_H
 
-#include "asset_manager/AssetHandle.h"
-#include "buffers/descriptors/DescriptorSet.h"
-#include "pipelines/ComputePipeline.h"
+#include "assets/asset_manager/AssetHandle.h"
+#include "gpu/descriptors/DescriptorSet.h"
+#include "gpu/pipelines/ComputePipeline.h"
 #include "renderer/passes/ComputePass.h"
-#include "shaders/Shader.h"
-#include "textures/Texture.h"
+#include "gpu/shaders/Shader.h"
+#include "gpu/textures/Texture.h"
 
 #include <memory>
 #include <vector>

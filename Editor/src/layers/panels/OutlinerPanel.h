@@ -7,8 +7,8 @@
 #include <components/ui_scope.h>
 
 #include "layers/panels/Panel.h"
-#include "scenes/Scene.h"
-#include "scenes/instances/Instance.h"
+#include "scene/Scene.h"
+#include "scene/instances/Instance.h"
 #include <cstdint>
 #include <memory>
 #include <string>

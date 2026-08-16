@@ -3,12 +3,12 @@
 
 #include "Workspace.h"
 
-#include <asset_manager/AssetHandle.h>
+#include <assets/asset_manager/AssetHandle.h>
 #include <components/context_menu.h>
-#include <events/EventSignal.h>
+#include <core/events/EventSignal.h>
 #include <memory>
-#include <scenes/World.h>
-#include <viewport/Viewport.h>
+#include <scene/World.h>
+#include <renderer/viewport/Viewport.h>
 
 class PlayLayer;
 

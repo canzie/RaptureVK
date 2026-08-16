@@ -8,9 +8,9 @@
 
 #include <glm/glm.hpp>
 
-#include "buffers/StorageBuffer.h"
-#include "scenes/Scene.h"
-#include "window_context/vulkan_context/RenderContext.h"
+#include "gpu/buffers/StorageBuffer.h"
+#include "gpu/vulkan_context/RenderContext.h"
+#include "scene/Scene.h"
 
 namespace Rapture {
 
@@ -41,7 +41,7 @@ class RtInstanceData {
     RtInstanceData(const RenderContext &renderContext);
     ~RtInstanceData();
 
-    void update(Scene& scene);
+    void update(Scene &scene);
 
     std::shared_ptr<StorageBuffer> getBuffer() { return m_buffer; }
     uint32_t getInstanceCount() const { return m_instanceCount; }
@@ -49,8 +49,8 @@ class RtInstanceData {
     void markMaterialDirty(MaterialInstance *material);
 
   private:
-    void rebuild(Scene& scene);
-    void patchDirty(Scene& scene);
+    void rebuild(Scene &scene);
+    void patchDirty(Scene &scene);
 
     RenderContext m_rc;
 

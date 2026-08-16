@@ -4,7 +4,7 @@
 #include "ShortcutRegistry.h"
 #include "layers/panels/FileBrowser.h"
 #include <amethyst/Amethyst.h>
-#include <asset_manager/AssetCommon.h>
+#include <assets/asset_manager/AssetCommon.h>
 #include <filesystem>
 #include <functional>
 #include <string_view>

@@ -1,7 +1,7 @@
 #include "ProjectLauncher.h"
 
 #include "Icons.h"
-#include "logging/Log.h"
+#include "core/utils/Log.h"
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/image_label.h>

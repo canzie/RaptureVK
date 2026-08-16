@@ -1,15 +1,15 @@
 #ifndef RAPTURE__AMETHYST_LAYER_H
 #define RAPTURE__AMETHYST_LAYER_H
 
-#include "layers/Layer.h"
+#include "app/Layer.h"
 #include "layers/panels/common.h"
 
 #include <amethyst/Amethyst.h>
 #include <amethyst__vk13_glfw.h>
 
-#include "buffers/command_buffers/CommandBuffer.h"
-#include "buffers/command_buffers/CommandPool.h"
-#include "events/EventSignal.h"
+#include "gpu/command_buffers/CommandBuffer.h"
+#include "gpu/command_buffers/CommandPool.h"
+#include "core/events/EventSignal.h"
 #include "layers/BottomBar.h"
 #include "layers/workspaces/Workspace.h"
 

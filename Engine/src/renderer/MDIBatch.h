@@ -1,9 +1,9 @@
 #pragma once
 
-#include "buffers/BufferPool.h"
-#include "buffers/StorageBuffer.h"
-#include "buffers/UniformBuffer.h"
-#include "window_context/vulkan_context/RenderContext.h"
+#include "gpu/buffers/BufferPool.h"
+#include "gpu/buffers/StorageBuffer.h"
+#include "gpu/buffers/UniformBuffer.h"
+#include "gpu/vulkan_context/RenderContext.h"
 
 #include <cstdint>
 #include <vector>

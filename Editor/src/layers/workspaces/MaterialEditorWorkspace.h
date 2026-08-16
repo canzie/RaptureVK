@@ -3,10 +3,10 @@
 
 #include "Workspace.h"
 
-#include <asset_manager/AssetCommon.h>
-#include <events/EventSignal.h>
-#include <ecs/entity_accessor.h>
-#include <viewport/Viewport.h>
+#include <assets/asset_manager/AssetCommon.h>
+#include <core/events/EventSignal.h>
+#include <core/ecs/entity_accessor.h>
+#include <renderer/viewport/Viewport.h>
 
 namespace Rapture {
 class Scene;

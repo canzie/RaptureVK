@@ -1,0 +1,68 @@
+# The layout in tree.md, as input for refactor.py. Applied in order, so more specific moves
+# come before the directory that would otherwise carry them along.
+#
+#   python3 tools/refactor.py batch tools/moves.txt --apply
+
+# gpu
+Engine/src/buffers/command_buffers        Engine/src/gpu/command_buffers
+Engine/src/buffers/descriptors            Engine/src/gpu/descriptors
+Engine/src/buffers                        Engine/src/gpu/buffers
+Engine/src/acceleration_structures        Engine/src/gpu/acceleration_structures
+Engine/src/pipelines                      Engine/src/gpu/pipelines
+Engine/src/shaders                        Engine/src/gpu/shaders
+Engine/src/textures                       Engine/src/gpu/textures
+Engine/src/render_targets/swap_chains     Engine/src/gpu/swap_chains
+Engine/src/render_targets                 Engine/src/gpu/render_targets
+Engine/src/window_context/vulkan_context  Engine/src/gpu/vulkan_context
+
+# app
+Engine/src/window_context/Application.h    Engine/src/app/Application.h
+Engine/src/window_context/Application.cpp  Engine/src/app/Application.cpp
+Engine/src/layers                          Engine/src/app
+
+# core
+Engine/src/window_context/Telemetry.h  Engine/src/core/utils/Telemetry.h
+Engine/src/ecs                         Engine/src/core/ecs
+Engine/src/events                      Engine/src/core/events
+Engine/src/jobs                        Engine/src/core/jobs
+Engine/src/serialization               Engine/src/core/serialization
+Engine/src/logging                     Engine/src/core/utils
+Engine/src/utils                       Engine/src/core/utils
+
+# platform, and whatever is left of window_context after the moves above
+Engine/src/window_context/GlfwContext.h         Engine/src/platform/glfw/GlfwContext.h
+Engine/src/window_context/GlfwContext.cpp       Engine/src/platform/glfw/GlfwContext.cpp
+Engine/src/window_context/GlfwWindowContext.h   Engine/src/platform/glfw/GlfwWindowContext.h
+Engine/src/window_context/GlfwWindowContext.cpp Engine/src/platform/glfw/GlfwWindowContext.cpp
+Engine/src/window_context                       Engine/src/platform
+
+# assets
+Engine/src/asset_manager  Engine/src/assets/asset_manager
+Engine/src/loaders        Engine/src/assets/loaders
+Engine/src/materials      Engine/src/assets/materials
+Engine/src/meshes         Engine/src/assets/meshes
+
+# scene
+Engine/src/cameras                        Engine/src/scene/cameras
+Engine/src/components/systems             Engine/src/scene/systems
+Engine/src/components                     Engine/src/scene/components
+Engine/src/scenes                         Engine/src/scene
+Engine/src/scene/entities/EntityCommon.h  Engine/src/scene/EntityCommon.h
+
+# the scene's GPU mirror, which the scene owns and no renderer does
+Engine/src/renderer/SceneRenderData.h    Engine/src/scene/render_data/SceneRenderData.h
+Engine/src/renderer/SceneRenderData.cpp  Engine/src/scene/render_data/SceneRenderData.cpp
+
+# renderer
+Engine/src/renderer/DeferredRenderer.h        Engine/src/renderer/deferred/DeferredRenderer.h
+Engine/src/renderer/DeferredRenderer.cpp      Engine/src/renderer/deferred/DeferredRenderer.cpp
+Engine/src/renderer/passes/GBufferPass.h      Engine/src/renderer/deferred/GBufferPass.h
+Engine/src/renderer/passes/GBufferPass.cpp    Engine/src/renderer/deferred/GBufferPass.cpp
+Engine/src/renderer/passes/LightingPass.h     Engine/src/renderer/deferred/LightingPass.h
+Engine/src/renderer/passes/LightingPass.cpp   Engine/src/renderer/deferred/LightingPass.cpp
+Engine/src/renderer/ForwardRenderer.h         Engine/src/renderer/forward/ForwardRenderer.h
+Engine/src/renderer/ForwardRenderer.cpp       Engine/src/renderer/forward/ForwardRenderer.cpp
+Engine/src/renderer/SceneQueryRenderer.h      Engine/src/renderer/query/SceneQueryRenderer.h
+Engine/src/renderer/SceneQueryRenderer.cpp    Engine/src/renderer/query/SceneQueryRenderer.cpp
+Engine/src/generators                         Engine/src/renderer/generators
+Engine/src/viewport                           Engine/src/renderer/viewport
