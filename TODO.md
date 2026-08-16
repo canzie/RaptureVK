@@ -47,11 +47,7 @@ servers
 
 ---
 
-- fix physics issue with bounding boxes and stuff
-    - character body
-    - make a panel for character body settings
-    - make a new panel for the scene object tree where components can be authored, also check if we should allow this sort of inline?
-    - can give static meshes a default rigid body maybe?
+- make a new panel for the scene object tree where components can be authored, also check if we should allow this sort of inline?
 - parse animations from gltf
 - parse bones
 - add some macros for compiling gbuffer vertex shader with joints/weights
@@ -68,7 +64,6 @@ servers
 - a way to check if something is dirty, like if a scene objects wasnt saved yet, then show a little circle on the workspace tab
 - snapping, copy pasting scene objects, shortcuts for all kind of stuff.
 - selection border
-- auto sizing tab bar width based on content In it
 - snapping when sizing/using gizmo, snapping when moving items, like corner snapping, or like when free moving a cube make it so it gets placed on floor behind/below it, so it drags over the floor instead of trough?
 - forward+ renderer ontop for blended materials
 - add support for masked objects in gbuffer pass (like folliage)

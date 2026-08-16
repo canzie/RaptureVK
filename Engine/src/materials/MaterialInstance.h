@@ -82,7 +82,7 @@ class MaterialInstance {
     std::string m_name;
     AssetPtr<BaseMaterial> m_baseMaterial;
     uint32_t m_bindlessIndex;
-    uint32_t m_graphDataOffset = UINT32_MAX;
+    VirtualStorageBuffer::Allocation m_graphData;
 
     MaterialData m_data;
     GraphInstanceData m_slice;

@@ -14,8 +14,23 @@ static VkDeviceSize s_roundUp(VkDeviceSize value, VkDeviceSize multiple)
     return ((value + multiple - 1) / multiple) * multiple;
 }
 
-VirtualStorageBuffer::VirtualStorageBuffer(VkDeviceSize capacityBytes, VkDeviceSize blockSize,
-                                           DescriptorSetBindingLocation binding)
+VirtualStorageBuffer::Allocation::Allocation(Allocation &&other) noexcept
+{
+    *this = std::move(other);
+}
+
+VirtualStorageBuffer::Allocation &VirtualStorageBuffer::Allocation::operator=(Allocation &&other) noexcept
+{
+    if (this != &other) {
+        m_handle = other.m_handle;
+        m_offsetBytes = other.m_offsetBytes;
+        m_sizeBytes = other.m_sizeBytes;
+        other.m_handle = VK_NULL_HANDLE;
+    }
+    return *this;
+}
+
+VirtualStorageBuffer::VirtualStorageBuffer(VkDeviceSize capacityBytes, VkDeviceSize blockSize, DescriptorSetBindingLocation binding)
     : m_capacity(capacityBytes), m_blockSize(blockSize == 0 ? 1 : blockSize), m_binding(binding)
 {
     auto &vc = Application::getInstance().getVulkanContext();
@@ -57,9 +72,11 @@ VirtualStorageBuffer::~VirtualStorageBuffer()
     }
 }
 
-bool VirtualStorageBuffer::allocate(VkDeviceSize sizeBytes, VkDeviceSize &outOffsetBytes)
+VirtualStorageBuffer::Allocation VirtualStorageBuffer::allocate(VkDeviceSize sizeBytes)
 {
-    if (m_block == VK_NULL_HANDLE || sizeBytes == 0) return false;
+    if (m_block == VK_NULL_HANDLE || sizeBytes == 0) {
+        return {};
+    }
 
     std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -71,54 +88,53 @@ bool VirtualStorageBuffer::allocate(VkDeviceSize sizeBytes, VkDeviceSize &outOff
     VkDeviceSize offset = 0;
     VkResult result = vmaVirtualAllocate(m_block, &allocCreateInfo, &allocation, &offset);
 
-    if (result == VK_SUCCESS && (offset % m_blockSize) == 0) {
-        m_allocations[offset] = allocation;
-        outOffsetBytes = offset;
-        return true;
+    if (result != VK_SUCCESS || (offset % m_blockSize) != 0) {
+        // VMA gave a misaligned offset, over-allocate and round the offset up by hand
+        if (result == VK_SUCCESS) {
+            vmaVirtualFree(m_block, allocation);
+        }
+        allocCreateInfo.size = s_roundUp(sizeBytes, m_blockSize) + (m_blockSize - 1);
+        allocCreateInfo.alignment = 1;
+        result = vmaVirtualAllocate(m_block, &allocCreateInfo, &allocation, &offset);
+        if (result != VK_SUCCESS) {
+            RP_CORE_ERROR("VirtualStorageBuffer is full, could not reserve {} bytes", sizeBytes);
+            return {};
+        }
+
+        VkDeviceSize remainder = offset % m_blockSize;
+        offset = remainder == 0 ? offset : offset + (m_blockSize - remainder);
     }
 
-    // VMA gave a misaligned offset, over-allocate and round the offset up by hand
-    if (result == VK_SUCCESS) {
-        vmaVirtualFree(m_block, allocation);
-    }
-    allocCreateInfo.size = s_roundUp(sizeBytes, m_blockSize) + (m_blockSize - 1);
-    allocCreateInfo.alignment = 1;
-    result = vmaVirtualAllocate(m_block, &allocCreateInfo, &allocation, &offset);
-    if (result != VK_SUCCESS) {
-        RP_CORE_ERROR("VirtualStorageBuffer is full, could not reserve {} bytes", sizeBytes);
-        return false;
-    }
-
-    VkDeviceSize remainder = offset % m_blockSize;
-    VkDeviceSize aligned = remainder == 0 ? offset : offset + (m_blockSize - remainder);
-    m_allocations[aligned] = allocation;
-    outOffsetBytes = aligned;
-    return true;
+    Allocation reserved;
+    reserved.m_handle = allocation;
+    reserved.m_offsetBytes = offset;
+    reserved.m_sizeBytes = sizeBytes;
+    return reserved;
 }
 
-void VirtualStorageBuffer::free(VkDeviceSize offsetBytes)
+void VirtualStorageBuffer::free(Allocation &allocation)
 {
-    if (m_block == VK_NULL_HANDLE) return;
-    std::lock_guard<std::mutex> lock(m_mutex);
-    auto it = m_allocations.find(offsetBytes);
-    if (it == m_allocations.end()) {
-        RP_CORE_ERROR("VirtualStorageBuffer freeing an unknown byte offset {}, double free or bad offset", offsetBytes);
-        return;
-    }
-    vmaVirtualFree(m_block, it->second);
-    m_allocations.erase(it);
-}
-
-void VirtualStorageBuffer::write(VkDeviceSize offsetBytes, const void *data, VkDeviceSize sizeBytes)
-{
-    if (m_buffer == nullptr || data == nullptr) return;
-    if (offsetBytes + sizeBytes > m_capacity) {
-        RP_CORE_ERROR("VirtualStorageBuffer write of {} bytes at offset {} exceeds capacity {}", sizeBytes, offsetBytes,
-                      m_capacity);
+    if (m_block == VK_NULL_HANDLE || !allocation.isValid()) {
         return;
     }
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_buffer->addData(const_cast<void *>(data), sizeBytes, offsetBytes);
+    vmaVirtualFree(m_block, allocation.m_handle);
+    allocation.m_handle = VK_NULL_HANDLE;
+}
+
+void VirtualStorageBuffer::write(const Allocation &allocation, std::span<const std::byte> data, VkDeviceSize offsetBytes)
+{
+    if (m_buffer == nullptr || !allocation.isValid() || data.empty()) {
+        return;
+    }
+    if (offsetBytes + data.size() > allocation.m_sizeBytes) {
+        RP_CORE_ERROR("VirtualStorageBuffer write of {} bytes at offset {} overruns a range of {} bytes", data.size(), offsetBytes,
+                      allocation.m_sizeBytes);
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_buffer->addData(const_cast<void *>(static_cast<const void *>(data.data())), data.size(),
+                      allocation.m_offsetBytes + offsetBytes);
 }
 
 } // namespace Rapture

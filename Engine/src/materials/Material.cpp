@@ -252,24 +252,23 @@ void MaterialManager::writeSlot(uint32_t slot, const MaterialData &data)
     s_materialBuffer->write(slot, &data);
 }
 
-uint32_t MaterialManager::allocateGraphData(uint32_t sizeBytes)
+VirtualStorageBuffer::Allocation MaterialManager::allocateGraphData(uint32_t sizeBytes)
 {
     RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
-    VkDeviceSize offsetBytes = 0;
-    if (!s_graphBuffer->allocate(sizeBytes, offsetBytes)) return UINT32_MAX;
-    return static_cast<uint32_t>(offsetBytes / sizeof(uint32_t));
+    return s_graphBuffer->allocate(sizeBytes);
 }
 
-void MaterialManager::freeGraphData(uint32_t uintOffset)
+void MaterialManager::freeGraphData(VirtualStorageBuffer::Allocation &allocation)
 {
     RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
-    s_graphBuffer->free(static_cast<VkDeviceSize>(uintOffset) * sizeof(uint32_t));
+    s_graphBuffer->free(allocation);
 }
 
-void MaterialManager::writeGraphData(uint32_t uintOffset, const void *data, uint32_t sizeBytes)
+void MaterialManager::writeGraphData(const VirtualStorageBuffer::Allocation &allocation, std::span<const uint32_t> data,
+                                     uint32_t uintOffset)
 {
     RP_ASSERT(s_graphBuffer != nullptr, "Initialise the material manager first");
-    s_graphBuffer->write(static_cast<VkDeviceSize>(uintOffset) * sizeof(uint32_t), data, sizeBytes);
+    s_graphBuffer->write(allocation, std::as_bytes(data), static_cast<VkDeviceSize>(uintOffset) * sizeof(uint32_t));
 }
 
 static void s_createGltfBaseMaterial()

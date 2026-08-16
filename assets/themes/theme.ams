@@ -315,7 +315,7 @@ radio-button.viewport-context-menu:active {
     text-x-alignment: center;
     text-y-alignment: center;
     font-size: 12px;
-    corner-radius: 2px;
+    corner-radius: 6px;
 }
 
 .segment-control:hover {

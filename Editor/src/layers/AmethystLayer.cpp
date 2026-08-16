@@ -17,9 +17,9 @@
 #include "layers/workspaces/TextureGeneratorWorkspace.h"
 #include "logging/Log.h"
 #include "logging/TracyProfiler.h"
-#include "utils/EnginePaths.h"
 #include "render_targets/swap_chains/SwapChain.h"
 #include "textures/Texture.h"
+#include "utils/EnginePaths.h"
 #include "utils/Timestep.h"
 #include "viewport/ViewportManager.h"
 #include "window_context/Application.h"
@@ -401,6 +401,7 @@ void AmethystLayer::setupWorkspaces(void)
                 {
                     .mode = Amethyst::TabBarMode::INSIDE,
                     .barThickness = EDITOR_WORKSPACE_TAB_HEIGHT,
+                    .tabWidth = 196.0f,
                 },
         },
         [this](Amethyst::TabBarScope &tabs) { m_workspaceTabBar = &tabs.component; });

@@ -5,6 +5,7 @@
 #include "MaterialParameters.h"
 #include "asset_manager/AssetCommon.h"
 #include "asset_manager/AssetHandle.h"
+#include "buffers/VirtualStorageBuffer.h"
 #include "events/Events.h"
 #include "graph/MaterialGraph.h"
 
@@ -18,7 +19,6 @@
 namespace Rapture {
 
 class FreeListStorageBuffer;
-class VirtualStorageBuffer;
 class SurfaceGraphManager;
 
 // Maximum number of live material instances backed by the shared SSBO arena
@@ -112,23 +112,24 @@ class MaterialManager {
     /**
      * @brief Reserve a range in the graph data arena
      * @param sizeBytes Byte size of the instance slice
-     * @return The uint offset of the range, or UINT32_MAX if the arena is full
+     * @return The range, invalid if the arena is full
      */
-    static uint32_t allocateGraphData(uint32_t sizeBytes);
+    static VirtualStorageBuffer::Allocation allocateGraphData(uint32_t sizeBytes);
 
     /**
-     * @brief Release a previously allocated graph data range
-     * @param uintOffset The uint offset returned by allocateGraphData
+     * @brief Release a previously allocated graph data range, leaving it invalid
+     * @param allocation The range returned by allocateGraphData
      */
-    static void freeGraphData(uint32_t uintOffset);
+    static void freeGraphData(VirtualStorageBuffer::Allocation &allocation);
 
     /**
      * @brief Write a graph instance's packed slice into the arena
-     * @param uintOffset The uint offset returned by allocateGraphData
-     * @param data Pointer to the packed uints to upload
-     * @param sizeBytes Byte size to write
+     * @param allocation The range returned by allocateGraphData
+     * @param data The packed uints to upload
+     * @param uintOffset Uint offset within the range to start writing at
      */
-    static void writeGraphData(uint32_t uintOffset, const void *data, uint32_t sizeBytes);
+    static void writeGraphData(const VirtualStorageBuffer::Allocation &allocation, std::span<const uint32_t> data,
+                               uint32_t uintOffset = 0);
 
     /**
      * @brief Access the owned surface graph manager

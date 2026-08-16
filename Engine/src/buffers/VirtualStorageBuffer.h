@@ -5,10 +5,11 @@
 
 #include <vk_mem_alloc.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
-#include <unordered_map>
+#include <span>
 
 namespace Rapture {
 
@@ -18,14 +19,32 @@ class StorageBuffer;
  * @brief A host-visible SSBO sub-allocated into variable-size byte ranges by a VMA virtual block
  *
  * Every allocation is aligned and rounded up to a fixed block size set at construction, so the
- * arena stays block-granular and its fragmentation is bounded. Callers address a range by its byte
- * offset, both to write it and to free it; the underlying VMA handles stay internal.
- *
- * TODO: the raw byte offset is too fragile as a caller-held handle (no validation, blocks
- * relocation/defrag); replace it with an opaque slot handle later.
+ * arena stays block-granular and its fragmentation is bounded.
  */
 class VirtualStorageBuffer {
   public:
+    /**
+     * @brief A range reserved from the arena, handed back to write or free it
+     */
+    struct Allocation {
+        Allocation() = default;
+        Allocation(const Allocation &) = delete;
+        Allocation &operator=(const Allocation &) = delete;
+        Allocation(Allocation &&other) noexcept;
+        Allocation &operator=(Allocation &&other) noexcept;
+
+        bool isValid() const { return m_handle != VK_NULL_HANDLE; }
+        VkDeviceSize getOffsetBytes() const { return m_offsetBytes; }
+        VkDeviceSize getSizeBytes() const { return m_sizeBytes; }
+
+      private:
+        friend class VirtualStorageBuffer;
+
+        VmaVirtualAllocation m_handle = VK_NULL_HANDLE;
+        VkDeviceSize m_offsetBytes = 0;
+        VkDeviceSize m_sizeBytes = 0;
+    };
+
     /**
      * @brief Create the arena buffer and register it at a descriptor binding
      * @param capacityBytes Total arena size in bytes
@@ -41,31 +60,29 @@ class VirtualStorageBuffer {
     /**
      * @brief Reserve a byte range from the arena, sized up to the block granularity
      * @param sizeBytes Number of bytes to reserve, rounded up to the block size
-     * @param outOffsetBytes Filled with the block-aligned byte offset of the range
-     * @return True on success, false if the arena is full
+     * @return The range, invalid if the arena is full
      */
-    bool allocate(VkDeviceSize sizeBytes, VkDeviceSize &outOffsetBytes);
+    Allocation allocate(VkDeviceSize sizeBytes);
 
     /**
-     * @brief Release a previously reserved range
-     * @param offsetBytes The byte offset returned by allocate
+     * @brief Release a previously reserved range, leaving it invalid
+     * @param allocation The range returned by allocate
      */
-    void free(VkDeviceSize offsetBytes);
+    void free(Allocation &allocation);
 
     /**
-     * @brief Upload bytes into the arena at a byte offset
-     * @param offsetBytes Byte offset to write at, usually a range's outOffsetBytes
-     * @param data Pointer to the bytes to upload
-     * @param sizeBytes Number of bytes to write
+     * @brief Upload bytes into a reserved range
+     * @param allocation The range to write into
+     * @param data The bytes to upload
+     * @param offsetBytes Byte offset within the range to start writing at
      */
-    void write(VkDeviceSize offsetBytes, const void *data, VkDeviceSize sizeBytes);
+    void write(const Allocation &allocation, std::span<const std::byte> data, VkDeviceSize offsetBytes = 0);
 
     VkDeviceSize getCapacity() const { return m_capacity; }
 
   private:
     std::unique_ptr<StorageBuffer> m_buffer;
     VmaVirtualBlock m_block = VK_NULL_HANDLE;
-    std::unordered_map<VkDeviceSize, VmaVirtualAllocation> m_allocations; // byte offset to its VMA handle
     uint32_t m_descriptorIndex = UINT32_MAX;
     VkDeviceSize m_capacity;
     VkDeviceSize m_blockSize;

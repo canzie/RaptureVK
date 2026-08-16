@@ -51,9 +51,7 @@ MaterialInstance::~MaterialInstance()
     if (m_bindlessIndex != UINT32_MAX) {
         MaterialManager::freeSlot(m_bindlessIndex);
     }
-    if (m_graphDataOffset != UINT32_MAX) {
-        MaterialManager::freeGraphData(m_graphDataOffset);
-    }
+    MaterialManager::freeGraphData(m_graphData);
 }
 
 void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data, std::vector<AssetPtr<Texture>> textures)
@@ -62,21 +60,18 @@ void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data,
     m_graphTextureRefs = std::move(textures);
 
     // The slice size is graph specific, so a structural change reallocates from scratch
-    if (m_graphDataOffset != UINT32_MAX) {
-        MaterialManager::freeGraphData(m_graphDataOffset);
-        m_graphDataOffset = UINT32_MAX;
-    }
+    MaterialManager::freeGraphData(m_graphData);
 
     uint32_t sizeBytes = static_cast<uint32_t>(data.size() * sizeof(uint32_t));
     if (sizeBytes > 0) {
-        m_graphDataOffset = MaterialManager::allocateGraphData(sizeBytes);
-        if (m_graphDataOffset != UINT32_MAX) {
-            MaterialManager::writeGraphData(m_graphDataOffset, data.data(), sizeBytes);
+        m_graphData = MaterialManager::allocateGraphData(sizeBytes);
+        if (m_graphData.isValid()) {
+            MaterialManager::writeGraphData(m_graphData, data);
         }
     }
 
     m_data.graphId = graphId;
-    m_data.graphDataOffset = m_graphDataOffset == UINT32_MAX ? 0u : m_graphDataOffset;
+    m_data.graphDataOffset = static_cast<uint32_t>(m_graphData.getOffsetBytes() / sizeof(uint32_t));
     syncToGPU();
     AssetEvents::onMaterialInstanceChanged().publish(this);
 }
@@ -138,8 +133,8 @@ void MaterialInstance::writeSlice(const ParameterId &id, const void *data, size_
     if (m_slice.size() < offset + words) m_slice.resize(offset + words, 0u);
     std::memcpy(&m_slice[offset], data, size);
 
-    if (m_graphDataOffset != UINT32_MAX) {
-        MaterialManager::writeGraphData(m_graphDataOffset + offset, data, static_cast<uint32_t>(size));
+    if (m_graphData.isValid()) {
+        MaterialManager::writeGraphData(m_graphData, std::span<const uint32_t>(&m_slice[offset], words), offset);
     }
     AssetEvents::onMaterialInstanceChanged().publish(this);
 }
@@ -280,10 +275,9 @@ std::unique_ptr<MaterialInstance> MaterialInstance::deserialize(std::span<const 
     auto instance = std::make_unique<MaterialInstance>(base, name);
 
     // Restore the scalar overrides before the texture slots are re-resolved to fresh bindless indices
-    if (slice.size() == instance->m_slice.size() && instance->m_graphDataOffset != UINT32_MAX) {
+    if (slice.size() == instance->m_slice.size() && instance->m_graphData.isValid()) {
         instance->m_slice = std::move(slice);
-        MaterialManager::writeGraphData(instance->m_graphDataOffset, instance->m_slice.data(),
-                                        static_cast<uint32_t>(instance->m_slice.size() * sizeof(uint32_t)));
+        MaterialManager::writeGraphData(instance->m_graphData, instance->m_slice);
     }
 
     for (const auto &[param, textureHandle] : textureDeps) {

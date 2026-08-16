@@ -11,8 +11,8 @@ static constexpr float PICKER_PREVIEW_SIZE = 28.0f;
 static constexpr float LABEL_FRAC = 0.4f;
 static constexpr float LABEL_PAD = 12.0f;
 static constexpr float CONTROL_VPAD = 4.0f;
-static constexpr float CONTROL_HPAD = 8.0f;
-static constexpr float CONTROL_GAP = 2.0f;
+static constexpr float CONTROL_HPAD = 10.0f;
+static constexpr float CONTROL_GAP = 6.0f;
 
 static constexpr float HEADER_HEIGHT = PropertySection::HEADER_HEIGHT;
 static constexpr float SECTION_SPACING = PropertySection::SECTION_SPACING;

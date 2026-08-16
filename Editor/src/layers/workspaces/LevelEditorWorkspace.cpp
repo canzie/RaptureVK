@@ -3,12 +3,12 @@
 #include "Icons.h"
 #include "layers/PlayLayer.h"
 #include "layers/panels/AddSceneObjectMenu.h"
-#include "layers/panels/components/context_menus.h"
 #include "layers/panels/ImagePreviewPanel.h"
 #include "layers/panels/OutlinerPanel.h"
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/ViewportPanel.h"
 #include "layers/panels/WorldSettingsPanel.h"
+#include "layers/panels/components/context_menus.h"
 
 #include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_list_layout.h>
@@ -114,6 +114,8 @@ void LevelEditorWorkspace::setupViewport()
     m_context.viewport = m_viewport.viewport;
 }
 
+// TODO: Add the separators, 1px full height bg-window color, around 8px space to the left and right of it, so 19px between each
+// element
 void LevelEditorWorkspace::setupHotbar()
 {
     if (m_hotbar == nullptr) {
@@ -123,14 +125,15 @@ void LevelEditorWorkspace::setupHotbar()
     auto *layout = m_hotbar->addExtension<Amethyst::UIListLayout>();
     layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
     layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-    layout->innerPadding = Amethyst::UDim::fromOffset(6.0f);
+    layout->innerPadding = Amethyst::UDim::fromOffset(18.0f);
 
     m_addMenu = m_container->add<Amethyst::ContextMenu>();
     m_addMenu->setRowFactories({.separator = [] { return std::make_unique<ViewportContextMenuSIV>(); }});
 
     Amethyst::UIScope(*m_hotbar).textButton(
         {.classes = {"generic-text-button"},
-         .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
+         .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 0.6f, 0.0f)},
+         .text = {.fontSize = 14.0f},
          .label = "Add"},
         [this](Amethyst::TextButtonScope &b) {
             b.component.onMouseButton1ClickCb = [this, button = &b.component]() {
@@ -141,7 +144,8 @@ void LevelEditorWorkspace::setupHotbar()
 
     Amethyst::UIScope(*m_hotbar).textButton(
         {.classes = {"generic-text-button"},
-         .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 1.0f, 0.0f)},
+         .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 0.6f, 0.0f)},
+         .text = {.fontSize = 14.0f},
          .label = "Save World"},
         [this](Amethyst::TextButtonScope &b) {
             b.component.onMouseButton1ClickCb = [this]() {
@@ -150,10 +154,11 @@ void LevelEditorWorkspace::setupHotbar()
             };
         });
 
+    // TODO: put these 3 into 1 container frame, since they belong with eachother
     Amethyst::UIScope(*m_hotbar).imageButton(
         {
             .classes = {"generic-text-button", "play-button"},
-            .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, 0.0f, 0.9f, 0.0f)},
+            .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, 0.0f, 0.7f, 0.0f)},
             .svg = Icons::SVG_PLAY,
         },
         [this](Amethyst::ImageButtonScope &b) {
@@ -172,7 +177,7 @@ void LevelEditorWorkspace::setupHotbar()
     Amethyst::UIScope(*m_hotbar).imageButton(
         {
             .classes = {"generic-text-button"},
-            .base = {.layoutOrder = 3, .size = Amethyst::UDim2(0.0f, 0.0f, 0.9f, 0.0f)},
+            .base = {.layoutOrder = 3, .size = Amethyst::UDim2(0.0f, 0.0f, 0.7f, 0.0f)},
             .svg = Icons::SVG_PAUSE,
         },
         [this](Amethyst::ImageButtonScope &b) {
@@ -187,7 +192,7 @@ void LevelEditorWorkspace::setupHotbar()
     Amethyst::UIScope(*m_hotbar).imageButton(
         {
             .classes = {"generic-text-button"},
-            .base = {.layoutOrder = 4, .size = Amethyst::UDim2(0.0f, 0.0f, 0.9f, 0.0f)},
+            .base = {.layoutOrder = 4, .size = Amethyst::UDim2(0.0f, 0.0f, 0.7f, 0.0f)},
             .svg = Icons::SVG_FRAME_ADVANCE,
         },
         [this](Amethyst::ImageButtonScope &b) {
