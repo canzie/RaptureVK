@@ -10,6 +10,8 @@
 #include "core/utils/Log.h"
 #include "core/utils/TracyProfiler.h"
 #include "scene/render_data/SceneRenderData.h"
+
+#include <algorithm>
 #include "scene/Scene.h"
 #include "core/utils/rp_assert.h"
 #include "app/Application.h"
@@ -23,10 +25,15 @@ struct OcclusionPushConstants {
     alignas(4) uint32_t cameraSlotIndex;
     alignas(4) uint32_t depthTextureIndex;
     alignas(4) uint32_t normalTextureIndex;
+    alignas(4) uint32_t depthScale;
     alignas(8) glm::ivec2 outputSize;
 };
 
 static constexpr uint32_t GTAO_LOCAL_SIZE = 8;
+
+// TODO: a depth aware upsample, since bilinear filtering the result across a depth discontinuity
+// halos. Four taps weighted by depth, either here or where the lighting samples it.
+static constexpr uint32_t GTAO_RESOLUTION_DIVISOR = 2;
 
 GroundTruthAmbientOcclusionPass::GroundTruthAmbientOcclusionPass(uint32_t width, uint32_t height, uint32_t framesInFlight)
     : m_width(width), m_height(height), m_framesInFlight(framesInFlight)
@@ -69,11 +76,21 @@ void GroundTruthAmbientOcclusionPass::loadShaders()
     m_pipeline = std::make_shared<ComputePipeline>(pipelineConfig);
 }
 
+uint32_t GroundTruthAmbientOcclusionPass::occlusionWidth() const
+{
+    return std::max(m_width / GTAO_RESOLUTION_DIVISOR, 1u);
+}
+
+uint32_t GroundTruthAmbientOcclusionPass::occlusionHeight() const
+{
+    return std::max(m_height / GTAO_RESOLUTION_DIVISOR, 1u);
+}
+
 void GroundTruthAmbientOcclusionPass::createTextures()
 {
     TextureSpecification spec;
-    spec.width = m_width;
-    spec.height = m_height;
+    spec.width = occlusionWidth();
+    spec.height = occlusionHeight();
     spec.format = TextureFormat::R16F;
     spec.type = TextureType::TEXTURE2D;
     spec.filter = TextureFilter::Linear;
@@ -166,13 +183,14 @@ void GroundTruthAmbientOcclusionPass::record(const RenderPassContext &context, C
     pushConstants.cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
     pushConstants.depthTextureIndex = context.targets->depthStencil->getBindlessIndex();
     pushConstants.normalTextureIndex = context.targets->gbufferNormalMotion->getBindlessIndex();
-    pushConstants.outputSize = glm::ivec2(m_width, m_height);
+    pushConstants.depthScale = GTAO_RESOLUTION_DIVISOR;
+    pushConstants.outputSize = glm::ivec2(occlusionWidth(), occlusionHeight());
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                        sizeof(OcclusionPushConstants), &pushConstants);
 
-    vkCmdDispatch(commandBuffer->getCommandBufferVk(), groupCount(m_width, GTAO_LOCAL_SIZE), groupCount(m_height, GTAO_LOCAL_SIZE),
-                  1);
+    vkCmdDispatch(commandBuffer->getCommandBufferVk(), groupCount(occlusionWidth(), GTAO_LOCAL_SIZE),
+                  groupCount(occlusionHeight(), GTAO_LOCAL_SIZE), 1);
 }
 
 } // namespace Rapture

@@ -41,6 +41,18 @@ class GroundTruthAmbientOcclusionPass : public ComputePass {
     void createTextures();
     void createDescriptorSets();
 
+    /**
+     * @brief Width of the occlusion texture, which is drawn below the viewport resolution
+     * @return The width in pixels
+     */
+    uint32_t occlusionWidth() const;
+
+    /**
+     * @brief Height of the occlusion texture, which is drawn below the viewport resolution
+     * @return The height in pixels
+     */
+    uint32_t occlusionHeight() const;
+
   private:
     const RenderContext *m_rc = nullptr;
 

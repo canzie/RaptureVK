@@ -16,8 +16,15 @@ layout(push_constant) uniform PushConstants {
     uint cameraSlotIndex;
     uint depthTextureIndex;
     uint normalTextureIndex;
+    uint depthScale;     // occlusion is drawn below the viewport resolution, depth and normals are not
     ivec2 outputSize;
 } pc;
+
+// TODO: a linear depth pyramid, so a step that covers many pixels reads a coarse level instead of
+// striding across the full resolution buffer and missing the cache on every tap
+ivec2 depthCoords(ivec2 occlusionCoords) {
+    return occlusionCoords * int(pc.depthScale);
+}
 
 const uint SLICE_COUNT = 3;
 const uint STEP_COUNT = 4;
@@ -45,7 +52,7 @@ float marchHorizon(vec3 P, vec3 viewDir, vec2 dir, float stepSize, ivec2 coords,
             break;                                  // off screen: no evidence, not an occluder
         }
 
-        float d = cameraLinearDepth(cam, texelFetch(gTextures[nonuniformEXT(pc.depthTextureIndex)], c, 0).r);
+        float d = cameraLinearDepth(cam, texelFetch(gTextures[nonuniformEXT(pc.depthTextureIndex)], depthCoords(c), 0).r);
         vec2  suv = (vec2(c) + 0.5) / vec2(pc.outputSize);
         vec3  D = cameraViewPositionFromLinearDepth(cam, suv, d) - P;
         float dist = length(D);
@@ -72,7 +79,7 @@ void main() {
     }
 
     CameraGPUData cam = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex];
-    float depth = texelFetch(gTextures[nonuniformEXT(pc.depthTextureIndex)], coords, 0).r;
+    float depth = texelFetch(gTextures[nonuniformEXT(pc.depthTextureIndex)], depthCoords(coords), 0).r;
 
     if (depth >= 1.0) {
         imageStore(outAmbientOcclusion, coords, vec4(1.0));
@@ -80,7 +87,7 @@ void main() {
     }
 
     float linDepth = cameraLinearDepth(cam, depth);
-    vec2 normal = texelFetch(gTextures[nonuniformEXT(pc.normalTextureIndex)], coords, 0).rg;
+    vec2 normal = texelFetch(gTextures[nonuniformEXT(pc.normalTextureIndex)], depthCoords(coords), 0).rg;
     vec3 worldNormal = octDecodeNormal(normal);
     vec3 viewNormal = normalize(mat3(cam.view) * worldNormal);
 
