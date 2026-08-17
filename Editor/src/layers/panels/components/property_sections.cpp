@@ -206,6 +206,28 @@ void PropertySection::rowAssetPicker(Amethyst::TableScope &t, std::string_view l
     });
 }
 
+void PropertySection::rowInstancePicker(Amethyst::TableScope &t, std::string_view label, std::optional<InstancePicker> &out,
+                                        const Rapture::TypeInfo &type,
+                                        const std::function<void(Rapture::SceneObject *)> &onSelected)
+{
+    t.row(PICKER_ROW_HEIGHT, [&](Amethyst::TableRowScope &tr) {
+        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
+        tr.cell([&](Amethyst::UIScope &cell) {
+            cell.frame(
+                {
+                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                    .style = {.backgroundTransparency = 1.0f},
+                },
+                [&](Amethyst::FrameScope &wrap) {
+                    out.emplace(wrap, type);
+                    out->onInstanceSelected = onSelected;
+                });
+        });
+    });
+}
+
 Amethyst::Dropdown *PropertySection::rowDropdown(Amethyst::TableScope &t, std::string_view label, std::string_view current,
                                                  const std::vector<std::string> &options, const std::function<void(int)> &onSelect)
 {

@@ -16,7 +16,7 @@
 
 namespace Rapture {
 
-struct MeshComponent;
+struct StaticMeshComponent;
 struct TransformComponent;
 struct LightComponent;
 

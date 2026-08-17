@@ -73,6 +73,25 @@ class MDIBatch {
     VkIndexType m_indexType;
 };
 
+/**
+ * @brief Everything a batch fixes for every draw in it.
+ *
+ * The arenas decide which buffers are bound, and the layout and index type decide how they are read,
+ * so two meshes only share a batch when all four agree.
+ */
+struct MDIBatchKey {
+    uint32_t vertexArenaId = 0;
+    uint32_t indexArenaId = 0;
+    size_t layoutHash = 0;
+    uint32_t indexType = 0;
+
+    bool operator==(const MDIBatchKey &other) const = default;
+};
+
+struct MDIBatchKeyHash {
+    size_t operator()(const MDIBatchKey &key) const;
+};
+
 // when a render pass uses multiple batches we need a way to neatly organise this
 class MDIBatchMap {
   public:
@@ -86,14 +105,12 @@ class MDIBatchMap {
     MDIBatch *obtainBatch(std::shared_ptr<BufferAllocation> vboArena, std::shared_ptr<BufferAllocation> iboArena,
                           BufferLayout &bufferLayout, VkIndexType indexType);
 
-    const std::unordered_map<uint64_t, std::unique_ptr<MDIBatch>> &getBatches() const { return m_batches; }
+    const std::unordered_map<MDIBatchKey, std::unique_ptr<MDIBatch>, MDIBatchKeyHash> &getBatches() const { return m_batches; }
 
   private:
     RenderContext m_rc;
 
-    // we take the buffer ids from both buffers, then add these numbers to generate a unique key
-    // e.g. 123 + 456 = 123456
-    std::unordered_map<uint64_t, std::unique_ptr<MDIBatch>> m_batches;
+    std::unordered_map<MDIBatchKey, std::unique_ptr<MDIBatch>, MDIBatchKeyHash> m_batches;
 };
 
 } // namespace Rapture

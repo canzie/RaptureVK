@@ -18,6 +18,8 @@
 #include "assets/asset_manager/ReservedAssets.h"
 #include "scene/Scene.h"
 #include "scene/instances/Node3D.h"
+#include "scene/instances/SkeletalMesh3D.h"
+#include "scene/instances/SkeletonPose.h"
 #include "scene/instances/StaticMesh3D.h"
 #include "gpu/buffers/BufferLayout.h"
 #include "scene/components/Components.h"
@@ -295,7 +297,7 @@ bool glTF2Loader::loadScene(yyjson_val *scene)
     sceneNode->name = "Scene";
     yyjson_arr_foreach(nodes, idx, max, node)
     {
-        loadNode(sceneNode.get(), idx);
+        loadNode(sceneNode.get(), static_cast<size_t>(getInt(node, 0)));
     }
 
     m_loadedData->rootNodes.push_back(std::move(sceneNode));
@@ -314,11 +316,24 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
     node->localTransform = getNodeTransform(nodeJson);
     node->worldTransform = (parent ? parent->worldTransform : glm::mat4(1.0f)) * node->localTransform;
 
+    // read before the mesh, since a primitive's joints only mean anything against this node's skin
+    AssetHandle skeleton = INVALID_ASSET_HANDLE;
+    yyjson_val *skinVal = getObjectValue(nodeJson, "skin");
+    if (skinVal != nullptr) {
+        loadSkin(skinVal);
+
+        auto skinIt = m_loadedData->skeletons.find(static_cast<size_t>(getInt(skinVal, 0)));
+        if (skinIt != m_loadedData->skeletons.end() && skinIt->second) {
+            skeleton = skinIt->second.get()->getHandle();
+        }
+        node->type = glTF_NodeType::SKELETON;
+    }
+
     yyjson_val *meshIdxVal = getObjectValue(nodeJson, "mesh");
     if (meshIdxVal && yyjson_is_int(meshIdxVal)) {
         size_t meshIndex = static_cast<size_t>(getInt(meshIdxVal, 0));
         if (meshIndex < getArraySize(m_meshes)) {
-            loadMesh(node.get(), meshIndex);
+            loadMesh(node.get(), meshIndex, skeleton);
         }
     }
 
@@ -334,12 +349,6 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
         }
     }
 
-    yyjson_val *skinVal = getObjectValue(nodeJson, "skin");
-    if (skinVal) {
-        loadSkin(skinVal);
-        node->type = glTF_NodeType::SKELETON;
-    }
-
     yyjson_val *weightsVal = getObjectValue(nodeJson, "weights");
     if (weightsVal) {
         loadWeights(weightsVal);
@@ -351,7 +360,10 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
     return true;
 }
 
-bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex)
+// TODO: the cache is keyed on the glTF mesh alone, so one mesh referenced by two nodes with
+// different skins reuses whichever was decoded first, silently binding the second to the wrong
+// skeleton. Key on the skin as well once anything actually does this.
+bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle skeleton)
 {
     auto cacheIt = m_meshCache.find(meshIndex);
     if (cacheIt == m_meshCache.end()) {
@@ -367,7 +379,7 @@ bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex)
         yyjson_arr_foreach(primitivesVal, idx, max, primitiveJson)
         {
             PrimitiveData data;
-            if (decodePrimitive(primitiveJson, meshIndex, idx, data)) {
+            if (decodePrimitive(primitiveJson, meshIndex, idx, skeleton, data)) {
                 primitives.push_back(std::move(data));
             }
         }
@@ -388,6 +400,7 @@ bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex)
         primNode->worldTransform = node->worldTransform;
         primNode->meshRef = data.meshRef;
         primNode->materialIndex = data.materialIndex;
+        primNode->skeleton = data.skeleton;
 
         node->children.push_back(std::move(primNode));
     }
@@ -395,7 +408,8 @@ bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex)
     return true;
 }
 
-bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, PrimitiveData &out)
+bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, AssetHandle skeleton,
+                                  PrimitiveData &out)
 {
     std::vector<std::pair<std::string, std::vector<uint8_t>>> attributeData;
     uint32_t vertexCount = 0;
@@ -412,6 +426,12 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
             val = yyjson_obj_iter_get_val(key);
             const char *attribName = yyjson_get_str(key);
             if (strcmp(attribName, "COLOR_0") == 0) continue;
+
+            // a static mesh deforms with nothing, so its joints and weights are never read
+            bool isSkinAttribute = strncmp(attribName, "JOINTS_", 7) == 0 || strncmp(attribName, "WEIGHTS_", 8) == 0;
+            if (isSkinAttribute && skeleton == INVALID_ASSET_HANDLE) {
+                continue;
+            }
 
             size_t accessorIdx = static_cast<size_t>(getInt(val, 0));
             yyjson_val *accessor = getArrayElement(m_accessors, static_cast<uint32_t>(accessorIdx));
@@ -530,10 +550,24 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
     std::string meshAssetName =
         m_filepath.stem().string() + "_Mesh" + std::to_string(meshIndex) + "_Prim" + std::to_string(primitiveIndex);
     AssetProvenance provenance{m_filepath, static_cast<uint32_t>(meshIndex)};
-    out.meshRef = AssetManager::importAsset(AssetImportDataRequest{.data = MeshImportData{std::move(params)},
-                                                                   .output = m_outputFolder,
-                                                                   .name = meshAssetName,
-                                                                   .provenance = provenance});
+
+    bool isSkinned = skeleton != INVALID_ASSET_HANDLE &&
+                     bufferLayout.getAttributeOffset(BufferAttributeID::JOINTS_0) != UINT32_MAX &&
+                     bufferLayout.getAttributeOffset(BufferAttributeID::WEIGHTS_0) != UINT32_MAX;
+
+    AssetImportDataVariant importData;
+    if (isSkinned) {
+        auto bindsIt = m_inverseBindMatrices.find(skeleton);
+        importData = SkeletalMeshImportData{std::move(params), skeleton,
+                                            bindsIt != m_inverseBindMatrices.end() ? bindsIt->second
+                                                                                   : std::vector<glm::mat4>{}};
+        out.skeleton = skeleton;
+    } else {
+        importData = StaticMeshImportData{std::move(params)};
+    }
+
+    out.meshRef = AssetManager::importAsset(AssetImportDataRequest{
+        .data = std::move(importData), .output = m_outputFolder, .name = meshAssetName, .provenance = provenance});
 
     yyjson_val *materialVal = getObjectValue(primitiveJson, "material");
     if (materialVal && yyjson_is_int(materialVal)) {
@@ -604,7 +638,16 @@ Node3D *glTF2Loader::buildSceneObject(SceneObject &parent, glTF_SceneNode *src)
     Node3D *node = nullptr;
 
     if (src->meshRef) {
-        StaticMesh3D *mesh = parent.add<StaticMesh3D>(src->name);
+        Mesh3D *mesh = nullptr;
+
+        if (src->skeleton != INVALID_ASSET_HANDLE) {
+            SkeletalMesh3D *skinned = parent.add<SkeletalMesh3D>(src->name);
+            m_skinnedMeshes[src->skeleton].push_back(skinned);
+            mesh = skinned;
+        } else {
+            mesh = parent.add<StaticMesh3D>(src->name);
+        }
+
         mesh->setMesh(src->meshRef.get()->getHandle());
 
         if (src->materialIndex >= 0) {
@@ -614,7 +657,11 @@ Node3D *glTF2Loader::buildSceneObject(SceneObject &parent, glTF_SceneNode *src)
             }
         }
 
-        mesh->setRayTraced(true);
+        // a skinned mesh has no acceleration structure to trace against
+        if (src->skeleton == INVALID_ASSET_HANDLE) {
+            mesh->setRayTraced(true);
+        }
+
         node = mesh;
     } else {
         node = parent.add<Node3D>(src->name);
@@ -629,12 +676,38 @@ Node3D *glTF2Loader::buildSceneObject(SceneObject &parent, glTF_SceneNode *src)
     return node;
 }
 
+void glTF2Loader::buildSkeletonPoses(SceneObject &root)
+{
+    uint32_t index = 0;
+
+    for (const auto &[skeleton, meshes] : m_skinnedMeshes) {
+        std::string poseName = std::string(root.name()) + "_Pose";
+        if (index > 0) {
+            poseName += std::to_string(index);
+        }
+        index++;
+
+        auto owned = std::make_unique<SkeletonPose>(*root.scene(), poseName, skeleton);
+        SkeletonPose *pose = owned.get();
+        root.addChild(std::move(owned));
+        pose->ready();
+
+        for (SkeletalMesh3D *mesh : meshes) {
+            mesh->setPose(pose);
+        }
+    }
+
+    m_skinnedMeshes.clear();
+}
+
 void glTF2Loader::buildSceneObjectAsset(Scene *scene)
 {
     std::string assetName = m_name.empty() ? m_filepath.stem().string() : m_name;
 
     Scene authoring(assetName);
     SceneObject *root = nullptr;
+
+    m_skinnedMeshes.clear();
 
     if (m_loadedData->rootNodes.size() == 1) {
         root = buildSceneObject(*authoring.root(), m_loadedData->rootNodes.front().get());
@@ -646,6 +719,8 @@ void glTF2Loader::buildSceneObjectAsset(Scene *scene)
         }
         root = group;
     }
+
+    buildSkeletonPoses(*root);
 
     SerialDocument document;
     root->serialize(document.root());
@@ -907,9 +982,161 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
     return ref;
 }
 
+Skeleton::JointTransform glTF2Loader::getNodeRestTransform(yyjson_val *nodeVal)
+{
+    Skeleton::JointTransform transform;
+
+    yyjson_val *matrixVal = getObjectValue(nodeVal, "matrix");
+    if (matrixVal && yyjson_is_arr(matrixVal)) {
+        glm::mat4 matrix = getNodeTransform(nodeVal);
+        transform.position = glm::vec3(matrix[3]);
+        transform.scale = glm::vec3(glm::length(glm::vec3(matrix[0])), glm::length(glm::vec3(matrix[1])),
+                                    glm::length(glm::vec3(matrix[2])));
+
+        glm::mat3 rotation(matrix);
+        for (int axis = 0; axis < 3; axis++) {
+            if (transform.scale[axis] != 0.0f) {
+                rotation[axis] /= transform.scale[axis];
+            }
+        }
+        transform.rotation = glm::quat_cast(rotation);
+        return transform;
+    }
+
+    yyjson_val *translationVal = getObjectValue(nodeVal, "translation");
+    if (translationVal && yyjson_is_arr(translationVal) && getArraySize(translationVal) >= 3) {
+        transform.position = glm::vec3(static_cast<float>(getDouble(getArrayElement(translationVal, 0), 0.0)),
+                                       static_cast<float>(getDouble(getArrayElement(translationVal, 1), 0.0)),
+                                       static_cast<float>(getDouble(getArrayElement(translationVal, 2), 0.0)));
+    }
+
+    yyjson_val *rotationVal = getObjectValue(nodeVal, "rotation");
+    if (rotationVal && yyjson_is_arr(rotationVal) && getArraySize(rotationVal) >= 4) {
+        // glTF quaternions are [x,y,z,w], but glm::quat takes [w,x,y,z]
+        transform.rotation = glm::quat(static_cast<float>(getDouble(getArrayElement(rotationVal, 3), 1.0)),
+                                       static_cast<float>(getDouble(getArrayElement(rotationVal, 0), 0.0)),
+                                       static_cast<float>(getDouble(getArrayElement(rotationVal, 1), 0.0)),
+                                       static_cast<float>(getDouble(getArrayElement(rotationVal, 2), 0.0)));
+    }
+
+    yyjson_val *scaleVal = getObjectValue(nodeVal, "scale");
+    if (scaleVal && yyjson_is_arr(scaleVal) && getArraySize(scaleVal) >= 3) {
+        transform.scale = glm::vec3(static_cast<float>(getDouble(getArrayElement(scaleVal, 0), 1.0)),
+                                    static_cast<float>(getDouble(getArrayElement(scaleVal, 1), 1.0)),
+                                    static_cast<float>(getDouble(getArrayElement(scaleVal, 2), 1.0)));
+    }
+
+    return transform;
+}
+
+std::unordered_map<size_t, size_t> glTF2Loader::buildNodeParents()
+{
+    std::unordered_map<size_t, size_t> parents;
+
+    size_t nodeCount = getArraySize(m_nodes);
+    for (size_t node = 0; node < nodeCount; node++) {
+        yyjson_val *childrenVal = getObjectValue(getArrayElement(m_nodes, static_cast<uint32_t>(node)), "children");
+        if (childrenVal == nullptr || !yyjson_is_arr(childrenVal)) {
+            continue;
+        }
+
+        size_t childCount = getArraySize(childrenVal);
+        for (size_t i = 0; i < childCount; i++) {
+            parents[static_cast<size_t>(getInt(getArrayElement(childrenVal, static_cast<uint32_t>(i)), 0))] = node;
+        }
+    }
+
+    return parents;
+}
+
 void glTF2Loader::loadSkin(yyjson_val *skinVal)
 {
-    (void)skinVal;
+    if (skinVal == nullptr || !yyjson_is_int(skinVal)) {
+        return;
+    }
+
+    size_t skinIndex = static_cast<size_t>(getInt(skinVal, 0));
+    if (skinIndex >= getArraySize(m_skins) || m_loadedData->skeletons.contains(skinIndex)) {
+        return;
+    }
+
+    yyjson_val *skin = getArrayElement(m_skins, static_cast<uint32_t>(skinIndex));
+    yyjson_val *jointsVal = getObjectValue(skin, "joints");
+    if (jointsVal == nullptr || !yyjson_is_arr(jointsVal)) {
+        RP_CORE_ERROR("skin {} has no joints", skinIndex);
+        return;
+    }
+
+    size_t jointCount = getArraySize(jointsVal);
+
+    std::vector<size_t> jointNodes(jointCount);
+    std::unordered_map<size_t, Skeleton::JointIndex> jointOfNode;
+    for (size_t joint = 0; joint < jointCount; joint++) {
+        size_t node = static_cast<size_t>(getInt(getArrayElement(jointsVal, static_cast<uint32_t>(joint)), 0));
+        jointNodes[joint] = node;
+        jointOfNode[node] = static_cast<Skeleton::JointIndex>(joint);
+    }
+
+    std::unordered_map<size_t, size_t> nodeParents = buildNodeParents();
+
+    std::vector<Skeleton::JointIndex> parents(jointCount, Skeleton::INVALID_JOINT_INDEX);
+    std::vector<std::string> names(jointCount);
+    Skeleton::Pose restPose;
+    restPose.joints.resize(jointCount);
+
+    for (size_t joint = 0; joint < jointCount; joint++) {
+        size_t node = jointNodes[joint];
+
+        auto parentNode = nodeParents.find(node);
+        if (parentNode != nodeParents.end()) {
+            auto parentJoint = jointOfNode.find(parentNode->second);
+            if (parentJoint != jointOfNode.end()) {
+                parents[joint] = parentJoint->second;
+            }
+        }
+
+        names[joint] = getNodeName(node);
+        restPose.joints[joint] = getNodeRestTransform(getArrayElement(m_nodes, static_cast<uint32_t>(node)));
+    }
+
+    // the joint order is the one the meshes' JOINTS_0 indices address, so it is kept as authored
+    for (size_t joint = 0; joint < jointCount; joint++) {
+        if (parents[joint] != Skeleton::INVALID_JOINT_INDEX && parents[joint] > joint) {
+            RP_CORE_ERROR("skin {} lists joint {} before its parent {}, which the pose evaluation relies on", skinIndex, joint,
+                          parents[joint]);
+            break;
+        }
+    }
+
+    std::vector<glm::mat4> inverseBindMatrices(jointCount, glm::mat4(1.0f));
+    yyjson_val *inverseBindVal = getObjectValue(skin, "inverseBindMatrices");
+    if (inverseBindVal != nullptr && yyjson_is_int(inverseBindVal)) {
+        std::vector<unsigned char> bytes;
+        loadAccessor(getArrayElement(m_accessors, static_cast<uint32_t>(getInt(inverseBindVal, 0))), bytes);
+
+        if (bytes.size() >= jointCount * sizeof(glm::mat4)) {
+            std::memcpy(inverseBindMatrices.data(), bytes.data(), jointCount * sizeof(glm::mat4));
+        } else {
+            RP_CORE_ERROR("skin {} has {} bytes of inverse bind matrices for {} joints", skinIndex, bytes.size(), jointCount);
+        }
+    }
+
+    std::string skeletonName = getString(getObjectValue(skin, "name"), "");
+    if (skeletonName.empty()) {
+        std::string base = m_name.empty() ? m_filepath.stem().string() : m_name;
+        skeletonName = base + "_skeleton_" + std::to_string(skinIndex);
+    }
+
+    auto skeleton = std::make_unique<Skeleton>(std::move(parents), std::move(names), std::move(restPose));
+
+    AssetRef ref = AssetManager::importAsset(AssetImportDataRequest{
+        .data = SkeletonImportData{std::move(skeleton)}, .output = m_outputFolder, .name = skeletonName});
+
+    // the bind pose belongs to the meshes bound against this skeleton, not to the skeleton itself
+    if (ref) {
+        m_inverseBindMatrices[ref.get()->getHandle()] = std::move(inverseBindMatrices);
+    }
+    m_loadedData->skeletons[skinIndex] = std::move(ref);
 }
 
 void glTF2Loader::loadWeights(yyjson_val *weightsVal)

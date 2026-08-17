@@ -238,9 +238,9 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
     // via pushconstants for now, since it is only one matrix
     // m_rc->descriptorManager->bindSet(DescriptorSetBindingLocation::SHADOW_MATRICES_UBO, commandBuffer, m_pipeline);
 
-    // Get entities with TransformComponent and MeshComponent for rendering
+    // Get entities with TransformComponent and StaticMeshComponent for rendering
     auto &registry = activeScene.getRegistry();
-    for (auto [entity, transform, meshComp] : registry.read<TransformComponent, MeshComponent>()) {
+    for (auto [entity, transform, meshComp] : registry.read<TransformComponent, StaticMeshComponent>()) {
         RAPTURE_PROFILE_SCOPE("Draw Shadow Mesh");
 
         // Skip invalid or loading meshes
@@ -254,7 +254,7 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
         }
 
         // Update world bounding box if transform changed
-        registry.write<MeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
+        registry.write<StaticMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
 
         // Perform frustum culling
         if (m_frustum.testBoundingBox(meshComp.worldBoundingBox) == FrustumResult::Outside) {

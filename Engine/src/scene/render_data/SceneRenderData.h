@@ -2,6 +2,7 @@
 #define RAPTURE__SCENERENDERDATA_H
 
 #include "scene/components/ChangeChannels.h"
+#include "scene/render_data/SkeletonInstanceManager.h"
 #include "renderer/GPUDataStructs.h"
 #include "renderer/RenderPartition.h"
 
@@ -74,7 +75,7 @@ class SceneRenderData {
 
     /**
      * @brief Where an entity's mesh data was packed
-     * @param entityId Entity holding the MeshComponent
+     * @param entityId Entity holding the StaticMeshComponent
      * @return The slot, or UINT32_MAX if the entity owns none
      */
     uint32_t getMeshSlot(ecs::Entity entityId) const;
@@ -113,6 +114,8 @@ class SceneRenderData {
      * @return The cascaded shadow map, or nullptr if the entity has none
      */
     CascadedShadowMap *getCascadedShadowMap(ecs::Entity entityId) const;
+
+    SkeletonInstanceManager &getSkeletonInstanceManager() { return m_skeletonInstanceManager; }
 
     GPUDataStore<MeshGPUData> &getMeshes() { return m_meshes; }
     GPUDataStore<LightGPUData> &getLights() { return m_lights; }
@@ -166,6 +169,8 @@ class SceneRenderData {
 
     std::unordered_map<ecs::Entity, std::unique_ptr<ShadowMap>> m_shadowMaps;
     std::unordered_map<ecs::Entity, std::unique_ptr<CascadedShadowMap>> m_cascadedShadowMaps;
+
+    SkeletonInstanceManager m_skeletonInstanceManager;
 
     RenderContext m_renderContext;
     Scene *m_scene = nullptr;

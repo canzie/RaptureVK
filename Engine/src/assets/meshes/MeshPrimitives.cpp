@@ -8,7 +8,7 @@
 
 namespace Rapture {
 
-Mesh Primitives::CreateCube()
+StaticMesh Primitives::CreateCube()
 {
     MeshAllocatorParams params;
 
@@ -100,10 +100,10 @@ Mesh Primitives::CreateCube()
     params.indexCount = indices.size();
     params.indexType = UNSIGNED_SHORT_TYPE;
 
-    return Mesh(params);
+    return StaticMesh(params);
 }
 
-Mesh Primitives::CreateSphere(float radius, uint32_t segments)
+StaticMesh Primitives::CreateSphere(float radius, uint32_t segments)
 {
     MeshAllocatorParams params;
 
@@ -192,10 +192,10 @@ Mesh Primitives::CreateSphere(float radius, uint32_t segments)
     params.indexCount = indices.size();
     params.indexType = UNSIGNED_SHORT_TYPE;
 
-    return Mesh(params);
+    return StaticMesh(params);
 }
 
-Mesh Primitives::CreatePlane(float segments)
+StaticMesh Primitives::CreatePlane(float segments)
 {
     MeshAllocatorParams params;
 
@@ -272,10 +272,10 @@ Mesh Primitives::CreatePlane(float segments)
     params.indexCount = indices.size();
     params.indexType = UNSIGNED_SHORT_TYPE;
 
-    return Mesh(params);
+    return StaticMesh(params);
 }
 
-Mesh Primitives::CreateLine(float start, float end)
+StaticMesh Primitives::CreateLine(float start, float end)
 {
     MeshAllocatorParams params;
 
@@ -310,7 +310,7 @@ Mesh Primitives::CreateLine(float start, float end)
     params.indexCount = indices.size();
     params.indexType = UNSIGNED_SHORT_TYPE;
 
-    return Mesh(params);
+    return StaticMesh(params);
 }
 
 } // namespace Rapture

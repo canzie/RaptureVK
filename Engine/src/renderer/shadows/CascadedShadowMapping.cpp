@@ -339,9 +339,9 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_pipeline);
     m_rc->descriptorManager->bindSet(2, commandBuffer, m_pipeline);
 
-    // Get entities with TransformComponent and MeshComponent for rendering
+    // Get entities with TransformComponent and StaticMeshComponent for rendering
     // First pass: Populate MDI batches with mesh data
-    for (auto [entity, transform, meshComp] : registry.read<TransformComponent, MeshComponent>()) {
+    for (auto [entity, transform, meshComp] : registry.read<TransformComponent, StaticMeshComponent>()) {
 
         // Skip invalid or loading meshes
         if (!meshComp.mesh || meshComp.isLoading) {
@@ -354,7 +354,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
         }
 
         // Update world bounding box if transform changed
-        registry.write<MeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
+        registry.write<StaticMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
 
         // Get buffer allocation info to determine batch
         auto vboAlloc = meshComp.mesh->getVertexAllocation();

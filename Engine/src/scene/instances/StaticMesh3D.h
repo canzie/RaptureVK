@@ -14,6 +14,26 @@ class StaticMesh3D : public Mesh3D {
 
     static const TypeInfo &staticType();
     const TypeInfo &type() const override;
+
+    void setMesh(AssetHandle mesh) override;
+
+    bool isVisible() const override;
+    void setVisible(bool visible) override;
+
+    Mobility mobility() const override;
+    void setMobility(Mobility mobility) override;
+
+    glm::vec3 boundsMin() const override;
+    glm::vec3 boundsMax() const override;
+
+    void setRayTraced(bool rayTraced) override;
+
+  private:
+    /**
+     * @brief Points this mesh's TLAS instance at the acceleration structure of the mesh it now holds,
+     * dropping it out of ray tracing if that mesh has none
+     */
+    void rebuildAccelerationStructure();
 };
 
 } // namespace Rapture

@@ -4,10 +4,19 @@
 
 #include "common/CameraCommon.glsl"
 
+#ifdef IS_SKINNED_MESH
+#include "common/Skinning.glsl"
+#endif // IS_SKINNED_MESH
+
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
 layout(location = 3) in vec4 aTangent;
+
+#ifdef IS_SKINNED_MESH
+layout(location = 5) in vec4 aWeights;
+layout(location = 6) in uvec4 aJoints;
+#endif // IS_SKINNED_MESH
 
 layout(location = 0) out vec4 outFragPosDepth;
 layout(location = 1) out vec3 outNormal;
@@ -22,6 +31,7 @@ struct MeshGPUData {
     uint materialIndex;
     uint flags;
     uint entityId;
+    uint boneOffset;
 };
 
 struct ObjectInfo {
@@ -43,6 +53,7 @@ layout(push_constant) uniform PushConstants {
     uint cameraSSBOIndex;
     uint cameraSlotIndex;
     uint meshSSBOIndex;
+    uint skeletonSSBOIndex;
 } pc;
 
 // Bit flag definitions
@@ -61,6 +72,14 @@ void main() {
 
     mat4 model = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].model;
     uint flags = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].flags;
+
+#ifdef IS_SKINNED_MESH
+    // folded into the model matrix so every basis derived from it below is deformed with the position
+    uint boneOffset = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].boneOffset;
+    if (boneOffset != NO_BONE_OFFSET) {
+        model = model * Skinning_blendMatrix(pc.skeletonSSBOIndex, boneOffset, aJoints, aWeights);
+    }
+#endif // IS_SKINNED_MESH
 
     // Use flags to determine attribute availability (branchless)
     float hasNormals = float((flags & FLAG_HAS_NORMALS) != 0u);

@@ -47,6 +47,7 @@ enum class DescriptorSetBindingLocation {
     GRAPH_DATA_SSBO = 101,
 
     MESH_DATA_SSBO = 200,
+    SKELETON_MATRICES_SSBO = 201,
 
     BINDLESS_TEXTURES = 300,
     BINDLESS_SSBOS = 301,

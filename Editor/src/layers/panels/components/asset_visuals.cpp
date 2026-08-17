@@ -47,7 +47,8 @@ Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
     case Rapture::ASSET_MATERIAL:
     case Rapture::ASSET_MATERIAL_INSTANCE:
         return Amethyst::Color3(0.68f, 0.45f, 0.95f); // violet
-    case Rapture::ASSET_MESH:
+    case Rapture::ASSET_STATIC_MESH:
+    case Rapture::ASSET_SKELETAL_MESH:
         return Amethyst::Color3(0.95f, 0.60f, 0.25f); // orange
     case Rapture::ASSET_SCENE_OBJECT:
         return Amethyst::Color3(0.50f, 0.50f, 0.95f); // periwinkle
@@ -93,7 +94,8 @@ const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *
     case Rapture::ASSET_MATERIAL:
     case Rapture::ASSET_MATERIAL_INSTANCE:
         return Icons::SVG_MATERIAL;
-    case Rapture::ASSET_MESH:
+    case Rapture::ASSET_STATIC_MESH:
+    case Rapture::ASSET_SKELETAL_MESH:
         return Icons::SVG_MESH;
     case Rapture::ASSET_SCENE_OBJECT:
         return Icons::SVG_CUBE;

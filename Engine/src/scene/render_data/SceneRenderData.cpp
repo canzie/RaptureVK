@@ -15,6 +15,22 @@
 
 namespace Rapture {
 
+// a skinned mesh deforms every frame, so it only ever belongs to the dynamic partition
+static bool s_tryReadMeshMobility(ecs::Registry &registry, ecs::Entity entity, Mobility &mobility)
+{
+    if (const StaticMeshComponent *mesh = registry.tryRead<StaticMeshComponent>(entity)) {
+        mobility = mesh->mobility;
+        return true;
+    }
+
+    if (registry.has<SkeletalMeshComponent>(entity)) {
+        mobility = MOBILITY_DYNAMIC;
+        return true;
+    }
+
+    return false;
+}
+
 SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scene, uint32_t frameCount)
     : m_renderContext(renderContext), m_scene(&scene), m_frameCount(frameCount)
 {
@@ -32,9 +48,9 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
     ecs::Registry &registry = m_scene->getRegistry();
 
     auto meshSwapCb = [this, &registry](ecs::Entity entity, uint32_t newSlot) {
-        const MeshComponent *mesh = registry.tryRead<MeshComponent>(entity);
-        if (mesh != nullptr) {
-            m_meshSlots[entity] = m_meshes.getGlobalSlot(mesh->mobility, newSlot);
+        Mobility mobility;
+        if (s_tryReadMeshMobility(registry, entity, mobility)) {
+            m_meshSlots[entity] = m_meshes.getGlobalSlot(mobility, newSlot);
         }
     };
     auto lightSwapCb = [this, &registry](ecs::Entity entity, uint32_t newSlot) {
@@ -65,8 +81,11 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
         m_shadows.getPartition(static_cast<Mobility>(i)).init(frameCount, shadowSwapCb);
     }
 
-    m_connections.push_back(registry.onConstructScoped<MeshComponent>([this](ecs::Entity entity) { onMeshAdded(entity); }));
-    m_connections.push_back(registry.onDestroyScoped<MeshComponent>([this](ecs::Entity entity) { onMeshRemoved(entity); }));
+    m_connections.push_back(registry.onConstructScoped<StaticMeshComponent>([this](ecs::Entity entity) { onMeshAdded(entity); }));
+    m_connections.push_back(registry.onDestroyScoped<StaticMeshComponent>([this](ecs::Entity entity) { onMeshRemoved(entity); }));
+
+    m_connections.push_back(registry.onConstructScoped<SkeletalMeshComponent>([this](ecs::Entity entity) { onMeshAdded(entity); }));
+    m_connections.push_back(registry.onDestroyScoped<SkeletalMeshComponent>([this](ecs::Entity entity) { onMeshRemoved(entity); }));
 
     connectLightSignals<DirectionalLightComponent>(registry);
     connectLightSignals<PointLightComponent>(registry);
@@ -93,7 +112,10 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
         onCascadedShadowRemoved(entity);
     }));
 
-    for (auto [entity, mesh] : registry.read<MeshComponent>()) {
+    for (auto [entity, mesh] : registry.read<StaticMeshComponent>()) {
+        onMeshAdded(entity);
+    }
+    for (auto [entity, mesh] : registry.read<SkeletalMeshComponent>()) {
         onMeshAdded(entity);
     }
     for (auto [entity, light] : registry.read<DirectionalLightComponent>()) {
@@ -129,32 +151,32 @@ SceneRenderData::~SceneRenderData() = default;
 
 void SceneRenderData::onMeshAdded(ecs::Entity entityId)
 {
-    const MeshComponent *mesh = m_scene->getRegistry().tryRead<MeshComponent>(entityId);
-    if (mesh == nullptr) {
+    Mobility mobility;
+    if (!s_tryReadMeshMobility(m_scene->getRegistry(), entityId, mobility)) {
         return;
     }
 
-    uint32_t localSlot = m_meshes.getPartition(mesh->mobility).allocateSlot(entityId);
-    m_meshSlots[entityId] = m_meshes.getGlobalSlot(mesh->mobility, localSlot);
+    uint32_t localSlot = m_meshes.getPartition(mobility).allocateSlot(entityId);
+    m_meshSlots[entityId] = m_meshes.getGlobalSlot(mobility, localSlot);
 }
 
 void SceneRenderData::onMeshRemoved(ecs::Entity entityId)
 {
-    const MeshComponent *mesh = m_scene->getRegistry().tryRead<MeshComponent>(entityId);
+    Mobility mobility;
     uint32_t globalSlot = getMeshSlot(entityId);
-    if (mesh == nullptr || globalSlot == UINT32_MAX) {
+    if (!s_tryReadMeshMobility(m_scene->getRegistry(), entityId, mobility) || globalSlot == UINT32_MAX) {
         return;
     }
 
-    uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, globalSlot);
-    m_meshes.getPartition(mesh->mobility).freeSlot(localSlot);
+    uint32_t localSlot = m_meshes.getLocalSlot(mobility, globalSlot);
+    m_meshes.getPartition(mobility).freeSlot(localSlot);
     m_meshSlots.erase(entityId);
 }
 
 void SceneRenderData::setMeshMobility(ecs::Entity entityId, Mobility mobility)
 {
     ecs::Registry &registry = m_scene->getRegistry();
-    const MeshComponent *mesh = registry.tryRead<MeshComponent>(entityId);
+    const StaticMeshComponent *mesh = registry.tryRead<StaticMeshComponent>(entityId);
     if (mesh == nullptr || mesh->mobility == mobility) {
         return;
     }
@@ -162,7 +184,7 @@ void SceneRenderData::setMeshMobility(ecs::Entity entityId, Mobility mobility)
     // The slot is freed against the old mobility and reallocated against the new one, so the
     // component's mobility is only changed between the two.
     onMeshRemoved(entityId);
-    registry.write<MeshComponent>(entityId)->mobility = mobility;
+    registry.write<StaticMeshComponent>(entityId)->mobility = mobility;
     onMeshAdded(entityId);
 }
 
@@ -414,16 +436,32 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
         ecs::Entity entityId = partition.getEntityId(i);
 
         const TransformComponent *transform = registry.tryRead<TransformComponent>(entityId);
-        const MeshComponent *mesh = registry.tryRead<MeshComponent>(entityId);
-        if (transform == nullptr || mesh == nullptr || !mesh->mesh) {
+        if (transform == nullptr) {
+            return;
+        }
+
+        const Mesh *mesh = nullptr;
+        uint32_t boneOffset = UINT32_MAX;
+
+        if (const StaticMeshComponent *staticMesh = registry.tryRead<StaticMeshComponent>(entityId)) {
+            mesh = staticMesh->mesh.get();
+        } else if (const SkeletalMeshComponent *skeletal = registry.tryRead<SkeletalMeshComponent>(entityId)) {
+            mesh = skeletal->mesh.get();
+            if (skeletal->pose != nullptr) {
+                boneOffset = skeletal->pose->getBoneOffset();
+            }
+        }
+
+        if (mesh == nullptr) {
             return;
         }
 
         MeshGPUData &data = partition.getSlotData(i);
         data.modelMatrix = transform->world;
-        data.vertexBufferFlags = mesh->mesh->getVertexBuffer()->getBufferLayout().getFlags();
+        data.vertexBufferFlags = mesh->getVertexBuffer()->getBufferLayout().getFlags();
         data.entityId = entityId;
         data.materialIndex = 0;
+        data.boneOffset = boneOffset;
     };
 
     // a slot the partition moved needs repacking whether or not its entity changed
@@ -435,14 +473,14 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
     ecs::Registry &registry = m_scene->getRegistry();
 
     auto repackEntity = [&](ecs::Entity entityId) {
-        const MeshComponent *mesh = registry.tryRead<MeshComponent>(entityId);
+        Mobility mobility;
         uint32_t globalSlot = getMeshSlot(entityId);
-        if (mesh == nullptr || globalSlot == UINT32_MAX) {
+        if (!s_tryReadMeshMobility(registry, entityId, mobility) || globalSlot == UINT32_MAX) {
             return;
         }
 
-        auto &partition = m_meshes.getPartition(mesh->mobility);
-        uint32_t localSlot = m_meshes.getLocalSlot(mesh->mobility, globalSlot);
+        auto &partition = m_meshes.getPartition(mobility);
+        uint32_t localSlot = m_meshes.getLocalSlot(mobility, globalSlot);
         packMesh(partition, localSlot);
         partition.markDirty(frameIndex, localSlot);
     };

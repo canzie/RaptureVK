@@ -69,6 +69,15 @@ struct BufferAllocation {
     VkDeviceAddress getDeviceAddress() const;
 
     void uploadData(const void *data, VkDeviceSize size, VkDeviceSize offset = 0);
+
+    /**
+     * @brief Reads bytes back out of this allocation, blocking until the copy has finished
+     * @param data Destination for size bytes
+     * @param size Number of bytes to read
+     * @param offset Byte offset within this allocation to read from
+     */
+    void downloadData(void *data, VkDeviceSize size, VkDeviceSize offset = 0) const;
+
     void free();
 };
 

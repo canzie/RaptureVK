@@ -285,11 +285,6 @@ static void s_setPhysicsBody(Rapture::SceneObject *node, PhysicsBodyKind kind)
 void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        rowAssetPicker(t, "Mesh", m_meshPicker, {.types = {Rapture::ASSET_MESH}}, [this](Rapture::AssetHandle handle) {
-            if (m_node != nullptr) {
-                m_node->setMesh(handle);
-            }
-        });
         rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
                        [this](Rapture::AssetHandle handle) {
                            if (m_node != nullptr) {
@@ -333,12 +328,74 @@ void Mesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
         if (m_mobilityDropdown != nullptr) {
             m_mobilityDropdown->setText(Rapture::mobilityToString(m_node->mobility()));
         }
-        if (m_meshPicker.has_value()) {
-            m_meshPicker->setAsset(m_node->mesh());
-        }
         if (m_materialPicker.has_value()) {
             m_materialPicker->setAsset(m_node->material());
         }
+    }
+}
+
+void StaticMesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowAssetPicker(t, "Mesh", m_meshPicker, {.types = {Rapture::ASSET_STATIC_MESH}}, [this](Rapture::AssetHandle handle) {
+            if (m_node != nullptr) {
+                m_node->setMesh(handle);
+            }
+        });
+    });
+}
+
+void StaticMesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
+{
+    Rapture::StaticMesh3D *previous = m_node;
+    m_node = s_instanceAs<Rapture::StaticMesh3D>(m_scene, entity);
+    if (m_node == nullptr) {
+        return;
+    }
+
+    if (previous != m_node && m_meshPicker.has_value()) {
+        m_meshPicker->setAsset(m_node->mesh());
+    }
+}
+
+void SkeletalMesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowAssetPicker(t, "Mesh", m_meshPicker, {.types = {Rapture::ASSET_SKELETAL_MESH}}, [this](Rapture::AssetHandle handle) {
+            if (m_node != nullptr) {
+                m_node->setMesh(handle);
+            }
+        });
+        rowInstancePicker(t, "Pose", m_posePicker, Rapture::SkeletonPose::staticType(),
+                          [this](Rapture::SceneObject *instance) {
+                              if (m_node != nullptr) {
+                                  m_node->setPose(instance != nullptr ? instance->as<Rapture::SkeletonPose>() : nullptr);
+                              }
+                          });
+    });
+}
+
+void SkeletalMesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
+{
+    Rapture::SkeletalMesh3D *previous = m_node;
+    m_node = s_instanceAs<Rapture::SkeletalMesh3D>(m_scene, entity);
+    if (m_node == nullptr) {
+        return;
+    }
+
+    if (m_posePicker.has_value()) {
+        m_posePicker->setSubject(m_selection, m_scene);
+    }
+
+    if (previous == m_node) {
+        return;
+    }
+
+    if (m_meshPicker.has_value()) {
+        m_meshPicker->setAsset(m_node->mesh());
+    }
+    if (m_posePicker.has_value()) {
+        m_posePicker->setInstance(m_node->pose());
     }
 }
 

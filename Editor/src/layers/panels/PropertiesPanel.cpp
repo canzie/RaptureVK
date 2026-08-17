@@ -213,6 +213,8 @@ void PropertiesPanel::refresh()
 
         ensure<Node3DEditor>(instance->isA<Rapture::Node3D>());
         ensure<Mesh3DEditor>(mesh != nullptr);
+        ensure<StaticMesh3DEditor>(instance->isA<Rapture::StaticMesh3D>());
+        ensure<SkeletalMesh3DEditor>(instance->isA<Rapture::SkeletalMesh3D>());
         ensure<PhysicsEditor>(mesh != nullptr || instance->component<Rapture::PhysicsBody3D>() != nullptr);
         ensure<Light3DEditor>(instance->isA<Rapture::Light3D>());
         ensure<DirectionalLight3DEditor>(instance->isA<Rapture::DirectionalLight3D>());

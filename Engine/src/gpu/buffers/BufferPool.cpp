@@ -121,6 +121,88 @@ void BufferAllocation::uploadData(const void *data, VkDeviceSize size, VkDeviceS
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
 }
 
+void BufferAllocation::downloadData(void *data, VkDeviceSize size, VkDeviceSize offset) const
+{
+    if (!isValid() || data == nullptr) {
+        RP_CORE_ERROR("Invalid allocation or null destination");
+        return;
+    }
+
+    if (offset + size > sizeBytes) {
+        RP_CORE_ERROR("Download size {} + offset {} exceeds allocation size {}", size, offset, sizeBytes);
+        return;
+    }
+
+    VmaAllocator allocator = parentArena->vmaAllocator;
+    VkBuffer sourceBuffer = parentArena->buffer;
+    VkDeviceSize sourceOffset = offsetBytes + offset;
+
+    VkBufferCreateInfo stagingBufferInfo{};
+    stagingBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    stagingBufferInfo.size = size;
+    stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    stagingBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo stagingAllocInfo{};
+    stagingAllocInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+    stagingAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    VkBuffer stagingBuffer;
+    VmaAllocation stagingAllocation;
+    VmaAllocationInfo stagingInfo;
+
+    VkResult result =
+        vmaCreateBuffer(allocator, &stagingBufferInfo, &stagingAllocInfo, &stagingBuffer, &stagingAllocation, &stagingInfo);
+    if (result != VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create staging buffer");
+        return;
+    }
+
+    auto &app = Application::getInstance();
+    auto &vulkanContext = app.getVulkanContext();
+
+    CommandPoolConfig poolConfig;
+    poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
+    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
+
+    auto &rc = vulkanContext.getRenderContext();
+    auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
+    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
+    if (!commandPool) {
+        RP_CORE_ERROR("Failed to get command pool");
+        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+        return;
+    }
+
+    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    if (!commandBuffer) {
+        RP_CORE_ERROR("Failed to get command buffer");
+        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+        return;
+    }
+
+    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = sourceOffset;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+
+    vkCmdCopyBuffer(commandBuffer->getCommandBufferVk(), sourceBuffer, stagingBuffer, 1, &copyRegion);
+
+    commandBuffer->end();
+
+    auto graphicsQueue = vulkanContext.getGraphicsQueue();
+    graphicsQueue->submitQueue(commandBuffer);
+    graphicsQueue->waitIdle();
+
+    vmaInvalidateAllocation(allocator, stagingAllocation, 0, size);
+    std::memcpy(data, stagingInfo.pMappedData, size);
+
+    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+}
+
 void BufferAllocation::free()
 {
     if (isValid()) {

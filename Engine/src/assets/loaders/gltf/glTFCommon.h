@@ -38,6 +38,7 @@ struct glTF_SceneNode {
 
     AssetRef meshRef;           ///< Mesh asset reference (registered with AssetManager)
     int32_t materialIndex = -1; ///< glTF file material index (-1 if no material)
+    AssetHandle skeleton = INVALID_ASSET_HANDLE; ///< The skeleton the mesh is bound to, invalid when it is not skinned
 
     std::vector<std::unique_ptr<glTF_SceneNode>> children;
     glTF_SceneNode *parent = nullptr;
@@ -50,6 +51,7 @@ struct glTF_SceneNode {
  */
 struct glTF_LoadedSceneData {
     std::unordered_map<size_t, AssetRef> materials; ///< Keyed by glTF material index
+    std::unordered_map<size_t, AssetRef> skeletons; ///< Keyed by glTF skin index
 
     std::vector<std::unique_ptr<glTF_SceneNode>> rootNodes;
 

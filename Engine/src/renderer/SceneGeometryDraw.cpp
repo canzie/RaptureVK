@@ -11,6 +11,20 @@
 
 namespace Rapture {
 
+static void s_addMeshToBatch(MDIBatchMap &batchMap, Mesh &mesh, uint32_t meshSlotIndex, uint32_t materialIndex)
+{
+    auto vboAlloc = mesh.getVertexAllocation();
+    auto iboAlloc = mesh.getIndexAllocation();
+    if (!vboAlloc || !iboAlloc) {
+        return;
+    }
+
+    MDIBatch *batch = batchMap.obtainBatch(vboAlloc, iboAlloc, mesh.getVertexBuffer()->getBufferLayout(),
+                                           mesh.getIndexBuffer()->getIndexType());
+
+    batch->addObject(mesh, meshSlotIndex, materialIndex);
+}
+
 SceneGeometryDraw::SceneGeometryDraw(RenderContext renderContext, uint32_t framesInFlight) : m_rc(renderContext)
 {
     m_batchMaps.resize(framesInFlight);
@@ -39,7 +53,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
     auto &registry = scene.getRegistry();
     SceneRenderData *renderData = scene.getRenderData();
 
-    for (auto [entity, transform, meshComp, materialComp] : registry.read<TransformComponent, MeshComponent, MaterialComponent>()) {
+    for (auto [entity, transform, meshComp, materialComp] : registry.read<TransformComponent, StaticMeshComponent, MaterialComponent>()) {
         RAPTURE_PROFILE_SCOPE("Populate Batch");
 
         if (!meshComp.mesh || meshComp.isLoading) {
@@ -52,25 +66,40 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
         }
 
         // a bounding box derived from the transform is a cache, not a change to the mesh
-        registry.write<MeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
+        registry.write<StaticMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
 
         if (frustum != nullptr && frustum->testBoundingBox(meshComp.worldBoundingBox) == FrustumResult::Outside) {
             continue;
         }
 
-        auto vboAlloc = mesh->getVertexAllocation();
-        auto iboAlloc = mesh->getIndexAllocation();
-        if (!vboAlloc || !iboAlloc) {
+        uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
+
+        s_addMeshToBatch(batchMap, *mesh, renderData->getMeshSlot(entity), materialIndex);
+    }
+
+    for (auto [entity, transform, meshComp, materialComp] :
+         registry.read<TransformComponent, SkeletalMeshComponent, MaterialComponent>()) {
+        RAPTURE_PROFILE_SCOPE("Populate Batch");
+
+        if (!meshComp.mesh || meshComp.isLoading) {
             continue;
         }
 
-        MDIBatch *batch = batchMap.obtainBatch(vboAlloc, iboAlloc, mesh->getVertexBuffer()->getBufferLayout(),
-                                               mesh->getIndexBuffer()->getIndexType());
+        auto mesh = meshComp.mesh;
+        if (!mesh->getVertexBuffer() || !mesh->getIndexBuffer()) {
+            continue;
+        }
 
-        uint32_t meshSlotIndex = renderData->getMeshSlot(entity);
+        // TODO: bind pose bounds, so an animated mesh whose joints leave them culls too early
+        registry.write<SkeletalMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
+
+        if (frustum != nullptr && frustum->testBoundingBox(meshComp.worldBoundingBox) == FrustumResult::Outside) {
+            continue;
+        }
+
         uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
 
-        batch->addObject(*mesh, meshSlotIndex, materialIndex);
+        s_addMeshToBatch(batchMap, *mesh, renderData->getMeshSlot(entity), materialIndex);
     }
 
     for (const auto &[batchKey, batch] : batchMap.getBatches()) {

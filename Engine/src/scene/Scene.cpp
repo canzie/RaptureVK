@@ -15,6 +15,7 @@
 #include "renderer/shadows/ShadowMapping.h"
 #include "scene/instances/SceneObject.h"
 #include "scene/instances/InstanceRegistry.h"
+#include "scene/SceneLoadContext.h"
 
 #include "assets/asset_manager/AssetManager.h"
 #include "assets/asset_manager/ReservedAssets.h"
@@ -78,7 +79,7 @@ ecs::EntityAccessor Scene::createCube(const std::string &name, Mobility mobility
     ecs::EntityAccessor entity(m_registry.create(), &m_registry);
     entity.add<TagComponent>(name);
     entity.add<TransformComponent>();
-    entity.add<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_CUBE_MESH), mobility);
+    entity.add<StaticMeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_CUBE_MESH), mobility);
 
     auto materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE);
     if (materialRef) {
@@ -118,7 +119,7 @@ ecs::EntityAccessor Scene::createSphere(const std::string &name, Mobility mobili
     ecs::EntityAccessor entity(m_registry.create(), &m_registry);
     entity.add<TagComponent>(name);
     entity.add<TransformComponent>();
-    entity.add<MeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_SPHERE_MESH), mobility);
+    entity.add<StaticMeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_SPHERE_MESH), mobility);
 
     auto materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE);
     if (materialRef) {
@@ -166,7 +167,7 @@ void Scene::onUpdate(float dt)
 
     {
         RAPTURE_PROFILE_SCOPE("OldPerEntity::updateMeshes");
-        for (auto [entity, material] : m_registry.read<MaterialComponent>().with<TransformComponent, MeshComponent>()) {
+        for (auto [entity, material] : m_registry.read<MaterialComponent>().with<TransformComponent, StaticMeshComponent>()) {
             if (!material.material) {
                 continue;
             }
@@ -394,14 +395,18 @@ std::unique_ptr<Scene> Scene::deserialize(ReadNode node)
     // the constructor seeds a default environment, which the document supplies again
     scene->clearInstances();
 
-    std::vector<SceneObject *> order;
+    // the instances are the ones the document was written from, so they keep the ids it gave them
+    SceneLoadContext context(false);
+
     ReadNode instances = node.child(KEY_INSTANCES);
     for (size_t i = 0; i < instances.size(); i++) {
-        if (!SceneObject::loadSubtree(*scene->m_root, instances.at(i), order)) {
+        if (SceneObject::loadSubtree(*scene->m_root, instances.at(i), context) == nullptr) {
             RP_CORE_ERROR("scene '{}' could not be read", scene->m_config.sceneName);
             return nullptr;
         }
     }
+
+    context.finish();
 
     return scene;
 }
@@ -416,7 +421,8 @@ static void s_mapInstancesById(const SceneObject &parent, std::unordered_map<Ins
 
 // Pre-order, so an instance is under its snapshot parent before its own children come looking for it.
 // Everything the snapshot names leaves the map, so what stays behind is what the scene gained since.
-static bool s_restoreSubtree(SceneObject &parent, ReadNode instances, std::unordered_map<InstanceId, SceneObject *> &live)
+static bool s_restoreSubtree(SceneObject &parent, ReadNode instances, std::unordered_map<InstanceId, SceneObject *> &live,
+                             SceneLoadContext &context)
 {
     for (size_t i = 0; i < instances.size(); i++) {
         ReadNode node = instances.at(i);
@@ -444,8 +450,9 @@ static bool s_restoreSubtree(SceneObject &parent, ReadNode instances, std::unord
         }
 
         instance->deserialize(node);
+        context.addInstance(header.id, instance);
 
-        if (!s_restoreSubtree(*instance, header.children, live)) {
+        if (!s_restoreSubtree(*instance, header.children, live, context)) {
             return false;
         }
     }
@@ -491,13 +498,19 @@ bool Scene::restoreFrom(ReadNode node)
     std::unordered_map<InstanceId, SceneObject *> live;
     s_mapInstancesById(*m_root, live);
 
-    if (!s_restoreSubtree(*m_root, node.child(KEY_INSTANCES), live)) {
+    // an instance the snapshot holds keeps the id it was written under, restored or reused alike
+    SceneLoadContext context(false);
+
+    if (!s_restoreSubtree(*m_root, node.child(KEY_INSTANCES), live, context)) {
         return false;
     }
 
     if (!live.empty()) {
         s_destroyInstancesNotInSnapshot(*m_root, live);
     }
+
+    // after the drop, so a reference the snapshot no longer holds is not resolved and then emptied
+    context.finish();
 
     onHierarchyChanged.fire();
     return true;
@@ -509,7 +522,7 @@ void Scene::registerBLAS(ecs::Entity entity)
         m_tlas = std::make_unique<TLAS>();
     }
 
-    const MeshComponent *mesh = m_registry.tryRead<MeshComponent>(entity);
+    const StaticMeshComponent *mesh = m_registry.tryRead<StaticMeshComponent>(entity);
     const TransformComponent *transform = m_registry.tryRead<TransformComponent>(entity);
     if (!m_registry.has<RayTracedComponent>(entity) || mesh == nullptr || transform == nullptr || !mesh->mesh) {
         RP_CORE_ERROR("Entity cannot be ray traced");

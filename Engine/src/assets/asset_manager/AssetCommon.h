@@ -29,8 +29,10 @@ enum AssetType {
     ASSET_SHADER,
     ASSET_MATERIAL,
     ASSET_MATERIAL_INSTANCE,
-    ASSET_MESH,
+    ASSET_STATIC_MESH,
+    ASSET_SKELETAL_MESH,
     ASSET_SCENE_OBJECT,
+    ASSET_SKELETON,
     ASSET_ANIMATION,
     ASSET_AUDIO,
     ASSET_VIDEO,
@@ -85,8 +87,10 @@ inline constexpr AssetTypeCode ASSET_TYPE_CODES[] = {
     {ASSET_SHADER, Asset_fourCC("SHDR")},
     {ASSET_MATERIAL, Asset_fourCC("MTL ")},
     {ASSET_MATERIAL_INSTANCE, Asset_fourCC("MTLI")},
-    {ASSET_MESH, Asset_fourCC("MESH")},
+    {ASSET_STATIC_MESH, Asset_fourCC("MESH")},
+    {ASSET_SKELETAL_MESH, Asset_fourCC("SKMH")},
     {ASSET_SCENE_OBJECT, Asset_fourCC("SOBJ")},
+    {ASSET_SKELETON, Asset_fourCC("SKEL")},
     {ASSET_ANIMATION, Asset_fourCC("ANIM")},
     {ASSET_AUDIO, Asset_fourCC("AUD ")},
     {ASSET_VIDEO, Asset_fourCC("VID ")},
@@ -138,10 +142,14 @@ inline std::string AssetTypeToString(AssetType type)
         return "Material";
     case ASSET_MATERIAL_INSTANCE:
         return "Material Instance";
-    case ASSET_MESH:
-        return "Mesh";
+    case ASSET_STATIC_MESH:
+        return "Static Mesh";
+    case ASSET_SKELETAL_MESH:
+        return "Skeletal Mesh";
     case ASSET_SCENE_OBJECT:
         return "Scene Object";
+    case ASSET_SKELETON:
+        return "Skeleton";
     case ASSET_ANIMATION:
         return "Animation";
     case ASSET_AUDIO:

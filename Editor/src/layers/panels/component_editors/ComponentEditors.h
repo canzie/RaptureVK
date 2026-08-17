@@ -12,6 +12,8 @@
 #include "scene/instances/DirectionalLight3D.h"
 #include "scene/instances/Environment.h"
 #include "scene/instances/Mesh3D.h"
+#include "scene/instances/SkeletalMesh3D.h"
+#include "scene/instances/StaticMesh3D.h"
 #include "scene/instances/PointLight3D.h"
 #include "scene/instances/RigidBody3D.h"
 #include "scene/instances/SpotLight3D.h"
@@ -122,9 +124,33 @@ class Mesh3DEditor : public ComponentEditorBase {
     bool m_isVisible = true;
     bool m_isRayTraced = false;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
-    std::optional<AssetPicker> m_meshPicker;
     std::optional<AssetPicker> m_materialPicker;
     Rapture::Mesh3D *m_node = nullptr;
+};
+
+class StaticMesh3DEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Static Mesh"; }
+    const char *icon() const override { return Icons::SVG_MESH; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
+
+  private:
+    std::optional<AssetPicker> m_meshPicker;
+    Rapture::StaticMesh3D *m_node = nullptr;
+};
+
+class SkeletalMesh3DEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Skeletal Mesh"; }
+    const char *icon() const override { return Icons::SVG_MESH; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
+
+  private:
+    std::optional<AssetPicker> m_meshPicker;
+    std::optional<InstancePicker> m_posePicker;
+    Rapture::SkeletalMesh3D *m_node = nullptr;
 };
 
 /**

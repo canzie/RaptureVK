@@ -40,6 +40,7 @@ class PropertiesPanel : public Panel {
     void ensure(bool present)
     {
         if (T *editor = m_sections->ensure<T>(present)) {
+            editor->setSelection(m_selection);
             editor->setSubject(m_scene, m_selectedEntity);
         }
     }

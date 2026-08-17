@@ -52,7 +52,7 @@ void RtInstanceData::rebuild(Scene &scene)
     ecs::Registry &reg = scene.getRegistry();
 
     auto isDrawable = [&reg](ecs::Entity entity) {
-        return reg.hasAll<MaterialComponent, MeshComponent, TransformComponent>(entity);
+        return reg.hasAll<MaterialComponent, StaticMeshComponent, TransformComponent>(entity);
     };
 
     std::vector<RtInstanceInfo> infos(tlas->getInstanceCount());
@@ -64,7 +64,7 @@ void RtInstanceData::rebuild(Scene &scene)
         info = {};
 
         if (isDrawable(inst.entityID)) {
-            const MeshComponent &meshComp = reg.read<MeshComponent>(inst.entityID);
+            const StaticMeshComponent &meshComp = reg.read<StaticMeshComponent>(inst.entityID);
             const MaterialComponent &materialComp = reg.read<MaterialComponent>(inst.entityID);
 
             info.modelMatrix = reg.read<TransformComponent>(inst.entityID).world;

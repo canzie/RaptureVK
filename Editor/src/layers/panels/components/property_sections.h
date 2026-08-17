@@ -7,6 +7,7 @@
 
 #include "layers/panels/components/asset_picker.h"
 #include "layers/panels/components/color_field.h"
+#include "layers/panels/components/instance_picker.h"
 
 #include <concepts>
 #include <functional>
@@ -128,6 +129,17 @@ class PropertySection {
      */
     void rowAssetPicker(Amethyst::TableScope &t, std::string_view label, std::optional<AssetPicker> &out, AssetPickerConfig config,
                         const std::function<void(Rapture::AssetHandle)> &onSelected);
+
+    /**
+     * @brief Adds a row holding a scene object field.
+     * @param t Scope of the table the row is added to.
+     * @param label Text shown in the row's label column.
+     * @param out Receives the field, so the subject it shows can be updated.
+     * @param type The class the field accepts.
+     * @param onSelected Called with the picked object, nullptr when the field is emptied.
+     */
+    void rowInstancePicker(Amethyst::TableScope &t, std::string_view label, std::optional<InstancePicker> &out,
+                           const Rapture::TypeInfo &type, const std::function<void(Rapture::SceneObject *)> &onSelected);
 
     /**
      * @brief Adds a row holding a dropdown.

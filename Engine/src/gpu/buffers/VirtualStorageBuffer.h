@@ -80,6 +80,12 @@ class VirtualStorageBuffer {
 
     VkDeviceSize getCapacity() const { return m_capacity; }
 
+    /**
+     * @brief The slot this buffer was bound at
+     * @return The index, or UINT32_MAX if it failed to bind
+     */
+    uint32_t getDescriptorIndex() const { return m_descriptorIndex; }
+
   private:
     std::unique_ptr<StorageBuffer> m_buffer;
     VmaVirtualBlock m_block = VK_NULL_HANDLE;

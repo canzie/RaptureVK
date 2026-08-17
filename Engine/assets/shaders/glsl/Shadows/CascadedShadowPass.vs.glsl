@@ -26,6 +26,7 @@ struct MeshGPUData {
     uint materialIndex;
     uint flags;
     uint entityId;
+    uint boneOffset;
 };
 
 layout(set = 2, binding = 0) readonly buffer MeshDataSSBO {

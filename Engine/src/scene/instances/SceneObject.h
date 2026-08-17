@@ -39,6 +39,7 @@ class SceneObject : public Instance {
         auto child = std::make_unique<T>(*scene(), name);
         T *raw = child.get();
         addChild(std::move(child));
+        raw->ready();
         return raw;
     }
 
@@ -123,6 +124,7 @@ class SceneObject : public Instance {
         auto created = std::make_unique<T>(*scene(), T::staticType().name);
         T *raw = created.get();
         attachComponent(std::move(created));
+        raw->ready();
         return raw;
     }
 
@@ -199,10 +201,10 @@ class SceneObject : public Instance {
      * @brief Creates the scene object a document names, parents it and reads its subtree
      * @param parent The object the new object is added to
      * @param node Cursor to the object's object
-     * @param order Receives every object created, in the order serialize wrote them
-     * @return True if the whole subtree was read
+     * @param context The read this object and its subtree belong to
+     * @return The object read, or nullptr if any of its subtree could not be read
      */
-    static bool loadSubtree(SceneObject &parent, ReadNode node, std::vector<SceneObject *> &order);
+    static SceneObject *loadSubtree(SceneObject &parent, ReadNode node, SceneLoadContext &context);
 
     /**
      * @brief Reads a subtree into a scene as its own objects rather than as the ones it was written from
@@ -236,10 +238,10 @@ class SceneObject : public Instance {
     /**
      * @brief Reads this object's components and children out of a document
      * @param header The header the fields were read from
-     * @param order Receives every object created below this one
+     * @param context The read this object belongs to
      * @return True if everything below this object was read
      */
-    bool loadContents(const DocumentHeader &header, std::vector<SceneObject *> &order);
+    bool loadContents(const DocumentHeader &header, SceneLoadContext &context);
 
   protected:
     ecs::EntityAccessor m_entity;

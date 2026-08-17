@@ -22,6 +22,8 @@
 #include "scene/cameras/PerspectiveCamera.h"
 #include "assets/materials/MaterialInstance.h"
 #include "assets/meshes/Mesh.h"
+#include "assets/meshes/SkeletalMesh.h"
+#include "assets/skeletons/Skeleton.h"
 
 #include "assets/asset_manager/AssetManager.h"
 #include "scene/components/ChangeChannels.h"
@@ -34,6 +36,8 @@
 #include <unordered_map>
 
 namespace Rapture {
+
+class SkeletonInstance;
 
 struct TagComponent {
     std::string tag;
@@ -120,24 +124,24 @@ struct MaterialComponent {
     MaterialComponent(AssetRef ref) : material(std::move(ref)) {}
 };
 
-struct MeshComponent {
+struct StaticMeshComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MESH_BINDING);
 
-    AssetPtr<Mesh> mesh;
+    AssetPtr<StaticMesh> mesh;
     bool isLoading = true;
     Mobility mobility = MOBILITY_STATIC;
     bool isEnabled = true;
     BoundingBox worldBoundingBox;
 
-    MeshComponent() = default;
+    StaticMeshComponent() = default;
 
-    MeshComponent(AssetRef ref, Mobility mob = MOBILITY_STATIC) : mesh(std::move(ref)), mobility(mob) { isLoading = false; }
+    StaticMeshComponent(AssetRef ref, Mobility mob = MOBILITY_STATIC) : mesh(std::move(ref)), mobility(mob) { isLoading = false; }
 
     /**
      * @brief Replaces the mesh, invalidating the world bounding box the old one produced
      * @param ref Reference to the new mesh
      */
-    void setMesh(AssetRef ref) { mesh = AssetPtr<Mesh>(std::move(ref)); }
+    void setMesh(AssetRef ref) { mesh = AssetPtr<StaticMesh>(std::move(ref)); }
 
     /**
      * @brief Recomputes the world bounding box from the mesh's bounds
@@ -150,6 +154,45 @@ struct MeshComponent {
         }
         worldBoundingBox = BoundingBox(mesh->getBoundsMin(), mesh->getBoundsMax()).transform(transform.world);
     }
+};
+
+struct SkeletalMeshComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MESH_BINDING);
+
+    AssetPtr<SkeletalMesh> mesh;
+    SkeletonInstance *pose = nullptr;
+    bool isLoading = true;
+    bool isEnabled = true;
+    BoundingBox worldBoundingBox;
+
+    SkeletalMeshComponent() = default;
+
+    SkeletalMeshComponent(AssetRef ref) : mesh(std::move(ref)) { isLoading = false; }
+
+    /**
+     * @brief Replaces the mesh, invalidating the world bounding box the old one produced
+     * @param ref Reference to the new mesh
+     */
+    void setMesh(AssetRef ref) { mesh = AssetPtr<SkeletalMesh>(std::move(ref)); }
+
+    /**
+     * @brief Recomputes the world bounding box from the mesh's bounds
+     * @param transform The transform placing this mesh in the world
+     */
+    void updateWorldBoundingBox(const TransformComponent &transform)
+    {
+        if (!mesh) {
+            return;
+        }
+        worldBoundingBox = BoundingBox(mesh->getBoundsMin(), mesh->getBoundsMax()).transform(transform.world);
+    }
+};
+
+struct SkeletonPoseComponent {
+    static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_SKELETON_POSE);
+
+    AssetPtr<Skeleton> skeleton;
+    SkeletonInstance *instance = nullptr;
 };
 
 struct LightComponent {

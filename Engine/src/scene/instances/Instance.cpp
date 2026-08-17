@@ -57,6 +57,30 @@ void Instance::onUpdate(float dt)
     (void)dt;
 }
 
+void Instance::link(const SceneLoadContext &context)
+{
+    onLink(context);
+}
+
+void Instance::ready()
+{
+    if (m_isReady) {
+        return;
+    }
+
+    m_isReady = true;
+    onReady();
+}
+
+void Instance::onLink(const SceneLoadContext &context)
+{
+    (void)context;
+}
+
+void Instance::onReady()
+{
+}
+
 void Instance::remintId()
 {
     m_id = UUIDGenerator::Generate();

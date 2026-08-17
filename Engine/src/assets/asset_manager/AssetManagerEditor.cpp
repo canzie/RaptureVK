@@ -40,7 +40,10 @@ static uint64_t s_hashPath(const std::filesystem::path &path)
 
 static uint64_t s_assetSizeHint(const Asset &asset)
 {
-    if (const Mesh *mesh = asset.getUnderlyingAsset<Mesh>()) {
+    if (const StaticMesh *mesh = asset.getUnderlyingAsset<StaticMesh>()) {
+        return mesh->getSizeBytes();
+    }
+    if (const SkeletalMesh *mesh = asset.getUnderlyingAsset<SkeletalMesh>()) {
         return mesh->getSizeBytes();
     }
     if (const Texture *texture = asset.getUnderlyingAsset<Texture>()) {
@@ -83,6 +86,21 @@ static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &
             return world->serialize();
         }
         break;
+    case ASSET_SKELETON:
+        if (Skeleton *skeleton = asset.getUnderlyingAsset<Skeleton>()) {
+            return skeleton->serialize();
+        }
+        break;
+    case ASSET_STATIC_MESH:
+        if (StaticMesh *mesh = asset.getUnderlyingAsset<StaticMesh>()) {
+            return mesh->serialize();
+        }
+        break;
+    case ASSET_SKELETAL_MESH:
+        if (SkeletalMesh *mesh = asset.getUnderlyingAsset<SkeletalMesh>()) {
+            return mesh->serialize();
+        }
+        break;
     default:
         break;
     }
@@ -98,8 +116,14 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
             return true;
         }
         break;
-    case ASSET_MESH:
-        if (auto mesh = Mesh::deserialize(payload)) {
+    case ASSET_STATIC_MESH:
+        if (auto mesh = StaticMesh::deserialize(payload)) {
+            asset.setAssetVariant(std::move(mesh));
+            return true;
+        }
+        break;
+    case ASSET_SKELETAL_MESH:
+        if (auto mesh = SkeletalMesh::deserialize(payload)) {
             asset.setAssetVariant(std::move(mesh));
             return true;
         }
@@ -131,6 +155,12 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
             return true;
         }
         break;
+    case ASSET_SKELETON:
+        if (auto skeleton = Skeleton::deserialize(payload)) {
+            asset.setAssetVariant(std::move(skeleton));
+            return true;
+        }
+        break;
     default:
         break;
     }
@@ -139,11 +169,17 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
 
 static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<uint8_t> &payload, AssetType &type)
 {
-    if (auto *meshData = std::get_if<MeshImportData>(&data)) {
-        // The Mesh keeps only GPU buffers, so serialize the source data before it builds
-        payload = meshData->params.serialize();
-        type = ASSET_MESH;
-        return std::make_unique<Mesh>(meshData->params);
+    if (auto *meshData = std::get_if<StaticMeshImportData>(&data)) {
+        // the source bytes are already in hand here, so this skips the readback serialize does
+        payload = StaticMesh::serializeParams(meshData->params);
+        type = ASSET_STATIC_MESH;
+        return std::make_unique<StaticMesh>(meshData->params);
+    }
+    if (auto *skeletalData = std::get_if<SkeletalMeshImportData>(&data)) {
+        payload = SkeletalMesh::serializeParams(skeletalData->params, skeletalData->skeleton, skeletalData->inverseBindMatrices);
+        type = ASSET_SKELETAL_MESH;
+        return std::make_unique<SkeletalMesh>(skeletalData->params, skeletalData->skeleton,
+                                              std::move(skeletalData->inverseBindMatrices));
     }
     if (auto *sceneObjectData = std::get_if<SceneObjectImportData>(&data)) {
         std::string text = sceneObjectData->document->toText();
@@ -165,6 +201,11 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
         payload = worldData->world->serialize();
         type = ASSET_WORLD;
         return std::move(worldData->world);
+    }
+    if (auto *skeletonData = std::get_if<SkeletonImportData>(&data)) {
+        payload = skeletonData->skeleton->serialize();
+        type = ASSET_SKELETON;
+        return std::move(skeletonData->skeleton);
     }
 
     type = ASSET_NONE;
@@ -570,11 +611,14 @@ bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
 
 void AssetManagerEditor::registerBuiltinAssets()
 {
-    registerReservedAsset(RE_PRIMITIVE_CUBE_MESH, std::make_unique<Mesh>(Primitives::CreateCube()), "<cube>", ASSET_MESH);
-    registerReservedAsset(RE_PRIMITIVE_SPHERE_MESH,
-                          std::make_unique<Mesh>(Primitives::CreateSphere(PRIMITIVE_SPHERE_RADIUS, PRIMITIVE_SPHERE_SEGMENTS)),
-                          "<sphere>", ASSET_MESH);
-    registerReservedAsset(RE_PRIMITIVE_PLANE_MESH, std::make_unique<Mesh>(Primitives::CreatePlane()), "<plane>", ASSET_MESH);
+    registerReservedAsset(RE_PRIMITIVE_CUBE_MESH, std::make_unique<StaticMesh>(Primitives::CreateCube()), "<cube>",
+                          ASSET_STATIC_MESH);
+    registerReservedAsset(
+        RE_PRIMITIVE_SPHERE_MESH,
+        std::make_unique<StaticMesh>(Primitives::CreateSphere(PRIMITIVE_SPHERE_RADIUS, PRIMITIVE_SPHERE_SEGMENTS)), "<sphere>",
+        ASSET_STATIC_MESH);
+    registerReservedAsset(RE_PRIMITIVE_PLANE_MESH, std::make_unique<StaticMesh>(Primitives::CreatePlane()), "<plane>",
+                          ASSET_STATIC_MESH);
 
     importDefaultAsset(ASSET_TEXTURE);
     importDefaultAsset(ASSET_MATERIAL_INSTANCE);

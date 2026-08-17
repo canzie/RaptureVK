@@ -157,10 +157,21 @@ void MDIBatchMap::beginFrame()
     }
 }
 
+size_t MDIBatchKeyHash::operator()(const MDIBatchKey &key) const
+{
+    size_t hash = key.layoutHash;
+    for (uint64_t part : {static_cast<uint64_t>(key.vertexArenaId), static_cast<uint64_t>(key.indexArenaId),
+                          static_cast<uint64_t>(key.indexType)}) {
+        hash ^= std::hash<uint64_t>()(part) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    }
+    return hash;
+}
+
 MDIBatch *MDIBatchMap::obtainBatch(std::shared_ptr<BufferAllocation> vboArena, std::shared_ptr<BufferAllocation> iboArena,
                                    BufferLayout &bufferLayout, VkIndexType indexType)
 {
-    uint64_t key = ((uint64_t)vboArena->parentArena->id << 32) | iboArena->parentArena->id;
+    MDIBatchKey key{vboArena->parentArena->id, iboArena->parentArena->id, bufferLayout.hash(),
+                    static_cast<uint32_t>(indexType)};
     auto it = m_batches.find(key);
     if (it != m_batches.end()) {
         return it->second.get();

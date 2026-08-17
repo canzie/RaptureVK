@@ -1,7 +1,8 @@
 #include "Mesh.h"
+
+#include "app/Application.h"
 #include "gpu/acceleration_structures/BLAS.h"
 #include "gpu/buffers/BufferPool.h"
-#include "app/Application.h"
 
 #include "core/utils/Log.h"
 
@@ -9,21 +10,10 @@
 
 namespace Rapture {
 
-static constexpr uint32_t MESH_BLOB_MAGIC = 0x484D5052; // "RPMH", identifies the blob as a mesh
-
-// Version packs major in the high 16 bits and minor in the low 16. A backward-compatible change
-// (consuming reserved header space) bumps minor, a breaking change (header grows, fields reorder)
-// bumps major. Readers reject a different major and warn on a different minor.
-static constexpr uint16_t MESH_BLOB_VERSION_MAJOR = 2;
-static constexpr uint16_t MESH_BLOB_VERSION_MINOR = 0;
-static constexpr uint32_t MESH_BLOB_VERSION = (static_cast<uint32_t>(MESH_BLOB_VERSION_MAJOR) << 16) | MESH_BLOB_VERSION_MINOR;
-
 // Fixed 128-byte directory at the start of every mesh blob. The reserved tail absorbs new fields
 // without moving the data, and the section offsets let readers jump straight to the bytes. When the
 // reserved space runs out, grow the header and bump the major version.
 struct MeshBlobHeader {
-    uint32_t magic = MESH_BLOB_MAGIC;
-    uint32_t version = MESH_BLOB_VERSION;
     uint32_t vertexDataSize = 0;
     uint32_t indexDataSize = 0;
     uint32_t indexCount = 0;
@@ -38,11 +28,10 @@ struct MeshBlobHeader {
     uint32_t indexDataOffset = 0;  // byte offset of the index bytes
     float boundsMin[3] = {};
     float boundsMax[3] = {};
-    uint32_t reserved[12] = {}; // pad to 128 bytes, consume for backward-compatible additions
+    uint32_t reserved[14] = {}; // pad to 128 bytes, consume for backward-compatible additions
 };
 
-static_assert(sizeof(MeshBlobHeader) == 128,
-              "mesh blob header is a fixed 128-byte directory, bump to 256 and the major version if it must grow");
+static_assert(sizeof(MeshBlobHeader) == 128, "mesh blob header is a fixed 128-byte directory, bump to 256 if it must grow");
 
 // std::unique_ptr<DescriptorSubAllocationBase<Buffer>> Mesh::s_bindlessMeshDataAllocation = nullptr;
 
@@ -139,6 +128,32 @@ void Mesh::setMeshData(MeshAllocatorParams &params)
     }
 }
 
+std::vector<uint8_t> Mesh::serializeGeometry() const
+{
+    if (!m_vertexAllocation || !m_indexAllocation || !m_vertexBuffer || !m_indexBuffer) {
+        RP_CORE_ERROR("mesh holds no geometry to read back");
+        return {};
+    }
+
+    std::vector<uint8_t> vertexBytes(m_vertexAllocation->sizeBytes);
+    std::vector<uint8_t> indexBytes(m_indexAllocation->sizeBytes);
+    m_vertexAllocation->downloadData(vertexBytes.data(), vertexBytes.size());
+    m_indexAllocation->downloadData(indexBytes.data(), indexBytes.size());
+
+    MeshAllocatorParams params;
+    params.vertexData = vertexBytes.data();
+    params.vertexDataSize = static_cast<uint32_t>(vertexBytes.size());
+    params.indexData = indexBytes.data();
+    params.indexDataSize = static_cast<uint32_t>(indexBytes.size());
+    params.indexCount = m_indexCount;
+    params.indexType = m_indexBuffer->getIndexType();
+    params.boundsMin = m_boundsMin;
+    params.boundsMax = m_boundsMax;
+    params.bufferLayout = m_vertexBuffer->getBufferLayout();
+
+    return params.serialize();
+}
+
 std::vector<uint8_t> MeshAllocatorParams::serialize() const
 {
     uint32_t attribBytes = 0;
@@ -190,37 +205,22 @@ std::vector<uint8_t> MeshAllocatorParams::serialize() const
     return blob;
 }
 
-std::unique_ptr<Mesh> Mesh::deserialize(std::span<const uint8_t> blob)
+bool MeshAllocatorParams::deserialize(std::span<const uint8_t> blob, MeshAllocatorParams &params)
 {
     if (blob.size() < sizeof(MeshBlobHeader)) {
         RP_CORE_ERROR("Mesh blob is smaller than its header");
-        return nullptr;
+        return false;
     }
 
     MeshBlobHeader header;
     std::memcpy(&header, blob.data(), sizeof(MeshBlobHeader));
 
-    if (header.magic != MESH_BLOB_MAGIC) {
-        RP_CORE_ERROR("Mesh blob has an invalid magic");
-        return nullptr;
-    }
-
-    uint16_t major = static_cast<uint16_t>(header.version >> 16);
-    if (major != MESH_BLOB_VERSION_MAJOR) {
-        RP_CORE_ERROR("Mesh blob major version {} is incompatible with {}", major, MESH_BLOB_VERSION_MAJOR);
-        return nullptr;
-    }
-    if (header.version != MESH_BLOB_VERSION) {
-        RP_CORE_WARN("Mesh blob minor version differs from {}, reading the known header fields", MESH_BLOB_VERSION_MINOR);
-    }
-
     if (header.vertexDataOffset + header.vertexDataSize > blob.size() ||
         header.indexDataOffset + header.indexDataSize > blob.size()) {
         RP_CORE_ERROR("Mesh blob data sections are out of range");
-        return nullptr;
+        return false;
     }
 
-    MeshAllocatorParams params;
     params.vertexDataSize = header.vertexDataSize;
     params.indexDataSize = header.indexDataSize;
     params.indexCount = header.indexCount;
@@ -249,11 +249,11 @@ std::unique_ptr<Mesh> Mesh::deserialize(std::span<const uint8_t> blob)
         BufferAttribute attrib;
         if (!readU32(name) || !readU32(attrib.componentType) || !readU32(attrib.offset) || !readU32(typeLen)) {
             RP_CORE_ERROR("Mesh blob attribute table is truncated");
-            return nullptr;
+            return false;
         }
         if (offset + typeLen > blob.size()) {
             RP_CORE_ERROR("Mesh blob attribute type is truncated");
-            return nullptr;
+            return false;
         }
         attrib.name = static_cast<BufferAttributeID>(name);
         attrib.type = std::string(reinterpret_cast<const char *>(blob.data() + offset), typeLen);
@@ -261,15 +261,10 @@ std::unique_ptr<Mesh> Mesh::deserialize(std::span<const uint8_t> blob)
         params.bufferLayout.buffer_attribs.push_back(std::move(attrib));
     }
 
-    std::vector<uint8_t> vertexStorage(blob.begin() + header.vertexDataOffset,
-                                       blob.begin() + header.vertexDataOffset + header.vertexDataSize);
-    std::vector<uint8_t> indexStorage(blob.begin() + header.indexDataOffset,
-                                      blob.begin() + header.indexDataOffset + header.indexDataSize);
+    params.vertexData = const_cast<uint8_t *>(blob.data() + header.vertexDataOffset);
+    params.indexData = const_cast<uint8_t *>(blob.data() + header.indexDataOffset);
 
-    params.vertexData = vertexStorage.data();
-    params.indexData = indexStorage.data();
-
-    return std::make_unique<Mesh>(params);
+    return true;
 }
 
 } // namespace Rapture

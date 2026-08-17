@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Mesh.h"
+#include "StaticMesh.h"
 
 #include <cstdint>
 #include <memory>
@@ -16,10 +16,10 @@ namespace Rapture {
 
 class Primitives {
   public:
-    static Mesh CreateCube();
-    static Mesh CreateSphere(float radius, uint32_t segments);
-    static Mesh CreatePlane(float segments = 1);
-    static Mesh CreateLine(float start, float end);
+    static StaticMesh CreateCube();
+    static StaticMesh CreateSphere(float radius, uint32_t segments);
+    static StaticMesh CreatePlane(float segments = 1);
+    static StaticMesh CreateLine(float start, float end);
 
   private:
 };

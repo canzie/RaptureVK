@@ -21,6 +21,7 @@ layout(push_constant) uniform PushConstants {
     uint cameraSSBOIndex;
     uint cameraSlotIndex;
     uint meshSSBOIndex;
+    uint skeletonSSBOIndex;
 } pc;
 
 void main() {

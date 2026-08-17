@@ -34,8 +34,14 @@ struct TextureImportConfig {
 
 using AssetImportConfigVariant = std::variant<std::monostate, ShaderImportConfig, TextureImportConfig>;
 
-struct MeshImportData {
+struct StaticMeshImportData {
     MeshAllocatorParams params;
+};
+
+struct SkeletalMeshImportData {
+    MeshAllocatorParams params;
+    AssetHandle skeleton = INVALID_ASSET_HANDLE;
+    std::vector<glm::mat4> inverseBindMatrices;
 };
 
 struct SceneObjectImportData {
@@ -59,8 +65,15 @@ struct WorldImportData {
     std::unique_ptr<World> world;
 };
 
-using AssetImportDataVariant = std::variant<std::monostate, MeshImportData, SceneObjectImportData, BaseMaterialImportData,
-                                            MaterialInstanceImportData, WorldImportData>;
+class Skeleton;
+
+struct SkeletonImportData {
+    std::unique_ptr<Skeleton> skeleton;
+};
+
+using AssetImportDataVariant =
+    std::variant<std::monostate, StaticMeshImportData, SkeletalMeshImportData, SceneObjectImportData, BaseMaterialImportData,
+                 MaterialInstanceImportData, WorldImportData, SkeletonImportData>;
 
 struct AssetImportFileRequest {
     std::filesystem::path source;

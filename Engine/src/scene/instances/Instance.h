@@ -2,6 +2,7 @@
 #define RAPTURE__INSTANCE_H
 
 #include "core/events/EventSignal.h"
+#include "core/utils/Typed.h"
 #include "scene/TickPhase.h"
 #include "core/serialization/SerialDocument.h"
 #include "core/utils/TypeInfo.h"
@@ -14,6 +15,7 @@
 namespace Rapture {
 
 class Scene;
+class SceneLoadContext;
 
 /**
  * @brief Identifies an instance for as long as it exists, across renames, reparenting and a reload
@@ -29,47 +31,16 @@ static constexpr InstanceId INVALID_INSTANCE_ID = 0;
  * through. What it is made of and where it sits are the two branches below it, SceneObject and
  * SceneComponent.
  */
-class Instance {
+class Instance : public Typed {
   public:
     Instance(Scene &scene, std::string_view name);
-    virtual ~Instance();
+    ~Instance() override;
 
     Instance(const Instance &) = delete;
     Instance &operator=(const Instance &) = delete;
 
     static const TypeInfo &staticType();
-
-    /**
-     * @brief The type of the object this actually is, rather than of the class it is held as
-     */
-    virtual const TypeInfo &type() const;
-
-    /**
-     * @brief Whether this instance is a T, or derives from one
-     */
-    template <typename T>
-    bool isA() const
-    {
-        const TypeInfo &self = type();
-        const TypeInfo &other = T::staticType();
-        return self.depth >= other.depth && self.chain[other.depth] == &other;
-    }
-
-    /**
-     * @brief Casts to T if this instance is one
-     * @return The cast pointer, or nullptr if the cast is not legal
-     */
-    template <typename T>
-    T *as()
-    {
-        return isA<T>() ? static_cast<T *>(this) : nullptr;
-    }
-
-    template <typename T>
-    const T *as() const
-    {
-        return isA<T>() ? static_cast<const T *>(this) : nullptr;
-    }
+    const TypeInfo &type() const override;
 
     /**
      * @brief Writes this instance's class and the fields its class declares
@@ -116,6 +87,19 @@ class Instance {
     virtual void onUpdate(float dt);
 
     /**
+     * @brief Runs the link hook
+     * @param context The read this instance came out of
+     */
+    void link(const SceneLoadContext &context);
+
+    /**
+     * @brief Runs the ready hook, once, however often this instance changes owner afterwards
+     */
+    void ready();
+
+    bool isReady() const { return m_isReady; }
+
+    /**
      * @brief Fires as this instance is destroyed, before anything it owns is torn down
      */
     EventSignal<void(Instance *)> onDestroy;
@@ -140,12 +124,25 @@ class Instance {
 
     Scene *scene() const { return m_scene; }
 
+  protected:
+    /**
+     * @brief Turns the ids this instance was read with into pointers to what they name
+     * @param context The read this instance came out of
+     */
+    virtual void onLink(const SceneLoadContext &context);
+
+    /**
+     * @brief Called once this instance is in a scene with every reference it was read with resolved
+     */
+    virtual void onReady();
+
   private:
     Scene *m_scene;
     InstanceId m_id;
     std::string m_name;
     TickPhase m_tickPhase = TICK_PRE_PHYSICS;
     uint32_t m_tickSlot;
+    bool m_isReady = false;
 };
 
 } // namespace Rapture

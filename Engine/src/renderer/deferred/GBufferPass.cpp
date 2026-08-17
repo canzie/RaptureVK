@@ -23,6 +23,7 @@ struct GBufferPushConstants {
     uint32_t cameraSSBOIndex;
     uint32_t cameraSlotIndex;
     uint32_t meshSSBOIndex;
+    uint32_t skeletonSSBOIndex;
 };
 
 struct TerrainGBufferPushConstants {
@@ -53,7 +54,8 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
 
-    createPipeline();
+    createPipeline(false);
+    createPipeline(true);
     createTerrainPipeline();
     createTextures();
 
@@ -95,6 +97,7 @@ GBufferPass::~GBufferPass()
 
     // Clean up pipelines
     m_pipeline.reset();
+    m_skinnedPipeline.reset();
     m_terrainPipeline.reset();
 }
 
@@ -206,9 +209,25 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
     uint32_t cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrame);
     uint32_t cameraSlot = renderData.getCameraSlot(camera.getEntity());
     uint32_t cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
+    uint32_t skeletonSSBOIndex = renderData.getSkeletonInstanceManager().getBindlessIndex();
+
+    // the initial bind above, so the first batch only rebinds if it is skinned
+    GraphicsPipeline *boundPipeline = m_pipeline.get();
 
     for (MDIBatch *batch : m_geometry->batches(currentFrame)) {
         RAPTURE_PROFILE_SCOPE("Draw Batch");
+
+        // a batch is keyed on its vertex layout, so it is skinned or unskinned as a whole
+        bool isSkinned = batch->getBufferLayout().getAttributeOffset(BufferAttributeID::JOINTS_0) != UINT32_MAX;
+        GraphicsPipeline *pipeline = isSkinned ? m_skinnedPipeline.get() : m_pipeline.get();
+        if (pipeline == nullptr) {
+            continue;
+        }
+
+        if (pipeline != boundPipeline) {
+            pipeline->bind(secondaryCb->getCommandBufferVk());
+            boundPipeline = pipeline;
+        }
 
         m_geometry->bindBatch(secondaryCb, batch);
 
@@ -218,13 +237,15 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
         pushConstants.cameraSSBOIndex = cameraSSBOIndex;
         pushConstants.cameraSlotIndex = cameraSlotIndex;
         pushConstants.meshSSBOIndex = meshSSBOIndex;
+        pushConstants.skeletonSSBOIndex = skeletonSSBOIndex;
 
+        const Shader *shader = isSkinned ? m_skinnedShader : m_shader;
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        if (m_shader && m_shader->getPushConstantLayouts().size() > 0) {
-            stageFlags = m_shader->getPushConstantLayouts()[0].stageFlags;
+        if (shader && shader->getPushConstantLayouts().size() > 0) {
+            stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
         }
 
-        vkCmdPushConstants(secondaryCb->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), stageFlags, 0,
+        vkCmdPushConstants(secondaryCb->getCommandBufferVk(), pipeline->getPipelineLayoutVk(), stageFlags, 0,
                            sizeof(GBufferPushConstants), &pushConstants);
 
         // Execute multi-draw indirect
@@ -387,7 +408,7 @@ void GBufferPass::bindGBufferTexturesToBindlessSet()
     }
 }
 
-void GBufferPass::createPipeline()
+void GBufferPass::createPipeline(bool skinned)
 {
     std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
                                                  VK_DYNAMIC_STATE_VERTEX_INPUT_EXT};
@@ -481,15 +502,24 @@ void GBufferPass::createPipeline()
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
+    if (skinned) {
+        shaderConfig.compileInfo.macros.emplace_back("IS_SKINNED_MESH");
+    }
 
     auto asset = AssetManager::importAsset(shaderPath / "glsl/GBuffer.vs.glsl", shaderConfig);
-    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    Shader *shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
 
-    if (!m_shader) {
+    if (!shader) {
         RP_CORE_ERROR("Failed to load GBuffer vertex shader");
         return;
     }
-    if (m_shader) m_shaderAssets.push_back(std::move(asset));
+    m_shaderAssets.push_back(std::move(asset));
+
+    if (skinned) {
+        m_skinnedShader = shader;
+    } else {
+        m_shader = shader;
+    }
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -501,7 +531,12 @@ void GBufferPass::createPipeline()
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = getFramebufferSpecification();
-    config.shader = m_shader;
+    config.shader = shader;
+
+    if (skinned) {
+        m_skinnedPipeline = std::make_unique<GraphicsPipeline>(config);
+        return;
+    }
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

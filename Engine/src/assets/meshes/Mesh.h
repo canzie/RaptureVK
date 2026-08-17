@@ -37,6 +37,14 @@ struct MeshAllocatorParams {
      * @return The serialized bytes
      */
     std::vector<uint8_t> serialize() const;
+
+    /**
+     * @brief Reads back what serialize wrote
+     * @param blob The serialized bytes, which have to outlive the params read from them
+     * @param params Filled in from the blob, with its vertex and index data aimed into it
+     * @return True if the blob was read
+     */
+    static bool deserialize(std::span<const uint8_t> blob, MeshAllocatorParams &params);
 };
 
 class Mesh {
@@ -44,7 +52,7 @@ class Mesh {
   public:
     Mesh(MeshAllocatorParams &params);
     Mesh();
-    ~Mesh();
+    virtual ~Mesh();
 
     Mesh(const Mesh &) = delete;
     Mesh &operator=(const Mesh &) = delete;
@@ -52,13 +60,6 @@ class Mesh {
     Mesh &operator=(Mesh &&other) noexcept;
 
     void setMeshData(MeshAllocatorParams &params);
-
-    /**
-     * @brief Builds a mesh from a blob produced by MeshAllocatorParams::serialize
-     * @param blob The serialized mesh bytes
-     * @return The mesh, or nullptr if the blob is invalid
-     */
-    static std::unique_ptr<Mesh> deserialize(std::span<const uint8_t> blob);
 
     std::shared_ptr<VertexBuffer> getVertexBuffer() const { return m_vertexBuffer; }
     std::shared_ptr<IndexBuffer> getIndexBuffer() const { return m_indexBuffer; }
@@ -100,6 +101,13 @@ class Mesh {
      * @return The acceleration structure, or nullptr if buildBLAS has not succeeded
      */
     BLAS *getBLAS() const { return m_blas.get(); }
+
+  protected:
+    /**
+     * @brief Serializes the geometry half of this mesh by reading it back off the GPU
+     * @return A mesh blob, empty if this mesh holds no geometry
+     */
+    std::vector<uint8_t> serializeGeometry() const;
 
   private:
     uint32_t m_indexCount;

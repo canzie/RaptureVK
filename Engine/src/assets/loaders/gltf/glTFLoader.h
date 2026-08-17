@@ -4,6 +4,7 @@
 #include "assets/asset_manager/AssetHandle.h"
 #include "glTFCommon.h"
 #include "assets/materials/MaterialParameters.h"
+#include "assets/skeletons/Skeleton.h"
 #include "yyjson.h"
 
 #include <cstddef>
@@ -24,6 +25,7 @@ class MaterialInstance;
 class Node3D;
 class Scene;
 class SceneObject;
+class SkeletalMesh3D;
 
 /**
  * @brief Loader for glTF 2.0 format 3D models
@@ -68,14 +70,24 @@ class glTF2Loader {
     struct PrimitiveData {
         AssetRef meshRef;
         int32_t materialIndex = -1;
+        AssetHandle skeleton = INVALID_ASSET_HANDLE;
         glm::vec3 boundingBoxMin = glm::vec3(0.0f);
         glm::vec3 boundingBoxMax = glm::vec3(0.0f);
     };
 
     bool loadScene(yyjson_val *sceneRoot);
     bool loadNode(glTF_SceneNode *parent, size_t nodeIndex);
-    bool loadMesh(glTF_SceneNode *node, size_t meshIndex);
-    bool decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, PrimitiveData &out);
+    /**
+     * @brief Builds the primitives of one glTF mesh as children of a node
+     * @param node The node the primitives hang from
+     * @param meshIndex The glTF mesh to build
+     * @param skeleton The skeleton this node's skin names, or INVALID_ASSET_HANDLE if it has none
+     * @return True if the mesh was built
+     */
+    bool loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle skeleton);
+
+    bool decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, AssetHandle skeleton,
+                         PrimitiveData &out);
 
     /**
      * @brief Builds the scene objects one glTF node subtree describes
@@ -93,6 +105,12 @@ class glTF2Loader {
      *
      * @param scene The scene to spawn the imported objects into, or nullptr to only write the asset
      */
+    /**
+     * @brief Adds one pose per skin below an asset's root and points its skinned meshes at it
+     * @param root The object the poses are added to
+     */
+    void buildSkeletonPoses(SceneObject &root);
+
     void buildSceneObjectAsset(Scene *scene);
 
     void loadSkin(yyjson_val *skinVal);
@@ -106,6 +124,20 @@ class glTF2Loader {
     void cleanUp();
 
     glm::mat4 getNodeTransform(yyjson_val *nodeVal);
+
+    /**
+     * @brief Reads a node's local transform as translation, rotation and scale
+     * @param nodeVal The node to read
+     * @return The transform, decomposed from the node's matrix if it has one
+     */
+    Skeleton::JointTransform getNodeRestTransform(yyjson_val *nodeVal);
+
+    /**
+     * @brief Maps each node that has a parent to it, over the whole node array
+     * @return Node index to its parent's node index
+     */
+    std::unordered_map<size_t, size_t> buildNodeParents();
+
     std::string getNodeName(size_t nodeIndex);
 
     yyjson_val *getObjectValue(yyjson_val *obj, const char *key);
@@ -136,6 +168,11 @@ class glTF2Loader {
     yyjson_val *m_samplers = nullptr;
 
     std::unordered_map<size_t, std::vector<PrimitiveData>> m_meshCache; ///< glTF mesh index -> decoded primitives
+
+    /// skeleton asset -> the bind pose each skinned mesh under it is bound against
+    std::unordered_map<AssetHandle, std::vector<glm::mat4>> m_inverseBindMatrices;
+    // ordered, so a reimport names the poses of a file with several skins the same way every time
+    std::map<AssetHandle, std::vector<SkeletalMesh3D *>> m_skinnedMeshes;
 
     std::vector<unsigned char> m_binVec;
     std::filesystem::path m_filepath;

@@ -101,6 +101,8 @@ void DescriptorManager::initializeSet2()
     // SCUFFED TEMP: bumped 3 -> 24 to fit 8 active scenes, see initializeSet0.
     bindings.bindings.push_back(
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::MESH_DATA_SSBO});
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, TextureViewType::DEFAULT, false,
+                                 DescriptorSetBindingLocation::SKELETON_MATRICES_SSBO});
     bindings.setNumber = 2;
 
     // Create the descriptor set

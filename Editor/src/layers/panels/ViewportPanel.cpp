@@ -502,7 +502,7 @@ void ViewportPanel::updateGizmo()
         m_previousSelectedEntity = m_selectedEntity;
     }
 
-    const auto *meshComp = m_selectedEntity.tryRead<Rapture::MeshComponent>();
+    const auto *meshComp = m_selectedEntity.tryRead<Rapture::StaticMeshComponent>();
 
     if (m_viewport == nullptr) {
         return;

@@ -9,6 +9,8 @@
 #include "scene/Scene.h"
 #include "scene/EntityCommon.h"
 
+class EntitySelection;
+
 /**
  * @brief A property section that edits one component of the selected entity.
  */
@@ -38,6 +40,12 @@ class ComponentEditorBase : public PropertySection {
         m_entity = entity;
     }
 
+    /**
+     * @brief Points this editor at the selection its fields claim a clicked object from.
+     * @param selection The selection of the workspace this editor is shown in.
+     */
+    void setSelection(EntitySelection *selection) { m_selection = selection; }
+
   protected:
     /**
      * @brief Adds the mobility row every movable node shares.
@@ -58,6 +66,7 @@ class ComponentEditorBase : public PropertySection {
   protected:
     Rapture::ecs::EntityAccessor m_entity;
     Rapture::Scene *m_scene = nullptr;
+    EntitySelection *m_selection = nullptr;
     bool m_subjectChanged = true;
 };
 

@@ -18,19 +18,19 @@ class Mesh3D : public Node3D {
     const TypeInfo &type() const override;
 
     AssetHandle mesh() const { return m_mesh; }
-    void setMesh(AssetHandle mesh);
+    virtual void setMesh(AssetHandle mesh) = 0;
 
     AssetHandle material() const { return m_material; }
     void setMaterial(AssetHandle material);
 
-    bool isVisible() const;
-    void setVisible(bool visible);
+    virtual bool isVisible() const = 0;
+    virtual void setVisible(bool visible) = 0;
 
-    Mobility mobility() const;
-    void setMobility(Mobility mobility);
+    virtual Mobility mobility() const = 0;
+    virtual void setMobility(Mobility mobility) = 0;
 
-    glm::vec3 boundsMin() const;
-    glm::vec3 boundsMax() const;
+    virtual glm::vec3 boundsMin() const = 0;
+    virtual glm::vec3 boundsMax() const = 0;
 
     bool isRayTraced() const;
 
@@ -38,7 +38,7 @@ class Mesh3D : public Node3D {
      * @brief Builds or drops the acceleration structure this mesh contributes to the scene TLAS
      * @param rayTraced Whether the mesh takes part in ray tracing
      */
-    void setRayTraced(bool rayTraced);
+    virtual void setRayTraced(bool rayTraced) = 0;
 
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
@@ -46,15 +46,10 @@ class Mesh3D : public Node3D {
   protected:
     Mesh3D(Scene &scene, std::string_view name);
 
-  private:
-    /**
-     * @brief Points this mesh's TLAS instance at the acceleration structure of the mesh it now holds,
-     * dropping it out of ray tracing if that mesh has none
-     */
-    void rebuildAccelerationStructure();
+  protected:
+    AssetHandle m_mesh = INVALID_ASSET_HANDLE;
 
   private:
-    AssetHandle m_mesh = INVALID_ASSET_HANDLE;
     AssetHandle m_material = INVALID_ASSET_HANDLE;
 };
 

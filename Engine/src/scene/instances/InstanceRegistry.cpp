@@ -9,6 +9,8 @@
 #include "scene/instances/Node3D.h"
 #include "scene/instances/PointLight3D.h"
 #include "scene/instances/RigidBody3D.h"
+#include "scene/instances/SkeletalMesh3D.h"
+#include "scene/instances/SkeletonPose.h"
 #include "scene/instances/SpotLight3D.h"
 #include "scene/instances/SpringArm3D.h"
 #include "scene/instances/StaticMesh3D.h"
@@ -40,6 +42,8 @@ void InstanceRegistry::init()
     addObject<Camera3D>();
     addObject<SpringArm3D>();
     addObject<StaticMesh3D>();
+    addObject<SkeletalMesh3D>();
+    addObject<SkeletonPose>();
     addObject<Terrain3D>();
     addObject<DirectionalLight3D>();
     addObject<PointLight3D>();

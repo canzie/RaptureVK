@@ -85,7 +85,13 @@ class GBufferPass : public RenderPass {
 
   private:
     void createTextures();
-    void createPipeline();
+
+    /**
+     * @brief Builds one of the two entity pipelines
+     * @param skinned Whether the pipeline deforms its vertices by a skeleton pose
+     */
+    void createPipeline(bool skinned);
+
     void createTerrainPipeline();
     void bindGBufferTexturesToBindlessSet();
     void setupCommandResources();
@@ -128,6 +134,9 @@ class GBufferPass : public RenderPass {
     std::vector<uint32_t> m_depthTextureIndices;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
+
+    Shader *m_skinnedShader = nullptr;
+    std::unique_ptr<GraphicsPipeline> m_skinnedPipeline;
 
     // Terrain rendering
     Shader *m_terrainShader = nullptr;

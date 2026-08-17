@@ -14,6 +14,7 @@ struct alignas(16) MeshGPUData {
     alignas(4) uint32_t materialIndex;
     alignas(4) uint32_t vertexBufferFlags;
     alignas(4) uint32_t entityId;
+    alignas(4) uint32_t boneOffset;
 };
 
 /**

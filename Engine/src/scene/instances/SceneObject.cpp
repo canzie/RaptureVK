@@ -3,6 +3,7 @@
 #include "scene/components/Components.h"
 #include "core/utils/Log.h"
 #include "scene/Scene.h"
+#include "scene/SceneLoadContext.h"
 #include "scene/instances/InstanceRegistry.h"
 
 namespace Rapture {
@@ -193,7 +194,7 @@ SceneObject::DocumentHeader SceneObject::readHeader(ReadNode node)
     return header;
 }
 
-bool SceneObject::loadContents(const DocumentHeader &header, std::vector<SceneObject *> &order)
+bool SceneObject::loadContents(const DocumentHeader &header, SceneLoadContext &context)
 {
     for (size_t i = 0; i < header.components.size(); i++) {
         ReadNode entry = header.components.at(i);
@@ -205,13 +206,21 @@ bool SceneObject::loadContents(const DocumentHeader &header, std::vector<SceneOb
             return false;
         }
 
+        SceneComponent *raw = component.get();
+
         // read before attaching so the component claims what it needs from its authored fields
         component->deserialize(entry);
+        context.addInstance(entry.child(KEY_ID).asU64(INVALID_INSTANCE_ID), raw);
+
+        if (context.remintsIds()) {
+            raw->remintId();
+        }
+
         attachComponent(std::move(component));
     }
 
     for (size_t i = 0; i < header.children.size(); i++) {
-        if (!loadSubtree(*this, header.children.at(i), order)) {
+        if (loadSubtree(*this, header.children.at(i), context) == nullptr) {
             return false;
         }
     }
@@ -226,36 +235,40 @@ SceneObject *SceneObject::spawnSubtree(SceneObject &parent, ReadNode node)
         return nullptr;
     }
 
-    std::vector<SceneObject *> order;
-    if (!loadSubtree(parent, node, order) || order.empty()) {
+    // what spawns is its own object, not the one it was read from
+    SceneLoadContext context(true);
+
+    SceneObject *root = loadSubtree(parent, node, context);
+    if (root == nullptr) {
         RP_CORE_ERROR("subtree could not be read into the scene");
         return nullptr;
     }
 
-    // what spawned is its own object, not the one it was read from
-    for (SceneObject *object : order) {
-        object->remintId();
-    }
+    context.finish();
 
-    return order.front();
+    return root;
 }
 
-bool SceneObject::loadSubtree(SceneObject &parent, ReadNode node, std::vector<SceneObject *> &order)
+SceneObject *SceneObject::loadSubtree(SceneObject &parent, ReadNode node, SceneLoadContext &context)
 {
     DocumentHeader header = readHeader(node);
 
     std::unique_ptr<SceneObject> created = InstanceRegistry::createObject(header.className, *parent.scene(), header.name);
     if (created == nullptr) {
         RP_CORE_ERROR("no scene object class named '{}', needed by '{}'", header.className, header.name);
-        return false;
+        return nullptr;
     }
 
     SceneObject *self = created.get();
     parent.addChild(std::move(created));
-    order.push_back(self);
+    context.addInstance(header.id, self);
     self->deserialize(node);
 
-    return self->loadContents(header, order);
+    if (context.remintsIds()) {
+        self->remintId();
+    }
+
+    return self->loadContents(header, context) ? self : nullptr;
 }
 
 } // namespace Rapture

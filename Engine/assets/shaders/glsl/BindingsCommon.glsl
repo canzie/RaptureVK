@@ -13,6 +13,7 @@
 
 // ==============  SET 2 ==============
 #define S2_B0_MESH_DATA_SSBO 0         // model matrix, flags, ...
+#define S2_B1_SKELETON_MATRICES_SSBO 1 // one skinning matrix per joint, every pose in the scene sharing the arena
 
 
 // ==============  SET 3 ==============
