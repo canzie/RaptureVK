@@ -2,6 +2,7 @@
 #define RAPTURE__RENDER_PASS_H
 
 #include "gpu/command_buffers/CommandBuffer.h"
+#include "gpu/textures/TextureCommon.h"
 #include "renderer/passes/RenderPassContext.h"
 
 #include <glm/glm.hpp>
@@ -77,6 +78,14 @@ struct RenderPassAttachments {
 };
 
 /**
+ * @brief One texture a pass reads, and how it reads it
+ */
+struct RenderPassInput {
+    Texture *texture = nullptr;
+    TextureUsage usage = TEXTURE_USAGE_SAMPLED_FRAGMENT;
+};
+
+/**
  * @brief A pass that renders into attachments through a secondary command buffer
  *
  * Ordering between passes stays with the renderer, which calls beginRendering, replays the
@@ -92,6 +101,13 @@ class RenderPass {
      * @return The pass's colour, depth and stencil attachments
      */
     const RenderPassAttachments &getAttachments(const RenderPassContext &context);
+
+    /**
+     * @brief Refresh and return the textures this pass reads
+     * @param context Per-frame inputs
+     * @return The pass's inputs, empty for a pass that reads none
+     */
+    const std::vector<RenderPassInput> &getInputs(const RenderPassContext &context);
 
     /**
      * @brief Record the pass body into a secondary command buffer
@@ -144,13 +160,30 @@ class RenderPass {
     virtual void updateAttachments(const RenderPassContext &context) = 0;
 
     /**
+     * @brief Fill m_inputs with the textures this pass reads this frame
+     *
+     * Left empty by a pass that reads none. Every texture declared here is transitioned into the
+     * layout its usage names before the pass runs, so a pass must not read one it did not declare.
+     *
+     * @param context Per-frame inputs
+     */
+    virtual void fillInputs(const RenderPassContext &context);
+
+    /**
      * @brief Force the next getAttachments to refill, after the attachment textures are recreated
      */
     void invalidateAttachments() { m_attachmentsFrame = UINT32_MAX; }
 
+    /**
+     * @brief Force the next getInputs to refill, after the textures read are recreated
+     */
+    void invalidateInputs() { m_inputsFrame = UINT32_MAX; }
+
   protected:
     RenderPassAttachments m_attachments;
+    std::vector<RenderPassInput> m_inputs;
     uint32_t m_attachmentsFrame = UINT32_MAX; ///< frame in flight m_attachments was last filled for
+    uint32_t m_inputsFrame = UINT32_MAX;      ///< frame in flight m_inputs was last filled for
 };
 
 } // namespace Rapture

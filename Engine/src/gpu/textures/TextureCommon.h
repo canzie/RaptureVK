@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__TEXTURE_COMMON_H
+#define RAPTURE__TEXTURE_COMMON_H
 
 #include <cmath>
 #include <cstdint>
@@ -402,4 +403,62 @@ inline uint32_t calculateMaxMipLevels(uint32_t width, uint32_t height)
     return static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
 }
 
+/**
+ * @brief The layout a texture is in and the work that last touched it
+ *
+ * Tracked as commands are recorded, so a barrier can wait on the stage that produced the texture
+ * rather than on every stage.
+ */
+struct TextureState {
+    VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_NONE;
+    VkAccessFlags2 access = VK_ACCESS_2_NONE;
+};
+
+/**
+ * @brief How a pass touches a texture
+ */
+enum TextureUsage {
+    TEXTURE_USAGE_SAMPLED_FRAGMENT,
+    TEXTURE_USAGE_SAMPLED_COMPUTE,
+    TEXTURE_USAGE_STORAGE_COMPUTE,
+    TEXTURE_USAGE_COLOR_ATTACHMENT,
+    TEXTURE_USAGE_DEPTH_ATTACHMENT,
+    TEXTURE_USAGE_COUNT
+};
+
+/**
+ * @brief The layout, stage and access a usage requires
+ * @param usage The way the texture is about to be touched
+ * @return The state the texture has to be moved into
+ */
+inline TextureState TextureState_forUsage(TextureUsage usage)
+{
+    switch (usage) {
+    case TEXTURE_USAGE_SAMPLED_FRAGMENT:
+        return {VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT};
+    case TEXTURE_USAGE_SAMPLED_COMPUTE:
+        return {VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT};
+    case TEXTURE_USAGE_STORAGE_COMPUTE:
+        return {VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT};
+    case TEXTURE_USAGE_COLOR_ATTACHMENT:
+        return {VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT};
+    case TEXTURE_USAGE_DEPTH_ATTACHMENT:
+        return {VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT};
+    case TEXTURE_USAGE_COUNT:
+        break;
+    }
+
+    RP_CORE_ERROR("Unsupported texture usage!");
+    return {};
+}
+
 } // namespace Rapture
+
+#endif // RAPTURE__TEXTURE_COMMON_H

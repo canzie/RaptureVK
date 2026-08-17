@@ -25,6 +25,21 @@ static void s_addMeshToBatch(MDIBatchMap &batchMap, Mesh &mesh, uint32_t meshSlo
     batch->addObject(mesh, meshSlotIndex, materialIndex);
 }
 
+// a bounding box derived from the transform is a cache, not a change to the mesh
+static void s_refreshEntityBounds(ecs::Registry &registry, ecs::Entity entity)
+{
+    if (registry.hasAll<TransformComponent, StaticMeshComponent>(entity)) {
+        const TransformComponent *transform = registry.tryRead<TransformComponent>(entity);
+        registry.write<StaticMeshComponent>(entity, 0)->updateWorldBoundingBox(*transform);
+        return;
+    }
+
+    if (registry.hasAll<TransformComponent, SkeletalMeshComponent>(entity)) {
+        const TransformComponent *transform = registry.tryRead<TransformComponent>(entity);
+        registry.write<SkeletalMeshComponent>(entity, 0)->updateWorldBoundingBox(*transform);
+    }
+}
+
 SceneGeometryDraw::SceneGeometryDraw(RenderContext renderContext, uint32_t framesInFlight) : m_rc(renderContext)
 {
     m_batchMaps.resize(framesInFlight);
@@ -35,9 +50,42 @@ SceneGeometryDraw::SceneGeometryDraw(RenderContext renderContext, uint32_t frame
     m_populatedBatches.resize(framesInFlight);
 }
 
+void SceneGeometryDraw::refreshWorldBounds(Scene &scene)
+{
+    RAPTURE_PROFILE_SCOPE("SceneGeometryDraw::refreshWorldBounds");
+
+    auto &registry = scene.getRegistry();
+    ecs::Journal &journal = registry.getJournal();
+
+    ecs::Batch moved = journal.readSince(CHANNEL_TRANSFORM_WORLD, m_transformBookmark);
+    ecs::Batch rebound = journal.readSince(CHANNEL_MESH_BINDING, m_meshBookmark);
+
+    if (moved.needsRebuild() || rebound.needsRebuild()) {
+        for (auto [entity, transform, meshComp] : registry.read<TransformComponent, StaticMeshComponent>()) {
+            registry.write<StaticMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
+        }
+
+        for (auto [entity, transform, meshComp] : registry.read<TransformComponent, SkeletalMeshComponent>()) {
+            registry.write<SkeletalMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
+        }
+
+        return;
+    }
+
+    for (ecs::Entity entity : moved) {
+        s_refreshEntityBounds(registry, entity);
+    }
+
+    for (ecs::Entity entity : rebound) {
+        s_refreshEntityBounds(registry, entity);
+    }
+}
+
 void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t frameInFlight)
 {
-    RAPTURE_PROFILE_FUNCTION();
+    RAPTURE_PROFILE_SCOPE("SceneGeometryDraw::populate");
+
+    refreshWorldBounds(scene);
 
     if (frameInFlight >= m_batchMaps.size()) {
         RP_CORE_ERROR("Frame {} has no batches", frameInFlight);
@@ -54,7 +102,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
     SceneRenderData *renderData = scene.getRenderData();
 
     for (auto [entity, transform, meshComp, materialComp] : registry.read<TransformComponent, StaticMeshComponent, MaterialComponent>()) {
-        RAPTURE_PROFILE_SCOPE("Populate Batch");
+        RAPTURE_PROFILE_SCOPE("Batch Static Mesh");
 
         if (!meshComp.mesh || meshComp.isLoading) {
             continue;
@@ -64,9 +112,6 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
         if (!mesh->getVertexBuffer() || !mesh->getIndexBuffer()) {
             continue;
         }
-
-        // a bounding box derived from the transform is a cache, not a change to the mesh
-        registry.write<StaticMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
 
         if (frustum != nullptr && frustum->testBoundingBox(meshComp.worldBoundingBox) == FrustumResult::Outside) {
             continue;
@@ -79,7 +124,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
 
     for (auto [entity, transform, meshComp, materialComp] :
          registry.read<TransformComponent, SkeletalMeshComponent, MaterialComponent>()) {
-        RAPTURE_PROFILE_SCOPE("Populate Batch");
+        RAPTURE_PROFILE_SCOPE("Batch Skeletal Mesh");
 
         if (!meshComp.mesh || meshComp.isLoading) {
             continue;
@@ -91,8 +136,6 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
         }
 
         // TODO: bind pose bounds, so an animated mesh whose joints leave them culls too early
-        registry.write<SkeletalMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
-
         if (frustum != nullptr && frustum->testBoundingBox(meshComp.worldBoundingBox) == FrustumResult::Outside) {
             continue;
         }
@@ -106,6 +149,10 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
         if (batch->getDrawCount() == 0) {
             continue;
         }
+
+        // uploaded here rather than at bind time, since several passes bind the same batch and can
+        // do so from separate jobs
+        batch->uploadBuffers();
         populated.push_back(batch.get());
     }
 }
@@ -123,8 +170,6 @@ std::span<MDIBatch *const> SceneGeometryDraw::batches(uint32_t frameInFlight) co
 void SceneGeometryDraw::bindBatch(CommandBuffer *commandBuffer, MDIBatch *batch)
 {
     RAPTURE_PROFILE_FUNCTION();
-
-    batch->uploadBuffers();
 
     auto &vc = Application::getInstance().getVulkanContext();
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();

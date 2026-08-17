@@ -8,6 +8,7 @@
 namespace Rapture {
 
 class Scene;
+class SceneGeometryDraw;
 class SceneRenderTarget;
 class TerrainGenerator;
 class Texture;
@@ -43,6 +44,7 @@ struct RenderPassContext {
     const RenderPassTargets *targets = nullptr;
     const RenderSettings *settings = nullptr;
     TerrainGenerator *terrain = nullptr;
+    SceneGeometryDraw *opaqueGeometry = nullptr; ///< this view's batched opaque geometry, populated for this frame
 
     uint32_t frameInFlight = 0; ///< indexes per-frame-in-flight resources
     uint32_t imageIndex = 0;    ///< image of the render target being written

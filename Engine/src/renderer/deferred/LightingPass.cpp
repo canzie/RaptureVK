@@ -1,16 +1,16 @@
 #include "renderer/deferred/LightingPass.h"
 
-#include "core/utils/EnginePaths.h"
 #include "app/Application.h"
+#include "core/utils/EnginePaths.h"
 
 #include "gpu/descriptors/DescriptorManager.h"
-#include "scene/components/Components.h"
-#include "scene/systems/Transforms.h"
-#include "scene/instances/Environment.h"
 #include "renderer/ImageBasedLighting.h"
 #include "renderer/RenderSettings.h"
-#include "scene/render_data/SceneRenderData.h"
 #include "renderer/shadows/ShadowMapping.h"
+#include "scene/components/Components.h"
+#include "scene/instances/Environment.h"
+#include "scene/render_data/SceneRenderData.h"
+#include "scene/systems/Transforms.h"
 
 #include "core/utils/Log.h"
 #include "core/utils/TracyProfiler.h"
@@ -61,7 +61,6 @@ LightingPass::LightingPass(float width, float height, DynamicDiffuseGI *ddgi, Vk
     m_rc = &vc.getRenderContext();
     m_device = vc.getLogicalDevice();
     m_vmaAllocator = vc.getVmaAllocator();
-
 
     auto shaderPath = EnginePaths::shaderDirectory();
 
@@ -348,6 +347,19 @@ void LightingPass::updateAttachments(const RenderPassContext &context)
 
     m_attachments.depthAttachment = {};
     m_attachments.stencilAttachment = {};
+}
+
+void LightingPass::fillInputs(const RenderPassContext &context)
+{
+    Texture *sampled[] = {context.targets->gbufferBaseColor, context.targets->gbufferNormalMotion,
+                          context.targets->gbufferMaterial,  context.targets->gbufferShadingModel,
+                          context.targets->depthStencil,     context.targets->ambientOcclusion};
+
+    for (Texture *texture : sampled) {
+        if (texture != nullptr) {
+            m_inputs.push_back({texture, TEXTURE_USAGE_SAMPLED_FRAGMENT});
+        }
+    }
 }
 
 void LightingPass::onResize(uint32_t width, uint32_t height)

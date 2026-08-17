@@ -36,6 +36,10 @@ struct Fiber {
 
     bool finished; // Job completed, fiber can be recycled
 
+    // the profiler identifies a fiber by this string, so every fiber needs its own and it has to
+    // outlive the trace
+    char profileName[24] = {};
+
     void switchTo();
     void switchToScheduler();
 

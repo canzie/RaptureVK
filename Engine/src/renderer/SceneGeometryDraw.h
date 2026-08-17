@@ -1,6 +1,7 @@
 #ifndef RAPTURE__SCENE_GEOMETRY_DRAW_H
 #define RAPTURE__SCENE_GEOMETRY_DRAW_H
 
+#include "core/ecs/journal.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/vulkan_context/RenderContext.h"
 #include "renderer/MDIBatch.h"
@@ -52,10 +53,21 @@ class SceneGeometryDraw {
     void bindBatch(CommandBuffer *commandBuffer, MDIBatch *batch);
 
   private:
+    /**
+     * @brief Recompute the world bounding box of every mesh that moved or changed mesh since the last frame
+     * @param scene Scene to refresh the bounds of
+     */
+    void refreshWorldBounds(Scene &scene);
+
+  private:
     RenderContext m_rc;
 
     std::vector<std::unique_ptr<MDIBatchMap>> m_batchMaps;
     std::vector<std::vector<MDIBatch *>> m_populatedBatches;
+
+    // this view's own position, so another view consuming the same change cannot hide it
+    ecs::Bookmark m_transformBookmark;
+    ecs::Bookmark m_meshBookmark;
 };
 
 } // namespace Rapture

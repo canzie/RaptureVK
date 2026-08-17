@@ -48,26 +48,13 @@ static VkExtent2D s_attachmentExtent(const RenderTargetRef &ref)
     return {0, 0};
 }
 
-static VkImageLayout s_attachmentLayout(const RenderTargetRef &ref)
-{
-    if (const auto *texture = std::get_if<Texture *>(&ref)) {
-        return (*texture)->getCurrentLayout();
-    }
-    if (const auto *image = std::get_if<RenderTargetImage>(&ref)) {
-        return image->target->getImageLayout(image->index);
-    }
-
-    return VK_IMAGE_LAYOUT_UNDEFINED;
-}
-
 /**
- * @brief Barrier moving an attachment into a layout, recording the new layout on its owner
+ * @brief Barrier moving an attachment into what a usage needs, recording the new state on its owner
  */
-static VkImageMemoryBarrier s_attachmentBarrier(const RenderTargetRef &ref, VkImageLayout oldLayout, VkImageLayout newLayout,
-                                                VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask)
+static VkImageMemoryBarrier2 s_attachmentBarrier(const RenderTargetRef &ref, TextureUsage usage, bool discardContents)
 {
     if (const auto *texture = std::get_if<Texture *>(&ref)) {
-        return (*texture)->getImageMemoryBarrier(oldLayout, newLayout, srcAccessMask, dstAccessMask);
+        return (*texture)->getBarrier2(usage, discardContents);
     }
 
     const auto *image = std::get_if<RenderTargetImage>(&ref);
@@ -75,12 +62,19 @@ static VkImageMemoryBarrier s_attachmentBarrier(const RenderTargetRef &ref, VkIm
         RP_CORE_ERROR("Cannot barrier an attachment that references no image");
         return {};
     }
-    image->target->setImageLayout(image->index, newLayout);
 
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
+    const TextureState current = image->target->getImageState(image->index);
+    const TextureState target = TextureState_forUsage(usage);
+    image->target->setImageState(image->index, target);
+
+    VkImageMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = current.stage;
+    barrier.srcAccessMask = current.access;
+    barrier.dstStageMask = target.stage;
+    barrier.dstAccessMask = target.access;
+    barrier.oldLayout = discardContents ? VK_IMAGE_LAYOUT_UNDEFINED : current.layout;
+    barrier.newLayout = target.layout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image->target->getImage(image->index);
@@ -89,8 +83,6 @@ static VkImageMemoryBarrier s_attachmentBarrier(const RenderTargetRef &ref, VkIm
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = srcAccessMask;
-    barrier.dstAccessMask = dstAccessMask;
 
     return barrier;
 }
@@ -172,23 +164,8 @@ static VkRenderingAttachmentInfo s_buildStencilAttachmentInfo(const RenderPassAt
     return info;
 }
 
-// The writes a layout implies, so a barrier out of it makes them available
-static VkAccessFlags s_writeAccessForLayout(VkImageLayout layout)
-{
-    switch (layout) {
-    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-        return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    case VK_IMAGE_LAYOUT_GENERAL:
-        return VK_ACCESS_SHADER_WRITE_BIT;
-    default:
-        return 0;
-    }
-}
-
-static void s_appendTransitionBarrier(std::vector<VkImageMemoryBarrier> &barriers, const RenderPassAttachment &attachment,
-                                      VkImageLayout newLayout, VkAccessFlags dstAccessMask)
+static void s_appendTransitionBarrier(std::vector<VkImageMemoryBarrier2> &barriers, const RenderPassAttachment &attachment,
+                                      TextureUsage usage)
 {
     if (!s_hasTarget(attachment.target)) {
         return;
@@ -196,13 +173,11 @@ static void s_appendTransitionBarrier(std::vector<VkImageMemoryBarrier> &barrier
 
     // A cleared or discarded attachment has nothing worth preserving, so it transitions from
     // UNDEFINED. A LOAD attachment keeps its contents and so comes from the layout it tracks.
-    const VkImageLayout oldLayout = attachment.loadOp == RenderPassAttachmentLoadOp::LOAD ? s_attachmentLayout(attachment.target)
-                                                                                         : VK_IMAGE_LAYOUT_UNDEFINED;
+    const bool discardContents = attachment.loadOp != RenderPassAttachmentLoadOp::LOAD;
 
     // Emitted even when the layout does not change, since it still carries the dependency on
     // whichever pass last wrote the attachment
-    barriers.push_back(
-        s_attachmentBarrier(attachment.target, oldLayout, newLayout, s_writeAccessForLayout(oldLayout), dstAccessMask));
+    barriers.push_back(s_attachmentBarrier(attachment.target, usage, discardContents));
 }
 
 const RenderPassAttachments &RenderPass::getAttachments(const RenderPassContext &context)
@@ -213,6 +188,22 @@ const RenderPassAttachments &RenderPass::getAttachments(const RenderPassContext 
     }
 
     return m_attachments;
+}
+
+void RenderPass::fillInputs(const RenderPassContext &context)
+{
+    (void)context;
+}
+
+const std::vector<RenderPassInput> &RenderPass::getInputs(const RenderPassContext &context)
+{
+    if (m_inputsFrame != context.frameInFlight) {
+        m_inputs.clear();
+        fillInputs(context);
+        m_inputsFrame = context.frameInFlight;
+    }
+
+    return m_inputs;
 }
 
 SecondaryBufferInheritance RenderPass::getInheritance(const RenderPassContext &context)
@@ -239,38 +230,36 @@ SecondaryBufferInheritance RenderPass::getInheritance(const RenderPassContext &c
 void RenderPass::beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb)
 {
     const RenderPassAttachments &attachments = getAttachments(context);
+    const std::vector<RenderPassInput> &inputs = getInputs(context);
 
-    std::vector<VkImageMemoryBarrier> barriers;
-    barriers.reserve(attachments.colorAttachments.size() + 2);
-    for (const RenderPassAttachment &colorAttachment : attachments.colorAttachments) {
-        s_appendTransitionBarrier(barriers, colorAttachment, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                                  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+    std::vector<VkImageMemoryBarrier2> barriers;
+    barriers.reserve(inputs.size() + attachments.colorAttachments.size() + 2);
+
+    for (const RenderPassInput &input : inputs) {
+        if (input.texture == nullptr) {
+            continue;
+        }
+        barriers.push_back(input.texture->getBarrier2(input.usage));
     }
 
-    s_appendTransitionBarrier(barriers, attachments.depthAttachment, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    for (const RenderPassAttachment &colorAttachment : attachments.colorAttachments) {
+        s_appendTransitionBarrier(barriers, colorAttachment, TEXTURE_USAGE_COLOR_ATTACHMENT);
+    }
+
+    s_appendTransitionBarrier(barriers, attachments.depthAttachment, TEXTURE_USAGE_DEPTH_ATTACHMENT);
 
     // Depth and stencil may point at the same combined texture; do not barrier it twice.
     if (attachments.stencilAttachment.target != attachments.depthAttachment.target) {
-        s_appendTransitionBarrier(barriers, attachments.stencilAttachment, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-    }
-
-    // An attachment coming from a real layout was written by an earlier pass, so the barrier has to
-    // wait on it. Nothing here knows which stage that was.
-    // TODO: narrow once Texture also tracks the stage that last wrote each image
-    VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    for (const VkImageMemoryBarrier &barrier : barriers) {
-        if (barrier.oldLayout != VK_IMAGE_LAYOUT_UNDEFINED) {
-            srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-            break;
-        }
+        s_appendTransitionBarrier(barriers, attachments.stencilAttachment, TEXTURE_USAGE_DEPTH_ATTACHMENT);
     }
 
     if (!barriers.empty()) {
-        vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(), srcStage,
-                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0,
-                             nullptr, 0, nullptr, static_cast<uint32_t>(barriers.size()), barriers.data());
+        VkDependencyInfo dependency{};
+        dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependency.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+        dependency.pImageMemoryBarriers = barriers.data();
+
+        vkCmdPipelineBarrier2(primaryCb->getCommandBufferVk(), &dependency);
     }
 
     std::vector<VkRenderingAttachmentInfo> colorAttachmentInfos;

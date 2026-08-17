@@ -2,25 +2,25 @@
 #define RAPTURE__GBUFFERPASS_H
 
 #include "gpu/pipelines/GraphicsPipeline.h"
+#include "gpu/shaders/Shader.h"
 #include "renderer/MDIBatch.h"
 #include "renderer/SceneGeometryDraw.h"
 #include "renderer/passes/RenderPass.h"
-#include "gpu/shaders/Shader.h"
 
 #include "assets/asset_manager/AssetManager.h"
+#include "core/events/GameEvents.h"
 #include "gpu/buffers/UniformBuffer.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorBinding.h"
 #include "gpu/descriptors/DescriptorManager.h"
 #include "gpu/descriptors/DescriptorSet.h"
-#include "scene/cameras/CameraCommon.h"
-#include "scene/components/Components.h"
-#include "core/events/GameEvents.h"
-#include "renderer/generators/terrain/TerrainGenerator.h"
-#include "scene/Scene.h"
 #include "gpu/textures/Texture.h"
 #include "gpu/vulkan_context/VulkanContext.h"
+#include "renderer/generators/terrain/TerrainGenerator.h"
+#include "scene/Scene.h"
+#include "scene/cameras/CameraCommon.h"
+#include "scene/components/Components.h"
 
 #include <cstdint>
 #include <memory>
@@ -56,32 +56,21 @@ class GBufferPass : public RenderPass {
     CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
     void onResize(uint32_t width, uint32_t height) override;
 
-    void endRendering(CommandBuffer *primaryCb) override;
-
     Texture *getNormalTexture(uint32_t frameInFlight) const { return m_normalTextures[frameInFlight].get(); }
     Texture *getAlbedoTexture(uint32_t frameInFlight) const { return m_albedoSpecTextures[frameInFlight].get(); }
     Texture *getMaterialTexture(uint32_t frameInFlight) const { return m_materialTextures[frameInFlight].get(); }
     Texture *getShadingModelTexture(uint32_t frameInFlight) const { return m_shadingModelTextures[frameInFlight].get(); }
-    Texture *getDepthTexture(uint32_t frameInFlight) const { return m_depthStencilTextures[frameInFlight].get(); }
-
-    /**
-     * @brief Non-owning views of the per-frame depth textures, for passes that share this depth buffer
-     * @return One pointer per frame in flight
-     */
-    std::vector<Texture *> getDepthTextures() const;
 
     // Getters for bindless texture indices for current frame
     uint32_t getNormalTextureIndex() const { return m_normalTextureIndices[m_currentFrame]; }
     uint32_t getAlbedoTextureIndex() const { return m_albedoTextureIndices[m_currentFrame]; }
     uint32_t getMaterialTextureIndex() const { return m_materialTextureIndices[m_currentFrame]; }
     uint32_t getShadingModelTextureIndex() const { return m_shadingModelTextureIndices[m_currentFrame]; }
-    uint32_t getDepthTextureIndex() const { return m_depthTextureIndices[m_currentFrame]; }
 
     // Getters for all bindless texture indices
     const std::vector<uint32_t> &getNormalTextureIndices() const { return m_normalTextureIndices; }
     const std::vector<uint32_t> &getAlbedoTextureIndices() const { return m_albedoTextureIndices; }
     const std::vector<uint32_t> &getMaterialTextureIndices() const { return m_materialTextureIndices; }
-    const std::vector<uint32_t> &getDepthTextureIndices() const { return m_depthTextureIndices; }
 
   private:
     void createTextures();
@@ -97,13 +86,11 @@ class GBufferPass : public RenderPass {
     void setupCommandResources();
 
     // Record terrain rendering only
-    void recordTerrainCommands(CommandBuffer *secondaryCb, Scene &activeScene, ecs::EntityAccessor camera, TerrainGenerator &terrain,
-                               uint32_t currentFrame);
+    void recordTerrainCommands(CommandBuffer *secondaryCb, Scene &activeScene, ecs::EntityAccessor camera,
+                               TerrainGenerator &terrain, uint32_t currentFrame);
 
     // Record entity rendering only
-    void recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, ecs::EntityAccessor camera, uint32_t currentFrame);
-
-    void transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame);
+    void recordEntityCommands(CommandBuffer *secondaryCb, const RenderPassContext &context);
 
   protected:
     void updateAttachments(const RenderPassContext &context) override;
@@ -124,14 +111,12 @@ class GBufferPass : public RenderPass {
     std::vector<std::unique_ptr<Texture>> m_albedoSpecTextures;
     std::vector<std::unique_ptr<Texture>> m_materialTextures;
     std::vector<std::unique_ptr<Texture>> m_shadingModelTextures;
-    std::vector<std::unique_ptr<Texture>> m_depthStencilTextures;
 
     // Bindless texture indices for each frame in flight
     std::vector<uint32_t> m_normalTextureIndices;
     std::vector<uint32_t> m_albedoTextureIndices;
     std::vector<uint32_t> m_materialTextureIndices;
     std::vector<uint32_t> m_shadingModelTextureIndices;
-    std::vector<uint32_t> m_depthTextureIndices;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
@@ -143,9 +128,6 @@ class GBufferPass : public RenderPass {
 
     std::vector<AssetRef> m_shaderAssets;
     std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
-
-    // MDI batching system - one set per frame in flight
-    std::unique_ptr<SceneGeometryDraw> m_geometry;
 
     CommandPoolHash m_commandPoolHash = 0;
 };

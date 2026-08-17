@@ -1,17 +1,39 @@
 #include "Viewport.h"
 
 #include "scene/components/Components.h"
+#include "renderer/DepthPrepassRenderer.h"
 #include "renderer/deferred/DeferredRenderer.h"
+#include "renderer/shadows/ShadowRenderer.h"
 #include "core/utils/rp_assert.h"
 #include "app/Application.h"
 
 namespace Rapture {
 
-Viewport::Viewport(const ViewportConfig &config, RenderContext renderContext) : m_config(config), m_renderContext(renderContext) {}
+static constexpr uint32_t DRAW_ORDER_SHADOWS = 0;
+static constexpr uint32_t DRAW_ORDER_DEPTH_PREPASS = 1;
+static constexpr uint32_t DRAW_ORDER_SCENE = 2;
+
+Viewport::Viewport(const ViewportConfig &config, RenderContext renderContext) : m_config(config), m_renderContext(renderContext)
+{
+    DrawManagerConfig drawConfig{
+        .targetType = m_config.targetType,
+        .width = m_config.width,
+        .height = m_config.height,
+        .framesInFlight = m_config.framesInFlight,
+        .allowReadback = m_config.allowReadback,
+    };
+
+    m_drawManager = std::make_unique<DrawManager>(m_renderContext, drawConfig);
+
+    if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
+        m_windowResizeConn = Application::getInstance().getMainWindow().getWindowContext()->onResize.connect(
+            [this](uint32_t width, uint32_t height) { resize(width, height); });
+    }
+}
 
 Viewport::~Viewport()
 {
-    m_renderer.reset();
+    m_drawManager.reset();
 }
 
 void Viewport::setScene(Scene *scene)
@@ -26,37 +48,44 @@ void Viewport::setCamera(ecs::EntityAccessor camera)
 
 void Viewport::createRenderer(RendererType type)
 {
-    m_renderer.reset();
     m_rendererType = type;
 
     RendererConfig rendererConfig{
-        .targetType = m_config.targetType,
+        .width = m_config.width,
+        .height = m_config.height,
         .framesInFlight = m_config.framesInFlight,
-        .allowReadback = m_config.allowReadback,
+        .outputFormat = m_drawManager->getOutputFormat(),
+        .sceneColorFormat = m_drawManager->getSceneColorFormat(),
         .enableAccelerationStructures = m_config.enableAccelerationStructures,
     };
 
+    m_drawManager->addRenderer(std::make_unique<ShadowRenderer>(m_renderContext, rendererConfig), DRAW_PHASE_PRE_COMPOSITE,
+                               DRAW_ORDER_SHADOWS);
+
+    m_drawManager->addRenderer(
+        std::make_unique<DepthPrepassRenderer>(m_renderContext, rendererConfig, m_drawManager->getDepthFormat()),
+        DRAW_PHASE_PRE_COMPOSITE, DRAW_ORDER_DEPTH_PREPASS);
+
+    std::unique_ptr<Renderer> renderer;
+
     switch (type) {
     case RendererType::DEFERRED:
-        m_renderer = std::make_unique<DeferredRenderer>(m_renderContext, rendererConfig);
+        renderer = std::make_unique<DeferredRenderer>(m_renderContext, rendererConfig);
         break;
     }
 
-    RP_ASSERT(m_renderer, "Failed to create renderer");
+    RP_ASSERT(renderer != nullptr, "Failed to create renderer");
 
-    if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
-        m_windowResizeConn = Application::getInstance().getMainWindow().getWindowContext()->onResize.connect(
-            [this](uint32_t width, uint32_t height) { resize(width, height); });
-    }
+    m_drawManager->addRenderer(std::move(renderer), DRAW_PHASE_PRE_COMPOSITE, DRAW_ORDER_SCENE);
 }
 
 void Viewport::drawFrame()
 {
-    if (m_renderer == nullptr || m_scene == nullptr) {
+    if (m_scene == nullptr) {
         return;
     }
 
-    m_renderer->drawFrame(*m_scene, m_camera, m_renderSettings);
+    m_drawManager->drawFrame(*m_scene, m_camera, m_renderSettings);
 }
 
 SceneQueryResult Viewport::queryRegion(const SceneQuery &region)
@@ -79,7 +108,7 @@ void Viewport::resize(uint32_t width, uint32_t height)
     }
     m_config.width = width;
     m_config.height = height;
-    m_renderer->resizeRenderTarget(width, height);
+    m_drawManager->resize(width, height);
 
     if (height == 0 || !m_camera.isValid()) {
         return;
@@ -93,25 +122,17 @@ void Viewport::resize(uint32_t width, uint32_t height)
 
 void Viewport::onSwapChainRecreated()
 {
-    if (m_renderer) {
-        m_renderer->onSwapChainRecreated();
-    }
+    m_drawManager->onSwapChainRecreated();
 }
 
 SceneRenderTarget *Viewport::getSceneRenderTarget()
 {
-    if (!m_renderer) {
-        return nullptr;
-    }
-    return &m_renderer->getSceneRenderTarget();
+    return &m_drawManager->getSceneRenderTarget();
 }
 
 uint32_t Viewport::getLastRenderedFrameIndex() const
 {
-    if (m_renderer == nullptr) {
-        return UINT32_MAX;
-    }
-    return m_renderer->getLastRenderedFrameIndex();
+    return m_drawManager->getLastRenderedFrameIndex();
 }
 
 } // namespace Rapture

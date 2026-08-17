@@ -137,7 +137,6 @@ void GroundTruthAmbientOcclusionPass::updateResources(const RenderPassContext &c
     occlusion.texture = getOcclusionTexture(context.frameInFlight);
     occlusion.access = ComputeResourceAccess::WRITE;
     occlusion.discardContents = true;
-    occlusion.readableAfter = true;
     m_resources.push_back(occlusion);
 }
 

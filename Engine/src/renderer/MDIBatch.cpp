@@ -39,21 +39,22 @@ void MDIBatch::addObject(const Mesh &mesh, uint32_t meshIndex, uint32_t material
     auto vboAlloc = mesh.getVertexAllocation();
     auto iboAlloc = mesh.getIndexAllocation();
 
+    const uint32_t indexSize = m_indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2;
+    const uint32_t vertexSize = m_bufferLayout.calculateVertexSize();
+
     VkDrawIndexedIndirectCommand cmd{};
     cmd.indexCount = mesh.getIndexCount();
     cmd.instanceCount = 1;
-    cmd.firstIndex = static_cast<int32_t>(iboAlloc->offsetBytes /
-                                          (m_indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2)); // Direct element index from BufferPool
-    cmd.vertexOffset = static_cast<int32_t>(vboAlloc->offsetBytes /
-                                            (m_bufferLayout.calculateVertexSize())); // Direct element index from BufferPool
+    // Direct element indices from BufferPool
+    cmd.firstIndex = static_cast<int32_t>(iboAlloc->offsetBytes / indexSize);
+    cmd.vertexOffset = static_cast<int32_t>(vboAlloc->offsetBytes / vertexSize);
     cmd.firstInstance = m_cpuIndirectCommands.size(); // This will be the index into the batch info buffer
 
-    if (iboAlloc->offsetBytes % (m_indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2) != 0) {
+    if (iboAlloc->offsetBytes % indexSize != 0) {
         RP_CORE_ERROR("Index buffer offset is not aligned to index size");
     }
-    if (vboAlloc->offsetBytes % (m_bufferLayout.calculateVertexSize()) != 0) {
-        RP_CORE_ERROR("Vertex buffer offset is not aligned to vertex size | {}",
-                      vboAlloc->offsetBytes % (m_bufferLayout.calculateVertexSize()));
+    if (vboAlloc->offsetBytes % vertexSize != 0) {
+        RP_CORE_ERROR("Vertex buffer offset is not aligned to vertex size | {}", vboAlloc->offsetBytes % vertexSize);
     }
 
     m_cpuIndirectCommands.push_back(cmd);

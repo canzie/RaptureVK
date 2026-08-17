@@ -17,21 +17,21 @@ StaticMesh Primitives::CreateCube()
     BufferAttribute positionAttribute;
     positionAttribute.name = BufferAttributeID::POSITION;
     positionAttribute.componentType = FLOAT_TYPE;
-    positionAttribute.type = "VEC3";
+    positionAttribute.type = BufferAttributeType::VEC3;
     positionAttribute.offset = 0;
     bufferLayout.buffer_attribs.push_back(positionAttribute);
 
     BufferAttribute normalAttribute;
     normalAttribute.name = BufferAttributeID::NORMAL;
     normalAttribute.componentType = FLOAT_TYPE;
-    normalAttribute.type = "VEC3";
+    normalAttribute.type = BufferAttributeType::VEC3;
     normalAttribute.offset = 12;
     bufferLayout.buffer_attribs.push_back(normalAttribute);
 
     BufferAttribute uvAttribute;
     uvAttribute.name = BufferAttributeID::TEXCOORD_0;
     uvAttribute.componentType = FLOAT_TYPE;
-    uvAttribute.type = "VEC2";
+    uvAttribute.type = BufferAttributeType::VEC2;
     uvAttribute.offset = 24;
     bufferLayout.buffer_attribs.push_back(uvAttribute);
 
@@ -112,21 +112,21 @@ StaticMesh Primitives::CreateSphere(float radius, uint32_t segments)
     BufferAttribute positionAttribute;
     positionAttribute.name = BufferAttributeID::POSITION;
     positionAttribute.componentType = FLOAT_TYPE;
-    positionAttribute.type = "VEC3";
+    positionAttribute.type = BufferAttributeType::VEC3;
     positionAttribute.offset = 0;
     bufferLayout.buffer_attribs.push_back(positionAttribute);
 
     BufferAttribute normalAttribute;
     normalAttribute.name = BufferAttributeID::NORMAL;
     normalAttribute.componentType = FLOAT_TYPE;
-    normalAttribute.type = "VEC3";
+    normalAttribute.type = BufferAttributeType::VEC3;
     normalAttribute.offset = 12;
     bufferLayout.buffer_attribs.push_back(normalAttribute);
 
     BufferAttribute uvAttribute;
     uvAttribute.name = BufferAttributeID::TEXCOORD_0;
     uvAttribute.componentType = FLOAT_TYPE;
-    uvAttribute.type = "VEC2";
+    uvAttribute.type = BufferAttributeType::VEC2;
     uvAttribute.offset = 24;
     bufferLayout.buffer_attribs.push_back(uvAttribute);
 
@@ -204,21 +204,21 @@ StaticMesh Primitives::CreatePlane(float segments)
     BufferAttribute positionAttribute;
     positionAttribute.name = BufferAttributeID::POSITION;
     positionAttribute.componentType = FLOAT_TYPE;
-    positionAttribute.type = "VEC3";
+    positionAttribute.type = BufferAttributeType::VEC3;
     positionAttribute.offset = 0;
     bufferLayout.buffer_attribs.push_back(positionAttribute);
 
     BufferAttribute normalAttribute;
     normalAttribute.name = BufferAttributeID::NORMAL;
     normalAttribute.componentType = FLOAT_TYPE;
-    normalAttribute.type = "VEC3";
+    normalAttribute.type = BufferAttributeType::VEC3;
     normalAttribute.offset = 12;
     bufferLayout.buffer_attribs.push_back(normalAttribute);
 
     BufferAttribute uvAttribute;
     uvAttribute.name = BufferAttributeID::TEXCOORD_0;
     uvAttribute.componentType = FLOAT_TYPE;
-    uvAttribute.type = "VEC2";
+    uvAttribute.type = BufferAttributeType::VEC2;
     uvAttribute.offset = 24;
     bufferLayout.buffer_attribs.push_back(uvAttribute);
 
@@ -284,7 +284,7 @@ StaticMesh Primitives::CreateLine(float start, float end)
     BufferAttribute positionAttribute;
     positionAttribute.name = BufferAttributeID::POSITION;
     positionAttribute.componentType = FLOAT_TYPE;
-    positionAttribute.type = "VEC3";
+    positionAttribute.type = BufferAttributeType::VEC3;
     positionAttribute.offset = 0;
     bufferLayout.buffer_attribs.push_back(positionAttribute);
 

@@ -46,13 +46,9 @@ servers
 - virtual texturing??? like decima i guess
 
 ---
-
+- fix assets with no texcoords and stuff excluded from ddgi
 - make a new panel for the scene object tree where components can be authored, also check if we should allow this sort of inline?
 - parseanimations from gltf
-- parse bones
-- add some macros for compiling gbuffer vertex shader with joints/weights
-    - create an ecs component to query all meshes with bones/skeleton references
-- skeleton asset i guess
 - animation events
 - editor side of this, including a timeline for the animation and a panel to view skeletons? or skeletal meshes maybe? or maybe just a skeleton panel with a mesh preview?
 - get lua in for something basic, then get a basic text editor in the engine, nothing fancy, then check for highlighting.

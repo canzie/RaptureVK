@@ -102,7 +102,7 @@ void SceneRenderTarget::onSwapChainRecreated()
     if (m_type == TargetType::SWAPCHAIN && m_swapChain) {
         m_width = m_swapChain->getExtent().width;
         m_height = m_swapChain->getExtent().height;
-        m_swapChainLayouts.assign(m_swapChain->getImageCount(), VK_IMAGE_LAYOUT_UNDEFINED);
+        m_swapChainStates.assign(m_swapChain->getImageCount(), TextureState{});
         RP_CORE_INFO("SceneRenderTarget updated after swapchain recreation: {}x{}", m_width, m_height);
     }
     // For OFFSCREEN type, this is a no-op - viewport size is independent
@@ -179,17 +179,7 @@ std::shared_ptr<Texture> SceneRenderTarget::getTexture(uint32_t index) const
 
 VkImageLayout SceneRenderTarget::getImageLayout(uint32_t index) const
 {
-    if (m_type == TargetType::OFFSCREEN) {
-        if (index < m_offscreenTextures.size()) {
-            return m_offscreenTextures[index]->getCurrentLayout();
-        }
-        return VK_IMAGE_LAYOUT_UNDEFINED;
-    }
-
-    if (index < m_swapChainLayouts.size()) {
-        return m_swapChainLayouts[index];
-    }
-    return VK_IMAGE_LAYOUT_UNDEFINED;
+    return getImageState(index).layout;
 }
 
 void SceneRenderTarget::setImageLayout(uint32_t index, VkImageLayout layout)
@@ -201,35 +191,56 @@ void SceneRenderTarget::setImageLayout(uint32_t index, VkImageLayout layout)
         return;
     }
 
-    if (index >= m_swapChainLayouts.size()) {
-        m_swapChainLayouts.resize(index + 1, VK_IMAGE_LAYOUT_UNDEFINED);
+    // a layout recorded without a stage leaves nothing to wait on precisely, so the next barrier
+    // out of it has to wait on everything
+    setImageState(index, {layout, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                          VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT});
+}
+
+TextureState SceneRenderTarget::getImageState(uint32_t index) const
+{
+    if (m_type == TargetType::OFFSCREEN) {
+        if (index < m_offscreenTextures.size()) {
+            return m_offscreenTextures[index]->getState();
+        }
+        return {};
     }
-    m_swapChainLayouts[index] = layout;
+
+    if (index < m_swapChainStates.size()) {
+        return m_swapChainStates[index];
+    }
+    return {};
+}
+
+void SceneRenderTarget::setImageState(uint32_t index, const TextureState &state)
+{
+    if (m_type == TargetType::OFFSCREEN) {
+        if (index < m_offscreenTextures.size()) {
+            m_offscreenTextures[index]->setState(state);
+        }
+        return;
+    }
+
+    if (index >= m_swapChainStates.size()) {
+        m_swapChainStates.resize(index + 1);
+    }
+    m_swapChainStates[index] = state;
 }
 
 void SceneRenderTarget::transitionToShaderReadLayout(CommandBuffer *commandBuffer, uint32_t imageIndex)
 {
-    if (m_type != TargetType::OFFSCREEN) {
+    if (m_type != TargetType::OFFSCREEN || imageIndex >= m_offscreenTextures.size()) {
         return; // Only offscreen targets need this transition
     }
 
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = getImage(imageIndex);
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    VkImageMemoryBarrier2 barrier = m_offscreenTextures[imageIndex]->getBarrier2(TEXTURE_USAGE_SAMPLED_FRAGMENT);
 
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    VkDependencyInfo dependency{};
+    dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency.imageMemoryBarrierCount = 1;
+    dependency.pImageMemoryBarriers = &barrier;
+
+    vkCmdPipelineBarrier2(commandBuffer->getCommandBufferVk(), &dependency);
 }
 
 } // namespace Rapture

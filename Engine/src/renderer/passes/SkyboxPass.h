@@ -25,7 +25,7 @@ class Scene;
 
 class SkyboxPass : public RenderPass {
   public:
-    SkyboxPass(std::vector<Texture *> depthTextures, VkFormat colorFormat);
+    SkyboxPass(VkFormat depthFormat, VkFormat colorFormat);
 
     ~SkyboxPass();
 
@@ -61,7 +61,7 @@ class SkyboxPass : public RenderPass {
 
     Texture *m_skyboxTexture;
     float m_skyIntensity = 1.0f;
-    std::vector<Texture *> m_depthTextures;
+    VkFormat m_depthFormat;
     std::shared_ptr<VertexBuffer> m_skyboxVertexBuffer;
     std::shared_ptr<IndexBuffer> m_skyboxIndexBuffer;
 

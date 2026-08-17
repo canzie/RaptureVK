@@ -31,9 +31,6 @@ struct ComputeResource {
     /// Discard the contents instead of transitioning from the layout the texture tracks, for an
     /// output that is fully overwritten
     bool discardContents = false;
-
-    /// Transition to SHADER_READ_ONLY_OPTIMAL after the dispatch, for a consumer that samples it
-    bool readableAfter = false;
 };
 
 /**
@@ -48,7 +45,7 @@ class ComputePass {
     virtual ~ComputePass() = default;
 
     /**
-     * @brief Transitions the declared resources, records the dispatch, then makes outputs readable
+     * @brief Transitions the declared resources and records the dispatch
      * @param context The frame being rendered
      * @param commandBuffer The buffer to record into
      */

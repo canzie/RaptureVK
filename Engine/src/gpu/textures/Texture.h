@@ -165,13 +165,33 @@ class Texture {
      * single-queue, and while a texture is not transitioned from two threads at once.
      * @return The tracked layout, UNDEFINED before the first transition
      */
-    VkImageLayout getCurrentLayout() const { return m_currentLayout; }
+    VkImageLayout getCurrentLayout() const { return m_state.layout; }
 
     /**
      * @brief Records a layout the image was put into by something that did not go through Texture
      * @param layout The layout the image is now in
      */
-    void setCurrentLayout(VkImageLayout layout) { m_currentLayout = layout; }
+    void setCurrentLayout(VkImageLayout layout);
+
+    /**
+     * @brief The layout the texture is in and the work that last touched it
+     * @return The tracked state
+     */
+    const TextureState &getState() const { return m_state; }
+
+    /**
+     * @brief Records the state the texture was put into by something that did not go through Texture
+     * @param state The state the texture is now in
+     */
+    void setState(const TextureState &state) { m_state = state; }
+
+    /**
+     * @brief Builds a barrier moving the texture into what a usage needs, and records the new state
+     * @param usage The way the texture is about to be touched
+     * @param discardContents Whether the texture's contents are overwritten rather than kept
+     * @return The barrier, for the caller to submit
+     */
+    VkImageMemoryBarrier2 getBarrier2(TextureUsage usage, bool discardContents = false);
 
     /**
      * @brief Builds a barrier out of the tracked layout, and records the new one
@@ -242,7 +262,7 @@ class Texture {
 
     std::unique_ptr<Sampler> m_sampler;
     VkImage m_image = VK_NULL_HANDLE;
-    VkImageLayout m_currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    TextureState m_state;
     VkImageView m_imageView = VK_NULL_HANDLE;
     VkImageView m_imageViewAttachment = VK_NULL_HANDLE;
     VkImageView m_imageViewStencilOnly = VK_NULL_HANDLE;

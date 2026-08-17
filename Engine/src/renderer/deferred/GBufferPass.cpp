@@ -59,9 +59,6 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
     createTerrainPipeline();
     createTextures();
 
-    // Initialize MDI batching system - one set per frame in flight
-    m_geometry = std::make_unique<SceneGeometryDraw>(*m_rc, framesInFlight);
-
     // Bind GBuffer textures to bindless set
     bindGBufferTexturesToBindlessSet();
 
@@ -93,7 +90,6 @@ GBufferPass::~GBufferPass()
     m_albedoSpecTextures.clear();
     m_materialTextures.clear();
     m_shadingModelTextures.clear();
-    m_depthStencilTextures.clear();
 
     // Clean up pipelines
     m_pipeline.reset();
@@ -113,17 +109,6 @@ FramebufferSpecification GBufferPass::getFramebufferSpecification()
     spec.colorAttachments.push_back(VK_FORMAT_R8G8B8A8_UNORM);      // r=shading model id gba=custom data
 
     return spec;
-}
-
-std::vector<Texture *> GBufferPass::getDepthTextures() const
-{
-    std::vector<Texture *> depthTextures;
-    depthTextures.reserve(m_depthStencilTextures.size());
-    for (const std::unique_ptr<Texture> &texture : m_depthStencilTextures) {
-        depthTextures.push_back(texture.get());
-    }
-
-    return depthTextures;
 }
 
 CommandBuffer *GBufferPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
@@ -157,17 +142,21 @@ CommandBuffer *GBufferPass::record(const RenderPassContext &context, const Secon
         recordTerrainCommands(commandBuffer, activeScene, camera, *terrain, currentFrame);
     }
 
-    recordEntityCommands(commandBuffer, activeScene, camera, currentFrame);
+    recordEntityCommands(commandBuffer, context);
 
     commandBuffer->end();
 
     return commandBuffer;
 }
 
-void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &activeScene, ecs::EntityAccessor camera,
-                                       uint32_t currentFrame)
+void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, const RenderPassContext &context)
 {
     RAPTURE_PROFILE_FUNCTION();
+
+    Scene &activeScene = *context.scene;
+    ecs::EntityAccessor camera = context.camera;
+    uint32_t currentFrame = context.frameInFlight;
+    SceneGeometryDraw *geometry = context.opaqueGeometry;
 
     m_pipeline->bind(secondaryCb->getCommandBufferVk());
 
@@ -185,19 +174,6 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
     scissor.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height)};
     vkCmdSetScissor(secondaryCb->getCommandBufferVk(), 0, 1, &scissor);
 
-    const CameraComponent *cameraComp = nullptr;
-
-    if (camera.isValid()) {
-        cameraComp = camera.tryRead<CameraComponent>();
-    }
-
-    const Frustum *frustum = nullptr;
-    if (cameraComp != nullptr && activeScene.getSettings().frustumCullingEnabled) {
-        frustum = &cameraComp->frustum;
-    }
-
-    m_geometry->populate(activeScene, frustum, currentFrame);
-
     // bind descriptor sets
     m_rc->descriptorManager->bindSet(0, secondaryCb, m_pipeline); // camera stuff
     m_rc->descriptorManager->bindSet(1, secondaryCb, m_pipeline); // materials
@@ -214,7 +190,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
     // the initial bind above, so the first batch only rebinds if it is skinned
     GraphicsPipeline *boundPipeline = m_pipeline.get();
 
-    for (MDIBatch *batch : m_geometry->batches(currentFrame)) {
+    for (MDIBatch *batch : geometry->batches(currentFrame)) {
         RAPTURE_PROFILE_SCOPE("Draw Batch");
 
         // a batch is keyed on its vertex layout, so it is skinned or unskinned as a whole
@@ -229,7 +205,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, Scene &active
             boundPipeline = pipeline;
         }
 
-        m_geometry->bindBatch(secondaryCb, batch);
+        geometry->bindBatch(secondaryCb, batch);
 
         // Set push constants for this batch
         GBufferPushConstants pushConstants{};
@@ -282,19 +258,12 @@ void GBufferPass::updateAttachments(const RenderPassContext &context)
     colorAttachment.target = m_shadingModelTextures[frame].get();
     m_attachments.colorAttachments.push_back(colorAttachment);
 
-    m_attachments.depthAttachment.target = m_depthStencilTextures[frame].get();
-    m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::CLEAR;
+    // the prepass laid this frame's depth down already, so it is loaded rather than cleared
+    m_attachments.depthAttachment.target = context.targets->depthStencil;
+    m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::LOAD;
     m_attachments.depthAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
-    m_attachments.depthAttachment.clearDepth = 1.0f;
-    m_attachments.depthAttachment.clearStencil = 0;
 
     m_attachments.stencilAttachment = m_attachments.depthAttachment;
-}
-
-void GBufferPass::endRendering(CommandBuffer *primaryCb)
-{
-    RenderPass::endRendering(primaryCb);
-    transitionToShaderReadableLayout(primaryCb, m_currentFrame);
 }
 
 void GBufferPass::onResize(uint32_t width, uint32_t height)
@@ -304,35 +273,6 @@ void GBufferPass::onResize(uint32_t width, uint32_t height)
     // is also what shader/pipeline hot reloading needs.
     m_width = static_cast<float>(width);
     m_height = static_cast<float>(height);
-}
-
-void GBufferPass::transitionToShaderReadableLayout(CommandBuffer *primaryCb, uint32_t currentFrame)
-{
-    RAPTURE_PROFILE_FUNCTION();
-
-    VkImageMemoryBarrier barriers[GBUFFER_ATTACHMENT_COUNT + 1];
-    barriers[0] = m_normalTextures[currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        VK_ACCESS_SHADER_READ_BIT);
-    barriers[1] = m_albedoSpecTextures[currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        VK_ACCESS_SHADER_READ_BIT);
-    barriers[2] = m_materialTextures[currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        VK_ACCESS_SHADER_READ_BIT);
-    barriers[3] = m_shadingModelTextures[currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        VK_ACCESS_SHADER_READ_BIT);
-    uint32_t barrierCount = GBUFFER_ATTACHMENT_COUNT;
-
-    barriers[barrierCount++] = m_depthStencilTextures[currentFrame]->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-
-    vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(),
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                         barrierCount, barriers);
 }
 
 void GBufferPass::createTextures()
@@ -365,20 +305,12 @@ void GBufferPass::createTextures()
     shadingModelSpec.type = TextureType::TEXTURE2D;
     shadingModelSpec.srgb = false;
 
-    TextureSpecification depthStencilSpec;
-    depthStencilSpec.width = static_cast<uint32_t>(m_width);
-    depthStencilSpec.height = static_cast<uint32_t>(m_height);
-    depthStencilSpec.format = TextureFormat::D24S8;
-    depthStencilSpec.type = TextureType::TEXTURE2D;
-    depthStencilSpec.srgb = false;
-
     // Create textures for each frame in flight
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
         m_normalTextures.push_back(std::make_unique<Texture>(normalSpec));
         m_albedoSpecTextures.push_back(std::make_unique<Texture>(albedoSpec));
         m_materialTextures.push_back(std::make_unique<Texture>(materialSpec));
         m_shadingModelTextures.push_back(std::make_unique<Texture>(shadingModelSpec));
-        m_depthStencilTextures.push_back(std::make_unique<Texture>(depthStencilSpec));
     }
 }
 
@@ -390,7 +322,6 @@ void GBufferPass::bindGBufferTexturesToBindlessSet()
     m_albedoTextureIndices.resize(m_framesInFlight);
     m_materialTextureIndices.resize(m_framesInFlight);
     m_shadingModelTextureIndices.resize(m_framesInFlight);
-    m_depthTextureIndices.resize(m_framesInFlight);
 
     // Add each texture to the bindless set and store the indices
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
@@ -398,11 +329,9 @@ void GBufferPass::bindGBufferTexturesToBindlessSet()
         m_albedoTextureIndices[i] = m_albedoSpecTextures[i]->getBindlessIndex();
         m_materialTextureIndices[i] = m_materialTextures[i]->getBindlessIndex();
         m_shadingModelTextureIndices[i] = m_shadingModelTextures[i]->getBindlessIndex();
-        m_depthTextureIndices[i] = m_depthStencilTextures[i]->getBindlessIndex();
 
         if (m_normalTextureIndices[i] == UINT32_MAX || m_albedoTextureIndices[i] == UINT32_MAX ||
-            m_materialTextureIndices[i] == UINT32_MAX || m_shadingModelTextureIndices[i] == UINT32_MAX ||
-            m_depthTextureIndices[i] == UINT32_MAX) {
+            m_materialTextureIndices[i] == UINT32_MAX || m_shadingModelTextureIndices[i] == UINT32_MAX) {
             RP_CORE_ERROR("Failed to add GBuffer texture(s) to bindless array for frame {}", i);
         }
     }
@@ -491,7 +420,7 @@ void GBufferPass::createPipeline(bool skinned)
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
     depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
@@ -621,7 +550,7 @@ void GBufferPass::createTerrainPipeline()
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
     depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 

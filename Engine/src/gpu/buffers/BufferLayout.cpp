@@ -20,6 +20,42 @@ BufferAttributeID stringToBufferAttributeID(const std::string &str)
     }
 }
 
+BufferAttributeType BufferAttributeType_fromString(std::string_view str)
+{
+    if (str == "VEC2") {
+        return BufferAttributeType::VEC2;
+    }
+    if (str == "VEC3") {
+        return BufferAttributeType::VEC3;
+    }
+    if (str == "VEC4") {
+        return BufferAttributeType::VEC4;
+    }
+    if (str == "MAT4") {
+        return BufferAttributeType::MAT4;
+    }
+
+    return BufferAttributeType::SCALAR;
+}
+
+std::string_view BufferAttributeType_toString(BufferAttributeType type)
+{
+    switch (type) {
+    case BufferAttributeType::SCALAR:
+        return "SCALAR";
+    case BufferAttributeType::VEC2:
+        return "VEC2";
+    case BufferAttributeType::VEC3:
+        return "VEC3";
+    case BufferAttributeType::VEC4:
+        return "VEC4";
+    case BufferAttributeType::MAT4:
+        return "MAT4";
+    }
+
+    return "SCALAR";
+}
+
 std::string bufferAttributeIDToString(BufferAttributeID id)
 {
     switch (id) {

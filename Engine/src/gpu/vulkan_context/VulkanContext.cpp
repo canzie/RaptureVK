@@ -836,6 +836,33 @@ static bool s_enableDynamicRendering(VkPhysicalDevice physicalDevice, VkPhysical
     return true;
 }
 
+static bool s_enableSynchronization2(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
+                                     VkPhysicalDeviceSynchronization2Features &outFeatures)
+{
+    VkPhysicalDeviceSynchronization2Features supported{};
+    supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+
+    VkPhysicalDeviceFeatures2 query{};
+    query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    query.pNext = &supported;
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &query);
+
+    if (supported.synchronization2) {
+        outFeatures = {};
+        outFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+        outFeatures.synchronization2 = VK_TRUE;
+
+        s_appendToPNextChain(featuresToEnable, reinterpret_cast<VkBaseOutStructure *>(&outFeatures));
+
+        RP_CORE_INFO("synchronization2 enabled.");
+    } else {
+        RP_CORE_WARN("synchronization2 NOT supported.");
+        return false;
+    }
+    return true;
+}
+
 static bool s_enableMeshShader(VkPhysicalDevice physicalDevice, VkPhysicalDeviceFeatures2 &featuresToEnable,
                                VkPhysicalDeviceMeshShaderFeaturesEXT &outFeatures)
 {
@@ -1270,6 +1297,9 @@ void VulkanContext::createLogicalDevice(VkSurfaceKHR surface)
 
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRendering{};
     m_isDynamicRenderingEnabled = s_enableDynamicRendering(m_physicalDevice, physicalDeviceFeaturesToEnable, dynamicRendering);
+
+    VkPhysicalDeviceSynchronization2Features synchronization2{};
+    m_isSynchronization2Enabled = s_enableSynchronization2(m_physicalDevice, physicalDeviceFeaturesToEnable, synchronization2);
 
     VkPhysicalDeviceMeshShaderFeaturesEXT meshShader{};
     m_isMeshShaderEnabled = s_enableMeshShader(m_physicalDevice, physicalDeviceFeaturesToEnable, meshShader);

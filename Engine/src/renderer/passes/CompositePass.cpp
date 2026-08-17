@@ -134,8 +134,6 @@ void CompositePass::beginRendering(const RenderPassContext &context, CommandBuff
         return;
     }
 
-    transitionSceneColorForSampling(primaryCb, context.targets->sceneColorHdr);
-
     // The presented image is picked by image index rather than by frame in flight, and the two do
     // not advance together, so the cached attachments cannot be reused across frames
     invalidateAttachments();
@@ -143,20 +141,17 @@ void CompositePass::beginRendering(const RenderPassContext &context, CommandBuff
     RenderPass::beginRendering(context, primaryCb);
 }
 
+void CompositePass::fillInputs(const RenderPassContext &context)
+{
+    if (context.targets->sceneColorHdr != nullptr) {
+        m_inputs.push_back({context.targets->sceneColorHdr, TEXTURE_USAGE_SAMPLED_FRAGMENT});
+    }
+}
+
 void CompositePass::onResize(uint32_t width, uint32_t height)
 {
     m_width = static_cast<float>(width);
     m_height = static_cast<float>(height);
-}
-
-void CompositePass::transitionSceneColorForSampling(CommandBuffer *primaryCb, Texture *sceneColor)
-{
-    VkImageMemoryBarrier sceneColorBarrier =
-        sceneColor->getImageMemoryBarrier(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-
-    vkCmdPipelineBarrier(primaryCb->getCommandBufferVk(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &sceneColorBarrier);
 }
 
 void CompositePass::createPipeline()

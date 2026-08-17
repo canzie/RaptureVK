@@ -5,15 +5,15 @@
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
 
+#include "core/ecs/entity_accessor.h"
 #include "gpu/buffers/UniformBuffer.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorSet.h"
 #include "scene/Scene.h"
-#include "core/ecs/entity_accessor.h"
 
-#include "renderer/passes/RenderPass.h"
 #include "gpu/textures/Texture.h"
+#include "renderer/passes/RenderPass.h"
 #include <memory>
 
 #include "renderer/gi/ddgi/DynamicDiffuseGI.h"
@@ -32,6 +32,7 @@ class LightingPass : public RenderPass {
 
   protected:
     void updateAttachments(const RenderPassContext &context) override;
+    void fillInputs(const RenderPassContext &context) override;
 
   private:
     void createPipeline();

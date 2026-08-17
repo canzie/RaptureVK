@@ -38,16 +38,10 @@ class CompositePass : public RenderPass {
 
   protected:
     void updateAttachments(const RenderPassContext &context) override;
+    void fillInputs(const RenderPassContext &context) override;
 
   private:
     void createPipeline();
-
-    /**
-     * @brief Transition the scene colour this pass samples into a shader readable layout
-     * @param primaryCb Primary buffer the rendering is issued on
-     * @param sceneColor HDR scene colour this pass samples
-     */
-    void transitionSceneColorForSampling(CommandBuffer *primaryCb, Texture *sceneColor);
 
   private:
     const RenderContext *m_rc = nullptr;

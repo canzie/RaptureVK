@@ -494,8 +494,8 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
         int componentType = getInt(getObjectValue(accessor, "componentType"), 0);
         const char *type = getString(getObjectValue(accessor, "type"), "");
 
-        bufferLayout.buffer_attribs.push_back(
-            {stringToBufferAttributeID(name), static_cast<uint32_t>(componentType), std::string(type), attrOffsets[i]});
+        bufferLayout.buffer_attribs.push_back({stringToBufferAttributeID(name), static_cast<uint32_t>(componentType),
+                                               BufferAttributeType_fromString(type), attrOffsets[i]});
     }
 
     bufferLayout.isInterleaved = true;

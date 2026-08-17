@@ -19,8 +19,8 @@ struct SkyboxPushConstants {
     float skyIntensity;
 };
 
-SkyboxPass::SkyboxPass(std::vector<Texture *> depthTextures, VkFormat colorFormat)
-    : m_skyboxTexture(nullptr), m_depthTextures(std::move(depthTextures)), m_width(0.0f), m_height(0.0f), m_colorFormat(colorFormat)
+SkyboxPass::SkyboxPass(VkFormat depthFormat, VkFormat colorFormat)
+    : m_skyboxTexture(nullptr), m_depthFormat(depthFormat), m_width(0.0f), m_height(0.0f), m_colorFormat(colorFormat)
 {
 
     auto &app = Application::getInstance();
@@ -233,7 +233,7 @@ void SkyboxPass::createPipeline()
     config.depthStencilState = depthStencil;
 
     FramebufferSpecification fbSpec;
-    fbSpec.depthAttachment = m_depthTextures[0]->getFormat();
+    fbSpec.depthAttachment = m_depthFormat;
     fbSpec.colorAttachments.push_back(m_colorFormat);
     config.framebufferSpec = fbSpec;
     config.shader = m_shader;
@@ -274,7 +274,7 @@ void SkyboxPass::updateAttachments(const RenderPassContext &context)
     m_attachments.colorAttachments.push_back(colorAttachment);
 
     m_attachments.depthAttachment = {};
-    m_attachments.depthAttachment.target = m_depthTextures[context.frameInFlight];
+    m_attachments.depthAttachment.target = context.targets->depthStencil;
     m_attachments.depthAttachment.loadOp = RenderPassAttachmentLoadOp::LOAD;
     m_attachments.depthAttachment.storeOp = RenderPassAttachmentStoreOp::STORE;
 

@@ -1,30 +1,31 @@
 #ifndef RAPTURE__RENDERER_H
 #define RAPTURE__RENDERER_H
 
-#include "core/ecs/entity_accessor.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/render_targets/SceneRenderTarget.h"
-#include "gpu/swap_chains/SwapChain.h"
+#include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/vulkan_context/RenderContext.h"
-#include "gpu/vulkan_context/VulkanQueue.h"
-#include "renderer/RenderSettings.h"
+#include "renderer/passes/RenderPassContext.h"
 
-#include <memory>
+#include <cstdint>
 
 namespace Rapture {
 
-class Scene;
+struct JobContext;
 
 /**
- * @brief Creation-time configuration for a renderer and its render target.
+ * @brief Creation-time configuration for a renderer
  */
 struct RendererConfig {
-    SceneRenderTarget::TargetType targetType;
+    uint32_t width;
+    uint32_t height;
     uint32_t framesInFlight;
-    bool allowReadback = false;
+    VkFormat outputFormat;
+    VkFormat sceneColorFormat;
     bool enableAccelerationStructures = true;
 };
 
+/**
+ * @brief An ordered set of passes drawing into a frame a DrawManager owns
+ */
 class Renderer {
   public:
     Renderer(RenderContext renderContext, const RendererConfig &config);
@@ -33,48 +34,46 @@ class Renderer {
     Renderer(const Renderer &) = delete;
     Renderer &operator=(const Renderer &) = delete;
 
-    virtual void drawFrame(Scene &activeScene, ecs::EntityAccessor camera, const RenderSettings &settings) = 0;
-    virtual void onSwapChainRecreated() = 0;
+    /**
+     * @brief What this renderer is called in profiles and job listings
+     * @return The name, a literal that outlives the renderer
+     */
+    virtual const char *name() const = 0;
 
     /**
-     * @brief Resize this renderer's render target to match its viewport.
-     * @param width New target width in pixels.
-     * @param height New target height in pixels.
+     * @brief Record this renderer's secondary buffers
+     *
+     * Runs as a job, and is called for every renderer of a phase before any of them replays.
+     *
+     * @param context The frame being drawn
+     * @param jobContext The job this runs on, which any nested wait has to yield through
      */
-    virtual void resizeRenderTarget(uint32_t width, uint32_t height) = 0;
-
-    SceneRenderTarget &getSceneRenderTarget() { return *m_sceneRenderTarget; }
-    const SceneRenderTarget &getSceneRenderTarget() const { return *m_sceneRenderTarget; }
-    uint32_t getCurrentFrame() const { return m_currentFrame; }
+    virtual void recordSecondaries(const RenderPassContext &context, JobContext &jobContext) = 0;
 
     /**
-     * @brief Index of the render target slot most recently fully rendered.
+     * @brief Replay what recordSecondaries produced into the frame
      *
-     * Only advances on an actual render, so consumers that sample the output
-     * stay aligned even on frames where drawFrame early-returns.
+     * Runs in phase order on the thread driving the frame, since the layout transitions it emits
+     * are tracked as one linear sequence.
      *
-     * @return The slot index of the most recently rendered frame.
+     * @param context The frame being drawn
+     * @param primaryCb Primary buffer the frame is recorded into
      */
-    uint32_t getLastRenderedFrameIndex() const { return m_lastRenderedFrame; }
-    SceneRenderTarget::TargetType getTargetType() const { return m_config.targetType; }
+    virtual void replay(const RenderPassContext &context, CommandBuffer *primaryCb) = 0;
+
+    /**
+     * @brief Rebuild what this renderer sizes to the target
+     * @param width New target width in pixels
+     * @param height New target height in pixels
+     */
+    virtual void onResize(uint32_t width, uint32_t height) = 0;
 
   protected:
     RenderContext m_renderContext;
     RendererConfig m_config;
 
-    std::shared_ptr<SwapChain> m_swapChain;
-    std::unique_ptr<SceneRenderTarget> m_sceneRenderTarget;
-
-    std::shared_ptr<VulkanQueue> m_graphicsQueue;
-    std::shared_ptr<VulkanQueue> m_presentQueue;
-
-    CommandPoolHash m_commandPoolHash = 0;
-    uint32_t m_currentFrame = 0;
-    uint32_t m_lastRenderedFrame = 0;
-
     float m_width = 0.0f;
     float m_height = 0.0f;
-    bool m_framebufferNeedsResize = false;
 };
 
 } // namespace Rapture

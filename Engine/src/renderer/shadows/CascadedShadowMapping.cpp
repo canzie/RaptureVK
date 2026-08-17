@@ -353,9 +353,6 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
             continue;
         }
 
-        // Update world bounding box if transform changed
-        registry.write<StaticMeshComponent>(entity, 0)->updateWorldBoundingBox(transform);
-
         // Get buffer allocation info to determine batch
         auto vboAlloc = meshComp.mesh->getVertexAllocation();
         auto iboAlloc = meshComp.mesh->getIndexAllocation();

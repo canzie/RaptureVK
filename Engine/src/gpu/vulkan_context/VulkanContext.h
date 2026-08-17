@@ -56,6 +56,7 @@ class VulkanContext {
     bool isVertexInputDynamicStateEnabled() const { return m_isVertexInputDynamicStateEnabled; }
     bool isVertexAttributeRobustnessEnabled() const { return m_isVertexAttributeRobustnessEnabled; }
     bool isDynamicRenderingEnabled() const { return m_isDynamicRenderingEnabled; }
+    bool isSynchronization2Enabled() const { return m_isSynchronization2Enabled; }
     bool isExtendedDynamicState3Enabled() const { return m_isExtendedDynamicState3Enabled; }
     bool isNullDescriptorEnabled() const { return m_isNullDescriptorEnabled; }
     bool isRayTracingEnabled() const { return m_isRayTracingEnabled; }
@@ -155,6 +156,7 @@ class VulkanContext {
     bool m_isVertexInputDynamicStateEnabled;
     bool m_isVertexAttributeRobustnessEnabled;
     bool m_isDynamicRenderingEnabled;
+    bool m_isSynchronization2Enabled;
     bool m_isExtendedDynamicState3Enabled;
     bool m_isNullDescriptorEnabled;
     bool m_isRayTracingEnabled;

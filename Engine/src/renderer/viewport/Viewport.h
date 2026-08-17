@@ -2,8 +2,8 @@
 #define RAPTURE__VIEWPORT_H
 
 #include "core/events/EventSignal.h"
+#include "renderer/DrawManager.h"
 #include "renderer/RenderSettings.h"
-#include "renderer/Renderer.h"
 #include "renderer/query/SceneQueryRenderer.h"
 #include "renderer/common.h"
 #include "scene/Scene.h"
@@ -72,8 +72,13 @@ class Viewport {
     RenderSettings &renderSettings() { return m_renderSettings; }
     const RenderSettings &renderSettings() const { return m_renderSettings; }
 
+    /**
+     * @brief Append a renderer to this viewport's draw manager
+     * @param type The kind of renderer to add
+     */
     void createRenderer(RendererType type);
-    Renderer *getRenderer() { return m_renderer.get(); }
+
+    DrawManager &getDrawManager() { return *m_drawManager; }
     RendererType getRendererType() const { return m_rendererType; }
 
     void drawFrame();
@@ -119,7 +124,7 @@ class Viewport {
     ViewportConfig m_config;
     RenderContext m_renderContext;
 
-    std::unique_ptr<Renderer> m_renderer;
+    std::unique_ptr<DrawManager> m_drawManager;
     std::unique_ptr<SceneQueryRenderer> m_queryRenderer;
     RendererType m_rendererType = RendererType::DEFERRED;
 

@@ -3,6 +3,7 @@
 #include "gpu/buffers/Buffers.h"
 
 #include <functional>
+#include <string_view>
 
 namespace Rapture {
 
@@ -21,22 +22,50 @@ enum class BufferAttributeID {
     JOINTS_1 = 10
 };
 
+/**
+ * @brief How many components one attribute holds
+ */
+enum class BufferAttributeType {
+    SCALAR,
+    VEC2,
+    VEC3,
+    VEC4,
+    MAT4
+};
+
 BufferAttributeID stringToBufferAttributeID(const std::string &str);
 std::string bufferAttributeIDToString(BufferAttributeID id);
+
+BufferAttributeType BufferAttributeType_fromString(std::string_view str);
+std::string_view BufferAttributeType_toString(BufferAttributeType type);
 
 struct BufferAttribute {
     BufferAttributeID name;
     uint32_t componentType; // int, float, etc
-    std::string type;       // vec2, vec3, etc
+    BufferAttributeType type;
     uint32_t offset;
+
+    uint32_t componentCount() const
+    {
+        switch (type) {
+        case BufferAttributeType::SCALAR:
+            return 1;
+        case BufferAttributeType::VEC2:
+            return 2;
+        case BufferAttributeType::VEC3:
+            return 3;
+        case BufferAttributeType::VEC4:
+            return 4;
+        case BufferAttributeType::MAT4:
+            return 16;
+        }
+
+        return 1;
+    }
 
     uint32_t getSizeInBytes() const
     {
-        uint32_t elementSize = 1; // For SCALAR
-        if (type == "VEC2") elementSize = 2;
-        else if (type == "VEC3") elementSize = 3;
-        else if (type == "VEC4") elementSize = 4;
-        else if (type == "MAT4") elementSize = 16;
+        uint32_t elementSize = componentCount();
 
         uint32_t componentSize = 1;
         switch (componentType) {
@@ -60,42 +89,43 @@ struct BufferAttribute {
 
     VkFormat getVkFormat() const
     {
-        // Map component types and vector types to VkFormat
-        if (componentType == FLOAT_TYPE) {
-            if (type == "SCALAR") return VK_FORMAT_R32_SFLOAT;
-            else if (type == "VEC2") return VK_FORMAT_R32G32_SFLOAT;
-            else if (type == "VEC3") return VK_FORMAT_R32G32B32_SFLOAT;
-            else if (type == "VEC4") return VK_FORMAT_R32G32B32A32_SFLOAT;
-        } else if (componentType == INT_TYPE) {
-            if (type == "SCALAR") return VK_FORMAT_R32_SINT;
-            else if (type == "VEC2") return VK_FORMAT_R32G32_SINT;
-            else if (type == "VEC3") return VK_FORMAT_R32G32B32_SINT;
-            else if (type == "VEC4") return VK_FORMAT_R32G32B32A32_SINT;
-        } else if (componentType == UNSIGNED_INT_TYPE) {
-            if (type == "SCALAR") return VK_FORMAT_R32_UINT;
-            else if (type == "VEC2") return VK_FORMAT_R32G32_UINT;
-            else if (type == "VEC3") return VK_FORMAT_R32G32B32_UINT;
-            else if (type == "VEC4") return VK_FORMAT_R32G32B32A32_UINT;
-        } else if (componentType == SHORT_TYPE) {
-            if (type == "SCALAR") return VK_FORMAT_R16_SINT;
-            else if (type == "VEC2") return VK_FORMAT_R16G16_SINT;
-            else if (type == "VEC3") return VK_FORMAT_R16G16B16_SINT;
-            else if (type == "VEC4") return VK_FORMAT_R16G16B16A16_SINT;
-        } else if (componentType == UNSIGNED_SHORT_TYPE) {
-            if (type == "SCALAR") return VK_FORMAT_R16_UINT;
-            else if (type == "VEC2") return VK_FORMAT_R16G16_UINT;
-            else if (type == "VEC3") return VK_FORMAT_R16G16B16_UINT;
-            else if (type == "VEC4") return VK_FORMAT_R16G16B16A16_UINT;
-        } else if (componentType == BYTE_TYPE) {
-            if (type == "SCALAR") return VK_FORMAT_R8_SINT;
-            else if (type == "VEC2") return VK_FORMAT_R8G8_SINT;
-            else if (type == "VEC3") return VK_FORMAT_R8G8B8_SINT;
-            else if (type == "VEC4") return VK_FORMAT_R8G8B8A8_SINT;
-        } else if (componentType == UNSIGNED_BYTE_TYPE) {
-            if (type == "SCALAR") return VK_FORMAT_R8_UINT;
-            else if (type == "VEC2") return VK_FORMAT_R8G8_UINT;
-            else if (type == "VEC3") return VK_FORMAT_R8G8B8_UINT;
-            else if (type == "VEC4") return VK_FORMAT_R8G8B8A8_UINT;
+        // one row per component type, indexed by how many components the attribute holds
+        static constexpr VkFormat FLOAT_FORMATS[] = {VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT,
+                                                     VK_FORMAT_R32G32B32A32_SFLOAT};
+        static constexpr VkFormat INT_FORMATS[] = {VK_FORMAT_R32_SINT, VK_FORMAT_R32G32_SINT, VK_FORMAT_R32G32B32_SINT,
+                                                   VK_FORMAT_R32G32B32A32_SINT};
+        static constexpr VkFormat UINT_FORMATS[] = {VK_FORMAT_R32_UINT, VK_FORMAT_R32G32_UINT, VK_FORMAT_R32G32B32_UINT,
+                                                    VK_FORMAT_R32G32B32A32_UINT};
+        static constexpr VkFormat SHORT_FORMATS[] = {VK_FORMAT_R16_SINT, VK_FORMAT_R16G16_SINT, VK_FORMAT_R16G16B16_SINT,
+                                                     VK_FORMAT_R16G16B16A16_SINT};
+        static constexpr VkFormat USHORT_FORMATS[] = {VK_FORMAT_R16_UINT, VK_FORMAT_R16G16_UINT, VK_FORMAT_R16G16B16_UINT,
+                                                      VK_FORMAT_R16G16B16A16_UINT};
+        static constexpr VkFormat BYTE_FORMATS[] = {VK_FORMAT_R8_SINT, VK_FORMAT_R8G8_SINT, VK_FORMAT_R8G8B8_SINT,
+                                                    VK_FORMAT_R8G8B8A8_SINT};
+        static constexpr VkFormat UBYTE_FORMATS[] = {VK_FORMAT_R8_UINT, VK_FORMAT_R8G8_UINT, VK_FORMAT_R8G8B8_UINT,
+                                                     VK_FORMAT_R8G8B8A8_UINT};
+
+        if (type == BufferAttributeType::MAT4) {
+            return VK_FORMAT_UNDEFINED;
+        }
+
+        const uint32_t components = componentCount() - 1;
+
+        switch (componentType) {
+        case FLOAT_TYPE:
+            return FLOAT_FORMATS[components];
+        case INT_TYPE:
+            return INT_FORMATS[components];
+        case UNSIGNED_INT_TYPE:
+            return UINT_FORMATS[components];
+        case SHORT_TYPE:
+            return SHORT_FORMATS[components];
+        case UNSIGNED_SHORT_TYPE:
+            return USHORT_FORMATS[components];
+        case BYTE_TYPE:
+            return BYTE_FORMATS[components];
+        case UNSIGNED_BYTE_TYPE:
+            return UBYTE_FORMATS[components];
         }
 
         // Default fallback - should not happen with valid input
@@ -152,9 +182,10 @@ struct BufferLayout {
         size_t hash = 0;
         for (const auto &attrib : buffer_attribs) {
             // Combine hashes of the attribute properties
-            size_t attribHash = std::hash<std::string>()(bufferAttributeIDToString(attrib.name)) ^
+            size_t attribHash = std::hash<uint32_t>()(static_cast<uint32_t>(attrib.name)) ^
                                 (std::hash<unsigned int>()(attrib.componentType) << 1) ^
-                                (std::hash<std::string>()(attrib.type) << 2) ^ (std::hash<size_t>()(attrib.offset) << 3);
+                                (std::hash<uint32_t>()(static_cast<uint32_t>(attrib.type)) << 2) ^
+                                (std::hash<size_t>()(attrib.offset) << 3);
             hash ^= attribHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         }
         // Add interleaved flag to the hash
@@ -232,7 +263,7 @@ struct BufferLayout {
                 break;
             case BufferAttributeID::TANGENT:
                 flags |= FLAG_HAS_TANGENTS;
-                if (attrib.type == "VEC4") {
+                if (attrib.type == BufferAttributeType::VEC4) {
                     flags |= FLAG_HAS_BITANGENTS;
                 }
                 break;

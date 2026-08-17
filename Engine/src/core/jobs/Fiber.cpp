@@ -4,6 +4,7 @@
 #include "core/utils/TracyProfiler.h"
 #include "core/utils/rp_assert.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <thread>
@@ -76,7 +77,7 @@ extern "C" void fiberEntryPointImpl()
 {
     Fiber *fiber = t_currentFiber;
 
-    RAPTURE_PROFILE_FIBER_ENTER("Job Fiber");
+    RAPTURE_PROFILE_FIBER_ENTER(fiber->profileName);
 
     JobContext ctx{&JobSystem::instance(), &fiber->currentJob, fiber};
 
@@ -99,7 +100,7 @@ void Fiber::switchToScheduler()
 {
     RAPTURE_PROFILE_FIBER_LEAVE;
     fiber_switch(&this->context, &t_schedulerFiber.context);
-    RAPTURE_PROFILE_FIBER_ENTER("Job Fiber");
+    RAPTURE_PROFILE_FIBER_ENTER(profileName);
 }
 
 void initializeFiber(Fiber *fiber)
@@ -204,6 +205,8 @@ void FiberPool::initializeFiberStacks()
             std::abort();
         }
 #endif // RAPTURE_FIBER_GUARD_PAGE
+
+        std::snprintf(fiber.profileName, sizeof(fiber.profileName), "Job Fiber %zu", i);
 
         initializeFiber(&fiber);
         m_fibers[i].inUse.store(false, std::memory_order_relaxed);

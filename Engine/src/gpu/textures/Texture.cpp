@@ -580,16 +580,56 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
     }
 }
 
+static VkImageSubresourceRange s_subresourceRange(const TextureSpecification &spec)
+{
+    VkImageSubresourceRange range{};
+    range.aspectMask = getImageAspectFlags(spec.format);
+    range.baseMipLevel = 0;
+    range.levelCount = spec.mipLevels;
+    range.baseArrayLayer = 0;
+    range.layerCount = isCubeType(spec.type) ? 6 : (isArrayType(spec.type) ? spec.depth : 1);
+    return range;
+}
+
+void Texture::setCurrentLayout(VkImageLayout layout)
+{
+    // a layout recorded without a stage leaves nothing to wait on precisely, so the next barrier
+    // out of it has to wait on everything
+    m_state = {layout, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
+}
+
+VkImageMemoryBarrier2 Texture::getBarrier2(TextureUsage usage, bool discardContents)
+{
+    const TextureState target = TextureState_forUsage(usage);
+
+    VkImageMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = m_state.stage;
+    barrier.srcAccessMask = m_state.access;
+    barrier.dstStageMask = target.stage;
+    barrier.dstAccessMask = target.access;
+    barrier.oldLayout = discardContents ? VK_IMAGE_LAYOUT_UNDEFINED : m_state.layout;
+    barrier.newLayout = target.layout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = m_image;
+    barrier.subresourceRange = s_subresourceRange(m_spec);
+
+    m_state = target;
+
+    return barrier;
+}
+
 VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout newLayout, VkAccessFlags srcAccessMask,
                                                     VkAccessFlags dstAccessMask)
 {
-    return getImageMemoryBarrier(m_currentLayout, newLayout, srcAccessMask, dstAccessMask);
+    return getImageMemoryBarrier(m_state.layout, newLayout, srcAccessMask, dstAccessMask);
 }
 
 VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags srcAccessMask,
                                                     VkAccessFlags dstAccessMask)
 {
-    m_currentLayout = newLayout;
+    setCurrentLayout(newLayout);
 
     VkImageMemoryBarrier barrier{};
     // Image layout transitions for dynamic rendering
@@ -599,14 +639,7 @@ VkImageMemoryBarrier Texture::getImageMemoryBarrier(VkImageLayout oldLayout, VkI
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = m_image;
-    barrier.subresourceRange.aspectMask = isDepthFormat(m_spec.format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-    if (m_spec.format == TextureFormat::D24S8) {
-        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    }
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = m_spec.mipLevels;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = isCubeType(m_spec.type) ? 6 : (isArrayType(m_spec.type) ? m_spec.depth : 1);
+    barrier.subresourceRange = s_subresourceRange(m_spec);
     barrier.srcAccessMask = srcAccessMask;
     barrier.dstAccessMask = dstAccessMask;
     return barrier;
@@ -1337,7 +1370,7 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
         return;
     }
 
-    m_currentLayout = newLayout;
+    setCurrentLayout(newLayout);
 
     auto &app = Application::getInstance();
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
@@ -1353,7 +1386,7 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
 void Texture::recordTransitionImageLayout(VkCommandBuffer cmd, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
-    m_currentLayout = newLayout;
+    setCurrentLayout(newLayout);
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;

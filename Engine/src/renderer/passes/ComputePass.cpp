@@ -7,25 +7,12 @@
 namespace Rapture {
 
 // A storage image must be GENERAL, anything only sampled can stay in the read-only layout
-static VkImageLayout s_dispatchLayout(ComputeResourceAccess access)
+static TextureUsage s_dispatchUsage(ComputeResourceAccess access)
 {
     if (access == ComputeResourceAccess::READ) {
-        return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        return TEXTURE_USAGE_SAMPLED_COMPUTE;
     }
-    return VK_IMAGE_LAYOUT_GENERAL;
-}
-
-static VkAccessFlags s_dispatchAccess(ComputeResourceAccess access)
-{
-    switch (access) {
-    case ComputeResourceAccess::READ:
-        return VK_ACCESS_SHADER_READ_BIT;
-    case ComputeResourceAccess::WRITE:
-        return VK_ACCESS_SHADER_WRITE_BIT;
-    case ComputeResourceAccess::READ_WRITE:
-        return VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-    }
-    return VK_ACCESS_SHADER_READ_BIT;
+    return TEXTURE_USAGE_STORAGE_COMPUTE;
 }
 
 uint32_t ComputePass::groupCount(uint32_t threads, uint32_t localSize)
@@ -51,55 +38,27 @@ void ComputePass::execute(const RenderPassContext &context, CommandBuffer *comma
 
     const std::vector<ComputeResource> &resources = getResources(context);
 
-    std::vector<VkImageMemoryBarrier> barriers;
+    std::vector<VkImageMemoryBarrier2> barriers;
     barriers.reserve(resources.size());
-
-    // A resource entering from UNDEFINED has no prior contents to wait on, so only one that carries
-    // real data forces a dependency on the work that produced it
-    VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
     for (const ComputeResource &resource : resources) {
         if (resource.texture == nullptr) {
             continue;
         }
 
-        const VkImageLayout target = s_dispatchLayout(resource.access);
-        const VkImageLayout current = resource.discardContents ? VK_IMAGE_LAYOUT_UNDEFINED : resource.texture->getCurrentLayout();
-
-        if (current != VK_IMAGE_LAYOUT_UNDEFINED) {
-            // TODO: conservative until Texture also tracks the stage that last wrote it
-            srcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-        }
-
-        if (current == target) {
-            continue;
-        }
-
-        barriers.push_back(resource.texture->getImageMemoryBarrier(current, target, 0, s_dispatchAccess(resource.access)));
+        barriers.push_back(resource.texture->getBarrier2(s_dispatchUsage(resource.access), resource.discardContents));
     }
 
     if (!barriers.empty()) {
-        vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), srcStage, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0,
-                             nullptr, static_cast<uint32_t>(barriers.size()), barriers.data());
+        VkDependencyInfo dependency{};
+        dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependency.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+        dependency.pImageMemoryBarriers = barriers.data();
+
+        vkCmdPipelineBarrier2(commandBuffer->getCommandBufferVk(), &dependency);
     }
 
     record(context, commandBuffer);
-
-    barriers.clear();
-    for (const ComputeResource &resource : resources) {
-        if (resource.texture == nullptr || !resource.readableAfter) {
-            continue;
-        }
-
-        barriers.push_back(resource.texture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                                                   s_dispatchAccess(resource.access), VK_ACCESS_SHADER_READ_BIT));
-    }
-
-    if (!barriers.empty()) {
-        vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(barriers.size()),
-                             barriers.data());
-    }
 }
 
 } // namespace Rapture

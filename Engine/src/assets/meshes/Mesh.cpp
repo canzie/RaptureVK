@@ -158,8 +158,7 @@ std::vector<uint8_t> MeshAllocatorParams::serialize() const
 {
     uint32_t attribBytes = 0;
     for (const auto &attrib : bufferLayout.buffer_attribs) {
-        attribBytes +=
-            sizeof(uint32_t) * 4 + static_cast<uint32_t>(attrib.type.size()); // name, componentType, offset, typeLen, chars
+        attribBytes += sizeof(uint32_t) * 4 + static_cast<uint32_t>(BufferAttributeType_toString(attrib.type).size());
     }
 
     MeshBlobHeader header;
@@ -190,9 +189,11 @@ std::vector<uint8_t> MeshAllocatorParams::serialize() const
         writeU32(static_cast<uint32_t>(attrib.name));
         writeU32(attrib.componentType);
         writeU32(attrib.offset);
-        writeU32(static_cast<uint32_t>(attrib.type.size()));
-        std::memcpy(blob.data() + offset, attrib.type.data(), attrib.type.size());
-        offset += attrib.type.size();
+        // the type stays a string on the wire, so a blob written before it became an enum still reads
+        std::string_view typeName = BufferAttributeType_toString(attrib.type);
+        writeU32(static_cast<uint32_t>(typeName.size()));
+        std::memcpy(blob.data() + offset, typeName.data(), typeName.size());
+        offset += typeName.size();
     }
 
     if (vertexData != nullptr && vertexDataSize > 0) {
@@ -256,7 +257,8 @@ bool MeshAllocatorParams::deserialize(std::span<const uint8_t> blob, MeshAllocat
             return false;
         }
         attrib.name = static_cast<BufferAttributeID>(name);
-        attrib.type = std::string(reinterpret_cast<const char *>(blob.data() + offset), typeLen);
+        attrib.type =
+            BufferAttributeType_fromString(std::string_view(reinterpret_cast<const char *>(blob.data() + offset), typeLen));
         offset += typeLen;
         params.bufferLayout.buffer_attribs.push_back(std::move(attrib));
     }
