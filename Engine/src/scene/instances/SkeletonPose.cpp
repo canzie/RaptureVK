@@ -3,7 +3,6 @@
 #include "assets/asset_manager/AssetManager.h"
 #include "assets/skeletons/Skeleton.h"
 #include "core/utils/Log.h"
-#include "core/utils/rp_assert.h"
 #include "scene/Scene.h"
 #include "scene/components/Components.h"
 #include "scene/render_data/SceneRenderData.h"
@@ -38,7 +37,9 @@ const TypeInfo &SkeletonPose::type() const
 
 void SkeletonPose::bindSkeleton(AssetHandle skeleton)
 {
-    RP_ASSERT(m_skeletonInstance == nullptr, "'{}' is already posing a skeleton", name());
+    if (m_skeleton == skeleton && m_skeletonInstance != nullptr) {
+        return;
+    }
 
     AssetRef ref = AssetManager::getAsset(skeleton);
     if (!ref) {
@@ -53,6 +54,9 @@ void SkeletonPose::bindSkeleton(AssetHandle skeleton)
     }
 
     SkeletonInstanceManager &manager = scene()->getRenderData()->getSkeletonInstanceManager();
+
+    // the bones of the skeleton being left go back to the arena before the new one asks for its own
+    m_skeletonInstance.reset();
     m_skeletonInstance = std::make_unique<SkeletonInstance>(manager.createSkeletonInstance(resolved));
     m_skeleton = skeleton;
 

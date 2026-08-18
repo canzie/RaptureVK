@@ -244,10 +244,7 @@ struct BufferLayout {
     // Calculate and cache vertex attribute flags based on available attributes
     uint32_t calculateFlags()
     {
-        // Forward declaration
-        enum class GBufferFlags : uint32_t;
-
-        // Vertex attribute flag definitions (must match GBufferFlags enum)
+        // Vertex attribute flag definitions (must match MaterialFlags in MaterialData.h)
         const uint32_t FLAG_HAS_NORMALS = 1u;
         const uint32_t FLAG_HAS_TANGENTS = 2u;
         const uint32_t FLAG_HAS_BITANGENTS = 4u;

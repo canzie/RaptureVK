@@ -61,7 +61,6 @@ const uint FLAG_HAS_NORMALS = 1u;
 const uint FLAG_HAS_TANGENTS = 2u;
 const uint FLAG_HAS_BITANGENTS = 4u;
 const uint FLAG_HAS_TEXCOORDS = 8u;
-const uint FLAG_HAS_NORMAL_MAP = 16u;
 
 void main() {
 
@@ -81,42 +80,43 @@ void main() {
     }
 #endif // IS_SKINNED_MESH
 
-    // Use flags to determine attribute availability (branchless)
-    float hasNormals = float((flags & FLAG_HAS_NORMALS) != 0u);
-    float hasTangents = float((flags & FLAG_HAS_TANGENTS) != 0u);
-    float hasBitangents = float((flags & FLAG_HAS_BITANGENTS) != 0u);
-    float hasTexcoords = float((flags & FLAG_HAS_TEXCOORDS) != 0u);
+    // Use flags to determine attribute availability
+    bool hasNormals = (flags & FLAG_HAS_NORMALS) != 0u;
+    bool hasTangents = (flags & FLAG_HAS_TANGENTS) != 0u;
+    bool hasBitangents = (flags & FLAG_HAS_BITANGENTS) != 0u;
+    bool hasTexcoords = (flags & FLAG_HAS_TEXCOORDS) != 0u;
 
     // Transform to world space
     outFragPosDepth.xyz = vec3(model * vec4(aPosition, 1.0));
 
-    // Handle normals branchlessly
-    vec3 defaultNormal = vec3(0.0, 1.0, 0.0);
-    vec3 transformedNormal = normalize(mat3(model) * aNormal);
-    outNormal = mix(defaultNormal, transformedNormal, hasNormals);
+    outNormal = vec3(0.0, 1.0, 0.0);
+    if (hasNormals) {
+        outNormal = normalize(mat3(model) * aNormal);
+    }
 
-    // Handle tangents branchlessly
-    vec3 defaultTangent = vec3(1.0, 0.0, 0.0);
-    vec3 transformedTangent = normalize(mat3(model) * aTangent.xyz);
-    outTangent = mix(defaultTangent, transformedTangent, hasTangents);
+    outTangent = vec3(1.0, 0.0, 0.0);
+    outBitangent = vec3(0.0, 0.0, 1.0);
+    if (hasTangents) {
+        outTangent = normalize(mat3(model) * aTangent.xyz);
+    }
 
-    // Calculate bitangent using glTF convention with handedness from tangent.w
-    vec3 calculatedBitangent = cross(aNormal, aTangent.xyz) * aTangent.w;
-    vec3 transformedBitangent = normalize(mat3(model) * calculatedBitangent);
-    vec3 defaultBitangent = vec3(0.0, 0.0, 1.0);
-    outBitangent = mix(defaultBitangent, transformedBitangent, hasBitangents * hasTangents * hasNormals);
+    if (hasNormals && hasTangents) {
+        // Re-orthogonalize tangent with respect to normal
+        outTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
 
-    // Re-orthogonalize tangent with respect to normal when both are available
-    vec3 orthogonalizedTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
-    outTangent = mix(outTangent, orthogonalizedTangent, hasNormals * hasTangents);
+        if (hasBitangents) {
+            // tangent.w is the bitangent handedness, so rebuild the bitangent orthogonal to the
+            // frame while preserving it
+            vec3 transformedBitangent = normalize(mat3(model) * (cross(aNormal, aTangent.xyz) * aTangent.w));
+            vec3 orthogonalBitangent = cross(outNormal, outTangent);
+            outBitangent = orthogonalBitangent * sign(dot(transformedBitangent, orthogonalBitangent));
+        }
+    }
 
-    // Recalculate bitangent to ensure orthogonal basis, preserving handedness
-    vec3 recalculatedBitangent = cross(outNormal, outTangent) * sign(dot(outBitangent, cross(outNormal, outTangent)));
-    outBitangent = mix(outBitangent, recalculatedBitangent, hasNormals * hasTangents * hasBitangents);
-
-    // Handle texture coordinates branchlessly
-    vec2 defaultTexCoord = vec2(0.0, 0.0);
-    outTexCoord = mix(defaultTexCoord, aTexCoord, hasTexcoords);
+    outTexCoord = vec2(0.0, 0.0);
+    if (hasTexcoords) {
+        outTexCoord = aTexCoord;
+    }
 
     // Pass flags to fragment shader
     outFlags = flags;

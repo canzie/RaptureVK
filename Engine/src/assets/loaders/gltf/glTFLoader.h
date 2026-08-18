@@ -120,7 +120,7 @@ class glTF2Loader {
     AssetRef loadMaterial(size_t materialIndex);
 
 
-    void loadAccessor(yyjson_val *accessorVal, std::vector<unsigned char> &dataVec);
+    void loadAccessor(yyjson_val *accessorVal, std::vector<uint8_t> &dataVec);
     void cleanUp();
 
     glm::mat4 getNodeTransform(yyjson_val *nodeVal);
@@ -174,7 +174,7 @@ class glTF2Loader {
     // ordered, so a reimport names the poses of a file with several skins the same way every time
     std::map<AssetHandle, std::vector<SkeletalMesh3D *>> m_skinnedMeshes;
 
-    std::vector<unsigned char> m_binVec;
+    std::vector<uint8_t> m_binVec;
     std::filesystem::path m_filepath;
     std::filesystem::path m_outputFolder;
     std::string m_name;

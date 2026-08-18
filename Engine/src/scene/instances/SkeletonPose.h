@@ -34,7 +34,7 @@ class SkeletonPose : public SceneObject {
 
   private:
     /**
-     * @brief Resolves the skeleton and takes room for its bones
+     * @brief Resolves the skeleton and takes room for its bones, dropping any skeleton already posed
      * @param skeleton The skeleton to pose
      */
     void bindSkeleton(AssetHandle skeleton);

@@ -7,7 +7,9 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -31,8 +33,113 @@
 #include "assets/materials/graph/SurfaceGraphManager.h"
 #include "assets/meshes/Mesh.h"
 #include "core/ecs/entity_accessor.h"
+#include "core/utils/GLTypes.h"
+#include "renderer/generators/TangentGeneration.h"
 
 namespace Rapture {
+
+// One glTF vertex attribute accessor, decoded out of its buffer view and still de-interleaved
+struct DecodedVertexAttribute {
+    std::string name;
+    uint32_t componentType;
+    BufferAttributeType type;
+    std::vector<uint8_t> data;
+};
+
+static const DecodedVertexAttribute *s_findVertexAttribute(const std::vector<DecodedVertexAttribute> &attributes,
+                                                           std::string_view name)
+{
+    for (const auto &attribute : attributes) {
+        if (attribute.name == name) {
+            return &attribute;
+        }
+    }
+    return nullptr;
+}
+
+/**
+ * @brief Run the tangent generator over a primitive's decoded attributes
+ * @param positions The POSITION attribute
+ * @param normals The NORMAL attribute
+ * @param texCoords The TEXCOORD_0 attribute
+ * @param vertexCount The vertex count the attributes agree on
+ * @param indexData The raw index bytes of the primitive
+ * @param indexType The glTF component type of one index
+ * @return One tangent per vertex, empty when the index component type cannot hold an index
+ */
+static std::vector<glm::vec4> s_generateTangents(const DecodedVertexAttribute &positions,
+                                                 const DecodedVertexAttribute &normals,
+                                                 const DecodedVertexAttribute &texCoords, uint32_t vertexCount,
+                                                 std::span<const uint8_t> indexData, uint32_t indexType)
+{
+    std::span<const glm::vec3> positionSpan(reinterpret_cast<const glm::vec3 *>(positions.data.data()), vertexCount);
+    std::span<const glm::vec3> normalSpan(reinterpret_cast<const glm::vec3 *>(normals.data.data()), vertexCount);
+    std::span<const glm::vec2> texCoordSpan(reinterpret_cast<const glm::vec2 *>(texCoords.data.data()), vertexCount);
+
+    switch (indexType) {
+    case UNSIGNED_BYTE_TYPE:
+        return generator::generateTangents(positionSpan, normalSpan, texCoordSpan, indexData);
+    case UNSIGNED_SHORT_TYPE:
+        return generator::generateTangents(
+            positionSpan, normalSpan, texCoordSpan,
+            std::span<const uint16_t>(reinterpret_cast<const uint16_t *>(indexData.data()),
+                                      indexData.size() / sizeof(uint16_t)));
+    case UNSIGNED_INT_TYPE:
+        return generator::generateTangents(
+            positionSpan, normalSpan, texCoordSpan,
+            std::span<const uint32_t>(reinterpret_cast<const uint32_t *>(indexData.data()),
+                                      indexData.size() / sizeof(uint32_t)));
+    }
+
+    RP_CORE_ERROR("Unsupported index component type {}", indexType);
+    return {};
+}
+
+/**
+ * @brief Append a generated TANGENT attribute when a primitive carries the inputs for one but no tangents
+ * @param attributes The decoded attributes, extended in place
+ * @param vertexCount The vertex count the attributes agree on
+ * @param indexData The raw index bytes of the primitive
+ * @param indexType The glTF component type of one index
+ */
+static void s_appendTangentAttribute(std::vector<DecodedVertexAttribute> &attributes, uint32_t vertexCount,
+                                     std::span<const uint8_t> indexData, uint32_t indexType)
+{
+    if (s_findVertexAttribute(attributes, "TANGENT") != nullptr) {
+        return;
+    }
+
+    const DecodedVertexAttribute *positions = s_findVertexAttribute(attributes, "POSITION");
+    const DecodedVertexAttribute *normals = s_findVertexAttribute(attributes, "NORMAL");
+    const DecodedVertexAttribute *texCoords = s_findVertexAttribute(attributes, "TEXCOORD_0");
+    if (positions == nullptr || normals == nullptr || texCoords == nullptr) {
+        return;
+    }
+
+    // Quantised texture coordinates are legal glTF but cannot be read as float uv
+    if (positions->componentType != FLOAT_TYPE || normals->componentType != FLOAT_TYPE ||
+        texCoords->componentType != FLOAT_TYPE) {
+        RP_CORE_WARN("Skipping tangent generation, the position, normal or texture coordinate accessors are not float");
+        return;
+    }
+
+    if (positions->data.size() < vertexCount * sizeof(glm::vec3) || normals->data.size() < vertexCount * sizeof(glm::vec3) ||
+        texCoords->data.size() < vertexCount * sizeof(glm::vec2)) {
+        RP_CORE_ERROR("Skipping tangent generation, an attribute accessor holds fewer than the {} vertices claimed",
+                      vertexCount);
+        return;
+    }
+
+    std::vector<glm::vec4> tangents = s_generateTangents(*positions, *normals, *texCoords, vertexCount, indexData, indexType);
+    if (tangents.empty()) {
+        return;
+    }
+
+    DecodedVertexAttribute attribute{"TANGENT", FLOAT_TYPE, BufferAttributeType::VEC4, {}};
+    attribute.data.resize(tangents.size() * sizeof(glm::vec4));
+    std::memcpy(attribute.data.data(), tangents.data(), attribute.data.size());
+    attributes.push_back(std::move(attribute));
+}
 
 glTF2Loader::glTF2Loader(const std::filesystem::path &filepath, std::filesystem::path outputFolder, std::string name)
     : m_filepath(filepath), m_outputFolder(std::move(outputFolder)), m_name(std::move(name))
@@ -142,7 +249,7 @@ void glTF2Loader::loadAndSetTexture(MaterialInstance *material, const ParameterI
         texImportConfig.format = TextureFormat::BC1_RGB; // roughness in G, metallic in B
     } else if (id == MP_NORMAL_MAP) {
         texImportConfig.srgb = false;
-        texImportConfig.format = TextureFormat::BC5; // Z reconstructed in shader via MAT_FLAG_NORMAL_BC5
+        texImportConfig.format = TextureFormat::BC5; // Z reconstructed in shader by the NORMAL_MAP_RG node
     } else if (id == MP_AO_MAP) {
         texImportConfig.srgb = false;
         texImportConfig.format = TextureFormat::BC4; // occlusion in R
@@ -411,7 +518,7 @@ bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle s
 bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, AssetHandle skeleton,
                                   PrimitiveData &out)
 {
-    std::vector<std::pair<std::string, std::vector<uint8_t>>> attributeData;
+    std::vector<DecodedVertexAttribute> attributeData;
     uint32_t vertexCount = 0;
 
     glm::vec3 minBounds(std::numeric_limits<float>::infinity());
@@ -454,10 +561,13 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
             }
 
             std::vector<uint8_t> attrData;
-            loadAccessor(getArrayElement(m_accessors, static_cast<uint32_t>(accessorIdx)), attrData);
+            loadAccessor(accessor, attrData);
 
             if (!attrData.empty()) {
-                attributeData.push_back({attribName, std::move(attrData)});
+                uint32_t componentType = static_cast<uint32_t>(getInt(getObjectValue(accessor, "componentType"), 0));
+                const char *type = getString(getObjectValue(accessor, "type"), "");
+                attributeData.push_back(
+                    {attribName, componentType, BufferAttributeType_fromString(type), std::move(attrData)});
             }
         }
     }
@@ -472,50 +582,7 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
         out.boundingBoxMax = maxBounds;
     }
 
-    uint32_t vertexStride = 0;
-    std::vector<uint32_t> attrSizes;
-    std::vector<uint32_t> attrOffsets;
-
-    for (const auto &[name, data] : attributeData) {
-        uint32_t attrSize = static_cast<uint32_t>(data.size() / vertexCount);
-        attrSizes.push_back(attrSize);
-        attrOffsets.push_back(vertexStride);
-        vertexStride += attrSize;
-    }
-
-    BufferLayout bufferLayout;
-
-    for (uint32_t i = 0; i < attributeData.size(); i++) {
-        const auto &[name, data] = attributeData[i];
-        yyjson_val *attributesObj = getObjectValue(primitiveJson, "attributes");
-        int accessorIdx = getInt(getObjectValue(attributesObj, name.c_str()), 0);
-        yyjson_val *accessor = getArrayElement(m_accessors, static_cast<uint32_t>(accessorIdx));
-
-        int componentType = getInt(getObjectValue(accessor, "componentType"), 0);
-        const char *type = getString(getObjectValue(accessor, "type"), "");
-
-        bufferLayout.buffer_attribs.push_back({stringToBufferAttributeID(name), static_cast<uint32_t>(componentType),
-                                               BufferAttributeType_fromString(type), attrOffsets[i]});
-    }
-
-    bufferLayout.isInterleaved = true;
-    bufferLayout.vertexSize = vertexStride;
-
-    uint32_t totalVertexDataSize = vertexCount * vertexStride;
-
-    std::vector<unsigned char> interleavedData(totalVertexDataSize);
-
-    for (uint32_t v = 0; v < vertexCount; v++) {
-        unsigned char *vertexDest = interleavedData.data() + (v * vertexStride);
-        for (uint32_t a = 0; a < attributeData.size(); a++) {
-            const auto &[name, data] = attributeData[a];
-            uint32_t attrSize = attrSizes[a];
-            const unsigned char *attrSrc = data.data() + (v * attrSize);
-            std::memcpy(vertexDest + attrOffsets[a], attrSrc, attrSize);
-        }
-    }
-
-    std::vector<unsigned char> indexData;
+    std::vector<uint8_t> indexData;
     uint32_t indexType = 0;
     uint32_t indexCount = 0;
 
@@ -534,6 +601,43 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
     if (indexData.empty()) {
         RP_CORE_ERROR("glTF2Loader: Vertex data only not supported yet");
         return false;
+    }
+
+    s_appendTangentAttribute(attributeData, vertexCount, indexData, indexType);
+
+    uint32_t vertexStride = 0;
+    std::vector<uint32_t> attrSizes;
+    std::vector<uint32_t> attrOffsets;
+
+    for (const auto &attribute : attributeData) {
+        uint32_t attrSize = static_cast<uint32_t>(attribute.data.size() / vertexCount);
+        attrSizes.push_back(attrSize);
+        attrOffsets.push_back(vertexStride);
+        vertexStride += attrSize;
+    }
+
+    BufferLayout bufferLayout;
+
+    for (uint32_t i = 0; i < attributeData.size(); i++) {
+        const auto &attribute = attributeData[i];
+        bufferLayout.buffer_attribs.push_back(
+            {stringToBufferAttributeID(attribute.name), attribute.componentType, attribute.type, attrOffsets[i]});
+    }
+
+    bufferLayout.isInterleaved = true;
+    bufferLayout.vertexSize = vertexStride;
+
+    uint32_t totalVertexDataSize = vertexCount * vertexStride;
+
+    std::vector<uint8_t> interleavedData(totalVertexDataSize);
+
+    for (uint32_t v = 0; v < vertexCount; v++) {
+        uint8_t *vertexDest = interleavedData.data() + (v * vertexStride);
+        for (uint32_t a = 0; a < attributeData.size(); a++) {
+            uint32_t attrSize = attrSizes[a];
+            const uint8_t *attrSrc = attributeData[a].data.data() + (v * attrSize);
+            std::memcpy(vertexDest + attrOffsets[a], attrSrc, attrSize);
+        }
     }
 
     MeshAllocatorParams params;
@@ -737,7 +841,7 @@ void glTF2Loader::buildSceneObjectAsset(Scene *scene)
     m_loadedData->sceneObject = std::move(ref);
 }
 
-void glTF2Loader::loadAccessor(yyjson_val *accessorVal, std::vector<unsigned char> &dataVec)
+void glTF2Loader::loadAccessor(yyjson_val *accessorVal, std::vector<uint8_t> &dataVec)
 {
     // Clear output vector
     dataVec.clear();
@@ -807,7 +911,7 @@ void glTF2Loader::loadAccessor(yyjson_val *accessorVal, std::vector<unsigned cha
     if (byteStride > 0 && byteStride != (elementSize * componentSize)) {
         // Data is interleaved, need to copy with stride
         unsigned int elementBytes = elementSize * componentSize;
-        unsigned char *dstPtr = dataVec.data();
+        uint8_t *dstPtr = dataVec.data();
 
         for (unsigned int i = 0; i < count; i++) {
             if (byteOffset + i * byteStride + elementBytes > m_binVec.size()) {
@@ -816,7 +920,7 @@ void glTF2Loader::loadAccessor(yyjson_val *accessorVal, std::vector<unsigned cha
                 return;
             }
 
-            const unsigned char *srcPtr = m_binVec.data() + byteOffset + i * byteStride;
+            const uint8_t *srcPtr = m_binVec.data() + byteOffset + i * byteStride;
             std::memcpy(dstPtr, srcPtr, elementBytes);
             dstPtr += elementBytes;
         }
@@ -1111,7 +1215,7 @@ void glTF2Loader::loadSkin(yyjson_val *skinVal)
     std::vector<glm::mat4> inverseBindMatrices(jointCount, glm::mat4(1.0f));
     yyjson_val *inverseBindVal = getObjectValue(skin, "inverseBindMatrices");
     if (inverseBindVal != nullptr && yyjson_is_int(inverseBindVal)) {
-        std::vector<unsigned char> bytes;
+        std::vector<uint8_t> bytes;
         loadAccessor(getArrayElement(m_accessors, static_cast<uint32_t>(getInt(inverseBindVal, 0))), bytes);
 
         if (bytes.size() >= jointCount * sizeof(glm::mat4)) {

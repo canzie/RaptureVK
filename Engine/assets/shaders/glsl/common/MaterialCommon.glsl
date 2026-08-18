@@ -13,17 +13,6 @@ const uint MAT_FLAG_HAS_TANGENTS   = 1u << 1;
 const uint MAT_FLAG_HAS_BITANGENTS = 1u << 2;
 const uint MAT_FLAG_HAS_TEXCOORDS  = 1u << 3;
 
-const uint MAT_FLAG_HAS_ALBEDO_MAP             = 1u << 5;
-const uint MAT_FLAG_HAS_NORMAL_MAP             = 1u << 6;
-const uint MAT_FLAG_HAS_METALLIC_ROUGHNESS_MAP = 1u << 7;
-const uint MAT_FLAG_HAS_AO_MAP                 = 1u << 8;
-const uint MAT_FLAG_HAS_METALLIC_MAP           = 1u << 9;
-const uint MAT_FLAG_HAS_ROUGHNESS_MAP          = 1u << 10;
-const uint MAT_FLAG_HAS_EMISSIVE_MAP           = 1u << 11;
-const uint MAT_FLAG_HAS_SPECULAR_MAP           = 1u << 12;
-const uint MAT_FLAG_HAS_HEIGHT_MAP             = 1u << 13;
-const uint MAT_FLAG_NORMAL_BC5                 = 1u << 14;
-
 // Per-material header, mirror of MaterialData.h. Surface inputs live in the graph slice at
 // graphDataOffset.
 struct MaterialData {
