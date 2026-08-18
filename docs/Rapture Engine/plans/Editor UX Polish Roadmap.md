@@ -65,7 +65,7 @@ There is no coverage mask coming out of the renderer — `Composite.fs.glsl:27` 
 
 Plain is close to free: `DeferredLighting.fs.glsl:435-437` already writes `vec4(0.0, 0.0, 0.0, 1.0)` for pixels with no geometry.
 
-**Blocker: the skybox would still draw over it.** The scratch scene needs a skybox for IBL but must not render it, or the cubemap becomes the background. `Environment::isSkyboxEnabled()` is exactly that switch, and the World Settings checkbox already drives it (`ComponentEditors.cpp:513`, read back at `:551`), but `DeferredRenderer::recordCommandBuffer` never reads it — `DeferredRenderer.cpp:323-329` only checks `m_skyboxPass->hasActiveSkybox()`. So the checkbox is inert today. Honouring the flag is a prerequisite here and a standalone bug fix.
+**The skybox no longer draws over it.** The scratch scene needs a skybox for IBL but must not render it, or the cubemap becomes the background. `Environment::isSkyboxEnabled()` is that switch, the World Settings checkbox drives it, and `DeferredRenderer::recordSecondaries` now hands the pass a null texture when it is off, so `hasActiveSkybox()` goes false and the pass is skipped. This was listed as a blocker and a standalone bug; it is neither now.
 
 ### Per type staging
 

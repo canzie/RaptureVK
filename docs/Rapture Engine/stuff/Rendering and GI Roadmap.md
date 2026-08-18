@@ -23,7 +23,7 @@ Key mental model established this session: **decouple render resolution from out
 - Net G-buffer: **36 → 16 bytes/px** written (normal 4 + albedo 4 + material 4 + depth 4); lighting reads 12 + depth instead of 32. ~half a GB/frame of 4K bandwidth removed. Result: roughly +20 fps; shadow pass cost dropped to ~1/3.
 
 ### Per-pass GPU markers (done)
-Added Tracy GPU zones (`RAPTURE_PROFILE_GPU_SCOPE`) around each pass's execute block on the **primary** command buffer in `DeferredRenderer::recordCommandBuffer` (GBuffer / Lighting / Skybox / Instanced Shapes). Done on the primary, not in the secondary recording, because `TracyVkCtx` query allocation isn't safe across the parallel recording fibers.
+Added Tracy GPU zones (`RAPTURE_PROFILE_GPU_SCOPE`) around each pass's replay on the **primary** command buffer, not in the secondary recording, because `TracyVkCtx` query allocation isn't safe across the parallel recording fibers. They live in each renderer's `replay` since the [[Renderer Restructure]].
 
 ### Viewport resize fix (done, earlier)
 Offscreen viewport target now resizes with the panel (debounced ~0.2 s to avoid startup GPU thrash/crash), and `AmethystLayer` re-registers the bindless texture when the backing `VkImageView` changes (fixes flicker from sampling freed views after a resize).

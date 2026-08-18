@@ -1,6 +1,6 @@
 # CommandPool
 
-**Source: `Engine/src/buffers/command_buffers/CommandPool.h/.cpp`**
+**Source: `Engine/src/gpu/command_buffers/CommandPool.h/.cpp`**
 
 Manages `VkCommandPool` and allocated [[CommandBuffer]] instances with deferred reset via timeline semaphore tracking. Allocates command buffers on demand.
 

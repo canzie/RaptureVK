@@ -1,5 +1,10 @@
 # Prefab
 
+> **Archived 2026-08-17.** `Prefab`, `PrefabComponent` and `buildPrefab` no longer exist anywhere in
+> the engine; the asset-that-records-arrangement role is now `SceneObjectImportData` and the scene
+> object tree. Kept because the reasoning about arrangement, sub-assets and blueprint updates still
+> applies to whatever fills that role, not because any statement below is current.
+
 > Status: **implemented** (2026-07-18). Defines the asset layer between a [[Mesh]] and a [[Scene]],
 > and what a glTF import actually produces. Companion to [[Asset Metadata]], which covers how those
 > assets are stored and reloaded. The core is built: `Prefab` (`components/systems/Prefab.h`) with a
@@ -20,7 +25,7 @@ at once.
 
 ---
 
-## Locked decisions
+## Decisions taken
 
 1. **A prefab is a blueprint.** It holds no meshes hostage, takes no ownership, contains no
    geometry. Pure references plus transforms.

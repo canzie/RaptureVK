@@ -1,6 +1,6 @@
 # AssetManager
 
-**Source: `Engine/src/asset_manager/`**
+**Source: `Engine/src/assets/asset_manager/`**
 
 Static singleton for asset lifecycle and import pipeline. `AssetImporter` handles per-type loading (shaders, materials, textures, cubemaps, scenes) by registered function dispatch.
 
@@ -9,8 +9,3 @@ Two manager implementations:
 - **`AssetManagerRuntime`** (planned) — production builds. Loads only pre-baked internal asset representations (no raw format support). Optimized for fast loading with no import overhead.
 
 Provides [[AssetRef]] for reference-counted access and [[AssetHandle]] (UUID) for identification.
-
-### add_int
-| Inputs           | Outputs   |
-| ---------------- | --------- |
-| `a` int, `b` int | `out` int |

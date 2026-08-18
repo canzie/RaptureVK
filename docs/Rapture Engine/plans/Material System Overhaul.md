@@ -22,9 +22,9 @@ The plan for replacing the current static-only material system with a two-path s
 
 ---
 
-## 2. Locked decisions
+## 2. Proposed decisions
 
-These were settled in design discussion and are the spine of the doc:
+These came out of design discussion and are the spine of the doc, until something proves them wrong:
 
 1. **Codegen only, no interpreter.** Graphs compile to GLSL, stitched into the ubershader shell, cached by hash, compiled on a background thread with last-good-pipeline swap. Rationale below in [[#8. Why codegen, not the interpreter]].
 2. **Static path stays a fixed fat struct.** `MaterialData` is grown for OpenPBR but stays hand-authored. Anything it cannot express goes through the graph. No data-driven/dynamic static struct.

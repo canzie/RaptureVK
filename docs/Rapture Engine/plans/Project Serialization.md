@@ -1,6 +1,6 @@
 # Project Serialization (.rapt)
 
-> Status: **locked architecture, implementation started** (refined 2026-07-12 in design
+> Status: **proposed architecture, implementation started** (refined 2026-07-12 in design
 > discussion, supersedes the 2026-07-11 revision). The 2026-07-12 pass replaced the "Project
 > calls one system per section" ownership model with an **event-driven** one, split load into two
 > synchronous phases, moved material instances into the asset registry, and made the editor block
@@ -53,7 +53,7 @@ mechanical.
 
 ---
 
-## Locked decisions
+## Proposed decisions
 
 1. **Project is NOT an asset.** It sits *above* the AssetManager and populates it. Making it an
    asset would create a cycle (the project living inside the registry it defines). `Project`

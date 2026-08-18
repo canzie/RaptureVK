@@ -34,7 +34,7 @@ Three parties, then, with a clean sentence each:
 
 The facility is a per-viewport immediate-mode draw list. A [[Viewport]] already owns the camera, the render target and the pixel space, and it is already the thing that answers `pickEntity`, so it is the natural owner of the overlay too. Two viewports get two independent overlays with no shared state, which falls out for free and is the correct behaviour.
 
-Submissions are cleared every frame. A tool that persists is a tool that resubmits. There is no handle to keep alive, no component to add, nothing to clean up when a tool is dismissed — the tool simply stops drawing. This is the opposite of the [[InstancedShapesPass]] route, where shapes are ECS components on scene entities, and that difference is deliberate: an editor tool is not part of the scene, must not be saved with it, must not be selectable as an entity, and must not appear in the outliner.
+Submissions are cleared every frame. A tool that persists is a tool that resubmits. There is no handle to keep alive, no component to add, nothing to clean up when a tool is dismissed — the tool simply stops drawing. This is the opposite of the deleted `InstancedShapesPass` route, where shapes were ECS components on scene entities, and that difference is deliberate: an editor tool is not part of the scene, must not be saved with it, must not be selectable as an entity, and must not appear in the outliner.
 
 The primitive set wants to stay small and screen-aware:
 
@@ -113,6 +113,6 @@ The test of the design is whether adding one of those requires touching the engi
 
 **Line thickness versus pick tolerance.** A one-pixel line is drawn correctly and picked terribly. Either the pass writes ids with a widened footprint, or primitives carry a pick radius separate from their visual width.
 
-**Whether [[InstancedShapesPass]] merges into this.** The pipelines and primitive encoding are close enough that they should probably share a layer, with the component-driven pass reduced to another producer feeding the same drawing code. That is a consolidation, not a prerequisite.
+**Whether a component-driven shape pass comes back on top of this.** `InstancedShapesPass` was deleted rather than merged. If scene-owned debug shapes are wanted again, they should be another producer feeding this drawing code, not a second pass.
 
-Related: [[Gizmo]], [[Viewport]], [[Amethyst]], [[InstancedShapesPass]], [[Input]], [[GBufferPass]]
+Related: [[Gizmo]], [[Viewport]], [[Amethyst]], [[Input]], [[Renderer Restructure]]

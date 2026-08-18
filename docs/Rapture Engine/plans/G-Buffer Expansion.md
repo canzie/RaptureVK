@@ -364,8 +364,7 @@ cost is paid unconditionally, the overdraw saving is scene-dependent.
 
 Landed and wired: `RenderPass.h` / `.cpp` and `RenderPassContext.h` in `Engine/src/renderer/passes/`.
 `GBufferPass`, `LightingPass`, `SkyboxPass` and the new `CompositePass` all inherit it.
-`InstancedShapesPass` and `StencilBorderPass` are commented out in `DeferredRenderer` and still need
-converting.
+`InstancedShapesPass` and `StencilBorderPass` have since been deleted rather than converted.
 
 **Why this went before the expansion:** the expansion touches every pass's attachment setup, barrier
 list and inheritance struct. Against the old copy-paste that edit gets made five times, and again for
@@ -481,7 +480,7 @@ What the conversion established, and what to carry forward:
 3. ✅ **Convert the existing passes to `RenderPass`** (§11). No behaviour change — the image must be
    pixel-identical afterwards. Do this before anything touches G-buffer channels, so the attachment
    edits below are made once instead of per pass.
-   *(`InstancedShapesPass` / `StencilBorderPass` still outstanding, commented out of the renderer.)*
+   *(`InstancedShapesPass` / `StencilBorderPass` were deleted instead of converted.)*
 4. ✅ **Layout expansion** (§5): RT3 lands, `shadingModelId` moves out of RT2, `specular` takes its
    place, emissive byte in RT1.a, RT0 widened to `RGBA16F` with motion reserved in `.zw`. Graph
    domain field + regenerate. Lighting reads the new locations. Verify no visual change beyond

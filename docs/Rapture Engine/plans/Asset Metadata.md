@@ -22,7 +22,7 @@ that makes the first load work makes an evicted asset reloadable, so the two are
 
 ---
 
-## Locked decisions
+## Proposed decisions
 
 1. **Provenance and reload source are separate fields.** They answer different questions and are
    allowed to hold different values for the same asset. See [[#The two fields]].
@@ -135,7 +135,7 @@ Sponza has zero names anywhere. A content hash is no help either: it is stable o
 geometry is unchanged, which is exactly the case where you are not reimporting.
 
 So the problem is unsolvable in general. That is why UE5's reimport duplicates rather than
-incompetence. What makes it tolerable is [[#Locked decisions|decision 2]] — provenance is advisory,
+incompetence. What makes it tolerable is [[#Proposed decisions|decision 2]] — provenance is advisory,
 so an imperfect key costs a bad reimport, never a broken project.
 
 ### Index is the key, name is the corroboration

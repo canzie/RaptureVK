@@ -1,6 +1,6 @@
 # DescriptorManager
 
-**Source: `Engine/src/buffers/descriptors/DescriptorManager.h/.cpp`**
+**Source: `Engine/src/gpu/descriptors/DescriptorManager.h/.cpp`**
 
 Manages descriptor sets for the bindless rendering pipeline. Binding locations encode the set and binding: `XYZ` means `SET=X BIND=YZ`.
 

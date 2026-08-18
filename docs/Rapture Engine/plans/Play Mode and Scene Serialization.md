@@ -95,4 +95,4 @@ widening it.
 6. Scene merging, efficient reload, export-with-dependencies.
 
 `shared_ptr<Entity>` is being removed in pass 1 because picking touches the same selection path:
-`EntitySelectedEvent`'s payload, `GBufferPass`, `StencilBorderPass`, `ViewportPanel`.
+`EntitySelectedEvent`'s payload, `GBufferPass`, `ViewportPanel`. (`StencilBorderPass` has since been deleted.)

@@ -3,7 +3,7 @@
 > Status: **in progress** (design 2026-07-12). Captures the editor-side layer that turns a
 > compiled material graph into something authored, previewed, and instanced in the editor. Builds
 > directly on [[Project Serialization]] (this is largely its S2 + S6, plus new workspace/preview
-> and pipeline-refresh work). Five decisions are locked below; the rest is proposed and refinable.
+> and pipeline-refresh work). Everything below is a proposal and stays refinable.
 > Zero-assumption: every claim cites the source it was verified against.
 >
 > **Done so far:** graph retained on `BaseMaterial`; `loadGraph` implemented (graph → canvas
@@ -33,7 +33,7 @@ Most of the plumbing already exists. This doc is mostly wiring + three genuinely
 
 ---
 
-## Locked decisions (this doc)
+## Proposed decisions (this doc)
 
 1. **The base instance is not enforced yet.** Every base material has one default instance seeded
    from the graph defaults so it can be shown on the preview sphere before any user instance
@@ -81,7 +81,7 @@ Most of the plumbing already exists. This doc is mostly wiring + three genuinely
 - **The editor already displays a viewport's output** by registering the render target's image as
   an Amethyst texture and handing it to `ViewportPanel` (`AmethystLayer.cpp:202-227`). A second
   viewport feeds a second `ViewportPanel` the same way.
-- **Instances-as-assets, named params, registry-scan material list** — all locked in
+- **Instances-as-assets, named params, registry-scan material list** — all proposed in
   [[Project Serialization]] (`material_instances` section, `MaterialInstanceDescription`,
   `ParameterID`-keyed params).
 

@@ -7,21 +7,21 @@ Zero-assumption: every claim about current state is cited to source.
 
 ---
 
-## 1. Starting state (verified)
+## 1. Starting state
 
-**Entity picking is a full-screen id attachment plus a blocking readback.** `GBufferPass.cpp:464-473` creates one `R32UI` texture per frame in flight at full viewport size with `allowReadback = true`, and `GBufferPass.cpp:123` declares it as a fifth colour attachment (`VK_FORMAT_R32_UINT`, "r=entity id, biased by one"). `GBufferPass.cpp:335,349-350` adds it to the attachment list whenever it exists. `GBufferPass.cpp:363-383` reads a single pixel back and un-biases it; `DeferredRenderer.cpp:196-202` and `Viewport.cpp:62-78` forward that up to the editor.
-
-The readback itself is `Texture::readbackRegion` (`Texture.cpp:730-803`): it creates a VMA staging buffer, acquires a transient graphics command buffer, copies, then `Texture.cpp:794-797` submits and calls `graphicsQueue->waitIdle()`. The TODO above that line already names the fix and names hover highlighting as the trigger for needing it.
-
-**The outline pass consumes that target and knows what selection is.** `SelectionOutlinePass.h:23-30` edge-detects the g-buffer entity ids, and `SelectionOutlinePass.h:74-76` holds a selected entity plus listeners on the editor's selection events — engine code subscribing to an editor concept. Because the id target only holds the frontmost surface, an entity behind another cannot be outlined at all.
+> **Revised 2026-08-17.** Sections struck below have since been built or removed. The pick-query
+> path exists as `SceneQueryRenderer` (`Engine/src/renderer/query/`), the id attachment and
+> `SelectionOutlinePass` are gone, and the pass-ordering problem was solved by the
+> [[Renderer Restructure]] rather than by an injection interface. What remains open is the overlay
+> itself, sections 4 and 5.
 
 **The gizmo lives in Amethyst.** `Engine/vendor/Amethyst/libamethyst/src/components/widgets/gizmo.cpp` is 1157 lines of 2D canvas drawing, screen-space distance tests and ray-plane constraint solving. `gizmo.cpp:153-192` defines a `GizmoCanvas` that captures the mouse through `Window::captureMouse` (`components/window.h:52`). The editor drives it from `ViewportPanel::updateGizmo` (`ViewportPanel.cpp:431-479`), which takes its matrices from `scene->getMainCamera()` (`ViewportPanel.cpp:460`) rather than from the viewport hosting it.
 
 **Picking is coupled to the gizmo's rectangle.** `ViewportPanel::onViewportPressed` (`ViewportPanel.cpp:396-429`) early-outs on `m_gizmo->isHovered()`, then derives render-target pixels from `m_gizmo->canvas()`'s absolute position and size.
 
-**There is no facility for drawing arbitrary 3D primitives.** `InstancedShapesPass` draws from ECS components — `InstancedShapesPass.cpp:103-107` iterates `TransformComponent, MeshComponent, InstanceShapeComponent` — so anything drawn must be a scene entity. It is also currently commented out of the frame (`DeferredRenderer.cpp:468-476,513-515`).
+**There is still no facility for drawing arbitrary 3D primitives.** `InstancedShapesPass` has since been deleted; nothing replaced it. This remains the gap section 4 fills.
 
-**Passes are a fixed list with fixed ordering.** `DeferredRenderer.h:59-65` holds seven passes as concrete members, and `DeferredRenderer::recordCommandBuffer` (`DeferredRenderer.cpp:330-544`) records them into secondaries and replays them in a hardcoded sequence: g-buffer (`:489-491`), ambient occlusion (`:496`), lighting (`:501-503`), skybox (`:507-509`), selection outline (`:519-521`), composite (`:527-531`). `RenderPass` (`RenderPass.h:65-134`) is already the right shape for an injected pass — `record` into a secondary, `beginRendering`/`endRendering` around the replay, `updateAttachments` per frame in flight — but nothing outside the renderer can add one.
+**Pass ordering is no longer fixed.** A `DrawManager` owns the ordered renderer list and a phase split around the composite, so an overlay is added rather than injected — see [[Renderer Restructure]].
 
 **The TLAS is for ray tracing only** and is not a picking structure. `Viewport.h:23-30` gates acceleration structures per viewport via `ViewportConfig::enableAccelerationStructures`, so it is not universally present either.
 

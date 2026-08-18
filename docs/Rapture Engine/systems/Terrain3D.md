@@ -1,6 +1,6 @@
 # Terrain3D
 
-**Source: `Engine/src/scenes/instances/Terrain3D.cpp`**
+**Source: `Engine/src/scene/instances/Terrain3D.cpp`**
 
 The [[Instance]] class for a generated heightfield, streamed in chunks around the camera. Attaches a `TerrainComponent`, serialises the grid settings, and is what the editor's add menu creates.
 

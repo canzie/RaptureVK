@@ -1,6 +1,6 @@
 # MaterialData
 
-**Source: `Engine/src/materials/MaterialData.h`, mirror in `common/MaterialCommon.glsl`**
+**Source: `Engine/src/assets/materials/MaterialData.h`, mirror in `common/MaterialCommon.glsl`**
 
 The small per-material header, one entry in the `MATERIAL_DATA_SSBO` arena indexed by a material's bindless index. After the [[Unified Material Graph]] flip it holds no surface inputs — just the graph handle (`graphId` + `graphDataOffset` into the `GRAPH_DATA_SSBO` slice), a `flags` bitset for mesh-attribute presence and routing, and a temporary terrain carve-out (tiling/height/slope) kept until the terrain path is reworked. All actual channels (albedo, textures, factors) live in the graph slice.
 
