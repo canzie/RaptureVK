@@ -77,6 +77,12 @@ class ViewportPanel : public Panel {
      * @param input The press that landed on the viewport image
      */
     void onViewportPressed(const Amethyst::InputObject &input);
+    /**
+     * @brief Submits a spinning set of shapes to this viewport, exercising both depth modes
+     * @param dt Seconds since the last update
+     */
+    void submitTestShapes(float dt);
+
     void setupOverlayButtons(void);
     void buildTransformMenu(void);
     void buildRenderMenu(void);

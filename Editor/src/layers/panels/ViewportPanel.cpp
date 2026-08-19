@@ -34,6 +34,16 @@
 static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.1f;
 static constexpr float VIEWPORT_PADDING = 6.0f;
 
+static float gShapeTestTime = 0.0f;
+
+static const glm::vec4 COL_TEST_BOX{0.95f, 0.75f, 0.2f, 1.0f};
+static const glm::vec4 COL_TEST_CONE{0.9f, 0.35f, 0.25f, 1.0f};
+static const glm::vec4 COL_TEST_SPHERE{0.35f, 0.8f, 0.95f, 0.8f};
+static const glm::vec4 COL_TEST_ORBIT{0.8f, 0.4f, 0.95f, 1.0f};
+static const glm::vec4 COL_TEST_AXIS_X{0.9f, 0.2f, 0.2f, 1.0f};
+static const glm::vec4 COL_TEST_AXIS_Y{0.2f, 0.9f, 0.2f, 1.0f};
+static const glm::vec4 COL_TEST_AXIS_Z{0.2f, 0.4f, 0.95f, 1.0f};
+
 // Odd so the cursor sits on a centre pixel. The aperture is the click tolerance, and it costs only
 // the pixels it covers, so widening it is cheap
 static constexpr uint32_t PICK_APERTURE = 11;
@@ -407,6 +417,7 @@ void ViewportPanel::onUpdate(float dt)
     }
 
     updateGizmo();
+    submitTestShapes(dt);
 
     auto *controller = cameraController();
     if (controller != nullptr) {
@@ -438,6 +449,36 @@ void ViewportPanel::onUpdate(float dt)
             }
         }
     }
+}
+
+void ViewportPanel::submitTestShapes(float dt)
+{
+    if (m_viewport == nullptr) {
+        return;
+    }
+
+    gShapeTestTime += dt;
+
+    const glm::mat4 spin = glm::rotate(glm::mat4(1.0f), gShapeTestTime, glm::vec3(0.0f, 1.0f, 0.0f));
+    Rapture::ImmediateDrawList &drawList = m_viewport->getImmediateDrawList();
+
+    Rapture::ShapeSubmission tested = drawList.getSubmission(Rapture::DEPTH_MODE_TESTED);
+
+    tested.box(spin, glm::vec3(-0.5f), glm::vec3(0.5f), COL_TEST_BOX, 2.0f);
+    tested.sphere(glm::vec3(0.0f, 1.5f, 0.0f), 0.6f, COL_TEST_SPHERE, 1.0f, 24);
+
+    const glm::vec3 coneBase = glm::vec3(spin * glm::vec4(1.5f, 0.0f, 0.0f, 1.0f));
+    const glm::vec3 coneTip = glm::vec3(spin * glm::vec4(1.5f, 0.9f, 0.0f, 1.0f));
+    tested.cone(coneBase, coneTip, 0.25f, COL_TEST_CONE);
+
+    Rapture::ShapeSubmission inFront = drawList.getSubmission(Rapture::DEPTH_MODE_ALWAYS_IN_FRONT);
+
+    inFront.line(glm::vec3(0.0f), glm::vec3(2.0f, 0.0f, 0.0f), COL_TEST_AXIS_X, 3.0f);
+    inFront.line(glm::vec3(0.0f), glm::vec3(0.0f, 2.0f, 0.0f), COL_TEST_AXIS_Y, 3.0f);
+    inFront.line(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 2.0f), COL_TEST_AXIS_Z, 3.0f);
+
+    const glm::vec3 orbit = glm::vec3(spin * glm::vec4(0.0f, 0.25f, 2.0f, 1.0f));
+    inFront.circle(orbit, glm::vec3(0.0f, 1.0f, 0.0f), 0.3f, COL_TEST_ORBIT, 2.0f, 24);
 }
 
 void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)

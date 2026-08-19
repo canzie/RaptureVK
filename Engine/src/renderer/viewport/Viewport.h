@@ -3,6 +3,7 @@
 
 #include "core/events/EventSignal.h"
 #include "renderer/DrawManager.h"
+#include "renderer/ImmediateDrawList.h"
 #include "renderer/RenderSettings.h"
 #include "renderer/query/SceneQueryRenderer.h"
 #include "renderer/common.h"
@@ -81,6 +82,12 @@ class Viewport {
     DrawManager &getDrawManager() { return *m_drawManager; }
     RendererType getRendererType() const { return m_rendererType; }
 
+    /**
+     * @brief The shapes drawn over this viewport, cleared once each frame has been recorded
+     * @return This viewport's draw list
+     */
+    ImmediateDrawList &getImmediateDrawList() { return m_immediateDrawList; }
+
     void drawFrame();
 
     /**
@@ -126,6 +133,7 @@ class Viewport {
 
     std::unique_ptr<DrawManager> m_drawManager;
     std::unique_ptr<SceneQueryRenderer> m_queryRenderer;
+    ImmediateDrawList m_immediateDrawList;
     RendererType m_rendererType = RendererType::DEFERRED;
 
     Scene *m_scene = nullptr;
