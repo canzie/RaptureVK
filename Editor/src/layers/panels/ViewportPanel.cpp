@@ -3,7 +3,6 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "scene/components/Components.h"
-#include "scene/systems/Transforms.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
 #include "scene/instances/controllers/CameraController.h"
@@ -13,7 +12,6 @@
 #include "core/utils/rp_assert.h"
 #include "renderer/viewport/Viewport.h"
 
-#include <components/canvas.h>
 #include <components/checkbox.h>
 #include <components/common.h>
 #include <components/extensions/ui_list_layout.h>
@@ -33,16 +31,6 @@
 
 static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.1f;
 static constexpr float VIEWPORT_PADDING = 6.0f;
-
-static float gShapeTestTime = 0.0f;
-
-static const glm::vec4 COL_TEST_BOX{0.95f, 0.75f, 0.2f, 1.0f};
-static const glm::vec4 COL_TEST_CONE{0.9f, 0.35f, 0.25f, 1.0f};
-static const glm::vec4 COL_TEST_SPHERE{0.35f, 0.8f, 0.95f, 0.8f};
-static const glm::vec4 COL_TEST_ORBIT{0.8f, 0.4f, 0.95f, 1.0f};
-static const glm::vec4 COL_TEST_AXIS_X{0.9f, 0.2f, 0.2f, 1.0f};
-static const glm::vec4 COL_TEST_AXIS_Y{0.2f, 0.9f, 0.2f, 1.0f};
-static const glm::vec4 COL_TEST_AXIS_Z{0.2f, 0.4f, 0.95f, 1.0f};
 
 // Odd so the cursor sits on a centre pixel. The aperture is the click tolerance, and it costs only
 // the pixels it covers, so widening it is cheap
@@ -151,9 +139,15 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
             m_viewportImage->track(m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
             m_viewportImage->track(
                 m_viewportImage->onInputBeganCb.connect([this](const Amethyst::InputObject &input) { onViewportPressed(input); }));
+            m_viewportImage->track(m_viewportImage->onInputChangedCb.connect(
+                [this](const Amethyst::InputObject &input) { onViewportCursorMoved(input); }));
+            m_viewportImage->track(m_viewportImage->onInputEndedCb.connect(
+                [this](const Amethyst::InputObject &input) { onViewportMouseReleased(input); }));
         });
 
-    m_gizmo = std::make_unique<Amethyst::Gizmo>(m_viewportImage);
+    auto *gizmoContainer = m_viewportImage->add<Amethyst::Container>();
+    gizmoContainer->setBaseProperties({.interactable = false, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
+    m_transformGizmo = std::make_unique<gizmo::TransformGizmo>(gizmoContainer);
 
     setupOverlayButtons();
     buildTransformMenu();
@@ -163,7 +157,7 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
         m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {
             m_selectedEntity = entity;
             if (!m_selectedEntity.isValid()) {
-                m_gizmo->reset();
+                m_transformGizmo->reset();
             }
         });
     }
@@ -247,9 +241,9 @@ void ViewportPanel::buildTransformMenu()
     });
 
     m_gizmoOpGroupConn = m_gizmoOpGroup.onChanged.connect(
-        [this]() { m_gizmoOperation = static_cast<Amethyst::GizmoOperation>(m_gizmoOpGroup.value); });
+        [this]() { m_gizmoOperation = static_cast<gizmo::TransformGizmo::Operation>(m_gizmoOpGroup.value); });
     m_gizmoSpaceGroupConn = m_gizmoSpaceGroup.onChanged.connect(
-        [this]() { m_gizmoSpace = static_cast<Amethyst::GizmoSpace>(m_gizmoSpaceGroup.value); });
+        [this]() { m_gizmoSpace = static_cast<gizmo::TransformGizmo::Space>(m_gizmoSpaceGroup.value); });
     m_cameraModeGroupConn = m_cameraModeGroup.onChanged.connect([this]() {
         auto *controller = cameraController();
         if (controller != nullptr) {
@@ -260,15 +254,17 @@ void ViewportPanel::buildTransformMenu()
     });
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    items.push_back(
-        ViewportContextMenuRID::create("Translate", &m_gizmoOpGroup, static_cast<int32_t>(Amethyst::GizmoOperation::TRANSLATE)));
-    items.push_back(
-        ViewportContextMenuRID::create("Rotate", &m_gizmoOpGroup, static_cast<int32_t>(Amethyst::GizmoOperation::ROTATE)));
-    items.push_back(
-        ViewportContextMenuRID::create("Scale", &m_gizmoOpGroup, static_cast<int32_t>(Amethyst::GizmoOperation::SCALE)));
+    items.push_back(ViewportContextMenuRID::create("Translate", &m_gizmoOpGroup,
+                                                   static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_TRANSLATE)));
+    items.push_back(ViewportContextMenuRID::create("Rotate", &m_gizmoOpGroup,
+                                                   static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_ROTATE)));
+    items.push_back(ViewportContextMenuRID::create("Scale", &m_gizmoOpGroup,
+                                                   static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_SCALE)));
     items.push_back(ViewportContextMenuSID::create("Space"));
-    items.push_back(ViewportContextMenuRID::create("World", &m_gizmoSpaceGroup, static_cast<int32_t>(Amethyst::GizmoSpace::WORLD)));
-    items.push_back(ViewportContextMenuRID::create("Local", &m_gizmoSpaceGroup, static_cast<int32_t>(Amethyst::GizmoSpace::LOCAL)));
+    items.push_back(ViewportContextMenuRID::create("World", &m_gizmoSpaceGroup,
+                                                   static_cast<int32_t>(gizmo::TransformGizmo::SPACE_WORLD)));
+    items.push_back(ViewportContextMenuRID::create("Local", &m_gizmoSpaceGroup,
+                                                   static_cast<int32_t>(gizmo::TransformGizmo::SPACE_LOCAL)));
     items.push_back(ViewportContextMenuSID::create("Camera"));
     items.push_back(
         ViewportContextMenuRID::create("Orbit", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::ORBIT)));
@@ -417,7 +413,6 @@ void ViewportPanel::onUpdate(float dt)
     }
 
     updateGizmo();
-    submitTestShapes(dt);
 
     auto *controller = cameraController();
     if (controller != nullptr) {
@@ -451,34 +446,48 @@ void ViewportPanel::onUpdate(float dt)
     }
 }
 
-void ViewportPanel::submitTestShapes(float dt)
+bool ViewportPanel::toViewportPixel(const Amethyst::vec2 &windowPosition, glm::vec2 &pixel) const
 {
-    if (m_viewport == nullptr) {
+    if (m_viewportImage == nullptr || m_viewport == nullptr) {
+        return false;
+    }
+
+    const Amethyst::vec2 origin = m_viewportImage->absoluteContentPosition;
+    const Amethyst::vec2 size = m_viewportImage->absoluteContentSize;
+    if (size.x < 1.0f || size.y < 1.0f) {
+        return false;
+    }
+
+    const float u = (windowPosition.x - origin.x) / size.x;
+    const float v = (windowPosition.y - origin.y) / size.y;
+    if (u < 0.0f || u >= 1.0f || v < 0.0f || v >= 1.0f) {
+        return false;
+    }
+
+    pixel = glm::vec2(u * static_cast<float>(m_viewport->getWidth()), v * static_cast<float>(m_viewport->getHeight()));
+    return true;
+}
+
+void ViewportPanel::onViewportCursorMoved(const Amethyst::InputObject &input)
+{
+    toViewportPixel(input.position, m_cursorInViewport);
+}
+
+void ViewportPanel::onViewportMouseReleased(const Amethyst::InputObject &input)
+{
+    if (input.type != Amethyst::InputType::MOUSE_BUTTON_1) {
         return;
     }
 
-    gShapeTestTime += dt;
+    toViewportPixel(input.position, m_cursorInViewport);
 
-    const glm::mat4 spin = glm::rotate(glm::mat4(1.0f), gShapeTestTime, glm::vec3(0.0f, 1.0f, 0.0f));
-    Rapture::ImmediateDrawList &drawList = m_viewport->getImmediateDrawList();
-
-    Rapture::ShapeSubmission tested = drawList.getSubmission(Rapture::DEPTH_MODE_TESTED);
-
-    tested.box(spin, glm::vec3(-0.5f), glm::vec3(0.5f), COL_TEST_BOX, 2.0f);
-    tested.sphere(glm::vec3(0.0f, 1.5f, 0.0f), 0.6f, COL_TEST_SPHERE, 1.0f, 24);
-
-    const glm::vec3 coneBase = glm::vec3(spin * glm::vec4(1.5f, 0.0f, 0.0f, 1.0f));
-    const glm::vec3 coneTip = glm::vec3(spin * glm::vec4(1.5f, 0.9f, 0.0f, 1.0f));
-    tested.cone(coneBase, coneTip, 0.25f, COL_TEST_CONE);
-
-    Rapture::ShapeSubmission inFront = drawList.getSubmission(Rapture::DEPTH_MODE_ALWAYS_IN_FRONT);
-
-    inFront.line(glm::vec3(0.0f), glm::vec3(2.0f, 0.0f, 0.0f), COL_TEST_AXIS_X, 3.0f);
-    inFront.line(glm::vec3(0.0f), glm::vec3(0.0f, 2.0f, 0.0f), COL_TEST_AXIS_Y, 3.0f);
-    inFront.line(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 2.0f), COL_TEST_AXIS_Z, 3.0f);
-
-    const glm::vec3 orbit = glm::vec3(spin * glm::vec4(0.0f, 0.25f, 2.0f, 1.0f));
-    inFront.circle(orbit, glm::vec3(0.0f, 1.0f, 0.0f), 0.3f, COL_TEST_ORBIT, 2.0f, 24);
+    if (m_gizmoCapturing) {
+        m_gizmoReleased = true;
+        m_gizmoCapturing = false;
+        if (auto *window = m_viewportImage->getWindow()) {
+            window->releaseMouse(m_viewportImage);
+        }
+    }
 }
 
 void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
@@ -486,29 +495,29 @@ void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
     if (input.type != Amethyst::InputType::MOUSE_BUTTON_1) {
         return;
     }
-    if (m_viewport == nullptr || m_gizmo == nullptr || m_gizmo->isHovered()) {
+
+    glm::vec2 pixel;
+    if (!toViewportPixel(input.position, pixel)) {
         return;
     }
 
-    // The gizmo canvas is what the rendered image is mapped onto, so picking shares its rect to stay
-    // aligned with what the handles are drawn against
-    Amethyst::Canvas &canvas = m_gizmo->canvas();
-    Amethyst::vec2 origin = canvas.absolutePosition;
-    Amethyst::vec2 size = canvas.absoluteSize;
-    if (size.x < 1.0f || size.y < 1.0f) {
-        return;
-    }
+    m_cursorInViewport = pixel;
 
-    float u = (input.position.x - origin.x) / size.x;
-    float v = (input.position.y - origin.y) / size.y;
-    if (u < 0.0f || u >= 1.0f || v < 0.0f || v >= 1.0f) {
+    // The gizmo answers from the handles it placed last frame, so a press on one is known before any
+    // pick query runs
+    if (m_transformGizmo->isHovered()) {
+        m_gizmoPressed = true;
+        m_gizmoCapturing = true;
+        if (auto *window = m_viewportImage->getWindow()) {
+            window->captureMouse(m_viewportImage);
+        }
         return;
     }
 
     onImageClicked.fire();
 
-    uint32_t px = static_cast<uint32_t>(u * static_cast<float>(m_viewport->getWidth()));
-    uint32_t py = static_cast<uint32_t>(v * static_cast<float>(m_viewport->getHeight()));
+    uint32_t px = static_cast<uint32_t>(pixel.x);
+    uint32_t py = static_cast<uint32_t>(pixel.y);
 
     // Clamped rather than centred, so an aperture against a viewport edge keeps its full width and
     // the cursor simply sits off centre within it
@@ -532,14 +541,14 @@ void ViewportPanel::updateGizmo()
 {
     if (!m_selectedEntity.isValid()) {
         if (m_previousSelectedEntity.isValid()) {
-            m_gizmo->reset();
+            m_transformGizmo->reset();
             m_previousSelectedEntity = Rapture::ecs::EntityAccessor();
         }
         return;
     }
 
     if (m_selectedEntity != m_previousSelectedEntity) {
-        m_gizmo->reset();
+        m_transformGizmo->reset();
         m_previousSelectedEntity = m_selectedEntity;
     }
 
@@ -572,41 +581,54 @@ void ViewportPanel::updateGizmo()
                           ? Rapture::BoundingBox(meshComp->mesh->getBoundsMin(), meshComp->mesh->getBoundsMax()).getCenter()
                           : glm::vec3(0.0f);
 
-    Amethyst::GizmoParams params;
+    gizmo::TransformGizmo::Params params;
     params.view = viewMatrix;
     params.projection = projectionMatrix;
     params.objectTransform = objectTransform;
     params.pivot = pivot;
+    params.viewportSize = glm::vec2(m_viewport->getWidth(), m_viewport->getHeight());
+    params.cursor = m_cursorInViewport;
+    params.cursorInside = m_viewportHovered || m_gizmoCapturing;
+    params.pressed = m_gizmoPressed;
+    params.released = m_gizmoReleased;
     params.operation = m_gizmoOperation;
     params.space = m_gizmoSpace;
 
-    Amethyst::GizmoResult result = m_gizmo->update(params);
+    m_gizmoPressed = false;
+    m_gizmoReleased = false;
 
-    if (result.active) {
-        glm::vec3 position;
-        glm::quat rotation;
-        glm::vec3 scale;
-        Rapture::transform::decompose(objectTransform, position, rotation, scale);
+    gizmo::TransformGizmo::Result result = m_transformGizmo->update(params, m_viewport->getImmediateDrawList());
 
-        glm::vec3 deltaPosition(result.deltaPosition.x, result.deltaPosition.y, result.deltaPosition.z);
-        glm::vec3 deltaScale(result.deltaScale.x, result.deltaScale.y, result.deltaScale.z);
-        glm::vec3 deltaRotation(result.deltaRotation.x, result.deltaRotation.y, result.deltaRotation.z);
-
-        position += deltaPosition;
-        scale *= deltaScale;
-
-        float rotationAngle = glm::length(deltaRotation);
-        if (rotationAngle > 0.0001f) {
-            glm::vec3 rotationAxis = deltaRotation / rotationAngle;
-            glm::quat deltaQuat = glm::angleAxis(rotationAngle, rotationAxis);
-
-            if (m_gizmoSpace == Amethyst::GizmoSpace::WORLD) {
-                rotation = deltaQuat * rotation;
-            } else {
-                rotation = rotation * deltaQuat;
-            }
-        }
-
-        node->setWorldTransform(Rapture::transform::compose(position, rotation, scale));
+    if (!result.active) {
+        return;
     }
+
+    // A turn or a scale is about the handle's own pivot, which is not the object's origin whenever
+    // the mesh sits off it, so the change is built around that point and applied on the outside
+    const glm::mat4 toPivot = glm::translate(glm::mat4(1.0f), -result.pivot);
+    const glm::mat4 fromPivot = glm::translate(glm::mat4(1.0f), result.pivot);
+    const glm::mat4 basis = glm::mat4(result.basis);
+
+    glm::mat4 delta(1.0f);
+
+    switch (result.operation) {
+    case gizmo::TransformGizmo::OPERATION_TRANSLATE:
+        delta = glm::translate(glm::mat4(1.0f), result.deltaPosition);
+        break;
+    case gizmo::TransformGizmo::OPERATION_ROTATE: {
+        const float angle = glm::length(result.deltaRotation);
+        if (angle <= 0.0001f) {
+            return;
+        }
+        delta = fromPivot * glm::rotate(glm::mat4(1.0f), angle, result.deltaRotation / angle) * toPivot;
+        break;
+    }
+    case gizmo::TransformGizmo::OPERATION_SCALE:
+        delta = fromPivot * basis * glm::scale(glm::mat4(1.0f), result.deltaScale) * glm::inverse(basis) * toPivot;
+        break;
+    case gizmo::TransformGizmo::OPERATION_COUNT:
+        return;
+    }
+
+    node->setWorldTransform(delta * objectTransform);
 }

@@ -141,6 +141,15 @@ class ShapeSubmission {
     void boxFilled(const glm::vec3 &min, const glm::vec3 &max, const glm::vec4 &color);
 
     /**
+     * @brief The six solid faces of a box under a transform
+     * @param transform Places the box, which spans min to max before it is applied
+     * @param min Corner the box runs from
+     * @param max Corner the box runs to
+     * @param color Fill colour
+     */
+    void boxFilled(const glm::mat4 &transform, const glm::vec3 &min, const glm::vec3 &max, const glm::vec4 &color);
+
+    /**
      * @brief A solid cone, capped at its base
      * @param base World position the base is centred on
      * @param tip World position the cone narrows to

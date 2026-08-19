@@ -6,9 +6,9 @@
 #include <components/context_menu.h>
 #include <components/radio_button.h>
 #include <components/ui_scope.h>
-#include <components/widgets/gizmo.h>
 
 #include "core/events/EventSignal.h"
+#include "gizmos/TransformGizmo.h"
 #include "layers/panels/Panel.h"
 #include "core/ecs/entity_accessor.h"
 
@@ -53,14 +53,14 @@ class ViewportPanel : public Panel {
     void setViewportImage(Amethyst::AmTextureId imageId);
     void onUpdate(float dt) override;
 
-    Amethyst::GizmoOperation getGizmoOperation() const { return m_gizmoOperation; }
-    void setGizmoOperation(Amethyst::GizmoOperation op)
+    gizmo::TransformGizmo::Operation getGizmoOperation() const { return m_gizmoOperation; }
+    void setGizmoOperation(gizmo::TransformGizmo::Operation op)
     {
         m_gizmoOperation = op;
         m_gizmoOpGroup.value = static_cast<int32_t>(op);
     }
-    Amethyst::GizmoSpace getGizmoSpace() const { return m_gizmoSpace; }
-    void setGizmoSpace(Amethyst::GizmoSpace space)
+    gizmo::TransformGizmo::Space getGizmoSpace() const { return m_gizmoSpace; }
+    void setGizmoSpace(gizmo::TransformGizmo::Space space)
     {
         m_gizmoSpace = space;
         m_gizmoSpaceGroup.value = static_cast<int32_t>(space);
@@ -73,15 +73,29 @@ class ViewportPanel : public Panel {
     void updateGizmo(void);
 
     /**
-     * @brief Selects the entity under the cursor on a left press in the viewport
-     * @param input The press that landed on the viewport image
+     * @brief Handles a press on the viewport image
+     * @param input The press
      */
     void onViewportPressed(const Amethyst::InputObject &input);
+
     /**
-     * @brief Submits a spinning set of shapes to this viewport, exercising both depth modes
-     * @param dt Seconds since the last update
+     * @brief Handles the cursor moving over the viewport image
+     * @param input The movement
      */
-    void submitTestShapes(float dt);
+    void onViewportCursorMoved(const Amethyst::InputObject &input);
+
+    /**
+     * @brief Handles a mouse button releasing over the viewport image
+     * @param input The release
+     */
+    void onViewportMouseReleased(const Amethyst::InputObject &input);
+    /**
+     * @brief Where a window position lands in this viewport's render target
+     * @param windowPosition Position Amethyst reported an input at
+     * @param[out] pixel The viewport pixel the position maps to, y down
+     * @return True where the position lies inside the viewport image
+     */
+    bool toViewportPixel(const Amethyst::vec2 &windowPosition, glm::vec2 &pixel) const;
 
     void setupOverlayButtons(void);
     void buildTransformMenu(void);
@@ -112,9 +126,14 @@ class ViewportPanel : public Panel {
 
     bool m_viewportHovered = false;
 
-    std::unique_ptr<Amethyst::Gizmo> m_gizmo;
-    Amethyst::GizmoOperation m_gizmoOperation = Amethyst::GizmoOperation::TRANSLATE;
-    Amethyst::GizmoSpace m_gizmoSpace = Amethyst::GizmoSpace::WORLD;
+    std::unique_ptr<gizmo::TransformGizmo> m_transformGizmo;
+    gizmo::TransformGizmo::Operation m_gizmoOperation = gizmo::TransformGizmo::OPERATION_TRANSLATE;
+    gizmo::TransformGizmo::Space m_gizmoSpace = gizmo::TransformGizmo::SPACE_WORLD;
+
+    glm::vec2 m_cursorInViewport{0.0f};
+    bool m_gizmoPressed = false;
+    bool m_gizmoReleased = false;
+    bool m_gizmoCapturing = false;
 
     Rapture::ecs::EntityAccessor m_selectedEntity;
     Rapture::ecs::EntityAccessor m_previousSelectedEntity;

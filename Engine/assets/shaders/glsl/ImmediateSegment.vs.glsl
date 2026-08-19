@@ -23,8 +23,13 @@ layout(push_constant) uniform PushConstants {
 } pc;
 
 layout(location = 0) out vec4 vColor;
+layout(location = 1) out float vEdgeDistance;
+layout(location = 2) out float vHalfThickness;
 
 const float MIN_CLIP_W = 1e-4;
+
+// Pixels the quad runs past the line's own width, giving the fragment shader room to fade the edge
+const float AA_FEATHER = 1.0;
 
 // Two triangles over the four corners of the quad, each corner naming an endpoint and a side
 const int QUAD_CORNERS[6] = int[6](0, 1, 2, 2, 1, 3);
@@ -67,9 +72,14 @@ void main() {
     vec4 clip = atEnd ? clipEnd : clipStart;
     vec2 ndc = atEnd ? ndcEnd : ndcStart;
 
+    float halfThickness = segment.thickness * 0.5;
+    float halfQuad = halfThickness + AA_FEATHER;
+
     // Thickness is authored in pixels, so the offset is built in pixels and taken back into ndc
-    vec2 ndcOffset = normal * side * segment.thickness / pc.viewportSize;
+    vec2 ndcOffset = normal * side * halfQuad * 2.0 / pc.viewportSize;
 
     gl_Position = vec4((ndc + ndcOffset) * clip.w, clip.z, clip.w);
     vColor = unpackUnorm4x8(segment.color);
+    vEdgeDistance = side * halfQuad;
+    vHalfThickness = halfThickness;
 }

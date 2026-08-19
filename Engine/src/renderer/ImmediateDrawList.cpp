@@ -6,6 +6,10 @@
 
 namespace Rapture {
 
+// The four corners of each box face, wound consistently, indexed as s_buildBoxCorners numbers them
+static constexpr uint32_t BOX_FACES[6][4] = {{0, 4, 6, 2}, {1, 3, 7, 5}, {0, 1, 5, 4},
+                                             {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}};
+
 static uint32_t s_packColor(const glm::vec4 &color)
 {
     const glm::vec4 clamped = glm::clamp(color, glm::vec4(0.0f), glm::vec4(1.0f));
@@ -140,10 +144,21 @@ void ShapeSubmission::boxFilled(const glm::vec3 &min, const glm::vec3 &max, cons
     glm::vec3 corners[8];
     s_buildBoxCorners(min, max, corners);
 
-    static constexpr uint32_t FACES[6][4] = {{0, 4, 6, 2}, {1, 3, 7, 5}, {0, 1, 5, 4},
-                                             {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}};
+    for (const uint32_t (&face)[4] : BOX_FACES) {
+        quadFilled(corners[face[0]], corners[face[1]], corners[face[2]], corners[face[3]], color);
+    }
+}
 
-    for (const uint32_t (&face)[4] : FACES) {
+void ShapeSubmission::boxFilled(const glm::mat4 &transform, const glm::vec3 &min, const glm::vec3 &max,
+                                const glm::vec4 &color)
+{
+    glm::vec3 corners[8];
+    s_buildBoxCorners(min, max, corners);
+    for (glm::vec3 &corner : corners) {
+        corner = glm::vec3(transform * glm::vec4(corner, 1.0f));
+    }
+
+    for (const uint32_t (&face)[4] : BOX_FACES) {
         quadFilled(corners[face[0]], corners[face[1]], corners[face[2]], corners[face[3]], color);
     }
 }
