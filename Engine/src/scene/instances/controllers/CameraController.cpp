@@ -7,11 +7,18 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <cmath>
 
 namespace Rapture {
 
 static const glm::vec3 WORLD_UP = glm::vec3(0.0f, 1.0f, 0.0f);
+
+// leaves a margin around what is framed, so it does not sit edge to edge
+static constexpr float FOCUS_FILL = 0.87f;
+
+// what a sphere with no size is framed as, so focusing a point still yields a usable distance
+static constexpr float FOCUS_MIN_RADIUS = 0.01f;
 
 static constexpr std::string_view KEY_MOUSE_SENSITIVITY = "mouseSensitivity";
 static constexpr std::string_view KEY_MOVEMENT_SPEED = "movementSpeed";
@@ -167,6 +174,52 @@ void CameraController::deserialize(ReadNode node)
     panSpeed = static_cast<float>(node.child(KEY_PAN_SPEED).asF64(panSpeed));
     zoomSpeed = static_cast<float>(node.child(KEY_ZOOM_SPEED).asF64(zoomSpeed));
     maxPitch = static_cast<float>(node.child(KEY_MAX_PITCH).asF64(maxPitch));
+}
+
+void CameraController::focusOn(const glm::vec3 &center, float radius, const glm::vec3 &direction)
+{
+    if (glm::length(direction) > 0.0f) {
+        glm::vec3 forward = glm::normalize(direction);
+        m_pitch = glm::clamp(glm::degrees(std::asin(forward.y)), -maxPitch, maxPitch);
+        m_yaw = glm::degrees(std::atan2(forward.z, forward.x));
+        recalcFront();
+    }
+
+    focusOn(center, radius);
+}
+
+void CameraController::focusOn(const glm::vec3 &center, float radius)
+{
+    if (m_viewCamera == nullptr) {
+        return;
+    }
+
+    const auto *camera = m_viewCamera->accessor().tryRead<CameraComponent>();
+    if (camera == nullptr) {
+        return;
+    }
+
+    float fitRadius = std::max(radius, FOCUS_MIN_RADIUS) / FOCUS_FILL;
+
+    // the frustum plane is tangent to the sphere, so the perpendicular from the centre to it is the
+    // radius, and that perpendicular measures distance * sin(half fov)
+    float halfFovY = glm::radians(camera->fov) * 0.5f;
+    float distance = fitRadius / std::sin(halfFovY);
+
+    // a viewport taller than it is wide is tighter across than it is down
+    if (camera->aspectRatio < 1.0f) {
+        float halfFovX = std::atan(camera->aspectRatio * std::tan(halfFovY));
+        distance = std::max(distance, fitRadius / std::sin(halfFovX));
+    }
+
+    distance = std::max(distance, camera->nearPlane + fitRadius);
+
+    m_focusPoint = center;
+    m_focusDistance = distance;
+    m_recenterFocus = false;
+
+    m_viewCamera->setPosition(center - m_front * distance);
+    updateViewCamera();
 }
 
 void CameraController::recalcFront()

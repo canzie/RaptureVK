@@ -74,8 +74,8 @@ void RtInstanceData::rebuild(Scene &scene)
             }
 
             if (meshComp.mesh) {
-                auto vb = meshComp.mesh->getVertexBuffer();
-                auto ib = meshComp.mesh->getIndexBuffer();
+                auto vb = meshComp.mesh->geometry().getVertexBuffer();
+                auto ib = meshComp.mesh->geometry().getIndexBuffer();
 
                 if (vb) {
                     info.vboIndex = vb->getBindlessIndex();

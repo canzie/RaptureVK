@@ -659,20 +659,6 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
                      bufferLayout.getAttributeOffset(BufferAttributeID::JOINTS_0) != UINT32_MAX &&
                      bufferLayout.getAttributeOffset(BufferAttributeID::WEIGHTS_0) != UINT32_MAX;
 
-    AssetImportDataVariant importData;
-    if (isSkinned) {
-        auto bindsIt = m_inverseBindMatrices.find(skeleton);
-        importData = SkeletalMeshImportData{std::move(params), skeleton,
-                                            bindsIt != m_inverseBindMatrices.end() ? bindsIt->second
-                                                                                   : std::vector<glm::mat4>{}};
-        out.skeleton = skeleton;
-    } else {
-        importData = StaticMeshImportData{std::move(params)};
-    }
-
-    out.meshRef = AssetManager::importAsset(AssetImportDataRequest{
-        .data = std::move(importData), .output = m_outputFolder, .name = meshAssetName, .provenance = provenance});
-
     yyjson_val *materialVal = getObjectValue(primitiveJson, "material");
     if (materialVal && yyjson_is_int(materialVal)) {
         out.materialIndex = getInt(materialVal, -1);
@@ -680,6 +666,23 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
             loadMaterial(static_cast<size_t>(out.materialIndex));
         }
     }
+
+    AssetHandle defaultMaterial = primitiveMaterial(out.materialIndex);
+
+    AssetImportDataVariant importData;
+    if (isSkinned) {
+        auto bindsIt = m_inverseBindMatrices.find(skeleton);
+        importData = SkeletalMeshImportData{std::move(params), skeleton,
+                                            bindsIt != m_inverseBindMatrices.end() ? bindsIt->second
+                                                                                   : std::vector<glm::mat4>{},
+                                            defaultMaterial};
+        out.skeleton = skeleton;
+    } else {
+        importData = StaticMeshImportData{std::move(params), defaultMaterial};
+    }
+
+    out.meshRef = AssetManager::importAsset(AssetImportDataRequest{
+        .data = std::move(importData), .output = m_outputFolder, .name = meshAssetName, .provenance = provenance});
 
     return true;
 }
@@ -754,12 +757,7 @@ Node3D *glTF2Loader::buildSceneObject(SceneObject &parent, glTF_SceneNode *src)
 
         mesh->setMesh(src->meshRef.get()->getHandle());
 
-        if (src->materialIndex >= 0) {
-            auto matIt = m_loadedData->materials.find(static_cast<size_t>(src->materialIndex));
-            if (matIt != m_loadedData->materials.end() && matIt->second) {
-                mesh->setMaterial(matIt->second.get()->getHandle());
-            }
-        }
+        mesh->setMaterial(primitiveMaterial(src->materialIndex));
 
         // a skinned mesh has no acceleration structure to trace against
         if (src->skeleton == INVALID_ASSET_HANDLE) {
@@ -974,6 +972,20 @@ static AssetPtr<BaseMaterial> s_obtainGltfBaseMaterial()
         RP_CORE_ERROR("glTF base material was not created at startup");
     }
     return base;
+}
+
+AssetHandle glTF2Loader::primitiveMaterial(int32_t materialIndex) const
+{
+    if (materialIndex < 0) {
+        return RE_DEFAULT_MATERIAL_INSTANCE;
+    }
+
+    auto found = m_loadedData->materials.find(static_cast<size_t>(materialIndex));
+    if (found == m_loadedData->materials.end() || !found->second) {
+        return RE_DEFAULT_MATERIAL_INSTANCE;
+    }
+
+    return found->second.get()->getHandle();
 }
 
 AssetRef glTF2Loader::loadMaterial(size_t materialIndex)

@@ -91,6 +91,11 @@ class Viewport {
     void drawFrame();
 
     /**
+     * @brief Fires as this viewport is destroyed, before anything it owns is torn down
+     */
+    EventSignal<void()> onDestroy;
+
+    /**
      * @brief Render a region of this viewport and report which entities cover each of its pixels
      *
      * Renders on demand and blocks on the result, so it belongs on the thread driving the editor.

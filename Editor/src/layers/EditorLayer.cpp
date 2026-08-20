@@ -84,30 +84,28 @@ void EditorLayer::syncViewportControls()
         // terrain streaming and the shadow cascades follow whoever is driving the scene
         viewport->getScene()->setActiveController(control.controller.get());
         viewport->editorBinding().controller = control.controller.get();
+
+        // the camera and controller live in the viewport's scene, which its owner is free to destroy
+        // as soon as the viewport is gone, so they cannot outlive it
+        control.destroyConn = viewport->onDestroy.connect([this, viewport]() { releaseViewportControl(viewport); });
+
         m_controls.emplace(viewport, std::move(control));
     }
+}
 
-    for (auto it = m_controls.begin(); it != m_controls.end();) {
-        bool stillExists = false;
-        for (const auto &vp : viewports) {
-            if (vp.get() == it->first) {
-                stillExists = true;
-                break;
-            }
-        }
-        if (stillExists) {
-            ++it;
-            continue;
-        }
-
-        // the viewport is already gone, so the scene is reached through the camera rather than through it
-        Rapture::Scene *scene = it->second.camera->scene();
-        if (scene != nullptr && scene->activeController() == it->second.controller.get()) {
-            scene->setActiveController(nullptr);
-        }
-
-        it = m_controls.erase(it);
+void EditorLayer::releaseViewportControl(Rapture::Viewport *viewport)
+{
+    auto found = m_controls.find(viewport);
+    if (found == m_controls.end()) {
+        return;
     }
+
+    Rapture::Scene *scene = viewport->getScene();
+    if (scene != nullptr && scene->activeController() == found->second.controller.get()) {
+        scene->setActiveController(nullptr);
+    }
+
+    m_controls.erase(found);
 }
 
 void EditorLayer::onUpdate(float dt)

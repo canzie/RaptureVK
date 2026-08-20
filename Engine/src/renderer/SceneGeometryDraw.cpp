@@ -108,8 +108,8 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
             continue;
         }
 
-        auto mesh = meshComp.mesh;
-        if (!mesh->getVertexBuffer() || !mesh->getIndexBuffer()) {
+        Mesh &mesh = meshComp.mesh->geometry();
+        if (!mesh.getVertexBuffer() || !mesh.getIndexBuffer()) {
             continue;
         }
 
@@ -119,7 +119,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
 
         uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
 
-        s_addMeshToBatch(batchMap, *mesh, renderData->getMeshSlot(entity), materialIndex);
+        s_addMeshToBatch(batchMap, mesh, renderData->getMeshSlot(entity), materialIndex);
     }
 
     for (auto [entity, transform, meshComp, materialComp] :
@@ -130,8 +130,8 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
             continue;
         }
 
-        auto mesh = meshComp.mesh;
-        if (!mesh->getVertexBuffer() || !mesh->getIndexBuffer()) {
+        Mesh &mesh = meshComp.mesh->geometry();
+        if (!mesh.getVertexBuffer() || !mesh.getIndexBuffer()) {
             continue;
         }
 
@@ -142,7 +142,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
 
         uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
 
-        s_addMeshToBatch(batchMap, *mesh, renderData->getMeshSlot(entity), materialIndex);
+        s_addMeshToBatch(batchMap, mesh, renderData->getMeshSlot(entity), materialIndex);
     }
 
     for (const auto &[batchKey, batch] : batchMap.getBatches()) {

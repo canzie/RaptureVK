@@ -577,9 +577,11 @@ void ViewportPanel::updateGizmo()
     glm::mat4 viewMatrix = camComp.camera.getViewMatrix();
     glm::mat4 projectionMatrix = camComp.camera.getProjectionMatrix();
     glm::mat4 objectTransform = node->worldTransform();
-    glm::vec3 pivot = (meshComp != nullptr && meshComp->mesh)
-                          ? Rapture::BoundingBox(meshComp->mesh->getBoundsMin(), meshComp->mesh->getBoundsMax()).getCenter()
-                          : glm::vec3(0.0f);
+    glm::vec3 pivot = glm::vec3(0.0f);
+    if (meshComp != nullptr && meshComp->mesh) {
+        const Rapture::Mesh &geometry = meshComp->mesh->geometry();
+        pivot = Rapture::BoundingBox(geometry.getBoundsMin(), geometry.getBoundsMax()).getCenter();
+    }
 
     gizmo::TransformGizmo::Params params;
     params.view = viewMatrix;

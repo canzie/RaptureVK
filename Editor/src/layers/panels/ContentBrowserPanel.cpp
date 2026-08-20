@@ -781,7 +781,8 @@ void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::u
 // the asset types that have a workspace to open in
 static bool s_opensInWorkspace(Rapture::AssetType type)
 {
-    return type == Rapture::ASSET_SCENE_OBJECT || type == Rapture::ASSET_MATERIAL_INSTANCE;
+    return type == Rapture::ASSET_SCENE_OBJECT || type == Rapture::ASSET_MATERIAL_INSTANCE ||
+           type == Rapture::ASSET_STATIC_MESH || type == Rapture::ASSET_SKELETAL_MESH || type == Rapture::ASSET_SKELETON;
 }
 
 std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPanel::assetActions(Rapture::AssetType type,

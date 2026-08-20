@@ -1,6 +1,6 @@
 #include "SkeletonInstanceManager.h"
 
-#include "assets/skeletons/Skeleton.h"
+#include "assets/skeletons/ASkeleton.h"
 #include "core/utils/Log.h"
 #include "core/utils/rp_assert.h"
 #include "gpu/descriptors/DescriptorSet.h"
@@ -78,11 +78,11 @@ SkeletonInstanceManager::SkeletonInstanceManager()
 
 SkeletonInstanceManager::~SkeletonInstanceManager() = default;
 
-SkeletonInstance SkeletonInstanceManager::createSkeletonInstance(const AssetPtr<Skeleton> &skeleton)
+SkeletonInstance SkeletonInstanceManager::createSkeletonInstance(const AssetPtr<ASkeleton> &skeleton)
 {
-    RP_ASSERT(skeleton && skeleton->getJointCount() > 0, "a skeleton instance needs a skeleton with joints");
+    RP_ASSERT(skeleton && skeleton->skeleton().getJointCount() > 0, "a skeleton instance needs a skeleton with joints");
 
-    return SkeletonInstance(*m_buffer, skeleton->getJointCount());
+    return SkeletonInstance(*m_buffer, skeleton->skeleton().getJointCount());
 }
 
 } // namespace Rapture

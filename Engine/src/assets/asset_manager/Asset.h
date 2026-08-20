@@ -15,9 +15,9 @@
 #include "AssetHandle.h"
 
 #include "assets/materials/MaterialInstance.h"
-#include "assets/meshes/SkeletalMesh.h"
-#include "assets/meshes/StaticMesh.h"
-#include "assets/skeletons/Skeleton.h"
+#include "assets/meshes/ASkeletalMesh.h"
+#include "assets/meshes/AStaticMesh.h"
+#include "assets/skeletons/ASkeleton.h"
 #include "scene/World.h"
 #include "core/serialization/SerialDocument.h"
 #include "gpu/shaders/Shader.h"
@@ -27,9 +27,9 @@
 namespace Rapture {
 
 using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
-                                  std::unique_ptr<BaseMaterial>, std::unique_ptr<MaterialInstance>, std::unique_ptr<StaticMesh>,
-                                  std::unique_ptr<SkeletalMesh>, std::unique_ptr<SerialDocument>, std::unique_ptr<World>,
-                                  std::unique_ptr<Skeleton>>;
+                                  std::unique_ptr<BaseMaterial>, std::unique_ptr<MaterialInstance>, std::unique_ptr<AStaticMesh>,
+                                  std::unique_ptr<ASkeletalMesh>, std::unique_ptr<SerialDocument>, std::unique_ptr<World>,
+                                  std::unique_ptr<ASkeleton>>;
 
 template <typename T, typename Variant>
 struct IsAssetType;

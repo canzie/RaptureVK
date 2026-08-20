@@ -42,11 +42,17 @@ void SkeletalMesh3D::setMesh(AssetHandle _mesh)
         return;
     }
 
+    const ASkeletalMesh *asset = ref.get()->getUnderlyingAsset<ASkeletalMesh>();
+
     auto component = m_entity.write<SkeletalMeshComponent>();
 
     component->setMesh(std::move(ref));
     component->isLoading = false;
     m_mesh = _mesh;
+
+    if (asset != nullptr) {
+        adoptDefaultMaterial(*asset);
+    }
 }
 
 void SkeletalMesh3D::setPose(SkeletonPose *pose)
@@ -95,13 +101,13 @@ void SkeletalMesh3D::setMobility(Mobility mobility)
 glm::vec3 SkeletalMesh3D::boundsMin() const
 {
     const auto *component = m_entity.tryRead<SkeletalMeshComponent>();
-    return (component != nullptr && component->mesh) ? component->mesh->getBoundsMin() : glm::vec3(0.0f);
+    return (component != nullptr && component->mesh) ? component->mesh->geometry().getBoundsMin() : glm::vec3(0.0f);
 }
 
 glm::vec3 SkeletalMesh3D::boundsMax() const
 {
     const auto *component = m_entity.tryRead<SkeletalMeshComponent>();
-    return (component != nullptr && component->mesh) ? component->mesh->getBoundsMax() : glm::vec3(0.0f);
+    return (component != nullptr && component->mesh) ? component->mesh->geometry().getBoundsMax() : glm::vec3(0.0f);
 }
 
 void SkeletalMesh3D::setRayTraced(bool rayTraced)

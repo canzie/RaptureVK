@@ -40,6 +40,8 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
         return;
     }
 
+    const AStaticMesh *asset = ref.get()->getUnderlyingAsset<AStaticMesh>();
+
     {
         auto component = m_entity.write<StaticMeshComponent>();
 
@@ -47,6 +49,10 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
         component->isLoading = false;
     }
     m_mesh = _mesh;
+
+    if (asset != nullptr) {
+        adoptDefaultMaterial(*asset);
+    }
 
     if (m_entity.has<RayTracedComponent>()) {
         rebuildAccelerationStructure();
@@ -56,7 +62,7 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
 void StaticMesh3D::rebuildAccelerationStructure()
 {
     const StaticMeshComponent *component = m_entity.tryRead<StaticMeshComponent>();
-    if (component == nullptr || !component->mesh || !component->mesh->buildBLAS()) {
+    if (component == nullptr || !component->mesh || !component->mesh->geometry().buildBLAS()) {
         RP_CORE_ERROR("'{}' left ray tracing because its mesh has no acceleration structure", name());
         m_entity.tryRemove<RayTracedComponent>();
         scene()->unregisterBLAS(m_entity.getEntity());
@@ -100,13 +106,13 @@ void StaticMesh3D::setMobility(Mobility mobility)
 glm::vec3 StaticMesh3D::boundsMin() const
 {
     const auto *component = m_entity.tryRead<StaticMeshComponent>();
-    return (component != nullptr && component->mesh) ? component->mesh->getBoundsMin() : glm::vec3(0.0f);
+    return (component != nullptr && component->mesh) ? component->mesh->geometry().getBoundsMin() : glm::vec3(0.0f);
 }
 
 glm::vec3 StaticMesh3D::boundsMax() const
 {
     const auto *component = m_entity.tryRead<StaticMeshComponent>();
-    return (component != nullptr && component->mesh) ? component->mesh->getBoundsMax() : glm::vec3(0.0f);
+    return (component != nullptr && component->mesh) ? component->mesh->geometry().getBoundsMax() : glm::vec3(0.0f);
 }
 
 void StaticMesh3D::setRayTraced(bool rayTraced)
@@ -128,7 +134,7 @@ void StaticMesh3D::setRayTraced(bool rayTraced)
         return;
     }
 
-    if (!component->mesh->buildBLAS()) {
+    if (!component->mesh->geometry().buildBLAS()) {
         RP_CORE_ERROR("'{}' cannot be ray traced because its mesh has no acceleration structure", name());
         return;
     }

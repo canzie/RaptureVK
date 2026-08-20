@@ -529,7 +529,7 @@ void Scene::registerBLAS(ecs::Entity entity)
         return;
     }
 
-    BLAS *blas = mesh->mesh->getBLAS();
+    BLAS *blas = mesh->mesh->geometry().getBLAS();
     if (blas == nullptr) {
         RP_CORE_ERROR("Entity's mesh has no acceleration structure");
         return;

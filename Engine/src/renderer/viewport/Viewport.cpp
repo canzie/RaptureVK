@@ -35,6 +35,8 @@ Viewport::Viewport(const ViewportConfig &config, RenderContext renderContext) : 
 
 Viewport::~Viewport()
 {
+    onDestroy.fire();
+
     m_drawManager.reset();
 }
 

@@ -119,6 +119,16 @@ inline constexpr const char *SVG_CUBE = ICON_SVG("<path d=\"M8 2l5.5 3v6L8 14 2.
 inline constexpr const char *SVG_MESH = ICON_SVG("<path d=\"M8 2l5.5 3v6L8 14 2.5 11V5L8 2z\"/>"
                                                  "<path d=\"M2.5 5L8 8l5.5-3M8 8v6M2.5 11L8 8 13.5 11\"/>");
 
+inline constexpr const char *SVG_SKELETON = ICON_SVG("<path d=\"M12.5 10.4V7a4.5 4.5 0 10-9 0v3.4\"/>"
+                                                     "<path d=\"M3.5 10.4h9\"/>"
+                                                     "<path d=\"M5.4 10.4v2.4a.7.7 0 00.7.7h3.8a.7.7 0 00.7-.7v-2.4\"/>"
+                                                     "<path d=\"M7.2 10.6v1.4M8.8 10.6v1.4\"/>"
+                                                     "<g fill=\"#ffffff\" stroke=\"none\">"
+                                                     "<circle cx=\"5.9\" cy=\"7.1\" r=\"1.3\"/>"
+                                                     "<circle cx=\"10.1\" cy=\"7.1\" r=\"1.3\"/>"
+                                                     "<path d=\"M8 8.4l.9 1.5H7.1L8 8.4z\"/>"
+                                                     "</g>");
+
 inline constexpr const char *SVG_LIGHT = ICON_SVG("<path d=\"M8 2.5a4 4 0 00-2.5 7.1V11h5V9.6A4 4 0 008 2.5z\"/>"
                                                   "<path d=\"M6.5 12.5h3M7 14h2\"/>");
 

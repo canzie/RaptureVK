@@ -349,25 +349,26 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
         }
 
         // Check if mesh has valid buffers
-        if (!meshComp.mesh->getVertexBuffer() || !meshComp.mesh->getIndexBuffer()) {
+        Mesh &mesh = meshComp.mesh->geometry();
+        if (!mesh.getVertexBuffer() || !mesh.getIndexBuffer()) {
             continue;
         }
 
         // Get buffer allocation info to determine batch
-        auto vboAlloc = meshComp.mesh->getVertexAllocation();
-        auto iboAlloc = meshComp.mesh->getIndexAllocation();
+        auto vboAlloc = mesh.getVertexAllocation();
+        auto iboAlloc = mesh.getIndexAllocation();
 
         if (!vboAlloc || !iboAlloc) {
             continue;
         }
 
         // Get or create batch for this VBO/IBO arena combination
-        MDIBatch *batch =
-            m_mdiBatchMaps[m_currentFrame]->obtainBatch(vboAlloc, iboAlloc, meshComp.mesh->getVertexBuffer()->getBufferLayout(),
-                                                        meshComp.mesh->getIndexBuffer()->getIndexType());
+        MDIBatch *batch = m_mdiBatchMaps[m_currentFrame]->obtainBatch(vboAlloc, iboAlloc,
+                                                                      mesh.getVertexBuffer()->getBufferLayout(),
+                                                                      mesh.getIndexBuffer()->getIndexType());
 
         // Add mesh to batch (materialIndex = 0 for shadow pass)
-        batch->addObject(*meshComp.mesh, renderData->getMeshSlot(entity), 0);
+        batch->addObject(mesh, renderData->getMeshSlot(entity), 0);
     }
 
     // Second pass: Upload batch data and render using MDI

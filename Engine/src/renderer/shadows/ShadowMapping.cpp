@@ -249,7 +249,8 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
         }
 
         // Check if mesh has valid buffers
-        if (!meshComp.mesh->getVertexBuffer() || !meshComp.mesh->getIndexBuffer()) {
+        Mesh &mesh = meshComp.mesh->geometry();
+        if (!mesh.getVertexBuffer() || !mesh.getIndexBuffer()) {
             continue;
         }
 
@@ -264,7 +265,7 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
         // Get the vertex buffer layout
         auto &app = Application::getInstance();
         auto &vc = app.getVulkanContext();
-        auto &bufferLayout = meshComp.mesh->getVertexBuffer()->getBufferLayout();
+        auto &bufferLayout = mesh.getVertexBuffer()->getBufferLayout();
 
         // Convert to EXT variants required by vkCmdSetVertexInputEXT
         auto bindingDescription = bufferLayout.getBindingDescription2EXT();
@@ -289,16 +290,16 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
                            sizeof(ShadowMappingPushConstants), &pushConstants);
 
         // Bind vertex buffer
-        VkBuffer vertexBuffers[] = {meshComp.mesh->getVertexBuffer()->getBufferVk()};
-        VkDeviceSize offsets[] = {meshComp.mesh->getVertexBuffer()->getOffset()};
+        VkBuffer vertexBuffers[] = {mesh.getVertexBuffer()->getBufferVk()};
+        VkDeviceSize offsets[] = {mesh.getVertexBuffer()->getOffset()};
         vkCmdBindVertexBuffers(commandBuffer->getCommandBufferVk(), 0, 1, vertexBuffers, offsets);
 
         // Bind index buffer
-        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexBuffer()->getBufferVk(),
-                             meshComp.mesh->getIndexBuffer()->getOffset(), meshComp.mesh->getIndexBuffer()->getIndexType());
+        vkCmdBindIndexBuffer(commandBuffer->getCommandBufferVk(), mesh.getIndexBuffer()->getBufferVk(),
+                             mesh.getIndexBuffer()->getOffset(), mesh.getIndexBuffer()->getIndexType());
 
         // Draw the mesh
-        vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), meshComp.mesh->getIndexCount(), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer->getCommandBufferVk(), mesh.getIndexCount(), 1, 0, 0, 0);
     }
 
     commandBuffer->end();

@@ -14,6 +14,9 @@
 #include "layers/workspaces/MaterialEditorWorkspace.h"
 #include "layers/workspaces/SceneObjectEditorWorkspace.h"
 #include "layers/workspaces/ScriptingWorkspace.h"
+#include "layers/workspaces/SkeletalMeshWorkspace.h"
+#include "layers/workspaces/SkeletonWorkspace.h"
+#include "layers/workspaces/StaticMeshWorkspace.h"
 #include "layers/workspaces/TextureGeneratorWorkspace.h"
 #include "core/utils/Log.h"
 #include "core/utils/TracyProfiler.h"
@@ -474,6 +477,15 @@ void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
         break;
     case Rapture::ASSET_MATERIAL_INSTANCE:
         workspace = std::make_unique<MaterialEditorWorkspace>(*m_workspaceTabBar, services, handle);
+        break;
+    case Rapture::ASSET_STATIC_MESH:
+        workspace = std::make_unique<StaticMeshWorkspace>(*m_workspaceTabBar, services, handle);
+        break;
+    case Rapture::ASSET_SKELETAL_MESH:
+        workspace = std::make_unique<SkeletalMeshWorkspace>(*m_workspaceTabBar, services, handle);
+        break;
+    case Rapture::ASSET_SKELETON:
+        workspace = std::make_unique<SkeletonWorkspace>(*m_workspaceTabBar, services, handle);
         break;
     case Rapture::ASSET_WORLD: {
         Rapture::AssetPtr<Rapture::World> world(Rapture::AssetManager::getAsset(handle));

@@ -444,9 +444,9 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
         uint32_t boneOffset = UINT32_MAX;
 
         if (const StaticMeshComponent *staticMesh = registry.tryRead<StaticMeshComponent>(entityId)) {
-            mesh = staticMesh->mesh.get();
+            mesh = staticMesh->mesh ? &staticMesh->mesh->geometry() : nullptr;
         } else if (const SkeletalMeshComponent *skeletal = registry.tryRead<SkeletalMeshComponent>(entityId)) {
-            mesh = skeletal->mesh.get();
+            mesh = skeletal->mesh ? &skeletal->mesh->geometry() : nullptr;
             if (skeletal->pose != nullptr) {
                 boneOffset = skeletal->pose->getBoneOffset();
             }

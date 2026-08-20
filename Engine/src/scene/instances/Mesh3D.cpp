@@ -1,6 +1,7 @@
 #include "Mesh3D.h"
 
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/meshes/AMesh.h"
 #include "core/utils/Log.h"
 #include "scene/Scene.h"
 #include "scene/components/Components.h"
@@ -51,6 +52,15 @@ void Mesh3D::setMaterial(AssetHandle _material)
 
     component->material = AssetPtr<MaterialInstance>(std::move(ref));
     m_material = _material;
+}
+
+void Mesh3D::adoptDefaultMaterial(const AMesh &mesh)
+{
+    if (m_material != INVALID_ASSET_HANDLE) {
+        return;
+    }
+
+    setMaterial(mesh.defaultMaterial());
 }
 
 bool Mesh3D::isRayTraced() const

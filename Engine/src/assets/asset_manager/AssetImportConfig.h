@@ -2,6 +2,7 @@
 #define RAPTURE__ASSET_IMPORT_CONFIG_H
 
 #include "AssetCommon.h"
+#include "ReservedAssets.h"
 #include "assets/meshes/Mesh.h"
 #include "core/serialization/SerialDocument.h"
 #include "gpu/shaders/Shader.h"
@@ -36,12 +37,14 @@ using AssetImportConfigVariant = std::variant<std::monostate, ShaderImportConfig
 
 struct StaticMeshImportData {
     MeshAllocatorParams params;
+    AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE;
 };
 
 struct SkeletalMeshImportData {
     MeshAllocatorParams params;
     AssetHandle skeleton = INVALID_ASSET_HANDLE;
     std::vector<glm::mat4> inverseBindMatrices;
+    AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE;
 };
 
 struct SceneObjectImportData {

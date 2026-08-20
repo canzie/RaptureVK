@@ -31,6 +31,17 @@ inline const ParameterId MP_EMISSIVE_MAP = "emissive_map";
 inline const ParameterId MP_HEIGHT_MAP = "height_map";
 inline const ParameterId MP_SPECULAR_MAP = "specular_map";
 
+/**
+ * @brief Parameter names the grid material exposes
+ */
+inline const ParameterId MP_GRID_SPACING = "grid_spacing";
+inline const ParameterId MP_GRID_SUBDIVISIONS = "grid_subdivisions";
+inline const ParameterId MP_GRID_LINE_WIDTH = "grid_line_width";
+inline const ParameterId MP_GRID_MINOR_LINE_WIDTH = "grid_minor_line_width";
+inline const ParameterId MP_GRID_COLOR = "grid_color";
+inline const ParameterId MP_GRID_LINE_COLOR = "grid_line_color";
+inline const ParameterId MP_GRID_MINOR_LINE_COLOR = "grid_minor_line_color";
+
 } // namespace Rapture
 
 #endif // RAPTURE__MATERIAL_PARAMETERS_H

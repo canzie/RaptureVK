@@ -3,6 +3,8 @@
 
 #include "app/Layer.h"
 
+#include "core/events/EventSignal.h"
+
 #include <memory>
 #include <unordered_map>
 
@@ -32,12 +34,19 @@ class EditorLayer : public Rapture::Layer {
     struct ViewportControl {
         std::unique_ptr<Rapture::Camera3D> camera;
         std::unique_ptr<Rapture::CameraController> controller;
+        Rapture::EventConnection destroyConn;
     };
 
     /**
-     * @brief Create controls for newly appeared viewports and drop controls for destroyed ones.
+     * @brief Create controls for newly appeared viewports.
      */
     void syncViewportControls(void);
+
+    /**
+     * @brief Drops the control driving a viewport, called as that viewport is destroyed
+     * @param viewport The viewport being destroyed
+     */
+    void releaseViewportControl(Rapture::Viewport *viewport);
 
     std::unique_ptr<Rapture::Input> m_input;
     std::unordered_map<Rapture::Viewport *, ViewportControl> m_controls;

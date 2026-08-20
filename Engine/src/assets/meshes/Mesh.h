@@ -102,10 +102,9 @@ class Mesh {
      */
     BLAS *getBLAS() const { return m_blas.get(); }
 
-  protected:
     /**
-     * @brief Serializes the geometry half of this mesh by reading it back off the GPU
-     * @return A mesh blob, empty if this mesh holds no geometry
+     * @brief Serializes this geometry by reading it back off the GPU
+     * @return A geometry blob, empty if this mesh holds none
      */
     std::vector<uint8_t> serializeGeometry() const;
 

@@ -97,6 +97,8 @@ const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *
     case Rapture::ASSET_STATIC_MESH:
     case Rapture::ASSET_SKELETAL_MESH:
         return Icons::SVG_MESH;
+    case Rapture::ASSET_SKELETON:
+        return Icons::SVG_SKELETON;
     case Rapture::ASSET_SCENE_OBJECT:
         return Icons::SVG_CUBE;
     case Rapture::ASSET_ANIMATION:

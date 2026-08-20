@@ -40,11 +40,11 @@ static uint64_t s_hashPath(const std::filesystem::path &path)
 
 static uint64_t s_assetSizeHint(const Asset &asset)
 {
-    if (const StaticMesh *mesh = asset.getUnderlyingAsset<StaticMesh>()) {
-        return mesh->getSizeBytes();
+    if (const AStaticMesh *mesh = asset.getUnderlyingAsset<AStaticMesh>()) {
+        return mesh->geometry().getSizeBytes();
     }
-    if (const SkeletalMesh *mesh = asset.getUnderlyingAsset<SkeletalMesh>()) {
-        return mesh->getSizeBytes();
+    if (const ASkeletalMesh *mesh = asset.getUnderlyingAsset<ASkeletalMesh>()) {
+        return mesh->geometry().getSizeBytes();
     }
     if (const Texture *texture = asset.getUnderlyingAsset<Texture>()) {
         return texture->getSizeBytes();
@@ -87,17 +87,17 @@ static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &
         }
         break;
     case ASSET_SKELETON:
-        if (Skeleton *skeleton = asset.getUnderlyingAsset<Skeleton>()) {
+        if (ASkeleton *skeleton = asset.getUnderlyingAsset<ASkeleton>()) {
             return skeleton->serialize();
         }
         break;
     case ASSET_STATIC_MESH:
-        if (StaticMesh *mesh = asset.getUnderlyingAsset<StaticMesh>()) {
+        if (AStaticMesh *mesh = asset.getUnderlyingAsset<AStaticMesh>()) {
             return mesh->serialize();
         }
         break;
     case ASSET_SKELETAL_MESH:
-        if (SkeletalMesh *mesh = asset.getUnderlyingAsset<SkeletalMesh>()) {
+        if (ASkeletalMesh *mesh = asset.getUnderlyingAsset<ASkeletalMesh>()) {
             return mesh->serialize();
         }
         break;
@@ -117,13 +117,13 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
         }
         break;
     case ASSET_STATIC_MESH:
-        if (auto mesh = StaticMesh::deserialize(payload)) {
+        if (auto mesh = AStaticMesh::deserialize(payload)) {
             asset.setAssetVariant(std::move(mesh));
             return true;
         }
         break;
     case ASSET_SKELETAL_MESH:
-        if (auto mesh = SkeletalMesh::deserialize(payload)) {
+        if (auto mesh = ASkeletalMesh::deserialize(payload)) {
             asset.setAssetVariant(std::move(mesh));
             return true;
         }
@@ -156,7 +156,7 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
         }
         break;
     case ASSET_SKELETON:
-        if (auto skeleton = Skeleton::deserialize(payload)) {
+        if (auto skeleton = ASkeleton::deserialize(payload)) {
             asset.setAssetVariant(std::move(skeleton));
             return true;
         }
@@ -171,15 +171,16 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
 {
     if (auto *meshData = std::get_if<StaticMeshImportData>(&data)) {
         // the source bytes are already in hand here, so this skips the readback serialize does
-        payload = StaticMesh::serializeParams(meshData->params);
+        payload = AStaticMesh::serializeParams(meshData->params, meshData->defaultMaterial);
         type = ASSET_STATIC_MESH;
-        return std::make_unique<StaticMesh>(meshData->params);
+        return std::make_unique<AStaticMesh>(meshData->params, meshData->defaultMaterial);
     }
     if (auto *skeletalData = std::get_if<SkeletalMeshImportData>(&data)) {
-        payload = SkeletalMesh::serializeParams(skeletalData->params, skeletalData->skeleton, skeletalData->inverseBindMatrices);
+        payload = ASkeletalMesh::serializeParams(skeletalData->params, skeletalData->skeleton,
+                                                 skeletalData->inverseBindMatrices, skeletalData->defaultMaterial);
         type = ASSET_SKELETAL_MESH;
-        return std::make_unique<SkeletalMesh>(skeletalData->params, skeletalData->skeleton,
-                                              std::move(skeletalData->inverseBindMatrices));
+        return std::make_unique<ASkeletalMesh>(skeletalData->params, skeletalData->skeleton,
+                                               std::move(skeletalData->inverseBindMatrices), skeletalData->defaultMaterial);
     }
     if (auto *sceneObjectData = std::get_if<SceneObjectImportData>(&data)) {
         std::string text = sceneObjectData->document->toText();
@@ -203,9 +204,10 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
         return std::move(worldData->world);
     }
     if (auto *skeletonData = std::get_if<SkeletonImportData>(&data)) {
-        payload = skeletonData->skeleton->serialize();
+        auto skeleton = std::make_unique<ASkeleton>(std::move(skeletonData->skeleton));
+        payload = skeleton->serialize();
         type = ASSET_SKELETON;
-        return std::move(skeletonData->skeleton);
+        return skeleton;
     }
 
     type = ASSET_NONE;
@@ -611,17 +613,25 @@ bool AssetManagerEditor::unregisterVirtualAsset(AssetHandle handle)
 
 void AssetManagerEditor::registerBuiltinAssets()
 {
-    registerReservedAsset(RE_PRIMITIVE_CUBE_MESH, std::make_unique<StaticMesh>(Primitives::CreateCube()), "<cube>",
+    registerReservedAsset(RE_PRIMITIVE_CUBE_MESH, std::make_unique<AStaticMesh>(Primitives::CreateCube()), "<cube>",
                           ASSET_STATIC_MESH);
     registerReservedAsset(
         RE_PRIMITIVE_SPHERE_MESH,
-        std::make_unique<StaticMesh>(Primitives::CreateSphere(PRIMITIVE_SPHERE_RADIUS, PRIMITIVE_SPHERE_SEGMENTS)), "<sphere>",
+        std::make_unique<AStaticMesh>(Primitives::CreateSphere(PRIMITIVE_SPHERE_RADIUS, PRIMITIVE_SPHERE_SEGMENTS)), "<sphere>",
         ASSET_STATIC_MESH);
-    registerReservedAsset(RE_PRIMITIVE_PLANE_MESH, std::make_unique<StaticMesh>(Primitives::CreatePlane()), "<plane>",
+    registerReservedAsset(RE_PRIMITIVE_PLANE_MESH, std::make_unique<AStaticMesh>(Primitives::CreatePlane()), "<plane>",
                           ASSET_STATIC_MESH);
 
     importDefaultAsset(ASSET_TEXTURE);
     importDefaultAsset(ASSET_MATERIAL_INSTANCE);
+
+    auto gridMaterial = MaterialManager::getMaterial("Grid Material");
+    if (gridMaterial) {
+        registerReservedAsset(RE_GRID_MATERIAL_INSTANCE, std::make_unique<MaterialInstance>(gridMaterial, "Grid"), "<grid>",
+                              ASSET_MATERIAL_INSTANCE);
+    } else {
+        RP_CORE_ERROR("grid material was not created at startup, so it has no instance to draw with");
+    }
 }
 
 Asset &AssetManagerEditor::getVirtualAssetByName(const std::string &virtualName)

@@ -5,6 +5,7 @@
 #include "gpu/buffers/FreeListStorageBuffer.h"
 #include "gpu/buffers/VirtualStorageBuffer.h"
 #include "core/events/ProjectEvents.h"
+#include "core/utils/EnginePaths.h"
 #include "graph/MaterialGraphCompiler.h"
 #include "graph/SurfaceGraphManager.h"
 #include "core/utils/Log.h"
@@ -39,6 +40,15 @@ struct MaterialBlobHeader {
 // many blocks as its packed slice needs
 static constexpr uint32_t GRAPH_ARENA_BLOCKS = 512;
 static constexpr uint32_t GRAPH_BLOCK_BYTES = 32;
+
+static constexpr float GRID_DEFAULT_SPACING = 1.0f;
+static constexpr float GRID_DEFAULT_SUBDIVISIONS = 4.0f;
+// a fraction of a cell, so the lines keep their proportion as the spacing changes
+static constexpr float GRID_DEFAULT_LINE_WIDTH = 0.02f;
+static constexpr float GRID_DEFAULT_MINOR_LINE_WIDTH = 0.03f;
+static const glm::vec3 GRID_DEFAULT_COLOR = glm::vec3(0.62f, 0.62f, 0.64f);
+static const glm::vec3 GRID_DEFAULT_LINE_COLOR = glm::vec3(0.13f, 0.13f, 0.15f);
+static const glm::vec3 GRID_DEFAULT_MINOR_LINE_COLOR = glm::vec3(0.36f, 0.36f, 0.38f);
 
 bool MaterialManager::s_initialized = false;
 uint32_t MaterialManager::s_defaultTextureIndex = 0;
@@ -347,6 +357,99 @@ static void s_createGltfBaseMaterial()
                                            RE_GLTF_BASE_MATERIAL);
 }
 
+// Both grids read a world position shifted by half a subdivision, which keeps a surface sitting on a
+// whole coordinate, as a floor at the origin does, off the lines. Sharing one shift is what keeps
+// every fourth subdivision line under a spacing line rather than beside it.
+static void s_createGridMaterial()
+{
+    using GN = GraphNodeType;
+    MaterialGraph graph;
+    graph.name = "Grid";
+    graph.domain = GD_SURFACE;
+
+    graph.nodes.push_back({.id = 1, .type = GN::POSITION});
+    graph.nodes.push_back({.id = 2, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(GRID_DEFAULT_SPACING))}});
+    graph.nodes.push_back(
+        {.id = 3, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(GRID_DEFAULT_SUBDIVISIONS))}});
+    graph.nodes.push_back({.id = 4, .type = GN::DIVIDE_VEC3});
+    graph.nodes.push_back({.id = 5, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(0.5f))}});
+    graph.nodes.push_back({.id = 6, .type = GN::MULTIPLY_VEC3});
+    graph.nodes.push_back({.id = 7, .type = GN::ADD_VEC3});
+    graph.nodes.push_back({.id = 8, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(0.5f)}});
+
+    graph.nodes.push_back({.id = 9, .type = GN::DIVIDE_VEC3});
+    graph.nodes.push_back({.id = 10, .type = GN::FRACT_VEC3});
+    graph.nodes.push_back({.id = 11, .type = GN::SUBTRACT_VEC3});
+    graph.nodes.push_back({.id = 12, .type = GN::ABS_VEC3});
+    graph.nodes.push_back({.id = 13, .type = GN::SPLIT_VEC3});
+    graph.nodes.push_back({.id = 14, .type = GN::MAX_FLOAT});
+    graph.nodes.push_back({.id = 15, .type = GN::MAX_FLOAT});
+
+    graph.nodes.push_back({.id = 16, .type = GN::DIVIDE_VEC3});
+    graph.nodes.push_back({.id = 17, .type = GN::FRACT_VEC3});
+    graph.nodes.push_back({.id = 18, .type = GN::SUBTRACT_VEC3});
+    graph.nodes.push_back({.id = 19, .type = GN::ABS_VEC3});
+    graph.nodes.push_back({.id = 20, .type = GN::SPLIT_VEC3});
+    graph.nodes.push_back({.id = 21, .type = GN::MAX_FLOAT});
+    graph.nodes.push_back({.id = 22, .type = GN::MAX_FLOAT});
+
+    graph.nodes.push_back({.id = 23, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(GRID_DEFAULT_LINE_WIDTH)}});
+    graph.nodes.push_back({.id = 24, .type = GN::SUBTRACT_FLOAT});
+    graph.nodes.push_back({.id = 25, .type = GN::SMOOTHSTEP_FLOAT});
+    graph.nodes.push_back({.id = 26, .type = GN::CONSTANT_FLOAT, .inputValues = {PinValue(GRID_DEFAULT_MINOR_LINE_WIDTH)}});
+    graph.nodes.push_back({.id = 27, .type = GN::SUBTRACT_FLOAT});
+    graph.nodes.push_back({.id = 28, .type = GN::SMOOTHSTEP_FLOAT});
+
+    graph.nodes.push_back({.id = 29, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(GRID_DEFAULT_COLOR)}});
+    graph.nodes.push_back({.id = 30, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(GRID_DEFAULT_LINE_COLOR)}});
+    graph.nodes.push_back({.id = 31, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(GRID_DEFAULT_MINOR_LINE_COLOR)}});
+    graph.nodes.push_back({.id = 32, .type = GN::MIX_VEC3});
+    graph.nodes.push_back({.id = 33, .type = GN::MIX_VEC3});
+
+    graph.nodes.push_back({.id = 34, .type = GN::SURFACE_OUTPUT});
+    graph.outputNodeId = 34;
+
+    graph.connections = {
+        {2, 0, 4, 0},   {3, 0, 4, 1},   {4, 0, 6, 0},   {5, 0, 6, 1},   {1, 0, 7, 0},   {6, 0, 7, 1},
+
+        {7, 0, 9, 0},   {2, 0, 9, 1},   {9, 0, 10, 0},  {10, 0, 11, 0}, {5, 0, 11, 1},  {11, 0, 12, 0}, {12, 0, 13, 0},
+        {13, 0, 14, 0}, {13, 1, 14, 1}, {14, 0, 15, 0}, {13, 2, 15, 1},
+
+        {7, 0, 16, 0},  {4, 0, 16, 1},  {16, 0, 17, 0}, {17, 0, 18, 0}, {5, 0, 18, 1},  {18, 0, 19, 0}, {19, 0, 20, 0},
+        {20, 0, 21, 0}, {20, 1, 21, 1}, {21, 0, 22, 0}, {20, 2, 22, 1},
+
+        {8, 0, 24, 0},  {23, 0, 24, 1}, {24, 0, 25, 0}, {8, 0, 25, 1},  {15, 0, 25, 2}, {8, 0, 27, 0},  {26, 0, 27, 1},
+        {27, 0, 28, 0}, {8, 0, 28, 1},  {22, 0, 28, 2},
+
+        {29, 0, 32, 0}, {31, 0, 32, 1}, {28, 0, 32, 2}, {32, 0, 33, 0}, {30, 0, 33, 1}, {25, 0, 33, 2}, {33, 0, 34, 0},
+    };
+
+    SurfaceGraphManager &graphs = MaterialManager::getSurfaceGraphManager();
+    uint32_t graphId = graphs.registerGraph(graph);
+    if (graphId == UINT32_MAX) {
+        RP_CORE_ERROR("Failed to compile the grid material graph");
+        return;
+    }
+
+    GraphSlotMapping mapping = graphs.getMapping(graphId);
+    std::unordered_map<ParameterId, uint32_t> table;
+    auto bind = [&](std::string_view id, uint32_t nodeId) {
+        auto slot = mapping.slots.find(Graph_pinKey(nodeId, 0));
+        if (slot != mapping.slots.end()) {
+            table[ParameterId(id)] = slot->second.offset;
+        }
+    };
+    bind(MP_GRID_SPACING, 2);
+    bind(MP_GRID_SUBDIVISIONS, 3);
+    bind(MP_GRID_LINE_WIDTH, 23);
+    bind(MP_GRID_MINOR_LINE_WIDTH, 26);
+    bind(MP_GRID_COLOR, 29);
+    bind(MP_GRID_LINE_COLOR, 30);
+    bind(MP_GRID_MINOR_LINE_COLOR, 31);
+
+    MaterialManager::createBuiltinMaterial("Grid Material", graphId, std::move(table), std::move(graph), RE_GRID_MATERIAL);
+}
+
 void MaterialManager::createDefaultMaterials()
 {
     // Blender-style default surface: a bare output node resolves to white albedo, roughness 0.5,
@@ -381,6 +484,9 @@ void MaterialManager::createDefaultMaterials()
     createBuiltinMaterial("Terrain Base Material", terrainGraphId, {}, std::move(terrainGraph), RE_TERRAIN_MATERIAL);
 
     s_createGltfBaseMaterial();
+    s_createGridMaterial();
+
+    s_surfaceGraphManager->writeGeneratedFiles(EnginePaths::shaderDirectory() / "glsl/generated");
 }
 
 AssetPtr<BaseMaterial> MaterialManager::getMaterial(const std::string &name)

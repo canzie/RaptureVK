@@ -21,9 +21,10 @@
 #include "gpu/buffers/UniformBuffer.h"
 #include "scene/cameras/PerspectiveCamera.h"
 #include "assets/materials/MaterialInstance.h"
+#include "assets/meshes/ASkeletalMesh.h"
+#include "assets/meshes/AStaticMesh.h"
 #include "assets/meshes/Mesh.h"
-#include "assets/meshes/SkeletalMesh.h"
-#include "assets/skeletons/Skeleton.h"
+#include "assets/skeletons/ASkeleton.h"
 
 #include "assets/asset_manager/AssetManager.h"
 #include "scene/components/ChangeChannels.h"
@@ -127,7 +128,7 @@ struct MaterialComponent {
 struct StaticMeshComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MESH_BINDING);
 
-    AssetPtr<StaticMesh> mesh;
+    AssetPtr<AStaticMesh> mesh;
     bool isLoading = true;
     Mobility mobility = MOBILITY_STATIC;
     bool isEnabled = true;
@@ -141,7 +142,7 @@ struct StaticMeshComponent {
      * @brief Replaces the mesh, invalidating the world bounding box the old one produced
      * @param ref Reference to the new mesh
      */
-    void setMesh(AssetRef ref) { mesh = AssetPtr<StaticMesh>(std::move(ref)); }
+    void setMesh(AssetRef ref) { mesh = AssetPtr<AStaticMesh>(std::move(ref)); }
 
     /**
      * @brief Recomputes the world bounding box from the mesh's bounds
@@ -152,14 +153,15 @@ struct StaticMeshComponent {
         if (!mesh) {
             return;
         }
-        worldBoundingBox = BoundingBox(mesh->getBoundsMin(), mesh->getBoundsMax()).transform(transform.world);
+        const Mesh &geometry = mesh->geometry();
+        worldBoundingBox = BoundingBox(geometry.getBoundsMin(), geometry.getBoundsMax()).transform(transform.world);
     }
 };
 
 struct SkeletalMeshComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MESH_BINDING);
 
-    AssetPtr<SkeletalMesh> mesh;
+    AssetPtr<ASkeletalMesh> mesh;
     SkeletonInstance *pose = nullptr;
     bool isLoading = true;
     bool isEnabled = true;
@@ -173,7 +175,7 @@ struct SkeletalMeshComponent {
      * @brief Replaces the mesh, invalidating the world bounding box the old one produced
      * @param ref Reference to the new mesh
      */
-    void setMesh(AssetRef ref) { mesh = AssetPtr<SkeletalMesh>(std::move(ref)); }
+    void setMesh(AssetRef ref) { mesh = AssetPtr<ASkeletalMesh>(std::move(ref)); }
 
     /**
      * @brief Recomputes the world bounding box from the mesh's bounds
@@ -184,14 +186,15 @@ struct SkeletalMeshComponent {
         if (!mesh) {
             return;
         }
-        worldBoundingBox = BoundingBox(mesh->getBoundsMin(), mesh->getBoundsMax()).transform(transform.world);
+        const Mesh &geometry = mesh->geometry();
+        worldBoundingBox = BoundingBox(geometry.getBoundsMin(), geometry.getBoundsMax()).transform(transform.world);
     }
 };
 
 struct SkeletonPoseComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_SKELETON_POSE);
 
-    AssetPtr<Skeleton> skeleton;
+    AssetPtr<ASkeleton> skeleton;
     SkeletonInstance *instance = nullptr;
 };
 

@@ -7,6 +7,8 @@
 
 namespace Rapture {
 
+class AMesh;
+
 /**
  * @brief Shared surface of everything drawn from a mesh and a material.
  */
@@ -45,6 +47,12 @@ class Mesh3D : public Node3D {
 
   protected:
     Mesh3D(Scene &scene, std::string_view name);
+
+    /**
+     * @brief Takes a mesh's default material as this object's own, where it has none yet
+     * @param mesh The mesh this object was just given
+     */
+    void adoptDefaultMaterial(const AMesh &mesh);
 
   protected:
     AssetHandle m_mesh = INVALID_ASSET_HANDLE;

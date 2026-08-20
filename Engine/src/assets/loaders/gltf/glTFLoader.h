@@ -4,7 +4,7 @@
 #include "assets/asset_manager/AssetHandle.h"
 #include "glTFCommon.h"
 #include "assets/materials/MaterialParameters.h"
-#include "assets/skeletons/Skeleton.h"
+#include "assets/skeletons/ASkeleton.h"
 #include "yyjson.h"
 
 #include <cstddef>
@@ -118,6 +118,13 @@ class glTF2Loader {
     void loadAnimation(yyjson_val *animationVal);
 
     AssetRef loadMaterial(size_t materialIndex);
+
+    /**
+     * @brief The material asset a primitive's material index names
+     * @param materialIndex Index into the file's materials, negative where the primitive names none
+     * @return The material, or the default material where the index names nothing loaded
+     */
+    AssetHandle primitiveMaterial(int32_t materialIndex) const;
 
 
     void loadAccessor(yyjson_val *accessorVal, std::vector<uint8_t> &dataVec);

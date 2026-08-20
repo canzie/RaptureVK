@@ -56,6 +56,21 @@ class CameraController : public Controller {
      */
     void setMode(CameraControlMode mode);
 
+    /**
+     * @brief Places the camera so a sphere fills the view, and orbits the point it is centred on
+     * @param center World position the sphere is centred on
+     * @param radius Radius of the sphere to fit in view
+     */
+    void focusOn(const glm::vec3 &center, float radius);
+
+    /**
+     * @brief Places the camera so a sphere fills the view, looking along a given direction
+     * @param center World position the sphere is centred on
+     * @param radius Radius of the sphere to fit in view
+     * @param direction Direction to look along, which need not be normalized
+     */
+    void focusOn(const glm::vec3 &center, float radius, const glm::vec3 &direction);
+
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 

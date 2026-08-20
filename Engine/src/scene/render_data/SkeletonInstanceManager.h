@@ -12,7 +12,7 @@
 
 namespace Rapture {
 
-class Skeleton;
+class ASkeleton;
 
 /**
  * @brief One skeleton's worth of bone matrices, given back to the arena when it goes
@@ -63,7 +63,7 @@ class SkeletonInstanceManager {
      * @param skeleton The skeleton to be posed
      * @return The instance
      */
-    SkeletonInstance createSkeletonInstance(const AssetPtr<Skeleton> &skeleton);
+    SkeletonInstance createSkeletonInstance(const AssetPtr<ASkeleton> &skeleton);
 
     /**
      * @brief The index a shader reads this scene's bone matrices from

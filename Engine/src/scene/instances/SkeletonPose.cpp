@@ -1,7 +1,7 @@
 #include "SkeletonPose.h"
 
 #include "assets/asset_manager/AssetManager.h"
-#include "assets/skeletons/Skeleton.h"
+#include "assets/skeletons/ASkeleton.h"
 #include "core/utils/Log.h"
 #include "scene/Scene.h"
 #include "scene/components/Components.h"
@@ -47,8 +47,8 @@ void SkeletonPose::bindSkeleton(AssetHandle skeleton)
         return;
     }
 
-    AssetPtr<Skeleton> resolved(std::move(ref));
-    if (!resolved || resolved->getJointCount() == 0) {
+    AssetPtr<ASkeleton> resolved(std::move(ref));
+    if (!resolved || resolved->skeleton().getJointCount() == 0) {
         RP_CORE_ERROR("skeleton {} has no joints for '{}' to pose", skeleton, name());
         return;
     }
