@@ -113,6 +113,8 @@ void MaterialEditorWorkspace::setupPreviewScene()
 
     auto extent = app.getMainWindow().getSwapChain()->getExtent();
     m_previewViewport = app.getViewportManager().createViewport({
+        .scene = m_previewScene.get(),
+        .camera = camera,
         .name = s_previewViewportName,
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = extent.width,
@@ -122,8 +124,6 @@ void MaterialEditorWorkspace::setupPreviewScene()
     });
     m_previewViewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
     m_previewViewport.viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, false);
-    m_previewViewport.viewport->setScene(m_previewScene.get());
-    m_previewViewport.viewport->setCamera(camera);
 
     m_context.scene = m_previewScene.get();
     m_context.viewport = m_previewViewport.viewport;

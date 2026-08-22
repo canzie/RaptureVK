@@ -30,6 +30,12 @@ class LevelEditorWorkspace : public Workspace {
     void setupHotbar();
 
     /**
+     * @brief Builds the play, pause and step buttons into one hotbar item
+     * @param layoutOrder Where the group sits among the hotbar's items
+     */
+    void setupPlayControls(uint32_t layoutOrder);
+
+    /**
      * @brief Offers this workspace's commands for as long as the cursor is over it
      */
     void setupShortcuts();

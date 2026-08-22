@@ -6,6 +6,8 @@
 constexpr float EDITOR_MENU_BAR_HEIGHT     = 28.0f;
 constexpr float EDITOR_WORKSPACE_TAB_HEIGHT = 32.0f;
 constexpr float EDITOR_HOTBAR_HEIGHT       = 40.0f;
+constexpr float EDITOR_HOTBAR_PADDING = 8.0f;
+constexpr float EDITOR_HOTBAR_SEPARATOR_WIDTH = 1.0f;
 constexpr float EDITOR_BOTTOM_BAR_HEIGHT   = 28.0f;
 
 constexpr int32_t LAUNCHER_WINDOW_WIDTH = 640;

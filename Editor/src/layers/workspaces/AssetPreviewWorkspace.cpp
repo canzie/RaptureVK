@@ -2,9 +2,12 @@
 
 #include <app/Application.h>
 #include <assets/asset_manager/AssetManager.h>
+#include <assets/asset_manager/ReservedAssets.h>
 #include <gpu/render_targets/SceneRenderTarget.h>
 #include <renderer/viewport/ViewportManager.h>
 #include <scene/Scene.h>
+#include <scene/instances/Mesh3D.h>
+#include <scene/instances/SceneObject.h>
 #include <scene/instances/controllers/CameraController.h>
 
 static constexpr uint32_t PREVIEW_VIEWPORT_WIDTH = 1280;
@@ -52,6 +55,7 @@ void AssetPreviewWorkspace::setupPreviewScene(std::string_view sceneName)
     }
 
     m_previewViewport = app.getViewportManager().createViewport({
+        .scene = m_previewScene.get(),
         .name = std::string(sceneName),
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = PREVIEW_VIEWPORT_WIDTH,
@@ -61,7 +65,6 @@ void AssetPreviewWorkspace::setupPreviewScene(std::string_view sceneName)
     });
     m_previewViewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
     m_previewViewport.viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, false);
-    m_previewViewport.viewport->setScene(m_previewScene.get());
 
     m_context.scene = m_previewScene.get();
     m_context.viewport = m_previewViewport.viewport;
@@ -89,12 +92,6 @@ void AssetPreviewWorkspace::applyStoredLayout()
 
 void AssetPreviewWorkspace::setFocusBounds(const glm::vec3 &min, const glm::vec3 &max)
 {
-    m_focusCenter = (min + max) * 0.5f;
-    m_focusRadius = glm::length(max - min) * 0.5f;
-}
-
-void AssetPreviewWorkspace::frameFocusBounds()
-{
     if (m_previewViewport.viewport == nullptr) {
         return;
     }
@@ -104,18 +101,13 @@ void AssetPreviewWorkspace::frameFocusBounds()
         return;
     }
 
-    controller->focusOn(m_focusCenter, m_focusRadius, FOCUS_DIRECTION);
-    m_framePending = false;
+    const glm::vec3 center = (min + max) * 0.5f;
+    controller->focusOn(center, glm::length(max - min) * 0.5f, FOCUS_DIRECTION);
 }
 
 void AssetPreviewWorkspace::onUpdate(float dt)
 {
     Workspace::onUpdate(dt);
-
-    // the camera is handed to the viewport a frame after it is created, so this cannot be done on open
-    if (m_framePending) {
-        frameFocusBounds();
-    }
 
     if (m_previewScene != nullptr) {
         m_previewScene->onUpdate(dt);

@@ -25,7 +25,13 @@ class FileBrowser {
         SAVE  ///< editable filename field for naming a new file
     };
 
-    explicit FileBrowser(Amethyst::Instance &parent, Mode mode = Mode::OPEN);
+    /**
+     * @brief Builds the dialog into a parent instance
+     * @param parent The instance the dialog fills
+     * @param mode Whether the dialog opens an existing file or names a new one
+     * @param startDirectory The directory the dialog opens at, the working directory when it names nothing that exists
+     */
+    explicit FileBrowser(Amethyst::Instance &parent, Mode mode = Mode::OPEN, const std::filesystem::path &startDirectory = {});
     ~FileBrowser();
     FileBrowser(const FileBrowser &) = delete;
     FileBrowser &operator=(const FileBrowser &) = delete;
@@ -75,6 +81,12 @@ class FileBrowser {
     void updateNavState(void);
 
     void onRowClicked(uint32_t row);
+
+    /**
+     * @brief Opens what a row holds, entering a directory or confirming a file
+     * @param row The row that was activated
+     */
+    void onRowActivated(uint32_t row);
     void updateSelectionLabel(void);
     void confirm(const std::filesystem::path &path);
 
@@ -106,6 +118,7 @@ class FileBrowser {
 
     Amethyst::TickHandle m_tick;
     std::optional<std::filesystem::path> m_pendingNavigation;
+    std::optional<std::filesystem::path> m_pendingConfirm;
 };
 
 #endif // RAPTURE__FILE_BROWSER_H

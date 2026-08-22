@@ -1,11 +1,12 @@
 #include "FileBrowser.h"
 #include "Icons.h"
 
+#include <core/utils/StringFormat.h>
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <components/properties.h>
-#include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <string>
@@ -22,8 +23,6 @@
 #define COL_LIST_BG_4  Amethyst::Color4(0.169f, 0.169f, 0.169f, 1.0f)
 #define COL_ROW_ALT_4  Amethyst::Color4(0.188f, 0.188f, 0.188f, 1.0f)
 #define COL_SELECTED_4 Amethyst::Color4(0.278f, 0.447f, 0.702f, 0.45f)
-#define COL_ACCENT     Amethyst::Color3::fromHex(0x4772b3)
-#define COL_HOVER      Amethyst::Color3::fromHex(0x363636)
 #define COL_APP        Amethyst::Color3::fromHex(0x0d0d0d)
 #define COL_LINE       Amethyst::Color3::fromHex(0x252525)
 #define COL_APP_HOVER  Amethyst::Color3::fromHex(0x1a1a1a)
@@ -71,32 +70,17 @@ static std::string s_formatTime(const std::filesystem::path &path)
     return buf;
 }
 
-static std::string s_formatSize(uintmax_t bytes)
-{
-    const char *units[] = {"B", "KB", "MB", "GB", "TB"};
-    double value = static_cast<double>(bytes);
-    int unit = 0;
-    while (value >= 1024.0 && unit < 4) {
-        value /= 1024.0;
-        unit++;
-    }
-    char buf[32];
-    if (unit == 0) {
-        std::snprintf(buf, sizeof(buf), "%llu %s", static_cast<unsigned long long>(bytes), units[unit]);
-    } else {
-        std::snprintf(buf, sizeof(buf), "%.1f %s", value, units[unit]);
-    }
-    return buf;
-}
-
 static std::string s_toLower(std::string s)
 {
     std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return s;
 }
 
-FileBrowser::FileBrowser(Amethyst::Instance &parent, Mode mode) : m_mode(mode)
+FileBrowser::FileBrowser(Amethyst::Instance &parent, Mode mode, const std::filesystem::path &startDirectory) : m_mode(mode)
 {
+    std::error_code ec;
+    m_currentDirectory = std::filesystem::is_directory(startDirectory, ec) ? startDirectory : std::filesystem::current_path();
+
     m_root = parent.add<Amethyst::Frame>();
     buildContent();
 }
@@ -116,8 +100,6 @@ void FileBrowser::buildContent()
     m_root->name = "File Browser";
     m_root->setBaseProperties({.position = Amethyst::UDim2::fromScale(0.0f), .size = Amethyst::UDim2::fromScale(1.0f)});
     m_root->setBaseStyleProperties({.backgroundColor = COL_PANEL});
-
-    m_currentDirectory = std::filesystem::current_path();
 
     setupTopBar();
     setupSideBar();
@@ -347,16 +329,8 @@ void FileBrowser::setupTopBar()
 static Amethyst::CollapsibleHeaderStylePropertiesArgs s_sectionHeaderStyle()
 {
     return {
-        .titleStyle =
-            {
-                .fontSize = 11.0f,
-                .textColor = COL_TEXT_MUTED,
-                .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                .textYAlignment = Amethyst::TextYAlignment::CENTER,
-            },
         .headerHeight = SECTION_HEADER_HEIGHT,
         .indicatorSize = 12.0f,
-        .indicatorColor = COL_TEXT_DIM,
     };
 }
 
@@ -367,61 +341,49 @@ struct BookmarkDef {
     bool active;
 };
 
-// One sidebar bookmark row: icon + label, with hover tint. Clicking navigates to its target.
+// One sidebar bookmark row: icon + label. Clicking navigates to its target.
 static void s_addBookmark(Amethyst::UIScope &scope, uint32_t order, const BookmarkDef &def,
                           const std::function<void(const std::filesystem::path &)> &navigate)
 {
-    scope.frame(
+    scope.textButton(
         {
+            .classes = {"file-browser-bookmark"},
             .base =
                 {
+                    .clipsDescendants = true,
                     .layoutOrder = order,
                     .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, BOOKMARK_HEIGHT),
                 },
-            .style = {.backgroundColor = COL_ACCENT, .backgroundTransparency = def.active ? 0.78f : 1.0f, .cornerRadius = 3.0f},
         },
-        [&def, navigate](Amethyst::FrameScope &bm) {
-            auto *action = bm.component.add<Amethyst::InvisibleButton>();
-            action->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
-            Amethyst::Frame *row = &bm.component;
-            bool active = def.active;
-            action->track(action->onHoverChanged.connect([row, active](bool hovered) {
-                row->setBaseStyleProperties({.backgroundColor = active ? COL_ACCENT : COL_HOVER,
-                                             .backgroundTransparency = (active || hovered) ? (active ? 0.78f : 0.0f) : 1.0f});
-            }));
+        [&def, navigate](Amethyst::TextButtonScope &row) {
+            if (def.active) {
+                row.component.setGuiState(static_cast<uint16_t>(row.component.getGuiState() | Amethyst::GUI_STATE_ACTIVE));
+            }
 
             if (!def.target.empty()) {
                 std::filesystem::path target = def.target;
-                action->onMouseButton1ClickCb = [navigate, target]() {
+                row.component.onMouseButton1ClickCb = [navigate, target]() {
                     navigate(target);
                     return Amethyst::EventResult::CONSUMED;
                 };
             }
 
-            auto *iconLabel = action->add<Amethyst::ImageLabel>();
+            auto *iconLabel = row.component.add<Amethyst::ImageLabel>();
+            iconLabel->addClass(def.active ? "file-browser-bookmark-icon-active" : "file-browser-bookmark-icon");
             iconLabel->setBaseProperties({
                 .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
                 .interactable = false,
                 .position = Amethyst::UDim2(0.0f, 8.0f, 0.5f, 0.0f),
                 .size = Amethyst::UDim2::fromOffset(14.0f, 14.0f),
             });
-            iconLabel->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-            iconLabel->setImageStyleProperties({.imageColor = active ? COL_FOLDER : COL_ICON});
             iconLabel->setSvg(def.icon);
 
-            auto *text = action->add<Amethyst::TextLabel>();
+            auto *text = row.component.add<Amethyst::TextLabel>();
+            text->addClass("file-browser-bookmark-label");
             text->setBaseProperties({
                 .interactable = false,
                 .position = Amethyst::UDim2(0.0f, 30.0f, 0.0f, 0.0f),
                 .size = Amethyst::UDim2(1.0f, -38.0f, 1.0f, 0.0f),
-            });
-            text->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-            text->setTextStyleProperties({
-                .fontSize = 12.0f,
-                .textColor = COL_TEXT,
-                .textXAlignment = Amethyst::TextXAlignment::LEFT,
-                .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                .textTruncate = Amethyst::TextTruncate::AT_END,
             });
             text->setText(def.label);
         });
@@ -443,6 +405,7 @@ static void s_addSection(Amethyst::UIScope &side, uint32_t order, const std::str
 
     side.collapsibleHeader(
         {
+            .classes = {"file-browser-section"},
             .base =
                 {
                     .clipsDescendants = true,
@@ -484,13 +447,13 @@ void FileBrowser::setupSideBar()
 {
     Amethyst::UIScope(*m_root).scrollingFrame(
         {
+            .classes = {"file-browser-sidebar"},
             .base =
                 {
                     .clipsDescendants = true,
                     .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, TOP_BAR_HEIGHT),
                     .size = Amethyst::UDim2(0.0f, SIDE_BAR_WIDTH, 1.0f, -(TOP_BAR_HEIGHT + STATUS_BAR_HEIGHT + FOOTER_HEIGHT)),
                 },
-            .style = {.backgroundColor = COL_PANEL},
             .scroll =
                 {
                     .scrollAxis = Amethyst::ScrollAxis::Y,
@@ -590,6 +553,7 @@ void FileBrowser::setupListArea()
                     t.column("DATE", 1.6f);
 
                     m_table->onRowSelected = [this](uint32_t row) { onRowClicked(row); };
+                    m_table->onRowActivated = [this](uint32_t row) { onRowActivated(row); };
                 });
         });
 }
@@ -762,23 +726,15 @@ void FileBrowser::setupFooter()
                         .action("Scripts", [pick] { pick("Scripts", {".lua", ".cpp", ".h", ".hpp"}); });
                 });
 
-            const Amethyst::TextStylePropertiesArgs btnText{
-                .fontSize = 12.0f,
-                .textColor = COL_TEXT,
-                .textXAlignment = Amethyst::TextXAlignment::CENTER,
-                .textYAlignment = Amethyst::TextYAlignment::CENTER,
-            };
-
             foot.textButton(
                 {
+                    .classes = {"generic-text-button"},
                     .base =
                         {
                             .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
                             .position = Amethyst::UDim2(1.0f, -(CONTENT_PADDING + openWidth + gap), 0.5f, 0.0f),
                             .size = Amethyst::UDim2(0.0f, cancelWidth, 0.0f, 30.0f),
                         },
-                    .style = {.backgroundColor = COL_PANEL_2, .cornerRadius = 3.0f},
-                    .text = btnText,
                     .label = "Cancel",
                 },
                 [this](Amethyst::TextButtonScope &btn) {
@@ -792,15 +748,13 @@ void FileBrowser::setupFooter()
 
             foot.textButton(
                 {
-                    .classes = {"primary"},
+                    .classes = {"accent-text-button"},
                     .base =
                         {
                             .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
                             .position = Amethyst::UDim2(1.0f, -CONTENT_PADDING, 0.5f, 0.0f),
                             .size = Amethyst::UDim2(0.0f, openWidth, 0.0f, 30.0f),
                         },
-                    .style = {.cornerRadius = 3.0f},
-                    .text = btnText,
                     .label = m_mode == Mode::SAVE ? "Save" : "Open",
                 },
                 [this](Amethyst::TextButtonScope &btn) {
@@ -906,7 +860,7 @@ void FileBrowser::populate()
             std::error_code sizeEc;
             uintmax_t bytes = std::filesystem::file_size(entry.path, sizeEc);
             if (!sizeEc) {
-                sizeText = s_formatSize(bytes);
+                sizeText = Rapture::StringFormat_bytesToUnitString(bytes);
             }
         }
 
@@ -966,6 +920,12 @@ void FileBrowser::processDeferred()
         std::filesystem::path target = std::move(*m_pendingNavigation);
         m_pendingNavigation.reset();
         navigateTo(target);
+    }
+
+    if (m_pendingConfirm.has_value()) {
+        std::filesystem::path target = std::move(*m_pendingConfirm);
+        m_pendingConfirm.reset();
+        confirm(target);
     }
 }
 
@@ -1036,17 +996,28 @@ void FileBrowser::onRowClicked(uint32_t row)
         return;
     }
 
+    m_selectedRow = static_cast<int>(row);
+
     const Entry &entry = m_visibleEntries[row];
-    if (entry.isDir) {
-        m_pendingNavigation = entry.path;
+    if (m_filenameInput != nullptr) {
+        m_filenameInput->setText(entry.isDir ? "" : entry.path.filename().string());
+    }
+    updateSelectionLabel();
+}
+
+void FileBrowser::onRowActivated(uint32_t row)
+{
+    if (row >= m_visibleEntries.size()) {
         return;
     }
 
-    m_selectedRow = static_cast<int>(row);
-    if (m_filenameInput != nullptr) {
-        m_filenameInput->setText(entry.path.filename().string());
+    // both outcomes tear down the rows this runs from, so neither can happen before the event is done with them
+    const Entry &entry = m_visibleEntries[row];
+    if (entry.isDir) {
+        m_pendingNavigation = entry.path;
+    } else {
+        m_pendingConfirm = entry.path;
     }
-    updateSelectionLabel();
 }
 
 void FileBrowser::updateSelectionLabel()

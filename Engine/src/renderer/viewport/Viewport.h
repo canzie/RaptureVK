@@ -23,6 +23,8 @@ class CameraController;
  * @brief Creation-time configuration for a viewport and its render target.
  */
 struct ViewportConfig {
+    Scene *scene;
+    ecs::EntityAccessor camera;
     std::string name;
     SceneRenderTarget::TargetType targetType;
     uint32_t width;

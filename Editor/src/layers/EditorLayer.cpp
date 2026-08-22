@@ -36,7 +36,11 @@ EditorLayer::~EditorLayer() = default;
 
 void EditorLayer::onAttach()
 {
-    m_input = std::make_unique<Rapture::Input>(&Rapture::Application::getInstance().getWindowContext());
+    auto &app = Rapture::Application::getInstance();
+    m_input = std::make_unique<Rapture::Input>(&app.getWindowContext());
+
+    m_viewportCreatedConn = app.getViewportManager().onViewportCreated.connect(
+        [this](Rapture::Viewport *viewport) { adoptViewport(viewport); });
 
     // controls outlive a detach, so whatever drove the scene while this layer was down hands it back
     for (auto &[viewport, control] : m_controls) {
@@ -55,42 +59,36 @@ void EditorLayer::onDetach()
     m_input.reset();
 }
 
-void EditorLayer::syncViewportControls()
+void EditorLayer::adoptViewport(Rapture::Viewport *viewport)
 {
-    const auto &viewports = Rapture::Application::getInstance().getViewportManager().getViewports();
-
-    for (const auto &vp : viewports) {
-        Rapture::Viewport *viewport = vp.get();
-
-        // a viewport that came with a camera is looking through someone else's, so it is not ours to drive
-        if (viewport->getScene() == nullptr || viewport->getCamera().isValid() || m_controls.count(viewport) != 0) {
-            continue;
-        }
-
-        // owned here and never parented, so it is not part of the scene it looks at and no save or
-        // snapshot restore can touch it
-        ViewportControl control;
-        control.camera = std::make_unique<Rapture::Camera3D>(*viewport->getScene(), "Editor Camera");
-        control.camera->setPosition(EDITOR_CAMERA_START);
-        control.camera->setFieldOfView(EDITOR_CAMERA_FOV);
-        control.camera->setNearPlane(EDITOR_CAMERA_NEAR_PLANE);
-        control.camera->setFarPlane(EDITOR_CAMERA_FAR_PLANE);
-        viewport->setCamera(control.camera->accessor());
-        control.controller = std::make_unique<Rapture::CameraController>(*viewport->getScene(), "Editor Camera Controller");
-        // driven from here with this viewport's own intent, so it stays out of the scene's tick lists
-        control.controller->setTickEnabled(false);
-        control.controller->possess(control.camera.get());
-
-        // terrain streaming and the shadow cascades follow whoever is driving the scene
-        viewport->getScene()->setActiveController(control.controller.get());
-        viewport->editorBinding().controller = control.controller.get();
-
-        // the camera and controller live in the viewport's scene, which its owner is free to destroy
-        // as soon as the viewport is gone, so they cannot outlive it
-        control.destroyConn = viewport->onDestroy.connect([this, viewport]() { releaseViewportControl(viewport); });
-
-        m_controls.emplace(viewport, std::move(control));
+    // a viewport that came with a camera is looking through someone else's, so it is not ours to drive
+    if (viewport->getScene() == nullptr || viewport->getCamera().isValid() || m_controls.count(viewport) != 0) {
+        return;
     }
+
+    // owned here and never parented, so it is not part of the scene it looks at and no save or
+    // snapshot restore can touch it
+    ViewportControl control;
+    control.camera = std::make_unique<Rapture::Camera3D>(*viewport->getScene(), "Editor Camera");
+    control.camera->setPosition(EDITOR_CAMERA_START);
+    control.camera->setFieldOfView(EDITOR_CAMERA_FOV);
+    control.camera->setNearPlane(EDITOR_CAMERA_NEAR_PLANE);
+    control.camera->setFarPlane(EDITOR_CAMERA_FAR_PLANE);
+    viewport->setCamera(control.camera->accessor());
+    control.controller = std::make_unique<Rapture::CameraController>(*viewport->getScene(), "Editor Camera Controller");
+    // driven from here with this viewport's own intent, so it stays out of the scene's tick lists
+    control.controller->setTickEnabled(false);
+    control.controller->possess(control.camera.get());
+
+    // terrain streaming and the shadow cascades follow whoever is driving the scene
+    viewport->getScene()->setActiveController(control.controller.get());
+    viewport->editorBinding().controller = control.controller.get();
+
+    // the camera and controller live in the viewport's scene, which its owner is free to destroy
+    // as soon as the viewport is gone, so they cannot outlive it
+    control.destroyConn = viewport->onDestroy.connect([this, viewport]() { releaseViewportControl(viewport); });
+
+    m_controls.emplace(viewport, std::move(control));
 }
 
 void EditorLayer::releaseViewportControl(Rapture::Viewport *viewport)
@@ -113,8 +111,6 @@ void EditorLayer::onUpdate(float dt)
     if (m_input == nullptr) {
         return;
     }
-
-    syncViewportControls();
 
     m_input->onUpdate();
 

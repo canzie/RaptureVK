@@ -40,6 +40,7 @@ void Workspace::buildContainer(Amethyst::Frame &container)
 
     m_hotbar = m_container->add<Amethyst::Frame>();
     m_hotbar->setBaseProperties({
+        .padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(EDITOR_HOTBAR_PADDING)},
         .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
         .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_HOTBAR_HEIGHT),
     });
@@ -52,6 +53,18 @@ void Workspace::buildContainer(Amethyst::Frame &container)
     m_dockingLayer->markDirty();
 
     m_context.dockingLayer = m_dockingLayer;
+}
+
+void Workspace::addHotbarSeparator(uint32_t layoutOrder)
+{
+    Amethyst::UIScope(*m_hotbar).frame({
+        .classes = {"hotbar-separator"},
+        .base =
+            {
+                .layoutOrder = layoutOrder,
+                .size = Amethyst::UDim2(0.0f, EDITOR_HOTBAR_SEPARATOR_WIDTH, 1.0f, 0.0f),
+            },
+    });
 }
 
 void Workspace::addPanel(std::unique_ptr<Panel> panel, Amethyst::DockZone zone)

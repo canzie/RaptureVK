@@ -3,6 +3,7 @@
 
 #include "assets/asset_manager/AssetCommon.h"
 #include "assets/skeletons/Skeleton.h"
+#include "core/events/EventSignal.h"
 
 #include <memory>
 #include <span>
@@ -55,6 +56,11 @@ class ASkeleton {
      * @return The asset, or nullptr if the blob is not a readable skeleton
      */
     static std::unique_ptr<ASkeleton> deserialize(std::span<const uint8_t> blob);
+
+    /**
+     * @brief Fires after a mesh is added to or dropped from the set this skeleton is shown on
+     */
+    EventSignal<void()> onPreviewMeshesChanged;
 
   private:
     std::unique_ptr<Skeleton> m_skeleton;

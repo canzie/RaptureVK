@@ -161,6 +161,8 @@ class AmethystLayer : public Rapture::Layer {
 
     std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
 
+    std::filesystem::path m_lastExplorerDirectory;
+
     Rapture::EventConnection m_mainSwapchainRecreatedConn;
 };
 

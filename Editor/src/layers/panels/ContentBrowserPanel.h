@@ -47,6 +47,7 @@ class ContentBrowserPanel : public Panel {
         Amethyst::TextInput *nameInput = nullptr;
         Amethyst::TextLabel *type = nullptr;
         Amethyst::Frame *typeBar = nullptr;
+        Amethyst::UITooltip *tooltip = nullptr;
         bool attached = false;
     };
 
@@ -72,6 +73,12 @@ class ContentBrowserPanel : public Panel {
 
     void setupTopBar(void);
     void setupSideBar(void);
+
+    /**
+     * @brief Sizes the sidebar sections so that a collapsed one takes only its header and the ones below it move up
+     */
+    void layoutSideBar(void);
+
     void setupContentArea(void);
     void setupContextMenu(void);
 
@@ -142,6 +149,13 @@ class ContentBrowserPanel : public Panel {
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> assetActions(Rapture::AssetType type,
                                                                                Rapture::AssetHandle handle);
 
+    /**
+     * @brief Sizes a card's footer so that it takes the type bar's strip on a card that has no type bar
+     * @param item The card being laid out
+     * @param hasTypeBar Whether the card shows a type accent bar along its bottom edge
+     */
+    void layoutCardFooter(ContentItemComponents &item, bool hasTypeBar);
+
     void refreshFileBrowser(void);
     void buildDirectoryTree(void);
     void rebuildBreadcrumb(void);
@@ -174,6 +188,8 @@ class ContentBrowserPanel : public Panel {
     Amethyst::ContextMenu *m_addMenu = nullptr;
 
     Amethyst::Frame *m_sideBarPane = nullptr;
+    Amethyst::CollapsibleHeader *m_projectSection = nullptr;
+    Amethyst::CollapsibleHeader *m_recentSection = nullptr;
     Amethyst::TreeView *m_directoryTree = nullptr;
 
     Amethyst::Frame *m_contentPane = nullptr;

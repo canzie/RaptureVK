@@ -54,6 +54,12 @@ class Workspace {
      */
     void setupBase(Amethyst::TabBar &tabBar, std::string_view label, std::string_view iconSvg = {});
 
+    /**
+     * @brief Adds a full height hairline to the hotbar, which marks the boundary between two groups of items
+     * @param layoutOrder Where the line sits among the hotbar's items
+     */
+    void addHotbarSeparator(uint32_t layoutOrder);
+
   private:
     /**
      * @brief Fills a tab's content frame with the hotbar and docking layer every workspace has.

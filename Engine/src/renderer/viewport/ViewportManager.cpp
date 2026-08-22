@@ -12,6 +12,8 @@ ViewportContext ViewportManager::createViewport(const ViewportConfig &config)
     auto *ptr = viewport.get();
     m_viewports.push_back(std::move(viewport));
 
+    onViewportCreated.fire(ptr);
+
     return {ptr->getId(), config.name, ptr};
 }
 

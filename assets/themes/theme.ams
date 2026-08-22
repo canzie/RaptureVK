@@ -53,6 +53,17 @@ text-button {
     text-color: @text-1;
 }
 
+.main-menu-bar-project {
+    background-color: @bg-input;
+    background-transparency: 0.0;
+    corner-radius: 2px;
+    text-color: @text-3;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    text-truncate: at_end;
+    font-size: 12px;
+}
+
 image-label {
     background-transparency: 1.0;
     image-color: @white;
@@ -145,6 +156,10 @@ context-menu#separator {
 
 .workspace-hotbar {
     background-color: @bg-panel;
+}
+
+.hotbar-separator {
+    background-color: @bg-window;
 }
 
 .bottom-bar {
@@ -297,6 +312,20 @@ radio-button.viewport-context-menu:active {
     border-color: @border-2;
 }
 
+.accent-text-button {
+    background-color: @accent;
+    background-transparency: 0.0;
+    text-color: @accent-contrast;
+    image-color: @accent-contrast;
+    border-pixel-size: 1px;
+    border-color: @border-1;
+    border-mode: outline;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    font-size: 12px;
+    corner-radius: 2px;
+}
+
 .play-button {
     image-color: @status-success;
 }
@@ -392,6 +421,80 @@ radio-button.viewport-context-menu:active {
     text-y-alignment: center;
     text-truncate: at_end;
     font-size: 10px;
+}
+
+.tooltip {
+    background-color: @bg-buttons;
+    corner-radius: 3px;
+    border-pixel-size: 1px;
+    border-color: @border-1;
+    border-mode: outline;
+}
+
+.tooltip-row {
+    background-transparency: 1.0;
+    text-color: @text-2;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    text-truncate: at_end;
+    font-size: 11px;
+}
+
+.file-browser-sidebar {
+    background-color: @bg-panel;
+    scrollbar-color: @bg-header;
+    scrollbar-thumb-color: @bg-contrast;
+}
+
+.file-browser-section {
+    background-transparency: 1.0;
+    text-color: @text-3;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    font-size: 11px;
+    indicator-color: @text-4;
+}
+
+.file-browser-section#header {
+    background-transparency: 1.0;
+    text-color: @text-3;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    font-size: 11px;
+}
+
+.file-browser-bookmark {
+    background-color: @bg-buttons;
+    background-transparency: 1.0;
+    corner-radius: 3px;
+}
+
+.file-browser-bookmark:hover {
+    background-transparency: 0.0;
+}
+
+.file-browser-bookmark:active {
+    background-color: @accent;
+    background-transparency: 0.0;
+}
+
+.file-browser-bookmark-label {
+    background-transparency: 1.0;
+    text-color: @text-2;
+    text-x-alignment: left;
+    text-y-alignment: center;
+    text-truncate: at_end;
+    font-size: 12px;
+}
+
+.file-browser-bookmark-icon {
+    background-transparency: 1.0;
+    image-color: @text-3;
+}
+
+.file-browser-bookmark-icon-active {
+    background-transparency: 1.0;
+    image-color: @type-folder;
 }
 
 .launcher-backdrop {

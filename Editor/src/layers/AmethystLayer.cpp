@@ -40,6 +40,10 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+static constexpr float PROJECT_NAME_WIDTH = 180.0f;
+static constexpr float PROJECT_NAME_RIGHT_INSET = 140.0f;
+static constexpr float PROJECT_NAME_VERTICAL_INSET = 8.0f;
+
 VkDescriptorPool AmethystLayer::createUiDescriptorPool()
 {
     auto &vulkanContext = Rapture::Application::getInstance().getVulkanContext();
@@ -385,6 +389,20 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
                 d.action("About", [] {});
             });
         });
+
+    // a sibling of the bar rather than a child, since a MenuBar flows every child it has as an entry
+    Amethyst::UIScope(m_window).textLabel({
+        .classes = {"main-menu-bar-project"},
+        .base =
+            {
+                .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
+                .interactable = false,
+                .position = Amethyst::UDim2(1.0f, -PROJECT_NAME_RIGHT_INSET, 0.0f, EDITOR_MENU_BAR_HEIGHT * 0.5f),
+                .size = Amethyst::UDim2(0.0f, PROJECT_NAME_WIDTH, 0.0f, EDITOR_MENU_BAR_HEIGHT - PROJECT_NAME_VERTICAL_INSET),
+                .zIndex = 2,
+            },
+        .label = Rapture::Application::getInstance().getProject().getProjectName(),
+    });
 }
 
 void AmethystLayer::setupWorkspaces(void)
@@ -713,10 +731,18 @@ void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::stri
 
 void AmethystLayer::openFileExplorer(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm)
 {
+    auto confirm = [this, onConfirm = std::move(onConfirm)](const std::filesystem::path &path) {
+        m_lastExplorerDirectory = path.parent_path();
+        if (onConfirm) {
+            onConfirm(path);
+        }
+    };
+
     openSecondaryWindow(FILE_EXPLORER_WINDOW_WIDTH, FILE_EXPLORER_WINDOW_HEIGHT, "Open File",
-                        [mode, onConfirm = std::move(onConfirm)](Amethyst::Window &window, const std::function<void()> &close) {
-                            auto fileBrowser = std::make_shared<FileBrowser>(window, mode);
-                            fileBrowser->onConfirm = onConfirm;
+                        [mode, startDirectory = m_lastExplorerDirectory, confirm = std::move(confirm)](
+                            Amethyst::Window &window, const std::function<void()> &close) {
+                            auto fileBrowser = std::make_shared<FileBrowser>(window, mode, startDirectory);
+                            fileBrowser->onConfirm = confirm;
                             fileBrowser->onClose = close;
                             return fileBrowser;
                         });

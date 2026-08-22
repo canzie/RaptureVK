@@ -1,6 +1,7 @@
 #ifndef RAPTURE__VIEWPORT_MANAGER_H
 #define RAPTURE__VIEWPORT_MANAGER_H
 
+#include "core/events/EventSignal.h"
 #include "renderer/viewport/Viewport.h"
 
 #include <cstdint>
@@ -36,6 +37,11 @@ class ViewportManager {
     void onSwapChainRecreated();
 
     const std::vector<std::unique_ptr<Viewport>> &getViewports() const { return m_viewports; }
+
+    /**
+     * @brief Fires once a viewport exists, for whatever attaches to every viewport that is made
+     */
+    EventSignal<void(Viewport *)> onViewportCreated;
 
   private:
     RenderContext m_renderContext;

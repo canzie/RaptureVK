@@ -1,6 +1,7 @@
 #include "LevelEditorWorkspace.h"
 
 #include "Icons.h"
+#include "layers/EditorLayout.h"
 #include "layers/PlayLayer.h"
 #include "layers/panels/AddSceneObjectMenu.h"
 #include "layers/panels/ImagePreviewPanel.h"
@@ -20,6 +21,8 @@
 #include <app/Application.h>
 
 static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
+static constexpr float PLAY_CONTROL_SCALE = 0.7f;
+static constexpr float PLAY_CONTROL_GAP = 6.0f;
 static constexpr uint32_t INITIAL_VIEWPORT_WIDTH = 1280;
 static constexpr uint32_t INITIAL_VIEWPORT_HEIGHT = 720;
 static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
@@ -102,6 +105,7 @@ void LevelEditorWorkspace::setupViewport()
     auto &app = Rapture::Application::getInstance();
 
     m_viewport = app.getViewportManager().createViewport({
+        .scene = m_context.scene,
         .name = m_world->getName(),
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = INITIAL_VIEWPORT_WIDTH,
@@ -109,13 +113,10 @@ void LevelEditorWorkspace::setupViewport()
         .framesInFlight = app.getFramesInFlight(),
     });
     m_viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
-    m_viewport.viewport->setScene(m_context.scene);
 
     m_context.viewport = m_viewport.viewport;
 }
 
-// TODO: Add the separators, 1px full height bg-window color, around 8px space to the left and right of it, so 19px between each
-// element
 void LevelEditorWorkspace::setupHotbar()
 {
     if (m_hotbar == nullptr) {
@@ -125,7 +126,7 @@ void LevelEditorWorkspace::setupHotbar()
     auto *layout = m_hotbar->addExtension<Amethyst::UIListLayout>();
     layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
     layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-    layout->innerPadding = Amethyst::UDim::fromOffset(18.0f);
+    layout->innerPadding = Amethyst::UDim::fromOffset(EDITOR_HOTBAR_PADDING);
 
     m_addMenu = m_container->add<Amethyst::ContextMenu>();
     m_addMenu->setRowFactories({.separator = [] { return std::make_unique<ViewportContextMenuSIV>(); }});
@@ -142,9 +143,11 @@ void LevelEditorWorkspace::setupHotbar()
             };
         });
 
+    addHotbarSeparator(1);
+
     Amethyst::UIScope(*m_hotbar).textButton(
         {.classes = {"generic-text-button"},
-         .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 0.6f, 0.0f)},
+         .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 0.6f, 0.0f)},
          .text = {.fontSize = 14.0f},
          .label = "Save World"},
         [this](Amethyst::TextButtonScope &b) {
@@ -154,50 +157,70 @@ void LevelEditorWorkspace::setupHotbar()
             };
         });
 
-    // TODO: put these 3 into 1 container frame, since they belong with eachother
-    Amethyst::UIScope(*m_hotbar).imageButton(
-        {
-            .classes = {"generic-text-button", "play-button"},
-            .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, 0.0f, 0.7f, 0.0f)},
-            .svg = Icons::SVG_PLAY,
-        },
-        [this](Amethyst::ImageButtonScope &b) {
-            m_playButton = &b.component;
-            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-            b.component.onMouseButton1ClickCb = [this]() {
-                if (isPlaying()) {
-                    stopPlay();
-                } else {
-                    startPlay();
-                }
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
+    addHotbarSeparator(3);
+    setupPlayControls(4);
+}
 
-    Amethyst::UIScope(*m_hotbar).imageButton(
-        {
-            .classes = {"generic-text-button"},
-            .base = {.layoutOrder = 3, .size = Amethyst::UDim2(0.0f, 0.0f, 0.7f, 0.0f)},
-            .svg = Icons::SVG_PAUSE,
-        },
-        [this](Amethyst::ImageButtonScope &b) {
-            m_pauseButton = &b.component;
-            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-            b.component.onMouseButton1ClickCb = [this]() {
-                togglePause();
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
+void LevelEditorWorkspace::setupPlayControls(uint32_t layoutOrder)
+{
+    const float buttonSize = EDITOR_HOTBAR_HEIGHT * PLAY_CONTROL_SCALE;
+    const float groupWidth = 3.0f * buttonSize + 2.0f * PLAY_CONTROL_GAP;
 
-    Amethyst::UIScope(*m_hotbar).imageButton(
+    Amethyst::UIScope(*m_hotbar).frame(
         {
-            .classes = {"generic-text-button"},
-            .base = {.layoutOrder = 4, .size = Amethyst::UDim2(0.0f, 0.0f, 0.7f, 0.0f)},
-            .svg = Icons::SVG_FRAME_ADVANCE,
+            .base = {.layoutOrder = layoutOrder, .size = Amethyst::UDim2(0.0f, groupWidth, 1.0f, 0.0f)},
+            .style = {.backgroundTransparency = 1.0f},
         },
-        [this](Amethyst::ImageButtonScope &b) {
-            m_stepButton = &b.component;
-            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
+        [this](Amethyst::FrameScope &controls) {
+            auto *layout = controls.component.addExtension<Amethyst::UIListLayout>();
+            layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+            layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+            layout->innerPadding = Amethyst::UDim::fromOffset(PLAY_CONTROL_GAP);
+
+            controls.imageButton(
+                {
+                    .classes = {"generic-text-button", "play-button"},
+                    .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
+                    .svg = Icons::SVG_PLAY,
+                },
+                [this](Amethyst::ImageButtonScope &b) {
+                    m_playButton = &b.component;
+                    b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
+                    b.component.onMouseButton1ClickCb = [this]() {
+                        if (isPlaying()) {
+                            stopPlay();
+                        } else {
+                            startPlay();
+                        }
+                        return Amethyst::EventResult::CONSUMED;
+                    };
+                });
+
+            controls.imageButton(
+                {
+                    .classes = {"generic-text-button"},
+                    .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
+                    .svg = Icons::SVG_PAUSE,
+                },
+                [this](Amethyst::ImageButtonScope &b) {
+                    m_pauseButton = &b.component;
+                    b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
+                    b.component.onMouseButton1ClickCb = [this]() {
+                        togglePause();
+                        return Amethyst::EventResult::CONSUMED;
+                    };
+                });
+
+            controls.imageButton(
+                {
+                    .classes = {"generic-text-button"},
+                    .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
+                    .svg = Icons::SVG_FRAME_ADVANCE,
+                },
+                [this](Amethyst::ImageButtonScope &b) {
+                    m_stepButton = &b.component;
+                    b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
+                });
         });
 }
 

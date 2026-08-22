@@ -45,6 +45,7 @@ bool ASkeleton::addPreviewMesh(AssetHandle mesh)
     }
 
     m_previewMeshes.push_back(mesh);
+    onPreviewMeshesChanged.fire();
     return true;
 }
 
@@ -56,6 +57,7 @@ bool ASkeleton::removePreviewMesh(AssetHandle mesh)
     }
 
     m_previewMeshes.erase(found);
+    onPreviewMeshesChanged.fire();
     return true;
 }
 

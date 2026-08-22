@@ -5,6 +5,7 @@
 #include "layers/panels/components/asset_visuals.h"
 #include "layers/panels/components/context_menus.h"
 #include "core/utils/Log.h"
+#include "core/utils/StringFormat.h"
 #include "scene/Project.h"
 #include "scene/instances/Camera3D.h"
 #include "scene/instances/DirectionalLight3D.h"
@@ -55,7 +56,12 @@ static constexpr float TILE_ICON_SIZE = 42.0f;
 static constexpr float CONTENT_PADDING = 10.0f;
 static constexpr float ADD_MENU_WIDTH = 240.0f;
 
+static constexpr float TOOLTIP_WIDTH = 240.0f;
+static constexpr float TOOLTIP_ROW_HEIGHT = 18.0f;
+static constexpr float TOOLTIP_PADDING = 8.0f;
+
 using MenuItems = std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>>;
+using TooltipRows = std::vector<std::pair<std::string, std::string>>;
 
 // TODO: replace with the asset creation panel these rows will open once it exists
 static void s_createAssetStub(std::string_view what)
@@ -140,6 +146,37 @@ static std::string s_normalizeForSearch(std::string_view text)
 static float s_estimateTextWidth(const std::string &text, float fontSize)
 {
     return static_cast<float>(text.size()) * fontSize * 0.55f + 14.0f;
+}
+
+static void s_fillTooltip(Amethyst::Tooltip &surface, const TooltipRows &rows)
+{
+    surface.removeAllChildren();
+    surface.setClasses({"tooltip"});
+    surface.setBaseProperties({
+        .padding = Amethyst::UDim4::fromOffset(TOOLTIP_PADDING),
+        .size = Amethyst::UDim2::fromOffset(TOOLTIP_WIDTH,
+                                            2.0f * TOOLTIP_PADDING + static_cast<float>(rows.size()) * TOOLTIP_ROW_HEIGHT),
+    });
+
+    auto *layout = surface.addExtension<Amethyst::UIListLayout>();
+    layout->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
+    layout->horizontalAlignment = Amethyst::HorizontalAlignment::ALIGN_LEFT;
+    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_TOP;
+
+    Amethyst::UIScope scope(surface);
+    uint32_t order = 0;
+    for (const auto &[label, value] : rows) {
+        scope.textLabel({
+            .classes = {"tooltip-row"},
+            .base =
+                {
+                    .interactable = false,
+                    .layoutOrder = order++,
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TOOLTIP_ROW_HEIGHT),
+                },
+            .label = label + ": " + value,
+        });
+    }
 }
 ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context)
     : Panel("Content Browser", context)
@@ -385,12 +422,14 @@ void ContentBrowserPanel::setupSideBar()
                     .base =
                         {
                             .clipsDescendants = true,
-                            .size = Amethyst::UDim2::fromScale(1.0f, 0.8f),
+                            .layoutOrder = 0,
                         },
                     .header = s_sidebarHeaderStyle(),
                     .title = "Project",
                 },
                 [this](Amethyst::CollapsibleHeaderScope &ch) {
+                    m_projectSection = &ch.component;
+                    ch.component.onToggled = [this](bool) { layoutSideBar(); };
                     ch.treeView(
                         {
                             .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
@@ -400,17 +439,37 @@ void ContentBrowserPanel::setupSideBar()
                             tv.column("", 1.0f);
                         });
                 });
-            side.collapsibleHeader({
-                .classes = {"component-header"},
-                .base =
-                    {
-                        .clipsDescendants = true,
-                        .size = Amethyst::UDim2::fromScale(1.0f, 0.2f),
-                    },
-                .header = s_sidebarHeaderStyle(),
-                .title = "Recent",
-            });
+            side.collapsibleHeader(
+                {
+                    .classes = {"component-header"},
+                    .base =
+                        {
+                            .clipsDescendants = true,
+                            .layoutOrder = 1,
+                        },
+                    .header = s_sidebarHeaderStyle(),
+                    .title = "Recent",
+                },
+                [this](Amethyst::CollapsibleHeaderScope &ch) {
+                    m_recentSection = &ch.component;
+                    ch.component.onToggled = [this](bool) { layoutSideBar(); };
+                });
         });
+
+    layoutSideBar();
+}
+
+void ContentBrowserPanel::layoutSideBar()
+{
+    // Recent holds nothing yet, so it is its header at either state and Project takes whatever is left
+    const float recentHeight = SECTION_HEADER_HEIGHT;
+    m_recentSection->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, recentHeight)});
+
+    const bool projectExpanded = static_cast<bool>(m_projectSection->getCollapsibleHeaderProperties().expanded);
+    m_projectSection->setBaseProperties({
+        .size = projectExpanded ? Amethyst::UDim2(1.0f, 0.0f, 1.0f, -recentHeight)
+                                : Amethyst::UDim2(1.0f, 0.0f, 0.0f, SECTION_HEADER_HEIGHT),
+    });
 }
 
 void ContentBrowserPanel::setupContentArea()
@@ -940,25 +999,40 @@ void ContentBrowserPanel::refreshFileBrowser()
         if (isDir) {
             item.icon->setSvg(Icons::SVG_FOLDER);
             item.icon->setImageStyleProperties({.imageColor = Amethyst::Color4(0.85f, 0.72f, 0.4f, 1.0f)});
-            item.typeBar->setBaseProperties({.visible = false});
+            layoutCardFooter(item, false);
             item.type->setBaseProperties({.visible = false});
         } else if (metadata != nullptr) {
             item.icon->setSvg(Asset_iconForType(metadata->assetType, metadata->authoredClass));
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});
-            item.typeBar->setBaseProperties({.visible = true});
+            layoutCardFooter(item, true);
             item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(metadata->assetType)});
             item.type->setBaseProperties({.visible = true});
             item.type->setText(s_typeLabel(metadata->assetType, metadata->authoredClass));
         } else {
             item.icon->setSvg(Icons::SVG_SCRIPT);
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});
-            item.typeBar->setBaseProperties({.visible = false});
+            layoutCardFooter(item, false);
             item.type->setBaseProperties({.visible = true});
             std::string extension = entry.path().extension().string();
             item.type->setText(extension.empty() ? "file" : extension);
         }
 
         item.name->setText(displayName);
+
+        TooltipRows tooltipRows;
+        tooltipRows.emplace_back("Name", displayName);
+        if (isDir) {
+            tooltipRows.emplace_back("Type", "Folder");
+        } else {
+            tooltipRows.emplace_back("Type", metadata != nullptr ? s_typeLabel(metadata->assetType, metadata->authoredClass)
+                                                                 : entry.path().extension().string());
+            std::error_code sizeEc;
+            uintmax_t bytes = std::filesystem::file_size(entry.path(), sizeEc);
+            if (!sizeEc) {
+                tooltipRows.emplace_back("Size", Rapture::StringFormat_bytesToUnitString(bytes));
+            }
+        }
+        item.tooltip->build = [rows = std::move(tooltipRows)](Amethyst::Tooltip &surface) { s_fillTooltip(surface, rows); };
 
         size_t itemIndex = index;
         item.action->onMouseButton1ClickCb = [this, itemIndex]() {
@@ -1019,12 +1093,12 @@ void ContentBrowserPanel::refreshFileBrowser()
 
         if (m_edit.kind == CONTENT_EDIT_FOLDER) {
             item.icon->setSvg(Icons::SVG_FOLDER);
-            item.typeBar->setBaseProperties({.visible = false});
+            layoutCardFooter(item, false);
             item.type->setBaseProperties({.visible = false});
         } else {
             item.icon->setSvg(Asset_iconForType(Rapture::ASSET_SCENE_OBJECT, m_edit.objectClass));
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});
-            item.typeBar->setBaseProperties({.visible = true});
+            layoutCardFooter(item, true);
             item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(Rapture::ASSET_SCENE_OBJECT)});
             item.type->setBaseProperties({.visible = true});
             item.type->setText(s_typeLabel(Rapture::ASSET_SCENE_OBJECT, m_edit.objectClass));
@@ -1037,6 +1111,17 @@ void ContentBrowserPanel::refreshFileBrowser()
 
     releasePoolItems(index);
     updateStatus(index);
+}
+
+void ContentBrowserPanel::layoutCardFooter(ContentItemComponents &item, bool hasTypeBar)
+{
+    const float barHeight = hasTypeBar ? TILE_TYPEBAR_HEIGHT : 0.0f;
+
+    item.typeBar->setBaseProperties({.visible = hasTypeBar});
+    item.footer->setBaseProperties({
+        .position = Amethyst::UDim2(0.0f, 0.0f, 1.0f, -barHeight),
+        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TILE_FOOTER_HEIGHT + TILE_TYPEBAR_HEIGHT - barHeight),
+    });
 }
 
 void ContentBrowserPanel::updateStatus(size_t itemCount)
@@ -1187,6 +1272,7 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
 
         item.action = item.container->add<Amethyst::InvisibleButton>();
         item.action->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
+        item.tooltip = item.action->addExtension<Amethyst::UITooltip>();
 
         item.thumbWell = item.action->add<Amethyst::Frame>();
         item.thumbWell->setBaseProperties({

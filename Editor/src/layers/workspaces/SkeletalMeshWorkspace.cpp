@@ -1,5 +1,6 @@
 #include "SkeletalMeshWorkspace.h"
 
+#include "layers/panels/AssetDetailsPanel.h"
 #include "layers/panels/ViewportPanel.h"
 #include "layers/panels/components/asset_visuals.h"
 
@@ -11,6 +12,8 @@
 #include <scene/instances/SkeletalMesh3D.h>
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "SkeletalMeshPreview";
+
+static constexpr float DETAILS_SPLIT = 0.75f;
 
 static constexpr float HOTBAR_BUTTON_WIDTH = 150.0f;
 static constexpr float HOTBAR_BUTTON_HEIGHT = 28.0f;
@@ -35,10 +38,18 @@ SkeletalMeshWorkspace::SkeletalMeshWorkspace(Amethyst::TabBar &tabBar, const Pan
     setFocusBounds(min + offset, max + offset);
 
     Amethyst::TabBar *viewportTabBar = nullptr;
-    Amethyst::DockScope(*m_dockingLayer).panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; });
+    Amethyst::TabBar *detailsTabBar = nullptr;
+    Amethyst::DockScope(*m_dockingLayer)
+        .split(
+            Amethyst::SplitAxis::VERTICAL, DETAILS_SPLIT,
+            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
+            [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
 
     if (viewportTabBar != nullptr) {
         m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
+    }
+    if (detailsTabBar != nullptr) {
+        m_panels.push_back(std::make_unique<AssetDetailsPanel>(detailsTabBar, m_context, handle));
     }
 
     setupHotbar();

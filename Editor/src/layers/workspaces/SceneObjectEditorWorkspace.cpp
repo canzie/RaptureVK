@@ -119,6 +119,8 @@ void SceneObjectEditorWorkspace::setupScene()
 
     auto extent = app.getMainWindow().getSwapChain()->getExtent();
     m_viewport = app.getViewportManager().createViewport({
+        .scene = m_scene.get(),
+        .camera = camera,
         .name = VIEWPORT_NAME,
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = extent.width,
@@ -127,8 +129,6 @@ void SceneObjectEditorWorkspace::setupScene()
         .enableAccelerationStructures = false,
     });
     m_viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
-    m_viewport.viewport->setScene(m_scene.get());
-    m_viewport.viewport->setCamera(camera);
 
     m_context.scene = m_scene.get();
     m_context.viewport = m_viewport.viewport;

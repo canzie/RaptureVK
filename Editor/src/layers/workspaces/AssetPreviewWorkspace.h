@@ -46,7 +46,7 @@ class AssetPreviewWorkspace : public Workspace {
     void applyStoredLayout();
 
     /**
-     * @brief Sets what the camera frames once this workspace has one to drive
+     * @brief Frames the camera on a box, so what this workspace opened fills the view
      * @param min Corner of the world space box to frame
      * @param max Opposite corner of the world space box to frame
      */
@@ -62,19 +62,9 @@ class AssetPreviewWorkspace : public Workspace {
     std::string_view assetName() const;
 
   private:
-    /**
-     * @brief Frames what this workspace opened, once the camera driving it exists
-     */
-    void frameFocusBounds();
-
-  private:
     std::unique_ptr<Rapture::Scene> m_previewScene;
     Rapture::ViewportContext m_previewViewport;
     Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
-
-    glm::vec3 m_focusCenter{0.0f};
-    float m_focusRadius = 1.0f;
-    bool m_framePending = true;
 };
 
 #endif // RAPTURE__ASSET_PREVIEW_WORKSPACE_H

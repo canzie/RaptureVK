@@ -1,5 +1,6 @@
 #include "SkeletonWorkspace.h"
 
+#include "layers/panels/AssetDetailsPanel.h"
 #include "layers/panels/ViewportPanel.h"
 #include "layers/panels/components/asset_visuals.h"
 
@@ -15,6 +16,8 @@
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "SkeletonPreview";
 
+static constexpr float DETAILS_SPLIT = 0.75f;
+
 SkeletonWorkspace::SkeletonWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::AssetHandle handle)
     : AssetPreviewWorkspace(staticKind(), services, handle)
 {
@@ -22,19 +25,39 @@ SkeletonWorkspace::SkeletonWorkspace(Amethyst::TabBar &tabBar, const PanelServic
 
     setupDockingLayer();
     setupPreviewScene(PREVIEW_SCENE_NAME);
+    setupPose();
     spawnPreviewMeshes();
 
     Amethyst::TabBar *viewportTabBar = nullptr;
-    Amethyst::DockScope(*m_dockingLayer).panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; });
+    Amethyst::TabBar *detailsTabBar = nullptr;
+    Amethyst::DockScope(*m_dockingLayer)
+        .split(
+            Amethyst::SplitAxis::VERTICAL, DETAILS_SPLIT,
+            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
+            [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
 
     if (viewportTabBar != nullptr) {
         m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
+    }
+    if (detailsTabBar != nullptr) {
+        m_panels.push_back(std::make_unique<AssetDetailsPanel>(detailsTabBar, m_context, handle));
     }
 
     applyStoredLayout();
 }
 
-void SkeletonWorkspace::spawnPreviewMeshes()
+void SkeletonWorkspace::onUpdate(float dt)
+{
+    AssetPreviewWorkspace::onUpdate(dt);
+
+    // the list changes from inside a picker's callback, which is no place to tear down scene objects
+    if (m_previewMeshesPending) {
+        m_previewMeshesPending = false;
+        spawnPreviewMeshes();
+    }
+}
+
+void SkeletonWorkspace::setupPose()
 {
     Rapture::AssetPtr<Rapture::ASkeleton> skeleton(Rapture::AssetManager::getAsset(handle()));
     if (!skeleton) {
@@ -42,22 +65,36 @@ void SkeletonWorkspace::spawnPreviewMeshes()
         return;
     }
 
+    auto owned = std::make_unique<Rapture::SkeletonPose>(*previewScene(), "Pose", handle());
+    m_pose = owned.get();
+    previewScene()->root()->addChild(std::move(owned));
+    m_pose->ready();
+
+    m_previewMeshesChangedConn = skeleton->onPreviewMeshesChanged.connect([this]() { m_previewMeshesPending = true; });
+}
+
+void SkeletonWorkspace::spawnPreviewMeshes()
+{
+    Rapture::AssetPtr<Rapture::ASkeleton> skeleton(Rapture::AssetManager::getAsset(handle()));
+    if (!skeleton || m_pose == nullptr) {
+        return;
+    }
+
+    for (Rapture::SkeletalMesh3D *object : m_previewObjects) {
+        previewScene()->destroyInstance(object);
+    }
+    m_previewObjects.clear();
+
     Rapture::SceneObject *root = previewScene()->root();
 
-    auto owned = std::make_unique<Rapture::SkeletonPose>(*previewScene(), "Pose", handle());
-    Rapture::SkeletonPose *pose = owned.get();
-    root->addChild(std::move(owned));
-    pose->ready();
-
-    std::vector<Rapture::SkeletalMesh3D *> objects;
     glm::vec3 min(0.0f);
     glm::vec3 max(0.0f);
 
     for (Rapture::AssetHandle mesh : skeleton->previewMeshes()) {
         auto *object = root->add<Rapture::SkeletalMesh3D>(Rapture::AssetManager::getAssetMetadata(mesh).getName());
         object->setMesh(mesh);
-        object->setPose(pose);
-        objects.push_back(object);
+        object->setPose(m_pose);
+        m_previewObjects.push_back(object);
 
         min = glm::min(min, object->boundsMin());
         max = glm::max(max, object->boundsMax());
@@ -66,7 +103,7 @@ void SkeletonWorkspace::spawnPreviewMeshes()
     // authored geometry can sit anywhere, and the scene around it is built at the origin, so every
     // mesh shifts by the same amount to keep them together
     const glm::vec3 offset = -(min + max) * 0.5f;
-    for (Rapture::SkeletalMesh3D *object : objects) {
+    for (Rapture::SkeletalMesh3D *object : m_previewObjects) {
         object->setPosition(offset);
     }
 

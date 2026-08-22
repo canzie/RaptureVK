@@ -25,6 +25,9 @@ Viewport::Viewport(const ViewportConfig &config, RenderContext renderContext) : 
         .allowReadback = m_config.allowReadback,
     };
 
+    m_scene = m_config.scene;
+    m_camera = m_config.camera;
+
     m_drawManager = std::make_unique<DrawManager>(m_renderContext, drawConfig);
 
     if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {

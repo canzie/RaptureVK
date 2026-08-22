@@ -1,5 +1,6 @@
 #include "StaticMeshWorkspace.h"
 
+#include "layers/panels/AssetDetailsPanel.h"
 #include "layers/panels/ViewportPanel.h"
 #include "layers/panels/components/asset_visuals.h"
 
@@ -9,6 +10,8 @@
 #include <scene/instances/StaticMesh3D.h>
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "StaticMeshPreview";
+
+static constexpr float DETAILS_SPLIT = 0.75f;
 
 StaticMeshWorkspace::StaticMeshWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
                                          Rapture::AssetHandle handle)
@@ -30,10 +33,18 @@ StaticMeshWorkspace::StaticMeshWorkspace(Amethyst::TabBar &tabBar, const PanelSe
     setFocusBounds(min + offset, max + offset);
 
     Amethyst::TabBar *viewportTabBar = nullptr;
-    Amethyst::DockScope(*m_dockingLayer).panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; });
+    Amethyst::TabBar *detailsTabBar = nullptr;
+    Amethyst::DockScope(*m_dockingLayer)
+        .split(
+            Amethyst::SplitAxis::VERTICAL, DETAILS_SPLIT,
+            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
+            [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
 
     if (viewportTabBar != nullptr) {
         m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
+    }
+    if (detailsTabBar != nullptr) {
+        m_panels.push_back(std::make_unique<AssetDetailsPanel>(detailsTabBar, m_context, handle));
     }
 
     applyStoredLayout();

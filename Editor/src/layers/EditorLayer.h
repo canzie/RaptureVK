@@ -38,9 +38,10 @@ class EditorLayer : public Rapture::Layer {
     };
 
     /**
-     * @brief Create controls for newly appeared viewports.
+     * @brief Gives a viewport a camera to look through and a controller to drive it
+     * @param viewport The viewport to take over, ignored if it came with a camera of its own
      */
-    void syncViewportControls(void);
+    void adoptViewport(Rapture::Viewport *viewport);
 
     /**
      * @brief Drops the control driving a viewport, called as that viewport is destroyed
@@ -50,6 +51,7 @@ class EditorLayer : public Rapture::Layer {
 
     std::unique_ptr<Rapture::Input> m_input;
     std::unordered_map<Rapture::Viewport *, ViewportControl> m_controls;
+    Rapture::EventConnection m_viewportCreatedConn;
 };
 
 #endif // RAPTURE__EDITOR_LAYER_H
