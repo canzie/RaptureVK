@@ -60,6 +60,7 @@ CLAUDE.md
 # cache
 .cache/
 
+__pycache__
 
 # vendor
 Engine/vendor/*
