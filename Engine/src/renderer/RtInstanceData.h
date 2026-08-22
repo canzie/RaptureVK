@@ -22,9 +22,6 @@ struct RtInstanceInfo {
     alignas(4) uint32_t iboIndex; // index of the buffer in the bindless buffers array
     alignas(4) uint32_t vboIndex; // index of the buffer in the bindless buffers array
 
-    alignas(4)
-        uint32_t meshIndex; // index of the mesh in the mesh array, this is the same index as the tlasinstance instanceCustomIndex
-
     alignas(16) glm::mat4 modelMatrix;
 
     alignas(4) uint32_t positionAttributeOffsetBytes; // Offset of position *within* the stride
@@ -66,7 +63,7 @@ class RtInstanceData {
     std::unordered_map<MaterialInstance *, std::vector<uint32_t>> m_materialToOffsets;
     std::unordered_map<uint32_t, uint32_t> m_entityToOffset;
 
-    uint32_t m_lastTlasInstanceCount = 0;
+    uint64_t m_tlasRevision = 0;
 
     uint32_t m_meshDataSSBOIndex = UINT32_MAX;
 };

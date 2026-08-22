@@ -2,20 +2,20 @@
 
 #include "core/utils/EnginePaths.h"
 
+#include "app/Application.h"
 #include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetManager.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorBinding.h"
 #include "gpu/descriptors/DescriptorManager.h"
 #include "gpu/descriptors/DescriptorSet.h"
-#include "scene/components/Components.h"
-#include "scene/render_data/SceneRenderData.h"
-#include "renderer/gi/ddgi/DDGICommon.h"
-#include "scene/Scene.h"
-#include "scene/instances/Environment.h"
 #include "gpu/textures/Texture.h"
 #include "gpu/textures/TextureCommon.h"
-#include "app/Application.h"
+#include "renderer/gi/ddgi/DDGICommon.h"
+#include "scene/Scene.h"
+#include "scene/components/Components.h"
+#include "scene/instances/Environment.h"
+#include "scene/render_data/SceneRenderData.h"
 
 #include "core/utils/TracyProfiler.h"
 
@@ -66,12 +66,11 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     : m_DDGI_ProbeTraceShader(nullptr), m_DDGI_ProbeIrradianceBlendingShader(nullptr), m_DDGI_ProbeDistanceBlendingShader(nullptr),
       m_DDGI_ProbeRelocationShader(nullptr), m_DDGI_ProbeClassificationShader(nullptr), m_DDGI_ProbeTracePipeline(nullptr),
       m_DDGI_ProbeIrradianceBlendingPipeline(nullptr), m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
-      m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr),
-      m_framesInFlight(framesInFlight), m_isFirstFrame(true), m_meshCount(0), m_probeIrradianceBindlessIndex(UINT32_MAX),
-      m_probeVisibilityBindlessIndex(UINT32_MAX), m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr),
-      m_skyIntensity(1.0f), m_probeTraceDescriptorSet(nullptr), m_probeIrradianceBlendingDescriptorSet(nullptr),
-      m_probeDistanceBlendingDescriptorSet(nullptr), m_probeClassificationDescriptorSet(nullptr),
-      m_probeRelocationDescriptorSet(nullptr)
+      m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_framesInFlight(framesInFlight),
+      m_isFirstFrame(true), m_meshCount(0), m_probeIrradianceBindlessIndex(UINT32_MAX), m_probeVisibilityBindlessIndex(UINT32_MAX),
+      m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr), m_skyIntensity(1.0f), m_probeTraceDescriptorSet(nullptr),
+      m_probeIrradianceBlendingDescriptorSet(nullptr), m_probeDistanceBlendingDescriptorSet(nullptr),
+      m_probeClassificationDescriptorSet(nullptr), m_probeRelocationDescriptorSet(nullptr)
 {
     m_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
     m_skyboxTexture = m_defaultSkyboxTexture.get();
@@ -97,9 +96,7 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     setupProbeTextures();
 }
 
-DynamicDiffuseGI::~DynamicDiffuseGI()
-{
-}
+DynamicDiffuseGI::~DynamicDiffuseGI() {}
 
 void DynamicDiffuseGI::createPipelines()
 {
@@ -715,7 +712,8 @@ void DynamicDiffuseGI::initTextures()
     // m_DistanceTextureFlattened = TextureFlattener::createFlattenTexture(m_VisibilityTexture, "[DDGI] Distance Flattened");
     // m_ProbeClassificationTextureFlattened = TextureFlattener::createFlattenTexture(
     //     m_ProbeClassificationTexture, "[DDGI] Probe Classification Flattened", FlattenerDataType::UINT);
-    // m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset Flattened");
+    // m_ProbeOffsetTextureFlattened = TextureFlattener::createFlattenTexture(m_ProbeOffsetTexture, "[DDGI] Probe Offset
+    // Flattened");
 
     clearTextures();
 

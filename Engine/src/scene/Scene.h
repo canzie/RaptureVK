@@ -178,17 +178,11 @@ class Scene {
      */
     void unregisterBLAS(ecs::Entity entity);
 
-    void buildTLAS();
-    std::shared_ptr<TLAS> getTLAS()
-    {
-        if (!m_tlas) {
-            // RP_CORE_ERROR("Scene::getTLAS - TLAS is not built");
-            return nullptr;
-        }
-        return m_tlas;
-    }
-
-    void updateTLAS();
+    /**
+     * @brief The scene's top level acceleration structure
+     * @return The structure, or nullptr if the scene has none
+     */
+    TLAS *getTLAS() { return m_tlas.get(); }
 
     /**
      * @brief Get the GPU data mirror
@@ -214,6 +208,11 @@ class Scene {
     void updateShadowViews(const glm::vec3 &cameraPosition, Camera3D *activeCamera);
 
     /**
+     * @brief Brings the acceleration structure up to date with the scene
+     */
+    void updateTLAS();
+
+    /**
      * @brief Hands every body the simulation moved this step back to the node it drives
      */
     void syncSimulatedTransforms();
@@ -236,8 +235,8 @@ class Scene {
     ecs::Bookmark m_shadowTransformBookmark;
     ecs::Bookmark m_shadowLightBookmark;
 
-    std::shared_ptr<TLAS> m_tlas;
-    bool m_tlasDirty = false;
+    std::unique_ptr<TLAS> m_tlas;
+    ecs::Bookmark m_tlasTransformBookmark;
 
     std::array<FreeList<Instance *>, TICK_COUNT> m_ticking;
 

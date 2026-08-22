@@ -2,108 +2,188 @@
 #define RAPTURE__TLAS_H
 
 #include "BLAS.h"
-#include "gpu/buffers/Buffers.h"
 
+#include <cstdint>
 #include <glm/glm.hpp>
-#include <memory>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 namespace Rapture {
 
+/**
+ * @brief The slot of an instance that is not in a top level structure
+ */
+static constexpr uint32_t INVALID_TLAS_SLOT = UINT32_MAX;
+
 struct TLASInstance {
     BLAS *blas = nullptr;
     glm::mat4 transform = glm::mat4(1.0f);
-    uint32_t instanceCustomIndex = 0;
     uint32_t mask = 0xFF;
     uint32_t shaderBindingTableRecordOffset = 0;
     VkGeometryInstanceFlagsKHR flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-    uint32_t entityID = 0;
+    uint32_t entityId = 0;
+    uint32_t slot = INVALID_TLAS_SLOT;
 };
 
-class TLAS : public std::enable_shared_from_this<TLAS> {
+/**
+ * @brief Top level acceleration structure over the bottom level structures of a scene
+ */
+class TLAS {
   public:
     TLAS();
     ~TLAS();
 
-    // Add a BLAS instance to the TLAS
-    void addInstance(const TLASInstance &instance);
+    TLAS(const TLAS &) = delete;
+    TLAS &operator=(const TLAS &) = delete;
 
     /**
-     * @brief Removes the instance belonging to an entity
-     * @param entityID The entity whose instance should be removed
+     * @brief Puts a bottom level structure into the scene under a slot of its own
+     * @param instance The instance to add, its slot member is ignored
+     * @return The slot the instance was given, or INVALID_TLAS_SLOT if it was rejected
      */
-    void removeInstance(uint32_t entityID);
+    uint32_t addInstance(const TLASInstance &instance);
 
-    // Build the acceleration structure
-    void build();
+    /**
+     * @brief Takes an entity's instance out of the scene and releases its slot
+     * @param entityId The entity whose instance should be removed
+     */
+    void removeInstance(uint32_t entityId);
 
-    // Update the acceleration structure (useful for dynamic scenes)
-    void update();
-
-    // Update specific instances efficiently without full rebuild
-    void updateInstances(const std::vector<std::pair<uint32_t, glm::mat4>> &instanceUpdates);
-
-    // Update a single instance
-    void updateInstance(uint32_t instanceIndex, const glm::mat4 &newTransform);
-
-    // Get the acceleration structure handle
-    VkAccelerationStructureKHR getAccelerationStructure() const { return m_accelerationStructure; }
-
-    // Get the device address of the acceleration structure
-    VkDeviceAddress getDeviceAddress() const { return m_deviceAddress; }
-
-    // Check if the acceleration structure has been built
-    bool isBuilt() const { return m_isBuilt; }
-
-    // Get the bindless index of this TLAS in the descriptor manager
-    uint32_t getBindlessIndex() const { return m_bindlessIndex; }
-
-    // Clear all instances
+    /**
+     * @brief Removes every instance and releases every slot
+     */
     void clear();
 
-    // Get number of instances
+    /**
+     * @brief Records and submits a full build of the acceleration structure
+     */
+    void build();
+
+    /**
+     * @brief Moves an entity's instance
+     * @param entityId The entity whose instance should move
+     * @param transform The world transform to place the instance at
+     * @return True if the entity has an instance and the transform differs from its current one
+     */
+    bool setInstanceTransform(uint32_t entityId, const glm::mat4 &transform);
+
+    /**
+     * @brief Records and submits a refit covering every transform set since the last call
+     */
+    void flushInstanceUpdates();
+
+    VkAccelerationStructureKHR getAccelerationStructure() const { return m_accelerationStructure; }
+    VkDeviceAddress getDeviceAddress() const { return m_deviceAddress; }
+    uint32_t getBindlessIndex() const { return m_bindlessIndex; }
+    bool isBuilt() const { return m_isBuilt; }
+    bool needsRebuild() const { return m_needsRebuild; }
     uint32_t getInstanceCount() const { return static_cast<uint32_t>(m_instances.size()); }
     const std::vector<TLASInstance> &getInstances() const { return m_instances; }
-    std::vector<TLASInstance> &getInstances() { return m_instances; }
+
+    /**
+     * @brief The length a slot indexed array must have to hold an entry for every live instance
+     * @return One past the highest slot ever handed out
+     */
+    uint32_t getSlotCapacity() const { return m_slotCapacity; }
+
+    /**
+     * @brief A counter that changes whenever the set of instances or their slots changes
+     * @return The current revision
+     */
+    uint64_t getRevision() const { return m_revision; }
 
   private:
-    void createAccelerationStructure();
-    void createInstanceBuffer();
-    void buildAccelerationStructure();
-    void updateInstanceBuffer(const std::vector<std::pair<uint32_t, glm::mat4>> &instanceUpdates);
+    /**
+     * @brief Per frame in flight build inputs, so a submitted build is never written over
+     */
+    struct BuildResources {
+        VkBuffer instanceBuffer = VK_NULL_HANDLE;
+        VmaAllocation instanceAllocation = VK_NULL_HANDLE;
+        VkDeviceSize instanceCapacityBytes = 0;
+
+        VkBuffer scratchBuffer = VK_NULL_HANDLE;
+        VmaAllocation scratchAllocation = VK_NULL_HANDLE;
+        VkDeviceSize scratchCapacityBytes = 0;
+
+        VkFence fence = VK_NULL_HANDLE;
+        bool isSubmitted = false;
+    };
+
+    /**
+     * @brief Takes this frame's build inputs, waiting for the build that last used them
+     * @return The resources to record the next build against
+     */
+    BuildResources &acquireBuildResources();
+
+    /**
+     * @brief Grows a build resource's instance buffer to hold every instance and fills it
+     * @param resources The resources to write into
+     * @return The device address of the filled instance buffer, or 0 on failure
+     */
+    VkDeviceAddress writeInstanceBuffer(BuildResources &resources);
+
+    /**
+     * @brief Grows a build resource's scratch buffer to the size the structure needs
+     * @param resources The resources to grow
+     * @param sizeBytes The scratch size the driver asked for
+     * @return The aligned device address of the scratch buffer, or 0 on failure
+     */
+    VkDeviceAddress reserveScratch(BuildResources &resources, VkDeviceSize sizeBytes);
+
+    /**
+     * @brief Creates the acceleration structure and its backing buffer at the current instance count
+     * @return True on success
+     */
+    bool createAccelerationStructure();
+
+    /**
+     * @brief Records a build or a refit and submits it against a fence
+     * @param mode Whether to build the structure from scratch or refit it in place
+     * @param resources The build inputs to read from
+     * @param scratchAddress The aligned scratch address the build writes through
+     */
+    void submitBuild(VkBuildAccelerationStructureModeKHR mode, BuildResources &resources, VkDeviceAddress scratchAddress);
+
+    /**
+     * @brief Publishes the structure to the bindless acceleration structure binding
+     */
     void registerWithDescriptorManager();
+
+    /**
+     * @brief Releases every build resource and its fence
+     */
+    void destroyBuildResources();
 
   private:
     std::vector<TLASInstance> m_instances;
+    std::unordered_map<uint32_t, uint32_t> m_entityToIndex;
+    std::unordered_set<uint32_t> m_dirtyInstances;
+
+    std::vector<uint32_t> m_freeSlots;
+    uint32_t m_slotCapacity;
+    uint64_t m_revision;
 
     VkAccelerationStructureKHR m_accelerationStructure;
     VkAccelerationStructureGeometryKHR m_geometry;
     VkAccelerationStructureBuildGeometryInfoKHR m_buildInfo;
     VkAccelerationStructureBuildRangeInfoKHR m_buildRangeInfo;
 
-    // Buffer to hold the acceleration structure
     VkBuffer m_buffer;
     VmaAllocation m_allocation;
 
-    // Buffer for instances data
-    VkBuffer m_instanceBuffer;
-    VmaAllocation m_instanceAllocation;
-
-    // Scratch buffer for building
-    VkBuffer m_scratchBuffer;
-    VmaAllocation m_scratchAllocation;
+    std::vector<BuildResources> m_buildResources;
 
     VkDeviceAddress m_deviceAddress;
     VkDeviceSize m_accelerationStructureSize;
-    VkDeviceSize m_scratchSize;
+    VkDeviceSize m_buildScratchSize;
+    VkDeviceSize m_updateScratchSize;
 
     bool m_isBuilt;
     bool m_needsRebuild;
-    bool m_supportsUpdate; // Whether the device supports AS updates
 
-    // Vulkan handles
     VkDevice m_device;
     VmaAllocator m_allocator;
 

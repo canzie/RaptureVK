@@ -38,7 +38,7 @@ void RtInstanceData::update(Scene &scene)
         return;
     }
 
-    if (m_instanceCount != tlas->getInstanceCount() || m_lastTlasInstanceCount != tlas->getInstanceCount()) {
+    if (m_tlasRevision != tlas->getRevision()) {
         rebuild(scene);
     } else {
         patchDirty(scene);
@@ -47,78 +47,71 @@ void RtInstanceData::update(Scene &scene)
 
 void RtInstanceData::rebuild(Scene &scene)
 {
-    auto tlas = scene.getTLAS();
-    auto &tlasInstances = tlas->getInstances();
+    TLAS *tlas = scene.getTLAS();
+    const auto &tlasInstances = tlas->getInstances();
     ecs::Registry &reg = scene.getRegistry();
 
     auto isDrawable = [&reg](ecs::Entity entity) {
         return reg.hasAll<MaterialComponent, StaticMeshComponent, TransformComponent>(entity);
     };
 
-    std::vector<RtInstanceInfo> infos(tlas->getInstanceCount());
+    // a shader reaches an entry by the slot the structure gave the instance, so removed instances leave holes
+    std::vector<RtInstanceInfo> infos(tlas->getSlotCapacity());
 
-    for (uint32_t i = 0; i < tlasInstances.size(); ++i) {
-        auto &inst = tlasInstances[i];
+    m_materialToOffsets.clear();
+    m_entityToOffset.clear();
 
-        RtInstanceInfo &info = infos[i];
-        info = {};
+    for (const TLASInstance &instance : tlasInstances) {
+        if (instance.slot >= infos.size() || !isDrawable(instance.entityId)) {
+            continue;
+        }
 
-        if (isDrawable(inst.entityID)) {
-            const StaticMeshComponent &meshComp = reg.read<StaticMeshComponent>(inst.entityID);
-            const MaterialComponent &materialComp = reg.read<MaterialComponent>(inst.entityID);
+        RtInstanceInfo &info = infos[instance.slot];
 
-            info.modelMatrix = reg.read<TransformComponent>(inst.entityID).world;
+        const StaticMeshComponent &meshComp = reg.read<StaticMeshComponent>(instance.entityId);
+        const MaterialComponent &materialComp = reg.read<MaterialComponent>(instance.entityId);
 
-            if (materialComp.material) {
-                info.materialIndex = materialComp.material->getBindlessIndex();
+        info.modelMatrix = reg.read<TransformComponent>(instance.entityId).world;
+
+        if (materialComp.material) {
+            info.materialIndex = materialComp.material->getBindlessIndex();
+        }
+
+        if (meshComp.mesh) {
+            auto vb = meshComp.mesh->geometry().getVertexBuffer();
+            auto ib = meshComp.mesh->geometry().getIndexBuffer();
+
+            if (vb) {
+                info.vboIndex = vb->getBindlessIndex();
+                auto &layout = vb->getBufferLayout();
+                info.positionAttributeOffsetBytes = layout.getAttributeOffset(BufferAttributeID::POSITION);
+                info.texCoordAttributeOffsetBytes = layout.getAttributeOffset(BufferAttributeID::TEXCOORD_0);
+                info.normalAttributeOffsetBytes = layout.getAttributeOffset(BufferAttributeID::NORMAL);
+                info.tangentAttributeOffsetBytes = layout.getAttributeOffset(BufferAttributeID::TANGENT);
+                info.vertexStrideBytes = layout.calculateVertexSize();
             }
 
-            if (meshComp.mesh) {
-                auto vb = meshComp.mesh->geometry().getVertexBuffer();
-                auto ib = meshComp.mesh->geometry().getIndexBuffer();
-
-                if (vb) {
-                    info.vboIndex = vb->getBindlessIndex();
-                    auto &layout = vb->getBufferLayout();
-                    info.positionAttributeOffsetBytes = layout.getAttributeOffset(BufferAttributeID::POSITION);
-                    info.texCoordAttributeOffsetBytes = layout.getAttributeOffset(BufferAttributeID::TEXCOORD_0);
-                    info.normalAttributeOffsetBytes = layout.getAttributeOffset(BufferAttributeID::NORMAL);
-                    info.tangentAttributeOffsetBytes = layout.getAttributeOffset(BufferAttributeID::TANGENT);
-                    info.vertexStrideBytes = layout.calculateVertexSize();
-                }
-
-                if (ib) {
-                    info.iboIndex = ib->getBindlessIndex();
-                    info.indexType = ib->getIndexType();
-                }
+            if (ib) {
+                info.iboIndex = ib->getBindlessIndex();
+                info.indexType = ib->getIndexType();
             }
         }
 
-        info.meshIndex = inst.instanceCustomIndex;
+        if (materialComp.material) {
+            uint32_t offset = instance.slot * static_cast<uint32_t>(sizeof(RtInstanceInfo));
+            m_entityToOffset[instance.entityId] = offset;
+            m_materialToOffsets[materialComp.material.get()].push_back(offset);
+        }
     }
 
     m_instanceCount = static_cast<uint32_t>(infos.size());
-    m_lastTlasInstanceCount = tlas->getInstanceCount();
+    m_tlasRevision = tlas->getRevision();
 
     if (!m_buffer || m_buffer->getSize() < sizeof(RtInstanceInfo) * infos.size()) {
         m_buffer =
             std::make_shared<StorageBuffer>(sizeof(RtInstanceInfo) * infos.size(), BufferUsage::DYNAMIC, m_allocator, infos.data());
     } else {
         m_buffer->addData(infos.data(), sizeof(RtInstanceInfo) * infos.size(), 0);
-    }
-
-    m_materialToOffsets.clear();
-    m_entityToOffset.clear();
-
-    for (uint32_t idx = 0; idx < infos.size(); ++idx) {
-        ecs::Entity entity = tlasInstances[idx].entityID;
-        if (isDrawable(entity)) {
-            const MaterialComponent &materialComp = reg.read<MaterialComponent>(entity);
-            if (materialComp.material) {
-                m_entityToOffset[entity] = idx * static_cast<uint32_t>(sizeof(RtInstanceInfo));
-                m_materialToOffsets[materialComp.material.get()].push_back(idx * static_cast<uint32_t>(sizeof(RtInstanceInfo)));
-            }
-        }
     }
 
     auto set = m_rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS);

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__BLAS_H
+#define RAPTURE__BLAS_H
 
 #include "gpu/buffers/Buffers.h"
 
@@ -28,6 +29,12 @@ class BLAS {
      * @brief Destroy the acceleration structure and its backing buffers
      */
     ~BLAS();
+
+    // m_buildInfo points at m_geometry, so a copy would describe the geometry of the object it came from
+    BLAS(const BLAS &) = delete;
+    BLAS &operator=(const BLAS &) = delete;
+    BLAS(BLAS &&) = delete;
+    BLAS &operator=(BLAS &&) = delete;
 
     /**
      * @brief Record and submit the acceleration structure build
@@ -96,3 +103,5 @@ class BLAS {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__BLAS_H

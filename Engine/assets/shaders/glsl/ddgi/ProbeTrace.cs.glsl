@@ -63,7 +63,6 @@ struct MeshInfo {
 
     uint iboIndex; // index of the buffer in the bindless buffers array
     uint vboIndex; // index of the buffer in the bindless buffers array
-    uint meshIndex; // index of the mesh in the mesh array, this is the same index as the tlasinstance instanceCustomIndex
 
     mat4 modelMatrix;
 

@@ -209,13 +209,6 @@ void Scene::onUpdate(float dt)
 
     m_renderData->onUpdate(frameCounter);
 
-    if (m_tlasDirty) {
-        if (m_tlas != nullptr && m_tlas->getInstanceCount() > 0) {
-            m_tlas->build();
-        }
-        m_tlasDirty = false;
-    }
-
     updateTLAS();
 }
 
@@ -535,14 +528,11 @@ void Scene::registerBLAS(ecs::Entity entity)
         return;
     }
 
-    m_tlas->removeInstance(entity);
-
     TLASInstance instance;
     instance.blas = blas;
     instance.transform = transform->world;
-    instance.entityID = entity;
+    instance.entityId = entity;
     m_tlas->addInstance(instance);
-    m_tlasDirty = true;
 }
 
 void Scene::unregisterBLAS(ecs::Entity entity)
@@ -552,41 +542,39 @@ void Scene::unregisterBLAS(ecs::Entity entity)
     }
 
     m_tlas->removeInstance(entity);
-    m_tlasDirty = true;
 }
 
-void Scene::buildTLAS()
-{
-    if (!m_tlas) {
-        RP_CORE_ERROR("TLAS is not initialized");
-        return;
-    }
-
-    m_tlas->build();
-}
-
-// TODO: update this so we update the transform directly instead of sotring the change and letting the tlas go over it again
 void Scene::updateTLAS()
 {
-
     if (!m_tlas) {
         return;
     }
 
-    std::vector<std::pair<uint32_t, glm::mat4>> instanceUpdates;
-    auto &instances = m_tlas->getInstances();
-    int instanceIndex = 0;
-
-    for (auto &instance : instances) {
-        const TransformComponent *transform = m_registry.tryRead<TransformComponent>(instance.entityID);
-
-        if (transform != nullptr && transform->world != instance.transform) {
-            instance.transform = transform->world;
-            instanceUpdates.push_back({instanceIndex, transform->world});
+    if (m_tlas->needsRebuild()) {
+        if (m_tlas->getInstanceCount() > 0) {
+            m_tlas->build();
         }
-        instanceIndex++;
+        return;
     }
 
-    m_tlas->updateInstances(instanceUpdates);
+    ecs::Batch transforms = m_registry.getJournal().readSince(CHANNEL_TRANSFORM_WORLD, m_tlasTransformBookmark);
+
+    if (transforms.needsRebuild()) {
+        for (const TLASInstance &instance : m_tlas->getInstances()) {
+            const TransformComponent *transform = m_registry.tryRead<TransformComponent>(instance.entityId);
+            if (transform != nullptr) {
+                m_tlas->setInstanceTransform(instance.entityId, transform->world);
+            }
+        }
+    } else {
+        for (ecs::Entity entity : transforms) {
+            const TransformComponent *transform = m_registry.tryRead<TransformComponent>(entity);
+            if (transform != nullptr) {
+                m_tlas->setInstanceTransform(entity, transform->world);
+            }
+        }
+    }
+
+    m_tlas->flushInstanceUpdates();
 }
 } // namespace Rapture
