@@ -2,6 +2,7 @@
 
 #include "app/Application.h"
 #include "core/utils/Log.h"
+#include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
 #include "core/utils/rp_assert.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorManager.h"
@@ -30,8 +31,8 @@ static VkDeviceAddress s_getBufferAddress(VkDevice device, VkBuffer buffer)
 TLAS::TLAS()
     : m_slotCapacity(0), m_revision(0), m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE),
       m_allocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0), m_buildScratchSize(0),
-      m_updateScratchSize(0), m_isBuilt(false), m_needsRebuild(false), m_device(VK_NULL_HANDLE), m_allocator(VK_NULL_HANDLE),
-      m_bindlessIndex(UINT32_MAX)
+      m_updateScratchSize(0), m_isBuilt(false), m_needsRebuild(false), m_isWaitingOnStructures(false),
+      m_device(VK_NULL_HANDLE), m_allocator(VK_NULL_HANDLE), m_bindlessIndex(UINT32_MAX)
 {
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
@@ -44,6 +45,9 @@ TLAS::TLAS()
 
     m_device = vulkanContext.getLogicalDevice();
     m_allocator = vulkanContext.getVmaAllocator();
+
+    m_structuresReadyConnection = vulkanContext.getRenderContext().accelerationStructureBuilder->onStructuresReady.connect(
+        [this]() { m_isWaitingOnStructures.store(false, std::memory_order_release); });
 
     m_buildResources.resize(std::max(1u, app.getFramesInFlight()));
 
@@ -109,11 +113,6 @@ uint32_t TLAS::addInstance(const TLASInstance &instance)
 {
     if (instance.blas == nullptr) {
         RP_CORE_ERROR("Cannot add an instance without a bottom level structure");
-        return INVALID_TLAS_SLOT;
-    }
-
-    if (!instance.blas->isBuilt()) {
-        RP_CORE_ERROR("Cannot add an instance whose bottom level structure is not built");
         return INVALID_TLAS_SLOT;
     }
 
@@ -421,6 +420,14 @@ void TLAS::build()
     if (m_instances.empty()) {
         RP_CORE_ERROR("Cannot build a top level structure with no instances");
         return;
+    }
+
+    // every instance is traced against the moment this goes live, so none of them may be unbuilt
+    for (const TLASInstance &instance : m_instances) {
+        if (!instance.blas->isReady()) {
+            m_isWaitingOnStructures.store(true, std::memory_order_release);
+            return;
+        }
     }
 
     auto &vulkanContext = Application::getInstance().getVulkanContext();

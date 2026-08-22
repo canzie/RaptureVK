@@ -2,6 +2,7 @@
 #include "VulkanContextHelpers.h"
 #include "core/utils/Log.h"
 
+#include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
 #include "gpu/buffers/BufferPool.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
@@ -146,6 +147,7 @@ VulkanContext::~VulkanContext()
         vkDeviceWaitIdle(m_device);
     }
 
+    m_accelerationStructureBuilder.reset();
     m_descriptorManager.reset();
     m_bufferPoolManager.reset();
     m_commandPoolManager.reset();
@@ -271,6 +273,9 @@ void VulkanContext::initManagers(uint32_t framesInFlight)
 
     m_descriptorManager = std::make_unique<DescriptorManager>();
     m_renderContext.descriptorManager = m_descriptorManager.get();
+
+    m_accelerationStructureBuilder = std::make_unique<AccelerationStructureBuilder>();
+    m_renderContext.accelerationStructureBuilder = m_accelerationStructureBuilder.get();
 }
 
 void VulkanContext::createInstance(WindowContext *windowContext)
@@ -1350,6 +1355,10 @@ void VulkanContext::createLogicalDevice(VkSurfaceKHR surface)
                      vkGetAccelerationStructureDeviceAddressKHR, vkCreateRayTracingPipelinesKHR,
                      vkGetRayTracingShaderGroupHandlesKHR, vkCmdTraceRaysKHR, m_rayTracingPipelineProperties,
                      m_accelerationStructureProperties);
+
+    s_loadDeviceFunction(m_device, "vkCmdCopyAccelerationStructureKHR", vkCmdCopyAccelerationStructureKHR);
+    s_loadDeviceFunction(m_device, "vkCmdWriteAccelerationStructuresPropertiesKHR",
+                         vkCmdWriteAccelerationStructuresPropertiesKHR);
 
     s_loadDeviceFunction(m_device, "vkGetDeviceFaultInfoEXT", vkGetDeviceFaultInfoEXT);
     if (vkGetDeviceFaultInfoEXT) {

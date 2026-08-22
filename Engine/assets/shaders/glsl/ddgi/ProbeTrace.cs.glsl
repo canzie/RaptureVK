@@ -73,9 +73,12 @@ struct MeshInfo {
 
 
     uint     vertexStrideBytes;            // Stride of the vertex buffer in bytes
-    uint     indexType;                    // GL_UNSIGNED_INT (5125) or GL_UNSIGNED_SHORT (5123)
+    uint     indexType;                    // VkIndexType, matched by INDEX_TYPE_UINT16 and INDEX_TYPE_UINT32
 
 };
+
+const uint INDEX_TYPE_UINT16 = 0u;
+const uint INDEX_TYPE_UINT32 = 1u;
 
 // Scene info buffer
 layout(std430, set=3, binding = 9) readonly buffer SceneInfo {
@@ -125,12 +128,12 @@ uvec3 fetchTriangleIndices(uint primitiveID, MeshInfo meshInfo) {
     uint baseIndex = primitiveID * 3;
     uvec3 indices;
     
-    if (meshInfo.indexType == 5125) { // GL_UNSIGNED_INT
+    if (meshInfo.indexType == INDEX_TYPE_UINT32) {
         uint indexOffset = baseIndex * 4; // 4 bytes per uint
         indices.x = gBuffers[meshInfo.iboIndex].data[indexOffset / 4];
         indices.y = gBuffers[meshInfo.iboIndex].data[(indexOffset + 4) / 4];
         indices.z = gBuffers[meshInfo.iboIndex].data[(indexOffset + 8) / 4];
-    } else { // GL_UNSIGNED_SHORT (5123)
+    } else {
         uint indexOffset = baseIndex * 2; // 2 bytes per ushort
 
         // First two uint16_t may straddle a 4-byte boundary

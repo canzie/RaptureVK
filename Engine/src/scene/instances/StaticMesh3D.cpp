@@ -62,7 +62,7 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
 void StaticMesh3D::rebuildAccelerationStructure()
 {
     const StaticMeshComponent *component = m_entity.tryRead<StaticMeshComponent>();
-    if (component == nullptr || !component->mesh || !component->mesh->geometry().buildBLAS()) {
+    if (component == nullptr || !component->mesh || !component->mesh->geometry().requestBLAS(m_mesh)) {
         RP_CORE_ERROR("'{}' left ray tracing because its mesh has no acceleration structure", name());
         m_entity.tryRemove<RayTracedComponent>();
         scene()->unregisterBLAS(m_entity.getEntity());
@@ -134,7 +134,7 @@ void StaticMesh3D::setRayTraced(bool rayTraced)
         return;
     }
 
-    if (!component->mesh->geometry().buildBLAS()) {
+    if (!component->mesh->geometry().requestBLAS(m_mesh)) {
         RP_CORE_ERROR("'{}' cannot be ray traced because its mesh has no acceleration structure", name());
         return;
     }

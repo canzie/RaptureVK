@@ -98,7 +98,7 @@ StaticMesh Primitives::CreateCube()
     params.indexData = indices.data();
     params.indexDataSize = indices.size() * sizeof(uint16_t);
     params.indexCount = indices.size();
-    params.indexType = UNSIGNED_SHORT_TYPE;
+    params.indexType = VK_INDEX_TYPE_UINT16;
 
     return StaticMesh(params);
 }
@@ -190,7 +190,7 @@ StaticMesh Primitives::CreateSphere(float radius, uint32_t segments)
     params.indexData = indices.data();
     params.indexDataSize = indices.size() * sizeof(uint16_t);
     params.indexCount = indices.size();
-    params.indexType = UNSIGNED_SHORT_TYPE;
+    params.indexType = VK_INDEX_TYPE_UINT16;
 
     return StaticMesh(params);
 }
@@ -270,7 +270,7 @@ StaticMesh Primitives::CreatePlane(float segments)
     params.indexData = indices.data();
     params.indexDataSize = indices.size() * sizeof(uint16_t);
     params.indexCount = indices.size();
-    params.indexType = UNSIGNED_SHORT_TYPE;
+    params.indexType = VK_INDEX_TYPE_UINT16;
 
     return StaticMesh(params);
 }
@@ -308,7 +308,7 @@ StaticMesh Primitives::CreateLine(float start, float end)
     params.indexData = indices.data();
     params.indexDataSize = indices.size() * sizeof(uint16_t);
     params.indexCount = indices.size();
-    params.indexType = UNSIGNED_SHORT_TYPE;
+    params.indexType = VK_INDEX_TYPE_UINT16;
 
     return StaticMesh(params);
 }

@@ -7,12 +7,14 @@ class VulkanContext;
 class BufferPoolManager;
 class CommandPoolManager;
 class DescriptorManager;
+class AccelerationStructureBuilder;
 
 struct RenderContext {
     VulkanContext *vulkanContext = nullptr;
     BufferPoolManager *bufferPoolManager = nullptr;
     CommandPoolManager *commandPoolManager = nullptr;
     DescriptorManager *descriptorManager = nullptr;
+    AccelerationStructureBuilder *accelerationStructureBuilder = nullptr;
 };
 
 } // namespace Rapture

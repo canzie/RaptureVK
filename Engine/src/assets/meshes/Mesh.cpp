@@ -1,9 +1,11 @@
 #include "Mesh.h"
 
 #include "app/Application.h"
+#include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
 #include "gpu/acceleration_structures/BLAS.h"
 #include "gpu/buffers/BufferPool.h"
 
+#include "core/utils/GLTypes.h"
 #include "core/utils/Log.h"
 
 #include <cstring>
@@ -53,13 +55,26 @@ Mesh::Mesh(Mesh &&other) noexcept = default;
 
 Mesh &Mesh::operator=(Mesh &&other) noexcept = default;
 
+VkIndexType Mesh::indexTypeFromComponentType(uint32_t componentType)
+{
+    switch (componentType) {
+    case UNSIGNED_INT_TYPE:
+        return VK_INDEX_TYPE_UINT32;
+    case UNSIGNED_SHORT_TYPE:
+        return VK_INDEX_TYPE_UINT16;
+    }
+
+    RP_CORE_ERROR("Indices cannot use component type {}, reading them as 16 bit", componentType);
+    return VK_INDEX_TYPE_UINT16;
+}
+
 void Mesh::setBounds(const glm::vec3 &min, const glm::vec3 &max)
 {
     m_boundsMin = min;
     m_boundsMax = max;
 }
 
-bool Mesh::buildBLAS()
+bool Mesh::requestBLAS(AssetHandle assetHandle)
 {
     if (m_blas != nullptr) {
         return true;
@@ -71,13 +86,11 @@ bool Mesh::buildBLAS()
         return false;
     }
 
-    blas->build();
-    if (!blas->isBuilt()) {
-        RP_CORE_ERROR("Failed to build the acceleration structure");
-        return false;
-    }
-
     m_blas = std::move(blas);
+
+    auto &rc = Application::getInstance().getVulkanContext().getRenderContext();
+    rc.accelerationStructureBuilder->enqueue(*this, assetHandle);
+
     return true;
 }
 
@@ -165,7 +178,7 @@ std::vector<uint8_t> MeshAllocatorParams::serialize() const
     header.vertexDataSize = vertexDataSize;
     header.indexDataSize = indexDataSize;
     header.indexCount = indexCount;
-    header.indexType = indexType;
+    header.indexType = static_cast<uint32_t>(indexType);
     header.attribCount = static_cast<uint32_t>(bufferLayout.buffer_attribs.size());
     header.isInterleaved = bufferLayout.isInterleaved ? 1u : 0u;
     header.vertexSize = bufferLayout.vertexSize;
@@ -225,7 +238,10 @@ bool MeshAllocatorParams::deserialize(std::span<const uint8_t> blob, MeshAllocat
     params.vertexDataSize = header.vertexDataSize;
     params.indexDataSize = header.indexDataSize;
     params.indexCount = header.indexCount;
-    params.indexType = header.indexType;
+    // blobs written before the field became an index type hold a glTF component type, whose values
+    // cannot collide with one
+    params.indexType = header.indexType >= UNSIGNED_BYTE_TYPE ? Mesh::indexTypeFromComponentType(header.indexType)
+                                                              : static_cast<VkIndexType>(header.indexType);
     params.bufferLayout.isInterleaved = header.isInterleaved != 0;
     params.bufferLayout.vertexSize = header.vertexSize;
     params.bufferLayout.binding = header.binding;

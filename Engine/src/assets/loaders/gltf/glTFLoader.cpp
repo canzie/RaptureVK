@@ -647,7 +647,7 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
     params.indexData = indexData.data();
     params.indexDataSize = static_cast<uint32_t>(indexData.size());
     params.indexCount = indexCount;
-    params.indexType = indexType;
+    params.indexType = Mesh::indexTypeFromComponentType(indexType);
     params.boundsMin = out.boundingBoxMin;
     params.boundsMax = out.boundingBoxMax;
 

@@ -3,6 +3,7 @@
 
 #include "gpu/buffers/Buffers.h"
 
+#include <atomic>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
@@ -37,9 +38,51 @@ class BLAS {
     BLAS &operator=(BLAS &&) = delete;
 
     /**
-     * @brief Record and submit the acceleration structure build
+     * @brief Records the build of this structure
+     * @param commandBuffer Command buffer to record into
+     * @param scratchAddress Device address of scratch space at least getBuildScratchSize bytes long
      */
-    void build();
+    void recordBuild(VkCommandBuffer commandBuffer, VkDeviceAddress scratchAddress);
+
+    /**
+     * @brief Marks the structure buildable against, once the build recorded for it has completed
+     */
+    void markBuilt() { m_isBuilt.store(true, std::memory_order_release); }
+
+    /**
+     * @brief Marks the structure usable, once it has been built and compacted
+     */
+    void markReady() { m_isReady.store(true, std::memory_order_release); }
+
+    /**
+     * @brief Whether the structure can be traced against
+     * @return True once the structure has been built and compacted
+     */
+    bool isReady() const { return m_isReady.load(std::memory_order_acquire); }
+
+    /**
+     * @brief Creates the smaller structure that a compacting copy writes into
+     * @param compactedSize Size the compacted structure needs, as reported by the size query
+     * @return True on success
+     */
+    bool createCompacted(VkDeviceSize compactedSize);
+
+    /**
+     * @brief Records the copy that fills the compacted structure created by createCompacted
+     * @param commandBuffer Command buffer to record into
+     */
+    void recordCompactCopy(VkCommandBuffer commandBuffer);
+
+    /**
+     * @brief Replaces this structure with its compacted copy, once the copy recorded for it has completed
+     */
+    void adoptCompacted();
+
+    /**
+     * @brief Scratch space one build of this structure needs
+     * @return The size in bytes
+     */
+    VkDeviceSize getBuildScratchSize() const { return m_scratchSize; }
 
     /**
      * @brief Get the acceleration structure handle
@@ -57,7 +100,7 @@ class BLAS {
      * @brief Whether the acceleration structure has been built
      * @return True once build has completed
      */
-    bool isBuilt() const { return m_isBuilt; }
+    bool isBuilt() const { return m_isBuilt.load(std::memory_order_acquire); }
 
     /**
      * @brief Whether construction succeeded; an invalid BLAS must not be built or used
@@ -88,14 +131,16 @@ class BLAS {
     VkBuffer m_buffer;
     VmaAllocation m_allocation;
 
-    VkBuffer m_scratchBuffer;
-    VmaAllocation m_scratchAllocation;
+    VkAccelerationStructureKHR m_compactedAccelerationStructure;
+    VkBuffer m_compactedBuffer;
+    VmaAllocation m_compactedAllocation;
 
     VkDeviceAddress m_deviceAddress;
     VkDeviceSize m_accelerationStructureSize;
     VkDeviceSize m_scratchSize;
 
-    bool m_isBuilt;
+    std::atomic<bool> m_isBuilt;
+    std::atomic<bool> m_isReady;
     bool m_isValid;
 
     VkDevice m_device;

@@ -166,9 +166,24 @@ void gpuPollThread(JobSystem *system, GpuPollQueue *queue)
             continue;
         }
 
+        // one wait covers the whole set, so the sweep does not cost a timeout per outstanding request
+        std::vector<const TimelineSemaphore *> semaphores;
+        std::vector<uint64_t> values;
+        semaphores.reserve(pending.size());
+        values.reserve(pending.size());
+
+        for (const GpuWaitRequest &request : pending) {
+            semaphores.push_back(request.semaphore);
+            values.push_back(request.waitValue);
+        }
+
+        if (!TimelineSemaphore::waitAny(semaphores, values, POLL_TIMEOUT_NS)) {
+            continue;
+        }
+
         auto it = pending.begin();
         while (it != pending.end()) {
-            if (it->semaphore->wait(it->waitValue, POLL_TIMEOUT_NS)) {
+            if (it->semaphore->wait(it->waitValue, 0)) {
                 it->counter->decrement();
                 it = pending.erase(it);
             } else {

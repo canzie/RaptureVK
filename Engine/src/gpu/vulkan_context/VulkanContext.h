@@ -88,6 +88,8 @@ class VulkanContext {
     PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR = nullptr;
     PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR = nullptr;
     PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR = nullptr;
+    PFN_vkCmdCopyAccelerationStructureKHR vkCmdCopyAccelerationStructureKHR = nullptr;
+    PFN_vkCmdWriteAccelerationStructuresPropertiesKHR vkCmdWriteAccelerationStructuresPropertiesKHR = nullptr;
     PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR = nullptr;
     PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR = nullptr;
     PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR = nullptr;
@@ -174,6 +176,7 @@ class VulkanContext {
     std::unique_ptr<BufferPoolManager> m_bufferPoolManager;
     std::unique_ptr<CommandPoolManager> m_commandPoolManager;
     std::unique_ptr<DescriptorManager> m_descriptorManager;
+    std::unique_ptr<AccelerationStructureBuilder> m_accelerationStructureBuilder;
     RenderContext m_renderContext;
 };
 

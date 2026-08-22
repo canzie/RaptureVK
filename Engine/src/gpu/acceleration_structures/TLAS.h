@@ -2,7 +2,9 @@
 #define RAPTURE__TLAS_H
 
 #include "BLAS.h"
+#include "core/events/EventSignal.h"
 
+#include <atomic>
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <unordered_map>
@@ -79,7 +81,12 @@ class TLAS {
     VkDeviceAddress getDeviceAddress() const { return m_deviceAddress; }
     uint32_t getBindlessIndex() const { return m_bindlessIndex; }
     bool isBuilt() const { return m_isBuilt; }
-    bool needsRebuild() const { return m_needsRebuild; }
+
+    /**
+     * @brief Whether a full build is due and every structure it references can be traced against
+     * @return True if build should be called
+     */
+    bool needsRebuild() const { return m_needsRebuild && !m_isWaitingOnStructures.load(std::memory_order_acquire); }
     uint32_t getInstanceCount() const { return static_cast<uint32_t>(m_instances.size()); }
     const std::vector<TLASInstance> &getInstances() const { return m_instances; }
 
@@ -183,6 +190,10 @@ class TLAS {
 
     bool m_isBuilt;
     bool m_needsRebuild;
+
+    // raised when a build found a structure that was not ready, cleared when the builder reports one finished
+    std::atomic<bool> m_isWaitingOnStructures;
+    EventConnection m_structuresReadyConnection;
 
     VkDevice m_device;
     VmaAllocator m_allocator;

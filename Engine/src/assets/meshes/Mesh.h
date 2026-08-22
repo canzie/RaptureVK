@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "assets/asset_manager/AssetCommon.h"
+
 #include <glm/glm.hpp>
 
 #include "gpu/buffers/BufferLayout.h"
@@ -25,7 +27,7 @@ struct MeshAllocatorParams {
     void *indexData = nullptr;
     uint32_t indexDataSize = 0;
     uint32_t indexCount = 0;
-    uint32_t indexType = 0;
+    VkIndexType indexType = VK_INDEX_TYPE_UINT16;
 
     glm::vec3 boundsMin = glm::vec3(0.0f);
     glm::vec3 boundsMax = glm::vec3(0.0f);
@@ -59,6 +61,13 @@ class Mesh {
     Mesh(Mesh &&other) noexcept;
     Mesh &operator=(Mesh &&other) noexcept;
 
+    /**
+     * @brief Converts a glTF index accessor's component type to the index type meshes carry
+     * @param componentType The glTF componentType of one index
+     * @return The matching index type, or VK_INDEX_TYPE_UINT16 for a component type indices cannot use
+     */
+    static VkIndexType indexTypeFromComponentType(uint32_t componentType);
+
     void setMeshData(MeshAllocatorParams &params);
 
     std::shared_ptr<VertexBuffer> getVertexBuffer() const { return m_vertexBuffer; }
@@ -91,14 +100,15 @@ class Mesh {
     uint64_t getSizeBytes() const;
 
     /**
-     * @brief Build this mesh's acceleration structure if it does not have one yet
-     * @return True if the mesh has a built acceleration structure once this returns
+     * @brief Asks for this mesh's acceleration structure, which is ready some time after this returns
+     * @param assetHandle The asset this mesh belongs to, referenced until the structure is ready
+     * @return True if the structure was created and handed over to be built
      */
-    bool buildBLAS();
+    bool requestBLAS(AssetHandle assetHandle);
 
     /**
-     * @brief Get this mesh's acceleration structure without building one
-     * @return The acceleration structure, or nullptr if buildBLAS has not succeeded
+     * @brief Get this mesh's acceleration structure without asking for one
+     * @return The acceleration structure, or nullptr if requestBLAS has not succeeded
      */
     BLAS *getBLAS() const { return m_blas.get(); }
 

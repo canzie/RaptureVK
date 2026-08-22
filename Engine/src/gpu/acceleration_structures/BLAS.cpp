@@ -11,8 +11,9 @@ namespace Rapture {
 
 BLAS::BLAS(const Mesh &mesh)
     : m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE),
-      m_scratchBuffer(VK_NULL_HANDLE), m_scratchAllocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0),
-      m_scratchSize(0), m_isBuilt(false), m_isValid(false), m_device(VK_NULL_HANDLE), m_allocator(VK_NULL_HANDLE)
+      m_compactedAccelerationStructure(VK_NULL_HANDLE), m_compactedBuffer(VK_NULL_HANDLE),
+      m_compactedAllocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0), m_scratchSize(0),
+      m_isBuilt(false), m_isReady(false), m_isValid(false), m_device(VK_NULL_HANDLE), m_allocator(VK_NULL_HANDLE)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -49,8 +50,12 @@ BLAS::~BLAS()
         vmaDestroyBuffer(m_allocator, m_buffer, m_allocation);
     }
 
-    if (m_scratchBuffer != VK_NULL_HANDLE) {
-        vmaDestroyBuffer(m_allocator, m_scratchBuffer, m_scratchAllocation);
+    if (m_compactedAccelerationStructure != VK_NULL_HANDLE) {
+        vulkanContext.vkDestroyAccelerationStructureKHR(m_device, m_compactedAccelerationStructure, nullptr);
+    }
+
+    if (m_compactedBuffer != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(m_allocator, m_compactedBuffer, m_compactedAllocation);
     }
 }
 
@@ -140,7 +145,8 @@ bool BLAS::createAccelerationStructure()
     m_buildInfo = {};
     m_buildInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     m_buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-    m_buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    m_buildInfo.flags =
+        VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
     m_buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
     m_buildInfo.geometryCount = 1;
     m_buildInfo.pGeometries = &m_geometry;
@@ -193,95 +199,100 @@ bool BLAS::createAccelerationStructure()
     return true;
 }
 
-void BLAS::build()
+void BLAS::recordBuild(VkCommandBuffer commandBuffer, VkDeviceAddress scratchAddress)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (m_isBuilt) {
-        RP_CORE_WARN("Acceleration structure is already built");
-        return;
-    }
-
-    RP_ASSERT(m_isValid, "BLAS::build called on a BLAS that failed construction");
+    RP_ASSERT(m_isValid, "BLAS::recordBuild called on a BLAS that failed construction");
     if (!m_isValid) {
         return;
     }
 
-    auto &app = Application::getInstance();
-    auto &vulkanContext = app.getVulkanContext();
+    auto &vulkanContext = Application::getInstance().getVulkanContext();
 
-    // Get alignment for scratch buffer
-    const auto &asProps = vulkanContext.getAccelerationStructureProperties();
-    const VkDeviceSize scratchAlignment = asProps.minAccelerationStructureScratchOffsetAlignment;
+    m_buildInfo.dstAccelerationStructure = m_accelerationStructure;
+    m_buildInfo.scratchData.deviceAddress = scratchAddress;
 
-    // Create scratch buffer
-    VkBufferCreateInfo scratchBufferCreateInfo{};
-    scratchBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    scratchBufferCreateInfo.size = m_scratchSize + scratchAlignment;
-    scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    const VkAccelerationStructureBuildRangeInfoKHR *pBuildRangeInfo = &m_buildRangeInfo;
+    vulkanContext.vkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &m_buildInfo, &pBuildRangeInfo);
+}
 
-    VmaAllocationCreateInfo scratchAllocCreateInfo{};
-    scratchAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+bool BLAS::createCompacted(VkDeviceSize compactedSize)
+{
+    RAPTURE_PROFILE_FUNCTION();
 
-    if (vmaCreateBuffer(m_allocator, &scratchBufferCreateInfo, &scratchAllocCreateInfo, &m_scratchBuffer, &m_scratchAllocation,
-                        nullptr) != VK_SUCCESS) {
-        RP_CORE_ERROR("BLAS: Failed to create scratch buffer!");
+    auto &vulkanContext = Application::getInstance().getVulkanContext();
+
+    VkBufferCreateInfo bufferCreateInfo{};
+    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCreateInfo.size = compactedSize;
+    bufferCreateInfo.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    VmaAllocationCreateInfo allocCreateInfo{};
+    allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    if (vmaCreateBuffer(m_allocator, &bufferCreateInfo, &allocCreateInfo, &m_compactedBuffer, &m_compactedAllocation, nullptr) !=
+        VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create the compacted acceleration structure buffer");
+        return false;
+    }
+
+    VkAccelerationStructureCreateInfoKHR createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+    createInfo.buffer = m_compactedBuffer;
+    createInfo.size = compactedSize;
+    createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+
+    if (vulkanContext.vkCreateAccelerationStructureKHR(m_device, &createInfo, nullptr, &m_compactedAccelerationStructure) !=
+        VK_SUCCESS) {
+        RP_CORE_ERROR("Failed to create the compacted acceleration structure");
+        vmaDestroyBuffer(m_allocator, m_compactedBuffer, m_compactedAllocation);
+        m_compactedBuffer = VK_NULL_HANDLE;
+        m_compactedAllocation = VK_NULL_HANDLE;
+        return false;
+    }
+
+    m_accelerationStructureSize = compactedSize;
+    return true;
+}
+
+void BLAS::recordCompactCopy(VkCommandBuffer commandBuffer)
+{
+    auto &vulkanContext = Application::getInstance().getVulkanContext();
+
+    VkCopyAccelerationStructureInfoKHR copyInfo{};
+    copyInfo.sType = VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR;
+    copyInfo.src = m_accelerationStructure;
+    copyInfo.dst = m_compactedAccelerationStructure;
+    copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
+
+    vulkanContext.vkCmdCopyAccelerationStructureKHR(commandBuffer, &copyInfo);
+}
+
+void BLAS::adoptCompacted()
+{
+    if (m_compactedAccelerationStructure == VK_NULL_HANDLE) {
         return;
     }
 
-    // Get scratch buffer device address
-    VkBufferDeviceAddressInfo scratchAddressInfo{};
-    scratchAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-    scratchAddressInfo.buffer = m_scratchBuffer;
-    VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(m_device, &scratchAddressInfo);
+    auto &vulkanContext = Application::getInstance().getVulkanContext();
 
-    // Align the scratch address
-    VkDeviceAddress alignedScratchAddress = (scratchAddress + scratchAlignment - 1) & ~(scratchAlignment - 1);
+    vulkanContext.vkDestroyAccelerationStructureKHR(m_device, m_accelerationStructure, nullptr);
+    vmaDestroyBuffer(m_allocator, m_buffer, m_allocation);
 
-    // Update build info with addresses
-    m_buildInfo.dstAccelerationStructure = m_accelerationStructure;
-    m_buildInfo.scratchData.deviceAddress = alignedScratchAddress;
+    m_accelerationStructure = m_compactedAccelerationStructure;
+    m_buffer = m_compactedBuffer;
+    m_allocation = m_compactedAllocation;
 
-    // Create command buffer and build acceleration structure
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
+    m_compactedAccelerationStructure = VK_NULL_HANDLE;
+    m_compactedBuffer = VK_NULL_HANDLE;
+    m_compactedAllocation = VK_NULL_HANDLE;
 
-    auto &rc = vulkanContext.getRenderContext();
-    auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    VkAccelerationStructureDeviceAddressInfoKHR addressInfo{};
+    addressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
+    addressInfo.accelerationStructure = m_accelerationStructure;
 
-    commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    // Build acceleration structure
-    const VkAccelerationStructureBuildRangeInfoKHR *pBuildRangeInfo = &m_buildRangeInfo;
-    vulkanContext.vkCmdBuildAccelerationStructuresKHR(commandBuffer->getCommandBufferVk(), 1, &m_buildInfo, &pBuildRangeInfo);
-
-    // Add memory barrier
-    VkMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
-
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0, nullptr);
-
-    commandBuffer->end();
-
-    // Submit command buffer
-    auto queue = vulkanContext.getGraphicsQueue();
-    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
-    queue->waitIdle();
-
-    // Clean up scratch buffer immediately as it's no longer needed
-    vmaDestroyBuffer(m_allocator, m_scratchBuffer, m_scratchAllocation);
-    m_scratchBuffer = VK_NULL_HANDLE;
-    m_scratchAllocation = VK_NULL_HANDLE;
-
-    m_isBuilt = true;
-    // RP_CORE_INFO("BLAS: Acceleration structure built successfully");
+    m_deviceAddress = vulkanContext.vkGetAccelerationStructureDeviceAddressKHR(m_device, &addressInfo);
 }
 
 } // namespace Rapture
