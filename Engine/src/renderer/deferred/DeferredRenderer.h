@@ -8,6 +8,7 @@
 #include "renderer/deferred/GBufferPass.h"
 #include "renderer/deferred/LightingPass.h"
 #include "renderer/gi/ddgi/DynamicDiffuseGI.h"
+#include "renderer/passes/DDGIProbeDebugPass.h"
 #include "renderer/passes/GroundTruthAmbientOcclusionPass.h"
 #include "renderer/passes/SkyboxPass.h"
 
@@ -48,6 +49,7 @@ class DeferredRenderer : public Renderer {
     std::unique_ptr<GroundTruthAmbientOcclusionPass> m_ambientOcclusionPass;
     std::unique_ptr<LightingPass> m_lightingPass;
     std::unique_ptr<SkyboxPass> m_skyboxPass;
+    std::unique_ptr<DDGIProbeDebugPass> m_probeDebugPass;
 
     RenderPassTargets m_passTargets;
 
@@ -56,6 +58,7 @@ class DeferredRenderer : public Renderer {
     CommandBuffer *m_gbufferCmdBuffer = nullptr;
     CommandBuffer *m_lightingCmdBuffer = nullptr;
     CommandBuffer *m_skyboxCmdBuffer = nullptr;
+    CommandBuffer *m_probeDebugCmdBuffer = nullptr;
 
     std::unique_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
     std::unique_ptr<RtInstanceData> m_rtInstanceData;

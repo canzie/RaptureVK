@@ -23,11 +23,25 @@ enum RenderSettingFlags {
 };
 
 /**
+ * @brief What a probe sphere is shaded with when RENDER_SHOW_DDGI_PROBES is set
+ */
+enum ProbeDebugMode {
+    PDM_CLASSIFICATION,
+    PDM_IRRADIANCE,
+    PDM_DISTANCE,
+    PDM_RELOCATION,
+    PDM_COUNT
+};
+
+/**
  * @brief Per-view, non-destructive render display overrides consumed by the renderer.
  */
 struct RenderSettings {
     uint32_t flags = RENDER_USE_GLOBAL_ILLUMINATION | RENDER_SHOW_DIRECT | RENDER_SHOW_INDIRECT | RENDER_MODULATE_INDIRECT |
                      RENDER_USE_AMBIENT_OCCLUSION;
+
+    ProbeDebugMode probeDebugMode = PDM_CLASSIFICATION;
+    float probeDebugRadius = 0.06f;
 
     bool useGlobalIllumination() const { return (flags & RENDER_USE_GLOBAL_ILLUMINATION) != 0u; }
     bool useDirectLighting() const { return (flags & RENDER_SHOW_DIRECT) != 0u; }

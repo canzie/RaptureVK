@@ -213,6 +213,10 @@ void DynamicDiffuseGI::clearTextures()
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
     layoutTransitions.push_back(probeClassificationTransition);
 
+    VkImageMemoryBarrier probeOffsetTransition = m_ProbeOffsetTexture->getImageMemoryBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
+    layoutTransitions.push_back(probeOffsetTransition);
+
     vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                          0, nullptr, 0, nullptr, static_cast<uint32_t>(layoutTransitions.size()), layoutTransitions.data());
 
@@ -225,6 +229,10 @@ void DynamicDiffuseGI::clearTextures()
                          1, &subresourceRange);
     vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), m_ProbeClassificationTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
                          &clearColorUint, 1, &subresourceRange);
+    // relocation reads its own previous offset and writes it back when the clamp rejects the new one,
+    // so anything left here is kept for the lifetime of the volume
+    vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), m_ProbeOffsetTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
+                         &clearColor, 1, &subresourceRange);
 
     if (commandBuffer->end() != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to end command buffer");
@@ -409,8 +417,11 @@ void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer, uint32_t fra
 
     // Barrier to ensure offset texture is ready for writing
     std::vector<VkImageMemoryBarrier> preRelocateBarriers;
-    VkImageMemoryBarrier offsetWriteBarrier = m_ProbeOffsetTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_SHADER_WRITE_BIT);
+    // relocation reads back the offset it wrote last frame, so the old layout has to be the real one
+    // rather than UNDEFINED, which lets the contents be discarded
+    VkImageMemoryBarrier offsetWriteBarrier =
+        m_ProbeOffsetTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_READ_BIT,
+                                                    VK_ACCESS_SHADER_WRITE_BIT);
     preRelocateBarriers.push_back(offsetWriteBarrier);
 
     vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,

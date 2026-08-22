@@ -118,11 +118,13 @@ class ViewportPanel : public Panel {
     Amethyst::RadioGroup m_gizmoSpaceGroup;
     Amethyst::RadioGroup m_cameraModeGroup;
     Amethyst::RadioGroup m_lightingModeGroup;
+    Amethyst::RadioGroup m_probeDebugModeGroup;
 
     Amethyst::EventConnection m_gizmoOpGroupConn;
     Amethyst::EventConnection m_gizmoSpaceGroupConn;
     Amethyst::EventConnection m_cameraModeGroupConn;
     Amethyst::EventConnection m_lightingModeGroupConn;
+    Amethyst::EventConnection m_probeDebugModeGroupConn;
 
     bool m_viewportHovered = false;
 

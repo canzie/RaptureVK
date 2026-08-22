@@ -285,6 +285,12 @@ void ViewportPanel::buildRenderMenu()
     m_lightingModeGroupConn = m_lightingModeGroup.onChanged.connect(
         [this]() { applyLightingMode(static_cast<ViewportLightingMode>(m_lightingModeGroup.value)); });
 
+    m_probeDebugModeGroupConn = m_probeDebugModeGroup.onChanged.connect([this]() {
+        if (m_viewport != nullptr) {
+            m_viewport->renderSettings().probeDebugMode = static_cast<Rapture::ProbeDebugMode>(m_probeDebugModeGroup.value);
+        }
+    });
+
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     items.push_back(ViewportContextMenuRID::create("Lit", &m_lightingModeGroup, VLM_LIT));
     items.push_back(ViewportContextMenuRID::create("Direct Lighting", &m_lightingModeGroup, VLM_DIRECT_LIGHTING));
@@ -301,6 +307,19 @@ void ViewportPanel::buildRenderMenu()
     });
     occlusionToggle->as<ViewportContextMenuTID>().value = true;
     items.push_back(std::move(occlusionToggle));
+
+    items.push_back(ViewportContextMenuSID::create("DDGI Probes"));
+
+    items.push_back(ViewportContextMenuTID::create("Show Probes", [this](bool on) {
+        if (m_viewport != nullptr) {
+            m_viewport->renderSettings().setFlag(Rapture::RENDER_SHOW_DDGI_PROBES, on);
+        }
+    }));
+
+    items.push_back(ViewportContextMenuRID::create("Probe Classification", &m_probeDebugModeGroup, Rapture::PDM_CLASSIFICATION));
+    items.push_back(ViewportContextMenuRID::create("Probe Irradiance", &m_probeDebugModeGroup, Rapture::PDM_IRRADIANCE));
+    items.push_back(ViewportContextMenuRID::create("Probe Distance", &m_probeDebugModeGroup, Rapture::PDM_DISTANCE));
+    items.push_back(ViewportContextMenuRID::create("Probe Relocation", &m_probeDebugModeGroup, Rapture::PDM_RELOCATION));
 
     m_renderMenu->setItems(std::move(items));
 }
