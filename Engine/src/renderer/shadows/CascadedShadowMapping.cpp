@@ -1,18 +1,18 @@
 #include "CascadedShadowMapping.h"
 
-#include "gpu/descriptors/DescriptorManager.h"
 #include "core/utils/EnginePaths.h"
+#include "gpu/descriptors/DescriptorManager.h"
 
-#include "scene/components/Components.h"
-#include "scene/systems/Transforms.h"
-#include "renderer/generators/terrain/TerrainTypes.h"
+#include "app/Application.h"
 #include "core/utils/Log.h"
 #include "core/utils/TracyProfiler.h"
+#include "renderer/generators/terrain/TerrainTypes.h"
+#include "renderer/shadows/ShadowCommon.h"
+#include "scene/components/Components.h"
+#include "scene/instances/Camera3D.h"
 #include "scene/instances/controllers/Controller.h"
 #include "scene/render_data/SceneRenderData.h"
-#include "renderer/shadows/ShadowCommon.h"
-#include "scene/instances/Camera3D.h"
-#include "app/Application.h"
+#include "scene/systems/Transforms.h"
 
 #include <algorithm>
 #include <cmath>
@@ -363,8 +363,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
         }
 
         // Get or create batch for this VBO/IBO arena combination
-        MDIBatch *batch = m_mdiBatchMaps[m_currentFrame]->obtainBatch(vboAlloc, iboAlloc,
-                                                                      mesh.getVertexBuffer()->getBufferLayout(),
+        MDIBatch *batch = m_mdiBatchMaps[m_currentFrame]->obtainBatch(vboAlloc, iboAlloc, mesh.getVertexBuffer()->getBufferLayout(),
                                                                       mesh.getIndexBuffer()->getIndexType());
 
         // Add mesh to batch (materialIndex = 0 for shadow pass)

@@ -1,6 +1,7 @@
 #ifndef RAPTURE__SKELETON_INSTANCE_MANAGER_H
 #define RAPTURE__SKELETON_INSTANCE_MANAGER_H
 
+#include "assets/asset_manager/AssetCommon.h"
 #include "assets/asset_manager/AssetHandle.h"
 #include "gpu/buffers/VirtualStorageBuffer.h"
 
@@ -9,10 +10,12 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <unordered_map>
 
 namespace Rapture {
 
 class ASkeleton;
+class ASkeletalMesh;
 
 /**
  * @brief One skeleton's worth of bone matrices, given back to the arena when it goes
@@ -66,12 +69,24 @@ class SkeletonInstanceManager {
     SkeletonInstance createSkeletonInstance(const AssetPtr<ASkeleton> &skeleton);
 
     /**
+     * @brief Where a shader reads a mesh's inverse bind matrices from
+     *
+     * The matrices are the same for every instance of a mesh, so the first one to ask puts them in
+     * the arena and the rest are given what is already there.
+     *
+     * @param mesh The mesh bound to a skeleton
+     * @return Where its first inverse bind sits, or SKIN_NO_OFFSET if the arena had no room
+     */
+    uint32_t getInverseBindOffset(const AssetPtr<ASkeletalMesh> &mesh);
+
+    /**
      * @brief The index a shader reads this scene's bone matrices from
      */
     uint32_t getBindlessIndex() const { return m_bindlessIndex; }
 
   private:
     std::unique_ptr<VirtualStorageBuffer> m_buffer;
+    std::unordered_map<AssetHandle, VirtualStorageBuffer::Allocation> m_inverseBinds;
     uint32_t m_bindlessIndex = UINT32_MAX;
 };
 

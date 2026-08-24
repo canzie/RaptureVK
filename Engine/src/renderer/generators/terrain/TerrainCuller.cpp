@@ -2,15 +2,15 @@
 
 #include "core/utils/EnginePaths.h"
 
+#include "app/Application.h"
 #include "assets/asset_manager/AssetImportConfig.h"
 #include "assets/asset_manager/AssetManager.h"
+#include "core/utils/Log.h"
+#include "core/utils/TracyProfiler.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorManager.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
 #include "renderer/Frustum.h"
-#include "app/Application.h"
 
 namespace Rapture {
 
@@ -68,7 +68,7 @@ void TerrainCuller::initCullPipeline()
     poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
     poolConfig.flags = 0;
 
-    auto& rc = vc.getRenderContext();
+    auto &rc = vc.getRenderContext();
     m_commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 
     RP_CORE_TRACE("TerrainCuller: Cull compute pipeline initialized");
@@ -112,7 +112,7 @@ void TerrainCuller::runCull(TerrainCullBuffers &buffers, uint32_t frustumBindles
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    auto& rc = vc.getRenderContext();
+    auto &rc = vc.getRenderContext();
     auto pool = rc.commandPoolManager->getCommandPool(m_commandPoolHash);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 

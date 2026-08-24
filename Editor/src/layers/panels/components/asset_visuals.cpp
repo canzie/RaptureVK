@@ -2,6 +2,7 @@
 
 #include "Icons.h"
 
+#include "scene/instances/Bone3D.h"
 #include "scene/instances/Camera3D.h"
 #include "scene/instances/Environment.h"
 #include "scene/instances/Folder.h"
@@ -32,6 +33,7 @@ static const AuthoredIcon AUTHORED_ICONS[] = {
     {&Rapture::Terrain3D::staticType(), Icons::SVG_GRID},
     {&Rapture::Mesh3D::staticType(), Icons::SVG_MESH},
     {&Rapture::Light3D::staticType(), Icons::SVG_LIGHT},
+    {&Rapture::Bone3D::staticType(), Icons::SVG_BONE},
     {&Rapture::Node3D::staticType(), Icons::SVG_TRANSFORM},
 };
 

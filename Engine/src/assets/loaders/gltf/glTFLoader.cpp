@@ -425,11 +425,14 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
 
     // read before the mesh, since a primitive's joints only mean anything against this node's skin
     AssetHandle skeleton = INVALID_ASSET_HANDLE;
+    size_t skin = SIZE_MAX;
     yyjson_val *skinVal = getObjectValue(nodeJson, "skin");
     if (skinVal != nullptr) {
         loadSkin(skinVal);
 
-        auto skinIt = m_loadedData->skeletons.find(static_cast<size_t>(getInt(skinVal, 0)));
+        skin = static_cast<size_t>(getInt(skinVal, 0));
+
+        auto skinIt = m_loadedData->skeletons.find(skin);
         if (skinIt != m_loadedData->skeletons.end() && skinIt->second) {
             skeleton = skinIt->second.get()->getHandle();
         }
@@ -440,7 +443,7 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
     if (meshIdxVal && yyjson_is_int(meshIdxVal)) {
         size_t meshIndex = static_cast<size_t>(getInt(meshIdxVal, 0));
         if (meshIndex < getArraySize(m_meshes)) {
-            loadMesh(node.get(), meshIndex, skeleton);
+            loadMesh(node.get(), meshIndex, skeleton, skin);
         }
     }
 
@@ -470,7 +473,7 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
 // TODO: the cache is keyed on the glTF mesh alone, so one mesh referenced by two nodes with
 // different skins reuses whichever was decoded first, silently binding the second to the wrong
 // skeleton. Key on the skin as well once anything actually does this.
-bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle skeleton)
+bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle skeleton, size_t skin)
 {
     auto cacheIt = m_meshCache.find(meshIndex);
     if (cacheIt == m_meshCache.end()) {
@@ -486,7 +489,7 @@ bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle s
         yyjson_arr_foreach(primitivesVal, idx, max, primitiveJson)
         {
             PrimitiveData data;
-            if (decodePrimitive(primitiveJson, meshIndex, idx, skeleton, data)) {
+            if (decodePrimitive(primitiveJson, meshIndex, idx, skeleton, skin, data)) {
                 primitives.push_back(std::move(data));
             }
         }
@@ -515,7 +518,8 @@ bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle s
     return true;
 }
 
-bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, AssetHandle skeleton,
+bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex,
+                                  AssetHandle skeleton, size_t skin,
                                   PrimitiveData &out)
 {
     std::vector<DecodedVertexAttribute> attributeData;
@@ -671,7 +675,7 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
 
     AssetImportDataVariant importData;
     if (isSkinned) {
-        auto bindsIt = m_inverseBindMatrices.find(skeleton);
+        auto bindsIt = m_inverseBindMatrices.find(skin);
         importData = SkeletalMeshImportData{std::move(params), skeleton,
                                             bindsIt != m_inverseBindMatrices.end() ? bindsIt->second
                                                                                    : std::vector<glm::mat4>{},
@@ -1250,7 +1254,7 @@ void glTF2Loader::loadSkin(yyjson_val *skinVal)
 
     // the bind pose belongs to the meshes bound against this skeleton, not to the skeleton itself
     if (ref) {
-        m_inverseBindMatrices[ref.get()->getHandle()] = std::move(inverseBindMatrices);
+        m_inverseBindMatrices[skinIndex] = std::move(inverseBindMatrices);
     }
     m_loadedData->skeletons[skinIndex] = std::move(ref);
 }

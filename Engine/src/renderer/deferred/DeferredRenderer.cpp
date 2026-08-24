@@ -6,7 +6,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/TracyProfiler.h"
 
-#include "core/jobs/InplaceFunction.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobCommon.h"
 #include "core/jobs/JobSystem.h"

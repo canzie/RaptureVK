@@ -15,6 +15,7 @@
 #include "scene/systems/Transforms.h"
 
 #include "renderer/Frustum.h"
+#include "renderer/GPUDataStructs.h"
 
 #include "assets/asset_manager/AssetManager.h"
 #include "gpu/buffers/StorageBuffer.h"
@@ -163,6 +164,7 @@ struct SkeletalMeshComponent {
 
     AssetPtr<ASkeletalMesh> mesh;
     SkeletonInstance *pose = nullptr;
+    uint32_t inverseBindOffset = SKIN_NO_OFFSET;
     bool isLoading = true;
     bool isEnabled = true;
     BoundingBox worldBoundingBox;

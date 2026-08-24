@@ -2,18 +2,18 @@
 
 #include "core/utils/EnginePaths.h"
 
+#include "app/Application.h"
 #include "assets/asset_manager/AssetImportConfig.h"
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/materials/Material.h"
+#include "assets/materials/graph/SurfaceGraphManager.h"
+#include "core/utils/Log.h"
+#include "core/utils/TracyProfiler.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorManager.h"
-#include "renderer/generators/textures/ProceduralTextures.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "assets/materials/Material.h"
-#include "assets/materials/graph/SurfaceGraphManager.h"
 #include "renderer/Frustum.h"
-#include "app/Application.h"
+#include "renderer/generators/textures/ProceduralTextures.h"
 
 #include <glm/gtc/packing.hpp>
 
@@ -282,7 +282,7 @@ void TerrainGenerator::initComputePipeline()
     poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
     poolConfig.flags = 0;
 
-    auto& rc = vc.getRenderContext();
+    auto &rc = vc.getRenderContext();
     m_computePoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 }
 
@@ -293,7 +293,8 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
         return;
     }
 
-    if (!m_splineCurveTexture || !m_noiseTextures[CONTINENTALNESS] || !m_noiseTextures[EROSION] || !m_noiseTextures[PEAKS_VALLEYS]) {
+    if (!m_splineCurveTexture || !m_noiseTextures[CONTINENTALNESS] || !m_noiseTextures[EROSION] ||
+        !m_noiseTextures[PEAKS_VALLEYS]) {
         return;
     }
 
@@ -303,7 +304,7 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    auto& rc = vc.getRenderContext();
+    auto &rc = vc.getRenderContext();
     auto pool = rc.commandPoolManager->getCommandPool(m_computePoolHash);
     auto commandBuffer = pool->getPrimaryCommandBuffer();
 
@@ -469,7 +470,8 @@ void TerrainGenerator::createTerrainMaterials()
     }
 
     auto instance = std::make_unique<MaterialInstance>(terrainBase, "Terrain");
-    m_material = AssetPtr<MaterialInstance>(AssetManager::registerVirtualAsset(std::move(instance), "Terrain", ASSET_MATERIAL_INSTANCE));
+    m_material =
+        AssetPtr<MaterialInstance>(AssetManager::registerVirtualAsset(std::move(instance), "Terrain", ASSET_MATERIAL_INSTANCE));
 
     SurfaceGraphManager &graphs = MaterialManager::getSurfaceGraphManager();
     uint32_t graphId = graphs.registerGraph(s_buildTerrainGraph());

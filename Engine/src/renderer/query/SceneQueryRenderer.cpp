@@ -1,22 +1,26 @@
 #include "renderer/query/SceneQueryRenderer.h"
 
-#include "gpu/descriptors/DescriptorManager.h"
 #include "core/utils/EnginePaths.h"
+#include "gpu/descriptors/DescriptorManager.h"
 
-#include "scene/components/Components.h"
+#include "app/Application.h"
 #include "core/utils/Log.h"
 #include "core/utils/TracyProfiler.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
-#include "renderer/Frustum.h"
-#include "renderer/MDIBatch.h"
-#include "scene/render_data/SceneRenderData.h"
-#include "scene/Scene.h"
 #include "gpu/shaders/Shader.h"
-#include "app/Application.h"
 #include "gpu/vulkan_context/VulkanContext.h"
+#include "renderer/Frustum.h"
+#include "renderer/GizmoDrawList.h"
+#include "renderer/MDIBatch.h"
+#include "scene/Scene.h"
+#include "scene/components/Components.h"
+#include "scene/render_data/SceneRenderData.h"
+#include "scene/systems/BoundingBox.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace Rapture {
 
@@ -35,8 +39,10 @@ struct SceneQueryPushConstants {
  * @brief One appended hit as the fragment shader writes it
  */
 struct SceneQueryGpuEntry {
-    alignas(4) uint32_t entity;
+    alignas(4) uint32_t userDataLow;
+    alignas(4) uint32_t userDataHigh;
     alignas(4) uint32_t depthBits;
+    alignas(4) uint32_t padding;
 };
 
 /**
@@ -70,6 +76,78 @@ static glm::mat4 s_regionProjection(const glm::mat4 &projection, uint32_t viewpo
     narrow[3][1] = -centerY * scaleY;
 
     return narrow * projection;
+}
+
+/**
+ * @brief Where a ray meets a triangle
+ * @param origin World position the ray starts at
+ * @param direction World direction the ray runs in, which need not be normalized
+ * @param a First corner
+ * @param b Second corner
+ * @param c Third corner
+ * @param[out] distance How far along the direction the meeting lies
+ * @return True if the ray meets the triangle ahead of its origin
+ */
+static bool s_intersectRayTriangle(const glm::vec3 &origin, const glm::vec3 &direction, const glm::vec3 &a,
+                                   const glm::vec3 &b, const glm::vec3 &c, float &distance)
+{
+    constexpr float EPSILON = 1e-8f;
+
+    const glm::vec3 edge1 = b - a;
+    const glm::vec3 edge2 = c - a;
+    const glm::vec3 across = glm::cross(direction, edge2);
+    const float determinant = glm::dot(edge1, across);
+
+    // parallel to the triangle's plane, so it either misses or grazes it edge on
+    if (std::abs(determinant) < EPSILON) {
+        return false;
+    }
+
+    const float inverseDeterminant = 1.0f / determinant;
+    const glm::vec3 toOrigin = origin - a;
+
+    const float u = glm::dot(toOrigin, across) * inverseDeterminant;
+    if (u < 0.0f || u > 1.0f) {
+        return false;
+    }
+
+    const glm::vec3 alongEdge = glm::cross(toOrigin, edge1);
+    const float v = glm::dot(direction, alongEdge) * inverseDeterminant;
+    if (v < 0.0f || u + v > 1.0f) {
+        return false;
+    }
+
+    distance = glm::dot(edge2, alongEdge) * inverseDeterminant;
+    return distance > EPSILON;
+}
+
+/**
+ * @brief Merges one hit into a pixel's layers, keeping the nearest of them
+ * @param[in,out] result The region's hits
+ * @param pixel Index of the pixel within the region
+ * @param hit The hit to merge
+ */
+static void s_insertHit(SceneQueryResult &result, uint32_t pixel, const SceneQueryHit &hit)
+{
+    const size_t base = static_cast<size_t>(pixel) * result.maxLayers;
+    const uint32_t kept = std::min(result.counts[pixel], result.maxLayers);
+
+    result.counts[pixel]++;
+
+    uint32_t slot = kept;
+    if (kept == result.maxLayers) {
+        if (hit.depth >= result.hits[base + kept - 1].depth) {
+            return;
+        }
+        slot = kept - 1;
+    }
+
+    while (slot > 0 && result.hits[base + slot - 1].depth > hit.depth) {
+        result.hits[base + slot] = result.hits[base + slot - 1];
+        slot--;
+    }
+
+    result.hits[base + slot] = hit;
 }
 
 std::span<const SceneQueryHit> SceneQueryResult::at(uint32_t x, uint32_t y) const
@@ -120,8 +198,9 @@ SceneQueryRenderer::~SceneQueryRenderer()
     }
 }
 
-SceneQueryResult SceneQueryRenderer::query(Scene &scene, ecs::EntityAccessor camera, uint32_t viewportWidth, uint32_t viewportHeight,
-                                           const SceneQuery &region)
+SceneQueryResult SceneQueryRenderer::query(Scene &scene, ecs::EntityAccessor camera, uint32_t viewportWidth,
+                                           uint32_t viewportHeight, const SceneQuery &region,
+                                           const GizmoDrawList *drawList)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -196,7 +275,14 @@ SceneQueryResult SceneQueryRenderer::query(Scene &scene, ecs::EntityAccessor cam
         vkWaitForFences(device, 1, &m_fence, VK_TRUE, UINT64_MAX);
     }
 
-    return readBack(region);
+    SceneQueryResult result = readBack(region);
+
+    if (drawList != nullptr && !drawList->getPickCandidates().empty()) {
+        const std::vector<PixelRay> rays = buildRegionRays(glm::inverse(viewProj), viewportWidth, viewportHeight, region);
+        addPickCandidateHits(result, *drawList, regionFrustum, viewProj, rays);
+    }
+
+    return result;
 }
 
 bool SceneQueryRenderer::resizeBuffers(uint32_t pixelCount, uint32_t maxLayers)
@@ -320,6 +406,88 @@ void SceneQueryRenderer::recordQuery(CommandBuffer *commandBuffer, Scene &scene,
                          nullptr);
 }
 
+std::vector<SceneQueryRenderer::PixelRay> SceneQueryRenderer::buildRegionRays(const glm::mat4 &inverseViewProj,
+                                                                             uint32_t viewportWidth,
+                                                                             uint32_t viewportHeight,
+                                                                             const SceneQuery &region)
+{
+    std::vector<PixelRay> rays(static_cast<size_t>(region.width) * region.height);
+
+    for (uint32_t y = 0; y < region.height; y++) {
+        for (uint32_t x = 0; x < region.width; x++) {
+            const float pixelX = static_cast<float>(region.x + x) + 0.5f;
+            const float pixelY = static_cast<float>(region.y + y) + 0.5f;
+
+            const float ndcX = 2.0f * pixelX / static_cast<float>(viewportWidth) - 1.0f;
+            const float ndcY = 2.0f * pixelY / static_cast<float>(viewportHeight) - 1.0f;
+
+            const glm::vec4 near = inverseViewProj * glm::vec4(ndcX, ndcY, 0.0f, 1.0f);
+            const glm::vec4 far = inverseViewProj * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
+
+            PixelRay &ray = rays[static_cast<size_t>(y) * region.width + x];
+            ray.origin = glm::vec3(near) / near.w;
+            ray.direction = glm::vec3(far) / far.w - ray.origin;
+        }
+    }
+
+    return rays;
+}
+
+void SceneQueryRenderer::addPickCandidateHits(SceneQueryResult &result, const GizmoDrawList &drawList,
+                                              const Frustum &regionFrustum, const glm::mat4 &viewProj,
+                                              const std::vector<PixelRay> &rays)
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    std::vector<float> nearest;
+
+    for (const PickCandidate &candidate : drawList.getPickCandidates()) {
+        if (regionFrustum.testBoundingBox(BoundingBox(candidate.worldMin, candidate.worldMax)) == FrustumResult::Outside) {
+            continue;
+        }
+
+        const std::vector<GizmoVertex> &vertices = drawList.getTriangleVertices(candidate.depthMode, candidate.shadingMode);
+        const uint32_t lastVertex = candidate.firstVertex + candidate.vertexCount;
+        if (lastVertex > vertices.size()) {
+            continue;
+        }
+
+        nearest.assign(rays.size(), std::numeric_limits<float>::max());
+
+        for (uint32_t vertex = candidate.firstVertex; vertex + 2 < lastVertex; vertex += 3) {
+            const glm::vec3 &a = vertices[vertex].position;
+            const glm::vec3 &b = vertices[vertex + 1].position;
+            const glm::vec3 &c = vertices[vertex + 2].position;
+
+            for (size_t pixel = 0; pixel < rays.size(); pixel++) {
+                float distance = 0.0f;
+                if (s_intersectRayTriangle(rays[pixel].origin, rays[pixel].direction, a, b, c, distance)) {
+                    nearest[pixel] = std::min(nearest[pixel], distance);
+                }
+            }
+        }
+
+        for (size_t pixel = 0; pixel < rays.size(); pixel++) {
+            if (nearest[pixel] == std::numeric_limits<float>::max()) {
+                continue;
+            }
+
+            SceneQueryHit hit;
+            hit.userData = candidate.userData;
+
+            if (candidate.depthMode == DEPTH_MODE_ALWAYS_IN_FRONT) {
+                hit.depth = 0.0f;
+            } else {
+                const glm::vec3 position = rays[pixel].origin + rays[pixel].direction * nearest[pixel];
+                const glm::vec4 clip = viewProj * glm::vec4(position, 1.0f);
+                hit.depth = clip.z / clip.w;
+            }
+
+            s_insertHit(result, static_cast<uint32_t>(pixel), hit);
+        }
+    }
+}
+
 SceneQueryResult SceneQueryRenderer::readBack(const SceneQuery &region)
 {
     RAPTURE_PROFILE_FUNCTION();
@@ -348,7 +516,10 @@ SceneQueryResult SceneQueryRenderer::readBack(const SceneQuery &region)
             float depth = 0.0f;
             std::memcpy(&depth, &entry.depthBits, sizeof(float));
 
-            result.hits[base + slot] = {entry.entity, depth};
+            const uint64_t userData =
+                static_cast<uint64_t>(entry.userDataLow) | (static_cast<uint64_t>(entry.userDataHigh) << 32);
+
+            result.hits[base + slot] = {userData, depth};
         }
 
         std::sort(result.hits.begin() + base, result.hits.begin() + base + kept,

@@ -5,15 +5,15 @@
 #include "TerrainTypes.h"
 
 #include "assets/asset_manager/AssetHandle.h"
+#include "assets/materials/MaterialInstance.h"
 #include "gpu/buffers/IndexBuffer.h"
 #include "gpu/buffers/StorageBuffer.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
-#include "renderer/generators/textures/ProceduralTextures.h"
-#include "assets/materials/MaterialInstance.h"
 #include "gpu/pipelines/ComputePipeline.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
+#include "renderer/generators/textures/ProceduralTextures.h"
 
 #include <glm/glm.hpp>
 

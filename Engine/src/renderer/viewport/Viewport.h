@@ -1,15 +1,15 @@
 #ifndef RAPTURE__VIEWPORT_H
 #define RAPTURE__VIEWPORT_H
 
-#include "core/events/EventSignal.h"
-#include "renderer/DrawManager.h"
-#include "renderer/ImmediateDrawList.h"
-#include "renderer/RenderSettings.h"
-#include "renderer/query/SceneQueryRenderer.h"
-#include "renderer/common.h"
-#include "scene/Scene.h"
 #include "core/ecs/entity_accessor.h"
+#include "core/events/EventSignal.h"
 #include "gpu/vulkan_context/RenderContext.h"
+#include "renderer/DrawManager.h"
+#include "renderer/GizmoDrawList.h"
+#include "renderer/RenderSettings.h"
+#include "renderer/common.h"
+#include "renderer/query/SceneQueryRenderer.h"
+#include "scene/Scene.h"
 
 #include <cstdint>
 #include <memory>
@@ -88,7 +88,7 @@ class Viewport {
      * @brief The shapes drawn over this viewport, cleared once each frame has been recorded
      * @return This viewport's draw list
      */
-    ImmediateDrawList &getImmediateDrawList() { return m_immediateDrawList; }
+    GizmoDrawList &getGizmoDrawList() { return m_gizmoDrawList; }
 
     void drawFrame();
 
@@ -140,7 +140,7 @@ class Viewport {
 
     std::unique_ptr<DrawManager> m_drawManager;
     std::unique_ptr<SceneQueryRenderer> m_queryRenderer;
-    ImmediateDrawList m_immediateDrawList;
+    GizmoDrawList m_gizmoDrawList;
     RendererType m_rendererType = RendererType::DEFERRED;
 
     Scene *m_scene = nullptr;

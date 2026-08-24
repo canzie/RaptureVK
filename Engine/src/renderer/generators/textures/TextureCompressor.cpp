@@ -2,20 +2,20 @@
 
 #include "core/utils/EnginePaths.h"
 
-#include "gpu/buffers/StorageBuffer.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/descriptors/DescriptorSet.h"
+#include "app/Application.h"
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobSystem.h"
 #include "core/utils/Log.h"
+#include "gpu/buffers/StorageBuffer.h"
+#include "gpu/command_buffers/CommandBuffer.h"
+#include "gpu/command_buffers/CommandPool.h"
+#include "gpu/descriptors/DescriptorSet.h"
 #include "gpu/pipelines/ComputePipeline.h"
-#include "scene/Project.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
-#include "app/Application.h"
 #include "gpu/vulkan_context/TimelineSemaphore.h"
+#include "scene/Project.h"
 
 #include <algorithm>
 #include <mutex>

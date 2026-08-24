@@ -1,14 +1,14 @@
-#include "renderer/ImmediateDrawList.h"
+#include "renderer/GizmoDrawList.h"
 
 #include <glm/gtc/constants.hpp>
 
 #include <cmath>
+#include <limits>
 
 namespace Rapture {
 
 // The four corners of each box face, wound consistently, indexed as s_buildBoxCorners numbers them
-static constexpr uint32_t BOX_FACES[6][4] = {{0, 4, 6, 2}, {1, 3, 7, 5}, {0, 1, 5, 4},
-                                             {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}};
+static constexpr uint32_t BOX_FACES[6][4] = {{0, 4, 6, 2}, {1, 3, 7, 5}, {0, 1, 5, 4}, {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}};
 
 static uint32_t s_packColor(const glm::vec4 &color)
 {
@@ -29,8 +29,7 @@ static uint32_t s_packColor(const glm::vec4 &color)
 static void s_buildBoxCorners(const glm::vec3 &min, const glm::vec3 &max, glm::vec3 (&corners)[8])
 {
     for (uint32_t i = 0; i < 8; ++i) {
-        corners[i] = glm::vec3((i & 1u) != 0u ? max.x : min.x, (i & 2u) != 0u ? max.y : min.y,
-                               (i & 4u) != 0u ? max.z : min.z);
+        corners[i] = glm::vec3((i & 1u) != 0u ? max.x : min.x, (i & 2u) != 0u ? max.y : min.y, (i & 4u) != 0u ? max.z : min.z);
     }
 }
 
@@ -48,12 +47,19 @@ static void s_buildPlaneBasis(const glm::vec3 &normal, glm::vec3 &tangent, glm::
     bitangent = glm::cross(axis, tangent);
 }
 
-void ShapeSubmission::line(const glm::vec3 &start, const glm::vec3 &end, const glm::vec4 &color, float thickness)
+GizmoBatch::GizmoBatch(DepthMode depthMode, GizmoShadingMode shadingMode) : m_depthMode(depthMode), m_shadingMode(shadingMode) {}
+
+GizmoBatch::GizmoBatch(DepthMode depthMode, GizmoShadingMode shadingMode, uint64_t userData)
+    : m_depthMode(depthMode), m_shadingMode(shadingMode), m_userData(userData)
+{
+}
+
+void GizmoBatch::line(const glm::vec3 &start, const glm::vec3 &end, const glm::vec4 &color, float thickness)
 {
     m_segments.push_back(LineSegment{start, thickness, end, s_packColor(color)});
 }
 
-void ShapeSubmission::polyline(std::span<const glm::vec3> points, const glm::vec4 &color, float thickness, bool closed)
+void GizmoBatch::polyline(std::span<const glm::vec3> points, const glm::vec4 &color, float thickness, bool closed)
 {
     if (points.size() < 2) {
         return;
@@ -69,8 +75,7 @@ void ShapeSubmission::polyline(std::span<const glm::vec3> points, const glm::vec
     }
 }
 
-void ShapeSubmission::triangle(const glm::vec3 &a, const glm::vec3 &b, const glm::vec3 &c, const glm::vec4 &color,
-                               float thickness)
+void GizmoBatch::triangle(const glm::vec3 &a, const glm::vec3 &b, const glm::vec3 &c, const glm::vec4 &color, float thickness)
 {
     const uint32_t packed = s_packColor(color);
     m_segments.push_back(LineSegment{a, thickness, b, packed});
@@ -78,16 +83,16 @@ void ShapeSubmission::triangle(const glm::vec3 &a, const glm::vec3 &b, const glm
     m_segments.push_back(LineSegment{c, thickness, a, packed});
 }
 
-void ShapeSubmission::triangleFilled(const glm::vec3 &a, const glm::vec3 &b, const glm::vec3 &c, const glm::vec4 &color)
+void GizmoBatch::triangleFilled(const glm::vec3 &a, const glm::vec3 &b, const glm::vec3 &c, const glm::vec4 &color)
 {
     const uint32_t packed = s_packColor(color);
-    m_triangleVertices.push_back(ShapeVertex{a, packed});
-    m_triangleVertices.push_back(ShapeVertex{b, packed});
-    m_triangleVertices.push_back(ShapeVertex{c, packed});
+    m_triangleVertices.push_back(GizmoVertex{a, packed});
+    m_triangleVertices.push_back(GizmoVertex{b, packed});
+    m_triangleVertices.push_back(GizmoVertex{c, packed});
 }
 
-void ShapeSubmission::quad(const glm::vec3 &a, const glm::vec3 &b, const glm::vec3 &c, const glm::vec3 &d,
-                           const glm::vec4 &color, float thickness)
+void GizmoBatch::quad(const glm::vec3 &a, const glm::vec3 &b, const glm::vec3 &c, const glm::vec3 &d, const glm::vec4 &color,
+                      float thickness)
 {
     const uint32_t packed = s_packColor(color);
     m_segments.push_back(LineSegment{a, thickness, b, packed});
@@ -96,14 +101,13 @@ void ShapeSubmission::quad(const glm::vec3 &a, const glm::vec3 &b, const glm::ve
     m_segments.push_back(LineSegment{d, thickness, a, packed});
 }
 
-void ShapeSubmission::quadFilled(const glm::vec3 &a, const glm::vec3 &b, const glm::vec3 &c, const glm::vec3 &d,
-                                 const glm::vec4 &color)
+void GizmoBatch::quadFilled(const glm::vec3 &a, const glm::vec3 &b, const glm::vec3 &c, const glm::vec3 &d, const glm::vec4 &color)
 {
     triangleFilled(a, b, c, color);
     triangleFilled(a, c, d, color);
 }
 
-void ShapeSubmission::box(const glm::vec3 &min, const glm::vec3 &max, const glm::vec4 &color, float thickness)
+void GizmoBatch::box(const glm::vec3 &min, const glm::vec3 &max, const glm::vec4 &color, float thickness)
 {
     glm::vec3 corners[8];
     s_buildBoxCorners(min, max, corners);
@@ -119,8 +123,8 @@ void ShapeSubmission::box(const glm::vec3 &min, const glm::vec3 &max, const glm:
     }
 }
 
-void ShapeSubmission::box(const glm::mat4 &transform, const glm::vec3 &min, const glm::vec3 &max,
-                          const glm::vec4 &color, float thickness)
+void GizmoBatch::box(const glm::mat4 &transform, const glm::vec3 &min, const glm::vec3 &max, const glm::vec4 &color,
+                     float thickness)
 {
     glm::vec3 corners[8];
     s_buildBoxCorners(min, max, corners);
@@ -139,7 +143,7 @@ void ShapeSubmission::box(const glm::mat4 &transform, const glm::vec3 &min, cons
     }
 }
 
-void ShapeSubmission::boxFilled(const glm::vec3 &min, const glm::vec3 &max, const glm::vec4 &color)
+void GizmoBatch::boxFilled(const glm::vec3 &min, const glm::vec3 &max, const glm::vec4 &color)
 {
     glm::vec3 corners[8];
     s_buildBoxCorners(min, max, corners);
@@ -149,8 +153,7 @@ void ShapeSubmission::boxFilled(const glm::vec3 &min, const glm::vec3 &max, cons
     }
 }
 
-void ShapeSubmission::boxFilled(const glm::mat4 &transform, const glm::vec3 &min, const glm::vec3 &max,
-                                const glm::vec4 &color)
+void GizmoBatch::boxFilled(const glm::mat4 &transform, const glm::vec3 &min, const glm::vec3 &max, const glm::vec4 &color)
 {
     glm::vec3 corners[8];
     s_buildBoxCorners(min, max, corners);
@@ -163,8 +166,7 @@ void ShapeSubmission::boxFilled(const glm::mat4 &transform, const glm::vec3 &min
     }
 }
 
-void ShapeSubmission::cone(const glm::vec3 &base, const glm::vec3 &tip, float radius, const glm::vec4 &color,
-                           uint32_t segments)
+void GizmoBatch::cone(const glm::vec3 &base, const glm::vec3 &tip, float radius, const glm::vec4 &color, uint32_t segments)
 {
     const glm::vec3 axis = tip - base;
     if (segments < 3 || glm::dot(axis, axis) <= 0.0f) {
@@ -187,8 +189,8 @@ void ShapeSubmission::cone(const glm::vec3 &base, const glm::vec3 &tip, float ra
     }
 }
 
-void ShapeSubmission::circle(const glm::vec3 &center, const glm::vec3 &normal, float radius, const glm::vec4 &color,
-                             float thickness, uint32_t segments)
+void GizmoBatch::circle(const glm::vec3 &center, const glm::vec3 &normal, float radius, const glm::vec4 &color, float thickness,
+                        uint32_t segments)
 {
     if (segments < 3) {
         return;
@@ -210,31 +212,135 @@ void ShapeSubmission::circle(const glm::vec3 &center, const glm::vec3 &normal, f
     }
 }
 
-void ShapeSubmission::sphere(const glm::vec3 &center, float radius, const glm::vec4 &color, float thickness,
-                             uint32_t segments)
+void GizmoBatch::sphere(const glm::vec3 &center, float radius, const glm::vec4 &color, float thickness, uint32_t segments)
 {
     circle(center, glm::vec3(1.0f, 0.0f, 0.0f), radius, color, thickness, segments);
     circle(center, glm::vec3(0.0f, 1.0f, 0.0f), radius, color, thickness, segments);
     circle(center, glm::vec3(0.0f, 0.0f, 1.0f), radius, color, thickness, segments);
 }
 
-bool ImmediateDrawList::empty() const
+void GizmoDrawList::submit(const GizmoBatch &batch)
+{
+    clearIfDrawn();
+
+    const std::vector<LineSegment> &batchSegments = batch.getSegments();
+    std::vector<LineSegment> &segments = m_segments[batch.getDepthMode()];
+    segments.insert(segments.end(), batchSegments.begin(), batchSegments.end());
+
+    const std::vector<GizmoVertex> &batchVertices = batch.getTriangleVertices();
+    if (batchVertices.empty()) {
+        return;
+    }
+
+    std::vector<GizmoVertex> &vertices = m_triangleVertices[batch.getDepthMode()][batch.getShadingMode()];
+    const uint32_t firstVertex = static_cast<uint32_t>(vertices.size());
+    vertices.insert(vertices.end(), batchVertices.begin(), batchVertices.end());
+
+    if (!batch.getUserData().has_value()) {
+        return;
+    }
+
+    PickCandidate candidate;
+    candidate.userData = *batch.getUserData();
+    candidate.depthMode = batch.getDepthMode();
+    candidate.shadingMode = batch.getShadingMode();
+    candidate.firstVertex = firstVertex;
+    candidate.vertexCount = static_cast<uint32_t>(batchVertices.size());
+    candidate.worldMin = glm::vec3(std::numeric_limits<float>::max());
+    candidate.worldMax = glm::vec3(std::numeric_limits<float>::lowest());
+
+    for (const GizmoVertex &vertex : batchVertices) {
+        candidate.worldMin = glm::min(candidate.worldMin, vertex.position);
+        candidate.worldMax = glm::max(candidate.worldMax, vertex.position);
+    }
+
+    m_pickCandidates.push_back(candidate);
+}
+
+void GizmoDrawList::submit(std::span<const GizmoBatch> batches)
+{
+    for (const GizmoBatch &batch : batches) {
+        submit(batch);
+    }
+}
+
+void GizmoBatch::sphereFilled(const glm::vec3 &center, float radius, const glm::vec4 &color, uint32_t segments, uint32_t rings)
+{
+    if (segments < 3 || rings < 2) {
+        return;
+    }
+
+    const float ringStep = glm::pi<float>() / static_cast<float>(rings);
+    const float segmentStep = glm::two_pi<float>() / static_cast<float>(segments);
+
+    auto pointAt = [&](uint32_t ring, uint32_t segment) {
+        const float phi = ringStep * static_cast<float>(ring);
+        const float theta = segmentStep * static_cast<float>(segment);
+        return center + radius * glm::vec3(std::sin(phi) * std::cos(theta), std::cos(phi), std::sin(phi) * std::sin(theta));
+    };
+
+    for (uint32_t ring = 0; ring < rings; ++ring) {
+        for (uint32_t segment = 0; segment < segments; ++segment) {
+            const glm::vec3 topLeft = pointAt(ring, segment);
+            const glm::vec3 topRight = pointAt(ring, segment + 1);
+            const glm::vec3 bottomLeft = pointAt(ring + 1, segment);
+            const glm::vec3 bottomRight = pointAt(ring + 1, segment + 1);
+
+            // the poles collapse to a point, so their row is one triangle rather than two
+            if (ring != 0) {
+                triangleFilled(topLeft, bottomLeft, topRight, color);
+            }
+            if (ring + 1 != rings) {
+                triangleFilled(topRight, bottomLeft, bottomRight, color);
+            }
+        }
+    }
+}
+
+void GizmoBatch::reset()
+{
+    m_segments.clear();
+    m_triangleVertices.clear();
+}
+
+bool GizmoDrawList::empty() const
 {
     for (uint32_t mode = 0; mode < DEPTH_MODE_COUNT; ++mode) {
-        if (!m_segments[mode].empty() || !m_triangleVertices[mode].empty()) {
+        if (!m_segments[mode].empty()) {
             return false;
+        }
+
+        for (uint32_t shading = 0; shading < GIZMO_SHADING_MODE_COUNT; ++shading) {
+            if (!m_triangleVertices[mode][shading].empty()) {
+                return false;
+            }
         }
     }
 
     return true;
 }
 
-void ImmediateDrawList::clear()
+void GizmoDrawList::clearIfDrawn()
+{
+    if (!m_drawn) {
+        return;
+    }
+
+    reset();
+}
+
+void GizmoDrawList::reset()
 {
     for (uint32_t mode = 0; mode < DEPTH_MODE_COUNT; ++mode) {
         m_segments[mode].clear();
-        m_triangleVertices[mode].clear();
+
+        for (uint32_t shading = 0; shading < GIZMO_SHADING_MODE_COUNT; ++shading) {
+            m_triangleVertices[mode][shading].clear();
+        }
     }
+
+    m_pickCandidates.clear();
+    m_drawn = false;
 }
 
 } // namespace Rapture

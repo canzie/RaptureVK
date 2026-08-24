@@ -4,6 +4,7 @@
 #include "core/utils/Log.h"
 #include "scene/Scene.h"
 #include "scene/components/Components.h"
+#include "scene/render_data/SceneRenderData.h"
 
 namespace Rapture {
 
@@ -44,15 +45,19 @@ void SkeletalMesh3D::setMesh(AssetHandle _mesh)
 
     const ASkeletalMesh *asset = ref.get()->getUnderlyingAsset<ASkeletalMesh>();
 
-    auto component = m_entity.write<SkeletalMeshComponent>();
+    {
+        auto component = m_entity.write<SkeletalMeshComponent>();
 
-    component->setMesh(std::move(ref));
-    component->isLoading = false;
-    m_mesh = _mesh;
+        component->setMesh(std::move(ref));
+        component->isLoading = false;
+        m_mesh = _mesh;
+    }
 
     if (asset != nullptr) {
         adoptDefaultMaterial(*asset);
     }
+
+    writePose();
 }
 
 void SkeletalMesh3D::setPose(SkeletonPose *pose)
@@ -70,6 +75,22 @@ void SkeletalMesh3D::writePose()
     auto component = m_entity.write<SkeletalMeshComponent>();
 
     component->pose = m_pose ? m_pose->skeletonInstance() : nullptr;
+    component->inverseBindOffset = SKIN_NO_OFFSET;
+
+    if (component->pose == nullptr || !component->mesh) {
+        return;
+    }
+
+    const uint32_t jointCount = component->mesh->geometry().getJointCount();
+    if (jointCount != m_pose->getJointCount()) {
+        RP_CORE_ERROR("'{}' is bound to {} joints and cannot be deformed by a pose of {}", name(), jointCount,
+                      m_pose->getJointCount());
+        component->pose = nullptr;
+        return;
+    }
+
+    SkeletonInstanceManager &manager = scene()->getRenderData()->getSkeletonInstanceManager();
+    component->inverseBindOffset = manager.getInverseBindOffset(component->mesh);
 }
 
 bool SkeletalMesh3D::isVisible() const

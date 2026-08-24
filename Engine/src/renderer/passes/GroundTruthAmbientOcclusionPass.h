@@ -4,9 +4,9 @@
 #include "assets/asset_manager/AssetHandle.h"
 #include "gpu/descriptors/DescriptorSet.h"
 #include "gpu/pipelines/ComputePipeline.h"
-#include "renderer/passes/ComputePass.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
+#include "renderer/passes/ComputePass.h"
 
 #include <memory>
 #include <vector>

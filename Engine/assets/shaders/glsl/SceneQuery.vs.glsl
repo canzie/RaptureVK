@@ -11,7 +11,7 @@ struct MeshGPUData {
     uint materialIndex;
     uint flags;
     uint entityId;
-    uint boneOffset;
+    uint skinOffsets;
 };
 
 struct ObjectInfo {

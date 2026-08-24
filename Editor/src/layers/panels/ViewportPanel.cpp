@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstdint>
+#include <optional>
 #include <cstdlib>
 #include <glm/gtc/matrix_transform.hpp>
 #include <math/math.h>
@@ -46,11 +47,12 @@ static constexpr uint32_t PICK_APERTURE = 11;
  * @param result The region's hits
  * @param cursorX Cursor x within the region
  * @param cursorY Cursor y within the region
- * @return The entity, or ecs::ENTITY_NULL where the region was empty
+ * @return What was drawn there reports itself as, empty where the region was empty
  */
-static Rapture::ecs::Entity s_nearestToCursor(const Rapture::SceneQueryResult &result, uint32_t cursorX, uint32_t cursorY)
+static std::optional<uint64_t> s_nearestToCursor(const Rapture::SceneQueryResult &result, uint32_t cursorX,
+                                                 uint32_t cursorY)
 {
-    Rapture::ecs::Entity best = Rapture::ecs::ENTITY_NULL;
+    std::optional<uint64_t> best;
     int32_t bestDistance = INT32_MAX;
     float bestDepth = 0.0f;
 
@@ -68,7 +70,7 @@ static Rapture::ecs::Entity s_nearestToCursor(const Rapture::SceneQueryResult &r
                 continue;
             }
 
-            best = hits[0].entity;
+            best = hits[0].userData;
             bestDistance = distance;
             bestDepth = hits[0].depth;
         }
@@ -548,9 +550,12 @@ void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
     region.height = std::min(PICK_APERTURE, m_viewport->getHeight() - region.y);
 
     Rapture::SceneQueryResult result = m_viewport->queryRegion(region);
-    Rapture::ecs::Entity id = s_nearestToCursor(result, px - region.x, py - region.y);
+    std::optional<uint64_t> hit = s_nearestToCursor(result, px - region.x, py - region.y);
 
-    Rapture::ecs::EntityAccessor picked = id == Rapture::ecs::ENTITY_NULL ? Rapture::ecs::EntityAccessor() : Rapture::ecs::EntityAccessor(id, &m_viewport->getScene()->getRegistry());
+    Rapture::ecs::EntityAccessor picked =
+        hit.has_value() ? Rapture::ecs::EntityAccessor(static_cast<Rapture::ecs::Entity>(*hit),
+                                                       &m_viewport->getScene()->getRegistry())
+                        : Rapture::ecs::EntityAccessor();
     if (m_selection != nullptr) {
         m_selection->select(picked);
     }
@@ -618,7 +623,7 @@ void ViewportPanel::updateGizmo()
     m_gizmoPressed = false;
     m_gizmoReleased = false;
 
-    gizmo::TransformGizmo::Result result = m_transformGizmo->update(params, m_viewport->getImmediateDrawList());
+    gizmo::TransformGizmo::Result result = m_transformGizmo->update(params, m_viewport->getGizmoDrawList());
 
     if (!result.active) {
         return;

@@ -59,6 +59,8 @@ class ViewportPanel : public Panel {
         m_gizmoOperation = op;
         m_gizmoOpGroup.value = static_cast<int32_t>(op);
     }
+    Rapture::Viewport *getViewport() const { return m_viewport; }
+
     gizmo::TransformGizmo::Space getGizmoSpace() const { return m_gizmoSpace; }
     void setGizmoSpace(gizmo::TransformGizmo::Space space)
     {
@@ -68,6 +70,7 @@ class ViewportPanel : public Panel {
 
   public:
     Rapture::EventSignal<void()> onImageClicked;
+
 
   private:
     void updateGizmo(void);

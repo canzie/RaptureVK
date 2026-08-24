@@ -10,7 +10,7 @@ layout(set = 3, binding = 1) buffer PickCountBuffer {
 } u_pickCounts[];
 
 layout(set = 3, binding = 1) buffer PickEntryBuffer {
-    uvec2 entries[];
+    uvec4 entries[];
 } u_pickEntries[];
 
 layout(push_constant) uniform PushConstants {
@@ -34,7 +34,8 @@ void main() {
     uint slot = atomicAdd(u_pickCounts[pc.countBufferIndex].counts[pixel], 1u);
 
     if (slot < pc.maxLayers) {
+        // geometry the renderer drew answers with its entity, that being the identity it has
         u_pickEntries[pc.entryBufferIndex].entries[pixel * pc.maxLayers + slot] =
-            uvec2(inEntityId, floatBitsToUint(gl_FragCoord.z));
+            uvec4(inEntityId, 0u, floatBitsToUint(gl_FragCoord.z), 0u);
     }
 }

@@ -1,4 +1,4 @@
-#include "ImmediateShapesDrawPass.h"
+#include "GizmoDrawPass.h"
 
 #include "app/Application.h"
 #include "assets/asset_manager/AssetManager.h"
@@ -7,6 +7,7 @@
 #include "core/utils/rp_assert.h"
 #include "gpu/descriptors/DescriptorManager.h"
 #include "scene/Scene.h"
+#include "scene/components/Components.h"
 #include "scene/render_data/SceneRenderData.h"
 
 #include <glm/glm.hpp>
@@ -23,19 +24,18 @@ static constexpr VkDeviceSize SHAPE_BUFFER_INITIAL_BYTES = 64 * 1024;
 // drop rather than a gap between two busy frames
 static constexpr uint32_t SHAPE_BUFFER_WINDOW_FRAMES = 60;
 
-struct ImmediateShapesPushConstants {
+struct GizmoPushConstants {
     glm::vec2 viewportSize;
     uint32_t cameraSSBOIndex;
     uint32_t cameraSlotIndex;
     uint32_t shapeOffset;
 };
 
-ImmediateShapesDrawPass::ImmediateShapesDrawPass(const ImmediateShapesDrawPassConfig &config,
-                                                 const ImmediateDrawList *drawList)
-    : m_drawList(drawList), m_config(config), m_targetBytes(SHAPE_BUFFER_INITIAL_BYTES),
-      m_width(static_cast<float>(config.width)), m_height(static_cast<float>(config.height))
+GizmoDrawPass::GizmoDrawPass(const GizmoDrawPassConfig &config, const GizmoDrawList *drawList)
+    : m_drawList(drawList), m_config(config), m_targetBytes(SHAPE_BUFFER_INITIAL_BYTES), m_width(static_cast<float>(config.width)),
+      m_height(static_cast<float>(config.height))
 {
-    RP_ASSERT(drawList != nullptr, "Immediate shapes draw pass needs a draw list to draw");
+    RP_ASSERT(drawList != nullptr, "gizmo draw pass needs a draw list to draw");
 
     m_rc = &Application::getInstance().getVulkanContext().getRenderContext();
 
@@ -44,10 +44,13 @@ ImmediateShapesDrawPass::ImmediateShapesDrawPass(const ImmediateShapesDrawPassCo
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/";
 
-    m_segmentShader =
-        AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/ImmediateSegment.fs.glsl", shaderConfig));
-    m_triangleShader =
-        AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/ImmediateTriangle.fs.glsl", shaderConfig));
+    m_segmentShader = AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/GizmoSegment.fs.glsl", shaderConfig));
+    m_triangleShader = AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/GizmoTriangle.fs.glsl", shaderConfig));
+
+    ShaderImportConfig shadedConfig = shaderConfig;
+    shadedConfig.compileInfo.macros.push_back({"USE_SHADED_MODE"});
+    m_shadedTriangleShader =
+        AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/GizmoTriangle.fs.glsl", shadedConfig));
 
     const uint32_t slotCount = m_config.framesInFlight + 1;
     m_shapeBuffers.resize(slotCount);
@@ -61,13 +64,15 @@ ImmediateShapesDrawPass::ImmediateShapesDrawPass(const ImmediateShapesDrawPassCo
     createPipelines();
 }
 
-ImmediateShapesDrawPass::~ImmediateShapesDrawPass()
+GizmoDrawPass::~GizmoDrawPass()
 {
     m_segmentPipeline.reset();
-    m_trianglePipeline.reset();
+    for (std::shared_ptr<GraphicsPipeline> &pipeline : m_trianglePipelines) {
+        pipeline.reset();
+    }
 }
 
-void ImmediateShapesDrawPass::buildBuffer(uint32_t slot, VkDeviceSize bytes)
+void GizmoDrawPass::buildBuffer(uint32_t slot, VkDeviceSize bytes)
 {
     VmaAllocator allocator = m_rc->vulkanContext->getVmaAllocator();
 
@@ -88,20 +93,24 @@ void ImmediateShapesDrawPass::buildBuffer(uint32_t slot, VkDeviceSize bytes)
     m_shapeSets[slot] = std::move(set);
 }
 
-VkDeviceSize ImmediateShapesDrawPass::requiredBytes() const
+VkDeviceSize GizmoDrawPass::requiredBytes() const
 {
     VkDeviceSize bytes = 0;
 
     for (uint32_t mode = 0; mode < DEPTH_MODE_COUNT; ++mode) {
         const DepthMode depthMode = static_cast<DepthMode>(mode);
         bytes += m_drawList->getSegments(depthMode).size() * sizeof(LineSegment);
-        bytes += m_drawList->getTriangleVertices(depthMode).size() * sizeof(ShapeVertex);
+
+        for (uint32_t shading = 0; shading < GIZMO_SHADING_MODE_COUNT; ++shading) {
+            const GizmoShadingMode shadingMode = static_cast<GizmoShadingMode>(shading);
+            bytes += m_drawList->getTriangleVertices(depthMode, shadingMode).size() * sizeof(GizmoVertex);
+        }
     }
 
     return bytes;
 }
 
-void ImmediateShapesDrawPass::updateTargetBytes(VkDeviceSize required)
+void GizmoDrawPass::updateTargetBytes(VkDeviceSize required)
 {
     m_windowPeakBytes = std::max(m_windowPeakBytes, required);
     ++m_windowFrames;
@@ -118,7 +127,7 @@ void ImmediateShapesDrawPass::updateTargetBytes(VkDeviceSize required)
     }
 }
 
-void ImmediateShapesDrawPass::createPipelines()
+void GizmoDrawPass::createPipelines()
 {
     std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
                                                  VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE};
@@ -222,10 +231,19 @@ void ImmediateShapesDrawPass::createPipelines()
     m_segmentPipeline = std::make_shared<GraphicsPipeline>(config);
 
     config.shader = m_triangleShader.get();
-    m_trianglePipeline = std::make_shared<GraphicsPipeline>(config);
+    m_trianglePipelines[GIZMO_SHADING_MODE_SOLID] = std::make_shared<GraphicsPipeline>(config);
+
+    rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
+    config.rasterizationState = rasterizer;
+    m_trianglePipelines[GIZMO_SHADING_MODE_WIREFRAME] = std::make_shared<GraphicsPipeline>(config);
+
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    config.rasterizationState = rasterizer;
+    config.shader = m_shadedTriangleShader.get();
+    m_trianglePipelines[GIZMO_SHADING_MODE_SHADED] = std::make_shared<GraphicsPipeline>(config);
 }
 
-void ImmediateShapesDrawPass::updateAttachments(const RenderPassContext &context)
+void GizmoDrawPass::updateAttachments(const RenderPassContext &context)
 {
     RenderPassAttachment colorAttachment;
     colorAttachment.target = RenderTargetImage{context.renderTarget, context.imageIndex};
@@ -245,7 +263,7 @@ void ImmediateShapesDrawPass::updateAttachments(const RenderPassContext &context
     m_attachments.stencilAttachment = {};
 }
 
-SecondaryBufferInheritance ImmediateShapesDrawPass::getInheritance(const RenderPassContext &context)
+SecondaryBufferInheritance GizmoDrawPass::getInheritance(const RenderPassContext &context)
 {
     (void)context;
 
@@ -256,7 +274,7 @@ SecondaryBufferInheritance ImmediateShapesDrawPass::getInheritance(const RenderP
     return inheritance;
 }
 
-void ImmediateShapesDrawPass::beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb)
+void GizmoDrawPass::beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb)
 {
     // The presented image is picked by image index rather than by frame in flight, and the two do
     // not advance together, so the cached attachments cannot be reused across frames
@@ -265,8 +283,34 @@ void ImmediateShapesDrawPass::beginRendering(const RenderPassContext &context, C
     RenderPass::beginRendering(context, primaryCb);
 }
 
-void ImmediateShapesDrawPass::uploadDrawList(uint32_t slot, std::array<DepthModeRange, DEPTH_MODE_COUNT> &ranges,
-                                             uint32_t &vertexBase)
+const std::vector<GizmoVertex> &GizmoDrawPass::sortTrianglesBackToFront(const std::vector<GizmoVertex> &vertices,
+                                                                        const glm::vec3 &viewPosition)
+{
+    struct Triangle {
+        GizmoVertex corners[3];
+    };
+    static_assert(sizeof(Triangle) == 3 * sizeof(GizmoVertex), "a triangle is its three corners and nothing else");
+
+    m_sortedVertices = vertices;
+
+    Triangle *triangles = reinterpret_cast<Triangle *>(m_sortedVertices.data());
+    const size_t triangleCount = m_sortedVertices.size() / 3;
+
+    auto distanceSq = [&viewPosition](const Triangle &triangle) {
+        const glm::vec3 centroid =
+            (triangle.corners[0].position + triangle.corners[1].position + triangle.corners[2].position) / 3.0f;
+        const glm::vec3 toEye = centroid - viewPosition;
+        return glm::dot(toEye, toEye);
+    };
+
+    std::sort(triangles, triangles + triangleCount,
+              [&distanceSq](const Triangle &lhs, const Triangle &rhs) { return distanceSq(lhs) > distanceSq(rhs); });
+
+    return m_sortedVertices;
+}
+
+void GizmoDrawPass::uploadDrawList(uint32_t slot, std::array<DepthModeRange, DEPTH_MODE_COUNT> &ranges,
+                                   uint32_t &vertexBase, const glm::vec3 &viewPosition)
 {
     StorageBuffer &buffer = *m_shapeBuffers[slot];
 
@@ -274,42 +318,45 @@ void ImmediateShapesDrawPass::uploadDrawList(uint32_t slot, std::array<DepthMode
     for (uint32_t mode = 0; mode < DEPTH_MODE_COUNT; ++mode) {
         const std::vector<LineSegment> &segments = m_drawList->getSegments(static_cast<DepthMode>(mode));
 
-        ranges[mode].firstSegment = segmentCursor;
-        ranges[mode].segmentCount = static_cast<uint32_t>(segments.size());
+        ranges[mode].segments.first = segmentCursor;
+        ranges[mode].segments.count = static_cast<uint32_t>(segments.size());
 
         if (!segments.empty()) {
             buffer.addData(const_cast<LineSegment *>(segments.data()), segments.size() * sizeof(LineSegment),
                            segmentCursor * sizeof(LineSegment));
         }
 
-        segmentCursor += ranges[mode].segmentCount;
+        segmentCursor += ranges[mode].segments.count;
     }
 
     const VkDeviceSize segmentBytes = static_cast<VkDeviceSize>(segmentCursor) * sizeof(LineSegment);
-    vertexBase = static_cast<uint32_t>(segmentBytes / sizeof(ShapeVertex));
+    vertexBase = static_cast<uint32_t>(segmentBytes / sizeof(GizmoVertex));
 
     uint32_t vertexCursor = 0;
     for (uint32_t mode = 0; mode < DEPTH_MODE_COUNT; ++mode) {
-        const std::vector<ShapeVertex> &vertices = m_drawList->getTriangleVertices(static_cast<DepthMode>(mode));
+        for (uint32_t shading = 0; shading < GIZMO_SHADING_MODE_COUNT; ++shading) {
+            const std::vector<GizmoVertex> &vertices =
+                m_drawList->getTriangleVertices(static_cast<DepthMode>(mode), static_cast<GizmoShadingMode>(shading));
 
-        ranges[mode].firstVertex = vertexCursor;
-        ranges[mode].vertexCount = static_cast<uint32_t>(vertices.size());
+            ranges[mode].vertices[shading].first = vertexCursor;
+            ranges[mode].vertices[shading].count = static_cast<uint32_t>(vertices.size());
 
-        if (!vertices.empty()) {
-            buffer.addData(const_cast<ShapeVertex *>(vertices.data()), vertices.size() * sizeof(ShapeVertex),
-                           segmentBytes + vertexCursor * sizeof(ShapeVertex));
+            if (!vertices.empty()) {
+                const std::vector<GizmoVertex> &sorted = sortTrianglesBackToFront(vertices, viewPosition);
+                buffer.addData(const_cast<GizmoVertex *>(sorted.data()), sorted.size() * sizeof(GizmoVertex),
+                               segmentBytes + vertexCursor * sizeof(GizmoVertex));
+            }
+
+            vertexCursor += ranges[mode].vertices[shading].count;
         }
-
-        vertexCursor += ranges[mode].vertexCount;
     }
 }
 
-CommandBuffer *ImmediateShapesDrawPass::record(const RenderPassContext &context,
-                                               const SecondaryBufferInheritance &inheritance)
+CommandBuffer *GizmoDrawPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (m_drawList->empty() || context.scene == nullptr) {
+    if (m_drawList->empty() || m_drawList->isDrawn() || context.scene == nullptr) {
         return nullptr;
     }
 
@@ -325,9 +372,14 @@ CommandBuffer *ImmediateShapesDrawPass::record(const RenderPassContext &context,
         buildBuffer(m_currentSlot, m_targetBytes);
     }
 
+    glm::vec3 viewPosition(0.0f);
+    if (const TransformComponent *transform = context.camera.tryRead<TransformComponent>()) {
+        viewPosition = glm::vec3(transform->world[3]);
+    }
+
     std::array<DepthModeRange, DEPTH_MODE_COUNT> ranges;
     uint32_t vertexBase = 0;
-    uploadDrawList(m_currentSlot, ranges, vertexBase);
+    uploadDrawList(m_currentSlot, ranges, vertexBase, viewPosition);
 
     CommandPoolConfig poolConfig = {};
     poolConfig.queueFamilyIndex = m_rc->vulkanContext->getGraphicsQueueIndex();
@@ -357,39 +409,42 @@ CommandBuffer *ImmediateShapesDrawPass::record(const RenderPassContext &context,
 
     const uint32_t cameraSlot = renderData->getCameraSlot(context.camera.getEntity());
 
-    ImmediateShapesPushConstants pushConstants{};
+    GizmoPushConstants pushConstants{};
     pushConstants.viewportSize = glm::vec2(m_width, m_height);
     pushConstants.cameraSSBOIndex = renderData->getCameras().getDescriptorIndex(context.frameInFlight);
     pushConstants.cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
 
     for (uint32_t mode = 0; mode < DEPTH_MODE_COUNT; ++mode) {
         const DepthModeRange &range = ranges[mode];
-        if (range.segmentCount == 0 && range.vertexCount == 0) {
-            continue;
-        }
 
         vkCmdSetDepthTestEnable(cb, mode == DEPTH_MODE_TESTED ? VK_TRUE : VK_FALSE);
 
-        if (range.vertexCount > 0) {
-            m_trianglePipeline->bind(cb);
-            m_rc->descriptorManager->bindSet(0, commandBuffer, m_trianglePipeline);
-            m_shapeSets[m_currentSlot]->bind(cb, m_trianglePipeline);
+        for (uint32_t shading = 0; shading < GIZMO_SHADING_MODE_COUNT; ++shading) {
+            const ShapeRange &vertices = range.vertices[shading];
+            if (vertices.count == 0) {
+                continue;
+            }
 
-            pushConstants.shapeOffset = vertexBase + range.firstVertex;
-            vkCmdPushConstants(cb, m_trianglePipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_VERTEX_BIT, 0,
-                               sizeof(ImmediateShapesPushConstants), &pushConstants);
-            vkCmdDraw(cb, range.vertexCount, 1, 0, 0);
+            const std::shared_ptr<GraphicsPipeline> &pipeline = m_trianglePipelines[shading];
+            pipeline->bind(cb);
+            m_rc->descriptorManager->bindSet(0, commandBuffer, pipeline);
+            m_shapeSets[m_currentSlot]->bind(cb, pipeline);
+
+            pushConstants.shapeOffset = vertexBase + vertices.first;
+            vkCmdPushConstants(cb, pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+                               sizeof(GizmoPushConstants), &pushConstants);
+            vkCmdDraw(cb, vertices.count, 1, 0, 0);
         }
 
-        if (range.segmentCount > 0) {
+        if (range.segments.count > 0) {
             m_segmentPipeline->bind(cb);
             m_rc->descriptorManager->bindSet(0, commandBuffer, m_segmentPipeline);
             m_shapeSets[m_currentSlot]->bind(cb, m_segmentPipeline);
 
-            pushConstants.shapeOffset = range.firstSegment;
+            pushConstants.shapeOffset = range.segments.first;
             vkCmdPushConstants(cb, m_segmentPipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_VERTEX_BIT, 0,
-                               sizeof(ImmediateShapesPushConstants), &pushConstants);
-            vkCmdDraw(cb, 6, range.segmentCount, 0, 0);
+                               sizeof(GizmoPushConstants), &pushConstants);
+            vkCmdDraw(cb, 6, range.segments.count, 0, 0);
         }
     }
 
@@ -398,7 +453,7 @@ CommandBuffer *ImmediateShapesDrawPass::record(const RenderPassContext &context,
     return commandBuffer;
 }
 
-void ImmediateShapesDrawPass::onResize(uint32_t width, uint32_t height)
+void GizmoDrawPass::onResize(uint32_t width, uint32_t height)
 {
     m_width = static_cast<float>(width);
     m_height = static_cast<float>(height);

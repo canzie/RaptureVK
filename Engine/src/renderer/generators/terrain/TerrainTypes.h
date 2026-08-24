@@ -33,7 +33,6 @@ inline const char *ToString(TerrainNoiseCategory category)
     }
 }
 
-
 enum HeightmapType {
     HM_SINGLE,
     HM_CEPV, // CONT, EROSION, PEAKS AND VALLEYS
@@ -167,7 +166,8 @@ struct TerrainConfig {
 
 // Hash for glm::ivec2 (for unordered_map usage)
 namespace std {
-template <> struct hash<glm::ivec2> {
+template <>
+struct hash<glm::ivec2> {
     size_t operator()(const glm::ivec2 &v) const noexcept
     {
         size_t h1 = hash<int>{}(v.x);

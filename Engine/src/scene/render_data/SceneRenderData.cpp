@@ -441,14 +441,14 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
         }
 
         const Mesh *mesh = nullptr;
-        uint32_t boneOffset = UINT32_MAX;
+        uint32_t skinOffsets = Skin_packOffsets(SKIN_NO_OFFSET, SKIN_NO_OFFSET);
 
         if (const StaticMeshComponent *staticMesh = registry.tryRead<StaticMeshComponent>(entityId)) {
             mesh = staticMesh->mesh ? &staticMesh->mesh->geometry() : nullptr;
         } else if (const SkeletalMeshComponent *skeletal = registry.tryRead<SkeletalMeshComponent>(entityId)) {
             mesh = skeletal->mesh ? &skeletal->mesh->geometry() : nullptr;
-            if (skeletal->pose != nullptr) {
-                boneOffset = skeletal->pose->getBoneOffset();
+            if (skeletal->pose != nullptr && skeletal->inverseBindOffset != SKIN_NO_OFFSET) {
+                skinOffsets = Skin_packOffsets(skeletal->pose->getBoneOffset(), skeletal->inverseBindOffset);
             }
         }
 
@@ -461,7 +461,7 @@ void SceneRenderData::updateMeshes(uint32_t frameIndex)
         data.vertexBufferFlags = mesh->getVertexBuffer()->getBufferLayout().getFlags();
         data.entityId = entityId;
         data.materialIndex = 0;
-        data.boneOffset = boneOffset;
+        data.skinOffsets = skinOffsets;
     };
 
     // a slot the partition moved needs repacking whether or not its entity changed

@@ -30,14 +30,16 @@ class ChunkGrid {
     void clear();
 
     // Iteration
-    template <typename Func> void forEach(Func &&fn)
+    template <typename Func>
+    void forEach(Func &&fn)
     {
         for (auto &[coord, chunk] : m_chunks) {
             fn(coord, chunk);
         }
     }
 
-    template <typename Func> void forEach(Func &&fn) const
+    template <typename Func>
+    void forEach(Func &&fn) const
     {
         for (const auto &[coord, chunk] : m_chunks) {
             fn(coord, chunk);

@@ -20,7 +20,7 @@ struct MeshGPUData {
     uint materialIndex;
     uint flags;
     uint entityId;
-    uint boneOffset;
+    uint skinOffsets;
 };
 
 struct ObjectInfo {
@@ -52,9 +52,9 @@ void main() {
     mat4 model = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].model;
 
 #ifdef IS_SKINNED_MESH
-    uint boneOffset = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].boneOffset;
-    if (boneOffset != NO_BONE_OFFSET) {
-        model = model * Skinning_blendMatrix(pc.skeletonSSBOIndex, boneOffset, aJoints, aWeights);
+    uint skinOffsets = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].skinOffsets;
+    if (Skinning_isSkinned(skinOffsets)) {
+        model = model * Skinning_blendMatrix(pc.skeletonSSBOIndex, skinOffsets, aJoints, aWeights);
     }
 #endif // IS_SKINNED_MESH
 

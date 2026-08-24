@@ -4,13 +4,13 @@
 
 #include "scene/instances/Environment.h"
 
+#include "app/Application.h"
 #include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetImportConfig.h"
 #include "assets/asset_manager/AssetManager.h"
-#include "gpu/descriptors/DescriptorManager.h"
 #include "core/utils/Log.h"
+#include "gpu/descriptors/DescriptorManager.h"
 #include "gpu/textures/Texture.h"
-#include "app/Application.h"
 #include "gpu/vulkan_context/VulkanQueue.h"
 
 namespace Rapture {
@@ -177,13 +177,38 @@ static void s_writeMemberDefault(std::vector<uint8_t> &buffer, const PushConstan
 
     using BaseType = PushConstantMemberInfo::BaseType;
     switch (member.getBaseType()) {
-    case BaseType::FLOAT: { float v = get(0); std::memcpy(dst, &v, 4); break; }
-    case BaseType::INT: { int32_t v = static_cast<int32_t>(get(0)); std::memcpy(dst, &v, 4); break; }
-    case BaseType::UINT: { uint32_t v = static_cast<uint32_t>(get(0)); std::memcpy(dst, &v, 4); break; }
-    case BaseType::VEC2: { float v[2] = {get(0), get(1)}; std::memcpy(dst, v, 8); break; }
-    case BaseType::VEC3: { float v[3] = {get(0), get(1), get(2)}; std::memcpy(dst, v, 12); break; }
-    case BaseType::VEC4: { float v[4] = {get(0), get(1), get(2), get(3)}; std::memcpy(dst, v, 16); break; }
-    default: break;
+    case BaseType::FLOAT: {
+        float v = get(0);
+        std::memcpy(dst, &v, 4);
+        break;
+    }
+    case BaseType::INT: {
+        int32_t v = static_cast<int32_t>(get(0));
+        std::memcpy(dst, &v, 4);
+        break;
+    }
+    case BaseType::UINT: {
+        uint32_t v = static_cast<uint32_t>(get(0));
+        std::memcpy(dst, &v, 4);
+        break;
+    }
+    case BaseType::VEC2: {
+        float v[2] = {get(0), get(1)};
+        std::memcpy(dst, v, 8);
+        break;
+    }
+    case BaseType::VEC3: {
+        float v[3] = {get(0), get(1), get(2)};
+        std::memcpy(dst, v, 12);
+        break;
+    }
+    case BaseType::VEC4: {
+        float v[4] = {get(0), get(1), get(2), get(3)};
+        std::memcpy(dst, v, 16);
+        break;
+    }
+    default:
+        break;
     }
 }
 

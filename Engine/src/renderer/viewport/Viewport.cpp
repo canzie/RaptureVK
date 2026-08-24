@@ -1,12 +1,12 @@
 #include "Viewport.h"
 
-#include "scene/components/Components.h"
+#include "app/Application.h"
+#include "core/utils/rp_assert.h"
 #include "renderer/DepthPrepassRenderer.h"
-#include "renderer/ImmediateShapesRenderer.h"
+#include "renderer/GizmoRenderer.h"
 #include "renderer/deferred/DeferredRenderer.h"
 #include "renderer/shadows/ShadowRenderer.h"
-#include "core/utils/rp_assert.h"
-#include "app/Application.h"
+#include "scene/components/Components.h"
 
 namespace Rapture {
 
@@ -85,9 +85,8 @@ void Viewport::createRenderer(RendererType type)
 
     m_drawManager->addRenderer(std::move(renderer), DRAW_PHASE_PRE_COMPOSITE, DRAW_ORDER_SCENE);
 
-    m_drawManager->addRenderer(std::make_unique<ImmediateShapesRenderer>(m_renderContext, rendererConfig,
-                                                                        m_drawManager->getDepthFormat(),
-                                                                        &m_immediateDrawList),
+    m_drawManager->addRenderer(std::make_unique<GizmoRenderer>(m_renderContext, rendererConfig,
+                                                                         m_drawManager->getDepthFormat(), &m_gizmoDrawList),
                                DRAW_PHASE_POST_COMPOSITE, DRAW_ORDER_IMMEDIATE_SHAPES);
 }
 
@@ -110,7 +109,7 @@ SceneQueryResult Viewport::queryRegion(const SceneQuery &region)
         m_queryRenderer = std::make_unique<SceneQueryRenderer>(m_renderContext);
     }
 
-    return m_queryRenderer->query(*m_scene, m_camera, m_config.width, m_config.height, region);
+    return m_queryRenderer->query(*m_scene, m_camera, m_config.width, m_config.height, region, &m_gizmoDrawList);
 }
 
 void Viewport::resize(uint32_t width, uint32_t height)

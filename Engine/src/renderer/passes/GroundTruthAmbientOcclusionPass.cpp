@@ -4,17 +4,17 @@
 
 #include "assets/asset_manager/AssetImportConfig.h"
 #include "assets/asset_manager/AssetManager.h"
+#include "core/utils/Log.h"
+#include "core/utils/TracyProfiler.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/descriptors/DescriptorManager.h"
 #include "scene/components/Components.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
 #include "scene/render_data/SceneRenderData.h"
 
-#include <algorithm>
-#include "scene/Scene.h"
-#include "core/utils/rp_assert.h"
 #include "app/Application.h"
+#include "core/utils/rp_assert.h"
+#include "scene/Scene.h"
+#include <algorithm>
 
 #include <glm/glm.hpp>
 

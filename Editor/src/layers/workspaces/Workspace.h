@@ -10,6 +10,18 @@
 #include <string_view>
 #include <vector>
 
+/**
+ * @brief What an edit made in a viewport acts on
+ */
+enum EditorMode {
+    EDITOR_MODE_OBJECT, ///< the objects in the scene, moved and selected whole
+    EDITOR_MODE_EDIT,   ///< the data an object is made of, such as a skeleton's rest pose
+    EDITOR_MODE_POSE,   ///< the pose an object is shown in, leaving the data it is made of alone
+    EDITOR_MODE_COUNT
+};
+
+constexpr std::string_view EDITOR_MODE_LABELS[EDITOR_MODE_COUNT] = {"Object Mode", "Edit Mode", "Pose Mode"};
+
 class Workspace {
   public:
     explicit Workspace(std::string_view kind) : kind(kind) { m_context.selection = &m_selection; }
@@ -34,7 +46,20 @@ class Workspace {
     virtual void onUpdate(float dt);
     virtual void saveLayout(void) = 0;
 
+    EditorMode mode() const { return m_mode; }
+
+    /**
+     * @brief Puts this workspace into a mode, firing onModeChanged when it differs from the current one
+     * @param mode The mode to enter
+     */
+    void setMode(EditorMode mode);
+
   public:
+    /**
+     * @brief Fires with the mode just entered
+     */
+    Rapture::EventSignal<void(EditorMode)> onModeChanged;
+
     // stable name for what this workspace edits, written to and read back from the editor's stored state
     const std::string_view kind;
 
@@ -72,6 +97,7 @@ class Workspace {
     bool focused = false;
 
   protected:
+    EditorMode m_mode = EDITOR_MODE_OBJECT;
     EntitySelection m_selection;
     WorkspaceContext m_context;
     Amethyst::Frame *m_container = nullptr;

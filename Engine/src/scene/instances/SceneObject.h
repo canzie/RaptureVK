@@ -12,6 +12,23 @@
 namespace Rapture {
 
 /**
+ * @brief Whether a child belongs to the object that made it rather than to whoever authored the scene
+ */
+enum class InternalMode {
+    DISABLED,
+    ENABLED
+};
+
+/**
+ * @brief What holds of a scene object beyond what it is made of
+ */
+enum SceneObjectFlag {
+    SCENE_OBJECT_FLAG_NONE = 0,
+    SCENE_OBJECT_FLAG_INTERNAL = 1 << 0,
+    SCENE_OBJECT_FLAG_SERIALIZED = 1 << 1
+};
+
+/**
  * @brief An authored object that exists in its own right inside a scene.
  *
  * Holds a place in the scene tree, owns the entity its components write their storage onto, and
@@ -31,14 +48,15 @@ class SceneObject : public Instance {
     /**
      * @brief Creates a T and parents it to this object
      * @param name Name for the new child
+     * @param internalMode Whether the child is added as internal
      * @return The child, owned by this object
      */
     template <typename T>
-    T *add(std::string_view name)
+    T *add(std::string_view name, InternalMode internalMode = InternalMode::DISABLED)
     {
         auto child = std::make_unique<T>(*scene(), name);
         T *raw = child.get();
-        addChild(std::move(child));
+        addChild(std::move(child), internalMode);
         raw->ready();
         return raw;
     }
@@ -46,8 +64,9 @@ class SceneObject : public Instance {
     /**
      * @brief Takes ownership of a child and links it to this object
      * @param child The child to adopt
+     * @param internalMode Whether the child is added as internal
      */
-    void addChild(std::unique_ptr<SceneObject> child);
+    void addChild(std::unique_ptr<SceneObject> child, InternalMode internalMode = InternalMode::DISABLED);
 
     /**
      * @brief Unlinks a child and hands its ownership back
@@ -56,24 +75,36 @@ class SceneObject : public Instance {
      */
     std::unique_ptr<SceneObject> removeChild(SceneObject *child);
 
+    bool isInternal() const { return (m_flags & SCENE_OBJECT_FLAG_INTERNAL) != 0; }
+
+    bool isSerialized() const { return (m_flags & SCENE_OBJECT_FLAG_SERIALIZED) != 0; }
+
+    /**
+     * @brief Sets whether this object is written out with the scene it sits in
+     * @param serialized True to write it
+     */
+    void setSerialized(bool serialized);
+
     /**
      * @brief Finds a direct child by name
      * @param name The child's name
+     * @param includeInternal Whether internal children are searched
      * @return The child, or nullptr if no child has that name
      */
-    SceneObject *findChild(std::string_view name) const;
+    SceneObject *findChild(std::string_view name, bool includeInternal = false) const;
 
     /**
      * @brief Finds a descendant by a slash separated path, for example "Door/Handle"
      * @param path Names from this object down, separated by slashes
+     * @param includeInternal Whether internal children are searched
      * @return The descendant, or nullptr if any step is missing
      */
-    SceneObject *findDescendant(std::string_view path) const;
+    SceneObject *findDescendant(std::string_view path, bool includeInternal = false) const;
 
     template <typename T>
-    T *findFirstChildOfType() const
+    T *findFirstChildOfType(bool includeInternal = false) const
     {
-        for (const auto &child : m_children) {
+        for (const auto &child : children(includeInternal)) {
             if (T *typed = child->as<T>()) {
                 return typed;
             }
@@ -83,16 +114,17 @@ class SceneObject : public Instance {
 
     /**
      * @brief Finds the first T anywhere below this object, depth first
+     * @param includeInternal Whether internal children are searched
      * @return The descendant, or nullptr if the subtree holds no T
      */
     template <typename T>
-    T *findFirstDescendantOfType() const
+    T *findFirstDescendantOfType(bool includeInternal = false) const
     {
-        for (const auto &child : m_children) {
+        for (const auto &child : children(includeInternal)) {
             if (T *typed = child->as<T>()) {
                 return typed;
             }
-            if (T *typed = child->findFirstDescendantOfType<T>()) {
+            if (T *typed = child->findFirstDescendantOfType<T>(includeInternal)) {
                 return typed;
             }
         }
@@ -215,7 +247,13 @@ class SceneObject : public Instance {
     static SceneObject *spawnSubtree(SceneObject &parent, ReadNode node);
 
     SceneObject *parent() const { return m_parent; }
-    std::span<const std::unique_ptr<SceneObject>> children() const { return m_children; }
+
+    /**
+     * @brief The objects below this one
+     * @param includeInternal Whether internal children are included
+     * @return The children
+     */
+    std::span<const std::unique_ptr<SceneObject>> children(bool includeInternal = false) const;
     std::span<const std::unique_ptr<SceneComponent>> components() const { return m_components; }
 
     ecs::Entity entity() const { return m_entity.getEntity(); }
@@ -250,6 +288,8 @@ class SceneObject : public Instance {
     SceneObject *m_parent = nullptr;
     std::vector<std::unique_ptr<SceneObject>> m_children;
     std::vector<std::unique_ptr<SceneComponent>> m_components;
+    size_t m_internalCount = 0;
+    uint32_t m_flags = SCENE_OBJECT_FLAG_SERIALIZED;
 };
 
 /**

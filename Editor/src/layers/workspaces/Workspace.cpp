@@ -10,6 +10,16 @@ Workspace::~Workspace()
     m_teardown = true;
 }
 
+void Workspace::setMode(EditorMode mode)
+{
+    if (m_mode == mode) {
+        return;
+    }
+
+    m_mode = mode;
+    onModeChanged.fire(mode);
+}
+
 void Workspace::onUpdate(float dt)
 {
     for (auto &panel : m_panels) {

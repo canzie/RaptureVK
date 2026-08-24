@@ -156,6 +156,7 @@ static glm::vec4 s_planeFill(TransformGizmo::Axis axis, bool hovered, bool activ
 }
 
 TransformGizmo::TransformGizmo(Amethyst::Container *container)
+    : m_handleBatch(Rapture::DEPTH_MODE_ALWAYS_IN_FRONT, Rapture::GIZMO_SHADING_MODE_SOLID)
 {
     m_valueLabel = container->add<Amethyst::TextLabel>();
     m_valueLabel->setBaseProperties({.visible = false});
@@ -559,7 +560,7 @@ glm::vec3 TransformGizmo::solveScale(const Params &params) const
     return scale;
 }
 
-void TransformGizmo::submitTranslate(Rapture::ShapeSubmission &submission) const
+void TransformGizmo::submitTranslate()
 {
     const float shaftLength = m_worldScale * AXIS_LENGTH * (1.0f - CONE_LENGTH);
     const float coneLength = m_worldScale * AXIS_LENGTH * CONE_LENGTH;
@@ -571,14 +572,14 @@ void TransformGizmo::submitTranslate(Rapture::ShapeSubmission &submission) const
         const glm::vec4 color = s_axisColor(axis.axis, hovered, active);
 
         const glm::vec3 shaftEnd = m_center + axis.direction * shaftLength;
-        submission.line(m_center, shaftEnd, color, LINE_THICKNESS);
-        submission.cone(shaftEnd, shaftEnd + axis.direction * coneLength, coneRadius, color, CONE_SEGMENTS);
+        m_handleBatch.line(m_center, shaftEnd, color, LINE_THICKNESS);
+        m_handleBatch.cone(shaftEnd, shaftEnd + axis.direction * coneLength, coneRadius, color, CONE_SEGMENTS);
     }
 
-    submitPlanes(submission);
+    submitPlanes();
 }
 
-void TransformGizmo::submitPlanes(Rapture::ShapeSubmission &submission) const
+void TransformGizmo::submitPlanes()
 {
     for (const PlaneHandle &plane : m_planes) {
         const bool hovered = m_hoveredAxis == plane.axis;
@@ -586,12 +587,13 @@ void TransformGizmo::submitPlanes(Rapture::ShapeSubmission &submission) const
         const glm::vec4 fill = s_planeFill(plane.axis, hovered, active);
         const glm::vec4 outline = glm::vec4(glm::vec3(fill), 1.0f);
 
-        submission.quadFilled(plane.corners[0], plane.corners[1], plane.corners[2], plane.corners[3], fill);
-        submission.quad(plane.corners[0], plane.corners[1], plane.corners[2], plane.corners[3], outline, PLANE_OUTLINE_THICKNESS);
+        m_handleBatch.quadFilled(plane.corners[0], plane.corners[1], plane.corners[2], plane.corners[3], fill);
+        m_handleBatch.quad(plane.corners[0], plane.corners[1], plane.corners[2], plane.corners[3], outline,
+                           PLANE_OUTLINE_THICKNESS);
     }
 }
 
-void TransformGizmo::submitRotate(Rapture::ShapeSubmission &submission) const
+void TransformGizmo::submitRotate()
 {
     const bool dragging = m_activeAxis != AXIS_NONE;
 
@@ -608,7 +610,7 @@ void TransformGizmo::submitRotate(Rapture::ShapeSubmission &submission) const
         const size_t count = ring.points.size();
 
         if (dragging) {
-            submission.polyline(ring.points, color, LINE_THICKNESS, true);
+            m_handleBatch.polyline(ring.points, color, LINE_THICKNESS, true);
             continue;
         }
 
@@ -618,12 +620,12 @@ void TransformGizmo::submitRotate(Rapture::ShapeSubmission &submission) const
                 continue;
             }
 
-            submission.line(ring.points[point], ring.points[next], color, LINE_THICKNESS);
+            m_handleBatch.line(ring.points[point], ring.points[next], color, LINE_THICKNESS);
         }
     }
 }
 
-void TransformGizmo::submitScale(Rapture::ShapeSubmission &submission) const
+void TransformGizmo::submitScale()
 {
     const float handleSize = m_worldScale * SCALE_HANDLE_SIZE;
 
@@ -636,33 +638,35 @@ void TransformGizmo::submitScale(Rapture::ShapeSubmission &submission) const
         const glm::mat4 knob(glm::vec4(m_basis[0], 0.0f), glm::vec4(m_basis[1], 0.0f), glm::vec4(m_basis[2], 0.0f),
                              glm::vec4(axis.tip, 1.0f));
 
-        submission.line(m_center, axis.tip, color, LINE_THICKNESS);
-        submission.boxFilled(knob, glm::vec3(-handleSize), glm::vec3(handleSize), color);
+        m_handleBatch.line(m_center, axis.tip, color, LINE_THICKNESS);
+        m_handleBatch.boxFilled(knob, glm::vec3(-handleSize), glm::vec3(handleSize), color);
     }
 
-    submitPlanes(submission);
+    submitPlanes();
 }
 
-void TransformGizmo::submitShapes(const Params &params, Rapture::ImmediateDrawList &drawList) const
+void TransformGizmo::submitShapes(const Params &params, Rapture::GizmoDrawList &drawList)
 {
-    Rapture::ShapeSubmission submission = drawList.getSubmission(Rapture::DEPTH_MODE_ALWAYS_IN_FRONT);
+    m_handleBatch.reset();
 
     switch (params.operation) {
     case OPERATION_TRANSLATE:
-        submitTranslate(submission);
+        submitTranslate();
         break;
     case OPERATION_ROTATE:
-        submitRotate(submission);
+        submitRotate();
         break;
     case OPERATION_SCALE:
-        submitScale(submission);
+        submitScale();
         break;
     case OPERATION_COUNT:
         break;
     }
+
+    drawList.submit(m_handleBatch);
 }
 
-TransformGizmo::Result TransformGizmo::update(const Params &params, Rapture::ImmediateDrawList &drawList)
+TransformGizmo::Result TransformGizmo::update(const Params &params, Rapture::GizmoDrawList &drawList)
 {
     Result result;
     result.operation = params.operation;

@@ -31,7 +31,8 @@ class ShadowRenderer : public Renderer {
     /**
      * @brief One shadow map and the buffer holding its drawing
      */
-    template <typename T> struct RecordedShadow {
+    template <typename T>
+    struct RecordedShadow {
         T *map = nullptr;
         CommandBuffer *secondary = nullptr;
     };

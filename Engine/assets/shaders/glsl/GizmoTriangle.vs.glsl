@@ -22,11 +22,21 @@ layout(push_constant) uniform PushConstants {
 
 layout(location = 0) out vec4 vColor;
 
+#ifdef USE_SHADED_MODE
+layout(location = 1) out vec3 vViewPosition;
+#endif // USE_SHADED_MODE
+
 void main() {
     ShapeVertex shapeVertex = u_shapes.vertices[pc.shapeOffset + gl_VertexIndex];
 
     CameraGPUData cam = u_cameraSSBO[pc.cameraSSBOIndex].cameras[pc.cameraSlotIndex];
 
-    gl_Position = cam.proj * cam.view * vec4(shapeVertex.position, 1.0);
+    vec4 viewPosition = cam.view * vec4(shapeVertex.position, 1.0);
+
+    gl_Position = cam.proj * viewPosition;
     vColor = unpackUnorm4x8(shapeVertex.color);
+
+#ifdef USE_SHADED_MODE
+    vViewPosition = viewPosition.xyz;
+#endif // USE_SHADED_MODE
 }

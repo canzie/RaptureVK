@@ -339,6 +339,11 @@ void Scene::destroyInstance(SceneObject *instance)
         return;
     }
 
+    if (instance->isInternal()) {
+        RP_CORE_ERROR("cannot destroy instance '{}' because it is internal to '{}'", instance->name(), parent->name());
+        return;
+    }
+
     parent->removeChild(instance);
 }
 

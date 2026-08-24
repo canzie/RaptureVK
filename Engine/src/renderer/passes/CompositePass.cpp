@@ -1,7 +1,7 @@
 #include "CompositePass.h"
 
-#include "core/utils/EnginePaths.h"
 #include "app/Application.h"
+#include "core/utils/EnginePaths.h"
 
 #include "assets/asset_manager/AssetManager.h"
 #include "gpu/descriptors/DescriptorManager.h"

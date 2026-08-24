@@ -89,6 +89,7 @@ void Node3D::setPosition(const glm::vec3 &position)
 
     m_entity.write<TransformComponent>()->local[3] = glm::vec4(position, 1.0f);
     updateWorldTransform();
+    onLocalTransformChanged();
 }
 
 const glm::vec3 &Node3D::rotation() const
@@ -142,6 +143,12 @@ const glm::mat4 &Node3D::localTransform() const
 
 void Node3D::setLocalTransform(const glm::mat4 &transform)
 {
+    setLocalTransformUnreported(transform);
+    onLocalTransformChanged();
+}
+
+void Node3D::setLocalTransformUnreported(const glm::mat4 &transform)
+{
     if (!m_entity.has<TransformComponent>()) {
         return;
     }
@@ -185,6 +192,7 @@ void Node3D::markRotationAndScaleWritten()
     m_dirtyMask &= ~TRANSFORM_DIRTY_ROTATION_AND_SCALE;
     m_dirtyMask |= TRANSFORM_DIRTY_LOCAL;
     updateWorldTransform();
+    onLocalTransformChanged();
 }
 
 void Node3D::markLocalWritten()
@@ -218,7 +226,9 @@ void Node3D::onParentChanged()
 
 void Node3D::updateDescendantWorldTransforms(const SceneObject &parent)
 {
-    for (const auto &child : parent.children()) {
+    const bool includeInternal = true;
+
+    for (const auto &child : parent.children(includeInternal)) {
         Node3D *node = child->as<Node3D>();
         if (node != nullptr) {
             node->updateWorldTransform();

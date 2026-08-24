@@ -7,16 +7,16 @@
 #include <glm/glm.hpp>
 
 #include "gpu/buffers/Buffers.h"
+#include "gpu/buffers/UniformBuffer.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorSet.h"
-#include "gpu/buffers/UniformBuffer.h"
-#include "scene/Scene.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
+#include "scene/Scene.h"
 
-#include "gpu/pipelines/ComputePipeline.h"
 #include "core/utils/TextureFlattener.h"
+#include "gpu/pipelines/ComputePipeline.h"
 #include "gpu/vulkan_context/VulkanQueue.h"
 
 #include "DDGICommon.h"

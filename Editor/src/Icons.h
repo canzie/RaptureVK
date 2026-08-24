@@ -129,6 +129,14 @@ inline constexpr const char *SVG_SKELETON = ICON_SVG("<path d=\"M12.5 10.4V7a4.5
                                                      "<path d=\"M8 8.4l.9 1.5H7.1L8 8.4z\"/>"
                                                      "</g>");
 
+inline constexpr const char *SVG_BONE = ICON_SVG("<g fill=\"#ffffff\" stroke=\"none\" transform=\"rotate(-45 8 8)\">"
+                                                 "<rect x=\"1\" y=\"6.8\" width=\"14\" height=\"2.4\"/>"
+                                                 "<circle cx=\"1\" cy=\"6.6\" r=\"1.9\"/>"
+                                                 "<circle cx=\"1\" cy=\"9.4\" r=\"1.9\"/>"
+                                                 "<circle cx=\"15\" cy=\"6.6\" r=\"1.9\"/>"
+                                                 "<circle cx=\"15\" cy=\"9.4\" r=\"1.9\"/>"
+                                                 "</g>");
+
 inline constexpr const char *SVG_LIGHT = ICON_SVG("<path d=\"M8 2.5a4 4 0 00-2.5 7.1V11h5V9.6A4 4 0 008 2.5z\"/>"
                                                   "<path d=\"M6.5 12.5h3M7 14h2\"/>");
 

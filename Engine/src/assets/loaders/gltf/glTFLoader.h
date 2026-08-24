@@ -82,12 +82,13 @@ class glTF2Loader {
      * @param node The node the primitives hang from
      * @param meshIndex The glTF mesh to build
      * @param skeleton The skeleton this node's skin names, or INVALID_ASSET_HANDLE if it has none
+     * @param skin The skin this node is bound through, whose bind pose its primitives are authored in
      * @return True if the mesh was built
      */
-    bool loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle skeleton);
+    bool loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle skeleton, size_t skin);
 
     bool decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, AssetHandle skeleton,
-                         PrimitiveData &out);
+                         size_t skin, PrimitiveData &out);
 
     /**
      * @brief Builds the scene objects one glTF node subtree describes
@@ -177,7 +178,9 @@ class glTF2Loader {
     std::unordered_map<size_t, std::vector<PrimitiveData>> m_meshCache; ///< glTF mesh index -> decoded primitives
 
     /// skeleton asset -> the bind pose each skinned mesh under it is bound against
-    std::unordered_map<AssetHandle, std::vector<glm::mat4>> m_inverseBindMatrices;
+    // keyed by skin, since a bind pose belongs to the binding of one mesh to a skeleton rather than
+    // to the skeleton, which two skins may share while standing in different poses
+    std::unordered_map<size_t, std::vector<glm::mat4>> m_inverseBindMatrices;
     // ordered, so a reimport names the poses of a file with several skins the same way every time
     std::map<AssetHandle, std::vector<SkeletalMesh3D *>> m_skinnedMeshes;
 

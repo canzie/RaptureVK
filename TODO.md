@@ -35,18 +35,14 @@ servers
 ### Engine Architecture
 
 
-- Make rendering things like bounds easier
-- optimise the shadow passes
 - make it run on windows???
 - TODO later: BC7 (high quality RGBA) and BC6H (HDR) encoders
 - shader/pipeline hot reloading
 - parallise/jobify shader compilation (note, current stack size is too small for
   this, maybe spawn another process and use gslang exec???)
-- pre generated normals?
 - virtual texturing??? like decima i guess
 
 ---
-- fix assets with no texcoords and stuff excluded from ddgi
 - make a new panel for the scene object tree where components can be authored, also check if we should allow this sort of inline?
 - parseanimations from gltf
 - animation events

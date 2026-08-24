@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "assets/asset_manager/AssetCommon.h"
 #include "core/utils/rp_assert.h"
 
 namespace Rapture {
@@ -78,6 +79,12 @@ template <typename T> class AssetPtr {
     explicit operator bool() const noexcept { return m_ptr != nullptr; }
 
     const AssetRef &ref() const noexcept { return m_ref; }
+
+    /**
+     * @brief The handle the asset this points at is known by
+     * @return The handle, or INVALID_ASSET_HANDLE if this points at nothing
+     */
+    AssetHandle getHandle() const noexcept;
 
   private:
     AssetRef m_ref;

@@ -1,7 +1,7 @@
 #ifndef RAPTURE__TRANSFORM_GIZMO_H
 #define RAPTURE__TRANSFORM_GIZMO_H
 
-#include "renderer/ImmediateDrawList.h"
+#include "renderer/GizmoDrawList.h"
 
 #include <amethyst/Amethyst.h>
 #include <components/container.h>
@@ -110,7 +110,7 @@ class TransformGizmo {
      * @param drawList Draw list of the viewport the gizmo is shown in
      * @return What the gizmo did this frame
      */
-    Result update(const Params &params, Rapture::ImmediateDrawList &drawList);
+    Result update(const Params &params, Rapture::GizmoDrawList &drawList);
 
     /**
      * @brief Whether a handle is under the cursor or being dragged
@@ -173,11 +173,11 @@ class TransformGizmo {
      */
     void updateValueLabel(const Params &params);
 
-    void submitShapes(const Params &params, Rapture::ImmediateDrawList &drawList) const;
-    void submitTranslate(Rapture::ShapeSubmission &submission) const;
-    void submitPlanes(Rapture::ShapeSubmission &submission) const;
-    void submitRotate(Rapture::ShapeSubmission &submission) const;
-    void submitScale(Rapture::ShapeSubmission &submission) const;
+    void submitShapes(const Params &params, Rapture::GizmoDrawList &drawList);
+    void submitTranslate();
+    void submitPlanes();
+    void submitRotate();
+    void submitScale();
 
     /**
      * @brief Take the constraint a drag will be solved against for its whole duration
@@ -206,6 +206,8 @@ class TransformGizmo {
 
   private:
     Amethyst::TextLabel *m_valueLabel = nullptr;
+
+    Rapture::GizmoBatch m_handleBatch;
 
     std::vector<AxisHandle> m_axes;
     std::vector<PlaneHandle> m_planes;

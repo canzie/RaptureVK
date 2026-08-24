@@ -7,6 +7,22 @@
 namespace Rapture {
 
 /**
+ * @brief Stands for a block of matrices a draw does not have
+ */
+static constexpr uint32_t SKIN_NO_OFFSET = 0xFFFFu;
+
+/**
+ * @brief Puts both of a skinned draw's matrix offsets into one mesh row field
+ * @param boneOffset Where the pose's joints start in the skeleton arena
+ * @param inverseBindOffset Where the mesh's inverse binds start in the skeleton arena
+ * @return The packed offsets
+ */
+inline uint32_t Skin_packOffsets(uint32_t boneOffset, uint32_t inverseBindOffset)
+{
+    return (boneOffset & SKIN_NO_OFFSET) | (inverseBindOffset << 16);
+}
+
+/**
  * @brief Per-mesh data for the mesh SSBO (std430 layout)
  */
 struct alignas(16) MeshGPUData {
@@ -14,7 +30,7 @@ struct alignas(16) MeshGPUData {
     alignas(4) uint32_t materialIndex;
     alignas(4) uint32_t vertexBufferFlags;
     alignas(4) uint32_t entityId;
-    alignas(4) uint32_t boneOffset;
+    alignas(4) uint32_t skinOffsets; ///< low half the pose's first joint, high half the mesh's first inverse bind
 };
 
 /**

@@ -1,5 +1,5 @@
-#ifndef RAPTURE__IMMEDIATE_SHAPES_DRAW_PASS_H
-#define RAPTURE__IMMEDIATE_SHAPES_DRAW_PASS_H
+#ifndef RAPTURE__GIZMO_DRAW_PASS_H
+#define RAPTURE__GIZMO_DRAW_PASS_H
 
 #include "assets/asset_manager/AssetHandle.h"
 #include "gpu/buffers/StorageBuffer.h"
@@ -8,7 +8,7 @@
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/vulkan_context/RenderContext.h"
-#include "renderer/ImmediateDrawList.h"
+#include "renderer/GizmoDrawList.h"
 #include "renderer/passes/RenderPass.h"
 
 #include <array>
@@ -21,7 +21,7 @@ namespace Rapture {
 /**
  * @brief Creation-time configuration for an immediate shapes draw pass and the buffers it uploads into
  */
-struct ImmediateShapesDrawPassConfig {
+struct GizmoDrawPassConfig {
     uint32_t width;
     uint32_t height;
     VkFormat colorFormat;
@@ -32,10 +32,10 @@ struct ImmediateShapesDrawPassConfig {
 /**
  * @brief Draws a draw list's lines and filled shapes over the rendered image
  */
-class ImmediateShapesDrawPass : public RenderPass {
+class GizmoDrawPass : public RenderPass {
   public:
-    ImmediateShapesDrawPass(const ImmediateShapesDrawPassConfig &config, const ImmediateDrawList *drawList);
-    ~ImmediateShapesDrawPass();
+    GizmoDrawPass(const GizmoDrawPassConfig &config, const GizmoDrawList *drawList);
+    ~GizmoDrawPass();
 
     CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
     void onResize(uint32_t width, uint32_t height) override;
@@ -73,13 +73,19 @@ class ImmediateShapesDrawPass : public RenderPass {
     void updateTargetBytes(VkDeviceSize required);
 
     /**
+     * @brief Where a run of shapes sits within a buffer
+     */
+    struct ShapeRange {
+        uint32_t first = 0;
+        uint32_t count = 0;
+    };
+
+    /**
      * @brief Where one depth mode's shapes sit within a buffer
      */
     struct DepthModeRange {
-        uint32_t firstSegment = 0;
-        uint32_t segmentCount = 0;
-        uint32_t firstVertex = 0;
-        uint32_t vertexCount = 0;
+        ShapeRange segments;
+        std::array<ShapeRange, GIZMO_SHADING_MODE_COUNT> vertices;
     };
 
     /**
@@ -87,19 +93,37 @@ class ImmediateShapesDrawPass : public RenderPass {
      * @param slot Buffer to upload into
      * @param[out] ranges Where each depth mode landed
      * @param[out] vertexBase Index the first filled shape corner sits at
+     * @param viewPosition Where the shapes are seen from, which decides the order they are drawn in
      */
-    void uploadDrawList(uint32_t slot, std::array<DepthModeRange, DEPTH_MODE_COUNT> &ranges, uint32_t &vertexBase);
+    void uploadDrawList(uint32_t slot, std::array<DepthModeRange, DEPTH_MODE_COUNT> &ranges, uint32_t &vertexBase,
+                        const glm::vec3 &viewPosition);
+
+    /**
+     * @brief Orders triangles so the ones furthest from the eye are drawn first
+     *
+     * Nothing here writes depth, and what it draws is blended, so what a triangle sits behind is
+     * decided by the order it is drawn in.
+     *
+     * @param vertices The triangles to order, three corners each
+     * @param viewPosition Where they are seen from
+     * @return The same triangles, furthest first
+     */
+    const std::vector<GizmoVertex> &sortTrianglesBackToFront(const std::vector<GizmoVertex> &vertices,
+                                                             const glm::vec3 &viewPosition);
 
   private:
     const RenderContext *m_rc = nullptr;
-    const ImmediateDrawList *m_drawList = nullptr;
-    ImmediateShapesDrawPassConfig m_config;
+    const GizmoDrawList *m_drawList = nullptr;
+    GizmoDrawPassConfig m_config;
 
     AssetPtr<Shader> m_segmentShader;
     AssetPtr<Shader> m_triangleShader;
+    AssetPtr<Shader> m_shadedTriangleShader;
 
     std::shared_ptr<GraphicsPipeline> m_segmentPipeline;
-    std::shared_ptr<GraphicsPipeline> m_trianglePipeline;
+    std::array<std::shared_ptr<GraphicsPipeline>, GIZMO_SHADING_MODE_COUNT> m_trianglePipelines;
+
+    std::vector<GizmoVertex> m_sortedVertices;
 
     // One more buffer than there are frames in flight, so the one picked up was last written a full
     // cycle plus a frame ago and can be rebuilt in place
@@ -118,4 +142,4 @@ class ImmediateShapesDrawPass : public RenderPass {
 
 } // namespace Rapture
 
-#endif // RAPTURE__IMMEDIATE_SHAPES_DRAW_PASS_H
+#endif // RAPTURE__GIZMO_DRAW_PASS_H

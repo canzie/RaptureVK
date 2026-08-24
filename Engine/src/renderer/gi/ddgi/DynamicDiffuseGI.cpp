@@ -420,8 +420,7 @@ void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer, uint32_t fra
     // relocation reads back the offset it wrote last frame, so the old layout has to be the real one
     // rather than UNDEFINED, which lets the contents be discarded
     VkImageMemoryBarrier offsetWriteBarrier =
-        m_ProbeOffsetTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_READ_BIT,
-                                                    VK_ACCESS_SHADER_WRITE_BIT);
+        m_ProbeOffsetTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT);
     preRelocateBarriers.push_back(offsetWriteBarrier);
 
     vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,

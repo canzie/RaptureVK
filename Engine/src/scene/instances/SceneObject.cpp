@@ -2,6 +2,7 @@
 
 #include "scene/components/Components.h"
 #include "core/utils/Log.h"
+#include "core/utils/rp_assert.h"
 #include "scene/Scene.h"
 #include "scene/SceneLoadContext.h"
 #include "scene/instances/InstanceRegistry.h"
@@ -55,21 +56,53 @@ void SceneObject::setName(std::string_view name)
     }
 }
 
-void SceneObject::addChild(std::unique_ptr<SceneObject> child)
+void SceneObject::setSerialized(bool serialized)
 {
-    if (child == nullptr) {
-        return;
+    if (serialized) {
+        m_flags |= SCENE_OBJECT_FLAG_SERIALIZED;
+    } else {
+        m_flags &= ~SCENE_OBJECT_FLAG_SERIALIZED;
     }
+}
+
+std::span<const std::unique_ptr<SceneObject>> SceneObject::children(bool includeInternal) const
+{
+    const size_t count = includeInternal ? m_children.size() : m_children.size() - m_internalCount;
+    return std::span<const std::unique_ptr<SceneObject>>(m_children.data(), count);
+}
+
+void SceneObject::addChild(std::unique_ptr<SceneObject> child, InternalMode internalMode)
+{
+    RP_ASSERT(child != nullptr, "a scene object cannot adopt nothing");
 
     child->m_parent = this;
+    if (internalMode == InternalMode::ENABLED) {
+        child->m_flags |= SCENE_OBJECT_FLAG_INTERNAL;
+    } else {
+        child->m_flags &= ~SCENE_OBJECT_FLAG_INTERNAL;
+    }
+
     SceneObject *adopted = child.get();
-    m_children.push_back(std::move(child));
+
+    if (adopted->isInternal()) {
+        m_children.push_back(std::move(child));
+        m_internalCount++;
+    } else {
+        m_children.insert(m_children.end() - static_cast<ptrdiff_t>(m_internalCount), std::move(child));
+    }
 
     adopted->onParentChanged();
 }
 
 std::unique_ptr<SceneObject> SceneObject::removeChild(SceneObject *child)
 {
+    RP_ASSERT(child != nullptr, "a scene object cannot release nothing");
+
+    if (child->isInternal()) {
+        RP_CORE_ERROR("'{}' is internal to '{}' and cannot be taken from it", child->name(), name());
+        return nullptr;
+    }
+
     for (size_t i = 0; i < m_children.size(); i++) {
         if (m_children[i].get() != child) {
             continue;
@@ -88,14 +121,16 @@ std::unique_ptr<SceneObject> SceneObject::removeChild(SceneObject *child)
 
 void SceneObject::onParentChanged()
 {
-    for (const auto &child : m_children) {
+    const bool includeInternal = true;
+
+    for (const auto &child : children(includeInternal)) {
         child->onParentChanged();
     }
 }
 
-SceneObject *SceneObject::findChild(std::string_view name) const
+SceneObject *SceneObject::findChild(std::string_view name, bool includeInternal) const
 {
-    for (const auto &child : m_children) {
+    for (const auto &child : children(includeInternal)) {
         if (child->name() == name) {
             return child.get();
         }
@@ -104,7 +139,7 @@ SceneObject *SceneObject::findChild(std::string_view name) const
     return nullptr;
 }
 
-SceneObject *SceneObject::findDescendant(std::string_view path) const
+SceneObject *SceneObject::findDescendant(std::string_view path, bool includeInternal) const
 {
     const SceneObject *current = this;
     SceneObject *found = nullptr;
@@ -116,7 +151,7 @@ SceneObject *SceneObject::findDescendant(std::string_view path) const
         std::string_view step = path.substr(start, length);
 
         if (!step.empty()) {
-            found = current->findChild(step);
+            found = current->findChild(step, includeInternal);
             if (found == nullptr) {
                 return nullptr;
             }
@@ -179,6 +214,9 @@ void SceneObject::serialize(WriteNode node) const
 
     WriteNode children = node.addArray(KEY_CHILDREN);
     for (const auto &child : m_children) {
+        if (!child->isSerialized()) {
+            continue;
+        }
         child->serialize(children.appendObject());
     }
 }
@@ -268,7 +306,13 @@ SceneObject *SceneObject::loadSubtree(SceneObject &parent, ReadNode node, SceneL
         self->remintId();
     }
 
-    return self->loadContents(header, context) ? self : nullptr;
+    if (!self->loadContents(header, context)) {
+        // what was read before the failure is not left behind, and the parent takes itself out in turn
+        parent.removeChild(self);
+        return nullptr;
+    }
+
+    return self;
 }
 
 } // namespace Rapture

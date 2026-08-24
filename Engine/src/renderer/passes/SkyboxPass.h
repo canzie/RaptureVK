@@ -1,6 +1,7 @@
 #ifndef RAPTURE__SKYBOX_PASS_H
 #define RAPTURE__SKYBOX_PASS_H
 
+#include "app/Application.h"
 #include "assets/asset_manager/Asset.h"
 #include "gpu/buffers/IndexBuffer.h"
 #include "gpu/buffers/UniformBuffer.h"
@@ -9,10 +10,9 @@
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorSet.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
-#include "renderer/passes/RenderPass.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
-#include "app/Application.h"
+#include "renderer/passes/RenderPass.h"
 
 #include "core/ecs/entity_accessor.h"
 

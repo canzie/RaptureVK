@@ -31,7 +31,7 @@ struct MeshGPUData {
     uint materialIndex;
     uint flags;
     uint entityId;
-    uint boneOffset;
+    uint skinOffsets;
 };
 
 struct ObjectInfo {
@@ -74,9 +74,9 @@ void main() {
 
 #ifdef IS_SKINNED_MESH
     // folded into the model matrix so every basis derived from it below is deformed with the position
-    uint boneOffset = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].boneOffset;
-    if (boneOffset != NO_BONE_OFFSET) {
-        model = model * Skinning_blendMatrix(pc.skeletonSSBOIndex, boneOffset, aJoints, aWeights);
+    uint skinOffsets = u_meshSSBO[pc.meshSSBOIndex].meshes[meshSlotIndex].skinOffsets;
+    if (Skinning_isSkinned(skinOffsets)) {
+        model = model * Skinning_blendMatrix(pc.skeletonSSBOIndex, skinOffsets, aJoints, aWeights);
     }
 #endif // IS_SKINNED_MESH
 

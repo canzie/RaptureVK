@@ -14,6 +14,10 @@ Delete an entry when it is done or turns out not to matter. Add the date when so
 - **2026-08-17 — glTF joint nodes still become `Node3D`s.** A skin's joints are nodes, so a skeleton appears twice: once as the joint list inside the `Skeleton` asset and once as a tree of `Node3D`s that nothing drives. The joint node indices are known in `loadSkin`; the node walk should skip them.
 - **Skinned meshes cull against bind-pose bounds** (`SceneGeometryDraw`, TODO in place). An animated mesh whose joints leave those bounds pops. Cheap fix is per-clip bounds baked at import.
 
+## Organisation
+
+- **2026-08-23 — the editor's shared UI code has no home that makes sense.** `layers/panels/components/` holds things that are not panels and not components in any consistent sense: whole control classes (`SegmentedControl`), free builder functions (`Asset_iconForType`, `iconTabLayout`), row builders (`property_sections`), pickers, and now a workspace-level mode control. Workspaces have no equivalent folder at all, so anything shared between them lands in the panels tree by default. Two different shapes are in use for the same job — a class deriving from an Amethyst component, and a free `X_addY(parent, ...)` builder — with nothing saying which to reach for. Wants a split by what the thing is rather than by which tree it was first needed in.
+
 ## Half-done
 
 - **`Mobility` and `Ray Traced` still show for skeletal meshes** in the properties panel, via `Mesh3DEditor`, though `SkeletalMesh3D` makes both no-ops.

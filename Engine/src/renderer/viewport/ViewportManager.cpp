@@ -19,8 +19,8 @@ ViewportContext ViewportManager::createViewport(const ViewportConfig &config)
 
 void ViewportManager::destroyViewport(const ViewportContext &context)
 {
-    auto it = std::find_if(m_viewports.begin(), m_viewports.end(),
-                           [&context](const auto &vp) { return vp->getId() == context.id; });
+    auto it =
+        std::find_if(m_viewports.begin(), m_viewports.end(), [&context](const auto &vp) { return vp->getId() == context.id; });
 
     if (it != m_viewports.end()) {
         m_viewports.erase(it);

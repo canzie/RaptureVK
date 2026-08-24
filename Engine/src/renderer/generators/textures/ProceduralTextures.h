@@ -294,28 +294,32 @@ class ProceduralTexture {
      * @param config Optional texture configuration
      * @return The generator, or nullptr if the shader or pipeline failed to initialise
      */
-    static std::unique_ptr<ProceduralTexture> createWhiteNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static std::unique_ptr<ProceduralTexture>
+    createWhiteNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Creates a persistent Perlin noise generator that can be regenerated on demand
      * @param config Optional texture configuration
      * @return The generator, or nullptr if the shader or pipeline failed to initialise
      */
-    static std::unique_ptr<ProceduralTexture> createPerlinNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static std::unique_ptr<ProceduralTexture>
+    createPerlinNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Creates a persistent simplex noise generator that can be regenerated on demand
      * @param config Optional texture configuration
      * @return The generator, or nullptr if the shader or pipeline failed to initialise
      */
-    static std::unique_ptr<ProceduralTexture> createSimplexNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static std::unique_ptr<ProceduralTexture>
+    createSimplexNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Creates a persistent ridged noise generator that can be regenerated on demand
      * @param config Optional texture configuration
      * @return The generator, or nullptr if the shader or pipeline failed to initialise
      */
-    static std::unique_ptr<ProceduralTexture> createRidgedNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static std::unique_ptr<ProceduralTexture>
+    createRidgedNoiseGenerator(const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Generates a white noise texture.

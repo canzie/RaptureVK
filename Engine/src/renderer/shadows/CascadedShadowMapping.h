@@ -2,10 +2,10 @@
 #define RAPTURE__CASCADEDSHADOWMAPPING_H
 
 #include "assets/asset_manager/AssetManager.h"
+#include "core/utils/TextureFlattener.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
-#include "core/utils/TextureFlattener.h"
 
 #include "gpu/buffers/UniformBuffer.h"
 #include "gpu/command_buffers/CommandBuffer.h"
@@ -14,9 +14,9 @@
 #include "gpu/descriptors/DescriptorManager.h"
 #include "gpu/descriptors/DescriptorSet.h"
 
+#include "renderer/Frustum.h"
 #include "renderer/generators/terrain/TerrainCuller.h"
 #include "renderer/generators/terrain/TerrainGenerator.h"
-#include "renderer/Frustum.h"
 
 #include "renderer/MDIBatch.h"
 

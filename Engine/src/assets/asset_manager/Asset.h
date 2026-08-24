@@ -110,4 +110,10 @@ AssetPtr<T>::AssetPtr(AssetRef ref) noexcept : m_ref(std::move(ref)), m_ptr(m_re
     RP_ASSERT(!m_ref || m_ptr != nullptr, "AssetPtr constructed from an asset that is not of type T");
 }
 
+template <typename T>
+AssetHandle AssetPtr<T>::getHandle() const noexcept
+{
+    return m_ref ? m_ref.get()->getHandle() : INVALID_ASSET_HANDLE;
+}
+
 } // namespace Rapture

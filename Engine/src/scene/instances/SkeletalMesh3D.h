@@ -47,7 +47,7 @@ class SkeletalMesh3D : public Mesh3D {
 
   private:
     /**
-     * @brief Puts the pose this mesh is drawn against into the storage the draw reads it from
+     * @brief Puts the matrices this mesh is deformed by into the storage the draw reads them from
      */
     void writePose();
 

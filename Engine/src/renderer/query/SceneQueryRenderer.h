@@ -2,11 +2,11 @@
 #define RAPTURE__SCENE_QUERY_RENDERER_H
 
 #include "assets/asset_manager/AssetManager.h"
+#include "core/ecs/entity_accessor.h"
 #include "gpu/buffers/StorageBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
-#include "core/ecs/entity_accessor.h"
-#include "renderer/SceneGeometryDraw.h"
 #include "gpu/vulkan_context/RenderContext.h"
+#include "renderer/SceneGeometryDraw.h"
 
 #include <glm/glm.hpp>
 
@@ -18,7 +18,9 @@
 namespace Rapture {
 
 class CommandBuffer;
+class Frustum;
 class GraphicsPipeline;
+class GizmoDrawList;
 class Scene;
 class Shader;
 
@@ -37,18 +39,22 @@ struct SceneQuery {
 };
 
 /**
- * @brief One entity covering one pixel of a scene query
+ * @brief One thing covering one pixel of a scene query
+ *
+ * The user data is whatever whoever drew the thing decided it should be, and this reports it back
+ * without reading it. Geometry the renderer drew answers with its entity, which is the only
+ * identity the renderer holds for it.
  */
 struct SceneQueryHit {
-    ecs::Entity entity = ecs::ENTITY_NULL;
+    uint64_t userData = 0;
     float depth = 0.0f;
 };
 
 /**
- * @brief Every entity covering every pixel of a scene query
+ * @brief Everything covering every pixel of a scene query
  *
  * A pixel keeps up to maxLayers hits, nearest first, so cycling through what sits under the cursor
- * and outlining something behind another entity both read from the same result. A pixel's count is
+ * and outlining something behind another thing both read from the same result. A pixel's count is
  * the number of fragments that covered it, and so reports how many were dropped when it exceeds
  * maxLayers.
  */
@@ -104,9 +110,11 @@ class SceneQueryRenderer {
      * @param viewportWidth Width of the image the region's pixels are in
      * @param viewportHeight Height of the image the region's pixels are in
      * @param region The region to cover
+     * @param drawList Shapes drawn over the scene, whose pick candidates answer alongside it, or nullptr for none
      * @return The region's hits, empty where the query could not be rendered
      */
-    SceneQueryResult query(Scene &scene, ecs::EntityAccessor camera, uint32_t viewportWidth, uint32_t viewportHeight, const SceneQuery &region);
+    SceneQueryResult query(Scene &scene, ecs::EntityAccessor camera, uint32_t viewportWidth, uint32_t viewportHeight,
+                           const SceneQuery &region, const GizmoDrawList *drawList = nullptr);
 
   private:
     void createPipeline();
@@ -114,6 +122,37 @@ class SceneQueryRenderer {
     void recordQuery(CommandBuffer *commandBuffer, Scene &scene, const glm::mat4 &viewProj, uint32_t viewportWidth,
                      uint32_t viewportHeight, const SceneQuery &region);
     SceneQueryResult readBack(const SceneQuery &region);
+
+    /**
+     * @brief Where a region's pixel centre sends a ray into the world
+     */
+    struct PixelRay {
+        glm::vec3 origin;
+        glm::vec3 direction;
+    };
+
+    /**
+     * @brief A ray per pixel of a region, in the order the region's pixels are stored
+     * @param inverseViewProj Takes clip space back to the world
+     * @param viewportWidth Width of the image the region's pixels are in
+     * @param viewportHeight Height of the image the region's pixels are in
+     * @param region The region the rays cover
+     * @return The rays
+     */
+    static std::vector<PixelRay> buildRegionRays(const glm::mat4 &inverseViewProj, uint32_t viewportWidth,
+                                                 uint32_t viewportHeight, const SceneQuery &region);
+
+    /**
+     * @brief Adds the hits a draw list's pick candidates cover a region's pixels with
+     * @param[in,out] result The region's hits, which the candidates' are merged into by depth
+     * @param drawList The shapes to test
+     * @param regionFrustum Frustum covering the region, which a candidate outside cannot be hit through
+     * @param viewProj Places a hit at the depth the scene's own hits are measured in
+     * @param rays One ray per pixel of the region
+     */
+    static void addPickCandidateHits(SceneQueryResult &result, const GizmoDrawList &drawList,
+                                     const Frustum &regionFrustum, const glm::mat4 &viewProj,
+                                     const std::vector<PixelRay> &rays);
 
   private:
     RenderContext m_rc;

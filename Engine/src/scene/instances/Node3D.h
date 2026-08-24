@@ -91,6 +91,17 @@ class Node3D : public SceneObject {
   protected:
     void onParentChanged() override;
 
+    /**
+     * @brief Replaces this node's local transform without reporting the change
+     * @param transform The local transform
+     */
+    void setLocalTransformUnreported(const glm::mat4 &transform);
+
+    /**
+     * @brief Called once this node's own local transform has changed and the world has been rebuilt
+     */
+    virtual void onLocalTransformChanged() {}
+
   private:
     /**
      * @brief Records that rotation or scale was written, staling the local matrix
