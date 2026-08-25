@@ -61,16 +61,15 @@ CharacterBody3D : PhysicsBody3D
 
 ## Controller : SceneObject
 
-The hooks a scripted controller gets, from `Controller.h:29,40,46,56`:
+From `Controller.h:29,40,46,56`:
 
 ```
 .possessed         SceneObject   read-only
 .intent            table         read-only, this frame's input
 .capturesCursor    bool          read/write
-:onPossess(subject)              called when handed a puppet
-:onUpdate(dt)                    called each frame while possessing
+.onPossess         Signal(subject)
+.onUpdate          Signal(dt)
 ```
-
 
 ## ScriptComponent : SceneComponent
 
@@ -78,7 +77,9 @@ The hooks a scripted controller gets, from `Controller.h:29,40,46,56`:
 .owner           SceneObject   read-only
 ```
 
-`self` inside a method is the script's own instance table, so `self.owner` is the object it is attached to.
+Reached as the global `script`. The body runs once, when the owner is ready, and that run is where a script does its connecting. There is no lifecycle method to fill in and nothing is wired by name.
+
+A consequence: a script cannot hear its own owner's ready, since the body is that moment. `onDestroy` and everything else are ordinary signals.
 
 ## Signal
 
@@ -86,6 +87,8 @@ The hooks a scripted controller gets, from `Controller.h:29,40,46,56`:
 :connect(fn)     -> Connection
 :once(fn)        -> Connection
 ```
+
+A connection does not replay, so a signal that fired before the connect is missed. Every signal reporting a state change is therefore paired with a property holding that state, `onPossess` with `.possessed`, and a script handles what is already there before connecting for what comes later.
 
 ## Connection
 
@@ -168,52 +171,58 @@ Nothing render-side, no materials, no GPU, no asset loading beyond references th
 `PlayerController.cpp` as a script.
 
 ```lua
-local PlayerController = {}
-
-PlayerController.movementSpeed = 5.0
-PlayerController.mouseSensitivity = 0.1
-PlayerController.maxPitch = 89.0
-
 local WORLD_UP = Vector3.new(0, 1, 0)
 
-function PlayerController:onPossess(subject)
-    self.yaw = -90.0
-    self.pitch = 0.0
-    self.body = subject:getComponent("CharacterBody3D")
-    self.cameraArm = subject:findFirstDescendantOfType("SpringArm3D")
+local movementSpeed = 5.0
+local mouseSensitivity = 0.1
+local maxPitch = 89.0
+
+local controller = script.owner
+local yaw = -90.0
+local pitch = 0.0
+local body = nil
+local cameraArm = nil
+
+local function usePuppet(subject)
+    body = subject:getComponent("CharacterBody3D")
+    cameraArm = subject:findFirstDescendantOfType("SpringArm3D")
 end
 
-function PlayerController:onUpdate(dt)
-    local subject = self.possessed
+if controller.possessed then
+    usePuppet(controller.possessed)
+end
+controller.onPossess:connect(usePuppet)
+
+controller.onUpdate:connect(function(dt)
+    local subject = controller.possessed
     if not subject then
         return
     end
 
-    local intent = self.intent
+    local intent = controller.intent
 
-    self.yaw = self.yaw + intent.look.x * self.mouseSensitivity
-    self.pitch = math.max(-self.maxPitch,
-                 math.min(self.maxPitch, self.pitch - intent.look.y * self.mouseSensitivity))
+    yaw = yaw + intent.look.x * mouseSensitivity
+    pitch = math.max(-maxPitch, math.min(maxPitch, pitch - intent.look.y * mouseSensitivity))
 
-    local turn = Quat.fromAxisAngle(WORLD_UP, math.rad(self.yaw))
+    local turn = Quat.fromAxisAngle(WORLD_UP, math.rad(yaw))
     local walk = turn * Vector3.new(intent.move.x, 0, intent.move.z)
 
-    self.body.walkSpeed = self.movementSpeed
-    self.body:move(walk)
+    body.walkSpeed = movementSpeed
+    body:move(walk)
 
     if intent.jump then
-        self.body:jump()
+        body:jump()
     end
 
     subject:lookAt(subject.position + walk)
 
-    if self.cameraArm then
-        self.cameraArm.rotationQ = Quat.fromAxisAngle(Vector3.new(1, 0, 0), math.rad(self.pitch))
+    if cameraArm then
+        cameraArm.rotationQ = Quat.fromAxisAngle(Vector3.new(1, 0, 0), math.rad(pitch))
     end
-end
-
-return PlayerController
+end)
 ```
+
+Locals rather than fields on a table, because each script instance loads its own chunk and so has its own globals and its own closure state.
 
 `math.clamp` does not exist in Lua 5.4, only in Luau, hence the `min`/`max` pair.
 

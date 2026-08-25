@@ -372,8 +372,9 @@ target_compile_options(lua PRIVATE
 )
 
 # --- sol2 Target ---
-target_link_libraries(sol2 INTERFACE lua)
-target_compile_definitions(sol2 INTERFACE
+# NOTE: sol2 exports itself unconditionally, so anything added to its link interface has to be in
+# an export set too. Lua is linked through vendor_libraries below instead.
+target_compile_definitions(vendor_libraries INTERFACE
     SOL_USING_CXX_LUA=1
     $<$<CONFIG:Debug>:SOL_ALL_SAFETIES_ON=1>
 )
@@ -397,6 +398,7 @@ target_link_libraries(vendor_libraries INTERFACE
     tomlplusplus::tomlplusplus
     concurrentqueue
     Jolt
+    lua
     sol2::sol2
 )
 
