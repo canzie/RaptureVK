@@ -41,6 +41,16 @@ The argument that settled it is **hot reload**, which is the reason a VM earns i
 
 What a binding is, since it grounds the harder C++ question: a Lua value holding a C++ object is a **userdata**, a blob containing a pointer, carrying a metatable whose `__index` resolves `obj.add`. What that finds is a plain `int (*)(lua_State *)` that pops arguments off the Lua stack, casts the userdata back, calls the real method, and pushes results. sol2 writes those functions from `new_usertype<T>("T", "add", &T::addChild)`. It is all one binary, one process — a binding is a function pointer in a table, and nothing is dynamic.
 
+### What the dependency actually is
+
+sol2 is header-only and carries no VM, so Lua is a separate dependency we build ourselves. There is also no knob telling sol2 which Lua to bind to — `SOL_LUA_VERSION` is `LUA_VERSION_NUM` read out of whichever `lua.h` is on the include path (`compatibility/lua_version.hpp:106`), and the compat layer `#error`s outside 5.1 to 5.4 (`compat-5.3.h:408`).
+
+That caps us at **Lua 5.4.8** even though 5.5 is released, since sol2's `develop` branch has the same guard. sol2 itself is at **v3.5.0**; the v4.0.0 alpha is not worth taking.
+
+**Lua is compiled as C++.** Built as C its error mechanism is `longjmp`, which jumps past the destructors of every C++ frame it unwinds through, and those frames are sol2's and ours. `ldo.c` picks a `throw`/`catch` implementation instead when `__cplusplus` is defined, and sol2's `SOL_USING_CXX_LUA` makes it include the headers unmangled to match.
+
+The consequence for the no-exceptions rule: Lua throws internally and sol2 throws `sol::error` by default, so engine code has to go through `sol::protected_function` and check the result rather than let anything propagate. `SOL_NO_EXCEPTIONS` is the wrong trade — it turns an unhandled script error into `abort()`.
+
 Undecided: a Lua state is not thread-safe, so given the fiber job system there is a choice between one state per world pinned to a known thread, or something finer. Worth settling early since it is hard to reverse.
 
 ---
@@ -153,3 +163,5 @@ Whether a small secondary tier for orchestration ever appears (Godot's autoloads
 ## 10. Next
 
 Lua integration, next session. It needs neither the shared library nor module loading to be useful, since the editor can host a Lua state today — which is part of why it goes first.
+
+Specced in [[Lua Scripting]].

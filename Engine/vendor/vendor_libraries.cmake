@@ -167,6 +167,36 @@ FetchContent_Declare(
 )
 
 
+# --- Lua ---
+# NOTE: the official Lua sources ship no build system, so the static target is
+# assembled by hand further down.
+FetchContent_Declare(
+    lua
+    GIT_REPOSITORY https://github.com/lua/lua.git
+    GIT_TAG v5.4.8
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+)
+
+# --- sol2 ---
+# NOTE: sol2 is header-only and binds against whatever lua.h it finds; 5.4 is the
+# newest version it supports.
+set(SOL2_TESTS OFF CACHE BOOL "" FORCE)
+set(SOL2_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SOL2_INTEROP_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SOL2_DYNAMIC_LOADING_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SOL2_SINGLE OFF CACHE BOOL "" FORCE)
+set(SOL2_DOCS OFF CACHE BOOL "" FORCE)
+set(SOL2_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    sol2
+    GIT_REPOSITORY https://github.com/ThePhD/sol2.git
+    GIT_TAG v3.5.0
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+)
+
+
 # ==================== Make Dependencies Available ====================
 
 message(STATUS "=== Fetching Vendor Dependencies ===")
@@ -188,6 +218,8 @@ FetchContent_MakeAvailable(tomlplusplus)
 target_compile_definitions(tomlplusplus_tomlplusplus INTERFACE TOML_EXCEPTIONS=0)
 FetchContent_MakeAvailable(concurrentqueue)
 FetchContent_MakeAvailable(JoltPhysics)
+FetchContent_MakeAvailable(lua)
+FetchContent_MakeAvailable(sol2)
 message(STATUS "=== All vendor dependencies available ===")
 
 # ==================== Suppress Warnings from Vendor Libraries ====================
@@ -312,6 +344,39 @@ target_compile_options(yyjson_static PRIVATE
     $<$<C_COMPILER_ID:MSVC>:/w>
 )
 
+# --- Lua Target ---
+# Built as C++ so a Lua error raises a C++ exception rather than longjmp-ing past
+# the destructors of the sol2 and engine frames it unwinds through.
+file(GLOB LUA_SOURCES ${lua_SOURCE_DIR}/*.c)
+list(REMOVE_ITEM LUA_SOURCES
+    ${lua_SOURCE_DIR}/lua.c
+    ${lua_SOURCE_DIR}/luac.c
+    ${lua_SOURCE_DIR}/onelua.c
+    ${lua_SOURCE_DIR}/ltests.c
+)
+add_library(lua STATIC ${LUA_SOURCES})
+set_source_files_properties(${LUA_SOURCES} PROPERTIES LANGUAGE CXX)
+target_include_directories(lua SYSTEM PUBLIC ${lua_SOURCE_DIR})
+set_target_properties(lua PROPERTIES CXX_STANDARD ${CMAKE_CXX_STANDARD} CXX_STANDARD_REQUIRED ON)
+if(UNIX AND NOT APPLE)
+    target_compile_definitions(lua PRIVATE LUA_USE_LINUX)
+    target_link_libraries(lua PRIVATE ${CMAKE_DL_LIBS} m)
+elseif(APPLE)
+    target_compile_definitions(lua PRIVATE LUA_USE_MACOSX)
+    target_link_libraries(lua PRIVATE ${CMAKE_DL_LIBS})
+endif()
+target_compile_options(lua PRIVATE
+    $<$<CXX_COMPILER_ID:GNU>:-w -Wno-odr -Wno-lto-type-mismatch -fno-lto>
+    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-w>
+    $<$<CXX_COMPILER_ID:MSVC>:/w>
+)
+
+# --- sol2 Target ---
+target_link_libraries(sol2 INTERFACE lua)
+target_compile_definitions(sol2 INTERFACE
+    SOL_USING_CXX_LUA=1
+    $<$<CONFIG:Debug>:SOL_ALL_SAFETIES_ON=1>
+)
 
 # ==================== Link all libraries to vendor_libraries ====================
 target_link_libraries(vendor_libraries INTERFACE
@@ -332,6 +397,7 @@ target_link_libraries(vendor_libraries INTERFACE
     tomlplusplus::tomlplusplus
     concurrentqueue
     Jolt
+    sol2::sol2
 )
 
 # Mark vendor_libraries includes as SYSTEM to suppress warnings
