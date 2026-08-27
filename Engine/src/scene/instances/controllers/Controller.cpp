@@ -40,10 +40,19 @@ void Controller::addPitchInput(float degrees)
     m_pitch = glm::clamp(m_pitch + degrees, -m_maxPitch, m_maxPitch);
 }
 
+void Controller::setControlRotation(float yawDegrees, float pitchDegrees)
+{
+    m_yaw = yawDegrees;
+    m_pitch = glm::clamp(pitchDegrees, -m_maxPitch, m_maxPitch);
+}
+
 glm::quat Controller::controlRotation() const
 {
-    return glm::angleAxis(glm::radians(m_yaw), WORLD_UP) *
-           glm::angleAxis(glm::radians(m_pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+    // an aim faces down its own -Z, so the turn is the one taking -Z onto the flattened forward
+    glm::vec3 forward = controlForward();
+    float turn = std::atan2(-forward.x, -forward.z);
+
+    return glm::angleAxis(turn, WORLD_UP) * glm::angleAxis(glm::radians(m_pitch), glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
 glm::vec3 Controller::controlForward() const

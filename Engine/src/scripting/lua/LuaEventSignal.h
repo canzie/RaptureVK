@@ -39,10 +39,7 @@ class LuaEventConnectionStore {
 class LuaEventConnection {
   public:
     LuaEventConnection() = default;
-    explicit LuaEventConnection(std::shared_ptr<EventConnection> connection)
-        : m_connection(std::move(connection))
-    {
-    }
+    explicit LuaEventConnection(std::shared_ptr<EventConnection> connection) : m_connection(std::move(connection)) {}
 
     void disconnect();
     bool connected() const;

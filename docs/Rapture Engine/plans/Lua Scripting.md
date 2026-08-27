@@ -75,7 +75,7 @@ From `Controller.h:29,40,46,56`:
 ```
 .possessed          SceneObject   read-only
 .intent             table         read-only, this frame's input
-.capturesCursor     bool          read-only
+.capturesCursor     bool          read/write
 :addYawInput(deg)                 turns the aim to the right
 :addPitchInput(deg)               tilts the aim up, held within maxPitch
 .controlRotation    Quat          read-only, where the controller is aiming
@@ -169,13 +169,15 @@ local Time = require("time")
 
 ```
 script                                  ScriptComponent
-log(...) warn(...) error(...)
+log(...) warn(...)
 wait(seconds)
 spawn(fn)
 delay(seconds, fn)
 Vector3
 Quat
 ```
+
+`error` stays Lua's own, which raises. A script reporting a problem without stopping uses `warn`.
 
 ## Withheld
 

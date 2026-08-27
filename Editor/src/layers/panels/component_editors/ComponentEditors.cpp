@@ -957,7 +957,7 @@ void CameraControllerEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             t, "Max Pitch", &m_maxPitch, 0.0f, 89.9f,
             [this](float v) {
                 if (m_controller != nullptr) {
-                    m_controller->maxPitch = v;
+                    m_controller->setMaxPitch(v);
                 }
             },
             "%.1f deg");
@@ -976,7 +976,7 @@ void CameraControllerEditor::sync(const Rapture::ecs::EntityAccessor &entity)
     m_orbitSensitivity = m_controller->orbitSensitivity;
     m_panSpeed = m_controller->panSpeed;
     m_zoomSpeed = m_controller->zoomSpeed;
-    m_maxPitch = m_controller->maxPitch;
+    m_maxPitch = m_controller->maxPitch();
 }
 
 void PlayerControllerEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
@@ -996,7 +996,7 @@ void PlayerControllerEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             t, "Max Pitch", &m_maxPitch, 0.0f, 89.9f,
             [this](float v) {
                 if (m_controller != nullptr) {
-                    m_controller->maxPitch = v;
+                    m_controller->setMaxPitch(v);
                 }
             },
             "%.1f deg");
@@ -1012,5 +1012,5 @@ void PlayerControllerEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 
     m_movementSpeed = m_controller->movementSpeed;
     m_mouseSensitivity = m_controller->mouseSensitivity;
-    m_maxPitch = m_controller->maxPitch;
+    m_maxPitch = m_controller->maxPitch();
 }

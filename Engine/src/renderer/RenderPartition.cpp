@@ -259,7 +259,11 @@ void GPUDataStore<T>::ensureCapacity(uint32_t requiredStaticCount, uint32_t requ
 
     if (!needsRealloc) return;
 
-    unregisterSSBOs();
+    // the old indices are held until the new ones are taken, so no other store can claim one that
+    // work already recorded is still reading through
+    std::vector<uint32_t> retiredIndices = m_descriptorIndices;
+    std::vector<std::unique_ptr<StorageBuffer>> retiredSsbos = std::move(m_ssbos);
+    m_ssbos.resize(m_frameCount);
 
     VmaAllocator allocator = m_renderContext->vulkanContext->getVmaAllocator();
     VkDeviceSize bufferSize = static_cast<VkDeviceSize>(m_staticCapacity + m_dynamicCapacity) * sizeof(T);
@@ -269,6 +273,8 @@ void GPUDataStore<T>::ensureCapacity(uint32_t requiredStaticCount, uint32_t requ
     }
 
     registerSSBOs();
+
+    freeDescriptorIndices(retiredIndices);
 
     for (auto &partition : m_partitions) {
         partition.markAllDirtyAllFrames();
@@ -298,6 +304,29 @@ void GPUDataStore<T>::registerSSBOs()
     for (uint32_t i = 0; i < m_frameCount; i++) {
         if (m_ssbos[i] != nullptr) {
             m_descriptorIndices[i] = binding->add(*m_ssbos[i]);
+        }
+    }
+}
+
+template <typename T>
+void GPUDataStore<T>::freeDescriptorIndices(std::span<const uint32_t> indices)
+{
+    if (m_bindingLocation == DescriptorSetBindingLocation::NONE) {
+        return;
+    }
+
+    auto set = m_renderContext->descriptorManager->getDescriptorSet(m_bindingLocation);
+    if (set == nullptr) {
+        return;
+    }
+    auto binding = set->getSSBOBinding(m_bindingLocation);
+    if (binding == nullptr) {
+        return;
+    }
+
+    for (uint32_t index : indices) {
+        if (index != UINT32_MAX) {
+            binding->free(index);
         }
     }
 }

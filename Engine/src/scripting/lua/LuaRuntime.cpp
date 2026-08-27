@@ -11,6 +11,19 @@
 
 namespace Rapture::scripting {
 
+static std::string s_concatenate(const sol::variadic_args &args)
+{
+    std::string line;
+    for (auto argument : args) {
+        if (!line.empty()) {
+            line += ' ';
+        }
+        line += argument.as<std::string>();
+    }
+
+    return line;
+}
+
 struct LuaRuntime::Impl {
     sol::state lua;
     LuaEventConnectionStore connections;
@@ -22,18 +35,23 @@ LuaRuntime::LuaRuntime(Scene &scene) : m_impl(std::make_unique<Impl>())
     sol::state &lua = m_impl->lua;
     setLuaScene(lua, scene);
 
-    lua.open_libraries(sol::lib::base, sol::lib::coroutine, sol::lib::math, sol::lib::string,
-                       sol::lib::table, sol::lib::utf8);
+    lua.open_libraries(sol::lib::base, sol::lib::coroutine, sol::lib::math, sol::lib::string, sol::lib::table, sol::lib::utf8);
 
     lua["load"] = sol::lua_nil;
     lua["loadfile"] = sol::lua_nil;
     lua["dofile"] = sol::lua_nil;
+
+    lua["log"] = [](sol::variadic_args args) { RP_CORE_INFO("{}", s_concatenate(args)); };
+    lua["warn"] = [](sol::variadic_args args) { RP_CORE_WARN("{}", s_concatenate(args)); };
 
     setLuaEventConnectionStore(lua, m_impl->connections);
 
     registerMathBindings(lua);
     registerEventSignalBindings(lua);
     registerInstanceBindings(lua);
+    registerNode3DBindings(lua);
+    registerControllerBindings(lua);
+    registerSceneComponentBindings(lua);
 }
 
 LuaRuntime::~LuaRuntime() = default;
@@ -58,8 +76,7 @@ void LuaRuntime::runScript(ScriptComponent &component)
     SceneObject *owner = component.owner();
     std::string chunkName = "@" + std::string(owner != nullptr ? owner->name() : component.name());
 
-    sol::protected_function_result result =
-        lua.safe_script(source, environment, sol::script_pass_on_error, chunkName);
+    sol::protected_function_result result = lua.safe_script(source, environment, sol::script_pass_on_error, chunkName);
     if (!result.valid()) {
         sol::error failure = result;
         RP_CORE_ERROR("{}", failure.what());

@@ -15,8 +15,7 @@ void setLuaScene(sol::state_view lua, Scene &scene)
 
 Scene *luaScene(sol::state_view lua)
 {
-    sol::optional<sol::light<Scene>> scene =
-        lua.registry()[SCENE_REGISTRY_KEY].get<sol::optional<sol::light<Scene>>>();
+    sol::optional<sol::light<Scene>> scene = lua.registry()[SCENE_REGISTRY_KEY].get<sol::optional<sol::light<Scene>>>();
     if (!scene.has_value()) {
         return nullptr;
     }

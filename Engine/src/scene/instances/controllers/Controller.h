@@ -53,6 +53,13 @@ class Controller : public SceneObject {
      */
     void addPitchInput(float degrees);
 
+    /**
+     * @brief Points this controller outright rather than turning it by a delta
+     * @param yawDegrees How far it is turned to the right
+     * @param pitchDegrees How far it is tilted up, held within the pitch limit
+     */
+    void setControlRotation(float yawDegrees, float pitchDegrees);
+
     float yaw() const { return m_yaw; }
     float pitch() const { return m_pitch; }
 

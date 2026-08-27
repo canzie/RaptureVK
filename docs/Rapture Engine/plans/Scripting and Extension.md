@@ -83,6 +83,16 @@ So every class a script can reach is registered, including ones that add nothing
 
 The id is assigned in first-call order, since each `TypeInfo` is a function-local static built when its class is first touched. It is not stable across runs and must never be serialized — `name` stays the serialized identity.
 
+### Where a script's source lives
+
+On the `ScriptComponent`, serialized inline into whatever document authored the object. Not an asset.
+
+The asset system was considered and rejected: of what it offers, a script wants only a shared identity, and would have to suppress the checksummed `.rasset` container that rejects an out-of-band edit, eviction, async status, import by extension, the frame-in-flight deferred free, and a path index keyed on the wrong file. That is six suppressions to buy one identifier the owning object already has.
+
+The objection to inline storage is that a prefab placed a hundred times writes its script a hundred times. That is true and it is not a script problem: `spawnSubtree` records nothing about the asset it came from, so a placed tree writes out its class, name, every component and every child in full. Script text is one field riding along, and the fix is a placed instance being a reference to its prefab plus per-instance overrides. Script text needs no override, since it is not per-instance mutable. That work is its own design pass.
+
+A shared library reached through `require` is the opposite case — standalone, shared, referenced by name — and every asset feature applies to it. So `ASSET_SCRIPT` is for that kind, when `require` lands, and not for behaviour scripts.
+
 ### Where the Lua layer lives
 
 ```

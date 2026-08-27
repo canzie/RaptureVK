@@ -152,6 +152,9 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
         uint32_t cameraSlot = activeScene.getRenderData()->getCameraSlot(camera.getEntity());
         if (cameraSlot != UINT32_MAX) {
             cameraSlotIndex = cameraSlot;
+        } else {
+            RP_CORE_WARN("lighting: camera entity {} has no slot, shading from slot 0",
+                         static_cast<uint32_t>(camera.getEntity()));
         }
     } else {
         RP_CORE_WARN("No main camera found!");

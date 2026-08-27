@@ -168,13 +168,20 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
     attach(tabBar, std::move(root));
 }
 
-ViewportPanel::~ViewportPanel()
+void ViewportPanel::releaseSlotImages()
 {
     for (auto &slot : m_slotImages) {
         if (slot.id.isValid() && m_services.unregisterTexture) {
             m_services.unregisterTexture(slot.id);
         }
     }
+
+    m_slotImages.clear();
+}
+
+ViewportPanel::~ViewportPanel()
+{
+    releaseSlotImages();
     if (m_viewport != nullptr) {
         m_viewport->editorBinding().displayed = false;
     }
@@ -459,6 +466,9 @@ void ViewportPanel::onUpdate(float dt)
                 if (size != m_lastViewportSize) {
                     m_lastViewportSize = size;
                     if (viewport != nullptr) {
+                        // the images this holds belong to the targets the resize destroys, and a new
+                        // target can land on the address the old one had
+                        releaseSlotImages();
                         viewport->resize(static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y));
                     }
                 }

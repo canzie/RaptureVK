@@ -51,6 +51,11 @@ class ViewportPanel : public Panel {
     ViewportPanel &operator=(ViewportPanel &&) = delete;
 
     void setViewportImage(Amethyst::AmTextureId imageId);
+
+    /**
+     * @brief Hands back every image this panel holds for its viewport's targets
+     */
+    void releaseSlotImages();
     void onUpdate(float dt) override;
 
     gizmo::TransformGizmo::Operation getGizmoOperation() const { return m_gizmoOperation; }

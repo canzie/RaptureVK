@@ -79,19 +79,16 @@ class CameraController : public Controller {
     float orbitSensitivity = 0.3f;
     float panSpeed = 0.0015f;
     float zoomSpeed = 0.15f;
-    float maxPitch = 89.0f;
 
   private:
     void updateFly(float dt, Node3D &node);
     void updateOrbit(Node3D &node);
-    void recalcFront();
+    void recalcForward();
 
   private:
     CameraControlMode m_mode = CameraControlMode::ORBIT;
 
-    float m_yaw = -90.0f;
-    float m_pitch = 0.0f;
-    glm::vec3 m_front = {0.0f, 0.0f, -1.0f};
+    glm::vec3 m_forward = {0.0f, 0.0f, -1.0f};
 
     glm::vec3 m_focusPoint = {0.0f, 0.0f, 0.0f};
     float m_focusDistance = 5.0f;

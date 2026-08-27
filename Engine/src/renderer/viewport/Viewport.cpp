@@ -1,6 +1,7 @@
 #include "Viewport.h"
 
 #include "app/Application.h"
+#include "core/utils/Log.h"
 #include "core/utils/rp_assert.h"
 #include "renderer/DepthPrepassRenderer.h"
 #include "renderer/GizmoRenderer.h"

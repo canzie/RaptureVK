@@ -50,7 +50,7 @@ void CameraController::possess(SceneObject *subject)
 
     Controller::possess(camera);
     setViewCamera(camera);
-    recalcFront();
+    recalcForward();
 }
 
 void CameraController::setMode(CameraControlMode mode)
@@ -87,7 +87,7 @@ void CameraController::onUpdate(float dt)
         updateOrbit(*m_viewCamera);
     }
 
-    camera->updateViewMatrix(transform::translation(m_viewCamera->worldTransform()), m_front);
+    camera->updateViewMatrix(transform::translation(m_viewCamera->worldTransform()), m_forward);
 }
 
 void CameraController::updateViewCamera()
@@ -96,51 +96,49 @@ void CameraController::updateViewCamera()
         return;
     }
 
-    // this controller aims itself rather than the object it sits on, so where it looks is m_front
-    // and not anything the transform carries
+    // this controller turns itself rather than the object it sits on, so where it looks is its own
+    // forward and not anything the transform carries
     m_viewCamera->accessor().write<CameraComponent>()->updateViewMatrix(
-        transform::translation(m_viewCamera->worldTransform()), m_front);
+        transform::translation(m_viewCamera->worldTransform()), m_forward);
 }
 
 void CameraController::updateFly(float dt, Node3D &node)
 {
     setCapturesCursor(true);
 
-    m_yaw += m_intent.look.x * mouseSensitivity;
-    m_pitch -= m_intent.look.y * mouseSensitivity;
-    m_pitch = glm::clamp(m_pitch, -maxPitch, maxPitch);
-    recalcFront();
+    addYawInput(m_intent.look.x * mouseSensitivity);
+    addPitchInput(-m_intent.look.y * mouseSensitivity);
+    recalcForward();
 
-    glm::vec3 right = glm::normalize(glm::cross(m_front, WORLD_UP));
+    glm::vec3 right = glm::normalize(glm::cross(m_forward, WORLD_UP));
     float distance = movementSpeed * dt;
 
     glm::vec3 position = node.position();
     position += right * m_intent.move.x * distance;
     position += WORLD_UP * m_intent.move.y * distance;
-    position += m_front * m_intent.move.z * distance;
+    position += m_forward * m_intent.move.z * distance;
     node.setPosition(position);
 }
 
 void CameraController::updateOrbit(Node3D &node)
 {
     if (m_recenterFocus) {
-        m_focusPoint = node.position() + m_front * m_focusDistance;
+        m_focusPoint = node.position() + m_forward * m_focusDistance;
         m_recenterFocus = false;
     }
 
     setCapturesCursor(m_intent.orbit);
 
     if (m_intent.orbit) {
-        glm::vec3 right = glm::normalize(glm::cross(m_front, WORLD_UP));
-        glm::vec3 up = glm::normalize(glm::cross(right, m_front));
+        glm::vec3 right = glm::normalize(glm::cross(m_forward, WORLD_UP));
+        glm::vec3 up = glm::normalize(glm::cross(right, m_forward));
         if (m_intent.pan) {
             float scale = panSpeed * m_focusDistance;
             m_focusPoint += (-right * m_intent.look.x + up * m_intent.look.y) * scale;
         } else {
-            m_yaw += m_intent.look.x * orbitSensitivity;
-            m_pitch -= m_intent.look.y * orbitSensitivity;
-            m_pitch = glm::clamp(m_pitch, -maxPitch, maxPitch);
-            recalcFront();
+            addYawInput(m_intent.look.x * orbitSensitivity);
+            addPitchInput(-m_intent.look.y * orbitSensitivity);
+            recalcForward();
         }
     }
 
@@ -151,7 +149,7 @@ void CameraController::updateOrbit(Node3D &node)
         }
     }
 
-    node.setPosition(m_focusPoint - m_front * m_focusDistance);
+    node.setPosition(m_focusPoint - m_forward * m_focusDistance);
 }
 
 void CameraController::serialize(WriteNode node) const
@@ -163,7 +161,7 @@ void CameraController::serialize(WriteNode node) const
     node.set(KEY_ORBIT_SENSITIVITY, orbitSensitivity);
     node.set(KEY_PAN_SPEED, panSpeed);
     node.set(KEY_ZOOM_SPEED, zoomSpeed);
-    node.set(KEY_MAX_PITCH, maxPitch);
+    node.set(KEY_MAX_PITCH, maxPitch());
 }
 
 void CameraController::deserialize(ReadNode node)
@@ -175,16 +173,15 @@ void CameraController::deserialize(ReadNode node)
     orbitSensitivity = static_cast<float>(node.child(KEY_ORBIT_SENSITIVITY).asF64(orbitSensitivity));
     panSpeed = static_cast<float>(node.child(KEY_PAN_SPEED).asF64(panSpeed));
     zoomSpeed = static_cast<float>(node.child(KEY_ZOOM_SPEED).asF64(zoomSpeed));
-    maxPitch = static_cast<float>(node.child(KEY_MAX_PITCH).asF64(maxPitch));
+    setMaxPitch(static_cast<float>(node.child(KEY_MAX_PITCH).asF64(maxPitch())));
 }
 
 void CameraController::focusOn(const glm::vec3 &center, float radius, const glm::vec3 &direction)
 {
     if (glm::length(direction) > 0.0f) {
         glm::vec3 forward = glm::normalize(direction);
-        m_pitch = glm::clamp(glm::degrees(std::asin(forward.y)), -maxPitch, maxPitch);
-        m_yaw = glm::degrees(std::atan2(forward.z, forward.x));
-        recalcFront();
+        setControlRotation(glm::degrees(std::atan2(forward.z, forward.x)), glm::degrees(std::asin(forward.y)));
+        recalcForward();
     }
 
     focusOn(center, radius);
@@ -220,17 +217,17 @@ void CameraController::focusOn(const glm::vec3 &center, float radius)
     m_focusDistance = distance;
     m_recenterFocus = false;
 
-    m_viewCamera->setPosition(center - m_front * distance);
+    m_viewCamera->setPosition(center - m_forward * distance);
     updateViewCamera();
 }
 
-void CameraController::recalcFront()
+void CameraController::recalcForward()
 {
-    glm::vec3 front;
-    front.x = std::cos(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
-    front.y = std::sin(glm::radians(m_pitch));
-    front.z = std::sin(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
-    m_front = glm::normalize(front);
+    glm::vec3 forward;
+    forward.x = std::cos(glm::radians(yaw())) * std::cos(glm::radians(pitch()));
+    forward.y = std::sin(glm::radians(pitch()));
+    forward.z = std::sin(glm::radians(yaw())) * std::cos(glm::radians(pitch()));
+    m_forward = glm::normalize(forward);
 }
 
 } // namespace Rapture

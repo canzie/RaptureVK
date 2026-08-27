@@ -184,6 +184,10 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, const RenderP
     uint32_t meshSSBOIndex = renderData.getMeshes().getDescriptorIndex(currentFrame);
     uint32_t cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrame);
     uint32_t cameraSlot = renderData.getCameraSlot(camera.getEntity());
+    if (cameraSlot == UINT32_MAX) {
+        RP_CORE_WARN("gbuffer: camera entity {} has no slot, drawing from slot 0",
+                     static_cast<uint32_t>(camera.getEntity()));
+    }
     uint32_t cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
     uint32_t skeletonSSBOIndex = renderData.getSkeletonInstanceManager().getBindlessIndex();
 

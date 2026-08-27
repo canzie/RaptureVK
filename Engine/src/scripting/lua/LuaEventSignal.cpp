@@ -50,8 +50,7 @@ LuaEventConnection LuaEventSignal::once(const sol::protected_function &callback,
     return subscribe(callback, state, true);
 }
 
-LuaEventConnection LuaEventSignal::subscribe(const sol::protected_function &callback, sol::this_state state,
-                                             bool once)
+LuaEventConnection LuaEventSignal::subscribe(const sol::protected_function &callback, sol::this_state state, bool once)
 {
     if (m_owner.get() == nullptr || m_connect == nullptr) {
         luaL_error(state, "the object this signal belongs to has been destroyed");

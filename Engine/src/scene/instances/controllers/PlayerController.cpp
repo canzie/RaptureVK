@@ -64,29 +64,6 @@ void PlayerController::possess(SceneObject *subject)
 void PlayerController::onUpdate(float dt)
 {
     Controller::onUpdate(dt);
-
-    Node3D *subject = m_possessed != nullptr ? m_possessed->as<Node3D>() : nullptr;
-    if (subject == nullptr) {
-        return;
-    }
-
-    addYawInput(m_intent.look.x * mouseSensitivity);
-    addPitchInput(-m_intent.look.y * mouseSensitivity);
-
-    glm::vec3 forward = controlForward();
-    const glm::vec3 walk = (controlRight() * m_intent.move.x + forward * m_intent.move.z) * movementSpeed;
-
-    if (m_body != nullptr) {
-        m_body->setVelocity(walk);
-        if (m_intent.jump && m_characterBody != nullptr) {
-            m_characterBody->jump();
-        }
-    } else {
-        subject->setPosition(subject->position() + walk * dt);
-    }
-
-    // a puppet faces down its own -Z, so the turn is the one taking -Z onto the walk direction
-    subject->setRotation(glm::angleAxis(std::atan2(-forward.x, -forward.z), WORLD_UP));
 }
 
 void PlayerController::updateViewCamera()

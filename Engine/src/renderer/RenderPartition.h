@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace Rapture {
@@ -260,6 +261,12 @@ class GPUDataStore {
     void ensureCapacity(uint32_t requiredStaticCount, uint32_t requiredDynamicCount);
     void registerSSBOs();
     void unregisterSSBOs();
+
+    /**
+     * @brief Hands a set of bindless slots back so other stores can take them
+     * @param indices The slots to release, entries of UINT32_MAX ignored
+     */
+    void freeDescriptorIndices(std::span<const uint32_t> indices);
 
     std::array<RenderPartition<T>, MOBILITY_COUNT> m_partitions;
     std::vector<std::unique_ptr<StorageBuffer>> m_ssbos;
