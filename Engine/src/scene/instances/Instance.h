@@ -2,13 +2,14 @@
 #define RAPTURE__INSTANCE_H
 
 #include "core/events/EventSignal.h"
-#include "core/utils/Typed.h"
-#include "scene/TickPhase.h"
 #include "core/serialization/SerialDocument.h"
 #include "core/utils/TypeInfo.h"
+#include "core/utils/Typed.h"
 #include "core/utils/UUID.h"
+#include "scene/TickPhase.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -114,6 +115,12 @@ class Instance : public Typed {
      */
     void remintId();
 
+    /**
+     * @brief A flag that is cleared when this instance is destroyed
+     * @return The flag, shared with everything holding an unowned reference to this instance
+     */
+    const std::shared_ptr<bool> &aliveFlag();
+
     std::string_view name() const { return m_name; }
 
     /**
@@ -143,6 +150,7 @@ class Instance : public Typed {
     TickPhase m_tickPhase = TICK_PRE_PHYSICS;
     uint32_t m_tickSlot;
     bool m_isReady = false;
+    std::shared_ptr<bool> m_alive;
 };
 
 } // namespace Rapture

@@ -107,6 +107,8 @@ void World::play()
         }
     }
 
+    m_scene->beginSimulation();
+
     m_playState = PlayState::PLAYING;
 }
 
@@ -147,6 +149,9 @@ void World::stop()
         m_playController = nullptr;
     }
     m_intent = ControlInput{};
+
+    // closed before the rewind, which destroys the instances its connections are holding on to
+    m_scene->endSimulation();
 
     // the snapshot outlives the rewind, its document is what the scene is read back out of
     m_scene->restoreFrom(m_snapshot.rootView());

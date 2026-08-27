@@ -66,6 +66,8 @@ void CameraController::setMode(CameraControlMode mode)
 
 void CameraController::onUpdate(float dt)
 {
+    Controller::onUpdate(dt);
+
     if (m_viewCamera == nullptr) {
         return;
     }
@@ -102,7 +104,7 @@ void CameraController::updateViewCamera()
 
 void CameraController::updateFly(float dt, Node3D &node)
 {
-    m_desiresCapture = true;
+    setCapturesCursor(true);
 
     m_yaw += m_intent.look.x * mouseSensitivity;
     m_pitch -= m_intent.look.y * mouseSensitivity;
@@ -126,7 +128,7 @@ void CameraController::updateOrbit(Node3D &node)
         m_recenterFocus = false;
     }
 
-    m_desiresCapture = m_intent.orbit;
+    setCapturesCursor(m_intent.orbit);
 
     if (m_intent.orbit) {
         glm::vec3 right = glm::normalize(glm::cross(m_front, WORLD_UP));

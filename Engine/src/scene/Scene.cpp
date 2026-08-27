@@ -16,6 +16,8 @@
 #include "scene/instances/SceneObject.h"
 #include "scene/instances/InstanceRegistry.h"
 #include "scene/SceneLoadContext.h"
+#include "scene/instances/scene_components/ScriptComponent.h"
+#include "scripting/lua/LuaRuntime.h"
 
 #include "assets/asset_manager/AssetManager.h"
 #include "assets/asset_manager/ReservedAssets.h"
@@ -366,6 +368,26 @@ void Scene::clearInstances()
     while (!m_root->children().empty()) {
         m_root->removeChild(m_root->children().front().get());
     }
+}
+
+void Scene::beginSimulation()
+{
+    m_scriptRuntime = std::make_unique<scripting::LuaRuntime>(*this);
+
+    for (auto [entity, ref] : m_registry.read<InstanceComponent>().with<ScriptedComponent>()) {
+        if (ref.instance == nullptr) {
+            continue;
+        }
+
+        if (ScriptComponent *script = ref.instance->component<ScriptComponent>()) {
+            m_scriptRuntime->runScript(*script);
+        }
+    }
+}
+
+void Scene::endSimulation()
+{
+    m_scriptRuntime.reset();
 }
 
 SerialDocument Scene::snapshot() const

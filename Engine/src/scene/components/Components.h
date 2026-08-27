@@ -299,6 +299,9 @@ inline const LightComponent *Light_tryReadLight(const ecs::EntityAccessor &entit
 // Marks an entity as participating in ray tracing
 struct RayTracedComponent {};
 
+// Marks an entity whose object carries a script
+struct ScriptedComponent {};
+
 struct ShadowComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_SHADOW_SETTINGS);
 

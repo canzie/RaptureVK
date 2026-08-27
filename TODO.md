@@ -60,11 +60,11 @@ servers
 - forward+ renderer ontop for blended materials
 - add support for masked objects in gbuffer pass (like folliage)
 - audio.
+- check if we can add enums to lua
 
 # features / stuff to add
 
 - animations
-- scripting
 - Photometry (use camera settings to calculate the correct exposure)
 - post processing
 - some limit testing

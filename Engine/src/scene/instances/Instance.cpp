@@ -16,6 +16,11 @@ Instance::Instance(Scene &scene, std::string_view name)
 Instance::~Instance()
 {
     setTickEnabled(false);
+
+    if (m_alive != nullptr) {
+        *m_alive = false;
+    }
+
     onDestroy.fire(this);
 }
 
@@ -84,6 +89,15 @@ void Instance::onReady()
 void Instance::remintId()
 {
     m_id = UUIDGenerator::Generate();
+}
+
+const std::shared_ptr<bool> &Instance::aliveFlag()
+{
+    if (m_alive == nullptr) {
+        m_alive = std::make_shared<bool>(true);
+    }
+
+    return m_alive;
 }
 
 const TypeInfo &Instance::staticType()

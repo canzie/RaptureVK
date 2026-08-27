@@ -30,6 +30,10 @@ class SceneRenderData;
 class PhysicsSystem;
 struct RenderContext;
 
+namespace scripting {
+class LuaRuntime;
+}
+
 static constexpr uint32_t SCENE_FORMAT_VERSION = 1;
 
 struct SceneSettings {
@@ -190,6 +194,22 @@ class Scene {
     SceneRenderData *getRenderData() { return m_renderData.get(); }
     const SceneRenderData *getRenderData() const { return m_renderData.get(); }
 
+    /**
+     * @brief Starts simulating this scene
+     */
+    void beginSimulation();
+
+    /**
+     * @brief Stops simulating this scene
+     */
+    void endSimulation();
+
+    /**
+     * @brief What this scene's scripts run in
+     * @return The runtime, or nullptr while the scene is not being simulated
+     */
+    scripting::LuaRuntime *scriptRuntime() const { return m_scriptRuntime.get(); }
+
   public:
     bool locked = false;
     bool active = false;
@@ -239,6 +259,8 @@ class Scene {
     ecs::Bookmark m_tlasTransformBookmark;
 
     std::array<FreeList<Instance *>, TICK_COUNT> m_ticking;
+
+    std::unique_ptr<scripting::LuaRuntime> m_scriptRuntime;
 
     // declared last so its subtree tears down before anything destroyEntity touches
     std::unique_ptr<SceneObject> m_root;

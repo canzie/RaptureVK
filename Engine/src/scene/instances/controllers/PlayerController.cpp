@@ -20,7 +20,10 @@ static constexpr std::string_view KEY_MOVEMENT_SPEED = "movementSpeed";
 static constexpr std::string_view KEY_MOUSE_SENSITIVITY = "mouseSensitivity";
 static constexpr std::string_view KEY_MAX_PITCH = "maxPitch";
 
-PlayerController::PlayerController(Scene &scene, std::string_view name) : Controller(scene, name) {}
+PlayerController::PlayerController(Scene &scene, std::string_view name) : Controller(scene, name)
+{
+    setCapturesCursor(true);
+}
 
 const TypeInfo &PlayerController::staticType()
 {
@@ -49,6 +52,7 @@ void PlayerController::possess(SceneObject *subject)
     m_cameraArm = node->findFirstDescendantOfType<SpringArm3D>();
     if (m_cameraArm != nullptr) {
         m_cameraArm->applyLength();
+        m_cameraArm->setFollowsControlRotation(true);
     }
 
     setViewCamera(node->findFirstDescendantOfType<Camera3D>());
@@ -59,19 +63,19 @@ void PlayerController::possess(SceneObject *subject)
 
 void PlayerController::onUpdate(float dt)
 {
+    Controller::onUpdate(dt);
+
     Node3D *subject = m_possessed != nullptr ? m_possessed->as<Node3D>() : nullptr;
     if (subject == nullptr) {
         return;
     }
 
-    m_yaw += m_intent.look.x * mouseSensitivity;
-    m_pitch = glm::clamp(m_pitch - m_intent.look.y * mouseSensitivity, -maxPitch, maxPitch);
+    addYawInput(m_intent.look.x * mouseSensitivity);
+    addPitchInput(-m_intent.look.y * mouseSensitivity);
 
-    float yaw = glm::radians(m_yaw);
-    glm::vec3 forward = glm::vec3(std::cos(yaw), 0.0f, std::sin(yaw));
-    glm::vec3 right = glm::cross(forward, WORLD_UP);
+    glm::vec3 forward = controlForward();
+    const glm::vec3 walk = (controlRight() * m_intent.move.x + forward * m_intent.move.z) * movementSpeed;
 
-    const glm::vec3 walk = (right * m_intent.move.x + forward * m_intent.move.z) * movementSpeed;
     if (m_body != nullptr) {
         m_body->setVelocity(walk);
         if (m_intent.jump && m_characterBody != nullptr) {
@@ -83,10 +87,6 @@ void PlayerController::onUpdate(float dt)
 
     // a puppet faces down its own -Z, so the turn is the one taking -Z onto the walk direction
     subject->setRotation(glm::angleAxis(std::atan2(-forward.x, -forward.z), WORLD_UP));
-
-    if (m_cameraArm != nullptr) {
-        m_cameraArm->setRotation(glm::angleAxis(glm::radians(m_pitch), glm::vec3(1.0f, 0.0f, 0.0f)));
-    }
 }
 
 void PlayerController::updateViewCamera()
@@ -115,7 +115,7 @@ void PlayerController::serialize(WriteNode node) const
 
     node.set(KEY_MOVEMENT_SPEED, movementSpeed);
     node.set(KEY_MOUSE_SENSITIVITY, mouseSensitivity);
-    node.set(KEY_MAX_PITCH, maxPitch);
+    node.set(KEY_MAX_PITCH, maxPitch());
 }
 
 void PlayerController::deserialize(ReadNode node)
@@ -124,7 +124,7 @@ void PlayerController::deserialize(ReadNode node)
 
     movementSpeed = static_cast<float>(node.child(KEY_MOVEMENT_SPEED).asF64(movementSpeed));
     mouseSensitivity = static_cast<float>(node.child(KEY_MOUSE_SENSITIVITY).asF64(mouseSensitivity));
-    maxPitch = static_cast<float>(node.child(KEY_MAX_PITCH).asF64(maxPitch));
+    setMaxPitch(static_cast<float>(node.child(KEY_MAX_PITCH).asF64(maxPitch())));
 }
 
 } // namespace Rapture

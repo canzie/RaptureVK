@@ -36,7 +36,6 @@ class PlayerController : public Controller {
 
     void updateViewCamera() override;
 
-    bool desiresCursorCapture() const override { return true; }
 
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
@@ -44,13 +43,9 @@ class PlayerController : public Controller {
   public:
     float movementSpeed = 5.0f;
     float mouseSensitivity = 0.1f;
-    float maxPitch = 89.0f;
 
   private:
-    float m_yaw = -90.0f;
-    float m_pitch = 0.0f;
-
-    /// The arm the camera hangs from, which pitch turns, null when the puppet has none
+    /// The arm the camera hangs from, null when the puppet has none
     SpringArm3D *m_cameraArm = nullptr;
 
     /// The body the puppet moves on, null when the puppet is walked by writing its transform

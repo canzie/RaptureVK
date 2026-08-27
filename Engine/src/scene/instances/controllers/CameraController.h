@@ -42,7 +42,6 @@ class CameraController : public Controller {
      * @brief Whether the camera wants the cursor captured this frame.
      * @return True if the cursor should be locked (DISABLED).
      */
-    bool desiresCursorCapture() const override { return m_desiresCapture; }
 
     /**
      * @brief Get the active control mode.
@@ -98,7 +97,6 @@ class CameraController : public Controller {
     float m_focusDistance = 5.0f;
     bool m_recenterFocus = true;
 
-    bool m_desiresCapture = false;
 };
 
 } // namespace Rapture

@@ -20,6 +20,13 @@ class SpringArm3D : public Node3D {
     void setLength(float length);
 
     /**
+     * @brief Whether this arm aims where the controller possessing the object above it is aiming
+     */
+    bool followsControlRotation() const { return m_followsControlRotation; }
+
+    void setFollowsControlRotation(bool follows);
+
+    /**
      * @brief Places every child at this arm's length behind the pivot
      */
     // TODO: shorten to the first hit along the arm once Jolt can be cast against
@@ -28,8 +35,12 @@ class SpringArm3D : public Node3D {
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 
+  protected:
+    void onUpdate(float dt) override;
+
   private:
     float m_length = 4.0f;
+    bool m_followsControlRotation = false;
 };
 
 } // namespace Rapture

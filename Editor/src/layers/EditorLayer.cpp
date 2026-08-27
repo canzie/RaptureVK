@@ -118,14 +118,14 @@ void EditorLayer::onUpdate(float dt)
 
     bool anyCapture = false;
     for (auto &[viewport, control] : m_controls) {
-        bool active = viewport->editorBinding().hovered || control.controller->desiresCursorCapture();
+        bool active = viewport->editorBinding().hovered || control.controller->capturesCursor();
         Rapture::ControlInput intent;
         if (active) {
             intent = mapped;
         }
         control.controller->setIntent(intent);
         control.controller->onUpdate(dt);
-        if (control.controller->desiresCursorCapture()) {
+        if (control.controller->capturesCursor()) {
             anyCapture = true;
         }
     }

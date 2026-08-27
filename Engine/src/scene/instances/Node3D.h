@@ -85,6 +85,37 @@ class Node3D : public SceneObject {
      */
     Node3D *parentNode() const;
 
+    /**
+     * @brief Where this object sits in the world
+     * @return The world space position
+     */
+    glm::vec3 worldPosition() const;
+
+    /**
+     * @brief This object's local -Z in world space
+     * @return The direction the object faces
+     */
+    glm::vec3 forward() const;
+
+    /**
+     * @brief This object's local +X in world space
+     * @return The direction to the object's right
+     */
+    glm::vec3 right() const;
+
+    /**
+     * @brief This object's local +Y in world space
+     * @return The direction out of the object's top
+     */
+    glm::vec3 up() const;
+
+    /**
+     * @brief Turns this object to face a point, leaving where it sits alone
+     * @param target The world space point to face
+     * @param worldUp The direction the object's top is kept nearest to
+     */
+    void lookAt(const glm::vec3 &target, const glm::vec3 &worldUp = glm::vec3(0.0f, 1.0f, 0.0f));
+
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 

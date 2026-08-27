@@ -32,6 +32,7 @@ struct TypeInfo {
     std::string_view name;
     const TypeInfo *base;
     uint8_t depth;
+    uint16_t id;
     const TypeInfo *chain[MAX_TYPE_DEPTH];
 };
 

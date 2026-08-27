@@ -50,6 +50,15 @@ class CharacterBody3D : public PhysicsBody3D {
      */
     void jump();
 
+    /**
+     * @brief Walks this body along a world space direction at its walk speed
+     * @param direction Where to walk, taken flat and normalised, stopping the body when it is zero
+     */
+    void move(const glm::vec3 &direction);
+
+    float walkSpeed() const { return m_walkSpeed; }
+    void setWalkSpeed(float walkSpeed) { m_walkSpeed = walkSpeed; }
+
     physics::GroundState groundState() const;
     bool isOnGround() const;
 
@@ -113,6 +122,7 @@ class CharacterBody3D : public PhysicsBody3D {
     float m_stepUp = 0.4f;
     float m_stepDown = 0.5f;
     float m_jumpSpeed = 4.0f;
+    float m_walkSpeed = 5.0f;
 
     std::unique_ptr<physics::CharacterBody> m_body;
 };

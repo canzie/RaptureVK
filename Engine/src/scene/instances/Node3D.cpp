@@ -2,6 +2,9 @@
 
 #include "scene/components/Components.h"
 #include "scene/systems/Transforms.h"
+
+#include <glm/gtc/constants.hpp>
+
 #include "scene/render_data/SceneRenderData.h"
 #include "scene/Scene.h"
 
@@ -72,6 +75,53 @@ const TypeInfo &Node3D::type() const
 Node3D *Node3D::parentNode() const
 {
     return findFirstAncestorOfType<Node3D>();
+}
+
+glm::vec3 Node3D::worldPosition() const
+{
+    return transform::translation(worldTransform());
+}
+
+glm::vec3 Node3D::forward() const
+{
+    return -glm::normalize(glm::vec3(worldTransform()[2]));
+}
+
+glm::vec3 Node3D::right() const
+{
+    return glm::normalize(glm::vec3(worldTransform()[0]));
+}
+
+glm::vec3 Node3D::up() const
+{
+    return glm::normalize(glm::vec3(worldTransform()[1]));
+}
+
+void Node3D::lookAt(const glm::vec3 &target, const glm::vec3 &worldUp)
+{
+    glm::vec3 direction = target - worldPosition();
+    if (glm::dot(direction, direction) <= glm::epsilon<float>()) {
+        return;
+    }
+
+    direction = glm::normalize(direction);
+    glm::vec3 reference = worldUp;
+    if (std::abs(glm::dot(direction, reference)) > 1.0f - glm::epsilon<float>()) {
+        reference = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+
+    // -Z is what forward() reads back, so the basis is built with +Z pointing away from the target
+    glm::vec3 zAxis = -direction;
+    glm::vec3 xAxis = glm::normalize(glm::cross(reference, zAxis));
+    glm::vec3 yAxis = glm::cross(zAxis, xAxis);
+    glm::quat rotation = glm::quat_cast(glm::mat3(xAxis, yAxis, zAxis));
+
+    Node3D *parent = parentNode();
+    if (parent != nullptr) {
+        rotation = glm::inverse(transform::rotation(parent->worldTransform())) * rotation;
+    }
+
+    setRotation(rotation);
 }
 
 glm::vec3 Node3D::position() const

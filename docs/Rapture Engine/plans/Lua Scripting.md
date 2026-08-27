@@ -3,6 +3,7 @@
 ## Instance
 
 ```
+Instance.new(class, parent)   -> SceneObject, parented to the scene root when no parent is given
 .id            string        read-only
 .name          string        read/write
 :isA(name)     -> bool
@@ -13,7 +14,7 @@
 ## SceneObject : Instance
 
 ```
-.parent                              SceneObject   read/write, assigning reparents
+.parent                              SceneObject   read/write, assigning reparents, the root has none and cannot be moved
 .children                            array         read-only snapshot
 :findChild(name)                     -> SceneObject or nil
 :findDescendant(path)                -> SceneObject or nil
@@ -35,6 +36,14 @@
 :lookAt(target)            turns to face a world space point
 :forward()       -> Vector3   local -Z in world space
 :right()         -> Vector3   local +X in world space
+:up()            -> Vector3   local +Y in world space
+```
+
+## SpringArm3D : Node3D
+
+```
+.length                    number   read/write
+.followsControlRotation    bool     read/write, aims where its controller aims
 ```
 
 ## SceneComponent : Instance
@@ -64,12 +73,20 @@ CharacterBody3D : PhysicsBody3D
 From `Controller.h:29,40,46,56`:
 
 ```
-.possessed         SceneObject   read-only
-.intent            table         read-only, this frame's input
-.capturesCursor    bool          read/write
-.onPossess         Signal(subject)
-.onUpdate          Signal(dt)
+.possessed          SceneObject   read-only
+.intent             table         read-only, this frame's input
+.capturesCursor     bool          read-only
+:addYawInput(deg)                 turns the aim to the right
+:addPitchInput(deg)               tilts the aim up, held within maxPitch
+.controlRotation    Quat          read-only, where the controller is aiming
+.controlForward     Vector3       read-only, the aim flattened onto the ground
+.controlRight       Vector3       read-only, controlForward turned a quarter right
+.maxPitch           number        read/write, degrees
+.onPossess          EventSignal(subject)
+.onUpdate           EventSignal(dt)
 ```
+
+The aim lives on the controller so a script never accumulates or clamps its own yaw and pitch. A `SpringArm3D` with `.followsControlRotation` set takes it from there, which is what makes the camera follow without the script touching the arm.
 
 ## ScriptComponent : SceneComponent
 
@@ -81,16 +98,16 @@ Reached as the global `script`. The body runs once, when the owner is ready, and
 
 A consequence: a script cannot hear its own owner's ready, since the body is that moment. `onDestroy` and everything else are ordinary signals.
 
-## Signal
+## EventSignal
 
 ```
-:connect(fn)     -> Connection
-:once(fn)        -> Connection
+:connect(fn)     -> EventConnection
+:once(fn)        -> EventConnection
 ```
 
 A connection does not replay, so a signal that fired before the connect is missed. Every signal reporting a state change is therefore paired with a property holding that state, `onPossess` with `.possessed`, and a script handles what is already there before connecting for what comes later.
 
-## Connection
+## EventConnection
 
 ```
 :disconnect()
@@ -126,10 +143,10 @@ Reached with `require`, which resolves engine modules and project scripts throug
 
 ```
 local Scene = require("scene")
-  Scene.tick.input           Signal(dt)
-  Scene.tick.prePhysics      Signal(dt)
-  Scene.tick.postPhysics     Signal(dt)
-  Scene.onHierarchyChanged   Signal()
+  Scene.tick.input           EventSignal(dt)
+  Scene.tick.prePhysics      EventSignal(dt)
+  Scene.tick.postPhysics     EventSignal(dt)
+  Scene.onHierarchyChanged   EventSignal()
   Scene.root                 SceneObject
   Scene:find(path)           -> SceneObject or nil
 
@@ -171,21 +188,19 @@ Nothing render-side, no materials, no GPU, no asset loading beyond references th
 `PlayerController.cpp` as a script.
 
 ```lua
-local WORLD_UP = Vector3.new(0, 1, 0)
-
-local movementSpeed = 5.0
 local mouseSensitivity = 0.1
-local maxPitch = 89.0
 
 local controller = script.owner
-local yaw = -90.0
-local pitch = 0.0
 local body = nil
-local cameraArm = nil
 
 local function usePuppet(subject)
     body = subject:getComponent("CharacterBody3D")
-    cameraArm = subject:findFirstDescendantOfType("SpringArm3D")
+    body.walkSpeed = 5.0
+
+    local cameraArm = subject:findFirstDescendantOfType("SpringArm3D")
+    if cameraArm then
+        cameraArm.followsControlRotation = true
+    end
 end
 
 if controller.possessed then
@@ -195,19 +210,16 @@ controller.onPossess:connect(usePuppet)
 
 controller.onUpdate:connect(function(dt)
     local subject = controller.possessed
-    if not subject then
+    if not subject or not body then
         return
     end
 
     local intent = controller.intent
 
-    yaw = yaw + intent.look.x * mouseSensitivity
-    pitch = math.max(-maxPitch, math.min(maxPitch, pitch - intent.look.y * mouseSensitivity))
+    controller:addYawInput(intent.look.x * mouseSensitivity)
+    controller:addPitchInput(-intent.look.y * mouseSensitivity)
 
-    local turn = Quat.fromAxisAngle(WORLD_UP, math.rad(yaw))
-    local walk = turn * Vector3.new(intent.move.x, 0, intent.move.z)
-
-    body.walkSpeed = movementSpeed
+    local walk = controller.controlRight * intent.move.x + controller.controlForward * intent.move.z
     body:move(walk)
 
     if intent.jump then
@@ -215,16 +227,12 @@ controller.onUpdate:connect(function(dt)
     end
 
     subject:lookAt(subject.position + walk)
-
-    if cameraArm then
-        cameraArm.rotationQ = Quat.fromAxisAngle(Vector3.new(1, 0, 0), math.rad(pitch))
-    end
 end)
 ```
 
 Locals rather than fields on a table, because each script instance loads its own chunk and so has its own globals and its own closure state.
 
-`math.clamp` does not exist in Lua 5.4, only in Luau, hence the `min`/`max` pair.
+No yaw or pitch state, no clamping and no arm rotation, because the controller holds the aim and the arm reads it.
 
 ## Open
 

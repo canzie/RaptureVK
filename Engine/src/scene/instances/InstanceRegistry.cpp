@@ -17,6 +17,7 @@
 #include "scene/instances/Terrain3D.h"
 #include "scene/instances/controllers/CameraController.h"
 #include "scene/instances/controllers/PlayerController.h"
+#include "scene/instances/scene_components/ScriptComponent.h"
 #include "scene/instances/scene_components/VisibilityComponent.h"
 
 #include <unordered_map>
@@ -54,6 +55,7 @@ void InstanceRegistry::init()
 
     addComponent<CharacterBody3D>();
     addComponent<RigidBody3D>();
+    addComponent<ScriptComponent>();
     addComponent<VisibilityComponent>();
 
     s_isInitialized = true;

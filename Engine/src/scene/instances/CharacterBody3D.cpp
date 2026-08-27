@@ -185,6 +185,19 @@ void CharacterBody3D::jump()
     pushMovement(true);
 }
 
+void CharacterBody3D::move(const glm::vec3 &direction)
+{
+    glm::vec3 flat(direction.x, 0.0f, direction.z);
+    float lengthSquared = glm::dot(flat, flat);
+
+    glm::vec3 velocity(0.0f, m_velocity.y, 0.0f);
+    if (lengthSquared > glm::epsilon<float>()) {
+        velocity += glm::normalize(flat) * m_walkSpeed;
+    }
+
+    setVelocity(velocity);
+}
+
 physics::GroundState CharacterBody3D::groundState() const
 {
     return m_body != nullptr ? m_body->groundState() : physics::GROUND_IN_AIR;

@@ -69,6 +69,34 @@ The three ways engines populate such a registry:
 
 Its own design pass when we get there.
 
+### What TypeInfo gets now
+
+One field, `uint16_t id`, assigned from a counter in the constructor.
+
+A script reaching an object holds an `Instance *`, so pushing the handle for what that object *actually* is means dispatching on its runtime type. That dispatch does not belong on `TypeInfo` as a `makeLuaHandle` function pointer: a second language would then be a second field, widening every type for a language it does not use, and `TypeInfo` would own a list of every language that exists.
+
+Instead each language layer keeps its own table, `std::vector<LuaHandlePush>` indexed by `type.id`. Lookup is one indexed load. Adding a language is a directory, not a field.
+
+An unregistered type reaches a script as `nil`. It does not fall back to the nearest bound ancestor, because a missing registration means the class was either not wanted or forgotten, and quietly handing back a base hides both.
+
+So every class a script can reach is registered, including ones that add nothing of their own. A snapshot like `.children` skips what it cannot push rather than writing `nil` into it, since a Lua array with a hole in it has no length.
+
+The id is assigned in first-call order, since each `TypeInfo` is a function-local static built when its class is first touched. It is not stable across runs and must never be serialized — `name` stays the serialized identity.
+
+### Where the Lua layer lives
+
+```
+Engine/src/scripting/lua/
+    LuaRuntime.h/.cpp        one lua_State per world, coroutine scheduler
+    LuaHandle.h              the handle struct and its resolve
+    LuaTypeBindings.h/.cpp   the id-indexed push table
+    bindings/                one file per group of usertypes
+```
+
+Only the `.cpp` files include sol2. `LuaRuntime.h` is reached from `World`, so it holds a pointer to an impl rather than a `sol::state` by value, to keep `sol.hpp` out of an include graph that wide.
+
+Types do not register themselves, since that would put sol2 in `scene/`. `bindings/LuaInstance.cpp` registers `Node3D` next to where it defines the `Node3D` usertype.
+
 ---
 
 ## 5. User C++ as a loadable addition

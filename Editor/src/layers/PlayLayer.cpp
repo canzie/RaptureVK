@@ -72,6 +72,6 @@ void PlayLayer::onUpdate(float dt)
     m_world.setIntent(intent);
 
     Rapture::Controller *controller = m_world.playController();
-    bool capture = !m_controlReleased && controller != nullptr && controller->desiresCursorCapture();
+    bool capture = !m_controlReleased && controller != nullptr && controller->capturesCursor();
     m_input->setCursorMode(capture ? Rapture::CursorMode::DISABLED : Rapture::CursorMode::NORMAL);
 }
