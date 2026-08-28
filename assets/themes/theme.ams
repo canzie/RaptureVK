@@ -107,6 +107,15 @@ context-menu#separator {
 }
 
 
+text-area {
+    background-color: @bg-input;
+    text-color: @text-1;
+    font-size: 14px;
+    line-height: 1.15;
+    selection-color: @accent;
+    cursor-color: @text-1;
+}
+
 .panel {
     background-color: @bg-panel;
     corner-radius: 2px;

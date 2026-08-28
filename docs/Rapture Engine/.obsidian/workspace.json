@@ -20,8 +20,23 @@
               "icon": "lucide-file",
               "title": "Neovim and RAD Debugger Text Architecture"
             }
+          },
+          {
+            "id": "b438becf4a768732",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Scene Graph Composition.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Scene Graph Composition"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -80,7 +95,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "2a07e0488325ea11",
@@ -185,8 +201,10 @@
       "bases:Create new base": false
     }
   },
-  "active": "6fa67950a6ea8521",
+  "active": "b438becf4a768732",
   "lastOpenFiles": [
+    "theory/Neovim and RAD Debugger Text Architecture.md",
+    "Scene Graph Composition.md",
     "theory/Neovim and RAD Debugger Text Architecture.md.tmp.3743.2c94902b5ec7",
     "ideas/Entity Types and Authoring Schema.md.tmp.1729.4b1857aac319",
     "ideas/Entity Types and Authoring Schema.md.tmp.1729.af5c6ca9d2fe",
@@ -199,7 +217,6 @@
     "plans/ECS Tiers and Ownership.md.tmp.2791.51d11edf2956",
     "stuff/Improvements.md.tmp.2791.c1c4bc64dc56",
     "plans/ECS Tiers and Ownership.md.tmp.2791.b63b8bdf5de4",
-    "plans/ECS Tiers and Ownership.md.tmp.2791.c0fe8f3323ad",
     "ideas/Custom Entity Component System.md",
     "ideas/Procedural Texture and Shader Editor.md",
     "theory/Ground Truth Ambient Occlusion.md",
@@ -222,7 +239,6 @@
     "systems/Asset.md",
     "Shadow Maps to SceneRenderData.md",
     "SceneRenderData.md",
-    "SceneRenderData Implementation.md",
     "Pasted image 20260517113657.png"
   ]
 }

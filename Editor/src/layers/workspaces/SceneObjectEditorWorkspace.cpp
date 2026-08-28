@@ -3,6 +3,7 @@
 #include "Icons.h"
 #include "layers/panels/PropertiesPanel.h"
 #include "layers/panels/SceneObjectTreePanel.h"
+#include "layers/panels/TextEditorPanel.h"
 #include "layers/panels/ViewportPanel.h"
 
 #include <assets/asset_manager/Asset.h>
@@ -159,6 +160,7 @@ void SceneObjectEditorWorkspace::setupPanels(Amethyst::TabBar *viewportTabBar, A
 {
     if (viewportTabBar != nullptr) {
         m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
+        m_panels.push_back(std::make_unique<TextEditorPanel>(viewportTabBar, m_context, "Script"));
     }
     if (treeTabBar != nullptr && m_sceneRoot != nullptr) {
         m_panels.push_back(std::make_unique<SceneObjectTreePanel>(treeTabBar, m_context, m_sceneRoot));

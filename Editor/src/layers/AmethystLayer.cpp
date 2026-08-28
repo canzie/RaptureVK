@@ -13,7 +13,6 @@
 #include "layers/workspaces/LevelEditorWorkspace.h"
 #include "layers/workspaces/MaterialEditorWorkspace.h"
 #include "layers/workspaces/SceneObjectEditorWorkspace.h"
-#include "layers/workspaces/ScriptingWorkspace.h"
 #include "layers/workspaces/SkeletalMeshWorkspace.h"
 #include "layers/workspaces/SkeletonWorkspace.h"
 #include "layers/workspaces/StaticMeshWorkspace.h"
@@ -238,8 +237,6 @@ void AmethystLayer::openStoredWorkspace(const EditorWorkspaceState &entry)
         openLevelEditor();
     } else if (entry.kind == TextureGeneratorWorkspace::staticKind()) {
         m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(*m_workspaceTabBar, services));
-    } else if (entry.kind == ScriptingWorkspace::staticKind()) {
-        m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(*m_workspaceTabBar, services));
     } else if (entry.kind == AnimationsWorkspace::staticKind()) {
         m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(*m_workspaceTabBar, services));
     } else {
