@@ -134,7 +134,7 @@ void AmethystLayer::onAttach()
     m_backend.init(initInfo, glfwInfo);
 
     auto fontPath = Rapture::EnginePaths::assetDirectory() / "fonts/Roboto-Regular.ttf";
-    if (!m_amCtx.loadFont(fontPath.string())) {
+    if (!m_amCtx.loadFont(fontPath.string()).isValid()) {
         RP_WARN("Failed to load font from: {}", fontPath.string());
     }
 

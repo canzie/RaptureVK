@@ -54,7 +54,7 @@ if(NOT MSVC AND NOT RAPTURE_SANITIZER STREQUAL "none")
     add_link_options(-fsanitize=${RAPTURE_SANITIZER})
 endif()
 
-option(RAPTURE_BUILD_UTESTS "Build the unit test executable" OFF)
+option(RAPTURE_BUILD_UTESTS "Build the unit test executables" OFF)
 option(RAPTURE_EXEC_UTESTS "Run the unit tests as part of the build" OFF)
 option(RAPTURE_UTESTS_VALGRIND "Run the unit tests under valgrind" OFF)
 
@@ -64,5 +64,7 @@ add_subdirectory(Editor)
 
 if(RAPTURE_BUILD_UTESTS)
     enable_testing()
-    add_subdirectory(test)
-endif() 
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RaptureTests.cmake)
+    add_subdirectory(Engine/test)
+    add_subdirectory(Editor/test)
+endif()
