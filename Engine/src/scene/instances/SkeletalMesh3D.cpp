@@ -33,7 +33,7 @@ void SkeletalMesh3D::setMesh(AssetHandle _mesh)
         return;
     }
 
-    AssetRef ref = AssetManager::getAsset(_mesh);
+    Ref<ASkeletalMesh> ref = AssetManager::getAsset<ASkeletalMesh>(_mesh);
     if (!ref) {
         RP_CORE_ERROR("mesh {} could not be resolved for '{}'", _mesh, name());
         return;
@@ -43,19 +43,15 @@ void SkeletalMesh3D::setMesh(AssetHandle _mesh)
         return;
     }
 
-    const ASkeletalMesh *asset = ref.get()->getUnderlyingAsset<ASkeletalMesh>();
-
     {
         auto component = m_entity.write<SkeletalMeshComponent>();
 
-        component->setMesh(std::move(ref));
+        component->setMesh(ref);
         component->isLoading = false;
         m_mesh = _mesh;
     }
 
-    if (asset != nullptr) {
-        adoptDefaultMaterial(*asset);
-    }
+    adoptDefaultMaterial(*ref);
 
     writePose();
 }

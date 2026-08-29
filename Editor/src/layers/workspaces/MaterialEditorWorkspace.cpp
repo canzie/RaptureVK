@@ -1,4 +1,5 @@
 #include "MaterialEditorWorkspace.h"
+#include <assets/materials/AMaterialInstance.h>
 
 #include "Icons.h"
 #include "layers/panels/NodeEditorPanel.h"
@@ -105,7 +106,7 @@ void MaterialEditorWorkspace::setupPreviewScene()
     auto skyboxPath = Rapture::EnginePaths::assetDirectory() / "textures/cubemaps/default.cubemap";
     Rapture::AssetRef skyboxRef = Rapture::AssetManager::importAsset(skyboxPath);
     if (environment != nullptr && skyboxRef) {
-        environment->setSkybox(skyboxRef.get()->getHandle());
+        environment->setSkybox(skyboxRef->handle());
         environment->setSkyIntensity(1.0f);
     }
 
@@ -137,7 +138,7 @@ void MaterialEditorWorkspace::showMaterialOnSphere(Rapture::AssetHandle handle)
         return;
     }
 
-    Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
+    Rapture::Ref<Rapture::AMaterialInstance> ref = Rapture::AssetManager::getAsset<Rapture::AMaterialInstance>(handle);
     if (!ref) {
         return;
     }
@@ -146,7 +147,7 @@ void MaterialEditorWorkspace::showMaterialOnSphere(Rapture::AssetHandle handle)
         m_previewSphere.add<Rapture::MaterialComponent>(std::move(ref));
         return;
     }
-    m_previewSphere.write<Rapture::MaterialComponent>()->material = Rapture::AssetPtr<Rapture::MaterialInstance>(std::move(ref));
+    m_previewSphere.write<Rapture::MaterialComponent>()->material = std::move(ref);
 }
 
 void MaterialEditorWorkspace::setupHotbar()

@@ -219,7 +219,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, const RenderP
         pushConstants.meshSSBOIndex = meshSSBOIndex;
         pushConstants.skeletonSSBOIndex = skeletonSSBOIndex;
 
-        const Shader *shader = isSkinned ? m_skinnedShader : m_shader;
+        const Shader *shader = isSkinned ? m_skinnedShader.operator->() : m_shader.operator->();
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (shader && shader->getPushConstantLayouts().size() > 0) {
             stageFlags = shader->getPushConstantLayouts()[0].stageFlags;
@@ -439,14 +439,12 @@ void GBufferPass::createPipeline(bool skinned)
         shaderConfig.compileInfo.macros.emplace_back("IS_SKINNED_MESH");
     }
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/GBuffer.vs.glsl", shaderConfig);
-    Shader *shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    Ref<AShader> shader = AssetManager::importAsset<AShader>(shaderPath / "glsl/GBuffer.vs.glsl", shaderConfig);
 
     if (!shader) {
         RP_CORE_ERROR("Failed to load GBuffer vertex shader");
         return;
     }
-    m_shaderAssets.push_back(std::move(asset));
 
     if (skinned) {
         m_skinnedShader = shader;
@@ -464,7 +462,7 @@ void GBufferPass::createPipeline(bool skinned)
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = getFramebufferSpecification();
-    config.shader = shader;
+    config.shader = shader.operator->();
 
     if (skinned) {
         m_skinnedPipeline = std::make_unique<GraphicsPipeline>(config);
@@ -563,13 +561,11 @@ void GBufferPass::createTerrainPipeline()
     ShaderImportConfig terrainShaderConfig;
     terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
-    m_terrainShader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    m_terrainShader = AssetManager::importAsset<AShader>(shaderPath / "glsl/terrain/terrain_gbuffer.vs.glsl", terrainShaderConfig);
     if (!m_terrainShader) {
         RP_CORE_WARN("Failed to load terrain GBuffer shader - terrain rendering disabled");
         return;
     }
-    m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -581,7 +577,7 @@ void GBufferPass::createTerrainPipeline()
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = getFramebufferSpecification();
-    config.shader = m_terrainShader;
+    config.shader = m_terrainShader.operator->();
 
     m_terrainPipeline = std::make_shared<GraphicsPipeline>(config);
 

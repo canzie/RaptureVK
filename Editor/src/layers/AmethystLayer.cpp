@@ -1,4 +1,5 @@
 #include "AmethystLayer.h"
+#include <assets/worlds/AWorld.h>
 
 #include "EditorLayout.h"
 #include "EditorState.h"
@@ -503,7 +504,7 @@ void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
         workspace = std::make_unique<SkeletonWorkspace>(*m_workspaceTabBar, services, handle);
         break;
     case Rapture::ASSET_WORLD: {
-        Rapture::AssetPtr<Rapture::World> world(Rapture::AssetManager::getAsset(handle));
+        Rapture::Ref<Rapture::AWorld> world = Rapture::AssetManager::getAsset<Rapture::AWorld>(handle);
         if (!world) {
             RP_WARN("world '{}' could not be loaded, not opening a level editor for it", metadata.getName());
             return;

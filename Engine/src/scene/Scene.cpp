@@ -81,9 +81,9 @@ ecs::EntityAccessor Scene::createCube(const std::string &name, Mobility mobility
     ecs::EntityAccessor entity(m_registry.create(), &m_registry);
     entity.add<TagComponent>(name);
     entity.add<TransformComponent>();
-    entity.add<StaticMeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_CUBE_MESH), mobility);
+    entity.add<StaticMeshComponent>(AssetManager::getAsset<AStaticMesh>(RE_PRIMITIVE_CUBE_MESH), mobility);
 
-    auto materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE);
+    Ref<AMaterialInstance> materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE).as<AMaterialInstance>();
     if (materialRef) {
         entity.add<MaterialComponent>(materialRef);
     }
@@ -121,9 +121,9 @@ ecs::EntityAccessor Scene::createSphere(const std::string &name, Mobility mobili
     ecs::EntityAccessor entity(m_registry.create(), &m_registry);
     entity.add<TagComponent>(name);
     entity.add<TransformComponent>();
-    entity.add<StaticMeshComponent>(AssetManager::getAsset(RE_PRIMITIVE_SPHERE_MESH), mobility);
+    entity.add<StaticMeshComponent>(AssetManager::getAsset<AStaticMesh>(RE_PRIMITIVE_SPHERE_MESH), mobility);
 
-    auto materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE);
+    Ref<AMaterialInstance> materialRef = AssetManager::importDefaultAsset(ASSET_MATERIAL_INSTANCE).as<AMaterialInstance>();
     if (materialRef) {
         entity.add<MaterialComponent>(materialRef);
     }

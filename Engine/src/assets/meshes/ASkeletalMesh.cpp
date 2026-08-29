@@ -6,6 +6,17 @@
 
 namespace Rapture {
 
+const TypeInfo &ASkeletalMesh::staticType()
+{
+    static const TypeInfo type("ASkeletalMesh", &AMesh::staticType());
+    return type;
+}
+
+const TypeInfo &ASkeletalMesh::type() const
+{
+    return staticType();
+}
+
 static constexpr uint32_t SKELETAL_MESH_MAGIC = Asset_fourCC("SKMH");
 
 static constexpr uint16_t SKELETAL_MESH_VERSION_MAJOR = 2;

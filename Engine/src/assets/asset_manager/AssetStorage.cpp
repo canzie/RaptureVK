@@ -109,6 +109,23 @@ bool AssetStorage::erase(AssetHandle handle)
 
 void AssetStorage::clear()
 {
+    // an asset can hold uses of other assets, so the ones nothing is using go first and the pass
+    // repeats as that releases more, rather than freeing a bucket something else still points into
+    bool freedAny = true;
+    while (freedAny) {
+        freedAny = false;
+        for (std::vector<AssetSlot> &bucket : m_buckets) {
+            for (AssetSlot &slot : bucket) {
+                if (slot.asset == nullptr || slot.asset->useCount() != 0) {
+                    continue;
+                }
+
+                slot.asset.reset();
+                freedAny = true;
+            }
+        }
+    }
+
     m_index.clear();
     for (std::vector<AssetSlot> &bucket : m_buckets) {
         bucket.clear();

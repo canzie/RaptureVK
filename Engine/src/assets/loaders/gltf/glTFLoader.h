@@ -1,7 +1,7 @@
 #ifndef RAPTURE__GLTF_LOADER_H
 #define RAPTURE__GLTF_LOADER_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
 #include "glTFCommon.h"
 #include "assets/materials/MaterialParameters.h"
 #include "assets/skeletons/ASkeleton.h"

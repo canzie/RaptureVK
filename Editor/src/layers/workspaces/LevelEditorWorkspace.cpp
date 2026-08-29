@@ -1,4 +1,5 @@
 #include "LevelEditorWorkspace.h"
+#include <assets/worlds/AWorld.h>
 
 #include "Icons.h"
 #include "layers/EditorLayout.h"
@@ -34,13 +35,13 @@ static void s_setButtonGuiState(Amethyst::ImageButton &button, uint16_t state, b
 }
 
 LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
-                                           Rapture::AssetPtr<Rapture::World> world)
+                                           Rapture::Ref<Rapture::AWorld> world)
     : Workspace(staticKind()), m_world(std::move(world))
 {
     RP_ASSERT(m_world, "a level editor has nothing to edit without a world");
 
     m_context.services = services;
-    m_context.world = m_world.get();
+    m_context.world = m_world.operator->();
     m_context.scene = m_world->getScene();
     setupViewport();
     setupBase(tabBar, "Level Editor", {});
@@ -275,7 +276,8 @@ void LevelEditorWorkspace::startPlay()
     }
 
     if (m_playLayer == nullptr) {
-        m_playLayer = static_cast<PlayLayer *>(app.pushLayer(std::make_unique<PlayLayer>(*m_world, *m_context.viewport)));
+        m_playLayer =
+            static_cast<PlayLayer *>(app.pushLayer(std::make_unique<PlayLayer>(m_world.get()->world(), *m_context.viewport)));
     } else {
         m_playLayer->attach();
     }
@@ -313,7 +315,7 @@ void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
 void LevelEditorWorkspace::saveWorld()
 {
     auto &project = Rapture::Application::getInstance().getProject();
-    if (!project.saveWorld(m_world.ref().get()->getHandle())) {
+    if (!project.saveWorld(m_world.get()->handle())) {
         return;
     }
 

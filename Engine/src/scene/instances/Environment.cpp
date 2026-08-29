@@ -1,4 +1,5 @@
 #include "Environment.h"
+#include "assets/textures/ATexture.h"
 
 #include "core/utils/EnginePaths.h"
 
@@ -45,13 +46,12 @@ static AssetHandle s_atmosphereShaderHandle()
         auto shaderDir = EnginePaths::shaderDirectory();
         ShaderImportConfig importConfig;
         importConfig.compileInfo.macros.push_back(ShaderMacro("OUTPUT_CUBEMAP"));
-        auto asset = AssetManager::importAsset(shaderDir / "glsl/Generators/Atmosphere.cs.glsl", importConfig);
-        auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-        if (!shader) {
+        Ref<AShader> asset = AssetManager::importAsset<AShader>(shaderDir / "glsl/Generators/Atmosphere.cs.glsl", importConfig);
+        if (!asset) {
             RP_CORE_ERROR("Failed to load Atmosphere cubemap shader");
             return 0;
         }
-        s_handle = asset.get()->getHandle();
+        s_handle = asset.get()->handle();
     }
     return s_handle;
 }
@@ -204,7 +204,7 @@ AssetHandle Environment::skybox() const
     if (!m_skyboxTexture) {
         return INVALID_ASSET_HANDLE;
     }
-    return m_skyboxTexture.ref().get()->getHandle();
+    return m_skyboxTexture.get()->handle();
 }
 
 void Environment::setSkybox(AssetHandle _skybox)
@@ -219,7 +219,7 @@ void Environment::setSkybox(AssetHandle _skybox)
         return;
     }
 
-    m_skyboxTexture = AssetPtr<Texture>(std::move(ref));
+    m_skyboxTexture = ref.as<ATexture>();
 }
 
 void Environment::update()
@@ -272,7 +272,7 @@ void Environment::update()
         AtmospherePushConstants pc = s_buildPushConstants(m_atmosphere, sunDir);
         m_skyboxGenerator->setPushConstants(pc);
         m_skyboxGenerator->generate();
-        m_ibl->bakeFromCube(m_skyboxTexture.get());
+        m_ibl->bakeFromCube(m_skyboxTexture.operator->());
     }
 }
 

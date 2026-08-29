@@ -1,8 +1,8 @@
 #include "MaterialGraph.h"
 
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/textures/ATexture.h"
 #include "core/utils/Log.h"
-#include "gpu/textures/Texture.h"
 
 #include <cstring>
 
@@ -66,8 +66,8 @@ std::vector<uint8_t> MaterialGraph::serialize() const
         }
 
         appendU32(nodeSection, static_cast<uint32_t>(node.inputTextures.size()));
-        for (const AssetPtr<Texture> &texture : node.inputTextures) {
-            AssetHandle handle = texture ? texture.ref().get()->getHandle() : INVALID_ASSET_HANDLE;
+        for (const Ref<ATexture> &texture : node.inputTextures) {
+            AssetHandle handle = texture ? texture.get()->handle() : INVALID_ASSET_HANDLE;
             appendU64(nodeSection, handle);
         }
     }
@@ -187,8 +187,8 @@ std::optional<MaterialGraph> MaterialGraph::deserialize(std::span<const uint8_t>
             if (!readU64(handle)) {
                 return std::nullopt;
             }
-            node.inputTextures.push_back(handle != INVALID_ASSET_HANDLE ? AssetPtr<Texture>(AssetManager::getAsset(handle))
-                                                                        : AssetPtr<Texture>{});
+            node.inputTextures.push_back(handle != INVALID_ASSET_HANDLE ? AssetManager::getAsset<ATexture>(handle)
+                                                                        : Ref<ATexture>{});
         }
 
         graph.nodes.push_back(std::move(node));

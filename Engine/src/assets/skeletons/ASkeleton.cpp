@@ -8,6 +8,17 @@
 
 namespace Rapture {
 
+const TypeInfo &ASkeleton::staticType()
+{
+    static const TypeInfo type("ASkeleton", &Asset::staticType());
+    return type;
+}
+
+const TypeInfo &ASkeleton::type() const
+{
+    return staticType();
+}
+
 static constexpr uint32_t SKELETON_ASSET_MAGIC = Asset_fourCC("SKEL");
 
 static constexpr uint16_t SKELETON_ASSET_VERSION_MAJOR = 2;

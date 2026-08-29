@@ -693,14 +693,12 @@ void CascadedShadowMap::createPipeline()
 
     auto shaderPath = EnginePaths::shaderDirectory();
 
-    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/shadows/CascadedShadowPass.vs.spv");
-    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    m_shader = AssetManager::importAsset<AShader>(shaderPath / "SPIRV/shadows/CascadedShadowPass.vs.spv");
 
     if (!m_shader) {
         RP_CORE_ERROR("Failed to load CascadedShadowPass vertex shader");
         return;
     }
-    if (m_shader) m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -720,7 +718,7 @@ void CascadedShadowMap::createPipeline()
     framebufferSpec.correlationMask = (1u << m_NumCascades) - 1; // All views are correlated
 
     config.framebufferSpec = framebufferSpec;
-    config.shader = m_shader;
+    config.shader = m_shader.operator->();
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }
@@ -805,13 +803,11 @@ void CascadedShadowMap::createTerrainPipeline()
     ShaderImportConfig terrainShaderConfig;
     terrainShaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_csm.vs.glsl", terrainShaderConfig);
-    m_terrainShader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    m_terrainShader = AssetManager::importAsset<AShader>(shaderPath / "glsl/terrain/terrain_csm.vs.glsl", terrainShaderConfig);
     if (!m_terrainShader) {
         RP_CORE_WARN("Terrain CSM shader not found");
         return;
     }
-    if (m_terrainShader) m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -829,7 +825,7 @@ void CascadedShadowMap::createTerrainPipeline()
     framebufferSpec.correlationMask = (1u << m_NumCascades) - 1;
 
     config.framebufferSpec = framebufferSpec;
-    config.shader = m_terrainShader;
+    config.shader = m_terrainShader.operator->();
     m_terrainPipeline = std::make_shared<GraphicsPipeline>(config);
 
     RP_CORE_INFO("Terrain CSM pipeline created");

@@ -2,9 +2,12 @@
 #define RAPTURE__TERRAIN_GENERATOR_H
 
 #include "TerrainCuller.h"
+#include "assets/textures/ATexture.h"
+#include "assets/materials/AMaterialInstance.h"
 #include "TerrainTypes.h"
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
 #include "assets/materials/MaterialInstance.h"
 #include "gpu/buffers/IndexBuffer.h"
 #include "gpu/buffers/StorageBuffer.h"
@@ -40,7 +43,7 @@ class TerrainGenerator {
     void shutdown();
 
     // Noise configuration
-    void setNoiseTexture(TerrainNoiseCategory category, AssetPtr<Texture> texture);
+    void setNoiseTexture(TerrainNoiseCategory category, Ref<ATexture> texture);
     Texture *getNoiseTexture(TerrainNoiseCategory category) const;
     MultiNoiseConfig &getMultiNoiseConfig() { return m_multiNoiseConfig; }
     const MultiNoiseConfig &getMultiNoiseConfig() const { return m_multiNoiseConfig; }
@@ -48,8 +51,8 @@ class TerrainGenerator {
     Texture *getSplineCurveTexture() const { return m_splineCurveTexture.get(); }
     void generateDefaultNoiseTextures();
 
-    void setSingleHeightmap(AssetPtr<Texture> texture) { m_noiseTextures[CONTINENTALNESS] = std::move(texture); }
-    Texture *getSingleHeightmap() const { return m_noiseTextures[CONTINENTALNESS].get(); }
+    void setSingleHeightmap(Ref<ATexture> texture) { m_noiseTextures[CONTINENTALNESS] = std::move(texture); }
+    Texture *getSingleHeightmap() const { return m_noiseTextures[CONTINENTALNESS].operator->(); }
 
     // Per-frame update: computes chunk data on GPU, runs culling
     void update(const glm::vec3 &cameraPos, Frustum &frustum, uint32_t frameIndex);
@@ -88,7 +91,7 @@ class TerrainGenerator {
      * @brief The material the terrain shades with, for binding an authored graph to it
      * @return The material instance, null when none was created
      */
-    const AssetPtr<MaterialInstance> &getMaterial() const { return m_material; }
+    const Ref<AMaterialInstance> &getMaterial() const { return m_material; }
 
   private:
     void createTerrainMaterials();
@@ -103,7 +106,7 @@ class TerrainGenerator {
     uint32_t m_chunkCount = 0;
 
     MultiNoiseConfig m_multiNoiseConfig;
-    AssetPtr<Texture> m_noiseTextures[TERRAIN_NC_COUNT];
+    Ref<ATexture> m_noiseTextures[TERRAIN_NC_COUNT];
     std::unique_ptr<Texture> m_splineCurveTexture;
 
     // Shared index buffers (one per LOD, grid topology)
@@ -114,16 +117,15 @@ class TerrainGenerator {
     std::unique_ptr<TerrainCuller> m_culler;
     std::vector<TerrainCullBuffers> m_cullBuffers;
 
-    Shader *m_chunkComputeShader;
+    Ref<AShader> m_chunkComputeShader;
     std::shared_ptr<ComputePipeline> m_chunkComputePipeline;
     CommandPoolHash m_computePoolHash = 0;
 
     bool m_initialized = false;
     bool m_wireframe = false;
 
-    std::vector<AssetRef> m_shaderAssets;
 
-    AssetPtr<MaterialInstance> m_material;
+    Ref<AMaterialInstance> m_material;
 };
 
 } // namespace Rapture

@@ -1,7 +1,8 @@
 #ifndef RAPTURE__COMPOSITE_PASS_H
 #define RAPTURE__COMPOSITE_PASS_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
@@ -45,8 +46,7 @@ class CompositePass : public RenderPass {
 
   private:
     const RenderContext *m_rc = nullptr;
-    Shader *m_shader = nullptr;
-    std::vector<AssetRef> m_shaderAssets;
+    Ref<AShader> m_shader;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 

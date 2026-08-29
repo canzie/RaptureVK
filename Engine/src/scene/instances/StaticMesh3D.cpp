@@ -30,7 +30,7 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
         return;
     }
 
-    AssetRef ref = AssetManager::getAsset(_mesh);
+    Ref<AStaticMesh> ref = AssetManager::getAsset<AStaticMesh>(_mesh);
     if (!ref) {
         RP_CORE_ERROR("mesh {} could not be resolved for '{}'", _mesh, name());
         return;
@@ -40,19 +40,15 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
         return;
     }
 
-    const AStaticMesh *asset = ref.get()->getUnderlyingAsset<AStaticMesh>();
-
     {
         auto component = m_entity.write<StaticMeshComponent>();
 
-        component->setMesh(std::move(ref));
+        component->setMesh(ref);
         component->isLoading = false;
     }
     m_mesh = _mesh;
 
-    if (asset != nullptr) {
-        adoptDefaultMaterial(*asset);
-    }
+    adoptDefaultMaterial(*ref);
 
     if (m_entity.has<RayTracedComponent>()) {
         rebuildAccelerationStructure();

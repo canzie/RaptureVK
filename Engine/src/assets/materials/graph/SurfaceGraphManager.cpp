@@ -1,5 +1,7 @@
 #include "SurfaceGraphManager.h"
 
+#include "assets/textures/ATexture.h"
+
 #include <fstream>
 #include <string>
 #include <string_view>
@@ -187,7 +189,7 @@ GraphSlotMapping SurfaceGraphManager::getMapping(uint32_t graphId) const
     return m_graphs[graphId].mapping;
 }
 
-std::vector<AssetPtr<Texture>> SurfaceGraphManager::getTextureRefs(uint32_t graphId) const
+std::vector<Ref<ATexture>> SurfaceGraphManager::getTextureRefs(uint32_t graphId) const
 {
     if (graphId >= m_graphs.size()) {
         return {};

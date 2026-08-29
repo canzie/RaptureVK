@@ -15,7 +15,7 @@ template <typename T>
 static T *s_assetAs(Rapture::AssetHandle handle)
 {
     Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
-    return ref ? ref.get()->getUnderlyingAsset<T>() : nullptr;
+    return ref ? ref->as<T>() : nullptr;
 }
 
 /**

@@ -387,14 +387,12 @@ void ShadowMap::createPipeline()
 
     auto shaderPath = EnginePaths::shaderDirectory();
 
-    auto asset = AssetManager::importAsset(shaderPath / "SPIRV/shadows/ShadowPass.vs.spv");
-    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    m_shader = AssetManager::importAsset<AShader>(shaderPath / "SPIRV/shadows/ShadowPass.vs.spv");
 
     if (!m_shader) {
         RP_CORE_ERROR("Failed to load ShadowPass vertex shader");
         return;
     }
-    m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -410,7 +408,7 @@ void ShadowMap::createPipeline()
     framebufferSpec.depthAttachment = m_shadowTexture->getFormat();
 
     config.framebufferSpec = framebufferSpec;
-    config.shader = m_shader;
+    config.shader = m_shader.operator->();
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

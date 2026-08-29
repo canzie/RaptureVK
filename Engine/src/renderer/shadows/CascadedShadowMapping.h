@@ -2,6 +2,7 @@
 #define RAPTURE__CASCADEDSHADOWMAPPING_H
 
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/shaders/AShader.h"
 #include "core/utils/TextureFlattener.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
@@ -142,13 +143,12 @@ class CascadedShadowMap {
     // Rendering attachments info
     VkRenderingAttachmentInfo m_depthAttachmentInfo{};
 
-    Shader *m_shader = nullptr;
+    Ref<AShader> m_shader;
 
     // Terrain shadow rendering
     std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
-    Shader *m_terrainShader = nullptr;
+    Ref<AShader> m_terrainShader;
 
-    std::vector<AssetRef> m_shaderAssets;
     Frustum m_shadowFrustum;
     std::vector<TerrainCullBuffers> m_terrainShadowBuffers;
 

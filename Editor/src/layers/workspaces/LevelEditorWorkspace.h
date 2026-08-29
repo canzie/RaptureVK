@@ -2,8 +2,9 @@
 #define RAPTURE__LEVEL_EDITOR_WORKSPACE_H
 
 #include "Workspace.h"
+#include <assets/worlds/AWorld.h>
 
-#include <assets/asset_manager/AssetHandle.h>
+#include <assets/asset_manager/Asset.h>
 #include <components/context_menu.h>
 #include <core/events/EventSignal.h>
 #include <memory>
@@ -14,7 +15,7 @@ class PlayLayer;
 
 class LevelEditorWorkspace : public Workspace {
   public:
-    LevelEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::AssetPtr<Rapture::World> world);
+    LevelEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::Ref<Rapture::AWorld> world);
     ~LevelEditorWorkspace() override;
 
     void saveLayout() override;
@@ -79,7 +80,7 @@ class LevelEditorWorkspace : public Workspace {
     Amethyst::ImageButton *m_pauseButton = nullptr;
     Amethyst::ImageButton *m_stepButton = nullptr;
 
-    Rapture::AssetPtr<Rapture::World> m_world;
+    Rapture::Ref<Rapture::AWorld> m_world;
     PlayLayer *m_playLayer = nullptr;
     Rapture::EventConnection m_viewportClickedConn;
     Rapture::ViewportContext m_viewport;

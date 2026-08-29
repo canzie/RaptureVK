@@ -2,6 +2,7 @@
 #define RAPTURE__SCENE_QUERY_RENDERER_H
 
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/shaders/AShader.h"
 #include "core/ecs/entity_accessor.h"
 #include "gpu/buffers/StorageBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
@@ -157,8 +158,7 @@ class SceneQueryRenderer {
   private:
     RenderContext m_rc;
 
-    Shader *m_shader = nullptr;
-    std::vector<AssetRef> m_shaderAssets;
+    Ref<AShader> m_shader;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     std::unique_ptr<SceneGeometryDraw> m_geometry;

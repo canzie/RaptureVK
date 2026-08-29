@@ -8,6 +8,8 @@
 #include "core/jobs/JobSystem.h"
 #include "assets/loaders/gltf/glTFCommon.h"
 #include "core/utils/Log.h"
+#include "assets/shaders/AShader.h"
+#include "assets/textures/ATexture.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
 
@@ -24,13 +26,12 @@ namespace Rapture {
 
 bool AssetImporter::s_isInitialized = false;
 
-bool AssetImporter::loadShader(Asset &asset, AssetMetadata &metadata)
+std::unique_ptr<Asset> AssetImporter::loadShader(AssetMetadata &metadata, AssetHandle handle)
 {
     const auto &initialPath = metadata.getSourcePath();
     if (!std::filesystem::exists(initialPath)) {
         FILE_NOT_FOUND_ERROR(initialPath);
-        asset.status = AssetStatus::FILE_NOT_FOUND;
-        return false;
+        return nullptr;
     }
 
     ShaderCompileInfo compileInfo = {};
@@ -58,8 +59,7 @@ bool AssetImporter::loadShader(Asset &asset, AssetMetadata &metadata)
         RP_CORE_ERROR("Could not determine shader "
                       "stage from file name: {}",
                       initialPath.string());
-        asset.status = AssetStatus::FAILED;
-        return false;
+        return nullptr;
     }
 
     std::unique_ptr<Shader> shader;
@@ -72,8 +72,7 @@ bool AssetImporter::loadShader(Asset &asset, AssetMetadata &metadata)
             RP_CORE_ERROR("Could not find compute shader "
                           "related to: {}",
                           initialPath.string());
-            asset.status = AssetStatus::FAILED;
-            return false;
+            return nullptr;
         }
 
         shader = std::make_unique<Shader>(*computePathOpt, compileInfo);
@@ -82,8 +81,7 @@ bool AssetImporter::loadShader(Asset &asset, AssetMetadata &metadata)
             RP_CORE_ERROR("Failed to create or compile "
                           "shader from {}",
                           initialPath.string());
-            asset.status = AssetStatus::FAILED;
-            return false;
+            return nullptr;
         }
 
     } else {
@@ -95,8 +93,7 @@ bool AssetImporter::loadShader(Asset &asset, AssetMetadata &metadata)
             RP_CORE_ERROR("Could not find vertex shader "
                           "related to: {}",
                           initialPath.string());
-            asset.status = AssetStatus::FAILED;
-            return false;
+            return nullptr;
         }
         if (!fragmentPathOpt) {
             RP_CORE_INFO("No fragment shader found, "
@@ -120,32 +117,29 @@ bool AssetImporter::loadShader(Asset &asset, AssetMetadata &metadata)
         if (!shader) {
             RP_CORE_ERROR("Failed to create or compile shader from {} and {}{}", vertexPath.string(), fragmentPath.string(),
                           geometryPathOpt ? " and " + geometryPathOpt->string() : "");
-            asset.status = AssetStatus::FAILED;
-            return false;
+            return nullptr;
         }
     }
 
-    // Wrap the shader in an Asset object
-    asset.status = shader->isReady() ? AssetStatus::LOADED : AssetStatus::FAILED;
-    asset.setAssetVariant(std::move(shader));
+    auto asset = std::make_unique<AShader>(std::move(shader));
+    asset->setHandle(handle);
+    asset->setStatus(asset->shader().isReady() ? AssetStatus::LOADED : AssetStatus::FAILED);
 
-    AssetEvents::onAssetLoaded().publish(asset.getHandle());
+    AssetEvents::onAssetLoaded().publish(handle);
 
-    return true;
+    return asset;
 }
 
-bool AssetImporter::loadMaterial(Asset &asset, AssetMetadata &metadata)
+std::unique_ptr<Asset> AssetImporter::loadMaterial(AssetMetadata &metadata, AssetHandle handle)
 {
-    (void)asset;
     (void)metadata;
-
-    asset.status = AssetStatus::FAILED;
+    (void)handle;
 
     RP_CORE_ERROR("Not implemented");
-    return false;
+    return nullptr;
 }
 
-bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
+std::unique_ptr<Asset> AssetImporter::loadTexture(AssetMetadata &metadata, AssetHandle handle)
 {
     TextureSpecification texSpec = TextureSpecification();
     texSpec.mipLevels = 0; // 0 is auto
@@ -163,17 +157,17 @@ bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
 
     if (!getImageDimensions(metadata.getSourcePath(), texSpec.width, texSpec.height)) {
         RP_CORE_ERROR("Failed to read texture dimensions: {}", metadata.getSourcePath().string());
-        asset.status = AssetStatus::FAILED;
-        return false;
+        return nullptr;
     }
 
     auto tex = Texture::createPlaceholder(texSpec);
     Texture *texPtr = tex.get();
-    Asset *assetPtr = &asset;
     std::filesystem::path path = metadata.getSourcePath();
 
-    asset.status = AssetStatus::LOADING;
-    asset.setAssetVariant(std::move(tex));
+    auto asset = std::make_unique<ATexture>(std::move(tex));
+    asset->setHandle(handle);
+    asset->setStatus(AssetStatus::LOADING);
+    Asset *assetPtr = asset.get();
 
     jobs().run(JobDeclaration(
         [texPtr, assetPtr, path](JobContext &jctx) {
@@ -196,7 +190,7 @@ bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
             if (!ioData->second) {
                 RP_CORE_ERROR("Failed to load texture file: {}", path.string());
                 texPtr->markFailed();
-                assetPtr->status = AssetStatus::FAILED;
+                assetPtr->setStatus(AssetStatus::FAILED);
                 return;
             }
 
@@ -204,7 +198,7 @@ bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
             if (!decoded.success) {
                 RP_CORE_ERROR("Failed to decode texture: {}", path.string());
                 texPtr->markFailed();
-                assetPtr->status = AssetStatus::FAILED;
+                assetPtr->setStatus(AssetStatus::FAILED);
                 return;
             }
 
@@ -235,28 +229,27 @@ bool AssetImporter::loadTexture(Asset &asset, AssetMetadata &metadata)
                 if (!compressed) {
                     RP_CORE_ERROR("Failed to compress texture: {}", path.string());
                     texPtr->markFailed();
-                    assetPtr->status = AssetStatus::FAILED;
+                    assetPtr->setStatus(AssetStatus::FAILED);
                     return;
                 }
             } else {
                 texPtr->uploadDataAsync(std::move(decoded.pixels));
             }
 
-            assetPtr->status = AssetStatus::LOADED;
-            AssetEvents::onAssetLoaded().publish(assetPtr->getHandle());
+            assetPtr->setStatus(AssetStatus::LOADED);
+            AssetEvents::onAssetLoaded().publish(assetPtr->handle());
         },
         JobPriority::NORMAL, QueueAffinity::ANY, nullptr, "Texture decode"));
 
-    return true;
+    return asset;
 }
 
-bool AssetImporter::loadCubemap(Asset &asset, AssetMetadata &metadata)
+std::unique_ptr<Asset> AssetImporter::loadCubemap(AssetMetadata &metadata, AssetHandle handle)
 {
     std::vector<std::string> cubemapPaths = getCubemapPaths(metadata.getSourcePath());
     if (cubemapPaths.size() != 6) {
         RP_CORE_ERROR("Cubemap file must contain exactly 6 paths. File: {}", metadata.getSourcePath().string());
-        asset.status = AssetStatus::FAILED;
-        return false;
+        return nullptr;
     }
 
     std::vector<DecodedImageData> decodedFaces;
@@ -267,8 +260,7 @@ bool AssetImporter::loadCubemap(Asset &asset, AssetMetadata &metadata)
         DecodedImageData decoded = decodeImageFile(cubemapPaths[i]);
         if (!decoded.success) {
             RP_CORE_ERROR("Failed to decode cubemap face: {}", cubemapPaths[i]);
-            asset.status = AssetStatus::FAILED;
-            return false;
+            return nullptr;
         }
         if (i == 0) {
             width = decoded.width;
@@ -292,11 +284,12 @@ bool AssetImporter::loadCubemap(Asset &asset, AssetMetadata &metadata)
 
     auto tex = std::make_unique<Texture>(texSpec, layerData);
 
-    asset.status = AssetStatus::LOADED;
-    asset.setAssetVariant(std::move(tex));
+    auto asset = std::make_unique<ATexture>(std::move(tex));
+    asset->setHandle(handle);
+    asset->setStatus(AssetStatus::LOADED);
 
-    AssetEvents::onAssetLoaded().publish(asset.getHandle());
-    return true;
+    AssetEvents::onAssetLoaded().publish(handle);
+    return asset;
 }
 
 } // namespace Rapture

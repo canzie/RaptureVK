@@ -59,20 +59,16 @@ void GroundTruthAmbientOcclusionPass::loadShaders()
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/GroundTruthAmbientOcclusion.cs.glsl", shaderConfig);
-    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (m_shader != nullptr) {
-        m_shaderAssets.push_back(std::move(asset));
-    }
+    m_shader = AssetManager::importAsset<AShader>(shaderPath / "glsl/GroundTruthAmbientOcclusion.cs.glsl", shaderConfig);
 
-    RP_ASSERT(m_shader != nullptr, "Ambient occlusion shader failed to load");
-    if (m_shader == nullptr) {
+    RP_ASSERT(m_shader, "Ambient occlusion shader failed to load");
+    if (!m_shader) {
         RP_CORE_ERROR("Ambient occlusion shader failed to load");
         return;
     }
 
     ComputePipelineConfiguration pipelineConfig;
-    pipelineConfig.shader = m_shader;
+    pipelineConfig.shader = m_shader.operator->();
     m_pipeline = std::make_shared<ComputePipeline>(pipelineConfig);
 }
 

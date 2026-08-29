@@ -1,4 +1,5 @@
 #include "GizmoDrawPass.h"
+#include "assets/shaders/AShader.h"
 
 #include "app/Application.h"
 #include "assets/asset_manager/AssetManager.h"
@@ -44,13 +45,13 @@ GizmoDrawPass::GizmoDrawPass(const GizmoDrawPassConfig &config, const GizmoDrawL
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/";
 
-    m_segmentShader = AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/GizmoSegment.fs.glsl", shaderConfig));
-    m_triangleShader = AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/GizmoTriangle.fs.glsl", shaderConfig));
+    m_segmentShader = AssetManager::importAsset(shaderPath / "glsl/GizmoSegment.fs.glsl", shaderConfig).as<AShader>();
+    m_triangleShader = AssetManager::importAsset(shaderPath / "glsl/GizmoTriangle.fs.glsl", shaderConfig).as<AShader>();
 
     ShaderImportConfig shadedConfig = shaderConfig;
     shadedConfig.compileInfo.macros.push_back({"USE_SHADED_MODE"});
     m_shadedTriangleShader =
-        AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/GizmoTriangle.fs.glsl", shadedConfig));
+        AssetManager::importAsset(shaderPath / "glsl/GizmoTriangle.fs.glsl", shadedConfig).as<AShader>();
 
     const uint32_t slotCount = m_config.framesInFlight + 1;
     m_shapeBuffers.resize(slotCount);
@@ -227,10 +228,10 @@ void GizmoDrawPass::createPipelines()
     config.depthStencilState = depthStencil;
     config.framebufferSpec = framebufferSpec;
 
-    config.shader = m_segmentShader.get();
+    config.shader = &m_segmentShader.get()->shader();
     m_segmentPipeline = std::make_shared<GraphicsPipeline>(config);
 
-    config.shader = m_triangleShader.get();
+    config.shader = &m_triangleShader.get()->shader();
     m_trianglePipelines[GIZMO_SHADING_MODE_SOLID] = std::make_shared<GraphicsPipeline>(config);
 
     rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
@@ -239,7 +240,7 @@ void GizmoDrawPass::createPipelines()
 
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     config.rasterizationState = rasterizer;
-    config.shader = m_shadedTriangleShader.get();
+    config.shader = &m_shadedTriangleShader.get()->shader();
     m_trianglePipelines[GIZMO_SHADING_MODE_SHADED] = std::make_shared<GraphicsPipeline>(config);
 }
 

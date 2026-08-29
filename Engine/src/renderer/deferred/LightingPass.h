@@ -1,7 +1,8 @@
 #ifndef RAPTURE__LIGHTING_PASS_H
 #define RAPTURE__LIGHTING_PASS_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
 
@@ -39,8 +40,7 @@ class LightingPass : public RenderPass {
 
   private:
     const RenderContext *m_rc = nullptr;
-    Shader *m_shader = nullptr;
-    std::vector<AssetRef> m_shaderAssets;
+    Ref<AShader> m_shader;
 
     VkFormat m_colorFormat;
     VmaAllocator m_vmaAllocator;

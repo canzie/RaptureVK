@@ -2,15 +2,10 @@
 #define RAPTURE__ASSET_IMPORT_CONFIG_H
 
 #include "AssetCommon.h"
-#include "ReservedAssets.h"
-#include "assets/meshes/Mesh.h"
-#include "core/serialization/SerialDocument.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/TextureCommon.h"
 
 #include <filesystem>
-#include <memory>
-#include <optional>
 #include <string>
 #include <variant>
 
@@ -35,61 +30,11 @@ struct TextureImportConfig {
 
 using AssetImportConfigVariant = std::variant<std::monostate, ShaderImportConfig, TextureImportConfig>;
 
-struct StaticMeshImportData {
-    MeshAllocatorParams params;
-    AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE;
-};
-
-struct SkeletalMeshImportData {
-    MeshAllocatorParams params;
-    AssetHandle skeleton = INVALID_ASSET_HANDLE;
-    std::vector<glm::mat4> inverseBindMatrices;
-    AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE;
-};
-
-struct ModuleImportData {
-    std::unique_ptr<SerialDocument> document;
-};
-
-class BaseMaterial;
-class MaterialInstance;
-
-struct BaseMaterialImportData {
-    std::unique_ptr<BaseMaterial> material;
-};
-
-struct MaterialInstanceImportData {
-    std::unique_ptr<MaterialInstance> instance;
-};
-
-class World;
-
-struct WorldImportData {
-    std::unique_ptr<World> world;
-};
-
-class Skeleton;
-
-struct SkeletonImportData {
-    std::unique_ptr<Skeleton> skeleton;
-};
-
-using AssetImportDataVariant =
-    std::variant<std::monostate, StaticMeshImportData, SkeletalMeshImportData, ModuleImportData, BaseMaterialImportData,
-                 MaterialInstanceImportData, WorldImportData, SkeletonImportData>;
-
 struct AssetImportFileRequest {
     std::filesystem::path source;
     std::filesystem::path output = {};
     AssetImportConfigVariant config = std::monostate();
     std::string name = {};
-};
-
-struct AssetImportDataRequest {
-    AssetImportDataVariant data;
-    std::filesystem::path output = {};
-    std::string name = {};
-    std::optional<AssetProvenance> provenance = std::nullopt;
 };
 
 } // namespace Rapture

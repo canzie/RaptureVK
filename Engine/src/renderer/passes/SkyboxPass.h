@@ -3,6 +3,7 @@
 
 #include "app/Application.h"
 #include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
 #include "gpu/buffers/IndexBuffer.h"
 #include "gpu/buffers/UniformBuffer.h"
 #include "gpu/buffers/VertexBuffer.h"
@@ -55,8 +56,7 @@ class SkyboxPass : public RenderPass {
     VkDevice m_device;
     VmaAllocator m_vmaAllocator;
 
-    Shader *m_shader = nullptr;
-    std::vector<AssetRef> m_shaderAssets;
+    Ref<AShader> m_shader;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     Texture *m_skyboxTexture;

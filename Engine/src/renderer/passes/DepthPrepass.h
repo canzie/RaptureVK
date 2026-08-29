@@ -2,6 +2,7 @@
 #define RAPTURE__DEPTH_PREPASS_H
 
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/shaders/AShader.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
@@ -40,9 +41,8 @@ class DepthPrepass : public RenderPass {
   private:
     const RenderContext *m_rc = nullptr;
 
-    Shader *m_shader = nullptr;
-    Shader *m_skinnedShader = nullptr;
-    std::vector<AssetRef> m_shaderAssets;
+    Ref<AShader> m_shader;
+    Ref<AShader> m_skinnedShader;
 
     // shared because DescriptorManager::bindSet takes ownership by shared_ptr
     std::shared_ptr<GraphicsPipeline> m_pipeline;

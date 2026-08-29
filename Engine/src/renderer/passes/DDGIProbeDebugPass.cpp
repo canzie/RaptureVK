@@ -1,4 +1,5 @@
 #include "DDGIProbeDebugPass.h"
+#include "assets/shaders/AShader.h"
 
 #include "app/Application.h"
 #include "assets/asset_manager/AssetManager.h"
@@ -45,7 +46,7 @@ DDGIProbeDebugPass::DDGIProbeDebugPass(const DDGIProbeDebugPassConfig &config, c
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/";
 
-    m_shader = AssetPtr<Shader>(AssetManager::importAsset(shaderPath / "glsl/ddgi/ProbeDebug.fs.glsl", shaderConfig));
+    m_shader = AssetManager::importAsset(shaderPath / "glsl/ddgi/ProbeDebug.fs.glsl", shaderConfig).as<AShader>();
 
     createPipeline();
 }
@@ -127,7 +128,7 @@ void DDGIProbeDebugPass::createPipeline()
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = framebufferSpec;
-    config.shader = m_shader.get();
+    config.shader = &m_shader.get()->shader();
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

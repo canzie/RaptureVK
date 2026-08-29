@@ -5,6 +5,17 @@
 
 namespace Rapture {
 
+const TypeInfo &AMesh::staticType()
+{
+    static const TypeInfo type("AMesh", &Asset::staticType());
+    return type;
+}
+
+const TypeInfo &AMesh::type() const
+{
+    return staticType();
+}
+
 void AMesh::setDefaultMaterial(AssetHandle material)
 {
     const AssetMetadata &metadata = AssetManager::getAssetMetadata(material);

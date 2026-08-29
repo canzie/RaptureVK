@@ -8,6 +8,7 @@
 #include "renderer/passes/RenderPass.h"
 
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/shaders/AShader.h"
 #include "core/events/GameEvents.h"
 #include "gpu/buffers/UniformBuffer.h"
 #include "gpu/command_buffers/CommandBuffer.h"
@@ -78,7 +79,7 @@ class GBufferPass : public RenderPass {
 
   private:
     const RenderContext *m_rc = nullptr;
-    Shader *m_shader = nullptr;
+    Ref<AShader> m_shader;
     float m_width;
     float m_height;
     uint32_t m_framesInFlight;
@@ -101,13 +102,12 @@ class GBufferPass : public RenderPass {
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
-    Shader *m_skinnedShader = nullptr;
+    Ref<AShader> m_skinnedShader;
     std::unique_ptr<GraphicsPipeline> m_skinnedPipeline;
 
     // Terrain rendering
-    Shader *m_terrainShader = nullptr;
+    Ref<AShader> m_terrainShader;
 
-    std::vector<AssetRef> m_shaderAssets;
     std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
 
     CommandPoolHash m_commandPoolHash = 0;

@@ -1,4 +1,5 @@
 #include "ModuleEditorWorkspace.h"
+#include <assets/modules/AModule.h>
 
 #include "Icons.h"
 #include "layers/panels/PropertiesPanel.h"
@@ -33,9 +34,7 @@ std::unique_ptr<ModuleEditorWorkspace> ModuleEditorWorkspace::create(Amethyst::T
                                                                               const PanelServices &services,
                                                                               Rapture::AssetHandle handle)
 {
-    Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
-    Rapture::Asset *asset = ref.get();
-    if (asset == nullptr || asset->getUnderlyingAsset<Rapture::SerialDocument>() == nullptr) {
+    if (!Rapture::AssetManager::getAsset<Rapture::AModule>(handle)) {
         RP_ERROR("asset {} holds no module to open", static_cast<uint64_t>(handle));
         return nullptr;
     }
@@ -50,8 +49,8 @@ ModuleEditorWorkspace::ModuleEditorWorkspace(const PanelServices &services, Rapt
 {
     m_context.services = services;
 
-    m_documentRef = Rapture::AssetManager::getAsset(handle);
-    m_document = m_documentRef ? m_documentRef.get()->getUnderlyingAsset<Rapture::SerialDocument>() : nullptr;
+    m_documentRef = Rapture::AssetManager::getAsset<Rapture::AModule>(handle);
+    m_document = m_documentRef ? &m_documentRef.get()->document() : nullptr;
 }
 
 ModuleEditorWorkspace::~ModuleEditorWorkspace()

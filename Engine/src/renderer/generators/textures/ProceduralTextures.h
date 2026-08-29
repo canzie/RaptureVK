@@ -2,6 +2,8 @@
 #define RAPTURE__PROCEDURAL_TEXTURES_H
 
 #include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
+#include "assets/textures/ATexture.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/descriptors/DescriptorSet.h"
@@ -237,9 +239,9 @@ class ProceduralTexture {
      *         command buffer is submitted.
      */
     Texture &getTexture() const { return *m_texture; }
-    Shader &getShader() const { return *m_shader; }
+    Shader &getShader() const { return m_shader.get()->shader(); }
 
-    AssetPtr<Texture> getTextureAsset() const { return AssetPtr<Texture>(m_textureAsset); }
+    Ref<ATexture> getTextureAsset() const { return m_textureAsset; }
 
     /**
      * @brief Checks if the generator was initialized successfully.
@@ -332,7 +334,7 @@ class ProceduralTexture {
      * @param config Optional texture configuration.
      * @return Shared pointer to the generated texture.
      */
-    static AssetPtr<Texture> generateWhiteNoise(uint32_t seed = 0,
+    static Ref<ATexture> generateWhiteNoise(uint32_t seed = 0,
                                                 const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
@@ -342,13 +344,13 @@ class ProceduralTexture {
      * @param config Optional texture configuration.
      * @return Shared pointer to the generated texture.
      */
-    static AssetPtr<Texture> generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
+    static Ref<ATexture> generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
                                                  const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
-    static AssetPtr<Texture> generateSimplexNoise(const SimplexNoisePushConstants &params = SimplexNoisePushConstants(),
+    static Ref<ATexture> generateSimplexNoise(const SimplexNoisePushConstants &params = SimplexNoisePushConstants(),
                                                   const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
-    static AssetPtr<Texture> generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
+    static Ref<ATexture> generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
                                                  const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
@@ -368,7 +370,7 @@ class ProceduralTexture {
      * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
      * @return Shared pointer to the generated panoramic texture.
      */
-    static AssetPtr<Texture> generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
+    static Ref<ATexture> generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
                                                 const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
@@ -383,7 +385,7 @@ class ProceduralTexture {
      * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
      * @return Pointer to the generated TEXTURECUBE texture.
      */
-    static AssetPtr<Texture> generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params = nullptr,
+    static Ref<ATexture> generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params = nullptr,
                                                        const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
@@ -409,11 +411,11 @@ class ProceduralTexture {
     bool verifyPushConstantSize(size_t providedSize);
     void reflectParameters();
 
-    Shader *m_shader;
+    Ref<AShader> m_shader;
     std::shared_ptr<ComputePipeline> m_pipeline;
     std::shared_ptr<DescriptorSet> m_descriptorSet;
     Texture *m_texture;
-    AssetRef m_textureAsset;
+    Ref<ATexture> m_textureAsset;
     CommandPoolHash m_commandPoolHash = 0;
 
     std::vector<uint8_t> m_pushConstantData;
@@ -422,7 +424,6 @@ class ProceduralTexture {
     ProceduralTextureConfig m_config;
     bool m_isValid = false;
 
-    std::vector<AssetRef> m_assets;
 
     static constexpr uint32_t TEXTURE_SIZE = 1024;
     static constexpr uint32_t WORKGROUP_SIZE = 8;

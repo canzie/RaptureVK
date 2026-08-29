@@ -43,13 +43,7 @@ void SkeletonPose::bindSkeleton(AssetHandle skeleton)
         return;
     }
 
-    AssetRef ref = AssetManager::getAsset(skeleton);
-    if (!ref) {
-        RP_CORE_ERROR("skeleton {} could not be resolved for '{}'", skeleton, name());
-        return;
-    }
-
-    AssetPtr<ASkeleton> resolved(std::move(ref));
+    Ref<ASkeleton> resolved = AssetManager::getAsset<ASkeleton>(skeleton);
     if (!resolved || resolved->skeleton().getJointCount() == 0) {
         RP_CORE_ERROR("skeleton {} has no joints for '{}' to pose", skeleton, name());
         return;

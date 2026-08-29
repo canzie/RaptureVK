@@ -1,5 +1,8 @@
 #include "MaterialGraphCompiler.h"
 
+#include "assets/materials/Material.h"
+#include "assets/textures/ATexture.h"
+
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -361,10 +364,11 @@ static void s_reportDeadNodes(const GraphContext &ctx, const std::vector<uint32_
  * @brief Pack each node's authored, unwired input pin values into the shared instance slice
  *
  * A wired pin draws its value from upstream and an unauthored pin bakes its literal default, so only
- * an unwired pin carrying an authored value reserves a slot. The layout is shared by every pass.
+ * an unwired pin carrying an authored value reserves a slot, as does every unwired texture pin. The
+ * layout is shared by every pass, and depends on the graph alone so a recompile reproduces it.
  */
 static void s_assignResources(const GraphContext &ctx, const std::vector<uint32_t> &order, GraphInstanceData &defaults,
-                              GraphSlotMapping &mapping, std::vector<AssetPtr<Texture>> &textureRefs)
+                              GraphSlotMapping &mapping, std::vector<Ref<ATexture>> &textureRefs)
 {
     GraphBufferOffset next = 0;
     for (uint32_t nodeId : order) {
@@ -381,18 +385,20 @@ static void s_assignResources(const GraphContext &ctx, const std::vector<uint32_
 
             const PinDef &pin = def->inputs[i];
             if (pin.type == PinType::TEXTURE) {
-                AssetPtr<Texture> texture = i < node->inputTextures.size() ? node->inputTextures[i] : AssetPtr<Texture>{};
-                if (!texture) {
-                    continue;
-                }
-
+                // a texture pin reserves its slot whether or not the texture resolves, so recompiling a
+                // graph reproduces the layout the parameter table serialized beside it was built against
                 GraphBufferOffset offset = next++;
                 if (defaults.size() <= offset) {
                     defaults.resize(offset + 1, 0u);
                 }
-                defaults[offset] = texture->getBindlessIndex();
+
+                Ref<ATexture> texture = i < node->inputTextures.size() ? node->inputTextures[i] : Ref<ATexture>{};
+                defaults[offset] = texture ? texture->getBindlessIndex() : MaterialManager::getDefaultTextureIndex();
                 mapping.slots[Graph_pinKey(nodeId, i)] = {offset, PinType::TEXTURE};
-                textureRefs.push_back(std::move(texture));
+
+                if (texture) {
+                    textureRefs.push_back(std::move(texture));
+                }
             } else {
                 if (i >= node->inputValues.size() || !node->inputValues[i].has_value()) {
                     continue;

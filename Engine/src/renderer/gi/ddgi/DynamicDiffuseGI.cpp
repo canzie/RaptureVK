@@ -119,42 +119,27 @@ void DynamicDiffuseGI::createPipelines()
     ShaderImportConfig probeTraceConfigImport;
     probeTraceConfigImport.compileInfo.includePath = shaderDir / "glsl/";
 
-    auto probeTraceAsset = AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", probeTraceConfigImport);
-    m_DDGI_ProbeTraceShader = probeTraceAsset ? probeTraceAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (m_DDGI_ProbeTraceShader) m_shaderAssets.push_back(std::move(probeTraceAsset));
-
-    auto probeIrradianceBlendAsset =
-        AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderIrradianceBlendConfig);
+    m_DDGI_ProbeTraceShader =
+        AssetManager::importAsset<AShader>(shaderDir / "glsl/ddgi/ProbeTrace.cs.glsl", probeTraceConfigImport);
     m_DDGI_ProbeIrradianceBlendingShader =
-        probeIrradianceBlendAsset ? probeIrradianceBlendAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (m_DDGI_ProbeIrradianceBlendingShader) m_shaderAssets.push_back(std::move(probeIrradianceBlendAsset));
-
-    auto probeDistanceBlendAsset =
-        AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderDistanceBlendConfig);
+        AssetManager::importAsset<AShader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderIrradianceBlendConfig);
     m_DDGI_ProbeDistanceBlendingShader =
-        probeDistanceBlendAsset ? probeDistanceBlendAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (m_DDGI_ProbeDistanceBlendingShader) m_shaderAssets.push_back(std::move(probeDistanceBlendAsset));
-
-    auto probeRelocationAsset = AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeRelocation.cs.glsl", shaderBaseProbeConfig);
-    m_DDGI_ProbeRelocationShader = probeRelocationAsset ? probeRelocationAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (m_DDGI_ProbeRelocationShader) m_shaderAssets.push_back(std::move(probeRelocationAsset));
-
-    auto probeClassificationAsset =
-        AssetManager::importAsset(shaderDir / "glsl/ddgi/ProbeClassification.cs.glsl", shaderBaseProbeConfig);
+        AssetManager::importAsset<AShader>(shaderDir / "glsl/ddgi/ProbeBlending.cs.glsl", shaderDistanceBlendConfig);
+    m_DDGI_ProbeRelocationShader =
+        AssetManager::importAsset<AShader>(shaderDir / "glsl/ddgi/ProbeRelocation.cs.glsl", shaderBaseProbeConfig);
     m_DDGI_ProbeClassificationShader =
-        probeClassificationAsset ? probeClassificationAsset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (m_DDGI_ProbeClassificationShader) m_shaderAssets.push_back(std::move(probeClassificationAsset));
+        AssetManager::importAsset<AShader>(shaderDir / "glsl/ddgi/ProbeClassification.cs.glsl", shaderBaseProbeConfig);
 
     ComputePipelineConfiguration probeTraceConfig;
-    probeTraceConfig.shader = m_DDGI_ProbeTraceShader;
+    probeTraceConfig.shader = m_DDGI_ProbeTraceShader.operator->();
     ComputePipelineConfiguration probeIrradianceBlendingConfig;
-    probeIrradianceBlendingConfig.shader = m_DDGI_ProbeIrradianceBlendingShader;
+    probeIrradianceBlendingConfig.shader = m_DDGI_ProbeIrradianceBlendingShader.operator->();
     ComputePipelineConfiguration probeDistanceBlendingConfig;
-    probeDistanceBlendingConfig.shader = m_DDGI_ProbeDistanceBlendingShader;
+    probeDistanceBlendingConfig.shader = m_DDGI_ProbeDistanceBlendingShader.operator->();
     ComputePipelineConfiguration probeRelocationConfig;
-    probeRelocationConfig.shader = m_DDGI_ProbeRelocationShader;
+    probeRelocationConfig.shader = m_DDGI_ProbeRelocationShader.operator->();
     ComputePipelineConfiguration probeClassificationConfig;
-    probeClassificationConfig.shader = m_DDGI_ProbeClassificationShader;
+    probeClassificationConfig.shader = m_DDGI_ProbeClassificationShader.operator->();
 
     m_DDGI_ProbeTracePipeline = std::make_shared<ComputePipeline>(probeTraceConfig);
     m_DDGI_ProbeIrradianceBlendingPipeline = std::make_shared<ComputePipeline>(probeIrradianceBlendingConfig);

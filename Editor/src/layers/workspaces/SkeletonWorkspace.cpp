@@ -107,7 +107,7 @@ void SkeletonWorkspace::setupHotbar()
 
 void SkeletonWorkspace::setupPose()
 {
-    Rapture::AssetPtr<Rapture::ASkeleton> skeleton(Rapture::AssetManager::getAsset(handle()));
+    Rapture::Ref<Rapture::ASkeleton> skeleton = Rapture::AssetManager::getAsset<Rapture::ASkeleton>(handle());
     if (!skeleton) {
         RP_ERROR("skeleton {} could not be resolved, showing nothing", handle());
         return;
@@ -125,7 +125,7 @@ void SkeletonWorkspace::setupPose()
 
 void SkeletonWorkspace::spawnPreviewMeshes()
 {
-    Rapture::AssetPtr<Rapture::ASkeleton> skeleton(Rapture::AssetManager::getAsset(handle()));
+    Rapture::Ref<Rapture::ASkeleton> skeleton = Rapture::AssetManager::getAsset<Rapture::ASkeleton>(handle());
     if (!skeleton || m_pose == nullptr) {
         return;
     }

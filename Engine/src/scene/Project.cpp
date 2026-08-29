@@ -1,4 +1,5 @@
 #include "Project.h"
+#include "assets/worlds/AWorld.h"
 
 #include "assets/asset_manager/AssetManager.h"
 #include "core/events/GameEvents.h"
@@ -38,24 +39,25 @@ void Project::createDefaultWorld()
     }
 
     world->getScene()->addDefaultContent();
-    m_config.startupWorld = m_worlds.back().ref().get()->getHandle();
+    m_config.startupWorld = m_worlds.back().get()->handle();
     activateWorld(world);
 }
 
 World *Project::createWorld(std::string name)
 {
-    AssetPtr<World> world(AssetManager::importAsset(AssetImportDataRequest{
-        .data = WorldImportData{std::make_unique<World>(name)},
-        .output = getContentDirectory(),
-        .name = name,
-    }));
+    Ref<AWorld> world = AssetManager::importAsset(AssetImportDataRequest{
+                                                      .data = WorldImportData{std::make_unique<World>(name)},
+                                                      .output = getContentDirectory(),
+                                                      .name = name,
+                                                  })
+                            .as<AWorld>();
     if (!world) {
         RP_CORE_ERROR("Could not create world '{}'", name);
         return nullptr;
     }
 
     m_worlds.push_back(std::move(world));
-    return m_worlds.back().get();
+    return &m_worlds.back().get()->world();
 }
 
 World *Project::openWorld(AssetHandle handle)
@@ -64,21 +66,21 @@ World *Project::openWorld(AssetHandle handle)
         return nullptr;
     }
 
-    AssetPtr<World> world(AssetManager::getAsset(handle));
+    Ref<AWorld> world = AssetManager::getAsset<AWorld>(handle);
     if (!world) {
         RP_CORE_ERROR("asset {} is not a world", handle);
         return nullptr;
     }
 
     // the manager hands out one payload per handle, so an already open world comes back as itself
-    for (const AssetPtr<World> &open : m_worlds) {
+    for (const Ref<AWorld> &open : m_worlds) {
         if (open.get() == world.get()) {
-            return open.get();
+            return &open.get()->world();
         }
     }
 
     m_worlds.push_back(std::move(world));
-    return m_worlds.back().get();
+    return &m_worlds.back().get()->world();
 }
 
 void Project::activateWorld(World *world)
@@ -114,7 +116,7 @@ bool Project::saveWorld(AssetHandle handle)
 
 void Project::onUpdate(float dt)
 {
-    for (const AssetPtr<World> &world : m_worlds) {
+    for (const Ref<AWorld> &world : m_worlds) {
         world->onUpdate(dt);
     }
 }

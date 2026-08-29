@@ -1,4 +1,5 @@
 #include "Mesh3D.h"
+#include "assets/materials/AMaterialInstance.h"
 
 #include "assets/asset_manager/AssetManager.h"
 #include "assets/meshes/AMesh.h"
@@ -50,7 +51,7 @@ void Mesh3D::setMaterial(AssetHandle _material)
     }
     auto component = m_entity.write<MaterialComponent>();
 
-    component->material = AssetPtr<MaterialInstance>(std::move(ref));
+    component->material = ref.as<AMaterialInstance>();
     m_material = _material;
 }
 

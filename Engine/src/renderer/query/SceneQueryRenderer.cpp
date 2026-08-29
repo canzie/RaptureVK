@@ -377,7 +377,7 @@ void SceneQueryRenderer::recordQuery(CommandBuffer *commandBuffer, Scene &scene,
     // sixteen byte alignment and the shader block is not
     VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     uint32_t pushSize = sizeof(SceneQueryPushConstants);
-    if (m_shader != nullptr && !m_shader->getPushConstantLayouts().empty()) {
+    if (m_shader && !m_shader->getPushConstantLayouts().empty()) {
         const VkPushConstantRange &pushRange = m_shader->getPushConstantLayouts()[0];
         stageFlags = pushRange.stageFlags;
         pushSize = pushRange.size;
@@ -585,14 +585,11 @@ void SceneQueryRenderer::createPipeline()
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    AssetRef asset = AssetManager::importAsset(shaderPath / "glsl/SceneQuery.vs.glsl", shaderConfig);
-    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-
-    if (m_shader == nullptr) {
+    m_shader = AssetManager::importAsset<AShader>(shaderPath / "glsl/SceneQuery.vs.glsl", shaderConfig);
+    if (!m_shader) {
         RP_CORE_ERROR("Failed to load the scene query shader");
         return;
     }
-    m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -602,7 +599,7 @@ void SceneQueryRenderer::createPipeline()
     config.multisampleState = multisampling;
     config.colorBlendState = colorBlending;
     config.vertexInputState = vertexInputInfo;
-    config.shader = m_shader;
+    config.shader = m_shader.operator->();
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

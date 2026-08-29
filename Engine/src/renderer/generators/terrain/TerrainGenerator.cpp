@@ -1,4 +1,6 @@
 #include "TerrainGenerator.h"
+#include "assets/textures/ATexture.h"
+#include "assets/materials/AMaterialInstance.h"
 
 #include "core/utils/EnginePaths.h"
 
@@ -143,7 +145,7 @@ void TerrainGenerator::createChunkDataBuffer()
     RP_CORE_TRACE("TerrainGenerator: Created chunk data buffer for {} chunks", m_chunkCount);
 }
 
-void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, AssetPtr<Texture> texture)
+void TerrainGenerator::setNoiseTexture(TerrainNoiseCategory category, Ref<ATexture> texture)
 {
     if (category >= TERRAIN_NC_COUNT) {
         return;
@@ -156,7 +158,7 @@ Texture *TerrainGenerator::getNoiseTexture(TerrainNoiseCategory category) const
     if (category >= TERRAIN_NC_COUNT) {
         return nullptr;
     }
-    return m_noiseTextures[category].get();
+    return &m_noiseTextures[category].get()->texture();
 }
 
 void TerrainGenerator::bakeSplineCurves()
@@ -264,17 +266,15 @@ void TerrainGenerator::initComputePipeline()
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_compute_bounds.cs.glsl", shaderConfig);
-    Shader *shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (!shader || !shader->isReady()) {
+    m_chunkComputeShader =
+        AssetManager::importAsset<AShader>(shaderPath / "glsl/terrain/terrain_compute_bounds.cs.glsl", shaderConfig);
+    if (!m_chunkComputeShader || !m_chunkComputeShader->isReady()) {
         RP_CORE_WARN("TerrainGenerator: Chunk compute shader not found");
         return;
     }
-    m_chunkComputeShader = shader;
-    m_shaderAssets.push_back(std::move(asset));
 
     ComputePipelineConfiguration pipelineConfig;
-    pipelineConfig.shader = m_chunkComputeShader;
+    pipelineConfig.shader = m_chunkComputeShader.operator->();
     m_chunkComputePipeline = std::make_shared<ComputePipeline>(pipelineConfig);
 
     CommandPoolConfig poolConfig{};
@@ -459,7 +459,7 @@ void TerrainGenerator::createTerrainMaterials()
 {
     // every terrain shades the same way, so a second generator adopts the instance the first one made
     if (AssetRef existing = AssetManager::getVirtualAsset("Terrain")) {
-        m_material = AssetPtr<MaterialInstance>(std::move(existing));
+        m_material = existing.as<AMaterialInstance>();
         return;
     }
 
@@ -470,8 +470,9 @@ void TerrainGenerator::createTerrainMaterials()
     }
 
     auto instance = std::make_unique<MaterialInstance>(terrainBase, "Terrain");
-    m_material =
-        AssetPtr<MaterialInstance>(AssetManager::registerVirtualAsset(std::move(instance), "Terrain", ASSET_MATERIAL_INSTANCE));
+    m_material = AssetManager::registerVirtualAsset(std::make_unique<AMaterialInstance>(std::move(instance)), "Terrain",
+                                                    ASSET_MATERIAL_INSTANCE)
+                     .as<AMaterialInstance>();
 
     SurfaceGraphManager &graphs = MaterialManager::getSurfaceGraphManager();
     uint32_t graphId = graphs.registerGraph(s_buildTerrainGraph());

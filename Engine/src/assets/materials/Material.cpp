@@ -2,6 +2,8 @@
 
 #include "assets/asset_manager/AssetManager.h"
 #include "assets/asset_manager/ReservedAssets.h"
+#include "assets/materials/AMaterial.h"
+#include "assets/textures/ATexture.h"
 #include "gpu/buffers/FreeListStorageBuffer.h"
 #include "gpu/buffers/VirtualStorageBuffer.h"
 #include "core/events/ProjectEvents.h"
@@ -203,8 +205,8 @@ void MaterialManager::init()
 
     s_surfaceGraphManager = std::make_unique<SurfaceGraphManager>();
 
-    auto asset = AssetManager::importDefaultAsset(ASSET_TEXTURE);
-    auto defaultTexture = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
+    Ref<ATexture> asset = AssetManager::importDefaultAsset(ASSET_TEXTURE).as<ATexture>();
+    Texture *defaultTexture = asset ? &asset.get()->texture() : nullptr;
     if (defaultTexture && defaultTexture->isReady()) {
         s_defaultTextureIndex = defaultTexture->getBindlessIndex();
     } else {
@@ -283,9 +285,12 @@ void MaterialManager::writeGraphData(const VirtualStorageBuffer::Allocation &all
 
 static void s_createGltfBaseMaterial()
 {
-    AssetPtr<Texture> white(AssetManager::importDefaultAsset(ASSET_TEXTURE));
-    AssetPtr<Texture> flatNormal(AssetManager::registerReservedAsset(
-        RE_FLAT_NORMAL_TEXTURE, Texture::createDefaultFlatNormalTexture(), "<default_flat_normal>", ASSET_TEXTURE));
+    Ref<ATexture> white = AssetManager::importDefaultAsset(ASSET_TEXTURE).as<ATexture>();
+    Ref<ATexture> flatNormal =
+        AssetManager::registerReservedAsset(RE_FLAT_NORMAL_TEXTURE,
+                                            std::make_unique<ATexture>(Texture::createDefaultFlatNormalTexture()),
+                                            "<default_flat_normal>", ASSET_TEXTURE)
+            .as<ATexture>();
 
     using GN = GraphNodeType;
     MaterialGraph graph;
@@ -489,18 +494,18 @@ void MaterialManager::createDefaultMaterials()
     s_surfaceGraphManager->writeGeneratedFiles(EnginePaths::shaderDirectory() / "glsl/generated");
 }
 
-AssetPtr<BaseMaterial> MaterialManager::getMaterial(const std::string &name)
+Ref<AMaterial> MaterialManager::getMaterial(const std::string &name)
 {
     auto it = s_materialHandles.find(name);
     if (it == s_materialHandles.end()) {
         return {};
     }
-    return AssetPtr<BaseMaterial>(AssetManager::getAsset(it->second));
+    return AssetManager::getAsset<AMaterial>(it->second);
 }
 
-AssetPtr<BaseMaterial> MaterialManager::createMaterial(const std::string &name, uint32_t graphId,
-                                                       std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
-                                                       std::filesystem::path outputFolder)
+Ref<AMaterial> MaterialManager::createMaterial(const std::string &name, uint32_t graphId,
+                                               std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
+                                               std::filesystem::path outputFolder)
 {
     RP_ASSERT(s_initialized, "Initialise the material manager first");
 
@@ -516,13 +521,13 @@ AssetPtr<BaseMaterial> MaterialManager::createMaterial(const std::string &name, 
         return {};
     }
 
-    s_materialHandles[name] = ref.get()->getHandle();
-    return AssetPtr<BaseMaterial>(std::move(ref));
+    s_materialHandles[name] = ref->handle();
+    return ref.as<AMaterial>();
 }
 
-AssetPtr<BaseMaterial> MaterialManager::createBuiltinMaterial(const std::string &name, uint32_t graphId,
-                                                              std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
-                                                              AssetHandle reservedHandle)
+Ref<AMaterial> MaterialManager::createBuiltinMaterial(const std::string &name, uint32_t graphId,
+                                                      std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
+                                                      AssetHandle reservedHandle)
 {
     RP_ASSERT(s_initialized, "Initialise the material manager first");
 
@@ -532,13 +537,14 @@ AssetPtr<BaseMaterial> MaterialManager::createBuiltinMaterial(const std::string 
     }
 
     auto material = std::make_unique<BaseMaterial>(name, graphId, std::move(table), std::move(graph));
-    AssetRef ref = AssetManager::registerReservedAsset(reservedHandle, std::move(material), name, ASSET_MATERIAL);
+    AssetRef ref = AssetManager::registerReservedAsset(reservedHandle, std::make_unique<AMaterial>(std::move(material)), name,
+                                                       ASSET_MATERIAL);
     if (!ref) {
         return {};
     }
 
-    s_materialHandles[name] = ref.get()->getHandle();
-    return AssetPtr<BaseMaterial>(std::move(ref));
+    s_materialHandles[name] = ref->handle();
+    return ref.as<AMaterial>();
 }
 
 uint32_t MaterialManager::getDefaultTextureIndex()

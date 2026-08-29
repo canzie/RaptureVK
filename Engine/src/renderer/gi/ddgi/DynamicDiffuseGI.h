@@ -1,6 +1,7 @@
 #pragma once
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
 #include <memory>
 #include <vector>
 
@@ -89,13 +90,12 @@ class DynamicDiffuseGI {
 
   private:
     const RenderContext *m_rc = nullptr;
-    Shader *m_DDGI_ProbeTraceShader = nullptr;
-    Shader *m_DDGI_ProbeIrradianceBlendingShader = nullptr;
-    Shader *m_DDGI_ProbeDistanceBlendingShader = nullptr;
-    Shader *m_DDGI_ProbeRelocationShader = nullptr;
-    Shader *m_DDGI_ProbeClassificationShader = nullptr;
+    Ref<AShader> m_DDGI_ProbeTraceShader;
+    Ref<AShader> m_DDGI_ProbeIrradianceBlendingShader;
+    Ref<AShader> m_DDGI_ProbeDistanceBlendingShader;
+    Ref<AShader> m_DDGI_ProbeRelocationShader;
+    Ref<AShader> m_DDGI_ProbeClassificationShader;
 
-    std::vector<AssetRef> m_shaderAssets;
 
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeTracePipeline;
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeIrradianceBlendingPipeline;

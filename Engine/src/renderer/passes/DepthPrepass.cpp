@@ -132,14 +132,12 @@ void DepthPrepass::createPipeline(bool skinned)
         shaderConfig.compileInfo.macros.emplace_back("IS_SKINNED_MESH");
     }
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/DepthPrepass.vs.glsl", shaderConfig);
-    Shader *shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    Ref<AShader> shader = AssetManager::importAsset<AShader>(shaderPath / "glsl/DepthPrepass.vs.glsl", shaderConfig);
 
-    if (shader == nullptr) {
+    if (!shader) {
         RP_CORE_ERROR("Failed to load depth prepass vertex shader");
         return;
     }
-    m_shaderAssets.push_back(std::move(asset));
 
     GraphicsPipelineConfiguration config;
     config.dynamicState = dynamicState;
@@ -151,7 +149,7 @@ void DepthPrepass::createPipeline(bool skinned)
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = getFramebufferSpecification();
-    config.shader = shader;
+    config.shader = shader.operator->();
 
     if (skinned) {
         m_skinnedShader = shader;
@@ -258,7 +256,7 @@ CommandBuffer *DepthPrepass::record(const RenderPassContext &context, const Seco
 
         pushConstants.batchInfoBufferIndex = batch->getBatchInfoBufferIndex();
 
-        const Shader *shader = isSkinned ? m_skinnedShader : m_shader;
+        const Shader *shader = isSkinned ? m_skinnedShader.operator->() : m_shader.operator->();
         VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         if (shader != nullptr && shader->getPushConstantLayouts().size() > 0) {
             stageFlags = shader->getPushConstantLayouts()[0].stageFlags;

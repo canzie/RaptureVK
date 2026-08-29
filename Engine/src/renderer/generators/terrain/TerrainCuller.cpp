@@ -50,17 +50,14 @@ void TerrainCuller::initCullPipeline()
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/terrain/";
 
-    AssetRef asset = AssetManager::importAsset(shaderPath / "glsl/terrain/terrain_cull.cs.glsl", shaderConfig);
-    auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (!shader || !shader->isReady()) {
+    m_cullShader = AssetManager::importAsset<AShader>(shaderPath / "glsl/terrain/terrain_cull.cs.glsl", shaderConfig);
+    if (!m_cullShader || !m_cullShader->isReady()) {
         RP_CORE_WARN("TerrainCuller: Cull compute shader not found");
         return;
     }
-    m_cullShader = shader;
-    m_assets.push_back(std::move(asset));
 
     ComputePipelineConfiguration pipelineConfig;
-    pipelineConfig.shader = m_cullShader;
+    pipelineConfig.shader = m_cullShader.operator->();
     m_cullPipeline = std::make_shared<ComputePipeline>(pipelineConfig);
 
     CommandPoolConfig poolConfig{};

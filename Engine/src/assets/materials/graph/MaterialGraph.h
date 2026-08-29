@@ -9,7 +9,8 @@
 
 #include "GraphDomain.h"
 #include "MaterialGraphTypes.h"
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/textures/ATexture.h"
 
 namespace Rapture {
 
@@ -22,7 +23,7 @@ struct GraphNode {
     uint32_t id = 0;
     GraphNodeType type = GraphNodeType::NONE;
     std::vector<std::optional<PinValue>> inputValues = {}; // authored numeric value per input pin, nullopt when unset
-    std::vector<AssetPtr<Texture>> inputTextures = {};     // authored texture per texture input pin, null when unset
+    std::vector<Ref<ATexture>> inputTextures = {};         // authored texture per texture input pin, null when unset
 };
 
 /**

@@ -2,6 +2,7 @@
 
 #include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/modules/AModule.h"
 #include "core/serialization/SerialDocument.h"
 #include "core/utils/Log.h"
 
@@ -34,15 +35,13 @@ bool Module::setAssetHandle(AssetHandle handle)
         return false;
     }
 
-    AssetRef ref = AssetManager::getAsset(m_assetHandle);
-    Asset *asset = ref.get();
-    SerialDocument *document = asset != nullptr ? asset->getUnderlyingAsset<SerialDocument>() : nullptr;
-    if (document == nullptr) {
+    Ref<AModule> module = AssetManager::getAsset<AModule>(m_assetHandle);
+    if (!module) {
         RP_CORE_ERROR("asset {} holds no module for '{}' to stand for", m_assetHandle, name());
         return false;
     }
 
-    m_contentRoot = spawnSubtree(*this, document->rootView(), InternalMode::ENABLED);
+    m_contentRoot = spawnSubtree(*this, module->rootView(), InternalMode::ENABLED);
     if (m_contentRoot == nullptr) {
         return false;
     }

@@ -100,7 +100,7 @@ void RtInstanceData::rebuild(Scene &scene)
         if (materialComp.material) {
             uint32_t offset = instance.slot * static_cast<uint32_t>(sizeof(RtInstanceInfo));
             m_entityToOffset[instance.entityId] = offset;
-            m_materialToOffsets[materialComp.material.get()].push_back(offset);
+            m_materialToOffsets[materialComp.material.operator->()].push_back(offset);
         }
     }
 

@@ -836,7 +836,7 @@ std::vector<uint8_t> Texture::readbackRegion(uint32_t x, uint32_t y, uint32_t wi
     return out;
 }
 
-std::vector<uint8_t> Texture::serialize(std::string_view sourcePath)
+std::vector<uint8_t> Texture::serialize()
 {
     TextureBlobHeader header{};
     header.format = static_cast<uint32_t>(m_spec.format);
@@ -857,7 +857,7 @@ std::vector<uint8_t> Texture::serialize(std::string_view sourcePath)
         }
         header.mode = TEXTURE_BLOB_EMBEDDED;
     } else {
-        payload.assign(sourcePath.begin(), sourcePath.end());
+        // an uncompressed texture is reloaded from the source its metadata records, so none of it is written here
         header.mode = TEXTURE_BLOB_SOURCE;
     }
     header.payloadSize = static_cast<uint32_t>(payload.size());
@@ -906,24 +906,6 @@ std::unique_ptr<Texture> Texture::deserialize(std::span<const uint8_t> blob)
     auto texture = createPlaceholder(spec);
     texture->uploadCompressedBlob(blob.subspan(header.payloadOffset, header.payloadSize));
     return texture;
-}
-
-std::string Texture::readBlobSourcePath(std::span<const uint8_t> blob)
-{
-    if (blob.size() < sizeof(TextureBlobHeader)) {
-        return {};
-    }
-
-    TextureBlobHeader header{};
-    std::memcpy(&header, blob.data(), sizeof(TextureBlobHeader));
-    if (header.magic != TEXTURE_BLOB_MAGIC || header.mode != TEXTURE_BLOB_SOURCE) {
-        return {};
-    }
-    if (blob.size() < static_cast<size_t>(header.payloadOffset) + header.payloadSize) {
-        return {};
-    }
-
-    return std::string(reinterpret_cast<const char *>(blob.data() + header.payloadOffset), header.payloadSize);
 }
 
 void Texture::uploadCompressedBlob(std::span<const uint8_t> bytes)

@@ -1,7 +1,7 @@
 #ifndef RAPTURE__MATERIAL_GRAPH_COMPILER_H
 #define RAPTURE__MATERIAL_GRAPH_COMPILER_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -12,6 +12,8 @@
 #include "assets/materials/GraphInstanceData.h"
 
 namespace Rapture {
+
+class ATexture;
 
 /**
  * @brief Codegen scheme version, bumped when the emitted GLSL shape changes
@@ -91,7 +93,7 @@ struct CompileResult {
 
     GraphInstanceData defaults; // packed default slice, one uint per texture index and per value component
     GraphSlotMapping mapping;
-    std::vector<AssetPtr<Texture>> textureRefs; // holds every texture the slice references so it is not evicted
+    std::vector<Ref<ATexture>> textureRefs; // holds every texture the slice references so it is not evicted
 
     /**
      * @brief Whether any diagnostic is an error

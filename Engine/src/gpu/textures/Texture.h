@@ -125,10 +125,9 @@ class Texture {
 
     /**
      * @brief Serialize this texture into a self-contained blob
-     * @param sourcePath The texture's source file
      * @return The serialized bytes, or empty on failure
      */
-    std::vector<uint8_t> serialize(std::string_view sourcePath);
+    std::vector<uint8_t> serialize();
 
     /**
      * @brief Rebuild a texture from a serialized blob
@@ -136,13 +135,6 @@ class Texture {
      * @return The texture, or nullptr on failure
      */
     static std::unique_ptr<Texture> deserialize(std::span<const uint8_t> blob);
-
-    /**
-     * @brief The source path referenced by a serialized texture blob
-     * @param blob The serialized bytes
-     * @return The path, or empty if absent
-     */
-    static std::string readBlobSourcePath(std::span<const uint8_t> blob);
 
     VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType = TextureViewType::DEFAULT) const;
 

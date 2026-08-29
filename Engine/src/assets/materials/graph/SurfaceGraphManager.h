@@ -1,7 +1,7 @@
 #ifndef RAPTURE__SURFACE_GRAPH_MANAGER_H
 #define RAPTURE__SURFACE_GRAPH_MANAGER_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
 #include <cstdint>
 #include <filesystem>
 #include <vector>
@@ -10,6 +10,8 @@
 #include "MaterialGraphCompiler.h"
 
 namespace Rapture {
+
+class ATexture;
 
 /**
  * @brief Owns compiled surface graphs and emits the generated GLSL dispatcher file
@@ -66,7 +68,7 @@ class SurfaceGraphManager {
      * @param graphId The graph to query
      * @return The texture references, or empty if the id is unknown
      */
-    std::vector<AssetPtr<Texture>> getTextureRefs(uint32_t graphId) const;
+    std::vector<Ref<ATexture>> getTextureRefs(uint32_t graphId) const;
 
   private:
     std::vector<CompileResult> m_graphs;

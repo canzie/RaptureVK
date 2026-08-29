@@ -35,11 +35,7 @@ CompositePass::CompositePass(float width, float height, VkFormat colorFormat)
         shaderConfig.compileInfo.macros.push_back({"COMPOSITE_APPLY_SRGB_ENCODE"});
     }
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/Composite.fs.glsl", shaderConfig);
-    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (m_shader) {
-        m_shaderAssets.push_back(std::move(asset));
-    }
+    m_shader = AssetManager::importAsset<AShader>(shaderPath / "glsl/Composite.fs.glsl", shaderConfig);
 
     createPipeline();
 }
@@ -249,7 +245,7 @@ void CompositePass::createPipeline()
     config.vertexInputState = vertexInputInfo;
     config.depthStencilState = depthStencil;
     config.framebufferSpec = framebufferSpec;
-    config.shader = m_shader;
+    config.shader = m_shader.operator->();
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

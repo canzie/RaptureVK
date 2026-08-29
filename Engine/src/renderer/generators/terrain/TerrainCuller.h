@@ -3,6 +3,8 @@
 
 #include "TerrainTypes.h"
 
+#include "assets/shaders/AShader.h"
+
 #include "gpu/buffers/StorageBuffer.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "gpu/pipelines/ComputePipeline.h"
@@ -50,8 +52,7 @@ class TerrainCuller {
     uint32_t m_initialIndirectCapacity;
     VmaAllocator m_allocator;
 
-    Shader *m_cullShader;
-    std::vector<AssetRef> m_assets;
+    Ref<AShader> m_cullShader;
     std::shared_ptr<ComputePipeline> m_cullPipeline;
     CommandPoolHash m_commandPoolHash;
 };

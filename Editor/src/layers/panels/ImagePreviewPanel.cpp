@@ -1,4 +1,5 @@
 #include "ImagePreviewPanel.h"
+#include <assets/textures/ATexture.h>
 
 #include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetManager.h"
@@ -128,14 +129,11 @@ void ImagePreviewPanel::selectTexture(Rapture::AssetHandle handle)
         return;
     }
 
-    auto assetRef = Rapture::AssetManager::getAsset(handle);
+    Rapture::Ref<Rapture::ATexture> assetRef = Rapture::AssetManager::getAsset<Rapture::ATexture>(handle);
     if (!assetRef) {
         return;
     }
-    auto *texture = assetRef.get()->getUnderlyingAsset<Rapture::Texture>();
-    if (texture == nullptr) {
-        return;
-    }
+    Rapture::Texture *texture = assetRef.operator->();
 
     auto it = m_registered.find(handle);
     if (it == m_registered.end()) {

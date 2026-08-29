@@ -1,41 +1,25 @@
-#pragma once
+#ifndef RAPTURE__ASSET_H
+#define RAPTURE__ASSET_H
 
 #include "AssetCommon.h"
 #include "AssetImportConfig.h"
 
+#include "core/utils/Ref.h"
+#include "core/utils/RefCounted.h"
+#include "core/utils/TypeInfo.h"
+
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
-#include <memory>
 #include <optional>
 #include <string>
-#include <type_traits>
-#include <variant>
-
-#include "AssetHandle.h"
-
-#include "assets/materials/MaterialInstance.h"
-#include "assets/meshes/ASkeletalMesh.h"
-#include "assets/meshes/AStaticMesh.h"
-#include "assets/skeletons/ASkeleton.h"
-#include "scene/World.h"
-#include "core/serialization/SerialDocument.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
-#include "core/utils/TypeInfo.h"
+#include <vector>
 
 namespace Rapture {
 
-using AssetVariant = std::variant<std::monostate, std::unique_ptr<Shader>, std::unique_ptr<Texture>,
-                                  std::unique_ptr<BaseMaterial>, std::unique_ptr<MaterialInstance>, std::unique_ptr<AStaticMesh>,
-                                  std::unique_ptr<ASkeletalMesh>, std::unique_ptr<SerialDocument>, std::unique_ptr<World>,
-                                  std::unique_ptr<ASkeleton>>;
-
-template <typename T, typename Variant>
-struct IsAssetType;
-template <typename T, typename... Us>
-struct IsAssetType<T, std::variant<Us...>> : std::bool_constant<(std::is_same_v<std::unique_ptr<T>, Us> || ...)> {};
-
+/**
+ * @brief What the asset manager knows about an asset without loading it
+ */
 struct AssetMetadata {
 
     AssetMetadata(const AssetMetadata &) = delete;
@@ -53,7 +37,6 @@ struct AssetMetadata {
     std::optional<AssetProvenance> provenance;
     std::filesystem::path assetPath;
 
-    std::atomic<uint32_t> useCount{0};
     AssetEvictionPolicy evictionPolicy = AssetEvictionPolicy::EVICT_IMMEDIATE;
     uint64_t sizeHintBytes = 0;
 
@@ -68,52 +51,56 @@ struct AssetMetadata {
     operator bool() const { return assetType != ASSET_NONE; }
 };
 
-class Asset {
+/**
+ * @brief Base of everything the asset manager holds.
+ *
+ * The manager owns an asset for its whole life and a Ref counts a user holding one. What an
+ * asset is made of is the branch below this, one class per kind of content.
+ */
+class Asset : public RefCounted {
   public:
-    Asset() = delete;
+    static const TypeInfo &staticType();
+    const TypeInfo &type() const override;
 
-    explicit Asset(AssetHandle _handle) : handle(_handle), m_asset(std::monostate()) {}
-    explicit Asset(AssetVariant asset, AssetHandle _handle) : handle(_handle), m_asset(std::move(asset)) {}
-    static const Asset const_null;
-    static Asset null;
+    AssetHandle handle() const { return m_handle; }
 
-    ~Asset() = default;
+    /**
+     * @brief Gives this asset the identity the manager registered it under
+     * @param handle The handle
+     */
+    void setHandle(AssetHandle handle) { m_handle = handle; }
 
-    template <typename T>
-    T *getUnderlyingAsset() const
-    {
-        if (std::holds_alternative<std::unique_ptr<T>>(m_asset)) {
-            return std::get<std::unique_ptr<T>>(m_asset).get();
-        }
-        return nullptr;
-    }
+    AssetStatus status() const { return m_status.load(std::memory_order_acquire); }
 
-    bool isValid() const { return !std::holds_alternative<std::monostate>(m_asset) && status != AssetStatus::FAILED; }
-    AssetStatus getStatus() const { return status; }
-    AssetHandle getHandle() const { return handle; }
-    void setAssetVariant(AssetVariant &&asset) { m_asset = std::move(asset); }
+    /**
+     * @brief Records how far this asset has got through being loaded
+     * @param status The status
+     */
+    void setStatus(AssetStatus status) { m_status.store(status, std::memory_order_release); }
 
-    bool operator==(Asset &other) { return handle == other.getHandle(); };
-    operator bool() const { return handle != Asset::null.getHandle(); }
+    bool isValid() const { return status() != AssetStatus::FAILED; }
 
-  public:
-    const AssetHandle handle;
-    std::atomic<AssetStatus> status{AssetStatus::REQUESTED};
+    /**
+     * @brief Writes this asset into the payload its asset file holds
+     * @return The serialized bytes, empty if this asset holds nothing to write
+     */
+    virtual std::vector<uint8_t> serialize() const = 0;
+
+    void onLastUseReleased() override;
+
+  protected:
+    Asset() = default;
 
   private:
-    AssetVariant m_asset;
+    AssetHandle m_handle = INVALID_ASSET_HANDLE;
+    std::atomic<AssetStatus> m_status{AssetStatus::REQUESTED};
 };
 
-template <typename T>
-AssetPtr<T>::AssetPtr(AssetRef ref) noexcept : m_ref(std::move(ref)), m_ptr(m_ref ? m_ref.get()->getUnderlyingAsset<T>() : nullptr)
-{
-    RP_ASSERT(!m_ref || m_ptr != nullptr, "AssetPtr constructed from an asset that is not of type T");
-}
-
-template <typename T>
-AssetHandle AssetPtr<T>::getHandle() const noexcept
-{
-    return m_ref ? m_ref.get()->getHandle() : INVALID_ASSET_HANDLE;
-}
+/**
+ * @brief A use of an asset whose class the holder has no stake in
+ */
+using AssetRef = Ref<Asset>;
 
 } // namespace Rapture
+
+#endif // RAPTURE__ASSET_H

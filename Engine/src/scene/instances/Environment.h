@@ -2,7 +2,8 @@
 #define RAPTURE__ENVIRONMENT_H
 
 #include "assets/asset_manager/AssetCommon.h"
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/textures/ATexture.h"
+#include "assets/asset_manager/Asset.h"
 #include "scene/instances/SceneObject.h"
 
 #include <glm/glm.hpp>
@@ -59,7 +60,7 @@ class Environment : public SceneObject {
     AssetHandle skybox() const;
     void setSkybox(AssetHandle skybox);
 
-    Texture *skyboxTexture() const { return m_skyboxTexture.get(); }
+    Texture *skyboxTexture() const { return m_skyboxTexture ? &m_skyboxTexture.get()->texture() : nullptr; }
 
     float skyIntensity() const { return m_skyIntensity; }
     void setSkyIntensity(float skyIntensity) { m_skyIntensity = skyIntensity; }
@@ -94,7 +95,7 @@ class Environment : public SceneObject {
   private:
     bool ensureSkyboxGenerator();
 
-    AssetPtr<Texture> m_skyboxTexture;
+    Ref<ATexture> m_skyboxTexture;
     float m_skyIntensity = 1.0f;
     bool m_skyboxEnabled = true;
     bool m_usesAtmosphereSkybox = false;

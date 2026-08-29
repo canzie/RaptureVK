@@ -2,7 +2,9 @@
 #define RAPTURE__SKELETON_INSTANCE_MANAGER_H
 
 #include "assets/asset_manager/AssetCommon.h"
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/skeletons/ASkeleton.h"
+#include "assets/meshes/ASkeletalMesh.h"
+#include "assets/asset_manager/Asset.h"
 #include "gpu/buffers/VirtualStorageBuffer.h"
 
 #include <glm/glm.hpp>
@@ -66,7 +68,7 @@ class SkeletonInstanceManager {
      * @param skeleton The skeleton to be posed
      * @return The instance
      */
-    SkeletonInstance createSkeletonInstance(const AssetPtr<ASkeleton> &skeleton);
+    SkeletonInstance createSkeletonInstance(const Ref<ASkeleton> &skeleton);
 
     /**
      * @brief Where a shader reads a mesh's inverse bind matrices from
@@ -77,7 +79,7 @@ class SkeletonInstanceManager {
      * @param mesh The mesh bound to a skeleton
      * @return Where its first inverse bind sits, or SKIN_NO_OFFSET if the arena had no room
      */
-    uint32_t getInverseBindOffset(const AssetPtr<ASkeletalMesh> &mesh);
+    uint32_t getInverseBindOffset(const Ref<ASkeletalMesh> &mesh);
 
     /**
      * @brief The index a shader reads this scene's bone matrices from

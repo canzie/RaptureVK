@@ -4,7 +4,8 @@
 #include "Workspace.h"
 
 #include <assets/asset_manager/AssetCommon.h>
-#include <assets/asset_manager/AssetHandle.h>
+#include <assets/asset_manager/Asset.h>
+#include <assets/modules/AModule.h>
 #include <renderer/viewport/Viewport.h>
 
 #include <memory>
@@ -73,7 +74,7 @@ class ModuleEditorWorkspace : public Workspace {
 
   private:
     Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
-    Rapture::AssetRef m_documentRef;
+    Rapture::Ref<Rapture::AModule> m_documentRef;
     Rapture::SerialDocument *m_document = nullptr;
 
     std::unique_ptr<Rapture::Scene> m_scene;

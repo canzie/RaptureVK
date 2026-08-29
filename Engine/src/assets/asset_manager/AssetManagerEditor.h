@@ -10,6 +10,7 @@
 #include "concurrentqueue.h"
 
 #include "Asset.h"
+#include "AssetImportData.h"
 #include "AssetManagerBase.h"
 #include "core/utils/PriorityQueue.h"
 
@@ -24,7 +25,7 @@ class AssetManagerEditor : public AssetManagerBase {
 
     bool isAssetLoaded(AssetHandle handle) const;
     virtual bool isAssetHandleValid(AssetHandle handle) const override;
-    virtual Asset &getAsset(AssetHandle handle) override;
+    virtual Asset *getAsset(AssetHandle handle) override;
 
     AssetMetadata &getAssetMetadata(AssetHandle handle);
     const AssetMetadata &getAssetMetadata(AssetHandle handle) const;
@@ -32,16 +33,16 @@ class AssetManagerEditor : public AssetManagerBase {
     /**
      * @brief Imports an external non-asset file into an owned asset
      * @param request The source file, output folder, import config and name
-     * @return The imported asset, or Asset::null on failure
+     * @return The imported asset, or nullptr on failure
      */
-    Asset &importAsset(const AssetImportFileRequest &request);
+    Asset *importAsset(const AssetImportFileRequest &request);
 
     /**
      * @brief Imports in-memory data into an owned asset, writing its asset file
      * @param request The data, output folder, name and provenance
-     * @return The imported asset, or Asset::null on failure
+     * @return The imported asset, or nullptr on failure
      */
-    Asset &importAsset(AssetImportDataRequest request);
+    Asset *importAsset(AssetImportDataRequest request);
 
     /**
      * @brief Registers an owned asset from its asset file without loading its data
@@ -63,7 +64,7 @@ class AssetManagerEditor : public AssetManagerBase {
      * @param asset The new asset value
      * @return True if the file now holds the new contents
      */
-    bool updateAsset(AssetHandle handle, AssetVariant asset);
+    bool updateAsset(AssetHandle handle, std::unique_ptr<Asset> asset);
 
     /**
      * @brief Writes a loaded asset back into its file, giving it one if it has none yet
@@ -73,9 +74,9 @@ class AssetManagerEditor : public AssetManagerBase {
      */
     bool saveAsset(AssetHandle handle, const std::filesystem::path &folder);
 
-    Asset &importDefaultAsset(AssetType assetType);
+    Asset *importDefaultAsset(AssetType assetType);
 
-    Asset &registerVirtualAsset(AssetVariant asset, const std::string &virtualName, AssetType assetType);
+    Asset *registerVirtualAsset(std::unique_ptr<Asset> asset, const std::string &virtualName, AssetType assetType);
     bool unregisterVirtualAsset(AssetHandle handle);
 
     /**
@@ -86,7 +87,7 @@ class AssetManagerEditor : public AssetManagerBase {
      * @param assetType The asset type
      * @return The registered asset, or the existing one if the handle is already registered
      */
-    Asset &registerReservedAsset(AssetHandle handle, AssetVariant asset, const std::string &name, AssetType assetType);
+    Asset *registerReservedAsset(AssetHandle handle, std::unique_ptr<Asset> asset, const std::string &name, AssetType assetType);
 
     /**
      * @brief Builds every engine builtin, so a scene referencing one resolves it whatever the load order
@@ -95,7 +96,7 @@ class AssetManagerEditor : public AssetManagerBase {
      */
     void registerBuiltinAssets();
 
-    Asset &getVirtualAssetByName(const std::string &virtualName);
+    Asset *getVirtualAssetByName(const std::string &virtualName);
     std::vector<AssetHandle> getVirtualAssetsByType(AssetType type) const;
 
     /**
@@ -148,7 +149,7 @@ class AssetManagerEditor : public AssetManagerBase {
      * @param payload The serialized bytes for a synchronous write, empty to defer to the async load
      * @return The registered asset
      */
-    Asset &registerImportedAsset(AssetHandle handle, std::unique_ptr<Asset> asset, std::unique_ptr<AssetMetadata> metadata,
+    Asset *registerImportedAsset(AssetHandle handle, std::unique_ptr<Asset> asset, std::unique_ptr<AssetMetadata> metadata,
                                  const std::filesystem::path &outputFolder, std::span<const uint8_t> payload);
 
     /**

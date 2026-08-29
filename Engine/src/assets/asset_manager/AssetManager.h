@@ -37,27 +37,29 @@ class AssetManager {
 
     static void shutdown();
 
-    static AssetRef getAsset(AssetHandle handle)
-    {
-        Asset &asset = s_activeAssetManager->getAsset(handle);
-        if (!asset) {
-            return AssetRef();
-        }
-        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(handle);
+    static AssetRef getAsset(AssetHandle handle) { return AssetRef(s_activeAssetManager->getAsset(handle)); }
 
-        return AssetRef(&asset, &metadata.useCount);
+    /**
+     * @brief Takes a use of an asset of a known class
+     * @param handle The asset to hold
+     * @return A use of the asset as a T, empty if it is not registered or is not a T
+     */
+    template <typename T>
+    static Ref<T> getAsset(AssetHandle handle)
+    {
+        Asset *asset = s_activeAssetManager->getAsset(handle);
+        return Ref<T>(asset != nullptr ? asset->as<T>() : nullptr);
     }
 
     static AssetRef importAsset(const AssetImportFileRequest &request)
     {
-        auto &asset = s_activeAssetManager->importAsset(request);
+        Asset *asset = s_activeAssetManager->importAsset(request);
 
-        if (!asset || !asset.isValid()) {
+        if (asset == nullptr || !asset->isValid()) {
             return AssetRef();
         }
 
-        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
-        return AssetRef(&asset, &metadata.useCount);
+        return AssetRef(asset);
     }
 
     static AssetRef importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate(),
@@ -67,19 +69,43 @@ class AssetManager {
             AssetImportFileRequest{.source = std::move(path), .config = std::move(importConfig), .name = std::move(name)});
     }
 
+    /**
+     * @brief Imports a file whose class is known, so the caller never handles it untyped
+     * @param path The source file
+     * @param importConfig How the source is read
+     * @param name A name for the asset, defaulting to the file's stem
+     * @return A use of the imported asset as a T, empty if it could not be imported or is not a T
+     */
+    template <typename T>
+    static Ref<T> importAsset(std::filesystem::path path, AssetImportConfigVariant importConfig = std::monostate(),
+                              std::string name = {})
+    {
+        return importAsset(std::move(path), std::move(importConfig), std::move(name)).template as<T>();
+    }
+
+    /**
+     * @brief Imports in-memory data whose class is known, so the caller never handles it untyped
+     * @param request The data, output folder, name and provenance
+     * @return A use of the imported asset as a T, empty if it could not be imported or is not a T
+     */
+    template <typename T>
+    static Ref<T> importAsset(AssetImportDataRequest request)
+    {
+        return importAsset(std::move(request)).template as<T>();
+    }
+
     static AssetRef importAsset(AssetImportDataRequest request)
     {
-        auto &asset = s_activeAssetManager->importAsset(std::move(request));
+        Asset *asset = s_activeAssetManager->importAsset(std::move(request));
 
-        if (!asset || !asset.isValid()) {
+        if (asset == nullptr || !asset->isValid()) {
             return AssetRef();
         }
 
-        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
-        return AssetRef(&asset, &metadata.useCount);
+        return AssetRef(asset);
     }
 
-    static bool updateAsset(AssetHandle handle, AssetVariant asset)
+    static bool updateAsset(AssetHandle handle, std::unique_ptr<Asset> asset)
     {
         return s_activeAssetManager->updateAsset(handle, std::move(asset));
     }
@@ -99,43 +125,30 @@ class AssetManager {
         return s_activeAssetManager->registerAssetDirectory(directory);
     }
 
-    static AssetHandle findAssetByPath(const std::filesystem::path &path)
-    {
-        return s_activeAssetManager->findAssetByPath(path);
-    }
+    static AssetHandle findAssetByPath(const std::filesystem::path &path) { return s_activeAssetManager->findAssetByPath(path); }
 
     static AssetRef importDefaultAsset(AssetType assetType)
     {
-        auto &asset = s_activeAssetManager->importDefaultAsset(assetType);
-        if (!asset) {
-            return AssetRef();
-        }
-
-        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
-        return AssetRef(&asset, &metadata.useCount);
+        return AssetRef(s_activeAssetManager->importDefaultAsset(assetType));
     }
 
-    static AssetRef registerVirtualAsset(AssetVariant &&assetValue, const std::string &virtualName, AssetType assetType)
+    static AssetRef registerVirtualAsset(std::unique_ptr<Asset> assetValue, const std::string &virtualName, AssetType assetType)
     {
         if (!s_isInitialized || !s_activeAssetManager) {
             RP_CORE_ERROR("AssetManager not initialized");
             return AssetRef();
         }
-        auto &asset = s_activeAssetManager->registerVirtualAsset(std::move(assetValue), virtualName, assetType);
-        auto &metdata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
-        return asset ? AssetRef(&asset, &metdata.useCount) : AssetRef();
+        return AssetRef(s_activeAssetManager->registerVirtualAsset(std::move(assetValue), virtualName, assetType));
     }
 
-    static AssetRef registerReservedAsset(AssetHandle handle, AssetVariant &&assetValue, const std::string &name,
+    static AssetRef registerReservedAsset(AssetHandle handle, std::unique_ptr<Asset> assetValue, const std::string &name,
                                           AssetType assetType)
     {
         if (!s_isInitialized || !s_activeAssetManager) {
             RP_CORE_ERROR("AssetManager not initialized");
             return AssetRef();
         }
-        auto &asset = s_activeAssetManager->registerReservedAsset(handle, std::move(assetValue), name, assetType);
-        auto &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
-        return asset ? AssetRef(&asset, &metadata.useCount) : AssetRef();
+        return AssetRef(s_activeAssetManager->registerReservedAsset(handle, std::move(assetValue), name, assetType));
     }
 
     static void registerBuiltinAssets()
@@ -162,13 +175,12 @@ class AssetManager {
             RP_CORE_ERROR("AssetManager not initialized");
             return AssetRef();
         }
-        Asset &asset = s_activeAssetManager->getVirtualAssetByName(virtualName);
-        if (!asset || !asset.isValid()) {
+        Asset *asset = s_activeAssetManager->getVirtualAssetByName(virtualName);
+        if (asset == nullptr || !asset->isValid()) {
             return AssetRef();
         }
 
-        AssetMetadata &metadata = s_activeAssetManager->getAssetMetadata(asset.getHandle());
-        return AssetRef(&asset, &metadata.useCount);
+        return AssetRef(asset);
     }
 
     static std::vector<AssetHandle> getVirtualAssetsByType(AssetType type)

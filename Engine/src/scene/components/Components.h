@@ -5,6 +5,7 @@
 */
 
 #include "ComponentsCommon.h"
+#include "assets/materials/AMaterialInstance.h"
 #include "assets/asset_manager/Asset.h"
 
 #include <glm/glm.hpp>
@@ -119,17 +120,17 @@ struct CameraComponent {
 struct MaterialComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MATERIAL_BINDING);
 
-    AssetPtr<MaterialInstance> material;
+    Ref<AMaterialInstance> material;
 
     MaterialComponent() = default;
 
-    MaterialComponent(AssetRef ref) : material(std::move(ref)) {}
+    MaterialComponent(Ref<AMaterialInstance> ref) : material(std::move(ref)) {}
 };
 
 struct StaticMeshComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MESH_BINDING);
 
-    AssetPtr<AStaticMesh> mesh;
+    Ref<AStaticMesh> mesh;
     bool isLoading = true;
     Mobility mobility = MOBILITY_STATIC;
     bool isEnabled = true;
@@ -137,13 +138,16 @@ struct StaticMeshComponent {
 
     StaticMeshComponent() = default;
 
-    StaticMeshComponent(AssetRef ref, Mobility mob = MOBILITY_STATIC) : mesh(std::move(ref)), mobility(mob) { isLoading = false; }
+    StaticMeshComponent(Ref<AStaticMesh> ref, Mobility mob = MOBILITY_STATIC) : mesh(std::move(ref)), mobility(mob)
+    {
+        isLoading = false;
+    }
 
     /**
      * @brief Replaces the mesh, invalidating the world bounding box the old one produced
      * @param ref Reference to the new mesh
      */
-    void setMesh(AssetRef ref) { mesh = AssetPtr<AStaticMesh>(std::move(ref)); }
+    void setMesh(Ref<AStaticMesh> ref) { mesh = std::move(ref); }
 
     /**
      * @brief Recomputes the world bounding box from the mesh's bounds
@@ -162,7 +166,7 @@ struct StaticMeshComponent {
 struct SkeletalMeshComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MESH_BINDING);
 
-    AssetPtr<ASkeletalMesh> mesh;
+    Ref<ASkeletalMesh> mesh;
     SkeletonInstance *pose = nullptr;
     uint32_t inverseBindOffset = SKIN_NO_OFFSET;
     bool isLoading = true;
@@ -171,13 +175,13 @@ struct SkeletalMeshComponent {
 
     SkeletalMeshComponent() = default;
 
-    SkeletalMeshComponent(AssetRef ref) : mesh(std::move(ref)) { isLoading = false; }
+    SkeletalMeshComponent(Ref<ASkeletalMesh> ref) : mesh(std::move(ref)) { isLoading = false; }
 
     /**
      * @brief Replaces the mesh, invalidating the world bounding box the old one produced
      * @param ref Reference to the new mesh
      */
-    void setMesh(AssetRef ref) { mesh = AssetPtr<ASkeletalMesh>(std::move(ref)); }
+    void setMesh(Ref<ASkeletalMesh> ref) { mesh = std::move(ref); }
 
     /**
      * @brief Recomputes the world bounding box from the mesh's bounds
@@ -196,7 +200,7 @@ struct SkeletalMeshComponent {
 struct SkeletonPoseComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_SKELETON_POSE);
 
-    AssetPtr<ASkeleton> skeleton;
+    Ref<ASkeleton> skeleton;
     SkeletonInstance *instance = nullptr;
 };
 

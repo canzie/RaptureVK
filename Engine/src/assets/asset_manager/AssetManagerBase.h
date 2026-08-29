@@ -18,7 +18,7 @@ class AssetManagerBase {
     virtual ~AssetManagerBase() { AssetImporter::shutdown(); };
 
     virtual bool isAssetHandleValid(AssetHandle handle) const = 0;
-    virtual const Asset &getAsset(AssetHandle handle) = 0;
+    virtual Asset *getAsset(AssetHandle handle) = 0;
 
     const AssetStorage &getAssets() const { return m_assets; }
 

@@ -5,7 +5,9 @@
 #include "Material.h"
 #include "MaterialData.h"
 #include "MaterialParameters.h"
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/materials/AMaterial.h"
+#include "assets/textures/ATexture.h"
 #include "core/events/AssetEvents.h"
 
 #include <cstring>
@@ -26,10 +28,10 @@ struct PendingTexture {
 
 class MaterialInstance {
   public:
-    MaterialInstance(AssetPtr<BaseMaterial> material, const std::string &name = "");
+    MaterialInstance(Ref<AMaterial> material, const std::string &name = "");
     ~MaterialInstance();
 
-    BaseMaterial *getBaseMaterial() const { return m_baseMaterial.get(); }
+    BaseMaterial *getBaseMaterial() const { return m_baseMaterial ? &m_baseMaterial.get()->material() : nullptr; }
 
     std::vector<uint8_t> serialize() const;
     static std::unique_ptr<MaterialInstance> deserialize(std::span<const uint8_t> blob);
@@ -50,14 +52,16 @@ class MaterialInstance {
     {
         T value{};
         uint32_t offset = 0;
-        if (!m_baseMaterial->tryGetOffset(id, offset)) return value;
+        if (!m_baseMaterial->tryGetOffset(id, offset)) {
+            return value;
+        }
         if (offset + sizeof(T) / sizeof(uint32_t) <= m_slice.size()) {
             std::memcpy(&value, &m_slice[offset], sizeof(T));
         }
         return value;
     }
 
-    void setParameter(const ParameterId &id, AssetRef texture);
+    void setParameter(const ParameterId &id, Ref<ATexture> texture);
     void updatePendingTextures();
 
     /**
@@ -65,7 +69,7 @@ class MaterialInstance {
      * @param id The texture parameter to look up
      * @return The bound texture, or null if none is set
      */
-    AssetPtr<Texture> getTextureRef(const ParameterId &id) const;
+    Ref<ATexture> getTextureRef(const ParameterId &id) const;
 
     /**
      * @brief Turn this instance into a graph material backed by a generated surface function
@@ -73,14 +77,14 @@ class MaterialInstance {
      * @param data Graph instance pool (compiler-assigned textures and values)
      * @param textures Textures the pool indexes, retained so they are not evicted while in use
      */
-    void setGraph(uint32_t graphId, const GraphInstanceData &data, std::vector<AssetPtr<Texture>> textures);
+    void setGraph(uint32_t graphId, const GraphInstanceData &data, std::vector<Ref<ATexture>> textures);
 
   private:
     void syncToGPU();
     void writeSlice(const ParameterId &id, const void *data, size_t size);
 
     std::string m_name;
-    AssetPtr<BaseMaterial> m_baseMaterial;
+    Ref<AMaterial> m_baseMaterial;
     uint32_t m_bindlessIndex;
     VirtualStorageBuffer::Allocation m_graphData;
 
@@ -90,8 +94,8 @@ class MaterialInstance {
     std::vector<PendingTexture> m_pendingTextures;
     std::mutex m_pendingTexturesMutex;
 
-    std::vector<std::pair<ParameterId, AssetPtr<Texture>>> m_textureRefs;
-    std::vector<AssetPtr<Texture>> m_graphTextureRefs;
+    std::vector<std::pair<ParameterId, Ref<ATexture>>> m_textureRefs;
+    std::vector<Ref<ATexture>> m_graphTextureRefs;
 };
 
 } // namespace Rapture

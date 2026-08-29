@@ -2,6 +2,7 @@
 #define RAPTURE__SHADOWMAPPING_H
 
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/shaders/AShader.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
@@ -67,8 +68,7 @@ class ShadowMap {
 
     Frustum m_frustum;
 
-    Shader *m_shader = nullptr;
-    std::vector<AssetRef> m_shaderAssets;
+    Ref<AShader> m_shader;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 

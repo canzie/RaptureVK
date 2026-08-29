@@ -1,6 +1,8 @@
 #pragma once
 
 #include <map>
+#include "assets/shaders/AShader.h"
+#include "assets/textures/ATexture.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,7 +40,7 @@ class FlattenTexture {
     /**
      * @brief Get the flattened texture
      */
-    Texture *getFlattenedTexture() const { return m_flattenedTexture.get(); }
+    Texture *getFlattenedTexture() const { return m_flattenedTexture.operator->(); }
 
     /**
      * @brief Get the input texture
@@ -52,7 +54,7 @@ class FlattenTexture {
 
   private:
     std::shared_ptr<Texture> m_inputTexture;
-    AssetPtr<Texture> m_flattenedTexture;
+    Ref<ATexture> m_flattenedTexture;
     uint32_t m_inputTextureBindlessIndex = 0;
     std::shared_ptr<DescriptorSet> m_descriptorSet;
     FlattenerDataType m_dataType;
@@ -97,11 +99,10 @@ class TextureFlattener {
     static std::unique_ptr<Texture> createFlattenedTextureSpec(std::shared_ptr<Texture> inputTexture);
 
     // Shared resources
-    static std::map<FlattenerDataType, Shader *> s_flattenShaders;
-    static Shader *s_flattenDepthShader;
+    static std::map<FlattenerDataType, Ref<AShader>> s_flattenShaders;
+    static Ref<AShader> s_flattenDepthShader;
     static std::map<FlattenerDataType, std::shared_ptr<ComputePipeline>> s_flattenPipelines;
     static std::shared_ptr<ComputePipeline> s_flattenDepthPipeline;
-    static std::vector<AssetRef> s_shaderAssets;
     static bool s_initialized;
 
     friend class FlattenTexture;

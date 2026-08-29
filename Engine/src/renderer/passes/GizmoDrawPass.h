@@ -1,7 +1,8 @@
 #ifndef RAPTURE__GIZMO_DRAW_PASS_H
 #define RAPTURE__GIZMO_DRAW_PASS_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
 #include "gpu/buffers/StorageBuffer.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/descriptors/DescriptorSet.h"
@@ -116,9 +117,9 @@ class GizmoDrawPass : public RenderPass {
     const GizmoDrawList *m_drawList = nullptr;
     GizmoDrawPassConfig m_config;
 
-    AssetPtr<Shader> m_segmentShader;
-    AssetPtr<Shader> m_triangleShader;
-    AssetPtr<Shader> m_shadedTriangleShader;
+    Ref<AShader> m_segmentShader;
+    Ref<AShader> m_triangleShader;
+    Ref<AShader> m_shadedTriangleShader;
 
     std::shared_ptr<GraphicsPipeline> m_segmentPipeline;
     std::array<std::shared_ptr<GraphicsPipeline>, GIZMO_SHADING_MODE_COUNT> m_trianglePipelines;

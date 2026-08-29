@@ -18,6 +18,9 @@ class ASkeletalMesh : public AMesh {
     ASkeletalMesh(MeshAllocatorParams &params, AssetHandle skeleton, std::vector<glm::mat4> inverseBindMatrices,
                   AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE);
 
+    static const TypeInfo &staticType();
+    const TypeInfo &type() const override;
+
     SkeletalMesh &geometry() { return m_geometry; }
     const SkeletalMesh &geometry() const { return m_geometry; }
 
@@ -31,7 +34,7 @@ class ASkeletalMesh : public AMesh {
      * @brief Serializes this asset, reading its geometry back off the GPU
      * @return The serialized bytes, empty if it holds no geometry
      */
-    std::vector<uint8_t> serialize() const;
+    std::vector<uint8_t> serialize() const override;
 
     /**
      * @brief Serializes geometry that has not been uploaded yet, skipping the read back off the GPU

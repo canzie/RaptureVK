@@ -4,7 +4,7 @@
 #include "MaterialData.h"
 #include "MaterialParameters.h"
 #include "assets/asset_manager/AssetCommon.h"
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
 #include "gpu/buffers/VirtualStorageBuffer.h"
 #include "core/events/Events.h"
 #include "graph/MaterialGraph.h"
@@ -18,6 +18,7 @@
 
 namespace Rapture {
 
+class AMaterial;
 class FreeListStorageBuffer;
 class SurfaceGraphManager;
 
@@ -80,13 +81,13 @@ class MaterialManager {
 
     static void shutdown();
 
-    static AssetPtr<BaseMaterial> getMaterial(const std::string &name);
-    static AssetPtr<BaseMaterial> createMaterial(const std::string &name, uint32_t graphId,
-                                                 std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
-                                                 std::filesystem::path outputFolder);
-    static AssetPtr<BaseMaterial> createBuiltinMaterial(const std::string &name, uint32_t graphId,
-                                                        std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
-                                                        AssetHandle reservedHandle);
+    static Ref<AMaterial> getMaterial(const std::string &name);
+    static Ref<AMaterial> createMaterial(const std::string &name, uint32_t graphId,
+                                         std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
+                                         std::filesystem::path outputFolder);
+    static Ref<AMaterial> createBuiltinMaterial(const std::string &name, uint32_t graphId,
+                                                std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
+                                                AssetHandle reservedHandle);
     static uint32_t getDefaultTextureIndex();
     static void printMaterialNames();
 

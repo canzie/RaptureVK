@@ -18,6 +18,8 @@
 
 #include "assets/asset_manager/AssetManager.h"
 #include "assets/asset_manager/ReservedAssets.h"
+#include "assets/materials/AMaterial.h"
+#include "assets/textures/ATexture.h"
 #include "scene/Scene.h"
 #include "scene/instances/Module.h"
 #include "scene/instances/Node3D.h"
@@ -260,8 +262,8 @@ void glTF2Loader::loadAndSetTexture(MaterialInstance *material, const ParameterI
     }
 
     AssetImportFileRequest request{.source = texturePathFS, .output = m_outputFolder, .config = texImportConfig};
-    auto asset = AssetManager::importAsset(request);
-    auto tex = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
+    Ref<ATexture> asset = AssetManager::importAsset(request).as<ATexture>();
+    Texture *tex = asset ? &asset.get()->texture() : nullptr;
 
     if (!tex) {
         RP_CORE_ERROR("Failed to import or get texture {}", texturePath);
@@ -435,7 +437,7 @@ bool glTF2Loader::loadNode(glTF_SceneNode *parent, size_t idx)
 
         auto skinIt = m_loadedData->skeletons.find(skin);
         if (skinIt != m_loadedData->skeletons.end() && skinIt->second) {
-            skeleton = skinIt->second.get()->getHandle();
+            skeleton = skinIt->second->handle();
         }
         node->type = glTF_NodeType::SKELETON;
     }
@@ -760,7 +762,7 @@ Node3D *glTF2Loader::buildSceneObject(SceneObject &parent, glTF_SceneNode *src)
             mesh = parent.add<StaticMesh3D>(src->name);
         }
 
-        mesh->setMesh(src->meshRef.get()->getHandle());
+        mesh->setMesh(src->meshRef->handle());
 
         mesh->setMaterial(primitiveMaterial(src->materialIndex));
 
@@ -839,7 +841,7 @@ void glTF2Loader::buildModule(Scene *scene)
                                .name = assetName});
 
     if (scene != nullptr && ref) {
-        scene->root()->add<Module>(assetName)->setAssetHandle(ref.get()->getHandle());
+        scene->root()->add<Module>(assetName)->setAssetHandle(ref->handle());
     }
 
     m_loadedData->sceneObject = std::move(ref);
@@ -971,7 +973,7 @@ SceneFileMetadata glTF2Loader::getMetadata()
  * The graph is authored here so the loader owns which node backs which parameter; the offsets the
  * compiler assigns are resolved into the parameter table the base exposes.
  */
-static AssetPtr<BaseMaterial> s_obtainGltfBaseMaterial()
+static Ref<AMaterial> s_obtainGltfBaseMaterial()
 {
     auto base = MaterialManager::getMaterial("glTF Base Material");
     if (!base) {
@@ -991,7 +993,7 @@ AssetHandle glTF2Loader::primitiveMaterial(int32_t materialIndex) const
         return RE_DEFAULT_MATERIAL_INSTANCE;
     }
 
-    return found->second.get()->getHandle();
+    return found->second->handle();
 }
 
 AssetRef glTF2Loader::loadMaterial(size_t materialIndex)

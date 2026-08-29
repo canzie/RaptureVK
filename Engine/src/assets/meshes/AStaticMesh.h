@@ -18,6 +18,9 @@ class AStaticMesh : public AMesh {
     AStaticMesh(MeshAllocatorParams &params, AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE);
     AStaticMesh(StaticMesh geometry, AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE);
 
+    static const TypeInfo &staticType();
+    const TypeInfo &type() const override;
+
     StaticMesh &geometry() { return m_geometry; }
     const StaticMesh &geometry() const { return m_geometry; }
 
@@ -25,7 +28,7 @@ class AStaticMesh : public AMesh {
      * @brief Serializes this asset, reading its geometry back off the GPU
      * @return The serialized bytes, empty if it holds no geometry
      */
-    std::vector<uint8_t> serialize() const;
+    std::vector<uint8_t> serialize() const override;
 
     /**
      * @brief Serializes geometry that has not been uploaded yet, skipping the read back off the GPU

@@ -2,7 +2,7 @@
 #define RAPTURE__ACCELERATION_STRUCTURE_BUILDER_H
 
 #include "assets/asset_manager/AssetCommon.h"
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
 #include "core/events/EventSignal.h"
 
 #include <cstdint>

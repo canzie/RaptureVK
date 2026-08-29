@@ -1,4 +1,5 @@
 #include "TextureFlattener.h"
+#include "assets/textures/ATexture.h"
 
 #include "core/utils/EnginePaths.h"
 
@@ -17,11 +18,10 @@ namespace Rapture {
 #define FLATTENING_ENABLED 1
 
 // Static member definitions
-std::map<FlattenerDataType, Shader *> TextureFlattener::s_flattenShaders;
-Shader *TextureFlattener::s_flattenDepthShader = nullptr;
+std::map<FlattenerDataType, Ref<AShader>> TextureFlattener::s_flattenShaders;
+Ref<AShader> TextureFlattener::s_flattenDepthShader;
 std::map<FlattenerDataType, std::shared_ptr<ComputePipeline>> TextureFlattener::s_flattenPipelines;
 std::shared_ptr<ComputePipeline> TextureFlattener::s_flattenDepthPipeline = nullptr;
-std::vector<AssetRef> TextureFlattener::s_shaderAssets;
 bool TextureFlattener::s_initialized = false;
 
 void TextureFlattener::shutdown()
@@ -29,8 +29,7 @@ void TextureFlattener::shutdown()
     s_flattenPipelines.clear();
     s_flattenDepthPipeline.reset();
     s_flattenShaders.clear();
-    s_flattenDepthShader = nullptr;
-    s_shaderAssets.clear();
+    s_flattenDepthShader = {};
     s_initialized = false;
 }
 
@@ -40,8 +39,8 @@ FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::uniqu
     : m_inputTexture(inputTexture), m_dataType(dataType), m_name(name)
 {
     // Register the texture with the asset manager and keep the AssetRef alive
-    auto asset = AssetManager::registerVirtualAsset(AssetVariant{std::move(flattenedTexture)}, name, ASSET_TEXTURE);
-    m_flattenedTexture = AssetPtr<Texture>(std::move(asset));
+    auto asset = AssetManager::registerVirtualAsset(std::make_unique<ATexture>(std::move(flattenedTexture)), name, ASSET_TEXTURE);
+    m_flattenedTexture = std::move(asset).as<ATexture>();
 
     // Add input texture to bindless texture array and get its index
     m_inputTextureBindlessIndex = inputTexture->getBindlessIndex();
@@ -59,7 +58,7 @@ FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::uniqu
     m_descriptorSet = std::make_shared<DescriptorSet>(bindings);
 
     // Update the descriptor set with the output texture
-    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)->add(*m_flattenedTexture);
+    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)->add(m_flattenedTexture.get()->texture());
 }
 
 void FlattenTexture::update(CommandBuffer *commandBuffer)
@@ -229,15 +228,11 @@ void TextureFlattener::initializeSharedResources()
     auto shaderDir = EnginePaths::shaderDirectory();
 
     // Load the depth texture flatten shader
-    auto asset = AssetManager::importAsset(shaderDir / "glsl/FlattenDepthArray.cs.glsl");
-    s_flattenDepthShader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (s_flattenDepthShader) {
-        s_shaderAssets.push_back(std::move(asset));
-    }
+    s_flattenDepthShader = AssetManager::importAsset<AShader>(shaderDir / "glsl/FlattenDepthArray.cs.glsl");
 
     // Create compute pipelines
     ComputePipelineConfiguration flattenDepthConfig;
-    flattenDepthConfig.shader = s_flattenDepthShader;
+    flattenDepthConfig.shader = s_flattenDepthShader.operator->();
     s_flattenDepthPipeline = std::make_shared<ComputePipeline>(flattenDepthConfig);
 
     s_initialized = true;
@@ -268,14 +263,12 @@ void TextureFlattener::getOrCreateShaderAndPipeline(FlattenerDataType dataType)
         break;
     }
 
-    auto asset = AssetManager::importAsset(shaderPath, importConfig);
-    auto shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
+    Ref<AShader> shader = AssetManager::importAsset<AShader>(shaderPath, importConfig);
     if (shader) {
         s_flattenShaders[dataType] = shader;
-        s_shaderAssets.push_back(std::move(asset));
 
         ComputePipelineConfiguration pipelineConfig;
-        pipelineConfig.shader = shader;
+        pipelineConfig.shader = shader.operator->();
         s_flattenPipelines[dataType] = std::make_shared<ComputePipeline>(pipelineConfig);
 
         RP_CORE_INFO("Created shader and pipeline for data type {}", (int)dataType);

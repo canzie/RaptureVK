@@ -1,4 +1,5 @@
 #include "TextureGeneratorWorkspace.h"
+#include <assets/shaders/AShader.h>
 
 #include "assets/asset_manager/AssetManager.h"
 #include "layers/panels/ImagePreviewPanel.h"
@@ -268,10 +269,10 @@ void TextureGeneratorWorkspace::refreshShaderDropdown()
 
     // Loading a shader can register further assets, so the handles are collected before anything is loaded
     for (Rapture::AssetHandle h : Rapture::AssetManager::getHandlesOfType(Rapture::ASSET_SHADER)) {
-        auto assetRef = Rapture::AssetManager::getAsset(h);
+        Rapture::Ref<Rapture::AShader> assetRef = Rapture::AssetManager::getAsset<Rapture::AShader>(h);
         if (!assetRef) continue;
-        auto *shader = assetRef.get()->getUnderlyingAsset<Rapture::Shader>();
-        if (shader == nullptr || !shader->isReady()) continue;
+        Rapture::Shader *shader = assetRef.operator->();
+        if (!shader->isReady()) continue;
         if (!shader->hasStage(Rapture::ShaderType::COMPUTE)) continue;
 
         std::string name = Rapture::AssetManager::getAssetMetadata(h).getName();

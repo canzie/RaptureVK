@@ -1,6 +1,7 @@
 #ifndef RAPTURE__ASKELETON_H
 #define RAPTURE__ASKELETON_H
 
+#include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetCommon.h"
 #include "assets/skeletons/Skeleton.h"
 #include "core/events/EventSignal.h"
@@ -17,9 +18,12 @@ namespace Rapture {
  * A skeleton draws nothing of its own, so seeing one means borrowing geometry bound to it. The
  * meshes it is shown on are seeded at import and authored from there.
  */
-class ASkeleton {
+class ASkeleton : public Asset {
   public:
     explicit ASkeleton(std::unique_ptr<Skeleton> skeleton, std::vector<AssetHandle> previewMeshes = {});
+
+    static const TypeInfo &staticType();
+    const TypeInfo &type() const override;
 
     Skeleton &skeleton() { return *m_skeleton; }
     const Skeleton &skeleton() const { return *m_skeleton; }
@@ -48,7 +52,7 @@ class ASkeleton {
      * @brief Serializes this asset into a self contained blob
      * @return The serialized bytes
      */
-    std::vector<uint8_t> serialize() const;
+    std::vector<uint8_t> serialize() const override;
 
     /**
      * @brief Builds a skeleton asset from a blob produced by serialize

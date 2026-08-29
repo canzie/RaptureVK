@@ -1,4 +1,6 @@
 #include "MaterialInstance.h"
+#include "assets/textures/ATexture.h"
+#include "assets/materials/AMaterial.h"
 
 #include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetManager.h"
@@ -27,7 +29,7 @@ struct InstanceBlobHeader {
     uint32_t reserved = 0;
 };
 
-MaterialInstance::MaterialInstance(AssetPtr<BaseMaterial> material, const std::string &name)
+MaterialInstance::MaterialInstance(Ref<AMaterial> material, const std::string &name)
     : m_baseMaterial(std::move(material)), m_bindlessIndex(UINT32_MAX)
 {
     if (!m_baseMaterial) {
@@ -54,7 +56,7 @@ MaterialInstance::~MaterialInstance()
     MaterialManager::freeGraphData(m_graphData);
 }
 
-void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data, std::vector<AssetPtr<Texture>> textures)
+void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data, std::vector<Ref<ATexture>> textures)
 {
     // Retain the textures the slice indexes so they outlive eviction while this instance uses them
     m_graphTextureRefs = std::move(textures);
@@ -76,7 +78,7 @@ void MaterialInstance::setGraph(uint32_t graphId, const GraphInstanceData &data,
     AssetEvents::onMaterialInstanceChanged().publish(this);
 }
 
-AssetPtr<Texture> MaterialInstance::getTextureRef(const ParameterId &id) const
+Ref<ATexture> MaterialInstance::getTextureRef(const ParameterId &id) const
 {
     for (const auto &entry : m_textureRefs) {
         if (entry.first == id) {
@@ -86,13 +88,12 @@ AssetPtr<Texture> MaterialInstance::getTextureRef(const ParameterId &id) const
     return {};
 }
 
-void MaterialInstance::setParameter(const ParameterId &id, AssetRef textureAsset)
+void MaterialInstance::setParameter(const ParameterId &id, Ref<ATexture> texturePtr)
 {
-    AssetPtr<Texture> texturePtr(textureAsset);
-    Texture *texture = texturePtr.get();
-    if (texture == nullptr) {
+    if (!texturePtr) {
         return;
     }
+    Texture *texture = texturePtr.operator->();
 
     m_graphTextureRefs.push_back(texturePtr);
     m_textureRefs.emplace_back(id, texturePtr);
@@ -127,10 +128,16 @@ void MaterialInstance::updatePendingTextures()
 void MaterialInstance::writeSlice(const ParameterId &id, const void *data, size_t size)
 {
     uint32_t offset = 0;
-    if (!m_baseMaterial->tryGetOffset(id, offset)) return;
+    if (!m_baseMaterial->tryGetOffset(id, offset)) {
+        return;
+    }
 
     uint32_t words = static_cast<uint32_t>(size / sizeof(uint32_t));
-    if (m_slice.size() < offset + words) m_slice.resize(offset + words, 0u);
+    if (offset + words > m_slice.size()) {
+        RP_CORE_ERROR("'{}' writes {} bytes to parameter '{}' at slot {}, past the {} slots its graph reserved", m_name, size,
+                      id, offset, m_slice.size());
+        return;
+    }
     std::memcpy(&m_slice[offset], data, size);
 
     if (m_graphData.isValid()) {
@@ -157,7 +164,7 @@ std::vector<uint8_t> MaterialInstance::serialize() const
         appendBytes(out, s.data(), s.size());
     };
 
-    AssetHandle baseHandle = m_baseMaterial ? m_baseMaterial.ref().get()->getHandle() : INVALID_ASSET_HANDLE;
+    AssetHandle baseHandle = m_baseMaterial ? m_baseMaterial.get()->handle() : INVALID_ASSET_HANDLE;
 
     std::vector<uint8_t> baseSection;
     appendU64(baseSection, baseHandle);
@@ -173,7 +180,7 @@ std::vector<uint8_t> MaterialInstance::serialize() const
     std::vector<uint8_t> textureSection;
     for (const auto &[param, texture] : m_textureRefs) {
         appendString(textureSection, param);
-        appendU64(textureSection, texture ? texture.ref().get()->getHandle() : INVALID_ASSET_HANDLE);
+        appendU64(textureSection, texture ? texture.get()->handle() : INVALID_ASSET_HANDLE);
     }
 
     InstanceBlobHeader header;
@@ -237,7 +244,7 @@ std::unique_ptr<MaterialInstance> MaterialInstance::deserialize(std::span<const 
         return nullptr;
     }
 
-    AssetPtr<BaseMaterial> base(AssetManager::getAsset(baseHandle));
+    Ref<AMaterial> base = AssetManager::getAsset<AMaterial>(baseHandle);
     if (!base) {
         RP_CORE_ERROR("Material instance references a missing base material");
         return nullptr;
@@ -285,7 +292,7 @@ std::unique_ptr<MaterialInstance> MaterialInstance::deserialize(std::span<const 
             continue;
         }
 
-        AssetRef textureAsset = AssetManager::getAsset(textureHandle);
+        Ref<ATexture> textureAsset = AssetManager::getAsset<ATexture>(textureHandle);
         if (!textureAsset) {
             RP_CORE_ERROR("Material instance '{}' references a missing texture {} for parameter '{}'", name, textureHandle, param);
             continue;

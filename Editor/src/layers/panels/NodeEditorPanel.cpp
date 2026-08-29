@@ -1,4 +1,6 @@
 #include "NodeEditorPanel.h"
+#include <assets/textures/ATexture.h>
+#include <assets/materials/AMaterialInstance.h>
 
 #include "Icons.h"
 #include "layers/panels/components/tab_layouts.h"
@@ -481,11 +483,12 @@ void NodeEditorPanel::loadMaterial(Rapture::AssetHandle handle)
         RP_ERROR("Could not open material {}", static_cast<uint64_t>(handle));
         return;
     }
-    auto *material = ref.get()->getUnderlyingAsset<Rapture::MaterialInstance>();
-    if (material == nullptr) {
+    Rapture::AMaterialInstance *instanceAsset = ref->as<Rapture::AMaterialInstance>();
+    if (instanceAsset == nullptr) {
         RP_ERROR("Asset {} holds no material instance", static_cast<uint64_t>(handle));
         return;
     }
+    Rapture::MaterialInstance *material = &instanceAsset->material();
     Rapture::BaseMaterial *base = material->getBaseMaterial();
     if (base == nullptr) {
         RP_ERROR("Material '{}' has no base material", Rapture::AssetManager::getAssetMetadata(handle).getName());
@@ -1164,16 +1167,13 @@ void NodeEditorPanel::setTextureNodeAsset(uint32_t nodeId, Rapture::AssetHandle 
         return;
     }
 
-    Rapture::AssetRef assetRef = Rapture::AssetManager::getAsset(handle);
+    Rapture::Ref<Rapture::ATexture> assetRef = Rapture::AssetManager::getAsset<Rapture::ATexture>(handle);
     if (!assetRef) {
         return;
     }
-    auto *texture = assetRef.get()->getUnderlyingAsset<Rapture::Texture>();
-    if (texture == nullptr) {
-        return;
-    }
+    Rapture::Texture *texture = assetRef.operator->();
 
-    it->second.textureData->texture = Rapture::AssetPtr<Rapture::Texture>(assetRef);
+    it->second.textureData->texture = assetRef;
 
     if (it->second.textureData->preview != nullptr && m_services.registerTexture) {
         it->second.textureData->preview->setImage(m_services.registerTexture(texture));
@@ -1360,13 +1360,13 @@ void NodeEditorPanel::setConstantValue(uint32_t nodeId, const Rapture::PinValue 
     *m_pins[pinId].value = value;
 }
 
-void NodeEditorPanel::setImageTexture(uint32_t nodeId, Rapture::AssetPtr<Rapture::Texture> texture)
+void NodeEditorPanel::setImageTexture(uint32_t nodeId, Rapture::Ref<Rapture::ATexture> texture)
 {
     auto it = m_nodes.find(nodeId);
     if (it == m_nodes.end() || it->second.textureData == nullptr) {
         return;
     }
-    Rapture::Texture *tex = texture.get();
+    Rapture::Texture *tex = texture.operator->();
     it->second.textureData->texture = std::move(texture);
 
     if (tex != nullptr && it->second.textureData->preview != nullptr && m_services.registerTexture) {

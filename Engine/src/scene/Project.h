@@ -1,7 +1,8 @@
 #ifndef RAPTURE__PROJECT_H
 #define RAPTURE__PROJECT_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/worlds/AWorld.h"
 #include "scene/Scene.h"
 #include "scene/World.h"
 #include "core/serialization/SerialDocument.h"
@@ -81,7 +82,7 @@ class Project {
      */
     void deactivateWorld(World *world);
 
-    const std::vector<AssetPtr<World>> &getWorlds() const { return m_worlds; }
+    const std::vector<Ref<AWorld>> &getWorlds() const { return m_worlds; }
 
     void onUpdate(float dt);
 
@@ -147,7 +148,7 @@ class Project {
   private:
     ProjectConfig m_config;
     SerialDocument m_editorSection;
-    std::vector<AssetPtr<World>> m_worlds;
+    std::vector<Ref<AWorld>> m_worlds;
     SerialDocument m_saveFile;
 };
 } // namespace Rapture

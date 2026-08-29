@@ -5,12 +5,13 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 
 #include "core/utils/Log.h"
 
 namespace Rapture {
 
-using AssetImporterFunction = std::function<bool(Asset &, AssetMetadata &)>;
+using AssetImporterFunction = std::function<std::unique_ptr<Asset>(AssetMetadata &, AssetHandle)>;
 static std::map<AssetType, AssetImporterFunction> s_assetImporters;
 
 class AssetImporter {
@@ -40,13 +41,28 @@ class AssetImporter {
         s_isInitialized = false;
     }
 
-    static bool importAsset(Asset &asset, AssetMetadata &metadata) { return s_assetImporters[metadata.assetType](asset, metadata); }
+    /**
+     * @brief Builds an asset from the external file its metadata names
+     * @param metadata The asset's metadata, whose assetType picks the importer
+     * @param handle The handle the asset is registered under, set before any async load can report against it
+     * @return The imported asset, or nullptr if its type has no importer or the source could not be read
+     */
+    static std::unique_ptr<Asset> importAsset(AssetMetadata &metadata, AssetHandle handle)
+    {
+        auto it = s_assetImporters.find(metadata.assetType);
+        if (it == s_assetImporters.end()) {
+            RP_CORE_ERROR("asset type {} has no importer", static_cast<int>(metadata.assetType));
+            return nullptr;
+        }
+
+        return it->second(metadata, handle);
+    }
 
   private:
-    static bool loadShader(Asset &asset, AssetMetadata &metadata);
-    static bool loadMaterial(Asset &asset, AssetMetadata &metadata);
-    static bool loadTexture(Asset &asset, AssetMetadata &metadata);
-    static bool loadCubemap(Asset &asset, AssetMetadata &metadata);
+    static std::unique_ptr<Asset> loadShader(AssetMetadata &metadata, AssetHandle handle);
+    static std::unique_ptr<Asset> loadMaterial(AssetMetadata &metadata, AssetHandle handle);
+    static std::unique_ptr<Asset> loadTexture(AssetMetadata &metadata, AssetHandle handle);
+    static std::unique_ptr<Asset> loadCubemap(AssetMetadata &metadata, AssetHandle handle);
 
   private:
     static bool s_isInitialized;

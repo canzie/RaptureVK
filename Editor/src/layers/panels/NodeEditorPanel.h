@@ -2,6 +2,7 @@
 #define RAPTURE__NODE_EDITOR_PANEL_H
 
 #include <amethyst/Amethyst.h>
+#include <assets/textures/ATexture.h>
 #include <components/shape.h>
 
 #include "assets/asset_manager/AssetCommon.h"
@@ -104,7 +105,7 @@ class NodeEditorPanel : public Panel {
      */
     struct TextureNodeData {
         TextureNodeKind kind = TextureNodeKind::ASSET;
-        Rapture::AssetPtr<Rapture::Texture> texture;
+        Rapture::Ref<Rapture::ATexture> texture;
         Amethyst::ImageLabel *preview = nullptr;
         std::unique_ptr<Rapture::ProceduralTexture> generator;
         std::vector<std::unique_ptr<TextureParam>> params;
@@ -290,7 +291,7 @@ class NodeEditorPanel : public Panel {
      * @param nodeId The image node id
      * @param texture The texture the node samples
      */
-    void setImageTexture(uint32_t nodeId, Rapture::AssetPtr<Rapture::Texture> texture);
+    void setImageTexture(uint32_t nodeId, Rapture::Ref<Rapture::ATexture> texture);
 
     /**
      * @brief Lays out a node's pins for its current type

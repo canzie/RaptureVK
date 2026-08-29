@@ -1,7 +1,8 @@
 #ifndef RAPTURE__GROUND_TRUTH_AMBIENT_OCCLUSION_PASS_H
 #define RAPTURE__GROUND_TRUTH_AMBIENT_OCCLUSION_PASS_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
 #include "gpu/descriptors/DescriptorSet.h"
 #include "gpu/pipelines/ComputePipeline.h"
 #include "gpu/shaders/Shader.h"
@@ -56,8 +57,7 @@ class GroundTruthAmbientOcclusionPass : public ComputePass {
   private:
     const RenderContext *m_rc = nullptr;
 
-    Shader *m_shader = nullptr;
-    std::vector<AssetRef> m_shaderAssets;
+    Ref<AShader> m_shader;
     std::shared_ptr<ComputePipeline> m_pipeline;
 
     std::vector<std::unique_ptr<Texture>> m_occlusionTextures;

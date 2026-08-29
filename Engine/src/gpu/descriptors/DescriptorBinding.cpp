@@ -2,6 +2,7 @@
 
 #include "gpu/acceleration_structures/TLAS.h"
 #include "assets/asset_manager/AssetManager.h"
+#include "assets/textures/ATexture.h"
 #include "gpu/buffers/Buffers.h"
 #include "gpu/descriptors/DescriptorSet.h"
 #include "gpu/buffers/UniformBuffer.h"
@@ -94,8 +95,7 @@ DescriptorBindingTexture::DescriptorBindingTexture(DescriptorSet *set, uint32_t 
 
 void DescriptorBindingTexture::fillAllSlotsWithPlaceholder()
 {
-    auto asset = AssetManager::importDefaultAsset(ASSET_TEXTURE);
-    auto defaultAsset = asset ? asset.get()->getUnderlyingAsset<Texture>() : nullptr;
+    Ref<ATexture> defaultAsset = AssetManager::importDefaultAsset(ASSET_TEXTURE).as<ATexture>();
     if (!defaultAsset) {
         RP_CORE_ERROR("Failed to get default texture for filling bindless slots");
         return;

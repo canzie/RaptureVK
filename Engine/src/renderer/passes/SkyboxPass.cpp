@@ -35,9 +35,7 @@ SkyboxPass::SkyboxPass(VkFormat depthFormat, VkFormat colorFormat)
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl";
 
-    auto asset = AssetManager::importAsset(shaderPath / "glsl/Skybox.vs.glsl", shaderConfig);
-    m_shader = asset ? asset.get()->getUnderlyingAsset<Shader>() : nullptr;
-    if (m_shader) m_shaderAssets.push_back(std::move(asset));
+    m_shader = AssetManager::importAsset<AShader>(shaderPath / "glsl/Skybox.vs.glsl", shaderConfig);
 
     createSkyboxGeometry();
     createPipeline();
@@ -236,7 +234,7 @@ void SkyboxPass::createPipeline()
     fbSpec.depthAttachment = m_depthFormat;
     fbSpec.colorAttachments.push_back(m_colorFormat);
     config.framebufferSpec = fbSpec;
-    config.shader = m_shader;
+    config.shader = m_shader.operator->();
 
     m_pipeline = std::make_shared<GraphicsPipeline>(config);
 }

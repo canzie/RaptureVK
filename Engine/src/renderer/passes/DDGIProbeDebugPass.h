@@ -1,7 +1,8 @@
 #ifndef RAPTURE__DDGI_PROBE_DEBUG_PASS_H
 #define RAPTURE__DDGI_PROBE_DEBUG_PASS_H
 
-#include "assets/asset_manager/AssetHandle.h"
+#include "assets/asset_manager/Asset.h"
+#include "assets/shaders/AShader.h"
 #include "gpu/command_buffers/CommandBuffer.h"
 #include "gpu/pipelines/GraphicsPipeline.h"
 #include "gpu/shaders/Shader.h"
@@ -50,7 +51,7 @@ class DDGIProbeDebugPass : public RenderPass {
 
     const RenderContext *m_rc = nullptr;
 
-    AssetPtr<Shader> m_shader;
+    Ref<AShader> m_shader;
     std::shared_ptr<GraphicsPipeline> m_pipeline;
 
     float m_width;

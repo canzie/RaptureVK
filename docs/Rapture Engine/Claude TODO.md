@@ -22,6 +22,7 @@ Delete an entry when it is done or turns out not to matter. Add the date when so
 
 - **`Mobility` and `Ray Traced` still show for skeletal meshes** in the properties panel, via `Mesh3DEditor`, though `SkeletalMesh3D` makes both no-ops.
 - **`AnimationComponent.h` is a stub** with an unrelated `FogType` enum next to it. Delete it rather than growing it — the real component shape is in the animation notes.
+- **2026-08-29 — shaders have no compiled cache.** `AShader::serialize` returns nothing, so a `.rshader` asset file holds only its metadata and every run recompiles from source. It should write the compiled SPIR-V as its payload, keyed so a source edit invalidates it. Note [[project_no_glslang_on_fibers]]: compilation cannot run on a job fiber, so a cache miss still has to go to the main thread.
 
 ## Things I would do next if given the choice
 

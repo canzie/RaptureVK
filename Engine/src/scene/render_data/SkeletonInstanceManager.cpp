@@ -87,18 +87,18 @@ SkeletonInstanceManager::~SkeletonInstanceManager()
     }
 }
 
-SkeletonInstance SkeletonInstanceManager::createSkeletonInstance(const AssetPtr<ASkeleton> &skeleton)
+SkeletonInstance SkeletonInstanceManager::createSkeletonInstance(const Ref<ASkeleton> &skeleton)
 {
     RP_ASSERT(skeleton && skeleton->skeleton().getJointCount() > 0, "a skeleton instance needs a skeleton with joints");
 
     return SkeletonInstance(*m_buffer, skeleton->skeleton().getJointCount());
 }
 
-uint32_t SkeletonInstanceManager::getInverseBindOffset(const AssetPtr<ASkeletalMesh> &mesh)
+uint32_t SkeletonInstanceManager::getInverseBindOffset(const Ref<ASkeletalMesh> &mesh)
 {
     RP_ASSERT(mesh, "an inverse bind block needs a mesh to come from");
 
-    const AssetHandle handle = mesh.getHandle();
+    const AssetHandle handle = mesh.get()->handle();
 
     auto existing = m_inverseBinds.find(handle);
     if (existing != m_inverseBinds.end()) {
