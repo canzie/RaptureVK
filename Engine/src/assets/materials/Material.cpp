@@ -4,15 +4,15 @@
 #include "assets/asset_manager/ReservedAssets.h"
 #include "assets/materials/AMaterial.h"
 #include "assets/textures/ATexture.h"
-#include "gpu/buffers/FreeListStorageBuffer.h"
-#include "gpu/buffers/VirtualStorageBuffer.h"
 #include "core/events/ProjectEvents.h"
 #include "core/utils/EnginePaths.h"
+#include "core/utils/Log.h"
+#include "core/utils/rp_assert.h"
+#include "gpu/buffers/FreeListStorageBuffer.h"
+#include "gpu/buffers/VirtualStorageBuffer.h"
+#include "gpu/textures/Texture.h"
 #include "graph/MaterialGraphCompiler.h"
 #include "graph/SurfaceGraphManager.h"
-#include "core/utils/Log.h"
-#include "gpu/textures/Texture.h"
-#include "core/utils/rp_assert.h"
 
 #include <glm/glm.hpp>
 
@@ -286,11 +286,10 @@ void MaterialManager::writeGraphData(const VirtualStorageBuffer::Allocation &all
 static void s_createGltfBaseMaterial()
 {
     Ref<ATexture> white = AssetManager::importDefaultAsset(ASSET_TEXTURE).as<ATexture>();
-    Ref<ATexture> flatNormal =
-        AssetManager::registerReservedAsset(RE_FLAT_NORMAL_TEXTURE,
-                                            std::make_unique<ATexture>(Texture::createDefaultFlatNormalTexture()),
-                                            "<default_flat_normal>", ASSET_TEXTURE)
-            .as<ATexture>();
+    Ref<ATexture> flatNormal = AssetManager::registerReservedAsset(
+                                   RE_FLAT_NORMAL_TEXTURE, std::make_unique<ATexture>(Texture::createDefaultFlatNormalTexture()),
+                                   "<default_flat_normal>", ASSET_TEXTURE)
+                                   .as<ATexture>();
 
     using GN = GraphNodeType;
     MaterialGraph graph;
@@ -374,8 +373,7 @@ static void s_createGridMaterial()
 
     graph.nodes.push_back({.id = 1, .type = GN::POSITION});
     graph.nodes.push_back({.id = 2, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(GRID_DEFAULT_SPACING))}});
-    graph.nodes.push_back(
-        {.id = 3, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(GRID_DEFAULT_SUBDIVISIONS))}});
+    graph.nodes.push_back({.id = 3, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(GRID_DEFAULT_SUBDIVISIONS))}});
     graph.nodes.push_back({.id = 4, .type = GN::DIVIDE_VEC3});
     graph.nodes.push_back({.id = 5, .type = GN::CONSTANT_VEC3, .inputValues = {PinValue(glm::vec3(0.5f))}});
     graph.nodes.push_back({.id = 6, .type = GN::MULTIPLY_VEC3});
@@ -537,8 +535,8 @@ Ref<AMaterial> MaterialManager::createBuiltinMaterial(const std::string &name, u
     }
 
     auto material = std::make_unique<BaseMaterial>(name, graphId, std::move(table), std::move(graph));
-    AssetRef ref = AssetManager::registerReservedAsset(reservedHandle, std::make_unique<AMaterial>(std::move(material)), name,
-                                                       ASSET_MATERIAL);
+    AssetRef ref =
+        AssetManager::registerReservedAsset(reservedHandle, std::make_unique<AMaterial>(std::move(material)), name, ASSET_MATERIAL);
     if (!ref) {
         return {};
     }

@@ -1,5 +1,6 @@
 #include "ContentBrowserPanel.h"
 #include "Icons.h"
+#include "assets/asset_manager/AssetRegistry.h"
 #include "assets/asset_manager/AssetManager.h"
 #include "scene/instances/SceneObject.h"
 #include "layers/panels/components/asset_visuals.h"
@@ -84,7 +85,7 @@ static std::string s_typeLabel(Rapture::AssetType type, const Rapture::TypeInfo 
     if (authoredClass != nullptr && type == Rapture::ASSET_MODULE) {
         return std::string(authoredClass->name);
     }
-    return Rapture::AssetTypeToString(type);
+    return std::string(Rapture::AssetRegistry::displayName(type));
 }
 
 static void s_setActive(Amethyst::UIObject &object, bool active)
@@ -105,7 +106,7 @@ static std::string s_uniqueFolderName(const std::filesystem::path &directory)
 
 static std::string s_uniqueAssetName(const std::filesystem::path &directory, std::string_view baseName, Rapture::AssetType type)
 {
-    std::string extension(Rapture::AssetTypeToExtension(type));
+    std::string extension(Rapture::AssetRegistry::fileExtension(type));
     std::string name(baseName);
     for (uint32_t suffix = 2; std::filesystem::exists(directory / (s_assetFileName(name) + extension)); suffix++) {
         name = std::string(baseName) + " " + std::to_string(suffix);
@@ -979,7 +980,7 @@ void ContentBrowserPanel::refreshFileBrowser()
 
         const Rapture::AssetMetadata *metadata = nullptr;
         Rapture::AssetHandle assetHandle = Rapture::INVALID_ASSET_HANDLE;
-        if (!isDir && Rapture::Asset_isRaptureExtension(entry.path().extension().string())) {
+        if (!isDir && Rapture::AssetRegistry::isRaptureExtension(entry.path().extension().string())) {
             assetHandle = Rapture::AssetManager::findAssetByPath(entry.path());
             if (assetHandle == Rapture::INVALID_ASSET_HANDLE) {
                 continue;

@@ -5,6 +5,8 @@
 #include "scene/EntityCommon.h"
 #include "scene/instances/Node3D.h"
 
+#include <vector>
+
 namespace Rapture {
 
 class AMesh;
@@ -22,8 +24,25 @@ class Mesh3D : public Node3D {
     AssetHandle mesh() const { return m_mesh; }
     virtual void setMesh(AssetHandle mesh) = 0;
 
-    AssetHandle material() const { return m_material; }
-    void setMaterial(AssetHandle material);
+    /**
+     * @brief The materials this object draws its mesh's runs with
+     * @return One material per run, in the same order the mesh slots them
+     */
+    const std::vector<AssetHandle> &materials() const { return m_materials; }
+
+    /**
+     * @brief The material this object draws one run with
+     * @param slot The run to read
+     * @return The material, or INVALID_ASSET_HANDLE if this object has no such run
+     */
+    AssetHandle material(uint32_t slot) const;
+
+    /**
+     * @brief Draws one run of this object's mesh with a material of its own
+     * @param slot The run to set, which has to be one the mesh has
+     * @param material The material to draw it with
+     */
+    void setMaterial(uint32_t slot, AssetHandle material);
 
     virtual bool isVisible() const = 0;
     virtual void setVisible(bool visible) = 0;
@@ -49,16 +68,16 @@ class Mesh3D : public Node3D {
     Mesh3D(Scene &scene, std::string_view name);
 
     /**
-     * @brief Takes a mesh's default material as this object's own, where it has none yet
+     * @brief Gives this object one material per run of a mesh, taking the mesh's own where it has none
      * @param mesh The mesh this object was just given
      */
-    void adoptDefaultMaterial(const AMesh &mesh);
+    void adoptMaterialSlots(const AMesh &mesh);
 
   protected:
     AssetHandle m_mesh = INVALID_ASSET_HANDLE;
 
   private:
-    AssetHandle m_material = INVALID_ASSET_HANDLE;
+    std::vector<AssetHandle> m_materials;
 };
 
 } // namespace Rapture

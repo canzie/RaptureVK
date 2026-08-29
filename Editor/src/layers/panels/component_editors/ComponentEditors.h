@@ -124,7 +124,8 @@ class Mesh3DEditor : public ComponentEditorBase {
     bool m_isVisible = true;
     bool m_isRayTraced = false;
     Amethyst::Dropdown *m_mobilityDropdown = nullptr;
-    std::optional<AssetPicker> m_materialPicker;
+    /// one per run of the mesh, so a mesh drawn with several materials can retarget each of them
+    std::vector<std::optional<AssetPicker>> m_materialPickers;
     Rapture::Mesh3D *m_node = nullptr;
 };
 

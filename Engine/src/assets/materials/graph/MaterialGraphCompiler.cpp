@@ -12,8 +12,8 @@
 
 #include "NodeRegistry.h"
 #include "core/utils/Log.h"
-#include "gpu/textures/Texture.h"
 #include "core/utils/rp_assert.h"
+#include "gpu/textures/Texture.h"
 
 namespace Rapture {
 
@@ -289,8 +289,7 @@ static void s_validate(const GraphContext &ctx, DiagnosticList &diagnostics)
             bool authored = i < node.inputTextures.size() && static_cast<bool>(node.inputTextures[i]);
             if (!wired && !authored) {
                 s_addDiagnostic(diagnostics, Level::ERROR,
-                                "input pin '" + def->inputs[i].name + "' requires a texture but none is connected or set",
-                                node.id);
+                                "input pin '" + def->inputs[i].name + "' requires a texture but none is connected or set", node.id);
             }
         }
     }
@@ -308,7 +307,11 @@ static void s_validate(const GraphContext &ctx, DiagnosticList &diagnostics)
  */
 static bool s_topoSort(const GraphContext &ctx, const std::vector<uint32_t> &roots, std::vector<uint32_t> &order)
 {
-    enum Color : uint8_t { WHITE = 0, GRAY, BLACK };
+    enum Color : uint8_t {
+        WHITE = 0,
+        GRAY,
+        BLACK
+    };
     std::unordered_map<uint32_t, Color> color;
     bool acyclic = true;
 
@@ -474,7 +477,8 @@ static std::string s_emitLocals(const GraphContext &ctx, const std::vector<uint3
         for (uint32_t pin = 0; pin < def->outputs.size(); ++pin) {
             if (ctx.usedOutputs.count(Graph_pinKey(nodeId, pin)) == 0) continue;
             const PinDef &outPin = def->outputs[pin];
-            std::string_view exprTemplate = multiOutput ? std::string_view(outPin.glslTemplate) : std::string_view(def->glslTemplate);
+            std::string_view exprTemplate =
+                multiOutput ? std::string_view(outPin.glslTemplate) : std::string_view(def->glslTemplate);
             std::string var = "_n" + std::to_string(counter++);
 
             std::string expr = s_emitNodeExpr(ctx, *def, *node, mapping, emitted, exprTemplate);
@@ -556,8 +560,8 @@ static std::vector<uint32_t> s_passRoots(const GraphContext &ctx, const GraphPas
 /**
  * @brief Compile one pass to its GLSL function: DCE from the pass roots, locals, then field writes
  */
-static CompiledFunction s_emitPass(const GraphContext &ctx, const GraphPass &pass, size_t passIndex,
-                                   const std::string &name, const GraphSlotMapping &mapping)
+static CompiledFunction s_emitPass(const GraphContext &ctx, const GraphPass &pass, size_t passIndex, const std::string &name,
+                                   const GraphSlotMapping &mapping)
 {
     std::vector<uint32_t> order;
     s_topoSort(ctx, s_passRoots(ctx, pass), order);

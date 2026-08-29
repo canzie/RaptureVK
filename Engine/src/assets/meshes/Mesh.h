@@ -21,6 +21,17 @@ namespace Rapture {
 
 class BLAS;
 
+/**
+ * @brief One run of a mesh's indices, drawn on its own.
+ *
+ * A mesh is cut into runs wherever what draws it changes, so a run is the smallest thing that can be
+ * given a material of its own. A mesh that is drawn with one material is a single run over all of it.
+ */
+struct MeshSection {
+    uint32_t firstIndex = 0; ///< where the run starts in the mesh's index data
+    uint32_t indexCount = 0;
+};
+
 struct MeshAllocatorParams {
     void *vertexData = nullptr;
     uint32_t vertexDataSize = 0;
@@ -33,6 +44,8 @@ struct MeshAllocatorParams {
     glm::vec3 boundsMax = glm::vec3(0.0f);
 
     BufferLayout bufferLayout;
+
+    std::vector<MeshSection> sections;
 
     /**
      * @brief Serializes this mesh data into a self-contained blob of header, vertex and index bytes
@@ -74,6 +87,12 @@ class Mesh {
     std::shared_ptr<IndexBuffer> getIndexBuffer() const { return m_indexBuffer; }
 
     uint32_t getIndexCount() const { return m_indexCount; }
+
+    /**
+     * @brief The runs this mesh is drawn in
+     * @return The runs, in the order their materials are slotted, none while this mesh holds no geometry
+     */
+    const std::vector<MeshSection> &getSections() const { return m_sections; }
 
     const glm::vec3 &getBoundsMin() const { return m_boundsMin; }
     const glm::vec3 &getBoundsMax() const { return m_boundsMax; }
@@ -128,6 +147,7 @@ class Mesh {
     std::shared_ptr<BufferAllocation> m_indexAllocation;
     std::shared_ptr<BufferAllocation> m_vertexAllocation;
 
+    std::vector<MeshSection> m_sections;
     std::unique_ptr<BLAS> m_blas;
 
     // std::shared_ptr<UniformBuffer> m_objectDataBuffer; // per mesh data

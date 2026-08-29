@@ -5,13 +5,16 @@
 #include "assets/asset_manager/AssetCommon.h"
 #include "assets/asset_manager/ReservedAssets.h"
 
+#include <vector>
+
 namespace Rapture {
 
 /**
  * @brief A mesh as it is stored and referenced, pairing geometry with what draws it.
  *
- * The geometry below this is vertex and index data alone, and knows nothing of materials. What a
- * mesh is drawn with is a fact about the pairing, which is what this layer is.
+ * The geometry below this is vertex and index data alone, cut into runs but knowing nothing of what
+ * fills them. Which material a run is drawn with is a fact about the pairing, which is what this
+ * layer is: one slot per run of the geometry, in the same order.
  */
 class AMesh : public Asset {
   public:
@@ -19,22 +22,30 @@ class AMesh : public Asset {
     const TypeInfo &type() const override;
 
     /**
-     * @brief The material this mesh is drawn with where nothing else is chosen
-     * @return The material
+     * @brief The materials this mesh's runs are drawn with where nothing else is chosen
+     * @return One material per run of the geometry, in the same order
      */
-    AssetHandle defaultMaterial() const { return m_defaultMaterial; }
+    const std::vector<AssetHandle> &materialSlots() const { return m_materialSlots; }
 
     /**
-     * @brief Sets the material this mesh is drawn with where nothing else is chosen
+     * @brief The material a slot is drawn with where nothing else is chosen
+     * @param slot The slot to read
+     * @return The material, or the default material if this mesh has no such slot
+     */
+    AssetHandle materialSlot(uint32_t slot) const;
+
+    /**
+     * @brief Sets the material a slot is drawn with where nothing else is chosen
+     * @param slot The slot to set, which has to be one this mesh has
      * @param material The material to default to
      */
-    void setDefaultMaterial(AssetHandle material);
+    void setMaterialSlot(uint32_t slot, AssetHandle material);
 
   protected:
-    explicit AMesh(AssetHandle defaultMaterial) : m_defaultMaterial(defaultMaterial) {}
+    explicit AMesh(std::vector<AssetHandle> materialSlots);
 
   private:
-    AssetHandle m_defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE;
+    std::vector<AssetHandle> m_materialSlots;
 };
 
 } // namespace Rapture

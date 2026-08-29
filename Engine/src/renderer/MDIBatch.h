@@ -12,6 +12,7 @@
 namespace Rapture {
 
 class Mesh;
+struct MeshSection;
 
 // Holds the data that will be indexed using the draw index in the shaders
 // currently bindless indices
@@ -26,7 +27,14 @@ class MDIBatch {
              BufferLayout &bufferLayout, VkIndexType indexType);
     ~MDIBatch();
 
-    void addObject(const Mesh &mesh, uint32_t meshIndex, uint32_t materialIndex);
+    /**
+     * @brief Adds one run of a mesh to this batch as a draw of its own
+     * @param mesh Mesh the run belongs to, whose allocations place the run in the arenas
+     * @param section The run to draw
+     * @param meshIndex Slot the mesh's per-object data was packed into
+     * @param materialIndex Bindless index of the material the run is drawn with
+     */
+    void addMeshSection(const Mesh &mesh, const MeshSection &section, uint32_t meshIndex, uint32_t materialIndex);
 
     // commit the data to the gpu buffers
     // should be called at the end, when all of the objects have been added

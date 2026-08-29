@@ -33,7 +33,7 @@ MDIBatch::~MDIBatch()
     }
 }
 
-void MDIBatch::addObject(const Mesh &mesh, uint32_t meshIndex, uint32_t materialIndex)
+void MDIBatch::addMeshSection(const Mesh &mesh, const MeshSection &section, uint32_t meshIndex, uint32_t materialIndex)
 {
 
     auto vboAlloc = mesh.getVertexAllocation();
@@ -43,10 +43,10 @@ void MDIBatch::addObject(const Mesh &mesh, uint32_t meshIndex, uint32_t material
     const uint32_t vertexSize = m_bufferLayout.calculateVertexSize();
 
     VkDrawIndexedIndirectCommand cmd{};
-    cmd.indexCount = mesh.getIndexCount();
+    cmd.indexCount = section.indexCount;
     cmd.instanceCount = 1;
     // Direct element indices from BufferPool
-    cmd.firstIndex = static_cast<int32_t>(iboAlloc->offsetBytes / indexSize);
+    cmd.firstIndex = static_cast<int32_t>(iboAlloc->offsetBytes / indexSize) + section.firstIndex;
     cmd.vertexOffset = static_cast<int32_t>(vboAlloc->offsetBytes / vertexSize);
     cmd.firstInstance = m_cpuIndirectCommands.size(); // This will be the index into the batch info buffer
 

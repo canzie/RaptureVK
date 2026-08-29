@@ -120,11 +120,22 @@ struct CameraComponent {
 struct MaterialComponent {
     static constexpr ecs::ChangeMask CHANGE_CHANNELS = ecs::ChannelBit(CHANNEL_MATERIAL_BINDING);
 
-    Ref<AMaterialInstance> material;
+    /// one per run of the mesh's geometry, in the same order
+    std::vector<Ref<AMaterialInstance>> materials;
 
     MaterialComponent() = default;
 
-    MaterialComponent(Ref<AMaterialInstance> ref) : material(std::move(ref)) {}
+    MaterialComponent(Ref<AMaterialInstance> ref) { materials.push_back(std::move(ref)); }
+
+    /**
+     * @brief The material a run is drawn with
+     * @param slot The run to read
+     * @return The material, or nullptr if this entity has none for that run
+     */
+    MaterialInstance *materialAt(uint32_t slot) const
+    {
+        return slot < materials.size() ? materials[slot].operator->() : nullptr;
+    }
 };
 
 struct StaticMeshComponent {

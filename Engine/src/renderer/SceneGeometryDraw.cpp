@@ -11,7 +11,7 @@
 
 namespace Rapture {
 
-static void s_addMeshToBatch(MDIBatchMap &batchMap, Mesh &mesh, uint32_t meshSlotIndex, uint32_t materialIndex)
+static void s_addMeshToBatch(MDIBatchMap &batchMap, Mesh &mesh, uint32_t meshSlotIndex, const MaterialComponent &materials)
 {
     auto vboAlloc = mesh.getVertexAllocation();
     auto iboAlloc = mesh.getIndexAllocation();
@@ -22,7 +22,11 @@ static void s_addMeshToBatch(MDIBatchMap &batchMap, Mesh &mesh, uint32_t meshSlo
     MDIBatch *batch = batchMap.obtainBatch(vboAlloc, iboAlloc, mesh.getVertexBuffer()->getBufferLayout(),
                                            mesh.getIndexBuffer()->getIndexType());
 
-    batch->addObject(mesh, meshSlotIndex, materialIndex);
+    const std::vector<MeshSection> &sections = mesh.getSections();
+    for (uint32_t slot = 0; slot < sections.size(); slot++) {
+        const MaterialInstance *material = materials.materialAt(slot);
+        batch->addMeshSection(mesh, sections[slot], meshSlotIndex, material != nullptr ? material->getBindlessIndex() : 0);
+    }
 }
 
 // a bounding box derived from the transform is a cache, not a change to the mesh
@@ -117,9 +121,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
             continue;
         }
 
-        uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
-
-        s_addMeshToBatch(batchMap, mesh, renderData->getMeshSlot(entity), materialIndex);
+        s_addMeshToBatch(batchMap, mesh, renderData->getMeshSlot(entity), materialComp);
     }
 
     for (auto [entity, transform, meshComp, materialComp] :
@@ -140,9 +142,7 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
             continue;
         }
 
-        uint32_t materialIndex = materialComp.material ? materialComp.material->getBindlessIndex() : 0;
-
-        s_addMeshToBatch(batchMap, mesh, renderData->getMeshSlot(entity), materialIndex);
+        s_addMeshToBatch(batchMap, mesh, renderData->getMeshSlot(entity), materialComp);
     }
 
     for (const auto &[batchKey, batch] : batchMap.getBatches()) {

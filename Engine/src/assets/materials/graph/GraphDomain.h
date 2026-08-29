@@ -85,7 +85,7 @@ struct GraphPass {
 struct GraphDomain {
     GraphDomainId id = GD_SURFACE;
     GraphNodeType sinkType = GraphNodeType::SURFACE_OUTPUT;
-    std::string_view inputStructName; // generated function parameter type, e.g. "SurfaceInputs"
+    std::string_view inputStructName;  // generated function parameter type, e.g. "SurfaceInputs"
     std::vector<GraphInputDef> inputs; // what {$name} in a node template may resolve to
     std::vector<GraphPass> passes;     // passes[0] is the full pass
 

@@ -1,12 +1,12 @@
 #include "MaterialInstance.h"
-#include "assets/textures/ATexture.h"
 #include "assets/materials/AMaterial.h"
+#include "assets/textures/ATexture.h"
 
 #include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetManager.h"
-#include "graph/SurfaceGraphManager.h"
 #include "core/utils/Log.h"
 #include "gpu/textures/Texture.h"
+#include "graph/SurfaceGraphManager.h"
 
 namespace Rapture {
 
@@ -134,8 +134,8 @@ void MaterialInstance::writeSlice(const ParameterId &id, const void *data, size_
 
     uint32_t words = static_cast<uint32_t>(size / sizeof(uint32_t));
     if (offset + words > m_slice.size()) {
-        RP_CORE_ERROR("'{}' writes {} bytes to parameter '{}' at slot {}, past the {} slots its graph reserved", m_name, size,
-                      id, offset, m_slice.size());
+        RP_CORE_ERROR("'{}' writes {} bytes to parameter '{}' at slot {}, past the {} slots its graph reserved", m_name, size, id,
+                      offset, m_slice.size());
         return;
     }
     std::memcpy(&m_slice[offset], data, size);

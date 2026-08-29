@@ -48,7 +48,7 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
     }
     m_mesh = _mesh;
 
-    adoptDefaultMaterial(*ref);
+    adoptMaterialSlots(*ref);
 
     if (m_entity.has<RayTracedComponent>()) {
         rebuildAccelerationStructure();

@@ -129,6 +129,10 @@ void DescriptorManager::initializeSet3()
     bindings.bindings.push_back(
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS});
 
+    // one entry per run of every traced mesh, reached by the geometry index of a hit
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false,
+                                 DescriptorSetBindingLocation::RT_GEOMETRY_INFO_SSBOS});
+
     // General purpose bindless storage textures
     bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 8, TextureViewType::DEFAULT, false,
                                  DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES});

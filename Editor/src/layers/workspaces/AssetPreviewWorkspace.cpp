@@ -51,7 +51,7 @@ void AssetPreviewWorkspace::setupPreviewScene(std::string_view sceneName)
     Rapture::SceneObject *floor = m_previewScene->root()->findChild(DEFAULT_FLOOR_NAME);
     Rapture::Mesh3D *floorMesh = floor != nullptr ? floor->as<Rapture::Mesh3D>() : nullptr;
     if (floorMesh != nullptr) {
-        floorMesh->setMaterial(Rapture::RE_GRID_MATERIAL_INSTANCE);
+        floorMesh->setMaterial(0, Rapture::RE_GRID_MATERIAL_INSTANCE);
     }
 
     m_previewViewport = app.getViewportManager().createViewport({

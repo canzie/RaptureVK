@@ -367,7 +367,9 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
                                                                       mesh.getIndexBuffer()->getIndexType());
 
         // Add mesh to batch (materialIndex = 0 for shadow pass)
-        batch->addObject(mesh, renderData->getMeshSlot(entity), 0);
+        for (const MeshSection &section : mesh.getSections()) {
+            batch->addMeshSection(mesh, section, renderData->getMeshSlot(entity), 0);
+        }
     }
 
     // Second pass: Upload batch data and render using MDI

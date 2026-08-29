@@ -2,7 +2,6 @@
 #define RAPTURE__ASSET_MANAGER_BASE_H
 
 #include "Asset.h"
-#include "AssetImporter.h"
 #include "AssetStorage.h"
 
 namespace Rapture {
@@ -14,8 +13,7 @@ namespace Rapture {
 */
 class AssetManagerBase {
   public:
-    AssetManagerBase() { AssetImporter::init(); };
-    virtual ~AssetManagerBase() { AssetImporter::shutdown(); };
+    virtual ~AssetManagerBase() = default;
 
     virtual bool isAssetHandleValid(AssetHandle handle) const = 0;
     virtual Asset *getAsset(AssetHandle handle) = 0;

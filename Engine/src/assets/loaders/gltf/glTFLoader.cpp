@@ -19,15 +19,6 @@
 #include "assets/asset_manager/AssetManager.h"
 #include "assets/asset_manager/ReservedAssets.h"
 #include "assets/materials/AMaterial.h"
-#include "assets/textures/ATexture.h"
-#include "scene/Scene.h"
-#include "scene/instances/Module.h"
-#include "scene/instances/Node3D.h"
-#include "scene/instances/SkeletalMesh3D.h"
-#include "scene/instances/SkeletonPose.h"
-#include "scene/instances/StaticMesh3D.h"
-#include "gpu/buffers/BufferLayout.h"
-#include "scene/components/Components.h"
 #include "assets/materials/Material.h"
 #include "assets/materials/MaterialInstance.h"
 #include "assets/materials/MaterialParameters.h"
@@ -35,19 +26,20 @@
 #include "assets/materials/graph/MaterialGraphCompiler.h"
 #include "assets/materials/graph/SurfaceGraphManager.h"
 #include "assets/meshes/Mesh.h"
+#include "assets/textures/ATexture.h"
 #include "core/ecs/entity_accessor.h"
 #include "core/utils/GLTypes.h"
+#include "gpu/buffers/BufferLayout.h"
 #include "renderer/generators/TangentGeneration.h"
+#include "scene/Scene.h"
+#include "scene/components/Components.h"
+#include "scene/instances/Module.h"
+#include "scene/instances/Node3D.h"
+#include "scene/instances/SkeletalMesh3D.h"
+#include "scene/instances/SkeletonPose.h"
+#include "scene/instances/StaticMesh3D.h"
 
 namespace Rapture {
-
-// One glTF vertex attribute accessor, decoded out of its buffer view and still de-interleaved
-struct DecodedVertexAttribute {
-    std::string name;
-    uint32_t componentType;
-    BufferAttributeType type;
-    std::vector<uint8_t> data;
-};
 
 static const DecodedVertexAttribute *s_findVertexAttribute(const std::vector<DecodedVertexAttribute> &attributes,
                                                            std::string_view name)
@@ -70,8 +62,7 @@ static const DecodedVertexAttribute *s_findVertexAttribute(const std::vector<Dec
  * @param indexType The glTF component type of one index
  * @return One tangent per vertex, empty when the index component type cannot hold an index
  */
-static std::vector<glm::vec4> s_generateTangents(const DecodedVertexAttribute &positions,
-                                                 const DecodedVertexAttribute &normals,
+static std::vector<glm::vec4> s_generateTangents(const DecodedVertexAttribute &positions, const DecodedVertexAttribute &normals,
                                                  const DecodedVertexAttribute &texCoords, uint32_t vertexCount,
                                                  std::span<const uint8_t> indexData, uint32_t indexType)
 {
@@ -85,13 +76,11 @@ static std::vector<glm::vec4> s_generateTangents(const DecodedVertexAttribute &p
     case UNSIGNED_SHORT_TYPE:
         return generator::generateTangents(
             positionSpan, normalSpan, texCoordSpan,
-            std::span<const uint16_t>(reinterpret_cast<const uint16_t *>(indexData.data()),
-                                      indexData.size() / sizeof(uint16_t)));
+            std::span<const uint16_t>(reinterpret_cast<const uint16_t *>(indexData.data()), indexData.size() / sizeof(uint16_t)));
     case UNSIGNED_INT_TYPE:
         return generator::generateTangents(
             positionSpan, normalSpan, texCoordSpan,
-            std::span<const uint32_t>(reinterpret_cast<const uint32_t *>(indexData.data()),
-                                      indexData.size() / sizeof(uint32_t)));
+            std::span<const uint32_t>(reinterpret_cast<const uint32_t *>(indexData.data()), indexData.size() / sizeof(uint32_t)));
     }
 
     RP_CORE_ERROR("Unsupported index component type {}", indexType);
@@ -120,16 +109,14 @@ static void s_appendTangentAttribute(std::vector<DecodedVertexAttribute> &attrib
     }
 
     // Quantised texture coordinates are legal glTF but cannot be read as float uv
-    if (positions->componentType != FLOAT_TYPE || normals->componentType != FLOAT_TYPE ||
-        texCoords->componentType != FLOAT_TYPE) {
+    if (positions->componentType != FLOAT_TYPE || normals->componentType != FLOAT_TYPE || texCoords->componentType != FLOAT_TYPE) {
         RP_CORE_WARN("Skipping tangent generation, the position, normal or texture coordinate accessors are not float");
         return;
     }
 
     if (positions->data.size() < vertexCount * sizeof(glm::vec3) || normals->data.size() < vertexCount * sizeof(glm::vec3) ||
         texCoords->data.size() < vertexCount * sizeof(glm::vec2)) {
-        RP_CORE_ERROR("Skipping tangent generation, an attribute accessor holds fewer than the {} vertices claimed",
-                      vertexCount);
+        RP_CORE_ERROR("Skipping tangent generation, an attribute accessor holds fewer than the {} vertices claimed", vertexCount);
         return;
     }
 
@@ -142,6 +129,79 @@ static void s_appendTangentAttribute(std::vector<DecodedVertexAttribute> &attrib
     attribute.data.resize(tangents.size() * sizeof(glm::vec4));
     std::memcpy(attribute.data.data(), tangents.data(), attribute.data.size());
     attributes.push_back(std::move(attribute));
+}
+
+static BufferLayout s_layoutCoveringEveryPrimitive(const std::vector<glTF_DecodedPrimitive> &primitives)
+{
+    BufferLayout mergedLayout;
+    mergedLayout.isInterleaved = true;
+
+    uint32_t nextAttributeOffset = 0;
+    for (const glTF_DecodedPrimitive &primitive : primitives) {
+        for (const DecodedVertexAttribute &attribute : primitive.attributes) {
+            BufferAttributeID attributeId = stringToBufferAttributeID(attribute.name);
+
+            bool alreadyCovered = false;
+            for (const BufferAttribute &covered : mergedLayout.buffer_attribs) {
+                alreadyCovered = alreadyCovered || covered.name == attributeId;
+            }
+            if (alreadyCovered) {
+                continue;
+            }
+
+            mergedLayout.buffer_attribs.push_back({attributeId, attribute.componentType, attribute.type, nextAttributeOffset});
+            nextAttributeOffset += mergedLayout.buffer_attribs.back().getSizeInBytes();
+        }
+    }
+
+    mergedLayout.vertexSize = nextAttributeOffset;
+    return mergedLayout;
+}
+
+static void s_appendPrimitiveVertices(const glTF_DecodedPrimitive &primitive, const BufferLayout &mergedLayout,
+                                      std::vector<uint8_t> &mergedVertices)
+{
+    size_t firstMergedByte = mergedVertices.size();
+    mergedVertices.resize(firstMergedByte + static_cast<size_t>(primitive.vertexCount) * mergedLayout.vertexSize);
+
+    for (const BufferAttribute &mergedAttribute : mergedLayout.buffer_attribs) {
+        const DecodedVertexAttribute *authoredAttribute = nullptr;
+        for (const DecodedVertexAttribute &attribute : primitive.attributes) {
+            if (stringToBufferAttributeID(attribute.name) == mergedAttribute.name) {
+                authoredAttribute = &attribute;
+                break;
+            }
+        }
+
+        // a primitive that does not carry an attribute the mesh has keeps the zeroes resize left
+        if (authoredAttribute == nullptr) {
+            continue;
+        }
+
+        uint32_t authoredSize = static_cast<uint32_t>(authoredAttribute->data.size() / primitive.vertexCount);
+        uint32_t copySize = std::min(authoredSize, mergedAttribute.getSizeInBytes());
+
+        for (uint32_t vertex = 0; vertex < primitive.vertexCount; vertex++) {
+            std::memcpy(mergedVertices.data() + firstMergedByte + static_cast<size_t>(vertex) * mergedLayout.vertexSize +
+                            mergedAttribute.offset,
+                        authoredAttribute->data.data() + static_cast<size_t>(vertex) * authoredSize, copySize);
+        }
+    }
+}
+
+static uint32_t s_readPrimitiveIndex(const glTF_DecodedPrimitive &primitive, uint32_t element)
+{
+    switch (primitive.indexComponentType) {
+    case UNSIGNED_INT_TYPE:
+        return reinterpret_cast<const uint32_t *>(primitive.indexData.data())[element];
+    case UNSIGNED_SHORT_TYPE:
+        return reinterpret_cast<const uint16_t *>(primitive.indexData.data())[element];
+    case UNSIGNED_BYTE_TYPE:
+        return primitive.indexData[element];
+    }
+
+    RP_CORE_ERROR("Indices cannot use component type {}, reading them as 16 bit", primitive.indexComponentType);
+    return reinterpret_cast<const uint16_t *>(primitive.indexData.data())[element];
 }
 
 glTF2Loader::glTF2Loader(const std::filesystem::path &filepath, std::filesystem::path outputFolder, std::string name)
@@ -486,44 +546,145 @@ bool glTF2Loader::loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle s
         yyjson_val *primitivesVal = getObjectValue(meshJson, "primitives");
         if (!primitivesVal || !yyjson_is_arr(primitivesVal)) return false;
 
-        std::vector<PrimitiveData> primitives;
+        std::vector<glTF_DecodedPrimitive> primitives;
         size_t idx, max;
         yyjson_val *primitiveJson;
         yyjson_arr_foreach(primitivesVal, idx, max, primitiveJson)
         {
-            PrimitiveData data;
-            if (decodePrimitive(primitiveJson, meshIndex, idx, skeleton, skin, data)) {
-                primitives.push_back(std::move(data));
+            glTF_DecodedPrimitive decoded;
+            if (decodePrimitive(primitiveJson, skeleton, decoded)) {
+                primitives.push_back(std::move(decoded));
             }
         }
 
-        cacheIt = m_meshCache.emplace(meshIndex, std::move(primitives)).first;
+        if (primitives.empty()) {
+            return false;
+        }
+
+        cacheIt = m_meshCache.emplace(meshIndex, mergePrimitives(primitives, meshIndex, skeleton, skin)).first;
     }
 
-    // Every node referencing this glTF mesh gets its own primitive child nodes, sharing the cached
-    // mesh assets instead of decoding duplicates.
-    const std::vector<PrimitiveData> &primitives = cacheIt->second;
-    for (size_t i = 0; i < primitives.size(); i++) {
-        const PrimitiveData &data = primitives[i];
-
-        auto primNode = std::make_unique<glTF_SceneNode>();
-        primNode->parent = node;
-        primNode->name = node->name + "_Primitive_" + std::to_string(i);
-        primNode->type = glTF_NodeType::PRIMITIVE;
-        primNode->worldTransform = node->worldTransform;
-        primNode->meshRef = data.meshRef;
-        primNode->materialIndex = data.materialIndex;
-        primNode->skeleton = data.skeleton;
-
-        node->children.push_back(std::move(primNode));
+    if (!cacheIt->second) {
+        return false;
     }
+
+    node->type = glTF_NodeType::MESH;
+    node->meshRef = cacheIt->second;
+    node->skeleton = skeleton;
 
     return true;
 }
 
-bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex,
-                                  AssetHandle skeleton, size_t skin,
-                                  PrimitiveData &out)
+AssetRef glTF2Loader::mergePrimitives(std::vector<glTF_DecodedPrimitive> &primitives, size_t meshIndex, AssetHandle skeleton,
+                                      size_t skin)
+{
+    // one run per material, so primitives sharing a material are drawn together and the mesh has as
+    // many slots as it has distinct materials rather than as many as it has primitives
+    std::vector<int32_t> runMaterials;
+    for (const glTF_DecodedPrimitive &primitive : primitives) {
+        if (std::find(runMaterials.begin(), runMaterials.end(), primitive.materialIndex) == runMaterials.end()) {
+            runMaterials.push_back(primitive.materialIndex);
+        }
+    }
+
+    BufferLayout mergedLayout = s_layoutCoveringEveryPrimitive(primitives);
+    if (mergedLayout.vertexSize == 0) {
+        RP_CORE_ERROR("mesh {} holds no vertex attributes", meshIndex);
+        return {};
+    }
+
+    uint32_t totalVertexCount = 0;
+    for (const glTF_DecodedPrimitive &primitive : primitives) {
+        totalVertexCount += primitive.vertexCount;
+    }
+
+    // the runs are concatenated into one vertex buffer, so their indices are rebased into it and
+    // have to be able to reach the last vertex of the last primitive
+    bool needs32BitIndices = totalVertexCount > UINT16_MAX;
+
+    std::vector<uint8_t> mergedVertices;
+    std::vector<uint8_t> mergedIndices;
+    std::vector<MeshSection> sections;
+    mergedVertices.reserve(static_cast<size_t>(totalVertexCount) * mergedLayout.vertexSize);
+
+    glm::vec3 boundsMin(std::numeric_limits<float>::infinity());
+    glm::vec3 boundsMax(-std::numeric_limits<float>::infinity());
+
+    uint32_t mergedIndexCount = 0;
+    uint32_t nextVertexBase = 0;
+    bool isSkinned = false;
+
+    for (int32_t runMaterial : runMaterials) {
+        MeshSection section;
+        section.firstIndex = mergedIndexCount;
+
+        for (glTF_DecodedPrimitive &primitive : primitives) {
+            if (primitive.materialIndex != runMaterial) {
+                continue;
+            }
+
+            s_appendPrimitiveVertices(primitive, mergedLayout, mergedVertices);
+
+            for (uint32_t element = 0; element < primitive.indexCount; element++) {
+                uint32_t index = s_readPrimitiveIndex(primitive, element) + nextVertexBase;
+                if (needs32BitIndices) {
+                    mergedIndices.insert(mergedIndices.end(), reinterpret_cast<const uint8_t *>(&index),
+                                         reinterpret_cast<const uint8_t *>(&index) + sizeof(uint32_t));
+                } else {
+                    uint16_t narrow = static_cast<uint16_t>(index);
+                    mergedIndices.insert(mergedIndices.end(), reinterpret_cast<const uint8_t *>(&narrow),
+                                         reinterpret_cast<const uint8_t *>(&narrow) + sizeof(uint16_t));
+                }
+            }
+
+            boundsMin = glm::min(boundsMin, primitive.boundsMin);
+            boundsMax = glm::max(boundsMax, primitive.boundsMax);
+
+            isSkinned = isSkinned || primitive.isSkinned;
+            mergedIndexCount += primitive.indexCount;
+            nextVertexBase += primitive.vertexCount;
+        }
+
+        section.indexCount = mergedIndexCount - section.firstIndex;
+        sections.push_back(section);
+    }
+
+    MeshAllocatorParams params;
+    params.bufferLayout = mergedLayout;
+    params.vertexData = mergedVertices.data();
+    params.vertexDataSize = static_cast<uint32_t>(mergedVertices.size());
+    params.indexData = mergedIndices.data();
+    params.indexDataSize = static_cast<uint32_t>(mergedIndices.size());
+    params.indexCount = mergedIndexCount;
+    params.indexType = needs32BitIndices ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
+    params.boundsMin = boundsMin;
+    params.boundsMax = boundsMax;
+    params.sections = std::move(sections);
+
+    std::vector<AssetHandle> materialSlots;
+    materialSlots.reserve(runMaterials.size());
+    for (int32_t runMaterial : runMaterials) {
+        materialSlots.push_back(primitiveMaterial(runMaterial));
+    }
+
+    AssetImportDataVariant importData;
+    if (isSkinned) {
+        auto bindsIt = m_inverseBindMatrices.find(skin);
+        importData = SkeletalMeshImportData{std::move(params), skeleton,
+                                            bindsIt != m_inverseBindMatrices.end() ? bindsIt->second : std::vector<glm::mat4>{},
+                                            std::move(materialSlots)};
+    } else {
+        importData = StaticMeshImportData{std::move(params), std::move(materialSlots)};
+    }
+
+    std::string meshAssetName = m_filepath.stem().string() + "_Mesh" + std::to_string(meshIndex);
+    AssetProvenance provenance{m_filepath, static_cast<uint32_t>(meshIndex)};
+
+    return AssetManager::importAsset(AssetImportDataRequest{
+        .data = std::move(importData), .output = m_outputFolder, .name = meshAssetName, .provenance = provenance});
+}
+
+bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, AssetHandle skeleton, glTF_DecodedPrimitive &out)
 {
     std::vector<DecodedVertexAttribute> attributeData;
     uint32_t vertexCount = 0;
@@ -573,8 +734,7 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
             if (!attrData.empty()) {
                 uint32_t componentType = static_cast<uint32_t>(getInt(getObjectValue(accessor, "componentType"), 0));
                 const char *type = getString(getObjectValue(accessor, "type"), "");
-                attributeData.push_back(
-                    {attribName, componentType, BufferAttributeType_fromString(type), std::move(attrData)});
+                attributeData.push_back({attribName, componentType, BufferAttributeType_fromString(type), std::move(attrData)});
             }
         }
     }
@@ -585,8 +745,8 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
     }
 
     if (hasBounds) {
-        out.boundingBoxMin = minBounds;
-        out.boundingBoxMax = maxBounds;
+        out.boundsMin = minBounds;
+        out.boundsMax = maxBounds;
     }
 
     std::vector<uint8_t> indexData;
@@ -612,59 +772,8 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
 
     s_appendTangentAttribute(attributeData, vertexCount, indexData, indexType);
 
-    uint32_t vertexStride = 0;
-    std::vector<uint32_t> attrSizes;
-    std::vector<uint32_t> attrOffsets;
-
-    for (const auto &attribute : attributeData) {
-        uint32_t attrSize = static_cast<uint32_t>(attribute.data.size() / vertexCount);
-        attrSizes.push_back(attrSize);
-        attrOffsets.push_back(vertexStride);
-        vertexStride += attrSize;
-    }
-
-    BufferLayout bufferLayout;
-
-    for (uint32_t i = 0; i < attributeData.size(); i++) {
-        const auto &attribute = attributeData[i];
-        bufferLayout.buffer_attribs.push_back(
-            {stringToBufferAttributeID(attribute.name), attribute.componentType, attribute.type, attrOffsets[i]});
-    }
-
-    bufferLayout.isInterleaved = true;
-    bufferLayout.vertexSize = vertexStride;
-
-    uint32_t totalVertexDataSize = vertexCount * vertexStride;
-
-    std::vector<uint8_t> interleavedData(totalVertexDataSize);
-
-    for (uint32_t v = 0; v < vertexCount; v++) {
-        uint8_t *vertexDest = interleavedData.data() + (v * vertexStride);
-        for (uint32_t a = 0; a < attributeData.size(); a++) {
-            uint32_t attrSize = attrSizes[a];
-            const uint8_t *attrSrc = attributeData[a].data.data() + (v * attrSize);
-            std::memcpy(vertexDest + attrOffsets[a], attrSrc, attrSize);
-        }
-    }
-
-    MeshAllocatorParams params;
-    params.bufferLayout = bufferLayout;
-    params.vertexData = interleavedData.data();
-    params.vertexDataSize = totalVertexDataSize;
-    params.indexData = indexData.data();
-    params.indexDataSize = static_cast<uint32_t>(indexData.size());
-    params.indexCount = indexCount;
-    params.indexType = Mesh::indexTypeFromComponentType(indexType);
-    params.boundsMin = out.boundingBoxMin;
-    params.boundsMax = out.boundingBoxMax;
-
-    std::string meshAssetName =
-        m_filepath.stem().string() + "_Mesh" + std::to_string(meshIndex) + "_Prim" + std::to_string(primitiveIndex);
-    AssetProvenance provenance{m_filepath, static_cast<uint32_t>(meshIndex)};
-
-    bool isSkinned = skeleton != INVALID_ASSET_HANDLE &&
-                     bufferLayout.getAttributeOffset(BufferAttributeID::JOINTS_0) != UINT32_MAX &&
-                     bufferLayout.getAttributeOffset(BufferAttributeID::WEIGHTS_0) != UINT32_MAX;
+    out.isSkinned = skeleton != INVALID_ASSET_HANDLE && s_findVertexAttribute(attributeData, "JOINTS_0") != nullptr &&
+                    s_findVertexAttribute(attributeData, "WEIGHTS_0") != nullptr;
 
     yyjson_val *materialVal = getObjectValue(primitiveJson, "material");
     if (materialVal && yyjson_is_int(materialVal)) {
@@ -674,22 +783,11 @@ bool glTF2Loader::decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, s
         }
     }
 
-    AssetHandle defaultMaterial = primitiveMaterial(out.materialIndex);
-
-    AssetImportDataVariant importData;
-    if (isSkinned) {
-        auto bindsIt = m_inverseBindMatrices.find(skin);
-        importData = SkeletalMeshImportData{std::move(params), skeleton,
-                                            bindsIt != m_inverseBindMatrices.end() ? bindsIt->second
-                                                                                   : std::vector<glm::mat4>{},
-                                            defaultMaterial};
-        out.skeleton = skeleton;
-    } else {
-        importData = StaticMeshImportData{std::move(params), defaultMaterial};
-    }
-
-    out.meshRef = AssetManager::importAsset(AssetImportDataRequest{
-        .data = std::move(importData), .output = m_outputFolder, .name = meshAssetName, .provenance = provenance});
+    out.attributes = std::move(attributeData);
+    out.vertexCount = vertexCount;
+    out.indexData = std::move(indexData);
+    out.indexComponentType = indexType;
+    out.indexCount = indexCount;
 
     return true;
 }
@@ -763,8 +861,6 @@ Node3D *glTF2Loader::buildSceneObject(SceneObject &parent, glTF_SceneNode *src)
         }
 
         mesh->setMesh(src->meshRef->handle());
-
-        mesh->setMaterial(primitiveMaterial(src->materialIndex));
 
         // a skinned mesh has no acceleration structure to trace against
         if (src->skeleton == INVALID_ASSET_HANDLE) {
@@ -1114,8 +1210,8 @@ Skeleton::JointTransform glTF2Loader::getNodeRestTransform(yyjson_val *nodeVal)
     if (matrixVal && yyjson_is_arr(matrixVal)) {
         glm::mat4 matrix = getNodeTransform(nodeVal);
         transform.position = glm::vec3(matrix[3]);
-        transform.scale = glm::vec3(glm::length(glm::vec3(matrix[0])), glm::length(glm::vec3(matrix[1])),
-                                    glm::length(glm::vec3(matrix[2])));
+        transform.scale =
+            glm::vec3(glm::length(glm::vec3(matrix[0])), glm::length(glm::vec3(matrix[1])), glm::length(glm::vec3(matrix[2])));
 
         glm::mat3 rotation(matrix);
         for (int axis = 0; axis < 3; axis++) {
@@ -1253,8 +1349,8 @@ void glTF2Loader::loadSkin(yyjson_val *skinVal)
 
     auto skeleton = std::make_unique<Skeleton>(std::move(parents), std::move(names), std::move(restPose));
 
-    AssetRef ref = AssetManager::importAsset(AssetImportDataRequest{
-        .data = SkeletonImportData{std::move(skeleton)}, .output = m_outputFolder, .name = skeletonName});
+    AssetRef ref = AssetManager::importAsset(
+        AssetImportDataRequest{.data = SkeletonImportData{std::move(skeleton)}, .output = m_outputFolder, .name = skeletonName});
 
     // the bind pose belongs to the meshes bound against this skeleton, not to the skeleton itself
     if (ref) {

@@ -102,7 +102,7 @@ void Scene::addDefaultContent()
 
     auto *floor = m_root->add<StaticMesh3D>("Floor");
     floor->setMesh(RE_PRIMITIVE_PLANE_MESH);
-    floor->setMaterial(RE_DEFAULT_MATERIAL_INSTANCE);
+    floor->setMaterial(0, RE_DEFAULT_MATERIAL_INSTANCE);
     floor->setScale(glm::vec3(DEFAULT_FLOOR_SIZE, 1.0f, DEFAULT_FLOOR_SIZE));
 
     if (m_environment != nullptr) {
@@ -170,10 +170,11 @@ void Scene::onUpdate(float dt)
     {
         RAPTURE_PROFILE_SCOPE("OldPerEntity::updateMeshes");
         for (auto [entity, material] : m_registry.read<MaterialComponent>().with<TransformComponent, StaticMeshComponent>()) {
-            if (!material.material) {
-                continue;
+            for (const Ref<AMaterialInstance> &instance : material.materials) {
+                if (instance) {
+                    instance->updatePendingTextures();
+                }
             }
-            material.material->updatePendingTextures();
         }
     }
 

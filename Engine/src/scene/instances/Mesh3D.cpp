@@ -11,7 +11,7 @@
 namespace Rapture {
 
 static constexpr std::string_view KEY_MESH = "mesh";
-static constexpr std::string_view KEY_MATERIAL = "material";
+static constexpr std::string_view KEY_MATERIALS = "materials";
 static constexpr std::string_view KEY_VISIBLE = "visible";
 static constexpr std::string_view KEY_MOBILITY = "mobility";
 static constexpr std::string_view KEY_RAY_TRACED = "rayTraced";
@@ -34,13 +34,28 @@ const TypeInfo &Mesh3D::type() const
     return staticType();
 }
 
-void Mesh3D::setMaterial(AssetHandle _material)
+AssetHandle Mesh3D::material(uint32_t slot) const
 {
-    if (m_material == _material) {
+    if (slot >= m_materials.size()) {
+        RP_CORE_WARN("slot {} is not one of the {} '{}' draws", slot, m_materials.size(), name());
+        return INVALID_ASSET_HANDLE;
+    }
+    return m_materials[slot];
+}
+
+void Mesh3D::setMaterial(uint32_t slot, AssetHandle _material)
+{
+    if (slot >= m_materials.size()) {
+        RP_CORE_WARN("slot {} is not one of the {} '{}' draws, leaving its materials as they were", slot, m_materials.size(),
+                     name());
         return;
     }
 
-    AssetRef ref = AssetManager::getAsset(_material);
+    if (m_materials[slot] == _material) {
+        return;
+    }
+
+    Ref<AMaterialInstance> ref = AssetManager::getAsset<AMaterialInstance>(_material);
     if (!ref) {
         RP_CORE_ERROR("material {} could not be resolved for '{}'", _material, name());
         return;
@@ -51,17 +66,27 @@ void Mesh3D::setMaterial(AssetHandle _material)
     }
     auto component = m_entity.write<MaterialComponent>();
 
-    component->material = ref.as<AMaterialInstance>();
-    m_material = _material;
+    component->materials.resize(m_materials.size());
+    component->materials[slot] = std::move(ref);
+    m_materials[slot] = _material;
 }
 
-void Mesh3D::adoptDefaultMaterial(const AMesh &mesh)
+void Mesh3D::adoptMaterialSlots(const AMesh &mesh)
 {
-    if (m_material != INVALID_ASSET_HANDLE) {
-        return;
+    const std::vector<AssetHandle> &slots = mesh.materialSlots();
+
+    // a run this object already draws keeps what it was given, the rest take what the mesh names
+    std::vector<AssetHandle> adopted = slots;
+    for (size_t slot = 0; slot < adopted.size() && slot < m_materials.size(); slot++) {
+        if (m_materials[slot] != INVALID_ASSET_HANDLE) {
+            adopted[slot] = m_materials[slot];
+        }
     }
 
-    setMaterial(mesh.defaultMaterial());
+    m_materials.assign(adopted.size(), INVALID_ASSET_HANDLE);
+    for (uint32_t slot = 0; slot < adopted.size(); slot++) {
+        setMaterial(slot, adopted[slot]);
+    }
 }
 
 bool Mesh3D::isRayTraced() const
@@ -75,7 +100,12 @@ void Mesh3D::serialize(WriteNode node) const
 
     WriteNode mesh = node.addObject(KEY_MESH);
     mesh.set(KEY_MESH, this->mesh());
-    mesh.set(KEY_MATERIAL, material());
+
+    WriteNode materials = mesh.addArray(KEY_MATERIALS);
+    for (AssetHandle handle : m_materials) {
+        materials.append(handle);
+    }
+
     mesh.set(KEY_VISIBLE, isVisible());
     mesh.set(KEY_MOBILITY, static_cast<uint64_t>(mobility()));
     mesh.set(KEY_RAY_TRACED, isRayTraced());
@@ -97,9 +127,12 @@ void Mesh3D::deserialize(ReadNode node)
         setMesh(meshHandle);
     }
 
-    AssetHandle materialHandle = mesh.child(KEY_MATERIAL).asU64(INVALID_ASSET_HANDLE);
-    if (materialHandle != INVALID_ASSET_HANDLE) {
-        setMaterial(materialHandle);
+    ReadNode materials = mesh.child(KEY_MATERIALS);
+    for (uint32_t slot = 0; slot < materials.size(); slot++) {
+        AssetHandle materialHandle = materials.at(slot).asU64(INVALID_ASSET_HANDLE);
+        if (materialHandle != INVALID_ASSET_HANDLE) {
+            setMaterial(slot, materialHandle);
+        }
     }
 
     setVisible(mesh.child(KEY_VISIBLE).asBool(isVisible()));

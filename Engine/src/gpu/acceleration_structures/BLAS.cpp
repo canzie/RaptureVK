@@ -94,15 +94,6 @@ bool BLAS::createGeometry(const Mesh &mesh)
     VkDeviceAddress indexBufferBaseAddress = vkGetBufferDeviceAddress(m_device, &indexBufferAddressInfo);
     VkDeviceAddress indexAddress = indexBufferBaseAddress + indexAllocation->offsetBytes;
 
-    // Set up geometry
-    m_geometry = {};
-    m_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    m_geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-    m_geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-
-    // Vertex data
-    m_geometry.geometry.triangles.vertexData.deviceAddress = vertexAddress;
-
     // Get vertex stride from buffer layout, fallback to 12 bytes (3 floats for position)
     uint32_t vertexStride = vertexBuffer->getBufferLayout().calculateVertexSize();
     if (vertexStride == 0) {
@@ -110,26 +101,44 @@ bool BLAS::createGeometry(const Mesh &mesh)
         RP_CORE_WARN("BLAS: Buffer layout not set, assuming 12-byte stride (3 float position)");
     }
 
-    m_geometry.geometry.triangles.vertexStride = vertexStride;
-    m_geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT; // Position format
-    m_geometry.geometry.triangles.maxVertex = static_cast<uint32_t>(vertexAllocation->sizeBytes / vertexStride) - 1;
-
-    // Index data
-    m_geometry.geometry.triangles.indexData.deviceAddress = indexAddress;
-
-    // Get index type from index buffer
     VkIndexType indexType = indexBuffer->getIndexType();
-    m_geometry.geometry.triangles.indexType = indexType;
+    const uint32_t indexSize = indexType == VK_INDEX_TYPE_UINT32 ? 4 : 2;
 
-    // Geometry flags
-    m_geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    m_geometries.clear();
+    m_buildRanges.clear();
 
-    // Build range info
-    m_buildRangeInfo = {};
-    m_buildRangeInfo.primitiveCount = mesh.getIndexCount() / 3; // Number of triangles
-    m_buildRangeInfo.primitiveOffset = 0;
-    m_buildRangeInfo.firstVertex = 0;
-    m_buildRangeInfo.transformOffset = 0;
+    for (const MeshSection &section : mesh.getSections()) {
+        VkAccelerationStructureGeometryKHR geometry{};
+        geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+        geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+
+        geometry.geometry.triangles.vertexData.deviceAddress = vertexAddress;
+        geometry.geometry.triangles.vertexStride = vertexStride;
+        geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT; // Position format
+        geometry.geometry.triangles.maxVertex = static_cast<uint32_t>(vertexAllocation->sizeBytes / vertexStride) - 1;
+
+        geometry.geometry.triangles.indexData.deviceAddress = indexAddress;
+        geometry.geometry.triangles.indexType = indexType;
+
+        // TODO: an alpha masked run has to drop this so its cutouts are tested, which needs the
+        // material's blend mode to reach here
+        geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+
+        VkAccelerationStructureBuildRangeInfoKHR range{};
+        range.primitiveCount = section.indexCount / 3;
+        range.primitiveOffset = section.firstIndex * indexSize;
+        range.firstVertex = 0;
+        range.transformOffset = 0;
+
+        m_geometries.push_back(geometry);
+        m_buildRanges.push_back(range);
+    }
+
+    if (m_geometries.empty()) {
+        RP_CORE_ERROR("Mesh holds no runs to build an acceleration structure from");
+        return false;
+    }
 
     return true;
 }
@@ -148,16 +157,21 @@ bool BLAS::createAccelerationStructure()
     m_buildInfo.flags =
         VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
     m_buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-    m_buildInfo.geometryCount = 1;
-    m_buildInfo.pGeometries = &m_geometry;
+    m_buildInfo.geometryCount = static_cast<uint32_t>(m_geometries.size());
+    m_buildInfo.pGeometries = m_geometries.data();
 
     // Get size requirements
     VkAccelerationStructureBuildSizesInfoKHR sizeInfo{};
     sizeInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
 
-    uint32_t primitiveCount = m_buildRangeInfo.primitiveCount;
+    std::vector<uint32_t> primitiveCounts;
+    primitiveCounts.reserve(m_buildRanges.size());
+    for (const VkAccelerationStructureBuildRangeInfoKHR &range : m_buildRanges) {
+        primitiveCounts.push_back(range.primitiveCount);
+    }
+
     vulkanContext.vkGetAccelerationStructureBuildSizesKHR(m_device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &m_buildInfo,
-                                                          &primitiveCount, &sizeInfo);
+                                                          primitiveCounts.data(), &sizeInfo);
 
     m_accelerationStructureSize = sizeInfo.accelerationStructureSize;
     m_scratchSize = sizeInfo.buildScratchSize;
@@ -213,7 +227,7 @@ void BLAS::recordBuild(VkCommandBuffer commandBuffer, VkDeviceAddress scratchAdd
     m_buildInfo.dstAccelerationStructure = m_accelerationStructure;
     m_buildInfo.scratchData.deviceAddress = scratchAddress;
 
-    const VkAccelerationStructureBuildRangeInfoKHR *pBuildRangeInfo = &m_buildRangeInfo;
+    const VkAccelerationStructureBuildRangeInfoKHR *pBuildRangeInfo = m_buildRanges.data();
     vulkanContext.vkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &m_buildInfo, &pBuildRangeInfo);
 }
 

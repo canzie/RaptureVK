@@ -284,13 +284,22 @@ static void s_setPhysicsBody(Rapture::SceneObject *node, PhysicsBodyKind kind)
 
 void Mesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
+    // the mesh decides how many runs there are, so the rows are built against the subject rather
+    // than fixed, and the body is rebuilt whenever the mesh under it changes
+    m_node = s_instanceAs<Rapture::Mesh3D>(m_scene, m_entity);
+    m_materialPickers.clear();
+    m_materialPickers.resize(m_node != nullptr ? m_node->materials().size() : 0);
+
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        rowAssetPicker(t, "Material", m_materialPicker, {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
-                       [this](Rapture::AssetHandle handle) {
-                           if (m_node != nullptr) {
-                               m_node->setMaterial(handle);
-                           }
-                       });
+        for (uint32_t slot = 0; slot < m_materialPickers.size(); slot++) {
+            std::string label = m_materialPickers.size() > 1 ? "Material " + std::to_string(slot) : "Material";
+            rowAssetPicker(t, label, m_materialPickers[slot], {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
+                           [this, slot](Rapture::AssetHandle handle) {
+                               if (m_node != nullptr) {
+                                   m_node->setMaterial(slot, handle);
+                               }
+                           });
+        }
         m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_STATIC, [this](Rapture::Mobility m) {
             if (m_node == nullptr) {
                 return;
@@ -324,12 +333,22 @@ void Mesh3DEditor::sync(const Rapture::ecs::EntityAccessor &entity)
     m_isVisible = m_node->isVisible();
     m_isRayTraced = m_node->isRayTraced();
 
+    // the run count is a fact about the mesh, so a mesh with a different number of them needs its rows rebuilt
+    if (m_node->materials().size() != m_materialPickers.size()) {
+        if (requestRefresh) {
+            requestRefresh();
+        }
+        return;
+    }
+
     if (previous != m_node) {
         if (m_mobilityDropdown != nullptr) {
             m_mobilityDropdown->setText(Rapture::mobilityToString(m_node->mobility()));
         }
-        if (m_materialPicker.has_value()) {
-            m_materialPicker->setAsset(m_node->material());
+        for (uint32_t slot = 0; slot < m_materialPickers.size(); slot++) {
+            if (m_materialPickers[slot].has_value()) {
+                m_materialPickers[slot]->setAsset(m_node->material(slot));
+            }
         }
     }
 }

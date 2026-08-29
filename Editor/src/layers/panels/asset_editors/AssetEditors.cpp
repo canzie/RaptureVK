@@ -83,35 +83,54 @@ void MeshAssetEditor::sync(Rapture::AssetHandle handle)
 
 void MeshMaterialAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
+    // the mesh decides how many slots there are, so the rows are built against the open asset
+    const Rapture::AMesh *mesh = s_meshAsset(m_handle);
+    m_materialPickers.clear();
+    m_materialPickers.resize(mesh != nullptr ? mesh->materialSlots().size() : 0);
+
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        rowAssetPicker(t, "Default", m_materialPicker, {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
-                       [this](Rapture::AssetHandle material) { applyDefaultMaterial(material); });
+        for (uint32_t slot = 0; slot < m_materialPickers.size(); slot++) {
+            std::string label = m_materialPickers.size() > 1 ? "Default " + std::to_string(slot) : "Default";
+            rowAssetPicker(t, label, m_materialPickers[slot], {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
+                           [this, slot](Rapture::AssetHandle material) { applyMaterialSlot(slot, material); });
+        }
     });
 }
 
-void MeshMaterialAssetEditor::applyDefaultMaterial(Rapture::AssetHandle material)
+void MeshMaterialAssetEditor::applyMaterialSlot(uint32_t slot, Rapture::AssetHandle material)
 {
     Rapture::AMesh *mesh = s_meshAsset(m_handle);
     if (mesh == nullptr) {
         return;
     }
 
-    mesh->setDefaultMaterial(material);
+    mesh->setMaterialSlot(slot, material);
 
     const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(m_handle);
     if (!Rapture::AssetManager::saveAsset(m_handle, metadata.assetPath.parent_path())) {
-        RP_ERROR("could not write '{}' back, its default material is only set for this run", metadata.getName());
+        RP_ERROR("could not write '{}' back, its default materials are only set for this run", metadata.getName());
     }
 }
 
 void MeshMaterialAssetEditor::sync(Rapture::AssetHandle handle)
 {
     const Rapture::AMesh *mesh = s_meshAsset(handle);
-    if (mesh == nullptr || !m_materialPicker) {
+    if (mesh == nullptr) {
         return;
     }
 
-    m_materialPicker->setAsset(mesh->defaultMaterial());
+    if (mesh->materialSlots().size() != m_materialPickers.size()) {
+        if (requestRefresh) {
+            requestRefresh();
+        }
+        return;
+    }
+
+    for (uint32_t slot = 0; slot < m_materialPickers.size(); slot++) {
+        if (m_materialPickers[slot].has_value()) {
+            m_materialPickers[slot]->setAsset(mesh->materialSlot(slot));
+        }
+    }
 }
 
 void MeshSkeletonAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

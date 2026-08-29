@@ -30,7 +30,9 @@ struct MeshBlobHeader {
     uint32_t indexDataOffset = 0;  // byte offset of the index bytes
     float boundsMin[3] = {};
     float boundsMax[3] = {};
-    uint32_t reserved[14] = {}; // pad to 128 bytes, consume for backward-compatible additions
+    uint32_t sectionCount = 0;
+    uint32_t sectionOffset = 0; // byte offset of the section table
+    uint32_t reserved[12] = {}; // pad to 128 bytes, consume for backward-compatible additions
 };
 
 static_assert(sizeof(MeshBlobHeader) == 128, "mesh blob header is a fixed 128-byte directory, bump to 256 if it must grow");
@@ -115,6 +117,11 @@ void Mesh::setMeshData(MeshAllocatorParams &params)
     m_boundsMin = params.boundsMin;
     m_boundsMax = params.boundsMax;
 
+    m_sections = params.sections;
+    if (m_sections.empty()) {
+        m_sections.push_back({0, params.indexCount});
+    }
+
     BufferAllocationRequest vertexRequest;
     vertexRequest.size = params.vertexDataSize;
     vertexRequest.usage = BufferUsage::STATIC;
@@ -163,6 +170,7 @@ std::vector<uint8_t> Mesh::serializeGeometry() const
     params.boundsMin = m_boundsMin;
     params.boundsMax = m_boundsMax;
     params.bufferLayout = m_vertexBuffer->getBufferLayout();
+    params.sections = m_sections;
 
     return params.serialize();
 }
@@ -187,10 +195,12 @@ std::vector<uint8_t> MeshAllocatorParams::serialize() const
     header.attribOffset = sizeof(MeshBlobHeader);
     header.vertexDataOffset = header.attribOffset + attribBytes;
     header.indexDataOffset = header.vertexDataOffset + vertexDataSize;
+    header.sectionCount = static_cast<uint32_t>(sections.size());
+    header.sectionOffset = header.indexDataOffset + indexDataSize;
     std::memcpy(header.boundsMin, &boundsMin, sizeof(header.boundsMin));
     std::memcpy(header.boundsMax, &boundsMax, sizeof(header.boundsMax));
 
-    std::vector<uint8_t> blob(header.indexDataOffset + indexDataSize);
+    std::vector<uint8_t> blob(header.sectionOffset + sections.size() * sizeof(MeshSection));
     std::memcpy(blob.data(), &header, sizeof(MeshBlobHeader));
 
     size_t offset = header.attribOffset;
@@ -214,6 +224,9 @@ std::vector<uint8_t> MeshAllocatorParams::serialize() const
     }
     if (indexData != nullptr && indexDataSize > 0) {
         std::memcpy(blob.data() + header.indexDataOffset, indexData, indexDataSize);
+    }
+    if (!sections.empty()) {
+        std::memcpy(blob.data() + header.sectionOffset, sections.data(), sections.size() * sizeof(MeshSection));
     }
 
     return blob;
@@ -248,6 +261,16 @@ bool MeshAllocatorParams::deserialize(std::span<const uint8_t> blob, MeshAllocat
     params.bufferLayout.flags = header.flags;
     params.boundsMin = glm::vec3(header.boundsMin[0], header.boundsMin[1], header.boundsMin[2]);
     params.boundsMax = glm::vec3(header.boundsMax[0], header.boundsMax[1], header.boundsMax[2]);
+
+    size_t sectionBytes = header.sectionCount * sizeof(MeshSection);
+    if (header.sectionOffset + sectionBytes > blob.size()) {
+        RP_CORE_ERROR("Mesh blob section table is out of range");
+        return false;
+    }
+    params.sections.resize(header.sectionCount);
+    if (header.sectionCount > 0) {
+        std::memcpy(params.sections.data(), blob.data() + header.sectionOffset, sectionBytes);
+    }
 
     size_t offset = header.attribOffset;
     auto readU32 = [&](uint32_t &out) -> bool {

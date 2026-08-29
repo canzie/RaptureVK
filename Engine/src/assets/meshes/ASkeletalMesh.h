@@ -11,12 +11,12 @@
 namespace Rapture {
 
 /**
- * @brief A skeletal mesh asset: geometry deformed by a skeleton, and the material it defaults to
+ * @brief A skeletal mesh asset: geometry deformed by a skeleton, and the materials its runs default to
  */
 class ASkeletalMesh : public AMesh {
   public:
     ASkeletalMesh(MeshAllocatorParams &params, AssetHandle skeleton, std::vector<glm::mat4> inverseBindMatrices,
-                  AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE);
+                  std::vector<AssetHandle> materialSlots = {});
 
     static const TypeInfo &staticType();
     const TypeInfo &type() const override;
@@ -41,11 +41,12 @@ class ASkeletalMesh : public AMesh {
      * @param params The mesh data to write
      * @param skeleton The skeleton the geometry is bound to
      * @param inverseBindMatrices One matrix per joint
-     * @param defaultMaterial The material the asset defaults to
+     * @param materialSlots The materials the asset's runs default to
      * @return The serialized bytes
      */
     static std::vector<uint8_t> serializeParams(const MeshAllocatorParams &params, AssetHandle skeleton,
-                                                const std::vector<glm::mat4> &inverseBindMatrices, AssetHandle defaultMaterial);
+                                                const std::vector<glm::mat4> &inverseBindMatrices,
+                                                const std::vector<AssetHandle> &materialSlots);
 
     /**
      * @brief Builds a skeletal mesh asset from a blob produced by serialize

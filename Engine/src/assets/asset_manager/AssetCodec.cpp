@@ -1,6 +1,7 @@
 #include "AssetCodec.h"
 
 #include "Asset.h"
+#include "AssetRegistry.h"
 #include "core/utils/Log.h"
 #include "scene/instances/InstanceRegistry.h"
 
@@ -103,7 +104,7 @@ struct ByteReader {
 static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata)
 {
     std::vector<uint8_t> out;
-    s_append(out, AssetTypeToCode(metadata.assetType));
+    s_append(out, AssetRegistry::fileMagic(metadata.assetType));
     s_append(out, static_cast<uint32_t>(metadata.storageType));
     s_append(out, static_cast<uint32_t>(metadata.evictionPolicy));
     s_append(out, metadata.sizeHintBytes);
@@ -129,7 +130,8 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
 {
     ByteReader reader{bytes.data(), bytes.size()};
     auto metadata = std::make_unique<AssetMetadata>();
-    metadata->assetType = AssetTypeFromCode(reader.read<uint32_t>());
+    const AssetClass *assetClass = AssetRegistry::findByFileMagic(reader.read<uint32_t>());
+    metadata->assetType = assetClass != nullptr ? assetClass->assetType : ASSET_NONE;
     metadata->storageType = static_cast<AssetStorageType>(reader.read<uint32_t>());
     metadata->evictionPolicy = static_cast<AssetEvictionPolicy>(reader.read<uint32_t>());
     metadata->sizeHintBytes = reader.read<uint64_t>();
@@ -167,7 +169,7 @@ bool AssetCodec::writeRaptureAsset(const std::filesystem::path &path, AssetHandl
 
     RaptureAssetHeader header;
     header.uuid = uuid;
-    header.assetTypeCode = AssetTypeToCode(metadata.assetType);
+    header.assetTypeCode = AssetRegistry::fileMagic(metadata.assetType);
     header.metadataSize = metadataBytes.size();
     header.payloadSize = payload.size();
     header.metadataChecksum = s_checksum(metadataBytes);

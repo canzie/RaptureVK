@@ -3,6 +3,7 @@
 
 #include "assets/asset_manager/Asset.h"
 #include "assets/loaders/SceneFileCommon.h"
+#include "gpu/buffers/BufferLayout.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -18,10 +19,38 @@ namespace Rapture {
  * @brief Type of a glTF node for processing purposes
  */
 enum class glTF_NodeType {
-    EMPTY,     ///< Node with no mesh (transform node or group)
-    PRIMITIVE, ///< Node containing a single primitive (renderable)
-    SKELETON,  ///< Node containing skeleton data
-    BONE,      ///< Bone node within a skeleton
+    EMPTY,    ///< Node with no mesh (transform node or group)
+    MESH,     ///< Node containing a mesh (renderable)
+    SKELETON, ///< Node containing skeleton data
+    BONE,     ///< Bone node within a skeleton
+};
+
+/**
+ * @brief One vertex attribute read out of an accessor, still in the file's own component type
+ */
+struct DecodedVertexAttribute {
+    std::string name;
+    uint32_t componentType = 0;
+    BufferAttributeType type = BufferAttributeType::SCALAR;
+    std::vector<uint8_t> data;
+};
+
+/**
+ * @brief One glTF primitive, decoded but not yet merged into the mesh it belongs to
+ */
+struct glTF_DecodedPrimitive {
+    std::vector<DecodedVertexAttribute> attributes;
+    uint32_t vertexCount = 0;
+
+    std::vector<uint8_t> indexData;
+    uint32_t indexComponentType = 0;
+    uint32_t indexCount = 0;
+
+    int32_t materialIndex = -1; ///< index into the file's materials, negative where it names none
+    bool isSkinned = false;
+
+    glm::vec3 boundsMin = glm::vec3(0.0f);
+    glm::vec3 boundsMax = glm::vec3(0.0f);
 };
 
 /**
@@ -36,8 +65,7 @@ struct glTF_SceneNode {
     glm::mat4 localTransform = glm::mat4(1.0f);
     glm::mat4 worldTransform = glm::mat4(1.0f);
 
-    AssetRef meshRef;           ///< Mesh asset reference (registered with AssetManager)
-    int32_t materialIndex = -1; ///< glTF file material index (-1 if no material)
+    AssetRef meshRef;                            ///< Mesh asset reference (registered with AssetManager)
     AssetHandle skeleton = INVALID_ASSET_HANDLE; ///< The skeleton the mesh is bound to, invalid when it is not skinned
 
     std::vector<std::unique_ptr<glTF_SceneNode>> children;

@@ -4,6 +4,7 @@
 #include "gpu/buffers/Buffers.h"
 
 #include <atomic>
+#include <vector>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
@@ -31,7 +32,7 @@ class BLAS {
      */
     ~BLAS();
 
-    // m_buildInfo points at m_geometry, so a copy would describe the geometry of the object it came from
+    // m_buildInfo points into m_geometries, so a copy would describe the geometry of the object it came from
     BLAS(const BLAS &) = delete;
     BLAS &operator=(const BLAS &) = delete;
     BLAS(BLAS &&) = delete;
@@ -116,17 +117,25 @@ class BLAS {
     bool createAccelerationStructure();
 
     /**
-     * @brief Fill in the triangle geometry and build range from a mesh's buffers
+     * @brief Fill in one triangle geometry and build range per run of a mesh
      * @param mesh Mesh to read vertex and index allocations from
      * @return True on success
      */
     bool createGeometry(const Mesh &mesh);
 
+  public:
+    /**
+     * @brief How many geometries this structure was built from, one per run of its mesh
+     * @return The count
+     */
+    uint32_t getGeometryCount() const { return static_cast<uint32_t>(m_geometries.size()); }
+
   private:
     VkAccelerationStructureKHR m_accelerationStructure;
-    VkAccelerationStructureGeometryKHR m_geometry;
+    // one per run of the mesh, so a hit reports which run it landed on and the run can be shaded with its own material
+    std::vector<VkAccelerationStructureGeometryKHR> m_geometries;
+    std::vector<VkAccelerationStructureBuildRangeInfoKHR> m_buildRanges;
     VkAccelerationStructureBuildGeometryInfoKHR m_buildInfo;
-    VkAccelerationStructureBuildRangeInfoKHR m_buildRangeInfo;
 
     VkBuffer m_buffer;
     VmaAllocation m_allocation;

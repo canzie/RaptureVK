@@ -147,7 +147,7 @@ void MaterialEditorWorkspace::showMaterialOnSphere(Rapture::AssetHandle handle)
         m_previewSphere.add<Rapture::MaterialComponent>(std::move(ref));
         return;
     }
-    m_previewSphere.write<Rapture::MaterialComponent>()->material = std::move(ref);
+    m_previewSphere.write<Rapture::MaterialComponent>()->materials.assign(1, std::move(ref));
 }
 
 void MaterialEditorWorkspace::setupHotbar()

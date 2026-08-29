@@ -48,7 +48,7 @@ static void s_appendPrimitive(std::vector<MenuItem> &items, SceneObjectScope sco
     s_append(items, SCENE_OBJECT_SCOPE_ALL, scope, std::move(label), [parent, &selection, name, mesh]() {
         auto *node = parent->add<Rapture::StaticMesh3D>(name);
         node->setMesh(mesh);
-        node->setMaterial(Rapture::RE_DEFAULT_MATERIAL_INSTANCE);
+        node->setMaterial(0, Rapture::RE_DEFAULT_MATERIAL_INSTANCE);
         s_announce(node, selection);
     });
 }

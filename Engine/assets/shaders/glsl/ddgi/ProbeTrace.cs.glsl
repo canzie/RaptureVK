@@ -59,7 +59,7 @@ const uint UINT32_MAX = 0xFFFFFFFFu;
 
 // Per-instance geometry info, mirror of RtInstanceInfo (RtInstanceData.h)
 struct MeshInfo {
-    uint materialIndex; // bindless index into the material header SSBO
+    uint firstGeometry; // where this instance's runs start in the geometry info buffer
 
     uint iboIndex; // index of the buffer in the bindless buffers array
     uint vboIndex; // index of the buffer in the bindless buffers array
@@ -84,6 +84,17 @@ const uint INDEX_TYPE_UINT32 = 1u;
 layout(std430, set=3, binding = 9) readonly buffer SceneInfo {
     MeshInfo MeshInfos[];
 } u_sceneInfo;
+
+// One run of a mesh, mirror of RtGeometryInfo (RtInstanceData.h). A mesh is cut into a run per
+// material, so the geometry index of a hit says which of them was hit.
+struct GeometryInfo {
+    uint materialIndex; // bindless index into the material header SSBO
+    uint firstIndex;    // where the run starts in its mesh's index data
+};
+
+layout(std430, set=3, binding = 10) readonly buffer GeometryInfoBuffer {
+    GeometryInfo Geometries[];
+} u_geometryInfo;
 
 // Global descriptor arrays for bindless textures (set 3)
 #ifndef DESCRIPTOR_ARRAYS_DEFINED
@@ -124,8 +135,9 @@ struct HitSurface {
 /**
  * Fetches triangle indices from the index buffer
  */
-uvec3 fetchTriangleIndices(uint primitiveID, MeshInfo meshInfo) {
-    uint baseIndex = primitiveID * 3;
+uvec3 fetchTriangleIndices(uint primitiveID, uint firstIndex, MeshInfo meshInfo) {
+    // the acceleration structure counts primitives from the start of the run that was hit
+    uint baseIndex = firstIndex + primitiveID * 3;
     uvec3 indices;
     
     if (meshInfo.indexType == INDEX_TYPE_UINT32) {
@@ -260,9 +272,9 @@ HitSurface interpolateVertexAttributes(VertexAttributes v0, VertexAttributes v1,
 /**
  * Gets complete surface data for a ray hit
  */
-HitSurface getSurfaceDataForHit(uint primitiveID, vec2 barycentrics, MeshInfo meshInfo) {
+HitSurface getSurfaceDataForHit(uint primitiveID, uint firstIndex, vec2 barycentrics, MeshInfo meshInfo) {
     // Fetch triangle indices
-    uvec3 indices = fetchTriangleIndices(primitiveID, meshInfo);
+    uvec3 indices = fetchTriangleIndices(primitiveID, firstIndex, meshInfo);
     
     // Fetch vertex data for all 3 vertices
     VertexAttributes v0 = fetchVertexAttributes(indices.x, meshInfo);
@@ -274,8 +286,8 @@ HitSurface getSurfaceDataForHit(uint primitiveID, vec2 barycentrics, MeshInfo me
 }
 
 // Evaluates the material's compiled diffuse surface graph at a hit point
-SurfaceDataDiffuse evalHitSurface(MeshInfo meshInfo, HitSurface hit) {
-    MaterialData mat = getMaterialData(meshInfo.materialIndex);
+SurfaceDataDiffuse evalHitSurface(uint materialIndex, HitSurface hit) {
+    MaterialData mat = getMaterialData(materialIndex);
 
     SurfaceInputs si;
     si.uv = hit.texCoord;
@@ -327,6 +339,7 @@ void main() {
     uint primitiveID;
     vec2 barycentrics;
     uint instanceCustomIndex;
+    uint geometryIndex;
     bool isFrontFacing = true;
 
     rayQueryProceedEXT(rayQuery);
@@ -342,6 +355,7 @@ void main() {
         primitiveID = rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, true);
         barycentrics = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
         instanceCustomIndex = rayQueryGetIntersectionInstanceCustomIndexEXT(rayQuery, true);
+        geometryIndex = rayQueryGetIntersectionGeometryIndexEXT(rayQuery, true);
         hit = true;
     } else {
         hit = false;
@@ -357,10 +371,11 @@ void main() {
 
             // Get mesh info using the instance custom index
             MeshInfo meshInfo = u_sceneInfo.MeshInfos[instanceCustomIndex];
+            GeometryInfo geometryInfo = u_geometryInfo.Geometries[meshInfo.firstGeometry + geometryIndex];
 
             // Get interpolated hit geometry, then run the material's diffuse surface graph
-            HitSurface surface = getSurfaceDataForHit(primitiveID, barycentrics, meshInfo);
-            SurfaceDataDiffuse mat = evalHitSurface(meshInfo, surface);
+            HitSurface surface = getSurfaceDataForHit(primitiveID, geometryInfo.firstIndex, barycentrics, meshInfo);
+            SurfaceDataDiffuse mat = evalHitSurface(geometryInfo.materialIndex, surface);
 
             vec3 worldShadingNormal = normalize(mat.normal);
             vec3 albedo = mat.albedo;

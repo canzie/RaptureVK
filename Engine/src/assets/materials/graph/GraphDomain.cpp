@@ -15,8 +15,8 @@ static bool s_builtinsRegistered = false;
 const char *Graph_domainName(GraphDomainId id)
 {
     switch (id) {
-#define X(name)                                                                                                                \
-    case name:                                                                                                                 \
+#define X(name) \
+    case name:  \
         return #name;
         RP_GRAPH_DOMAINS(X)
 #undef X
@@ -127,8 +127,8 @@ static void s_validateDomain(const GraphDomain &domain)
                     break;
                 }
             }
-            RP_ASSERT(pin != nullptr, "graph domain '{}' pass '{}' binds field '{}' with no matching sink pin", domainName,
-                      pass.id, field.name);
+            RP_ASSERT(pin != nullptr, "graph domain '{}' pass '{}' binds field '{}' with no matching sink pin", domainName, pass.id,
+                      field.name);
             if (pin == nullptr) {
                 continue;
             }

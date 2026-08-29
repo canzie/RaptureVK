@@ -1,17 +1,17 @@
 #include "AssetImporter.h"
 
 #include "AssetHelpers.h"
+#include "assets/loaders/gltf/glTFCommon.h"
+#include "assets/shaders/AShader.h"
+#include "assets/textures/ATexture.h"
 #include "core/events/AssetEvents.h"
-#include "renderer/generators/textures/TextureCompressor.h"
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobSystem.h"
-#include "assets/loaders/gltf/glTFCommon.h"
 #include "core/utils/Log.h"
-#include "assets/shaders/AShader.h"
-#include "assets/textures/ATexture.h"
 #include "gpu/shaders/Shader.h"
 #include "gpu/textures/Texture.h"
+#include "renderer/generators/textures/TextureCompressor.h"
 
 #include <filesystem>
 #include <memory>
@@ -24,9 +24,7 @@ namespace Rapture {
 
 #define FILE_NOT_FOUND_ERROR(path) RP_CORE_ERROR("File not found: {}", path.string());
 
-bool AssetImporter::s_isInitialized = false;
-
-std::unique_ptr<Asset> AssetImporter::loadShader(AssetMetadata &metadata, AssetHandle handle)
+std::unique_ptr<Asset> Asset_importShader(AssetMetadata &metadata, AssetHandle handle)
 {
     const auto &initialPath = metadata.getSourcePath();
     if (!std::filesystem::exists(initialPath)) {
@@ -130,7 +128,7 @@ std::unique_ptr<Asset> AssetImporter::loadShader(AssetMetadata &metadata, AssetH
     return asset;
 }
 
-std::unique_ptr<Asset> AssetImporter::loadMaterial(AssetMetadata &metadata, AssetHandle handle)
+std::unique_ptr<Asset> Asset_importMaterialInstance(AssetMetadata &metadata, AssetHandle handle)
 {
     (void)metadata;
     (void)handle;
@@ -139,7 +137,7 @@ std::unique_ptr<Asset> AssetImporter::loadMaterial(AssetMetadata &metadata, Asse
     return nullptr;
 }
 
-std::unique_ptr<Asset> AssetImporter::loadTexture(AssetMetadata &metadata, AssetHandle handle)
+std::unique_ptr<Asset> Asset_importTexture(AssetMetadata &metadata, AssetHandle handle)
 {
     TextureSpecification texSpec = TextureSpecification();
     texSpec.mipLevels = 0; // 0 is auto
@@ -244,7 +242,7 @@ std::unique_ptr<Asset> AssetImporter::loadTexture(AssetMetadata &metadata, Asset
     return asset;
 }
 
-std::unique_ptr<Asset> AssetImporter::loadCubemap(AssetMetadata &metadata, AssetHandle handle)
+std::unique_ptr<Asset> Asset_importCubemap(AssetMetadata &metadata, AssetHandle handle)
 {
     std::vector<std::string> cubemapPaths = getCubemapPaths(metadata.getSourcePath());
     if (cubemapPaths.size() != 6) {

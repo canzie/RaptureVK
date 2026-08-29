@@ -9,9 +9,9 @@
 
 #include "GraphDomain.h"
 #include "MaterialGraphTypes.h"
+#include "app/Application.h"
 #include "core/events/ShaderEvents.h"
 #include "core/utils/Log.h"
-#include "app/Application.h"
 
 namespace Rapture {
 

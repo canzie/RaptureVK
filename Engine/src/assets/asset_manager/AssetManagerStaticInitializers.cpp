@@ -1,8 +1,8 @@
 #include "AssetManager.h"
 
-#include "renderer/generators/textures/TextureCompressor.h"
 #include "core/utils/Log.h"
 #include "core/utils/TextureFlattener.h"
+#include "renderer/generators/textures/TextureCompressor.h"
 
 namespace Rapture {
 

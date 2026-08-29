@@ -89,7 +89,7 @@ struct CompileResult {
 
     GraphDomainId domainId = GD_SURFACE;     // the domain the graph belongs to
     std::vector<CompiledFunction> functions; // one per domain pass, sharing the slice layout below
-    uint32_t graphId = 0; // global identifier for the graph among all registered graphs
+    uint32_t graphId = 0;                    // global identifier for the graph among all registered graphs
 
     GraphInstanceData defaults; // packed default slice, one uint per texture index and per value component
     GraphSlotMapping mapping;

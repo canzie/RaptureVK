@@ -57,6 +57,7 @@ void RtInstanceData::rebuild(Scene &scene)
 
     // a shader reaches an entry by the slot the structure gave the instance, so removed instances leave holes
     std::vector<RtInstanceInfo> infos(tlas->getSlotCapacity());
+    std::vector<RtGeometryInfo> geometries;
 
     m_materialToOffsets.clear();
     m_entityToOffset.clear();
@@ -73,8 +74,21 @@ void RtInstanceData::rebuild(Scene &scene)
 
         info.modelMatrix = reg.read<TransformComponent>(instance.entityId).world;
 
-        if (materialComp.material) {
-            info.materialIndex = materialComp.material->getBindlessIndex();
+        // the runs are laid out in the order the acceleration structure holds its geometries, so a
+        // hit's geometry index reaches its own run's entry
+        info.firstGeometry = static_cast<uint32_t>(geometries.size());
+        if (meshComp.mesh) {
+            for (uint32_t slot = 0; slot < meshComp.mesh->geometry().getSections().size(); slot++) {
+                MaterialInstance *runMaterial = materialComp.materialAt(slot);
+                uint32_t runMaterialIndex = runMaterial != nullptr ? runMaterial->getBindlessIndex() : 0;
+
+                if (runMaterial != nullptr) {
+                    m_materialToOffsets[runMaterial].push_back(static_cast<uint32_t>(geometries.size()) *
+                                                               static_cast<uint32_t>(sizeof(RtGeometryInfo)));
+                }
+
+                geometries.push_back({runMaterialIndex, meshComp.mesh->geometry().getSections()[slot].firstIndex});
+            }
         }
 
         if (meshComp.mesh) {
@@ -97,15 +111,15 @@ void RtInstanceData::rebuild(Scene &scene)
             }
         }
 
-        if (materialComp.material) {
-            uint32_t offset = instance.slot * static_cast<uint32_t>(sizeof(RtInstanceInfo));
-            m_entityToOffset[instance.entityId] = offset;
-            m_materialToOffsets[materialComp.material.operator->()].push_back(offset);
-        }
+        m_entityToOffset[instance.entityId] = instance.slot * static_cast<uint32_t>(sizeof(RtInstanceInfo));
     }
 
     m_instanceCount = static_cast<uint32_t>(infos.size());
     m_tlasRevision = tlas->getRevision();
+
+    if (geometries.empty()) {
+        geometries.push_back({});
+    }
 
     if (!m_buffer || m_buffer->getSize() < sizeof(RtInstanceInfo) * infos.size()) {
         m_buffer =
@@ -114,11 +128,26 @@ void RtInstanceData::rebuild(Scene &scene)
         m_buffer->addData(infos.data(), sizeof(RtInstanceInfo) * infos.size(), 0);
     }
 
+    if (!m_geometryBuffer || m_geometryBuffer->getSize() < sizeof(RtGeometryInfo) * geometries.size()) {
+        m_geometryBuffer = std::make_shared<StorageBuffer>(sizeof(RtGeometryInfo) * geometries.size(), BufferUsage::DYNAMIC,
+                                                           m_allocator, geometries.data());
+    } else {
+        m_geometryBuffer->addData(geometries.data(), sizeof(RtGeometryInfo) * geometries.size(), 0);
+    }
+
     auto set = m_rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS);
     if (set) {
         auto binding = set->getSSBOBinding(DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS);
         if (binding) {
             m_meshDataSSBOIndex = binding->add(*m_buffer);
+        }
+    }
+
+    auto geometrySet = m_rc.descriptorManager->getDescriptorSet(DescriptorSetBindingLocation::RT_GEOMETRY_INFO_SSBOS);
+    if (geometrySet) {
+        auto binding = geometrySet->getSSBOBinding(DescriptorSetBindingLocation::RT_GEOMETRY_INFO_SSBOS);
+        if (binding) {
+            m_geometryDataSSBOIndex = binding->add(*m_geometryBuffer);
         }
     }
 
@@ -134,27 +163,20 @@ void RtInstanceData::patchDirty(Scene &scene)
 {
     if (!m_buffer) return;
 
-    constexpr size_t MAT_START = offsetof(RtInstanceInfo, materialIndex);
-    constexpr size_t MAT_END = offsetof(RtInstanceInfo, iboIndex);
-    constexpr size_t MAT_SIZE = MAT_END - MAT_START;
+    constexpr size_t MAT_START = offsetof(RtGeometryInfo, materialIndex);
     constexpr size_t TRANSFORM_OFFSET = offsetof(RtInstanceInfo, modelMatrix);
 
-    struct PackedMat {
-        uint32_t materialIndex;
-    };
-
     for (auto *mat : m_dirtyMaterials) {
-        if (!mat) continue;
+        if (!mat || m_geometryBuffer == nullptr) continue;
 
         auto it = m_materialToOffsets.find(mat);
         if (it == m_materialToOffsets.end()) continue;
 
-        PackedMat packed = {};
-        packed.materialIndex = mat->getBindlessIndex();
+        uint32_t materialIndex = mat->getBindlessIndex();
 
         for (uint32_t baseOffset : it->second) {
             uint32_t dst = baseOffset + static_cast<uint32_t>(MAT_START);
-            m_buffer->addData(&packed, static_cast<uint32_t>(MAT_SIZE), dst);
+            m_geometryBuffer->addData(&materialIndex, sizeof(uint32_t), dst);
         }
     }
 

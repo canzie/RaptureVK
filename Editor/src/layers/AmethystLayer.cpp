@@ -5,6 +5,7 @@
 #include "EditorState.h"
 #include "LauncherConfig.h"
 #include "ProjectLauncher.h"
+#include "assets/asset_manager/AssetRegistry.h"
 #include "assets/asset_manager/AssetManager.h"
 #include "gpu/command_buffers/CommandPool.h"
 #include "layers/panels/FileBrowser.h"
@@ -513,7 +514,7 @@ void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
         break;
     }
     default:
-        RP_WARN("'{}' assets have no workspace to open in", Rapture::AssetTypeToString(metadata.assetType));
+        RP_WARN("'{}' assets have no workspace to open in", Rapture::AssetRegistry::displayName(metadata.assetType));
         return;
     }
 

@@ -2,9 +2,9 @@
 #define RAPTURE__GLTF_LOADER_H
 
 #include "assets/asset_manager/Asset.h"
-#include "glTFCommon.h"
 #include "assets/materials/MaterialParameters.h"
 #include "assets/skeletons/ASkeleton.h"
+#include "glTFCommon.h"
 #include "yyjson.h"
 
 #include <cstddef>
@@ -61,25 +61,15 @@ class glTF2Loader {
     bool isLoaded() const { return m_isLoaded; }
 
   private:
-    /**
-     * @brief Decoded mesh + material for one glTF primitive, cached per glTF mesh index
-     *
-     * Cached so multiple nodes referencing the same glTF mesh share the decoded mesh assets
-     * instead of decoding and registering duplicates.
-     */
-    struct PrimitiveData {
-        AssetRef meshRef;
-        int32_t materialIndex = -1;
-        AssetHandle skeleton = INVALID_ASSET_HANDLE;
-        glm::vec3 boundingBoxMin = glm::vec3(0.0f);
-        glm::vec3 boundingBoxMax = glm::vec3(0.0f);
-    };
-
     bool loadScene(yyjson_val *sceneRoot);
     bool loadNode(glTF_SceneNode *parent, size_t nodeIndex);
     /**
-     * @brief Builds the primitives of one glTF mesh as children of a node
-     * @param node The node the primitives hang from
+     * @brief Builds one glTF mesh into the single mesh asset a node draws
+     *
+     * The mesh's primitives are merged, one run per material, so a file's mesh is a mesh here too
+     * however many primitives it was authored in.
+     *
+     * @param node The node that draws the mesh
      * @param meshIndex The glTF mesh to build
      * @param skeleton The skeleton this node's skin names, or INVALID_ASSET_HANDLE if it has none
      * @param skin The skin this node is bound through, whose bind pose its primitives are authored in
@@ -87,8 +77,28 @@ class glTF2Loader {
      */
     bool loadMesh(glTF_SceneNode *node, size_t meshIndex, AssetHandle skeleton, size_t skin);
 
-    bool decodePrimitive(yyjson_val *primitiveJson, size_t meshIndex, size_t primitiveIndex, AssetHandle skeleton,
-                         size_t skin, PrimitiveData &out);
+    /**
+     * @brief Reads one primitive's attributes, indices and material, leaving them unmerged
+     * @param primitiveJson The primitive to read
+     * @param skeleton The skeleton the mesh is bound to, or INVALID_ASSET_HANDLE if it is not skinned
+     * @param out Filled in from the primitive
+     * @return True if the primitive holds geometry
+     */
+    bool decodePrimitive(yyjson_val *primitiveJson, AssetHandle skeleton, glTF_DecodedPrimitive &out);
+
+    /**
+     * @brief Builds the one mesh asset a glTF mesh's primitives describe between them
+     *
+     * The primitives are concatenated into a single pair of buffers, grouped so that everything
+     * drawn with one material forms one run and the mesh carries a slot per distinct material.
+     *
+     * @param primitives The decoded primitives of one glTF mesh
+     * @param meshIndex The glTF mesh they came from, which names the asset
+     * @param skeleton The skeleton the mesh is bound to, or INVALID_ASSET_HANDLE if it is not skinned
+     * @param skin The skin the mesh is bound through, whose bind pose it is authored in
+     * @return The imported asset, or null if the primitives hold nothing drawable
+     */
+    AssetRef mergePrimitives(std::vector<glTF_DecodedPrimitive> &primitives, size_t meshIndex, AssetHandle skeleton, size_t skin);
 
     /**
      * @brief Builds the scene objects one glTF node subtree describes
@@ -126,7 +136,6 @@ class glTF2Loader {
      * @return The material, or the default material where the index names nothing loaded
      */
     AssetHandle primitiveMaterial(int32_t materialIndex) const;
-
 
     void loadAccessor(yyjson_val *accessorVal, std::vector<uint8_t> &dataVec);
     void cleanUp();
@@ -175,7 +184,8 @@ class glTF2Loader {
     yyjson_val *m_images = nullptr;
     yyjson_val *m_samplers = nullptr;
 
-    std::unordered_map<size_t, std::vector<PrimitiveData>> m_meshCache; ///< glTF mesh index -> decoded primitives
+    /// glTF mesh index -> the merged asset built for it, so nodes sharing a mesh share one asset
+    std::unordered_map<size_t, AssetRef> m_meshCache;
 
     /// skeleton asset -> the bind pose each skinned mesh under it is bound against
     // keyed by skin, since a bind pose belongs to the binding of one mesh to a skeleton rather than

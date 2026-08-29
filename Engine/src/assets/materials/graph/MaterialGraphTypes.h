@@ -134,37 +134,23 @@ enum class GraphNodeType {
     SURFACE_OUTPUT,
 };
 
-#define RP_GRAPH_NODE_TYPES(X)                                                                                                  \
-    X(NONE)                                                                                                                     \
-    X(POSITION) X(NORMAL) X(TANGENT) X(BITANGENT) X(TEXCOORD)                                                                   \
-    X(CONSTANT_FLOAT) X(CONSTANT_INT) X(CONSTANT_VEC2) X(CONSTANT_VEC3) X(CONSTANT_VEC4)                                        \
-    X(TEXTURE_SAMPLE)                                                                                                           \
-    X(TEXTURE_WHITE_NOISE) X(TEXTURE_PERLIN) X(TEXTURE_SIMPLEX) X(TEXTURE_RIDGED)                                               \
-    X(ADD_FLOAT) X(ADD_VEC3) X(ADD_INT)                                                                                         \
-    X(SUBTRACT_FLOAT) X(SUBTRACT_VEC3) X(SUBTRACT_INT)                                                                          \
-    X(MULTIPLY_FLOAT) X(MULTIPLY_VEC3) X(MULTIPLY_INT)                                                                          \
-    X(DIVIDE_FLOAT) X(DIVIDE_VEC3) X(DIVIDE_INT)                                                                                \
-    X(ABS_FLOAT) X(ABS_VEC3) X(ABS_INT)                                                                                         \
-    X(MIN_FLOAT) X(MIN_VEC3) X(MIN_INT)                                                                                         \
-    X(MAX_FLOAT) X(MAX_VEC3) X(MAX_INT)                                                                                         \
-    X(CLAMP_FLOAT) X(CLAMP_VEC3) X(CLAMP_INT)                                                                                   \
-    X(SATURATE_FLOAT) X(SATURATE_VEC3)                                                                                          \
-    X(MIX_FLOAT) X(MIX_VEC3)                                                                                                    \
-    X(STEP_FLOAT) X(STEP_VEC3)                                                                                                  \
-    X(SMOOTHSTEP_FLOAT) X(SMOOTHSTEP_VEC3)                                                                                      \
-    X(FRACT_FLOAT) X(FRACT_VEC3)                                                                                                \
-    X(POWER_FLOAT) X(POWER_VEC3)                                                                                                \
-    X(SQRT_FLOAT) X(SQRT_VEC3)                                                                                                  \
-    X(SIN_FLOAT) X(SIN_VEC3)                                                                                                    \
-    X(COS_FLOAT) X(COS_VEC3)                                                                                                    \
-    X(DOT_VEC3) X(CROSS_VEC3) X(NORMALIZE_VEC3) X(LENGTH_VEC3) X(DISTANCE_VEC3)                                                 \
-    X(COMBINE_VEC2) X(COMBINE_VEC3) X(COMBINE_VEC4)                                                                             \
-    X(SPLIT_VEC2) X(SPLIT_VEC3) X(SPLIT_VEC4)                                                                                   \
-    X(NORMAL_MAP) X(NORMAL_MAP_RG) X(LUMINANCE) X(REMAP_FLOAT)                                                                  \
-    X(SLOPE) X(FACING_ANGLE) X(TRIPLANAR_SAMPLE) X(TRIPLANAR_NORMAL) X(HEIGHT_BLEND_WEIGHT)                                     \
-    X(TERRAIN_HEIGHT) X(TERRAIN_CURVATURE) X(TERRAIN_LOD)                                                                       \
-    X(TERRAIN_EROSION) X(TERRAIN_CONTINENTALNESS) X(TERRAIN_PEAKS_VALLEYS)                                                      \
-    X(SURFACE_OUTPUT)
+#define RP_GRAPH_NODE_TYPES(X)                                                                                                    \
+    X(NONE)                                                                                                                       \
+    X(POSITION)                                                                                                                   \
+    X(NORMAL) X(TANGENT) X(BITANGENT) X(TEXCOORD) X(CONSTANT_FLOAT) X(CONSTANT_INT) X(CONSTANT_VEC2) X(CONSTANT_VEC3)             \
+        X(CONSTANT_VEC4) X(TEXTURE_SAMPLE) X(TEXTURE_WHITE_NOISE) X(TEXTURE_PERLIN) X(TEXTURE_SIMPLEX) X(TEXTURE_RIDGED)          \
+            X(ADD_FLOAT) X(ADD_VEC3) X(ADD_INT) X(SUBTRACT_FLOAT) X(SUBTRACT_VEC3) X(SUBTRACT_INT) X(MULTIPLY_FLOAT)              \
+                X(MULTIPLY_VEC3) X(MULTIPLY_INT) X(DIVIDE_FLOAT) X(DIVIDE_VEC3) X(DIVIDE_INT) X(ABS_FLOAT) X(ABS_VEC3) X(ABS_INT) \
+                    X(MIN_FLOAT) X(MIN_VEC3) X(MIN_INT) X(MAX_FLOAT) X(MAX_VEC3) X(MAX_INT) X(CLAMP_FLOAT) X(CLAMP_VEC3)          \
+                        X(CLAMP_INT) X(SATURATE_FLOAT) X(SATURATE_VEC3) X(MIX_FLOAT) X(MIX_VEC3) X(STEP_FLOAT) X(STEP_VEC3)       \
+                            X(SMOOTHSTEP_FLOAT) X(SMOOTHSTEP_VEC3) X(FRACT_FLOAT) X(FRACT_VEC3) X(POWER_FLOAT) X(POWER_VEC3)      \
+                                X(SQRT_FLOAT) X(SQRT_VEC3) X(SIN_FLOAT) X(SIN_VEC3) X(COS_FLOAT) X(COS_VEC3) X(DOT_VEC3)          \
+                                    X(CROSS_VEC3) X(NORMALIZE_VEC3) X(LENGTH_VEC3) X(DISTANCE_VEC3) X(COMBINE_VEC2)               \
+                                        X(COMBINE_VEC3) X(COMBINE_VEC4) X(SPLIT_VEC2) X(SPLIT_VEC3) X(SPLIT_VEC4) X(NORMAL_MAP)   \
+                                            X(NORMAL_MAP_RG) X(LUMINANCE) X(REMAP_FLOAT) X(SLOPE) X(FACING_ANGLE)                 \
+                                                X(TRIPLANAR_SAMPLE) X(TRIPLANAR_NORMAL) X(HEIGHT_BLEND_WEIGHT) X(TERRAIN_HEIGHT)  \
+                                                    X(TERRAIN_CURVATURE) X(TERRAIN_LOD) X(TERRAIN_EROSION)                        \
+                                                        X(TERRAIN_CONTINENTALNESS) X(TERRAIN_PEAKS_VALLEYS) X(SURFACE_OUTPUT)
 
 /**
  * @brief A pin default stored as whichever scalar or vector type the pin uses

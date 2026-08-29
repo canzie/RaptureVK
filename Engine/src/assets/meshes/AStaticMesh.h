@@ -11,12 +11,12 @@
 namespace Rapture {
 
 /**
- * @brief A static mesh asset: geometry drawn with no deformation, and the material it defaults to
+ * @brief A static mesh asset: geometry drawn with no deformation, and the materials its runs default to
  */
 class AStaticMesh : public AMesh {
   public:
-    AStaticMesh(MeshAllocatorParams &params, AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE);
-    AStaticMesh(StaticMesh geometry, AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE);
+    AStaticMesh(MeshAllocatorParams &params, std::vector<AssetHandle> materialSlots = {});
+    AStaticMesh(StaticMesh geometry, std::vector<AssetHandle> materialSlots = {});
 
     static const TypeInfo &staticType();
     const TypeInfo &type() const override;
@@ -33,10 +33,10 @@ class AStaticMesh : public AMesh {
     /**
      * @brief Serializes geometry that has not been uploaded yet, skipping the read back off the GPU
      * @param params The mesh data to write
-     * @param defaultMaterial The material the asset defaults to
+     * @param materialSlots The materials the asset's runs default to
      * @return The serialized bytes
      */
-    static std::vector<uint8_t> serializeParams(const MeshAllocatorParams &params, AssetHandle defaultMaterial);
+    static std::vector<uint8_t> serializeParams(const MeshAllocatorParams &params, const std::vector<AssetHandle> &materialSlots);
 
     /**
      * @brief Builds a static mesh asset from a blob produced by serialize

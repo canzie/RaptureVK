@@ -22,14 +22,14 @@ namespace Rapture {
 
 struct StaticMeshImportData {
     MeshAllocatorParams params;
-    AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE;
+    std::vector<AssetHandle> materialSlots;
 };
 
 struct SkeletalMeshImportData {
     MeshAllocatorParams params;
     AssetHandle skeleton = INVALID_ASSET_HANDLE;
     std::vector<glm::mat4> inverseBindMatrices;
-    AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE;
+    std::vector<AssetHandle> materialSlots;
 };
 
 struct ModuleImportData {

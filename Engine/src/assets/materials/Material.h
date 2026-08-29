@@ -3,10 +3,10 @@
 
 #include "MaterialData.h"
 #include "MaterialParameters.h"
-#include "assets/asset_manager/AssetCommon.h"
 #include "assets/asset_manager/Asset.h"
-#include "gpu/buffers/VirtualStorageBuffer.h"
+#include "assets/asset_manager/AssetCommon.h"
 #include "core/events/Events.h"
+#include "gpu/buffers/VirtualStorageBuffer.h"
 #include "graph/MaterialGraph.h"
 
 #include <filesystem>
@@ -82,9 +82,8 @@ class MaterialManager {
     static void shutdown();
 
     static Ref<AMaterial> getMaterial(const std::string &name);
-    static Ref<AMaterial> createMaterial(const std::string &name, uint32_t graphId,
-                                         std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
-                                         std::filesystem::path outputFolder);
+    static Ref<AMaterial> createMaterial(const std::string &name, uint32_t graphId, std::unordered_map<ParameterId, uint32_t> table,
+                                         MaterialGraph graph, std::filesystem::path outputFolder);
     static Ref<AMaterial> createBuiltinMaterial(const std::string &name, uint32_t graphId,
                                                 std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph,
                                                 AssetHandle reservedHandle);

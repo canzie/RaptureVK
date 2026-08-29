@@ -34,13 +34,15 @@ class MeshMaterialAssetEditor : public AssetEditorBase {
 
   private:
     /**
-     * @brief Points the open mesh at a material and writes it back to disk
-     * @param material The material to default to
+     * @brief Points one of the open mesh's slots at a material and writes it back to disk
+     * @param slot The slot to set
+     * @param material The material the slot is to default to
      */
-    void applyDefaultMaterial(Rapture::AssetHandle material);
+    void applyMaterialSlot(uint32_t slot, Rapture::AssetHandle material);
 
   private:
-    std::optional<AssetPicker> m_materialPicker;
+    /// one per run of the mesh, so a mesh drawn with several materials can default each of them
+    std::vector<std::optional<AssetPicker>> m_materialPickers;
 };
 
 /**

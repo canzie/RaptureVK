@@ -51,7 +51,7 @@ void SkeletalMesh3D::setMesh(AssetHandle _mesh)
         m_mesh = _mesh;
     }
 
-    adoptDefaultMaterial(*ref);
+    adoptMaterialSlots(*ref);
 
     writePose();
 }
