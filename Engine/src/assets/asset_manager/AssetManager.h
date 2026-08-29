@@ -127,6 +127,13 @@ class AssetManager {
 
     static AssetHandle findAssetByPath(const std::filesystem::path &path) { return s_activeAssetManager->findAssetByPath(path); }
 
+    static void markSourceChanged(const std::filesystem::path &sourcePath)
+    {
+        s_activeAssetManager->markSourceChanged(sourcePath);
+    }
+
+    static bool reimportIfSourceChanged(AssetHandle handle) { return s_activeAssetManager->reimportIfSourceChanged(handle); }
+
     static AssetRef importDefaultAsset(AssetType assetType)
     {
         return AssetRef(s_activeAssetManager->importDefaultAsset(assetType));

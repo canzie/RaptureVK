@@ -13,6 +13,7 @@
 #include "assets/meshes/AStaticMesh.h"
 #include "assets/meshes/MeshPrimitives.h"
 #include "assets/modules/AModule.h"
+#include "assets/scripts/AScript.h"
 #include "assets/skeletons/ASkeleton.h"
 #include "assets/textures/ATexture.h"
 #include "assets/worlds/AWorld.h"
@@ -83,7 +84,7 @@ static std::unique_ptr<Asset> s_deserializeAsset(const AssetMetadata &metadata, 
         return nullptr;
     }
 
-    return assetClass->deserialize(payload);
+    return assetClass->deserialize(metadata, payload);
 }
 
 static std::unique_ptr<Asset> s_buildImportData(AssetImportDataVariant &data, std::vector<uint8_t> &payload, AssetType &type)
@@ -127,6 +128,13 @@ static std::unique_ptr<Asset> s_buildImportData(AssetImportDataVariant &data, st
         payload = skeleton->serialize();
         type = ASSET_SKELETON;
         return skeleton;
+    }
+    if (auto *scriptData = std::get_if<ScriptImportData>(&data)) {
+        type = ASSET_SCRIPT;
+        if (scriptData->sourceIsInline) {
+            payload.assign(scriptData->source.begin(), scriptData->source.end());
+        }
+        return std::make_unique<AScript>(std::move(scriptData->source), scriptData->sourceIsInline);
     }
 
     type = ASSET_NONE;
@@ -238,8 +246,7 @@ Asset *AssetManagerEditor::importAsset(const AssetImportFileRequest &request)
         return nullptr;
     }
 
-    // The load is asynchronous, so the empty payload defers the asset file write until it finishes
-    return registerImportedAsset(handle, std::move(asset), std::move(metadata), request.output, {});
+    return registerLoadingAsset(handle, std::move(asset), std::move(metadata), request.output);
 }
 
 Asset *AssetManagerEditor::importAsset(AssetImportDataRequest request)
@@ -391,6 +398,8 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
         return ASSET_MATERIAL;
     } else if (extension == ".spv" || extension == ".glsl") {
         return ASSET_SHADER;
+    } else if (extension == ".lua") {
+        return ASSET_SCRIPT;
     }
 
     RP_CORE_WARN("Unknown asset type for extension: {}", extension);
@@ -471,12 +480,10 @@ std::unique_ptr<Asset> AssetManagerEditor::loadFromMetadata(AssetHandle handle, 
 {
     if (!metadata.assetPath.empty() && std::filesystem::exists(metadata.assetPath)) {
         std::vector<uint8_t> payload = AssetCodec::readRaptureAssetPayload(metadata.assetPath);
-        if (!payload.empty()) {
-            if (std::unique_ptr<Asset> asset = s_deserializeAsset(metadata, payload)) {
-                asset->setHandle(handle);
-                asset->setStatus(AssetStatus::LOADED);
-                return asset;
-            }
+        if (std::unique_ptr<Asset> asset = s_deserializeAsset(metadata, payload)) {
+            asset->setHandle(handle);
+            asset->setStatus(AssetStatus::LOADED);
+            return asset;
         }
         RP_CORE_WARN("Failed to load '{}' from its asset file, falling back to the source file", metadata.getName());
     }
@@ -490,22 +497,32 @@ Asset *AssetManagerEditor::registerImportedAsset(AssetHandle handle, std::unique
 {
     metadata->sizeHintBytes = s_assetSizeHint(*asset);
 
-    bool deferWrite = false;
     if (outputFolder.empty()) {
-        // Shaders keep their native format, everything else is expected to own an asset file
-        if (metadata->assetType != ASSET_SHADER) {
-            RP_CORE_ERROR("No output folder provided for '{}'", metadata->name);
-        }
-    } else if (!payload.empty()) {
-        writeRaptureAssetFile(handle, outputFolder, *metadata, payload);
+        RP_CORE_ERROR("No output folder provided for '{}'", metadata->name);
     } else {
-        deferWrite = true;
+        writeRaptureAssetFile(handle, outputFolder, *metadata, payload);
+    }
+
+    AssetSlot &slot = m_assets.insert(handle, std::move(metadata));
+    slot.asset = std::move(asset);
+    return slot.asset.get();
+}
+
+Asset *AssetManagerEditor::registerLoadingAsset(AssetHandle handle, std::unique_ptr<Asset> asset,
+                                                std::unique_ptr<AssetMetadata> metadata, const std::filesystem::path &outputFolder)
+{
+    metadata->sizeHintBytes = s_assetSizeHint(*asset);
+
+    // Shaders keep their native format, everything else is expected to own an asset file
+    bool wantsAssetFile = !outputFolder.empty();
+    if (!wantsAssetFile && metadata->assetType != ASSET_SHADER) {
+        RP_CORE_ERROR("No output folder provided for '{}'", metadata->name);
     }
 
     AssetSlot &slot = m_assets.insert(handle, std::move(metadata));
     slot.asset = std::move(asset);
 
-    if (deferWrite) {
+    if (wantsAssetFile) {
         m_pendingWrites.push_back({AssetRef(slot.asset.get()), outputFolder});
     }
 
@@ -593,6 +610,40 @@ AssetHandle AssetManagerEditor::findAssetByPath(const std::filesystem::path &pat
         return INVALID_ASSET_HANDLE;
     }
     return it->second;
+}
+
+void AssetManagerEditor::markSourceChanged(const std::filesystem::path &sourcePath)
+{
+    // the hash alone, since a collision only costs whoever asks an extra read of a file that is
+    // already on disk, and the paths themselves would sit here for the life of the project
+    m_changedSources.insert(s_hashPath(sourcePath));
+}
+
+bool AssetManagerEditor::reimportIfSourceChanged(AssetHandle handle)
+{
+    AssetSlot *slot = m_assets.find(handle);
+    if (slot == nullptr || slot->asset == nullptr || slot->metadata == nullptr) {
+        return false;
+    }
+
+    std::filesystem::path sourcePath = slot->metadata->getSourcePath();
+    if (sourcePath.empty()) {
+        return false;
+    }
+
+    auto it = m_changedSources.find(s_hashPath(sourcePath));
+    if (it == m_changedSources.end()) {
+        return false;
+    }
+
+    m_changedSources.erase(it);
+
+    if (!slot->asset->reimport(*slot->metadata)) {
+        return false;
+    }
+
+    RP_CORE_INFO("Read '{}' again, '{}' had changed", slot->metadata->getName(), sourcePath.string());
+    return true;
 }
 
 void AssetManagerEditor::ensureDeferredFreeBuckets()
@@ -693,10 +744,6 @@ bool AssetManagerEditor::saveAsset(AssetHandle handle, const std::filesystem::pa
 
     AssetMetadata &metadata = *slot->metadata;
     std::vector<uint8_t> payload = slot->asset->serialize();
-    if (payload.empty()) {
-        RP_CORE_ERROR("Failed to serialize '{}'", metadata.getName());
-        return false;
-    }
 
     if (metadata.assetPath.empty()) {
         metadata.storageType = AssetStorageType::DISK;
@@ -714,11 +761,6 @@ bool AssetManagerEditor::saveAsset(AssetHandle handle, const std::filesystem::pa
 void AssetManagerEditor::writeRaptureAssetFile(AssetHandle handle, const std::filesystem::path &folder, AssetMetadata &metadata,
                                                std::span<const uint8_t> payload)
 {
-    if (payload.empty()) {
-        RP_CORE_ERROR("Failed to serialize '{}'", metadata.getName());
-        return;
-    }
-
     // The display name keeps its spaces, the on-disk file name does not
     std::string fileName = metadata.getName();
     std::replace(fileName.begin(), fileName.end(), ' ', '_');

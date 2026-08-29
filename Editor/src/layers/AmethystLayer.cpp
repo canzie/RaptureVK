@@ -15,6 +15,7 @@
 #include "layers/workspaces/LevelEditorWorkspace.h"
 #include "layers/workspaces/MaterialEditorWorkspace.h"
 #include "layers/workspaces/ModuleEditorWorkspace.h"
+#include "layers/workspaces/ScriptingWorkspace.h"
 #include "layers/workspaces/SkeletalMeshWorkspace.h"
 #include "layers/workspaces/SkeletonWorkspace.h"
 #include "layers/workspaces/StaticMeshWorkspace.h"
@@ -226,6 +227,30 @@ void AmethystLayer::openLevelEditor()
     openAssetWorkspace(Rapture::Application::getInstance().getProject().getStartupWorld());
 }
 
+ScriptingWorkspace *AmethystLayer::openScriptingWorkspace()
+{
+    if (m_workspaceTabBar == nullptr) {
+        return nullptr;
+    }
+
+    for (auto &ws : m_workspaces) {
+        if (ws->kind == ScriptingWorkspace::staticKind()) {
+            auto *scripting = static_cast<ScriptingWorkspace *>(ws.get());
+            m_workspaceTabBar->select(scripting->getContainer());
+            return scripting;
+        }
+    }
+
+    auto workspace = std::make_unique<ScriptingWorkspace>(*m_workspaceTabBar, buildServices());
+    sizeDockingLayer(*workspace);
+
+    ScriptingWorkspace *scripting = workspace.get();
+    Amethyst::Frame *container = workspace->getContainer();
+    m_workspaces.push_back(std::move(workspace));
+    m_workspaceTabBar->select(container);
+    return scripting;
+}
+
 void AmethystLayer::openStoredWorkspace(const EditorWorkspaceState &entry)
 {
     if (entry.handle != Rapture::INVALID_ASSET_HANDLE) {
@@ -241,6 +266,8 @@ void AmethystLayer::openStoredWorkspace(const EditorWorkspaceState &entry)
         m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(*m_workspaceTabBar, services));
     } else if (entry.kind == AnimationsWorkspace::staticKind()) {
         m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(*m_workspaceTabBar, services));
+    } else if (entry.kind == ScriptingWorkspace::staticKind()) {
+        m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(*m_workspaceTabBar, services));
     } else {
         RP_WARN("dropping stored workspace '{}', this build has no such workspace", entry.kind);
     }
@@ -484,6 +511,15 @@ void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
     const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(handle);
     PanelServices services = buildServices();
     std::unique_ptr<Workspace> workspace;
+
+    // every script is written in the one scripting workspace, which holds a tab per open script
+    if (metadata.assetType == Rapture::ASSET_SCRIPT) {
+        ScriptingWorkspace *scripting = openScriptingWorkspace();
+        if (scripting != nullptr) {
+            scripting->openScript(handle);
+        }
+        return;
+    }
 
     switch (metadata.assetType) {
     case Rapture::ASSET_MODULE:

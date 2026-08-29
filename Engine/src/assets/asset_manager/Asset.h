@@ -81,6 +81,21 @@ class Asset : public RefCounted {
     bool isValid() const { return status() != AssetStatus::FAILED; }
 
     /**
+     * @brief Reads this asset again from the file it was imported from, in place
+     *
+     * In place, because everything holding a Ref to this goes on holding it. A class that cannot be
+     * refilled without being rebuilt does not override this and is reloaded by being evicted.
+     *
+     * @param metadata This asset's metadata, whose provenance names the file to read
+     * @return True if this asset now holds what that file holds
+     */
+    virtual bool reimport(const AssetMetadata &metadata)
+    {
+        (void)metadata;
+        return false;
+    }
+
+    /**
      * @brief Writes this asset into the payload its asset file holds
      * @return The serialized bytes, empty if this asset holds nothing to write
      */

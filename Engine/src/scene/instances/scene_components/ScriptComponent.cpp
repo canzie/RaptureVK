@@ -1,5 +1,7 @@
 #include "ScriptComponent.h"
 
+#include "assets/asset_manager/AssetManager.h"
+#include "core/utils/Log.h"
 #include "core/utils/rp_assert.h"
 #include "scene/Scene.h"
 #include "scene/components/Components.h"
@@ -7,8 +9,7 @@
 
 namespace Rapture {
 
-static constexpr std::string_view KEY_SOURCE = "source";
-static constexpr std::string_view KEY_EXTERNAL_PATH = "externalPath";
+static constexpr std::string_view KEY_SCRIPT = "script";
 
 ScriptComponent::ScriptComponent(Scene &scene, std::string_view name) : SceneComponent(scene, name) {}
 
@@ -23,16 +24,25 @@ const TypeInfo &ScriptComponent::type() const
     return staticType();
 }
 
-void ScriptComponent::setSource(std::string_view source)
+void ScriptComponent::setScript(AssetHandle script)
 {
-    m_source = source;
-    m_externalDirty = false;
+    if (m_script == script) {
+        return;
+    }
+
+    Ref<AScript> asset = AssetManager::getAsset<AScript>(script);
+    if (!asset) {
+        RP_CORE_ERROR("script {} could not be resolved for '{}'", script, name());
+        return;
+    }
+
+    m_scriptAsset = std::move(asset);
+    m_script = script;
 }
 
-void ScriptComponent::setExternalPath(std::filesystem::path path)
+std::string_view ScriptComponent::source() const
 {
-    m_externalPath = std::move(path);
-    m_externalDirty = false;
+    return m_scriptAsset ? m_scriptAsset->source() : std::string_view{};
 }
 
 void ScriptComponent::onAttach()
@@ -61,22 +71,17 @@ void ScriptComponent::serialize(WriteNode node) const
 {
     SceneComponent::serialize(node);
 
-    node.set(KEY_SOURCE, std::string_view(m_source));
-
-    if (!m_externalPath.empty()) {
-        node.set(KEY_EXTERNAL_PATH, m_externalPath.string());
-    }
+    node.set(KEY_SCRIPT, m_script);
 }
 
 void ScriptComponent::deserialize(ReadNode node)
 {
     SceneComponent::deserialize(node);
 
-    m_source = node.child(KEY_SOURCE).asString();
-
-    std::string_view path = node.child(KEY_EXTERNAL_PATH).asString();
-    m_externalPath = path.empty() ? std::filesystem::path() : std::filesystem::path(path);
-    m_externalDirty = false;
+    AssetHandle script = node.child(KEY_SCRIPT).asU64(INVALID_ASSET_HANDLE);
+    if (script != INVALID_ASSET_HANDLE) {
+        setScript(script);
+    }
 }
 
 } // namespace Rapture

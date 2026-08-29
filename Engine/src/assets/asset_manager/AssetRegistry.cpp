@@ -6,6 +6,7 @@
 #include "assets/meshes/ASkeletalMesh.h"
 #include "assets/meshes/AStaticMesh.h"
 #include "assets/modules/AModule.h"
+#include "assets/scripts/AScript.h"
 #include "assets/shaders/AShader.h"
 #include "assets/skeletons/ASkeleton.h"
 #include "assets/textures/ATexture.h"
@@ -35,7 +36,7 @@ static constexpr std::array<AssetClass, ASSET_TYPE_COUNT> ASSET_CLASSES = {{
      .fileMagic = Asset_fourCC("TEX "),
      .fileExtension = ".rtex",
      .displayName = "Texture",
-     .deserialize = [](std::span<const uint8_t> payload) { return s_wrap<ATexture>(Texture::deserialize(payload)); },
+     .deserialize = [](const AssetMetadata &, std::span<const uint8_t> payload) { return s_wrap<ATexture>(Texture::deserialize(payload)); },
      .import = Asset_importTexture},
 
     {.assetType = ASSET_CUBEMAP,
@@ -54,33 +55,33 @@ static constexpr std::array<AssetClass, ASSET_TYPE_COUNT> ASSET_CLASSES = {{
      .fileMagic = Asset_fourCC("MTL "),
      .fileExtension = ".rmat",
      .displayName = "Material",
-     .deserialize = [](std::span<const uint8_t> payload) { return s_wrap<AMaterial>(BaseMaterial::deserialize(payload)); }},
+     .deserialize = [](const AssetMetadata &, std::span<const uint8_t> payload) { return s_wrap<AMaterial>(BaseMaterial::deserialize(payload)); }},
 
     {.assetType = ASSET_MATERIAL_INSTANCE,
      .fileMagic = Asset_fourCC("MTLI"),
      .fileExtension = ".rmat",
      .displayName = "Material Instance",
      .deserialize =
-         [](std::span<const uint8_t> payload) { return s_wrap<AMaterialInstance>(MaterialInstance::deserialize(payload)); },
+         [](const AssetMetadata &, std::span<const uint8_t> payload) { return s_wrap<AMaterialInstance>(MaterialInstance::deserialize(payload)); },
      .import = Asset_importMaterialInstance},
 
     {.assetType = ASSET_STATIC_MESH,
      .fileMagic = Asset_fourCC("MESH"),
      .fileExtension = ".rmesh",
      .displayName = "Static Mesh",
-     .deserialize = [](std::span<const uint8_t> payload) -> std::unique_ptr<Asset> { return AStaticMesh::deserialize(payload); }},
+     .deserialize = [](const AssetMetadata &, std::span<const uint8_t> payload) -> std::unique_ptr<Asset> { return AStaticMesh::deserialize(payload); }},
 
     {.assetType = ASSET_SKELETAL_MESH,
      .fileMagic = Asset_fourCC("SKMH"),
      .fileExtension = ".rmesh",
      .displayName = "Skeletal Mesh",
-     .deserialize = [](std::span<const uint8_t> payload) -> std::unique_ptr<Asset> { return ASkeletalMesh::deserialize(payload); }},
+     .deserialize = [](const AssetMetadata &, std::span<const uint8_t> payload) -> std::unique_ptr<Asset> { return ASkeletalMesh::deserialize(payload); }},
 
     {.assetType = ASSET_MODULE,
      .fileMagic = Asset_fourCC("MODL"),
      .fileExtension = ".rmod",
      .displayName = "Module",
-     .deserialize = [](std::span<const uint8_t> payload) -> std::unique_ptr<Asset> {
+     .deserialize = [](const AssetMetadata &, std::span<const uint8_t> payload) -> std::unique_ptr<Asset> {
          std::string_view text(reinterpret_cast<const char *>(payload.data()), payload.size());
          auto document = std::make_unique<SerialDocument>(SerialDocument::parse(text));
          if (!document->rootView().valid()) {
@@ -93,7 +94,7 @@ static constexpr std::array<AssetClass, ASSET_TYPE_COUNT> ASSET_CLASSES = {{
      .fileMagic = Asset_fourCC("SKEL"),
      .fileExtension = ".rskel",
      .displayName = "Skeleton",
-     .deserialize = [](std::span<const uint8_t> payload) -> std::unique_ptr<Asset> { return ASkeleton::deserialize(payload); }},
+     .deserialize = [](const AssetMetadata &, std::span<const uint8_t> payload) -> std::unique_ptr<Asset> { return ASkeleton::deserialize(payload); }},
 
     {.assetType = ASSET_ANIMATION, .fileMagic = Asset_fourCC("ANIM"), .fileExtension = ".ranim", .displayName = "Animation"},
 
@@ -105,7 +106,17 @@ static constexpr std::array<AssetClass, ASSET_TYPE_COUNT> ASSET_CLASSES = {{
      .fileMagic = Asset_fourCC("WRLD"),
      .fileExtension = ".rworld",
      .displayName = "World",
-     .deserialize = [](std::span<const uint8_t> payload) { return s_wrap<AWorld>(World::deserialize(payload)); }},
+     .deserialize = [](const AssetMetadata &, std::span<const uint8_t> payload) { return s_wrap<AWorld>(World::deserialize(payload)); }},
+
+    {.assetType = ASSET_SCRIPT,
+     .fileMagic = Asset_fourCC("LUA "),
+     .fileExtension = ".rscript",
+     .displayName = "Script",
+     .deserialize =
+         [](const AssetMetadata &metadata, std::span<const uint8_t> payload) -> std::unique_ptr<Asset> {
+             return AScript::deserialize(metadata, payload);
+         },
+     .import = Asset_importScript},
 }};
 
 // the table is read by indexing it with an AssetType, so an entry in the wrong slot would answer for another class

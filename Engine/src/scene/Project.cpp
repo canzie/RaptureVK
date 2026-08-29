@@ -29,6 +29,7 @@ Project::Project(const std::filesystem::path &projectDirectory, std::string_view
     RP_CORE_INFO("Opening project '{}' at '{}'", m_config.name, m_config.projectDirectory.string());
 
     createProjectDirectories();
+    watchContentDirectory();
 }
 
 void Project::createDefaultWorld()
@@ -116,8 +117,33 @@ bool Project::saveWorld(AssetHandle handle)
 
 void Project::onUpdate(float dt)
 {
+    if (m_contentWatcher) {
+        m_contentWatcher->poll();
+    }
+
     for (const Ref<AWorld> &world : m_worlds) {
         world->onUpdate(dt);
+    }
+}
+
+void Project::watchContentDirectory()
+{
+    m_contentWatcher = DirectoryWatcher::create(getContentDirectory(), true, [](const FileChange &change) {
+        switch (change.type) {
+        case FW_ADDED:
+        case FW_MODIFIED:
+        case FW_RENAMED:
+            AssetManager::markSourceChanged(change.path);
+            break;
+        case FW_REMOVED:
+        case FW_COUNT:
+            break;
+        }
+    });
+
+    if (!m_contentWatcher) {
+        RP_CORE_WARN("Could not watch '{}', files changed outside the editor will go unnoticed",
+                     getContentDirectory().string());
     }
 }
 

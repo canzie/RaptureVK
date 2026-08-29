@@ -5,6 +5,7 @@
 #include <memory>
 #include <span>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "concurrentqueue.h"
@@ -106,6 +107,23 @@ class AssetManagerEditor : public AssetManagerBase {
      */
     AssetHandle findAssetByPath(const std::filesystem::path &path) const;
 
+    /**
+     * @brief Records that a file some asset was imported from has changed on disk
+     *
+     * Nothing is read here. The file is only noted as having moved on, for whoever next wants the
+     * asset built from it to be current.
+     *
+     * @param sourcePath The file that changed
+     */
+    void markSourceChanged(const std::filesystem::path &sourcePath);
+
+    /**
+     * @brief Reads an asset again where the file it was imported from has changed since
+     * @param handle The asset to bring up to date
+     * @return True if the asset was read again
+     */
+    bool reimportIfSourceChanged(AssetHandle handle);
+
     void onUpdate();
 
     /**
@@ -141,16 +159,27 @@ class AssetManagerEditor : public AssetManagerBase {
                                std::span<const uint8_t> payload);
 
     /**
-     * @brief Registers a built asset, then writes its asset file now or defers it until its load finishes
+     * @brief Registers a built asset and writes its asset file
      * @param handle The asset handle
-     * @param asset The built asset, loaded or still loading
+     * @param asset The built asset
      * @param metadata The asset metadata
-     * @param outputFolder Directory the owned asset file is written into, empty to skip
-     * @param payload The serialized bytes for a synchronous write, empty to defer to the async load
+     * @param outputFolder Directory the owned asset file is written into
+     * @param payload The serialized asset bytes
      * @return The registered asset
      */
     Asset *registerImportedAsset(AssetHandle handle, std::unique_ptr<Asset> asset, std::unique_ptr<AssetMetadata> metadata,
                                  const std::filesystem::path &outputFolder, std::span<const uint8_t> payload);
+
+    /**
+     * @brief Registers an asset that is still loading, writing its asset file once the load finishes
+     * @param handle The asset handle
+     * @param asset The asset being loaded
+     * @param metadata The asset metadata
+     * @param outputFolder Directory the owned asset file is written into, empty for a type that owns no asset file
+     * @return The registered asset
+     */
+    Asset *registerLoadingAsset(AssetHandle handle, std::unique_ptr<Asset> asset, std::unique_ptr<AssetMetadata> metadata,
+                                const std::filesystem::path &outputFolder);
 
     /**
      * @brief Rebuilds an asset from its reload source described in the metadata
@@ -186,6 +215,9 @@ class AssetManagerEditor : public AssetManagerBase {
 
     // Hash of an asset file path to the handle registered at that path
     std::unordered_map<uint64_t, AssetHandle> m_pathIndex;
+
+    // Hashes of the source files that have changed since whoever uses them last read them
+    std::unordered_set<uint64_t> m_changedSources;
 
     std::vector<PendingWrite> m_pendingWrites;
 };

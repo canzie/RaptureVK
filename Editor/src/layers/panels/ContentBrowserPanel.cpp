@@ -642,6 +642,8 @@ MenuItems ContentBrowserPanel::buildAddMenuItems()
     items.push_back(
         AddAssetContextMenuAID::createAssetRow("Material", Rapture::ASSET_MATERIAL, []() { s_createAssetStub("material"); }));
     items.push_back(AddAssetContextMenuAID::createAssetRow("World", Rapture::ASSET_WORLD, []() { s_createAssetStub("world"); }));
+    items.push_back(AddAssetContextMenuAID::createAssetRow("Script", Rapture::ASSET_SCRIPT,
+                                                           [this]() { beginCreate(CONTENT_EDIT_SCRIPT); }));
 
     items.push_back(ViewportContextMenuSID::create("Create Advanced Asset"));
     for (auto &advanced : buildAdvancedAddItems()) {
@@ -702,8 +704,21 @@ void ContentBrowserPanel::beginCreate(ContentEditKind kind, const Rapture::TypeI
     m_edit = {};
     m_edit.kind = kind;
     m_edit.objectClass = objectClass;
-    m_edit.initialName = kind == CONTENT_EDIT_FOLDER ? s_uniqueFolderName(m_currentDirectory)
-                                                     : s_uniqueAssetName(m_currentDirectory, objectClass->name, Rapture::ASSET_MODULE);
+
+    switch (kind) {
+    case CONTENT_EDIT_FOLDER:
+        m_edit.initialName = s_uniqueFolderName(m_currentDirectory);
+        break;
+    case CONTENT_EDIT_MODULE:
+        m_edit.initialName = s_uniqueAssetName(m_currentDirectory, objectClass->name, Rapture::ASSET_MODULE);
+        break;
+    case CONTENT_EDIT_SCRIPT:
+        m_edit.initialName = s_uniqueAssetName(m_currentDirectory, "Script", Rapture::ASSET_SCRIPT);
+        break;
+    default:
+        break;
+    }
+
     refresh();
 }
 
@@ -764,6 +779,9 @@ void ContentBrowserPanel::commitEdit()
         case CONTENT_EDIT_MODULE:
             createModule(*edit.objectClass, name);
             break;
+        case CONTENT_EDIT_SCRIPT:
+            createScript(name);
+            break;
         case CONTENT_EDIT_RENAME:
             renameItem(edit.target, name);
             break;
@@ -797,6 +815,24 @@ void ContentBrowserPanel::createModule(const Rapture::TypeInfo &type, std::strin
 
     if (!Rapture::AssetManager::importAsset(std::move(request))) {
         RP_ERROR("Could not create a '{}' named '{}' in '{}'", type.name, name, m_currentDirectory.string());
+    }
+}
+
+void ContentBrowserPanel::createScript(std::string_view name)
+{
+    Rapture::AssetRef script = Rapture::AssetManager::importAsset(Rapture::AssetImportDataRequest{
+        .data = Rapture::ScriptImportData{},
+        .output = m_currentDirectory,
+        .name = std::string(name),
+    });
+
+    if (!script) {
+        RP_ERROR("Could not create a script named '{}' in '{}'", name, m_currentDirectory.string());
+        return;
+    }
+
+    if (m_services.openAssetWorkspace) {
+        m_services.openAssetWorkspace(script->handle());
     }
 }
 
@@ -1085,7 +1121,7 @@ void ContentBrowserPanel::refreshFileBrowser()
         index++;
     }
 
-    if (m_edit.kind == CONTENT_EDIT_FOLDER || m_edit.kind == CONTENT_EDIT_MODULE) {
+    if (m_edit.kind == CONTENT_EDIT_FOLDER || m_edit.kind == CONTENT_EDIT_MODULE || m_edit.kind == CONTENT_EDIT_SCRIPT) {
         auto &item = acquirePoolItem(index);
         item.container->setBaseProperties({.layoutOrder = static_cast<uint32_t>(index)});
         item.action->onMouseButton1ClickCb = nullptr;
@@ -1096,12 +1132,13 @@ void ContentBrowserPanel::refreshFileBrowser()
             layoutCardFooter(item, false);
             item.type->setBaseProperties({.visible = false});
         } else {
-            item.icon->setSvg(Asset_iconForType(Rapture::ASSET_MODULE, m_edit.objectClass));
+            Rapture::AssetType assetType = m_edit.kind == CONTENT_EDIT_MODULE ? Rapture::ASSET_MODULE : Rapture::ASSET_SCRIPT;
+            item.icon->setSvg(Asset_iconForType(assetType, m_edit.objectClass));
             item.icon->setImageStyleProperties({.imageColor = COL_ICON});
             layoutCardFooter(item, true);
-            item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(Rapture::ASSET_MODULE)});
+            item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(assetType)});
             item.type->setBaseProperties({.visible = true});
-            item.type->setText(s_typeLabel(Rapture::ASSET_MODULE, m_edit.objectClass));
+            item.type->setText(s_typeLabel(assetType, m_edit.objectClass));
         }
 
         m_edit.itemIndex = index;

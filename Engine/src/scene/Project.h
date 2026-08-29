@@ -3,6 +3,7 @@
 
 #include "assets/asset_manager/Asset.h"
 #include "assets/worlds/AWorld.h"
+#include "platform/FileWatcher.h"
 #include "scene/Scene.h"
 #include "scene/World.h"
 #include "core/serialization/SerialDocument.h"
@@ -145,11 +146,17 @@ class Project {
      */
     void openStartupWorld();
 
+    /**
+     * @brief Starts watching the content directory, noting every file that changes on disk
+     */
+    void watchContentDirectory();
+
   private:
     ProjectConfig m_config;
     SerialDocument m_editorSection;
     std::vector<Ref<AWorld>> m_worlds;
     SerialDocument m_saveFile;
+    std::unique_ptr<DirectoryWatcher> m_contentWatcher;
 };
 } // namespace Rapture
 

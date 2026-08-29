@@ -1,15 +1,20 @@
 #ifndef RAPTURE__SCRIPT_COMPONENT_H
 #define RAPTURE__SCRIPT_COMPONENT_H
 
+#include "assets/asset_manager/AssetCommon.h"
+#include "assets/scripts/AScript.h"
+#include "core/utils/Ref.h"
 #include "scene/instances/SceneComponent.h"
 
-#include <filesystem>
-#include <string>
+#include <string_view>
 
 namespace Rapture {
 
 /**
  * @brief The Lua the object this is attached to runs.
+ *
+ * The Lua itself is a script asset, so objects running the same script share one copy of it. What
+ * differs between them belongs here rather than in the asset.
  */
 class ScriptComponent : public SceneComponent {
   public:
@@ -21,32 +26,19 @@ class ScriptComponent : public SceneComponent {
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 
-    std::string_view source() const { return m_source; }
+    AssetHandle script() const { return m_script; }
 
     /**
      * @brief Replaces the script this runs
-     * @param source The Lua to run
+     * @param script The script asset to run
      */
-    void setSource(std::string_view source);
+    void setScript(AssetHandle script);
 
     /**
-     * @brief The file this script is checked out to for editing outside the editor
-     * @return The path, empty when the script only lives in the document
+     * @brief The Lua this runs
+     * @return The Lua, empty while this has no script
      */
-    const std::filesystem::path &externalPath() const { return m_externalPath; }
-
-    /**
-     * @brief Names the file this script is checked out to
-     * @param path The path, empty to keep the script in the document alone
-     */
-    void setExternalPath(std::filesystem::path path);
-
-    /**
-     * @brief Whether the checked out file has changed since this script was last read from it
-     */
-    bool isExternalDirty() const { return m_externalDirty; }
-
-    void setExternalDirty(bool dirty) { m_externalDirty = dirty; }
+    std::string_view source() const;
 
   protected:
     void onAttach() override;
@@ -54,9 +46,8 @@ class ScriptComponent : public SceneComponent {
     void onReady() override;
 
   private:
-    std::string m_source;
-    std::filesystem::path m_externalPath;
-    bool m_externalDirty = false;
+    AssetHandle m_script = INVALID_ASSET_HANDLE;
+    Ref<AScript> m_scriptAsset;
 };
 
 } // namespace Rapture

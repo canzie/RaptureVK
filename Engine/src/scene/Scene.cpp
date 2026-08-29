@@ -381,6 +381,7 @@ void Scene::beginSimulation()
         }
 
         if (ScriptComponent *script = ref.instance->component<ScriptComponent>()) {
+            AssetManager::reimportIfSourceChanged(script->script());
             m_scriptRuntime->runScript(*script);
         }
     }

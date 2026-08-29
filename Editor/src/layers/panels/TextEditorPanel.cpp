@@ -2,6 +2,7 @@
 
 #include "core/utils/Log.h"
 
+#include <assets/asset_manager/AssetManager.h>
 #include <components/ui_scope.h>
 #include <input/InputCodes.h>
 
@@ -101,6 +102,18 @@ void TextEditorPanel::buildToolbar(Amethyst::UIScope &scope)
                 });
 }
 
+void TextEditorPanel::loadText(const std::string &text)
+{
+    m_buffer.load(text);
+    m_savedRevision = m_buffer.revision();
+
+    if (m_editor != nullptr) {
+        m_editor->setCursorPosition({0, 0});
+        m_editor->scrollToLine(0);
+    }
+    refreshStatus();
+}
+
 bool TextEditorPanel::openFile(const std::filesystem::path &path)
 {
     std::string contents;
@@ -109,26 +122,62 @@ bool TextEditorPanel::openFile(const std::filesystem::path &path)
         return false;
     }
 
-    m_buffer.load(contents);
+    m_script = Rapture::INVALID_ASSET_HANDLE;
+    m_scriptAsset = {};
     m_path = path;
-    m_savedRevision = m_buffer.revision();
+    loadText(contents);
+    return true;
+}
 
-    if (m_editor != nullptr) {
-        m_editor->setCursorPosition({0, 0});
-        m_editor->scrollToLine(0);
+bool TextEditorPanel::openScript(Rapture::AssetHandle handle)
+{
+    Rapture::Ref<Rapture::AScript> script = Rapture::AssetManager::getAsset<Rapture::AScript>(handle);
+    if (!script) {
+        RP_ERROR("script {} could not be read", handle);
+        return false;
     }
-    refreshStatus();
+
+    m_script = handle;
+    m_path = script->isSourceInline() ? std::filesystem::path{}
+                                      : Rapture::AssetManager::getAssetMetadata(handle).getSourcePath();
+
+    std::string contents{script->source()};
+    m_scriptAsset = std::move(script);
+    loadText(contents);
     return true;
 }
 
 bool TextEditorPanel::save()
 {
+    if (m_scriptAsset) {
+        return saveScript();
+    }
+
     if (m_path.empty()) {
         RP_WARN("Nothing to save, no file is open");
         return false;
     }
 
     if (!s_writeFile(m_path, m_buffer.text())) {
+        RP_ERROR("Could not write {}", m_path.string());
+        return false;
+    }
+
+    m_savedRevision = m_buffer.revision();
+    refreshStatus();
+    return true;
+}
+
+bool TextEditorPanel::saveScript()
+{
+    std::string text = m_buffer.text();
+    m_scriptAsset->setSource(text);
+
+    if (m_scriptAsset->isSourceInline()) {
+        if (!Rapture::AssetManager::saveAsset(m_script, {})) {
+            return false;
+        }
+    } else if (!s_writeFile(m_path, text)) {
         RP_ERROR("Could not write {}", m_path.string());
         return false;
     }
@@ -145,13 +194,16 @@ void TextEditorPanel::refreshStatus()
     }
 
     std::string label;
-    if (m_path.empty()) {
+    if (m_scriptAsset) {
+        label = Rapture::AssetManager::getAssetMetadata(m_script).getName();
+    } else if (m_path.empty()) {
         label = "No file";
     } else {
         label = m_path.filename().string();
-        if (isModified()) {
-            label += " *";
-        }
+    }
+
+    if (isModified()) {
+        label += " *";
     }
 
     if (m_editor != nullptr) {

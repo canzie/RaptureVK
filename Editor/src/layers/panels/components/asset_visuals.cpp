@@ -62,6 +62,8 @@ Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
         return Amethyst::Color3(0.95f, 0.35f, 0.35f); // red
     case Rapture::ASSET_WORLD:
         return Amethyst::Color3(0.72f, 0.85f, 0.30f); // lime
+    case Rapture::ASSET_SCRIPT:
+        return Amethyst::Color3(0.35f, 0.75f, 0.85f); // cyan
     default:
         return Amethyst::Color3(0.55f, 0.55f, 0.55f); // gray
     }
@@ -111,6 +113,8 @@ const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *
         return Icons::SVG_CAMERA;
     case Rapture::ASSET_WORLD:
         return Icons::SVG_SCENE;
+    case Rapture::ASSET_SCRIPT:
+        return Icons::SVG_SCRIPT;
     default:
         return Icons::SVG_COPY;
     }

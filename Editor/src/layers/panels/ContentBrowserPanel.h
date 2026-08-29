@@ -56,6 +56,7 @@ class ContentBrowserPanel : public Panel {
         CONTENT_EDIT_NONE,
         CONTENT_EDIT_FOLDER,
         CONTENT_EDIT_MODULE,
+        CONTENT_EDIT_SCRIPT,
         CONTENT_EDIT_RENAME,
         CONTENT_EDIT_COUNT
     };
@@ -132,6 +133,12 @@ class ContentBrowserPanel : public Panel {
      * @param name The asset's name
      */
     void createModule(const Rapture::TypeInfo &type, std::string_view name);
+
+    /**
+     * @brief Creates a script holding an empty Lua body, and opens it
+     * @param name The asset's name
+     */
+    void createScript(std::string_view name);
 
     /**
      * @brief Renames a file or folder on disk

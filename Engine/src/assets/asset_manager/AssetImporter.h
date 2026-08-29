@@ -39,6 +39,14 @@ std::unique_ptr<Asset> Asset_importTexture(AssetMetadata &metadata, AssetHandle 
  */
 std::unique_ptr<Asset> Asset_importCubemap(AssetMetadata &metadata, AssetHandle handle);
 
+/**
+ * @brief Builds a script from the Lua file its metadata names
+ * @param metadata The asset's metadata, naming the Lua to read
+ * @param handle The handle the asset is registered under
+ * @return The imported asset, or nullptr if the Lua could not be read
+ */
+std::unique_ptr<Asset> Asset_importScript(AssetMetadata &metadata, AssetHandle handle);
+
 } // namespace Rapture
 
 #endif // RAPTURE__ASSET_IMPORTER_H

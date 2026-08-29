@@ -35,6 +35,7 @@ enum AssetType {
     ASSET_AUDIO,
     ASSET_VIDEO,
     ASSET_WORLD,
+    ASSET_SCRIPT,
     ASSET_TYPE_COUNT
 };
 

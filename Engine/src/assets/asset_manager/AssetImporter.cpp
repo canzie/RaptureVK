@@ -2,6 +2,7 @@
 
 #include "AssetHelpers.h"
 #include "assets/loaders/gltf/glTFCommon.h"
+#include "assets/scripts/AScript.h"
 #include "assets/shaders/AShader.h"
 #include "assets/textures/ATexture.h"
 #include "core/events/AssetEvents.h"
@@ -14,6 +15,7 @@
 #include "renderer/generators/textures/TextureCompressor.h"
 
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <regex>
 #include <span>
@@ -122,6 +124,21 @@ std::unique_ptr<Asset> Asset_importShader(AssetMetadata &metadata, AssetHandle h
     auto asset = std::make_unique<AShader>(std::move(shader));
     asset->setHandle(handle);
     asset->setStatus(asset->shader().isReady() ? AssetStatus::LOADED : AssetStatus::FAILED);
+
+    AssetEvents::onAssetLoaded().publish(handle);
+
+    return asset;
+}
+
+std::unique_ptr<Asset> Asset_importScript(AssetMetadata &metadata, AssetHandle handle)
+{
+    auto asset = std::make_unique<AScript>(std::string{}, false);
+    if (!asset->reimport(metadata)) {
+        return nullptr;
+    }
+
+    asset->setHandle(handle);
+    asset->setStatus(AssetStatus::LOADED);
 
     AssetEvents::onAssetLoaded().publish(handle);
 

@@ -27,6 +27,7 @@ class EditorState;
 struct EditorWorkspaceState;
 class FileBrowser;
 class ProjectLauncher;
+class ScriptingWorkspace;
 
 class AmethystLayer : public Rapture::Layer {
   public:
@@ -45,6 +46,12 @@ class AmethystLayer : public Rapture::Layer {
      * @brief Opens a level editor on the project's startup world
      */
     void openLevelEditor(void);
+
+    /**
+     * @brief Brings up the workspace scripts are written in, opening it if it is not up yet
+     * @return The workspace, or nullptr before the workspace bar is built
+     */
+    ScriptingWorkspace *openScriptingWorkspace(void);
 
     /**
      * @brief Reopens one workspace the editor had open, warning when this build cannot

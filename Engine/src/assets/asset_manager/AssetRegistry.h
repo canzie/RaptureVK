@@ -26,7 +26,7 @@ struct AssetClass {
     /**
      * @brief Builds an asset of this class from the payload its asset file holds
      */
-    std::unique_ptr<Asset> (*deserialize)(std::span<const uint8_t> payload) = nullptr;
+    std::unique_ptr<Asset> (*deserialize)(const AssetMetadata &metadata, std::span<const uint8_t> payload) = nullptr;
 
     /**
      * @brief Builds an asset of this class from the external file its metadata names
