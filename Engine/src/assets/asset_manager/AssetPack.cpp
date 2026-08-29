@@ -1,4 +1,4 @@
-// Parked: the packed `.rblob` partition store, the future runtime bake/export format.
+// Parked: the packed `.rpack` partition store, the future runtime bake/export format.
 //
 // It packs many opaque payloads into 64MB partition files keyed by asset handle. It stores no
 // registry/metadata, so it must be revamped to carry that before the runtime path is built. Kept
@@ -64,7 +64,7 @@ AssetCodec::AssetCodec(std::filesystem::path directory) : m_directory(std::move(
 std::filesystem::path AssetCodec::partitionPath(uint32_t index) const
 {
     char name[32];
-    std::snprintf(name, sizeof(name), "blob_%04u.rblob", index);
+    std::snprintf(name, sizeof(name), "pack_%04u.rpack", index);
     return m_directory / name;
 }
 
@@ -77,7 +77,7 @@ void AssetCodec::loadExistingPartitions()
 
     std::vector<std::filesystem::path> paths;
     for (const auto &entry : std::filesystem::directory_iterator(m_directory, ec)) {
-        if (entry.path().extension() == ".rblob") {
+        if (entry.path().extension() == ".rpack") {
             paths.push_back(entry.path());
         }
     }

@@ -119,6 +119,24 @@ std::unique_ptr<SceneObject> SceneObject::removeChild(SceneObject *child)
     return nullptr;
 }
 
+void SceneObject::destroyChild(SceneObject *child)
+{
+    RP_ASSERT(child != nullptr, "a scene object cannot destroy nothing");
+
+    for (size_t i = 0; i < m_children.size(); i++) {
+        if (m_children[i].get() != child) {
+            continue;
+        }
+
+        if (child->isInternal()) {
+            m_internalCount--;
+        }
+
+        m_children.erase(m_children.begin() + static_cast<ptrdiff_t>(i));
+        return;
+    }
+}
+
 void SceneObject::onParentChanged()
 {
     const bool includeInternal = true;
@@ -266,7 +284,7 @@ bool SceneObject::loadContents(const DocumentHeader &header, SceneLoadContext &c
     return true;
 }
 
-SceneObject *SceneObject::spawnSubtree(SceneObject &parent, ReadNode node)
+SceneObject *SceneObject::spawnSubtree(SceneObject &parent, ReadNode node, InternalMode internalMode)
 {
     if (parent.scene() == nullptr) {
         RP_CORE_ERROR("a subtree spawns into a scene, and '{}' is in none", parent.name());
@@ -276,7 +294,7 @@ SceneObject *SceneObject::spawnSubtree(SceneObject &parent, ReadNode node)
     // what spawns is its own object, not the one it was read from
     SceneLoadContext context(true);
 
-    SceneObject *root = loadSubtree(parent, node, context);
+    SceneObject *root = loadSubtree(parent, node, context, internalMode);
     if (root == nullptr) {
         RP_CORE_ERROR("subtree could not be read into the scene");
         return nullptr;
@@ -287,7 +305,7 @@ SceneObject *SceneObject::spawnSubtree(SceneObject &parent, ReadNode node)
     return root;
 }
 
-SceneObject *SceneObject::loadSubtree(SceneObject &parent, ReadNode node, SceneLoadContext &context)
+SceneObject *SceneObject::loadSubtree(SceneObject &parent, ReadNode node, SceneLoadContext &context, InternalMode internalMode)
 {
     DocumentHeader header = readHeader(node);
 
@@ -298,7 +316,7 @@ SceneObject *SceneObject::loadSubtree(SceneObject &parent, ReadNode node, SceneL
     }
 
     SceneObject *self = created.get();
-    parent.addChild(std::move(created));
+    parent.addChild(std::move(created), internalMode);
     context.addInstance(header.id, self);
     self->deserialize(node);
 
@@ -308,7 +326,7 @@ SceneObject *SceneObject::loadSubtree(SceneObject &parent, ReadNode node, SceneL
 
     if (!self->loadContents(header, context)) {
         // what was read before the failure is not left behind, and the parent takes itself out in turn
-        parent.removeChild(self);
+        parent.destroyChild(self);
         return nullptr;
     }
 

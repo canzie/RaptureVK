@@ -65,7 +65,7 @@ static std::vector<uint8_t> s_serializeAsset(Asset &asset, const AssetMetadata &
             return texture->serialize(metadata.getSourcePath().string());
         }
         break;
-    case ASSET_SCENE_OBJECT:
+    case ASSET_MODULE:
         if (SerialDocument *document = asset.getUnderlyingAsset<SerialDocument>()) {
             std::string text = document->toText();
             return std::vector<uint8_t>(text.begin(), text.end());
@@ -128,7 +128,7 @@ static bool s_deserializeAsset(Asset &asset, const AssetMetadata &metadata, std:
             return true;
         }
         break;
-    case ASSET_SCENE_OBJECT: {
+    case ASSET_MODULE: {
         std::string_view text(reinterpret_cast<const char *>(payload.data()), payload.size());
         auto document = std::make_unique<SerialDocument>(SerialDocument::parse(text));
         if (document->rootView().valid()) {
@@ -182,11 +182,11 @@ static AssetVariant s_buildImportData(AssetImportDataVariant &data, std::vector<
         return std::make_unique<ASkeletalMesh>(skeletalData->params, skeletalData->skeleton,
                                                std::move(skeletalData->inverseBindMatrices), skeletalData->defaultMaterial);
     }
-    if (auto *sceneObjectData = std::get_if<SceneObjectImportData>(&data)) {
-        std::string text = sceneObjectData->document->toText();
+    if (auto *moduleData = std::get_if<ModuleImportData>(&data)) {
+        std::string text = moduleData->document->toText();
         payload.assign(text.begin(), text.end());
-        type = ASSET_SCENE_OBJECT;
-        return std::move(sceneObjectData->document);
+        type = ASSET_MODULE;
+        return std::move(moduleData->document);
     }
     if (auto *materialData = std::get_if<BaseMaterialImportData>(&data)) {
         payload = materialData->material->serialize();
@@ -291,7 +291,7 @@ Asset &AssetManagerEditor::importAsset(const AssetImportFileRequest &request)
         return Asset::null;
     }
 
-    if (request.source.extension() == ".rasset") {
+    if (Asset_isRaptureExtension(request.source.extension().string())) {
         RP_CORE_ERROR("importAsset expects an external file, use registerRaptureAsset for '{}'", request.source.string());
         return Asset::null;
     }
@@ -319,7 +319,7 @@ Asset &AssetManagerEditor::importAsset(const AssetImportFileRequest &request)
         return Asset::null;
     }
 
-    // The load is asynchronous, so the empty payload defers the .rasset write until it finishes
+    // The load is asynchronous, so the empty payload defers the asset file write until it finishes
     return registerImportedAsset(handle, std::move(asset), std::move(metadata), request.output, {});
 }
 
@@ -353,14 +353,14 @@ Asset &AssetManagerEditor::importAsset(AssetImportDataRequest request)
 
 AssetHandle AssetManagerEditor::registerRaptureAsset(std::filesystem::path path)
 {
-    if (path.extension() != ".rasset") {
-        RP_CORE_ERROR("registerRaptureAsset expects a .rasset file: {}", path.string());
+    if (!Asset_isRaptureExtension(path.extension().string())) {
+        RP_CORE_ERROR("registerRaptureAsset expects a Rapture asset file: {}", path.string());
         return INVALID_ASSET_HANDLE;
     }
 
     auto info = AssetCodec::readRaptureAssetInfo(path);
     if (!info || !info->metadata) {
-        RP_CORE_ERROR("Failed to read .rasset header: {}", path.string());
+        RP_CORE_ERROR("Failed to read the header of: {}", path.string());
         return INVALID_ASSET_HANDLE;
     }
 
@@ -387,7 +387,7 @@ uint32_t AssetManagerEditor::registerAssetDirectory(const std::filesystem::path 
 
     uint32_t registered = 0;
     for (std::filesystem::recursive_directory_iterator it(directory, ec), end; !ec && it != end; it.increment(ec)) {
-        if (!it->is_regular_file() || it->path().extension() != ".rasset") {
+        if (!it->is_regular_file() || !Asset_isRaptureExtension(it->path().extension().string())) {
             continue;
         }
         if (registerRaptureAsset(it->path()) != INVALID_ASSET_HANDLE) {
@@ -465,7 +465,7 @@ AssetType AssetManagerEditor::determineAssetType(const std::string &path)
     } else if (extension == ".cubemap") {
         return ASSET_CUBEMAP;
     } else if (extension == ".gltf" || extension == ".glb" || extension == ".fbx") {
-        return ASSET_SCENE_OBJECT;
+        return ASSET_MODULE;
     } else if (extension == ".rmat") {
         return ASSET_MATERIAL;
     } else if (extension == ".spv" || extension == ".glsl") {
@@ -553,7 +553,7 @@ std::unique_ptr<Asset> AssetManagerEditor::loadFromMetadata(AssetHandle handle, 
             asset->status = AssetStatus::LOADED;
             return asset;
         }
-        RP_CORE_WARN("Failed to load '{}' from its .rasset, falling back to the source file", metadata.getName());
+        RP_CORE_WARN("Failed to load '{}' from its asset file, falling back to the source file", metadata.getName());
     }
 
     if (!AssetImporter::importAsset(*asset, metadata)) {
@@ -570,7 +570,7 @@ Asset &AssetManagerEditor::registerImportedAsset(AssetHandle handle, std::unique
 
     bool deferWrite = false;
     if (outputFolder.empty()) {
-        // Shaders keep their native format, everything else is expected to own a .rasset
+        // Shaders keep their native format, everything else is expected to own an asset file
         if (metadata->assetType != ASSET_SHADER) {
             RP_CORE_ERROR("No output folder provided for '{}'", metadata->name);
         }
@@ -710,7 +710,7 @@ void AssetManagerEditor::processPendingWrites()
             if (status == AssetStatus::LOADED) {
                 writeRaptureAssetFile(handle, m_pendingWrites[i].outputFolder, metadata, s_serializeAsset(*asset, metadata));
             } else if (status == AssetStatus::FAILED) {
-                RP_CORE_WARN("Dropping the deferred .rasset write for '{}' ({}), its load failed", metadata.getName(),
+                RP_CORE_WARN("Dropping the deferred asset file write for '{}' ({}), its load failed", metadata.getName(),
                              AssetTypeToString(metadata.assetType));
             } else {
                 finished = false;
@@ -755,7 +755,7 @@ bool AssetManagerEditor::updateAsset(AssetHandle handle, AssetVariant asset)
     }
 
     if (!AssetCodec::writeRaptureAsset(metadata.assetPath, handle, metadata, payload)) {
-        RP_CORE_ERROR("Failed to write .rasset for '{}'", metadata.getName());
+        RP_CORE_ERROR("Failed to write asset file for '{}'", metadata.getName());
         return false;
     }
 
@@ -784,7 +784,7 @@ bool AssetManagerEditor::saveAsset(AssetHandle handle, const std::filesystem::pa
     }
 
     if (!AssetCodec::writeRaptureAsset(metadata.assetPath, handle, metadata, payload)) {
-        RP_CORE_ERROR("Failed to write .rasset for '{}'", metadata.getName());
+        RP_CORE_ERROR("Failed to write asset file for '{}'", metadata.getName());
         return false;
     }
     return true;
@@ -801,12 +801,12 @@ void AssetManagerEditor::writeRaptureAssetFile(AssetHandle handle, const std::fi
     // The display name keeps its spaces, the on-disk file name does not
     std::string fileName = metadata.getName();
     std::replace(fileName.begin(), fileName.end(), ' ', '_');
-    std::filesystem::path output = folder / (fileName + ".rasset");
+    std::filesystem::path output = folder / (fileName + std::string(AssetTypeToExtension(metadata.assetType)));
     if (AssetCodec::writeRaptureAsset(output, handle, metadata, payload)) {
         metadata.assetPath = output;
         m_pathIndex[s_hashPath(output)] = handle;
     } else {
-        RP_CORE_ERROR("Failed to write .rasset for '{}'", metadata.getName());
+        RP_CORE_ERROR("Failed to write asset file for '{}'", metadata.getName());
     }
 }
 

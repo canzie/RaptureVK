@@ -1,4 +1,4 @@
-#include "SceneObjectEditorWorkspace.h"
+#include "ModuleEditorWorkspace.h"
 
 #include "Icons.h"
 #include "layers/panels/PropertiesPanel.h"
@@ -22,30 +22,30 @@
 #include <renderer/viewport/ViewportManager.h>
 #include <app/Application.h>
 
-static constexpr const char *DOCK_NAME = "Scene Object Editor Dock";
-static constexpr const char *VIEWPORT_NAME = "scene_object_editor";
+static constexpr const char *DOCK_NAME = "Module Editor Dock";
+static constexpr const char *VIEWPORT_NAME = "module_editor";
 static constexpr const char *ROOT_NAME = "Scene Root";
 static constexpr float HOTBAR_BUTTON_WIDTH = 80.0f;
 static constexpr float EDITOR_SUN_PITCH = -1.874f;
 static constexpr float EDITOR_SUN_INTENSITY = 3.14f;
 
-std::unique_ptr<SceneObjectEditorWorkspace> SceneObjectEditorWorkspace::create(Amethyst::TabBar &tabBar,
+std::unique_ptr<ModuleEditorWorkspace> ModuleEditorWorkspace::create(Amethyst::TabBar &tabBar,
                                                                               const PanelServices &services,
                                                                               Rapture::AssetHandle handle)
 {
     Rapture::AssetRef ref = Rapture::AssetManager::getAsset(handle);
     Rapture::Asset *asset = ref.get();
     if (asset == nullptr || asset->getUnderlyingAsset<Rapture::SerialDocument>() == nullptr) {
-        RP_ERROR("asset {} holds no scene object to open", static_cast<uint64_t>(handle));
+        RP_ERROR("asset {} holds no module to open", static_cast<uint64_t>(handle));
         return nullptr;
     }
 
-    auto workspace = std::unique_ptr<SceneObjectEditorWorkspace>(new SceneObjectEditorWorkspace(services, handle));
+    auto workspace = std::unique_ptr<ModuleEditorWorkspace>(new ModuleEditorWorkspace(services, handle));
     workspace->build(tabBar);
     return workspace;
 }
 
-SceneObjectEditorWorkspace::SceneObjectEditorWorkspace(const PanelServices &services, Rapture::AssetHandle handle)
+ModuleEditorWorkspace::ModuleEditorWorkspace(const PanelServices &services, Rapture::AssetHandle handle)
     : Workspace(staticKind()), m_handle(handle)
 {
     m_context.services = services;
@@ -54,7 +54,7 @@ SceneObjectEditorWorkspace::SceneObjectEditorWorkspace(const PanelServices &serv
     m_document = m_documentRef ? m_documentRef.get()->getUnderlyingAsset<Rapture::SerialDocument>() : nullptr;
 }
 
-SceneObjectEditorWorkspace::~SceneObjectEditorWorkspace()
+ModuleEditorWorkspace::~ModuleEditorWorkspace()
 {
     m_panels.clear();
 
@@ -64,7 +64,7 @@ SceneObjectEditorWorkspace::~SceneObjectEditorWorkspace()
     m_scene.reset();
 }
 
-void SceneObjectEditorWorkspace::build(Amethyst::TabBar &tabBar)
+void ModuleEditorWorkspace::build(Amethyst::TabBar &tabBar)
 {
     // TODO: follow the asset's name once renaming reaches the workspaces an asset is open in
     setupBase(tabBar, Rapture::AssetManager::getAssetMetadata(m_handle).getName(), Icons::SVG_SCENE);
@@ -103,7 +103,7 @@ void SceneObjectEditorWorkspace::build(Amethyst::TabBar &tabBar)
     }
 }
 
-void SceneObjectEditorWorkspace::setupScene()
+void ModuleEditorWorkspace::setupScene()
 {
     auto &app = Rapture::Application::getInstance();
 
@@ -135,7 +135,7 @@ void SceneObjectEditorWorkspace::setupScene()
     m_context.viewport = m_viewport.viewport;
 }
 
-void SceneObjectEditorWorkspace::setupLighting()
+void ModuleEditorWorkspace::setupLighting()
 {
     // parented beside the asset's root rather than inside it, so a save never captures it
     auto *sun = m_scene->root()->add<Rapture::DirectionalLight3D>("Editor Sun");
@@ -145,7 +145,7 @@ void SceneObjectEditorWorkspace::setupLighting()
     sun->setCastsShadow(true);
 }
 
-Rapture::SceneObject *SceneObjectEditorWorkspace::spawn()
+Rapture::SceneObject *ModuleEditorWorkspace::spawn()
 {
     // an asset that has never been authored starts from the root everything else hangs off
     if (m_document == nullptr || !m_document->isReadable()) {
@@ -155,7 +155,7 @@ Rapture::SceneObject *SceneObjectEditorWorkspace::spawn()
     return Rapture::SceneObject::spawnSubtree(*m_scene->root(), m_document->rootView());
 }
 
-void SceneObjectEditorWorkspace::setupPanels(Amethyst::TabBar *viewportTabBar, Amethyst::TabBar *treeTabBar,
+void ModuleEditorWorkspace::setupPanels(Amethyst::TabBar *viewportTabBar, Amethyst::TabBar *treeTabBar,
                                              Amethyst::TabBar *propertiesTabBar)
 {
     if (viewportTabBar != nullptr) {
@@ -170,7 +170,7 @@ void SceneObjectEditorWorkspace::setupPanels(Amethyst::TabBar *viewportTabBar, A
     }
 }
 
-void SceneObjectEditorWorkspace::setupHotbar()
+void ModuleEditorWorkspace::setupHotbar()
 {
     if (m_hotbar == nullptr) {
         return;
@@ -193,7 +193,7 @@ void SceneObjectEditorWorkspace::setupHotbar()
         });
 }
 
-void SceneObjectEditorWorkspace::save()
+void ModuleEditorWorkspace::save()
 {
     if (m_document == nullptr || m_sceneRoot == nullptr) {
         return;
@@ -206,11 +206,11 @@ void SceneObjectEditorWorkspace::save()
 
     auto &project = Rapture::Application::getInstance().getProject();
     if (!Rapture::AssetManager::saveAsset(m_handle, project.getContentDirectory())) {
-        RP_ERROR("Could not save scene object '{}'", Rapture::AssetManager::getAssetMetadata(m_handle).getName());
+        RP_ERROR("Could not save module '{}'", Rapture::AssetManager::getAssetMetadata(m_handle).getName());
     }
 }
 
-void SceneObjectEditorWorkspace::onUpdate(float dt)
+void ModuleEditorWorkspace::onUpdate(float dt)
 {
     Workspace::onUpdate(dt);
 
@@ -219,7 +219,7 @@ void SceneObjectEditorWorkspace::onUpdate(float dt)
     }
 }
 
-void SceneObjectEditorWorkspace::saveLayout()
+void ModuleEditorWorkspace::saveLayout()
 {
     Amethyst::LayoutConfig::instance().set(m_dockingLayer->name, Amethyst::ConfigEntry(m_dockingLayer->saveConfig()));
 }

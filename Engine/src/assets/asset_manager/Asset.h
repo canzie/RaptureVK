@@ -57,7 +57,7 @@ struct AssetMetadata {
     AssetEvictionPolicy evictionPolicy = AssetEvictionPolicy::EVICT_IMMEDIATE;
     uint64_t sizeHintBytes = 0;
 
-    /// The class a scene object or module asset holds, so assets can be filtered by class without being loaded
+    /// The class a module's root is, so assets can be filtered by class without being loaded
     const TypeInfo *authoredClass = nullptr;
 
     bool isDiskAsset() const { return storageType == AssetStorageType::DISK; }

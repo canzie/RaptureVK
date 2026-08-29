@@ -17,7 +17,7 @@ namespace Rapture {
  */
 static bool s_recordsClass(AssetType type)
 {
-    return type == ASSET_SCENE_OBJECT;
+    return type == ASSET_MODULE;
 }
 
 static constexpr uint32_t RASSET_MAGIC = 0x54534152; // "RAST"
@@ -25,7 +25,7 @@ static constexpr uint16_t RASSET_VERSION_MAJOR = 1;
 static constexpr uint16_t RASSET_VERSION_MINOR = 0;
 static constexpr uint32_t RASSET_VERSION = (static_cast<uint32_t>(RASSET_VERSION_MAJOR) << 16) | RASSET_VERSION_MINOR;
 
-// Fixed 64-byte header at the start of every `.rasset`. The metadata section follows immediately,
+// Fixed 64-byte header at the start of every asset file. The metadata section follows immediately,
 // then the payload. The reserved tail absorbs backward-compatible additions, a breaking change
 // bumps the major version.
 struct RaptureAssetHeader {
@@ -41,7 +41,7 @@ struct RaptureAssetHeader {
     uint32_t reserved[4] = {};
 };
 
-static_assert(sizeof(RaptureAssetHeader) == 64, "rasset header is a fixed 64-byte block");
+static_assert(sizeof(RaptureAssetHeader) == 64, "the asset file header is a fixed 64-byte block");
 
 // FNV-1a, enough to catch a truncated or corrupted section
 static uint32_t s_checksum(std::span<const uint8_t> bytes)
@@ -186,7 +186,7 @@ bool AssetCodec::writeRaptureAsset(const std::filesystem::path &path, AssetHandl
     file.write(reinterpret_cast<const char *>(metadataBytes.data()), static_cast<std::streamsize>(metadataBytes.size()));
     file.write(reinterpret_cast<const char *>(payload.data()), static_cast<std::streamsize>(payload.size()));
     if (!file) {
-        RP_CORE_ERROR("Failed to write rasset '{0}'", path.string());
+        RP_CORE_ERROR("Failed to write '{0}'", path.string());
         return false;
     }
 
@@ -213,7 +213,7 @@ std::optional<AssetCodec::RaptureAssetInfo> AssetCodec::readRaptureAssetInfo(con
 {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
-        RP_CORE_ERROR("Failed to open rasset '{0}'", path.string());
+        RP_CORE_ERROR("Failed to open '{0}'", path.string());
         return std::nullopt;
     }
 
@@ -247,7 +247,7 @@ std::vector<uint8_t> AssetCodec::readRaptureAssetPayload(const std::filesystem::
 {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
-        RP_CORE_ERROR("Failed to open rasset '{0}'", path.string());
+        RP_CORE_ERROR("Failed to open '{0}'", path.string());
         return {};
     }
 

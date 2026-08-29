@@ -1,5 +1,5 @@
-#ifndef RAPTURE__SCENE_OBJECT_EDITOR_WORKSPACE_H
-#define RAPTURE__SCENE_OBJECT_EDITOR_WORKSPACE_H
+#ifndef RAPTURE__MODULE_EDITOR_WORKSPACE_H
+#define RAPTURE__MODULE_EDITOR_WORKSPACE_H
 
 #include "Workspace.h"
 
@@ -17,33 +17,33 @@ class Viewport;
 } // namespace Rapture
 
 /**
- * @brief The workspace one open scene object asset is edited in.
+ * @brief The workspace one open module is edited in.
  *
  * The asset holds a subtree as a document, so editing it is spawning that subtree into a scene of
  * its own, authoring it through the same viewport, tree and properties panels a world uses, and
  * writing the root back out on save.
  */
-class SceneObjectEditorWorkspace : public Workspace {
+class ModuleEditorWorkspace : public Workspace {
   public:
     /**
-     * @brief Opens a scene object asset in its workspace
+     * @brief Opens a module in its workspace
      * @param tabBar The workspace bar the tab is appended to
      * @param services Services the panels are built against
-     * @param handle The scene object asset to edit
+     * @param handle The module to edit
      * @return The workspace, or nullptr if the asset holds no document
      */
-    static std::unique_ptr<SceneObjectEditorWorkspace> create(Amethyst::TabBar &tabBar, const PanelServices &services,
-                                                              Rapture::AssetHandle handle);
+    static std::unique_ptr<ModuleEditorWorkspace> create(Amethyst::TabBar &tabBar, const PanelServices &services,
+                                                         Rapture::AssetHandle handle);
 
-    ~SceneObjectEditorWorkspace() override;
+    ~ModuleEditorWorkspace() override;
 
     void onUpdate(float dt) override;
     void saveLayout() override;
 
-    static constexpr std::string_view staticKind() { return "sceneObjectEditor"; }
+    static constexpr std::string_view staticKind() { return "moduleEditor"; }
 
   private:
-    SceneObjectEditorWorkspace(const PanelServices &services, Rapture::AssetHandle handle);
+    ModuleEditorWorkspace(const PanelServices &services, Rapture::AssetHandle handle);
 
     /**
      * @brief Builds the tab, the scene the asset is authored in and the panels over it
@@ -81,4 +81,4 @@ class SceneObjectEditorWorkspace : public Workspace {
     Rapture::SceneObject *m_sceneRoot = nullptr;
 };
 
-#endif // RAPTURE__SCENE_OBJECT_EDITOR_WORKSPACE_H
+#endif // RAPTURE__MODULE_EDITOR_WORKSPACE_H

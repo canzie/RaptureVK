@@ -234,17 +234,20 @@ class SceneObject : public Instance {
      * @param parent The object the new object is added to
      * @param node Cursor to the object's object
      * @param context The read this object and its subtree belong to
+     * @param internalMode Whether the root that is read is added as internal
      * @return The object read, or nullptr if any of its subtree could not be read
      */
-    static SceneObject *loadSubtree(SceneObject &parent, ReadNode node, SceneLoadContext &context);
+    static SceneObject *loadSubtree(SceneObject &parent, ReadNode node, SceneLoadContext &context,
+                                    InternalMode internalMode = InternalMode::DISABLED);
 
     /**
      * @brief Reads a subtree into a scene as its own objects rather than as the ones it was written from
      * @param parent The object the root is parented to, which gains ownership of it
      * @param node Cursor to the root object's object
+     * @param internalMode Whether the root that is read is added as internal
      * @return The root of what was read, or nullptr if it could not be read
      */
-    static SceneObject *spawnSubtree(SceneObject &parent, ReadNode node);
+    static SceneObject *spawnSubtree(SceneObject &parent, ReadNode node, InternalMode internalMode = InternalMode::DISABLED);
 
     SceneObject *parent() const { return m_parent; }
 
@@ -280,6 +283,12 @@ class SceneObject : public Instance {
      * @return True if everything below this object was read
      */
     bool loadContents(const DocumentHeader &header, SceneLoadContext &context);
+
+    /**
+     * @brief Unlinks a child and destroys it, whether it is internal or not
+     * @param child The child to destroy
+     */
+    void destroyChild(SceneObject *child);
 
   protected:
     ecs::EntityAccessor m_entity;

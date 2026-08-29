@@ -47,7 +47,7 @@ struct SkeletalMeshImportData {
     AssetHandle defaultMaterial = RE_DEFAULT_MATERIAL_INSTANCE;
 };
 
-struct SceneObjectImportData {
+struct ModuleImportData {
     std::unique_ptr<SerialDocument> document;
 };
 
@@ -75,7 +75,7 @@ struct SkeletonImportData {
 };
 
 using AssetImportDataVariant =
-    std::variant<std::monostate, StaticMeshImportData, SkeletalMeshImportData, SceneObjectImportData, BaseMaterialImportData,
+    std::variant<std::monostate, StaticMeshImportData, SkeletalMeshImportData, ModuleImportData, BaseMaterialImportData,
                  MaterialInstanceImportData, WorldImportData, SkeletonImportData>;
 
 struct AssetImportFileRequest {

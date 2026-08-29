@@ -5,7 +5,9 @@
 #include "layers/panels/components/asset_visuals.h"
 #include "layers/panels/components/context_menus.h"
 #include "layers/panels/components/tab_layouts.h"
+#include "assets/asset_manager/AssetManager.h"
 #include "scene/World.h"
+#include "scene/instances/Module.h"
 #include "scene/instances/SceneObject.h"
 #include "scene/instances/scene_components/VisibilityComponent.h"
 #include "core/ecs/entity_accessor.h"
@@ -234,6 +236,14 @@ void OutlinerPanel::buildInstanceTree(Rapture::SceneObject *instance, Amethyst::
 
     std::string instanceName(instance->name());
     std::string typeName(instance->type().name);
+
+    // a placed module reads as the asset it stands for, the way a class reads as itself
+    if (const Rapture::Module *placedModule = instance->as<Rapture::Module>()) {
+        const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(placedModule->assetHandle());
+        if (metadata) {
+            typeName = metadata.getName();
+        }
+    }
 
     SceneObjectIcon icon = SceneObject_iconForClass(&instance->type());
     rowScope.cell([instanceName, icon](Amethyst::UIScope &s) { s_nameLabel(s, instanceName, "treeview-primary-column", &icon); });

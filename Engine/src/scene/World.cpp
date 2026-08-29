@@ -6,6 +6,7 @@
 #include "core/utils/Log.h"
 #include "physics/PhysicsSystem.h"
 #include "scene/Scene.h"
+#include "scene/instances/Module.h"
 #include "scene/instances/SceneObject.h"
 #include "scene/instances/controllers/Controller.h"
 
@@ -18,21 +19,25 @@ static constexpr std::string_view KEY_CONTROLLER = "controller";
 static constexpr std::string_view KEY_GRAVITY = "gravity";
 
 /**
- * @brief Reads a scene object asset into a scene as its own objects
+ * @brief Places a module asset in a scene
  * @param handle The asset to spawn
- * @param scene The scene the root is parented into
- * @return The spawned root, or nullptr if the asset holds nothing readable
+ * @param scene The scene the module is parented into
+ * @return The spawned module, or nullptr if the asset holds nothing readable
  */
-static SceneObject *s_spawnSceneObject(AssetHandle handle, Scene &scene)
+static Module *s_spawnModule(AssetHandle handle, Scene &scene)
 {
-    AssetRef ref = AssetManager::getAsset(handle);
-    Asset *asset = ref.get();
-    SerialDocument *document = asset != nullptr ? asset->getUnderlyingAsset<SerialDocument>() : nullptr;
-    if (document == nullptr) {
+    const AssetMetadata &metadata = AssetManager::getAssetMetadata(handle);
+    if (!metadata) {
         return nullptr;
     }
 
-    return SceneObject::spawnSubtree(*scene.root(), document->rootView());
+    Module *placedModule = scene.root()->add<Module>(metadata.getName());
+    if (!placedModule->setAssetHandle(handle)) {
+        scene.root()->removeChild(placedModule);
+        return nullptr;
+    }
+
+    return placedModule;
 }
 
 World::World(std::string name) : m_name(std::move(name)), m_scene(std::make_unique<Scene>(m_name)) {}
@@ -90,13 +95,16 @@ void World::play()
     // taken before anything is spawned, so the rewind on stop is what clears the run
     m_snapshot = m_scene->snapshot();
 
-    SceneObject *puppetRoot = s_spawnSceneObject(m_data.puppet, *m_scene);
+    // a module stands for its asset, and what the asset was written from is what is driven
+    Module *puppet = s_spawnModule(m_data.puppet, *m_scene);
+    SceneObject *puppetRoot = puppet != nullptr ? puppet->contentRoot() : nullptr;
     if (puppetRoot == nullptr) {
         RP_CORE_WARN("no puppet to be played with, so nothing will be spawned");
     }
 
-    SceneObject *spawnedController = s_spawnSceneObject(m_data.controller, *m_scene);
-    m_playController = spawnedController != nullptr ? spawnedController->as<Controller>() : nullptr;
+    Module *controller = s_spawnModule(m_data.controller, *m_scene);
+    SceneObject *controllerRoot = controller != nullptr ? controller->contentRoot() : nullptr;
+    m_playController = controllerRoot != nullptr ? controllerRoot->as<Controller>() : nullptr;
     if (m_playController == nullptr) {
         RP_CORE_WARN("no controller to be played with, so nothing will drive the run");
     } else {

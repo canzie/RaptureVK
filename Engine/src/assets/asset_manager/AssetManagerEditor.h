@@ -30,35 +30,35 @@ class AssetManagerEditor : public AssetManagerBase {
     const AssetMetadata &getAssetMetadata(AssetHandle handle) const;
 
     /**
-     * @brief Imports an external non-.rasset file into an owned asset
+     * @brief Imports an external non-asset file into an owned asset
      * @param request The source file, output folder, import config and name
      * @return The imported asset, or Asset::null on failure
      */
     Asset &importAsset(const AssetImportFileRequest &request);
 
     /**
-     * @brief Imports in-memory data into an owned asset, writing its .rasset
+     * @brief Imports in-memory data into an owned asset, writing its asset file
      * @param request The data, output folder, name and provenance
      * @return The imported asset, or Asset::null on failure
      */
     Asset &importAsset(AssetImportDataRequest request);
 
     /**
-     * @brief Registers an owned asset from its .rasset file without loading its data
-     * @param path The .rasset file
+     * @brief Registers an owned asset from its asset file without loading its data
+     * @param path The asset file
      * @return The registered asset handle, or INVALID_ASSET_HANDLE on failure
      */
     AssetHandle registerRaptureAsset(std::filesystem::path path);
 
     /**
-     * @brief Registers every .rasset under a directory tree without loading their data
+     * @brief Registers every asset file under a directory tree without loading their data
      * @param directory The directory to scan recursively
      * @return The number of newly registered assets
      */
     uint32_t registerAssetDirectory(const std::filesystem::path &directory);
 
     /**
-     * @brief Replaces an owned asset's contents and rewrites its .rasset in place
+     * @brief Replaces an owned asset's contents and rewrites its asset file in place
      * @param handle The asset to overwrite, which must already be registered from a file
      * @param asset The new asset value
      * @return True if the file now holds the new contents
@@ -99,8 +99,8 @@ class AssetManagerEditor : public AssetManagerBase {
     std::vector<AssetHandle> getVirtualAssetsByType(AssetType type) const;
 
     /**
-     * @brief Looks up the asset registered at an on-disk .rasset path
-     * @param path The .rasset file path
+     * @brief Looks up the asset registered at an on-disk asset file path
+     * @param path The asset file path
      * @return The asset handle, or INVALID_ASSET_HANDLE if no asset is registered there
      */
     AssetHandle findAssetByPath(const std::filesystem::path &path) const;
@@ -125,12 +125,12 @@ class AssetManagerEditor : public AssetManagerBase {
     void drainColdList();
 
     /**
-     * @brief Writes the .rasset for any imported asset whose load has finished
+     * @brief Writes the asset file for any imported asset whose load has finished
      */
     void processPendingWrites();
 
     /**
-     * @brief Writes an asset's payload to <folder>/<name>.rasset and records its path
+     * @brief Writes an asset's payload into a folder under its name and its type's extension, and records its path
      * @param handle The asset handle stored in the file
      * @param folder The output directory
      * @param metadata The asset metadata encoded into the file
@@ -140,11 +140,11 @@ class AssetManagerEditor : public AssetManagerBase {
                                std::span<const uint8_t> payload);
 
     /**
-     * @brief Registers a built asset, then writes its .rasset now or defers it until its load finishes
+     * @brief Registers a built asset, then writes its asset file now or defers it until its load finishes
      * @param handle The asset handle
      * @param asset The built asset, loaded or still loading
      * @param metadata The asset metadata
-     * @param outputFolder Directory the owned .rasset is written into, empty to skip
+     * @param outputFolder Directory the owned asset file is written into, empty to skip
      * @param payload The serialized bytes for a synchronous write, empty to defer to the async load
      * @return The registered asset
      */
@@ -160,7 +160,7 @@ class AssetManagerEditor : public AssetManagerBase {
     std::unique_ptr<Asset> loadFromMetadata(AssetHandle handle, AssetMetadata &metadata);
 
     /**
-     * @brief An import whose async load must finish before its .rasset can be written
+     * @brief An import whose async load must finish before its asset file can be written
      *
      * The ref pins the asset for the lifetime of the entry, so an eviction cannot destroy it before its payload is serialized.
      */
@@ -183,7 +183,7 @@ class AssetManagerEditor : public AssetManagerBase {
     PriorityQueue<AssetHandle> m_coldList;
     bool m_coldDraining = false;
 
-    // Hash of a .rasset path to the handle registered at that path
+    // Hash of an asset file path to the handle registered at that path
     std::unordered_map<uint64_t, AssetHandle> m_pathIndex;
 
     std::vector<PendingWrite> m_pendingWrites;

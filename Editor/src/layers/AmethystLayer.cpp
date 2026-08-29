@@ -12,7 +12,7 @@
 #include "layers/workspaces/AnimationsWorkspace.h"
 #include "layers/workspaces/LevelEditorWorkspace.h"
 #include "layers/workspaces/MaterialEditorWorkspace.h"
-#include "layers/workspaces/SceneObjectEditorWorkspace.h"
+#include "layers/workspaces/ModuleEditorWorkspace.h"
 #include "layers/workspaces/SkeletalMeshWorkspace.h"
 #include "layers/workspaces/SkeletonWorkspace.h"
 #include "layers/workspaces/StaticMeshWorkspace.h"
@@ -484,8 +484,8 @@ void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
     std::unique_ptr<Workspace> workspace;
 
     switch (metadata.assetType) {
-    case Rapture::ASSET_SCENE_OBJECT:
-        workspace = SceneObjectEditorWorkspace::create(*m_workspaceTabBar, services, handle);
+    case Rapture::ASSET_MODULE:
+        workspace = ModuleEditorWorkspace::create(*m_workspaceTabBar, services, handle);
         if (workspace == nullptr) {
             return;
         }

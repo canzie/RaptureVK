@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace Rapture {
 
@@ -31,7 +32,7 @@ enum AssetType {
     ASSET_MATERIAL_INSTANCE,
     ASSET_STATIC_MESH,
     ASSET_SKELETAL_MESH,
-    ASSET_SCENE_OBJECT,
+    ASSET_MODULE,
     ASSET_SKELETON,
     ASSET_ANIMATION,
     ASSET_AUDIO,
@@ -70,31 +71,33 @@ inline constexpr uint32_t Asset_fourCC(const char (&code)[5])
            (static_cast<uint32_t>(code[3]) << 24);
 }
 
-struct AssetTypeCode {
+struct AssetFileFormat {
     AssetType type;
     uint32_t code;
+    std::string_view extension;
 };
 
 /**
  * @brief What each asset type is written as on disk.
  *
  * A code is the type's identity in a file rather than its place in the enum, so the enum is free to
- * gain, lose and reorder entries. A code is never reused for a different type.
+ * gain, lose and reorder entries. A code is never reused for a different type. An extension only
+ * labels a file for the user and their tools, so related types share one.
  */
-inline constexpr AssetTypeCode ASSET_TYPE_CODES[] = {
-    {ASSET_TEXTURE, Asset_fourCC("TEX ")},
-    {ASSET_CUBEMAP, Asset_fourCC("CUBE")},
-    {ASSET_SHADER, Asset_fourCC("SHDR")},
-    {ASSET_MATERIAL, Asset_fourCC("MTL ")},
-    {ASSET_MATERIAL_INSTANCE, Asset_fourCC("MTLI")},
-    {ASSET_STATIC_MESH, Asset_fourCC("MESH")},
-    {ASSET_SKELETAL_MESH, Asset_fourCC("SKMH")},
-    {ASSET_SCENE_OBJECT, Asset_fourCC("SOBJ")},
-    {ASSET_SKELETON, Asset_fourCC("SKEL")},
-    {ASSET_ANIMATION, Asset_fourCC("ANIM")},
-    {ASSET_AUDIO, Asset_fourCC("AUD ")},
-    {ASSET_VIDEO, Asset_fourCC("VID ")},
-    {ASSET_WORLD, Asset_fourCC("WRLD")},
+inline constexpr AssetFileFormat ASSET_FILE_FORMATS[] = {
+    {ASSET_TEXTURE, Asset_fourCC("TEX "), ".rtex"},
+    {ASSET_CUBEMAP, Asset_fourCC("CUBE"), ".rtex"},
+    {ASSET_SHADER, Asset_fourCC("SHDR"), ".rshader"},
+    {ASSET_MATERIAL, Asset_fourCC("MTL "), ".rmat"},
+    {ASSET_MATERIAL_INSTANCE, Asset_fourCC("MTLI"), ".rmat"},
+    {ASSET_STATIC_MESH, Asset_fourCC("MESH"), ".rmesh"},
+    {ASSET_SKELETAL_MESH, Asset_fourCC("SKMH"), ".rmesh"},
+    {ASSET_MODULE, Asset_fourCC("MODL"), ".rmod"},
+    {ASSET_SKELETON, Asset_fourCC("SKEL"), ".rskel"},
+    {ASSET_ANIMATION, Asset_fourCC("ANIM"), ".ranim"},
+    {ASSET_AUDIO, Asset_fourCC("AUD "), ".raudio"},
+    {ASSET_VIDEO, Asset_fourCC("VID "), ".rvideo"},
+    {ASSET_WORLD, Asset_fourCC("WRLD"), ".rworld"},
 };
 
 /**
@@ -104,7 +107,7 @@ inline constexpr AssetTypeCode ASSET_TYPE_CODES[] = {
  */
 inline uint32_t AssetTypeToCode(AssetType type)
 {
-    for (const AssetTypeCode &entry : ASSET_TYPE_CODES) {
+    for (const AssetFileFormat &entry : ASSET_FILE_FORMATS) {
         if (entry.type == type) {
             return entry.code;
         }
@@ -121,12 +124,44 @@ inline uint32_t AssetTypeToCode(AssetType type)
  */
 inline AssetType AssetTypeFromCode(uint32_t code)
 {
-    for (const AssetTypeCode &entry : ASSET_TYPE_CODES) {
+    for (const AssetFileFormat &entry : ASSET_FILE_FORMATS) {
         if (entry.code == code) {
             return entry.type;
         }
     }
     return ASSET_NONE;
+}
+
+/**
+ * @brief The extension a type's file is written with
+ * @param type The type to look up
+ * @return The extension, leading dot included
+ */
+inline std::string_view AssetTypeToExtension(AssetType type)
+{
+    for (const AssetFileFormat &entry : ASSET_FILE_FORMATS) {
+        if (entry.type == type) {
+            return entry.extension;
+        }
+    }
+
+    RP_ASSERT(false, "asset type {} has no extension to be written with", static_cast<int>(type));
+    RP_UNREACHABLE();
+}
+
+/**
+ * @brief Whether an extension is one Rapture writes its own assets with
+ * @param extension The extension to test, leading dot included
+ * @return True if a type is written with that extension
+ */
+inline bool Asset_isRaptureExtension(std::string_view extension)
+{
+    for (const AssetFileFormat &entry : ASSET_FILE_FORMATS) {
+        if (entry.extension == extension) {
+            return true;
+        }
+    }
+    return false;
 }
 
 inline std::string AssetTypeToString(AssetType type)
@@ -146,8 +181,8 @@ inline std::string AssetTypeToString(AssetType type)
         return "Static Mesh";
     case ASSET_SKELETAL_MESH:
         return "Skeletal Mesh";
-    case ASSET_SCENE_OBJECT:
-        return "Scene Object";
+    case ASSET_MODULE:
+        return "Module";
     case ASSET_SKELETON:
         return "Skeleton";
     case ASSET_ANIMATION:

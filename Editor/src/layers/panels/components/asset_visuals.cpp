@@ -52,7 +52,7 @@ Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
     case Rapture::ASSET_STATIC_MESH:
     case Rapture::ASSET_SKELETAL_MESH:
         return Amethyst::Color3(0.95f, 0.60f, 0.25f); // orange
-    case Rapture::ASSET_SCENE_OBJECT:
+    case Rapture::ASSET_MODULE:
         return Amethyst::Color3(0.50f, 0.50f, 0.95f); // periwinkle
     case Rapture::ASSET_ANIMATION:
         return Amethyst::Color3(0.95f, 0.82f, 0.30f); // yellow
@@ -82,7 +82,7 @@ SceneObjectIcon SceneObject_iconForClass(const Rapture::TypeInfo *authoredClass)
 
 const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass)
 {
-    if (type == Rapture::ASSET_SCENE_OBJECT) {
+    if (type == Rapture::ASSET_MODULE) {
         return SceneObject_iconForClass(authoredClass).svg;
     }
 
@@ -101,7 +101,7 @@ const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *
         return Icons::SVG_MESH;
     case Rapture::ASSET_SKELETON:
         return Icons::SVG_SKELETON;
-    case Rapture::ASSET_SCENE_OBJECT:
+    case Rapture::ASSET_MODULE:
         return Icons::SVG_CUBE;
     case Rapture::ASSET_ANIMATION:
         return Icons::SVG_PLAY;

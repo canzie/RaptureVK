@@ -19,6 +19,7 @@
 #include "assets/asset_manager/AssetManager.h"
 #include "assets/asset_manager/ReservedAssets.h"
 #include "scene/Scene.h"
+#include "scene/instances/Module.h"
 #include "scene/instances/Node3D.h"
 #include "scene/instances/SkeletalMesh3D.h"
 #include "scene/instances/SkeletonPose.h"
@@ -390,7 +391,7 @@ bool glTF2Loader::load(Scene *scene, int32_t sceneIndex)
     m_isInitialized = true;
     m_isLoaded = true;
 
-    buildSceneObjectAsset(scene);
+    buildModule(scene);
 
     return true;
 }
@@ -806,7 +807,7 @@ void glTF2Loader::buildSkeletonPoses(SceneObject &root)
     m_skinnedMeshes.clear();
 }
 
-void glTF2Loader::buildSceneObjectAsset(Scene *scene)
+void glTF2Loader::buildModule(Scene *scene)
 {
     std::string assetName = m_name.empty() ? m_filepath.stem().string() : m_name;
 
@@ -832,14 +833,15 @@ void glTF2Loader::buildSceneObjectAsset(Scene *scene)
     root->serialize(document.root());
     document.freeze();
 
-    if (scene != nullptr) {
-        SceneObject::spawnSubtree(*scene->root(), document.rootView());
-    }
-
     AssetRef ref = AssetManager::importAsset(
-        AssetImportDataRequest{.data = SceneObjectImportData{std::make_unique<SerialDocument>(std::move(document))},
+        AssetImportDataRequest{.data = ModuleImportData{std::make_unique<SerialDocument>(std::move(document))},
                                .output = m_outputFolder,
                                .name = assetName});
+
+    if (scene != nullptr && ref) {
+        scene->root()->add<Module>(assetName)->setAssetHandle(ref.get()->getHandle());
+    }
+
     m_loadedData->sceneObject = std::move(ref);
 }
 

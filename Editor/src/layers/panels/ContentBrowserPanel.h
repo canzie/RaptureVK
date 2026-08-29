@@ -55,7 +55,7 @@ class ContentBrowserPanel : public Panel {
     enum ContentEditKind {
         CONTENT_EDIT_NONE,
         CONTENT_EDIT_FOLDER,
-        CONTENT_EDIT_SCENE_OBJECT,
+        CONTENT_EDIT_MODULE,
         CONTENT_EDIT_RENAME,
         CONTENT_EDIT_COUNT
     };
@@ -101,7 +101,7 @@ class ContentBrowserPanel : public Panel {
     /**
      * @brief Puts a placeholder tile in the grid for the user to name, which creates nothing until confirmed
      * @param kind What the confirmed name will create
-     * @param objectClass The class a scene object asset holds, ignored by the other kinds
+     * @param objectClass The class a module holds, ignored by the other kinds
      */
     void beginCreate(ContentEditKind kind, const Rapture::TypeInfo *objectClass = nullptr);
 
@@ -127,11 +127,11 @@ class ContentBrowserPanel : public Panel {
     void createFolder(std::string_view name);
 
     /**
-     * @brief Creates a scene object asset holding one authored object of a registered class
+     * @brief Creates a module holding one authored object of a registered class
      * @param type The class the asset's root is
      * @param name The asset's name
      */
-    void createSceneObject(const Rapture::TypeInfo &type, std::string_view name);
+    void createModule(const Rapture::TypeInfo &type, std::string_view name);
 
     /**
      * @brief Renames a file or folder on disk

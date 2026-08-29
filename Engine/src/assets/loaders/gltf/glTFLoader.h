@@ -38,7 +38,7 @@ class glTF2Loader {
     /**
      * @brief Constructor
      * @param filepath Path to the .gltf file
-     * @param outputFolder Directory every .rasset this loader creates is written into
+     * @param outputFolder Directory every asset this loader creates is written into
      * @param name Name for the produced prefab, falls back to the file stem when empty
      */
     explicit glTF2Loader(const std::filesystem::path &filepath, std::filesystem::path outputFolder, std::string name = {});
@@ -99,20 +99,20 @@ class glTF2Loader {
     Node3D *buildSceneObject(SceneObject &parent, glTF_SceneNode *src);
 
     /**
-     * @brief Imports this file's nodes as a scene object asset, and spawns them if there is a scene
+     * @brief Adds one pose per skin below an asset's root and points its skinned meshes at it
+     * @param root The object the poses are added to
+     */
+    void buildSkeletonPoses(SceneObject &root);
+
+    /**
+     * @brief Imports this file's nodes as a module, and spawns them if there is a scene
      *
      * The objects are built in a scene of their own and serialized from there, so the asset is
      * written by the same classes that read it back.
      *
      * @param scene The scene to spawn the imported objects into, or nullptr to only write the asset
      */
-    /**
-     * @brief Adds one pose per skin below an asset's root and points its skinned meshes at it
-     * @param root The object the poses are added to
-     */
-    void buildSkeletonPoses(SceneObject &root);
-
-    void buildSceneObjectAsset(Scene *scene);
+    void buildModule(Scene *scene);
 
     void loadSkin(yyjson_val *skinVal);
     void loadWeights(yyjson_val *weightsVal);

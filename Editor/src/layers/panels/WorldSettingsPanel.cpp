@@ -24,14 +24,14 @@ void WorldPlaySection::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
         rowAssetPicker(t, "Puppet", m_puppetPicker,
-                       {.types = {Rapture::ASSET_SCENE_OBJECT}, .predicate = s_isPuppetAsset},
+                       {.types = {Rapture::ASSET_MODULE}, .predicate = s_isPuppetAsset},
                        [this](Rapture::AssetHandle handle) {
                            if (world != nullptr) {
                                world->data().puppet = handle;
                            }
                        });
         rowAssetPicker(t, "Controller", m_controllerPicker,
-                       {.types = {Rapture::ASSET_SCENE_OBJECT}, .predicate = s_isControllerAsset},
+                       {.types = {Rapture::ASSET_MODULE}, .predicate = s_isControllerAsset},
                        [this](Rapture::AssetHandle handle) {
                            if (world != nullptr) {
                                world->data().controller = handle;

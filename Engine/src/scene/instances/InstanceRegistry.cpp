@@ -6,6 +6,7 @@
 #include "scene/instances/DirectionalLight3D.h"
 #include "scene/instances/Environment.h"
 #include "scene/instances/Folder.h"
+#include "scene/instances/Module.h"
 #include "scene/instances/Node3D.h"
 #include "scene/instances/PointLight3D.h"
 #include "scene/instances/RigidBody3D.h"
@@ -39,6 +40,7 @@ void InstanceRegistry::init()
     }
 
     addObject<Folder>();
+    addObject<Module>();
     addObject<Node3D>();
     addObject<Camera3D>();
     addObject<SpringArm3D>();
