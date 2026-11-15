@@ -416,7 +416,7 @@ SubmenuItem::create(std::string label, std::vector<std::unique_ptr<ContextMenu::
 
 Frame *SubmenuItemView::create(ContextMenu &owner)
 {
-    Frame *row = SubmenuItemView::create(owner);
+    Frame *row = ContextMenu::SubmenuItemView::create(owner);
 
     m_icon = row->add<ImageLabel>();
     m_icon->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
