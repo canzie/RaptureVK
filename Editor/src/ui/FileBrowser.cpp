@@ -76,7 +76,7 @@ static std::string s_toLower(std::string s)
     return s;
 }
 
-FileBrowser::FileBrowser(Amethyst::Instance &parent, Mode mode, const std::filesystem::path &startDirectory) : m_mode(mode)
+FileBrowser::FileBrowser(Amethyst::Instance &parent, FileDialogMode mode, const std::filesystem::path &startDirectory) : m_mode(mode)
 {
     std::error_code ec;
     m_currentDirectory = std::filesystem::is_directory(startDirectory, ec) ? startDirectory : std::filesystem::current_path();
@@ -671,11 +671,11 @@ void FileBrowser::setupFooter()
                                 },
                             .style = {.backgroundTransparency = 1.0f},
                             .textInput = {.text = {.textColor = COL_TEXT, .textYAlignment = Amethyst::TextYAlignment::CENTER}},
-                            .placeholder = m_mode == Mode::SAVE ? "Filename" : "No file selected",
+                            .placeholder = m_mode == FILE_DIALOG_SAVE ? "Filename" : "No file selected",
                         },
                         [this](Amethyst::TextInputScope &ti) {
                             m_filenameInput = &ti.component;
-                            if (m_mode == Mode::OPEN) {
+                            if (m_mode == FILE_DIALOG_OPEN) {
                                 m_filenameInput->setBaseProperties({.interactable = false});
                             }
                         });
@@ -755,7 +755,7 @@ void FileBrowser::setupFooter()
                             .position = Amethyst::UDim2(1.0f, -CONTENT_PADDING, 0.5f, 0.0f),
                             .size = Amethyst::UDim2(0.0f, openWidth, 0.0f, 30.0f),
                         },
-                    .label = m_mode == Mode::SAVE ? "Save" : "Open",
+                    .label = m_mode == FILE_DIALOG_SAVE ? "Save" : "Open",
                 },
                 [this](Amethyst::TextButtonScope &btn) {
                     btn.component.onMouseButton1ClickCb = [this]() {
@@ -766,7 +766,7 @@ void FileBrowser::setupFooter()
                             } else {
                                 confirm(e.path);
                             }
-                        } else if (m_mode == Mode::SAVE && m_filenameInput != nullptr) {
+                        } else if (m_mode == FILE_DIALOG_SAVE && m_filenameInput != nullptr) {
                             std::string name = m_filenameInput->getText();
                             if (!name.empty()) {
                                 confirm(m_currentDirectory / name);

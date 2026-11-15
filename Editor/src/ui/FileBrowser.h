@@ -1,6 +1,8 @@
 #ifndef RAPTURE__FILE_BROWSER_H
 #define RAPTURE__FILE_BROWSER_H
 
+#include "context/EditorContext.h"
+
 #include <amethyst/Amethyst.h>
 #include <components/table.h>
 #include <components/ui_scope.h>
@@ -18,20 +20,13 @@
 class FileBrowser {
   public:
     /**
-     * @brief Whether the dialog opens an existing file or names a new one.
-     */
-    enum class Mode {
-        OPEN, ///< read-only filename field showing the current selection
-        SAVE  ///< editable filename field for naming a new file
-    };
-
-    /**
      * @brief Builds the dialog into a parent instance
      * @param parent The instance the dialog fills
      * @param mode Whether the dialog opens an existing file or names a new one
      * @param startDirectory The directory the dialog opens at, the working directory when it names nothing that exists
      */
-    explicit FileBrowser(Amethyst::Instance &parent, Mode mode = Mode::OPEN, const std::filesystem::path &startDirectory = {});
+    explicit FileBrowser(Amethyst::Instance &parent, FileDialogMode mode = FILE_DIALOG_OPEN,
+                         const std::filesystem::path &startDirectory = {});
     ~FileBrowser();
     FileBrowser(const FileBrowser &) = delete;
     FileBrowser &operator=(const FileBrowser &) = delete;
@@ -90,7 +85,7 @@ class FileBrowser {
     void updateSelectionLabel(void);
     void confirm(const std::filesystem::path &path);
 
-    Mode m_mode;
+    FileDialogMode m_mode;
 
     Amethyst::Frame *m_root = nullptr;
     Amethyst::EventConnection m_rootDestroyConn;
