@@ -178,33 +178,10 @@ static void s_fillTooltip(Amethyst::Tooltip &surface, const TooltipRows &rows)
         });
     }
 }
-ContentBrowserPanel::ContentBrowserPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context)
-    : Panel("Content Browser", context)
+ContentBrowserPanel::ContentBrowserPanel(const WorkspaceContext &context, std::function<void()> onDockRequested)
+    : Panel("Content Browser", context), m_onDockRequested(std::move(onDockRequested))
 {
-    m_isDocked = true;
     m_scene = context.world != nullptr ? context.world->getScene() : nullptr;
-
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-
-    buildContent();
-    attach(tabBar, std::move(root));
-}
-
-ContentBrowserPanel::ContentBrowserPanel(Amethyst::PopupScope &scope, const PanelServices &services)
-    : Panel("Content Browser", services)
-{
-    m_root = &scope.component;
-    buildContent();
-}
-
-ContentBrowserPanel::~ContentBrowserPanel()
-{
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
 }
 
 void ContentBrowserPanel::setContext(const WorkspaceContext &context)
@@ -213,9 +190,9 @@ void ContentBrowserPanel::setContext(const WorkspaceContext &context)
     m_scene = context.world != nullptr ? context.world->getScene() : nullptr;
 }
 
-void ContentBrowserPanel::buildContent()
+void ContentBrowserPanel::build(Amethyst::UIScope &scope)
 {
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
+    (void)scope;
 
     m_baseDirectory = Rapture::Application::getInstance().getProject().getProjectDirectory();
     m_currentDirectory = m_baseDirectory;
@@ -292,8 +269,9 @@ void ContentBrowserPanel::setupTopBar()
                         [this](Amethyst::TextButtonScope &b) {
                             m_importBtn = &b.component;
                             m_importBtn->onMouseButton1ClickCb = [this]() {
-                                m_services.openFileExplorer(FileBrowser::Mode::OPEN, [this](const std::filesystem::path &path) {
-                                    m_services.openImportPanel(path, m_currentDirectory);
+                                WindowHostBase *windows = m_context.editor->windows;
+                                windows->openFileDialog(FILE_DIALOG_OPEN, [this, windows](const std::filesystem::path &path) {
+                                    windows->openImportPanel(path, m_currentDirectory);
                                 });
                                 return Amethyst::EventResult::CONSUMED;
                             };
@@ -369,7 +347,7 @@ void ContentBrowserPanel::setupTopBar()
                 },
                 [this](Amethyst::ImageButtonScope &b) { m_settingsBtn = &b.component; });
 
-            if (!m_isDocked) {
+            if (m_onDockRequested) {
                 top.textButton(
                     {
                         .classes = {"generic-text-button"},
@@ -382,9 +360,10 @@ void ContentBrowserPanel::setupTopBar()
                         .label = "Dock in layout",
                     },
                     [this](Amethyst::TextButtonScope &b) {
-                        b.component.onMouseButton1ClickCb = [this]() {
-                            m_isDocked = true;
-                            onDockInLayout.fire();
+                        b.component.onMouseButton1ClickCb = [this, button = &b.component]() {
+                            button->setBaseProperties({.visible = false});
+                            std::function<void()> dock = std::move(m_onDockRequested);
+                            dock();
                             return Amethyst::EventResult::CONSUMED;
                         };
                     });
@@ -615,8 +594,8 @@ void ContentBrowserPanel::setupContextMenu()
     // the rows differ in height, which is what the item count caps the menu against
     m_addMenu->maxVisibleItems = INT_MAX;
     m_addMenu->setRowFactories({
-        .action = [] { return std::make_unique<AddAssetContextMenuAIV>(); },
-        .separator = [] { return std::make_unique<ViewportContextMenuSIV>(); },
+        .action = [] { return std::make_unique<AddAssetMenuItemView>(); },
+        .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
     });
 }
 
@@ -633,19 +612,19 @@ MenuItems ContentBrowserPanel::buildAddMenuItems()
 {
     MenuItems items;
 
-    items.push_back(ViewportContextMenuSID::create("Folder"));
-    items.push_back(AddAssetContextMenuAID::createIconRow("New Folder", Icons::SVG_FOLDER_PLUS,
+    items.push_back(SeparatorMenuItem::create("Folder"));
+    items.push_back(AddAssetMenuItem::createIconRow("New Folder", Icons::SVG_FOLDER_PLUS,
                                                           [this]() { beginCreate(CONTENT_EDIT_FOLDER); }));
-    items.push_back(AddAssetContextMenuAID::createIconRow("Refresh", Icons::SVG_REFRESH, [this]() { refresh(); }));
+    items.push_back(AddAssetMenuItem::createIconRow("Refresh", Icons::SVG_REFRESH, [this]() { refresh(); }));
 
-    items.push_back(ViewportContextMenuSID::create("Create Basic Asset"));
+    items.push_back(SeparatorMenuItem::create("Create Basic Asset"));
     items.push_back(
-        AddAssetContextMenuAID::createAssetRow("Material", Rapture::ASSET_MATERIAL, []() { s_createAssetStub("material"); }));
-    items.push_back(AddAssetContextMenuAID::createAssetRow("World", Rapture::ASSET_WORLD, []() { s_createAssetStub("world"); }));
-    items.push_back(AddAssetContextMenuAID::createAssetRow("Script", Rapture::ASSET_SCRIPT,
+        AddAssetMenuItem::createAssetRow("Material", Rapture::ASSET_MATERIAL, []() { s_createAssetStub("material"); }));
+    items.push_back(AddAssetMenuItem::createAssetRow("World", Rapture::ASSET_WORLD, []() { s_createAssetStub("world"); }));
+    items.push_back(AddAssetMenuItem::createAssetRow("Script", Rapture::ASSET_SCRIPT,
                                                            [this]() { beginCreate(CONTENT_EDIT_SCRIPT); }));
 
-    items.push_back(ViewportContextMenuSID::create("Create Advanced Asset"));
+    items.push_back(SeparatorMenuItem::create("Create Advanced Asset"));
     for (auto &advanced : buildAdvancedAddItems()) {
         items.push_back(std::move(advanced));
     }
@@ -657,7 +636,7 @@ MenuItems ContentBrowserPanel::buildAdvancedAddItems()
 {
     // a row is labelled with the class it creates, so a class is named once and never relabelled
     auto appendClass = [this](MenuItems &into, const Rapture::TypeInfo &type) {
-        into.push_back(AddAssetContextMenuAID::createPlainRow(
+        into.push_back(AddAssetMenuItem::createPlainRow(
             std::string(type.name), [this, &type]() { beginCreate(CONTENT_EDIT_MODULE, &type); }));
     };
 
@@ -671,7 +650,7 @@ MenuItems ContentBrowserPanel::buildAdvancedAddItems()
     appendClass(lights, Rapture::SpotLight3D::staticType());
 
     MenuItems scenes;
-    scenes.push_back(AddAssetContextMenuAID::createPlainRow("Level", []() { s_createAssetStub("level"); }));
+    scenes.push_back(AddAssetMenuItem::createPlainRow("Level", []() { s_createAssetStub("level"); }));
     appendClass(scenes, Rapture::StaticMesh3D::staticType());
     appendClass(scenes, Rapture::Camera3D::staticType());
     appendClass(scenes, Rapture::SpringArm3D::staticType());
@@ -679,12 +658,12 @@ MenuItems ContentBrowserPanel::buildAdvancedAddItems()
     scenes.push_back(Amethyst::makeSubmenuItem("Controllers", std::move(controllers)));
 
     MenuItems shaders;
-    shaders.push_back(AddAssetContextMenuAID::createPlainRow("Compute Shader", []() { s_createAssetStub("compute shader"); }));
-    shaders.push_back(AddAssetContextMenuAID::createPlainRow("Graphics Shader", []() { s_createAssetStub("graphics shader"); }));
+    shaders.push_back(AddAssetMenuItem::createPlainRow("Compute Shader", []() { s_createAssetStub("compute shader"); }));
+    shaders.push_back(AddAssetMenuItem::createPlainRow("Graphics Shader", []() { s_createAssetStub("graphics shader"); }));
 
     MenuItems textures;
-    textures.push_back(AddAssetContextMenuAID::createPlainRow("Texture", []() { s_createAssetStub("texture"); }));
-    textures.push_back(AddAssetContextMenuAID::createPlainRow("Cubemap", []() { s_createAssetStub("cubemap"); }));
+    textures.push_back(AddAssetMenuItem::createPlainRow("Texture", []() { s_createAssetStub("texture"); }));
+    textures.push_back(AddAssetMenuItem::createPlainRow("Cubemap", []() { s_createAssetStub("cubemap"); }));
 
     MenuItems items;
     items.push_back(Amethyst::makeSubmenuItem("Scenes", std::move(scenes)));
@@ -831,9 +810,7 @@ void ContentBrowserPanel::createScript(std::string_view name)
         return;
     }
 
-    if (m_services.openAssetWorkspace) {
-        m_services.openAssetWorkspace(script->handle());
-    }
+    m_context.editor->workspaces->openAsset(script->handle());
 }
 
 void ContentBrowserPanel::createFolder(std::string_view name)
@@ -886,11 +863,7 @@ std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPane
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
 
     if (s_opensInWorkspace(type)) {
-        items.push_back(Amethyst::makeActionItem("Open", [this, handle]() {
-            if (m_services.openAssetWorkspace) {
-                m_services.openAssetWorkspace(handle);
-            }
-        }));
+        items.push_back(Amethyst::makeActionItem("Open", [this, handle]() { m_context.editor->workspaces->openAsset(handle); }));
     }
 
     switch (type) {
@@ -1088,9 +1061,7 @@ void ContentBrowserPanel::refreshFileBrowser()
             item.action->onMouseButton1DoubleClickCb = [this, assetHandle](int32_t x, int32_t y) {
                 (void)x;
                 (void)y;
-                if (m_services.openAssetWorkspace) {
-                    m_services.openAssetWorkspace(assetHandle);
-                }
+                m_context.editor->workspaces->openAsset(assetHandle);
                 return Amethyst::EventResult::CONSUMED;
             };
         } else {

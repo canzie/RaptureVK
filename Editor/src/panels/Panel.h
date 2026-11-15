@@ -6,6 +6,7 @@
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -29,6 +30,12 @@ class Panel {
      * @param tabBar The bar the tab is added to
      */
     void attach(Amethyst::TabBar *tabBar);
+
+    /**
+     * @brief Builds this panel into a parent that is not a tab bar, filling it
+     * @param parent The instance the panel's frame is added to
+     */
+    void attachTo(Amethyst::Instance &parent);
 
     /**
      * @brief Moves this panel's tab to another bar, leaving what it holds built
@@ -93,6 +100,13 @@ class Panel {
     Amethyst::Frame *m_root = nullptr;
     Amethyst::EventConnection m_rootDestroyConn;
     EntitySelection *m_selection = nullptr;
+
+  private:
+    /**
+     * @brief Creates this panel's frame and fills it
+     * @return The frame, not yet added to anything
+     */
+    std::unique_ptr<Amethyst::Frame> buildRoot();
 
   private:
     bool m_shown = false;

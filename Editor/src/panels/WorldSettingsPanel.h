@@ -38,15 +38,16 @@ class WorldPlaySection : public PropertySection {
  */
 class WorldSettingsPanel : public Panel {
   public:
-    WorldSettingsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
-    ~WorldSettingsPanel() override;
-    WorldSettingsPanel(const WorldSettingsPanel &) = delete;
-    WorldSettingsPanel &operator=(const WorldSettingsPanel &) = delete;
+    explicit WorldSettingsPanel(const WorkspaceContext &context);
 
     void onUpdate(float dt) override;
 
+  protected:
+    void build(Amethyst::UIScope &scope) override;
+    void onRootDestroyed() override;
+
   private:
-    void setupPlaceholder(void);
+    void setupPlaceholder(Amethyst::UIScope &scope);
     void setupWorldView(void);
     void refresh(void);
 

@@ -3,7 +3,6 @@
 
 #include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetManager.h"
-#include "core/utils/Log.h"
 #include "gpu/textures/Texture.h"
 
 #include <components/context_menu_item.h>
@@ -11,21 +10,22 @@
 
 static constexpr float PICKER_HEADER_HEIGHT = 34.0f;
 
-ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string title,
-                                     ImagePreviewMode mode)
-    : Panel(title, context), m_mode(mode)
+ImagePreviewPanel::ImagePreviewPanel(const WorkspaceContext &context, std::string title, ImagePreviewMode mode)
+    : Panel(std::move(title), context), m_mode(mode)
 {
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
-    m_root->name = std::string(title);
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
+}
 
+ImagePreviewPanel::~ImagePreviewPanel()
+{
+    for (const auto &[handle, id] : m_registered) {
+        m_context.editor->textures->unregisterTexture(id);
+    }
+}
+
+void ImagePreviewPanel::build(Amethyst::UIScope &scope)
+{
     const bool picker = m_mode == ImagePreviewMode::ASSET_PICKER;
     const float imageOffsetY = picker ? PICKER_HEADER_HEIGHT : 0.0f;
-
-    Amethyst::UIScope scope(*m_root);
 
     if (picker) {
         scope.frame(
@@ -78,17 +78,12 @@ ImagePreviewPanel::ImagePreviewPanel(Amethyst::TabBar *tabBar, const WorkspaceCo
     if (picker) {
         rebuildSelector();
     }
-
-    attach(tabBar, std::move(root));
 }
 
-ImagePreviewPanel::~ImagePreviewPanel()
+void ImagePreviewPanel::onRootDestroyed()
 {
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
+    m_image = nullptr;
+    m_selector = nullptr;
 }
 
 void ImagePreviewPanel::setImage(Amethyst::AmTextureId image)
@@ -124,11 +119,6 @@ void ImagePreviewPanel::rebuildSelector()
 
 void ImagePreviewPanel::selectTexture(Rapture::AssetHandle handle)
 {
-    if (!m_services.registerTexture) {
-        RP_ERROR("registerTexture service not set, cannot display texture");
-        return;
-    }
-
     Rapture::Ref<Rapture::ATexture> assetRef = Rapture::AssetManager::getAsset<Rapture::ATexture>(handle);
     if (!assetRef) {
         return;
@@ -137,7 +127,7 @@ void ImagePreviewPanel::selectTexture(Rapture::AssetHandle handle)
 
     auto it = m_registered.find(handle);
     if (it == m_registered.end()) {
-        it = m_registered.emplace(handle, m_services.registerTexture(texture)).first;
+        it = m_registered.emplace(handle, m_context.editor->textures->registerTexture(texture)).first;
     }
 
     setImage(it->second);

@@ -28,14 +28,10 @@ class SceneObjectTreePanel : public Panel {
   public:
     /**
      * @brief Builds the panel over a subtree
-     * @param tabBar The bar the panel's tab is added to
      * @param context The workspace the panel is built against
      * @param root The scene object whose subtree is shown, which cannot be deleted from here
      */
-    SceneObjectTreePanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::SceneObject *root);
-    ~SceneObjectTreePanel() override;
-    SceneObjectTreePanel(const SceneObjectTreePanel &) = delete;
-    SceneObjectTreePanel &operator=(const SceneObjectTreePanel &) = delete;
+    SceneObjectTreePanel(const WorkspaceContext &context, Rapture::SceneObject *root);
 
     /**
      * @brief Rebuilds the tree from the root's current subtree
@@ -43,6 +39,10 @@ class SceneObjectTreePanel : public Panel {
     void refresh(void);
 
     void onUpdate(float dt) override;
+
+  protected:
+    void build(Amethyst::UIScope &scope) override;
+    void onRootDestroyed() override;
 
   private:
     void setupHeader(Amethyst::UIScope &scope);

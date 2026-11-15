@@ -61,21 +61,14 @@ static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::stri
         [](Amethyst::TextLabelScope &l) { l.component.propagate(Amethyst::INTERACTION_CATEGORY_ALL); });
 }
 
-OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Outliner", context)
+OutlinerPanel::OutlinerPanel(const WorkspaceContext &context) : Panel("Outliner", context)
 {
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
-        m_root = nullptr;
-        m_scrollingFrame = nullptr;
-        m_treeView = nullptr;
-        m_contextMenu = nullptr;
-        m_renameInput = nullptr;
-    });
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
+    m_icon = Icons::SVG_LAYERS;
+}
 
-    Amethyst::UIScope(*m_root)
+void OutlinerPanel::build(Amethyst::UIScope &scope)
+{
+    scope
         .frame({
             .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
             .style = {.backgroundTransparency = 1.0f},
@@ -118,21 +111,17 @@ OutlinerPanel::OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
 
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
-    m_contextMenu->setRowFactories({.separator = [] { return std::make_unique<ViewportContextMenuSIV>(); }});
+    m_contextMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
 
-    icon = Icons::SVG_LAYERS;
-    attach(tabBar, std::move(root));
-
-    setScene(context.scene);
+    setScene(m_context.scene);
 }
 
-OutlinerPanel::~OutlinerPanel()
+void OutlinerPanel::onRootDestroyed()
 {
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
+    m_scrollingFrame = nullptr;
+    m_treeView = nullptr;
+    m_contextMenu = nullptr;
+    m_renameInput = nullptr;
 }
 
 void OutlinerPanel::setScene(Rapture::Scene *scene)
@@ -287,7 +276,7 @@ void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
         items.push_back(Amethyst::makeSubmenuItem(
             "Add", AddSceneObjectMenu_buildItems(instance, *m_selection, SCENE_OBJECT_SCOPE_LEVEL)));
     }
-    items.push_back(ViewportContextMenuSID::create());
+    items.push_back(SeparatorMenuItem::create());
     items.push_back(Amethyst::makeActionItem("Rename", [this, row, instance]() { startRename(row, instance); }));
     items.push_back(Amethyst::makeActionItem("Delete", [this, instance]() { requestDelete(instance, false); }));
     if (hasChildren) {

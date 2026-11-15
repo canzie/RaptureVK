@@ -2,7 +2,6 @@
 #define RAPTURE__CONTENT_BROWSER_PANEL_H
 
 #include "assets/asset_manager/AssetCommon.h"
-#include "core/events/EventSignal.h"
 #include "core/utils/TypeInfo.h"
 #include <amethyst/Amethyst.h>
 #include <components/context_menu.h>
@@ -11,6 +10,7 @@
 #include <components/ui_scope.h>
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -20,21 +20,21 @@
 
 class ContentBrowserPanel : public Panel {
   public:
-    ContentBrowserPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
-    ContentBrowserPanel(Amethyst::PopupScope &scope, const PanelServices &services);
-    ~ContentBrowserPanel();
-    ContentBrowserPanel(const ContentBrowserPanel &) = delete;
-    ContentBrowserPanel &operator=(const ContentBrowserPanel &) = delete;
-    ContentBrowserPanel(ContentBrowserPanel &&) = delete;
-    ContentBrowserPanel &operator=(ContentBrowserPanel &&) = delete;
+    /**
+     * @brief Creates the content browser
+     * @param context The workspace the panel is built against
+     * @param onDockRequested Run once the browser is asked to move into the workspace's layout, empty
+     *        when it already lives there
+     */
+    explicit ContentBrowserPanel(const WorkspaceContext &context, std::function<void()> onDockRequested = {});
 
-    virtual void setContext(const WorkspaceContext &context);
+    void setContext(const WorkspaceContext &context) override;
 
     void refresh();
     void setBaseDirectory(const std::filesystem::path &path);
-    void setScene(Rapture::Scene *scene) { m_scene = scene; }
 
-    Rapture::EventSignal<void()> onDockInLayout;
+  protected:
+    void build(Amethyst::UIScope &scope) override;
 
   private:
     struct ContentItemComponents {
@@ -70,8 +70,6 @@ class ContentBrowserPanel : public Panel {
     };
 
   private:
-    void buildContent(void);
-
     void setupTopBar(void);
     void setupSideBar(void);
 
@@ -209,7 +207,7 @@ class ContentBrowserPanel : public Panel {
     size_t m_selectedItem = SIZE_MAX;
     ContentEdit m_edit;
 
-    bool m_isDocked = false;
+    std::function<void()> m_onDockRequested;
     Rapture::Scene *m_scene = nullptr;
 
     std::filesystem::path m_baseDirectory;

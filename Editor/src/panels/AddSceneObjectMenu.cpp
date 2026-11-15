@@ -110,7 +110,7 @@ static void s_appendSection(std::vector<MenuItem> &items, std::string label, std
         return;
     }
 
-    items.push_back(ViewportContextMenuSID::create(std::move(label)));
+    items.push_back(SeparatorMenuItem::create(std::move(label)));
     for (MenuItem &item : group) {
         items.push_back(std::move(item));
     }

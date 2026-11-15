@@ -1168,8 +1168,8 @@ void NodeEditorPanel::setTextureNodeAsset(uint32_t nodeId, Rapture::AssetHandle 
 
     it->second.textureData->texture = assetRef;
 
-    if (it->second.textureData->preview != nullptr && m_services.registerTexture) {
-        it->second.textureData->preview->setImage(m_services.registerTexture(texture));
+    if (it->second.textureData->preview != nullptr) {
+        it->second.textureData->preview->setImage(m_context.editor->textures->registerTexture(texture));
     }
 }
 
@@ -1264,8 +1264,8 @@ void NodeEditorPanel::regenerateProcedural(uint32_t nodeId)
     td.generator->generate();
     td.texture = td.generator->getTextureAsset();
 
-    if (td.preview != nullptr && m_services.registerTexture) {
-        td.preview->setImage(m_services.registerTexture(&td.generator->getTexture()));
+    if (td.preview != nullptr) {
+        td.preview->setImage(m_context.editor->textures->registerTexture(&td.generator->getTexture()));
     }
 }
 
@@ -1362,8 +1362,8 @@ void NodeEditorPanel::setImageTexture(uint32_t nodeId, Rapture::Ref<Rapture::ATe
     Rapture::Texture *tex = texture.operator->();
     it->second.textureData->texture = std::move(texture);
 
-    if (tex != nullptr && it->second.textureData->preview != nullptr && m_services.registerTexture) {
-        it->second.textureData->preview->setImage(m_services.registerTexture(tex));
+    if (tex != nullptr && it->second.textureData->preview != nullptr) {
+        it->second.textureData->preview->setImage(m_context.editor->textures->registerTexture(tex));
     }
 }
 

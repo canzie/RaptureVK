@@ -16,12 +16,7 @@
 
 class OutlinerPanel : public Panel {
   public:
-    OutlinerPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
-    ~OutlinerPanel();
-    OutlinerPanel(const OutlinerPanel &) = delete;
-    OutlinerPanel &operator=(const OutlinerPanel &) = delete;
-    OutlinerPanel(OutlinerPanel &&) = delete;
-    OutlinerPanel &operator=(OutlinerPanel &&) = delete;
+    explicit OutlinerPanel(const WorkspaceContext &context);
 
     /**
      * @brief Update the outliner with the current scene
@@ -34,6 +29,10 @@ class OutlinerPanel : public Panel {
     void refresh(void);
 
     void onUpdate(float dt) override;
+
+  protected:
+    void build(Amethyst::UIScope &scope) override;
+    void onRootDestroyed() override;
 
   private:
     void buildInstanceTree(Rapture::SceneObject *instance, Amethyst::TreeRowScope &rowScope);

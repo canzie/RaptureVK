@@ -44,7 +44,7 @@ struct AssetPickerConfig {
 
 /**
  * @brief Editor asset field: a bar showing the selected asset that drops down the matching assets on click.
- * The dropdown rows are AssetContextMenuAIV rows in a ContextMenu. The given theme classes are applied to every
+ * The dropdown rows are AssetMenuItemView rows in a ContextMenu. The given theme classes are applied to every
  * component it builds, the popup included.
  */
 class AssetPicker {

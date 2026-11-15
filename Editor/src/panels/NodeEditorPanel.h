@@ -35,12 +35,8 @@ class MaterialInstance;
  */
 class NodeEditorPanel : public Panel {
   public:
-    NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::AssetHandle material);
+    NodeEditorPanel(const WorkspaceContext &context, Rapture::AssetHandle material);
     ~NodeEditorPanel() override;
-    NodeEditorPanel(const NodeEditorPanel &) = delete;
-    NodeEditorPanel &operator=(const NodeEditorPanel &) = delete;
-    NodeEditorPanel(NodeEditorPanel &&) = delete;
-    NodeEditorPanel &operator=(NodeEditorPanel &&) = delete;
 
     /**
      * @brief Builds the current graph, runs it through the compiler, and logs the outcome
@@ -64,6 +60,10 @@ class NodeEditorPanel : public Panel {
         SIMPLEX_NOISE,
         RIDGED_NOISE,
     };
+
+  protected:
+    void build(Amethyst::UIScope &scope) override;
+    void onRootDestroyed() override;
 
   private:
     static constexpr uint32_t INVALID_PIN = UINT32_MAX;

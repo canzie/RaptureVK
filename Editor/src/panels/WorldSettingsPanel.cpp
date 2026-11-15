@@ -61,41 +61,29 @@ void WorldPlaySection::sync()
     m_gravity = world->gravity().y;
 }
 
-WorldSettingsPanel::WorldSettingsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context)
-    : Panel("World Settings", context), m_world(context.world)
+WorldSettingsPanel::WorldSettingsPanel(const WorkspaceContext &context) : Panel("World Settings", context), m_world(context.world)
 {
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
-        m_root = nullptr;
-        m_placeholderText = nullptr;
-    });
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
+    m_icon = Icons::SVG_WORLD;
+}
 
-    setupPlaceholder();
+void WorldSettingsPanel::build(Amethyst::UIScope &scope)
+{
+    setupPlaceholder(scope);
     setupWorldView();
-
-    icon = Icons::SVG_WORLD;
-    attach(tabBar, std::move(root));
 
     m_placeholderText->setBaseProperties({.visible = m_world == nullptr});
     m_sections->setVisible(m_world != nullptr);
     refresh();
 }
 
-WorldSettingsPanel::~WorldSettingsPanel()
+void WorldSettingsPanel::onRootDestroyed()
 {
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
+    m_placeholderText = nullptr;
 }
 
-void WorldSettingsPanel::setupPlaceholder()
+void WorldSettingsPanel::setupPlaceholder(Amethyst::UIScope &scope)
 {
-    Amethyst::UIScope(*m_root).textLabel(
+    scope.textLabel(
         {
             .base =
                 {

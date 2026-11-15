@@ -32,6 +32,19 @@ const EditorConfig &Panel::config() const
 void Panel::attach(Amethyst::TabBar *tabBar)
 {
     RP_ASSERT(tabBar != nullptr, "a panel cannot be attached to no bar");
+
+    tabBar->addTab(buildRoot(), iconTabLabel(m_name, m_icon, config()));
+}
+
+void Panel::attachTo(Amethyst::Instance &parent)
+{
+    std::unique_ptr<Amethyst::Frame> root = buildRoot();
+    root->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
+    parent.addChild(std::move(root));
+}
+
+std::unique_ptr<Amethyst::Frame> Panel::buildRoot()
+{
     RP_ASSERT(m_root == nullptr, "a panel can only be attached once, use moveTo to redock it");
 
     auto root = std::make_unique<Amethyst::Frame>();
@@ -48,7 +61,7 @@ void Panel::attach(Amethyst::TabBar *tabBar)
     build(scope);
     resolveLayout();
 
-    tabBar->addTab(std::move(root), iconTabLabel(m_name, m_icon, config()));
+    return root;
 }
 
 void Panel::moveTo(Amethyst::TabBar *tabBar)

@@ -30,26 +30,20 @@ static constexpr float HEADER_PAD = 6.0f;
 static constexpr float CONTENT_OFFSET = HEADER_HEIGHT + (HEADER_PAD * 2.0f);
 static constexpr float ADD_BUTTON_WIDTH = 64.0f;
 
-SceneObjectTreePanel::SceneObjectTreePanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::SceneObject *root)
+SceneObjectTreePanel::SceneObjectTreePanel(const WorkspaceContext &context, Rapture::SceneObject *root)
     : Panel("Scene Objects", context), m_scene(context.scene), m_rootObject(root)
 {
-    auto rootFrame = std::make_unique<Amethyst::Frame>();
-    m_root = rootFrame.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
-        m_root = nullptr;
-        m_treeView = nullptr;
-        m_contextMenu = nullptr;
-    });
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
+    m_icon = Icons::SVG_SCENE;
+}
 
-    Amethyst::UIScope scope(*m_root);
+void SceneObjectTreePanel::build(Amethyst::UIScope &scope)
+{
     setupHeader(scope);
     setupTree(scope);
 
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
-    m_contextMenu->setRowFactories({.separator = [] { return std::make_unique<ViewportContextMenuSIV>(); }});
+    m_contextMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
 
     if (m_scene != nullptr) {
         // deferred, the signal reaches here from inside a context menu callback
@@ -60,19 +54,13 @@ SceneObjectTreePanel::SceneObjectTreePanel(Amethyst::TabBar *tabBar, const Works
         m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) { selectRowFor(entity); });
     }
 
-    icon = Icons::SVG_SCENE;
-    attach(tabBar, std::move(rootFrame));
-
     refresh();
 }
 
-SceneObjectTreePanel::~SceneObjectTreePanel()
+void SceneObjectTreePanel::onRootDestroyed()
 {
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
+    m_treeView = nullptr;
+    m_contextMenu = nullptr;
 }
 
 void SceneObjectTreePanel::setupHeader(Amethyst::UIScope &scope)
@@ -262,7 +250,7 @@ void SceneObjectTreePanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
 
     // the root is what the asset is authored into, so it stays
     if (instance != m_rootObject) {
-        items.push_back(ViewportContextMenuSID::create());
+        items.push_back(SeparatorMenuItem::create());
         items.push_back(Amethyst::makeActionItem("Delete", [this, instance]() { requestDelete(instance); }));
     }
 
