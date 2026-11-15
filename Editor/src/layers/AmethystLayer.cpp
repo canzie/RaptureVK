@@ -1,35 +1,18 @@
 #include "AmethystLayer.h"
-#include <assets/worlds/AWorld.h>
 
-#include "EditorLayout.h"
 #include "EditorState.h"
-#include "LauncherConfig.h"
 #include "ProjectLauncher.h"
-#include "assets/asset_manager/AssetRegistry.h"
-#include "assets/asset_manager/AssetManager.h"
+#include "context/WorkspaceHost.h"
 #include "gpu/command_buffers/CommandPool.h"
-#include "layers/panels/FileBrowser.h"
-#include "layers/panels/ImportPanel.h"
-#include "layers/panels/components/tab_layouts.h"
-#include "layers/workspaces/AnimationsWorkspace.h"
-#include "layers/workspaces/LevelEditorWorkspace.h"
-#include "layers/workspaces/MaterialEditorWorkspace.h"
-#include "layers/workspaces/ModuleEditorWorkspace.h"
-#include "layers/workspaces/ScriptingWorkspace.h"
-#include "layers/workspaces/SkeletalMeshWorkspace.h"
-#include "layers/workspaces/SkeletonWorkspace.h"
-#include "layers/workspaces/StaticMeshWorkspace.h"
-#include "layers/workspaces/TextureGeneratorWorkspace.h"
+#include "panels/ImportPanel.h"
+#include "ui/FileBrowser.h"
 #include "core/utils/Log.h"
 #include "core/utils/TracyProfiler.h"
 #include "gpu/swap_chains/SwapChain.h"
-#include "gpu/textures/Texture.h"
 #include "core/utils/EnginePaths.h"
 #include "core/utils/Timestep.h"
-#include "renderer/viewport/ViewportManager.h"
 #include "app/Application.h"
 
-#include <algorithm>
 #include <components/common.h>
 #include <components/extensions/ui_drag_detector.h>
 #include <components/image_label.h>
@@ -45,6 +28,35 @@
 static constexpr float PROJECT_NAME_WIDTH = 180.0f;
 static constexpr float PROJECT_NAME_RIGHT_INSET = 140.0f;
 static constexpr float PROJECT_NAME_VERTICAL_INSET = 8.0f;
+
+static constexpr int32_t LAUNCHER_WINDOW_WIDTH = 640;
+static constexpr int32_t LAUNCHER_WINDOW_HEIGHT = 520;
+
+static constexpr int32_t FILE_DIALOG_WINDOW_WIDTH = 880;
+static constexpr int32_t FILE_DIALOG_WINDOW_HEIGHT = 560;
+
+static constexpr std::string_view LAYOUT_CONFIG_FILE = "layout.conf";
+
+void AmethystLayer::LayerWindowHost::openSecondaryWindow(int32_t width, int32_t height, std::string_view title,
+                                                         std::function<void(Amethyst::Window &)> build)
+{
+    m_layer->openSecondaryWindow(width, height, title,
+                                 [build = std::move(build)](Amethyst::Window &window, const std::function<void()> &close) {
+                                     (void)close;
+                                     build(window);
+                                     return std::shared_ptr<void>{};
+                                 });
+}
+
+void AmethystLayer::LayerWindowHost::openFileDialog(FileDialogMode mode, std::function<void(const std::filesystem::path &)> onConfirm)
+{
+    m_layer->openFileDialog(mode, std::move(onConfirm));
+}
+
+void AmethystLayer::LayerWindowHost::openImportPanel(const std::filesystem::path &source, const std::filesystem::path &outputFolder)
+{
+    m_layer->openImportPanel(source, outputFolder);
+}
 
 VkDescriptorPool AmethystLayer::createUiDescriptorPool()
 {
@@ -78,18 +90,25 @@ AmethystLayer::AmethystLayer()
 
     m_mainSwapchainRecreatedConn = app.getMainWindow().getSwapChain()->onRecreated.connect(
         [this]() { onResize(*Rapture::Application::getInstance().getMainWindow().getSwapChain()); });
+
+    m_config = EditorConfig::load();
+    Amethyst::LayoutConfig::instance().loadFromFile(LAYOUT_CONFIG_FILE);
 }
 
 AmethystLayer::~AmethystLayer()
 {
-    for (auto &ws : m_workspaces) {
-        ws->saveLayout();
+    if (m_workspaceHost != nullptr) {
+        m_workspaceHost->saveDockLayouts();
     }
 
     auto &app = Rapture::Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
     vulkanContext.waitIdle();
 
+    // panels hand their textures back to the backend as they go, so they go before it shuts down
+    m_activeWorkspaceChangedConn.disconnect();
+    m_bottomBar.reset();
+    m_workspaceHost.reset();
     m_secondaryWindows.clear();
 
     m_backend.shutdown();
@@ -160,11 +179,27 @@ void AmethystLayer::onAttach()
         return;
     }
 
-    setupMenuBar(screenSize);
-    setupWorkspaces();
+    setupEditorContext();
+    setupMenuBar();
 
-    m_bottomBar = std::make_unique<BottomBar>(&m_window, buildServices());
-    m_bottomBar->setCurrentWorkspace(m_workspaces.empty() ? nullptr : m_workspaces[m_activeWorkspaceIndex].get());
+    m_bottomBar = std::make_unique<BottomBar>(&m_window, m_editorContext);
+    setupWorkspaces();
+}
+
+void AmethystLayer::setupEditorContext()
+{
+    m_editorContext = {
+        .amethyst = &m_amCtx,
+        .windows = &m_windowHost,
+        .workspaces = nullptr,
+        .textures = &m_textures,
+        .shortcuts = &m_shortcutRegistry,
+        .config = &m_config,
+        .project = &Rapture::Application::getInstance().getProject(),
+    };
+
+    m_workspaceHost = std::make_unique<WorkspaceHost>(m_editorContext);
+    m_editorContext.workspaces = m_workspaceHost.get();
 }
 
 void AmethystLayer::wireLauncher(ProjectLauncher &launcher)
@@ -172,7 +207,7 @@ void AmethystLayer::wireLauncher(ProjectLauncher &launcher)
     launcher.onOpenProject = [this](const std::filesystem::path &projectPath) { launchProject(projectPath); };
     launcher.onCreateProject = [this](std::string_view name) { createProject(name); };
     launcher.onBrowseForProject = [this]() {
-        openFileExplorer(FileBrowser::Mode::OPEN, [this](const std::filesystem::path &path) { launchProject(path); });
+        openFileDialog(FILE_DIALOG_OPEN, [this](const std::filesystem::path &path) { launchProject(path); });
     };
 }
 
@@ -202,10 +237,9 @@ void AmethystLayer::createProject(std::string_view name)
 
 void AmethystLayer::launchProject(const std::filesystem::path &projectPath)
 {
-    LauncherConfig config = LauncherConfig::load();
-    config.addRecentProject(projectPath);
-    config.setAutoLaunchProject(projectPath);
-    config.save();
+    m_config.addRecentProject(projectPath);
+    m_config.setAutoLaunchProject(projectPath);
+    m_config.save();
 
     // the editor is built around an open project, so it restarts into this one
     Rapture::Application::getInstance().requestRelaunch(projectPath);
@@ -215,105 +249,17 @@ void AmethystLayer::onDetach()
 {
     RP_INFO("Detaching AmethystLayer...");
 
-    for (auto &ws : m_workspaces) {
-        ws->saveLayout();
-    }
-
-    storeEditorState();
-}
-
-void AmethystLayer::openLevelEditor()
-{
-    openAssetWorkspace(Rapture::Application::getInstance().getProject().getStartupWorld());
-}
-
-ScriptingWorkspace *AmethystLayer::openScriptingWorkspace()
-{
-    if (m_workspaceTabBar == nullptr) {
-        return nullptr;
-    }
-
-    for (auto &ws : m_workspaces) {
-        if (ws->kind == ScriptingWorkspace::staticKind()) {
-            auto *scripting = static_cast<ScriptingWorkspace *>(ws.get());
-            m_workspaceTabBar->select(scripting->getContainer());
-            return scripting;
-        }
-    }
-
-    auto workspace = std::make_unique<ScriptingWorkspace>(*m_workspaceTabBar, buildServices());
-    sizeDockingLayer(*workspace);
-
-    ScriptingWorkspace *scripting = workspace.get();
-    Amethyst::Frame *container = workspace->getContainer();
-    m_workspaces.push_back(std::move(workspace));
-    m_workspaceTabBar->select(container);
-    return scripting;
-}
-
-void AmethystLayer::openStoredWorkspace(const EditorWorkspaceState &entry)
-{
-    if (entry.handle != Rapture::INVALID_ASSET_HANDLE) {
-        openAssetWorkspace(entry.handle);
+    if (m_workspaceHost == nullptr) {
         return;
     }
 
-    PanelServices services = buildServices();
-
-    if (entry.kind == LevelEditorWorkspace::staticKind()) {
-        openLevelEditor();
-    } else if (entry.kind == TextureGeneratorWorkspace::staticKind()) {
-        m_workspaces.push_back(std::make_unique<TextureGeneratorWorkspace>(*m_workspaceTabBar, services));
-    } else if (entry.kind == AnimationsWorkspace::staticKind()) {
-        m_workspaces.push_back(std::make_unique<AnimationsWorkspace>(*m_workspaceTabBar, services));
-    } else if (entry.kind == ScriptingWorkspace::staticKind()) {
-        m_workspaces.push_back(std::make_unique<ScriptingWorkspace>(*m_workspaceTabBar, services));
-    } else {
-        RP_WARN("dropping stored workspace '{}', this build has no such workspace", entry.kind);
-    }
-}
-
-Rapture::AssetHandle AmethystLayer::assetHandleFor(const Workspace &workspace) const
-{
-    for (const auto &[handle, assetWorkspace] : m_assetWorkspaces) {
-        if (assetWorkspace == &workspace) {
-            return handle;
-        }
-    }
-    return Rapture::INVALID_ASSET_HANDLE;
-}
-
-void AmethystLayer::restoreActiveWorkspace(const EditorState &state)
-{
-    const EditorWorkspaceState *wanted = nullptr;
-    for (const EditorWorkspaceState &entry : state.workspaces) {
-        if (entry.active) {
-            wanted = &entry;
-            break;
-        }
-    }
-
-    Workspace *target = m_workspaces.front().get();
-    if (wanted != nullptr) {
-        for (auto &ws : m_workspaces) {
-            if (ws->kind == wanted->kind && assetHandleFor(*ws) == wanted->handle) {
-                target = ws.get();
-                break;
-            }
-        }
-    }
-
-    m_workspaceTabBar->select(target->getContainer());
+    m_workspaceHost->saveDockLayouts();
+    storeEditorState();
 }
 
 void AmethystLayer::storeEditorState()
 {
-    EditorState state;
-    state.workspaces.reserve(m_workspaces.size());
-
-    for (const auto &ws : m_workspaces) {
-        state.workspaces.push_back({std::string(ws->kind), ws->active, assetHandleFor(*ws)});
-    }
+    EditorState state = m_workspaceHost->captureState();
 
     auto &project = Rapture::Application::getInstance().getProject();
     state.store(project);
@@ -334,8 +280,8 @@ void AmethystLayer::onUpdate(float dt)
 
     updateShortcuts();
 
-    for (auto &ws : m_workspaces) {
-        ws->onUpdate(dt);
+    if (m_workspaceHost != nullptr) {
+        m_workspaceHost->onUpdate(dt);
     }
 
     m_window.tick(dt);
@@ -361,15 +307,17 @@ static void s_saveProject()
     project.saveProject(project.getProjectFilePath());
 }
 
-void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
+void AmethystLayer::setupMenuBar()
 {
+    const float menuBarHeight = m_config.getFloat(EDITOR_CONFIG_MENU_BAR_HEIGHT);
+
     Amethyst::UIScope(m_window).menuBar(
         {
             .classes = {"main-menu-bar"},
             .base =
                 {
                     .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_MENU_BAR_HEIGHT),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, menuBarHeight),
                 },
             .style =
                 {
@@ -423,8 +371,8 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
             {
                 .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
                 .interactable = false,
-                .position = Amethyst::UDim2(1.0f, -PROJECT_NAME_RIGHT_INSET, 0.0f, EDITOR_MENU_BAR_HEIGHT * 0.5f),
-                .size = Amethyst::UDim2(0.0f, PROJECT_NAME_WIDTH, 0.0f, EDITOR_MENU_BAR_HEIGHT - PROJECT_NAME_VERTICAL_INSET),
+                .position = Amethyst::UDim2(1.0f, -PROJECT_NAME_RIGHT_INSET, 0.0f, menuBarHeight * 0.5f),
+                .size = Amethyst::UDim2(0.0f, PROJECT_NAME_WIDTH, 0.0f, menuBarHeight - PROJECT_NAME_VERTICAL_INSET),
                 .zIndex = 2,
             },
         .label = Rapture::Application::getInstance().getProject().getProjectName(),
@@ -433,146 +381,40 @@ void AmethystLayer::setupMenuBar(glm::vec2 screenSize)
 
 void AmethystLayer::setupWorkspaces(void)
 {
-    EditorState state = EditorState::load(Rapture::Application::getInstance().getProject());
-    m_workspaces.reserve(state.workspaces.size() + 1);
+    const float menuBarHeight = m_config.getFloat(EDITOR_CONFIG_MENU_BAR_HEIGHT);
+    const float bottomBarHeight = m_config.getFloat(EDITOR_CONFIG_BOTTOM_BAR_HEIGHT);
 
     Amethyst::UIScope(m_window).tabBar(
         {
             .classes = {"workspace", "workspace-tab"},
             .base =
                 {
-                    .position = Amethyst::UDim2::fromOffset(0.0f, EDITOR_MENU_BAR_HEIGHT),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(EDITOR_MENU_BAR_HEIGHT + EDITOR_BOTTOM_BAR_HEIGHT)),
+                    .position = Amethyst::UDim2::fromOffset(0.0f, menuBarHeight),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(menuBarHeight + bottomBarHeight)),
                 },
             .tabBar =
                 {
                     .mode = Amethyst::TabBarMode::INSIDE,
-                    .barThickness = EDITOR_WORKSPACE_TAB_HEIGHT,
-                    .tabWidth = 196.0f,
+                    .barThickness = m_config.getFloat(EDITOR_CONFIG_WORKSPACE_TAB_HEIGHT),
+                    .tabWidth = m_config.getFloat(EDITOR_CONFIG_WORKSPACE_TAB_WIDTH),
                 },
         },
         [this](Amethyst::TabBarScope &tabs) { m_workspaceTabBar = &tabs.component; });
 
-    bool hasLevelEditor = false;
-    for (const EditorWorkspaceState &entry : state.workspaces) {
-        hasLevelEditor = hasLevelEditor || entry.kind == LevelEditorWorkspace::staticKind();
-        openStoredWorkspace(entry);
-    }
+    m_activeWorkspaceChangedConn =
+        m_workspaceHost->onActiveWorkspaceChanged.connect([this](Workspace *workspace) { m_bottomBar->setCurrentWorkspace(workspace); });
 
-    if (!hasLevelEditor) {
-        openLevelEditor();
-    }
-
-    for (auto &ws : m_workspaces) {
-        sizeDockingLayer(*ws);
-    }
-
-    restoreActiveWorkspace(state);
-
-    m_workspaceTabBar->onSelectionChanged = [this](int32_t index) {
-        Amethyst::Instance *content = m_workspaceTabBar->getTabContent(index);
-        for (auto &ws : m_workspaces) {
-            ws->active = ws->getContainer() == content;
-            if (ws->active && m_bottomBar != nullptr) {
-                m_bottomBar->setCurrentWorkspace(ws.get());
-            }
-        }
-        m_activeWorkspaceIndex = index;
-    };
-
-    m_workspaceTabBar->onTabClosed = [this](Amethyst::Instance *content) { closeWorkspace(content); };
+    m_workspaceHost->attach(*m_workspaceTabBar);
+    placeWorkspaceContent(m_window.absoluteSize);
+    m_workspaceHost->restore(EditorState::load(*m_editorContext.project));
 }
 
-void AmethystLayer::sizeDockingLayer(Workspace &workspace)
+void AmethystLayer::placeWorkspaceContent(glm::vec2 screenSize)
 {
-    Amethyst::DockingLayer *dock = workspace.getDockingLayer();
-    if (dock == nullptr) {
-        return;
-    }
-    dock->absoluteSize = {
-        m_window.absoluteSize.x,
-        m_window.absoluteSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING - EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING,
-    };
-    dock->markDirty();
-}
+    const float contentTop = m_config.getFloat(EDITOR_CONFIG_MENU_BAR_HEIGHT) + m_config.getFloat(EDITOR_CONFIG_WORKSPACE_TAB_HEIGHT);
+    const float bottomBarHeight = m_config.getFloat(EDITOR_CONFIG_BOTTOM_BAR_HEIGHT);
 
-void AmethystLayer::openAssetWorkspace(Rapture::AssetHandle handle)
-{
-    if (handle == Rapture::INVALID_ASSET_HANDLE || m_workspaceTabBar == nullptr) {
-        return;
-    }
-
-    auto open = m_assetWorkspaces.find(handle);
-    if (open != m_assetWorkspaces.end()) {
-        m_workspaceTabBar->select(open->second->getContainer());
-        return;
-    }
-
-    const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(handle);
-    PanelServices services = buildServices();
-    std::unique_ptr<Workspace> workspace;
-
-    // every script is written in the one scripting workspace, which holds a tab per open script
-    if (metadata.assetType == Rapture::ASSET_SCRIPT) {
-        ScriptingWorkspace *scripting = openScriptingWorkspace();
-        if (scripting != nullptr) {
-            scripting->openScript(handle);
-        }
-        return;
-    }
-
-    switch (metadata.assetType) {
-    case Rapture::ASSET_MODULE:
-        workspace = ModuleEditorWorkspace::create(*m_workspaceTabBar, services, handle);
-        if (workspace == nullptr) {
-            return;
-        }
-        break;
-    case Rapture::ASSET_MATERIAL_INSTANCE:
-        workspace = std::make_unique<MaterialEditorWorkspace>(*m_workspaceTabBar, services, handle);
-        break;
-    case Rapture::ASSET_STATIC_MESH:
-        workspace = std::make_unique<StaticMeshWorkspace>(*m_workspaceTabBar, services, handle);
-        break;
-    case Rapture::ASSET_SKELETAL_MESH:
-        workspace = std::make_unique<SkeletalMeshWorkspace>(*m_workspaceTabBar, services, handle);
-        break;
-    case Rapture::ASSET_SKELETON:
-        workspace = std::make_unique<SkeletonWorkspace>(*m_workspaceTabBar, services, handle);
-        break;
-    case Rapture::ASSET_WORLD: {
-        Rapture::Ref<Rapture::AWorld> world = Rapture::AssetManager::getAsset<Rapture::AWorld>(handle);
-        if (!world) {
-            RP_WARN("world '{}' could not be loaded, not opening a level editor for it", metadata.getName());
-            return;
-        }
-        workspace = std::make_unique<LevelEditorWorkspace>(*m_workspaceTabBar, services, std::move(world));
-        break;
-    }
-    default:
-        RP_WARN("'{}' assets have no workspace to open in", Rapture::AssetRegistry::displayName(metadata.assetType));
-        return;
-    }
-
-    sizeDockingLayer(*workspace);
-    m_assetWorkspaces.emplace(handle, workspace.get());
-
-    // held before selecting, so the selection handler can find the workspace the new tab belongs to
-    Amethyst::Frame *container = workspace->getContainer();
-    m_workspaces.push_back(std::move(workspace));
-    m_workspaceTabBar->select(container);
-}
-
-void AmethystLayer::closeWorkspace(Amethyst::Instance *content)
-{
-    auto it = std::find_if(m_workspaces.begin(), m_workspaces.end(),
-                           [content](const std::unique_ptr<Workspace> &ws) { return ws->getContainer() == content; });
-    if (it == m_workspaces.end()) {
-        return;
-    }
-
-    std::erase_if(m_assetWorkspaces, [&it](const auto &entry) { return entry.second == it->get(); });
-    m_workspaces.erase(it);
+    m_workspaceHost->setContentArea({0.0f, contentTop}, {screenSize.x, screenSize.y - contentTop - bottomBarHeight});
 }
 
 void AmethystLayer::beginDynamicRendering(Rapture::CommandBuffer *commandBuffer, VkImageView targetImageView, uint32_t imageIndex,
@@ -664,12 +506,8 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
         m_window.absoluteSize = screenSize;
         m_window.markDirty();
 
-        for (auto &ws : m_workspaces) {
-            if (auto *dock = ws->getDockingLayer()) {
-                dock->absoluteSize = {screenSize.x, screenSize.y - EDITOR_CONTENT_TOP - EDITOR_DOCK_SPACING -
-                                                        EDITOR_BOTTOM_BAR_HEIGHT - EDITOR_DOCK_SPACING};
-                dock->markDirty();
-            }
+        if (m_workspaceHost != nullptr) {
+            placeWorkspaceContent(screenSize);
         }
     } else {
         for (auto &context : m_secondaryWindows) {
@@ -691,48 +529,22 @@ void AmethystLayer::updateShortcuts()
     m_shortcutRegistry.onUpdate(*m_input, cursor);
 }
 
-PanelServices AmethystLayer::buildServices(void)
+void AmethystLayer::openImportPanel(const std::filesystem::path &source, const std::filesystem::path &outputFolder)
 {
-    PanelServices services;
-    services.openSecondaryWindow = [this](int32_t width, int32_t height, std::string_view title,
-                                          std::function<void(Amethyst::Window &)> build) {
-        openSecondaryWindow(width, height, title,
-                            [build = std::move(build)](Amethyst::Window &window, const std::function<void()> &close) {
-                                (void)close;
-                                build(window);
-                                return std::shared_ptr<void>{};
-                            });
+    struct Session {
+        std::unique_ptr<ImportPanel> panel;
+        Amethyst::TickHandle watchTick;
+        bool pendingDestroy = false;
     };
-    services.openFileExplorer = [this](FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm) {
-        openFileExplorer(mode, std::move(onConfirm));
-    };
-    services.registerTexture = [this](Rapture::Texture *tex) -> Amethyst::AmTextureId {
-        if (tex == nullptr) return Amethyst::AM_INVALID_TEXTURE;
-        return m_backend.registerTexture(tex->getImageView(), tex->getSampler().getSamplerVk());
-    };
-    services.unregisterTexture = [this](Amethyst::AmTextureId id) { m_backend.unregisterTexture(id); };
-    services.registerShortcut = [this](EditorCommand command, Shortcut defaultShortcut, Amethyst::UIObject *root,
-                                       std::function<void()> action) {
-        m_shortcutRegistry.registerShortcut(command, defaultShortcut, root, std::move(action));
-    };
-    services.openImportPanel = [this](const std::filesystem::path &source, const std::filesystem::path &outputFolder) {
-        struct Session {
-            std::unique_ptr<ImportPanel> panel;
-            Amethyst::TickHandle watchTick;
-            bool pendingDestroy = false;
-        };
-        auto session = std::make_shared<Session>();
-        session->panel = std::make_unique<ImportPanel>(m_window, source, outputFolder);
-        session->panel->onClose = [session](void) { session->pendingDestroy = true; };
-        session->watchTick = m_window.registerTick([session](float) {
-            if (session->pendingDestroy) {
-                session->panel.reset();
-                session->watchTick.unregister();
-            }
-        });
-    };
-    services.openAssetWorkspace = [this](Rapture::AssetHandle handle) { openAssetWorkspace(handle); };
-    return services;
+    auto session = std::make_shared<Session>();
+    session->panel = std::make_unique<ImportPanel>(m_window, source, outputFolder);
+    session->panel->onClose = [session](void) { session->pendingDestroy = true; };
+    session->watchTick = m_window.registerTick([session](float) {
+        if (session->pendingDestroy) {
+            session->panel.reset();
+            session->watchTick.unregister();
+        }
+    });
 }
 
 void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::string_view title, SecondaryWindowBuilder build)
@@ -764,7 +576,7 @@ void AmethystLayer::openSecondaryWindow(int32_t width, int32_t height, std::stri
     renderWindow.onClose = [this, contextPtr]() { closeSecondaryWindow(contextPtr); };
 }
 
-void AmethystLayer::openFileExplorer(FileBrowser::Mode mode, std::function<void(const std::filesystem::path &)> onConfirm)
+void AmethystLayer::openFileDialog(FileDialogMode mode, std::function<void(const std::filesystem::path &)> onConfirm)
 {
     auto confirm = [this, onConfirm = std::move(onConfirm)](const std::filesystem::path &path) {
         m_lastExplorerDirectory = path.parent_path();
@@ -773,7 +585,7 @@ void AmethystLayer::openFileExplorer(FileBrowser::Mode mode, std::function<void(
         }
     };
 
-    openSecondaryWindow(FILE_EXPLORER_WINDOW_WIDTH, FILE_EXPLORER_WINDOW_HEIGHT, "Open File",
+    openSecondaryWindow(FILE_DIALOG_WINDOW_WIDTH, FILE_DIALOG_WINDOW_HEIGHT, "Open File",
                         [mode, startDirectory = m_lastExplorerDirectory, confirm = std::move(confirm)](
                             Amethyst::Window &window, const std::function<void()> &close) {
                             auto fileBrowser = std::make_shared<FileBrowser>(window, mode, startDirectory);

@@ -14,6 +14,7 @@ class Project;
  * @brief A workspace that was open, and whether it was the one in front
  */
 struct EditorWorkspaceState {
+    /// The tab label of a workspace that is for no single asset, empty for one that is
     std::string kind;
     bool active = false;
     // the asset the workspace was editing, invalid for the workspaces that edit no single asset

@@ -25,11 +25,11 @@ EditorState EditorState::load(const Rapture::Project &project)
     for (size_t i = 0; i < workspaces.size(); i++) {
         Rapture::ReadNode entry = workspaces.at(i);
         std::string_view kind = entry.child(KEY_KIND).asString();
-        if (kind.empty()) {
+        Rapture::AssetHandle handle = entry.child(KEY_HANDLE).asU64(Rapture::INVALID_ASSET_HANDLE);
+        if (kind.empty() && handle == Rapture::INVALID_ASSET_HANDLE) {
             continue;
         }
-        state.workspaces.push_back({std::string(kind), entry.child(KEY_ACTIVE).asBool(false),
-                                    entry.child(KEY_HANDLE).asU64(Rapture::INVALID_ASSET_HANDLE)});
+        state.workspaces.push_back({std::string(kind), entry.child(KEY_ACTIVE).asBool(false), handle});
     }
 
     return state;
@@ -43,7 +43,9 @@ void EditorState::store(Rapture::Project &project) const
 
     for (const EditorWorkspaceState &workspace : workspaces) {
         Rapture::WriteNode entry = workspaceList.appendObject();
-        entry.set(KEY_KIND, std::string_view(workspace.kind));
+        if (!workspace.kind.empty()) {
+            entry.set(KEY_KIND, std::string_view(workspace.kind));
+        }
         entry.set(KEY_ACTIVE, workspace.active);
         if (workspace.handle != Rapture::INVALID_ASSET_HANDLE) {
             entry.set(KEY_HANDLE, static_cast<uint64_t>(workspace.handle));

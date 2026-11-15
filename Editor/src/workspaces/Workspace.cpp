@@ -92,11 +92,31 @@ void Workspace::resolveLayout()
     }
 
     m_contentDock->innerSpacing = config().getFloat(EDITOR_CONFIG_DOCK_INNER_SPACING);
-    m_contentDock->markDirty();
+    placeContentDock();
 
     for (auto &panel : m_panels) {
         panel->resolveLayout();
     }
+}
+
+void Workspace::setContentArea(Amethyst::vec2 position, Amethyst::vec2 size)
+{
+    m_contentAreaPosition = position;
+    m_contentAreaSize = size;
+
+    if (m_contentDock != nullptr) {
+        placeContentDock();
+    }
+}
+
+void Workspace::placeContentDock()
+{
+    const float hotbarHeight = config().getFloat(EDITOR_CONFIG_HOTBAR_HEIGHT);
+    const float outerSpacing = config().getFloat(EDITOR_CONFIG_DOCK_OUTER_SPACING);
+
+    m_contentDock->absolutePosition = {m_contentAreaPosition.x, m_contentAreaPosition.y + hotbarHeight + outerSpacing};
+    m_contentDock->absoluteSize = {m_contentAreaSize.x, m_contentAreaSize.y - hotbarHeight - 2.0f * outerSpacing};
+    m_contentDock->markDirty();
 }
 
 void Workspace::adoptPanel(std::unique_ptr<Panel> panel, Amethyst::TabBar *tabBar)

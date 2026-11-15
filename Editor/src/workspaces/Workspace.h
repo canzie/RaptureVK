@@ -90,6 +90,13 @@ class Workspace {
     bool isActive() const { return m_active; }
 
     /**
+     * @brief Tells this workspace where its tab's content sits in the window
+     * @param position Top left corner of the content, in window pixels
+     * @param size Size of the content, in window pixels
+     */
+    void setContentArea(Amethyst::vec2 position, Amethyst::vec2 size);
+
+    /**
      * @brief Lays this workspace's contents out by the sizes the editor config currently holds.
      *
      * Called as the workspace is built and again whenever those sizes change.
@@ -226,6 +233,11 @@ class Workspace {
     void refreshShownPanels();
 
     /**
+     * @brief Puts the content dock in the part of the content area the hotbar leaves free
+     */
+    void placeContentDock();
+
+    /**
      * @brief Sizes and places one hotbar item, called as it is added and again on a scale change
      * @param item The item to lay out
      */
@@ -239,6 +251,8 @@ class Workspace {
     float labelWidth(const Amethyst::TextButton &button) const;
 
     std::vector<HotbarItem> m_hotbarItems;
+    Amethyst::vec2 m_contentAreaPosition = {0.0f, 0.0f};
+    Amethyst::vec2 m_contentAreaSize = {0.0f, 0.0f};
     bool m_active = false;
     bool m_teardown = false;
 };
