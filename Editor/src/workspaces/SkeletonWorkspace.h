@@ -1,7 +1,7 @@
 #ifndef RAPTURE__SKELETON_WORKSPACE_H
 #define RAPTURE__SKELETON_WORKSPACE_H
 
-#include "AssetPreviewWorkspace.h"
+#include "PreviewWorkspace.h"
 #include "gizmos/SkeletonGizmo.h"
 
 #include <core/events/EventSignal.h>
@@ -18,17 +18,19 @@ class SkeletonPose;
 /**
  * @brief The workspace one open skeleton asset is edited in
  */
-class SkeletonWorkspace : public AssetPreviewWorkspace {
+class SkeletonWorkspace : public PreviewWorkspace {
   public:
-    SkeletonWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::AssetHandle handle);
+    SkeletonWorkspace(const EditorContext &context, Rapture::AssetHandle handle);
 
     void onUpdate(float dt) override;
 
-    static constexpr std::string_view staticKind() { return "skeleton"; }
+    std::string_view tabIcon() const override;
+
+  protected:
+    void build() override;
+    void buildHotbar() override;
 
   private:
-    void setupHotbar();
-
     /**
      * @brief Creates the pose the open skeleton is shown through, and watches what it is shown on
      */

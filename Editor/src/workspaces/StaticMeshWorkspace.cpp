@@ -1,10 +1,9 @@
 #include "StaticMeshWorkspace.h"
 
-#include "layers/panels/AssetDetailsPanel.h"
-#include "layers/panels/ViewportPanel.h"
-#include "layers/panels/components/asset_visuals.h"
+#include "panels/AssetDetailsPanel.h"
+#include "panels/ViewportPanel.h"
+#include "ui/AssetVisuals.h"
 
-#include <assets/asset_manager/AssetManager.h>
 #include <scene/Scene.h>
 #include <scene/instances/SceneObject.h>
 #include <scene/instances/StaticMesh3D.h>
@@ -13,39 +12,35 @@ static constexpr std::string_view PREVIEW_SCENE_NAME = "StaticMeshPreview";
 
 static constexpr float DETAILS_SPLIT = 0.75f;
 
-StaticMeshWorkspace::StaticMeshWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
-                                         Rapture::AssetHandle handle)
-    : AssetPreviewWorkspace(staticKind(), services, handle)
+StaticMeshWorkspace::StaticMeshWorkspace(const EditorContext &context, Rapture::AssetHandle handle)
+    : PreviewWorkspace(context, handle, PREVIEW_SCENE_NAME)
 {
-    setupBase(tabBar, assetName(), Asset_iconForType(Rapture::ASSET_STATIC_MESH));
+    preview().addGroundAndSky();
 
-    setupDockingLayer();
-    setupPreviewScene(PREVIEW_SCENE_NAME);
-
-    auto *mesh = previewScene()->root()->add<Rapture::StaticMesh3D>(assetName());
+    auto *mesh = preview().scene()->root()->add<Rapture::StaticMesh3D>(assetName());
     mesh->setMesh(handle);
 
-    // authored geometry can sit anywhere, and the scene around it is built at the origin
-    const glm::vec3 min = mesh->boundsMin();
-    const glm::vec3 max = mesh->boundsMax();
-    const glm::vec3 offset = -(min + max) * 0.5f;
-    mesh->setPosition(offset);
-    setFocusBounds(min + offset, max + offset);
+    m_context.viewport = preview().createViewport();
 
+    Rapture::Mesh3D *placed[] = {mesh};
+    preview().centreMeshOnOrigin(placed);
+}
+
+std::string_view StaticMeshWorkspace::tabIcon() const
+{
+    return Asset_iconForType(Rapture::ASSET_STATIC_MESH);
+}
+
+void StaticMeshWorkspace::build()
+{
     Amethyst::TabBar *viewportTabBar = nullptr;
     Amethyst::TabBar *detailsTabBar = nullptr;
-    Amethyst::DockScope(*m_dockingLayer)
+    Amethyst::DockScope(*m_contentDock)
         .split(
             Amethyst::SplitAxis::VERTICAL, DETAILS_SPLIT,
             [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
             [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
 
-    if (viewportTabBar != nullptr) {
-        m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
-    }
-    if (detailsTabBar != nullptr) {
-        m_panels.push_back(std::make_unique<AssetDetailsPanel>(detailsTabBar, m_context, handle));
-    }
-
-    applyStoredLayout();
+    addPanel(std::make_unique<ViewportPanel>(m_context), viewportTabBar);
+    addPanel(std::make_unique<AssetDetailsPanel>(m_context, handle()), detailsTabBar);
 }

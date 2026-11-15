@@ -1,12 +1,9 @@
 #include "SkeletalMeshWorkspace.h"
 
-#include "layers/panels/AssetDetailsPanel.h"
-#include "layers/panels/ViewportPanel.h"
-#include "layers/panels/components/asset_visuals.h"
+#include "panels/AssetDetailsPanel.h"
+#include "panels/ViewportPanel.h"
+#include "ui/AssetVisuals.h"
 
-#include <assets/asset_manager/AssetManager.h>
-#include <components/extensions/ui_list_layout.h>
-#include <components/ui_scope.h>
 #include <scene/Scene.h>
 #include <scene/instances/SceneObject.h>
 #include <scene/instances/SkeletalMesh3D.h>
@@ -15,67 +12,41 @@ static constexpr std::string_view PREVIEW_SCENE_NAME = "SkeletalMeshPreview";
 
 static constexpr float DETAILS_SPLIT = 0.75f;
 
-static constexpr float HOTBAR_BUTTON_WIDTH = 150.0f;
-static constexpr float HOTBAR_BUTTON_HEIGHT = 28.0f;
-
-SkeletalMeshWorkspace::SkeletalMeshWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
-                                             Rapture::AssetHandle handle)
-    : AssetPreviewWorkspace(staticKind(), services, handle)
+SkeletalMeshWorkspace::SkeletalMeshWorkspace(const EditorContext &context, Rapture::AssetHandle handle)
+    : PreviewWorkspace(context, handle, PREVIEW_SCENE_NAME)
 {
-    setupBase(tabBar, assetName(), Asset_iconForType(Rapture::ASSET_SKELETAL_MESH));
+    preview().addGroundAndSky();
 
-    setupDockingLayer();
-    setupPreviewScene(PREVIEW_SCENE_NAME);
-
-    auto *mesh = previewScene()->root()->add<Rapture::SkeletalMesh3D>(assetName());
+    auto *mesh = preview().scene()->root()->add<Rapture::SkeletalMesh3D>(assetName());
     mesh->setMesh(handle);
 
-    // authored geometry can sit anywhere, and the scene around it is built at the origin
-    const glm::vec3 min = mesh->boundsMin();
-    const glm::vec3 max = mesh->boundsMax();
-    const glm::vec3 offset = -(min + max) * 0.5f;
-    mesh->setPosition(offset);
-    setFocusBounds(min + offset, max + offset);
+    m_context.viewport = preview().createViewport();
 
+    Rapture::Mesh3D *placed[] = {mesh};
+    preview().centreMeshOnOrigin(placed);
+}
+
+std::string_view SkeletalMeshWorkspace::tabIcon() const
+{
+    return Asset_iconForType(Rapture::ASSET_SKELETAL_MESH);
+}
+
+void SkeletalMeshWorkspace::build()
+{
     Amethyst::TabBar *viewportTabBar = nullptr;
     Amethyst::TabBar *detailsTabBar = nullptr;
-    Amethyst::DockScope(*m_dockingLayer)
+    Amethyst::DockScope(*m_contentDock)
         .split(
             Amethyst::SplitAxis::VERTICAL, DETAILS_SPLIT,
             [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
             [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
 
-    if (viewportTabBar != nullptr) {
-        m_panels.push_back(std::make_unique<ViewportPanel>(viewportTabBar, m_context));
-    }
-    if (detailsTabBar != nullptr) {
-        m_panels.push_back(std::make_unique<AssetDetailsPanel>(detailsTabBar, m_context, handle));
-    }
-
-    setupHotbar();
-    applyStoredLayout();
+    addPanel(std::make_unique<ViewportPanel>(m_context), viewportTabBar);
+    addPanel(std::make_unique<AssetDetailsPanel>(m_context, handle()), detailsTabBar);
 }
 
-void SkeletalMeshWorkspace::setupHotbar()
+void SkeletalMeshWorkspace::buildHotbar()
 {
-    if (m_hotbar == nullptr) {
-        return;
-    }
-
-    auto *layout = m_hotbar->addExtension<Amethyst::UIListLayout>();
-    layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-    layout->innerPadding = Amethyst::UDim::fromOffset(6.0f);
-
-    Amethyst::UIScope(*m_hotbar).textButton(
-        {.classes = {"generic-text-button"},
-         .base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(HOTBAR_BUTTON_WIDTH, HOTBAR_BUTTON_HEIGHT)},
-         .text = {.fontSize = 14.0f,
-                  .textXAlignment = Amethyst::TextXAlignment::CENTER,
-                  .textYAlignment = Amethyst::TextYAlignment::CENTER},
-         .label = "Convert Pose to Static"},
-        [](Amethyst::TextButtonScope &b) {
-            // TODO: bake the current pose into a static mesh asset
-            b.component.onMouseButton1ClickCb = []() { return Amethyst::EventResult::CONSUMED; };
-        });
+    // TODO: bake the current pose into a static mesh asset
+    addHotbarButton("Convert Pose to Static", []() {});
 }

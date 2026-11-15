@@ -1,50 +1,35 @@
 #ifndef RAPTURE__MATERIAL_EDITOR_WORKSPACE_H
 #define RAPTURE__MATERIAL_EDITOR_WORKSPACE_H
 
-#include "Workspace.h"
+#include "PreviewWorkspace.h"
 
-#include <assets/asset_manager/AssetCommon.h>
-#include <core/events/EventSignal.h>
 #include <core/ecs/entity_accessor.h>
-#include <renderer/viewport/Viewport.h>
-
-namespace Rapture {
-class Scene;
-}
+#include <core/events/EventSignal.h>
 
 class NodeEditorPanel;
 
-class MaterialEditorWorkspace : public Workspace {
+/**
+ * @brief The workspace one open material is authored in, shown on a sphere beside its graph
+ */
+class MaterialEditorWorkspace : public PreviewWorkspace {
   public:
-    /**
-     * @brief Opens a material asset in a tab of its own.
-     * @param tabBar The workspace bar the tab is appended to.
-     * @param services Services the panels are built against.
-     * @param handle The material asset this workspace edits.
-     */
-    MaterialEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::AssetHandle handle);
-    ~MaterialEditorWorkspace() override;
+    MaterialEditorWorkspace(const EditorContext &context, Rapture::AssetHandle handle);
 
-    void onUpdate(float dt) override;
-    void saveLayout() override;
+    std::string_view tabIcon() const override;
 
-    static constexpr std::string_view staticKind() { return "materialEditor"; }
+  protected:
+    void build() override;
+    void buildHotbar() override;
 
   private:
-    void setupHotbar(void);
-    void setupPreviewScene(void);
-
     /**
      * @brief Binds a selected material instance onto the preview sphere
      * @param handle The material asset to show
      */
     void showMaterialOnSphere(Rapture::AssetHandle handle);
 
+  private:
     NodeEditorPanel *m_nodeEditor = nullptr;
-
-    Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
-    std::unique_ptr<Rapture::Scene> m_previewScene;
-    Rapture::ViewportContext m_previewViewport;
     Rapture::ecs::EntityAccessor m_previewSphere;
     Rapture::EventConnection m_materialSelectedConn;
 };

@@ -11,20 +11,30 @@
 
 class TextEditorPanel;
 
+/**
+ * @brief The workspace the project's scripts are written in, holding as many at once as are opened
+ */
 class ScriptingWorkspace : public Workspace {
   public:
-    ScriptingWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services);
+    explicit ScriptingWorkspace(const EditorContext &context);
 
-    void saveLayout() override;
+    std::string_view tabLabel() const override { return "Scripting"; }
+    std::string_view tabIcon() const override;
 
-    static constexpr std::string_view staticKind() { return "scripting"; }
-
+    /**
+     * @brief Opens a script in a tab of its own, focusing the tab it is already open in
+     * @param handle The script to open
+     */
     void openScript(Rapture::AssetHandle handle);
 
     static Rapture::AssetHandle createScript(const std::filesystem::path &folder, std::string_view name);
 
+  protected:
+    void build() override;
+    void buildHotbar() override;
+    std::string dockLayoutName() const override { return "Scripting Dock"; }
+
   private:
-    void setupHotbar();
     void createAndOpenScript();
     TextEditorPanel *shownEditor() const;
     void closeScript(Amethyst::Instance *content);

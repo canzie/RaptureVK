@@ -4,13 +4,13 @@
 #include "Icons.h"
 #include "layers/EditorLayout.h"
 #include "layers/PlayLayer.h"
-#include "layers/panels/AddSceneObjectMenu.h"
-#include "layers/panels/ImagePreviewPanel.h"
-#include "layers/panels/OutlinerPanel.h"
-#include "layers/panels/PropertiesPanel.h"
-#include "layers/panels/ViewportPanel.h"
-#include "layers/panels/WorldSettingsPanel.h"
-#include "layers/panels/components/context_menus.h"
+#include "panels/AddSceneObjectMenu.h"
+#include "panels/ImagePreviewPanel.h"
+#include "panels/OutlinerPanel.h"
+#include "panels/PropertiesPanel.h"
+#include "panels/ViewportPanel.h"
+#include "panels/WorldSettingsPanel.h"
+#include "ui/menus/ContextMenuItems.h"
 
 #include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_list_layout.h>

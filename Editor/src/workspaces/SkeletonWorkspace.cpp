@@ -1,14 +1,10 @@
 #include "SkeletonWorkspace.h"
 
-#include "layers/EditorLayout.h"
-#include "layers/panels/AssetDetailsPanel.h"
-#include "layers/panels/SkeletonHierarchyPanel.h"
-#include "layers/panels/ViewportPanel.h"
-#include "layers/panels/components/asset_visuals.h"
-#include "layers/panels/components/mode_dropdown.h"
-
-#include <components/extensions/ui_list_layout.h>
-#include <components/ui_scope.h>
+#include "panels/AssetDetailsPanel.h"
+#include "panels/SkeletonHierarchyPanel.h"
+#include "panels/ViewportPanel.h"
+#include "ui/AssetVisuals.h"
+#include "ui/controls/ModeDropdown.h"
 
 #include <assets/asset_manager/AssetManager.h>
 #include <assets/skeletons/ASkeleton.h>
@@ -20,30 +16,37 @@
 #include <scene/instances/SkeletalMesh3D.h>
 #include <scene/instances/SkeletonPose.h>
 
-#include <vector>
-
 static constexpr std::string_view PREVIEW_SCENE_NAME = "SkeletonPreview";
 
 static constexpr float DETAILS_SPLIT = 0.75f;
 
 static constexpr float HIERARCHY_SPLIT = 0.45f;
 
+static constexpr float MODE_DROPDOWN_WIDTH = 120.0f;
+
 static constexpr EditorMode OFFERED_MODES[] = {EDITOR_MODE_OBJECT, EDITOR_MODE_EDIT, EDITOR_MODE_POSE};
 
-SkeletonWorkspace::SkeletonWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::AssetHandle handle)
-    : AssetPreviewWorkspace(staticKind(), services, handle)
+SkeletonWorkspace::SkeletonWorkspace(const EditorContext &context, Rapture::AssetHandle handle)
+    : PreviewWorkspace(context, handle, PREVIEW_SCENE_NAME)
 {
-    setupBase(tabBar, assetName(), Asset_iconForType(Rapture::ASSET_SKELETON));
+    preview().addGroundAndSky();
+    m_context.viewport = preview().createViewport();
 
-    setupDockingLayer();
-    setupPreviewScene(PREVIEW_SCENE_NAME);
     setupPose();
     spawnPreviewMeshes();
+}
 
+std::string_view SkeletonWorkspace::tabIcon() const
+{
+    return Asset_iconForType(Rapture::ASSET_SKELETON);
+}
+
+void SkeletonWorkspace::build()
+{
     Amethyst::TabBar *viewportTabBar = nullptr;
     Amethyst::TabBar *hierarchyTabBar = nullptr;
     Amethyst::TabBar *detailsTabBar = nullptr;
-    Amethyst::DockScope(*m_dockingLayer)
+    Amethyst::DockScope(*m_contentDock)
         .split(
             Amethyst::SplitAxis::VERTICAL, DETAILS_SPLIT,
             [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
@@ -54,25 +57,30 @@ SkeletonWorkspace::SkeletonWorkspace(Amethyst::TabBar &tabBar, const PanelServic
                     [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
             });
 
-    if (viewportTabBar != nullptr) {
-        auto panel = std::make_unique<ViewportPanel>(viewportTabBar, m_context);
-        m_viewportPanel = panel.get();
-        m_panels.push_back(std::move(panel));
-    }
-    if (hierarchyTabBar != nullptr && m_pose != nullptr) {
-        m_panels.push_back(std::make_unique<SkeletonHierarchyPanel>(hierarchyTabBar, m_context, m_pose));
-    }
-    if (detailsTabBar != nullptr) {
-        m_panels.push_back(std::make_unique<AssetDetailsPanel>(detailsTabBar, m_context, handle));
-    }
+    auto viewport = std::make_unique<ViewportPanel>(m_context);
+    m_viewportPanel = viewport.get();
+    addPanel(std::move(viewport), viewportTabBar);
 
-    setupHotbar();
-    applyStoredLayout();
+    if (m_pose != nullptr) {
+        addPanel(std::make_unique<SkeletonHierarchyPanel>(m_context, m_pose), hierarchyTabBar);
+    }
+    addPanel(std::make_unique<AssetDetailsPanel>(m_context, handle()), detailsTabBar);
+}
+
+void SkeletonWorkspace::buildHotbar()
+{
+    addHotbarItem(MODE_DROPDOWN_WIDTH, [this](Amethyst::UIScope &slot) {
+        ModeDropdown_add(slot.get(), OFFERED_MODES, [this](EditorMode mode) { setMode(mode); });
+    });
 }
 
 void SkeletonWorkspace::onUpdate(float dt)
 {
-    AssetPreviewWorkspace::onUpdate(dt);
+    PreviewWorkspace::onUpdate(dt);
+
+    if (!isActive()) {
+        return;
+    }
 
     // the list changes from inside a picker's callback, which is no place to tear down scene objects
     if (m_previewMeshesPending) {
@@ -91,20 +99,6 @@ void SkeletonWorkspace::onUpdate(float dt)
     m_skeletonGizmo.submit(viewport->getGizmoDrawList());
 }
 
-void SkeletonWorkspace::setupHotbar()
-{
-    if (m_hotbar == nullptr) {
-        return;
-    }
-
-    auto *layout = m_hotbar->addExtension<Amethyst::UIListLayout>();
-    layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-    layout->innerPadding = Amethyst::UDim::fromOffset(EDITOR_HOTBAR_PADDING);
-
-    ModeDropdown_add(*m_hotbar, OFFERED_MODES, [this](EditorMode mode) { setMode(mode); });
-}
-
 void SkeletonWorkspace::setupPose()
 {
     Rapture::Ref<Rapture::ASkeleton> skeleton = Rapture::AssetManager::getAsset<Rapture::ASkeleton>(handle());
@@ -113,9 +107,9 @@ void SkeletonWorkspace::setupPose()
         return;
     }
 
-    auto owned = std::make_unique<Rapture::SkeletonPose>(*previewScene(), "Pose", handle());
+    auto owned = std::make_unique<Rapture::SkeletonPose>(*preview().scene(), "Pose", handle());
     m_pose = owned.get();
-    previewScene()->root()->addChild(std::move(owned));
+    preview().scene()->root()->addChild(std::move(owned));
     m_pose->ready();
 
     m_modeChangedConn = onModeChanged.connect([this](EditorMode mode) { m_skeletonGizmo.setMode(mode); });
@@ -131,32 +125,20 @@ void SkeletonWorkspace::spawnPreviewMeshes()
     }
 
     for (Rapture::SkeletalMesh3D *object : m_previewObjects) {
-        previewScene()->destroyInstance(object);
+        preview().scene()->destroyInstance(object);
     }
     m_previewObjects.clear();
 
-    Rapture::SceneObject *root = previewScene()->root();
+    Rapture::SceneObject *root = preview().scene()->root();
 
-    glm::vec3 min(0.0f);
-    glm::vec3 max(0.0f);
-
+    std::vector<Rapture::Mesh3D *> placed;
     for (Rapture::AssetHandle mesh : skeleton->previewMeshes()) {
         auto *object = root->add<Rapture::SkeletalMesh3D>(Rapture::AssetManager::getAssetMetadata(mesh).getName());
         object->setMesh(mesh);
         object->setPose(m_pose);
         m_previewObjects.push_back(object);
-
-        min = glm::min(min, object->boundsMin());
-        max = glm::max(max, object->boundsMax());
+        placed.push_back(object);
     }
 
-    // authored geometry can sit anywhere, and the scene around it is built at the origin, so every
-    // mesh shifts by the same amount to keep them together
-    const glm::vec3 offset = -(min + max) * 0.5f;
-    for (Rapture::SkeletalMesh3D *object : m_previewObjects) {
-        object->setPosition(offset);
-    }
-    m_pose->setPosition(offset);
-
-    setFocusBounds(min + offset, max + offset);
+    m_pose->setPosition(preview().centreMeshOnOrigin(placed));
 }

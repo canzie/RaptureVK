@@ -1,9 +1,8 @@
 #ifndef RAPTURE__MODULE_EDITOR_WORKSPACE_H
 #define RAPTURE__MODULE_EDITOR_WORKSPACE_H
 
-#include "Workspace.h"
+#include "AssetWorkspace.h"
 
-#include <assets/asset_manager/AssetCommon.h>
 #include <assets/asset_manager/Asset.h>
 #include <assets/modules/AModule.h>
 #include <renderer/viewport/Viewport.h>
@@ -14,7 +13,6 @@ namespace Rapture {
 class SceneObject;
 class SerialDocument;
 class Scene;
-class Viewport;
 } // namespace Rapture
 
 /**
@@ -24,56 +22,39 @@ class Viewport;
  * its own, authoring it through the same viewport, tree and properties panels a world uses, and
  * writing the root back out on save.
  */
-class ModuleEditorWorkspace : public Workspace {
+class ModuleEditorWorkspace : public AssetWorkspace {
   public:
-    /**
-     * @brief Opens a module in its workspace
-     * @param tabBar The workspace bar the tab is appended to
-     * @param services Services the panels are built against
-     * @param handle The module to edit
-     * @return The workspace, or nullptr if the asset holds no document
-     */
-    static std::unique_ptr<ModuleEditorWorkspace> create(Amethyst::TabBar &tabBar, const PanelServices &services,
-                                                         Rapture::AssetHandle handle);
-
+    ModuleEditorWorkspace(const EditorContext &context, Rapture::AssetHandle handle);
     ~ModuleEditorWorkspace() override;
 
     void onUpdate(float dt) override;
-    void saveLayout() override;
 
-    static constexpr std::string_view staticKind() { return "moduleEditor"; }
+    std::string_view tabIcon() const override;
+
+  protected:
+    void build() override;
+    void buildHotbar() override;
 
   private:
-    ModuleEditorWorkspace(const PanelServices &services, Rapture::AssetHandle handle);
+    void setupScene();
 
     /**
-     * @brief Builds the tab, the scene the asset is authored in and the panels over it
-     * @param tabBar The workspace bar the tab is appended to
+     * @brief Lights the scene, kept outside the asset's own root so a save cannot take it
      */
-    void build(Amethyst::TabBar &tabBar);
-
-    void setupHotbar(void);
-    void setupScene(void);
-
-    /**
-     * @brief Lights the preview scene, kept outside the asset's own root so a save cannot take it
-     */
-    void setupLighting(void);
-    void setupPanels(Amethyst::TabBar *viewportTabBar, Amethyst::TabBar *treeTabBar, Amethyst::TabBar *propertiesTabBar);
+    void setupLighting();
 
     /**
      * @brief Reads the asset's document into the workspace scene
      * @return The spawned root, or a fresh empty one if the asset has never been authored
      */
-    Rapture::SceneObject *spawn(void);
+    Rapture::SceneObject *spawn();
 
     /**
      * @brief Writes the authored subtree back into the asset and saves it
      */
-    void save(void);
+    void save();
 
   private:
-    Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
     Rapture::Ref<Rapture::AModule> m_documentRef;
     Rapture::SerialDocument *m_document = nullptr;
 

@@ -1,7 +1,7 @@
 #ifndef RAPTURE__SKELETON_GIZMO_H
 #define RAPTURE__SKELETON_GIZMO_H
 
-#include "layers/workspaces/Workspace.h"
+#include "workspaces/Workspace.h"
 
 #include <assets/skeletons/Skeleton.h>
 #include <renderer/GizmoDrawList.h>
