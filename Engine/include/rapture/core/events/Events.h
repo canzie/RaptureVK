@@ -17,7 +17,8 @@ using EventListenerId = size_t;
  * EventBus - A templated event dispatcher for the observer pattern
  * Allows subscribing to and publishing events with arbitrary parameters
  */
-template <typename... Args> class EventBus {
+template <typename... Args>
+class EventBus {
   public:
     using EventCallback = std::function<void(Args...)>;
 
@@ -55,7 +56,8 @@ class BaseEventHandler {
 };
 
 // Concrete event handler for specific event types
-template <typename... Args> class EventHandler : public BaseEventHandler {
+template <typename... Args>
+class EventHandler : public BaseEventHandler {
   public:
     EventHandler() = default;
 
@@ -80,7 +82,8 @@ class EventRegistry {
     }
 
     // Get or create an event bus for the given name and types
-    template <typename... Args> EventBus<Args...> &getEventBus(const std::string &name)
+    template <typename... Args>
+    EventBus<Args...> &getEventBus(const std::string &name)
     {
         // std::type_index typeIdx = std::type_index(typeid(EventBus<Args...>));
         std::string typeId = typeid(EventBus<Args...>).name();

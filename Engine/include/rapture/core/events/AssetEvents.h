@@ -1,7 +1,7 @@
 #pragma once
 
-#include <rapture/core/events/Events.h>
 #include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/core/events/Events.h>
 #include <rapture/scene/EntityCommon.h>
 
 namespace Rapture {

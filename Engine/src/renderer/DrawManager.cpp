@@ -1,18 +1,18 @@
 #include <rapture/renderer/DrawManager.h>
 
-#include <rapture/app/Application.h>
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobCommon.h"
 #include "core/jobs/JobSystem.h"
+#include "renderer/Renderer.h"
+#include "scene/components/TerrainComponent.h"
+#include <rapture/app/Application.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/TracyProfiler.h>
 #include <rapture/core/utils/rp_assert.h>
-#include "renderer/Renderer.h"
 #include <rapture/renderer/passes/RenderPassContext.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/components/Components.h>
-#include "scene/components/TerrainComponent.h"
 
 #include <algorithm>
 
@@ -100,8 +100,8 @@ void DrawManager::createSharedTextures()
         m_sceneColorHdrTextures.push_back(std::make_unique<Texture>(colorSpec));
     }
 
-    m_compositePass = std::make_unique<CompositePass>(static_cast<float>(m_config.width), static_cast<float>(m_config.height),
-                                                      getOutputFormat());
+    m_compositePass =
+        std::make_unique<CompositePass>(static_cast<float>(m_config.width), static_cast<float>(m_config.height), getOutputFormat());
 }
 
 VkFormat DrawManager::getDepthFormat() const

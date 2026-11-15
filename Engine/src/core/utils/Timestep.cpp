@@ -1,5 +1,5 @@
-#include <rapture/core/utils/Timestep.h>
 #include <cmath>
+#include <rapture/core/utils/Timestep.h>
 
 namespace Rapture {
 std::chrono::seconds Timestep::getSeconds()

@@ -76,7 +76,8 @@ static std::string s_toLower(std::string s)
     return s;
 }
 
-FileBrowser::FileBrowser(Amethyst::Instance &parent, FileDialogMode mode, const std::filesystem::path &startDirectory) : m_mode(mode)
+FileBrowser::FileBrowser(Amethyst::Instance &parent, FileDialogMode mode, const std::filesystem::path &startDirectory)
+    : m_mode(mode)
 {
     std::error_code ec;
     m_currentDirectory = std::filesystem::is_directory(startDirectory, ec) ? startDirectory : std::filesystem::current_path();

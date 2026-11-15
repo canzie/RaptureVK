@@ -1,9 +1,9 @@
 #include <rapture/platform/RenderWindow.h>
 
-#include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <rapture/core/utils/Log.h>
-#include <rapture/gpu/swap_chains/SwapChain.h>
 #include <rapture/core/utils/rp_assert.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/swap_chains/SwapChain.h>
 #include <rapture/gpu/vulkan_context/VulkanContext.h>
 
 #define GLFW_INCLUDE_VULKAN

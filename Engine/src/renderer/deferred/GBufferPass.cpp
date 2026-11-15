@@ -1,13 +1,13 @@
 #include "renderer/deferred/GBufferPass.h"
 
-#include <rapture/core/utils/EnginePaths.h>
 #include "gpu/descriptors/DescriptorManager.h"
+#include <rapture/core/utils/EnginePaths.h>
 
+#include "renderer/generators/terrain/TerrainGenerator.h"
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetImportConfig.h>
 #include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/core/utils/TracyProfiler.h>
-#include "renderer/generators/terrain/TerrainGenerator.h"
 #include <rapture/renderer/generators/terrain/TerrainTypes.h>
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/render_data/SceneRenderData.h>
@@ -185,8 +185,7 @@ void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, const RenderP
     uint32_t cameraSSBOIndex = renderData.getCameras().getDescriptorIndex(currentFrame);
     uint32_t cameraSlot = renderData.getCameraSlot(camera.getEntity());
     if (cameraSlot == UINT32_MAX) {
-        RP_CORE_WARN("gbuffer: camera entity {} has no slot, drawing from slot 0",
-                     static_cast<uint32_t>(camera.getEntity()));
+        RP_CORE_WARN("gbuffer: camera entity {} has no slot, drawing from slot 0", static_cast<uint32_t>(camera.getEntity()));
     }
     uint32_t cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
     uint32_t skeletonSSBOIndex = renderData.getSkeletonInstanceManager().getBindlessIndex();

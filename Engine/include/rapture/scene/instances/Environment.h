@@ -1,9 +1,9 @@
 #ifndef RAPTURE__ENVIRONMENT_H
 #define RAPTURE__ENVIRONMENT_H
 
+#include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/asset_manager/AssetCommon.h>
 #include <rapture/assets/textures/ATexture.h>
-#include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/scene/instances/SceneObject.h>
 
 #include <glm/glm.hpp>

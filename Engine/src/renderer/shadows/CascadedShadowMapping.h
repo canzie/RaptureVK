@@ -1,23 +1,23 @@
 #ifndef RAPTURE__CASCADEDSHADOWMAPPING_H
 #define RAPTURE__CASCADEDSHADOWMAPPING_H
 
+#include "core/utils/TextureFlattener.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/shaders/AShader.h>
-#include "core/utils/TextureFlattener.h"
 #include <rapture/gpu/pipelines/GraphicsPipeline.h>
 #include <rapture/gpu/shaders/Shader.h>
 #include <rapture/gpu/textures/Texture.h>
 
+#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/gpu/buffers/UniformBuffer.h>
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
 #include <rapture/gpu/descriptors/DescriptorBinding.h>
-#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/gpu/descriptors/DescriptorSet.h>
 
-#include <rapture/renderer/Frustum.h>
 #include "renderer/generators/terrain/TerrainCuller.h"
 #include "renderer/generators/terrain/TerrainGenerator.h"
+#include <rapture/renderer/Frustum.h>
 
 #include <rapture/renderer/MDIBatch.h>
 

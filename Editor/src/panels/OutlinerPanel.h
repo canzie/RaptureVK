@@ -7,10 +7,10 @@
 #include <components/ui_scope.h>
 
 #include "panels/Panel.h"
-#include <rapture/scene/Scene.h>
-#include <rapture/scene/instances/Instance.h>
 #include <cstdint>
 #include <memory>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Instance.h>
 #include <string>
 #include <vector>
 

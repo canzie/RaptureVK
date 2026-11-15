@@ -6,9 +6,9 @@
 #include <components/tree_view.h>
 #include <components/ui_scope.h>
 
-#include <rapture/core/events/EventSignal.h>
 #include "panels/Panel.h"
 #include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/events/EventSignal.h>
 
 #include <cstdint>
 #include <vector>

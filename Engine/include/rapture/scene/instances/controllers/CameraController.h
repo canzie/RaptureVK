@@ -93,7 +93,6 @@ class CameraController : public Controller {
     glm::vec3 m_focusPoint = {0.0f, 0.0f, 0.0f};
     float m_focusDistance = 5.0f;
     bool m_recenterFocus = true;
-
 };
 
 } // namespace Rapture

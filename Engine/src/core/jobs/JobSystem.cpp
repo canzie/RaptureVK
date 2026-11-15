@@ -1,11 +1,11 @@
 #include "core/jobs/JobSystem.h"
 
 #include "core/jobs/Counter.h"
-#include <rapture/core/utils/TracyProfiler.h>
-#include <rapture/core/utils/rp_assert.h>
-#include "gpu/vulkan_context/TimelineSemaphore.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/WaitList.h"
+#include "gpu/vulkan_context/TimelineSemaphore.h"
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/core/utils/rp_assert.h>
 
 #include <algorithm>
 #include <cassert>

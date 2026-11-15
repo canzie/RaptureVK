@@ -1,12 +1,12 @@
 #include "renderer/shadows/ShadowMapping.h"
 
-#include <rapture/core/utils/EnginePaths.h>
 #include "gpu/descriptors/DescriptorManager.h"
+#include <rapture/core/utils/EnginePaths.h>
 
+#include "renderer/shadows/ShadowCommon.h"
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/TracyProfiler.h>
-#include "renderer/shadows/ShadowCommon.h"
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/systems/Transforms.h>
 

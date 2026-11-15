@@ -1,9 +1,9 @@
 #ifndef RAPTURE__GIZMO_RENDERER_H
 #define RAPTURE__GIZMO_RENDERER_H
 
-#include <rapture/renderer/GizmoDrawList.h>
 #include "renderer/Renderer.h"
 #include "renderer/passes/GizmoDrawPass.h"
+#include <rapture/renderer/GizmoDrawList.h>
 
 #include <memory>
 
@@ -14,8 +14,7 @@ namespace Rapture {
  */
 class GizmoRenderer : public Renderer {
   public:
-    GizmoRenderer(RenderContext renderContext, const RendererConfig &config, VkFormat depthFormat,
-                            GizmoDrawList *drawList);
+    GizmoRenderer(RenderContext renderContext, const RendererConfig &config, VkFormat depthFormat, GizmoDrawList *drawList);
 
     const char *name() const override { return "Gizmos"; }
 

@@ -1,8 +1,8 @@
 #ifndef RAPTURE__SHADOW_RENDERER_H
 #define RAPTURE__SHADOW_RENDERER_H
 
-#include <rapture/core/ecs/journal.h>
 #include "renderer/Renderer.h"
+#include <rapture/core/ecs/journal.h>
 
 #include <vector>
 

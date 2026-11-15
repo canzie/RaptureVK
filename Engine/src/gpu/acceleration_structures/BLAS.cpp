@@ -11,9 +11,9 @@ namespace Rapture {
 
 BLAS::BLAS(const Mesh &mesh)
     : m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE), m_allocation(VK_NULL_HANDLE),
-      m_compactedAccelerationStructure(VK_NULL_HANDLE), m_compactedBuffer(VK_NULL_HANDLE),
-      m_compactedAllocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0), m_scratchSize(0),
-      m_isBuilt(false), m_isReady(false), m_isValid(false), m_device(VK_NULL_HANDLE), m_allocator(VK_NULL_HANDLE)
+      m_compactedAccelerationStructure(VK_NULL_HANDLE), m_compactedBuffer(VK_NULL_HANDLE), m_compactedAllocation(VK_NULL_HANDLE),
+      m_deviceAddress(0), m_accelerationStructureSize(0), m_scratchSize(0), m_isBuilt(false), m_isReady(false), m_isValid(false),
+      m_device(VK_NULL_HANDLE), m_allocator(VK_NULL_HANDLE)
 {
 
     RAPTURE_PROFILE_FUNCTION();

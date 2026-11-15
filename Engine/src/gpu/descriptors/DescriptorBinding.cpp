@@ -1,15 +1,15 @@
 #include <rapture/gpu/descriptors/DescriptorBinding.h>
 
-#include <rapture/gpu/acceleration_structures/TLAS.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/textures/ATexture.h>
+#include <rapture/gpu/acceleration_structures/TLAS.h>
 #include <rapture/gpu/buffers/Buffers.h>
-#include <rapture/gpu/descriptors/DescriptorSet.h>
 #include <rapture/gpu/buffers/UniformBuffer.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
 #include <rapture/gpu/textures/Texture.h>
 
-#include <rapture/core/utils/Log.h>
 #include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
 
 namespace Rapture {
 
@@ -23,7 +23,8 @@ DescriptorBinding<T>::DescriptorBinding(DescriptorSet *set, uint32_t binding, Vk
     fillEmpty();
 }
 
-template <typename T> DescriptorBinding<T>::~DescriptorBinding()
+template <typename T>
+DescriptorBinding<T>::~DescriptorBinding()
 {
     for (uint32_t i = 0; i < m_size; ++i) {
         if (m_isAllocated[i]) {
@@ -33,9 +34,13 @@ template <typename T> DescriptorBinding<T>::~DescriptorBinding()
     m_isAllocated.clear();
 }
 
-template <typename T> void DescriptorBinding<T>::fillEmpty() {}
+template <typename T>
+void DescriptorBinding<T>::fillEmpty()
+{
+}
 
-template <typename T> uint32_t DescriptorBinding<T>::findFreeIndex()
+template <typename T>
+uint32_t DescriptorBinding<T>::findFreeIndex()
 {
     for (uint32_t i = 0; i < m_size; ++i) {
         if (!m_isAllocated[i]) {
@@ -223,7 +228,8 @@ uint32_t DescriptorBindingTLAS::add(TLAS &resource)
 }
 
 // Template free method implementation
-template <typename T> void DescriptorBinding<T>::free(uint32_t index)
+template <typename T>
+void DescriptorBinding<T>::free(uint32_t index)
 {
     if (m_isArray && index >= m_size) {
         RP_CORE_WARN("Index {} out of bounds for binding {} with size {}", index, m_binding, m_size);

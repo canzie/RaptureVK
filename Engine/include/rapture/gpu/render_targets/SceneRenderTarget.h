@@ -1,10 +1,10 @@
 #ifndef RAPTURE__SCENE_RENDER_TARGET_H
 #define RAPTURE__SCENE_RENDER_TARGET_H
 
+#include <memory>
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <rapture/gpu/swap_chains/SwapChain.h>
 #include <rapture/gpu/textures/Texture.h>
-#include <memory>
 #include <vector>
 
 namespace Rapture {

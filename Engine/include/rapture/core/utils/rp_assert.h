@@ -39,12 +39,12 @@
 /**
  * @brief Log a std::format message and abort when expr is false
  */
-#define RP_ASSERT(expr, ...)                                                                                                   \
-    do {                                                                                                                       \
-        if (!(expr)) {                                                                                                         \
-            RP_CORE_CRITICAL("assertion '{}' failed: {}", #expr, std::format(__VA_ARGS__));                                    \
-            std::abort();                                                                                                      \
-        }                                                                                                                      \
+#define RP_ASSERT(expr, ...)                                                                \
+    do {                                                                                    \
+        if (!(expr)) {                                                                      \
+            RP_CORE_CRITICAL("assertion '{}' failed: {}", #expr, std::format(__VA_ARGS__)); \
+            std::abort();                                                                   \
+        }                                                                                   \
     } while (false)
 
 #endif // NDEBUG

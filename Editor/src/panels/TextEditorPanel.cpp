@@ -3,8 +3,8 @@
 
 #include <rapture/core/utils/Log.h>
 
-#include <rapture/assets/asset_manager/AssetManager.h>
 #include <components/ui_scope.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/input/InputCodes.h>
 
 #include <fstream>
@@ -41,11 +41,11 @@ void TextEditorPanel::build(Amethyst::UIScope &scope)
     buildToolbar(scope);
 
     m_editor = m_root->add<Amethyst::TextArea>();
-    m_editor->setBaseProperties({.clipsDescendants = true,
-                                 .padding = Amethyst::UDim4{.top = Amethyst::UDim::fromOffset(4.0f),
-                                                            .left = Amethyst::UDim::fromOffset(6.0f)},
-                                 .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, TOOLBAR_HEIGHT),
-                                 .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -TOOLBAR_HEIGHT)});
+    m_editor->setBaseProperties(
+        {.clipsDescendants = true,
+         .padding = Amethyst::UDim4{.top = Amethyst::UDim::fromOffset(4.0f), .left = Amethyst::UDim::fromOffset(6.0f)},
+         .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, TOOLBAR_HEIGHT),
+         .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -TOOLBAR_HEIGHT)});
     m_editor->setSource(&m_buffer);
 
     m_context.editor->shortcuts->registerShortcut(EDITOR_COMMAND_SAVE, {Rapture::KEY_S, SHORTCUT_MOD_CONTROL}, m_root,
@@ -65,30 +65,28 @@ TextEditorPanel::~TextEditorPanel()
 
 void TextEditorPanel::buildToolbar(Amethyst::UIScope &scope)
 {
-    scope.frame({.classes = {"panel"}, .base = {.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TOOLBAR_HEIGHT)}},
-                [this](Amethyst::FrameScope &f) {
-                    f.textButton({.base = {.position = Amethyst::UDim2::fromOffset(4.0f, 3.0f),
-                                           .size = Amethyst::UDim2::fromOffset(70.0f, 22.0f)},
-                                  .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER,
-                                           .textYAlignment = Amethyst::TextYAlignment::CENTER},
-                                  .label = "Open..."},
-                                 [this](Amethyst::TextButtonScope &b) {
-                                     b.component.onMouseButton1ClickCb = [this]() {
-                                         m_context.editor->windows->openFileDialog(
-                                             FILE_DIALOG_OPEN,
-                                             [this](const std::filesystem::path &path) { openFile(path); });
-                                         return Amethyst::EventResult::CONSUMED;
-                                     };
-                                 });
-
-                    f.textLabel({.base = {.position = Amethyst::UDim2(0.0f, 80.0f, 0.0f, 3.0f),
-                                          .size = Amethyst::UDim2(1.0f, -84.0f, 0.0f, 22.0f)},
-                                 .style = {.backgroundTransparency = 1.0f},
-                                 .text = {.textXAlignment = Amethyst::TextXAlignment::LEFT,
-                                          .textYAlignment = Amethyst::TextYAlignment::CENTER},
-                                 .label = ""},
-                                [this](Amethyst::TextLabelScope &t) { m_status = &t.component; });
+    scope.frame(
+        {.classes = {"panel"}, .base = {.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TOOLBAR_HEIGHT)}},
+        [this](Amethyst::FrameScope &f) {
+            f.textButton(
+                {.base = {.position = Amethyst::UDim2::fromOffset(4.0f, 3.0f), .size = Amethyst::UDim2::fromOffset(70.0f, 22.0f)},
+                 .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+                 .label = "Open..."},
+                [this](Amethyst::TextButtonScope &b) {
+                    b.component.onMouseButton1ClickCb = [this]() {
+                        m_context.editor->windows->openFileDialog(FILE_DIALOG_OPEN,
+                                                                  [this](const std::filesystem::path &path) { openFile(path); });
+                        return Amethyst::EventResult::CONSUMED;
+                    };
                 });
+
+            f.textLabel(
+                {.base = {.position = Amethyst::UDim2(0.0f, 80.0f, 0.0f, 3.0f), .size = Amethyst::UDim2(1.0f, -84.0f, 0.0f, 22.0f)},
+                 .style = {.backgroundTransparency = 1.0f},
+                 .text = {.textXAlignment = Amethyst::TextXAlignment::LEFT, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+                 .label = ""},
+                [this](Amethyst::TextLabelScope &t) { m_status = &t.component; });
+        });
 }
 
 void TextEditorPanel::loadText(const std::string &text)
@@ -127,8 +125,7 @@ bool TextEditorPanel::openScript(Rapture::AssetHandle handle)
     }
 
     m_script = handle;
-    m_path = script->isSourceInline() ? std::filesystem::path{}
-                                      : Rapture::AssetManager::getAssetMetadata(handle).getSourcePath();
+    m_path = script->isSourceInline() ? std::filesystem::path{} : Rapture::AssetManager::getAssetMetadata(handle).getSourcePath();
 
     std::string contents{script->source()};
     m_scriptAsset = std::move(script);

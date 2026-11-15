@@ -1,8 +1,8 @@
 #ifndef RAPTURE__PHYSICS_SERIALIZATION_H
 #define RAPTURE__PHYSICS_SERIALIZATION_H
 
-#include <rapture/physics/Common.h>
 #include <rapture/core/serialization/SerialDocument.h>
+#include <rapture/physics/Common.h>
 
 namespace Rapture {
 namespace physics {

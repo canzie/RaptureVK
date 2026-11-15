@@ -1,10 +1,10 @@
 #include <rapture/gpu/vulkan_context/VulkanQueue.h>
 
-#include <rapture/gpu/command_buffers/CommandPool.h>
-#include <rapture/core/utils/Log.h>
-#include <rapture/app/Application.h>
 #include <cassert>
 #include <cstdint>
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include <set>
 #include <stdexcept>
 #include <vector>

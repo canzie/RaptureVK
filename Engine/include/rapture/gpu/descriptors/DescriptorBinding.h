@@ -30,7 +30,8 @@ enum class TextureViewType : uint8_t;
 // TODO Add some sort of checking/verification for making sure that when adding a ubo to an array it is the same type
 //      as the current one
 
-template <typename T> class DescriptorBinding {
+template <typename T>
+class DescriptorBinding {
 
   public:
     DescriptorBinding(DescriptorSet *set, uint32_t binding, VkDescriptorType type, uint32_t size = 1);

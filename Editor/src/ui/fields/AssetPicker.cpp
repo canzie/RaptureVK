@@ -1,9 +1,9 @@
 #include "AssetPicker.h"
 
 #include "Icons.h"
-#include <rapture/assets/asset_manager/AssetManager.h>
 #include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
 
 #include <algorithm>
 #include <cctype>

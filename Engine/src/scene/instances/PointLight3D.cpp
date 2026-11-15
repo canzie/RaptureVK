@@ -1,7 +1,7 @@
 #include <rapture/scene/instances/PointLight3D.h>
 
-#include <rapture/scene/components/Components.h>
 #include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
 
 namespace Rapture {
 

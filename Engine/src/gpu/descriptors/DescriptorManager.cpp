@@ -1,8 +1,8 @@
 #include "gpu/descriptors/DescriptorManager.h"
-#include <rapture/gpu/buffers/UniformBuffer.h>
-#include <rapture/core/utils/Log.h>
-#include <rapture/gpu/shaders/ShaderCommon.h>
 #include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/buffers/UniformBuffer.h>
+#include <rapture/gpu/shaders/ShaderCommon.h>
 
 namespace Rapture {
 

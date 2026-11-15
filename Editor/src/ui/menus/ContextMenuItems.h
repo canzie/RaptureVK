@@ -1,10 +1,10 @@
 #ifndef RAPTURE__CONTEXT_MENU_ITEMS_H
 #define RAPTURE__CONTEXT_MENU_ITEMS_H
 
-#include <rapture/assets/asset_manager/AssetCommon.h>
 #include "components/checkbox.h"
 #include "components/context_menu.h"
 #include "components/radio_button.h"
+#include <rapture/assets/asset_manager/AssetCommon.h>
 
 #include <components/common.h>
 #include <components/frame.h>

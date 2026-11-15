@@ -1,8 +1,8 @@
 #include "AddSceneObjectMenu.h"
 
 #include "EntitySelection.h"
-#include <rapture/assets/asset_manager/ReservedAssets.h>
 #include "ui/menus/ContextMenuItems.h"
+#include <rapture/assets/asset_manager/ReservedAssets.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/DirectionalLight3D.h>
@@ -140,7 +140,8 @@ static std::vector<MenuItem> s_buildNode3DItems(SceneObjectScope scope, Rapture:
     return items;
 }
 
-std::vector<MenuItem> AddSceneObjectMenu_buildItems(Rapture::SceneObject *parent, EntitySelection &selection, SceneObjectScope scope)
+std::vector<MenuItem> AddSceneObjectMenu_buildItems(Rapture::SceneObject *parent, EntitySelection &selection,
+                                                    SceneObjectScope scope)
 {
     std::vector<MenuItem> meshes;
     s_appendPrimitive(meshes, scope, parent, selection, "Cube", Rapture::RE_PRIMITIVE_CUBE_MESH);

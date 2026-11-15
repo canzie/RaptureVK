@@ -1,8 +1,8 @@
 #ifndef RAPTURE__SCENE_FILE_COMMON_H
 #define RAPTURE__SCENE_FILE_COMMON_H
 
-#include <rapture/assets/asset_manager/AssetCommon.h>
 #include <filesystem>
+#include <rapture/assets/asset_manager/AssetCommon.h>
 
 namespace Rapture {
 

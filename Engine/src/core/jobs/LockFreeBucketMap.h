@@ -10,7 +10,8 @@
 
 namespace Rapture {
 
-template <typename Key, typename Value, size_t BucketCount = 1024, typename Hash = std::hash<Key>> class LockFreeBucketMap {
+template <typename Key, typename Value, size_t BucketCount = 1024, typename Hash = std::hash<Key>>
+class LockFreeBucketMap {
   public:
     using Node = StackNode<Value>;
 
@@ -42,7 +43,8 @@ template <typename Key, typename Value, size_t BucketCount = 1024, typename Hash
         return result;
     }
 
-    template <typename Predicate> std::vector<Value> stealMatching(const Key &key, Predicate predicate)
+    template <typename Predicate>
+    std::vector<Value> stealMatching(const Key &key, Predicate predicate)
     {
         size_t idx = Hash{}(key) & (BucketCount - 1);
         Node *list = m_buckets[idx].stealAll();

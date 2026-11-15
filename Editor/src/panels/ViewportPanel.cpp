@@ -2,14 +2,14 @@
 
 #include "EntitySelection.h"
 #include "Icons.h"
-#include <rapture/scene/components/Components.h>
 #include "ui/menus/ContextMenuItems.h"
-#include <rapture/scene/instances/controllers/CameraController.h>
-#include <rapture/gpu/render_targets/SceneRenderTarget.h>
-#include <rapture/scene/World.h>
-#include <rapture/scene/instances/Node3D.h>
 #include <rapture/core/utils/rp_assert.h>
+#include <rapture/gpu/render_targets/SceneRenderTarget.h>
 #include <rapture/renderer/viewport/Viewport.h>
+#include <rapture/scene/World.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/controllers/CameraController.h>
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -22,10 +22,10 @@
 #include <algorithm>
 #include <climits>
 #include <cstdint>
-#include <optional>
 #include <cstdlib>
 #include <glm/gtc/matrix_transform.hpp>
 #include <math/math.h>
+#include <optional>
 #include <span>
 
 static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.1f;
@@ -47,8 +47,7 @@ static constexpr uint32_t PICK_APERTURE = 11;
  * @param cursorY Cursor y within the region
  * @return What was drawn there reports itself as, empty where the region was empty
  */
-static std::optional<uint64_t> s_nearestToCursor(const Rapture::SceneQueryResult &result, uint32_t cursorX,
-                                                 uint32_t cursorY)
+static std::optional<uint64_t> s_nearestToCursor(const Rapture::SceneQueryResult &result, uint32_t cursorX, uint32_t cursorY)
 {
     std::optional<uint64_t> best;
     int32_t bestDistance = INT32_MAX;
@@ -177,7 +176,6 @@ void ViewportPanel::build(Amethyst::UIScope &scope)
             }
         });
     }
-
 }
 
 void ViewportPanel::releaseSlotImages()
@@ -271,22 +269,17 @@ void ViewportPanel::buildTransformMenu()
     });
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    items.push_back(RadioMenuItem::create("Translate", &m_gizmoOpGroup,
-                                                   static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_TRANSLATE)));
-    items.push_back(RadioMenuItem::create("Rotate", &m_gizmoOpGroup,
-                                                   static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_ROTATE)));
-    items.push_back(RadioMenuItem::create("Scale", &m_gizmoOpGroup,
-                                                   static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_SCALE)));
+    items.push_back(
+        RadioMenuItem::create("Translate", &m_gizmoOpGroup, static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_TRANSLATE)));
+    items.push_back(
+        RadioMenuItem::create("Rotate", &m_gizmoOpGroup, static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_ROTATE)));
+    items.push_back(RadioMenuItem::create("Scale", &m_gizmoOpGroup, static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_SCALE)));
     items.push_back(SeparatorMenuItem::create("Space"));
-    items.push_back(RadioMenuItem::create("World", &m_gizmoSpaceGroup,
-                                                   static_cast<int32_t>(gizmo::TransformGizmo::SPACE_WORLD)));
-    items.push_back(RadioMenuItem::create("Local", &m_gizmoSpaceGroup,
-                                                   static_cast<int32_t>(gizmo::TransformGizmo::SPACE_LOCAL)));
+    items.push_back(RadioMenuItem::create("World", &m_gizmoSpaceGroup, static_cast<int32_t>(gizmo::TransformGizmo::SPACE_WORLD)));
+    items.push_back(RadioMenuItem::create("Local", &m_gizmoSpaceGroup, static_cast<int32_t>(gizmo::TransformGizmo::SPACE_LOCAL)));
     items.push_back(SeparatorMenuItem::create("Camera"));
-    items.push_back(
-        RadioMenuItem::create("Orbit", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::ORBIT)));
-    items.push_back(
-        RadioMenuItem::create("Fly", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::FLY)));
+    items.push_back(RadioMenuItem::create("Orbit", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::ORBIT)));
+    items.push_back(RadioMenuItem::create("Fly", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::FLY)));
     m_transformMenu->setItems(std::move(items));
 }
 
@@ -569,10 +562,9 @@ void ViewportPanel::onViewportPressed(const Amethyst::InputObject &input)
     Rapture::SceneQueryResult result = m_viewport->queryRegion(region);
     std::optional<uint64_t> hit = s_nearestToCursor(result, px - region.x, py - region.y);
 
-    Rapture::ecs::EntityAccessor picked =
-        hit.has_value() ? Rapture::ecs::EntityAccessor(static_cast<Rapture::ecs::Entity>(*hit),
-                                                       &m_viewport->getScene()->getRegistry())
-                        : Rapture::ecs::EntityAccessor();
+    Rapture::ecs::EntityAccessor picked = hit.has_value() ? Rapture::ecs::EntityAccessor(static_cast<Rapture::ecs::Entity>(*hit),
+                                                                                         &m_viewport->getScene()->getRegistry())
+                                                          : Rapture::ecs::EntityAccessor();
     if (m_selection != nullptr) {
         m_selection->select(picked);
     }

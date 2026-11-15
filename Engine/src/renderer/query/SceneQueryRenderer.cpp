@@ -1,7 +1,7 @@
 #include <rapture/renderer/query/SceneQueryRenderer.h>
 
-#include <rapture/core/utils/EnginePaths.h>
 #include "gpu/descriptors/DescriptorManager.h"
+#include <rapture/core/utils/EnginePaths.h>
 
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/Log.h>
@@ -88,8 +88,8 @@ static glm::mat4 s_regionProjection(const glm::mat4 &projection, uint32_t viewpo
  * @param[out] distance How far along the direction the meeting lies
  * @return True if the ray meets the triangle ahead of its origin
  */
-static bool s_intersectRayTriangle(const glm::vec3 &origin, const glm::vec3 &direction, const glm::vec3 &a,
-                                   const glm::vec3 &b, const glm::vec3 &c, float &distance)
+static bool s_intersectRayTriangle(const glm::vec3 &origin, const glm::vec3 &direction, const glm::vec3 &a, const glm::vec3 &b,
+                                   const glm::vec3 &c, float &distance)
 {
     constexpr float EPSILON = 1e-8f;
 
@@ -199,8 +199,7 @@ SceneQueryRenderer::~SceneQueryRenderer()
 }
 
 SceneQueryResult SceneQueryRenderer::query(Scene &scene, ecs::EntityAccessor camera, uint32_t viewportWidth,
-                                           uint32_t viewportHeight, const SceneQuery &region,
-                                           const GizmoDrawList *drawList)
+                                           uint32_t viewportHeight, const SceneQuery &region, const GizmoDrawList *drawList)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -407,9 +406,8 @@ void SceneQueryRenderer::recordQuery(CommandBuffer *commandBuffer, Scene &scene,
 }
 
 std::vector<SceneQueryRenderer::PixelRay> SceneQueryRenderer::buildRegionRays(const glm::mat4 &inverseViewProj,
-                                                                             uint32_t viewportWidth,
-                                                                             uint32_t viewportHeight,
-                                                                             const SceneQuery &region)
+                                                                              uint32_t viewportWidth, uint32_t viewportHeight,
+                                                                              const SceneQuery &region)
 {
     std::vector<PixelRay> rays(static_cast<size_t>(region.width) * region.height);
 
@@ -433,9 +431,8 @@ std::vector<SceneQueryRenderer::PixelRay> SceneQueryRenderer::buildRegionRays(co
     return rays;
 }
 
-void SceneQueryRenderer::addPickCandidateHits(SceneQueryResult &result, const GizmoDrawList &drawList,
-                                              const Frustum &regionFrustum, const glm::mat4 &viewProj,
-                                              const std::vector<PixelRay> &rays)
+void SceneQueryRenderer::addPickCandidateHits(SceneQueryResult &result, const GizmoDrawList &drawList, const Frustum &regionFrustum,
+                                              const glm::mat4 &viewProj, const std::vector<PixelRay> &rays)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -516,8 +513,7 @@ SceneQueryResult SceneQueryRenderer::readBack(const SceneQuery &region)
             float depth = 0.0f;
             std::memcpy(&depth, &entry.depthBits, sizeof(float));
 
-            const uint64_t userData =
-                static_cast<uint64_t>(entry.userDataLow) | (static_cast<uint64_t>(entry.userDataHigh) << 32);
+            const uint64_t userData = static_cast<uint64_t>(entry.userDataLow) | (static_cast<uint64_t>(entry.userDataHigh) << 32);
 
             result.hits[base + slot] = {userData, depth};
         }

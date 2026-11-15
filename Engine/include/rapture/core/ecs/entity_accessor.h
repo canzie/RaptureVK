@@ -21,10 +21,7 @@ class EntityAccessor {
 
     Entity getEntity() const { return m_entity; }
 
-    bool operator==(const EntityAccessor &other) const
-    {
-        return m_entity == other.m_entity && m_registry == other.m_registry;
-    }
+    bool operator==(const EntityAccessor &other) const { return m_entity == other.m_entity && m_registry == other.m_registry; }
 
     /**
      * @brief Attaches a component to this entity.

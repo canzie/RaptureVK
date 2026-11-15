@@ -6,9 +6,7 @@
 
 namespace Rapture {
 
-Bone3D::Bone3D(Scene &scene, std::string_view name) : Node3D(scene, name)
-{
-}
+Bone3D::Bone3D(Scene &scene, std::string_view name) : Node3D(scene, name) {}
 
 const TypeInfo &Bone3D::staticType()
 {

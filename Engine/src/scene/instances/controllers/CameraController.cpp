@@ -1,9 +1,9 @@
 #include <rapture/scene/instances/controllers/CameraController.h>
 
-#include <rapture/scene/components/Components.h>
-#include <rapture/scene/systems/Transforms.h>
 #include <rapture/core/utils/Log.h>
+#include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/Camera3D.h>
+#include <rapture/scene/systems/Transforms.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -98,8 +98,8 @@ void CameraController::updateViewCamera()
 
     // this controller turns itself rather than the object it sits on, so where it looks is its own
     // forward and not anything the transform carries
-    m_viewCamera->accessor().write<CameraComponent>()->updateViewMatrix(
-        transform::translation(m_viewCamera->worldTransform()), m_forward);
+    m_viewCamera->accessor().write<CameraComponent>()->updateViewMatrix(transform::translation(m_viewCamera->worldTransform()),
+                                                                        m_forward);
 }
 
 void CameraController::updateFly(float dt, Node3D &node)

@@ -1,10 +1,10 @@
 #ifndef RAPTURE__SCENERENDERDATA_H
 #define RAPTURE__SCENERENDERDATA_H
 
-#include <rapture/scene/components/ChangeChannels.h>
-#include <rapture/scene/render_data/SkeletonInstanceManager.h>
 #include <rapture/renderer/GPUDataStructs.h>
 #include <rapture/renderer/RenderPartition.h>
+#include <rapture/scene/components/ChangeChannels.h>
+#include <rapture/scene/render_data/SkeletonInstanceManager.h>
 
 #include <rapture/core/ecs/registry.h>
 #include <rapture/gpu/vulkan_context/RenderContext.h>
@@ -192,8 +192,8 @@ class SceneRenderData {
      * @param repackEntity Repacks one entity's slot, called only for entities that own one
      * @param repackAll Repacks every slot, used when the reader fell too far behind
      */
-    void consumeChanges(StoreBookmarks &bookmarks, SceneChannel paramsChannel,
-                        const std::function<void(ecs::Entity)> &repackEntity, const std::function<void()> &repackAll);
+    void consumeChanges(StoreBookmarks &bookmarks, SceneChannel paramsChannel, const std::function<void(ecs::Entity)> &repackEntity,
+                        const std::function<void()> &repackAll);
 
     std::vector<ecs::SignalConnection> m_connections;
 

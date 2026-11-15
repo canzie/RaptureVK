@@ -1,12 +1,12 @@
 #include "EditorLayer.h"
 
-#include <rapture/scene/instances/controllers/CameraController.h>
+#include <rapture/app/Application.h>
 #include <rapture/input/Input.h>
-#include <rapture/scene/Scene.h>
-#include <rapture/scene/instances/Camera3D.h>
 #include <rapture/renderer/viewport/Viewport.h>
 #include <rapture/renderer/viewport/ViewportManager.h>
-#include <rapture/app/Application.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Camera3D.h>
+#include <rapture/scene/instances/controllers/CameraController.h>
 
 #include <glm/glm.hpp>
 
@@ -39,8 +39,8 @@ void EditorLayer::onAttach()
     auto &app = Rapture::Application::getInstance();
     m_input = std::make_unique<Rapture::Input>(&app.getWindowContext());
 
-    m_viewportCreatedConn = app.getViewportManager().onViewportCreated.connect(
-        [this](Rapture::Viewport *viewport) { adoptViewport(viewport); });
+    m_viewportCreatedConn =
+        app.getViewportManager().onViewportCreated.connect([this](Rapture::Viewport *viewport) { adoptViewport(viewport); });
 
     // controls outlive a detach, so whatever drove the scene while this layer was down hands it back
     for (auto &[viewport, control] : m_controls) {

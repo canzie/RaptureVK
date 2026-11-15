@@ -1,14 +1,14 @@
 #include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
 
+#include "core/jobs/JobSystem.h"
+#include "gpu/vulkan_context/TimelineSemaphore.h"
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/meshes/Mesh.h>
-#include "core/jobs/JobSystem.h"
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/TracyProfiler.h>
 #include <rapture/gpu/acceleration_structures/BLAS.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
-#include "gpu/vulkan_context/TimelineSemaphore.h"
 
 #include <thread>
 
@@ -89,7 +89,8 @@ void AccelerationStructureBuilder::kickDrain()
 std::vector<AccelerationStructureBuilder::PendingMesh> AccelerationStructureBuilder::takeBatch(VkDeviceSize &scratchBytes)
 {
     auto &vulkanContext = Application::getInstance().getVulkanContext();
-    const VkDeviceSize alignment = vulkanContext.getAccelerationStructureProperties().minAccelerationStructureScratchOffsetAlignment;
+    const VkDeviceSize alignment =
+        vulkanContext.getAccelerationStructureProperties().minAccelerationStructureScratchOffsetAlignment;
 
     std::vector<PendingMesh> batch;
     scratchBytes = 0;
@@ -139,7 +140,8 @@ CommandBuffer *AccelerationStructureBuilder::takeCommandBuffer()
 VkDeviceAddress AccelerationStructureBuilder::reserveScratch(VkDeviceSize sizeBytes)
 {
     auto &vulkanContext = Application::getInstance().getVulkanContext();
-    const VkDeviceSize alignment = vulkanContext.getAccelerationStructureProperties().minAccelerationStructureScratchOffsetAlignment;
+    const VkDeviceSize alignment =
+        vulkanContext.getAccelerationStructureProperties().minAccelerationStructureScratchOffsetAlignment;
     const VkDeviceSize requiredBytes = sizeBytes + alignment;
 
     if (m_scratchCapacityBytes < requiredBytes) {
@@ -178,7 +180,8 @@ void AccelerationStructureBuilder::drainBatch(JobContext &jobContext)
     RAPTURE_PROFILE_FUNCTION();
 
     auto &vulkanContext = Application::getInstance().getVulkanContext();
-    const VkDeviceSize alignment = vulkanContext.getAccelerationStructureProperties().minAccelerationStructureScratchOffsetAlignment;
+    const VkDeviceSize alignment =
+        vulkanContext.getAccelerationStructureProperties().minAccelerationStructureScratchOffsetAlignment;
 
     while (true) {
         VkDeviceSize scratchBytes = 0;

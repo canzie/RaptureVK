@@ -8,13 +8,12 @@ namespace Rapture::scripting {
 
 void registerInstanceBindings(sol::state_view lua)
 {
-    auto instance = lua.new_usertype<LuaHandle<Instance>>("Instance", sol::no_constructor, sol::base_classes,
-                                                          sol::bases<LuaHandleBase>());
+    auto instance =
+        lua.new_usertype<LuaHandle<Instance>>("Instance", sol::no_constructor, sol::base_classes, sol::bases<LuaHandleBase>());
     addInstanceMembers(instance);
     LuaHandleBase::registerType<Instance>();
 
-    instance["new"] = [](const std::string &className, sol::optional<sol::object> parentValue,
-                         sol::this_state state) {
+    instance["new"] = [](const std::string &className, sol::optional<sol::object> parentValue, sol::this_state state) {
         sol::state_view lua(state);
         Scene *scene = luaScene(lua);
         if (scene == nullptr) {
@@ -40,13 +39,13 @@ void registerInstanceBindings(sol::state_view lua)
         return LuaHandleBase::push(lua, raw);
     };
 
-    auto sceneObject = lua.new_usertype<LuaHandle<SceneObject>>(
-        "SceneObject", sol::no_constructor, sol::base_classes, sol::bases<LuaHandleBase>());
+    auto sceneObject = lua.new_usertype<LuaHandle<SceneObject>>("SceneObject", sol::no_constructor, sol::base_classes,
+                                                                sol::bases<LuaHandleBase>());
     addSceneObjectMembers(sceneObject);
     LuaHandleBase::registerType<SceneObject>();
 
-    auto folder = lua.new_usertype<LuaHandle<Folder>>("Folder", sol::no_constructor, sol::base_classes,
-                                                      sol::bases<LuaHandleBase>());
+    auto folder =
+        lua.new_usertype<LuaHandle<Folder>>("Folder", sol::no_constructor, sol::base_classes, sol::bases<LuaHandleBase>());
     addSceneObjectMembers(folder);
     LuaHandleBase::registerType<Folder>();
 }

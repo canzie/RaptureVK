@@ -1,16 +1,16 @@
-#include <rapture/renderer/generators/textures/ProceduralTextures.h>
 #include <rapture/assets/textures/ATexture.h>
+#include <rapture/renderer/generators/textures/ProceduralTextures.h>
 
 #include <rapture/core/utils/EnginePaths.h>
 
 #include <rapture/scene/instances/Environment.h>
 
+#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/asset_manager/AssetImportConfig.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/core/utils/Log.h>
-#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/gpu/textures/Texture.h>
 #include <rapture/gpu/vulkan_context/VulkanQueue.h>
 
@@ -458,8 +458,7 @@ Ref<ATexture> ProceduralTexture::generateWhiteNoise(uint32_t seed, const Procedu
     return generator->getTextureAsset();
 }
 
-Ref<ATexture> ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &params,
-                                                         const ProceduralTextureConfig &config)
+Ref<ATexture> ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConstants &params, const ProceduralTextureConfig &config)
 {
     auto generator = createPerlinNoiseGenerator(config);
     if (!generator) {
@@ -473,7 +472,7 @@ Ref<ATexture> ProceduralTexture::generatePerlinNoise(const PerlinNoisePushConsta
 }
 
 Ref<ATexture> ProceduralTexture::generateSimplexNoise(const SimplexNoisePushConstants &params,
-                                                          const ProceduralTextureConfig &config)
+                                                      const ProceduralTextureConfig &config)
 {
     auto generator = createSimplexNoiseGenerator(config);
     if (!generator) {
@@ -486,8 +485,7 @@ Ref<ATexture> ProceduralTexture::generateSimplexNoise(const SimplexNoisePushCons
     return generator->getTextureAsset();
 }
 
-Ref<ATexture> ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &params,
-                                                         const ProceduralTextureConfig &config)
+Ref<ATexture> ProceduralTexture::generateRidgedNoise(const RidgedNoisePushConstants &params, const ProceduralTextureConfig &config)
 {
     auto generator = createRidgedNoiseGenerator(config);
     if (!generator) {
@@ -528,7 +526,7 @@ static AtmospherePushConstants s_buildAtmospherePushConstants(float timeOfDay, c
 }
 
 Ref<ATexture> ProceduralTexture::generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params,
-                                                        const ProceduralTextureConfig &config)
+                                                    const ProceduralTextureConfig &config)
 {
     // Function-local static for shader handle - AssetManager handles caching
     static AssetHandle s_shaderHandle;
@@ -585,7 +583,7 @@ static AssetHandle s_getAtmosphereCubemapShaderHandle()
 }
 
 Ref<ATexture> ProceduralTexture::generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params,
-                                                               const ProceduralTextureConfig &config)
+                                                           const ProceduralTextureConfig &config)
 {
     AssetHandle shaderHandle = s_getAtmosphereCubemapShaderHandle();
     if (shaderHandle == 0) {

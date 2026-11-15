@@ -1,12 +1,12 @@
 #ifndef RAPTURE__MATERIAL_INSTANCE_H
 #define RAPTURE__MATERIAL_INSTANCE_H
 
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/materials/AMaterial.h>
 #include <rapture/assets/materials/GraphInstanceData.h>
 #include <rapture/assets/materials/Material.h>
 #include <rapture/assets/materials/MaterialData.h>
 #include <rapture/assets/materials/MaterialParameters.h>
-#include <rapture/assets/asset_manager/Asset.h>
-#include <rapture/assets/materials/AMaterial.h>
 #include <rapture/assets/textures/ATexture.h>
 #include <rapture/core/events/AssetEvents.h>
 

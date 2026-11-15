@@ -16,6 +16,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <yyjson.h>
 
+#include "renderer/generators/TangentGeneration.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/asset_manager/ReservedAssets.h>
 #include <rapture/assets/materials/AMaterial.h>
@@ -30,7 +31,6 @@
 #include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/core/utils/GLTypes.h>
 #include <rapture/gpu/buffers/BufferLayout.h>
-#include "renderer/generators/TangentGeneration.h"
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/Module.h>

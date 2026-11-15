@@ -1,10 +1,10 @@
 #include <rapture/scene/World.h>
 
+#include "physics/PhysicsSystem.h"
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/core/serialization/SerialDocument.h>
 #include <rapture/core/utils/Log.h>
-#include "physics/PhysicsSystem.h"
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/Module.h>
 #include <rapture/scene/instances/SceneObject.h>

@@ -2,17 +2,17 @@
 #define RAPTURE__AMETHYST_LAYER_H
 
 #include "app/EditorConfig.h"
-#include <rapture/app/Layer.h>
 #include "context/EditorContext.h"
+#include <rapture/app/Layer.h>
 
 #include <amethyst/Amethyst.h>
 #include <amethyst__vk13_glfw.h>
 
 #include "ShortcutRegistry.h"
+#include "layers/BottomBar.h"
 #include <rapture/core/events/EventSignal.h>
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
-#include "layers/BottomBar.h"
 
 #include <glm/vec2.hpp>
 #include <memory>

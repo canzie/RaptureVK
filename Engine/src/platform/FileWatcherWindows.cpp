@@ -38,14 +38,9 @@ Win32DirectoryWatcher::Win32DirectoryWatcher(std::filesystem::path directory, bo
         return;
     }
 
-    m_dirHandle = CreateFileW(
-        m_directory.wstring().c_str(),
-        FILE_LIST_DIRECTORY,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-        nullptr,
-        OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-        nullptr);
+    m_dirHandle =
+        CreateFileW(m_directory.wstring().c_str(), FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, nullptr);
     if (m_dirHandle == INVALID_HANDLE_VALUE) {
         RP_CORE_ERROR("CreateFileW failed for '{}'", m_directory.string());
         return;
@@ -102,15 +97,8 @@ void Win32DirectoryWatcher::run()
 
     while (true) {
         DWORD bytesReturned = 0;
-        BOOL ok = ReadDirectoryChangesW(
-            m_dirHandle,
-            buffer,
-            sizeof(buffer),
-            m_recursive ? TRUE : FALSE,
-            s_notifyFilter,
-            &bytesReturned,
-            &overlapped,
-            nullptr);
+        BOOL ok = ReadDirectoryChangesW(m_dirHandle, buffer, sizeof(buffer), m_recursive ? TRUE : FALSE, s_notifyFilter,
+                                        &bytesReturned, &overlapped, nullptr);
         if (ok == FALSE) {
             RP_CORE_ERROR("ReadDirectoryChangesW failed for '{}'", m_directory.string());
             break;
@@ -171,7 +159,8 @@ void Win32DirectoryWatcher::processEvents(const char *buffer, DWORD length)
     }
 }
 
-std::unique_ptr<DirectoryWatcher> DirectoryWatcher::create(const std::filesystem::path &directory, bool recursive, Callback callback)
+std::unique_ptr<DirectoryWatcher> DirectoryWatcher::create(const std::filesystem::path &directory, bool recursive,
+                                                           Callback callback)
 {
     auto watcher = std::make_unique<Win32DirectoryWatcher>(directory, recursive, std::move(callback));
     if (!watcher->isValid()) {

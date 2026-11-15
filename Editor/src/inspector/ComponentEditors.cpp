@@ -1,11 +1,11 @@
 #include "ComponentEditors.h"
 
-#include <rapture/scene/components/Components.h>
 #include "ui/chrome/HeaderLayouts.h"
 #include <rapture/core/utils/Log.h>
-#include <rapture/scene/render_data/SceneRenderData.h>
 #include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/Environment.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
 #include <algorithm>
 
@@ -385,12 +385,11 @@ void SkeletalMesh3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 m_node->setMesh(handle);
             }
         });
-        rowInstancePicker(t, "Pose", m_posePicker, Rapture::SkeletonPose::staticType(),
-                          [this](Rapture::SceneObject *instance) {
-                              if (m_node != nullptr) {
-                                  m_node->setPose(instance != nullptr ? instance->as<Rapture::SkeletonPose>() : nullptr);
-                              }
-                          });
+        rowInstancePicker(t, "Pose", m_posePicker, Rapture::SkeletonPose::staticType(), [this](Rapture::SceneObject *instance) {
+            if (m_node != nullptr) {
+                m_node->setPose(instance != nullptr ? instance->as<Rapture::SkeletonPose>() : nullptr);
+            }
+        });
     });
 }
 
@@ -590,17 +589,18 @@ void PhysicsEditor::setSubject(Rapture::Scene *scene, const Rapture::ecs::Entity
 void RigidBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        m_shapeDropdown = rowDropdown(t, "Shape", Rapture::physics::CollisionShape_toString(Rapture::physics::COLLISION_SHAPE_BOX),
-                                      s_shapeOptions(), [this](int index) {
-                                          if (m_rigidBody == nullptr) {
-                                              return;
-                                          }
-                                          const auto type = static_cast<Rapture::physics::CollisionShapeType>(index);
-                                          m_rigidBody->setShape(Rapture::physics::CollisionShape_ofType(type));
-                                          if (m_shapeDropdown != nullptr) {
-                                              m_shapeDropdown->setText(std::string(Rapture::physics::CollisionShape_toString(type)));
-                                          }
-                                      });
+        m_shapeDropdown =
+            rowDropdown(t, "Shape", Rapture::physics::CollisionShape_toString(Rapture::physics::COLLISION_SHAPE_BOX),
+                        s_shapeOptions(), [this](int index) {
+                            if (m_rigidBody == nullptr) {
+                                return;
+                            }
+                            const auto type = static_cast<Rapture::physics::CollisionShapeType>(index);
+                            m_rigidBody->setShape(Rapture::physics::CollisionShape_ofType(type));
+                            if (m_shapeDropdown != nullptr) {
+                                m_shapeDropdown->setText(std::string(Rapture::physics::CollisionShape_toString(type)));
+                            }
+                        });
         m_motionTypeDropdown =
             rowDropdown(t, "Motion", Rapture::physics::MotionType_toString(Rapture::physics::MOTION_DYNAMIC), {"Static", "Dynamic"},
                         [this](int index) {
@@ -657,17 +657,18 @@ Rapture::CharacterBody3D *CharacterBody3DEditor::resolveBody(const Rapture::ecs:
 void CharacterBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        m_shapeDropdown = rowDropdown(t, "Shape", Rapture::physics::CollisionShape_toString(Rapture::physics::COLLISION_SHAPE_CAPSULE),
-                                      s_shapeOptions(), [this](int index) {
-                                          if (m_characterBody == nullptr) {
-                                              return;
-                                          }
-                                          const auto type = static_cast<Rapture::physics::CollisionShapeType>(index);
-                                          m_characterBody->setShape(Rapture::physics::CollisionShape_ofType(type));
-                                          if (m_shapeDropdown != nullptr) {
-                                              m_shapeDropdown->setText(std::string(Rapture::physics::CollisionShape_toString(type)));
-                                          }
-                                      });
+        m_shapeDropdown =
+            rowDropdown(t, "Shape", Rapture::physics::CollisionShape_toString(Rapture::physics::COLLISION_SHAPE_CAPSULE),
+                        s_shapeOptions(), [this](int index) {
+                            if (m_characterBody == nullptr) {
+                                return;
+                            }
+                            const auto type = static_cast<Rapture::physics::CollisionShapeType>(index);
+                            m_characterBody->setShape(Rapture::physics::CollisionShape_ofType(type));
+                            if (m_shapeDropdown != nullptr) {
+                                m_shapeDropdown->setText(std::string(Rapture::physics::CollisionShape_toString(type)));
+                            }
+                        });
         rowVec3(t, "Shape Offset", m_shapeOffset, 0.01, -100.0, 100.0, [this]() {
             if (m_characterBody != nullptr) {
                 m_characterBody->setShapeOffset(glm::vec3(static_cast<float>(m_shapeOffset[0]),

@@ -3,10 +3,10 @@
 
 #include <vk_mem_alloc.h>
 
-#include <rapture/platform/WindowContext.h>
 #include <rapture/gpu/vulkan_context/RenderContext.h>
 #include <rapture/gpu/vulkan_context/VulkanQueue.h>
 #include <rapture/gpu/vulkan_context/VulkanTypes.h>
+#include <rapture/platform/WindowContext.h>
 
 #include <map>
 #include <memory>

@@ -1,7 +1,7 @@
 #include <rapture/assets/meshes/Mesh.h>
 
-#include <rapture/app/Application.h>
 #include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
+#include <rapture/app/Application.h>
 #include <rapture/gpu/acceleration_structures/BLAS.h>
 #include <rapture/gpu/buffers/BufferPool.h>
 

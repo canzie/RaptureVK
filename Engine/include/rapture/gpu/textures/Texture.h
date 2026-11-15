@@ -1,8 +1,8 @@
 #ifndef RAPTURE__TEXTURE_H
 #define RAPTURE__TEXTURE_H
 
-#include <rapture/gpu/textures/TextureCommon.h>
 #include <rapture/gpu/descriptors/DescriptorBinding.h>
+#include <rapture/gpu/textures/TextureCommon.h>
 
 #include <atomic>
 #include <memory>
@@ -192,8 +192,7 @@ class Texture {
      * @param dstAccessMask Access to make visible
      * @return The barrier, for the caller to submit
      */
-    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout newLayout, VkAccessFlags srcAccessMask,
-                                               VkAccessFlags dstAccessMask);
+    VkImageMemoryBarrier getImageMemoryBarrier(VkImageLayout newLayout, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask);
 
     /**
      * @brief Builds a barrier out of an explicit old layout, and records the new one

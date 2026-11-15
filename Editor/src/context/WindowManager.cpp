@@ -27,12 +27,14 @@ WindowManager::~WindowManager()
 
 void WindowManager::openWindow(int32_t width, int32_t height, std::string_view title, WindowContentBuilder build)
 {
-    Rapture::RenderWindow &renderWindow = Rapture::Application::getInstance().createSecondaryWindow(width, height, std::string(title).c_str());
+    Rapture::RenderWindow &renderWindow =
+        Rapture::Application::getInstance().createSecondaryWindow(width, height, std::string(title).c_str());
     auto swapChain = renderWindow.getSwapChain();
 
     auto open = std::make_unique<OpenWindow>();
     open->renderWindow = &renderWindow;
-    open->window.absoluteSize = {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)};
+    open->window.absoluteSize = {static_cast<float>(swapChain->getExtent().width),
+                                 static_cast<float>(swapChain->getExtent().height)};
     open->window.absoluteRotation = 0.0f;
 
     m_backend->registerWindow(renderWindow.getWindowContext()->getNativeWindowContext(), &open->window);
@@ -59,7 +61,7 @@ void WindowManager::openFileDialog(FileDialogMode mode, std::function<void(const
 
     openWindow(FILE_DIALOG_WINDOW_WIDTH, FILE_DIALOG_WINDOW_HEIGHT, "Open File",
                [mode, startDirectory = m_lastDialogDirectory, confirm = std::move(confirm)](Amethyst::Window &window,
-                                                                                           const std::function<void()> &close) {
+                                                                                            const std::function<void()> &close) {
                    auto fileBrowser = std::make_shared<FileBrowser>(window, mode, startDirectory);
                    fileBrowser->onConfirm = confirm;
                    fileBrowser->onClose = close;

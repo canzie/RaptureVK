@@ -85,7 +85,7 @@ struct IoRequest {
 struct GpuWaitRequest {
     const TimelineSemaphore *semaphore;
     uint64_t waitValue;
-    Counter *counter;  // Decrement when semaphore signals
+    Counter *counter; // Decrement when semaphore signals
 };
 
 } // namespace Rapture

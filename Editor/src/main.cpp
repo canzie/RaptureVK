@@ -1,8 +1,8 @@
 #include "EntryPoint.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/EnginePaths.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/gpu/swap_chains/SwapChain.h>
-#include <rapture/core/utils/EnginePaths.h>
-#include <rapture/app/Application.h>
 
 #include <cerrno>
 #include <cstring>

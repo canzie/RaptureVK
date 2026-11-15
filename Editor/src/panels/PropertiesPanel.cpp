@@ -3,8 +3,8 @@
 #include "Icons.h"
 #include "inspector/ComponentEditors.h"
 
-#include <rapture/scene/components/Components.h>
 #include <rapture/scene/World.h>
+#include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/SceneObject.h>
 
 #include <components/common.h>

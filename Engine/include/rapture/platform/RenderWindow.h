@@ -1,8 +1,8 @@
 #ifndef RAPTURE__RENDER_WINDOW_H
 #define RAPTURE__RENDER_WINDOW_H
 
-#include <rapture/gpu/command_buffers/CommandPool.h>
 #include <rapture/core/events/EventSignal.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include <rapture/platform/WindowContext.h>
 
 #include <vulkan/vulkan.h>

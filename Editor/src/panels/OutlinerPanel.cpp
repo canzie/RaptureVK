@@ -5,11 +5,11 @@
 #include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/scene/World.h>
 #include <rapture/scene/instances/Module.h>
 #include <rapture/scene/instances/SceneObject.h>
 #include <rapture/scene/instances/scene_components/VisibilityComponent.h>
-#include <rapture/core/ecs/entity_accessor.h>
 
 #include <components/common.h>
 #include <components/context_menu_item.h>
@@ -273,8 +273,8 @@ void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     if (m_selection != nullptr) {
-        items.push_back(Amethyst::makeSubmenuItem(
-            "Add", AddSceneObjectMenu_buildItems(instance, *m_selection, SCENE_OBJECT_SCOPE_LEVEL)));
+        items.push_back(
+            Amethyst::makeSubmenuItem("Add", AddSceneObjectMenu_buildItems(instance, *m_selection, SCENE_OBJECT_SCOPE_LEVEL)));
     }
     items.push_back(SeparatorMenuItem::create());
     items.push_back(Amethyst::makeActionItem("Rename", [this, row, instance]() { startRename(row, instance); }));

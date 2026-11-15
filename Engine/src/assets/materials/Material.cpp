@@ -1,18 +1,18 @@
 #include <rapture/assets/materials/Material.h>
 
+#include "gpu/buffers/FreeListStorageBuffer.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/asset_manager/ReservedAssets.h>
 #include <rapture/assets/materials/AMaterial.h>
+#include <rapture/assets/materials/graph/MaterialGraphCompiler.h>
+#include <rapture/assets/materials/graph/SurfaceGraphManager.h>
 #include <rapture/assets/textures/ATexture.h>
 #include <rapture/core/events/ProjectEvents.h>
 #include <rapture/core/utils/EnginePaths.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/rp_assert.h>
-#include "gpu/buffers/FreeListStorageBuffer.h"
 #include <rapture/gpu/buffers/VirtualStorageBuffer.h>
 #include <rapture/gpu/textures/Texture.h>
-#include <rapture/assets/materials/graph/MaterialGraphCompiler.h>
-#include <rapture/assets/materials/graph/SurfaceGraphManager.h>
 
 #include <glm/glm.hpp>
 

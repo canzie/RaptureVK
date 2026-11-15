@@ -8,8 +8,7 @@ namespace Rapture {
 
 static std::atomic<uint16_t> s_nextTypeId{0};
 
-TypeInfo::TypeInfo(std::string_view name, const TypeInfo *base)
-    : name(name), base(base), depth(0), id(s_nextTypeId++), chain{}
+TypeInfo::TypeInfo(std::string_view name, const TypeInfo *base) : name(name), base(base), depth(0), id(s_nextTypeId++), chain{}
 {
     if (base != nullptr) {
         depth = static_cast<uint8_t>(base->depth + 1);

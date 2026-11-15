@@ -1,7 +1,7 @@
 #include <rapture/scene/instances/controllers/PlayerController.h>
 
-#include <rapture/scene/components/Components.h>
 #include <rapture/core/utils/Log.h>
+#include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/CharacterBody3D.h>
 #include <rapture/scene/instances/Node3D.h>

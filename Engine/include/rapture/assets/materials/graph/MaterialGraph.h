@@ -7,9 +7,9 @@
 #include <string>
 #include <vector>
 
+#include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/materials/graph/GraphDomain.h>
 #include <rapture/assets/materials/graph/MaterialGraphTypes.h>
-#include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/textures/ATexture.h>
 
 namespace Rapture {

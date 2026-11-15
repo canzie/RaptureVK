@@ -120,8 +120,7 @@ std::unique_ptr<ASkeletalMesh> ASkeletalMesh::deserialize(std::span<const uint8_
 
     std::vector<AssetHandle> materialSlots(header.materialSlotCount);
     if (header.materialSlotCount > 0) {
-        std::memcpy(materialSlots.data(), blob.data() + header.materialSlotOffset,
-                    header.materialSlotCount * sizeof(AssetHandle));
+        std::memcpy(materialSlots.data(), blob.data() + header.materialSlotOffset, header.materialSlotCount * sizeof(AssetHandle));
     }
 
     std::vector<glm::mat4> inverseBindMatrices(header.jointCount);

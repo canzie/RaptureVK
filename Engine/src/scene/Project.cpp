@@ -1,5 +1,5 @@
-#include <rapture/scene/Project.h>
 #include <rapture/assets/worlds/AWorld.h>
+#include <rapture/scene/Project.h>
 
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/core/events/GameEvents.h>
@@ -142,8 +142,7 @@ void Project::watchContentDirectory()
     });
 
     if (!m_contentWatcher) {
-        RP_CORE_WARN("Could not watch '{}', files changed outside the editor will go unnoticed",
-                     getContentDirectory().string());
+        RP_CORE_WARN("Could not watch '{}', files changed outside the editor will go unnoticed", getContentDirectory().string());
     }
 }
 

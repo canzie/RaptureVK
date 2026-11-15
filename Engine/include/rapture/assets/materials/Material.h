@@ -1,13 +1,13 @@
 #ifndef RAPTURE__MATERIAL_H
 #define RAPTURE__MATERIAL_H
 
-#include <rapture/assets/materials/MaterialData.h>
-#include <rapture/assets/materials/MaterialParameters.h>
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/materials/MaterialData.h>
+#include <rapture/assets/materials/MaterialParameters.h>
+#include <rapture/assets/materials/graph/MaterialGraph.h>
 #include <rapture/core/events/Events.h>
 #include <rapture/gpu/buffers/VirtualStorageBuffer.h>
-#include <rapture/assets/materials/graph/MaterialGraph.h>
 
 #include <filesystem>
 #include <memory>

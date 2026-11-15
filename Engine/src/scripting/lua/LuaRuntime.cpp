@@ -1,11 +1,11 @@
 #include "scripting/lua/LuaRuntime.h"
 
-#include <rapture/core/utils/Log.h>
-#include <rapture/scene/instances/SceneObject.h>
 #include "scene/instances/scene_components/ScriptComponent.h"
 #include "scripting/lua/LuaEventSignal.h"
 #include "scripting/lua/LuaHandle.h"
 #include "scripting/lua/bindings/LuaBindings.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/instances/SceneObject.h>
 
 #include <sol/sol.hpp>
 

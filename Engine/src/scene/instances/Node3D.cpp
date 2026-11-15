@@ -5,8 +5,8 @@
 
 #include <glm/gtc/constants.hpp>
 
-#include <rapture/scene/render_data/SceneRenderData.h>
 #include <rapture/scene/Scene.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
 namespace Rapture {
 

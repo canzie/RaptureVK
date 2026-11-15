@@ -182,10 +182,9 @@ struct BufferLayout {
         size_t hash = 0;
         for (const auto &attrib : buffer_attribs) {
             // Combine hashes of the attribute properties
-            size_t attribHash = std::hash<uint32_t>()(static_cast<uint32_t>(attrib.name)) ^
-                                (std::hash<unsigned int>()(attrib.componentType) << 1) ^
-                                (std::hash<uint32_t>()(static_cast<uint32_t>(attrib.type)) << 2) ^
-                                (std::hash<size_t>()(attrib.offset) << 3);
+            size_t attribHash =
+                std::hash<uint32_t>()(static_cast<uint32_t>(attrib.name)) ^ (std::hash<unsigned int>()(attrib.componentType) << 1) ^
+                (std::hash<uint32_t>()(static_cast<uint32_t>(attrib.type)) << 2) ^ (std::hash<size_t>()(attrib.offset) << 3);
             hash ^= attribHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);
         }
         // Add interleaved flag to the hash

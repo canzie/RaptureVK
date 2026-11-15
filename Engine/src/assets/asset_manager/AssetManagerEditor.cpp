@@ -1,16 +1,16 @@
-#include <rapture/assets/asset_manager/AssetManagerEditor.h>
 #include "assets/asset_manager/AssetCodec.h"
-#include <rapture/assets/asset_manager/AssetRegistry.h>
-#include <rapture/assets/asset_manager/ReservedAssets.h>
+#include "assets/meshes/MeshPrimitives.h"
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/asset_manager/AssetManagerEditor.h>
+#include <rapture/assets/asset_manager/AssetRegistry.h>
+#include <rapture/assets/asset_manager/ReservedAssets.h>
 #include <rapture/assets/materials/AMaterial.h>
 #include <rapture/assets/materials/AMaterialInstance.h>
 #include <rapture/assets/materials/Material.h>
 #include <rapture/assets/materials/MaterialInstance.h>
 #include <rapture/assets/meshes/ASkeletalMesh.h>
 #include <rapture/assets/meshes/AStaticMesh.h>
-#include "assets/meshes/MeshPrimitives.h"
 #include <rapture/assets/modules/AModule.h>
 #include <rapture/assets/scripts/AScript.h>
 #include <rapture/assets/skeletons/ASkeleton.h>
@@ -101,7 +101,8 @@ static std::unique_ptr<Asset> s_buildImportData(AssetImportDataVariant &data, st
                                                  skeletalData->materialSlots);
         type = ASSET_SKELETAL_MESH;
         return std::make_unique<ASkeletalMesh>(skeletalData->params, skeletalData->skeleton,
-                                               std::move(skeletalData->inverseBindMatrices), std::move(skeletalData->materialSlots));
+                                               std::move(skeletalData->inverseBindMatrices),
+                                               std::move(skeletalData->materialSlots));
     }
     if (auto *moduleData = std::get_if<ModuleImportData>(&data)) {
         std::string text = moduleData->document->toText();

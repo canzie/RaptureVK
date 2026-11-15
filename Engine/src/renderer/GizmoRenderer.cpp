@@ -5,8 +5,8 @@
 
 namespace Rapture {
 
-GizmoRenderer::GizmoRenderer(RenderContext renderContext, const RendererConfig &config,
-                                                 VkFormat depthFormat, GizmoDrawList *drawList)
+GizmoRenderer::GizmoRenderer(RenderContext renderContext, const RendererConfig &config, VkFormat depthFormat,
+                             GizmoDrawList *drawList)
     : Renderer(renderContext, config), m_drawList(drawList), m_depthFormat(depthFormat)
 {
     RP_ASSERT(drawList != nullptr, "gizmo renderer needs a draw list to draw");

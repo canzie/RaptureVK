@@ -2,15 +2,15 @@
 #define RAPTURE__NODE_EDITOR_PANEL_H
 
 #include <amethyst/Amethyst.h>
-#include <rapture/assets/textures/ATexture.h>
 #include <components/shape.h>
+#include <rapture/assets/textures/ATexture.h>
 
-#include <rapture/assets/asset_manager/AssetCommon.h>
-#include <rapture/core/events/EventSignal.h>
-#include <rapture/core/events/ProjectEvents.h>
 #include "panels/Panel.h"
+#include <rapture/assets/asset_manager/AssetCommon.h>
 #include <rapture/assets/materials/graph/MaterialGraph.h>
 #include <rapture/assets/materials/graph/MaterialGraphTypes.h>
+#include <rapture/core/events/EventSignal.h>
+#include <rapture/core/events/ProjectEvents.h>
 #include <rapture/core/utils/FreeList.h>
 
 namespace Rapture {

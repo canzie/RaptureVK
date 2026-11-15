@@ -1,13 +1,13 @@
 #ifndef RAPTURE__LUAINSTANCEMEMBERS_H
 #define RAPTURE__LUAINSTANCEMEMBERS_H
 
+#include "scene/instances/scene_components/ScriptComponent.h"
+#include "scripting/lua/LuaEventSignal.h"
+#include "scripting/lua/LuaHandle.h"
 #include <rapture/scene/instances/CharacterBody3D.h>
 #include <rapture/scene/instances/InstanceRegistry.h>
 #include <rapture/scene/instances/Node3D.h>
 #include <rapture/scene/instances/controllers/Controller.h>
-#include "scene/instances/scene_components/ScriptComponent.h"
-#include "scripting/lua/LuaEventSignal.h"
-#include "scripting/lua/LuaHandle.h"
 
 namespace Rapture::scripting {
 

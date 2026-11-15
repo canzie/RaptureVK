@@ -2,10 +2,10 @@
 
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/skeletons/ASkeleton.h>
-#include <rapture/scene/instances/Bone3D.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Bone3D.h>
 #include <rapture/scene/render_data/SceneRenderData.h>
 #include <rapture/scene/systems/Transforms.h>
 

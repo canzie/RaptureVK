@@ -1,8 +1,8 @@
 #pragma once
 
+#include <memory>
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/shaders/AShader.h>
-#include <memory>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -95,7 +95,6 @@ class DynamicDiffuseGI {
     Ref<AShader> m_DDGI_ProbeDistanceBlendingShader;
     Ref<AShader> m_DDGI_ProbeRelocationShader;
     Ref<AShader> m_DDGI_ProbeClassificationShader;
-
 
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeTracePipeline;
     std::shared_ptr<ComputePipeline> m_DDGI_ProbeIrradianceBlendingPipeline;

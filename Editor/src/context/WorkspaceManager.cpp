@@ -71,8 +71,8 @@ void WorkspaceManager::restore(const EditorState &state)
     if (wanted != state.workspaces.end()) {
         for (auto &workspace : m_workspaces) {
             auto *assetWorkspace = dynamic_cast<AssetWorkspace *>(workspace.get());
-            const bool matches = assetWorkspace != nullptr ? assetWorkspace->handle() == wanted->handle
-                                                           : workspace->tabLabel() == wanted->kind;
+            const bool matches =
+                assetWorkspace != nullptr ? assetWorkspace->handle() == wanted->handle : workspace->tabLabel() == wanted->kind;
             if (matches) {
                 front = workspace.get();
                 break;

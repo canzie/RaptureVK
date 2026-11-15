@@ -3,9 +3,9 @@
 
 #include "AssetWorkspace.h"
 
+#include <components/context_menu.h>
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/worlds/AWorld.h>
-#include <components/context_menu.h>
 #include <rapture/core/events/EventSignal.h>
 #include <rapture/renderer/viewport/Viewport.h>
 #include <rapture/scene/World.h>

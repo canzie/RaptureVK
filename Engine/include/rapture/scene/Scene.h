@@ -1,6 +1,9 @@
 #ifndef RAPTURE__SCENE_H
 #define RAPTURE__SCENE_H
 
+#include <array>
+#include <cstdint>
+#include <memory>
 #include <rapture/assets/asset_manager/AssetCommon.h>
 #include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/core/events/EventSignal.h>
@@ -11,9 +14,6 @@
 #include <rapture/scene/EntityCommon.h>
 #include <rapture/scene/TickPhase.h>
 #include <rapture/scene/components/ChangeChannels.h>
-#include <array>
-#include <cstdint>
-#include <memory>
 #include <span>
 #include <string>
 #include <vector>

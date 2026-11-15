@@ -82,9 +82,7 @@ void Instance::onLink(const SceneLoadContext &context)
     (void)context;
 }
 
-void Instance::onReady()
-{
-}
+void Instance::onReady() {}
 
 void Instance::remintId()
 {

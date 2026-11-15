@@ -123,9 +123,7 @@ void ModuleEditorWorkspace::build()
                 r.split(
                     Amethyst::SplitAxis::HORIZONTAL, PROPERTIES_SPLIT,
                     [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { treeTabBar = &tb.component; }); },
-                    [&](Amethyst::DockScope &b) {
-                        b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; });
-                    });
+                    [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
             });
 
     addPanel(std::make_unique<ViewportPanel>(m_context), viewportTabBar);

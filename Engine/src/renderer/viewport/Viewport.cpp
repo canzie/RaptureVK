@@ -1,12 +1,12 @@
 #include <rapture/renderer/viewport/Viewport.h>
 
-#include <rapture/app/Application.h>
-#include <rapture/core/utils/Log.h>
-#include <rapture/core/utils/rp_assert.h>
 #include "renderer/DepthPrepassRenderer.h"
 #include "renderer/GizmoRenderer.h"
 #include "renderer/deferred/DeferredRenderer.h"
 #include "renderer/shadows/ShadowRenderer.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
 #include <rapture/scene/components/Components.h>
 
 namespace Rapture {
@@ -86,9 +86,9 @@ void Viewport::createRenderer(RendererType type)
 
     m_drawManager->addRenderer(std::move(renderer), DRAW_PHASE_PRE_COMPOSITE, DRAW_ORDER_SCENE);
 
-    m_drawManager->addRenderer(std::make_unique<GizmoRenderer>(m_renderContext, rendererConfig,
-                                                                         m_drawManager->getDepthFormat(), &m_gizmoDrawList),
-                               DRAW_PHASE_POST_COMPOSITE, DRAW_ORDER_IMMEDIATE_SHAPES);
+    m_drawManager->addRenderer(
+        std::make_unique<GizmoRenderer>(m_renderContext, rendererConfig, m_drawManager->getDepthFormat(), &m_gizmoDrawList),
+        DRAW_PHASE_POST_COMPOSITE, DRAW_ORDER_IMMEDIATE_SHAPES);
 }
 
 void Viewport::drawFrame()

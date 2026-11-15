@@ -7,10 +7,10 @@
 #include <string_view>
 #include <unordered_set>
 
+#include "core/events/ShaderEvents.h"
+#include <rapture/app/Application.h>
 #include <rapture/assets/materials/graph/GraphDomain.h>
 #include <rapture/assets/materials/graph/MaterialGraphTypes.h>
-#include <rapture/app/Application.h>
-#include "core/events/ShaderEvents.h"
 #include <rapture/core/utils/Log.h>
 
 namespace Rapture {

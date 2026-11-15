@@ -1,7 +1,7 @@
 #include "TestLayer.h"
 
-#include <rapture/core/utils/Log.h>
 #include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/Telemetry.h>
 
 static constexpr float REPORT_INTERVAL = 1.0f;

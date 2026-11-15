@@ -1,11 +1,11 @@
 #include <rapture/gpu/acceleration_structures/TLAS.h>
 
+#include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
+#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/Log.h>
-#include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
 #include <rapture/core/utils/rp_assert.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
-#include "gpu/descriptors/DescriptorManager.h"
 
 #include <algorithm>
 #include <cstring>
@@ -31,8 +31,8 @@ static VkDeviceAddress s_getBufferAddress(VkDevice device, VkBuffer buffer)
 TLAS::TLAS()
     : m_slotCapacity(0), m_revision(0), m_accelerationStructure(VK_NULL_HANDLE), m_buffer(VK_NULL_HANDLE),
       m_allocation(VK_NULL_HANDLE), m_deviceAddress(0), m_accelerationStructureSize(0), m_buildScratchSize(0),
-      m_updateScratchSize(0), m_isBuilt(false), m_needsRebuild(false), m_isWaitingOnStructures(false),
-      m_device(VK_NULL_HANDLE), m_allocator(VK_NULL_HANDLE), m_bindlessIndex(UINT32_MAX)
+      m_updateScratchSize(0), m_isBuilt(false), m_needsRebuild(false), m_isWaitingOnStructures(false), m_device(VK_NULL_HANDLE),
+      m_allocator(VK_NULL_HANDLE), m_bindlessIndex(UINT32_MAX)
 {
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();

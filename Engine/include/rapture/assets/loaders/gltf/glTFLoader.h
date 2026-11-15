@@ -2,9 +2,9 @@
 #define RAPTURE__GLTF_LOADER_H
 
 #include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/loaders/gltf/glTFCommon.h>
 #include <rapture/assets/materials/MaterialParameters.h>
 #include <rapture/assets/skeletons/ASkeleton.h>
-#include <rapture/assets/loaders/gltf/glTFCommon.h>
 
 #include <cstddef>
 #include <cstdint>

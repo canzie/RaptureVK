@@ -1,10 +1,10 @@
 #ifndef RAPTURE__SKELETON_INSTANCE_MANAGER_H
 #define RAPTURE__SKELETON_INSTANCE_MANAGER_H
 
-#include <rapture/assets/asset_manager/AssetCommon.h>
-#include <rapture/assets/skeletons/ASkeleton.h>
-#include <rapture/assets/meshes/ASkeletalMesh.h>
 #include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/meshes/ASkeletalMesh.h>
+#include <rapture/assets/skeletons/ASkeleton.h>
 #include <rapture/gpu/buffers/VirtualStorageBuffer.h>
 
 #include <glm/glm.hpp>

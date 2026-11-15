@@ -5,8 +5,8 @@
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
-#include <rapture/core/utils/rp_assert.h>
 #include <parsers/config/layout_config.h>
+#include <rapture/core/utils/rp_assert.h>
 
 static constexpr std::string_view WORKSPACE_CLASS = "workspace";
 static constexpr std::string_view PANEL_TAB_CLASS = "panel-tab";

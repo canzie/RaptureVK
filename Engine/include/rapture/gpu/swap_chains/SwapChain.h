@@ -1,11 +1,11 @@
 #pragma once
 
+#include "vulkan/vulkan.h"
+#include <memory>
 #include <rapture/core/events/EventSignal.h>
 #include <rapture/gpu/textures/Texture.h>
-#include "vulkan/vulkan.h"
-#include <rapture/platform/WindowContext.h>
 #include <rapture/gpu/vulkan_context/VulkanTypes.h>
-#include <memory>
+#include <rapture/platform/WindowContext.h>
 #include <vector>
 
 namespace Rapture {

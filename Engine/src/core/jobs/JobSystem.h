@@ -3,10 +3,10 @@
 #define RAPTURE__JOB_SYSTEM_H
 
 #include "core/jobs/Counter.h"
-#include "core/jobs/Job.h"
-#include "core/jobs/WaitList.h"
 #include "core/jobs/Fiber.h"
+#include "core/jobs/Job.h"
 #include "core/jobs/JobQueue.h"
+#include "core/jobs/WaitList.h"
 
 #include <atomic>
 #include <thread>

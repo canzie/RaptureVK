@@ -3,8 +3,8 @@
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/EnginePaths.h>
 
-#include <rapture/assets/asset_manager/AssetManager.h>
 #include "gpu/descriptors/DescriptorManager.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/gpu/textures/Texture.h>
 
 #include <rapture/core/utils/Log.h>

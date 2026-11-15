@@ -235,9 +235,9 @@ std::unique_ptr<physics::CharacterBody> PhysicsSystem::createCharacterBody(const
     settings.mPredictiveContactDistance = config.predictiveContactDistance;
 
     physics::CharacterRecord record;
-    record.character = new JPH::CharacterVirtual(&settings, physics::glmToJoltPosition(config.position),
-                                                 physics::glmToJoltQuat(config.rotation),
-                                                 reinterpret_cast<uint64_t>(owner), &m_physicsSystem);
+    record.character =
+        new JPH::CharacterVirtual(&settings, physics::glmToJoltPosition(config.position), physics::glmToJoltQuat(config.rotation),
+                                  reinterpret_cast<uint64_t>(owner), &m_physicsSystem);
     record.owner = owner;
     record.up = config.up;
     record.stepUp = config.stepUp;

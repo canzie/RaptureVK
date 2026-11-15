@@ -3,10 +3,10 @@
 
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/worlds/AWorld.h>
+#include <rapture/core/serialization/SerialDocument.h>
 #include <rapture/platform/FileWatcher.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/World.h>
-#include <rapture/core/serialization/SerialDocument.h>
 
 #include <filesystem>
 #include <memory>

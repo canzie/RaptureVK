@@ -1,13 +1,13 @@
 #ifndef RAPTURE__CONTENT_BROWSER_PANEL_H
 #define RAPTURE__CONTENT_BROWSER_PANEL_H
 
-#include <rapture/assets/asset_manager/AssetCommon.h>
-#include <rapture/core/utils/TypeInfo.h>
 #include <amethyst/Amethyst.h>
 #include <components/context_menu.h>
 #include <components/tab_bar.h>
 #include <components/tree_view.h>
 #include <components/ui_scope.h>
+#include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/core/utils/TypeInfo.h>
 
 #include <filesystem>
 #include <functional>

@@ -6,8 +6,8 @@
 
 #include "inspector/PropertySections.h"
 #include <rapture/core/ecs/entity_accessor.h>
-#include <rapture/scene/Scene.h>
 #include <rapture/scene/EntityCommon.h>
+#include <rapture/scene/Scene.h>
 
 class EntitySelection;
 

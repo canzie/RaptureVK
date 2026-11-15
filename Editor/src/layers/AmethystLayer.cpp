@@ -4,13 +4,13 @@
 #include "ProjectLauncher.h"
 #include "context/WindowManager.h"
 #include "context/WorkspaceManager.h"
-#include <rapture/gpu/command_buffers/CommandPool.h>
-#include <rapture/core/utils/Log.h>
-#include <rapture/core/utils/TracyProfiler.h>
-#include <rapture/gpu/swap_chains/SwapChain.h>
-#include <rapture/core/utils/EnginePaths.h>
-#include <rapture/core/utils/Timestep.h>
 #include <rapture/app/Application.h>
+#include <rapture/core/utils/EnginePaths.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/Timestep.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/swap_chains/SwapChain.h>
 
 #include <components/common.h>
 #include <components/extensions/ui_drag_detector.h>
@@ -148,8 +148,10 @@ void AmethystLayer::onAttach()
     });
     m_backgroundFrame->setBaseStyleProperties({.backgroundColor = Amethyst::Color3::fromHex(0x181818)});
 
-    m_windowManager = std::make_unique<WindowManager>(
-        m_backend, m_window, [this](Amethyst::Window &window, Rapture::RenderWindow &renderWindow) { drawSecondaryWindow(window, renderWindow); });
+    m_windowManager =
+        std::make_unique<WindowManager>(m_backend, m_window, [this](Amethyst::Window &window, Rapture::RenderWindow &renderWindow) {
+            drawSecondaryWindow(window, renderWindow);
+        });
 
     if (!app.hasProject()) {
         m_startupLauncher = std::make_unique<ProjectLauncher>(m_window);
@@ -379,8 +381,8 @@ void AmethystLayer::setupWorkspaces(void)
         },
         [this](Amethyst::TabBarScope &tabs) { m_workspaceTabBar = &tabs.component; });
 
-    m_activeWorkspaceChangedConn =
-        m_workspaceManager->onActiveWorkspaceChanged.connect([this](Workspace *workspace) { m_bottomBar->setCurrentWorkspace(workspace); });
+    m_activeWorkspaceChangedConn = m_workspaceManager->onActiveWorkspaceChanged.connect(
+        [this](Workspace *workspace) { m_bottomBar->setCurrentWorkspace(workspace); });
 
     m_workspaceManager->attach(*m_workspaceTabBar);
     placeWorkspaceContent(m_window.absoluteSize);
@@ -389,7 +391,8 @@ void AmethystLayer::setupWorkspaces(void)
 
 void AmethystLayer::placeWorkspaceContent(glm::vec2 screenSize)
 {
-    const float contentTop = m_config.getFloat(EDITOR_CONFIG_MENU_BAR_HEIGHT) + m_config.getFloat(EDITOR_CONFIG_WORKSPACE_TAB_HEIGHT);
+    const float contentTop =
+        m_config.getFloat(EDITOR_CONFIG_MENU_BAR_HEIGHT) + m_config.getFloat(EDITOR_CONFIG_WORKSPACE_TAB_HEIGHT);
     const float bottomBarHeight = m_config.getFloat(EDITOR_CONFIG_BOTTOM_BAR_HEIGHT);
 
     m_workspaceManager->setContentArea({0.0f, contentTop}, {screenSize.x, screenSize.y - contentTop - bottomBarHeight});

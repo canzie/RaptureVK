@@ -1,8 +1,8 @@
 #include <rapture/scene/instances/Light3D.h>
 
+#include <rapture/scene/Scene.h>
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/render_data/SceneRenderData.h>
-#include <rapture/scene/Scene.h>
 
 #include <cmath>
 

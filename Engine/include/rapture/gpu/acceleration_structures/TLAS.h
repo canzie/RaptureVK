@@ -1,8 +1,8 @@
 #ifndef RAPTURE__TLAS_H
 #define RAPTURE__TLAS_H
 
-#include <rapture/gpu/acceleration_structures/BLAS.h>
 #include <rapture/core/events/EventSignal.h>
+#include <rapture/gpu/acceleration_structures/BLAS.h>
 
 #include <atomic>
 #include <cstdint>

@@ -36,7 +36,6 @@ class PlayerController : public Controller {
 
     void updateViewCamera() override;
 
-
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 

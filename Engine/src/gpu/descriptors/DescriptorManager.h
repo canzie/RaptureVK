@@ -12,16 +12,15 @@ class DescriptorManager {
     DescriptorManager();
     ~DescriptorManager();
 
-    DescriptorManager(const DescriptorManager&) = delete;
-    DescriptorManager& operator=(const DescriptorManager&) = delete;
+    DescriptorManager(const DescriptorManager &) = delete;
+    DescriptorManager &operator=(const DescriptorManager &) = delete;
 
     std::shared_ptr<DescriptorSet> getDescriptorSet(uint32_t setNumber);
     std::shared_ptr<DescriptorSet> getDescriptorSet(DescriptorSetBindingLocation location);
 
     // Convenience method to bind resources to descriptor sets
     void bindSet(uint32_t setNumber, CommandBuffer *commandBuffer, std::shared_ptr<PipelineBase> pipeline);
-    void bindSet(DescriptorSetBindingLocation location, CommandBuffer *commandBuffer,
-                 std::shared_ptr<PipelineBase> pipeline);
+    void bindSet(DescriptorSetBindingLocation location, CommandBuffer *commandBuffer, std::shared_ptr<PipelineBase> pipeline);
 
     // Get descriptor set layouts for pipeline creation
     std::vector<VkDescriptorSetLayout> getDescriptorSetLayouts();

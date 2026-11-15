@@ -1,20 +1,20 @@
-#include <rapture/scene/instances/Environment.h>
 #include <rapture/assets/textures/ATexture.h>
+#include <rapture/scene/instances/Environment.h>
 
 #include <rapture/core/utils/EnginePaths.h>
 
+#include "renderer/ImageBasedLighting.h"
+#include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetImportConfig.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
-#include <rapture/scene/components/Components.h>
-#include <rapture/scene/systems/Transforms.h>
-#include <rapture/renderer/generators/textures/ProceduralTextures.h>
 #include <rapture/core/utils/Log.h>
-#include "renderer/ImageBasedLighting.h"
-#include <rapture/scene/Scene.h>
-#include <rapture/scene/instances/Node3D.h>
 #include <rapture/gpu/shaders/Shader.h>
 #include <rapture/gpu/textures/Texture.h>
-#include <rapture/app/Application.h>
+#include <rapture/renderer/generators/textures/ProceduralTextures.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/systems/Transforms.h>
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -100,7 +100,8 @@ glm::vec3 Environment::sunDirection(float timeOfDay, float latitude, float longi
     float phi = glm::radians(latitude);
     float delta = 0.0f;
 
-    float sinElev = glm::clamp(std::sin(phi) * std::sin(delta) + std::cos(phi) * std::cos(delta) * std::cos(hourAngle), -1.0f, 1.0f);
+    float sinElev =
+        glm::clamp(std::sin(phi) * std::sin(delta) + std::cos(phi) * std::cos(delta) * std::cos(hourAngle), -1.0f, 1.0f);
     float elev = std::asin(sinElev);
     float cosElev = std::cos(elev);
 

@@ -1,9 +1,9 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <rapture/assets/shaders/AShader.h>
 #include <rapture/assets/textures/ATexture.h>
-#include <memory>
 #include <string>
 #include <vector>
 

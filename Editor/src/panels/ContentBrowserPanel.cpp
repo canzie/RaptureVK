@@ -2,27 +2,27 @@
 #include "Icons.h"
 #include "context/WindowManager.h"
 #include "context/WorkspaceManager.h"
-#include <rapture/assets/asset_manager/AssetRegistry.h>
-#include <rapture/assets/asset_manager/AssetManager.h>
-#include <rapture/scene/instances/SceneObject.h>
 #include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/asset_manager/AssetRegistry.h>
+#include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/StringFormat.h>
 #include <rapture/scene/Project.h>
+#include <rapture/scene/World.h>
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/DirectionalLight3D.h>
 #include <rapture/scene/instances/InstanceRegistry.h>
 #include <rapture/scene/instances/Module.h>
 #include <rapture/scene/instances/PointLight3D.h>
+#include <rapture/scene/instances/SceneObject.h>
 #include <rapture/scene/instances/SpotLight3D.h>
 #include <rapture/scene/instances/SpringArm3D.h>
 #include <rapture/scene/instances/StaticMesh3D.h>
 #include <rapture/scene/instances/controllers/CameraController.h>
 #include <rapture/scene/instances/controllers/PlayerController.h>
-#include <rapture/scene/World.h>
-#include <rapture/core/ecs/entity_accessor.h>
-#include <rapture/app/Application.h>
 
 #include <algorithm>
 #include <cctype>
@@ -615,16 +615,15 @@ MenuItems ContentBrowserPanel::buildAddMenuItems()
     MenuItems items;
 
     items.push_back(SeparatorMenuItem::create("Folder"));
-    items.push_back(AddAssetMenuItem::createIconRow("New Folder", Icons::SVG_FOLDER_PLUS,
-                                                          [this]() { beginCreate(CONTENT_EDIT_FOLDER); }));
+    items.push_back(
+        AddAssetMenuItem::createIconRow("New Folder", Icons::SVG_FOLDER_PLUS, [this]() { beginCreate(CONTENT_EDIT_FOLDER); }));
     items.push_back(AddAssetMenuItem::createIconRow("Refresh", Icons::SVG_REFRESH, [this]() { refresh(); }));
 
     items.push_back(SeparatorMenuItem::create("Create Basic Asset"));
-    items.push_back(
-        AddAssetMenuItem::createAssetRow("Material", Rapture::ASSET_MATERIAL, []() { s_createAssetStub("material"); }));
+    items.push_back(AddAssetMenuItem::createAssetRow("Material", Rapture::ASSET_MATERIAL, []() { s_createAssetStub("material"); }));
     items.push_back(AddAssetMenuItem::createAssetRow("World", Rapture::ASSET_WORLD, []() { s_createAssetStub("world"); }));
-    items.push_back(AddAssetMenuItem::createAssetRow("Script", Rapture::ASSET_SCRIPT,
-                                                           [this]() { beginCreate(CONTENT_EDIT_SCRIPT); }));
+    items.push_back(
+        AddAssetMenuItem::createAssetRow("Script", Rapture::ASSET_SCRIPT, [this]() { beginCreate(CONTENT_EDIT_SCRIPT); }));
 
     items.push_back(SeparatorMenuItem::create("Create Advanced Asset"));
     for (auto &advanced : buildAdvancedAddItems()) {
@@ -638,8 +637,8 @@ MenuItems ContentBrowserPanel::buildAdvancedAddItems()
 {
     // a row is labelled with the class it creates, so a class is named once and never relabelled
     auto appendClass = [this](MenuItems &into, const Rapture::TypeInfo &type) {
-        into.push_back(AddAssetMenuItem::createPlainRow(
-            std::string(type.name), [this, &type]() { beginCreate(CONTENT_EDIT_MODULE, &type); }));
+        into.push_back(
+            AddAssetMenuItem::createPlainRow(std::string(type.name), [this, &type]() { beginCreate(CONTENT_EDIT_MODULE, &type); }));
     };
 
     MenuItems controllers;
@@ -855,8 +854,8 @@ void ContentBrowserPanel::showContextMenu(Amethyst::vec2 pos, std::vector<std::u
 // the asset types that have a workspace to open in
 static bool s_opensInWorkspace(Rapture::AssetType type)
 {
-    return type == Rapture::ASSET_MODULE || type == Rapture::ASSET_MATERIAL_INSTANCE ||
-           type == Rapture::ASSET_STATIC_MESH || type == Rapture::ASSET_SKELETAL_MESH || type == Rapture::ASSET_SKELETON;
+    return type == Rapture::ASSET_MODULE || type == Rapture::ASSET_MATERIAL_INSTANCE || type == Rapture::ASSET_STATIC_MESH ||
+           type == Rapture::ASSET_SKELETAL_MESH || type == Rapture::ASSET_SKELETON;
 }
 
 std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPanel::assetActions(Rapture::AssetType type,
@@ -870,8 +869,7 @@ std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> ContentBrowserPane
 
     switch (type) {
     case Rapture::ASSET_MODULE:
-        items.push_back(
-            Amethyst::makeActionItem("Load in scene", [this, handle]() { s_spawnModule(handle, m_scene); }));
+        items.push_back(Amethyst::makeActionItem("Load in scene", [this, handle]() { s_spawnModule(handle, m_scene); }));
         break;
     default:
         break;

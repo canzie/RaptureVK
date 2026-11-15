@@ -1,6 +1,6 @@
-#include <rapture/gpu/descriptors/DescriptorSet.h>
-#include <rapture/core/utils/Log.h>
 #include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
 
 #include <rapture/gpu/acceleration_structures/TLAS.h>
 #include <rapture/gpu/buffers/Buffers.h>

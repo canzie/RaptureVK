@@ -1,10 +1,10 @@
 #include <rapture/gpu/shaders/Shader.h>
 
-#include "gpu/descriptors/DescriptorManager.h"
 #include "core/events/ShaderEvents.h"
-#include <rapture/core/utils/Log.h>
 #include "core/utils/io.h"
+#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
 
 #include <rapture/gpu/shaders/ShaderReflections.h>
 

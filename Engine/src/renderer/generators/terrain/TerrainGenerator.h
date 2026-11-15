@@ -2,13 +2,13 @@
 #define RAPTURE__TERRAIN_GENERATOR_H
 
 #include "renderer/generators/terrain/TerrainCuller.h"
-#include <rapture/assets/textures/ATexture.h>
 #include <rapture/assets/materials/AMaterialInstance.h>
+#include <rapture/assets/textures/ATexture.h>
 #include <rapture/renderer/generators/terrain/TerrainTypes.h>
 
 #include <rapture/assets/asset_manager/Asset.h>
-#include <rapture/assets/shaders/AShader.h>
 #include <rapture/assets/materials/MaterialInstance.h>
+#include <rapture/assets/shaders/AShader.h>
 #include <rapture/gpu/buffers/IndexBuffer.h>
 #include <rapture/gpu/buffers/StorageBuffer.h>
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
@@ -123,7 +123,6 @@ class TerrainGenerator {
 
     bool m_initialized = false;
     bool m_wireframe = false;
-
 
     Ref<AMaterialInstance> m_material;
 };

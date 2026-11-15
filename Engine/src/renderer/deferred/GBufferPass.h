@@ -7,6 +7,9 @@
 #include <rapture/renderer/SceneGeometryDraw.h>
 #include <rapture/renderer/passes/RenderPass.h>
 
+#include "gpu/descriptors/DescriptorManager.h"
+#include "renderer/generators/terrain/TerrainGenerator.h"
+#include "scene/cameras/CameraCommon.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/shaders/AShader.h>
 #include <rapture/core/events/GameEvents.h>
@@ -14,13 +17,10 @@
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
 #include <rapture/gpu/descriptors/DescriptorBinding.h>
-#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/gpu/descriptors/DescriptorSet.h>
 #include <rapture/gpu/textures/Texture.h>
 #include <rapture/gpu/vulkan_context/VulkanContext.h>
-#include "renderer/generators/terrain/TerrainGenerator.h"
 #include <rapture/scene/Scene.h>
-#include "scene/cameras/CameraCommon.h"
 #include <rapture/scene/components/Components.h>
 
 #include <cstdint>

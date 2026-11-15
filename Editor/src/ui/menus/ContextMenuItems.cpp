@@ -1,10 +1,10 @@
 #include "ContextMenuItems.h"
 
 #include "amethyst/icons.h"
+#include "components/context_menu.h"
+#include "ui/AssetVisuals.h"
 #include <rapture/assets/asset_manager/AssetCommon.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
-#include "ui/AssetVisuals.h"
-#include "components/context_menu.h"
 
 #include <components/common.h>
 #include <components/frame.h>
@@ -111,7 +111,7 @@ void AssetMenuItemView::bind(ContextMenu::ItemData &item)
 }
 
 std::unique_ptr<ContextMenu::ItemData> AddAssetMenuItem::createIconRow(std::string label, std::string svgIcon,
-                                                                             std::function<void()> onActivate)
+                                                                       std::function<void()> onActivate)
 {
     auto item = std::make_unique<AddAssetMenuItem>();
     item->style = ADD_ROW_ICON;
@@ -123,7 +123,7 @@ std::unique_ptr<ContextMenu::ItemData> AddAssetMenuItem::createIconRow(std::stri
 }
 
 std::unique_ptr<ContextMenu::ItemData> AddAssetMenuItem::createAssetRow(std::string label, Rapture::AssetType assetType,
-                                                                              std::function<void()> onActivate)
+                                                                        std::function<void()> onActivate)
 {
     auto item = std::make_unique<AddAssetMenuItem>();
     item->style = ADD_ROW_ASSET;
@@ -228,8 +228,7 @@ void AddAssetMenuItemView::bind(ContextMenu::ItemData &item)
     m_row->setBaseProperties({.interactable = addItem.enabled});
 }
 
-std::unique_ptr<ContextMenu::ItemData> ToggleMenuItem::create(std::string label, std::function<void(bool)> cb,
-                                                                      std::string svgIcon)
+std::unique_ptr<ContextMenu::ItemData> ToggleMenuItem::create(std::string label, std::function<void(bool)> cb, std::string svgIcon)
 {
     auto item = std::make_unique<ToggleMenuItem>(std::move(cb));
     item->label = std::move(label);
@@ -290,7 +289,7 @@ void ToggleMenuItemView::bind(ContextMenu::ItemData &item)
 }
 
 std::unique_ptr<ContextMenu::ItemData> RadioMenuItem::create(std::string label, RadioGroup *group, int32_t value,
-                                                                      std::string svgIcon)
+                                                             std::string svgIcon)
 {
     auto item = std::make_unique<RadioMenuItem>();
     item->label = std::move(label);

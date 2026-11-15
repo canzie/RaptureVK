@@ -1,12 +1,12 @@
 #include "renderer/passes/GizmoDrawPass.h"
 #include <rapture/assets/shaders/AShader.h>
 
+#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/core/utils/EnginePaths.h>
 #include <rapture/core/utils/TracyProfiler.h>
 #include <rapture/core/utils/rp_assert.h>
-#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/render_data/SceneRenderData.h>
@@ -50,8 +50,7 @@ GizmoDrawPass::GizmoDrawPass(const GizmoDrawPassConfig &config, const GizmoDrawL
 
     ShaderImportConfig shadedConfig = shaderConfig;
     shadedConfig.compileInfo.macros.push_back({"USE_SHADED_MODE"});
-    m_shadedTriangleShader =
-        AssetManager::importAsset(shaderPath / "glsl/GizmoTriangle.fs.glsl", shadedConfig).as<AShader>();
+    m_shadedTriangleShader = AssetManager::importAsset(shaderPath / "glsl/GizmoTriangle.fs.glsl", shadedConfig).as<AShader>();
 
     const uint32_t slotCount = m_config.framesInFlight + 1;
     m_shapeBuffers.resize(slotCount);
@@ -310,8 +309,8 @@ const std::vector<GizmoVertex> &GizmoDrawPass::sortTrianglesBackToFront(const st
     return m_sortedVertices;
 }
 
-void GizmoDrawPass::uploadDrawList(uint32_t slot, std::array<DepthModeRange, DEPTH_MODE_COUNT> &ranges,
-                                   uint32_t &vertexBase, const glm::vec3 &viewPosition)
+void GizmoDrawPass::uploadDrawList(uint32_t slot, std::array<DepthModeRange, DEPTH_MODE_COUNT> &ranges, uint32_t &vertexBase,
+                                   const glm::vec3 &viewPosition)
 {
     StorageBuffer &buffer = *m_shapeBuffers[slot];
 
@@ -432,8 +431,8 @@ CommandBuffer *GizmoDrawPass::record(const RenderPassContext &context, const Sec
             m_shapeSets[m_currentSlot]->bind(cb, pipeline);
 
             pushConstants.shapeOffset = vertexBase + vertices.first;
-            vkCmdPushConstants(cb, pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_VERTEX_BIT, 0,
-                               sizeof(GizmoPushConstants), &pushConstants);
+            vkCmdPushConstants(cb, pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GizmoPushConstants),
+                               &pushConstants);
             vkCmdDraw(cb, vertices.count, 1, 0, 0);
         }
 

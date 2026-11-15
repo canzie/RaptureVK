@@ -13,9 +13,9 @@
 #include <rapture/gpu/descriptors/DescriptorSet.h>
 #include <rapture/scene/Scene.h>
 
+#include <memory>
 #include <rapture/gpu/textures/Texture.h>
 #include <rapture/renderer/passes/RenderPass.h>
-#include <memory>
 
 #include "renderer/gi/ddgi/DynamicDiffuseGI.h"
 

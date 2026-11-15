@@ -1,9 +1,10 @@
 #include "renderer/generators/terrain/TerrainGenerator.h"
-#include <rapture/assets/textures/ATexture.h>
 #include <rapture/assets/materials/AMaterialInstance.h>
+#include <rapture/assets/textures/ATexture.h>
 
 #include <rapture/core/utils/EnginePaths.h>
 
+#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetImportConfig.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
@@ -13,7 +14,6 @@
 #include <rapture/core/utils/TracyProfiler.h>
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
-#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/renderer/Frustum.h>
 #include <rapture/renderer/generators/textures/ProceduralTextures.h>
 

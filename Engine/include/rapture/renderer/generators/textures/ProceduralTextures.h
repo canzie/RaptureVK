@@ -334,8 +334,7 @@ class ProceduralTexture {
      * @param config Optional texture configuration.
      * @return Shared pointer to the generated texture.
      */
-    static Ref<ATexture> generateWhiteNoise(uint32_t seed = 0,
-                                                const ProceduralTextureConfig &config = ProceduralTextureConfig());
+    static Ref<ATexture> generateWhiteNoise(uint32_t seed = 0, const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Generates a Perlin noise texture.
@@ -345,13 +344,13 @@ class ProceduralTexture {
      * @return Shared pointer to the generated texture.
      */
     static Ref<ATexture> generatePerlinNoise(const PerlinNoisePushConstants &params = PerlinNoisePushConstants(),
-                                                 const ProceduralTextureConfig &config = ProceduralTextureConfig());
+                                             const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     static Ref<ATexture> generateSimplexNoise(const SimplexNoisePushConstants &params = SimplexNoisePushConstants(),
-                                                  const ProceduralTextureConfig &config = ProceduralTextureConfig());
+                                              const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     static Ref<ATexture> generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
-                                                 const ProceduralTextureConfig &config = ProceduralTextureConfig());
+                                             const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Generates an atmospheric scattering texture.
@@ -371,7 +370,7 @@ class ProceduralTexture {
      * @return Shared pointer to the generated panoramic texture.
      */
     static Ref<ATexture> generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
-                                                const ProceduralTextureConfig &config = ProceduralTextureConfig());
+                                            const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Generates an atmospheric scattering cubemap usable as a skybox.
@@ -386,7 +385,7 @@ class ProceduralTexture {
      * @return Pointer to the generated TEXTURECUBE texture.
      */
     static Ref<ATexture> generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params = nullptr,
-                                                       const ProceduralTextureConfig &config = ProceduralTextureConfig());
+                                                   const ProceduralTextureConfig &config = ProceduralTextureConfig());
 
     /**
      * @brief Re-renders an atmosphere cubemap into an existing texture in place.
@@ -423,7 +422,6 @@ class ProceduralTexture {
     size_t m_expectedPushConstantSize = 0;
     ProceduralTextureConfig m_config;
     bool m_isValid = false;
-
 
     static constexpr uint32_t TEXTURE_SIZE = 1024;
     static constexpr uint32_t WORKGROUP_SIZE = 8;

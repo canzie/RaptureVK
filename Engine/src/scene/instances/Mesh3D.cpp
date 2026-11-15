@@ -1,5 +1,5 @@
-#include <rapture/scene/instances/Mesh3D.h>
 #include <rapture/assets/materials/AMaterialInstance.h>
+#include <rapture/scene/instances/Mesh3D.h>
 
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/meshes/AMesh.h>

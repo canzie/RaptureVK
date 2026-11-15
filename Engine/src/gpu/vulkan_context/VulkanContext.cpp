@@ -1,12 +1,12 @@
-#include <rapture/gpu/vulkan_context/VulkanContext.h>
 #include "gpu/vulkan_context/VulkanContextHelpers.h"
 #include <rapture/core/utils/Log.h>
+#include <rapture/gpu/vulkan_context/VulkanContext.h>
 
 #include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
+#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/gpu/buffers/BufferPool.h>
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
-#include "gpu/descriptors/DescriptorManager.h"
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -1357,8 +1357,7 @@ void VulkanContext::createLogicalDevice(VkSurfaceKHR surface)
                      m_accelerationStructureProperties);
 
     s_loadDeviceFunction(m_device, "vkCmdCopyAccelerationStructureKHR", vkCmdCopyAccelerationStructureKHR);
-    s_loadDeviceFunction(m_device, "vkCmdWriteAccelerationStructuresPropertiesKHR",
-                         vkCmdWriteAccelerationStructuresPropertiesKHR);
+    s_loadDeviceFunction(m_device, "vkCmdWriteAccelerationStructuresPropertiesKHR", vkCmdWriteAccelerationStructuresPropertiesKHR);
 
     s_loadDeviceFunction(m_device, "vkGetDeviceFaultInfoEXT", vkGetDeviceFaultInfoEXT);
     if (vkGetDeviceFaultInfoEXT) {
@@ -1389,9 +1388,8 @@ void VulkanContext::logDeviceFaultInfo()
     }
 
     RP_CORE_ERROR("=== VK_EXT_device_fault diagnostic ===");
-    RP_CORE_ERROR("Address info count: {}, Vendor info count: {}, Vendor binary size: {}",
-                  counts.addressInfoCount, counts.vendorInfoCount,
-                  static_cast<uint64_t>(counts.vendorBinarySize));
+    RP_CORE_ERROR("Address info count: {}, Vendor info count: {}, Vendor binary size: {}", counts.addressInfoCount,
+                  counts.vendorInfoCount, static_cast<uint64_t>(counts.vendorBinarySize));
 
     if (counts.addressInfoCount > 0 || counts.vendorInfoCount > 0) {
         std::vector<VkDeviceFaultAddressInfoKHR> addressInfos(counts.addressInfoCount > 0 ? counts.addressInfoCount : 1);
@@ -1412,27 +1410,39 @@ void VulkanContext::logDeviceFaultInfo()
                 auto &addr = addressInfos[i];
                 const char *typeStr = "Unknown";
                 switch (addr.addressType) {
-                    case VK_DEVICE_FAULT_ADDRESS_TYPE_NONE_KHR: typeStr = "None"; break;
-                    case VK_DEVICE_FAULT_ADDRESS_TYPE_READ_INVALID_KHR: typeStr = "Read Invalid"; break;
-                    case VK_DEVICE_FAULT_ADDRESS_TYPE_WRITE_INVALID_KHR: typeStr = "Write Invalid"; break;
-                    case VK_DEVICE_FAULT_ADDRESS_TYPE_EXECUTE_INVALID_KHR: typeStr = "Execute Invalid"; break;
-                    case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_UNKNOWN_KHR: typeStr = "IP Unknown"; break;
-                    case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_INVALID_KHR: typeStr = "IP Invalid"; break;
-                    case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_FAULT_KHR: typeStr = "IP Fault"; break;
-                    default: typeStr = "Unknown"; break;
+                case VK_DEVICE_FAULT_ADDRESS_TYPE_NONE_KHR:
+                    typeStr = "None";
+                    break;
+                case VK_DEVICE_FAULT_ADDRESS_TYPE_READ_INVALID_KHR:
+                    typeStr = "Read Invalid";
+                    break;
+                case VK_DEVICE_FAULT_ADDRESS_TYPE_WRITE_INVALID_KHR:
+                    typeStr = "Write Invalid";
+                    break;
+                case VK_DEVICE_FAULT_ADDRESS_TYPE_EXECUTE_INVALID_KHR:
+                    typeStr = "Execute Invalid";
+                    break;
+                case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_UNKNOWN_KHR:
+                    typeStr = "IP Unknown";
+                    break;
+                case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_INVALID_KHR:
+                    typeStr = "IP Invalid";
+                    break;
+                case VK_DEVICE_FAULT_ADDRESS_TYPE_INSTRUCTION_POINTER_FAULT_KHR:
+                    typeStr = "IP Fault";
+                    break;
+                default:
+                    typeStr = "Unknown";
+                    break;
                 }
-                RP_CORE_ERROR("  Address[{}]: type={}, address=0x{:x}, precision={}",
-                              i, typeStr,
-                              static_cast<uint64_t>(addr.reportedAddress),
-                              static_cast<uint64_t>(addr.addressPrecision));
+                RP_CORE_ERROR("  Address[{}]: type={}, address=0x{:x}, precision={}", i, typeStr,
+                              static_cast<uint64_t>(addr.reportedAddress), static_cast<uint64_t>(addr.addressPrecision));
             }
 
             for (uint32_t i = 0; i < counts.vendorInfoCount; ++i) {
                 auto &vinfo = vendorInfos[i];
-                RP_CORE_ERROR("  Vendor[{}]: desc='{}', code={}, data={}",
-                              i, vinfo.description,
-                              static_cast<uint64_t>(vinfo.vendorFaultCode),
-                              static_cast<uint64_t>(vinfo.vendorFaultData));
+                RP_CORE_ERROR("  Vendor[{}]: desc='{}', code={}, data={}", i, vinfo.description,
+                              static_cast<uint64_t>(vinfo.vendorFaultCode), static_cast<uint64_t>(vinfo.vendorFaultData));
             }
         }
     }

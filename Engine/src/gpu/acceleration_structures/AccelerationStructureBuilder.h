@@ -1,8 +1,8 @@
 #ifndef RAPTURE__ACCELERATION_STRUCTURE_BUILDER_H
 #define RAPTURE__ACCELERATION_STRUCTURE_BUILDER_H
 
-#include <rapture/assets/asset_manager/AssetCommon.h>
 #include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetCommon.h>
 #include <rapture/core/events/EventSignal.h>
 
 #include <cstdint>

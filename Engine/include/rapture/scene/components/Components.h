@@ -4,9 +4,9 @@
     Stores the state part of the ecs, mainly the data/instance of a system
 */
 
-#include <rapture/scene/components/ComponentsCommon.h>
-#include <rapture/assets/materials/AMaterialInstance.h>
 #include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/materials/AMaterialInstance.h>
+#include <rapture/scene/components/ComponentsCommon.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -19,20 +19,20 @@
 #include <rapture/renderer/GPUDataStructs.h>
 
 #include <rapture/assets/asset_manager/AssetManager.h>
-#include <rapture/gpu/buffers/StorageBuffer.h>
-#include <rapture/gpu/buffers/UniformBuffer.h>
-#include <rapture/scene/cameras/PerspectiveCamera.h>
 #include <rapture/assets/materials/MaterialInstance.h>
 #include <rapture/assets/meshes/ASkeletalMesh.h>
 #include <rapture/assets/meshes/AStaticMesh.h>
 #include <rapture/assets/meshes/Mesh.h>
 #include <rapture/assets/skeletons/ASkeleton.h>
+#include <rapture/gpu/buffers/StorageBuffer.h>
+#include <rapture/gpu/buffers/UniformBuffer.h>
+#include <rapture/scene/cameras/PerspectiveCamera.h>
 
 #include <rapture/assets/asset_manager/AssetManager.h>
-#include <rapture/scene/components/ChangeChannels.h>
 #include <rapture/core/ecs/entity_accessor.h>
-#include <rapture/scene/EntityCommon.h>
 #include <rapture/gpu/textures/Texture.h>
+#include <rapture/scene/EntityCommon.h>
+#include <rapture/scene/components/ChangeChannels.h>
 
 #include <memory>
 #include <string>
@@ -132,10 +132,7 @@ struct MaterialComponent {
      * @param slot The run to read
      * @return The material, or nullptr if this entity has none for that run
      */
-    MaterialInstance *materialAt(uint32_t slot) const
-    {
-        return slot < materials.size() ? materials[slot].operator->() : nullptr;
-    }
+    MaterialInstance *materialAt(uint32_t slot) const { return slot < materials.size() ? materials[slot].operator->() : nullptr; }
 };
 
 struct StaticMeshComponent {
@@ -236,7 +233,6 @@ struct LightComponent {
   protected:
     LightComponent() = default;
     LightComponent(const glm::vec3 &color, float intensity) : color(color), intensity(intensity) {}
-
 };
 
 struct DirectionalLightComponent : public LightComponent {
@@ -326,7 +322,6 @@ struct ShadowComponent {
 
     ShadowComponent() = default;
     explicit ShadowComponent(uint32_t resolution) : resolution(resolution) {}
-
 };
 
 struct CascadedShadowComponent {
@@ -344,7 +339,6 @@ struct CascadedShadowComponent {
         : resolution(resolution), numCascades(numCascades), lambda(lambda)
     {
     }
-
 };
 
 } // namespace Rapture

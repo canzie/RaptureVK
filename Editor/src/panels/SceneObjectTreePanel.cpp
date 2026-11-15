@@ -51,7 +51,8 @@ void SceneObjectTreePanel::build(Amethyst::UIScope &scope)
     }
 
     if (m_selection != nullptr) {
-        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) { selectRowFor(entity); });
+        m_selectionChangedConn =
+            m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) { selectRowFor(entity); });
     }
 
     refresh();

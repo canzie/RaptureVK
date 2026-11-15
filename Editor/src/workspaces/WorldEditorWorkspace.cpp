@@ -12,11 +12,11 @@
 #include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
 
-#include <rapture/app/Application.h>
-#include <rapture/app/Layer.h>
 #include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
+#include <rapture/app/Application.h>
+#include <rapture/app/Layer.h>
 #include <rapture/core/utils/rp_assert.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/Instance.h>

@@ -1,5 +1,6 @@
 #include <rapture/scene/instances/InstanceRegistry.h>
 
+#include "scene/instances/scene_components/ScriptComponent.h"
 #include <rapture/core/utils/Log.h>
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/CharacterBody3D.h>
@@ -18,7 +19,6 @@
 #include <rapture/scene/instances/Terrain3D.h>
 #include <rapture/scene/instances/controllers/CameraController.h>
 #include <rapture/scene/instances/controllers/PlayerController.h>
-#include "scene/instances/scene_components/ScriptComponent.h"
 #include <rapture/scene/instances/scene_components/VisibilityComponent.h>
 
 #include <unordered_map>

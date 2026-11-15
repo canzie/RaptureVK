@@ -169,13 +169,13 @@ void SkeletonPreviewAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
     fieldTable(ch, [this](Amethyst::TableScope &t) {
         AssetPickerConfig config{
             .types = {Rapture::ASSET_SKELETAL_MESH},
-            .predicate = [this](Rapture::AssetHandle mesh, const Rapture::AssetMetadata &metadata) {
-                (void)metadata;
-                return s_meshUsesSkeleton(mesh, m_handle);
-            },
+            .predicate =
+                [this](Rapture::AssetHandle mesh, const Rapture::AssetMetadata &metadata) {
+                    (void)metadata;
+                    return s_meshUsesSkeleton(mesh, m_handle);
+                },
         };
-        rowAssetPicker(t, "Mesh", m_meshPicker, std::move(config),
-                       [this](Rapture::AssetHandle mesh) { applyPreviewMesh(mesh); });
+        rowAssetPicker(t, "Mesh", m_meshPicker, std::move(config), [this](Rapture::AssetHandle mesh) { applyPreviewMesh(mesh); });
     });
 }
 

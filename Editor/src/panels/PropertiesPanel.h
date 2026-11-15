@@ -4,12 +4,12 @@
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 
-#include <rapture/core/events/EventSignal.h>
 #include "inspector/ComponentEditorBase.h"
 #include "inspector/PropertySections.h"
 #include "panels/Panel.h"
-#include <rapture/scene/Scene.h>
 #include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/events/EventSignal.h>
+#include <rapture/scene/Scene.h>
 
 #include <concepts>
 #include <optional>

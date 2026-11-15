@@ -1,13 +1,13 @@
-#include "layers/EditorLayer.h"
 #include "layers/AmethystLayer.h"
+#include "layers/EditorLayer.h"
 #include "layers/TestLayer.h"
-#include <rapture/core/utils/Log.h>
 #include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
 
 #include "EntryPoint.h"
+#include "app/EditorConfig.h"
 #include <rapture/core/events/Events.h>
 #include <rapture/core/events/GameEvents.h>
-#include "app/EditorConfig.h"
 #include <rapture/scene/Project.h>
 
 #include <filesystem>
@@ -25,8 +25,7 @@ class EditorApp : public Rapture::Application {
         // Initialize event listeners
         setupEventHandlers();
 
-        std::filesystem::path projectPath =
-            argc > 1 ? std::filesystem::path(argv[1]) : EditorConfig::load().autoLaunchProject();
+        std::filesystem::path projectPath = argc > 1 ? std::filesystem::path(argv[1]) : EditorConfig::load().autoLaunchProject();
         if (!projectPath.empty()) {
             openProject(projectPath);
         }
@@ -58,8 +57,8 @@ class EditorApp : public Rapture::Application {
     void setupEventHandlers()
     {
         // Scene change events
-        m_sceneActivatedListenerId = Rapture::GameEvents::onSceneActivated().addListener(
-            [](Rapture::Scene& scene) { RP_INFO("Scene activated"); });
+        m_sceneActivatedListenerId =
+            Rapture::GameEvents::onSceneActivated().addListener([](Rapture::Scene &scene) { RP_INFO("Scene activated"); });
 
         m_worldActivatedListenerId = Rapture::GameEvents::onWorldActivated().addListener(
             [](Rapture::World *world) { RP_INFO("World activated: {0}", world->getName()); });

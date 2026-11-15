@@ -7,12 +7,12 @@
 #include <string_view>
 #include <vector>
 
+#include <rapture/core/events/EventSignal.h>
+#include <rapture/core/events/Events.h>
+#include <rapture/gpu/buffers/Buffers.h>
 #include <rapture/gpu/shaders/ShaderCommon.h>
 #include <rapture/gpu/shaders/ShaderCompilation.h>
 #include <rapture/gpu/shaders/ShaderReflections.h>
-#include <rapture/gpu/buffers/Buffers.h>
-#include <rapture/core/events/EventSignal.h>
-#include <rapture/core/events/Events.h>
 #include <vulkan/vulkan.h>
 
 namespace Rapture {

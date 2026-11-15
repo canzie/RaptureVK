@@ -1,14 +1,14 @@
-#include <rapture/gpu/textures/Texture.h>
-#include <rapture/gpu/command_buffers/CommandBuffer.h>
-#include <rapture/gpu/command_buffers/CommandPool.h>
-#include "gpu/descriptors/DescriptorManager.h"
-#include <rapture/gpu/descriptors/DescriptorSet.h>
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobSystem.h"
-#include <rapture/core/utils/Log.h>
-#include <rapture/app/Application.h>
+#include "gpu/descriptors/DescriptorManager.h"
 #include "gpu/vulkan_context/TimelineSemaphore.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/textures/Texture.h>
 
 #include <algorithm>
 #include <cstring>
@@ -49,7 +49,8 @@ struct TextureBlobHeader {
     uint32_t reserved[4] = {};
 };
 
-static_assert(sizeof(TextureBlobHeader) == 64, "texture blob header is a fixed 64-byte directory, bump to 128 and the major version if it must grow");
+static_assert(sizeof(TextureBlobHeader) == 64,
+              "texture blob header is a fixed 64-byte directory, bump to 128 and the major version if it must grow");
 
 /**
  * @brief Acquire a primary command buffer from a transient graphics-queue pool for this thread
@@ -101,9 +102,9 @@ static std::vector<VkBufferImageCopy> s_buildImageCopyRegions(const TextureSpeci
         region.imageExtent = {w, h, d};
         regions.push_back(region);
 
-        uint64_t mipBytesPerLayer =
-            compressed ? static_cast<uint64_t>((w + 3) / 4) * ((h + 3) / 4) * d * getBytesPerBlock(spec.format)
-                       : static_cast<uint64_t>(w) * h * d * getBytesPerPixel(spec.format);
+        uint64_t mipBytesPerLayer = compressed
+                                        ? static_cast<uint64_t>((w + 3) / 4) * ((h + 3) / 4) * d * getBytesPerBlock(spec.format)
+                                        : static_cast<uint64_t>(w) * h * d * getBytesPerPixel(spec.format);
         offset += mipBytesPerLayer * layers;
     }
 
@@ -744,8 +745,8 @@ std::vector<uint8_t> Texture::readbackData()
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    vkCmdCopyImageToBuffer(cmd, m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer,
-                           static_cast<uint32_t>(regions.size()), regions.data());
+    vkCmdCopyImageToBuffer(cmd, m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, static_cast<uint32_t>(regions.size()),
+                           regions.data());
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     commandBuffer->end();
 
@@ -949,8 +950,8 @@ void Texture::uploadCompressedBlob(std::span<const uint8_t> bytes)
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    vkCmdCopyBufferToImage(cmd, stagingBuffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           static_cast<uint32_t>(regions.size()), regions.data());
+    vkCmdCopyBufferToImage(cmd, stagingBuffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(regions.size()),
+                           regions.data());
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     commandBuffer->end();
 

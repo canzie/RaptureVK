@@ -6,9 +6,9 @@
 #ifndef RAPTURE__BUFFER_POOL_H
 #define RAPTURE__BUFFER_POOL_H
 
+#include <rapture/core/utils/Log.h>
 #include <rapture/gpu/buffers/BufferLayout.h>
 #include <rapture/gpu/buffers/Buffers.h>
-#include <rapture/core/utils/Log.h>
 
 #include <glm/glm.hpp>
 #include <vk_mem_alloc.h>

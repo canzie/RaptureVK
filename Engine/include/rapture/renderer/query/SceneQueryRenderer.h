@@ -140,8 +140,8 @@ class SceneQueryRenderer {
      * @param region The region the rays cover
      * @return The rays
      */
-    static std::vector<PixelRay> buildRegionRays(const glm::mat4 &inverseViewProj, uint32_t viewportWidth,
-                                                 uint32_t viewportHeight, const SceneQuery &region);
+    static std::vector<PixelRay> buildRegionRays(const glm::mat4 &inverseViewProj, uint32_t viewportWidth, uint32_t viewportHeight,
+                                                 const SceneQuery &region);
 
     /**
      * @brief Adds the hits a draw list's pick candidates cover a region's pixels with
@@ -151,9 +151,8 @@ class SceneQueryRenderer {
      * @param viewProj Places a hit at the depth the scene's own hits are measured in
      * @param rays One ray per pixel of the region
      */
-    static void addPickCandidateHits(SceneQueryResult &result, const GizmoDrawList &drawList,
-                                     const Frustum &regionFrustum, const glm::mat4 &viewProj,
-                                     const std::vector<PixelRay> &rays);
+    static void addPickCandidateHits(SceneQueryResult &result, const GizmoDrawList &drawList, const Frustum &regionFrustum,
+                                     const glm::mat4 &viewProj, const std::vector<PixelRay> &rays);
 
   private:
     RenderContext m_rc;

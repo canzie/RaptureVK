@@ -1,8 +1,8 @@
 #include <rapture/gpu/swap_chains/SwapChain.h>
 
+#include <rapture/app/Application.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/TracyProfiler.h>
-#include <rapture/app/Application.h>
 
 #include <algorithm>
 #include <cstddef>

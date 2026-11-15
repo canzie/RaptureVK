@@ -5,8 +5,8 @@
 
 #include "gpu/descriptors/DescriptorManager.h"
 #include "renderer/ImageBasedLighting.h"
-#include <rapture/renderer/RenderSettings.h>
 #include "renderer/shadows/ShadowMapping.h"
+#include <rapture/renderer/RenderSettings.h>
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/Environment.h>
 #include <rapture/scene/render_data/SceneRenderData.h>
@@ -151,8 +151,7 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
         if (cameraSlot != UINT32_MAX) {
             cameraSlotIndex = cameraSlot;
         } else {
-            RP_CORE_WARN("lighting: camera entity {} has no slot, shading from slot 0",
-                         static_cast<uint32_t>(camera.getEntity()));
+            RP_CORE_WARN("lighting: camera entity {} has no slot, shading from slot 0", static_cast<uint32_t>(camera.getEntity()));
         }
     } else {
         RP_CORE_WARN("No main camera found!");

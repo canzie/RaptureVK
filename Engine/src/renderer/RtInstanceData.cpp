@@ -1,5 +1,6 @@
 #include "renderer/RtInstanceData.h"
 
+#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/app/Application.h>
 #include <rapture/assets/materials/MaterialInstance.h>
 #include <rapture/assets/materials/MaterialParameters.h>
@@ -9,7 +10,6 @@
 #include <rapture/core/utils/Log.h>
 #include <rapture/gpu/acceleration_structures/TLAS.h>
 #include <rapture/gpu/buffers/BufferLayout.h>
-#include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/gpu/descriptors/DescriptorSet.h>
 #include <rapture/scene/components/Components.h>
 

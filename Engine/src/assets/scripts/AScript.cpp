@@ -38,8 +38,7 @@ bool AScript::reimport(const AssetMetadata &metadata)
 {
     std::filesystem::path path = metadata.getSourcePath();
     if (path.empty()) {
-        RP_CORE_ERROR("'{}' keeps its Lua in its own asset file, so there is nothing to read it from",
-                      metadata.getName());
+        RP_CORE_ERROR("'{}' keeps its Lua in its own asset file, so there is nothing to read it from", metadata.getName());
         return false;
     }
 

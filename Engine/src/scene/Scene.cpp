@@ -1,35 +1,35 @@
 #include <rapture/scene/Scene.h>
 
-#include <rapture/scene/components/Components.h>
+#include "renderer/shadows/CascadedShadowMapping.h"
+#include "renderer/shadows/ShadowMapping.h"
 #include "scene/components/TerrainComponent.h"
-#include <rapture/scene/systems/Transforms.h>
-#include <rapture/scene/instances/controllers/Controller.h>
+#include "scene/instances/scene_components/ScriptComponent.h"
+#include "scripting/lua/LuaRuntime.h"
+#include <rapture/scene/SceneLoadContext.h>
+#include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/DirectionalLight3D.h>
 #include <rapture/scene/instances/Environment.h>
+#include <rapture/scene/instances/InstanceRegistry.h>
 #include <rapture/scene/instances/Node3D.h>
 #include <rapture/scene/instances/PhysicsBody3D.h>
-#include <rapture/scene/instances/StaticMesh3D.h>
-#include <rapture/scene/render_data/SceneRenderData.h>
-#include "renderer/shadows/CascadedShadowMapping.h"
-#include "renderer/shadows/ShadowMapping.h"
 #include <rapture/scene/instances/SceneObject.h>
-#include <rapture/scene/instances/InstanceRegistry.h>
-#include <rapture/scene/SceneLoadContext.h>
-#include "scene/instances/scene_components/ScriptComponent.h"
-#include "scripting/lua/LuaRuntime.h"
+#include <rapture/scene/instances/StaticMesh3D.h>
+#include <rapture/scene/instances/controllers/Controller.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
+#include <rapture/scene/systems/Transforms.h>
 
+#include "physics/PhysicsSystem.h"
+#include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/asset_manager/ReservedAssets.h>
-#include <rapture/core/utils/TracyProfiler.h>
-#include "physics/PhysicsSystem.h"
-#include <rapture/scene/EntityCommon.h>
 #include <rapture/core/serialization/SerialDocument.h>
-#include <rapture/app/Application.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/scene/EntityCommon.h>
 
 #include <memory>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace Rapture {
 

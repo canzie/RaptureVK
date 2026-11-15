@@ -19,8 +19,8 @@ static void s_addMeshToBatch(MDIBatchMap &batchMap, Mesh &mesh, uint32_t meshSlo
         return;
     }
 
-    MDIBatch *batch = batchMap.obtainBatch(vboAlloc, iboAlloc, mesh.getVertexBuffer()->getBufferLayout(),
-                                           mesh.getIndexBuffer()->getIndexType());
+    MDIBatch *batch =
+        batchMap.obtainBatch(vboAlloc, iboAlloc, mesh.getVertexBuffer()->getBufferLayout(), mesh.getIndexBuffer()->getIndexType());
 
     const std::vector<MeshSection> &sections = mesh.getSections();
     for (uint32_t slot = 0; slot < sections.size(); slot++) {
@@ -105,7 +105,8 @@ void SceneGeometryDraw::populate(Scene &scene, const Frustum *frustum, uint32_t 
     auto &registry = scene.getRegistry();
     SceneRenderData *renderData = scene.getRenderData();
 
-    for (auto [entity, transform, meshComp, materialComp] : registry.read<TransformComponent, StaticMeshComponent, MaterialComponent>()) {
+    for (auto [entity, transform, meshComp, materialComp] :
+         registry.read<TransformComponent, StaticMeshComponent, MaterialComponent>()) {
         RAPTURE_PROFILE_SCOPE("Batch Static Mesh");
 
         if (!meshComp.mesh || meshComp.isLoading) {

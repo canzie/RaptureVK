@@ -17,7 +17,8 @@ namespace Rapture {
  * slots are recycled, so an id may be handed out again after its element is removed. Iteration
  * over live elements is done with forEach.
  */
-template <typename T> class FreeList {
+template <typename T>
+class FreeList {
   public:
     static constexpr uint32_t INVALID_ID = UINT32_MAX;
 
@@ -95,7 +96,8 @@ template <typename T> class FreeList {
      * @brief Invokes a callback for each live element
      * @param fn Callable invoked as fn(uint32_t id, T& value)
      */
-    template <typename F> void forEach(F &&fn)
+    template <typename F>
+    void forEach(F &&fn)
     {
         for (uint32_t i = 0; i < m_slots.size(); ++i) {
             if (m_slots[i].live) {
@@ -108,7 +110,8 @@ template <typename T> class FreeList {
      * @brief Invokes a callback for each live element
      * @param fn Callable invoked as fn(uint32_t id, const T& value)
      */
-    template <typename F> void forEach(F &&fn) const
+    template <typename F>
+    void forEach(F &&fn) const
     {
         for (uint32_t i = 0; i < m_slots.size(); ++i) {
             if (m_slots[i].live) {

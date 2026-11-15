@@ -1,9 +1,9 @@
 #include <rapture/app/Application.h>
 
+#include "core/jobs/JobSystem.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/materials/Material.h>
 #include <rapture/core/events/Events.h>
-#include "core/jobs/JobSystem.h"
 #include <rapture/core/utils/EnginePaths.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/Timestep.h>

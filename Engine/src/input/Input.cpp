@@ -2,13 +2,9 @@
 
 namespace Rapture {
 
-Input::Input(WindowContext *window) : m_window(window)
-{
-}
+Input::Input(WindowContext *window) : m_window(window) {}
 
-Input::~Input()
-{
-}
+Input::~Input() {}
 
 bool Input::isKeyPressed(KeyCode key) const
 {

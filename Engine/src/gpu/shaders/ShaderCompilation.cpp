@@ -1,9 +1,9 @@
-#include <rapture/gpu/shaders/ShaderCompilation.h>
 #include <rapture/core/utils/Log.h>
+#include <rapture/gpu/shaders/ShaderCompilation.h>
 
+#include <SPIRV/GlslangToSpv.h>
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
-#include <SPIRV/GlslangToSpv.h>
 
 #include <fstream>
 #include <memory>
@@ -14,23 +14,23 @@ namespace Rapture {
 
 class ShaderIncluder : public glslang::TShader::Includer {
   public:
-    ShaderIncluder(const std::filesystem::path& includePath) : m_includePath(includePath) {}
+    ShaderIncluder(const std::filesystem::path &includePath) : m_includePath(includePath) {}
 
-    IncludeResult* includeLocal(const char* headerName, const char* includerName, size_t depth) override
+    IncludeResult *includeLocal(const char *headerName, const char *includerName, size_t depth) override
     {
         (void)includerName;
         (void)depth;
         return readInclude(headerName);
     }
 
-    IncludeResult* includeSystem(const char* headerName, const char* includerName, size_t depth) override
+    IncludeResult *includeSystem(const char *headerName, const char *includerName, size_t depth) override
     {
         (void)includerName;
         (void)depth;
         return readInclude(headerName);
     }
 
-    void releaseInclude(IncludeResult* result) override
+    void releaseInclude(IncludeResult *result) override
     {
         if (result != nullptr) {
             m_liveIncludes.erase(result);
@@ -44,9 +44,9 @@ class ShaderIncluder : public glslang::TShader::Includer {
         std::string path;
         std::string content;
     };
-    std::unordered_map<IncludeResult*, std::pair<std::unique_ptr<IncludeStorage>, std::unique_ptr<IncludeResult>>> m_liveIncludes;
+    std::unordered_map<IncludeResult *, std::pair<std::unique_ptr<IncludeStorage>, std::unique_ptr<IncludeResult>>> m_liveIncludes;
 
-    IncludeResult* readInclude(const char* headerName)
+    IncludeResult *readInclude(const char *headerName)
     {
         const std::filesystem::path fullPath = m_includePath / headerName;
         std::ifstream file(fullPath);
@@ -60,10 +60,9 @@ class ShaderIncluder : public glslang::TShader::Includer {
         auto storage = std::make_unique<IncludeStorage>();
         storage->path = fullPath.string();
         storage->content = buffer.str();
-        auto result = std::make_unique<IncludeResult>(
-            storage->path, storage->content.c_str(), storage->content.size(), nullptr);
+        auto result = std::make_unique<IncludeResult>(storage->path, storage->content.c_str(), storage->content.size(), nullptr);
 
-        IncludeResult* raw = result.get();
+        IncludeResult *raw = result.get();
         m_liveIncludes.emplace(raw, std::make_pair(std::move(storage), std::move(result)));
         return raw;
     }
@@ -96,7 +95,7 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
     }
 
     std::string preamble = "#extension GL_GOOGLE_include_directive : require\n";
-    for (const auto& macro : compileInfo.macros) {
+    for (const auto &macro : compileInfo.macros) {
         preamble += "#define " + macro.name;
         if (!macro.value.empty()) preamble += " " + macro.value;
         preamble += "\n";
@@ -105,10 +104,10 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
     const EShLanguage eshStage = static_cast<EShLanguage>(stage);
     glslang::TShader shader(eshStage);
 
-    const char* src = source.c_str();
+    const char *src = source.c_str();
     const int srcLen = static_cast<int>(source.size());
     const std::string pathStr = path.string();
-    const char* srcName = pathStr.c_str();
+    const char *srcName = pathStr.c_str();
     shader.setStringsWithLengthsAndNames(&src, &srcLen, &srcName, 1);
     shader.setPreamble(preamble.c_str());
 
@@ -136,7 +135,7 @@ std::vector<char> ShaderCompiler::Compile(const std::filesystem::path &path, con
 
     std::vector<std::string> macroStrings;
     macroStrings.reserve(compileInfo.macros.size());
-    for (const auto& macro : compileInfo.macros) {
+    for (const auto &macro : compileInfo.macros) {
         macroStrings.push_back(macro.value.empty() ? macro.name : macro.name + "=" + macro.value);
     }
     RP_CORE_INFO("Compiled shader: {0} \n\t using macros: [{1}]", path.string(), fmt::join(macroStrings, ", "));

@@ -1,15 +1,15 @@
 #ifndef RAPTURE__MATERIAL_GRAPH_COMPILER_H
 #define RAPTURE__MATERIAL_GRAPH_COMPILER_H
 
-#include <rapture/assets/asset_manager/Asset.h>
 #include <cstdint>
+#include <rapture/assets/asset_manager/Asset.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include <rapture/assets/materials/GraphInstanceData.h>
 #include <rapture/assets/materials/graph/GraphDomain.h>
 #include <rapture/assets/materials/graph/MaterialGraph.h>
-#include <rapture/assets/materials/GraphInstanceData.h>
 
 namespace Rapture {
 

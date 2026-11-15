@@ -1,6 +1,6 @@
-#include <rapture/gpu/render_targets/SceneRenderTarget.h>
-#include <rapture/core/utils/Log.h>
 #include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/render_targets/SceneRenderTarget.h>
 
 #include <algorithm>
 
@@ -193,8 +193,8 @@ void SceneRenderTarget::setImageLayout(uint32_t index, VkImageLayout layout)
 
     // a layout recorded without a stage leaves nothing to wait on precisely, so the next barrier
     // out of it has to wait on everything
-    setImageState(index, {layout, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                          VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT});
+    setImageState(index,
+                  {layout, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT});
 }
 
 TextureState SceneRenderTarget::getImageState(uint32_t index) const

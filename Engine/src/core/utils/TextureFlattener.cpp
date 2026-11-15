@@ -5,13 +5,13 @@
 
 #include <cmath>
 
-#include <rapture/assets/asset_manager/AssetManager.h>
-#include <rapture/gpu/command_buffers/CommandPool.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include <rapture/gpu/descriptors/DescriptorSet.h>
-#include <rapture/core/utils/Log.h>
-#include <rapture/gpu/shaders/ShaderCompilation.h>
 #include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/shaders/ShaderCompilation.h>
 
 namespace Rapture {
 
@@ -58,7 +58,8 @@ FlattenTexture::FlattenTexture(std::shared_ptr<Texture> inputTexture, std::uniqu
     m_descriptorSet = std::make_shared<DescriptorSet>(bindings);
 
     // Update the descriptor set with the output texture
-    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)->add(m_flattenedTexture.get()->texture());
+    m_descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_FLATTEN_OUTPUT)
+        ->add(m_flattenedTexture.get()->texture());
 }
 
 void FlattenTexture::update(CommandBuffer *commandBuffer)

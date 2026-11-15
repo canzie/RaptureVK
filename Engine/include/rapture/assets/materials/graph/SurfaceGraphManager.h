@@ -1,9 +1,9 @@
 #ifndef RAPTURE__SURFACE_GRAPH_MANAGER_H
 #define RAPTURE__SURFACE_GRAPH_MANAGER_H
 
-#include <rapture/assets/asset_manager/Asset.h>
 #include <cstdint>
 #include <filesystem>
+#include <rapture/assets/asset_manager/Asset.h>
 #include <vector>
 
 #include <rapture/assets/materials/graph/MaterialGraph.h>

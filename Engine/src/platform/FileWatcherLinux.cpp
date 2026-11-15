@@ -4,9 +4,9 @@
 
 #include <rapture/core/utils/Log.h>
 
+#include <poll.h>
 #include <sys/eventfd.h>
 #include <sys/inotify.h>
-#include <poll.h>
 #include <unistd.h>
 
 #include <thread>
@@ -14,8 +14,7 @@
 
 namespace Rapture {
 
-static constexpr uint32_t s_watchMask =
-    IN_CREATE | IN_DELETE | IN_CLOSE_WRITE | IN_MOVED_FROM | IN_MOVED_TO | IN_DELETE_SELF;
+static constexpr uint32_t s_watchMask = IN_CREATE | IN_DELETE | IN_CLOSE_WRITE | IN_MOVED_FROM | IN_MOVED_TO | IN_DELETE_SELF;
 
 class InotifyDirectoryWatcher : public DirectoryWatcher {
   public:
@@ -196,7 +195,8 @@ void InotifyDirectoryWatcher::processEvents(const char *buffer, ssize_t length)
     }
 }
 
-std::unique_ptr<DirectoryWatcher> DirectoryWatcher::create(const std::filesystem::path &directory, bool recursive, Callback callback)
+std::unique_ptr<DirectoryWatcher> DirectoryWatcher::create(const std::filesystem::path &directory, bool recursive,
+                                                           Callback callback)
 {
     auto watcher = std::make_unique<InotifyDirectoryWatcher>(directory, recursive, std::move(callback));
     if (!watcher->isValid()) {
