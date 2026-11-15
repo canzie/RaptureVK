@@ -770,16 +770,15 @@ void AssetManagerEditor::processUnloadRequests()
     AssetHandle handle;
     while (m_pendingUnloadChecks.try_dequeue(handle)) {
         const AssetSlot *slot = m_assets.find(handle);
-        if (slot == nullptr) {
+        // a handle released to zero twice before this runs is queued twice, and the first check already evicted it
+        if (slot == nullptr || slot->asset == nullptr) {
             continue;
         }
 
-        if (slot->asset != nullptr) {
-            AssetStatus status = slot->asset->status();
-            if (status == AssetStatus::REQUESTED || status == AssetStatus::LOADING) {
-                stillLoading.push_back(handle);
-                continue;
-            }
+        AssetStatus status = slot->asset->status();
+        if (status == AssetStatus::REQUESTED || status == AssetStatus::LOADING) {
+            stillLoading.push_back(handle);
+            continue;
         }
 
         const AssetMetadata &metadata = *slot->metadata;

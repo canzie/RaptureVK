@@ -39,6 +39,8 @@ class AssetManager {
 
     static AssetRef getAsset(AssetHandle handle) { return AssetRef(s_activeAssetManager->getAsset(handle)); }
 
+    static bool isAssetLoaded(AssetHandle handle) { return s_activeAssetManager->isAssetLoaded(handle); }
+
     /**
      * @brief Takes a use of an asset of a known class
      * @param handle The asset to hold
