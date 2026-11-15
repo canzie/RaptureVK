@@ -136,8 +136,9 @@ VulkanContext::VulkanContext(const std::vector<const char *> &surfaceExtensions)
     setupDebugMessenger();
 }
 
-void VulkanContext::initDevice(VkSurfaceKHR surface)
+void VulkanContext::initDevice(VkSurfaceKHR surface, QueueFamilyAssignment queueFamilyAssignment)
 {
+    m_queueFamilyAssignment = queueFamilyAssignment;
     pickPhysicalDevice(surface);
     createLogicalDevice(surface);
     createVmaAllocator();
@@ -618,90 +619,100 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surfa
     return isDeviceSuitable;
 }
 
-#define PREFER_QUEUE_INDEX(type)                                               \
-    (queueIndicesUses[indices.familyIndices[type]] < queueFamily.queueCount || \
-     queueIndicesUses[i] < queueIndicesUses[indices.familyIndices[type]])
+static uint32_t s_findGraphicsComputeFamily(const std::vector<VkQueueFamilyProperties> &queueFamilies)
+{
+    for (uint32_t i = 0; i < queueFamilies.size(); i++) {
+        if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0 && (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0) {
+            return i;
+        }
+    }
+    return UINT32_MAX;
+}
+
+static uint32_t s_findComputeOnlyFamily(const std::vector<VkQueueFamilyProperties> &queueFamilies)
+{
+    for (uint32_t i = 0; i < queueFamilies.size(); i++) {
+        if ((queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0 && (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) {
+            return i;
+        }
+    }
+    return UINT32_MAX;
+}
+
+static uint32_t s_findTransferOnlyFamily(const std::vector<VkQueueFamilyProperties> &queueFamilies)
+{
+    constexpr VkQueueFlags capabilitiesBesidesTransfer = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
+    constexpr VkQueueFlags flagsIgnoredForPlainTransfer = VK_QUEUE_SPARSE_BINDING_BIT | VK_QUEUE_PROTECTED_BIT;
+
+    uint32_t transferFamily = UINT32_MAX;
+    for (uint32_t i = 0; i < queueFamilies.size(); i++) {
+        VkQueueFlags flags = queueFamilies[i].queueFlags;
+        if ((flags & VK_QUEUE_TRANSFER_BIT) == 0 || (flags & capabilitiesBesidesTransfer) != 0) {
+            continue;
+        }
+        // a family that only copies is preferred over one that also runs video or optical flow work
+        if ((flags & ~(VK_QUEUE_TRANSFER_BIT | flagsIgnoredForPlainTransfer)) == 0) {
+            return i;
+        }
+        if (transferFamily == UINT32_MAX) {
+            transferFamily = i;
+        }
+    }
+    return transferFamily;
+}
+
+static uint32_t s_findPresentFamily(VkPhysicalDevice device, VkSurfaceKHR surface, uint32_t graphicsFamily, uint32_t familyCount)
+{
+    VkBool32 presentSupport = VK_FALSE;
+    if (graphicsFamily != UINT32_MAX) {
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, graphicsFamily, surface, &presentSupport);
+        if (presentSupport == VK_TRUE) {
+            return graphicsFamily;
+        }
+    }
+
+    for (uint32_t i = 0; i < familyCount; i++) {
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+        if (presentSupport == VK_TRUE) {
+            return i;
+        }
+    }
+    return UINT32_MAX;
+}
 
 QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) const
 {
     QueueFamilyIndices indices;
 
-    // a device without a surface never presents, so it has no present family
-    if (surface == VK_NULL_HANDLE) {
-        indices.familyIndices[PRESENT] = UINT32_MAX;
-    }
-
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    std::vector<uint32_t> queueIndicesUses(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-    int i = 0;
-    for (const auto &queueFamily : queueFamilies) {
-        if (indices.isComplete(surface != VK_NULL_HANDLE)) {
-            break;
+    indices.familyIndices[GRAPHICS] = s_findGraphicsComputeFamily(queueFamilies);
+    indices.familyIndices[COMPUTE] = indices.familyIndices[GRAPHICS];
+    indices.familyIndices[TRANSFER] = indices.familyIndices[GRAPHICS];
+
+    if (m_queueFamilyAssignment == QueueFamilyAssignment::DEDICATED_FAMILIES) {
+        uint32_t computeFamily = s_findComputeOnlyFamily(queueFamilies);
+        if (computeFamily != UINT32_MAX) {
+            indices.familyIndices[COMPUTE] = computeFamily;
         }
 
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            if (indices.familyIndices[GRAPHICS] == UINT32_MAX) {
-                indices.familyIndices[GRAPHICS] = i;
-                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
-                queueIndicesUses[i]++;
-            } else if (PREFER_QUEUE_INDEX(GRAPHICS)) {
-                queueIndicesUses[indices.familyIndices[GRAPHICS]]--;
-                indices.familyIndices[GRAPHICS] = i;
-                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
-                queueIndicesUses[i]++;
-            }
+        uint32_t transferFamily = s_findTransferOnlyFamily(queueFamilies);
+        indices.familyIndices[TRANSFER] = transferFamily != UINT32_MAX ? transferFamily : indices.familyIndices[COMPUTE];
+    }
+
+    // a device without a surface never presents, so it has no present family
+    if (surface != VK_NULL_HANDLE) {
+        indices.familyIndices[PRESENT] = s_findPresentFamily(device, surface, indices.familyIndices[GRAPHICS], queueFamilyCount);
+    }
+
+    for (uint32_t role = 0; role < COUNT; role++) {
+        if (indices.familyIndices[role] != UINT32_MAX) {
+            indices.familyQueueCounts[role] = queueFamilies[indices.familyIndices[role]].queueCount;
         }
-        if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-            if (indices.familyIndices[COMPUTE] == UINT32_MAX) {
-                indices.familyIndices[COMPUTE] = i;
-                indices.familyQueueCounts[COMPUTE] = queueFamily.queueCount;
-                queueIndicesUses[i]++;
-            } else if (PREFER_QUEUE_INDEX(COMPUTE)) {
-                queueIndicesUses[indices.familyIndices[COMPUTE]]--;
-                indices.familyIndices[COMPUTE] = i;
-                indices.familyQueueCounts[COMPUTE] = queueFamily.queueCount;
-                queueIndicesUses[i]++;
-            }
-        }
-
-        if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) {
-            if (indices.familyIndices[TRANSFER] == UINT32_MAX) {
-                indices.familyIndices[TRANSFER] = i;
-                indices.familyQueueCounts[TRANSFER] = queueFamily.queueCount;
-                queueIndicesUses[i]++;
-            } else if (PREFER_QUEUE_INDEX(TRANSFER)) {
-                queueIndicesUses[indices.familyIndices[TRANSFER]]--;
-                indices.familyIndices[TRANSFER] = i;
-                indices.familyQueueCounts[TRANSFER] = queueFamily.queueCount;
-                queueIndicesUses[i]++;
-            }
-        }
-
-        if (surface != VK_NULL_HANDLE) {
-            VkBool32 presentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
-
-            if (presentSupport) {
-                if (indices.familyIndices[PRESENT] == UINT32_MAX) {
-                    indices.familyIndices[GRAPHICS] = i;
-                    indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
-                    queueIndicesUses[i]++;
-                } else if (PREFER_QUEUE_INDEX(PRESENT)) {
-                    queueIndicesUses[indices.familyIndices[PRESENT]]--;
-
-                    indices.familyIndices[PRESENT] = i;
-                    indices.familyQueueCounts[PRESENT] = queueFamily.queueCount;
-                    queueIndicesUses[i]++;
-                }
-            }
-        }
-
-        i++;
     }
 
     indices.print();

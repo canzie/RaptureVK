@@ -36,9 +36,9 @@ Application::Application(const ApplicationConfig &config) : m_running(true), m_i
     EnginePaths::init();
 
     if (config.mainWindow.has_value()) {
-        createMainWindowAndDevice(*config.mainWindow);
+        createMainWindowAndDevice(*config.mainWindow, config.queueFamilyAssignment);
     } else {
-        createWindowlessDevice();
+        createWindowlessDevice(config.queueFamilyAssignment);
     }
 
     AssetManager::init(&m_telemetry, m_framesInFlight);
@@ -97,7 +97,7 @@ Application::Application(const ApplicationConfig &config) : m_running(true), m_i
     RP_CORE_INFO("========== Application created ==========");
 }
 
-void Application::createMainWindowAndDevice(const MainWindowConfig &config)
+void Application::createMainWindowAndDevice(const MainWindowConfig &config, QueueFamilyAssignment queueFamilyAssignment)
 {
     m_platformContext = PlatformContext::create();
 
@@ -111,18 +111,18 @@ void Application::createMainWindowAndDevice(const MainWindowConfig &config)
         std::vector<const char *>(surfaceExtensions, surfaceExtensions + window->getExtensionCount()));
 
     m_mainWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
-    m_vulkanContext->initDevice(m_mainWindow->getSurface());
+    m_vulkanContext->initDevice(m_mainWindow->getSurface(), queueFamilyAssignment);
 
     m_mainWindow->createSwapChain(*m_vulkanContext);
     m_framesInFlight = m_mainWindow->getSwapChain()->getImageCount();
     RP_ASSERT(m_framesInFlight > 0, "the main window's swapchain reported no images");
 }
 
-void Application::createWindowlessDevice()
+void Application::createWindowlessDevice(QueueFamilyAssignment queueFamilyAssignment)
 {
     RP_CORE_INFO("Creating windowless Vulkan context...");
     m_vulkanContext = std::make_unique<VulkanContext>(std::vector<const char *>{});
-    m_vulkanContext->initDevice(VK_NULL_HANDLE);
+    m_vulkanContext->initDevice(VK_NULL_HANDLE, queueFamilyAssignment);
 
     m_framesInFlight = WINDOWLESS_FRAMES_IN_FLIGHT;
 }

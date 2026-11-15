@@ -1,5 +1,8 @@
-#pragma once
+#ifndef RAPTURE__VULKAN_TYPES_H
+#define RAPTURE__VULKAN_TYPES_H
 
+#include <algorithm>
+#include <iterator>
 #include <optional>
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -16,8 +19,18 @@ enum QueueFamilyIndex {
     COUNT,
 };
 
+/**
+ * @brief How the graphics, compute and transfer roles are spread over the device's queue families
+ */
+enum class QueueFamilyAssignment {
+    ONE_FAMILY,
+    DEDICATED_FAMILIES
+};
+
 struct QueueFamilyIndices {
-    uint32_t familyIndices[COUNT] = {UINT32_MAX};
+    QueueFamilyIndices() { std::fill(std::begin(familyIndices), std::end(familyIndices), UINT32_MAX); }
+
+    uint32_t familyIndices[COUNT];
     uint32_t familyQueueCounts[COUNT] = {0};
 
     /**
@@ -39,7 +52,7 @@ struct QueueFamilyIndices {
         RP_CORE_INFO("Present: {}:{}", familyIndices[PRESENT], familyQueueCounts[PRESENT]);
         RP_CORE_INFO("Transfer: {}:{}", familyIndices[TRANSFER], familyQueueCounts[TRANSFER]);
     }
-}; // namespace Rapture
+};
 
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -48,3 +61,5 @@ struct SwapChainSupportDetails {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__VULKAN_TYPES_H

@@ -30,8 +30,9 @@ class VulkanContext {
     /**
      * @brief Picks the physical device and creates the logical device on it
      * @param surface The surface the device presents to, VK_NULL_HANDLE for a context that never presents
+     * @param queueFamilyAssignment How the queue roles are spread over the device's queue families
      */
-    void initDevice(VkSurfaceKHR surface);
+    void initDevice(VkSurfaceKHR surface, QueueFamilyAssignment queueFamilyAssignment);
 
     void waitIdle();
 
@@ -167,6 +168,7 @@ class VulkanContext {
     std::vector<const char *> m_deviceExtensions;
 
     QueueFamilyIndices m_queueFamilyIndices;
+    QueueFamilyAssignment m_queueFamilyAssignment = QueueFamilyAssignment::ONE_FAMILY;
 
     VmaAllocator m_vmaAllocator;
 

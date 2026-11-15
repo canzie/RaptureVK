@@ -34,6 +34,7 @@ struct MainWindowConfig {
  */
 struct ApplicationConfig {
     std::optional<MainWindowConfig> mainWindow;
+    QueueFamilyAssignment queueFamilyAssignment = QueueFamilyAssignment::ONE_FAMILY;
 };
 
 class Application {
@@ -170,13 +171,15 @@ class Application {
     /**
      * @brief Opens the main window and creates the device that presents to it
      * @param config The window to open
+     * @param queueFamilyAssignment How the device spreads its queue roles over its queue families
      */
-    void createMainWindowAndDevice(const MainWindowConfig &config);
+    void createMainWindowAndDevice(const MainWindowConfig &config, QueueFamilyAssignment queueFamilyAssignment);
 
     /**
      * @brief Creates a device that never presents
+     * @param queueFamilyAssignment How the device spreads its queue roles over its queue families
      */
-    void createWindowlessDevice();
+    void createWindowlessDevice(QueueFamilyAssignment queueFamilyAssignment);
 
     /**
      * @brief Samples the current hardware readings into m_telemetry
