@@ -44,11 +44,12 @@ Application::Application(int width, int height, const char *title) : m_running(t
     m_mainWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
     m_vulkanContext->initDevice(m_mainWindow->getSurface());
 
-    AssetManager::init(&m_telemetry);
-
     m_mainWindow->createSwapChain(*m_vulkanContext);
     m_framesInFlight = m_mainWindow->getSwapChain()->getImageCount();
     RP_ASSERT(m_framesInFlight > 0, "the main window's swapchain reported no images");
+
+    AssetManager::init(&m_telemetry, m_framesInFlight);
+
     m_vulkanContext->initManagers(m_framesInFlight);
     m_mainWindow->getSwapChain()->invalidate();
 

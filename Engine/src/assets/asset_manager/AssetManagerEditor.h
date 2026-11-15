@@ -21,7 +21,7 @@ struct Telemetry;
 
 class AssetManagerEditor : public AssetManagerBase {
   public:
-    explicit AssetManagerEditor(const Telemetry *telemetry);
+    AssetManagerEditor(const Telemetry *telemetry, uint32_t framesInFlight);
     ~AssetManagerEditor();
 
     bool isAssetLoaded(AssetHandle handle) const;
@@ -137,7 +137,6 @@ class AssetManagerEditor : public AssetManagerBase {
     AssetType determineAssetType(const std::string &path);
 
     bool evictAsset(AssetHandle handle);
-    void ensureDeferredFreeBuckets();
 
     void processUnloadRequests();
     void addToColdList(AssetHandle handle, const AssetMetadata &metadata);

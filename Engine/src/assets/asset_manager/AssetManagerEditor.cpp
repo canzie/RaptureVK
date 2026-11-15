@@ -2,7 +2,6 @@
 #include "AssetCodec.h"
 #include "AssetRegistry.h"
 #include "ReservedAssets.h"
-#include "app/Application.h"
 #include "assets/asset_manager/Asset.h"
 #include "assets/asset_manager/AssetCommon.h"
 #include "assets/materials/AMaterial.h"
@@ -141,7 +140,10 @@ static std::unique_ptr<Asset> s_buildImportData(AssetImportDataVariant &data, st
     return nullptr;
 }
 
-AssetManagerEditor::AssetManagerEditor(const Telemetry *telemetry) : AssetManagerBase(), m_telemetry(telemetry) {}
+AssetManagerEditor::AssetManagerEditor(const Telemetry *telemetry, uint32_t framesInFlight)
+    : AssetManagerBase(), m_telemetry(telemetry), m_deferredFrees(static_cast<size_t>(framesInFlight) + 1)
+{
+}
 
 AssetManagerEditor::~AssetManagerEditor()
 {
@@ -646,19 +648,8 @@ bool AssetManagerEditor::reimportIfSourceChanged(AssetHandle handle)
     return true;
 }
 
-void AssetManagerEditor::ensureDeferredFreeBuckets()
-{
-    uint32_t framesInFlight = Application::getInstance().getFramesInFlight();
-    size_t bucketCount = static_cast<size_t>(framesInFlight) + 1;
-    if (m_deferredFrees.size() < bucketCount) {
-        m_deferredFrees.resize(bucketCount);
-    }
-}
-
 void AssetManagerEditor::onUpdate()
 {
-    ensureDeferredFreeBuckets();
-
     m_deferredFreeBucket = (m_deferredFreeBucket + 1) % m_deferredFrees.size();
 
     std::vector<std::unique_ptr<Asset>> toFree = std::move(m_deferredFrees[m_deferredFreeBucket]);
@@ -876,7 +867,6 @@ bool AssetManagerEditor::evictAsset(AssetHandle handle)
     RP_CORE_INFO("Evicting {} asset '{}'", AssetRegistry::displayName(metadata.assetType), metadata.name);
     bool isVirtual = metadata.isVirtualAsset();
 
-    ensureDeferredFreeBuckets();
     m_deferredFrees[m_deferredFreeBucket].push_back(std::move(slot->asset));
 
     // A virtual asset has no file to reload from, so dropping its payload drops its registration too
