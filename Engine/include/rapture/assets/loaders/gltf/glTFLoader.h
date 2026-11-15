@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <vector>
 
+struct yyjson_doc;
 struct yyjson_val;
 
 namespace Rapture {
