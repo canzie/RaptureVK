@@ -103,6 +103,8 @@ A headless application has a Vulkan device and everything above it, but no GLFW,
 
 Not in this phase: a headless executable and the command socket (they come together), and running without a GPU at all.
 
+Naming, from Thomas (2026-11-15): "headless" is meant as no Vulkan at all, for running the server side of a game. What this phase built is windowless rendering (a real device, offscreen only), so the proposed names are **windowless** for this mode, **headless** for a CPU-only runtime mode with no device, and **dedicated server** for a build that compiles rendering out. The code still says `isHeadless` until the rename is agreed. Headless needs the CPU side of scenes and assets separated from their GPU mirrors; no software Vulkan.
+
 ## Testing and stress
 
 GoogleTest is already wired (`Engine/test/event_signal_test.cpp`, `logging_test.cpp`, `file_watcher_test.cpp`, `Editor/test/text_buffer_test.cpp`).
