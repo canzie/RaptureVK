@@ -3,6 +3,7 @@
 
 #include <rapture/app/LayerStack.h>
 #include <rapture/core/utils/Telemetry.h>
+#include <rapture/core/utils/rp_assert.h>
 #include <rapture/gpu/vulkan_context/VulkanContext.h>
 #include <rapture/platform/PlatformContext.h>
 #include <rapture/platform/RenderWindow.h>
@@ -13,17 +14,48 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace Rapture {
 
+/**
+ * @brief The OS window an application opens at startup
+ */
+struct MainWindowConfig {
+    int32_t width;
+    int32_t height;
+    std::string title;
+};
+
+/**
+ * @brief How an application starts, headless when it opens no main window
+ */
+struct ApplicationConfig {
+    std::optional<MainWindowConfig> mainWindow;
+};
+
 class Application {
   public:
-    Application(int width, int height, const char *title);
+    explicit Application(const ApplicationConfig &config);
 
     virtual ~Application();
 
+    /**
+     * @brief Runs frames until the application is closed
+     */
     void run();
+
+    /**
+     * @brief Runs one frame: assets, layers, the project, every viewport and the windows
+     */
+    void runFrame();
+
+    /**
+     * @brief Whether the application runs without a window, rendering offscreen only
+     */
+    bool isHeadless() const { return m_mainWindow == nullptr; }
 
     /**
      * @brief Stops the run loop and asks the entry point to start the editor again
@@ -95,10 +127,18 @@ class Application {
 
     const VulkanContext &getVulkanContext() const { return *m_vulkanContext; }
     VulkanContext &getVulkanContext() { return *m_vulkanContext; }
-    const RenderWindow &getMainWindow() const { return *m_mainWindow; }
-    RenderWindow &getMainWindow() { return *m_mainWindow; }
-    const WindowContext &getWindowContext() const { return *m_mainWindow->getWindowContext(); }
-    WindowContext &getWindowContext() { return *m_mainWindow->getWindowContext(); }
+    const RenderWindow &getMainWindow() const
+    {
+        RP_ASSERT(m_mainWindow != nullptr, "a headless application has no main window");
+        return *m_mainWindow;
+    }
+    RenderWindow &getMainWindow()
+    {
+        RP_ASSERT(m_mainWindow != nullptr, "a headless application has no main window");
+        return *m_mainWindow;
+    }
+    const WindowContext &getWindowContext() const { return *getMainWindow().getWindowContext(); }
+    WindowContext &getWindowContext() { return *getMainWindow().getWindowContext(); }
     const Project &getProject() const { return *m_project; }
     Project &getProject() { return *m_project; }
     ViewportManager &getViewportManager() { return *m_viewportManager; }
@@ -127,6 +167,17 @@ class Application {
     static const RenderContext &getRenderContext() { return s_instance->m_vulkanContext->getRenderContext(); }
 
   private:
+    /**
+     * @brief Opens the main window and creates the device that presents to it
+     * @param config The window to open
+     */
+    void createMainWindowAndDevice(const MainWindowConfig &config);
+
+    /**
+     * @brief Creates a device that never presents
+     */
+    void createHeadlessDevice();
+
     /**
      * @brief Samples the current hardware readings into m_telemetry
      */

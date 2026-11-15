@@ -20,10 +20,15 @@ struct QueueFamilyIndices {
     uint32_t familyIndices[COUNT] = {UINT32_MAX};
     uint32_t familyQueueCounts[COUNT] = {0};
 
-    bool isComplete() const
+    /**
+     * @brief Whether every family the device needs has been found
+     * @param presentRequired Whether the device presents to a surface
+     * @return True if graphics, compute and, when required, present have a family
+     */
+    bool isComplete(bool presentRequired) const
     {
         return familyIndices[GRAPHICS] != UINT32_MAX && familyIndices[COMPUTE] != UINT32_MAX &&
-               familyIndices[PRESENT] != UINT32_MAX;
+               (!presentRequired || familyIndices[PRESENT] != UINT32_MAX);
     }
 
     void print() const

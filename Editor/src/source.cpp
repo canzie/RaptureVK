@@ -16,7 +16,8 @@
 // The main Editor application class
 class EditorApp : public Rapture::Application {
   public:
-    EditorApp(int width, int height, const char *title, int argc, char **argv) : Application(width, height, title)
+    EditorApp(int width, int height, const char *title, int argc, char **argv)
+        : Application({.mainWindow = Rapture::MainWindowConfig{.width = width, .height = height, .title = title}})
     {
 
         // Log startup message
@@ -57,11 +58,10 @@ class EditorApp : public Rapture::Application {
     void setupEventHandlers()
     {
         // Scene change events
-        m_sceneActivatedListenerId =
-            Rapture::GameEvents::onSceneActivated().addListener([](Rapture::Scene &scene) {
-                (void)scene;
-                RP_INFO("Scene activated");
-            });
+        m_sceneActivatedListenerId = Rapture::GameEvents::onSceneActivated().addListener([](Rapture::Scene &scene) {
+            (void)scene;
+            RP_INFO("Scene activated");
+        });
 
         m_worldActivatedListenerId = Rapture::GameEvents::onWorldActivated().addListener(
             [](Rapture::World *world) { RP_INFO("World activated: {0}", world->getName()); });

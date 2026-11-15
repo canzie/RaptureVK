@@ -6,7 +6,6 @@
 #include <rapture/gpu/vulkan_context/RenderContext.h>
 #include <rapture/gpu/vulkan_context/VulkanQueue.h>
 #include <rapture/gpu/vulkan_context/VulkanTypes.h>
-#include <rapture/platform/WindowContext.h>
 
 #include <map>
 #include <memory>
@@ -20,9 +19,17 @@ class Renderpass;
 
 class VulkanContext {
   public:
-    VulkanContext(WindowContext *windowContext);
+    /**
+     * @brief Creates the Vulkan instance
+     * @param surfaceExtensions The instance extensions a window surface needs, empty for a context that never presents
+     */
+    explicit VulkanContext(const std::vector<const char *> &surfaceExtensions);
     ~VulkanContext();
 
+    /**
+     * @brief Picks the physical device and creates the logical device on it
+     * @param surface The surface the device presents to, VK_NULL_HANDLE for a context that never presents
+     */
     void initDevice(VkSurfaceKHR surface);
 
     void waitIdle();
@@ -111,11 +118,11 @@ class VulkanContext {
     const RenderContext &getRenderContext() const { return m_renderContext; }
 
   private:
-    void createInstance(WindowContext *windowContext);
+    void createInstance(const std::vector<const char *> &surfaceExtensions);
     void checkExtensionSupport();
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 
-    std::vector<const char *> getRequiredExtensions(WindowContext *windowContext);
+    std::vector<const char *> getRequiredExtensions(const std::vector<const char *> &surfaceExtensions);
 
     // Validation layers
     bool checkValidationLayerSupport();

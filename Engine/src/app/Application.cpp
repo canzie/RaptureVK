@@ -20,9 +20,11 @@
 
 namespace Rapture {
 
+static constexpr uint32_t HEADLESS_FRAMES_IN_FLIGHT = 2;
+
 Application *Application::s_instance = nullptr;
 
-Application::Application(int width, int height, const char *title) : m_running(true), m_isMinimized(false)
+Application::Application(const ApplicationConfig &config) : m_running(true), m_isMinimized(false)
 // m_vulkanContext is not initialized here yet
 {
     if (s_instance) {
@@ -33,25 +35,18 @@ Application::Application(int width, int height, const char *title) : m_running(t
 
     EnginePaths::init();
 
-    m_platformContext = PlatformContext::create();
-
-    RP_CORE_INFO("Creating window...");
-    auto window = std::unique_ptr<WindowContext>(WindowContext::createWindow(*m_platformContext, width, height, title));
-
-    RP_CORE_INFO("Creating Vulkan context...");
-    m_vulkanContext = std::make_unique<VulkanContext>(window.get());
-
-    m_mainWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
-    m_vulkanContext->initDevice(m_mainWindow->getSurface());
-
-    m_mainWindow->createSwapChain(*m_vulkanContext);
-    m_framesInFlight = m_mainWindow->getSwapChain()->getImageCount();
-    RP_ASSERT(m_framesInFlight > 0, "the main window's swapchain reported no images");
+    if (config.mainWindow.has_value()) {
+        createMainWindowAndDevice(*config.mainWindow);
+    } else {
+        createHeadlessDevice();
+    }
 
     AssetManager::init(&m_telemetry, m_framesInFlight);
 
     m_vulkanContext->initManagers(m_framesInFlight);
-    m_mainWindow->getSwapChain()->invalidate();
+    if (m_mainWindow != nullptr) {
+        m_mainWindow->getSwapChain()->invalidate();
+    }
 
     TracyProfiler::init();
 
@@ -89,6 +84,36 @@ Application::Application(int width, int height, const char *title) : m_running(t
     AssetManager::registerBuiltinAssets();
 
     RP_CORE_INFO("========== Application created ==========");
+}
+
+void Application::createMainWindowAndDevice(const MainWindowConfig &config)
+{
+    m_platformContext = PlatformContext::create();
+
+    RP_CORE_INFO("Creating window...");
+    auto window = std::unique_ptr<WindowContext>(
+        WindowContext::createWindow(*m_platformContext, config.width, config.height, config.title.c_str()));
+
+    RP_CORE_INFO("Creating Vulkan context...");
+    const char **surfaceExtensions = window->getExtensions();
+    m_vulkanContext = std::make_unique<VulkanContext>(
+        std::vector<const char *>(surfaceExtensions, surfaceExtensions + window->getExtensionCount()));
+
+    m_mainWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
+    m_vulkanContext->initDevice(m_mainWindow->getSurface());
+
+    m_mainWindow->createSwapChain(*m_vulkanContext);
+    m_framesInFlight = m_mainWindow->getSwapChain()->getImageCount();
+    RP_ASSERT(m_framesInFlight > 0, "the main window's swapchain reported no images");
+}
+
+void Application::createHeadlessDevice()
+{
+    RP_CORE_INFO("Creating headless Vulkan context...");
+    m_vulkanContext = std::make_unique<VulkanContext>(std::vector<const char *>{});
+    m_vulkanContext->initDevice(VK_NULL_HANDLE);
+
+    m_framesInFlight = HEADLESS_FRAMES_IN_FLIGHT;
 }
 
 Application::~Application()
@@ -178,76 +203,84 @@ void Application::requestRelaunch(const std::filesystem::path &projectPath)
 
 void Application::run()
 {
-
     while (m_running) {
-        TracyProfiler::beginFrame();
-
-        Timestep::onUpdate();
-
-        // Flush queues before beginFrame to handle any work queued during initialization
-        m_vulkanContext->getComputeQueue()->flush();
-        m_vulkanContext->getGraphicsQueue()->flush();
-        m_vulkanContext->getTransferQueue()->flush();
-
-        m_vulkanContext->getRenderContext().commandPoolManager->beginFrame();
-
-        m_telemetryPollAccum += Timestep::deltaTime();
-        if (m_telemetryPollAccum >= 1.0f) {
-            m_telemetryPollAccum = 0.0f;
-            pollTelemetry();
-        }
-
-        AssetManager::onUpdate();
-
-        for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
-            if ((*it)->isAttached()) {
-                (*it)->onUpdate(Timestep::deltaTime());
-            }
-        }
-
-        m_project->onUpdate(Timestep::deltaTime());
-
-        m_viewportManager->drawAll();
-
-        for (auto it = m_layerStack.overlayBegin(); it != m_layerStack.overlayEnd(); ++it) {
-            if ((*it)->isAttached()) {
-                (*it)->onUpdate(Timestep::deltaTime());
-            }
-        }
-
-        m_mainWindow->onUpdate();
-
-        if (m_mainWindow->getWindowContext()->shouldClose()) {
-            m_running = false;
-        }
-
-        for (auto it = m_secondaryWindows.begin(); it != m_secondaryWindows.end();) {
-            if (!m_running || (*it)->getWindowContext()->shouldClose()) {
-                m_vulkanContext->waitIdle();
-                if ((*it)->onClose != nullptr) {
-                    (*it)->onClose();
-                }
-                it = m_secondaryWindows.erase(it);
-            } else {
-                if ((*it)->onFrame != nullptr) {
-                    (*it)->onFrame(**it);
-                }
-                ++it;
-            }
-        }
-
-        m_vulkanContext->getRenderContext().commandPoolManager->endFrame();
-
-        m_frameCount++;
-
-        TracyProfiler::endFrame();
+        runFrame();
     }
 
     m_vulkanContext->waitIdle();
 }
 
+void Application::runFrame()
+{
+    TracyProfiler::beginFrame();
+
+    Timestep::onUpdate();
+
+    // Flush queues before beginFrame to handle any work queued during initialization
+    m_vulkanContext->getComputeQueue()->flush();
+    m_vulkanContext->getGraphicsQueue()->flush();
+    m_vulkanContext->getTransferQueue()->flush();
+
+    m_vulkanContext->getRenderContext().commandPoolManager->beginFrame();
+
+    m_telemetryPollAccum += Timestep::deltaTime();
+    if (m_telemetryPollAccum >= 1.0f) {
+        m_telemetryPollAccum = 0.0f;
+        pollTelemetry();
+    }
+
+    AssetManager::onUpdate();
+
+    for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
+        if ((*it)->isAttached()) {
+            (*it)->onUpdate(Timestep::deltaTime());
+        }
+    }
+
+    m_project->onUpdate(Timestep::deltaTime());
+
+    m_viewportManager->drawAll();
+
+    for (auto it = m_layerStack.overlayBegin(); it != m_layerStack.overlayEnd(); ++it) {
+        if ((*it)->isAttached()) {
+            (*it)->onUpdate(Timestep::deltaTime());
+        }
+    }
+
+    if (m_mainWindow != nullptr) {
+        m_mainWindow->onUpdate();
+
+        if (m_mainWindow->getWindowContext()->shouldClose()) {
+            m_running = false;
+        }
+    }
+
+    for (auto it = m_secondaryWindows.begin(); it != m_secondaryWindows.end();) {
+        if (!m_running || (*it)->getWindowContext()->shouldClose()) {
+            m_vulkanContext->waitIdle();
+            if ((*it)->onClose != nullptr) {
+                (*it)->onClose();
+            }
+            it = m_secondaryWindows.erase(it);
+        } else {
+            if ((*it)->onFrame != nullptr) {
+                (*it)->onFrame(**it);
+            }
+            ++it;
+        }
+    }
+
+    m_vulkanContext->getRenderContext().commandPoolManager->endFrame();
+
+    m_frameCount++;
+
+    TracyProfiler::endFrame();
+}
+
 RenderWindow &Application::createSecondaryWindow(int32_t width, int32_t height, const char *title)
 {
+    RP_ASSERT(!isHeadless(), "a headless application cannot open windows");
+
     auto window = std::unique_ptr<WindowContext>(WindowContext::createWindow(*m_platformContext, width, height, title, true));
     auto renderWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
     renderWindow->createSwapChain(*m_vulkanContext);

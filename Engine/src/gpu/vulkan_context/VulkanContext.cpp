@@ -73,7 +73,7 @@ const bool enableValidationLayers = true;
 
 namespace Rapture {
 
-VulkanContext::VulkanContext(WindowContext *windowContext)
+VulkanContext::VulkanContext(const std::vector<const char *> &surfaceExtensions)
 {
 
     m_applicationInfo = {};
@@ -107,7 +107,9 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
         RP_CORE_INFO("Validation layers disabled!");
     }
 
-    m_deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    if (!surfaceExtensions.empty()) {
+        m_deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    }
     m_deviceExtensions.push_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME);
     m_deviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -130,7 +132,7 @@ VulkanContext::VulkanContext(WindowContext *windowContext)
     m_deviceExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 
     checkExtensionSupport();
-    createInstance(windowContext);
+    createInstance(surfaceExtensions);
     setupDebugMessenger();
 }
 
@@ -278,7 +280,7 @@ void VulkanContext::initManagers(uint32_t framesInFlight)
     m_renderContext.accelerationStructureBuilder = m_accelerationStructureBuilder.get();
 }
 
-void VulkanContext::createInstance(WindowContext *windowContext)
+void VulkanContext::createInstance(const std::vector<const char *> &surfaceExtensions)
 {
 
     if (enableValidationLayers && !checkValidationLayerSupport()) {
@@ -301,7 +303,7 @@ void VulkanContext::createInstance(WindowContext *windowContext)
     m_instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     m_instanceCreateInfo.pApplicationInfo = &m_applicationInfo;
 
-    auto extensions = getRequiredExtensions(windowContext);
+    auto extensions = getRequiredExtensions(surfaceExtensions);
     m_instanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     m_instanceCreateInfo.ppEnabledExtensionNames = extensions.data();
 
@@ -394,15 +396,16 @@ bool VulkanContext::checkDeviceExtensionSupport(VkPhysicalDevice device)
     return requiredExtensions.empty();
 }
 
-std::vector<const char *> VulkanContext::getRequiredExtensions(WindowContext *windowContext)
+std::vector<const char *> VulkanContext::getRequiredExtensions(const std::vector<const char *> &surfaceExtensions)
 {
-    uint32_t WCextensionCount = windowContext->getExtensionCount();
-    const char **WCextensions = windowContext->getExtensions();
-
-    std::vector<const char *> extensions(WCextensions, WCextensions + WCextensionCount);
+    std::vector<const char *> extensions = surfaceExtensions;
 
     if (enableValidationLayers) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+
+    if (surfaceExtensions.empty()) {
+        return extensions;
     }
 
 #ifdef RAPTURE_RUNTIME_WAYLAND_DETECTION
@@ -536,7 +539,7 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surfa
 
     // Check queue family indices
     QueueFamilyIndices indices = findQueueFamilies(device, surface);
-    if (!indices.isComplete()) {
+    if (!indices.isComplete(surface != VK_NULL_HANDLE)) {
         RP_CORE_WARN("GPU {0}: Queue families incomplete:", deviceProperties.deviceName);
         if (indices.familyIndices[GRAPHICS] == UINT32_MAX) {
             RP_CORE_WARN("\t- Graphics queue family not found");
@@ -581,9 +584,9 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surfa
         RP_CORE_INFO("GPU {0}: All required device extensions supported", deviceProperties.deviceName);
     }
 
-    // Check swap chain support
+    // Check swap chain support, which a device without a surface never uses
     bool swapChainAdequate = false;
-    if (extensionsSupported) {
+    if (surface != VK_NULL_HANDLE && extensionsSupported) {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, surface);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
 
@@ -600,7 +603,7 @@ bool VulkanContext::isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surfa
             RP_CORE_INFO("GPU {0}: Swap chain support adequate ({1} formats, {2} present modes)", deviceProperties.deviceName,
                          swapChainSupport.formats.size(), swapChainSupport.presentModes.size());
         }
-    } else {
+    } else if (surface != VK_NULL_HANDLE) {
         RP_CORE_WARN("GPU {0}: Cannot check swap chain support - extensions not supported", deviceProperties.deviceName);
         isDeviceSuitable = false;
     }
@@ -623,6 +626,11 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device, VkS
 {
     QueueFamilyIndices indices;
 
+    // a device without a surface never presents, so it has no present family
+    if (surface == VK_NULL_HANDLE) {
+        indices.familyIndices[PRESENT] = UINT32_MAX;
+    }
+
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
@@ -632,7 +640,7 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device, VkS
 
     int i = 0;
     for (const auto &queueFamily : queueFamilies) {
-        if (indices.isComplete()) {
+        if (indices.isComplete(surface != VK_NULL_HANDLE)) {
             break;
         }
 
@@ -674,20 +682,22 @@ QueueFamilyIndices VulkanContext::findQueueFamilies(VkPhysicalDevice device, VkS
             }
         }
 
-        VkBool32 presentSupport = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+        if (surface != VK_NULL_HANDLE) {
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
 
-        if (presentSupport) {
-            if (indices.familyIndices[PRESENT] == UINT32_MAX) {
-                indices.familyIndices[GRAPHICS] = i;
-                indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
-                queueIndicesUses[i]++;
-            } else if (PREFER_QUEUE_INDEX(PRESENT)) {
-                queueIndicesUses[indices.familyIndices[PRESENT]]--;
+            if (presentSupport) {
+                if (indices.familyIndices[PRESENT] == UINT32_MAX) {
+                    indices.familyIndices[GRAPHICS] = i;
+                    indices.familyQueueCounts[GRAPHICS] = queueFamily.queueCount;
+                    queueIndicesUses[i]++;
+                } else if (PREFER_QUEUE_INDEX(PRESENT)) {
+                    queueIndicesUses[indices.familyIndices[PRESENT]]--;
 
-                indices.familyIndices[PRESENT] = i;
-                indices.familyQueueCounts[PRESENT] = queueFamily.queueCount;
-                queueIndicesUses[i]++;
+                    indices.familyIndices[PRESENT] = i;
+                    indices.familyQueueCounts[PRESENT] = queueFamily.queueCount;
+                    queueIndicesUses[i]++;
+                }
             }
         }
 
