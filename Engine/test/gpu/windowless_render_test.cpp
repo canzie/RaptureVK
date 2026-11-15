@@ -24,12 +24,14 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <string_view>
 #include <vector>
 
 static constexpr uint32_t IMAGE_WIDTH = 128;
 static constexpr uint32_t IMAGE_HEIGHT = 128;
 static constexpr uint32_t CHANNEL_COUNT = 4;
 static constexpr uint32_t FRAMES_TO_RENDER = 4;
+static constexpr uint32_t FRAMES_TO_RENDER_WITH_GLOBAL_ILLUMINATION = 16;
 static constexpr float FRAME_DELTA_TIME = 1.0f / 60.0f;
 
 static constexpr glm::vec3 SPHERE_CENTRE = glm::vec3(0.0f);
@@ -70,72 +72,90 @@ static void s_writeHalfFloatImageAsPng(const std::vector<uint8_t> &pixels, const
                    static_cast<int>(CHANNEL_COUNT), bytes.data(), static_cast<int>(IMAGE_WIDTH * CHANNEL_COUNT));
 }
 
-class WindowlessRender : public WindowlessGpuTest {};
+class WindowlessRender : public WindowlessGpuTest {
+  protected:
+    /**
+     * @brief Renders a lit sphere offscreen, writes it as a png and checks it stands out from the background
+     * @param withGlobalIllumination Whether the viewport builds acceleration structures and renders DDGI
+     * @param imageName The png's file name under the temp directory's rapture_tests folder
+     */
+    void renderSphere(bool withGlobalIllumination, std::string_view imageName)
+    {
+        Rapture::Application &app = Rapture::Application::getInstance();
+        ASSERT_TRUE(app.isWindowless());
+
+        Rapture::Scene scene("WindowlessRender");
+        scene.active = true;
+
+        auto *sphere = scene.root()->add<Rapture::StaticMesh3D>("Sphere");
+        sphere->setMesh(Rapture::RE_PRIMITIVE_SPHERE_MESH);
+        sphere->setMaterial(0, Rapture::RE_DEFAULT_MATERIAL_INSTANCE);
+        sphere->setRayTraced(withGlobalIllumination);
+
+        auto *camera = scene.root()->add<Rapture::Camera3D>("Camera");
+        camera->setFieldOfView(CAMERA_FIELD_OF_VIEW);
+        camera->setNearPlane(CAMERA_NEAR_PLANE);
+        camera->setFarPlane(CAMERA_FAR_PLANE);
+
+        Rapture::CameraController controller(scene, "Camera Controller");
+        controller.setTickEnabled(false);
+        controller.possess(camera);
+        controller.focusOn(SPHERE_CENTRE, SPHERE_RADIUS, CAMERA_LOOK_DIRECTION);
+
+        auto *light = scene.root()->add<Rapture::DirectionalLight3D>("Light");
+        light->setRotation(LIGHT_ROTATION);
+        light->setColor(glm::vec3(1.0f));
+        light->setIntensity(LIGHT_INTENSITY);
+
+        Rapture::ViewportContext viewport = app.getViewportManager().createViewport({
+            .scene = &scene,
+            .camera = camera->accessor(),
+            .name = "WindowlessRender",
+            .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
+            .width = IMAGE_WIDTH,
+            .height = IMAGE_HEIGHT,
+            .framesInFlight = app.getFramesInFlight(),
+            .allowReadback = true,
+            .enableAccelerationStructures = withGlobalIllumination,
+        });
+        ASSERT_NE(viewport.viewport, nullptr);
+        viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
+        viewport.viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, withGlobalIllumination);
+
+        const uint32_t frameCount = withGlobalIllumination ? FRAMES_TO_RENDER_WITH_GLOBAL_ILLUMINATION : FRAMES_TO_RENDER;
+        for (uint32_t frame = 0; frame < frameCount; frame++) {
+            controller.onUpdate(FRAME_DELTA_TIME);
+            scene.onUpdate(FRAME_DELTA_TIME);
+            app.runFrame();
+        }
+        app.getVulkanContext().getGraphicsQueue()->flush();
+
+        uint32_t lastFrame = viewport.viewport->getLastRenderedFrameIndex();
+        ASSERT_NE(lastFrame, UINT32_MAX);
+
+        std::vector<uint8_t> pixels = viewport.viewport->getSceneRenderTarget()->getTexture(lastFrame)->readbackData();
+        ASSERT_EQ(pixels.size(), static_cast<size_t>(IMAGE_WIDTH) * IMAGE_HEIGHT * CHANNEL_COUNT * sizeof(uint16_t));
+
+        s_writeHalfFloatImageAsPng(pixels, std::filesystem::temp_directory_path() / "rapture_tests" / imageName);
+
+        glm::vec4 centre = s_readHalfFloatPixel(pixels, IMAGE_WIDTH / 2, IMAGE_HEIGHT / 2);
+        glm::vec4 corner = s_readHalfFloatPixel(pixels, 0, 0);
+        for (glm::length_t channel = 0; channel < 3; channel++) {
+            EXPECT_TRUE(std::isfinite(centre[channel]));
+            EXPECT_TRUE(std::isfinite(corner[channel]));
+        }
+        EXPECT_GT(glm::length(glm::vec3(centre) - glm::vec3(corner)), MIN_CENTRE_TO_CORNER_DIFFERENCE);
+
+        app.getViewportManager().destroyViewport(viewport);
+    }
+};
 
 TEST_F(WindowlessRender, SphereStandsOutFromTheBackground)
 {
-    Rapture::Application &app = Rapture::Application::getInstance();
-    ASSERT_TRUE(app.isWindowless());
+    renderSphere(false, "windowless_render_sphere.png");
+}
 
-    Rapture::Scene scene("WindowlessRender");
-    scene.active = true;
-
-    auto *sphere = scene.root()->add<Rapture::StaticMesh3D>("Sphere");
-    sphere->setMesh(Rapture::RE_PRIMITIVE_SPHERE_MESH);
-    sphere->setMaterial(0, Rapture::RE_DEFAULT_MATERIAL_INSTANCE);
-
-    auto *camera = scene.root()->add<Rapture::Camera3D>("Camera");
-    camera->setFieldOfView(CAMERA_FIELD_OF_VIEW);
-    camera->setNearPlane(CAMERA_NEAR_PLANE);
-    camera->setFarPlane(CAMERA_FAR_PLANE);
-
-    Rapture::CameraController controller(scene, "Camera Controller");
-    controller.setTickEnabled(false);
-    controller.possess(camera);
-    controller.focusOn(SPHERE_CENTRE, SPHERE_RADIUS, CAMERA_LOOK_DIRECTION);
-
-    auto *light = scene.root()->add<Rapture::DirectionalLight3D>("Light");
-    light->setRotation(LIGHT_ROTATION);
-    light->setColor(glm::vec3(1.0f));
-    light->setIntensity(LIGHT_INTENSITY);
-
-    Rapture::ViewportContext viewport = app.getViewportManager().createViewport({
-        .scene = &scene,
-        .camera = camera->accessor(),
-        .name = "WindowlessRender",
-        .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
-        .width = IMAGE_WIDTH,
-        .height = IMAGE_HEIGHT,
-        .framesInFlight = app.getFramesInFlight(),
-        .allowReadback = true,
-        .enableAccelerationStructures = false,
-    });
-    ASSERT_NE(viewport.viewport, nullptr);
-    viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
-    viewport.viewport->renderSettings().setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, false);
-
-    for (uint32_t frame = 0; frame < FRAMES_TO_RENDER; frame++) {
-        controller.onUpdate(FRAME_DELTA_TIME);
-        scene.onUpdate(FRAME_DELTA_TIME);
-        app.runFrame();
-    }
-    app.getVulkanContext().getGraphicsQueue()->flush();
-
-    uint32_t lastFrame = viewport.viewport->getLastRenderedFrameIndex();
-    ASSERT_NE(lastFrame, UINT32_MAX);
-
-    std::vector<uint8_t> pixels = viewport.viewport->getSceneRenderTarget()->getTexture(lastFrame)->readbackData();
-    ASSERT_EQ(pixels.size(), static_cast<size_t>(IMAGE_WIDTH) * IMAGE_HEIGHT * CHANNEL_COUNT * sizeof(uint16_t));
-
-    s_writeHalfFloatImageAsPng(pixels, std::filesystem::temp_directory_path() / "rapture_tests" / "windowless_render_sphere.png");
-
-    glm::vec4 centre = s_readHalfFloatPixel(pixels, IMAGE_WIDTH / 2, IMAGE_HEIGHT / 2);
-    glm::vec4 corner = s_readHalfFloatPixel(pixels, 0, 0);
-    for (glm::length_t channel = 0; channel < 3; channel++) {
-        EXPECT_TRUE(std::isfinite(centre[channel]));
-        EXPECT_TRUE(std::isfinite(corner[channel]));
-    }
-    EXPECT_GT(glm::length(glm::vec3(centre) - glm::vec3(corner)), MIN_CENTRE_TO_CORNER_DIFFERENCE);
-
-    app.getViewportManager().destroyViewport(viewport);
+TEST_F(WindowlessRender, SphereStandsOutWithGlobalIllumination)
+{
+    renderSphere(true, "windowless_render_sphere_global_illumination.png");
 }
