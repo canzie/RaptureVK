@@ -497,6 +497,7 @@ class NodeEditorPanel : public Panel {
 
     Rapture::EventSignal<void(Rapture::AssetHandle)> m_onMaterialSelectionChanged;
 
+    Rapture::AssetHandle m_material = Rapture::INVALID_ASSET_HANDLE;
     Rapture::EventListenerId m_serializeListener = 0;
 };
 
