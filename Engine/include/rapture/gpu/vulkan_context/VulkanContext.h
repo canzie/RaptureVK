@@ -36,6 +36,18 @@ class VulkanContext {
 
     void waitIdle();
 
+    /**
+     * @brief Lets a buffer be used from every queue family the queue roles run on
+     * @param createInfo The buffer's create info, its sharing mode and queue families are filled in
+     */
+    void shareAcrossQueueFamilies(VkBufferCreateInfo &createInfo) const;
+
+    /**
+     * @brief Lets an image be used from every queue family the queue roles run on
+     * @param createInfo The image's create info, its sharing mode and queue families are filled in
+     */
+    void shareAcrossQueueFamilies(VkImageCreateInfo &createInfo) const;
+
     VkDevice getLogicalDevice() const { return m_device; }
     VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
     VkInstance getInstance() const { return m_instance; }
@@ -169,6 +181,7 @@ class VulkanContext {
 
     QueueFamilyIndices m_queueFamilyIndices;
     QueueFamilyAssignment m_queueFamilyAssignment = QueueFamilyAssignment::ONE_FAMILY;
+    std::vector<uint32_t> m_sharedQueueFamilies;
 
     VmaAllocator m_vmaAllocator;
 

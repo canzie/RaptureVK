@@ -85,6 +85,7 @@ uint32_t GroundTruthAmbientOcclusionPass::occlusionHeight() const
 void GroundTruthAmbientOcclusionPass::createTextures()
 {
     TextureSpecification spec;
+    spec.graphicsQueueOnly = true;
     spec.width = occlusionWidth();
     spec.height = occlusionHeight();
     spec.format = TextureFormat::R16F;

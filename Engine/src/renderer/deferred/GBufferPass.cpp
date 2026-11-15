@@ -258,6 +258,7 @@ void GBufferPass::onResize(uint32_t width, uint32_t height)
 void GBufferPass::createTextures()
 {
     TextureSpecification normalSpec;
+    normalSpec.graphicsQueueOnly = true;
     normalSpec.width = static_cast<uint32_t>(m_width);
     normalSpec.height = static_cast<uint32_t>(m_height);
     normalSpec.format = TextureFormat::RGBA16F;
@@ -265,6 +266,7 @@ void GBufferPass::createTextures()
     normalSpec.srgb = false;
 
     TextureSpecification albedoSpec;
+    albedoSpec.graphicsQueueOnly = true;
     albedoSpec.width = static_cast<uint32_t>(m_width);
     albedoSpec.height = static_cast<uint32_t>(m_height);
     albedoSpec.format = TextureFormat::RGBA8;
@@ -272,6 +274,7 @@ void GBufferPass::createTextures()
     albedoSpec.srgb = true;
 
     TextureSpecification materialSpec;
+    materialSpec.graphicsQueueOnly = true;
     materialSpec.width = static_cast<uint32_t>(m_width);
     materialSpec.height = static_cast<uint32_t>(m_height);
     materialSpec.format = TextureFormat::RGBA8;
@@ -279,6 +282,7 @@ void GBufferPass::createTextures()
     materialSpec.srgb = false;
 
     TextureSpecification shadingModelSpec;
+    shadingModelSpec.graphicsQueueOnly = true;
     shadingModelSpec.width = static_cast<uint32_t>(m_width);
     shadingModelSpec.height = static_cast<uint32_t>(m_height);
     shadingModelSpec.format = TextureFormat::RGBA8;

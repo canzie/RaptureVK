@@ -212,7 +212,7 @@ BufferArena::BufferArena(uint32_t id, VmaAllocator allocator, VkDeviceSize arena
     bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferCreateInfo.size = arenaSize;
     bufferCreateInfo.usage = usageFlags;
-    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    Application::getInstance().getVulkanContext().shareAcrossQueueFamilies(bufferCreateInfo);
 
     VmaAllocationCreateInfo allocCreateInfo{};
     switch (usage) {

@@ -49,6 +49,7 @@ void SceneRenderTarget::createOffscreenTextures(uint32_t width, uint32_t height,
     m_offscreenTextures.reserve(imageCount);
 
     TextureSpecification spec;
+    spec.graphicsQueueOnly = true;
     spec.width = width;
     spec.height = height;
     spec.depth = 1;

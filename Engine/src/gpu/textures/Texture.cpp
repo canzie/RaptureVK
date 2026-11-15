@@ -318,29 +318,46 @@ void Texture::uploadDataAsync(std::vector<uint8_t> data, Counter *completionCoun
             memcpy(mapped, pixelData->data(), static_cast<size_t>(imageSize));
             vmaUnmapMemory(allocator, stagingAllocation);
 
-            CommandBufferLease commandBufferLease =
+            auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
+
+            CommandBufferLease copyCommandBufferLease =
                 Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getTransferQueueIndex());
-            CommandBuffer *commandBuffer = commandBufferLease.get();
+            CommandBuffer *copyCommandBuffer = copyCommandBufferLease.get();
 
-            commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+            copyCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-            texturePtr->recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_UNDEFINED,
+            texturePtr->recordTransitionImageLayout(copyCommandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_UNDEFINED,
                                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            texturePtr->recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), stagingBuffer, texturePtr->m_spec.width,
+            texturePtr->recordCopyBufferToImage(copyCommandBuffer->getCommandBufferVk(), stagingBuffer, texturePtr->m_spec.width,
                                                 texturePtr->m_spec.height);
 
+            copyCommandBuffer->end();
+
+            uint64_t copiedValue = transferQueue->submitQueue(copyCommandBuffer);
+
+            // mip generation blits, which a transfer queue cannot do, and the graphics queue waiting on the copy
+            // is what orders the texture before the frames that sample it
+            CommandBufferLease finishCommandBufferLease = s_leaseGraphicsCommandBuffer();
+            CommandBuffer *finishCommandBuffer = finishCommandBufferLease.get();
+
+            finishCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
             if (texturePtr->m_spec.mipLevels > 1) {
-                texturePtr->recordGenerateMipmaps(commandBuffer->getCommandBufferVk());
+                texturePtr->recordGenerateMipmaps(finishCommandBuffer->getCommandBufferVk());
             } else {
-                texturePtr->recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                texturePtr->recordTransitionImageLayout(finishCommandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
 
-            commandBuffer->end();
+            finishCommandBuffer->end();
 
-            uint64_t signalValue = transferQueue->addToBatch(commandBuffer);
+            SemaphoreWait copyWait{.semaphore = transferQueue->getTimelineSemaphore(),
+                                   .value = copiedValue,
+                                   .stageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT};
+            uint64_t signalValue = graphicsQueue->submitQueue(
+                finishCommandBuffer, SubmitSynchronization{.waits = std::span<const SemaphoreWait>(&copyWait, 1)});
 
-            TimelineSemaphore semaphoreWrapper(transferQueue->getTimelineSemaphore());
+            TimelineSemaphore semaphoreWrapper(graphicsQueue->getTimelineSemaphore());
             Counter gpuCounter;
             gpuCounter.increment();
 
@@ -981,7 +998,11 @@ void Texture::createImage()
             imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
         }
     }
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (m_spec.graphicsQueueOnly) {
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    } else {
+        Application::getInstance().getVulkanContext().shareAcrossQueueFamilies(imageInfo);
+    }
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.flags = isCubeType(m_spec.type) ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
 

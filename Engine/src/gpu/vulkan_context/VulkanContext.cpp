@@ -192,6 +192,34 @@ VulkanContext::~VulkanContext()
     RP_CORE_INFO("Destroyed Vulkan Context!");
 }
 
+void VulkanContext::shareAcrossQueueFamilies(VkBufferCreateInfo &createInfo) const
+{
+    if (m_sharedQueueFamilies.size() < 2) {
+        createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.queueFamilyIndexCount = 0;
+        createInfo.pQueueFamilyIndices = nullptr;
+        return;
+    }
+
+    createInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    createInfo.queueFamilyIndexCount = static_cast<uint32_t>(m_sharedQueueFamilies.size());
+    createInfo.pQueueFamilyIndices = m_sharedQueueFamilies.data();
+}
+
+void VulkanContext::shareAcrossQueueFamilies(VkImageCreateInfo &createInfo) const
+{
+    if (m_sharedQueueFamilies.size() < 2) {
+        createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.queueFamilyIndexCount = 0;
+        createInfo.pQueueFamilyIndices = nullptr;
+        return;
+    }
+
+    createInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    createInfo.queueFamilyIndexCount = static_cast<uint32_t>(m_sharedQueueFamilies.size());
+    createInfo.pQueueFamilyIndices = m_sharedQueueFamilies.data();
+}
+
 void VulkanContext::waitIdle()
 {
     std::vector<std::unique_lock<std::mutex>> locks(m_queues.size());
@@ -1262,6 +1290,14 @@ void VulkanContext::createLogicalDevice(VkSurfaceKHR surface)
 {
 
     m_queueFamilyIndices = findQueueFamilies(m_physicalDevice, surface);
+
+    m_sharedQueueFamilies.clear();
+    for (QueueFamilyIndex role : {GRAPHICS, COMPUTE, TRANSFER}) {
+        uint32_t family = m_queueFamilyIndices.familyIndices[role];
+        if (std::find(m_sharedQueueFamilies.begin(), m_sharedQueueFamilies.end(), family) == m_sharedQueueFamilies.end()) {
+            m_sharedQueueFamilies.push_back(family);
+        }
+    }
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
         m_queueFamilyIndices.familyIndices[GRAPHICS], m_queueFamilyIndices.familyIndices[PRESENT],

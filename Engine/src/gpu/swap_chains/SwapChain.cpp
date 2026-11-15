@@ -172,6 +172,7 @@ void SwapChain::createImageViews()
 void SwapChain::createDepthTexture()
 {
     TextureSpecification depthSpec{};
+    depthSpec.graphicsQueueOnly = true;
     depthSpec.type = TextureType::TEXTURE2D;
     depthSpec.format = TextureFormat::D32F;
     depthSpec.width = m_swapChainExtent.width;

@@ -167,7 +167,7 @@ void Buffer::createBuffer()
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = m_Size;
     bufferInfo.usage = m_usageFlags;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    Application::getInstance().getVulkanContext().shareAcrossQueueFamilies(bufferInfo);
 
     VmaAllocationCreateInfo allocInfo = {};
 

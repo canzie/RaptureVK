@@ -76,6 +76,7 @@ void DrawManager::createSharedTextures()
     m_sceneColorHdrTextures.clear();
 
     TextureSpecification depthSpec;
+    depthSpec.graphicsQueueOnly = true;
     depthSpec.width = m_config.width;
     depthSpec.height = m_config.height;
     depthSpec.format = TextureFormat::D24S8;
@@ -83,6 +84,7 @@ void DrawManager::createSharedTextures()
     depthSpec.srgb = false;
 
     TextureSpecification colorSpec;
+    colorSpec.graphicsQueueOnly = true;
     colorSpec.width = m_config.width;
     colorSpec.height = m_config.height;
     colorSpec.format = TextureFormat::RGBA16F;
