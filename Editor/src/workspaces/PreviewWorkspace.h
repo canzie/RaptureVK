@@ -9,6 +9,8 @@
  */
 class PreviewWorkspace : public AssetWorkspace {
   public:
+    ~PreviewWorkspace() override;
+
     void onUpdate(float dt) override;
 
   protected:

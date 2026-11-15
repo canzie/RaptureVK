@@ -1,26 +1,30 @@
-#ifndef RAPTURE__LEVEL_EDITOR_WORKSPACE_H
-#define RAPTURE__LEVEL_EDITOR_WORKSPACE_H
+#ifndef RAPTURE__WORLD_EDITOR_WORKSPACE_H
+#define RAPTURE__WORLD_EDITOR_WORKSPACE_H
 
-#include "Workspace.h"
-#include <assets/worlds/AWorld.h>
+#include "AssetWorkspace.h"
 
 #include <assets/asset_manager/Asset.h>
+#include <assets/worlds/AWorld.h>
 #include <components/context_menu.h>
 #include <core/events/EventSignal.h>
-#include <memory>
-#include <scene/World.h>
 #include <renderer/viewport/Viewport.h>
+#include <scene/World.h>
 
 class PlayLayer;
 
-class LevelEditorWorkspace : public Workspace {
+/**
+ * @brief The workspace one world is built and played in
+ */
+class WorldEditorWorkspace : public AssetWorkspace {
   public:
-    LevelEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services, Rapture::Ref<Rapture::AWorld> world);
-    ~LevelEditorWorkspace() override;
+    WorldEditorWorkspace(const EditorContext &context, Rapture::Ref<Rapture::AWorld> world);
+    ~WorldEditorWorkspace() override;
 
-    void saveLayout() override;
+    std::string_view tabIcon() const override;
 
-    static constexpr std::string_view staticKind() { return "levelEditor"; }
+  protected:
+    void build() override;
+    void buildHotbar() override;
 
   private:
     /**
@@ -28,13 +32,11 @@ class LevelEditorWorkspace : public Workspace {
      */
     void setupViewport();
 
-    void setupHotbar();
-
     /**
      * @brief Builds the play, pause and step buttons into one hotbar item
-     * @param layoutOrder Where the group sits among the hotbar's items
+     * @param group The hotbar item the buttons go in
      */
-    void setupPlayControls(uint32_t layoutOrder);
+    void setupPlayControls(Amethyst::Frame &group);
 
     /**
      * @brief Offers this workspace's commands for as long as the cursor is over it
@@ -76,6 +78,7 @@ class LevelEditorWorkspace : public Workspace {
 
   private:
     Amethyst::ContextMenu *m_addMenu = nullptr;
+    Amethyst::TextButton *m_addButton = nullptr;
     Amethyst::ImageButton *m_playButton = nullptr;
     Amethyst::ImageButton *m_pauseButton = nullptr;
     Amethyst::ImageButton *m_stepButton = nullptr;
@@ -86,4 +89,4 @@ class LevelEditorWorkspace : public Workspace {
     Rapture::ViewportContext m_viewport;
 };
 
-#endif // RAPTURE__LEVEL_EDITOR_WORKSPACE_H
+#endif // RAPTURE__WORLD_EDITOR_WORKSPACE_H

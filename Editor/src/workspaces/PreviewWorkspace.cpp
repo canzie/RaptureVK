@@ -7,6 +7,11 @@ PreviewWorkspace::PreviewWorkspace(const EditorContext &context, Rapture::AssetH
     m_context.scene = m_preview.scene();
 }
 
+PreviewWorkspace::~PreviewWorkspace()
+{
+    destroyPanels();
+}
+
 void PreviewWorkspace::onUpdate(float dt)
 {
     Workspace::onUpdate(dt);

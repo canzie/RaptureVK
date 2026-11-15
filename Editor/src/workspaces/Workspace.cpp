@@ -24,6 +24,11 @@ Workspace::Workspace(const EditorContext &context) : m_editor(context)
 
 Workspace::~Workspace()
 {
+    destroyPanels();
+}
+
+void Workspace::destroyPanels()
+{
     m_teardown = true;
     m_panels.clear();
 }
@@ -99,7 +104,11 @@ void Workspace::adoptPanel(std::unique_ptr<Panel> panel, Amethyst::TabBar *tabBa
     RP_ASSERT(tabBar != nullptr, "a panel needs a bar to be docked into");
 
     panel->setContext(m_context);
-    panel->attach(tabBar);
+    if (panel->root() == nullptr) {
+        panel->attach(tabBar);
+    } else {
+        panel->moveTo(tabBar);
+    }
     m_panels.push_back(std::move(panel));
 
     tabBar->onSelectionChanged = [this](int32_t) {

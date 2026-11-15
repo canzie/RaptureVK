@@ -16,9 +16,11 @@ class TextEditorPanel;
  */
 class ScriptingWorkspace : public Workspace {
   public:
+    static constexpr std::string_view LABEL = "Scripting";
+
     explicit ScriptingWorkspace(const EditorContext &context);
 
-    std::string_view tabLabel() const override { return "Scripting"; }
+    std::string_view tabLabel() const override { return LABEL; }
     std::string_view tabIcon() const override;
 
     /**

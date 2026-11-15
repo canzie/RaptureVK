@@ -5,15 +5,16 @@
 
 class AnimationsWorkspace : public Workspace {
   public:
-    AnimationsWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services) : Workspace(staticKind())
-    {
-        m_context.services = services;
-        setupBase(tabBar, "Animations", {});
-    }
+    static constexpr std::string_view LABEL = "Animations";
 
-    void saveLayout() override {}
+    explicit AnimationsWorkspace(const EditorContext &context) : Workspace(context) {}
 
-    static constexpr std::string_view staticKind() { return "animations"; }
+    std::string_view tabLabel() const override { return LABEL; }
+
+  protected:
+    void build() override {}
+    void buildHotbar() override {}
+    std::string dockLayoutName() const override { return "Animations Dock"; }
 };
 
 #endif // RAPTURE__ANIMATIONS_WORKSPACE_H

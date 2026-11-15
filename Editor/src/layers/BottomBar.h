@@ -1,6 +1,7 @@
 #ifndef RAPTURE__BOTTOM_BAR_H
 #define RAPTURE__BOTTOM_BAR_H
 
+#include "context/EditorContext.h"
 #include "workspaces/Workspace.h"
 #include <amethyst/Amethyst.h>
 
@@ -10,7 +11,7 @@ class ContentBrowserPanel;
 
 class BottomBar {
   public:
-    BottomBar(Amethyst::Window *window, const PanelServices &services);
+    BottomBar(Amethyst::Window *window, const EditorContext &context);
     ~BottomBar();
     BottomBar(const BottomBar &) = delete;
     BottomBar &operator=(const BottomBar &) = delete;
@@ -23,8 +24,13 @@ class BottomBar {
     void setupContentBrowserToggle(void);
     void toggleContentBrowser(void);
 
+    /**
+     * @brief Moves the floating content browser into the current workspace's layout
+     */
+    void dockContentBrowser(void);
+
   private:
-    PanelServices m_services;
+    EditorContext m_editor;
     Workspace *m_currWorkspace = nullptr;
     Amethyst::Window *m_window = nullptr;
     Amethyst::Frame *m_root = nullptr;

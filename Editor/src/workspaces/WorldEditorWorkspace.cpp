@@ -1,8 +1,7 @@
-#include "LevelEditorWorkspace.h"
-#include <assets/worlds/AWorld.h>
+#include "WorldEditorWorkspace.h"
 
 #include "Icons.h"
-#include "layers/EditorLayout.h"
+#include "app/EditorConfig.h"
 #include "layers/PlayLayer.h"
 #include "panels/AddSceneObjectMenu.h"
 #include "panels/ImagePreviewPanel.h"
@@ -10,20 +9,22 @@
 #include "panels/PropertiesPanel.h"
 #include "panels/ViewportPanel.h"
 #include "panels/WorldSettingsPanel.h"
+#include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
 
+#include <app/Application.h>
+#include <app/Layer.h>
 #include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
-#include <app/Layer.h>
+#include <core/utils/rp_assert.h>
 #include <scene/Scene.h>
 #include <scene/instances/Instance.h>
-#include <core/utils/rp_assert.h>
-#include <app/Application.h>
 
-static constexpr float HOTBAR_BUTTON_WIDTH = 90.0f;
 static constexpr float PLAY_CONTROL_SCALE = 0.7f;
 static constexpr float PLAY_CONTROL_GAP = 6.0f;
+static constexpr float OUTLINER_SPLIT = 0.25f;
+static constexpr float VIEWPORT_SPLIT = 0.65f;
 static constexpr uint32_t INITIAL_VIEWPORT_WIDTH = 1280;
 static constexpr uint32_t INITIAL_VIEWPORT_HEIGHT = 720;
 static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
@@ -34,74 +35,28 @@ static void s_setButtonGuiState(Amethyst::ImageButton &button, uint16_t state, b
     button.setGuiState(static_cast<uint16_t>(on ? (current | state) : (current & ~state)));
 }
 
-LevelEditorWorkspace::LevelEditorWorkspace(Amethyst::TabBar &tabBar, const PanelServices &services,
-                                           Rapture::Ref<Rapture::AWorld> world)
-    : Workspace(staticKind()), m_world(std::move(world))
+WorldEditorWorkspace::WorldEditorWorkspace(const EditorContext &context, Rapture::Ref<Rapture::AWorld> world)
+    : AssetWorkspace(context, world.get()->handle()), m_world(std::move(world))
 {
-    RP_ASSERT(m_world, "a level editor has nothing to edit without a world");
+    RP_ASSERT(m_world, "a world editor has nothing to edit without a world");
 
-    m_context.services = services;
     m_context.world = m_world.operator->();
     m_context.scene = m_world->getScene();
     setupViewport();
-    setupBase(tabBar, "Level Editor", {});
-
-    m_dockingLayer->name = "Editor Dock";
-    m_dockingLayer->tabBarClasses = {"panel", "panel-tab"};
-
-    Amethyst::TabBar *viewportTabBar = nullptr;
-    Amethyst::TabBar *outlinerTabBar = nullptr;
-    Amethyst::TabBar *propertiesTabBar = nullptr;
-
-    Amethyst::DockScope(*m_dockingLayer)
-        .split(
-            Amethyst::SplitAxis::VERTICAL, 0.25f,
-            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { outlinerTabBar = &tb.component; }); },
-            [&](Amethyst::DockScope &r) {
-                r.split(
-                    Amethyst::SplitAxis::HORIZONTAL, 0.65f,
-                    [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
-                    [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
-            });
-
-    if (viewportTabBar != nullptr) {
-        auto viewportPanel = std::make_unique<ViewportPanel>(viewportTabBar, m_context);
-        m_viewportClickedConn = viewportPanel->onImageClicked.connect([this]() {
-            if (m_playLayer != nullptr && isPlaying()) {
-                m_playLayer->takeControl();
-            }
-        });
-        m_panels.push_back(std::move(viewportPanel));
-    }
-    if (outlinerTabBar != nullptr) {
-        m_panels.push_back(std::make_unique<OutlinerPanel>(outlinerTabBar, m_context));
-    }
-    if (propertiesTabBar != nullptr) {
-        m_panels.push_back(std::make_unique<PropertiesPanel>(propertiesTabBar, m_context));
-        m_panels.push_back(std::make_unique<WorldSettingsPanel>(propertiesTabBar, m_context));
-        m_panels.push_back(
-            std::make_unique<ImagePreviewPanel>(propertiesTabBar, m_context, "Texture Viewer", ImagePreviewMode::ASSET_PICKER));
-    }
-
-    setupHotbar();
-    setupShortcuts();
-
-    if (Amethyst::LayoutConfig::instance().loadFromFile("layout.conf")) {
-        if (auto *entry = Amethyst::LayoutConfig::instance().get("Editor Dock")) {
-            if (entry->type == Amethyst::ConfigType::DOCK_LAYOUT) {
-                m_dockingLayer->applyConfig(entry->dockLayout);
-            }
-        }
-    }
 }
 
-LevelEditorWorkspace::~LevelEditorWorkspace()
+WorldEditorWorkspace::~WorldEditorWorkspace()
 {
-    m_panels.clear();
+    destroyPanels();
     Rapture::Application::getInstance().getViewportManager().destroyViewport(m_viewport);
 }
 
-void LevelEditorWorkspace::setupViewport()
+std::string_view WorldEditorWorkspace::tabIcon() const
+{
+    return Asset_iconForType(Rapture::ASSET_WORLD);
+}
+
+void WorldEditorWorkspace::setupViewport()
 {
     auto &app = Rapture::Application::getInstance();
 
@@ -118,127 +73,123 @@ void LevelEditorWorkspace::setupViewport()
     m_context.viewport = m_viewport.viewport;
 }
 
-void LevelEditorWorkspace::setupHotbar()
+void WorldEditorWorkspace::build()
 {
-    if (m_hotbar == nullptr) {
-        return;
-    }
+    Amethyst::TabBar *viewportTabBar = nullptr;
+    Amethyst::TabBar *outlinerTabBar = nullptr;
+    Amethyst::TabBar *propertiesTabBar = nullptr;
 
-    auto *layout = m_hotbar->addExtension<Amethyst::UIListLayout>();
-    layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-    layout->innerPadding = Amethyst::UDim::fromOffset(EDITOR_HOTBAR_PADDING);
+    Amethyst::DockScope(*m_contentDock)
+        .split(
+            Amethyst::SplitAxis::VERTICAL, OUTLINER_SPLIT,
+            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { outlinerTabBar = &tb.component; }); },
+            [&](Amethyst::DockScope &r) {
+                r.split(
+                    Amethyst::SplitAxis::HORIZONTAL, VIEWPORT_SPLIT,
+                    [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
+                    [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
+            });
+
+    auto *viewportPanel = addPanel(std::make_unique<ViewportPanel>(m_context), viewportTabBar);
+    m_viewportClickedConn = viewportPanel->onImageClicked.connect([this]() {
+        if (m_playLayer != nullptr && isPlaying()) {
+            m_playLayer->takeControl();
+        }
+    });
+
+    addPanel(std::make_unique<OutlinerPanel>(m_context), outlinerTabBar);
+    addPanel(std::make_unique<PropertiesPanel>(m_context), propertiesTabBar);
+    addPanel(std::make_unique<WorldSettingsPanel>(m_context), propertiesTabBar);
+    addPanel(std::make_unique<ImagePreviewPanel>(m_context, "Texture Viewer", ImagePreviewMode::ASSET_PICKER), propertiesTabBar);
 
     m_addMenu = m_container->add<Amethyst::ContextMenu>();
-    m_addMenu->setRowFactories({.separator = [] { return std::make_unique<ViewportContextMenuSIV>(); }});
+    m_addMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
 
-    Amethyst::UIScope(*m_hotbar).textButton(
-        {.classes = {"generic-text-button"},
-         .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 0.6f, 0.0f)},
-         .text = {.fontSize = 14.0f},
-         .label = "Add"},
-        [this](Amethyst::TextButtonScope &b) {
-            b.component.onMouseButton1ClickCb = [this, button = &b.component]() {
-                showAddMenu(*button);
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
-
-    addHotbarSeparator(1);
-
-    Amethyst::UIScope(*m_hotbar).textButton(
-        {.classes = {"generic-text-button"},
-         .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, HOTBAR_BUTTON_WIDTH, 0.6f, 0.0f)},
-         .text = {.fontSize = 14.0f},
-         .label = "Save World"},
-        [this](Amethyst::TextButtonScope &b) {
-            b.component.onMouseButton1ClickCb = [this]() {
-                saveWorld();
-                return Amethyst::EventResult::CONSUMED;
-            };
-        });
-
-    addHotbarSeparator(3);
-    setupPlayControls(4);
+    setupShortcuts();
 }
 
-void LevelEditorWorkspace::setupPlayControls(uint32_t layoutOrder)
+void WorldEditorWorkspace::buildHotbar()
 {
-    const float buttonSize = EDITOR_HOTBAR_HEIGHT * PLAY_CONTROL_SCALE;
+    m_addButton = addHotbarButton("Add", [this]() { showAddMenu(*m_addButton); });
+
+    addHotbarSeparator();
+    addHotbarButton("Save World", [this]() { saveWorld(); });
+    addHotbarSeparator();
+
+    const float buttonSize = config().getUnscaledFloat(EDITOR_CONFIG_HOTBAR_HEIGHT) * PLAY_CONTROL_SCALE;
     const float groupWidth = 3.0f * buttonSize + 2.0f * PLAY_CONTROL_GAP;
+    addHotbarItem(groupWidth, [this](Amethyst::UIScope &slot) { setupPlayControls(*slot.get().as<Amethyst::Frame>()); });
+}
 
-    Amethyst::UIScope(*m_hotbar).frame(
+void WorldEditorWorkspace::setupPlayControls(Amethyst::Frame &group)
+{
+    Amethyst::UIScope controls(group);
+
+    auto *layout = group.addExtension<Amethyst::UIListLayout>();
+    layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+    layout->innerPadding = Amethyst::UDim::fromOffset(PLAY_CONTROL_GAP);
+
+    controls.imageButton(
         {
-            .base = {.layoutOrder = layoutOrder, .size = Amethyst::UDim2(0.0f, groupWidth, 1.0f, 0.0f)},
-            .style = {.backgroundTransparency = 1.0f},
+            .classes = {"generic-text-button", "play-button"},
+            .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
+            .svg = Icons::SVG_PLAY,
         },
-        [this](Amethyst::FrameScope &controls) {
-            auto *layout = controls.component.addExtension<Amethyst::UIListLayout>();
-            layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-            layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-            layout->innerPadding = Amethyst::UDim::fromOffset(PLAY_CONTROL_GAP);
+        [this](Amethyst::ImageButtonScope &b) {
+            m_playButton = &b.component;
+            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
+            b.component.onMouseButton1ClickCb = [this]() {
+                if (isPlaying()) {
+                    stopPlay();
+                } else {
+                    startPlay();
+                }
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
 
-            controls.imageButton(
-                {
-                    .classes = {"generic-text-button", "play-button"},
-                    .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
-                    .svg = Icons::SVG_PLAY,
-                },
-                [this](Amethyst::ImageButtonScope &b) {
-                    m_playButton = &b.component;
-                    b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-                    b.component.onMouseButton1ClickCb = [this]() {
-                        if (isPlaying()) {
-                            stopPlay();
-                        } else {
-                            startPlay();
-                        }
-                        return Amethyst::EventResult::CONSUMED;
-                    };
-                });
+    controls.imageButton(
+        {
+            .classes = {"generic-text-button"},
+            .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
+            .svg = Icons::SVG_PAUSE,
+        },
+        [this](Amethyst::ImageButtonScope &b) {
+            m_pauseButton = &b.component;
+            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
+            b.component.onMouseButton1ClickCb = [this]() {
+                togglePause();
+                return Amethyst::EventResult::CONSUMED;
+            };
+        });
 
-            controls.imageButton(
-                {
-                    .classes = {"generic-text-button"},
-                    .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
-                    .svg = Icons::SVG_PAUSE,
-                },
-                [this](Amethyst::ImageButtonScope &b) {
-                    m_pauseButton = &b.component;
-                    b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-                    b.component.onMouseButton1ClickCb = [this]() {
-                        togglePause();
-                        return Amethyst::EventResult::CONSUMED;
-                    };
-                });
-
-            controls.imageButton(
-                {
-                    .classes = {"generic-text-button"},
-                    .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
-                    .svg = Icons::SVG_FRAME_ADVANCE,
-                },
-                [this](Amethyst::ImageButtonScope &b) {
-                    m_stepButton = &b.component;
-                    b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-                });
+    controls.imageButton(
+        {
+            .classes = {"generic-text-button"},
+            .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
+            .svg = Icons::SVG_FRAME_ADVANCE,
+        },
+        [this](Amethyst::ImageButtonScope &b) {
+            m_stepButton = &b.component;
+            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
         });
 }
 
-void LevelEditorWorkspace::setupShortcuts()
+void WorldEditorWorkspace::setupShortcuts()
 {
-    const PanelServices &services = m_context.services;
+    ShortcutRegistry *shortcuts = m_editor.shortcuts;
 
-    services.registerShortcut(EDITOR_COMMAND_PLAY_MODE_TOGGLE_CONTROL, {Rapture::KEY_F8}, m_container, [this]() {
+    shortcuts->registerShortcut(EDITOR_COMMAND_PLAY_MODE_TOGGLE_CONTROL, {Rapture::KEY_F8}, m_container, [this]() {
         if (m_playLayer != nullptr && isPlaying()) {
             m_playLayer->toggleControl();
         }
     });
 
-    services.registerShortcut(EDITOR_COMMAND_PLAY_MODE_STOP, {Rapture::KEY_ESCAPE}, m_container, [this]() { stopPlay(); });
+    shortcuts->registerShortcut(EDITOR_COMMAND_PLAY_MODE_STOP, {Rapture::KEY_ESCAPE}, m_container, [this]() { stopPlay(); });
 }
 
-void LevelEditorWorkspace::togglePause()
+void WorldEditorWorkspace::togglePause()
 {
     if (!isPlaying()) {
         return;
@@ -253,7 +204,7 @@ void LevelEditorWorkspace::togglePause()
     syncPlayButtons();
 }
 
-void LevelEditorWorkspace::syncPlayButtons()
+void WorldEditorWorkspace::syncPlayButtons()
 {
     const bool playing = isPlaying();
     m_playButton->setSvg(playing ? Icons::SVG_STOP : Icons::SVG_PLAY);
@@ -264,7 +215,7 @@ void LevelEditorWorkspace::syncPlayButtons()
     s_setButtonGuiState(*m_pauseButton, Amethyst::GUI_STATE_ACTIVE, paused);
 }
 
-void LevelEditorWorkspace::startPlay()
+void WorldEditorWorkspace::startPlay()
 {
     if (m_context.viewport == nullptr || isPlaying()) {
         return;
@@ -285,7 +236,7 @@ void LevelEditorWorkspace::startPlay()
     syncPlayButtons();
 }
 
-void LevelEditorWorkspace::stopPlay()
+void WorldEditorWorkspace::stopPlay()
 {
     if (!isPlaying()) {
         return;
@@ -302,7 +253,7 @@ void LevelEditorWorkspace::stopPlay()
     syncPlayButtons();
 }
 
-void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
+void WorldEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
 {
     if (m_addMenu == nullptr) {
         return;
@@ -312,7 +263,7 @@ void LevelEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
     m_addMenu->showAt({button.absolutePosition.x, button.absolutePosition.y + button.absoluteSize.y});
 }
 
-void LevelEditorWorkspace::saveWorld()
+void WorldEditorWorkspace::saveWorld()
 {
     auto &project = Rapture::Application::getInstance().getProject();
     if (!project.saveWorld(m_world.get()->handle())) {
@@ -320,9 +271,4 @@ void LevelEditorWorkspace::saveWorld()
     }
 
     project.saveProject(project.getProjectFilePath());
-}
-
-void LevelEditorWorkspace::saveLayout()
-{
-    Amethyst::LayoutConfig::instance().set(m_dockingLayer->name, Amethyst::ConfigEntry(m_dockingLayer->saveConfig()));
 }

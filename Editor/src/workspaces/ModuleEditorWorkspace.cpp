@@ -45,7 +45,7 @@ ModuleEditorWorkspace::ModuleEditorWorkspace(const EditorContext &context, Raptu
 
 ModuleEditorWorkspace::~ModuleEditorWorkspace()
 {
-    m_panels.clear();
+    destroyPanels();
 
     Rapture::Application::getInstance().getViewportManager().destroyViewport(m_viewport);
     m_viewport = {};

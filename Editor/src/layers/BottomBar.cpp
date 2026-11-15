@@ -1,9 +1,7 @@
 #include "layers/BottomBar.h"
 
-#include "layers/EditorLayout.h"
+#include "app/EditorConfig.h"
 #include "panels/ContentBrowserPanel.h"
-
-#include <scene/World.h>
 
 #include <components/common.h>
 #include <components/popup.h>
@@ -14,14 +12,11 @@ static constexpr float BOTTOM_BAR_PADDING = 4.0f;
 static constexpr float CONTENT_BROWSER_BUTTON_WIDTH = 150.0f;
 static constexpr float SEARCHBAR_CONTAINER_WIDTH = 400.0f;
 
-static Rapture::Scene *s_workspaceScene(Workspace *workspace)
-{
-    return workspace != nullptr ? workspace->getContext().scene : nullptr;
-}
-
 static bool s_workspaceContainsContentBrowserPanel(Workspace *workspace)
 {
-    if (workspace == nullptr) return false;
+    if (workspace == nullptr) {
+        return false;
+    }
 
     for (const auto &panel : workspace->getPanels()) {
         if (dynamic_cast<ContentBrowserPanel *>(panel.get()) != nullptr) {
@@ -31,14 +26,16 @@ static bool s_workspaceContainsContentBrowserPanel(Workspace *workspace)
     return false;
 }
 
-BottomBar::BottomBar(Amethyst::Window *window, const PanelServices &services) : m_services(services), m_window(window)
+BottomBar::BottomBar(Amethyst::Window *window, const EditorContext &context) : m_editor(context), m_window(window)
 {
+    const float height = m_editor.config->getFloat(EDITOR_CONFIG_BOTTOM_BAR_HEIGHT);
+
     m_root = window->add<Amethyst::Frame>();
     m_root->name = "Bottom Bar";
     m_root->addClass("bottom-bar");
     m_root->setBaseProperties({
-        .position = Amethyst::UDim2(0.0f, 0.0f, 1.0f, -EDITOR_BOTTOM_BAR_HEIGHT),
-        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, EDITOR_BOTTOM_BAR_HEIGHT),
+        .position = Amethyst::UDim2(0.0f, 0.0f, 1.0f, -height),
+        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, height),
     });
 
     auto rootScope = Amethyst::UIScope(*m_root);
@@ -120,25 +117,29 @@ void BottomBar::setupContentBrowserToggle()
             .style = {.backgroundColor = Amethyst::Color3(0.13f), .borderPixelSize = 0.0f},
             .placement = Amethyst::PopupPlacement::ABOVE,
         },
-        [this](Amethyst::PopupScope &p) {
-            m_contentBrowserPopup = &p.component;
-            m_contentBrowserPanel = std::make_unique<ContentBrowserPanel>(p, m_services);
-            m_contentBrowserPanel->setScene(s_workspaceScene(m_currWorkspace));
-            m_contentBrowserPanel->onDockInLayout.detachedOnce([this]() {
-                if (m_currWorkspace != nullptr) {
-                    m_currWorkspace->addPanel(std::move(m_contentBrowserPanel), Amethyst::DockZone::BOTTOM);
-                    m_contentBrowserPanel = nullptr;
-                    m_contentBrowserPopup = nullptr;
-                }
-            });
-        });
+        [this](Amethyst::PopupScope &p) { m_contentBrowserPopup = &p.component; });
+
+    WorkspaceContext context = m_currWorkspace != nullptr ? m_currWorkspace->getContext() : WorkspaceContext{.editor = &m_editor};
+    m_contentBrowserPanel = std::make_unique<ContentBrowserPanel>(context, [this]() { dockContentBrowser(); });
+    m_contentBrowserPanel->attachTo(*m_contentBrowserPopup);
+}
+
+void BottomBar::dockContentBrowser()
+{
+    if (m_currWorkspace == nullptr) {
+        return;
+    }
+
+    m_currWorkspace->addPanel(std::move(m_contentBrowserPanel), Amethyst::DockZone::BOTTOM);
+    m_contentBrowserPanel = nullptr;
+    m_contentBrowserPopup = nullptr;
 }
 
 void BottomBar::setCurrentWorkspace(Workspace *workspace)
 {
     m_currWorkspace = workspace;
-    if (m_contentBrowserPanel != nullptr) {
-        m_contentBrowserPanel->setScene(s_workspaceScene(workspace));
+    if (m_contentBrowserPanel != nullptr && workspace != nullptr) {
+        m_contentBrowserPanel->setContext(workspace->getContext());
     }
 }
 

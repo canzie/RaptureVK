@@ -148,6 +148,11 @@ class Workspace {
     void restoreDockLayout();
 
     /**
+     * @brief Destroys every panel, for a workspace whose own members outlive them by less than the base does
+     */
+    void destroyPanels();
+
+    /**
      * @brief Adds a button to the end of the hotbar, as wide as the text it holds
      * @param label Text on the button
      * @param onClick What to run when the button is pressed
@@ -209,7 +214,7 @@ class Workspace {
     void buildContainer(Amethyst::Frame &container);
 
     /**
-     * @brief Takes a panel over, builds it and docks its tab
+     * @brief Takes a panel over, building it if it is not built yet, and docks its tab
      * @param panel The panel to take over
      * @param tabBar The bar the panel's tab is added to
      */
