@@ -36,6 +36,7 @@ Ordered by how likely they are to be hit.
 - [ ] **Queue batch read without its lock.** `VulkanQueue::submitAndFlushQueue` (`VulkanQueue.cpp:205`, already a TODO).
 - [ ] **Command pools keyed by thread id under fibers.** `DynamicDiffuseGI.cpp:294`, `SkyboxPass.cpp:70`, `Texture.cpp:66`, `:329`, `:1690`. Two jobs interleaving on one worker share a pool whose bookkeeping is non-atomic.
 - [ ] **Component type ids across modules.** `NextComponentTypeId` is a non-atomic static in an inline function (`component_pool.h:22`). Games never define components, but a C++ scripting module that instantiates engine ECS templates inline (any scene object accessor that reaches `registry.read<T>`) gets its own counter and disagrees with the engine on ids. Matters only once C++ scripting exists.
+- [ ] **Queue family selection only treats graphics as unset.** `QueueFamilyIndices::familyIndices[COUNT] = {UINT32_MAX}` (`VulkanTypes.h:20`) sets element 0 only; compute, present and transfer start at family 0. The `== UINT32_MAX` branches in `findQueueFamilies` (`VulkanContext.cpp:640-690`) never run for them, the present branch writes `GRAPHICS` where it means `PRESENT` (`:682`), and `isComplete` passes on a device whose family 0 cannot compute or present. Works today because family 0 does everything on the development GPU.
 - [ ] **Latent: layer and window lists mutated while iterated.** `Application::run` iterates `m_layerStack` and `m_secondaryWindows` with iterators (`Application.cpp:198-230`); `pushLayer` inserts into the same vector. Clicks are dispatched from `glfwPollEvents`, outside those loops, so nothing hits it today. Shortcuts run inside `AmethystLayer::onUpdate`, inside the loop, so the first shortcut that pushes a layer will.
 
 ## Ownership and scale
@@ -77,7 +78,28 @@ Amethyst is not included by any engine file; the editor links it itself.
 - [x] **Step 2, the split.** Reachable headers move to `include/rapture/`, the rest stay in `src/`, every engine include rewritten to `<rapture/...>`.
 - [x] **Step 3, the cheap vendor leaks.** yyjson, concurrentqueue and spirv_reflect out of the public headers that include them, then linked private.
 - [ ] **Next phase: the public surface.** `Application.h` stops pulling in the renderer and scene, so the reachable set shrinks to the actual API.
-- [ ] **Next phase: headless.** `Application` without a window or swapchain, which the ECS and scene test fixtures need (`Scene`'s constructor builds physics and the TLAS).
+- [ ] **Next phase: headless.** `Application` without a window or swapchain, which the ECS and scene test fixtures need (`Scene`'s constructor builds physics and the TLAS). Steps below.
+
+## Headless
+
+A headless application has a Vulkan device and everything above it, but no GLFW, no window, no surface and no swapchain. Rendering goes to offscreen viewports, which already submit without the swapchain (`DrawManager::submitFrame`, `DrawManager.cpp:393`) and already pace themselves through the command pools' timeline waits (`CommandPool::resetIfNeeded`). What ties the engine to a window today:
+
+| Where | What |
+|---|---|
+| `Application.cpp:36-52` | Creates the platform context, window, surface and swapchain; frames in flight come from the swapchain image count |
+| `VulkanContext.cpp:76`, `:397` | Instance extensions come from the window |
+| `VulkanContext.cpp:137`, `:525`, `:622` | Device choice requires a present-capable family and adequate swapchain support for the surface; `VK_KHR_swapchain` is a required device extension |
+| `Application::run` | Polls the main window, closes on its close request |
+| `DrawManager.cpp:28`, `:38` | Takes the main swapchain and its recreate signal for every viewport, offscreen ones included |
+| `Scene.cpp:167` | Fetches the main swapchain and never uses it |
+
+- [ ] **Step 1, application config.** `Application` takes an `ApplicationConfig` (window size, title, headless), the editor passes its window. Headless skips the platform context, window, surface and swapchain, and uses a fixed frames-in-flight count. `getMainWindow` and `createSecondaryWindow` assert they are not headless.
+- [ ] **Step 2, device without a surface.** `VulkanContext` builds its instance from a given extension list instead of a window, and `initDevice` without a surface skips the present family, the swapchain support check and the swapchain extension. The queue family fix above lands here, since present becomes optional.
+- [ ] **Step 3, the loop.** `run` becomes a loop over a public `runFrame`, so a test or a command interface can step frames itself. Headless frames skip the main window.
+- [ ] **Step 4, window readers.** `DrawManager` takes the swapchain only for a swapchain target; the unused fetch in `Scene::onUpdate` goes.
+- [ ] **Step 5, fixture and smoke test.** A GoogleTest environment that brings up one headless application for the engine test executable, then a test that builds a scene with a mesh, camera and light, renders an offscreen viewport for a few frames and reads the result back. The ECS and scene fixtures build on it.
+
+Not in this phase: a headless executable and the command socket (they come together), and running without a GPU at all.
 
 ## Testing and stress
 
