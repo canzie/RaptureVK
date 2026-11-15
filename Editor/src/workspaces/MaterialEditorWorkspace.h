@@ -3,10 +3,13 @@
 
 #include "PreviewWorkspace.h"
 
-#include <core/ecs/entity_accessor.h>
 #include <core/events/EventSignal.h>
 
 class NodeEditorPanel;
+
+namespace Rapture {
+class StaticMesh3D;
+} // namespace Rapture
 
 /**
  * @brief The workspace one open material is authored in, shown on a sphere beside its graph
@@ -30,7 +33,7 @@ class MaterialEditorWorkspace : public PreviewWorkspace {
 
   private:
     NodeEditorPanel *m_nodeEditor = nullptr;
-    Rapture::ecs::EntityAccessor m_previewSphere;
+    Rapture::StaticMesh3D *m_previewSphere = nullptr;
     Rapture::EventConnection m_materialSelectedConn;
 };
 
