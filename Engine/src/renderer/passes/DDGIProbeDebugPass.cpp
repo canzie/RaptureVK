@@ -215,10 +215,11 @@ CommandBufferLease DDGIProbeDebugPass::record(const RenderPassContext &context, 
     pushConstants.cameraSSBOIndex = renderData->getCameras().getDescriptorIndex(context.frameInFlight);
     pushConstants.cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
     pushConstants.volumeSlot = context.frameInFlight;
-    pushConstants.probeIrradianceIndex = m_gi->getProbeIrradianceBindlessIndex();
-    pushConstants.probeDistanceIndex = m_gi->getProbeVisibilityBindlessIndex();
-    pushConstants.probeOffsetIndex = m_gi->getProbeOffsetBindlessIndex();
-    pushConstants.probeClassificationIndex = m_gi->getProbeClassificationBindlessIndex();
+    const DDGIProbeTextureIndices probeTextures = m_gi->getPublishedProbeTextureIndices();
+    pushConstants.probeIrradianceIndex = probeTextures.irradiance;
+    pushConstants.probeDistanceIndex = probeTextures.visibility;
+    pushConstants.probeOffsetIndex = probeTextures.offset;
+    pushConstants.probeClassificationIndex = probeTextures.classification;
     pushConstants.mode = static_cast<uint32_t>(context.settings->probeDebugMode);
     pushConstants.probeRadius = context.settings->probeDebugRadius;
 

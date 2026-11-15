@@ -19,6 +19,7 @@
 
 #include <rapture/core/utils/TracyProfiler.h>
 
+#include <array>
 #include <cmath>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -60,17 +61,18 @@ struct DDGIClassifyPushConstants {
 struct DDGIRelocatePushConstants {
     uint32_t rayDataIndex;
     uint32_t volumeSlot;
+    uint32_t prevOffsetIndex;
 };
+
+static constexpr VkPipelineStageFlags PROBE_TEXTURE_READER_STAGES =
+    VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
 DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     : m_DDGI_ProbeTraceShader(nullptr), m_DDGI_ProbeIrradianceBlendingShader(nullptr), m_DDGI_ProbeDistanceBlendingShader(nullptr),
       m_DDGI_ProbeRelocationShader(nullptr), m_DDGI_ProbeClassificationShader(nullptr), m_DDGI_ProbeTracePipeline(nullptr),
       m_DDGI_ProbeIrradianceBlendingPipeline(nullptr), m_DDGI_ProbeDistanceBlendingPipeline(nullptr),
       m_DDGI_ProbeRelocationPipeline(nullptr), m_DDGI_ProbeClassificationPipeline(nullptr), m_framesInFlight(framesInFlight),
-      m_isFirstFrame(true), m_meshCount(0), m_probeIrradianceBindlessIndex(UINT32_MAX), m_probeVisibilityBindlessIndex(UINT32_MAX),
-      m_probeOffsetBindlessIndex(UINT32_MAX), m_skyboxTexture(nullptr), m_skyIntensity(1.0f), m_probeTraceDescriptorSet(nullptr),
-      m_probeIrradianceBlendingDescriptorSet(nullptr), m_probeDistanceBlendingDescriptorSet(nullptr),
-      m_probeClassificationDescriptorSet(nullptr), m_probeRelocationDescriptorSet(nullptr)
+      m_meshCount(0), m_skyboxTexture(nullptr), m_skyIntensity(1.0f), m_probeTraceDescriptorSet(nullptr)
 {
     m_defaultSkyboxTexture = Texture::createDefaultWhiteCubemapTexture();
     m_skyboxTexture = m_defaultSkyboxTexture.get();
@@ -86,7 +88,6 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
 
     initProbeInfoBuffer();
     initTextures();
-    setupProbeTextures();
 }
 
 DynamicDiffuseGI::~DynamicDiffuseGI() {}
@@ -141,23 +142,9 @@ void DynamicDiffuseGI::createPipelines()
     m_DDGI_ProbeClassificationPipeline = std::make_shared<ComputePipeline>(probeClassificationConfig);
 }
 
-void DynamicDiffuseGI::setupProbeTextures()
+DDGIProbeTextureIndices DynamicDiffuseGI::getPublishedProbeTextureIndices() const
 {
-    RP_CORE_TRACE("Setting up probe textures for bindless access");
-
-    // Get bindless indices for probe textures (these will be used in lighting pass)
-    if (m_RadianceTexture) {
-        m_probeIrradianceBindlessIndex = m_RadianceTexture->getBindlessIndex();
-    }
-    if (m_VisibilityTexture) {
-        m_probeVisibilityBindlessIndex = m_VisibilityTexture->getBindlessIndex();
-    }
-    if (m_ProbeOffsetTexture) {
-        m_probeOffsetBindlessIndex = m_ProbeOffsetTexture->getBindlessIndex();
-    }
-    if (m_ProbeClassificationTexture) {
-        m_probeClassificationBindlessIndex = m_ProbeClassificationTexture->getBindlessIndex();
-    }
+    return m_probeTextureSets[m_publishedSetIndex.load(std::memory_order_acquire)].indices;
 }
 
 void DynamicDiffuseGI::clearTextures()
@@ -178,23 +165,19 @@ void DynamicDiffuseGI::clearTextures()
     subresourceRange.baseArrayLayer = 0;
     subresourceRange.layerCount = m_ProbeVolume.gridDimensions.y;
 
+    std::vector<Texture *> probeTextures;
+    for (ProbeTextureSet &set : m_probeTextureSets) {
+        probeTextures.push_back(set.irradiance.get());
+        probeTextures.push_back(set.visibility.get());
+        probeTextures.push_back(set.offset.get());
+        probeTextures.push_back(set.classification.get());
+    }
+
     std::vector<VkImageMemoryBarrier> layoutTransitions;
-
-    VkImageMemoryBarrier radianceTransition = m_RadianceTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
-    layoutTransitions.push_back(radianceTransition);
-
-    VkImageMemoryBarrier visibilityTransition = m_VisibilityTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
-    layoutTransitions.push_back(visibilityTransition);
-
-    VkImageMemoryBarrier probeClassificationTransition = m_ProbeClassificationTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
-    layoutTransitions.push_back(probeClassificationTransition);
-
-    VkImageMemoryBarrier probeOffsetTransition = m_ProbeOffsetTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
-    layoutTransitions.push_back(probeOffsetTransition);
+    for (Texture *texture : probeTextures) {
+        layoutTransitions.push_back(
+            texture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT));
+    }
 
     vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                          0, nullptr, 0, nullptr, static_cast<uint32_t>(layoutTransitions.size()), layoutTransitions.data());
@@ -202,16 +185,29 @@ void DynamicDiffuseGI::clearTextures()
     VkClearColorValue clearColor = {{0.0f, 0.0f, 0.0f, 0.0f}};
     VkClearColorValue clearColorUint = {{0u, 0u, 0u, 0u}};
 
-    vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), m_RadianceTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL, &clearColor,
-                         1, &subresourceRange);
-    vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), m_VisibilityTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL, &clearColor,
-                         1, &subresourceRange);
-    vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), m_ProbeClassificationTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
-                         &clearColorUint, 1, &subresourceRange);
-    // relocation reads its own previous offset and writes it back when the clamp rejects the new one,
-    // so anything left here is kept for the lifetime of the volume
-    vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), m_ProbeOffsetTexture->getImage(), VK_IMAGE_LAYOUT_GENERAL,
-                         &clearColor, 1, &subresourceRange);
+    for (ProbeTextureSet &set : m_probeTextureSets) {
+        vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), set.irradiance->getImage(), VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1,
+                             &subresourceRange);
+        vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), set.visibility->getImage(), VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1,
+                             &subresourceRange);
+        vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), set.classification->getImage(), VK_IMAGE_LAYOUT_GENERAL,
+                             &clearColorUint, 1, &subresourceRange);
+        // relocation reads the previous offset and writes it back when the clamp rejects the new one,
+        // so anything left here is kept for the lifetime of the volume
+        vkCmdClearColorImage(commandBuffer->getCommandBufferVk(), set.offset->getImage(), VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1,
+                             &subresourceRange);
+    }
+
+    std::vector<VkImageMemoryBarrier> readTransitions;
+    for (Texture *texture : probeTextures) {
+        readTransitions.push_back(texture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                                                 VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT));
+    }
+    readTransitions.push_back(m_RayDataTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_UNDEFINED,
+                                                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0));
+
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_TRANSFER_BIT, PROBE_TEXTURE_READER_STAGES, 0, 0,
+                         nullptr, 0, nullptr, static_cast<uint32_t>(readTransitions.size()), readTransitions.data());
 
     if (commandBuffer->end() != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to end command buffer");
@@ -222,6 +218,18 @@ void DynamicDiffuseGI::clearTextures()
 }
 
 void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
+{
+    bool expectedRecording = false;
+    if (!m_isProbeUpdateRecording.compare_exchange_strong(expectedRecording, true, std::memory_order_acquire)) {
+        return;
+    }
+
+    recordAndSubmitProbeUpdate(scene, frameIndex);
+
+    m_isProbeUpdateRecording.store(false, std::memory_order_release);
+}
+
+void DynamicDiffuseGI::recordAndSubmitProbeUpdate(Scene &scene, uint32_t frameIndex)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -279,6 +287,11 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
         return;
     }
 
+    const uint32_t publishedSetIndex = m_publishedSetIndex.load(std::memory_order_acquire);
+    const uint32_t writtenSetIndex = (publishedSetIndex + 1) % PROBE_TEXTURE_SET_COUNT;
+    const ProbeTextureSet &publishedSet = m_probeTextureSets[publishedSetIndex];
+    ProbeTextureSet &writtenSet = m_probeTextureSets[writtenSetIndex];
+
     auto &vc = Application::getInstance().getVulkanContext();
 
     CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
@@ -289,9 +302,11 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
         return;
     }
 
+    beginWritingProbeTextureSet(commandBuffer, writtenSet);
+
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::populateProbesCompute");
-        castRays(scene, commandBuffer, frameIndex);
+        castRays(scene, commandBuffer, frameIndex, publishedSet);
     }
 
     if (m_RayDataTextureFlattened) {
@@ -300,7 +315,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::relocateProbes");
-        relocateProbes(commandBuffer, frameIndex);
+        relocateProbes(commandBuffer, frameIndex, publishedSet, writtenSet);
     }
 
     if (m_ProbeOffsetTextureFlattened) {
@@ -309,7 +324,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::classifyProbes");
-        classifyProbes(commandBuffer, frameIndex);
+        classifyProbes(commandBuffer, frameIndex, writtenSet);
     }
 
     if (m_ProbeClassificationTextureFlattened) {
@@ -318,7 +333,7 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 
     {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DynamicDiffuseGI::blendTextures");
-        blendTextures(commandBuffer, frameIndex);
+        blendTextures(commandBuffer, frameIndex, publishedSet, writtenSet);
     }
 
     if (m_IrradianceTextureFlattened) {
@@ -335,36 +350,44 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
         return;
     }
 
-    m_computeQueue->submitQueue(commandBuffer, nullptr, nullptr);
+    if (!m_computeQueue->submitQueue(commandBuffer, nullptr, nullptr)) {
+        return;
+    }
 
-    m_isFirstFrame = false;
+    m_publishedSetIndex.store(writtenSetIndex, std::memory_order_release);
 }
 
-void DynamicDiffuseGI::classifyProbes(CommandBuffer *commandBuffer, uint32_t frameIndex)
+void DynamicDiffuseGI::beginWritingProbeTextureSet(CommandBuffer *commandBuffer, ProbeTextureSet &writtenSet)
+{
+    constexpr VkAccessFlags writeAccess = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+
+    std::array<VkImageMemoryBarrier, 4> writeTransitions = {
+        writtenSet.irradiance->getImageMemoryBarrier(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, writeAccess),
+        writtenSet.visibility->getImageMemoryBarrier(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, writeAccess),
+        writtenSet.offset->getImageMemoryBarrier(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0, writeAccess),
+        writtenSet.classification->getImageMemoryBarrier(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 0,
+                                                         writeAccess),
+    };
+
+    // waits for every reader of the set from the time it was published
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), PROBE_TEXTURE_READER_STAGES, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0,
+                         nullptr, 0, nullptr, static_cast<uint32_t>(writeTransitions.size()), writeTransitions.data());
+}
+
+void DynamicDiffuseGI::classifyProbes(CommandBuffer *commandBuffer, uint32_t frameIndex, ProbeTextureSet &writtenSet)
 {
     RAPTURE_PROFILE_FUNCTION();
-
-    // Barrier to ensure ray data is ready for reading and classification texture is ready for writing
-    std::vector<VkImageMemoryBarrier> preClassifyBarriers;
-
-    VkImageMemoryBarrier classificationWriteBarrier = m_ProbeClassificationTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_SHADER_WRITE_BIT);
-    preClassifyBarriers.push_back(classificationWriteBarrier);
-
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                         static_cast<uint32_t>(preClassifyBarriers.size()), preClassifyBarriers.data());
 
     // Bind pipeline and descriptor sets
     m_DDGI_ProbeClassificationPipeline->bind(commandBuffer->getCommandBufferVk());
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeClassificationPipeline);
     m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeClassificationPipeline);
-    m_probeClassificationDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeClassificationPipeline);
+    writtenSet.classificationDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeClassificationPipeline);
 
     // Push constants
     DDGIClassifyPushConstants pushConstants = {};
     pushConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
-    pushConstants.probeOffsetHandle = m_probeOffsetBindlessIndex;
+    pushConstants.probeOffsetHandle = writtenSet.indices.offset;
     pushConstants.volumeSlot = frameIndex;
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeClassificationPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIClassifyPushConstants), &pushConstants);
@@ -375,38 +398,28 @@ void DynamicDiffuseGI::classifyProbes(CommandBuffer *commandBuffer, uint32_t fra
     vkCmdDispatch(commandBuffer->getCommandBufferVk(), workGroupsX, 1, 1);
 
     // Barrier to ensure classification texture is ready for reading by next stages
-    VkImageMemoryBarrier classificationReadBarrier = m_ProbeClassificationTexture->getImageMemoryBarrier(
+    VkImageMemoryBarrier classificationReadBarrier = writtenSet.classification->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &classificationReadBarrier);
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, PROBE_TEXTURE_READER_STAGES, 0, 0,
+                         nullptr, 0, nullptr, 1, &classificationReadBarrier);
 }
 
-void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer, uint32_t frameIndex)
+void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer, uint32_t frameIndex, const ProbeTextureSet &publishedSet,
+                                      ProbeTextureSet &writtenSet)
 {
     RAPTURE_PROFILE_FUNCTION();
-
-    // Barrier to ensure offset texture is ready for writing
-    std::vector<VkImageMemoryBarrier> preRelocateBarriers;
-    // relocation reads back the offset it wrote last frame, so the old layout has to be the real one
-    // rather than UNDEFINED, which lets the contents be discarded
-    VkImageMemoryBarrier offsetWriteBarrier =
-        m_ProbeOffsetTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT);
-    preRelocateBarriers.push_back(offsetWriteBarrier);
-
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                         static_cast<uint32_t>(preRelocateBarriers.size()), preRelocateBarriers.data());
 
     // Bind pipeline and descriptor sets
     m_DDGI_ProbeRelocationPipeline->bind(commandBuffer->getCommandBufferVk());
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeRelocationPipeline);
     m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeRelocationPipeline);
-    m_probeRelocationDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeRelocationPipeline);
+    writtenSet.relocationDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeRelocationPipeline);
 
     // Push constants
     DDGIRelocatePushConstants pushConstants = {};
     pushConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
     pushConstants.volumeSlot = frameIndex;
+    pushConstants.prevOffsetIndex = publishedSet.indices.offset;
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeRelocationPipeline->getPipelineLayoutVk(),
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DDGIRelocatePushConstants), &pushConstants);
 
@@ -416,10 +429,10 @@ void DynamicDiffuseGI::relocateProbes(CommandBuffer *commandBuffer, uint32_t fra
     vkCmdDispatch(commandBuffer->getCommandBufferVk(), workGroupsX, 1, 1);
 
     // Barrier to ensure offset texture is ready for reading
-    VkImageMemoryBarrier offsetReadBarrier = m_ProbeOffsetTexture->getImageMemoryBarrier(
+    VkImageMemoryBarrier offsetReadBarrier = writtenSet.offset->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &offsetReadBarrier);
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, PROBE_TEXTURE_READER_STAGES, 0, 0,
+                         nullptr, 0, nullptr, 1, &offsetReadBarrier);
 }
 
 void DynamicDiffuseGI::updateSkybox(Scene &scene)
@@ -438,7 +451,7 @@ void DynamicDiffuseGI::updateSkybox(Scene &scene)
     }
 }
 
-void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint32_t frameIndex)
+void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint32_t frameIndex, const ProbeTextureSet &publishedSet)
 {
 
     RAPTURE_PROFILE_FUNCTION();
@@ -454,38 +467,13 @@ void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint
     // (fresh uniform-random rotation, Arvo's method). Convergence relies on the
     // hysteresis blend averaging these stochastic estimates over time.
 
-    // === BARRIER PHASE 1: Prepare for trace shader (3 dependencies) ===
-    std::vector<VkImageMemoryBarrier> preTraceBarriers;
-
+    // === BARRIER PHASE 1: Prepare for trace shader ===
+    // the published probe textures it reads are already in the shader read layout
     VkImageMemoryBarrier rayDataWriteBarrier = m_RayDataTexture->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-        m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT);
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT);
 
-    preTraceBarriers.push_back(rayDataWriteBarrier);
-
-    // Transition probe textures for reading (they contain data from previous frame)
-    VkImageMemoryBarrier radianceReadBarrier = m_RadianceTexture->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT);
-
-    preTraceBarriers.push_back(radianceReadBarrier);
-
-    VkImageMemoryBarrier visibilityReadBarrier = m_VisibilityTexture->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT);
-
-    preTraceBarriers.push_back(visibilityReadBarrier);
-
-    VkImageMemoryBarrier probeClassificationReadBarrier = m_ProbeClassificationTexture->getImageMemoryBarrier(
-        m_isFirstFrame ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, m_isFirstFrame ? 0 : VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT);
-
-    preTraceBarriers.push_back(probeClassificationReadBarrier);
-
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(),
-                         m_isFirstFrame ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                         static_cast<uint32_t>(preTraceBarriers.size()), preTraceBarriers.data());
+    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &rayDataWriteBarrier);
 
     // Bind the compute pipeline
     m_DDGI_ProbeTracePipeline->bind(commandBuffer->getCommandBufferVk());
@@ -516,10 +504,10 @@ void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint
     pushConstants.lightDynamicCount = lightStore.getPartition(MOBILITY_DYNAMIC).getCount();
     pushConstants.skyboxTextureIndex = m_skyboxTexture ? m_skyboxTexture->getBindlessIndex() : 0;
     pushConstants.tlasIndex = tlas->getBindlessIndex();
-    pushConstants.prevRadianceIndex = m_probeIrradianceBindlessIndex;
-    pushConstants.prevVisibilityIndex = m_probeVisibilityBindlessIndex;
-    pushConstants.probeOffsetHandle = m_probeOffsetBindlessIndex;
-    pushConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
+    pushConstants.prevRadianceIndex = publishedSet.indices.irradiance;
+    pushConstants.prevVisibilityIndex = publishedSet.indices.visibility;
+    pushConstants.probeOffsetHandle = publishedSet.indices.offset;
+    pushConstants.probeClassificationHandle = publishedSet.indices.classification;
     pushConstants.skyIntensity = m_skyIntensity;
     pushConstants.volumeSlot = frameIndex;
 
@@ -542,32 +530,11 @@ void DynamicDiffuseGI::castRays(Scene &scene, CommandBuffer *commandBuffer, uint
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &rayDataReadBarrier);
 }
 
-void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer, uint32_t frameIndex)
+void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer, uint32_t frameIndex, const ProbeTextureSet &publishedSet,
+                                     ProbeTextureSet &writtenSet)
 {
 
     RAPTURE_PROFILE_FUNCTION();
-
-    // === BARRIER PHASE 5: Prepare for blending shaders ===
-    // Transition probe textures to GENERAL layout for read-modify-write operations
-    // The blend shader will read from the same texture it writes to (for hysteresis blending)
-    std::vector<VkImageMemoryBarrier> preBlendingBarriers;
-
-    VkImageMemoryBarrier radianceReadWriteBarrier =
-        m_RadianceTexture->getImageMemoryBarrier(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-                                                 VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-
-    preBlendingBarriers.push_back(radianceReadWriteBarrier);
-
-    VkImageMemoryBarrier visibilityReadWriteBarrier = m_VisibilityTexture->getImageMemoryBarrier(
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_READ_BIT,
-        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-
-    preBlendingBarriers.push_back(visibilityReadWriteBarrier);
-
-    vkCmdPipelineBarrier(commandBuffer->getCommandBufferVk(),
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Wait for flatten to finish
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // Prepare for blending operations
-                         0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(preBlendingBarriers.size()), preBlendingBarriers.data());
 
     // Irradiance blending shader
     m_DDGI_ProbeIrradianceBlendingPipeline->bind(commandBuffer->getCommandBufferVk());
@@ -575,13 +542,13 @@ void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer, uint32_t fram
     // Use the new descriptor manager system for blending shaders
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // probe volume
     m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeIrradianceBlendingPipeline); // bindless
-    m_probeIrradianceBlendingDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeIrradianceBlendingPipeline);
+    writtenSet.irradianceBlendingDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeIrradianceBlendingPipeline);
 
     // Set push constants for radiance blending
     DDGIBlendPushConstants radianceBlendConstants = {};
-    radianceBlendConstants.prevTextureIndex = m_probeIrradianceBindlessIndex;
+    radianceBlendConstants.prevTextureIndex = publishedSet.indices.irradiance;
     radianceBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
-    radianceBlendConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
+    radianceBlendConstants.probeClassificationHandle = writtenSet.indices.classification;
     radianceBlendConstants.volumeSlot = frameIndex;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeIrradianceBlendingPipeline->getPipelineLayoutVk(),
@@ -595,13 +562,13 @@ void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer, uint32_t fram
 
     m_rc->descriptorManager->bindSet(0, commandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // probe volume
     m_rc->descriptorManager->bindSet(3, commandBuffer, m_DDGI_ProbeDistanceBlendingPipeline); // bindless
-    m_probeDistanceBlendingDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeDistanceBlendingPipeline);
+    writtenSet.distanceBlendingDescriptorSet->bind(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeDistanceBlendingPipeline);
 
     // Set push constants for visibility blending
     DDGIBlendPushConstants visibilityBlendConstants = {};
-    visibilityBlendConstants.prevTextureIndex = m_probeVisibilityBindlessIndex;
+    visibilityBlendConstants.prevTextureIndex = publishedSet.indices.visibility;
     visibilityBlendConstants.rayDataIndex = m_RayDataTexture->getBindlessIndex();
-    visibilityBlendConstants.probeClassificationHandle = m_probeClassificationBindlessIndex;
+    visibilityBlendConstants.probeClassificationHandle = writtenSet.indices.classification;
     visibilityBlendConstants.volumeSlot = frameIndex;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_DDGI_ProbeDistanceBlendingPipeline->getPipelineLayoutVk(),
@@ -614,20 +581,20 @@ void DynamicDiffuseGI::blendTextures(CommandBuffer *commandBuffer, uint32_t fram
     // Transition probe textures back to shader read mode for next frame and final lighting
     std::vector<VkImageMemoryBarrier> postBlendingBarriers;
 
-    VkImageMemoryBarrier radianceReadBarrier = m_RadianceTexture->getImageMemoryBarrier(
+    VkImageMemoryBarrier radianceReadBarrier = writtenSet.irradiance->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
     postBlendingBarriers.push_back(radianceReadBarrier);
 
-    VkImageMemoryBarrier visibilityReadBarrier = m_VisibilityTexture->getImageMemoryBarrier(
+    VkImageMemoryBarrier visibilityReadBarrier = writtenSet.visibility->getImageMemoryBarrier(
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
     postBlendingBarriers.push_back(visibilityReadBarrier);
 
     vkCmdPipelineBarrier(
         commandBuffer->getCommandBufferVk(),
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,                                         // After blending operations
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // For next frame and final lighting
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // After blending operations
+        PROBE_TEXTURE_READER_STAGES,          // For next frame and final lighting
         0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(postBlendingBarriers.size()), postBlendingBarriers.data());
 }
 
@@ -679,11 +646,9 @@ void DynamicDiffuseGI::initTextures()
     // Create the textures
     m_RayDataTexture = std::make_shared<Texture>(rayDataSpec);
 
-    m_RadianceTexture = std::make_shared<Texture>(irradianceSpec);
-    m_VisibilityTexture = std::make_shared<Texture>(distanceSpec);
-
-    m_ProbeClassificationTexture = std::make_shared<Texture>(probeClassificationSpec);
-    m_ProbeOffsetTexture = std::make_shared<Texture>(probeOffsetSpec);
+    for (ProbeTextureSet &set : m_probeTextureSets) {
+        initProbeTextureSet(set, irradianceSpec, distanceSpec, probeClassificationSpec, probeOffsetSpec);
+    }
 
     // Flattened debug views disabled - the per-frame flatten passes also read the atlas (and transition it from
     // UNDEFINED, which may discard contents) and cost fps. Re-enable only when the Texture Viewer is needed.
@@ -699,30 +664,6 @@ void DynamicDiffuseGI::initTextures()
 
     // --- Create custom descriptor sets for each compute shader ---
 
-    // For Probe Irradiance Blending
-    {
-        DescriptorSetBindings bindings;
-        bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
-                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS});
-        m_probeIrradianceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeIrradianceBlendingDescriptorSet
-            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS)
-            ->add(*m_RadianceTexture);
-    }
-
-    // For Probe Distance Blending
-    {
-        DescriptorSetBindings bindings;
-        bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
-                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS});
-        m_probeDistanceBlendingDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeDistanceBlendingDescriptorSet
-            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS)
-            ->add(*m_VisibilityTexture);
-    }
-
     // For Probe Tracing
     {
         DescriptorSetBindings bindings;
@@ -734,31 +675,45 @@ void DynamicDiffuseGI::initTextures()
             ->add(*m_RayDataTexture);
     }
 
-    // For Probe Classification
-    {
-        DescriptorSetBindings bindings;
-        bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
-                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION});
-        m_probeClassificationDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeClassificationDescriptorSet
-            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION)
-            ->add(*m_ProbeClassificationTexture);
-    }
-
-    // For Probe Relocation
-    {
-        DescriptorSetBindings bindings;
-        bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
-                                     (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_RELOCATION});
-        m_probeRelocationDescriptorSet = std::make_shared<DescriptorSet>(bindings);
-        m_probeRelocationDescriptorSet
-            ->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::PROBE_RELOCATION)
-            ->add(*m_ProbeOffsetTexture);
-    }
-
     RP_CORE_INFO("DDGI: Created custom descriptor sets for compute pipelines.");
+}
+
+static std::unique_ptr<DescriptorSet> s_createProbeStorageImageDescriptorSet(DDGIDescriptorSetBindingLocation location,
+                                                                             Texture &texture)
+{
+    DescriptorSetBindings bindings;
+    bindings.setNumber = 4;
+    bindings.bindings.push_back(
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)location});
+
+    auto descriptorSet = std::make_unique<DescriptorSet>(bindings);
+    descriptorSet->getTextureBinding((DescriptorSetBindingLocation)location)->add(texture);
+    return descriptorSet;
+}
+
+void DynamicDiffuseGI::initProbeTextureSet(ProbeTextureSet &set, const TextureSpecification &irradianceSpec,
+                                           const TextureSpecification &distanceSpec,
+                                           const TextureSpecification &classificationSpec,
+                                           const TextureSpecification &offsetSpec)
+{
+    set.irradiance = std::make_unique<Texture>(irradianceSpec);
+    set.visibility = std::make_unique<Texture>(distanceSpec);
+    set.offset = std::make_unique<Texture>(offsetSpec);
+    set.classification = std::make_unique<Texture>(classificationSpec);
+
+    set.indices.irradiance = set.irradiance->getBindlessIndex();
+    set.indices.visibility = set.visibility->getBindlessIndex();
+    set.indices.offset = set.offset->getBindlessIndex();
+    set.indices.classification = set.classification->getBindlessIndex();
+
+    set.irradianceBlendingDescriptorSet =
+        s_createProbeStorageImageDescriptorSet(DDGIDescriptorSetBindingLocation::PROBE_IRRADIANCE_ATLAS, *set.irradiance);
+    set.distanceBlendingDescriptorSet =
+        s_createProbeStorageImageDescriptorSet(DDGIDescriptorSetBindingLocation::PROBE_DISTANCE_ATLAS, *set.visibility);
+    set.relocationDescriptorSet =
+        s_createProbeStorageImageDescriptorSet(DDGIDescriptorSetBindingLocation::PROBE_RELOCATION, *set.offset);
+    set.classificationDescriptorSet =
+        s_createProbeStorageImageDescriptorSet(DDGIDescriptorSetBindingLocation::PROBE_CLASSIFICATION, *set.classification);
 }
 
 void DynamicDiffuseGI::updateProbeVolume(uint32_t frameIndex)

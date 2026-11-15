@@ -35,6 +35,7 @@ ProbeVolume u_volume;
 layout(push_constant) uniform PushConstants {
     uint rayDataIndex;
     uint volumeSlot;
+    uint prevOffsetIndex;
 } pc;
 
 // -----------------------------------------------------------------------------
@@ -70,7 +71,7 @@ void main() {
     ivec3 texelCoord  = ivec3(outputCoords);
 
     // Read the current world‑space position offset for this probe
-    vec3 storedOffset = imageLoad(ProbeOffsets, texelCoord).xyz;
+    vec3 storedOffset = texelFetch(gTextureArrays[pc.prevOffsetIndex], texelCoord, 0).xyz;
     vec3 offset       = DDGILoadProbeDataOffset(storedOffset, u_volume);
 
     // ---------------------------------------------------------------------

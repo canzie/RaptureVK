@@ -192,10 +192,11 @@ CommandBufferLease LightingPass::record(const RenderPassContext &context, const 
     // Get probe texture indices from DDGI system
     if (m_ddgi) {
         pushConstants.probeVolumeHandle = 0; // Probe volume data is in set 0, binding 5
-        pushConstants.probeIrradianceHandle = m_ddgi->getProbeIrradianceBindlessIndex();
-        pushConstants.probeVisibilityHandle = m_ddgi->getProbeVisibilityBindlessIndex();
-        pushConstants.probeOffsetHandle = m_ddgi->getProbeOffsetBindlessIndex();
-        pushConstants.probeClassificationHandle = m_ddgi->getProbeClassificationBindlessIndex();
+        const DDGIProbeTextureIndices probeTextures = m_ddgi->getPublishedProbeTextureIndices();
+        pushConstants.probeIrradianceHandle = probeTextures.irradiance;
+        pushConstants.probeVisibilityHandle = probeTextures.visibility;
+        pushConstants.probeOffsetHandle = probeTextures.offset;
+        pushConstants.probeClassificationHandle = probeTextures.classification;
     } else {
         pushConstants.probeVolumeHandle = 0;
         pushConstants.probeIrradianceHandle = 0;

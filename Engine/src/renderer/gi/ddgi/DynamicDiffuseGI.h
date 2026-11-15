@@ -1,5 +1,8 @@
-#pragma once
+#ifndef RAPTURE__DYNAMIC_DIFFUSE_GI_H
+#define RAPTURE__DYNAMIC_DIFFUSE_GI_H
 
+#include <array>
+#include <atomic>
 #include <memory>
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/shaders/AShader.h>
@@ -38,15 +41,27 @@ enum class DDGIDescriptorSetBindingLocation {
     PROBE_RELOCATION = 404
 };
 
+/**
+ * @brief Bindless indices of the probe textures from one finished probe update
+ */
+struct DDGIProbeTextureIndices {
+    uint32_t irradiance = UINT32_MAX;
+    uint32_t visibility = UINT32_MAX;
+    uint32_t offset = UINT32_MAX;
+    uint32_t classification = UINT32_MAX;
+};
+
 class DynamicDiffuseGI {
   public:
     DynamicDiffuseGI(uint32_t framesInFlight);
     ~DynamicDiffuseGI();
 
+    /**
+     * @brief Records and submits one probe update, skipped while the previous update is still being recorded
+     * @param scene The scene the probes trace against
+     * @param frameIndex The frame in flight the update belongs to
+     */
     void populateProbesCompute(Scene &scene, uint32_t frameIndex);
-
-    std::shared_ptr<Texture> getRadianceTexture() { return m_RadianceTexture; }
-    std::shared_ptr<Texture> getVisibilityTexture() { return m_VisibilityTexture; }
 
     Texture *getRadianceTextureFlattened()
     {
@@ -66,25 +81,49 @@ class DynamicDiffuseGI {
     void updateSkybox(Scene &scene);
     void updateProbeVolume(uint32_t frameIndex);
 
-    // Get bindless indices for probe textures
-    uint32_t getProbeIrradianceBindlessIndex() const { return m_probeIrradianceBindlessIndex; }
-    uint32_t getProbeVisibilityBindlessIndex() const { return m_probeVisibilityBindlessIndex; }
-    uint32_t getProbeOffsetBindlessIndex() const { return m_probeOffsetBindlessIndex; }
-    uint32_t getProbeClassificationBindlessIndex() const { return m_probeClassificationBindlessIndex; }
+    /**
+     * @brief The probe textures of the most recently finished probe update
+     * @return Their bindless indices, all from the same update
+     */
+    DDGIProbeTextureIndices getPublishedProbeTextureIndices() const;
 
     const std::vector<std::shared_ptr<UniformBuffer>> &getProbeVolumeUniformBuffers() const { return m_ProbeInfoBuffers; }
 
   private:
-    void castRays(Scene &scene, CommandBuffer *commandBuffer, uint32_t frameIndex);
-    void blendTextures(CommandBuffer *commandBuffer, uint32_t frameIndex);
-    void classifyProbes(CommandBuffer *commandBuffer, uint32_t frameIndex);
-    void relocateProbes(CommandBuffer *commandBuffer, uint32_t frameIndex);
+    struct ProbeTextureSet {
+        std::unique_ptr<Texture> irradiance;
+        std::unique_ptr<Texture> visibility;
+        std::unique_ptr<Texture> offset;
+        std::unique_ptr<Texture> classification;
+
+        DDGIProbeTextureIndices indices;
+
+        std::unique_ptr<DescriptorSet> irradianceBlendingDescriptorSet;
+        std::unique_ptr<DescriptorSet> distanceBlendingDescriptorSet;
+        std::unique_ptr<DescriptorSet> relocationDescriptorSet;
+        std::unique_ptr<DescriptorSet> classificationDescriptorSet;
+    };
+
+    static constexpr uint32_t PROBE_TEXTURE_SET_COUNT = 2;
+
+  private:
+    void recordAndSubmitProbeUpdate(Scene &scene, uint32_t frameIndex);
+
+    void beginWritingProbeTextureSet(CommandBuffer *commandBuffer, ProbeTextureSet &writtenSet);
+    void castRays(Scene &scene, CommandBuffer *commandBuffer, uint32_t frameIndex, const ProbeTextureSet &publishedSet);
+    void relocateProbes(CommandBuffer *commandBuffer, uint32_t frameIndex, const ProbeTextureSet &publishedSet,
+                        ProbeTextureSet &writtenSet);
+    void classifyProbes(CommandBuffer *commandBuffer, uint32_t frameIndex, ProbeTextureSet &writtenSet);
+    void blendTextures(CommandBuffer *commandBuffer, uint32_t frameIndex, const ProbeTextureSet &publishedSet,
+                       ProbeTextureSet &writtenSet);
 
     void initTextures();
+    void initProbeTextureSet(ProbeTextureSet &set, const TextureSpecification &irradianceSpec,
+                             const TextureSpecification &distanceSpec, const TextureSpecification &classificationSpec,
+                             const TextureSpecification &offsetSpec);
     void initProbeInfoBuffer();
 
     void createPipelines();
-    void setupProbeTextures();
 
     void clearTextures();
 
@@ -107,14 +146,11 @@ class DynamicDiffuseGI {
     std::vector<std::shared_ptr<UniformBuffer>> m_ProbeInfoBuffers;
     std::shared_ptr<DescriptorBindingUniformBuffer> m_probeInfoBinding;
 
-    // is actually irradiance but iam retarted, will need to update this everywhere :(
-    std::shared_ptr<Texture> m_RadianceTexture;
-    std::shared_ptr<Texture> m_VisibilityTexture;
+    std::array<ProbeTextureSet, PROBE_TEXTURE_SET_COUNT> m_probeTextureSets;
+    std::atomic<uint32_t> m_publishedSetIndex{0};
+    std::atomic<bool> m_isProbeUpdateRecording{false};
 
     std::shared_ptr<Texture> m_RayDataTexture;
-
-    std::shared_ptr<Texture> m_ProbeClassificationTexture;
-    std::shared_ptr<Texture> m_ProbeOffsetTexture; // stores an offset for each probe, enables the use of the relocation shader
 
     std::unique_ptr<FlattenTexture> m_IrradianceTextureFlattened;
     std::unique_ptr<FlattenTexture> m_DistanceTextureFlattened;
@@ -132,18 +168,10 @@ class DynamicDiffuseGI {
 
     uint32_t m_framesInFlight;
 
-    bool m_isFirstFrame;
-
     bool m_isVolumeDirty;
 
     uint32_t m_meshCount;
     uint32_t m_probesPerRow; // Number of probes along the X-axis of the atlas texture
-
-    // Probe texture bindless indices for use in lighting pass
-    uint32_t m_probeIrradianceBindlessIndex = 0;
-    uint32_t m_probeVisibilityBindlessIndex = 0;
-    uint32_t m_probeOffsetBindlessIndex = 0;
-    uint32_t m_probeClassificationBindlessIndex = 0;
 
     Texture *m_skyboxTexture;
     float m_skyIntensity = 1.0f;
@@ -151,10 +179,8 @@ class DynamicDiffuseGI {
     std::unique_ptr<Texture> m_defaultSkyboxTexture;
 
     std::shared_ptr<DescriptorSet> m_probeTraceDescriptorSet;
-    std::shared_ptr<DescriptorSet> m_probeIrradianceBlendingDescriptorSet;
-    std::shared_ptr<DescriptorSet> m_probeDistanceBlendingDescriptorSet;
-    std::shared_ptr<DescriptorSet> m_probeClassificationDescriptorSet;
-    std::shared_ptr<DescriptorSet> m_probeRelocationDescriptorSet;
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__DYNAMIC_DIFFUSE_GI_H

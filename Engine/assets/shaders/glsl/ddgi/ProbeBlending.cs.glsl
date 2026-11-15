@@ -112,6 +112,15 @@ void UpdateBorderTexelsGLSL(
 
 }
 
+void StoreProbeTexel(ivec3 _texelCoords, vec4 _value)
+{
+    #ifdef DDGI_BLEND_RADIANCE
+        imageStore(ProbeIrradianceAtlas, _texelCoords, _value);
+    #else
+        imageStore(ProbeDistanceAtlas, _texelCoords, vec4(_value.rg, 0.0, 1.0));
+    #endif
+}
+
 void main() {
     u_volume = u_probeInfo[pc.volumeSlot].volume;
 #if defined(DDGI_BLEND_RADIANCE) || defined(DDGI_BLEND_DISTANCE)
@@ -139,8 +148,12 @@ void main() {
         return;
     }
 
+    // the previous update's value, carried forward wherever this update does not blend
+    vec4 probeTexelHistory = texelFetch(gTextureArrays[pc.prevTextureIndex], ivec3(gl_GlobalInvocationID.xyz), 0);
+
     uint probeState = DDGILoadProbeState(probeIndex, gUintTextureArrays[pc.probeClassificationHandle], u_volume);
     if (probeState != 0u) {
+        StoreProbeTexel(ivec3(gl_GlobalInvocationID.xyz), probeTexelHistory);
         return;
     }
 
@@ -255,13 +268,7 @@ void main() {
         result.a = 1.0;
 
 
-        vec3 probeIrradianceMean = vec3(0.0, 0.0, 0.0);
-        #ifdef DDGI_BLEND_RADIANCE
-            probeIrradianceMean = imageLoad(ProbeIrradianceAtlas, ivec3(gl_GlobalInvocationID.xyz)).rgb;
-        #endif
-        #ifdef DDGI_BLEND_DISTANCE
-            probeIrradianceMean = imageLoad(ProbeDistanceAtlas, ivec3(gl_GlobalInvocationID.xyz)).rgb;
-        #endif
+        vec3 probeIrradianceMean = probeTexelHistory.rgb;
 
         // Get the history weight (hysteresis) to use for the probe texel's previous value
         // If the probe was previously cleared to completely black, set the hysteresis to zero
@@ -330,6 +337,10 @@ void main() {
     #endif
 
     } // End of interior texel processing
+
+    if (!isBorderTexel && skipStore) {
+        StoreProbeTexel(ivec3(gl_GlobalInvocationID.xyz), probeTexelHistory);
+    }
 
     // Synchronization: Ensure all interior texel calculations and stores are complete
     // before any thread attempts to read them for border updates.
