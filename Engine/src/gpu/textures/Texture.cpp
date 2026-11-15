@@ -1642,6 +1642,23 @@ void Texture::uploadData(std::span<const uint8_t> data)
     m_status.store(TextureStatus::READY, std::memory_order_release);
 }
 
+static void s_destroyStagingBufferOnceCopied(VmaAllocator allocator, VkBuffer stagingBuffer, VmaAllocation stagingAllocation,
+                                             VulkanQueue &queue, uint64_t copiedValue)
+{
+    jobs().run(JobDeclaration(
+        [allocator, stagingBuffer, stagingAllocation, &queue, copiedValue](JobContext &jctx) {
+            TimelineSemaphore semaphoreWrapper(queue.getTimelineSemaphore());
+            Counter gpuCounter;
+            gpuCounter.increment();
+
+            jobs().submitGpuWait(&semaphoreWrapper, copiedValue, gpuCounter);
+            jctx.waitFor(gpuCounter, 0);
+
+            vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+        },
+        JobPriority::LOW, QueueAffinity::ANY, nullptr, "Staging buffer release"));
+}
+
 void Texture::setPixel(uint32_t x, uint32_t y, uint32_t rgba)
 {
     setPixel(x, y, 0, rgba);
@@ -1713,10 +1730,9 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
 
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer);
+    uint64_t copiedValue = graphicsQueue->submitQueue(commandBuffer);
 
-    // Fire-and-forget: staging buffer will be reused/recycled by command pool reset
-    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+    s_destroyStagingBufferOnceCopied(allocator, stagingBuffer, stagingAllocation, *graphicsQueue, copiedValue);
 }
 
 void Texture::setPixels(std::span<const uint8_t> data)
@@ -1766,10 +1782,9 @@ void Texture::setPixels(std::span<const uint8_t> data)
 
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer);
+    uint64_t copiedValue = graphicsQueue->submitQueue(commandBuffer);
 
-    // Fire-and-forget: staging buffer cleanup
-    vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+    s_destroyStagingBufferOnceCopied(allocator, stagingBuffer, stagingAllocation, *graphicsQueue, copiedValue);
 }
 
 } // namespace Rapture
