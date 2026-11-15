@@ -13,6 +13,8 @@ file(GLOB_RECURSE EDITOR_SOURCES
 # Create Editor executable with appropriate entry point
 add_executable(${EDITOR_NAME} ${EDITOR_SOURCES})
 
+rapture_set_warnings(${EDITOR_NAME})
+
 # Set the desired output executable name (can contain spaces)
 set_target_properties(${EDITOR_NAME} PROPERTIES OUTPUT_NAME "RaptureEditor")
 
@@ -26,9 +28,11 @@ target_include_directories(${EDITOR_NAME} PRIVATE
 set_property(TARGET ${EDITOR_NAME} PROPERTY CXX_STANDARD 20)
 set_property(TARGET ${EDITOR_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
-# Link with Engine library and vendor libraries directly
+# Link with the engine and the UI library
 target_link_libraries(${EDITOR_NAME} PRIVATE 
     RaptureVK
+    amethyst
+    amethyst_vk13_glfw
 )
 
 # Set output directory

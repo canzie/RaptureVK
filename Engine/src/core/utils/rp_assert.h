@@ -32,7 +32,7 @@
 
 #ifdef NDEBUG
 
-#define RP_ASSERT(expr, ...) ((void)0)
+#define RP_ASSERT(expr, ...) ((void)sizeof(!(expr)))
 
 #else
 

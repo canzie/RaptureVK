@@ -8,33 +8,10 @@ file(GLOB_RECURSE ENGINE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
 )
 
-
-
 # Create engine library
 add_library(${ENGINE_NAME} STATIC ${ENGINE_SOURCES})
 
-# Debug mode settings - check in multiple ways
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR RAPTURE_DEBUG)
-    message(STATUS "Debug build detected - Enabling debug flags")
-    add_definitions(-DRAPTURE_DEBUG)
-    add_definitions(-D_DEBUG)
-    # Tracy is now controlled by RAPTURE_USE_TRACY in TracyProfiler.h
-    if(MSVC)
-        target_compile_options(${ENGINE_NAME} PRIVATE /W4 /WX)
-        add_compile_definitions($<$<CONFIG:Debug>:RAPTURE_DEBUG>)
-        add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
-        message(STATUS "MSVC Debug build - Enabling debug flags")
-    else()
-        target_compile_options(${ENGINE_NAME} PRIVATE -Wall -Wextra -pedantic -Werror)
-        message(STATUS "GCC Debug build - Enabling debug flags")
-    endif()
-else()
-    message(STATUS "Release build - Debug flags disabled")
-    add_definitions(-DNDEBUG)
-endif()
-
-# Create engine executable (changed from library)
-#add_executable(${ENGINE_NAME} ${ENGINE_SOURCES})
+rapture_set_warnings(${ENGINE_NAME})
 
 # Include directories
 target_include_directories(${ENGINE_NAME} PUBLIC
@@ -42,15 +19,19 @@ target_include_directories(${ENGINE_NAME} PUBLIC
 )
 
 # Vulkan clips at 0 <= z <= w, so glm must build projections for that range. PUBLIC because a
-# matrix built in one target and consumed in another has to agree on the convention.
+# matrix built in one target and consumed in another has to agree on the convention, and the same
+# holds for RAPTURE_DEBUG wherever it changes what a header declares.
 target_compile_definitions(${ENGINE_NAME} PUBLIC
     GLM_FORCE_DEPTH_ZERO_TO_ONE
+    $<$<OR:$<CONFIG:Debug>,$<BOOL:${RAPTURE_DEBUG}>>:RAPTURE_DEBUG>
 )
 
-# Link with vendor libraries
-target_link_libraries(${ENGINE_NAME} PUBLIC
-    vendor_libraries
-    Threads::Threads
+target_link_libraries(${ENGINE_NAME}
+    PUBLIC
+        engine_public_dependencies
+        Threads::Threads
+    PRIVATE
+        engine_private_dependencies
 )
 
 # Set output directory
@@ -58,4 +39,4 @@ set_target_properties(${ENGINE_NAME} PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-) 
+)

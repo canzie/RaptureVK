@@ -58,6 +58,8 @@ option(RAPTURE_BUILD_UTESTS "Build the unit test executables" OFF)
 option(RAPTURE_EXEC_UTESTS "Run the unit tests as part of the build" OFF)
 option(RAPTURE_UTESTS_VALGRIND "Run the unit tests under valgrind" OFF)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RaptureWarnings.cmake)
+
 # Add subdirectories
 add_subdirectory(Engine)
 add_subdirectory(Editor)

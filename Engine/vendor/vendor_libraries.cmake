@@ -18,8 +18,9 @@ set(CMAKE_WARN_DEPRECATED OFF CACHE INTERNAL "")
 
 # ==================== Vendor Libraries Configuration ====================
 
-# Create a vendor interface target
-add_library(vendor_libraries INTERFACE)
+# Vendor libraries the engine's public headers include, and those only its sources include
+add_library(engine_public_dependencies INTERFACE)
+add_library(engine_private_dependencies INTERFACE)
 
 # Find system dependencies
 find_package(Vulkan REQUIRED)
@@ -373,45 +374,49 @@ target_compile_options(lua PRIVATE
 
 # --- sol2 Target ---
 # NOTE: sol2 exports itself unconditionally, so anything added to its link interface has to be in
-# an export set too. Lua is linked through vendor_libraries below instead.
-target_compile_definitions(vendor_libraries INTERFACE
+# an export set too. Lua is linked through engine_private_dependencies below instead.
+target_compile_definitions(engine_private_dependencies INTERFACE
     SOL_USING_CXX_LUA=1
     $<$<CONFIG:Debug>:SOL_ALL_SAFETIES_ON=1>
 )
 
-# ==================== Link all libraries to vendor_libraries ====================
-target_link_libraries(vendor_libraries INTERFACE
-    glfw
+# ==================== Link the engine's dependency sets ====================
+target_link_libraries(engine_public_dependencies INTERFACE
     glm
-    amethyst
-    amethyst_vk13_glfw
     spdlog
-    stb_image
     vma
     spirv_reflect_static
     yyjson_static
     Vulkan::Vulkan
     tracy::client
+    concurrentqueue
+)
+
+target_link_libraries(engine_private_dependencies INTERFACE
+    glfw
+    stb_image
     glslang
     SPIRV
     glslang-default-resource-limits
     tomlplusplus::tomlplusplus
-    concurrentqueue
     Jolt
     lua
     sol2::sol2
 )
 
-# Mark vendor_libraries includes as SYSTEM to suppress warnings
-target_include_directories(vendor_libraries SYSTEM INTERFACE
-    ${glfw_SOURCE_DIR}/include
+# Mark the dependency includes as SYSTEM to suppress warnings
+target_include_directories(engine_public_dependencies SYSTEM INTERFACE
     ${glm_SOURCE_DIR}
     ${spdlog_SOURCE_DIR}/include
 )
 
+target_include_directories(engine_private_dependencies SYSTEM INTERFACE
+    ${glfw_SOURCE_DIR}/include
+)
+
 # Add platform-specific libraries for GLFW
 if(WIN32)
-    target_link_libraries(vendor_libraries INTERFACE gdi32 user32 shell32)
+    target_link_libraries(engine_private_dependencies INTERFACE gdi32 user32 shell32)
 elseif(UNIX AND NOT APPLE)
     # Linux: Check for Wayland and X11 support
     
@@ -421,8 +426,8 @@ elseif(UNIX AND NOT APPLE)
         pkg_check_modules(WAYLAND wayland-client wayland-cursor wayland-egl)
         if(WAYLAND_FOUND)
             message(STATUS "Wayland libraries found, linking Wayland support")
-            target_link_libraries(vendor_libraries INTERFACE ${WAYLAND_LIBRARIES})
-            target_include_directories(vendor_libraries INTERFACE ${WAYLAND_INCLUDE_DIRS})
+            target_link_libraries(engine_private_dependencies INTERFACE ${WAYLAND_LIBRARIES})
+            target_include_directories(engine_private_dependencies INTERFACE ${WAYLAND_INCLUDE_DIRS})
         endif()
     endif()
     
@@ -430,7 +435,7 @@ elseif(UNIX AND NOT APPLE)
     find_package(X11 QUIET)
     if(X11_FOUND)
         message(STATUS "X11 libraries found, linking X11 support")
-        target_link_libraries(vendor_libraries INTERFACE ${X11_LIBRARIES})
+        target_link_libraries(engine_private_dependencies INTERFACE ${X11_LIBRARIES})
     endif()
 endif()
 

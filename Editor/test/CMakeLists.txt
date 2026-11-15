@@ -10,7 +10,7 @@ set(EDITOR_TEST_UNITS
 
 rapture_add_tests(RaptureEditorTests
     SOURCES ${EDITOR_TEST_SOURCES} ${EDITOR_TEST_UNITS}
-    LIBRARIES RaptureVK
+    LIBRARIES RaptureVK amethyst
     INCLUDES
         ${CMAKE_SOURCE_DIR}/Editor/src
         ${CMAKE_SOURCE_DIR}/Engine/vendor/Amethyst/libamethyst/src

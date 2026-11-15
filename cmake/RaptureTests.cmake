@@ -25,6 +25,7 @@ function(rapture_add_tests TARGET)
 
     add_executable(${TARGET} ${ARG_SOURCES})
     target_link_libraries(${TARGET} PRIVATE ${ARG_LIBRARIES} GTest::gtest_main)
+    rapture_set_warnings(${TARGET})
 
     if(ARG_INCLUDES)
         target_include_directories(${TARGET} PRIVATE ${ARG_INCLUDES})
