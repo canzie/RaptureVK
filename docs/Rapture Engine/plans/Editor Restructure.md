@@ -4,6 +4,20 @@ Full rebuild of `Editor/` as a codebase: file layout, panel and workspace lifeti
 
 Source of truth for the work. Every claim below is checked against the tree at the time of writing and cited.
 
+## Status
+
+2026-11-15, branch `editor-restructure`: Phase 1 done apart from the rig family, which is postponed until the skeleton and animation side of the editor is rethought. The editor builds and runs. Line citations in the "Why now" and Phase 1 sections describe the tree before the restructure and point at files that have since moved or gone.
+
+What Phase 1 ended up as, where it differs from the text below:
+
+- The two hosts are concrete classes named `WindowManager` (secondary windows, file dialog, import panel) and `WorkspaceManager` (open workspaces, asset routing, restore and store), both in `context/`. `EditorContext` points at them directly; there are no interface bases.
+- `AmethystLayer` still draws every UI window, `WindowManager` included through a draw callback, until Phase 5 moves that into the engine.
+- A workspace is told its content area by the shell and places its own dock below the hotbar, since the dock is a layer and gets no absolutes from its parent.
+- A panel can be built outside a tab bar (`Panel::attachTo`) and moved into one later, which is how the bottom bar's content browser docks into a workspace.
+- `ScenePreviewHost` became `PreviewScene`, held by `PreviewWorkspace`. The world editor keeps its own viewport.
+- Material preview is built from scene objects. Its skybox is still a cubemap imported from disk, left until preview backgrounds move to grids and gradients.
+- `AnimationsWorkspace` stays an empty tab: the engine has no animation asset class yet.
+
 ## Why now
 
 Three flaws are load-bearing and block everything downstream.
@@ -110,7 +124,7 @@ Two other stores stay as they are and are not part of this:
 ```
 Editor/src/
   app/          EditorApp, main, relaunch, EditorSettings, EditorState, EditorShell
-  context/      EditorContext, WindowHost, WorkspaceHost
+  context/      EditorContext, WindowManager, WorkspaceManager
   ui/           the editor's widget vocabulary, workspace-agnostic
     EditorWidget.h
     fields/     AssetField, ObjectField, ColorField, SearchField, FieldTable
@@ -219,8 +233,8 @@ Depends on Phase 1.
 `AmethystLayer` is 841 + 176 lines doing eight things. Split four ways:
 
 - **`UiRenderLayer`**, moved to the engine — Amethyst backend, descriptor pool, dynamic rendering, per-window draw and record, swapchain resize. Removes the last raw Vulkan from `Editor/` (`createUiDescriptorPool`, `beginDynamicRendering`, `endDynamicRendering`, hand-written `vkCmdPipelineBarrier`).
-- **`WindowHost`** — secondary windows, file dialog, import dialog.
-- **`EditorShell`** — menu bar, workspace tab bar, bottom bar, workspace open/close/restore.
+- **`WindowManager`** — secondary windows, file dialog, import dialog. Done in Phase 1, minus the drawing.
+- **`EditorShell`** — menu bar, workspace tab bar, bottom bar. Workspace open/close/restore already lives in `WorkspaceManager`.
 - **`EditorState`** — unchanged.
 
 ### Phase 6 — dedup
@@ -255,12 +269,14 @@ Undo/redo (Phase 7). Multi-selection — `EntitySelection` holds one entity and 
 ## Still open
 
 - Where the undo stack lives now that there is no document object: per workspace, or per asset shared across the workspaces showing it.
-- Closing an `AssetWorkspace` when its asset is deleted has no hook. There is no asset-removed signal anywhere — `AssetManager`, `AssetRegistry` and `AssetManagerEditor` expose no `EventSignal`, and `ProjectEvents` only covers serialise and register. Needs an engine-side signal before it can be wired.
+- Closing an `AssetWorkspace` when its asset is deleted has no hook. There is no asset-removed signal anywhere — `AssetManager`, `AssetRegistry` and `AssetManagerEditor` expose no `EventSignal`, and `ProjectEvents` only covers serialise and register. Asset deletion itself does not exist yet either (the content browser's Delete entry is an empty lambda), so this lands together with delete.
+- Whether UI scale belongs in Amethyst after all. Tweening and animated layout make a library-level scale hard to avoid, which would shrink `applyMetrics()` to whatever the library cannot know.
+- Whether `Viewport::EditorBinding::displayed` stays as the one-panel-per-viewport guard or goes with the other UI facts on the viewport.
 - The scripting workspace needs a file tree panel, since opening a second script into an existing workspace is now its job rather than the router's.
 - Which metrics snap to a set and which round, per category. Icons and hairlines are the ones that need deciding by eye rather than by rule.
 - Whether `applyMetrics()` is a plain tree walk or driven off a dirty epoch, so a widget built after a scale change does not need a second pass.
 - Whether the generated theme `.ams` is written to the project or beside the executable.
-- Whether `ScenePreviewHost` covers the level editor too, or the level editor keeps its own viewport ownership.
+- The rig family: skeleton, skeletal mesh and animation workspaces sharing a rig preview. Postponed until the editor side of skeletons and animation is rethought.
 
 ## Related
 
