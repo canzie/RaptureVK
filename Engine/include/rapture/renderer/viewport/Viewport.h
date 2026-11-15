@@ -132,6 +132,12 @@ class Viewport {
     void setActive(bool active) { m_active = active; }
 
   private:
+    /**
+     * @brief Matches the camera's projection to this viewport's width and height
+     */
+    void updateCameraAspectRatio();
+
+  private:
     inline static ViewportId s_nextId = 1;
 
     const ViewportId m_id = s_nextId++;

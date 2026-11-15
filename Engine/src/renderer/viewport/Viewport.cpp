@@ -30,6 +30,7 @@ Viewport::Viewport(const ViewportConfig &config, RenderContext renderContext) : 
     m_camera = m_config.camera;
 
     m_drawManager = std::make_unique<DrawManager>(m_renderContext, drawConfig);
+    updateCameraAspectRatio();
 
     if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
         m_windowResizeConn = Application::getInstance().getMainWindow().getWindowContext()->onResize.connect(
@@ -52,6 +53,7 @@ void Viewport::setScene(Scene *scene)
 void Viewport::setCamera(ecs::EntityAccessor camera)
 {
     m_camera = camera;
+    updateCameraAspectRatio();
 }
 
 void Viewport::createRenderer(RendererType type)
@@ -121,15 +123,18 @@ void Viewport::resize(uint32_t width, uint32_t height)
     m_config.width = width;
     m_config.height = height;
     m_drawManager->resize(width, height);
+    updateCameraAspectRatio();
+}
 
-    if (height == 0 || !m_camera.isValid()) {
+void Viewport::updateCameraAspectRatio()
+{
+    if (m_config.height == 0 || !m_camera.isValid() || !m_camera.has<CameraComponent>()) {
         return;
     }
-    if (m_camera.has<CameraComponent>()) {
-        auto camera = m_camera.write<CameraComponent>();
-        float aspect = static_cast<float>(width) / static_cast<float>(height);
-        camera->updateProjectionMatrix(camera->fov, aspect, camera->nearPlane, camera->farPlane);
-    }
+
+    auto camera = m_camera.write<CameraComponent>();
+    float aspect = static_cast<float>(m_config.width) / static_cast<float>(m_config.height);
+    camera->updateProjectionMatrix(camera->fov, aspect, camera->nearPlane, camera->farPlane);
 }
 
 void Viewport::onSwapChainRecreated()
