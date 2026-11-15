@@ -97,6 +97,10 @@ bool VulkanQueue::submitBatchThen(const VkSubmitInfo2 *submitAfterBatch, VkFence
 
     VkResult result = vkQueueSubmit2(m_queue, static_cast<uint32_t>(submits.size()), submits.data(), fence);
 
+    if (result == VK_SUCCESS && !m_cmdBufferBatch.empty()) {
+        m_lastSubmittedValue.store(m_batchSignalValue, std::memory_order_release);
+    }
+
     m_cmdBufferBatch.clear();
     m_batchSignalValue = 0;
 
@@ -198,9 +202,22 @@ uint64_t VulkanQueue::submitQueue(CommandBuffer *commandBuffer, const SubmitSync
         return 0;
     }
 
+    m_lastSubmittedValue.store(signalValue, std::memory_order_release);
+
     s_markCommandBufferSubmitted(commandBuffer, m_timelineSemaphore, signalValue);
 
     return signalValue;
+}
+
+void VulkanQueue::waitForTimelineValue(uint64_t value) const
+{
+    VkSemaphoreWaitInfo waitInfo{};
+    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+    waitInfo.semaphoreCount = 1;
+    waitInfo.pSemaphores = &m_timelineSemaphore;
+    waitInfo.pValues = &value;
+
+    vkWaitSemaphores(m_device, &waitInfo, UINT64_MAX);
 }
 
 void VulkanQueue::waitIdle()

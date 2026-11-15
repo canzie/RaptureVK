@@ -182,6 +182,11 @@ class Application {
     void createWindowlessDevice(QueueFamilyAssignment queueFamilyAssignment);
 
     /**
+     * @brief Blocks until the device has finished the frame that last used the current frame-in-flight slot
+     */
+    void waitForFrameSlotToFinish();
+
+    /**
      * @brief Samples the current hardware readings into m_telemetry
      */
     void pollTelemetry();
@@ -207,6 +212,7 @@ class Application {
 
     uint64_t m_frameCount = 0;
     uint32_t m_framesInFlight = 1;
+    std::vector<uint64_t> m_frameSlotSubmittedValues;
 
     Telemetry m_telemetry;
     float m_telemetryPollAccum = 0.0f;

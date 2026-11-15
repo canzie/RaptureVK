@@ -20,7 +20,7 @@
 
 namespace Rapture {
 
-static constexpr uint32_t WINDOWLESS_FRAMES_IN_FLIGHT = 2;
+static constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 Application *Application::s_instance = nullptr;
 
@@ -40,6 +40,9 @@ Application::Application(const ApplicationConfig &config) : m_running(true), m_i
     } else {
         createWindowlessDevice(config.queueFamilyAssignment);
     }
+
+    m_framesInFlight = FRAMES_IN_FLIGHT;
+    m_frameSlotSubmittedValues.assign(m_framesInFlight, 0);
 
     AssetManager::init(&m_telemetry, m_framesInFlight);
 
@@ -114,8 +117,6 @@ void Application::createMainWindowAndDevice(const MainWindowConfig &config, Queu
     m_vulkanContext->initDevice(m_mainWindow->getSurface(), queueFamilyAssignment);
 
     m_mainWindow->createSwapChain(*m_vulkanContext);
-    m_framesInFlight = m_mainWindow->getSwapChain()->getImageCount();
-    RP_ASSERT(m_framesInFlight > 0, "the main window's swapchain reported no images");
 }
 
 void Application::createWindowlessDevice(QueueFamilyAssignment queueFamilyAssignment)
@@ -123,8 +124,6 @@ void Application::createWindowlessDevice(QueueFamilyAssignment queueFamilyAssign
     RP_CORE_INFO("Creating windowless Vulkan context...");
     m_vulkanContext = std::make_unique<VulkanContext>(std::vector<const char *>{});
     m_vulkanContext->initDevice(VK_NULL_HANDLE, queueFamilyAssignment);
-
-    m_framesInFlight = WINDOWLESS_FRAMES_IN_FLIGHT;
 }
 
 Application::~Application()
@@ -232,6 +231,8 @@ void Application::runFrame()
     m_vulkanContext->getGraphicsQueue()->flush();
     m_vulkanContext->getTransferQueue()->flush();
 
+    waitForFrameSlotToFinish();
+
     m_telemetryPollAccum += Timestep::deltaTime();
     if (m_telemetryPollAccum >= 1.0f) {
         m_telemetryPollAccum = 0.0f;
@@ -279,9 +280,19 @@ void Application::runFrame()
         }
     }
 
+    m_vulkanContext->getGraphicsQueue()->flush();
+    m_frameSlotSubmittedValues[getFrameInFlightIndex()] = m_vulkanContext->getGraphicsQueue()->getLastSubmittedValue();
+
     m_frameCount++;
 
     TracyProfiler::endFrame();
+}
+
+void Application::waitForFrameSlotToFinish()
+{
+    RAPTURE_PROFILE_FUNCTION();
+
+    m_vulkanContext->getGraphicsQueue()->waitForTimelineValue(m_frameSlotSubmittedValues[getFrameInFlightIndex()]);
 }
 
 RenderWindow &Application::createSecondaryWindow(int32_t width, int32_t height, const char *title)

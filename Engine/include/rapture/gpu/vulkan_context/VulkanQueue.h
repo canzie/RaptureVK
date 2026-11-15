@@ -3,6 +3,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <atomic>
 #include <mutex>
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <span>
@@ -68,6 +69,18 @@ class VulkanQueue {
 
     void waitIdle();
 
+    /**
+     * @brief The timeline value of the most recent submission sent to the device
+     * @return The value, 0 before the first submission
+     */
+    uint64_t getLastSubmittedValue() const { return m_lastSubmittedValue.load(std::memory_order_acquire); }
+
+    /**
+     * @brief Blocks the calling thread until the device has finished every submission up to a timeline value
+     * @param value The timeline value to wait for
+     */
+    void waitForTimelineValue(uint64_t value) const;
+
     // should probably check if queue is present but well see
     VkResult presentQueue(VkPresentInfoKHR &presentInfo);
 
@@ -93,6 +106,7 @@ class VulkanQueue {
     std::vector<CommandBuffer *> m_cmdBufferBatch;
     uint64_t m_batchSignalValue = 0;
     uint64_t m_nextTimelineValue = 1;
+    std::atomic<uint64_t> m_lastSubmittedValue{0};
 
     VkDevice m_device;
     VkQueue m_queue;
