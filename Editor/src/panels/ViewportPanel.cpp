@@ -3,8 +3,7 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "scene/components/Components.h"
-#include "layers/panels/components/context_menus.h"
-#include "layers/panels/components/tab_layouts.h"
+#include "ui/menus/ContextMenuItems.h"
 #include "scene/instances/controllers/CameraController.h"
 #include "gpu/render_targets/SceneRenderTarget.h"
 #include "scene/World.h"
@@ -18,7 +17,6 @@
 #include <components/input_events.h>
 #include <components/ui_scope.h>
 
-#include "core/utils/Log.h"
 #include "renderer/RenderSettings.h"
 
 #include <algorithm>
@@ -97,32 +95,48 @@ static void s_showGrownMenu(Amethyst::ContextMenu *menu, Amethyst::UIObject *anc
     menu->show(anchor);
 }
 
-ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Viewport", context)
+ViewportPanel::ViewportPanel(const WorkspaceContext &context) : Panel("Viewport", context)
 {
+    m_icon = Icons::SVG_VIEWPORT;
+
     m_viewport = context.viewport;
-    if (m_viewport != nullptr) {
-        bool alreadyDisplayed = m_viewport->editorBinding().displayed;
-        RP_ASSERT(!alreadyDisplayed, "viewport is already displayed by another panel");
-        if (alreadyDisplayed) {
-            m_viewport = nullptr;
-        } else {
-            m_viewport->editorBinding().displayed = true;
-            if (context.scene != nullptr) {
-                m_viewport->setScene(context.scene);
-            }
-        }
+    if (m_viewport == nullptr) {
+        return;
     }
 
+    RP_ASSERT(!m_viewport->editorBinding().displayed, "viewport is already displayed by another panel");
+    m_viewport->editorBinding().displayed = true;
+
+    if (context.scene != nullptr) {
+        m_viewport->setScene(context.scene);
+    }
+
+    // nothing is looking at it until its tab comes to the front
+    m_viewport->setActive(false);
+}
+
+void ViewportPanel::onShown()
+{
+    if (m_viewport != nullptr) {
+        m_viewport->setActive(true);
+    }
+}
+
+void ViewportPanel::onHidden()
+{
+    if (m_viewport != nullptr) {
+        m_viewport->setActive(false);
+    }
+}
+
+void ViewportPanel::build(Amethyst::UIScope &scope)
+{
     m_gizmoSpaceGroup.value = static_cast<int32_t>(m_gizmoSpace);
     m_lightingModeGroup.value = VLM_LIT;
 
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
-    m_root->addClass("panel");
     m_root->setBaseProperties({.clipsDescendants = true, .padding = Amethyst::UDim4::fromOffset(VIEWPORT_PADDING)});
 
-    Amethyst::UIScope(*m_root).imageLabel(
+    scope.imageLabel(
         {
             .base =
                 {
@@ -164,15 +178,14 @@ ViewportPanel::ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &c
         });
     }
 
-    icon = Icons::SVG_VIEWPORT;
-    attach(tabBar, std::move(root));
 }
 
 void ViewportPanel::releaseSlotImages()
 {
+    UiTextures *textures = m_context.editor->textures;
     for (auto &slot : m_slotImages) {
-        if (slot.id.isValid() && m_services.unregisterTexture) {
-            m_services.unregisterTexture(slot.id);
+        if (slot.id.isValid()) {
+            textures->unregisterTexture(slot.id);
         }
     }
 
@@ -184,12 +197,7 @@ ViewportPanel::~ViewportPanel()
     releaseSlotImages();
     if (m_viewport != nullptr) {
         m_viewport->editorBinding().displayed = false;
-    }
-
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
+        m_viewport->setActive(false);
     }
 }
 
@@ -245,8 +253,8 @@ void ViewportPanel::buildTransformMenu()
     m_transformMenu->popupWidth *= 1.3f;
     m_transformMenu->maxVisibleItems = INT_MAX;
     m_transformMenu->setRowFactories({
-        .separator = [] { return std::make_unique<ViewportContextMenuSIV>(); },
-        .radio = [] { return std::make_unique<ViewportContextMenuRIV>(); },
+        .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
+        .radio = [] { return std::make_unique<RadioMenuItemView>(); },
     });
 
     m_gizmoOpGroupConn = m_gizmoOpGroup.onChanged.connect(
@@ -263,22 +271,22 @@ void ViewportPanel::buildTransformMenu()
     });
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    items.push_back(ViewportContextMenuRID::create("Translate", &m_gizmoOpGroup,
+    items.push_back(RadioMenuItem::create("Translate", &m_gizmoOpGroup,
                                                    static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_TRANSLATE)));
-    items.push_back(ViewportContextMenuRID::create("Rotate", &m_gizmoOpGroup,
+    items.push_back(RadioMenuItem::create("Rotate", &m_gizmoOpGroup,
                                                    static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_ROTATE)));
-    items.push_back(ViewportContextMenuRID::create("Scale", &m_gizmoOpGroup,
+    items.push_back(RadioMenuItem::create("Scale", &m_gizmoOpGroup,
                                                    static_cast<int32_t>(gizmo::TransformGizmo::OPERATION_SCALE)));
-    items.push_back(ViewportContextMenuSID::create("Space"));
-    items.push_back(ViewportContextMenuRID::create("World", &m_gizmoSpaceGroup,
+    items.push_back(SeparatorMenuItem::create("Space"));
+    items.push_back(RadioMenuItem::create("World", &m_gizmoSpaceGroup,
                                                    static_cast<int32_t>(gizmo::TransformGizmo::SPACE_WORLD)));
-    items.push_back(ViewportContextMenuRID::create("Local", &m_gizmoSpaceGroup,
+    items.push_back(RadioMenuItem::create("Local", &m_gizmoSpaceGroup,
                                                    static_cast<int32_t>(gizmo::TransformGizmo::SPACE_LOCAL)));
-    items.push_back(ViewportContextMenuSID::create("Camera"));
+    items.push_back(SeparatorMenuItem::create("Camera"));
     items.push_back(
-        ViewportContextMenuRID::create("Orbit", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::ORBIT)));
+        RadioMenuItem::create("Orbit", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::ORBIT)));
     items.push_back(
-        ViewportContextMenuRID::create("Fly", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::FLY)));
+        RadioMenuItem::create("Fly", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::FLY)));
     m_transformMenu->setItems(std::move(items));
 }
 
@@ -288,8 +296,8 @@ void ViewportPanel::buildRenderMenu()
     m_renderMenu->addClass("viewport-context-menu");
     m_renderMenu->popupWidth *= 1.3f;
     m_renderMenu->maxVisibleItems = INT_MAX;
-    m_renderMenu->setRowFactories({.toggle = [] { return std::make_unique<ViewportContextMenuTIV>(); },
-                                   .radio = [] { return std::make_unique<ViewportContextMenuRIV>(); }});
+    m_renderMenu->setRowFactories({.toggle = [] { return std::make_unique<ToggleMenuItemView>(); },
+                                   .radio = [] { return std::make_unique<RadioMenuItemView>(); }});
 
     m_lightingModeGroupConn = m_lightingModeGroup.onChanged.connect(
         [this]() { applyLightingMode(static_cast<ViewportLightingMode>(m_lightingModeGroup.value)); });
@@ -301,34 +309,34 @@ void ViewportPanel::buildRenderMenu()
     });
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    items.push_back(ViewportContextMenuRID::create("Lit", &m_lightingModeGroup, VLM_LIT));
-    items.push_back(ViewportContextMenuRID::create("Direct Lighting", &m_lightingModeGroup, VLM_DIRECT_LIGHTING));
-    items.push_back(ViewportContextMenuRID::create("Indirect Lighting", &m_lightingModeGroup, VLM_INDIRECT_LIGHTING));
-    items.push_back(ViewportContextMenuRID::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
-    items.push_back(ViewportContextMenuRID::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
-    items.push_back(ViewportContextMenuRID::create("Show Motion Vectors", &m_lightingModeGroup, VLM_MOTION));
-    items.push_back(ViewportContextMenuRID::create("Show Ambient Occlusion", &m_lightingModeGroup, VLM_AMBIENT_OCCLUSION));
+    items.push_back(RadioMenuItem::create("Lit", &m_lightingModeGroup, VLM_LIT));
+    items.push_back(RadioMenuItem::create("Direct Lighting", &m_lightingModeGroup, VLM_DIRECT_LIGHTING));
+    items.push_back(RadioMenuItem::create("Indirect Lighting", &m_lightingModeGroup, VLM_INDIRECT_LIGHTING));
+    items.push_back(RadioMenuItem::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
+    items.push_back(RadioMenuItem::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
+    items.push_back(RadioMenuItem::create("Show Motion Vectors", &m_lightingModeGroup, VLM_MOTION));
+    items.push_back(RadioMenuItem::create("Show Ambient Occlusion", &m_lightingModeGroup, VLM_AMBIENT_OCCLUSION));
 
-    auto occlusionToggle = ViewportContextMenuTID::create("Ambient Occlusion", [this](bool on) {
+    auto occlusionToggle = ToggleMenuItem::create("Ambient Occlusion", [this](bool on) {
         if (m_viewport != nullptr) {
             m_viewport->renderSettings().setFlag(Rapture::RENDER_USE_AMBIENT_OCCLUSION, on);
         }
     });
-    occlusionToggle->as<ViewportContextMenuTID>().value = true;
+    occlusionToggle->as<ToggleMenuItem>().value = true;
     items.push_back(std::move(occlusionToggle));
 
-    items.push_back(ViewportContextMenuSID::create("DDGI Probes"));
+    items.push_back(SeparatorMenuItem::create("DDGI Probes"));
 
-    items.push_back(ViewportContextMenuTID::create("Show Probes", [this](bool on) {
+    items.push_back(ToggleMenuItem::create("Show Probes", [this](bool on) {
         if (m_viewport != nullptr) {
             m_viewport->renderSettings().setFlag(Rapture::RENDER_SHOW_DDGI_PROBES, on);
         }
     }));
 
-    items.push_back(ViewportContextMenuRID::create("Probe Classification", &m_probeDebugModeGroup, Rapture::PDM_CLASSIFICATION));
-    items.push_back(ViewportContextMenuRID::create("Probe Irradiance", &m_probeDebugModeGroup, Rapture::PDM_IRRADIANCE));
-    items.push_back(ViewportContextMenuRID::create("Probe Distance", &m_probeDebugModeGroup, Rapture::PDM_DISTANCE));
-    items.push_back(ViewportContextMenuRID::create("Probe Relocation", &m_probeDebugModeGroup, Rapture::PDM_RELOCATION));
+    items.push_back(RadioMenuItem::create("Probe Classification", &m_probeDebugModeGroup, Rapture::PDM_CLASSIFICATION));
+    items.push_back(RadioMenuItem::create("Probe Irradiance", &m_probeDebugModeGroup, Rapture::PDM_IRRADIANCE));
+    items.push_back(RadioMenuItem::create("Probe Distance", &m_probeDebugModeGroup, Rapture::PDM_DISTANCE));
+    items.push_back(RadioMenuItem::create("Probe Relocation", &m_probeDebugModeGroup, Rapture::PDM_RELOCATION));
 
     m_renderMenu->setItems(std::move(items));
 }
@@ -420,12 +428,11 @@ void ViewportPanel::updateViewportImage()
 
     SlotImage &cached = m_slotImages[slot];
     if (texture.get() != cached.texture) {
-        if (cached.id.isValid() && m_services.unregisterTexture) {
-            m_services.unregisterTexture(cached.id);
+        UiTextures *textures = m_context.editor->textures;
+        if (cached.id.isValid()) {
+            textures->unregisterTexture(cached.id);
         }
-        if (m_services.registerTexture) {
-            cached.id = m_services.registerTexture(texture.get());
-        }
+        cached.id = textures->registerTexture(texture.get());
         cached.texture = texture.get();
     }
 

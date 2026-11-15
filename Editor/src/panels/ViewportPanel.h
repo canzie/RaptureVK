@@ -2,15 +2,14 @@
 #define RAPTURE__VIEWPORT_PANEL_H
 
 #include <amethyst/Amethyst.h>
-#include <amethyst__vk13_glfw.h>
 #include <components/context_menu.h>
 #include <components/radio_button.h>
 #include <components/ui_scope.h>
 
+#include "core/ecs/entity_accessor.h"
 #include "core/events/EventSignal.h"
 #include "gizmos/TransformGizmo.h"
-#include "layers/panels/Panel.h"
-#include "core/ecs/entity_accessor.h"
+#include "panels/Panel.h"
 
 #include <cstdint>
 #include <math/math.h>
@@ -43,12 +42,8 @@ enum ViewportLightingMode {
 
 class ViewportPanel : public Panel {
   public:
-    ViewportPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
-    ~ViewportPanel();
-    ViewportPanel(const ViewportPanel &) = delete;
-    ViewportPanel &operator=(const ViewportPanel &) = delete;
-    ViewportPanel(ViewportPanel &&) = delete;
-    ViewportPanel &operator=(ViewportPanel &&) = delete;
+    explicit ViewportPanel(const WorkspaceContext &context);
+    ~ViewportPanel() override;
 
     void setViewportImage(Amethyst::AmTextureId imageId);
 
@@ -56,6 +51,7 @@ class ViewportPanel : public Panel {
      * @brief Hands back every image this panel holds for its viewport's targets
      */
     void releaseSlotImages();
+
     void onUpdate(float dt) override;
 
     gizmo::TransformGizmo::Operation getGizmoOperation() const { return m_gizmoOperation; }
@@ -76,6 +72,18 @@ class ViewportPanel : public Panel {
   public:
     Rapture::EventSignal<void()> onImageClicked;
 
+  protected:
+    void build(Amethyst::UIScope &scope) override;
+
+    /**
+     * @brief Starts the viewport drawing, since what it draws is now on screen
+     */
+    void onShown() override;
+
+    /**
+     * @brief Stops the viewport drawing, since nothing is looking at what it draws
+     */
+    void onHidden() override;
 
   private:
     void updateGizmo(void);
@@ -97,6 +105,7 @@ class ViewportPanel : public Panel {
      * @param input The release
      */
     void onViewportMouseReleased(const Amethyst::InputObject &input);
+
     /**
      * @brief Where a window position lands in this viewport's render target
      * @param windowPosition Position Amethyst reported an input at
