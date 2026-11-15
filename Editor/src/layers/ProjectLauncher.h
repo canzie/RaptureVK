@@ -1,7 +1,7 @@
 #ifndef RAPTURE__PROJECT_LAUNCHER_H
 #define RAPTURE__PROJECT_LAUNCHER_H
 
-#include "LauncherConfig.h"
+#include "app/EditorConfig.h"
 
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
@@ -54,7 +54,7 @@ class ProjectLauncher {
     void createProject(void);
 
   private:
-    LauncherConfig m_config;
+    EditorConfig m_config;
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextInput *m_nameField = nullptr;
     Amethyst::EventConnection m_rootDestroyConn;

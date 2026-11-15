@@ -32,7 +32,7 @@ static constexpr float ROW_NAME_HEIGHT = 18.0f;
 static constexpr float ROW_PATH_TOP = 25.0f;
 static constexpr float ROW_PATH_HEIGHT = 15.0f;
 
-ProjectLauncher::ProjectLauncher(Amethyst::Instance &parent) : m_config(LauncherConfig::load())
+ProjectLauncher::ProjectLauncher(Amethyst::Instance &parent) : m_config(EditorConfig::load())
 {
     m_root = parent.add<Amethyst::Frame>();
     buildContent();

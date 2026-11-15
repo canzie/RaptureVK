@@ -7,7 +7,7 @@
 #include "EntryPoint.h"
 #include "core/events/Events.h"
 #include "core/events/GameEvents.h"
-#include "LauncherConfig.h"
+#include "app/EditorConfig.h"
 #include "scene/Project.h"
 
 #include <filesystem>
@@ -26,7 +26,7 @@ class EditorApp : public Rapture::Application {
         setupEventHandlers();
 
         std::filesystem::path projectPath =
-            argc > 1 ? std::filesystem::path(argv[1]) : LauncherConfig::load().autoLaunchProject();
+            argc > 1 ? std::filesystem::path(argv[1]) : EditorConfig::load().autoLaunchProject();
         if (!projectPath.empty()) {
             openProject(projectPath);
         }
