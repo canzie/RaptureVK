@@ -1,4 +1,4 @@
-#include "WorkspaceHost.h"
+#include "WorkspaceManager.h"
 
 #include "workspaces/AnimationsWorkspace.h"
 #include "workspaces/MaterialEditorWorkspace.h"
@@ -18,9 +18,9 @@
 
 #include <algorithm>
 
-WorkspaceHost::WorkspaceHost(const EditorContext &context) : m_editor(&context) {}
+WorkspaceManager::WorkspaceManager(const EditorContext &context) : m_editor(&context) {}
 
-WorkspaceHost::~WorkspaceHost()
+WorkspaceManager::~WorkspaceManager()
 {
     if (m_tabBar != nullptr) {
         m_tabBar->onSelectionChanged = nullptr;
@@ -30,14 +30,14 @@ WorkspaceHost::~WorkspaceHost()
     m_workspaces.clear();
 }
 
-void WorkspaceHost::attach(Amethyst::TabBar &tabBar)
+void WorkspaceManager::attach(Amethyst::TabBar &tabBar)
 {
     m_tabBar = &tabBar;
     m_tabBar->onSelectionChanged = [this](int32_t index) { onTabSelected(m_tabBar->getTabContent(index)); };
     m_tabBar->onTabClosed = [this](Amethyst::Instance *content) { closeWorkspace(content); };
 }
 
-void WorkspaceHost::setContentArea(Amethyst::vec2 position, Amethyst::vec2 size)
+void WorkspaceManager::setContentArea(Amethyst::vec2 position, Amethyst::vec2 size)
 {
     m_contentAreaPosition = position;
     m_contentAreaSize = size;
@@ -47,7 +47,7 @@ void WorkspaceHost::setContentArea(Amethyst::vec2 position, Amethyst::vec2 size)
     }
 }
 
-void WorkspaceHost::restore(const EditorState &state)
+void WorkspaceManager::restore(const EditorState &state)
 {
     RP_ASSERT(m_tabBar != nullptr, "workspaces cannot be restored before the workspace bar exists");
 
@@ -83,7 +83,7 @@ void WorkspaceHost::restore(const EditorState &state)
     select(*front);
 }
 
-void WorkspaceHost::openStoredWorkspace(const EditorWorkspaceState &entry)
+void WorkspaceManager::openStoredWorkspace(const EditorWorkspaceState &entry)
 {
     if (entry.handle != Rapture::INVALID_ASSET_HANDLE) {
         openAsset(entry.handle);
@@ -99,7 +99,7 @@ void WorkspaceHost::openStoredWorkspace(const EditorWorkspaceState &entry)
     }
 }
 
-EditorState WorkspaceHost::captureState() const
+EditorState WorkspaceManager::captureState() const
 {
     EditorState state;
     state.workspaces.reserve(m_workspaces.size());
@@ -118,21 +118,21 @@ EditorState WorkspaceHost::captureState() const
     return state;
 }
 
-void WorkspaceHost::saveDockLayouts() const
+void WorkspaceManager::saveDockLayouts() const
 {
     for (const auto &workspace : m_workspaces) {
         workspace->saveDockLayout();
     }
 }
 
-void WorkspaceHost::onUpdate(float dt)
+void WorkspaceManager::onUpdate(float dt)
 {
     for (auto &workspace : m_workspaces) {
         workspace->onUpdate(dt);
     }
 }
 
-void WorkspaceHost::openAsset(Rapture::AssetHandle handle)
+void WorkspaceManager::openAsset(Rapture::AssetHandle handle)
 {
     if (handle == Rapture::INVALID_ASSET_HANDLE || m_tabBar == nullptr) {
         return;
@@ -161,7 +161,7 @@ void WorkspaceHost::openAsset(Rapture::AssetHandle handle)
     }
 }
 
-std::unique_ptr<Workspace> WorkspaceHost::createAssetWorkspace(Rapture::AssetHandle handle) const
+std::unique_ptr<Workspace> WorkspaceManager::createAssetWorkspace(Rapture::AssetHandle handle) const
 {
     const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(handle);
 
@@ -190,7 +190,7 @@ std::unique_ptr<Workspace> WorkspaceHost::createAssetWorkspace(Rapture::AssetHan
     }
 }
 
-Workspace *WorkspaceHost::adopt(std::unique_ptr<Workspace> workspace)
+Workspace *WorkspaceManager::adopt(std::unique_ptr<Workspace> workspace)
 {
     Workspace *adopted = workspace.get();
     adopted->setContentArea(m_contentAreaPosition, m_contentAreaSize);
@@ -203,7 +203,7 @@ Workspace *WorkspaceHost::adopt(std::unique_ptr<Workspace> workspace)
     return adopted;
 }
 
-AssetWorkspace *WorkspaceHost::findAssetWorkspace(Rapture::AssetHandle handle) const
+AssetWorkspace *WorkspaceManager::findAssetWorkspace(Rapture::AssetHandle handle) const
 {
     for (const auto &workspace : m_workspaces) {
         auto *assetWorkspace = dynamic_cast<AssetWorkspace *>(workspace.get());
@@ -214,7 +214,7 @@ AssetWorkspace *WorkspaceHost::findAssetWorkspace(Rapture::AssetHandle handle) c
     return nullptr;
 }
 
-ScriptingWorkspace *WorkspaceHost::findScriptingWorkspace() const
+ScriptingWorkspace *WorkspaceManager::findScriptingWorkspace() const
 {
     for (const auto &workspace : m_workspaces) {
         if (auto *scripting = dynamic_cast<ScriptingWorkspace *>(workspace.get())) {
@@ -224,13 +224,13 @@ ScriptingWorkspace *WorkspaceHost::findScriptingWorkspace() const
     return nullptr;
 }
 
-void WorkspaceHost::select(Workspace &workspace)
+void WorkspaceManager::select(Workspace &workspace)
 {
     m_tabBar->select(workspace.getContainer());
     onTabSelected(workspace.getContainer());
 }
 
-void WorkspaceHost::onTabSelected(Amethyst::Instance *content)
+void WorkspaceManager::onTabSelected(Amethyst::Instance *content)
 {
     Workspace *selected = nullptr;
     for (auto &workspace : m_workspaces) {
@@ -249,7 +249,7 @@ void WorkspaceHost::onTabSelected(Amethyst::Instance *content)
     onActiveWorkspaceChanged.fire(m_active);
 }
 
-void WorkspaceHost::closeWorkspace(Amethyst::Instance *content)
+void WorkspaceManager::closeWorkspace(Amethyst::Instance *content)
 {
     auto it = std::find_if(m_workspaces.begin(), m_workspaces.end(),
                            [content](const std::unique_ptr<Workspace> &workspace) { return workspace->getContainer() == content; });

@@ -1,5 +1,5 @@
-#ifndef RAPTURE__WORKSPACE_HOST_H
-#define RAPTURE__WORKSPACE_HOST_H
+#ifndef RAPTURE__WORKSPACE_MANAGER_H
+#define RAPTURE__WORKSPACE_MANAGER_H
 
 #include "EditorState.h"
 #include "context/EditorContext.h"
@@ -17,17 +17,17 @@ class Workspace;
 /**
  * @brief Holds the open workspaces, one tab each in the workspace bar
  */
-class WorkspaceHost : public WorkspaceHostBase {
+class WorkspaceManager {
   public:
     /**
-     * @brief Creates a host with no workspaces open
-     * @param context What the whole editor reaches, which has to outlive the host
+     * @brief Creates a manager with no workspaces open
+     * @param context What the whole editor reaches, which has to outlive the manager
      */
-    explicit WorkspaceHost(const EditorContext &context);
-    ~WorkspaceHost() override;
+    explicit WorkspaceManager(const EditorContext &context);
+    ~WorkspaceManager();
 
-    WorkspaceHost(const WorkspaceHost &) = delete;
-    WorkspaceHost &operator=(const WorkspaceHost &) = delete;
+    WorkspaceManager(const WorkspaceManager &) = delete;
+    WorkspaceManager &operator=(const WorkspaceManager &) = delete;
 
     /**
      * @brief Takes over the bar the workspaces are tabs of
@@ -61,7 +61,11 @@ class WorkspaceHost : public WorkspaceHostBase {
 
     void onUpdate(float dt);
 
-    void openAsset(Rapture::AssetHandle handle) override;
+    /**
+     * @brief Opens an asset in the workspace its type calls for, focusing the tab it is already in
+     * @param handle The asset to open
+     */
+    void openAsset(Rapture::AssetHandle handle);
 
     Workspace *activeWorkspace() const { return m_active; }
 
@@ -123,4 +127,4 @@ class WorkspaceHost : public WorkspaceHostBase {
     Amethyst::vec2 m_contentAreaSize = {0.0f, 0.0f};
 };
 
-#endif // RAPTURE__WORKSPACE_HOST_H
+#endif // RAPTURE__WORKSPACE_MANAGER_H
