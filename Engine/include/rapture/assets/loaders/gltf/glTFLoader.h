@@ -5,7 +5,6 @@
 #include <rapture/assets/materials/MaterialParameters.h>
 #include <rapture/assets/skeletons/ASkeleton.h>
 #include <rapture/assets/loaders/gltf/glTFCommon.h>
-#include "yyjson.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -17,6 +16,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+struct yyjson_val;
 
 namespace Rapture {
 

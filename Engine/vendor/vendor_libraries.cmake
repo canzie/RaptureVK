@@ -385,16 +385,16 @@ target_link_libraries(engine_public_dependencies INTERFACE
     glm
     spdlog
     vma
-    spirv_reflect_static
-    yyjson_static
     Vulkan::Vulkan
     tracy::client
-    concurrentqueue
 )
 
 target_link_libraries(engine_private_dependencies INTERFACE
     glfw
     stb_image
+    spirv_reflect_static
+    yyjson_static
+    concurrentqueue
     glslang
     SPIRV
     glslang-default-resource-limits

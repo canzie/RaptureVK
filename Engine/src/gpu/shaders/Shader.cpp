@@ -10,6 +10,8 @@
 
 #include <algorithm>
 
+#include <spirv_reflect.h>
+
 namespace Rapture {
 
 Shader::Shader()

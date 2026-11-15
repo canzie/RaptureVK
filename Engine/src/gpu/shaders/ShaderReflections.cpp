@@ -1,4 +1,5 @@
 #include <rapture/gpu/shaders/ShaderReflections.h>
+#include "gpu/shaders/ShaderReflections_internal.h"
 #include <rapture/core/utils/Log.h>
 
 #include <rapture/gpu/shaders/Shader.h>

@@ -8,8 +8,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "concurrentqueue.h"
-
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/asset_manager/AssetImportData.h>
 #include <rapture/assets/asset_manager/AssetManagerBase.h>
@@ -188,6 +186,8 @@ class AssetManagerEditor : public AssetManagerBase {
      */
     std::unique_ptr<Asset> loadFromMetadata(AssetHandle handle, AssetMetadata &metadata);
 
+    struct UnloadCheckQueue;
+
     /**
      * @brief An import whose async load must finish before its asset file can be written
      *
@@ -207,7 +207,7 @@ class AssetManagerEditor : public AssetManagerBase {
     size_t m_deferredFreeBucket = 0;
     bool m_shuttingDown = false;
 
-    moodycamel::ConcurrentQueue<AssetHandle> m_pendingUnloadChecks;
+    std::unique_ptr<UnloadCheckQueue> m_pendingUnloadChecks;
 
     PriorityQueue<AssetHandle> m_coldList;
     bool m_coldDraining = false;

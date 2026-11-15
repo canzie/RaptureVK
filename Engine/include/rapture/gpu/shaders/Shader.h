@@ -15,8 +15,6 @@
 #include <rapture/core/events/Events.h>
 #include <vulkan/vulkan.h>
 
-#include <spirv_reflect.h>
-
 namespace Rapture {
 
 enum class ShaderStatus {

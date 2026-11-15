@@ -1,7 +1,6 @@
 #ifndef RAPTURE__SHADER_REFLECTIONS_H
 #define RAPTURE__SHADER_REFLECTIONS_H
 
-#include <spirv_reflect.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -100,17 +99,8 @@ inline std::vector<VkPushConstantRange> pushConstantInfoToRanges(const std::vect
     return ranges;
 }
 
-// Helper to determine if a descriptor type is a texture
-bool isTextureDescriptorType(SpvReflectDescriptorType descriptorType);
-
-// Convert SPIR-V descriptor type to string (for debugging)
-std::string descriptorTypeToString(SpvReflectDescriptorType descriptorType);
-
 // Get descriptor info from the material set
 std::vector<DescriptorInfo> extractMaterialSets(const std::vector<char> &spirvCode);
-
-// New helper function to get a string representation of a SPIR-V type description
-std::string getSpirvTypeDescriptionString(const SpvReflectTypeDescription *typeDescription);
 
 // get push constant info for populating the VkPushConstantRange(s)
 // Extract and merge push constant information from multiple shader stages

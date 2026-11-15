@@ -27,6 +27,8 @@
 #include <filesystem>
 #include <memory>
 
+#include "concurrentqueue.h"
+
 namespace Rapture {
 
 static constexpr int32_t EVICTION_PRIORITY_LAZY = 1000; // EVICT_HINT_LAZY, drained before LAST
@@ -140,8 +142,13 @@ static std::unique_ptr<Asset> s_buildImportData(AssetImportDataVariant &data, st
     return nullptr;
 }
 
+struct AssetManagerEditor::UnloadCheckQueue {
+    moodycamel::ConcurrentQueue<AssetHandle> handles;
+};
+
 AssetManagerEditor::AssetManagerEditor(const Telemetry *telemetry, uint32_t framesInFlight)
-    : AssetManagerBase(), m_telemetry(telemetry), m_deferredFrees(static_cast<size_t>(framesInFlight) + 1)
+    : AssetManagerBase(), m_telemetry(telemetry), m_deferredFrees(static_cast<size_t>(framesInFlight) + 1),
+      m_pendingUnloadChecks(std::make_unique<UnloadCheckQueue>())
 {
 }
 
@@ -768,7 +775,7 @@ void AssetManagerEditor::processUnloadRequests()
 {
     std::vector<AssetHandle> stillLoading;
     AssetHandle handle;
-    while (m_pendingUnloadChecks.try_dequeue(handle)) {
+    while (m_pendingUnloadChecks->handles.try_dequeue(handle)) {
         const AssetSlot *slot = m_assets.find(handle);
         // a handle released to zero twice before this runs is queued twice, and the first check already evicted it
         if (slot == nullptr || slot->asset == nullptr) {
@@ -794,7 +801,7 @@ void AssetManagerEditor::processUnloadRequests()
     }
 
     for (AssetHandle h : stillLoading) {
-        m_pendingUnloadChecks.enqueue(h);
+        m_pendingUnloadChecks->handles.enqueue(h);
     }
 }
 
@@ -881,7 +888,7 @@ void AssetManagerEditor::requestUnload(AssetHandle handle)
     if (m_shuttingDown) {
         return;
     }
-    m_pendingUnloadChecks.enqueue(handle);
+    m_pendingUnloadChecks->handles.enqueue(handle);
 }
 
 } // namespace Rapture
