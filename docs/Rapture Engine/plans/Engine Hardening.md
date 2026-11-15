@@ -61,10 +61,23 @@ The one-panel-per-viewport rule stays either way: the panel resizes the viewport
 
 ## Library layout
 
-- [ ] Public include tree separate from private sources, so the editor sees only the engine's API.
-- [ ] Vendor libraries linked `PRIVATE` where they do not appear in public headers (Jolt is already behind a pimpl; sol2, VMA and others to check).
-- [ ] Target-scoped compile definitions and warnings instead of `add_definitions`, and the same warnings in every configuration.
-- [ ] Engine buildable as a library with a headless entry point, which is also what makes it testable.
+Layout: public headers in `Engine/include/rapture/<module>/`, private headers (anything only the engine includes) next to their sources in `Engine/src/<module>/` under their plain name. The `_internal` suffix is only for the private half of a header that also has a public one: a public `Texture.h` in `include/rapture/gpu/textures/` with its `_internal` companion in `src/gpu/textures/`. Every engine include is `<rapture/...>`, and the editor's include path only sees `include/`.
+
+Measured 2026-11-15 by following includes from `Editor/src` and `Engine/test`: 170 of 245 headers are reachable, mostly through `app/Application.h` (which pulls in `VulkanContext`, `Scene`, `RenderWindow`, `ViewportManager`). The split starts from that set; shrinking it is its own step.
+
+Vendor libraries by whether a reachable header includes them:
+
+| Public | Private |
+|---|---|
+| Vulkan, VMA (`gpu/`), glm, spdlog (`Log.h`), Tracy (`TracyProfiler.h`), spirv_reflect (`Shader.h`), yyjson (`glTFLoader.h`), concurrentqueue (`AssetManagerEditor.h`) | GLFW, stb, glslang, toml++, Jolt, Lua, sol2 |
+
+Amethyst is not included by any engine file; the editor links it itself.
+
+- [ ] **Step 1, CMake hygiene.** Target-scoped compile definitions, `RAPTURE_DEBUG` public so the editor and tests agree with the engine (`add_definitions` in `Engine/CMakeLists.txt` never reached them). The same warnings and `-Werror` in every configuration and on the editor, which had none. `RP_ASSERT` keeps its operands referenced in release so asserted-only variables do not warn. Vendor libraries split into a public and a private set, Amethyst linked by the editor. Dead `Engine/src/source.cpp` removed.
+- [ ] **Step 2, the split.** Reachable headers move to `include/rapture/`, the rest stay in `src/`, every engine include rewritten to `<rapture/...>`.
+- [ ] **Step 3, the cheap vendor leaks.** yyjson, concurrentqueue and spirv_reflect out of the public headers that include them, then linked private.
+- [ ] **Next phase: the public surface.** `Application.h` stops pulling in the renderer and scene, so the reachable set shrinks to the actual API.
+- [ ] **Next phase: headless.** `Application` without a window or swapchain, which the ECS and scene test fixtures need (`Scene`'s constructor builds physics and the TLAS).
 
 ## Testing and stress
 
