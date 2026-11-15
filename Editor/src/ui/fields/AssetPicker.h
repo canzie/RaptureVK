@@ -21,7 +21,7 @@ struct AssetMetadata;
 struct AssetQuery {
     std::vector<Rapture::AssetType> types;
     std::string nameFilter;
-    std::function<bool(Rapture::AssetHandle, const Rapture::AssetMetadata &)> predicate;
+    std::function<bool(Rapture::AssetHandle, const Rapture::AssetMetadata &)> predicate = {};
     bool includeDisk = true;
     bool includeVirtual = true;
 };
@@ -35,7 +35,7 @@ std::vector<Rapture::AssetHandle> AssetQuery_collect(const AssetQuery &query);
 
 struct AssetPickerConfig {
     std::vector<Rapture::AssetType> types; // empty = every type
-    std::function<bool(Rapture::AssetHandle, const Rapture::AssetMetadata &)> predicate;
+    std::function<bool(Rapture::AssetHandle, const Rapture::AssetMetadata &)> predicate = {};
     float rowHeight = 47.0f;
     int32_t maxVisibleRows = 10;
     float popupWidth = 0.0f; // 0 = match the picker's own width

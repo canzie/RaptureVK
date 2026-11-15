@@ -62,6 +62,7 @@ void WorldEditorWorkspace::setupViewport()
 
     m_viewport = app.getViewportManager().createViewport({
         .scene = m_context.scene,
+        .camera = {},
         .name = m_world->getName(),
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = INITIAL_VIEWPORT_WIDTH,

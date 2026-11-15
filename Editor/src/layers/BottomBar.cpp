@@ -91,7 +91,7 @@ BottomBar::BottomBar(Amethyst::Window *window, const EditorContext &context) : m
                 },
             .style = {.backgroundColor = Amethyst::Color3::fromHex(0x181818)},
         },
-        [this](Amethyst::FrameScope &fs) {});
+        [](Amethyst::FrameScope &fs) { (void)fs; });
 
     rootScope.frame(
         {
@@ -102,7 +102,7 @@ BottomBar::BottomBar(Amethyst::Window *window, const EditorContext &context) : m
                 },
             .style = {.backgroundColor = Amethyst::Color3::fromHex(0x181818)},
         },
-        [this](Amethyst::FrameScope &fs) {});
+        [](Amethyst::FrameScope &fs) { (void)fs; });
 
     setupContentBrowserToggle();
 }

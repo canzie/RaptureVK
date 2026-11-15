@@ -20,15 +20,6 @@ TextRange span(uint64_t startLine, uint64_t startColumn, uint64_t endLine, uint6
     return TextRange{TextPosition{startLine, startColumn}, TextPosition{endLine, endColumn}};
 }
 
-std::vector<std::string> allLines(const TextBuffer &buffer)
-{
-    std::vector<std::string> out;
-    for (uint64_t i = 0; i < buffer.lineCount(); i++) {
-        out.emplace_back(buffer.line(i));
-    }
-    return out;
-}
-
 // Enough distinct lines to span many blocks, so block boundaries land mid-test.
 std::string manyLines(size_t count)
 {

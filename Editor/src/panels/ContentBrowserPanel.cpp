@@ -917,7 +917,6 @@ void ContentBrowserPanel::rebuildBreadcrumb()
 
         const std::string &label = segments[i].first;
         const std::filesystem::path &target = segments[i].second;
-        bool isLast = (i == segments.size() - 1);
 
         scope.textButton(
             {
@@ -1272,7 +1271,6 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
     if (index >= m_contentItemPool.size()) {
         // The InvisibleButton must be the topmost hittable node in the tile, so the visual
         // children are marked non-interactable; otherwise they swallow the click/hover.
-        size_t slot = m_contentItemPool.size();
         ContentItemComponents item;
 
         item.container = m_contentContainer->add<Amethyst::Frame>();
