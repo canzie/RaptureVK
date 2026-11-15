@@ -48,7 +48,7 @@ SkyboxPass::~SkyboxPass()
     m_skyboxIndexBuffer.reset();
 }
 
-CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
+CommandBufferLease SkyboxPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     Scene &activeScene = *context.scene;
     ecs::EntityAccessor camera = context.camera;
@@ -56,23 +56,17 @@ CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const Second
     uint32_t frameInFlightIndex = context.frameInFlight;
 
     if (!m_skyboxTexture || !m_skyboxTexture->isReady()) {
-        return nullptr;
+        return {};
     }
 
     if (!m_pipeline) {
         RP_CORE_ERROR("Pipeline is not initialized!");
-        return nullptr;
+        return {};
     }
 
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = Application::getInstance().getVulkanContext().getGraphicsQueueIndex();
-    config.flags = 0;
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    config.threadId = threadId;
-    auto hash = m_rc->commandPoolManager->createCommandPool(config);
-
-    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease =
+        m_rc->commandPoolManager->leaseSecondary(Application::getInstance().getVulkanContext().getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->beginSecondary(inheritance);
 
@@ -135,7 +129,7 @@ CommandBuffer *SkyboxPass::record(const RenderPassContext &context, const Second
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 void SkyboxPass::setSkyboxTexture(Texture *skyboxTexture)

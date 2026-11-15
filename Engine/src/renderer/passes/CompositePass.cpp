@@ -69,25 +69,19 @@ SecondaryBufferInheritance CompositePass::getInheritance(const RenderPassContext
     return inheritance;
 }
 
-CommandBuffer *CompositePass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
+CommandBufferLease CompositePass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     if (context.targets == nullptr || context.targets->sceneColorHdr == nullptr) {
         RP_CORE_ERROR("No HDR scene colour to composite");
-        return nullptr;
+        return {};
     }
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    config.threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    auto hash = m_rc->commandPoolManager->createCommandPool(config);
-
-    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leaseSecondary(vc.getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->beginSecondary(inheritance);
 
@@ -120,7 +114,7 @@ CommandBuffer *CompositePass::record(const RenderPassContext &context, const Sec
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 void CompositePass::beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb)

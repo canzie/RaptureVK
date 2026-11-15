@@ -61,21 +61,6 @@ GBufferPass::GBufferPass(float width, float height, uint32_t framesInFlight)
 
     // Bind GBuffer textures to bindless set
     bindGBufferTexturesToBindlessSet();
-
-    setupCommandResources();
-}
-
-void GBufferPass::setupCommandResources()
-{
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
-
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    config.threadId = threadId;
-    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
 GBufferPass::~GBufferPass()
@@ -111,7 +96,7 @@ FramebufferSpecification GBufferPass::getFramebufferSpecification()
     return spec;
 }
 
-CommandBuffer *GBufferPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
+CommandBufferLease GBufferPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -122,19 +107,11 @@ CommandBuffer *GBufferPass::record(const RenderPassContext &context, const Secon
 
     m_currentFrame = currentFrame;
 
-    // updates the hash according to the current thread
     auto &app = Application::getInstance();
     auto &vc = app.getVulkanContext();
 
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    config.threadId = threadId;
-    auto hash = m_rc->commandPoolManager->createCommandPool(config);
-
-    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leaseSecondary(vc.getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->beginSecondary(inheritance);
 
@@ -146,7 +123,7 @@ CommandBuffer *GBufferPass::record(const RenderPassContext &context, const Secon
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 void GBufferPass::recordEntityCommands(CommandBuffer *secondaryCb, const RenderPassContext &context)

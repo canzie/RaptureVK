@@ -65,9 +65,9 @@ void ShadowRenderer::recordSecondaries(const RenderPassContext &context, JobCont
             continue;
         }
 
-        auto shadowBuffer = shadowMap->recordSecondary(activeScene, context.frameInFlight);
-        if (shadowBuffer) {
-            m_recordedMaps.push_back({shadowMap, shadowBuffer});
+        CommandBufferLease shadowBuffer = shadowMap->recordSecondary(activeScene, context.frameInFlight);
+        if (shadowBuffer.isValid()) {
+            m_recordedMaps.push_back({shadowMap, std::move(shadowBuffer)});
         }
     }
 
@@ -79,9 +79,9 @@ void ShadowRenderer::recordSecondaries(const RenderPassContext &context, JobCont
             continue;
         }
 
-        auto shadowBuffer = cascadedShadowMap->recordSecondary(activeScene, context.frameInFlight, context.terrain);
-        if (shadowBuffer) {
-            m_recordedCascades.push_back({cascadedShadowMap, shadowBuffer});
+        CommandBufferLease shadowBuffer = cascadedShadowMap->recordSecondary(activeScene, context.frameInFlight, context.terrain);
+        if (shadowBuffer.isValid()) {
+            m_recordedCascades.push_back({cascadedShadowMap, std::move(shadowBuffer)});
         }
     }
 }
@@ -92,15 +92,15 @@ void ShadowRenderer::replay(const RenderPassContext &context, CommandBuffer *pri
 
     RAPTURE_PROFILE_GPU_SCOPE(primaryCb->getCommandBufferVk(), "Shadow Maps");
 
-    for (const RecordedShadow<ShadowMap> &recorded : m_recordedMaps) {
+    for (RecordedShadow<ShadowMap> &recorded : m_recordedMaps) {
         recorded.map->beginDynamicRendering(primaryCb);
-        primaryCb->executeSecondary(*recorded.secondary);
+        primaryCb->executeSecondary(std::move(recorded.secondary));
         recorded.map->endDynamicRendering(primaryCb);
     }
 
-    for (const RecordedShadow<CascadedShadowMap> &recorded : m_recordedCascades) {
+    for (RecordedShadow<CascadedShadowMap> &recorded : m_recordedCascades) {
         recorded.map->beginDynamicRendering(primaryCb);
-        primaryCb->executeSecondary(*recorded.secondary);
+        primaryCb->executeSecondary(std::move(recorded.secondary));
         recorded.map->endDynamicRendering(primaryCb);
     }
 }

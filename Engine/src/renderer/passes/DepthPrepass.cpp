@@ -29,8 +29,6 @@ DepthPrepass::DepthPrepass(float width, float height, VkFormat depthFormat)
 
     createPipeline(false);
     createPipeline(true);
-
-    setupCommandResources();
 }
 
 DepthPrepass::~DepthPrepass()
@@ -45,15 +43,6 @@ FramebufferSpecification DepthPrepass::getFramebufferSpecification() const
     spec.depthAttachment = m_depthFormat;
 
     return spec;
-}
-
-void DepthPrepass::setupCommandResources()
-{
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = m_rc->vulkanContext->getGraphicsQueueIndex();
-    config.flags = 0;
-
-    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
 void DepthPrepass::createPipeline(bool skinned)
@@ -181,29 +170,23 @@ void DepthPrepass::onResize(uint32_t width, uint32_t height)
     m_height = static_cast<float>(height);
 }
 
-CommandBuffer *DepthPrepass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
+CommandBufferLease DepthPrepass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     SceneGeometryDraw *geometry = context.opaqueGeometry;
     if (m_pipeline == nullptr || geometry == nullptr) {
-        return nullptr;
+        return {};
     }
 
     Scene &activeScene = *context.scene;
     SceneRenderData *renderData = activeScene.getRenderData();
     if (renderData == nullptr) {
-        return nullptr;
+        return {};
     }
 
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = m_rc->vulkanContext->getGraphicsQueueIndex();
-    config.flags = 0;
-    config.threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    auto hash = m_rc->commandPoolManager->createCommandPool(config);
-
-    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leaseSecondary(m_rc->vulkanContext->getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->beginSecondary(inheritance);
 
@@ -274,7 +257,7 @@ CommandBuffer *DepthPrepass::record(const RenderPassContext &context, const Seco
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 } // namespace Rapture

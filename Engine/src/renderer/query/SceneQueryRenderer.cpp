@@ -177,12 +177,6 @@ SceneQueryRenderer::SceneQueryRenderer(RenderContext renderContext) : m_rc(rende
 
     createPipeline();
 
-    CommandPoolConfig config{};
-    config.name = "SceneQueryRenderer";
-    config.queueFamilyIndex = m_rc.vulkanContext->getGraphicsQueueIndex();
-    config.flags = 0;
-    m_commandPoolHash = m_rc.commandPoolManager->createCommandPool(config);
-
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 
@@ -245,12 +239,12 @@ SceneQueryResult SceneQueryRenderer::query(Scene &scene, ecs::EntityAccessor cam
 
     const glm::mat4 viewProj = projection * view;
 
-    CommandPool *pool = m_rc.commandPoolManager->getCommandPool(m_commandPoolHash);
-    if (pool == nullptr) {
+    CommandBufferLease commandBufferLease = m_rc.commandPoolManager->leasePrimary(m_rc.vulkanContext->getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
+    if (commandBuffer == nullptr) {
         return {};
     }
 
-    CommandBuffer *commandBuffer = pool->getPrimaryCommandBuffer();
     if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to begin recording the scene query");
         return {};

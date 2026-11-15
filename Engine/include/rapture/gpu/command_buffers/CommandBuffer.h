@@ -1,21 +1,13 @@
 #ifndef RAPTURE__COMMANDBUFFER_H
 #define RAPTURE__COMMANDBUFFER_H
 
-#include <memory>
-#include <mutex>
+#include <rapture/gpu/command_buffers/CommandBufferLease.h>
+
 #include <string>
 #include <vector>
 #include <vulkan/vulkan.h>
 
 namespace Rapture {
-
-enum class CmdBufferState {
-    INITIAL,
-    RECORDING,
-    EXECUTABLE,
-    PENDING,
-    INVALID
-};
 
 enum class CmdBufferLevel {
     PRIMARY,
@@ -31,24 +23,11 @@ struct SecondaryBufferInheritance {
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 };
 
-struct CmdBufferDefferedDestruction {
-    VkCommandBuffer commandBuffer;
-    CmdBufferState state;
-    std::string name;
-    uint32_t destroyAttempts = 0;
-    uint64_t pendingSignalValue;
-    VkSemaphore pendingSemaphore;
-};
-
-const char *cmdBufferStateToString(CmdBufferState state);
-
 class CommandPool;
 
 class CommandBuffer {
   public:
     CommandBuffer(CommandPool *commandPool, CmdBufferLevel level, const std::string &name = "unnamed");
-    CommandBuffer(CommandPool *commandPool, VkCommandBuffer commandBuffer, CmdBufferLevel level,
-                  const std::string &name = "unnamed");
     ~CommandBuffer();
 
     VkCommandBuffer getCommandBufferVk() const { return m_commandBuffer; }
@@ -63,20 +42,23 @@ class CommandBuffer {
                             VkCommandBufferUsageFlags flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkResult end();
 
-    void executeSecondary(CommandBuffer &secondary);
-    void executeSecondaries(const std::vector<const CommandBuffer *> &secondaries);
+    /**
+     * @brief Records a secondary command buffer into this one, holding its lease until this buffer is submitted
+     * @param secondary The recorded secondary
+     */
+    void executeSecondary(CommandBufferLease secondary);
 
-    std::vector<CommandBuffer *> &getSecondaries() { return secondaries; }
-    void clearSecondaries() { secondaries.clear(); }
+    /**
+     * @brief The secondaries recorded into this buffer since it was last submitted
+     */
+    const std::vector<CommandBufferLease> &getSecondaries() const { return m_secondaries; }
 
-    static std::vector<std::unique_ptr<CommandBuffer>> createCommandBuffers(CommandPool *commandPool, uint32_t count,
-                                                                            const std::string &namePrefix = "cmd");
-    static std::vector<std::unique_ptr<CommandBuffer>> createSecondaryCommandBuffers(CommandPool *commandPool, uint32_t count,
-                                                                                     const std::string &namePrefix = "secondary");
+    /**
+     * @brief Hands back the leases of every secondary recorded into this buffer
+     */
+    void clearSecondaries() { m_secondaries.clear(); }
 
   private:
-    void updatePendingState();
-
     VkCommandBuffer m_commandBuffer;
     CommandPool *m_commandPool;
 
@@ -84,7 +66,7 @@ class CommandBuffer {
     CmdBufferLevel m_level = CmdBufferLevel::PRIMARY;
     std::string m_name;
 
-    std::vector<CommandBuffer *> secondaries;
+    std::vector<CommandBufferLease> m_secondaries;
 };
 
 } // namespace Rapture

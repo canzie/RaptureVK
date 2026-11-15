@@ -121,20 +121,10 @@ std::vector<AccelerationStructureBuilder::PendingMesh> AccelerationStructureBuil
     return batch;
 }
 
-CommandBuffer *AccelerationStructureBuilder::takeCommandBuffer()
+CommandBufferLease AccelerationStructureBuilder::leaseCommandBuffer()
 {
     auto &vulkanContext = Application::getInstance().getVulkanContext();
-
-    // a fiber can resume on a different worker than it parked on, and a pool belongs to one thread
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    auto &rc = vulkanContext.getRenderContext();
-    auto poolHash = rc.commandPoolManager->createCommandPool(poolConfig);
-
-    return rc.commandPoolManager->getCommandPool(poolHash)->getPrimaryCommandBuffer();
+    return vulkanContext.getRenderContext().commandPoolManager->leasePrimary(vulkanContext.getGraphicsQueueIndex());
 }
 
 VkDeviceAddress AccelerationStructureBuilder::reserveScratch(VkDeviceSize sizeBytes)
@@ -224,7 +214,7 @@ void AccelerationStructureBuilder::drainBatch(JobContext &jobContext)
         structures.reserve(count);
 
         {
-            auto buildCommandBuffer = takeCommandBuffer();
+            CommandBufferLease buildCommandBuffer = leaseCommandBuffer();
             VkCommandBuffer cb = buildCommandBuffer->getCommandBufferVk();
 
             if (buildCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
@@ -259,7 +249,7 @@ void AccelerationStructureBuilder::drainBatch(JobContext &jobContext)
 
             buildCommandBuffer->end();
 
-            uint64_t signalValue = graphicsQueue->addToBatch(buildCommandBuffer);
+            uint64_t signalValue = graphicsQueue->addToBatch(buildCommandBuffer.get());
 
             Counter gpuCounter;
             gpuCounter.increment();
@@ -286,7 +276,7 @@ void AccelerationStructureBuilder::drainBatch(JobContext &jobContext)
         compacting.reserve(count);
 
         {
-            auto copyCommandBuffer = takeCommandBuffer();
+            CommandBufferLease copyCommandBuffer = leaseCommandBuffer();
             VkCommandBuffer cb = copyCommandBuffer->getCommandBufferVk();
 
             if (copyCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
@@ -313,7 +303,7 @@ void AccelerationStructureBuilder::drainBatch(JobContext &jobContext)
                 continue;
             }
 
-            uint64_t signalValue = graphicsQueue->addToBatch(copyCommandBuffer);
+            uint64_t signalValue = graphicsQueue->addToBatch(copyCommandBuffer.get());
 
             Counter gpuCounter;
             gpuCounter.increment();

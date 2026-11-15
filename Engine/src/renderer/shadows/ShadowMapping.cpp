@@ -24,18 +24,6 @@ ShadowMap::ShadowMap(float width, float height) : m_width(width), m_height(heigh
     createPipeline();
 
     m_rc = &Application::getInstance().getVulkanContext().getRenderContext();
-
-    setupCommandResources();
-}
-
-void ShadowMap::setupCommandResources()
-{
-    auto &vc = Application::getInstance().getVulkanContext();
-
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
 ShadowMap::~ShadowMap() {}
@@ -203,14 +191,14 @@ void ShadowMap::updateViewMatrix(ecs::EntityAccessor light, const TransformCompo
     m_lightViewProjection = shadowMapData.lightViewProjection;
 }
 
-CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame)
+CommandBufferLease ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     m_currentFrame = currentFrame;
 
-    auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash, currentFrame);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leaseSecondary(m_rc->vulkanContext->getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     SecondaryBufferInheritance inheritance{};
     inheritance.depthFormat = m_shadowTexture->getFormat();
@@ -304,7 +292,7 @@ CommandBuffer *ShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFr
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 void ShadowMap::createPipeline()

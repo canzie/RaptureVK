@@ -47,9 +47,9 @@ void GizmoRenderer::replay(const RenderPassContext &context, CommandBuffer *prim
 {
     RAPTURE_PROFILE_GPU_SCOPE(primaryCb->getCommandBufferVk(), "Gizmos");
 
-    if (m_secondary != nullptr) {
+    if (m_secondary.isValid()) {
         m_pass->beginRendering(context, primaryCb);
-        primaryCb->executeSecondary(*m_secondary);
+        primaryCb->executeSecondary(std::move(m_secondary));
         m_pass->endRendering(primaryCb);
     }
 

@@ -28,7 +28,7 @@ class GizmoRenderer : public Renderer {
   private:
     std::unique_ptr<GizmoDrawPass> m_pass;
     GizmoDrawList *m_drawList = nullptr;
-    CommandBuffer *m_secondary = nullptr;
+    CommandBufferLease m_secondary;
     VkFormat m_depthFormat;
 };
 

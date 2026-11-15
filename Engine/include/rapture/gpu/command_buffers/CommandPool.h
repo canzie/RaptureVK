@@ -1,111 +1,117 @@
 #ifndef RAPTURE__COMMAND_POOL_H
 #define RAPTURE__COMMAND_POOL_H
 
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandBufferLease.h>
+
 #include <vulkan/vulkan.h>
 
-#include <atomic>
-#include <functional>
 #include <memory>
 #include <mutex>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace Rapture {
 
-class CommandBuffer;
-struct CmdBufferDefferedDestruction;
-enum class CmdBufferLevel;
-
-using CommandPoolHash = uint32_t;
-
-static inline void hash_combine(size_t &seed, size_t value)
-{
-    seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
-}
-
-struct CommandPoolConfig {
-    std::string name = "CommandPool";
-    size_t threadId = 0;
-    uint32_t queueFamilyIndex;
-    VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    VkCommandPoolResetFlags resetFlags = 0;
-
-    CommandPoolHash hash() const
-    {
-        size_t seed = 0;
-        hash_combine(seed, std::hash<size_t>{}(threadId));
-        hash_combine(seed, std::hash<uint32_t>{}(queueFamilyIndex));
-        hash_combine(seed, std::hash<VkCommandPoolCreateFlags>{}(flags));
-        hash_combine(seed, std::hash<VkCommandPoolResetFlags>{}(resetFlags));
-        return static_cast<CommandPoolHash>(seed);
-    }
-};
-
-// should automatically create a command pool for each queue family in a thread,
-// not for each call but use a manager system to create a new pool when the conditions are met
-// could also allow for manual specs.
-class CommandPool : public std::enable_shared_from_this<CommandPool> {
+/**
+ * @brief A Vulkan command pool holding a single command buffer
+ */
+class CommandPool {
   public:
-    CommandPool(const CommandPoolConfig &config);
+    CommandPool(VkDevice device, uint32_t queueFamilyIndex, CmdBufferLevel level);
     ~CommandPool();
 
+    CommandPool(const CommandPool &) = delete;
+    CommandPool &operator=(const CommandPool &) = delete;
+
     VkCommandPool getCommandPoolVk() const { return m_commandPool; }
-    CommandBuffer *getPrimaryCommandBuffer();
-    CommandBuffer *getSecondaryCommandBuffer();
+    CommandBuffer *getCommandBuffer() const { return m_commandBuffer.get(); }
+    uint32_t getQueueFamilyIndex() const { return m_queueFamilyIndex; }
+    CmdBufferLevel getLevel() const { return m_level; }
 
+    /**
+     * @brief Records a submission the pool's command buffer is part of
+     * @param timelineSemaphore The timeline semaphore the submission signals
+     * @param signalValue The value it signals once the GPU is done with the submission
+     */
     void markPendingSignal(VkSemaphore timelineSemaphore, uint64_t signalValue);
-    void markResetPending();
+
+    /**
+     * @brief Whether the GPU has finished every submission of the pool's command buffer
+     */
+    bool isIdleOnGpu() const;
+
+    /**
+     * @brief Returns the command buffer to the initial state, ready to record again
+     */
+    void reset();
 
   private:
-    void allocateCommandBuffer(CmdBufferLevel level);
-    void resetIfNeeded();
+    struct PendingSignal {
+        VkSemaphore timelineSemaphore;
+        uint64_t signalValue;
+    };
 
   private:
-    VkCommandPoolCreateInfo m_createInfo;
-    VkCommandPool m_commandPool;
-    CommandPoolHash m_hash;
-
     VkDevice m_device;
+    VkCommandPool m_commandPool = VK_NULL_HANDLE;
+    uint32_t m_queueFamilyIndex;
+    CmdBufferLevel m_level;
 
-    VkCommandPoolResetFlags m_resetFlags;
-
-    uint32_t m_primaryCommandBufferIndex = 0;
-    uint32_t m_secondaryCommandBufferIndex = 0;
-    std::vector<std::unique_ptr<CommandBuffer>> m_primaryCommandBuffers;
-    std::vector<std::unique_ptr<CommandBuffer>> m_secondaryCommandBuffers;
-
-    std::unordered_map<VkSemaphore, uint64_t> m_pendingSignals;
-    bool m_needsReset = false;
-
-    std::atomic<bool> m_resetPending{false};
+    std::unique_ptr<CommandBuffer> m_commandBuffer;
+    std::vector<PendingSignal> m_pendingSignals;
 };
 
+/**
+ * @brief Hands out command buffer leases, reusing pools the GPU is done with
+ */
 class CommandPoolManager {
   public:
-    explicit CommandPoolManager(uint32_t framesInFlight);
+    explicit CommandPoolManager(VkDevice device);
     ~CommandPoolManager();
 
     CommandPoolManager(const CommandPoolManager &) = delete;
     CommandPoolManager &operator=(const CommandPoolManager &) = delete;
 
-    CommandPoolHash createCommandPool(const CommandPoolConfig &config);
-    // access a pool by its hash
-    CommandPool *getCommandPool(CommandPoolHash hash, uint32_t frameIndex);
-    CommandPool *getCommandPool(CommandPoolHash hash);
-    // the strict flag will return the command pool closest to the config provided (most same values)
-    // assuming atleast 1 pool exists, this function will return a pool, given the strict flag=false
-    // static std::shared_ptr<CommandPool> getCommandPool(const CommandPoolConfig& config, bool isStrict = true);
+    /**
+     * @brief Leases a primary command buffer, safe to record from any thread or job
+     * @param queueFamilyIndex The queue family the buffer is submitted to
+     * @return The lease, empty if no pool could be created
+     */
+    CommandBufferLease leasePrimary(uint32_t queueFamilyIndex);
 
-    void beginFrame();
-    void endFrame();
+    /**
+     * @brief Leases a secondary command buffer, safe to record from any thread or job
+     * @param queueFamilyIndex The queue family of the primary it is recorded into
+     * @return The lease, empty if no pool could be created
+     */
+    CommandBufferLease leaseSecondary(uint32_t queueFamilyIndex);
+
+    /**
+     * @brief Destroys every pool that is not leased out, the GPU must be idle
+     */
     void closeAllPools();
 
   private:
-    std::unordered_map<CommandPoolHash, std::vector<std::unique_ptr<CommandPool>>> m_commandPools;
+    friend class CommandBufferLease;
+
+    /**
+     * @brief Leases a pool of the given family and level, reusing one the GPU is done with
+     * @param queueFamilyIndex The queue family of the pool
+     * @param level The level of the pool's command buffer
+     * @return The lease, empty if no pool could be created
+     */
+    CommandBufferLease lease(uint32_t queueFamilyIndex, CmdBufferLevel level);
+
+    /**
+     * @brief Takes back a pool whose lease was dropped
+     * @param pool The pool
+     */
+    void returnPool(std::unique_ptr<CommandPool> pool);
+
+  private:
+    VkDevice m_device;
     std::mutex m_mutex;
-    uint32_t m_framesInFlight;
-    uint32_t m_currentFrameIndex = 0;
+    std::vector<std::unique_ptr<CommandPool>> m_returnedPools;
 };
 
 } // namespace Rapture

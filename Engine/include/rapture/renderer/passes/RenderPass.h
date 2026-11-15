@@ -116,9 +116,9 @@ class RenderPass {
      *
      * @param context Per-frame inputs
      * @param inheritance Attachment formats the secondary buffer inherits
-     * @return The recorded secondary buffer, or nullptr when the pass has nothing to draw
+     * @return The recorded secondary buffer, empty when the pass has nothing to draw
      */
-    virtual CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) = 0;
+    virtual CommandBufferLease record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) = 0;
 
     /**
      * @brief Recreate size-dependent resources

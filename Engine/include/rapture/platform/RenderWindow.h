@@ -2,7 +2,7 @@
 #define RAPTURE__RENDER_WINDOW_H
 
 #include <rapture/core/events/EventSignal.h>
-#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/command_buffers/CommandBufferLease.h>
 #include <rapture/platform/WindowContext.h>
 
 #include <vulkan/vulkan.h>
@@ -83,8 +83,7 @@ class RenderWindow {
     EventConnection m_swapchainRecreateConn;
     EventConnection m_windowResizeConn;
 
-    CommandPoolHash m_presentCommandPoolHash = 0;
-    CommandBuffer *m_currentCommandBuffer = nullptr;
+    CommandBufferLease m_currentCommandBuffer;
     uint32_t m_currentFrame = 0;
     uint32_t m_currentImageIndex = 0;
     bool m_framebufferResized = false;

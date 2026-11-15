@@ -54,7 +54,6 @@ class TerrainCuller {
 
     Ref<AShader> m_cullShader;
     std::shared_ptr<ComputePipeline> m_cullPipeline;
-    CommandPoolHash m_commandPoolHash;
 };
 
 } // namespace Rapture

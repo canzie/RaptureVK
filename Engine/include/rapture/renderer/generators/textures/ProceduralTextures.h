@@ -405,7 +405,6 @@ class ProceduralTexture {
     void initPipeline();
     void initDescriptorSet();
     void initTexture();
-    void initCommandBuffer();
     void extractExpectedPushConstantSize();
     bool verifyPushConstantSize(size_t providedSize);
     void reflectParameters();
@@ -415,7 +414,6 @@ class ProceduralTexture {
     std::shared_ptr<DescriptorSet> m_descriptorSet;
     Texture *m_texture;
     Ref<ATexture> m_textureAsset;
-    CommandPoolHash m_commandPoolHash = 0;
 
     std::vector<uint8_t> m_pushConstantData;
     std::vector<ProceduralParameter> m_parameters;

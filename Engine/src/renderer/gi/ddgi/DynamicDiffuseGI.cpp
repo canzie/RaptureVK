@@ -84,13 +84,6 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
 
     createPipelines();
 
-    CommandPoolConfig poolConfig;
-    poolConfig.name = "DDGI Command Pool";
-    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
-    poolConfig.flags = 0;
-
-    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(poolConfig);
-
     initProbeInfoBuffer();
     initTextures();
     setupProbeTextures();
@@ -169,8 +162,9 @@ void DynamicDiffuseGI::setupProbeTextures()
 
 void DynamicDiffuseGI::clearTextures()
 {
-    auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash);
-    auto commandBuffer = pool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease =
+        m_rc->commandPoolManager->leasePrimary(Application::getInstance().getVulkanContext().getComputeQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to begin command buffer");
@@ -287,17 +281,8 @@ void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    CommandPoolConfig poolConfig;
-    poolConfig.name = "DDGI Command Pool";
-    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
-    poolConfig.flags = 0;
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    poolConfig.threadId = threadId;
-
-    auto hash = m_rc->commandPoolManager->createCommandPool(poolConfig);
-
-    auto pool = m_rc->commandPoolManager->getCommandPool(hash, frameIndex);
-    auto commandBuffer = pool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     if (commandBuffer->begin() != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to begin command buffer");

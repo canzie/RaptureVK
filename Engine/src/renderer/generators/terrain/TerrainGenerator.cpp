@@ -259,8 +259,6 @@ void TerrainGenerator::update(const glm::vec3 &cameraPos, Frustum &frustum, uint
 
 void TerrainGenerator::initComputePipeline()
 {
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
     auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
@@ -276,20 +274,12 @@ void TerrainGenerator::initComputePipeline()
     ComputePipelineConfiguration pipelineConfig;
     pipelineConfig.shader = m_chunkComputeShader.operator->();
     m_chunkComputePipeline = std::make_shared<ComputePipeline>(pipelineConfig);
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.name = "TerrainChunkComputePool";
-    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
-    poolConfig.flags = 0;
-
-    auto &rc = vc.getRenderContext();
-    m_computePoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 }
 
 void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
 {
 
-    if (!m_chunkComputePipeline || m_computePoolHash == 0) {
+    if (!m_chunkComputePipeline) {
         return;
     }
 
@@ -305,8 +295,8 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
     auto &vc = Application::getInstance().getVulkanContext();
 
     auto &rc = vc.getRenderContext();
-    auto pool = rc.commandPoolManager->getCommandPool(m_computePoolHash);
-    auto commandBuffer = pool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();

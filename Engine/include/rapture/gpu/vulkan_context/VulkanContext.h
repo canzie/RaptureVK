@@ -120,7 +120,7 @@ class VulkanContext {
     PFN_vkCmdDrawMeshTasksIndirectEXT vkCmdDrawMeshTasksIndirectEXT = nullptr;
     PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT = nullptr;
 
-    void initManagers(uint32_t framesInFlight);
+    void initManagers();
 
     const RenderContext &getRenderContext() const { return m_renderContext; }
 

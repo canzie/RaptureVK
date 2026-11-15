@@ -92,17 +92,11 @@ void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize siz
     auto &app = Application::getInstance();
     auto graphicsQueueIndex = app.getVulkanContext().getGraphicsQueueIndex();
 
-    CommandPoolConfig config;
-    config.queueFamilyIndex = graphicsQueueIndex;
-    config.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-    config.threadId = 0;
-
     auto &rc = app.getVulkanContext().getRenderContext();
-    auto commandPoolHash = rc.commandPoolManager->createCommandPool(config);
-    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
 
     // Create command buffer for transfer
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(graphicsQueueIndex);
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     // Begin command buffer
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);

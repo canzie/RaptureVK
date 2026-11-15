@@ -31,12 +31,12 @@ void DepthPrepassRenderer::replay(const RenderPassContext &context, CommandBuffe
 {
     RAPTURE_PROFILE_GPU_SCOPE(primaryCb->getCommandBufferVk(), "Depth Prepass");
 
-    if (m_secondary == nullptr) {
+    if (!m_secondary.isValid()) {
         return;
     }
 
     m_pass->beginRendering(context, primaryCb);
-    primaryCb->executeSecondary(*m_secondary);
+    primaryCb->executeSecondary(std::move(m_secondary));
     m_pass->endRendering(primaryCb);
 }
 

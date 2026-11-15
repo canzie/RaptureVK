@@ -4,6 +4,7 @@
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/asset_manager/AssetCommon.h>
 #include <rapture/core/events/EventSignal.h>
+#include <rapture/gpu/command_buffers/CommandBufferLease.h>
 
 #include <cstdint>
 #include <mutex>
@@ -14,7 +15,6 @@
 namespace Rapture {
 
 class BLAS;
-class CommandBuffer;
 class Mesh;
 struct JobContext;
 
@@ -74,10 +74,10 @@ class AccelerationStructureBuilder {
     void releaseBuildResources();
 
     /**
-     * @brief Takes a command buffer from the pool of the thread the job is running on right now
-     * @return The command buffer to record into
+     * @brief Leases a primary command buffer for the graphics queue
+     * @return The lease to record into
      */
-    CommandBuffer *takeCommandBuffer();
+    CommandBufferLease leaseCommandBuffer();
 
     /**
      * @brief Grows the shared scratch buffer to hold a batch

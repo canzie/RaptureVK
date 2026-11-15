@@ -21,7 +21,7 @@ class DepthPrepass : public RenderPass {
     DepthPrepass(float width, float height, VkFormat depthFormat);
     ~DepthPrepass();
 
-    CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
+    CommandBufferLease record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
     void onResize(uint32_t width, uint32_t height) override;
 
     FramebufferSpecification getFramebufferSpecification() const;
@@ -36,8 +36,6 @@ class DepthPrepass : public RenderPass {
      */
     void createPipeline(bool skinned);
 
-    void setupCommandResources();
-
   private:
     const RenderContext *m_rc = nullptr;
 
@@ -51,8 +49,6 @@ class DepthPrepass : public RenderPass {
     float m_width;
     float m_height;
     VkFormat m_depthFormat;
-
-    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture

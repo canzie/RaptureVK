@@ -11,6 +11,18 @@
 #include <vulkan/vulkan_core.h>
 
 namespace Rapture {
+
+static void s_markCommandBufferSubmitted(CommandBuffer *commandBuffer, VkSemaphore timelineSemaphore, uint64_t signalValue)
+{
+    commandBuffer->getCommandPool()->markPendingSignal(timelineSemaphore, signalValue);
+
+    for (const CommandBufferLease &secondary : commandBuffer->getSecondaries()) {
+        secondary->getCommandPool()->markPendingSignal(timelineSemaphore, signalValue);
+    }
+
+    commandBuffer->clearSecondaries();
+}
+
 VulkanQueue::VulkanQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, const std::string &name)
     : m_device(device), m_queueFamilyIndex(queueFamilyIndex), m_name(name)
 {
@@ -99,10 +111,6 @@ bool VulkanQueue::flush()
         return false;
     }
 
-    for (auto *cmdBuffer : m_cmdBufferBatch) {
-        cmdBuffer->clearSecondaries();
-    }
-
     m_cmdBufferBatch.clear();
     return true;
 }
@@ -113,15 +121,7 @@ uint64_t VulkanQueue::addToBatch(CommandBuffer *commandBuffer)
 
     uint64_t signalValue = m_nextTimelineValue.fetch_add(1);
 
-    if (commandBuffer->getCommandPool()) {
-        commandBuffer->getCommandPool()->markPendingSignal(m_timelineSemaphore, signalValue);
-    }
-
-    for (auto *secCmdBuffer : commandBuffer->getSecondaries()) {
-        if (secCmdBuffer->getCommandPool()) {
-            secCmdBuffer->getCommandPool()->markPendingSignal(m_timelineSemaphore, signalValue);
-        }
-    }
+    s_markCommandBufferSubmitted(commandBuffer, m_timelineSemaphore, signalValue);
 
     m_cmdBufferBatch.push_back(commandBuffer);
 
@@ -183,17 +183,7 @@ bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, std::span<VkSemaphor
         return false;
     }
 
-    if (commandBuffer->getCommandPool()) {
-        commandBuffer->getCommandPool()->markPendingSignal(m_immediateTimeSema, signalValue);
-    }
-
-    for (auto *secCmdBuffer : commandBuffer->getSecondaries()) {
-        if (secCmdBuffer->getCommandPool()) {
-            secCmdBuffer->getCommandPool()->markPendingSignal(m_immediateTimeSema, signalValue);
-        }
-    }
-
-    commandBuffer->clearSecondaries();
+    s_markCommandBufferSubmitted(commandBuffer, m_immediateTimeSema, signalValue);
 
     return true;
 }
@@ -288,21 +278,7 @@ bool VulkanQueue::submitAndFlushQueue(CommandBuffer *commandBuffer, std::span<Vk
             return false;
         }
 
-        for (auto *cmdBuffer : m_cmdBufferBatch) {
-            cmdBuffer->clearSecondaries();
-        }
-
-        if (commandBuffer->getCommandPool()) {
-            commandBuffer->getCommandPool()->markPendingSignal(m_immediateTimeSema, signalValue);
-        }
-
-        for (auto *secCmdBuffer : commandBuffer->getSecondaries()) {
-            if (secCmdBuffer->getCommandPool()) {
-                secCmdBuffer->getCommandPool()->markPendingSignal(m_immediateTimeSema, signalValue);
-            }
-        }
-
-        commandBuffer->clearSecondaries();
+        s_markCommandBufferSubmitted(commandBuffer, m_immediateTimeSema, signalValue);
 
         m_cmdBufferBatch.clear();
     }

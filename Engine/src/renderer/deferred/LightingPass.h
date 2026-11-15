@@ -28,7 +28,7 @@ class LightingPass : public RenderPass {
 
     FramebufferSpecification getFramebufferSpecification();
 
-    CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
+    CommandBufferLease record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
     void onResize(uint32_t width, uint32_t height) override;
 
   protected:

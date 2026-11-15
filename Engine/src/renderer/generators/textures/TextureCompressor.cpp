@@ -221,17 +221,8 @@ bool TextureCompressor::encode(JobContext &jctx, Texture &dst, TextureFormat for
     descriptorSet->getTextureBinding(DescriptorSetBindingLocation::CUSTOM_0)->add(*m_source);
     descriptorSet->getSSBOBinding(DescriptorSetBindingLocation::CUSTOM_1)->add(*scratch);
 
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-    poolConfig.threadId = threadId;
-
-    auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();

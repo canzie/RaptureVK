@@ -51,7 +51,6 @@ void ProceduralTexture::initFromShaderPath(const std::string &shaderPath, bool c
 
     extractExpectedPushConstantSize();
     initPipeline();
-    initCommandBuffer();
 
     if (createTexture) {
         initTexture();
@@ -73,7 +72,6 @@ void ProceduralTexture::initFromShaderHandle(const AssetHandle &shaderHandle, bo
 
     extractExpectedPushConstantSize();
     initPipeline();
-    initCommandBuffer();
 
     if (createTexture) {
         initTexture();
@@ -89,19 +87,6 @@ void ProceduralTexture::initPipeline()
     ComputePipelineConfiguration config;
     config.shader = m_shader.operator->();
     m_pipeline = std::make_shared<ComputePipeline>(config);
-}
-
-void ProceduralTexture::initCommandBuffer()
-{
-    auto &app = Application::getInstance();
-    auto &vulkanContext = app.getVulkanContext();
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = vulkanContext.getComputeQueueIndex();
-    poolConfig.flags = 0;
-
-    auto &rc = vulkanContext.getRenderContext();
-    m_commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 }
 
 void ProceduralTexture::initTexture()
@@ -328,9 +313,10 @@ void ProceduralTexture::generate()
         return;
     }
 
-    auto &rc = Application::getInstance().getVulkanContext().getRenderContext();
-    auto pool = rc.commandPoolManager->getCommandPool(m_commandPoolHash);
-    auto commandBuffer = pool->getPrimaryCommandBuffer();
+    auto &vc = Application::getInstance().getVulkanContext();
+    auto &rc = vc.getRenderContext();
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 

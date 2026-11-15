@@ -53,22 +53,13 @@ static_assert(sizeof(TextureBlobHeader) == 64,
               "texture blob header is a fixed 64-byte directory, bump to 128 and the major version if it must grow");
 
 /**
- * @brief Acquire a primary command buffer from a transient graphics-queue pool for this thread
- * @return A command buffer ready to begin recording
+ * @brief Leases a primary command buffer for the graphics queue
+ * @return The lease, ready to begin recording
  */
-static CommandBuffer *s_acquireTransientGraphicsCommandBuffer()
+static CommandBufferLease s_leaseGraphicsCommandBuffer()
 {
     auto &app = Application::getInstance();
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-    poolConfig.threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
-    return commandPool->getPrimaryCommandBuffer();
+    return Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getGraphicsQueueIndex());
 }
 
 /**
@@ -327,17 +318,9 @@ void Texture::uploadDataAsync(std::vector<uint8_t> data, Counter *completionCoun
             memcpy(mapped, pixelData->data(), static_cast<size_t>(imageSize));
             vmaUnmapMemory(allocator, stagingAllocation);
 
-            size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-            CommandPoolConfig poolConfig{};
-            poolConfig.queueFamilyIndex = app.getVulkanContext().getTransferQueueIndex();
-            poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-            poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-            poolConfig.threadId = threadId;
-
-            auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
-            auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
-            auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+            CommandBufferLease commandBufferLease =
+                Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getTransferQueueIndex());
+            CommandBuffer *commandBuffer = commandBufferLease.get();
 
             commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -438,13 +421,13 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
     auto &app = Application::getInstance();
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
 
-    CommandBuffer *internalCommandBuffer = nullptr;
+    CommandBufferLease internalCommandBuffer;
     VkCommandBuffer commandBufferVk;
 
     bool useExternalCommandBuffer = (extCommandBuffer != VK_NULL_HANDLE);
 
     if (!useExternalCommandBuffer) {
-        internalCommandBuffer = s_acquireTransientGraphicsCommandBuffer();
+        internalCommandBuffer = s_leaseGraphicsCommandBuffer();
         commandBufferVk = internalCommandBuffer->getCommandBufferVk();
         internalCommandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     } else {
@@ -569,13 +552,13 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
             fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
             vkCreateFence(app.getVulkanContext().getLogicalDevice(), &fenceInfo, nullptr, &fence);
 
-            graphicsQueue->submitQueue(internalCommandBuffer, signalSemaphoresSpan, waitSemaphoresSpan, waitStagePtr, fence);
+            graphicsQueue->submitQueue(internalCommandBuffer.get(), signalSemaphoresSpan, waitSemaphoresSpan, waitStagePtr, fence);
 
             vkWaitForFences(app.getVulkanContext().getLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
             vkDestroyFence(app.getVulkanContext().getLogicalDevice(), fence, nullptr);
         } else {
             // Non-blocking approach - caller handles synchronization
-            graphicsQueue->submitQueue(internalCommandBuffer, signalSemaphoresSpan, waitSemaphoresSpan, waitStagePtr,
+            graphicsQueue->submitQueue(internalCommandBuffer.get(), signalSemaphoresSpan, waitSemaphoresSpan, waitStagePtr,
                                        VK_NULL_HANDLE);
         }
     }
@@ -740,7 +723,7 @@ std::vector<uint8_t> Texture::readbackData()
     }
 
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
-    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+    auto commandBuffer = s_leaseGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
@@ -750,7 +733,7 @@ std::vector<uint8_t> Texture::readbackData()
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
     // TODO: replace this blocking waitIdle with a fence/timeline wait once readback correctness is verified
     graphicsQueue->waitIdle();
 
@@ -816,7 +799,7 @@ std::vector<uint8_t> Texture::readbackRegion(uint32_t x, uint32_t y, uint32_t wi
     }
 
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
-    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+    auto commandBuffer = s_leaseGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
@@ -825,7 +808,7 @@ std::vector<uint8_t> Texture::readbackRegion(uint32_t x, uint32_t y, uint32_t wi
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
     // TODO: replace this blocking waitIdle with a fence/timeline wait, and with an async ring once
     // hover highlighting or marquee selection needs a result every frame
     graphicsQueue->waitIdle();
@@ -945,7 +928,7 @@ void Texture::uploadCompressedBlob(std::span<const uint8_t> bytes)
     std::vector<VkBufferImageCopy> regions = s_buildImageCopyRegions(m_spec, total);
 
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
-    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+    auto commandBuffer = s_leaseGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();
@@ -955,7 +938,7 @@ void Texture::uploadCompressedBlob(std::span<const uint8_t> bytes)
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
 
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
@@ -1357,13 +1340,13 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
 
     auto &app = Application::getInstance();
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
-    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+    auto commandBuffer = s_leaseGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), oldLayout, newLayout);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
 }
 
@@ -1462,13 +1445,13 @@ void Texture::generateMipmaps()
     }
 
     auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
-    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+    auto commandBuffer = s_leaseGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     recordGenerateMipmaps(commandBuffer->getCommandBufferVk());
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
     graphicsQueue->waitIdle();
 
     RP_CORE_TRACE("Generated {} mip levels for texture", m_spec.mipLevels);
@@ -1551,13 +1534,13 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
 
     auto &app = Application::getInstance();
     auto queue = app.getVulkanContext().getGraphicsQueue();
-    auto commandBuffer = s_acquireTransientGraphicsCommandBuffer();
+    auto commandBuffer = s_leaseGraphicsCommandBuffer();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), buffer, width, height);
     commandBuffer->end();
 
-    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
     queue->waitIdle();
 }
 
@@ -1688,17 +1671,9 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
     memcpy(mapped, &rgba, sizeof(uint32_t));
     vmaUnmapMemory(allocator, stagingAllocation);
 
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getTransferQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-    poolConfig.threadId = threadId;
-
-    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease =
+        Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getTransferQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -1763,17 +1738,9 @@ void Texture::setPixels(std::span<const uint8_t> data)
     memcpy(mapped, data.data(), data.size_bytes());
     vmaUnmapMemory(allocator, stagingAllocation);
 
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = app.getVulkanContext().getTransferQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-    poolConfig.threadId = threadId;
-
-    auto commandPoolHash = Application::getRenderContext().commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = Application::getRenderContext().commandPoolManager->getCommandPool(commandPoolHash);
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease =
+        Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getTransferQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 

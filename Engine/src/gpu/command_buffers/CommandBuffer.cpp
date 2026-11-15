@@ -5,8 +5,6 @@
 
 #include <rapture/gpu/command_buffers/CommandPool.h>
 
-#include <set>
-
 namespace Rapture {
 
 CommandBuffer::CommandBuffer(CommandPool *commandPool, CmdBufferLevel level, const std::string &name)
@@ -24,13 +22,6 @@ CommandBuffer::CommandBuffer(CommandPool *commandPool, CmdBufferLevel level, con
         RP_CORE_ERROR("CommandBuffer[{}]: failed to allocate command buffer!", m_name);
         throw std::runtime_error("failed to allocate command buffers!");
     }
-}
-
-CommandBuffer::CommandBuffer(CommandPool *commandPool, VkCommandBuffer commandBuffer, CmdBufferLevel level, const std::string &name)
-    : m_commandBuffer(commandBuffer), m_commandPool(commandPool), m_level(level), m_name(name)
-{
-    auto &app = Application::getInstance();
-    m_device = app.getVulkanContext().getLogicalDevice();
 }
 
 CommandBuffer::~CommandBuffer()
@@ -106,102 +97,21 @@ VkResult CommandBuffer::end()
     return result;
 }
 
-void CommandBuffer::executeSecondary(CommandBuffer &secondary)
+void CommandBuffer::executeSecondary(CommandBufferLease secondary)
 {
     if (m_level != CmdBufferLevel::PRIMARY) {
         RP_CORE_ERROR("CommandBuffer[{}]: executeSecondary called on non-primary buffer", m_name);
         return;
     }
 
-    if (!secondary.isSecondary()) {
+    if (!secondary.isValid() || !secondary->isSecondary()) {
         RP_CORE_ERROR("CommandBuffer[{}]: executeSecondary called with invalid secondary buffer", m_name);
         return;
     }
 
-    secondaries.push_back(&secondary);
-    VkCommandBuffer secondaryVk = secondary.getCommandBufferVk();
+    VkCommandBuffer secondaryVk = secondary->getCommandBufferVk();
     vkCmdExecuteCommands(m_commandBuffer, 1, &secondaryVk);
-}
-
-void CommandBuffer::executeSecondaries(const std::vector<const CommandBuffer *> &secondaries)
-{
-    if (m_level != CmdBufferLevel::PRIMARY) {
-        RP_CORE_ERROR("CommandBuffer[{}]: executeSecondaries called on non-primary buffer", m_name);
-        return;
-    }
-
-    if (secondaries.empty()) {
-        return;
-    }
-
-    std::vector<VkCommandBuffer> secondaryBuffers;
-    secondaryBuffers.reserve(secondaries.size());
-    for (const auto *secondary : secondaries) {
-        if (!secondary || !secondary->isSecondary()) {
-            RP_CORE_ERROR("CommandBuffer[{}]: executeSecondaries contains invalid secondary buffer", m_name);
-            return;
-        }
-        secondaryBuffers.push_back(secondary->getCommandBufferVk());
-    }
-    vkCmdExecuteCommands(m_commandBuffer, static_cast<uint32_t>(secondaryBuffers.size()), secondaryBuffers.data());
-}
-
-std::vector<std::unique_ptr<CommandBuffer>> CommandBuffer::createCommandBuffers(CommandPool *commandPool, uint32_t count,
-                                                                                const std::string &namePrefix)
-{
-    std::vector<VkCommandBuffer> commandBuffersVk(count);
-
-    auto &app = Application::getInstance();
-    auto device = app.getVulkanContext().getLogicalDevice();
-
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool->getCommandPoolVk();
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = count;
-
-    if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffersVk.data()) != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to allocate command buffers!");
-        throw std::runtime_error("failed to allocate command buffers!");
-    }
-
-    std::vector<std::unique_ptr<CommandBuffer>> commandBuffers;
-    for (uint32_t i = 0; i < count; i++) {
-        std::string name = namePrefix + "_" + std::to_string(i);
-        commandBuffers.push_back(std::make_unique<CommandBuffer>(commandPool, commandBuffersVk[i], CmdBufferLevel::PRIMARY, name));
-    }
-
-    return commandBuffers;
-}
-
-std::vector<std::unique_ptr<CommandBuffer>> CommandBuffer::createSecondaryCommandBuffers(CommandPool *commandPool, uint32_t count,
-                                                                                         const std::string &namePrefix)
-{
-    std::vector<VkCommandBuffer> commandBuffersVk(count);
-
-    auto &app = Application::getInstance();
-    auto device = app.getVulkanContext().getLogicalDevice();
-
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool->getCommandPoolVk();
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-    allocInfo.commandBufferCount = count;
-
-    if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffersVk.data()) != VK_SUCCESS) {
-        RP_CORE_ERROR("failed to allocate secondary command buffers!");
-        return {};
-    }
-
-    std::vector<std::unique_ptr<CommandBuffer>> commandBuffers;
-    commandBuffers.reserve(count);
-    for (uint32_t i = 0; i < count; i++) {
-        std::string name = namePrefix + "_" + std::to_string(i);
-        commandBuffers.push_back(
-            std::make_unique<CommandBuffer>(commandPool, commandBuffersVk[i], CmdBufferLevel::SECONDARY, name));
-    }
-
-    return commandBuffers;
+    m_secondaries.push_back(std::move(secondary));
 }
 
 } // namespace Rapture

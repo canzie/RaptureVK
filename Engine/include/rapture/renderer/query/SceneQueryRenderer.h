@@ -167,7 +167,6 @@ class SceneQueryRenderer {
     uint32_t m_pixelCapacity = 0;
     uint32_t m_entryCapacity = 0;
 
-    CommandPoolHash m_commandPoolHash = 0;
     VkFence m_fence = VK_NULL_HANDLE;
 };
 

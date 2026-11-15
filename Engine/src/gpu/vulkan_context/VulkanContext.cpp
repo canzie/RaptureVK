@@ -263,11 +263,11 @@ std::shared_ptr<VulkanQueue> VulkanContext::getVendorQueue() const
     return m_vendorQueue != nullptr ? m_vendorQueue : getGraphicsQueue();
 }
 
-void VulkanContext::initManagers(uint32_t framesInFlight)
+void VulkanContext::initManagers()
 {
     m_renderContext.vulkanContext = this;
 
-    m_commandPoolManager = std::make_unique<CommandPoolManager>(framesInFlight);
+    m_commandPoolManager = std::make_unique<CommandPoolManager>(m_device);
     m_renderContext.commandPoolManager = m_commandPoolManager.get();
 
     m_bufferPoolManager = std::make_unique<BufferPoolManager>(m_vmaAllocator);

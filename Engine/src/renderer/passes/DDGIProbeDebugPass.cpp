@@ -162,37 +162,31 @@ SecondaryBufferInheritance DDGIProbeDebugPass::getInheritance(const RenderPassCo
     return inheritance;
 }
 
-CommandBuffer *DDGIProbeDebugPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
+CommandBufferLease DDGIProbeDebugPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     if (context.settings == nullptr || !context.settings->showDDGIProbes()) {
-        return nullptr;
+        return {};
     }
 
     if (context.scene == nullptr) {
-        return nullptr;
+        return {};
     }
 
     SceneRenderData *renderData = context.scene->getRenderData();
     if (renderData == nullptr) {
-        return nullptr;
+        return {};
     }
 
     const ProbeVolume &volume = m_gi->getProbeVolume();
     const uint32_t probeCount = volume.gridDimensions.x * volume.gridDimensions.y * volume.gridDimensions.z;
     if (probeCount == 0) {
-        return nullptr;
+        return {};
     }
 
-    CommandPoolConfig poolConfig = {};
-    poolConfig.queueFamilyIndex = m_rc->vulkanContext->getGraphicsQueueIndex();
-    poolConfig.flags = 0;
-    poolConfig.threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    auto hash = m_rc->commandPoolManager->createCommandPool(poolConfig);
-
-    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leaseSecondary(m_rc->vulkanContext->getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
     VkCommandBuffer cb = commandBuffer->getCommandBufferVk();
 
     commandBuffer->beginSecondary(inheritance);
@@ -235,7 +229,7 @@ CommandBuffer *DDGIProbeDebugPass::record(const RenderPassContext &context, cons
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 void DDGIProbeDebugPass::onResize(uint32_t width, uint32_t height)

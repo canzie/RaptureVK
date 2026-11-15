@@ -34,7 +34,7 @@ struct alignas(16) TerrainCullPushConstants {
 TerrainCuller::TerrainCuller(std::shared_ptr<StorageBuffer> chunkDataBuffer, uint32_t chunkCount, float heightScale,
                              uint32_t initialIndirectCapacity, VmaAllocator allocator)
     : m_chunkDataBuffer(chunkDataBuffer), m_chunkCount(chunkCount), m_heightScale(heightScale),
-      m_initialIndirectCapacity(initialIndirectCapacity), m_allocator(allocator), m_commandPoolHash(0)
+      m_initialIndirectCapacity(initialIndirectCapacity), m_allocator(allocator)
 {
     initCullPipeline();
 }
@@ -43,8 +43,6 @@ TerrainCuller::~TerrainCuller() {}
 
 void TerrainCuller::initCullPipeline()
 {
-    auto &app = Application::getInstance();
-    auto &vc = app.getVulkanContext();
     auto shaderPath = EnginePaths::shaderDirectory();
 
     ShaderImportConfig shaderConfig;
@@ -59,14 +57,6 @@ void TerrainCuller::initCullPipeline()
     ComputePipelineConfiguration pipelineConfig;
     pipelineConfig.shader = m_cullShader.operator->();
     m_cullPipeline = std::make_shared<ComputePipeline>(pipelineConfig);
-
-    CommandPoolConfig poolConfig{};
-    poolConfig.name = "TerrainCullCommandPool";
-    poolConfig.queueFamilyIndex = vc.getComputeQueueIndex();
-    poolConfig.flags = 0;
-
-    auto &rc = vc.getRenderContext();
-    m_commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
 
     RP_CORE_TRACE("TerrainCuller: Cull compute pipeline initialized");
 }
@@ -103,15 +93,15 @@ void TerrainCuller::runCull(TerrainCullBuffers &buffers, uint32_t frustumBindles
 {
     RAPTURE_PROFILE_FUNCTION();
 
-    if (!m_cullPipeline || m_commandPoolHash == 0) {
+    if (!m_cullPipeline) {
         return;
     }
 
     auto &vc = Application::getInstance().getVulkanContext();
 
     auto &rc = vc.getRenderContext();
-    auto pool = rc.commandPoolManager->getCommandPool(m_commandPoolHash);
-    auto commandBuffer = pool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 

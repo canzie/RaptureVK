@@ -53,7 +53,7 @@ class CascadedShadowMap {
     CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda);
     ~CascadedShadowMap();
 
-    CommandBuffer *recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain);
+    CommandBufferLease recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);
@@ -100,7 +100,6 @@ class CascadedShadowMap {
     void createTerrainPipeline();
     void createShadowTexture();
     void createUniformBuffers();
-    void setupCommandResources();
 
     void recordTerrainCommands(CommandBuffer *commandBuffer, TerrainGenerator *terrain, const glm::vec3 &cameraPos);
 
@@ -156,8 +155,6 @@ class CascadedShadowMap {
 
     // MDI batching system - one per frame in flight
     std::vector<std::unique_ptr<MDIBatchMap>> m_mdiBatchMaps;
-
-    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture

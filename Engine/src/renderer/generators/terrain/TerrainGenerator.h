@@ -119,7 +119,6 @@ class TerrainGenerator {
 
     Ref<AShader> m_chunkComputeShader;
     std::shared_ptr<ComputePipeline> m_chunkComputePipeline;
-    CommandPoolHash m_computePoolHash = 0;
 
     bool m_initialized = false;
     bool m_wireframe = false;

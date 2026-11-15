@@ -43,7 +43,7 @@ Application::Application(const ApplicationConfig &config) : m_running(true), m_i
 
     AssetManager::init(&m_telemetry, m_framesInFlight);
 
-    m_vulkanContext->initManagers(m_framesInFlight);
+    m_vulkanContext->initManagers();
     if (m_mainWindow != nullptr) {
         m_mainWindow->getSwapChain()->invalidate();
     }
@@ -55,20 +55,31 @@ Application::Application(const ApplicationConfig &config) : m_running(true), m_i
         auto &vc = getVulkanContext();
         auto vendorQueue = vc.getVendorQueue();
 
-        CommandPoolConfig config = {};
-        config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-        config.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Pool reset handles this now
-        auto &cmdPoolMgr = *vc.getRenderContext().commandPoolManager;
-        auto tracyPoolHash = cmdPoolMgr.createCommandPool(config);
-        auto tracyPool = cmdPoolMgr.getCommandPool(tracyPoolHash, 0);
+        // Tracy begins this buffer several times without resetting it, so it needs a pool that allows that
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolInfo.queueFamilyIndex = vc.getGraphicsQueueIndex();
 
-        auto tempCmdBuffer = tracyPool->getPrimaryCommandBuffer();
+        VkCommandPool tracyPool = VK_NULL_HANDLE;
+        vkCreateCommandPool(vc.getLogicalDevice(), &poolInfo, nullptr, &tracyPool);
+
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = tracyPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer tracyCommandBuffer = VK_NULL_HANDLE;
+        vkAllocateCommandBuffers(vc.getLogicalDevice(), &allocInfo, &tracyCommandBuffer);
 
         {
             auto queueLock = vendorQueue->acquireQueueLock();
             TracyProfiler::initGPUContext(vc.getPhysicalDevice(), vc.getLogicalDevice(), vendorQueue->getQueueVk(),
-                                          tempCmdBuffer->getCommandBufferVk());
+                                          tracyCommandBuffer);
         }
+
+        vkDestroyCommandPool(vc.getLogicalDevice(), tracyPool, nullptr);
     }
 #endif // RAPTURE_TRACY_PROFILING_ENABLED
 
@@ -221,8 +232,6 @@ void Application::runFrame()
     m_vulkanContext->getGraphicsQueue()->flush();
     m_vulkanContext->getTransferQueue()->flush();
 
-    m_vulkanContext->getRenderContext().commandPoolManager->beginFrame();
-
     m_telemetryPollAccum += Timestep::deltaTime();
     if (m_telemetryPollAccum >= 1.0f) {
         m_telemetryPollAccum = 0.0f;
@@ -269,8 +278,6 @@ void Application::runFrame()
             ++it;
         }
     }
-
-    m_vulkanContext->getRenderContext().commandPoolManager->endFrame();
 
     m_frameCount++;
 

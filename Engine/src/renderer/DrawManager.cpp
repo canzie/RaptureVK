@@ -31,7 +31,6 @@ DrawManager::DrawManager(RenderContext renderContext, const DrawManagerConfig &c
         m_presentQueue = vc.getPresentQueue();
     }
 
-    setupCommandResources();
     createRenderTarget();
     createSharedTextures();
 
@@ -57,15 +56,6 @@ DrawManager::~DrawManager()
     m_graphicsQueue.reset();
     m_presentQueue.reset();
     m_swapChain.reset();
-}
-
-void DrawManager::setupCommandResources()
-{
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = m_renderContext.vulkanContext->getGraphicsQueueIndex();
-    config.flags = 0;
-
-    m_commandPoolHash = m_renderContext.commandPoolManager->createCommandPool(config);
 }
 
 void DrawManager::createRenderTarget()
@@ -203,13 +193,13 @@ void DrawManager::recordComposite(const RenderPassContext &context, CommandBuffe
 {
     RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Composite Pass");
 
-    CommandBuffer *secondary = m_compositePass->record(context, m_compositePass->getInheritance(context));
-    if (secondary == nullptr) {
+    CommandBufferLease secondary = m_compositePass->record(context, m_compositePass->getInheritance(context));
+    if (!secondary.isValid()) {
         return;
     }
 
     m_compositePass->beginRendering(context, commandBuffer);
-    commandBuffer->executeSecondary(*secondary);
+    commandBuffer->executeSecondary(std::move(secondary));
     m_compositePass->endRendering(commandBuffer);
 }
 
@@ -338,8 +328,9 @@ void DrawManager::drawFrame(Scene &scene, ecs::EntityAccessor camera, const Rend
         return;
     }
 
-    auto pool = m_renderContext.commandPoolManager->getCommandPool(m_commandPoolHash, m_currentFrame);
-    auto commandBuffer = pool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease =
+        m_renderContext.commandPoolManager->leasePrimary(m_renderContext.vulkanContext->getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     recordFrame(commandBuffer, scene, camera, imageIndex, settings);
 

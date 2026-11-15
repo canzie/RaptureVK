@@ -352,17 +352,17 @@ void GizmoDrawPass::uploadDrawList(uint32_t slot, std::array<DepthModeRange, DEP
     }
 }
 
-CommandBuffer *GizmoDrawPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
+CommandBufferLease GizmoDrawPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
     if (m_drawList->empty() || m_drawList->isDrawn() || context.scene == nullptr) {
-        return nullptr;
+        return {};
     }
 
     SceneRenderData *renderData = context.scene->getRenderData();
     if (renderData == nullptr) {
-        return nullptr;
+        return {};
     }
 
     m_currentSlot = (m_currentSlot + 1) % static_cast<uint32_t>(m_shapeBuffers.size());
@@ -381,14 +381,8 @@ CommandBuffer *GizmoDrawPass::record(const RenderPassContext &context, const Sec
     uint32_t vertexBase = 0;
     uploadDrawList(m_currentSlot, ranges, vertexBase, viewPosition);
 
-    CommandPoolConfig poolConfig = {};
-    poolConfig.queueFamilyIndex = m_rc->vulkanContext->getGraphicsQueueIndex();
-    poolConfig.flags = 0;
-    poolConfig.threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    auto hash = m_rc->commandPoolManager->createCommandPool(poolConfig);
-
-    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leaseSecondary(m_rc->vulkanContext->getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
     VkCommandBuffer cb = commandBuffer->getCommandBufferVk();
 
     commandBuffer->beginSecondary(inheritance);
@@ -450,7 +444,7 @@ CommandBuffer *GizmoDrawPass::record(const RenderPassContext &context, const Sec
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 void GizmoDrawPass::onResize(uint32_t width, uint32_t height)

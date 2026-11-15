@@ -378,14 +378,9 @@ void TLAS::submitBuild(VkBuildAccelerationStructureModeKHR mode, BuildResources 
     m_buildInfo.dstAccelerationStructure = m_accelerationStructure;
     m_buildInfo.scratchData.deviceAddress = scratchAddress;
 
-    CommandPoolConfig poolConfig{};
-    poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-
     auto &rc = vulkanContext.getRenderContext();
-    auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vulkanContext.getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 

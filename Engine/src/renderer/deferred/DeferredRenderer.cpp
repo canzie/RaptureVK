@@ -129,10 +129,10 @@ void DeferredRenderer::recordSecondaries(const RenderPassContext &frameContext, 
     }
 
     {
-        m_gbufferCmdBuffer = nullptr;
-        m_lightingCmdBuffer = nullptr;
-        m_skyboxCmdBuffer = nullptr;
-        m_probeDebugCmdBuffer = nullptr;
+        m_gbufferCmdBuffer = {};
+        m_lightingCmdBuffer = {};
+        m_skyboxCmdBuffer = {};
+        m_probeDebugCmdBuffer = {};
 
         RenderPassContext context = buildPassContext(frameContext);
 
@@ -207,10 +207,10 @@ void DeferredRenderer::replay(const RenderPassContext &frameContext, CommandBuff
 
     RenderPassContext context = buildPassContext(frameContext);
 
-    if (m_gbufferCmdBuffer) {
+    if (m_gbufferCmdBuffer.isValid()) {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "GBuffer Pass");
         m_gbufferPass->beginRendering(context, commandBuffer);
-        commandBuffer->executeSecondary(*m_gbufferCmdBuffer);
+        commandBuffer->executeSecondary(std::move(m_gbufferCmdBuffer));
         m_gbufferPass->endRendering(commandBuffer);
     }
 
@@ -219,24 +219,24 @@ void DeferredRenderer::replay(const RenderPassContext &frameContext, CommandBuff
         m_ambientOcclusionPass->execute(context, commandBuffer);
     }
 
-    if (m_lightingCmdBuffer) {
+    if (m_lightingCmdBuffer.isValid()) {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Lighting Pass");
         m_lightingPass->beginRendering(context, commandBuffer);
-        commandBuffer->executeSecondary(*m_lightingCmdBuffer);
+        commandBuffer->executeSecondary(std::move(m_lightingCmdBuffer));
         m_lightingPass->endRendering(commandBuffer);
     }
 
-    if (m_skyboxCmdBuffer) {
+    if (m_skyboxCmdBuffer.isValid()) {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "Skybox Pass");
         m_skyboxPass->beginRendering(context, commandBuffer);
-        commandBuffer->executeSecondary(*m_skyboxCmdBuffer);
+        commandBuffer->executeSecondary(std::move(m_skyboxCmdBuffer));
         m_skyboxPass->endRendering(commandBuffer);
     }
 
-    if (m_probeDebugCmdBuffer) {
+    if (m_probeDebugCmdBuffer.isValid()) {
         RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DDGI Probe Debug Pass");
         m_probeDebugPass->beginRendering(context, commandBuffer);
-        commandBuffer->executeSecondary(*m_probeDebugCmdBuffer);
+        commandBuffer->executeSecondary(std::move(m_probeDebugCmdBuffer));
         m_probeDebugPass->endRendering(commandBuffer);
     }
 }

@@ -35,7 +35,7 @@ class GBufferPass : public RenderPass {
 
     static FramebufferSpecification getFramebufferSpecification();
 
-    CommandBuffer *record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
+    CommandBufferLease record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
     void onResize(uint32_t width, uint32_t height) override;
 
     Texture *getNormalTexture(uint32_t frameInFlight) const { return m_normalTextures[frameInFlight].get(); }
@@ -65,7 +65,6 @@ class GBufferPass : public RenderPass {
 
     void createTerrainPipeline();
     void bindGBufferTexturesToBindlessSet();
-    void setupCommandResources();
 
     // Record terrain rendering only
     void recordTerrainCommands(CommandBuffer *secondaryCb, Scene &activeScene, ecs::EntityAccessor camera,
@@ -109,8 +108,6 @@ class GBufferPass : public RenderPass {
     Ref<AShader> m_terrainShader;
 
     std::shared_ptr<GraphicsPipeline> m_terrainPipeline;
-
-    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture

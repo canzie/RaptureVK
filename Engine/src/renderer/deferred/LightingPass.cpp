@@ -96,7 +96,7 @@ FramebufferSpecification LightingPass::getFramebufferSpecification()
     return spec;
 }
 
-CommandBuffer *LightingPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
+CommandBufferLease LightingPass::record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -108,15 +108,8 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    config.threadId = threadId;
-    auto hash = m_rc->commandPoolManager->createCommandPool(config);
-
-    auto pool = m_rc->commandPoolManager->getCommandPool(hash);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leaseSecondary(vc.getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->beginSecondary(inheritance);
 
@@ -224,7 +217,7 @@ CommandBuffer *LightingPass::record(const RenderPassContext &context, const Seco
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 void LightingPass::createPipeline()

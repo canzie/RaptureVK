@@ -77,22 +77,10 @@ void BufferAllocation::uploadData(const void *data, VkDeviceSize size, VkDeviceS
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
 
-    // Create command pool config for transfer operations
-    CommandPoolConfig poolConfig;
-    poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex(); // Using graphics queue for transfer
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-
+    // Using graphics queue for transfer
     auto &rc = vulkanContext.getRenderContext();
-    auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
-    if (!commandPool) {
-        RP_CORE_ERROR("Failed to get command pool");
-        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
-        return;
-    }
-
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vulkanContext.getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
     if (!commandBuffer) {
         RP_CORE_ERROR("Failed to get command buffer");
         vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
@@ -161,21 +149,10 @@ void BufferAllocation::downloadData(void *data, VkDeviceSize size, VkDeviceSize 
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
 
-    CommandPoolConfig poolConfig;
-    poolConfig.queueFamilyIndex = vulkanContext.getGraphicsQueueIndex();
-    poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-
     auto &rc = vulkanContext.getRenderContext();
-    auto commandPoolHash = rc.commandPoolManager->createCommandPool(poolConfig);
-    auto commandPool = rc.commandPoolManager->getCommandPool(commandPoolHash);
-    if (!commandPool) {
-        RP_CORE_ERROR("Failed to get command pool");
-        vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
-        return;
-    }
 
-    auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vulkanContext.getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
     if (!commandBuffer) {
         RP_CORE_ERROR("Failed to get command buffer");
         vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);

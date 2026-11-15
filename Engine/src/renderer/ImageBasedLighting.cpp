@@ -182,15 +182,8 @@ void ImageBasedLighting::kickBakeIfIdle()
 
             std::shared_ptr<DescriptorSet> brdfSet;
 
-            size_t threadId = std::hash<std::thread::id>{}(std::this_thread::get_id());
-            CommandPoolConfig poolConfig{};
-            poolConfig.queueFamilyIndex = vc.getGraphicsQueueIndex();
-            poolConfig.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-            poolConfig.resetFlags = VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT;
-            poolConfig.threadId = threadId;
-            auto poolHash = rc.commandPoolManager->createCommandPool(poolConfig);
-            auto commandPool = rc.commandPoolManager->getCommandPool(poolHash);
-            auto commandBuffer = commandPool->getPrimaryCommandBuffer();
+            CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getGraphicsQueueIndex());
+            CommandBuffer *commandBuffer = commandBufferLease.get();
 
             commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
             VkCommandBuffer cmd = commandBuffer->getCommandBufferVk();

@@ -2,7 +2,7 @@
 
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/rp_assert.h>
-#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include <rapture/gpu/swap_chains/SwapChain.h>
 #include <rapture/gpu/vulkan_context/VulkanContext.h>
 
@@ -67,14 +67,6 @@ AcquiredFrame RenderWindow::beginFrame()
         return {};
     }
 
-    if (m_presentCommandPoolHash == 0) {
-        CommandPoolConfig config;
-        config.queueFamilyIndex = m_context->getGraphicsQueueIndex();
-        config.flags = 0;
-        config.threadId = 0;
-        m_presentCommandPoolHash = m_context->getRenderContext().commandPoolManager->createCommandPool(config);
-    }
-
     int imageIndex = m_swapChain->acquireImage(m_currentFrame);
     if (imageIndex == -1) {
         m_currentFrame = 0;
@@ -84,8 +76,7 @@ AcquiredFrame RenderWindow::beginFrame()
 
     m_currentImageIndex = static_cast<uint32_t>(imageIndex);
 
-    auto pool = m_context->getRenderContext().commandPoolManager->getCommandPool(m_presentCommandPoolHash, m_currentFrame);
-    m_currentCommandBuffer = pool->getPrimaryCommandBuffer();
+    m_currentCommandBuffer = m_context->getRenderContext().commandPoolManager->leasePrimary(m_context->getGraphicsQueueIndex());
 
     if (m_currentCommandBuffer->begin(0) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to begin present command buffer!");
@@ -96,7 +87,7 @@ AcquiredFrame RenderWindow::beginFrame()
     frame.acquired = true;
     frame.imageIndex = m_currentImageIndex;
     frame.imageView = m_swapChain->getImageViews()[m_currentImageIndex];
-    frame.commandBuffer = m_currentCommandBuffer;
+    frame.commandBuffer = m_currentCommandBuffer.get();
     return frame;
 }
 
@@ -114,8 +105,10 @@ void RenderWindow::endFrame()
     std::span<VkSemaphore> signalSpan(&renderFinished, 1);
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-    m_context->getGraphicsQueue()->submitAndFlushQueue(m_currentCommandBuffer, &signalSpan, &waitSpan, &waitStage,
+    m_context->getGraphicsQueue()->submitAndFlushQueue(m_currentCommandBuffer.get(), &signalSpan, &waitSpan, &waitStage,
                                                        m_swapChain->getInFlightFence(m_currentFrame));
+
+    m_currentCommandBuffer.release();
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;

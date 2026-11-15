@@ -55,10 +55,10 @@ class DeferredRenderer : public Renderer {
 
     Counter m_cmdCounter{};
 
-    CommandBuffer *m_gbufferCmdBuffer = nullptr;
-    CommandBuffer *m_lightingCmdBuffer = nullptr;
-    CommandBuffer *m_skyboxCmdBuffer = nullptr;
-    CommandBuffer *m_probeDebugCmdBuffer = nullptr;
+    CommandBufferLease m_gbufferCmdBuffer;
+    CommandBufferLease m_lightingCmdBuffer;
+    CommandBufferLease m_skyboxCmdBuffer;
+    CommandBufferLease m_probeDebugCmdBuffer;
 
     std::unique_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
     std::unique_ptr<RtInstanceData> m_rtInstanceData;

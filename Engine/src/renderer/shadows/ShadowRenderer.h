@@ -34,7 +34,7 @@ class ShadowRenderer : public Renderer {
     template <typename T>
     struct RecordedShadow {
         T *map = nullptr;
-        CommandBuffer *secondary = nullptr;
+        CommandBufferLease secondary;
     };
 
   private:

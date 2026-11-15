@@ -130,7 +130,6 @@ class DynamicDiffuseGI {
 
     VkDevice m_device = VK_NULL_HANDLE;
 
-    CommandPoolHash m_commandPoolHash = 0;
     uint32_t m_framesInFlight;
 
     bool m_isFirstFrame;

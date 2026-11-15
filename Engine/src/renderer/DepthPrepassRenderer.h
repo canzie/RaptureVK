@@ -23,7 +23,7 @@ class DepthPrepassRenderer : public Renderer {
 
   private:
     std::unique_ptr<DepthPrepass> m_pass;
-    CommandBuffer *m_secondary = nullptr;
+    CommandBufferLease m_secondary;
     VkFormat m_depthFormat;
 };
 

@@ -130,7 +130,6 @@ class DrawManager {
 
   private:
     void createRenderTarget();
-    void setupCommandResources();
     void applyPendingResize();
 
     /**
@@ -220,7 +219,6 @@ class DrawManager {
     std::shared_ptr<VulkanQueue> m_graphicsQueue;
     std::shared_ptr<VulkanQueue> m_presentQueue;
 
-    CommandPoolHash m_commandPoolHash = 0;
     uint32_t m_currentFrame = 0;
     uint32_t m_lastRenderedFrame = 0;
 

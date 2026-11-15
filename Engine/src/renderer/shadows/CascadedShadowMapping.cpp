@@ -72,18 +72,6 @@ CascadedShadowMap::CascadedShadowMap(float width, float height, uint32_t numCasc
     for (uint32_t i = 0; i < m_framesInFlight; i++) {
         m_mdiBatchMaps[i] = std::make_unique<MDIBatchMap>(*m_rc);
     }
-
-    setupCommandResources();
-}
-
-void CascadedShadowMap::setupCommandResources()
-{
-    auto &vc = Application::getInstance().getVulkanContext();
-
-    CommandPoolConfig config = {};
-    config.queueFamilyIndex = vc.getGraphicsQueueIndex();
-    config.flags = 0;
-    m_commandPoolHash = m_rc->commandPoolManager->createCommandPool(config);
 }
 
 CascadedShadowMap::~CascadedShadowMap() = default;
@@ -287,7 +275,7 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     return cascadeData;
 }
 
-CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain)
+CommandBufferLease CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -308,8 +296,8 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
     auto &registry = activeScene.getRegistry();
     SceneRenderData *renderData = activeScene.getRenderData();
 
-    auto pool = m_rc->commandPoolManager->getCommandPool(m_commandPoolHash, currentFrame);
-    auto commandBuffer = pool->getSecondaryCommandBuffer();
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leaseSecondary(m_rc->vulkanContext->getGraphicsQueueIndex());
+    CommandBuffer *commandBuffer = commandBufferLease.get();
 
     SecondaryBufferInheritance inheritance{};
     inheritance.depthFormat = m_shadowTextureArray->getFormat();
@@ -437,7 +425,7 @@ CommandBuffer *CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t c
 
     commandBuffer->end();
 
-    return commandBuffer;
+    return commandBufferLease;
 }
 
 std::vector<CascadeData> CascadedShadowMap::updateViewMatrix(const LightComponent &lightComp,

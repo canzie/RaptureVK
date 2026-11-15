@@ -33,7 +33,7 @@ class ShadowMap {
     ShadowMap(float width, float height);
     ~ShadowMap();
 
-    CommandBuffer *recordSecondary(Scene &activeScene, uint32_t currentFrame);
+    CommandBufferLease recordSecondary(Scene &activeScene, uint32_t currentFrame);
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 
@@ -51,7 +51,6 @@ class ShadowMap {
 
     void createPipeline();
     void createShadowTexture();
-    void setupCommandResources();
 
   private:
     const RenderContext *m_rc = nullptr;
@@ -71,8 +70,6 @@ class ShadowMap {
     Ref<AShader> m_shader;
 
     std::shared_ptr<GraphicsPipeline> m_pipeline;
-
-    CommandPoolHash m_commandPoolHash = 0;
 };
 
 } // namespace Rapture
