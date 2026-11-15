@@ -26,7 +26,7 @@ Statics for `Application`, `AssetManager` and the job system are intentional and
 
 Ordered by how likely they are to be hit.
 
-- [ ] **Asset unload null dereference.** `AssetManagerEditor::processUnloadRequests` null-checks `slot->asset` before the status check but then calls `slot->asset->useCount()` unconditionally (`AssetManagerEditor.cpp:795`). Every last release enqueues the handle (`Asset.cpp:23`), so an asset released to zero twice in one frame is dequeued twice: the first evicts it (non-virtual assets keep their slot with a null payload), the second dereferences null. `EVICT_IMMEDIATE` is the default policy. First unit test to write.
+- [x] **Asset unload null dereference.** `AssetManagerEditor::processUnloadRequests` null-checks `slot->asset` before the status check but then calls `slot->asset->useCount()` unconditionally (`AssetManagerEditor.cpp:795`). Every last release enqueues the handle (`Asset.cpp:23`), so an asset released to zero twice in one frame is dequeued twice: the first evicts it (non-virtual assets keep their slot with a null payload), the second dereferences null. `EVICT_IMMEDIATE` is the default policy. First unit test to write.
 - [ ] **Fibers crash on Windows.** The context switch is SysV x86-64 assembly (`Fiber.cpp:38`): arguments in rdi/rsi and only the SysV callee-saved registers. Win64 passes in rcx/rdx, also preserves rdi, rsi and xmm6-15, and needs the TIB stack base/limit swapped, or stack probes and SEH fail. Use `CreateFiber`/`SwitchToFiber` on Windows, or Win64-correct assembly.
 - [ ] **DDGI races the lighting pass.** The probe update is submitted on the compute queue with no semaphores (`DynamicDiffuseGI.cpp:353`) while the graphics queue samples the same images. Queue families are spread across distinct families by `findQueueFamilies`, so nothing orders the two.
 - [ ] **No queue family ownership transfers.** Every buffer and image is `VK_SHARING_MODE_EXCLUSIVE` and no barrier anywhere sets a real `srcQueueFamilyIndex`, yet uploads run on the transfer family and DDGI on the compute family. Works on NVIDIA, undefined by the spec.
@@ -70,8 +70,8 @@ The one-panel-per-viewport rule stays either way: the panel resizes the viewport
 
 GoogleTest is already wired (`Engine/test/event_signal_test.cpp`, `logging_test.cpp`, `file_watcher_test.cpp`, `Editor/test/text_buffer_test.cpp`).
 
-- [ ] A test fixture that brings up the asset manager and the ECS without a window.
-- [ ] Unit tests for each bug above as it is fixed, starting with the unload double enqueue.
+- [ ] A test fixture that brings up the asset manager and the ECS without a window. Asset manager done (`Engine/test/asset_manager_fixture.h`), it takes frames in flight at init instead of reading `Application`; ECS still to do.
+- [ ] Unit tests for each bug above as it is fixed. Unload double enqueue done (`Engine/test/asset_unload_test.cpp`).
 - [ ] ECS: create/destroy churn, generation wrap, stale handles.
 - [ ] Assets: load, release, reacquire within a frame; evict while loading; malformed and truncated asset files.
 - [ ] Scene: spawn and destroy thousands of objects, destroy from inside a tick, reparent during iteration.
