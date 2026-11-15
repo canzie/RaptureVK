@@ -69,13 +69,13 @@ Vendor libraries by whether a reachable header includes them:
 
 | Public | Private |
 |---|---|
-| Vulkan, VMA (`gpu/`), glm, spdlog (`Log.h`), Tracy (`TracyProfiler.h`), spirv_reflect (`Shader.h`), yyjson (`glTFLoader.h`), concurrentqueue (`AssetManagerEditor.h`) | GLFW, stb, glslang, toml++, Jolt, Lua, sol2 |
+| Vulkan, VMA (`gpu/`), glm, spdlog (`Log.h`), Tracy (`TracyProfiler.h`) | GLFW, stb, glslang, toml++, Jolt, Lua, sol2, spirv_reflect, yyjson, concurrentqueue |
 
 Amethyst is not included by any engine file; the editor links it itself.
 
-- [ ] **Step 1, CMake hygiene.** Target-scoped compile definitions, `RAPTURE_DEBUG` public so the editor and tests agree with the engine (`add_definitions` in `Engine/CMakeLists.txt` never reached them). The same warnings and `-Werror` in every configuration and on the editor, which had none. `RP_ASSERT` keeps its operands referenced in release so asserted-only variables do not warn. Vendor libraries split into a public and a private set, Amethyst linked by the editor. Dead `Engine/src/source.cpp` removed.
-- [ ] **Step 2, the split.** Reachable headers move to `include/rapture/`, the rest stay in `src/`, every engine include rewritten to `<rapture/...>`.
-- [ ] **Step 3, the cheap vendor leaks.** yyjson, concurrentqueue and spirv_reflect out of the public headers that include them, then linked private.
+- [x] **Step 1, CMake hygiene.** Target-scoped compile definitions, `RAPTURE_DEBUG` public so the editor and tests agree with the engine (`add_definitions` in `Engine/CMakeLists.txt` never reached them). The same warnings and `-Werror` in every configuration and on the editor, which had none. `RP_ASSERT` keeps its operands referenced in release so asserted-only variables do not warn. Vendor libraries split into a public and a private set, Amethyst linked by the editor. Dead `Engine/src/source.cpp` removed.
+- [x] **Step 2, the split.** Reachable headers move to `include/rapture/`, the rest stay in `src/`, every engine include rewritten to `<rapture/...>`.
+- [x] **Step 3, the cheap vendor leaks.** yyjson, concurrentqueue and spirv_reflect out of the public headers that include them, then linked private.
 - [ ] **Next phase: the public surface.** `Application.h` stops pulling in the renderer and scene, so the reachable set shrinks to the actual API.
 - [ ] **Next phase: headless.** `Application` without a window or swapchain, which the ECS and scene test fixtures need (`Scene`'s constructor builds physics and the TLAS).
 
