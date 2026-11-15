@@ -17,7 +17,7 @@ Out of 10. The architecture is ahead of its implementation: the risk is concentr
 | Elegance | 6 | Asset eviction (deferred buckets, never evicts while loading, VRAM-driven cold list), fixed-step physics with a step cap, and Lua handles with alive flags are well thought through. The graphics queue `clear()` on acquire failure and thread-id keyed command pools under fibers are patches that will bite. |
 | Correctness | 4 | See "Bugs". |
 | Portability | 3 | Fibers are SysV-only assembly; no queue family ownership transfers anywhere. |
-| Testability | 3 | GoogleTest is already in place (`Engine/test/`, `Editor/test/`), but `Application`'s constructor creates the window and device, so little above `core/` can be built in a test. Same work as the headless run. |
+| Testability | 3 | GoogleTest is already in place (`Engine/test/`, `Editor/test/`), but `Application`'s constructor creates the window and device, so little above `core/` can be built in a test. Same work as the windowless run. |
 | Library hygiene | 4 | Include root is `src/` so every header is public; vendor libraries link `PUBLIC`; `add_definitions` is global; `-Werror` only in Debug (`Engine/CMakeLists.txt`). |
 
 Statics for `Application`, `AssetManager` and the job system are intentional and not counted against anything.
@@ -37,8 +37,8 @@ Ordered by how likely they are to be hit.
 - [ ] **Command pools keyed by thread id under fibers.** `DynamicDiffuseGI.cpp:294`, `SkyboxPass.cpp:70`, `Texture.cpp:66`, `:329`, `:1690`. Two jobs interleaving on one worker share a pool whose bookkeeping is non-atomic.
 - [ ] **Component type ids across modules.** `NextComponentTypeId` is a non-atomic static in an inline function (`component_pool.h:22`). Games never define components, but a C++ scripting module that instantiates engine ECS templates inline (any scene object accessor that reaches `registry.read<T>`) gets its own counter and disagrees with the engine on ids. Matters only once C++ scripting exists.
 - [ ] **Queue family selection only treats graphics as unset.** `QueueFamilyIndices::familyIndices[COUNT] = {UINT32_MAX}` (`VulkanTypes.h:20`) sets element 0 only; compute, present and transfer start at family 0. The `== UINT32_MAX` branches in `findQueueFamilies` (`VulkanContext.cpp:640-690`) never run for them, the present branch writes `GRAPHICS` where it means `PRESENT` (`:682`), and `isComplete` passes on a device whose family 0 cannot compute or present. Works today because family 0 does everything on the development GPU. Also hides the two items above: since every role is family 0, the engine runs on a single queue. Fix together with them in the GPU synchronization step, not alone.
-- [ ] **A `Camera3D` renders from the origin unless a controller drives it.** The view matrix only exists in `CameraComponent::camera` and only controllers write it (`CameraController::updateViewCamera`, `PlayerController.cpp:86`); `SceneRenderData` reads it from there (`SceneRenderData.cpp:602`). `Camera3D::setPosition` moves the transform, which the view never reads. Found by the headless smoke test, which drives its camera with a `CameraController` until this is fixed. The view should follow the camera's world transform.
-- [x] **A viewport only set its camera's aspect ratio on resize.** A viewport created at its final size, or handed a new camera, rendered with whatever aspect the camera had (`Viewport.cpp`, `updateCameraAspectRatio`). Found by the headless smoke test.
+- [ ] **A `Camera3D` renders from the origin unless a controller drives it.** The view matrix only exists in `CameraComponent::camera` and only controllers write it (`CameraController::updateViewCamera`, `PlayerController.cpp:86`); `SceneRenderData` reads it from there (`SceneRenderData.cpp:602`). `Camera3D::setPosition` moves the transform, which the view never reads. Found by the windowless smoke test, which drives its camera with a `CameraController` until this is fixed. The view should follow the camera's world transform.
+- [x] **A viewport only set its camera's aspect ratio on resize.** A viewport created at its final size, or handed a new camera, rendered with whatever aspect the camera had (`Viewport.cpp`, `updateCameraAspectRatio`). Found by the windowless smoke test.
 - [ ] **Latent: layer and window lists mutated while iterated.** `Application::run` iterates `m_layerStack` and `m_secondaryWindows` with iterators (`Application.cpp:198-230`); `pushLayer` inserts into the same vector. Clicks are dispatched from `glfwPollEvents`, outside those loops, so nothing hits it today. Shortcuts run inside `AmethystLayer::onUpdate`, inside the loop, so the first shortcut that pushes a layer will.
 
 ## Ownership and scale
@@ -80,11 +80,11 @@ Amethyst is not included by any engine file; the editor links it itself.
 - [x] **Step 2, the split.** Reachable headers move to `include/rapture/`, the rest stay in `src/`, every engine include rewritten to `<rapture/...>`.
 - [x] **Step 3, the cheap vendor leaks.** yyjson, concurrentqueue and spirv_reflect out of the public headers that include them, then linked private.
 - [ ] **Next phase: the public surface.** `Application.h` stops pulling in the renderer and scene, so the reachable set shrinks to the actual API.
-- [x] **Next phase: headless.** `Application` without a window or swapchain, which the ECS and scene test fixtures need (`Scene`'s constructor builds physics and the TLAS). Steps below.
+- [x] **Next phase: windowless.** `Application` without a window or swapchain, which the ECS and scene test fixtures need (`Scene`'s constructor builds physics and the TLAS). Steps below.
 
-## Headless
+## Windowless
 
-A headless application has a Vulkan device and everything above it, but no GLFW, no window, no surface and no swapchain. Rendering goes to offscreen viewports, which already submit without the swapchain (`DrawManager::submitFrame`, `DrawManager.cpp:393`) and already pace themselves through the command pools' timeline waits (`CommandPool::resetIfNeeded`). What ties the engine to a window today:
+A windowless application has a Vulkan device and everything above it, but no GLFW, no window, no surface and no swapchain. Rendering goes to offscreen viewports, which already submit without the swapchain (`DrawManager::submitFrame`, `DrawManager.cpp:393`) and already pace themselves through the command pools' timeline waits (`CommandPool::resetIfNeeded`). What ties the engine to a window today:
 
 | Where | What |
 |---|---|
@@ -95,15 +95,15 @@ A headless application has a Vulkan device and everything above it, but no GLFW,
 | `DrawManager.cpp:28`, `:38` | Takes the main swapchain and its recreate signal for every viewport, offscreen ones included |
 | `Scene.cpp:167` | Fetches the main swapchain and never uses it |
 
-- [x] **Step 1, application config.** `Application` takes an `ApplicationConfig` (window size, title, headless), the editor passes its window. Headless skips the platform context, window, surface and swapchain, and uses a fixed frames-in-flight count. `getMainWindow` and `createSecondaryWindow` assert they are not headless.
+- [x] **Step 1, application config.** `Application` takes an `ApplicationConfig` (an optional main window), the editor passes its window. Windowless skips the platform context, window, surface and swapchain, and uses a fixed frames-in-flight count. `getMainWindow` and `createSecondaryWindow` assert they are not windowless.
 - [x] **Step 2, device without a surface.** `VulkanContext` builds its instance from a given extension list instead of a window, and `initDevice` without a surface skips the present family, the swapchain support check and the swapchain extension. Present becomes optional (`QueueFamilyIndices::isComplete(presentRequired)`); the queue family fix itself moved to GPU synchronization, see the bug above.
-- [x] **Step 3, the loop.** `run` becomes a loop over a public `runFrame`, so a test or a command interface can step frames itself. Headless frames skip the main window.
+- [x] **Step 3, the loop.** `run` becomes a loop over a public `runFrame`, so a test or a command interface can step frames itself. Windowless frames skip the main window.
 - [x] **Step 4, window readers.** `DrawManager` takes the swapchain only for a swapchain target; the unused fetch in `Scene::onUpdate` goes.
-- [x] **Step 5, fixture and smoke test.** A GoogleTest environment that brings up one headless application for the engine test executable, then a test that builds a scene with a mesh, camera and light, renders an offscreen viewport for a few frames and reads the result back. The ECS and scene fixtures build on it. Lives in its own executable, `RaptureEngineGpuTests` (`Engine/test/gpu/`), so the CPU tests still run without a device. It writes the image it read back to `rapture_tests/headless_render_sphere.png` in the temp directory.
+- [x] **Step 5, fixture and smoke test.** A GoogleTest environment that brings up one windowless application for the engine test executable, then a test that builds a scene with a mesh, camera and light, renders an offscreen viewport for a few frames and reads the result back. The ECS and scene fixtures build on it. Lives in its own executable, `RaptureEngineGpuTests` (`Engine/test/gpu/`), so the CPU tests still run without a device. It writes the image it read back to `rapture_tests/windowless_render_sphere.png` in the temp directory.
 
-Not in this phase: a headless executable and the command socket (they come together), and running without a GPU at all.
+Not in this phase: a windowless executable and the command socket (they come together), and running without a GPU at all.
 
-Naming, from Thomas (2026-11-15): "headless" is meant as no Vulkan at all, for running the server side of a game. What this phase built is windowless rendering (a real device, offscreen only), so the proposed names are **windowless** for this mode, **headless** for a CPU-only runtime mode with no device, and **dedicated server** for a build that compiles rendering out. The code still says `isHeadless` until the rename is agreed. Headless needs the CPU side of scenes and assets separated from their GPU mirrors; no software Vulkan.
+Naming, from Thomas (2026-11-15): "headless" is meant as no Vulkan at all, for running the server side of a game. What this phase built is windowless rendering (a real device, offscreen only), so the proposed names are **windowless** for this mode, **headless** for a CPU-only runtime mode with no device, and **dedicated server** for a build that compiles rendering out. Agreed and renamed in code (`isWindowless`); "headless" is reserved for the CPU-only mode. Headless needs the CPU side of scenes and assets separated from their GPU mirrors; no software Vulkan.
 
 ## Testing and stress
 
@@ -120,7 +120,7 @@ GoogleTest is already wired (`Engine/test/event_signal_test.cpp`, `logging_test.
 ## Order
 
 1. Unload null dereference, with the first fixture and test.
-2. Library layout and the headless fixture.
+2. Library layout and the windowless fixture.
 3. GPU synchronization: compute and transfer semaphores and ownership transfers, no `clear()` on acquire failure, frames in flight decoupled from the image count, the queue batch lock, command pools not keyed by thread.
 4. Ownership: shared physics jobs, per-view cascades and terrain, per-scene DDGI, deferred destruction, entity generations.
 5. Editor bindings off `Viewport`.

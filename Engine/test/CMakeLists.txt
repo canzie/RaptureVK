@@ -7,7 +7,7 @@ rapture_add_tests(RaptureEngineTests
     LIBRARIES RaptureVK
 )
 
-# Tests that bring up a headless application, so they need a Vulkan device
+# Tests that bring up a windowless application, so they need a Vulkan device
 file(GLOB ENGINE_GPU_TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/gpu/*_test.cpp
 )

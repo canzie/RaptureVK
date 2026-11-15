@@ -30,7 +30,7 @@ struct MainWindowConfig {
 };
 
 /**
- * @brief How an application starts, headless when it opens no main window
+ * @brief How an application starts, windowless when it opens no main window
  */
 struct ApplicationConfig {
     std::optional<MainWindowConfig> mainWindow;
@@ -55,7 +55,7 @@ class Application {
     /**
      * @brief Whether the application runs without a window, rendering offscreen only
      */
-    bool isHeadless() const { return m_mainWindow == nullptr; }
+    bool isWindowless() const { return m_mainWindow == nullptr; }
 
     /**
      * @brief Stops the run loop and asks the entry point to start the editor again
@@ -129,12 +129,12 @@ class Application {
     VulkanContext &getVulkanContext() { return *m_vulkanContext; }
     const RenderWindow &getMainWindow() const
     {
-        RP_ASSERT(m_mainWindow != nullptr, "a headless application has no main window");
+        RP_ASSERT(m_mainWindow != nullptr, "a windowless application has no main window");
         return *m_mainWindow;
     }
     RenderWindow &getMainWindow()
     {
-        RP_ASSERT(m_mainWindow != nullptr, "a headless application has no main window");
+        RP_ASSERT(m_mainWindow != nullptr, "a windowless application has no main window");
         return *m_mainWindow;
     }
     const WindowContext &getWindowContext() const { return *getMainWindow().getWindowContext(); }
@@ -176,7 +176,7 @@ class Application {
     /**
      * @brief Creates a device that never presents
      */
-    void createHeadlessDevice();
+    void createWindowlessDevice();
 
     /**
      * @brief Samples the current hardware readings into m_telemetry

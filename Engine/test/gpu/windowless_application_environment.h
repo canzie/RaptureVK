@@ -1,5 +1,5 @@
-#ifndef RAPTURE__HEADLESS_APPLICATION_ENVIRONMENT_H
-#define RAPTURE__HEADLESS_APPLICATION_ENVIRONMENT_H
+#ifndef RAPTURE__WINDOWLESS_APPLICATION_ENVIRONMENT_H
+#define RAPTURE__WINDOWLESS_APPLICATION_ENVIRONMENT_H
 
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/Log.h>
@@ -9,9 +9,9 @@
 #include <memory>
 
 /**
- * @brief One headless application shared by every test in the executable
+ * @brief One windowless application shared by every test in the executable
  */
-class HeadlessApplicationEnvironment : public ::testing::Environment {
+class WindowlessApplicationEnvironment : public ::testing::Environment {
   public:
     void SetUp() override
     {
@@ -29,7 +29,7 @@ class HeadlessApplicationEnvironment : public ::testing::Environment {
     std::unique_ptr<Rapture::Application> m_application;
 };
 
-inline const ::testing::Environment *gHeadlessApplicationEnvironment =
-    ::testing::AddGlobalTestEnvironment(new HeadlessApplicationEnvironment);
+inline const ::testing::Environment *gWindowlessApplicationEnvironment =
+    ::testing::AddGlobalTestEnvironment(new WindowlessApplicationEnvironment);
 
-#endif // RAPTURE__HEADLESS_APPLICATION_ENVIRONMENT_H
+#endif // RAPTURE__WINDOWLESS_APPLICATION_ENVIRONMENT_H

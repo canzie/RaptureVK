@@ -1,4 +1,4 @@
-#include "headless_application_environment.h"
+#include "windowless_application_environment.h"
 
 #include <rapture/assets/asset_manager/ReservedAssets.h>
 #include <rapture/gpu/render_targets/SceneRenderTarget.h>
@@ -70,12 +70,12 @@ static void s_writeHalfFloatImageAsPng(const std::vector<uint8_t> &pixels, const
                    static_cast<int>(CHANNEL_COUNT), bytes.data(), static_cast<int>(IMAGE_WIDTH * CHANNEL_COUNT));
 }
 
-TEST(HeadlessRender, SphereStandsOutFromTheBackground)
+TEST(WindowlessRender, SphereStandsOutFromTheBackground)
 {
     Rapture::Application &app = Rapture::Application::getInstance();
-    ASSERT_TRUE(app.isHeadless());
+    ASSERT_TRUE(app.isWindowless());
 
-    Rapture::Scene scene("HeadlessRender");
+    Rapture::Scene scene("WindowlessRender");
     scene.active = true;
 
     auto *sphere = scene.root()->add<Rapture::StaticMesh3D>("Sphere");
@@ -100,7 +100,7 @@ TEST(HeadlessRender, SphereStandsOutFromTheBackground)
     Rapture::ViewportContext viewport = app.getViewportManager().createViewport({
         .scene = &scene,
         .camera = camera->accessor(),
-        .name = "HeadlessRender",
+        .name = "WindowlessRender",
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = IMAGE_WIDTH,
         .height = IMAGE_HEIGHT,
@@ -125,7 +125,7 @@ TEST(HeadlessRender, SphereStandsOutFromTheBackground)
     std::vector<uint8_t> pixels = viewport.viewport->getSceneRenderTarget()->getTexture(lastFrame)->readbackData();
     ASSERT_EQ(pixels.size(), static_cast<size_t>(IMAGE_WIDTH) * IMAGE_HEIGHT * CHANNEL_COUNT * sizeof(uint16_t));
 
-    s_writeHalfFloatImageAsPng(pixels, std::filesystem::temp_directory_path() / "rapture_tests" / "headless_render_sphere.png");
+    s_writeHalfFloatImageAsPng(pixels, std::filesystem::temp_directory_path() / "rapture_tests" / "windowless_render_sphere.png");
 
     glm::vec4 centre = s_readHalfFloatPixel(pixels, IMAGE_WIDTH / 2, IMAGE_HEIGHT / 2);
     glm::vec4 corner = s_readHalfFloatPixel(pixels, 0, 0);

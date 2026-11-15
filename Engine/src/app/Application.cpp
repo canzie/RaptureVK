@@ -20,7 +20,7 @@
 
 namespace Rapture {
 
-static constexpr uint32_t HEADLESS_FRAMES_IN_FLIGHT = 2;
+static constexpr uint32_t WINDOWLESS_FRAMES_IN_FLIGHT = 2;
 
 Application *Application::s_instance = nullptr;
 
@@ -38,7 +38,7 @@ Application::Application(const ApplicationConfig &config) : m_running(true), m_i
     if (config.mainWindow.has_value()) {
         createMainWindowAndDevice(*config.mainWindow);
     } else {
-        createHeadlessDevice();
+        createWindowlessDevice();
     }
 
     AssetManager::init(&m_telemetry, m_framesInFlight);
@@ -107,13 +107,13 @@ void Application::createMainWindowAndDevice(const MainWindowConfig &config)
     RP_ASSERT(m_framesInFlight > 0, "the main window's swapchain reported no images");
 }
 
-void Application::createHeadlessDevice()
+void Application::createWindowlessDevice()
 {
-    RP_CORE_INFO("Creating headless Vulkan context...");
+    RP_CORE_INFO("Creating windowless Vulkan context...");
     m_vulkanContext = std::make_unique<VulkanContext>(std::vector<const char *>{});
     m_vulkanContext->initDevice(VK_NULL_HANDLE);
 
-    m_framesInFlight = HEADLESS_FRAMES_IN_FLIGHT;
+    m_framesInFlight = WINDOWLESS_FRAMES_IN_FLIGHT;
 }
 
 Application::~Application()
@@ -279,7 +279,7 @@ void Application::runFrame()
 
 RenderWindow &Application::createSecondaryWindow(int32_t width, int32_t height, const char *title)
 {
-    RP_ASSERT(!isHeadless(), "a headless application cannot open windows");
+    RP_ASSERT(!isWindowless(), "a windowless application cannot open windows");
 
     auto window = std::unique_ptr<WindowContext>(WindowContext::createWindow(*m_platformContext, width, height, title, true));
     auto renderWindow = std::make_unique<RenderWindow>(std::move(window), *m_vulkanContext);
