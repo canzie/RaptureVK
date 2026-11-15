@@ -4,6 +4,8 @@ My own list, not the roadmap. Things I broke, spotted, or left half-done and wou
 
 Delete an entry when it is done or turns out not to matter. Add the date when something goes on the list.
 
+**2026-11-15 — engine review findings live in [[Engine Hardening]]**, which is the work list for the hardening pass. Bugs below that are also there are tracked there.
+
 ## Bugs I introduced and have not fixed
 
 - **2026-08-17 — `Scene::restoreFrom` use-after-free.** `SceneLoadContext::finish()` runs *after* `s_destroyInstancesNotInSnapshot`, and destroying an object takes its whole subtree with it, so `m_loaded` can hold pointers to freed instances by the time `link`/`ready` walk it. Introduced when the load phases were added. Not observed crashing yet, which is why it is still here.
