@@ -1,5 +1,5 @@
-#ifndef RAPTURE__CONTEXT_MENUS_H
-#define RAPTURE__CONTEXT_MENUS_H
+#ifndef RAPTURE__CONTEXT_MENU_ITEMS_H
+#define RAPTURE__CONTEXT_MENU_ITEMS_H
 
 #include "assets/asset_manager/AssetCommon.h"
 #include "components/checkbox.h"
@@ -22,8 +22,7 @@ namespace Rapture {
 struct TypeInfo;
 } // namespace Rapture
 
-// Asset Context Menu Action Item Data
-class AssetContextMenuAID : public AM::ContextMenu::ActionItemData {
+class AssetMenuItem : public AM::ContextMenu::ActionItemData {
   public:
     std::function<void(AM::UIObject &row)> content; // empty = default text-row builder
 
@@ -37,8 +36,7 @@ class AssetContextMenuAID : public AM::ContextMenu::ActionItemData {
     std::string name;
 };
 
-// Asset Context Menu Action Item View
-class AssetContextMenuAIV : public AM::ContextMenu::ActionItemView {
+class AssetMenuItemView : public AM::ContextMenu::ActionItemView {
   public:
     AM::Frame *create(AM::ContextMenu &owner) override;
     void bind(AM::ContextMenu::ItemData &item) override;
@@ -59,8 +57,7 @@ enum AddAssetRowStyle {
     ADD_ROW_COUNT
 };
 
-// Add Asset Context Menu Action Item Data
-class AddAssetContextMenuAID : public AM::ContextMenu::ActionItemData {
+class AddAssetMenuItem : public AM::ContextMenu::ActionItemData {
   public:
     static std::unique_ptr<AM::ContextMenu::ItemData> createIconRow(std::string label, std::string svgIcon,
                                                                     std::function<void()> onActivate);
@@ -86,8 +83,7 @@ class AddAssetContextMenuAID : public AM::ContextMenu::ActionItemData {
     bool enabled = true;
 };
 
-// Add Asset Context Menu Action Item View
-class AddAssetContextMenuAIV : public AM::ContextMenu::ActionItemView {
+class AddAssetMenuItemView : public AM::ContextMenu::ActionItemView {
   public:
     AM::Frame *create(AM::ContextMenu &owner) override;
     void bind(AM::ContextMenu::ItemData &item) override;
@@ -100,10 +96,9 @@ class AddAssetContextMenuAIV : public AM::ContextMenu::ActionItemView {
     AM::TextLabel *m_label = nullptr;
 };
 
-// Viewport Context Menu Toggle Item Data
-class ViewportContextMenuTID : public AM::ContextMenu::ToggleItemData {
+class ToggleMenuItem : public AM::ContextMenu::ToggleItemData {
   public:
-    explicit ViewportContextMenuTID(std::function<void(bool)> cb = {}) : ToggleItemData(std::move(cb)) {}
+    explicit ToggleMenuItem(std::function<void(bool)> cb = {}) : ToggleItemData(std::move(cb)) {}
 
     static std::unique_ptr<AM::ContextMenu::ItemData> create(std::string label, std::function<void(bool)> cb = {},
                                                              std::string svgIcon = {});
@@ -114,8 +109,7 @@ class ViewportContextMenuTID : public AM::ContextMenu::ToggleItemData {
     bool enabled = true;
 };
 
-// Viewport Context Menu Toggle Item View
-class ViewportContextMenuTIV : public AM::ContextMenu::ToggleItemView {
+class ToggleMenuItemView : public AM::ContextMenu::ToggleItemView {
   public:
     AM::Frame *create(AM::ContextMenu &owner) override;
     void bind(AM::ContextMenu::ItemData &item) override;
@@ -126,8 +120,7 @@ class ViewportContextMenuTIV : public AM::ContextMenu::ToggleItemView {
     AM::TextLabel *m_label = nullptr;
 };
 
-// Viewport Context Menu Radio Item Data
-class ViewportContextMenuRID : public AM::ContextMenu::RadioItemData {
+class RadioMenuItem : public AM::ContextMenu::RadioItemData {
   public:
     static std::unique_ptr<AM::ContextMenu::ItemData> create(std::string label, AM::RadioGroup *group, int32_t value,
                                                              std::string svgIcon = {});
@@ -138,8 +131,7 @@ class ViewportContextMenuRID : public AM::ContextMenu::RadioItemData {
     bool enabled = true;
 };
 
-// Viewport Context Menu Radio Item View
-class ViewportContextMenuRIV : public AM::ContextMenu::RadioItemView {
+class RadioMenuItemView : public AM::ContextMenu::RadioItemView {
   public:
     AM::Frame *create(AM::ContextMenu &owner) override;
     void bind(AM::ContextMenu::ItemData &item) override;
@@ -150,8 +142,7 @@ class ViewportContextMenuRIV : public AM::ContextMenu::RadioItemView {
     AM::TextLabel *m_label = nullptr;
 };
 
-// Viewport Context Menu Separator Item Data
-class ViewportContextMenuSID : public AM::ContextMenu::SeparatorItemData {
+class SeparatorMenuItem : public AM::ContextMenu::SeparatorItemData {
   public:
     static std::unique_ptr<AM::ContextMenu::ItemData> create(std::string label = {});
 
@@ -159,8 +150,7 @@ class ViewportContextMenuSID : public AM::ContextMenu::SeparatorItemData {
     std::string label; // empty = plain line, no text
 };
 
-// Viewport Context Menu Separator Item View
-class ViewportContextMenuSIV : public AM::ContextMenu::SeparatorItemView {
+class SeparatorMenuItemView : public AM::ContextMenu::SeparatorItemView {
   public:
     AM::Frame *create(AM::ContextMenu &owner) override;
     void bind(AM::ContextMenu::ItemData &item) override;
@@ -170,8 +160,7 @@ class ViewportContextMenuSIV : public AM::ContextMenu::SeparatorItemView {
     AM::Frame *m_line = nullptr;
 };
 
-// Viewport Context Menu Submenu Item Data
-class ViewportContextMenuMID : public AM::ContextMenu::SubmenuItemData {
+class SubmenuItem : public AM::ContextMenu::SubmenuItemData {
   public:
     static std::unique_ptr<AM::ContextMenu::ItemData>
     create(std::string label, std::vector<std::unique_ptr<AM::ContextMenu::ItemData>> items, std::string svgIcon = {});
@@ -182,8 +171,7 @@ class ViewportContextMenuMID : public AM::ContextMenu::SubmenuItemData {
     bool enabled = true;
 };
 
-// Viewport Context Menu Submenu Item View
-class ViewportContextMenuMIV : public AM::ContextMenu::SubmenuItemView {
+class SubmenuItemView : public AM::ContextMenu::SubmenuItemView {
   public:
     AM::Frame *create(AM::ContextMenu &owner) override;
     void bind(AM::ContextMenu::ItemData &item) override;
@@ -196,4 +184,4 @@ class ViewportContextMenuMIV : public AM::ContextMenu::SubmenuItemView {
     AM::ImageLabel *m_arrow = nullptr;
 };
 
-#endif // RAPTURE__CONTEXT_MENUS_H
+#endif // RAPTURE__CONTEXT_MENU_ITEMS_H

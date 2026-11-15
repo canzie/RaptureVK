@@ -1,4 +1,4 @@
-#include "instance_picker.h"
+#include "InstancePicker.h"
 
 #include "EntitySelection.h"
 #include "Icons.h"

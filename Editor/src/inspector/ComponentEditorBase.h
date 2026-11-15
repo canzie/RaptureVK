@@ -4,7 +4,7 @@
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 
-#include "layers/panels/components/property_sections.h"
+#include "inspector/PropertySections.h"
 #include "core/ecs/entity_accessor.h"
 #include "scene/Scene.h"
 #include "scene/EntityCommon.h"

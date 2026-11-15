@@ -5,9 +5,9 @@
 #include <components/ui_scope.h>
 
 #include "core/events/EventSignal.h"
-#include "layers/panels/Panel.h"
-#include "layers/panels/component_editors/ComponentEditorBase.h"
-#include "layers/panels/components/property_sections.h"
+#include "inspector/ComponentEditorBase.h"
+#include "inspector/PropertySections.h"
+#include "panels/Panel.h"
 #include "scene/Scene.h"
 #include "core/ecs/entity_accessor.h"
 
@@ -16,20 +16,19 @@
 
 class PropertiesPanel : public Panel {
   public:
-    PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context);
-    ~PropertiesPanel();
-    PropertiesPanel(const PropertiesPanel &) = delete;
-    PropertiesPanel &operator=(const PropertiesPanel &) = delete;
-    PropertiesPanel(PropertiesPanel &&) = delete;
-    PropertiesPanel &operator=(PropertiesPanel &&) = delete;
+    explicit PropertiesPanel(const WorkspaceContext &context);
 
     void setScene(Rapture::Scene *scene);
     void onUpdate(float dt) override;
 
+  protected:
+    void build(Amethyst::UIScope &scope) override;
+    void onRootDestroyed() override;
+
   private:
-    void setupSearchBar(void);
-    void setupPlaceholder(void);
-    void setupEntityView(void);
+    void setupSearchBar(Amethyst::UIScope &scope);
+    void setupPlaceholder(Amethyst::UIScope &scope);
+    void setupEntityView();
 
     /**
      * @brief Ensures the section for T and points it at the selected entity.

@@ -2,7 +2,7 @@
 #define RAPTURE__ASSET_EDITORS_H
 
 #include "Icons.h"
-#include "layers/panels/asset_editors/AssetEditorBase.h"
+#include "inspector/AssetEditorBase.h"
 
 #include <optional>
 

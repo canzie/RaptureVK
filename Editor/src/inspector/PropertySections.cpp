@@ -1,6 +1,6 @@
-#include "property_sections.h"
+#include "PropertySections.h"
 
-#include "layers/panels/components/header_layouts.h"
+#include "ui/chrome/HeaderLayouts.h"
 
 #include <components/checkbox.h>
 #include <components/common.h>

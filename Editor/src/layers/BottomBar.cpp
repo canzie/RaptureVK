@@ -1,7 +1,7 @@
 #include "layers/BottomBar.h"
 
 #include "layers/EditorLayout.h"
-#include "layers/panels/ContentBrowserPanel.h"
+#include "panels/ContentBrowserPanel.h"
 
 #include <scene/World.h>
 

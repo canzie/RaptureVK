@@ -1,7 +1,7 @@
 #ifndef RAPTURE__IMAGE_PREVIEW_PANEL_H
 #define RAPTURE__IMAGE_PREVIEW_PANEL_H
 
-#include "layers/panels/Panel.h"
+#include "panels/Panel.h"
 
 #include "assets/asset_manager/AssetCommon.h"
 

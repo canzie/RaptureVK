@@ -7,7 +7,7 @@
 #include <components/ui_scope.h>
 
 #include "core/events/EventSignal.h"
-#include "layers/panels/Panel.h"
+#include "panels/Panel.h"
 #include "core/ecs/entity_accessor.h"
 
 #include <cstdint>

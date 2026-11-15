@@ -1,4 +1,4 @@
-#include "layers/panels/components/color_field.h"
+#include "ColorField.h"
 
 #include <algorithm>
 #include <cctype>

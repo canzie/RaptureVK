@@ -1,4 +1,4 @@
-#include "asset_visuals.h"
+#include "AssetVisuals.h"
 
 #include "Icons.h"
 

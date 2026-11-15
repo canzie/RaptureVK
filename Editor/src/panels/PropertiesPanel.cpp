@@ -1,8 +1,7 @@
 #include "PropertiesPanel.h"
 #include "EntitySelection.h"
 #include "Icons.h"
-#include "layers/panels/component_editors/ComponentEditors.h"
-#include "layers/panels/components/tab_layouts.h"
+#include "inspector/ComponentEditors.h"
 
 #include "scene/components/Components.h"
 #include "scene/World.h"
@@ -16,24 +15,16 @@ static constexpr float SEARCH_BAR_HEIGHT = 28.0f;
 static constexpr float SEARCH_BAR_TOP_PAD = 8.0f;
 static constexpr float CONTENT_OFFSET = SEARCH_BAR_TOP_PAD + SEARCH_BAR_HEIGHT + 8.0f;
 
-PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context) : Panel("Properties", context)
+PropertiesPanel::PropertiesPanel(const WorkspaceContext &context) : Panel("Properties", context)
 {
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
-        m_root = nullptr;
-        m_placeholderText = nullptr;
-        m_searchInput = nullptr;
-    });
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
+    m_icon = Icons::SVG_PROPERTIES;
+}
 
-    setupSearchBar();
-    setupPlaceholder();
+void PropertiesPanel::build(Amethyst::UIScope &scope)
+{
+    setupSearchBar(scope);
+    setupPlaceholder(scope);
     setupEntityView();
-
-    icon = Icons::SVG_PROPERTIES;
-    attach(tabBar, std::move(root));
 
     if (m_selection != nullptr) {
         m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {
@@ -45,21 +36,18 @@ PropertiesPanel::PropertiesPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
         });
     }
 
-    setScene(context.scene);
+    setScene(m_context.scene);
 }
 
-PropertiesPanel::~PropertiesPanel()
+void PropertiesPanel::onRootDestroyed()
 {
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
+    m_placeholderText = nullptr;
+    m_searchInput = nullptr;
 }
 
-void PropertiesPanel::setupSearchBar()
+void PropertiesPanel::setupSearchBar(Amethyst::UIScope &scope)
 {
-    Amethyst::UIScope(*m_root).frame(
+    scope.frame(
         {
             .base =
                 {
@@ -153,9 +141,9 @@ void PropertiesPanel::setupSearchBar()
         });
 }
 
-void PropertiesPanel::setupPlaceholder()
+void PropertiesPanel::setupPlaceholder(Amethyst::UIScope &scope)
 {
-    Amethyst::UIScope(*m_root).textLabel(
+    scope.textLabel(
         {
             .base =
                 {

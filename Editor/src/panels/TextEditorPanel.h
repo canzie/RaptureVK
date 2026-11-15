@@ -1,7 +1,7 @@
 #ifndef RAPTURE__TEXT_EDITOR_PANEL_H
 #define RAPTURE__TEXT_EDITOR_PANEL_H
 
-#include "layers/panels/Panel.h"
+#include "panels/Panel.h"
 #include "text/TextBuffer.h"
 
 #include <amethyst/Amethyst.h>
@@ -19,7 +19,7 @@
  */
 class TextEditorPanel : public Panel {
   public:
-    TextEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string title = "Text Editor");
+    explicit TextEditorPanel(const WorkspaceContext &context, std::string title = "Text Editor");
     ~TextEditorPanel() override;
 
     void onUpdate(float dt) override;
@@ -50,6 +50,9 @@ class TextEditorPanel : public Panel {
      * @brief Whether there are edits that have not been written back.
      */
     bool isModified() const { return m_buffer.revision() != m_savedRevision; }
+
+  protected:
+    void build(Amethyst::UIScope &scope) override;
 
   private:
     void buildToolbar(Amethyst::UIScope &scope);

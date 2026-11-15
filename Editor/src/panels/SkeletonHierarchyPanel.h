@@ -7,7 +7,7 @@
 
 #include "core/ecs/entity_accessor.h"
 #include "core/events/EventSignal.h"
-#include "layers/panels/Panel.h"
+#include "panels/Panel.h"
 
 #include <cstdint>
 #include <vector>
@@ -27,19 +27,19 @@ class SkeletonHierarchyPanel : public Panel {
   public:
     /**
      * @brief Builds the panel over a pose
-     * @param tabBar The bar the panel's tab is added to
      * @param context The workspace the panel is built against
      * @param pose The pose whose bones are shown
      */
-    SkeletonHierarchyPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::SkeletonPose *pose);
-    ~SkeletonHierarchyPanel() override;
-    SkeletonHierarchyPanel(const SkeletonHierarchyPanel &) = delete;
-    SkeletonHierarchyPanel &operator=(const SkeletonHierarchyPanel &) = delete;
+    SkeletonHierarchyPanel(const WorkspaceContext &context, Rapture::SkeletonPose *pose);
 
     /**
      * @brief Rebuilds the rows from the pose's current bones
      */
     void refresh(void);
+
+  protected:
+    void build(Amethyst::UIScope &scope) override;
+    void onRootDestroyed() override;
 
   private:
     void setupTreeView(Amethyst::UIScope &scope);

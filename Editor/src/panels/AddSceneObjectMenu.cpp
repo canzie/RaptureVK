@@ -2,7 +2,7 @@
 
 #include "EntitySelection.h"
 #include "assets/asset_manager/ReservedAssets.h"
-#include "layers/panels/components/context_menus.h"
+#include "ui/menus/ContextMenuItems.h"
 #include "scene/Scene.h"
 #include "scene/instances/Camera3D.h"
 #include "scene/instances/DirectionalLight3D.h"

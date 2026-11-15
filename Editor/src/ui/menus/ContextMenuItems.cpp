@@ -1,9 +1,9 @@
-#include "context_menus.h"
+#include "ContextMenuItems.h"
 
 #include "amethyst/icons.h"
 #include "assets/asset_manager/AssetCommon.h"
 #include "assets/asset_manager/AssetManager.h"
-#include "asset_visuals.h"
+#include "ui/AssetVisuals.h"
 #include "components/context_menu.h"
 
 #include <components/common.h>
@@ -31,9 +31,9 @@ static float s_estimateTextWidth(const std::string &text, float fontSize)
     return static_cast<float>(text.size()) * fontSize * 0.55f + 4.0f;
 }
 
-std::unique_ptr<ContextMenu::ItemData> AssetContextMenuAID::create(Rapture::AssetHandle asset)
+std::unique_ptr<ContextMenu::ItemData> AssetMenuItem::create(Rapture::AssetHandle asset)
 {
-    auto item = std::make_unique<AssetContextMenuAID>();
+    auto item = std::make_unique<AssetMenuItem>();
     item->assetHandle = asset;
 
     const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(asset);
@@ -44,7 +44,7 @@ std::unique_ptr<ContextMenu::ItemData> AssetContextMenuAID::create(Rapture::Asse
     return item;
 }
 
-Frame *AssetContextMenuAIV::create(ContextMenu &owner)
+Frame *AssetMenuItemView::create(ContextMenu &owner)
 {
     Frame *row = ActionItemView::create(owner);
 
@@ -80,10 +80,10 @@ Frame *AssetContextMenuAIV::create(ContextMenu &owner)
     return row;
 }
 
-void AssetContextMenuAIV::bind(ContextMenu::ItemData &item)
+void AssetMenuItemView::bind(ContextMenu::ItemData &item)
 {
     m_boundItem = &item;
-    auto &asset = item.as<AssetContextMenuAID>();
+    auto &asset = item.as<AssetMenuItem>();
 
     if (asset.content) {
         m_preview->setBaseProperties({.visible = false});
@@ -110,10 +110,10 @@ void AssetContextMenuAIV::bind(ContextMenu::ItemData &item)
     m_label->setText(asset.name);
 }
 
-std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createIconRow(std::string label, std::string svgIcon,
+std::unique_ptr<ContextMenu::ItemData> AddAssetMenuItem::createIconRow(std::string label, std::string svgIcon,
                                                                              std::function<void()> onActivate)
 {
-    auto item = std::make_unique<AddAssetContextMenuAID>();
+    auto item = std::make_unique<AddAssetMenuItem>();
     item->style = ADD_ROW_ICON;
     item->label = std::move(label);
     item->svgIcon = std::move(svgIcon);
@@ -122,10 +122,10 @@ std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createIconRow(std
     return item;
 }
 
-std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createAssetRow(std::string label, Rapture::AssetType assetType,
+std::unique_ptr<ContextMenu::ItemData> AddAssetMenuItem::createAssetRow(std::string label, Rapture::AssetType assetType,
                                                                               std::function<void()> onActivate)
 {
-    auto item = std::make_unique<AddAssetContextMenuAID>();
+    auto item = std::make_unique<AddAssetMenuItem>();
     item->style = ADD_ROW_ASSET;
     item->label = std::move(label);
     item->assetType = assetType;
@@ -134,9 +134,9 @@ std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createAssetRow(st
     return item;
 }
 
-std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createPlainRow(std::string label, std::function<void()> onActivate)
+std::unique_ptr<ContextMenu::ItemData> AddAssetMenuItem::createPlainRow(std::string label, std::function<void()> onActivate)
 {
-    auto item = std::make_unique<AddAssetContextMenuAID>();
+    auto item = std::make_unique<AddAssetMenuItem>();
     item->style = ADD_ROW_PLAIN;
     item->label = std::move(label);
     item->onActivate = std::move(onActivate);
@@ -144,18 +144,18 @@ std::unique_ptr<ContextMenu::ItemData> AddAssetContextMenuAID::createPlainRow(st
     return item;
 }
 
-float AddAssetContextMenuAIV::rowHeight(const ContextMenu &owner) const
+float AddAssetMenuItemView::rowHeight(const ContextMenu &owner) const
 {
-    if (m_boundItem == nullptr || m_boundItem->as<AddAssetContextMenuAID>().style != ADD_ROW_ASSET) {
+    if (m_boundItem == nullptr || m_boundItem->as<AddAssetMenuItem>().style != ADD_ROW_ASSET) {
         return owner.itemHeight;
     }
     return ADD_ASSET_ROW_HEIGHT;
 }
 
-Frame *AddAssetContextMenuAIV::create(ContextMenu &owner)
+Frame *AddAssetMenuItemView::create(ContextMenu &owner)
 {
     Frame *row = ActionItemView::create(owner);
-    auto &addItem = m_boundItem->as<AddAssetContextMenuAID>();
+    auto &addItem = m_boundItem->as<AddAssetMenuItem>();
 
     if (addItem.style == ADD_ROW_ASSET) {
         m_iconWell = row->add<Frame>();
@@ -198,10 +198,10 @@ Frame *AddAssetContextMenuAIV::create(ContextMenu &owner)
     return row;
 }
 
-void AddAssetContextMenuAIV::bind(ContextMenu::ItemData &item)
+void AddAssetMenuItemView::bind(ContextMenu::ItemData &item)
 {
     m_boundItem = &item;
-    auto &addItem = item.as<AddAssetContextMenuAID>();
+    auto &addItem = item.as<AddAssetMenuItem>();
 
     float labelLeft = ROW_PADDING;
     if (addItem.style == ADD_ROW_ASSET) {
@@ -228,17 +228,17 @@ void AddAssetContextMenuAIV::bind(ContextMenu::ItemData &item)
     m_row->setBaseProperties({.interactable = addItem.enabled});
 }
 
-std::unique_ptr<ContextMenu::ItemData> ViewportContextMenuTID::create(std::string label, std::function<void(bool)> cb,
+std::unique_ptr<ContextMenu::ItemData> ToggleMenuItem::create(std::string label, std::function<void(bool)> cb,
                                                                       std::string svgIcon)
 {
-    auto item = std::make_unique<ViewportContextMenuTID>(std::move(cb));
+    auto item = std::make_unique<ToggleMenuItem>(std::move(cb));
     item->label = std::move(label);
     item->svgIcon = std::move(svgIcon);
 
     return item;
 }
 
-Frame *ViewportContextMenuTIV::create(ContextMenu &owner)
+Frame *ToggleMenuItemView::create(ContextMenu &owner)
 {
     Frame *row = ToggleItemView::create(owner);
 
@@ -261,10 +261,10 @@ Frame *ViewportContextMenuTIV::create(ContextMenu &owner)
     return row;
 }
 
-void ViewportContextMenuTIV::bind(ContextMenu::ItemData &item)
+void ToggleMenuItemView::bind(ContextMenu::ItemData &item)
 {
     m_boundItem = &item;
-    auto &toggleItem = item.as<ViewportContextMenuTID>();
+    auto &toggleItem = item.as<ToggleMenuItem>();
 
     float iconSize = m_owner->itemHeight - ICON_INSET;
     m_checkbox->setBaseProperties({.size = UDim2::fromOffset(iconSize, iconSize)});
@@ -289,10 +289,10 @@ void ViewportContextMenuTIV::bind(ContextMenu::ItemData &item)
     m_row->setBaseProperties({.interactable = toggleItem.enabled});
 }
 
-std::unique_ptr<ContextMenu::ItemData> ViewportContextMenuRID::create(std::string label, RadioGroup *group, int32_t value,
+std::unique_ptr<ContextMenu::ItemData> RadioMenuItem::create(std::string label, RadioGroup *group, int32_t value,
                                                                       std::string svgIcon)
 {
-    auto item = std::make_unique<ViewportContextMenuRID>();
+    auto item = std::make_unique<RadioMenuItem>();
     item->label = std::move(label);
     item->svgIcon = std::move(svgIcon);
     item->group = group;
@@ -301,7 +301,7 @@ std::unique_ptr<ContextMenu::ItemData> ViewportContextMenuRID::create(std::strin
     return item;
 }
 
-Frame *ViewportContextMenuRIV::create(ContextMenu &owner)
+Frame *RadioMenuItemView::create(ContextMenu &owner)
 {
     Frame *row = RadioItemView::create(owner);
 
@@ -320,10 +320,10 @@ Frame *ViewportContextMenuRIV::create(ContextMenu &owner)
     return row;
 }
 
-void ViewportContextMenuRIV::bind(ContextMenu::ItemData &item)
+void RadioMenuItemView::bind(ContextMenu::ItemData &item)
 {
     m_boundItem = &item;
-    auto &radioItem = item.as<ViewportContextMenuRID>();
+    auto &radioItem = item.as<RadioMenuItem>();
 
     float iconSize = m_owner->itemHeight - ICON_INSET;
     float radioSize = iconSize * RADIO_DIAMETER_SCALE;
@@ -349,15 +349,15 @@ void ViewportContextMenuRIV::bind(ContextMenu::ItemData &item)
     m_row->setBaseProperties({.interactable = radioItem.enabled});
 }
 
-std::unique_ptr<ContextMenu::ItemData> ViewportContextMenuSID::create(std::string label)
+std::unique_ptr<ContextMenu::ItemData> SeparatorMenuItem::create(std::string label)
 {
-    auto item = std::make_unique<ViewportContextMenuSID>();
+    auto item = std::make_unique<SeparatorMenuItem>();
     item->label = std::move(label);
 
     return item;
 }
 
-Frame *ViewportContextMenuSIV::create(ContextMenu &owner)
+Frame *SeparatorMenuItemView::create(ContextMenu &owner)
 {
     Frame *row = SeparatorItemView::create(owner);
     row->setBaseProperties({.interactable = false});
@@ -379,10 +379,10 @@ Frame *ViewportContextMenuSIV::create(ContextMenu &owner)
     return row;
 }
 
-void ViewportContextMenuSIV::bind(ContextMenu::ItemData &item)
+void SeparatorMenuItemView::bind(ContextMenu::ItemData &item)
 {
     m_boundItem = &item;
-    auto &sep = item.as<ViewportContextMenuSID>();
+    auto &sep = item.as<SeparatorMenuItem>();
 
     if (sep.label.empty()) {
         m_label->setBaseProperties({.visible = false});
@@ -405,9 +405,9 @@ void ViewportContextMenuSIV::bind(ContextMenu::ItemData &item)
 }
 
 std::unique_ptr<ContextMenu::ItemData>
-ViewportContextMenuMID::create(std::string label, std::vector<std::unique_ptr<ContextMenu::ItemData>> items, std::string svgIcon)
+SubmenuItem::create(std::string label, std::vector<std::unique_ptr<ContextMenu::ItemData>> items, std::string svgIcon)
 {
-    auto item = std::make_unique<ViewportContextMenuMID>();
+    auto item = std::make_unique<SubmenuItem>();
     item->label = std::move(label);
     item->svgIcon = std::move(svgIcon);
     item->items = std::move(items);
@@ -415,7 +415,7 @@ ViewportContextMenuMID::create(std::string label, std::vector<std::unique_ptr<Co
     return item;
 }
 
-Frame *ViewportContextMenuMIV::create(ContextMenu &owner)
+Frame *SubmenuItemView::create(ContextMenu &owner)
 {
     Frame *row = SubmenuItemView::create(owner);
 
@@ -447,10 +447,10 @@ Frame *ViewportContextMenuMIV::create(ContextMenu &owner)
     return row;
 }
 
-void ViewportContextMenuMIV::bind(ContextMenu::ItemData &item)
+void SubmenuItemView::bind(ContextMenu::ItemData &item)
 {
     m_boundItem = &item;
-    auto &submenu = item.as<ViewportContextMenuMID>();
+    auto &submenu = item.as<SubmenuItem>();
 
     float iconSize = m_owner->itemHeight - ICON_INSET;
     float arrowSize = iconSize * 0.6f;

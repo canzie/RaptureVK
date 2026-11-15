@@ -5,8 +5,8 @@
 #include <components/ui_scope.h>
 
 #include "Icons.h"
-#include "layers/panels/Panel.h"
-#include "layers/panels/components/property_sections.h"
+#include "inspector/PropertySections.h"
+#include "panels/Panel.h"
 
 #include <optional>
 

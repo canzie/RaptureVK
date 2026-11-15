@@ -2,7 +2,7 @@
 
 #include "EntitySelection.h"
 #include "Icons.h"
-#include "layers/panels/components/asset_visuals.h"
+#include "ui/AssetVisuals.h"
 #include "scene/instances/SceneObject.h"
 #include "scene/instances/SkeletonPose.h"
 
@@ -42,20 +42,19 @@ static void s_nameCell(Amethyst::UIScope &s, const std::string &text, const Scen
         [](Amethyst::TextLabelScope &l) { l.component.propagate(Amethyst::INTERACTION_CATEGORY_ALL); });
 }
 
-SkeletonHierarchyPanel::SkeletonHierarchyPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context,
-                                               Rapture::SkeletonPose *pose)
+SkeletonHierarchyPanel::SkeletonHierarchyPanel(const WorkspaceContext &context, Rapture::SkeletonPose *pose)
     : Panel("Hierarchy", context), m_pose(pose)
 {
-    auto rootFrame = std::make_unique<Amethyst::Frame>();
-    m_root = rootFrame.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
-        m_root = nullptr;
-        m_treeView = nullptr;
-    });
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
+    m_icon = Icons::SVG_BONE;
+}
 
-    Amethyst::UIScope scope(*m_root);
+void SkeletonHierarchyPanel::onRootDestroyed()
+{
+    m_treeView = nullptr;
+}
+
+void SkeletonHierarchyPanel::build(Amethyst::UIScope &scope)
+{
     setupTreeView(scope);
 
     if (m_selection != nullptr) {
@@ -63,19 +62,7 @@ SkeletonHierarchyPanel::SkeletonHierarchyPanel(Amethyst::TabBar *tabBar, const W
             m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) { selectRowFor(entity); });
     }
 
-    icon = Icons::SVG_BONE;
-    attach(tabBar, std::move(rootFrame));
-
     refresh();
-}
-
-SkeletonHierarchyPanel::~SkeletonHierarchyPanel()
-{
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
 }
 
 void SkeletonHierarchyPanel::setupTreeView(Amethyst::UIScope &scope)

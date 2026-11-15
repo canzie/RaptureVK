@@ -1,34 +1,21 @@
 #include "AssetDetailsPanel.h"
 
 #include "Icons.h"
-#include "layers/panels/asset_editors/AssetEditors.h"
+#include "inspector/AssetEditors.h"
 
 #include <assets/asset_manager/AssetManager.h>
 
-AssetDetailsPanel::AssetDetailsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::AssetHandle handle)
+AssetDetailsPanel::AssetDetailsPanel(const WorkspaceContext &context, Rapture::AssetHandle handle)
     : Panel("Details", context), m_handle(handle)
 {
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
-
-    setupSectionView();
-
-    icon = Icons::SVG_PROPERTIES;
-    attach(tabBar, std::move(root));
-
-    refresh();
+    m_icon = Icons::SVG_PROPERTIES;
 }
 
-AssetDetailsPanel::~AssetDetailsPanel()
+void AssetDetailsPanel::build(Amethyst::UIScope &scope)
 {
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
+    (void)scope;
+    setupSectionView();
+    refresh();
 }
 
 void AssetDetailsPanel::setupSectionView()

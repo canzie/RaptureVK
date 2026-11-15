@@ -1,9 +1,9 @@
-#include "asset_picker.h"
+#include "AssetPicker.h"
 
 #include "Icons.h"
 #include "assets/asset_manager/AssetManager.h"
-#include "asset_visuals.h"
-#include "context_menus.h"
+#include "ui/AssetVisuals.h"
+#include "ui/menus/ContextMenuItems.h"
 
 #include <algorithm>
 #include <cctype>
@@ -255,7 +255,7 @@ void AssetPicker::buildMenu()
     }
     m_menu->itemHeight = m_config.rowHeight;
     m_menu->maxVisibleItems = m_config.maxVisibleRows;
-    m_menu->setRowFactories({.action = [] { return std::make_unique<AssetContextMenuAIV>(); }});
+    m_menu->setRowFactories({.action = [] { return std::make_unique<AssetMenuItemView>(); }});
     m_menu->onClosedCb = [this]() { applyOpenState(false); };
 }
 
@@ -270,8 +270,8 @@ void AssetPicker::rebuildItems()
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     items.reserve(handles.size());
     for (Rapture::AssetHandle handle : handles) {
-        auto item = AssetContextMenuAID::create(handle);
-        item->as<AssetContextMenuAID>().onActivate = [this, handle]() { selectAsset(handle); };
+        auto item = AssetMenuItem::create(handle);
+        item->as<AssetMenuItem>().onActivate = [this, handle]() { selectAsset(handle); };
         items.push_back(std::move(item));
     }
 

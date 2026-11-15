@@ -1,4 +1,4 @@
-#include "segmented_control.h"
+#include "SegmentedControl.h"
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>

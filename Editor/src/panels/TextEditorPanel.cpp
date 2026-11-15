@@ -33,17 +33,10 @@ static bool s_writeFile(const std::filesystem::path &path, std::string_view text
     return file.good();
 }
 
-TextEditorPanel::TextEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, std::string title)
-    : Panel(std::move(title), context)
-{
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) { m_root = nullptr; });
-    m_root->name = m_name;
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
+TextEditorPanel::TextEditorPanel(const WorkspaceContext &context, std::string title) : Panel(std::move(title), context) {}
 
-    Amethyst::UIScope scope(*m_root);
+void TextEditorPanel::build(Amethyst::UIScope &scope)
+{
     buildToolbar(scope);
 
     m_editor = m_root->add<Amethyst::TextArea>();
@@ -54,11 +47,9 @@ TextEditorPanel::TextEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContex
                                  .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -TOOLBAR_HEIGHT)});
     m_editor->setSource(&m_buffer);
 
-    if (m_services.registerShortcut) {
-        m_services.registerShortcut(EDITOR_COMMAND_SAVE, {Rapture::KEY_S, SHORTCUT_MOD_CONTROL}, m_root, [this] { save(); });
-    }
+    m_context.editor->shortcuts->registerShortcut(EDITOR_COMMAND_SAVE, {Rapture::KEY_S, SHORTCUT_MOD_CONTROL}, m_root,
+                                                  [this] { save(); });
 
-    attach(tabBar, std::move(root));
     refreshStatus();
 }
 
@@ -82,12 +73,9 @@ void TextEditorPanel::buildToolbar(Amethyst::UIScope &scope)
                                   .label = "Open..."},
                                  [this](Amethyst::TextButtonScope &b) {
                                      b.component.onMouseButton1ClickCb = [this]() {
-                                         if (m_services.openFileExplorer) {
-                                             m_services.openFileExplorer(FileBrowser::Mode::OPEN,
-                                                                         [this](const std::filesystem::path &path) {
-                                                                             openFile(path);
-                                                                         });
-                                         }
+                                         m_context.editor->windows->openFileDialog(
+                                             FILE_DIALOG_OPEN,
+                                             [this](const std::filesystem::path &path) { openFile(path); });
                                          return Amethyst::EventResult::CONSUMED;
                                      };
                                  });

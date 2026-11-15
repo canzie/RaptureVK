@@ -1,7 +1,7 @@
 #ifndef RAPTURE__MODE_DROPDOWN_H
 #define RAPTURE__MODE_DROPDOWN_H
 
-#include "layers/workspaces/Workspace.h"
+#include "workspaces/Workspace.h"
 
 #include <amethyst/Amethyst.h>
 

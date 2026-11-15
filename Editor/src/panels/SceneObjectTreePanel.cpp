@@ -2,9 +2,8 @@
 
 #include "EntitySelection.h"
 #include "Icons.h"
-#include "layers/panels/AddSceneObjectMenu.h"
-#include "layers/panels/components/context_menus.h"
-#include "layers/panels/components/tab_layouts.h"
+#include "panels/AddSceneObjectMenu.h"
+#include "ui/menus/ContextMenuItems.h"
 #include "scene/Scene.h"
 #include "scene/instances/SceneObject.h"
 #include "scene/instances/scene_components/VisibilityComponent.h"

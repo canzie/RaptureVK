@@ -5,9 +5,9 @@
 #include <components/table.h>
 #include <components/ui_scope.h>
 
-#include "layers/panels/components/asset_picker.h"
-#include "layers/panels/components/color_field.h"
-#include "layers/panels/components/instance_picker.h"
+#include "ui/fields/AssetPicker.h"
+#include "ui/fields/ColorField.h"
+#include "ui/fields/InstancePicker.h"
 
 #include <concepts>
 #include <functional>

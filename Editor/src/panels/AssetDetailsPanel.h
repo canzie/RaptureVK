@@ -4,9 +4,9 @@
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 
-#include "layers/panels/Panel.h"
-#include "layers/panels/asset_editors/AssetEditorBase.h"
-#include "layers/panels/components/property_sections.h"
+#include "inspector/AssetEditorBase.h"
+#include "inspector/PropertySections.h"
+#include "panels/Panel.h"
 
 #include <assets/asset_manager/AssetCommon.h>
 
@@ -21,13 +21,12 @@
  */
 class AssetDetailsPanel : public Panel {
   public:
-    AssetDetailsPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::AssetHandle handle);
-    ~AssetDetailsPanel();
-
-    AssetDetailsPanel(const AssetDetailsPanel &) = delete;
-    AssetDetailsPanel &operator=(const AssetDetailsPanel &) = delete;
+    AssetDetailsPanel(const WorkspaceContext &context, Rapture::AssetHandle handle);
 
     void onUpdate(float dt) override;
+
+  protected:
+    void build(Amethyst::UIScope &scope) override;
 
   private:
     void setupSectionView();
@@ -48,8 +47,6 @@ class AssetDetailsPanel : public Panel {
     void refresh();
 
   private:
-    Amethyst::Frame *m_root = nullptr;
-    Amethyst::EventConnection m_rootDestroyConn;
     std::optional<PropertySectionList> m_sections;
     Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
 };

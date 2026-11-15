@@ -6,7 +6,7 @@
 #include <components/tree_view.h>
 #include <components/ui_scope.h>
 
-#include "layers/panels/Panel.h"
+#include "panels/Panel.h"
 #include "scene/Scene.h"
 #include "scene/instances/Instance.h"
 #include <cstdint>

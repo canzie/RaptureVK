@@ -3,7 +3,7 @@
 #include <assets/materials/AMaterialInstance.h>
 
 #include "Icons.h"
-#include "layers/panels/components/tab_layouts.h"
+#include "ui/chrome/TabLabels.h"
 
 #include "assets/materials/graph/MaterialGraphCompiler.h"
 #include "assets/materials/graph/NodeRegistry.h"
@@ -350,48 +350,41 @@ static std::unique_ptr<Amethyst::ContextMenu::ItemData> s_categoryToMenuItem(con
                                                                              const SpawnFn &spawn, const TexSpawnFn &spawnTexture,
                                                                              Amethyst::Color3 color);
 
-NodeEditorPanel::NodeEditorPanel(Amethyst::TabBar *tabBar, const WorkspaceContext &context, Rapture::AssetHandle material)
-    : Panel("Node Editor", context)
+NodeEditorPanel::NodeEditorPanel(const WorkspaceContext &context, Rapture::AssetHandle material)
+    : Panel("Node Editor", context), m_material(material)
 {
+    m_icon = Icons::SVG_MATERIAL;
     Rapture::GraphDomainRegistry::registerBuiltins();
-
-    auto root = std::make_unique<Amethyst::Frame>();
-    m_root = root.get();
-    m_rootDestroyConn = m_root->onDestroy.connect([this](Amethyst::Instance *) {
-        m_root = nullptr;
-        m_canvas = nullptr;
-        m_content = nullptr;
-        m_wireLayer = nullptr;
-        m_contextMenu = nullptr;
-        m_dragWire = nullptr;
-        m_connecting = false;
-        m_selectedNodes.clear();
-        m_primaryNodeId = 0;
-    });
-    m_root->addClass("panel");
-    m_root->setBaseProperties({.clipsDescendants = true});
-
-    setupCanvas();
-    setupContextMenu();
-
-    icon = Icons::SVG_MATERIAL;
-    attach(tabBar, std::move(root));
-
-    loadMaterial(material);
-
-    m_serializeListener =
-        Rapture::ProjectEvents::onProjectSerialize().addListener([this](Rapture::WriteNode &root) { (void)root; });
 }
 
 NodeEditorPanel::~NodeEditorPanel()
 {
     Rapture::ProjectEvents::onProjectSerialize().removeListener(m_serializeListener);
+}
 
-    if (m_root != nullptr && m_root->parent != nullptr) {
-        if (auto *tabBar = m_root->parent->as<Amethyst::TabBar>()) {
-            tabBar->removeTab(m_root);
-        }
-    }
+void NodeEditorPanel::onRootDestroyed()
+{
+    m_canvas = nullptr;
+    m_content = nullptr;
+    m_wireLayer = nullptr;
+    m_contextMenu = nullptr;
+    m_dragWire = nullptr;
+    m_connecting = false;
+    m_selectedNodes.clear();
+    m_primaryNodeId = 0;
+}
+
+void NodeEditorPanel::build(Amethyst::UIScope &scope)
+{
+    (void)scope;
+
+    setupCanvas();
+    setupContextMenu();
+
+    loadMaterial(m_material);
+
+    m_serializeListener =
+        Rapture::ProjectEvents::onProjectSerialize().addListener([this](Rapture::WriteNode &root) { (void)root; });
 }
 
 void NodeEditorPanel::setupCanvas()

@@ -16,7 +16,7 @@
 #include <string_view>
 #include <vector>
 
-#include "layers/panels/Panel.h"
+#include "panels/Panel.h"
 
 class ContentBrowserPanel : public Panel {
   public:

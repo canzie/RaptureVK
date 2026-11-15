@@ -1,4 +1,4 @@
-#include "layers/panels/components/header_layouts.h"
+#include "HeaderLayouts.h"
 
 #include "Icons.h"
 #include "core/utils/Log.h"

@@ -1,12 +1,9 @@
-#include "mode_dropdown.h"
+#include "ModeDropdown.h"
 
 #include <components/dropdown.h>
 #include <components/ui_scope.h>
 
 #include <string>
-
-static constexpr float DROPDOWN_WIDTH = 120.0f;
-static constexpr float DROPDOWN_HEIGHT = 24.0f;
 
 Amethyst::Dropdown *ModeDropdown_add(Amethyst::Instance &parent, std::span<const EditorMode> modes,
                                      std::function<void(EditorMode)> onSelected)
@@ -20,7 +17,7 @@ Amethyst::Dropdown *ModeDropdown_add(Amethyst::Instance &parent, std::span<const
     Amethyst::UIScope(parent).dropdown(
         {
             .classes = {"property-input-field"},
-            .base = {.size = Amethyst::UDim2::fromOffset(DROPDOWN_WIDTH, DROPDOWN_HEIGHT)},
+            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
             .label = std::string(EDITOR_MODE_LABELS[modes.front()]),
         },
         [&](Amethyst::DropdownScope &d) {
