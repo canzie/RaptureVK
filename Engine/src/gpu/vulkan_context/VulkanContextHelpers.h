@@ -2,6 +2,7 @@
 #include <rapture/core/utils/Log.h>
 #include <vulkan/vulkan.h>
 
+#include <atomic>
 #include <fstream>
 
 namespace Rapture {
@@ -14,7 +15,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
                                                     const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
     (void)messageType;
-    (void)pUserData;
 
 #if RAPTURE_VERBOSE_VALIDATION
     if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
@@ -27,6 +27,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
         RP_CORE_WARN("validation layer: {0}", pCallbackData->pMessage);
     } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         RP_CORE_ERROR("validation layer: {0}", pCallbackData->pMessage);
+        static_cast<std::atomic<uint32_t> *>(pUserData)->fetch_add(1, std::memory_order_relaxed);
     }
 
     return VK_FALSE;
@@ -52,7 +53,7 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
-void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo)
+void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo, std::atomic<uint32_t> *validationErrorCount)
 {
     createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -61,6 +62,7 @@ void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &create
     createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     createInfo.pfnUserCallback = debugCallback;
+    createInfo.pUserData = validationErrorCount;
 }
 
 } // namespace Rapture

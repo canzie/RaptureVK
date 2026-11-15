@@ -312,7 +312,7 @@ void VulkanContext::createInstance(const std::vector<const char *> &surfaceExten
         m_instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(m_validationLayers.size());
         m_instanceCreateInfo.ppEnabledLayerNames = m_validationLayers.data();
 
-        populateDebugMessengerCreateInfo(debugCreateInfo);
+        populateDebugMessengerCreateInfo(debugCreateInfo, &m_validationErrorCount);
         m_instanceCreateInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
     } else {
         m_instanceCreateInfo.enabledLayerCount = 0;
@@ -483,7 +483,7 @@ void VulkanContext::setupDebugMessenger()
     if (!enableValidationLayers) return;
 
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
-    populateDebugMessengerCreateInfo(createInfo);
+    populateDebugMessengerCreateInfo(createInfo, &m_validationErrorCount);
 
     if (CreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS) {
         RP_CORE_ERROR("failed to set up debug messenger!");

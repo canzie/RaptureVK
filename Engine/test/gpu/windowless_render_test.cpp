@@ -70,7 +70,9 @@ static void s_writeHalfFloatImageAsPng(const std::vector<uint8_t> &pixels, const
                    static_cast<int>(CHANNEL_COUNT), bytes.data(), static_cast<int>(IMAGE_WIDTH * CHANNEL_COUNT));
 }
 
-TEST(WindowlessRender, SphereStandsOutFromTheBackground)
+class WindowlessRender : public WindowlessGpuTest {};
+
+TEST_F(WindowlessRender, SphereStandsOutFromTheBackground)
 {
     Rapture::Application &app = Rapture::Application::getInstance();
     ASSERT_TRUE(app.isWindowless());

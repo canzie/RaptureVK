@@ -7,6 +7,7 @@
 #include <rapture/gpu/vulkan_context/VulkanQueue.h>
 #include <rapture/gpu/vulkan_context/VulkanTypes.h>
 
+#include <atomic>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -79,6 +80,12 @@ class VulkanContext {
      * @return The lower of maxColorAttachments and maxFragmentOutputAttachments
      */
     uint32_t getMaxColorAttachments() const { return m_maxColorAttachments; }
+
+    /**
+     * @brief Errors the validation layer has reported since the instance was created
+     * @return The error count, always zero when validation is off
+     */
+    uint32_t getValidationErrorCount() const { return m_validationErrorCount.load(std::memory_order_relaxed); }
 
     // Extension function pointers
     PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = nullptr;
@@ -154,6 +161,7 @@ class VulkanContext {
     std::shared_ptr<VulkanQueue> m_vendorQueue;
 
     VkDebugUtilsMessengerEXT m_debugMessenger;
+    std::atomic<uint32_t> m_validationErrorCount{0};
 
     std::vector<const char *> m_validationLayers;
     std::vector<const char *> m_deviceExtensions;
