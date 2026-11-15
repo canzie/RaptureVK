@@ -1,9 +1,9 @@
 #include "EditorConfig.h"
 
-#include "core/serialization/SerialDocument.h"
-#include "core/utils/EnginePaths.h"
-#include "core/utils/Log.h"
-#include "core/utils/rp_assert.h"
+#include <rapture/core/serialization/SerialDocument.h>
+#include <rapture/core/utils/EnginePaths.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
 
 #include <algorithm>
 #include <cmath>

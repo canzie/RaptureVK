@@ -4,12 +4,12 @@
 #include "panels/AddSceneObjectMenu.h"
 #include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "scene/World.h"
-#include "scene/instances/Module.h"
-#include "scene/instances/SceneObject.h"
-#include "scene/instances/scene_components/VisibilityComponent.h"
-#include "core/ecs/entity_accessor.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/scene/World.h>
+#include <rapture/scene/instances/Module.h>
+#include <rapture/scene/instances/SceneObject.h>
+#include <rapture/scene/instances/scene_components/VisibilityComponent.h>
+#include <rapture/core/ecs/entity_accessor.h>
 
 #include <components/common.h>
 #include <components/context_menu_item.h>

@@ -8,9 +8,9 @@
 
 #include <glm/glm.hpp>
 
-#include "gpu/buffers/StorageBuffer.h"
-#include "gpu/vulkan_context/RenderContext.h"
-#include "scene/Scene.h"
+#include <rapture/gpu/buffers/StorageBuffer.h>
+#include <rapture/gpu/vulkan_context/RenderContext.h>
+#include <rapture/scene/Scene.h>
 
 namespace Rapture {
 

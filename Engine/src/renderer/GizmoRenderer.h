@@ -1,7 +1,7 @@
 #ifndef RAPTURE__GIZMO_RENDERER_H
 #define RAPTURE__GIZMO_RENDERER_H
 
-#include "renderer/GizmoDrawList.h"
+#include <rapture/renderer/GizmoDrawList.h>
 #include "renderer/Renderer.h"
 #include "renderer/passes/GizmoDrawPass.h"
 

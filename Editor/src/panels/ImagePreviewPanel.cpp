@@ -1,9 +1,9 @@
 #include "ImagePreviewPanel.h"
-#include <assets/textures/ATexture.h>
+#include <rapture/assets/textures/ATexture.h>
 
-#include "assets/asset_manager/Asset.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/gpu/textures/Texture.h>
 
 #include <components/context_menu_item.h>
 #include <components/ui_scope.h>

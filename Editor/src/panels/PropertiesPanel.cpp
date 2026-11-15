@@ -3,9 +3,9 @@
 #include "Icons.h"
 #include "inspector/ComponentEditors.h"
 
-#include "scene/components/Components.h"
-#include "scene/World.h"
-#include "scene/instances/SceneObject.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/World.h>
+#include <rapture/scene/instances/SceneObject.h>
 
 #include <components/common.h>
 #include <components/ui_scope.h>

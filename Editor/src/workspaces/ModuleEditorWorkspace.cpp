@@ -6,18 +6,18 @@
 #include "panels/TextEditorPanel.h"
 #include "panels/ViewportPanel.h"
 
-#include <app/Application.h>
-#include <assets/asset_manager/AssetManager.h>
-#include <core/ecs/entity_accessor.h>
-#include <core/serialization/SerialDocument.h>
-#include <core/utils/Log.h>
-#include <gpu/render_targets/SceneRenderTarget.h>
-#include <renderer/viewport/ViewportManager.h>
-#include <scene/Scene.h>
-#include <scene/components/Components.h>
-#include <scene/instances/DirectionalLight3D.h>
-#include <scene/instances/Node3D.h>
-#include <scene/systems/Transforms.h>
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/serialization/SerialDocument.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/render_targets/SceneRenderTarget.h>
+#include <rapture/renderer/viewport/ViewportManager.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/DirectionalLight3D.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/systems/Transforms.h>
 
 static constexpr std::string_view ROOT_NAME = "Scene Root";
 

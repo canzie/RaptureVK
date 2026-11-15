@@ -1,7 +1,7 @@
 #ifndef RAPTURE__ASSET_MANAGER_FIXTURE_H
 #define RAPTURE__ASSET_MANAGER_FIXTURE_H
 
-#include "assets/asset_manager/AssetManager.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
 
 #include <gtest/gtest.h>
 

@@ -2,9 +2,9 @@
 #ifndef RAPTURE__JOB_SYSTEM_H
 #define RAPTURE__JOB_SYSTEM_H
 
-#include "Counter.h"
-#include "Job.h"
-#include "WaitList.h"
+#include "core/jobs/Counter.h"
+#include "core/jobs/Job.h"
+#include "core/jobs/WaitList.h"
 #include "core/jobs/Fiber.h"
 #include "core/jobs/JobQueue.h"
 

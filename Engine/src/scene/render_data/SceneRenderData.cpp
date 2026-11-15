@@ -1,12 +1,12 @@
-#include "scene/render_data/SceneRenderData.h"
+#include <rapture/scene/render_data/SceneRenderData.h>
 
-#include "scene/components/Components.h"
-#include "scene/systems/Transforms.h"
-#include "core/ecs/entity_accessor.h"
-#include "core/utils/TracyProfiler.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/systems/Transforms.h>
+#include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/utils/TracyProfiler.h>
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
-#include "scene/Scene.h"
+#include <rapture/scene/Scene.h>
 
 #include <algorithm>
 #include <cmath>

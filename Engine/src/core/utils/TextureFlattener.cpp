@@ -1,17 +1,17 @@
-#include "TextureFlattener.h"
-#include "assets/textures/ATexture.h"
+#include "core/utils/TextureFlattener.h"
+#include <rapture/assets/textures/ATexture.h>
 
-#include "core/utils/EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 
 #include <cmath>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "core/utils/Log.h"
-#include "gpu/shaders/ShaderCompilation.h"
-#include "app/Application.h"
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/shaders/ShaderCompilation.h>
+#include <rapture/app/Application.h>
 
 namespace Rapture {
 

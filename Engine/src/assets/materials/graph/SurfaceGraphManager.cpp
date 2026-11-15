@@ -1,17 +1,17 @@
-#include "SurfaceGraphManager.h"
+#include <rapture/assets/materials/graph/SurfaceGraphManager.h>
 
-#include "assets/textures/ATexture.h"
+#include <rapture/assets/textures/ATexture.h>
 
 #include <fstream>
 #include <string>
 #include <string_view>
 #include <unordered_set>
 
-#include "GraphDomain.h"
-#include "MaterialGraphTypes.h"
-#include "app/Application.h"
+#include <rapture/assets/materials/graph/GraphDomain.h>
+#include <rapture/assets/materials/graph/MaterialGraphTypes.h>
+#include <rapture/app/Application.h>
 #include "core/events/ShaderEvents.h"
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 namespace Rapture {
 

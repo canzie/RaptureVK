@@ -1,4 +1,4 @@
-#include "Controller.h"
+#include <rapture/scene/instances/controllers/Controller.h>
 
 #include <glm/gtc/quaternion.hpp>
 

@@ -1,9 +1,9 @@
-#include "VertexBuffer.h"
-#include "app/Application.h"
-#include "core/utils/Log.h"
-#include "gpu/buffers/BufferPool.h"
+#include <rapture/gpu/buffers/VertexBuffer.h>
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/buffers/BufferPool.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "gpu/descriptors/DescriptorSet.h"
+#include <rapture/gpu/descriptors/DescriptorSet.h>
 
 namespace Rapture {
 

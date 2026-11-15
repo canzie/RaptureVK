@@ -1,6 +1,6 @@
-#include "StaticMesh.h"
+#include <rapture/assets/meshes/StaticMesh.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 namespace Rapture {
 

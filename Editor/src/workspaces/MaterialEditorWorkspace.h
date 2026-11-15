@@ -3,7 +3,7 @@
 
 #include "PreviewWorkspace.h"
 
-#include <core/events/EventSignal.h>
+#include <rapture/core/events/EventSignal.h>
 
 class NodeEditorPanel;
 

@@ -1,4 +1,4 @@
-#include "AWorld.h"
+#include <rapture/assets/worlds/AWorld.h>
 
 namespace Rapture {
 

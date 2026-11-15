@@ -1,4 +1,4 @@
-#include "AShader.h"
+#include <rapture/assets/shaders/AShader.h>
 
 namespace Rapture {
 

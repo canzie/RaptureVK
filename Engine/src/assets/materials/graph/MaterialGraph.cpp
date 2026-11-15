@@ -1,8 +1,8 @@
-#include "MaterialGraph.h"
+#include <rapture/assets/materials/graph/MaterialGraph.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/textures/ATexture.h"
-#include "core/utils/Log.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/textures/ATexture.h>
+#include <rapture/core/utils/Log.h>
 
 #include <cstring>
 

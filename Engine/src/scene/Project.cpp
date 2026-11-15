@@ -1,10 +1,10 @@
-#include "Project.h"
-#include "assets/worlds/AWorld.h"
+#include <rapture/scene/Project.h>
+#include <rapture/assets/worlds/AWorld.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "core/events/GameEvents.h"
-#include "core/events/ProjectEvents.h"
-#include "core/utils/Log.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/events/GameEvents.h>
+#include <rapture/core/events/ProjectEvents.h>
+#include <rapture/core/utils/Log.h>
 
 #include <fstream>
 

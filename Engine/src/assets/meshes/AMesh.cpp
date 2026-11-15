@@ -1,7 +1,7 @@
-#include "AMesh.h"
+#include <rapture/assets/meshes/AMesh.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "core/utils/Log.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/utils/Log.h>
 
 namespace Rapture {
 

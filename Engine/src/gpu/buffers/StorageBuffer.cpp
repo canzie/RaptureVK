@@ -1,7 +1,7 @@
-#include "StorageBuffer.h"
+#include <rapture/gpu/buffers/StorageBuffer.h>
 
-#include "app/Application.h"
-#include "core/utils/Log.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
 
 #include "gpu/descriptors/DescriptorManager.h"
 

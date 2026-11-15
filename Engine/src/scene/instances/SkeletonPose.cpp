@@ -1,13 +1,13 @@
-#include "SkeletonPose.h"
+#include <rapture/scene/instances/SkeletonPose.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/skeletons/ASkeleton.h"
-#include "scene/instances/Bone3D.h"
-#include "core/utils/Log.h"
-#include "scene/Scene.h"
-#include "scene/components/Components.h"
-#include "scene/render_data/SceneRenderData.h"
-#include "scene/systems/Transforms.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/skeletons/ASkeleton.h>
+#include <rapture/scene/instances/Bone3D.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
+#include <rapture/scene/systems/Transforms.h>
 
 namespace Rapture {
 

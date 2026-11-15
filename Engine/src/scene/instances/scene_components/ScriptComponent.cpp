@@ -1,10 +1,10 @@
-#include "ScriptComponent.h"
+#include "scene/instances/scene_components/ScriptComponent.h"
 
-#include "assets/asset_manager/AssetManager.h"
-#include "core/utils/Log.h"
-#include "core/utils/rp_assert.h"
-#include "scene/Scene.h"
-#include "scene/components/Components.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
 #include "scripting/lua/LuaRuntime.h"
 
 namespace Rapture {

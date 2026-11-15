@@ -1,7 +1,7 @@
 #include "ProjectLauncher.h"
 
 #include "Icons.h"
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/image_label.h>

@@ -1,7 +1,7 @@
 #ifndef RAPTURE__TEXTURE_COMPRESSOR_H
 #define RAPTURE__TEXTURE_COMPRESSOR_H
 
-#include "gpu/textures/TextureCommon.h"
+#include <rapture/gpu/textures/TextureCommon.h>
 
 #include <cstdint>
 #include <memory>

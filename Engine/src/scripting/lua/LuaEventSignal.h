@@ -1,8 +1,8 @@
 #ifndef RAPTURE__LUAEVENTSIGNAL_H
 #define RAPTURE__LUAEVENTSIGNAL_H
 
-#include "core/events/EventSignal.h"
-#include "core/utils/Log.h"
+#include <rapture/core/events/EventSignal.h>
+#include <rapture/core/utils/Log.h>
 #include "scripting/lua/LuaHandle.h"
 
 #include <functional>

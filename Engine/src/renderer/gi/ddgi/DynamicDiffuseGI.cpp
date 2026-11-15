@@ -1,23 +1,23 @@
-#include "DynamicDiffuseGI.h"
+#include "renderer/gi/ddgi/DynamicDiffuseGI.h"
 
-#include "core/utils/EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 
-#include "app/Application.h"
-#include "assets/asset_manager/Asset.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/descriptors/DescriptorBinding.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/descriptors/DescriptorBinding.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "gpu/textures/Texture.h"
-#include "gpu/textures/TextureCommon.h"
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/gpu/textures/TextureCommon.h>
 #include "renderer/gi/ddgi/DDGICommon.h"
-#include "scene/Scene.h"
-#include "scene/components/Components.h"
-#include "scene/instances/Environment.h"
-#include "scene/render_data/SceneRenderData.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Environment.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
-#include "core/utils/TracyProfiler.h"
+#include <rapture/core/utils/TracyProfiler.h>
 
 #include <cmath>
 #include <glm/gtc/constants.hpp>

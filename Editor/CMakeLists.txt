@@ -21,7 +21,6 @@ set_target_properties(${EDITOR_NAME} PROPERTIES OUTPUT_NAME "RaptureEditor")
 # Set include directories
 target_include_directories(${EDITOR_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/Engine/src  # Include Engine headers
 )
 
 # Ensure C++20 standard

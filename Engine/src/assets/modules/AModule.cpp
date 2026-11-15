@@ -1,4 +1,4 @@
-#include "AModule.h"
+#include <rapture/assets/modules/AModule.h>
 
 namespace Rapture {
 

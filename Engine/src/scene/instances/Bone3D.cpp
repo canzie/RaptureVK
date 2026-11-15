@@ -1,8 +1,8 @@
-#include "Bone3D.h"
+#include <rapture/scene/instances/Bone3D.h>
 
-#include "core/utils/rp_assert.h"
-#include "scene/instances/SkeletonPose.h"
-#include "scene/systems/Transforms.h"
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/scene/instances/SkeletonPose.h>
+#include <rapture/scene/systems/Transforms.h>
 
 namespace Rapture {
 

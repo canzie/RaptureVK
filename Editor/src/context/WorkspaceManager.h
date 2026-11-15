@@ -5,7 +5,7 @@
 #include "context/EditorContext.h"
 
 #include <amethyst/Amethyst.h>
-#include <core/events/EventSignal.h>
+#include <rapture/core/events/EventSignal.h>
 
 #include <memory>
 #include <vector>

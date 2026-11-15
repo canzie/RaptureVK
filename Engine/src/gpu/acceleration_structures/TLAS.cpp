@@ -1,10 +1,10 @@
-#include "TLAS.h"
+#include <rapture/gpu/acceleration_structures/TLAS.h>
 
-#include "app/Application.h"
-#include "core/utils/Log.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
 #include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
-#include "core/utils/rp_assert.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include "gpu/descriptors/DescriptorManager.h"
 
 #include <algorithm>

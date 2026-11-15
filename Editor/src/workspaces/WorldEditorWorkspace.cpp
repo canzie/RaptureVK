@@ -12,14 +12,14 @@
 #include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
 
-#include <app/Application.h>
-#include <app/Layer.h>
+#include <rapture/app/Application.h>
+#include <rapture/app/Layer.h>
 #include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
-#include <core/utils/rp_assert.h>
-#include <scene/Scene.h>
-#include <scene/instances/Instance.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Instance.h>
 
 static constexpr float PLAY_CONTROL_SCALE = 0.7f;
 static constexpr float PLAY_CONTROL_GAP = 6.0f;

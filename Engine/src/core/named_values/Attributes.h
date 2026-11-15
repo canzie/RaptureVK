@@ -1,9 +1,9 @@
 #ifndef RAPTURE__ATTRIBUTES_H
 #define RAPTURE__ATTRIBUTES_H
 
-#include "core/events/EventSignal.h"
+#include <rapture/core/events/EventSignal.h>
 #include "core/named_values/NamedValues.h"
-#include "core/serialization/SerialDocument.h"
+#include <rapture/core/serialization/SerialDocument.h>
 
 #include <glm/glm.hpp>
 

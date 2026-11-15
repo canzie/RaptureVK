@@ -1,9 +1,9 @@
-#include "CameraController.h"
+#include <rapture/scene/instances/controllers/CameraController.h>
 
-#include "scene/components/Components.h"
-#include "scene/systems/Transforms.h"
-#include "core/utils/Log.h"
-#include "scene/instances/Camera3D.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/systems/Transforms.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/instances/Camera3D.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 

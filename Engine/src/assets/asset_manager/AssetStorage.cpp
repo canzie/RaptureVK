@@ -1,6 +1,6 @@
-#include "AssetStorage.h"
+#include <rapture/assets/asset_manager/AssetStorage.h>
 
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/rp_assert.h>
 
 namespace Rapture {
 

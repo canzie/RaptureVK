@@ -1,7 +1,7 @@
 #ifndef RAPTURE__ASSET_IMPORTER_H
 #define RAPTURE__ASSET_IMPORTER_H
 
-#include "Asset.h"
+#include <rapture/assets/asset_manager/Asset.h>
 
 #include <memory>
 

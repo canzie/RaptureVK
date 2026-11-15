@@ -1,15 +1,15 @@
-#include "DescriptorBinding.h"
+#include <rapture/gpu/descriptors/DescriptorBinding.h>
 
-#include "gpu/acceleration_structures/TLAS.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/textures/ATexture.h"
-#include "gpu/buffers/Buffers.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "gpu/buffers/UniformBuffer.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/gpu/acceleration_structures/TLAS.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/textures/ATexture.h>
+#include <rapture/gpu/buffers/Buffers.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/buffers/UniformBuffer.h>
+#include <rapture/gpu/textures/Texture.h>
 
-#include "core/utils/Log.h"
-#include "app/Application.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/app/Application.h>
 
 namespace Rapture {
 

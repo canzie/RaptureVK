@@ -1,4 +1,4 @@
-#include "ChunkGrid.h"
+#include "renderer/generators/terrain/ChunkGrid.h"
 
 namespace Rapture {
 

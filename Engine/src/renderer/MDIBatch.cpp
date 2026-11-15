@@ -1,9 +1,9 @@
-#include "renderer/MDIBatch.h"
+#include <rapture/renderer/MDIBatch.h>
 
-#include "app/Application.h"
-#include "assets/meshes/Mesh.h"
-#include "core/utils/Log.h"
-#include "gpu/buffers/Buffers.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/meshes/Mesh.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/buffers/Buffers.h>
 #include "gpu/descriptors/DescriptorManager.h"
 
 namespace Rapture {

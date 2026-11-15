@@ -1,4 +1,4 @@
-#include "MeshPrimitives.h"
+#include "assets/meshes/MeshPrimitives.h"
 #include <algorithm>
 #include <cmath>
 

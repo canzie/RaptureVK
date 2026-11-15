@@ -1,10 +1,10 @@
-#include "BufferPool.h"
+#include <rapture/gpu/buffers/BufferPool.h>
 
-#include "app/Application.h"
-#include "core/utils/GLTypes.h"
-#include "core/utils/Log.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/GLTypes.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 
 #include <algorithm>
 #include <cstring>

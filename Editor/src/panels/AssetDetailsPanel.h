@@ -8,7 +8,7 @@
 #include "inspector/PropertySections.h"
 #include "panels/Panel.h"
 
-#include <assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/asset_manager/AssetCommon.h>
 
 #include <concepts>
 #include <optional>

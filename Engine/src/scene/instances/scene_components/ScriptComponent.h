@@ -1,10 +1,10 @@
 #ifndef RAPTURE__SCRIPT_COMPONENT_H
 #define RAPTURE__SCRIPT_COMPONENT_H
 
-#include "assets/asset_manager/AssetCommon.h"
-#include "assets/scripts/AScript.h"
-#include "core/utils/Ref.h"
-#include "scene/instances/SceneComponent.h"
+#include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/scripts/AScript.h>
+#include <rapture/core/utils/Ref.h>
+#include <rapture/scene/instances/SceneComponent.h>
 
 #include <string_view>
 

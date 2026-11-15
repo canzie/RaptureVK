@@ -1,12 +1,12 @@
-#include "DescriptorSet.h"
-#include "core/utils/Log.h"
-#include "app/Application.h"
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/app/Application.h>
 
-#include "gpu/acceleration_structures/TLAS.h"
-#include "gpu/buffers/Buffers.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/gpu/acceleration_structures/TLAS.h>
+#include <rapture/gpu/buffers/Buffers.h>
+#include <rapture/gpu/textures/Texture.h>
 
-#include "gpu/descriptors/DescriptorBinding.h"
+#include <rapture/gpu/descriptors/DescriptorBinding.h>
 
 #include <algorithm>
 #include <array>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "platform/PlatformContext.h"
-#include "platform/WindowContext.h"
+#include <rapture/platform/PlatformContext.h>
+#include <rapture/platform/WindowContext.h>
 
 #include <GLFW/glfw3.h>
 

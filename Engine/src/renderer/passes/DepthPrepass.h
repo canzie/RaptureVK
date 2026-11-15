@@ -1,13 +1,13 @@
 #ifndef RAPTURE__DEPTH_PREPASS_H
 #define RAPTURE__DEPTH_PREPASS_H
 
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/shaders/AShader.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/pipelines/GraphicsPipeline.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/vulkan_context/RenderContext.h"
-#include "renderer/passes/RenderPass.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/shaders/AShader.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/pipelines/GraphicsPipeline.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/vulkan_context/RenderContext.h>
+#include <rapture/renderer/passes/RenderPass.h>
 
 #include <memory>
 

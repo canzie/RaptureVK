@@ -1,9 +1,9 @@
 #ifndef RAPTURE__EDITOR_LAYER_H
 #define RAPTURE__EDITOR_LAYER_H
 
-#include "app/Layer.h"
+#include <rapture/app/Layer.h>
 
-#include "core/events/EventSignal.h"
+#include <rapture/core/events/EventSignal.h>
 
 #include <memory>
 #include <unordered_map>

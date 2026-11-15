@@ -1,4 +1,4 @@
-#include "FileWatcher.h"
+#include <rapture/platform/FileWatcher.h>
 
 namespace Rapture {
 

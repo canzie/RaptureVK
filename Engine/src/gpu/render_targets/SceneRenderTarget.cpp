@@ -1,6 +1,6 @@
-#include "SceneRenderTarget.h"
-#include "core/utils/Log.h"
-#include "app/Application.h"
+#include <rapture/gpu/render_targets/SceneRenderTarget.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/app/Application.h>
 
 #include <algorithm>
 

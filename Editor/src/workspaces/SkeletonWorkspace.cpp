@@ -6,15 +6,15 @@
 #include "ui/AssetVisuals.h"
 #include "ui/controls/ModeDropdown.h"
 
-#include <assets/asset_manager/AssetManager.h>
-#include <assets/skeletons/ASkeleton.h>
-#include <core/utils/Log.h>
-#include <core/utils/rp_assert.h>
-#include <renderer/viewport/Viewport.h>
-#include <scene/Scene.h>
-#include <scene/instances/SceneObject.h>
-#include <scene/instances/SkeletalMesh3D.h>
-#include <scene/instances/SkeletonPose.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/skeletons/ASkeleton.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/renderer/viewport/Viewport.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/SceneObject.h>
+#include <rapture/scene/instances/SkeletalMesh3D.h>
+#include <rapture/scene/instances/SkeletonPose.h>
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "SkeletonPreview";
 

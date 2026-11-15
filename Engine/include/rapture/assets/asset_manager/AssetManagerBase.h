@@ -1,0 +1,29 @@
+#ifndef RAPTURE__ASSET_MANAGER_BASE_H
+#define RAPTURE__ASSET_MANAGER_BASE_H
+
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetStorage.h>
+
+namespace Rapture {
+
+/*
+ @brief Base class for all asset manager implementations
+
+ intented for the Editor Asset Manager and the Runtime Asset Manager (for actual games)
+*/
+class AssetManagerBase {
+  public:
+    virtual ~AssetManagerBase() = default;
+
+    virtual bool isAssetHandleValid(AssetHandle handle) const = 0;
+    virtual Asset *getAsset(AssetHandle handle) = 0;
+
+    const AssetStorage &getAssets() const { return m_assets; }
+
+  protected:
+    AssetStorage m_assets;
+};
+
+} // namespace Rapture
+
+#endif // RAPTURE__ASSET_MANAGER_BASE_H

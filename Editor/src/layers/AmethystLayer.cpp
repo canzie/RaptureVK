@@ -4,13 +4,13 @@
 #include "ProjectLauncher.h"
 #include "context/WindowManager.h"
 #include "context/WorkspaceManager.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "gpu/swap_chains/SwapChain.h"
-#include "core/utils/EnginePaths.h"
-#include "core/utils/Timestep.h"
-#include "app/Application.h"
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/gpu/swap_chains/SwapChain.h>
+#include <rapture/core/utils/EnginePaths.h>
+#include <rapture/core/utils/Timestep.h>
+#include <rapture/app/Application.h>
 
 #include <components/common.h>
 #include <components/extensions/ui_drag_detector.h>

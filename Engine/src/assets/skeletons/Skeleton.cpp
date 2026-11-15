@@ -1,6 +1,6 @@
-#include "Skeleton.h"
+#include <rapture/assets/skeletons/Skeleton.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #include <cstring>
 

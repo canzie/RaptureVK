@@ -1,7 +1,7 @@
 #include "SkeletonGizmo.h"
 
-#include <scene/instances/Bone3D.h>
-#include <scene/instances/SkeletonPose.h>
+#include <rapture/scene/instances/Bone3D.h>
+#include <rapture/scene/instances/SkeletonPose.h>
 
 #include <cmath>
 #include <span>

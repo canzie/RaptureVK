@@ -1,7 +1,7 @@
 #ifndef RAPTURE__LUAHANDLE_H
 #define RAPTURE__LUAHANDLE_H
 
-#include "scene/instances/Instance.h"
+#include <rapture/scene/instances/Instance.h>
 
 #include <sol/sol.hpp>
 

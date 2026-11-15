@@ -1,12 +1,12 @@
-#include "Node3D.h"
+#include <rapture/scene/instances/Node3D.h>
 
-#include "scene/components/Components.h"
-#include "scene/systems/Transforms.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/systems/Transforms.h>
 
 #include <glm/gtc/constants.hpp>
 
-#include "scene/render_data/SceneRenderData.h"
-#include "scene/Scene.h"
+#include <rapture/scene/render_data/SceneRenderData.h>
+#include <rapture/scene/Scene.h>
 
 namespace Rapture {
 

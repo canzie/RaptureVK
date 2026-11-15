@@ -1,12 +1,12 @@
-#include "MaterialInstance.h"
-#include "assets/materials/AMaterial.h"
-#include "assets/textures/ATexture.h"
+#include <rapture/assets/materials/MaterialInstance.h>
+#include <rapture/assets/materials/AMaterial.h>
+#include <rapture/assets/textures/ATexture.h>
 
-#include "assets/asset_manager/Asset.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "core/utils/Log.h"
-#include "gpu/textures/Texture.h"
-#include "graph/SurfaceGraphManager.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/assets/materials/graph/SurfaceGraphManager.h>
 
 namespace Rapture {
 

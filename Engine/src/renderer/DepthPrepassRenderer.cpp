@@ -1,6 +1,6 @@
 #include "renderer/DepthPrepassRenderer.h"
 
-#include "core/utils/TracyProfiler.h"
+#include <rapture/core/utils/TracyProfiler.h>
 
 namespace Rapture {
 

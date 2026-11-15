@@ -1,7 +1,7 @@
-#include "ShaderReflections.h"
-#include "core/utils/Log.h"
+#include <rapture/gpu/shaders/ShaderReflections.h>
+#include <rapture/core/utils/Log.h>
 
-#include "gpu/shaders/Shader.h"
+#include <rapture/gpu/shaders/Shader.h>
 
 #include <algorithm>
 #include <map>

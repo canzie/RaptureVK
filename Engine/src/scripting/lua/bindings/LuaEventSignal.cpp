@@ -1,4 +1,4 @@
-#include "LuaBindings.h"
+#include "scripting/lua/bindings/LuaBindings.h"
 
 #include "scripting/lua/LuaEventSignal.h"
 

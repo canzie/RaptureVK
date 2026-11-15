@@ -1,20 +1,20 @@
-#include "Environment.h"
-#include "assets/textures/ATexture.h"
+#include <rapture/scene/instances/Environment.h>
+#include <rapture/assets/textures/ATexture.h>
 
-#include "core/utils/EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 
-#include "assets/asset_manager/AssetImportConfig.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "scene/components/Components.h"
-#include "scene/systems/Transforms.h"
-#include "renderer/generators/textures/ProceduralTextures.h"
-#include "core/utils/Log.h"
+#include <rapture/assets/asset_manager/AssetImportConfig.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/systems/Transforms.h>
+#include <rapture/renderer/generators/textures/ProceduralTextures.h>
+#include <rapture/core/utils/Log.h>
 #include "renderer/ImageBasedLighting.h"
-#include "scene/Scene.h"
-#include "scene/instances/Node3D.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
-#include "app/Application.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/app/Application.h>
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>

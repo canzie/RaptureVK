@@ -1,5 +1,5 @@
-#include "ShaderCompilation.h"
-#include "core/utils/Log.h"
+#include <rapture/gpu/shaders/ShaderCompilation.h>
+#include <rapture/core/utils/Log.h>
 
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>

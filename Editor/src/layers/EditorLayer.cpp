@@ -1,12 +1,12 @@
 #include "EditorLayer.h"
 
-#include "scene/instances/controllers/CameraController.h"
-#include "input/Input.h"
-#include "scene/Scene.h"
-#include "scene/instances/Camera3D.h"
-#include "renderer/viewport/Viewport.h"
-#include "renderer/viewport/ViewportManager.h"
-#include "app/Application.h"
+#include <rapture/scene/instances/controllers/CameraController.h>
+#include <rapture/input/Input.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Camera3D.h>
+#include <rapture/renderer/viewport/Viewport.h>
+#include <rapture/renderer/viewport/ViewportManager.h>
+#include <rapture/app/Application.h>
 
 #include <glm/glm.hpp>
 

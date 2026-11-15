@@ -1,10 +1,10 @@
-#include "PhysicsBody3D.h"
+#include <rapture/scene/instances/PhysicsBody3D.h>
 
-#include "core/utils/Log.h"
-#include "physics/CharacterBody.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/physics/CharacterBody.h>
 #include "physics/PhysicsSystem.h"
-#include "physics/RigidBody.h"
-#include "scene/Scene.h"
+#include <rapture/physics/RigidBody.h>
+#include <rapture/scene/Scene.h>
 
 namespace Rapture {
 

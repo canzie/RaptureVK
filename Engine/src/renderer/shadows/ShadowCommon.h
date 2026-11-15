@@ -1,6 +1,6 @@
 #pragma once
 
-#include "renderer/GPUDataStructs.h"
+#include <rapture/renderer/GPUDataStructs.h>
 
 #include <glm/glm.hpp>
 

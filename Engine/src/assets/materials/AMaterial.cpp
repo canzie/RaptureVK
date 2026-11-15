@@ -1,4 +1,4 @@
-#include "AMaterial.h"
+#include <rapture/assets/materials/AMaterial.h>
 
 namespace Rapture {
 

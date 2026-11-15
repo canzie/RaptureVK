@@ -1,18 +1,18 @@
 #pragma once
 
 #include <map>
-#include "assets/shaders/AShader.h"
-#include "assets/textures/ATexture.h"
+#include <rapture/assets/shaders/AShader.h>
+#include <rapture/assets/textures/ATexture.h>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "assets/asset_manager/Asset.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "gpu/pipelines/ComputePipeline.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/pipelines/ComputePipeline.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/textures/Texture.h>
 
 namespace Rapture {
 

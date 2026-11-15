@@ -1,14 +1,14 @@
 #include "renderer/passes/DepthPrepass.h"
 
-#include "app/Application.h"
-#include "core/utils/EnginePaths.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/EnginePaths.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "renderer/MDIBatch.h"
-#include "renderer/SceneGeometryDraw.h"
-#include "scene/Scene.h"
-#include "scene/render_data/SceneRenderData.h"
+#include <rapture/renderer/MDIBatch.h>
+#include <rapture/renderer/SceneGeometryDraw.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
 #include <thread>
 

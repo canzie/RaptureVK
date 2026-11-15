@@ -1,4 +1,4 @@
-#include "VisibilityComponent.h"
+#include <rapture/scene/instances/scene_components/VisibilityComponent.h>
 
 namespace Rapture {
 

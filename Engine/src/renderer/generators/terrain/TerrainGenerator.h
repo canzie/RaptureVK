@@ -1,22 +1,22 @@
 #ifndef RAPTURE__TERRAIN_GENERATOR_H
 #define RAPTURE__TERRAIN_GENERATOR_H
 
-#include "TerrainCuller.h"
-#include "assets/textures/ATexture.h"
-#include "assets/materials/AMaterialInstance.h"
-#include "TerrainTypes.h"
+#include "renderer/generators/terrain/TerrainCuller.h"
+#include <rapture/assets/textures/ATexture.h>
+#include <rapture/assets/materials/AMaterialInstance.h>
+#include <rapture/renderer/generators/terrain/TerrainTypes.h>
 
-#include "assets/asset_manager/Asset.h"
-#include "assets/shaders/AShader.h"
-#include "assets/materials/MaterialInstance.h"
-#include "gpu/buffers/IndexBuffer.h"
-#include "gpu/buffers/StorageBuffer.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/pipelines/ComputePipeline.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
-#include "renderer/generators/textures/ProceduralTextures.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/shaders/AShader.h>
+#include <rapture/assets/materials/MaterialInstance.h>
+#include <rapture/gpu/buffers/IndexBuffer.h>
+#include <rapture/gpu/buffers/StorageBuffer.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/pipelines/ComputePipeline.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/renderer/generators/textures/ProceduralTextures.h>
 
 #include <glm/glm.hpp>
 

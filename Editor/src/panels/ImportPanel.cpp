@@ -1,8 +1,8 @@
 #include "ImportPanel.h"
 
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/loaders/gltf/glTFLoader.h"
-#include "core/utils/Log.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/loaders/gltf/glTFLoader.h>
+#include <rapture/core/utils/Log.h>
 
 #include <components/checkbox.h>
 #include <components/extensions/ui_drag_detector.h>

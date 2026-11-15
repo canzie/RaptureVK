@@ -1,9 +1,9 @@
 #ifndef RAPTURE__RENDERER_H
 #define RAPTURE__RENDERER_H
 
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/vulkan_context/RenderContext.h"
-#include "renderer/passes/RenderPassContext.h"
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/vulkan_context/RenderContext.h>
+#include <rapture/renderer/passes/RenderPassContext.h>
 
 #include <cstdint>
 

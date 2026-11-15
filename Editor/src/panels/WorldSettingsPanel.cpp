@@ -1,9 +1,9 @@
 #include "WorldSettingsPanel.h"
 
-#include "assets/asset_manager/Asset.h"
-#include "scene/World.h"
-#include "scene/instances/Node3D.h"
-#include "scene/instances/controllers/Controller.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/scene/World.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/controllers/Controller.h>
 
 #include <components/common.h>
 

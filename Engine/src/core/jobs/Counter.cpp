@@ -1,8 +1,8 @@
-#include "Counter.h"
+#include "core/jobs/Counter.h"
 #include <atomic>
 #include <cstdint>
 
-#include "JobSystem.h"
+#include "core/jobs/JobSystem.h"
 
 namespace Rapture {
 

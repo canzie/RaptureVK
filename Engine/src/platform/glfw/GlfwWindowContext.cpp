@@ -1,7 +1,7 @@
 #include "platform/glfw/GlfwWindowContext.h"
 #include "core/events/InputEvents.h"
-#include "core/utils/Log.h"
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
 
 namespace Rapture {
 

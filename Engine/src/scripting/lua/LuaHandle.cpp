@@ -1,6 +1,6 @@
-#include "LuaHandle.h"
+#include "scripting/lua/LuaHandle.h"
 
-#include "core/utils/TypeInfo.h"
+#include <rapture/core/utils/TypeInfo.h>
 
 namespace Rapture::scripting {
 

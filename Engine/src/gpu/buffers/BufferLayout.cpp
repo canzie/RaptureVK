@@ -1,4 +1,4 @@
-#include "BufferLayout.h"
+#include <rapture/gpu/buffers/BufferLayout.h>
 
 namespace Rapture {
 

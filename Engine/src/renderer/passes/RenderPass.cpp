@@ -1,8 +1,8 @@
-#include "renderer/passes/RenderPass.h"
+#include <rapture/renderer/passes/RenderPass.h>
 
-#include "core/utils/rp_assert.h"
-#include "gpu/render_targets/SceneRenderTarget.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/gpu/render_targets/SceneRenderTarget.h>
+#include <rapture/gpu/textures/Texture.h>
 
 namespace Rapture {
 

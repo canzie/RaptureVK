@@ -1,18 +1,18 @@
-#include "CascadedShadowMapping.h"
+#include "renderer/shadows/CascadedShadowMapping.h"
 
-#include "core/utils/EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 #include "gpu/descriptors/DescriptorManager.h"
 
-#include "app/Application.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "renderer/generators/terrain/TerrainTypes.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/renderer/generators/terrain/TerrainTypes.h>
 #include "renderer/shadows/ShadowCommon.h"
-#include "scene/components/Components.h"
-#include "scene/instances/Camera3D.h"
-#include "scene/instances/controllers/Controller.h"
-#include "scene/render_data/SceneRenderData.h"
-#include "scene/systems/Transforms.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Camera3D.h>
+#include <rapture/scene/instances/controllers/Controller.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
+#include <rapture/scene/systems/Transforms.h>
 
 #include <algorithm>
 #include <cmath>

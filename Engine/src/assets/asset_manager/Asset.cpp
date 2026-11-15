@@ -1,6 +1,6 @@
-#include "Asset.h"
+#include <rapture/assets/asset_manager/Asset.h>
 
-#include "AssetManager.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
 
 namespace Rapture {
 

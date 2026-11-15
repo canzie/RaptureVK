@@ -1,9 +1,9 @@
-#include "AssetCodec.h"
+#include "assets/asset_manager/AssetCodec.h"
 
-#include "Asset.h"
-#include "AssetRegistry.h"
-#include "core/utils/Log.h"
-#include "scene/instances/InstanceRegistry.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetRegistry.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/instances/InstanceRegistry.h>
 
 #include <cstring>
 #include <fstream>

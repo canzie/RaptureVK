@@ -1,6 +1,6 @@
-#include "EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #if defined(_WIN32)
 #include <windows.h>

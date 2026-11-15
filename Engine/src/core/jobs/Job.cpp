@@ -1,6 +1,6 @@
-#include "Job.h"
-#include "Counter.h"
-#include "JobSystem.h"
+#include "core/jobs/Job.h"
+#include "core/jobs/Counter.h"
+#include "core/jobs/JobSystem.h"
 
 namespace Rapture {
 

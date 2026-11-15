@@ -1,10 +1,10 @@
-#include "Frustum.h"
+#include <rapture/renderer/Frustum.h>
 
-#include "app/Application.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "gpu/buffers/StorageBuffer.h"
-#include "scene/systems/BoundingBox.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/gpu/buffers/StorageBuffer.h>
+#include <rapture/scene/systems/BoundingBox.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 

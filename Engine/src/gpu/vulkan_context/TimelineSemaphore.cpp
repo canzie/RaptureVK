@@ -1,6 +1,6 @@
-#include "TimelineSemaphore.h"
+#include "gpu/vulkan_context/TimelineSemaphore.h"
 
-#include "app/Application.h"
+#include <rapture/app/Application.h>
 
 namespace Rapture {
 

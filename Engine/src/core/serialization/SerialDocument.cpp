@@ -1,4 +1,4 @@
-#include "SerialDocument.h"
+#include <rapture/core/serialization/SerialDocument.h>
 
 #include <charconv>
 #include <cmath>
@@ -6,7 +6,7 @@
 
 #include <yyjson.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 namespace Rapture {
 

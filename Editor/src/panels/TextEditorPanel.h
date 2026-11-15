@@ -7,9 +7,9 @@
 #include <amethyst/Amethyst.h>
 #include <components/text_area.h>
 
-#include <assets/asset_manager/AssetCommon.h>
-#include <assets/scripts/AScript.h>
-#include <core/utils/Ref.h>
+#include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/scripts/AScript.h>
+#include <rapture/core/utils/Ref.h>
 
 #include <cstdint>
 #include <filesystem>

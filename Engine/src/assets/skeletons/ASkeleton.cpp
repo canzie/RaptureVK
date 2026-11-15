@@ -1,7 +1,7 @@
-#include "ASkeleton.h"
+#include <rapture/assets/skeletons/ASkeleton.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "core/utils/Log.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/utils/Log.h>
 
 #include <algorithm>
 #include <cstring>

@@ -1,6 +1,6 @@
-#include "journal.h"
+#include <rapture/core/ecs/journal.h>
 
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/rp_assert.h>
 
 #include <bit>
 

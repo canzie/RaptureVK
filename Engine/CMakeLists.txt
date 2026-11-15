@@ -13,9 +13,12 @@ add_library(${ENGINE_NAME} STATIC ${ENGINE_SOURCES})
 
 rapture_set_warnings(${ENGINE_NAME})
 
-# Include directories
-target_include_directories(${ENGINE_NAME} PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+# The public headers are the engine's API, src/ holds the sources and the headers only they include
+target_include_directories(${ENGINE_NAME}
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 # Vulkan clips at 0 <= z <= w, so glm must build projections for that range. PUBLIC because a

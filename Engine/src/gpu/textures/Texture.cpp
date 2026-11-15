@@ -1,13 +1,13 @@
-#include "Texture.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "gpu/descriptors/DescriptorSet.h"
+#include <rapture/gpu/descriptors/DescriptorSet.h>
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobSystem.h"
-#include "core/utils/Log.h"
-#include "app/Application.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/app/Application.h>
 #include "gpu/vulkan_context/TimelineSemaphore.h"
 
 #include <algorithm>

@@ -1,4 +1,4 @@
-#include "registry.h"
+#include <rapture/core/ecs/registry.h>
 
 #include <bit>
 

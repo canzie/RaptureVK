@@ -1,0 +1,93 @@
+#ifndef RAPTURE__GLTF_COMMON_H
+#define RAPTURE__GLTF_COMMON_H
+
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/loaders/SceneFileCommon.h>
+#include <rapture/gpu/buffers/BufferLayout.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <glm/glm.hpp>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+namespace Rapture {
+
+/**
+ * @brief Type of a glTF node for processing purposes
+ */
+enum class glTF_NodeType {
+    EMPTY,    ///< Node with no mesh (transform node or group)
+    MESH,     ///< Node containing a mesh (renderable)
+    SKELETON, ///< Node containing skeleton data
+    BONE,     ///< Bone node within a skeleton
+};
+
+/**
+ * @brief One vertex attribute read out of an accessor, still in the file's own component type
+ */
+struct DecodedVertexAttribute {
+    std::string name;
+    uint32_t componentType = 0;
+    BufferAttributeType type = BufferAttributeType::SCALAR;
+    std::vector<uint8_t> data;
+};
+
+/**
+ * @brief One glTF primitive, decoded but not yet merged into the mesh it belongs to
+ */
+struct glTF_DecodedPrimitive {
+    std::vector<DecodedVertexAttribute> attributes;
+    uint32_t vertexCount = 0;
+
+    std::vector<uint8_t> indexData;
+    uint32_t indexComponentType = 0;
+    uint32_t indexCount = 0;
+
+    int32_t materialIndex = -1; ///< index into the file's materials, negative where it names none
+    bool isSkinned = false;
+
+    glm::vec3 boundsMin = glm::vec3(0.0f);
+    glm::vec3 boundsMax = glm::vec3(0.0f);
+};
+
+/**
+ * @brief Represents a single node in the parsed glTF scene graph
+ *
+ * Built during async parsing and later converted to ECS entities
+ */
+struct glTF_SceneNode {
+    std::string name;
+    glTF_NodeType type = glTF_NodeType::EMPTY;
+
+    glm::mat4 localTransform = glm::mat4(1.0f);
+    glm::mat4 worldTransform = glm::mat4(1.0f);
+
+    AssetRef meshRef;                            ///< Mesh asset reference (registered with AssetManager)
+    AssetHandle skeleton = INVALID_ASSET_HANDLE; ///< The skeleton the mesh is bound to, invalid when it is not skinned
+
+    std::vector<std::unique_ptr<glTF_SceneNode>> children;
+    glTF_SceneNode *parent = nullptr;
+};
+
+/**
+ * @brief Contains all data loaded from a glTF file
+ *
+ * Built during async loading, then finalized to ECS on main thread
+ */
+struct glTF_LoadedSceneData {
+    std::unordered_map<size_t, AssetRef> materials; ///< Keyed by glTF material index
+    std::unordered_map<size_t, AssetRef> skeletons; ///< Keyed by glTF skin index
+
+    std::vector<std::unique_ptr<glTF_SceneNode>> rootNodes;
+
+    AssetRef sceneObject;
+
+    SceneFileMetadata metadata;
+};
+
+} // namespace Rapture
+
+#endif // RAPTURE__GLTF_COMMON_H

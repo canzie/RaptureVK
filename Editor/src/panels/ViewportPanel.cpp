@@ -2,14 +2,14 @@
 
 #include "EntitySelection.h"
 #include "Icons.h"
-#include "scene/components/Components.h"
+#include <rapture/scene/components/Components.h>
 #include "ui/menus/ContextMenuItems.h"
-#include "scene/instances/controllers/CameraController.h"
-#include "gpu/render_targets/SceneRenderTarget.h"
-#include "scene/World.h"
-#include "scene/instances/Node3D.h"
-#include "core/utils/rp_assert.h"
-#include "renderer/viewport/Viewport.h"
+#include <rapture/scene/instances/controllers/CameraController.h>
+#include <rapture/gpu/render_targets/SceneRenderTarget.h>
+#include <rapture/scene/World.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/renderer/viewport/Viewport.h>
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -17,7 +17,7 @@
 #include <components/input_events.h>
 #include <components/ui_scope.h>
 
-#include "renderer/RenderSettings.h"
+#include <rapture/renderer/RenderSettings.h>
 
 #include <algorithm>
 #include <climits>

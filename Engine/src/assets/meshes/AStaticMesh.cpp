@@ -1,6 +1,6 @@
-#include "AStaticMesh.h"
+#include <rapture/assets/meshes/AStaticMesh.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #include <cstring>
 

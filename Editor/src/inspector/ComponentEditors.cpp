@@ -1,11 +1,11 @@
 #include "ComponentEditors.h"
 
-#include "scene/components/Components.h"
+#include <rapture/scene/components/Components.h>
 #include "ui/chrome/HeaderLayouts.h"
-#include "core/utils/Log.h"
-#include "scene/render_data/SceneRenderData.h"
-#include "scene/Scene.h"
-#include "scene/instances/Environment.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Environment.h>
 
 #include <algorithm>
 

@@ -1,4 +1,4 @@
-#include "Layer.h"
+#include <rapture/app/Layer.h>
 
 namespace Rapture {
 

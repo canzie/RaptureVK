@@ -1,7 +1,7 @@
 #ifndef RAPTURE__ASSET_CODEC_H
 #define RAPTURE__ASSET_CODEC_H
 
-#include "AssetCommon.h"
+#include <rapture/assets/asset_manager/AssetCommon.h>
 
 #include <cstdint>
 #include <filesystem>

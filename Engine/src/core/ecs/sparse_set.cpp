@@ -1,6 +1,6 @@
-#include "sparse_set.h"
+#include <rapture/core/ecs/sparse_set.h>
 
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/rp_assert.h>
 
 namespace Rapture {
 namespace ecs {

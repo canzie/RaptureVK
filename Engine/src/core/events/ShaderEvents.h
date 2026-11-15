@@ -1,7 +1,7 @@
 #ifndef RAPTURE__SHADER_EVENTS_H
 #define RAPTURE__SHADER_EVENTS_H
 
-#include "Events.h"
+#include <rapture/core/events/Events.h>
 
 #include <string_view>
 

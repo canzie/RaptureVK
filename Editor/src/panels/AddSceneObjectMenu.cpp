@@ -1,18 +1,18 @@
 #include "AddSceneObjectMenu.h"
 
 #include "EntitySelection.h"
-#include "assets/asset_manager/ReservedAssets.h"
+#include <rapture/assets/asset_manager/ReservedAssets.h>
 #include "ui/menus/ContextMenuItems.h"
-#include "scene/Scene.h"
-#include "scene/instances/Camera3D.h"
-#include "scene/instances/DirectionalLight3D.h"
-#include "scene/instances/Folder.h"
-#include "scene/instances/Node3D.h"
-#include "scene/instances/PointLight3D.h"
-#include "scene/instances/SpotLight3D.h"
-#include "scene/instances/SpringArm3D.h"
-#include "scene/instances/StaticMesh3D.h"
-#include "scene/instances/Terrain3D.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Camera3D.h>
+#include <rapture/scene/instances/DirectionalLight3D.h>
+#include <rapture/scene/instances/Folder.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/PointLight3D.h>
+#include <rapture/scene/instances/SpotLight3D.h>
+#include <rapture/scene/instances/SpringArm3D.h>
+#include <rapture/scene/instances/StaticMesh3D.h>
+#include <rapture/scene/instances/Terrain3D.h>
 
 #include <components/context_menu_item.h>
 

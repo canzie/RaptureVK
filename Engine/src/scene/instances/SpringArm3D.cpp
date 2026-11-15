@@ -1,8 +1,8 @@
-#include "SpringArm3D.h"
+#include <rapture/scene/instances/SpringArm3D.h>
 
-#include "scene/Scene.h"
-#include "scene/instances/controllers/Controller.h"
-#include "scene/systems/Transforms.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/controllers/Controller.h>
+#include <rapture/scene/systems/Transforms.h>
 
 namespace Rapture {
 

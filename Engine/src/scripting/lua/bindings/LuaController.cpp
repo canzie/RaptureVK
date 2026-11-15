@@ -1,8 +1,8 @@
-#include "LuaBindings.h"
-#include "LuaInstanceMembers.h"
+#include "scripting/lua/bindings/LuaBindings.h"
+#include "scripting/lua/bindings/LuaInstanceMembers.h"
 
-#include "scene/instances/controllers/CameraController.h"
-#include "scene/instances/controllers/PlayerController.h"
+#include <rapture/scene/instances/controllers/CameraController.h>
+#include <rapture/scene/instances/controllers/PlayerController.h>
 
 namespace Rapture::scripting {
 

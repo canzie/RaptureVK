@@ -1,21 +1,21 @@
 #ifndef RAPTURE__SKYBOX_PASS_H
 #define RAPTURE__SKYBOX_PASS_H
 
-#include "app/Application.h"
-#include "assets/asset_manager/Asset.h"
-#include "assets/shaders/AShader.h"
-#include "gpu/buffers/IndexBuffer.h"
-#include "gpu/buffers/UniformBuffer.h"
-#include "gpu/buffers/VertexBuffer.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "gpu/pipelines/GraphicsPipeline.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
-#include "renderer/passes/RenderPass.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/shaders/AShader.h>
+#include <rapture/gpu/buffers/IndexBuffer.h>
+#include <rapture/gpu/buffers/UniformBuffer.h>
+#include <rapture/gpu/buffers/VertexBuffer.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/pipelines/GraphicsPipeline.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/renderer/passes/RenderPass.h>
 
-#include "core/ecs/entity_accessor.h"
+#include <rapture/core/ecs/entity_accessor.h>
 
 #include <memory>
 #include <vector>

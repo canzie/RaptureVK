@@ -1,13 +1,13 @@
-#include "AccelerationStructureBuilder.h"
+#include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
 
-#include "app/Application.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/meshes/Mesh.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/meshes/Mesh.h>
 #include "core/jobs/JobSystem.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "gpu/acceleration_structures/BLAS.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/gpu/acceleration_structures/BLAS.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include "gpu/vulkan_context/TimelineSemaphore.h"
 
 #include <thread>

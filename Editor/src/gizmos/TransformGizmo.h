@@ -1,7 +1,7 @@
 #ifndef RAPTURE__TRANSFORM_GIZMO_H
 #define RAPTURE__TRANSFORM_GIZMO_H
 
-#include "renderer/GizmoDrawList.h"
+#include <rapture/renderer/GizmoDrawList.h>
 
 #include <amethyst/Amethyst.h>
 #include <components/container.h>

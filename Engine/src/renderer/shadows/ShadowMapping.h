@@ -1,24 +1,24 @@
 #ifndef RAPTURE__SHADOWMAPPING_H
 #define RAPTURE__SHADOWMAPPING_H
 
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/shaders/AShader.h"
-#include "gpu/pipelines/GraphicsPipeline.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/shaders/AShader.h>
+#include <rapture/gpu/pipelines/GraphicsPipeline.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/textures/Texture.h>
 
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/descriptors/DescriptorBinding.h"
-#include "gpu/descriptors/DescriptorSet.h"
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/descriptors/DescriptorBinding.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
 
-#include "renderer/Frustum.h"
+#include <rapture/renderer/Frustum.h>
 
-#include "scene/Scene.h"
+#include <rapture/scene/Scene.h>
 
-#include "gpu/vulkan_context/RenderContext.h"
+#include <rapture/gpu/vulkan_context/RenderContext.h>
 
-#include "core/ecs/entity_accessor.h"
+#include <rapture/core/ecs/entity_accessor.h>
 
 #include <glm/glm.hpp>
 #include <memory>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Events.h"
+#include <rapture/core/events/Events.h>
 
 namespace Rapture {
 namespace InputEvents {

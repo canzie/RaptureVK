@@ -1,6 +1,6 @@
-#include "AScript.h"
+#include <rapture/assets/scripts/AScript.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #include <filesystem>
 #include <fstream>

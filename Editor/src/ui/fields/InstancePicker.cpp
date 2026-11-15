@@ -3,9 +3,9 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 
-#include "core/utils/TypeInfo.h"
-#include "scene/Scene.h"
-#include "scene/instances/SceneObject.h"
+#include <rapture/core/utils/TypeInfo.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/SceneObject.h>
 
 #include <string>
 #include <vector>

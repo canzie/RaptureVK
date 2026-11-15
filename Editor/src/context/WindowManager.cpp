@@ -4,8 +4,8 @@
 #include "ui/FileBrowser.h"
 
 #include <amethyst__vk13_glfw.h>
-#include <app/Application.h>
-#include <gpu/swap_chains/SwapChain.h>
+#include <rapture/app/Application.h>
+#include <rapture/gpu/swap_chains/SwapChain.h>
 
 static constexpr int32_t FILE_DIALOG_WINDOW_WIDTH = 880;
 static constexpr int32_t FILE_DIALOG_WINDOW_HEIGHT = 560;

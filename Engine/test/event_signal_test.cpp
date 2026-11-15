@@ -1,4 +1,4 @@
-#include "core/events/EventSignal.h"
+#include <rapture/core/events/EventSignal.h>
 
 #include <gtest/gtest.h>
 

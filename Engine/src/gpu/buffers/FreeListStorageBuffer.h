@@ -1,7 +1,7 @@
 #ifndef RAPTURE__FREE_LIST_STORAGE_BUFFER_H
 #define RAPTURE__FREE_LIST_STORAGE_BUFFER_H
 
-#include "gpu/descriptors/DescriptorSet.h"
+#include <rapture/gpu/descriptors/DescriptorSet.h>
 
 #include <cstdint>
 #include <memory>

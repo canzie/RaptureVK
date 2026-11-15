@@ -1,9 +1,9 @@
-#include "CommandBuffer.h"
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
 
-#include "app/Application.h"
-#include "core/utils/Log.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
 
-#include "CommandPool.h"
+#include <rapture/gpu/command_buffers/CommandPool.h>
 
 #include <set>
 

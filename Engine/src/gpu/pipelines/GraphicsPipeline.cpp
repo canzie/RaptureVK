@@ -1,7 +1,7 @@
-#include "GraphicsPipeline.h"
+#include <rapture/gpu/pipelines/GraphicsPipeline.h>
 
-#include "app/Application.h"
-#include "core/utils/Log.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
 
 #include <glm/glm.hpp>
 #include <stdexcept>

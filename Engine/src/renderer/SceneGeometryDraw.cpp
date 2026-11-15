@@ -1,13 +1,13 @@
-#include "renderer/SceneGeometryDraw.h"
+#include <rapture/renderer/SceneGeometryDraw.h>
 
-#include "app/Application.h"
-#include "assets/meshes/Mesh.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "renderer/Frustum.h"
-#include "scene/Scene.h"
-#include "scene/components/Components.h"
-#include "scene/render_data/SceneRenderData.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/meshes/Mesh.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/renderer/Frustum.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
 namespace Rapture {
 

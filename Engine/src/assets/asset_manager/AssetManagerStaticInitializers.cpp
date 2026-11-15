@@ -1,6 +1,6 @@
-#include "AssetManager.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 #include "core/utils/TextureFlattener.h"
 #include "renderer/generators/textures/TextureCompressor.h"
 

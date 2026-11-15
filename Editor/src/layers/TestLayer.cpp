@@ -1,8 +1,8 @@
 #include "TestLayer.h"
 
-#include "core/utils/Log.h"
-#include "app/Application.h"
-#include "core/utils/Telemetry.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Telemetry.h>
 
 static constexpr float REPORT_INTERVAL = 1.0f;
 static constexpr double BYTES_PER_MB = 1024.0 * 1024.0;

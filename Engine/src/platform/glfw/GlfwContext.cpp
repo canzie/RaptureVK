@@ -1,6 +1,6 @@
 #include "platform/glfw/GlfwContext.h"
 
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/rp_assert.h>
 
 #include <GLFW/glfw3.h>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "platform/PlatformContext.h"
+#include <rapture/platform/PlatformContext.h>
 
 namespace Rapture {
 

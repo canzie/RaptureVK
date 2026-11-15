@@ -2,7 +2,7 @@
 #define RAPTURE__BLACKBOARD_H
 
 #include "core/named_values/NamedValues.h"
-#include "core/serialization/SerialDocument.h"
+#include <rapture/core/serialization/SerialDocument.h>
 
 #include <cstdint>
 #include <string_view>

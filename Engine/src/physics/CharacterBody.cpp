@@ -1,4 +1,4 @@
-#include "physics/CharacterBody.h"
+#include <rapture/physics/CharacterBody.h>
 
 #include "physics/PhysicsSystem.h"
 

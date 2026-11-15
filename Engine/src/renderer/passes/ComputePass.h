@@ -1,7 +1,7 @@
 #ifndef RAPTURE__COMPUTE_PASS_H
 #define RAPTURE__COMPUTE_PASS_H
 
-#include "renderer/passes/RenderPassContext.h"
+#include <rapture/renderer/passes/RenderPassContext.h>
 
 #include <cstdint>
 #include <vector>

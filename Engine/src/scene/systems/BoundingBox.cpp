@@ -1,7 +1,7 @@
-#include "BoundingBox.h"
+#include <rapture/scene/systems/BoundingBox.h>
 
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
 
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>

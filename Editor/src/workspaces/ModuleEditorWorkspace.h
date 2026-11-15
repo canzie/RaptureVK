@@ -3,9 +3,9 @@
 
 #include "AssetWorkspace.h"
 
-#include <assets/asset_manager/Asset.h>
-#include <assets/modules/AModule.h>
-#include <renderer/viewport/Viewport.h>
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/modules/AModule.h>
+#include <rapture/renderer/viewport/Viewport.h>
 
 #include <memory>
 

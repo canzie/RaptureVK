@@ -1,11 +1,11 @@
 #include "renderer/shadows/ShadowRenderer.h"
 
-#include "core/utils/TracyProfiler.h"
+#include <rapture/core/utils/TracyProfiler.h>
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
-#include "scene/Scene.h"
-#include "scene/components/Components.h"
-#include "scene/render_data/SceneRenderData.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
 #include <unordered_set>
 

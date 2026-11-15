@@ -4,9 +4,9 @@
 #include "Icons.h"
 #include "panels/AddSceneObjectMenu.h"
 #include "ui/menus/ContextMenuItems.h"
-#include "scene/Scene.h"
-#include "scene/instances/SceneObject.h"
-#include "scene/instances/scene_components/VisibilityComponent.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/SceneObject.h>
+#include <rapture/scene/instances/scene_components/VisibilityComponent.h>
 
 #include <components/common.h>
 #include <components/context_menu_item.h>

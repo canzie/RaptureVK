@@ -1,6 +1,6 @@
-#include "Instance.h"
+#include <rapture/scene/instances/Instance.h>
 
-#include "scene/Scene.h"
+#include <rapture/scene/Scene.h>
 
 namespace Rapture {
 

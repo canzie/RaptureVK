@@ -1,14 +1,14 @@
 #include "PreviewScene.h"
 
-#include <app/Application.h>
-#include <assets/asset_manager/ReservedAssets.h>
-#include <gpu/render_targets/SceneRenderTarget.h>
-#include <renderer/viewport/ViewportManager.h>
-#include <scene/Scene.h>
-#include <scene/instances/DirectionalLight3D.h>
-#include <scene/instances/Environment.h>
-#include <scene/instances/StaticMesh3D.h>
-#include <scene/instances/controllers/CameraController.h>
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/ReservedAssets.h>
+#include <rapture/gpu/render_targets/SceneRenderTarget.h>
+#include <rapture/renderer/viewport/ViewportManager.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/DirectionalLight3D.h>
+#include <rapture/scene/instances/Environment.h>
+#include <rapture/scene/instances/StaticMesh3D.h>
+#include <rapture/scene/instances/controllers/CameraController.h>
 
 // the panel showing it resizes it to its pane, so this only has to be a sane first frame
 static constexpr uint32_t PREVIEW_WIDTH = 1280;

@@ -3,7 +3,7 @@
 #include "Icons.h"
 #include "inspector/AssetEditors.h"
 
-#include <assets/asset_manager/AssetManager.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
 
 AssetDetailsPanel::AssetDetailsPanel(const WorkspaceContext &context, Rapture::AssetHandle handle)
     : Panel("Details", context), m_handle(handle)

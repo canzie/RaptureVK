@@ -13,10 +13,10 @@
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 
-#include "core/utils/Log.h"
-#include "physics/Common.h"
-#include "core/utils/FreeList.h"
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/physics/Common.h>
+#include <rapture/core/utils/FreeList.h>
+#include <rapture/core/utils/rp_assert.h>
 
 #include <algorithm>
 #include <type_traits>

@@ -1,7 +1,7 @@
-#include "SceneComponent.h"
+#include <rapture/scene/instances/SceneComponent.h>
 
-#include "scene/Scene.h"
-#include "scene/instances/SceneObject.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/SceneObject.h>
 
 namespace Rapture {
 

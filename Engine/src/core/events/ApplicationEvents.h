@@ -1,7 +1,7 @@
 #ifndef RAPTURE__APPLICATION_EVENTS_H
 #define RAPTURE__APPLICATION_EVENTS_H
 
-#include "Events.h" // For EventBus and EventRegistry
+#include <rapture/core/events/Events.h> // For EventBus and EventRegistry
 
 #include <cstdint>
 

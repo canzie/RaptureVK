@@ -1,6 +1,6 @@
 #include "EditorContext.h"
 
-#include "gpu/textures/Texture.h"
+#include <rapture/gpu/textures/Texture.h>
 
 #include <amethyst__vk13_glfw.h>
 

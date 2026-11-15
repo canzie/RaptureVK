@@ -1,8 +1,8 @@
-#include "Light3D.h"
+#include <rapture/scene/instances/Light3D.h>
 
-#include "scene/components/Components.h"
-#include "scene/render_data/SceneRenderData.h"
-#include "scene/Scene.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
+#include <rapture/scene/Scene.h>
 
 #include <cmath>
 

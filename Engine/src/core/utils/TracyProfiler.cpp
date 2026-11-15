@@ -1,5 +1,5 @@
-#include "TracyProfiler.h"
-#include "core/utils/Log.h"
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/core/utils/Log.h>
 
 namespace Rapture {
 

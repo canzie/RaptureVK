@@ -1,11 +1,11 @@
-#include "VulkanContext.h"
-#include "VulkanContextHelpers.h"
-#include "core/utils/Log.h"
+#include <rapture/gpu/vulkan_context/VulkanContext.h>
+#include "gpu/vulkan_context/VulkanContextHelpers.h"
+#include <rapture/core/utils/Log.h>
 
 #include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
-#include "gpu/buffers/BufferPool.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/gpu/buffers/BufferPool.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include "gpu/descriptors/DescriptorManager.h"
 
 #ifdef _WIN32

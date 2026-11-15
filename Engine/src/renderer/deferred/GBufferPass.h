@@ -1,27 +1,27 @@
 #ifndef RAPTURE__GBUFFERPASS_H
 #define RAPTURE__GBUFFERPASS_H
 
-#include "gpu/pipelines/GraphicsPipeline.h"
-#include "gpu/shaders/Shader.h"
-#include "renderer/MDIBatch.h"
-#include "renderer/SceneGeometryDraw.h"
-#include "renderer/passes/RenderPass.h"
+#include <rapture/gpu/pipelines/GraphicsPipeline.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/renderer/MDIBatch.h>
+#include <rapture/renderer/SceneGeometryDraw.h>
+#include <rapture/renderer/passes/RenderPass.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/shaders/AShader.h"
-#include "core/events/GameEvents.h"
-#include "gpu/buffers/UniformBuffer.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/descriptors/DescriptorBinding.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/shaders/AShader.h>
+#include <rapture/core/events/GameEvents.h>
+#include <rapture/gpu/buffers/UniformBuffer.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/descriptors/DescriptorBinding.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "gpu/textures/Texture.h"
-#include "gpu/vulkan_context/VulkanContext.h"
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/gpu/vulkan_context/VulkanContext.h>
 #include "renderer/generators/terrain/TerrainGenerator.h"
-#include "scene/Scene.h"
+#include <rapture/scene/Scene.h>
 #include "scene/cameras/CameraCommon.h"
-#include "scene/components/Components.h"
+#include <rapture/scene/components/Components.h>
 
 #include <cstdint>
 #include <memory>

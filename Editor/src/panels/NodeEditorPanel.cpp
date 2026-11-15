@@ -1,25 +1,25 @@
 #include "NodeEditorPanel.h"
-#include <assets/textures/ATexture.h>
-#include <assets/materials/AMaterialInstance.h>
+#include <rapture/assets/textures/ATexture.h>
+#include <rapture/assets/materials/AMaterialInstance.h>
 
 #include "Icons.h"
 #include "ui/chrome/TabLabels.h"
 
-#include "assets/materials/graph/MaterialGraphCompiler.h"
-#include "assets/materials/graph/NodeRegistry.h"
-#include "assets/materials/graph/SurfaceGraphManager.h"
+#include <rapture/assets/materials/graph/MaterialGraphCompiler.h>
+#include <rapture/assets/materials/graph/NodeRegistry.h>
+#include <rapture/assets/materials/graph/SurfaceGraphManager.h>
 
-#include "assets/asset_manager/Asset.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "renderer/generators/textures/ProceduralTextures.h"
-#include "core/utils/Log.h"
-#include "assets/materials/Material.h"
-#include "assets/materials/MaterialData.h"
-#include "assets/materials/MaterialInstance.h"
-#include "assets/materials/MaterialParameters.h"
-#include "gpu/textures/Texture.h"
-#include "core/utils/EnginePaths.h"
-#include "app/Application.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/renderer/generators/textures/ProceduralTextures.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/assets/materials/Material.h>
+#include <rapture/assets/materials/MaterialData.h>
+#include <rapture/assets/materials/MaterialInstance.h>
+#include <rapture/assets/materials/MaterialParameters.h>
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/core/utils/EnginePaths.h>
+#include <rapture/app/Application.h>
 
 #include <components/common.h>
 #include <components/context_menu_item.h>

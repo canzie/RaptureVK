@@ -1,8 +1,8 @@
 #ifndef RAPTURE__JOB_H
 #define RAPTURE__JOB_H
 
-#include "InplaceFunction.h"
-#include "JobCommon.h"
+#include "core/jobs/InplaceFunction.h"
+#include "core/jobs/JobCommon.h"
 
 #include <cstdint>
 #include <filesystem>

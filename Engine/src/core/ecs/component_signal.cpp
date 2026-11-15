@@ -1,4 +1,4 @@
-#include "component_signal.h"
+#include <rapture/core/ecs/component_signal.h>
 
 namespace Rapture {
 namespace ecs {

@@ -3,7 +3,7 @@
 #include "app/EditorConfig.h"
 #include "ui/chrome/TabLabels.h"
 
-#include <core/utils/rp_assert.h>
+#include <rapture/core/utils/rp_assert.h>
 
 static constexpr std::string_view PANEL_CLASS = "panel";
 

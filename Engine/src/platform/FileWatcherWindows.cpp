@@ -1,8 +1,8 @@
 #ifdef _WIN32
 
-#include "FileWatcher.h"
+#include <rapture/platform/FileWatcher.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

@@ -1,10 +1,10 @@
-#include "NodeRegistry.h"
+#include <rapture/assets/materials/graph/NodeRegistry.h>
 
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/rp_assert.h>
 
 namespace Rapture {
 

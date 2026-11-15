@@ -1,7 +1,7 @@
 #ifndef RAPTURE__FIBER_H
 #define RAPTURE__FIBER_H
 
-#include "Job.h"
+#include "core/jobs/Job.h"
 
 #include <array>
 #include <atomic>

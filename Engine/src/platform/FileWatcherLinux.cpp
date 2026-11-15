@@ -1,8 +1,8 @@
 #ifdef __linux__
 
-#include "FileWatcher.h"
+#include <rapture/platform/FileWatcher.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #include <sys/eventfd.h>
 #include <sys/inotify.h>

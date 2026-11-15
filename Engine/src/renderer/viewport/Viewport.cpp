@@ -1,13 +1,13 @@
-#include "Viewport.h"
+#include <rapture/renderer/viewport/Viewport.h>
 
-#include "app/Application.h"
-#include "core/utils/Log.h"
-#include "core/utils/rp_assert.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
 #include "renderer/DepthPrepassRenderer.h"
 #include "renderer/GizmoRenderer.h"
 #include "renderer/deferred/DeferredRenderer.h"
 #include "renderer/shadows/ShadowRenderer.h"
-#include "scene/components/Components.h"
+#include <rapture/scene/components/Components.h>
 
 namespace Rapture {
 

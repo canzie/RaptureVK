@@ -1,16 +1,16 @@
-#include "DeferredRenderer.h"
+#include "renderer/deferred/DeferredRenderer.h"
 
-#include "app/Application.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/app/Application.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
 
 #include "core/jobs/Job.h"
 #include "core/jobs/JobCommon.h"
 #include "core/jobs/JobSystem.h"
-#include "scene/instances/Environment.h"
-#include "scene/render_data/SceneRenderData.h"
+#include <rapture/scene/instances/Environment.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
 namespace Rapture {
 

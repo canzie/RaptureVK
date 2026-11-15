@@ -1,6 +1,6 @@
 #pragma once
 
-#include "StaticMesh.h"
+#include <rapture/assets/meshes/StaticMesh.h>
 
 #include <cstdint>
 #include <memory>

@@ -4,7 +4,7 @@
 #include "PreviewWorkspace.h"
 #include "gizmos/SkeletonGizmo.h"
 
-#include <core/events/EventSignal.h>
+#include <rapture/core/events/EventSignal.h>
 
 #include <vector>
 

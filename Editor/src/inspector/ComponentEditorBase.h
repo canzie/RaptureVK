@@ -5,9 +5,9 @@
 #include <components/ui_scope.h>
 
 #include "inspector/PropertySections.h"
-#include "core/ecs/entity_accessor.h"
-#include "scene/Scene.h"
-#include "scene/EntityCommon.h"
+#include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/EntityCommon.h>
 
 class EntitySelection;
 

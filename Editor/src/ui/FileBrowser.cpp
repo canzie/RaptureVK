@@ -1,7 +1,7 @@
 #include "FileBrowser.h"
 #include "Icons.h"
 
-#include <core/utils/StringFormat.h>
+#include <rapture/core/utils/StringFormat.h>
 
 #include <algorithm>
 #include <cctype>

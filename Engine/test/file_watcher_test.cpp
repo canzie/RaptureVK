@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "platform/FileWatcher.h"
+#include <rapture/platform/FileWatcher.h>
 
 #include <chrono>
 #include <fstream>

@@ -1,7 +1,7 @@
 #ifndef RAPTURE__CHUNK_GRID_H
 #define RAPTURE__CHUNK_GRID_H
 
-#include "TerrainTypes.h"
+#include <rapture/renderer/generators/terrain/TerrainTypes.h>
 
 #include <glm/glm.hpp>
 

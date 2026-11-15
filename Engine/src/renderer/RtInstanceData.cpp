@@ -1,17 +1,17 @@
-#include "RtInstanceData.h"
+#include "renderer/RtInstanceData.h"
 
-#include "app/Application.h"
-#include "assets/materials/MaterialInstance.h"
-#include "assets/materials/MaterialParameters.h"
-#include "assets/meshes/Mesh.h"
-#include "core/ecs/entity_accessor.h"
-#include "core/events/AssetEvents.h"
-#include "core/utils/Log.h"
-#include "gpu/acceleration_structures/TLAS.h"
-#include "gpu/buffers/BufferLayout.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/materials/MaterialInstance.h>
+#include <rapture/assets/materials/MaterialParameters.h>
+#include <rapture/assets/meshes/Mesh.h>
+#include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/events/AssetEvents.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/acceleration_structures/TLAS.h>
+#include <rapture/gpu/buffers/BufferLayout.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "scene/components/Components.h"
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/scene/components/Components.h>
 
 namespace Rapture {
 

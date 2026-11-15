@@ -3,8 +3,8 @@
 
 #include <amethyst/Amethyst.h>
 
-#include <input/Input.h>
-#include <input/InputCodes.h>
+#include <rapture/input/Input.h>
+#include <rapture/input/InputCodes.h>
 
 #include <array>
 #include <cstdint>

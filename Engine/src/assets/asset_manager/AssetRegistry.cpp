@@ -1,17 +1,17 @@
-#include "AssetRegistry.h"
+#include <rapture/assets/asset_manager/AssetRegistry.h>
 
-#include "AssetImporter.h"
-#include "assets/materials/AMaterial.h"
-#include "assets/materials/AMaterialInstance.h"
-#include "assets/meshes/ASkeletalMesh.h"
-#include "assets/meshes/AStaticMesh.h"
-#include "assets/modules/AModule.h"
-#include "assets/scripts/AScript.h"
-#include "assets/shaders/AShader.h"
-#include "assets/skeletons/ASkeleton.h"
-#include "assets/textures/ATexture.h"
-#include "assets/worlds/AWorld.h"
-#include "core/utils/rp_assert.h"
+#include "assets/asset_manager/AssetImporter.h"
+#include <rapture/assets/materials/AMaterial.h>
+#include <rapture/assets/materials/AMaterialInstance.h>
+#include <rapture/assets/meshes/ASkeletalMesh.h>
+#include <rapture/assets/meshes/AStaticMesh.h>
+#include <rapture/assets/modules/AModule.h>
+#include <rapture/assets/scripts/AScript.h>
+#include <rapture/assets/shaders/AShader.h>
+#include <rapture/assets/skeletons/ASkeleton.h>
+#include <rapture/assets/textures/ATexture.h>
+#include <rapture/assets/worlds/AWorld.h>
+#include <rapture/core/utils/rp_assert.h>
 
 #include <array>
 

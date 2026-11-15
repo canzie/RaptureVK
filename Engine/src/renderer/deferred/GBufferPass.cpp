@@ -1,16 +1,16 @@
 #include "renderer/deferred/GBufferPass.h"
 
-#include "core/utils/EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 #include "gpu/descriptors/DescriptorManager.h"
 
-#include "app/Application.h"
-#include "assets/asset_manager/AssetImportConfig.h"
-#include "core/ecs/entity_accessor.h"
-#include "core/utils/TracyProfiler.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/AssetImportConfig.h>
+#include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/utils/TracyProfiler.h>
 #include "renderer/generators/terrain/TerrainGenerator.h"
-#include "renderer/generators/terrain/TerrainTypes.h"
-#include "scene/components/Components.h"
-#include "scene/render_data/SceneRenderData.h"
+#include <rapture/renderer/generators/terrain/TerrainTypes.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
 #include <cstdint>
 #include <cstdio>

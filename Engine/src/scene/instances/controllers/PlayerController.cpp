@@ -1,12 +1,12 @@
-#include "PlayerController.h"
+#include <rapture/scene/instances/controllers/PlayerController.h>
 
-#include "scene/components/Components.h"
-#include "core/utils/Log.h"
-#include "scene/instances/Camera3D.h"
-#include "scene/instances/CharacterBody3D.h"
-#include "scene/instances/Node3D.h"
-#include "scene/instances/PhysicsBody3D.h"
-#include "scene/instances/SpringArm3D.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/instances/Camera3D.h>
+#include <rapture/scene/instances/CharacterBody3D.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/PhysicsBody3D.h>
+#include <rapture/scene/instances/SpringArm3D.h>
 
 #include <glm/gtc/quaternion.hpp>
 

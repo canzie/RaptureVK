@@ -1,7 +1,7 @@
 #ifndef RAPTURE__EDITOR_STATE_H
 #define RAPTURE__EDITOR_STATE_H
 
-#include "assets/asset_manager/AssetCommon.h"
+#include <rapture/assets/asset_manager/AssetCommon.h>
 
 #include <string>
 #include <vector>

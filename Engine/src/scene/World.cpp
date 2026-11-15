@@ -1,14 +1,14 @@
-#include "World.h"
+#include <rapture/scene/World.h>
 
-#include "assets/asset_manager/Asset.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "core/serialization/SerialDocument.h"
-#include "core/utils/Log.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/serialization/SerialDocument.h>
+#include <rapture/core/utils/Log.h>
 #include "physics/PhysicsSystem.h"
-#include "scene/Scene.h"
-#include "scene/instances/Module.h"
-#include "scene/instances/SceneObject.h"
-#include "scene/instances/controllers/Controller.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Module.h>
+#include <rapture/scene/instances/SceneObject.h>
+#include <rapture/scene/instances/controllers/Controller.h>
 
 namespace Rapture {
 

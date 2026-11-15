@@ -1,17 +1,17 @@
-#include "renderer/DrawManager.h"
+#include <rapture/renderer/DrawManager.h>
 
-#include "app/Application.h"
+#include <rapture/app/Application.h>
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobCommon.h"
 #include "core/jobs/JobSystem.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/core/utils/rp_assert.h>
 #include "renderer/Renderer.h"
-#include "renderer/passes/RenderPassContext.h"
-#include "scene/Scene.h"
-#include "scene/components/Components.h"
+#include <rapture/renderer/passes/RenderPassContext.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
 #include "scene/components/TerrainComponent.h"
 
 #include <algorithm>

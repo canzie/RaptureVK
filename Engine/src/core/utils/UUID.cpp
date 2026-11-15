@@ -1,4 +1,4 @@
-#include "UUID.h"
+#include <rapture/core/utils/UUID.h>
 
 namespace Rapture {
 

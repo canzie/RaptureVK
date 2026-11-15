@@ -1,6 +1,6 @@
-#include "PerspectiveCamera.h"
+#include <rapture/scene/cameras/PerspectiveCamera.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 

@@ -1,4 +1,4 @@
-#include "Input.h"
+#include <rapture/input/Input.h>
 
 namespace Rapture {
 

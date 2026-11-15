@@ -3,8 +3,8 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "ui/AssetVisuals.h"
-#include "scene/instances/SceneObject.h"
-#include "scene/instances/SkeletonPose.h"
+#include <rapture/scene/instances/SceneObject.h>
+#include <rapture/scene/instances/SkeletonPose.h>
 
 #include <components/common.h>
 #include <components/text_label.h>

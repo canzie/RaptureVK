@@ -1,6 +1,6 @@
-#include "TangentGeneration.h"
+#include "renderer/generators/TangentGeneration.h"
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #include <cmath>
 

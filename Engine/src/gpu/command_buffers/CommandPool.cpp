@@ -1,9 +1,9 @@
-#include "CommandPool.h"
+#include <rapture/gpu/command_buffers/CommandPool.h>
 
-#include "CommandBuffer.h"
-#include "app/Application.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
 
 namespace Rapture {
 

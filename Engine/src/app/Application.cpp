@@ -1,15 +1,15 @@
-#include "app/Application.h"
+#include <rapture/app/Application.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/materials/Material.h"
-#include "core/events/Events.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/materials/Material.h>
+#include <rapture/core/events/Events.h>
 #include "core/jobs/JobSystem.h"
-#include "core/utils/EnginePaths.h"
-#include "core/utils/Log.h"
-#include "core/utils/Timestep.h"
-#include "core/utils/TracyProfiler.h"
-#include "core/utils/rp_assert.h"
-#include "scene/instances/InstanceRegistry.h"
+#include <rapture/core/utils/EnginePaths.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/Timestep.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/scene/instances/InstanceRegistry.h>
 
 #if defined(__linux__)
 #include <cstdlib>

@@ -1,7 +1,7 @@
 #ifndef RAPTURE__ASSET_VISUALS_H
 #define RAPTURE__ASSET_VISUALS_H
 
-#include "assets/asset_manager/AssetCommon.h"
+#include <rapture/assets/asset_manager/AssetCommon.h>
 
 #include <modules/color.h>
 

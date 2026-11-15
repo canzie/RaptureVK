@@ -1,7 +1,7 @@
 #include "renderer/GizmoRenderer.h"
 
-#include "core/utils/TracyProfiler.h"
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/core/utils/rp_assert.h>
 
 namespace Rapture {
 

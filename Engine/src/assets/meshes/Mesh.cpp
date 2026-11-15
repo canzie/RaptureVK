@@ -1,12 +1,12 @@
-#include "Mesh.h"
+#include <rapture/assets/meshes/Mesh.h>
 
-#include "app/Application.h"
+#include <rapture/app/Application.h>
 #include "gpu/acceleration_structures/AccelerationStructureBuilder.h"
-#include "gpu/acceleration_structures/BLAS.h"
-#include "gpu/buffers/BufferPool.h"
+#include <rapture/gpu/acceleration_structures/BLAS.h>
+#include <rapture/gpu/buffers/BufferPool.h>
 
-#include "core/utils/GLTypes.h"
-#include "core/utils/Log.h"
+#include <rapture/core/utils/GLTypes.h>
+#include <rapture/core/utils/Log.h>
 
 #include <cstring>
 

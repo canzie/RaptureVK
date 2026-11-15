@@ -9,12 +9,12 @@
 #include "workspaces/StaticMeshWorkspace.h"
 #include "workspaces/WorldEditorWorkspace.h"
 
-#include <assets/asset_manager/AssetManager.h>
-#include <assets/asset_manager/AssetRegistry.h>
-#include <assets/worlds/AWorld.h>
-#include <core/utils/Log.h>
-#include <core/utils/rp_assert.h>
-#include <scene/Project.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/asset_manager/AssetRegistry.h>
+#include <rapture/assets/worlds/AWorld.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/scene/Project.h>
 
 #include <algorithm>
 

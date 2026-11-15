@@ -1,18 +1,18 @@
-#include "ProceduralTextures.h"
-#include "assets/textures/ATexture.h"
+#include <rapture/renderer/generators/textures/ProceduralTextures.h>
+#include <rapture/assets/textures/ATexture.h>
 
-#include "core/utils/EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 
-#include "scene/instances/Environment.h"
+#include <rapture/scene/instances/Environment.h>
 
-#include "app/Application.h"
-#include "assets/asset_manager/Asset.h"
-#include "assets/asset_manager/AssetImportConfig.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "core/utils/Log.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetImportConfig.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/utils/Log.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "gpu/textures/Texture.h"
-#include "gpu/vulkan_context/VulkanQueue.h"
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/gpu/vulkan_context/VulkanQueue.h>
 
 namespace Rapture {
 

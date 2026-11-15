@@ -7,8 +7,8 @@
 #include <components/ui_scope.h>
 
 #include "panels/Panel.h"
-#include "scene/Scene.h"
-#include "scene/instances/Instance.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Instance.h>
 #include <cstdint>
 #include <memory>
 #include <string>

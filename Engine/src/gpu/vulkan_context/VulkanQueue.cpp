@@ -1,8 +1,8 @@
-#include "VulkanQueue.h"
+#include <rapture/gpu/vulkan_context/VulkanQueue.h>
 
-#include "gpu/command_buffers/CommandPool.h"
-#include "core/utils/Log.h"
-#include "app/Application.h"
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/app/Application.h>
 #include <cassert>
 #include <cstdint>
 #include <set>

@@ -1,4 +1,4 @@
-#include "SceneLoadContext.h"
+#include <rapture/scene/SceneLoadContext.h>
 
 namespace Rapture {
 

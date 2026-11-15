@@ -1,6 +1,6 @@
 #include "AssetWorkspace.h"
 
-#include <assets/asset_manager/AssetManager.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
 
 AssetWorkspace::AssetWorkspace(const EditorContext &context, Rapture::AssetHandle handle) : Workspace(context), m_handle(handle) {}
 

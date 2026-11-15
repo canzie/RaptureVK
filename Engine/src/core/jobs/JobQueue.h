@@ -2,8 +2,8 @@
 #define RAPTURE__JOBQUEUE_H
 
 // concurrentqueue needs to know jobs size beforehand
-#include "Job.h"
-#include "JobCommon.h"
+#include "core/jobs/Job.h"
+#include "core/jobs/JobCommon.h"
 #include "concurrentqueue.h"
 
 #include <array>

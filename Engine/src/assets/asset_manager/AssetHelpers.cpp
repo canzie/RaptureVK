@@ -1,4 +1,4 @@
-#include "AssetHelpers.h"
+#include "assets/asset_manager/AssetHelpers.h"
 
 #include "stb_image.h"
 

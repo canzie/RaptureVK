@@ -1,12 +1,12 @@
-#include "SkeletonInstanceManager.h"
+#include <rapture/scene/render_data/SkeletonInstanceManager.h>
 
-#include "assets/asset_manager/Asset.h"
-#include "assets/meshes/ASkeletalMesh.h"
-#include "assets/skeletons/ASkeleton.h"
-#include "core/utils/Log.h"
-#include "core/utils/rp_assert.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "renderer/GPUDataStructs.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/meshes/ASkeletalMesh.h>
+#include <rapture/assets/skeletons/ASkeleton.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/renderer/GPUDataStructs.h>
 
 #include <vector>
 

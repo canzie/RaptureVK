@@ -1,9 +1,9 @@
 #ifndef RAPTURE__DESCRIPTOR_MANAGER_H
 #define RAPTURE__DESCRIPTOR_MANAGER_H
 
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/descriptors/DescriptorBinding.h"
-#include "gpu/descriptors/DescriptorSet.h"
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/descriptors/DescriptorBinding.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
 
 namespace Rapture {
 

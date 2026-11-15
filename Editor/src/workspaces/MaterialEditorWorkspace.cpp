@@ -4,15 +4,15 @@
 #include "panels/NodeEditorPanel.h"
 #include "panels/ViewportPanel.h"
 
-#include <assets/asset_manager/AssetManager.h>
-#include <assets/asset_manager/ReservedAssets.h>
-#include <core/utils/EnginePaths.h>
-#include <scene/Scene.h>
-#include <scene/instances/Camera3D.h>
-#include <scene/instances/DirectionalLight3D.h>
-#include <scene/instances/Environment.h>
-#include <scene/instances/SceneObject.h>
-#include <scene/instances/StaticMesh3D.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/asset_manager/ReservedAssets.h>
+#include <rapture/core/utils/EnginePaths.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Camera3D.h>
+#include <rapture/scene/instances/DirectionalLight3D.h>
+#include <rapture/scene/instances/Environment.h>
+#include <rapture/scene/instances/SceneObject.h>
+#include <rapture/scene/instances/StaticMesh3D.h>
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "MaterialPreview";
 

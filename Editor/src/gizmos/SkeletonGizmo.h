@@ -3,8 +3,8 @@
 
 #include "workspaces/Workspace.h"
 
-#include <assets/skeletons/Skeleton.h>
-#include <renderer/GizmoDrawList.h>
+#include <rapture/assets/skeletons/Skeleton.h>
+#include <rapture/renderer/GizmoDrawList.h>
 
 #include <vector>
 

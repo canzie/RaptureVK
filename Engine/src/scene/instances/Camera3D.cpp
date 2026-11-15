@@ -1,7 +1,7 @@
-#include "Camera3D.h"
+#include <rapture/scene/instances/Camera3D.h>
 
-#include "scene/components/Components.h"
-#include "scene/Scene.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/Scene.h>
 
 namespace Rapture {
 

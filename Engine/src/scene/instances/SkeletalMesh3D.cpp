@@ -1,10 +1,10 @@
-#include "SkeletalMesh3D.h"
+#include <rapture/scene/instances/SkeletalMesh3D.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "core/utils/Log.h"
-#include "scene/Scene.h"
-#include "scene/components/Components.h"
-#include "scene/render_data/SceneRenderData.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
 
 namespace Rapture {
 

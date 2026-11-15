@@ -1,10 +1,10 @@
-#include "Module.h"
+#include <rapture/scene/instances/Module.h>
 
-#include "assets/asset_manager/Asset.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/modules/AModule.h"
-#include "core/serialization/SerialDocument.h"
-#include "core/utils/Log.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/modules/AModule.h>
+#include <rapture/core/serialization/SerialDocument.h>
+#include <rapture/core/utils/Log.h>
 
 namespace Rapture {
 

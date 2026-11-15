@@ -1,9 +1,9 @@
-#include "VirtualStorageBuffer.h"
+#include <rapture/gpu/buffers/VirtualStorageBuffer.h>
 
-#include "app/Application.h"
-#include "core/utils/Log.h"
-#include "gpu/buffers/StorageBuffer.h"
-#include "gpu/descriptors/DescriptorBinding.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/buffers/StorageBuffer.h>
+#include <rapture/gpu/descriptors/DescriptorBinding.h>
 #include "gpu/descriptors/DescriptorManager.h"
 
 namespace Rapture {

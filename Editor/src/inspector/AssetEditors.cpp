@@ -1,11 +1,11 @@
 #include "AssetEditors.h"
 
-#include <assets/asset_manager/AssetManager.h>
-#include <assets/meshes/AMesh.h>
-#include <assets/meshes/ASkeletalMesh.h>
-#include <assets/meshes/AStaticMesh.h>
-#include <assets/skeletons/ASkeleton.h>
-#include <core/utils/Log.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/meshes/AMesh.h>
+#include <rapture/assets/meshes/ASkeletalMesh.h>
+#include <rapture/assets/meshes/AStaticMesh.h>
+#include <rapture/assets/skeletons/ASkeleton.h>
+#include <rapture/core/utils/Log.h>
 
 #include <cstdio>
 #include <span>

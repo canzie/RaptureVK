@@ -3,12 +3,12 @@
 
 #include "AssetWorkspace.h"
 
-#include <assets/asset_manager/Asset.h>
-#include <assets/worlds/AWorld.h>
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/worlds/AWorld.h>
 #include <components/context_menu.h>
-#include <core/events/EventSignal.h>
-#include <renderer/viewport/Viewport.h>
-#include <scene/World.h>
+#include <rapture/core/events/EventSignal.h>
+#include <rapture/renderer/viewport/Viewport.h>
+#include <rapture/scene/World.h>
 
 class PlayLayer;
 

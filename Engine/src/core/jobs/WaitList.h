@@ -1,8 +1,8 @@
 #ifndef RAPTURE__WAITLIST_H
 #define RAPTURE__WAITLIST_H
 
-#include "Job.h"
-#include "LockFreeBucketMap.h"
+#include "core/jobs/Job.h"
+#include "core/jobs/LockFreeBucketMap.h"
 
 #include <cstddef>
 #include <cstdint>

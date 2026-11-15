@@ -1,21 +1,21 @@
-#include "TextureCompressor.h"
+#include "renderer/generators/textures/TextureCompressor.h"
 
-#include "core/utils/EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 
-#include "app/Application.h"
+#include <rapture/app/Application.h>
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobSystem.h"
-#include "core/utils/Log.h"
-#include "gpu/buffers/StorageBuffer.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "gpu/pipelines/ComputePipeline.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/buffers/StorageBuffer.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/pipelines/ComputePipeline.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/textures/Texture.h>
 #include "gpu/vulkan_context/TimelineSemaphore.h"
-#include "scene/Project.h"
+#include <rapture/scene/Project.h>
 
 #include <algorithm>
 #include <mutex>

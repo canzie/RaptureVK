@@ -1,4 +1,4 @@
-#include "Folder.h"
+#include <rapture/scene/instances/Folder.h>
 
 namespace Rapture {
 

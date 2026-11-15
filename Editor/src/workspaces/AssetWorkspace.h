@@ -3,7 +3,7 @@
 
 #include "Workspace.h"
 
-#include <assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/asset_manager/AssetCommon.h>
 
 /**
  * @brief A workspace that exists for one asset, taken as it is opened.

@@ -1,14 +1,14 @@
-#include "CompositePass.h"
+#include <rapture/renderer/passes/CompositePass.h>
 
-#include "app/Application.h"
-#include "core/utils/EnginePaths.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/EnginePaths.h>
 
-#include "assets/asset_manager/AssetManager.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/gpu/textures/Texture.h>
 
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
 
 #include <thread>
 

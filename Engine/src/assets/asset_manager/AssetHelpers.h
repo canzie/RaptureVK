@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 #include <toml++/toml.hpp>
 

@@ -4,9 +4,9 @@
 #include "panels/ViewportPanel.h"
 #include "ui/AssetVisuals.h"
 
-#include <scene/Scene.h>
-#include <scene/instances/SceneObject.h>
-#include <scene/instances/StaticMesh3D.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/SceneObject.h>
+#include <rapture/scene/instances/StaticMesh3D.h>
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "StaticMeshPreview";
 

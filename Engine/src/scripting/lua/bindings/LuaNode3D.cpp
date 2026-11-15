@@ -1,11 +1,11 @@
-#include "LuaBindings.h"
-#include "LuaInstanceMembers.h"
+#include "scripting/lua/bindings/LuaBindings.h"
+#include "scripting/lua/bindings/LuaInstanceMembers.h"
 
-#include "scene/instances/Camera3D.h"
-#include "scene/instances/Mesh3D.h"
-#include "scene/instances/SkeletalMesh3D.h"
-#include "scene/instances/SpringArm3D.h"
-#include "scene/instances/StaticMesh3D.h"
+#include <rapture/scene/instances/Camera3D.h>
+#include <rapture/scene/instances/Mesh3D.h>
+#include <rapture/scene/instances/SkeletalMesh3D.h>
+#include <rapture/scene/instances/SpringArm3D.h>
+#include <rapture/scene/instances/StaticMesh3D.h>
 
 namespace Rapture::scripting {
 

@@ -1,7 +1,7 @@
-#include "Terrain3D.h"
+#include <rapture/scene/instances/Terrain3D.h>
 
 #include "scene/components/TerrainComponent.h"
-#include "scene/Scene.h"
+#include <rapture/scene/Scene.h>
 
 namespace Rapture {
 

@@ -1,11 +1,11 @@
 #include "TextEditorPanel.h"
 #include "context/WindowManager.h"
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
-#include <assets/asset_manager/AssetManager.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
 #include <components/ui_scope.h>
-#include <input/InputCodes.h>
+#include <rapture/input/InputCodes.h>
 
 #include <fstream>
 #include <iterator>

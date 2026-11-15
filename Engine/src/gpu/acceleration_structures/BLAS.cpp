@@ -1,11 +1,11 @@
-#include "BLAS.h"
+#include <rapture/gpu/acceleration_structures/BLAS.h>
 
-#include "app/Application.h"
-#include "assets/meshes/Mesh.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "core/utils/rp_assert.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/meshes/Mesh.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 
 namespace Rapture {
 

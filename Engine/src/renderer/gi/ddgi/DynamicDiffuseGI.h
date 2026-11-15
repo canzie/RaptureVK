@@ -1,27 +1,27 @@
 #pragma once
 
-#include "assets/asset_manager/Asset.h"
-#include "assets/shaders/AShader.h"
+#include <rapture/assets/asset_manager/Asset.h>
+#include <rapture/assets/shaders/AShader.h>
 #include <memory>
 #include <vector>
 
 #include <glm/glm.hpp>
 
-#include "gpu/buffers/Buffers.h"
-#include "gpu/buffers/UniformBuffer.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/descriptors/DescriptorSet.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
-#include "scene/Scene.h"
+#include <rapture/gpu/buffers/Buffers.h>
+#include <rapture/gpu/buffers/UniformBuffer.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/descriptors/DescriptorSet.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/textures/Texture.h>
+#include <rapture/scene/Scene.h>
 
 #include "core/utils/TextureFlattener.h"
-#include "gpu/pipelines/ComputePipeline.h"
-#include "gpu/vulkan_context/VulkanQueue.h"
+#include <rapture/gpu/pipelines/ComputePipeline.h>
+#include <rapture/gpu/vulkan_context/VulkanQueue.h>
 
-#include "DDGICommon.h"
-#include "gpu/vulkan_context/RenderContext.h"
+#include "renderer/gi/ddgi/DDGICommon.h"
+#include <rapture/gpu/vulkan_context/RenderContext.h>
 
 namespace Rapture {
 

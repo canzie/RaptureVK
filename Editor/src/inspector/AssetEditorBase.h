@@ -6,7 +6,7 @@
 
 #include "inspector/PropertySections.h"
 
-#include <assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/asset_manager/AssetCommon.h>
 
 /**
  * @brief A property section that edits one facet of the open asset.

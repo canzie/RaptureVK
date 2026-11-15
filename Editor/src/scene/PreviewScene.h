@@ -1,8 +1,8 @@
 #ifndef RAPTURE__PREVIEW_SCENE_H
 #define RAPTURE__PREVIEW_SCENE_H
 
-#include <core/ecs/entity_accessor.h>
-#include <renderer/viewport/Viewport.h>
+#include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/renderer/viewport/Viewport.h>
 
 #include <glm/glm.hpp>
 

@@ -9,8 +9,8 @@
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/RegisterTypes.h>
 
-#include "physics/CharacterBody.h"
-#include "physics/RigidBody.h"
+#include <rapture/physics/CharacterBody.h>
+#include <rapture/physics/RigidBody.h>
 
 #include <atomic>
 #include <cstdarg>

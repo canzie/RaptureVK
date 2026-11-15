@@ -1,4 +1,4 @@
-#include "physics/RigidBody.h"
+#include <rapture/physics/RigidBody.h>
 
 #include "physics/PhysicsSystem.h"
 

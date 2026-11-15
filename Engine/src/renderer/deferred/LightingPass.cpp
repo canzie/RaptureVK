@@ -1,19 +1,19 @@
 #include "renderer/deferred/LightingPass.h"
 
-#include "app/Application.h"
-#include "core/utils/EnginePaths.h"
+#include <rapture/app/Application.h>
+#include <rapture/core/utils/EnginePaths.h>
 
 #include "gpu/descriptors/DescriptorManager.h"
 #include "renderer/ImageBasedLighting.h"
-#include "renderer/RenderSettings.h"
+#include <rapture/renderer/RenderSettings.h>
 #include "renderer/shadows/ShadowMapping.h"
-#include "scene/components/Components.h"
-#include "scene/instances/Environment.h"
-#include "scene/render_data/SceneRenderData.h"
-#include "scene/systems/Transforms.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Environment.h>
+#include <rapture/scene/render_data/SceneRenderData.h>
+#include <rapture/scene/systems/Transforms.h>
 
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
 
 namespace Rapture {
 

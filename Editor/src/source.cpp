@@ -1,14 +1,14 @@
 #include "layers/EditorLayer.h"
 #include "layers/AmethystLayer.h"
 #include "layers/TestLayer.h"
-#include "core/utils/Log.h"
-#include "app/Application.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/app/Application.h>
 
 #include "EntryPoint.h"
-#include "core/events/Events.h"
-#include "core/events/GameEvents.h"
+#include <rapture/core/events/Events.h>
+#include <rapture/core/events/GameEvents.h>
 #include "app/EditorConfig.h"
-#include "scene/Project.h"
+#include <rapture/scene/Project.h>
 
 #include <filesystem>
 #include <memory>

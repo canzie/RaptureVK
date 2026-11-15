@@ -1,11 +1,11 @@
-#include "SceneObject.h"
+#include <rapture/scene/instances/SceneObject.h>
 
-#include "scene/components/Components.h"
-#include "core/utils/Log.h"
-#include "core/utils/rp_assert.h"
-#include "scene/Scene.h"
-#include "scene/SceneLoadContext.h"
-#include "scene/instances/InstanceRegistry.h"
+#include <rapture/scene/components/Components.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/rp_assert.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/SceneLoadContext.h>
+#include <rapture/scene/instances/InstanceRegistry.h>
 
 namespace Rapture {
 

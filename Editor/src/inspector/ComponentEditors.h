@@ -3,23 +3,23 @@
 
 #include "ComponentEditorBase.h"
 #include "Icons.h"
-#include "scene/components/Components.h"
+#include <rapture/scene/components/Components.h>
 #include "ui/controls/SegmentedControl.h"
 #include "ui/fields/AssetPicker.h"
 #include "ui/fields/ColorField.h"
-#include "scene/instances/Camera3D.h"
-#include "scene/instances/CharacterBody3D.h"
-#include "scene/instances/DirectionalLight3D.h"
-#include "scene/instances/Environment.h"
-#include "scene/instances/Mesh3D.h"
-#include "scene/instances/SkeletalMesh3D.h"
-#include "scene/instances/StaticMesh3D.h"
-#include "scene/instances/PointLight3D.h"
-#include "scene/instances/RigidBody3D.h"
-#include "scene/instances/SpotLight3D.h"
-#include "scene/instances/SpringArm3D.h"
-#include "scene/instances/controllers/CameraController.h"
-#include "scene/instances/controllers/PlayerController.h"
+#include <rapture/scene/instances/Camera3D.h>
+#include <rapture/scene/instances/CharacterBody3D.h>
+#include <rapture/scene/instances/DirectionalLight3D.h>
+#include <rapture/scene/instances/Environment.h>
+#include <rapture/scene/instances/Mesh3D.h>
+#include <rapture/scene/instances/SkeletalMesh3D.h>
+#include <rapture/scene/instances/StaticMesh3D.h>
+#include <rapture/scene/instances/PointLight3D.h>
+#include <rapture/scene/instances/RigidBody3D.h>
+#include <rapture/scene/instances/SpotLight3D.h>
+#include <rapture/scene/instances/SpringArm3D.h>
+#include <rapture/scene/instances/controllers/CameraController.h>
+#include <rapture/scene/instances/controllers/PlayerController.h>
 
 #include <glm/glm.hpp>
 #include <optional>

@@ -1,4 +1,4 @@
-#include "glTFLoader.h"
+#include <rapture/assets/loaders/gltf/glTFLoader.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -16,28 +16,28 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <yyjson.h>
 
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/asset_manager/ReservedAssets.h"
-#include "assets/materials/AMaterial.h"
-#include "assets/materials/Material.h"
-#include "assets/materials/MaterialInstance.h"
-#include "assets/materials/MaterialParameters.h"
-#include "assets/materials/graph/MaterialGraph.h"
-#include "assets/materials/graph/MaterialGraphCompiler.h"
-#include "assets/materials/graph/SurfaceGraphManager.h"
-#include "assets/meshes/Mesh.h"
-#include "assets/textures/ATexture.h"
-#include "core/ecs/entity_accessor.h"
-#include "core/utils/GLTypes.h"
-#include "gpu/buffers/BufferLayout.h"
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/asset_manager/ReservedAssets.h>
+#include <rapture/assets/materials/AMaterial.h>
+#include <rapture/assets/materials/Material.h>
+#include <rapture/assets/materials/MaterialInstance.h>
+#include <rapture/assets/materials/MaterialParameters.h>
+#include <rapture/assets/materials/graph/MaterialGraph.h>
+#include <rapture/assets/materials/graph/MaterialGraphCompiler.h>
+#include <rapture/assets/materials/graph/SurfaceGraphManager.h>
+#include <rapture/assets/meshes/Mesh.h>
+#include <rapture/assets/textures/ATexture.h>
+#include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/utils/GLTypes.h>
+#include <rapture/gpu/buffers/BufferLayout.h>
 #include "renderer/generators/TangentGeneration.h"
-#include "scene/Scene.h"
-#include "scene/components/Components.h"
-#include "scene/instances/Module.h"
-#include "scene/instances/Node3D.h"
-#include "scene/instances/SkeletalMesh3D.h"
-#include "scene/instances/SkeletonPose.h"
-#include "scene/instances/StaticMesh3D.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Module.h>
+#include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/SkeletalMesh3D.h>
+#include <rapture/scene/instances/SkeletonPose.h>
+#include <rapture/scene/instances/StaticMesh3D.h>
 
 namespace Rapture {
 

@@ -1,6 +1,6 @@
-#include "Renderer.h"
+#include "renderer/Renderer.h"
 
-#include "core/utils/rp_assert.h"
+#include <rapture/core/utils/rp_assert.h>
 
 namespace Rapture {
 

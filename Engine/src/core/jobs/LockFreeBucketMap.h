@@ -1,7 +1,7 @@
 #ifndef RAPTURE__LOCKFREEBUCKETMAP_H
 #define RAPTURE__LOCKFREEBUCKETMAP_H
 
-#include "LockFreeStack.h"
+#include "core/jobs/LockFreeStack.h"
 
 #include <array>
 #include <cstddef>

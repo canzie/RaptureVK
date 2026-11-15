@@ -1,16 +1,16 @@
 #ifndef RAPTURE__TERRAIN_CULLER_H
 #define RAPTURE__TERRAIN_CULLER_H
 
-#include "TerrainTypes.h"
+#include <rapture/renderer/generators/terrain/TerrainTypes.h>
 
-#include "assets/shaders/AShader.h"
+#include <rapture/assets/shaders/AShader.h>
 
-#include "gpu/buffers/StorageBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
-#include "gpu/pipelines/ComputePipeline.h"
-#include "gpu/shaders/Shader.h"
+#include <rapture/gpu/buffers/StorageBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
+#include <rapture/gpu/pipelines/ComputePipeline.h>
+#include <rapture/gpu/shaders/Shader.h>
 
-#include "assets/asset_manager/Asset.h"
+#include <rapture/assets/asset_manager/Asset.h>
 
 #include <glm/glm.hpp>
 

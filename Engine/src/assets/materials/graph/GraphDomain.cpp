@@ -1,11 +1,11 @@
-#include "GraphDomain.h"
+#include <rapture/assets/materials/graph/GraphDomain.h>
 
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include "NodeRegistry.h"
-#include "core/utils/rp_assert.h"
+#include <rapture/assets/materials/graph/NodeRegistry.h>
+#include <rapture/core/utils/rp_assert.h>
 
 namespace Rapture {
 

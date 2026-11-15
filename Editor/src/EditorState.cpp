@@ -1,7 +1,7 @@
 #include "EditorState.h"
 
-#include "core/utils/Log.h"
-#include "scene/Project.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/Project.h>
 
 #include <utility>
 

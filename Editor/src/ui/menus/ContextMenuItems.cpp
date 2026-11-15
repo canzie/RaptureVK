@@ -1,8 +1,8 @@
 #include "ContextMenuItems.h"
 
 #include "amethyst/icons.h"
-#include "assets/asset_manager/AssetCommon.h"
-#include "assets/asset_manager/AssetManager.h"
+#include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
 #include "ui/AssetVisuals.h"
 #include "components/context_menu.h"
 

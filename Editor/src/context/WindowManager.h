@@ -2,7 +2,7 @@
 #define RAPTURE__WINDOW_MANAGER_H
 
 #include <amethyst/Amethyst.h>
-#include <core/events/EventSignal.h>
+#include <rapture/core/events/EventSignal.h>
 
 #include <cstdint>
 #include <filesystem>

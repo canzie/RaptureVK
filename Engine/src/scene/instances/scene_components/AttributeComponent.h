@@ -2,7 +2,7 @@
 #define RAPTURE__ATTRIBUTE_COMPONENT_H
 
 #include "core/named_values/Attributes.h"
-#include "scene/instances/SceneComponent.h"
+#include <rapture/scene/instances/SceneComponent.h>
 
 namespace Rapture {
 

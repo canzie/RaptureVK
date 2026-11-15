@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "core/utils/Log.h"
+#include <rapture/core/utils/Log.h>
 
 namespace {
 

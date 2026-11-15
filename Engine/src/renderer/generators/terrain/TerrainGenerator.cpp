@@ -1,21 +1,21 @@
-#include "TerrainGenerator.h"
-#include "assets/textures/ATexture.h"
-#include "assets/materials/AMaterialInstance.h"
+#include "renderer/generators/terrain/TerrainGenerator.h"
+#include <rapture/assets/textures/ATexture.h>
+#include <rapture/assets/materials/AMaterialInstance.h>
 
-#include "core/utils/EnginePaths.h"
+#include <rapture/core/utils/EnginePaths.h>
 
-#include "app/Application.h"
-#include "assets/asset_manager/AssetImportConfig.h"
-#include "assets/asset_manager/AssetManager.h"
-#include "assets/materials/Material.h"
-#include "assets/materials/graph/SurfaceGraphManager.h"
-#include "core/utils/Log.h"
-#include "core/utils/TracyProfiler.h"
-#include "gpu/command_buffers/CommandBuffer.h"
-#include "gpu/command_buffers/CommandPool.h"
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/AssetImportConfig.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/materials/Material.h>
+#include <rapture/assets/materials/graph/SurfaceGraphManager.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/TracyProfiler.h>
+#include <rapture/gpu/command_buffers/CommandBuffer.h>
+#include <rapture/gpu/command_buffers/CommandPool.h>
 #include "gpu/descriptors/DescriptorManager.h"
-#include "renderer/Frustum.h"
-#include "renderer/generators/textures/ProceduralTextures.h"
+#include <rapture/renderer/Frustum.h>
+#include <rapture/renderer/generators/textures/ProceduralTextures.h>
 
 #include <glm/gtc/packing.hpp>
 

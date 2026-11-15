@@ -1,8 +1,8 @@
-#include "LuaBindings.h"
-#include "LuaInstanceMembers.h"
+#include "scripting/lua/bindings/LuaBindings.h"
+#include "scripting/lua/bindings/LuaInstanceMembers.h"
 
-#include "scene/Scene.h"
-#include "scene/instances/Folder.h"
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Folder.h>
 
 namespace Rapture::scripting {
 

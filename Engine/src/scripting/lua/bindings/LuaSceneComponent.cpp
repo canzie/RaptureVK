@@ -1,5 +1,5 @@
-#include "LuaBindings.h"
-#include "LuaInstanceMembers.h"
+#include "scripting/lua/bindings/LuaBindings.h"
+#include "scripting/lua/bindings/LuaInstanceMembers.h"
 
 namespace Rapture::scripting {
 

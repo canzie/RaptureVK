@@ -3,12 +3,12 @@
 #include "panels/TextEditorPanel.h"
 #include "ui/AssetVisuals.h"
 
-#include <app/Application.h>
-#include <assets/asset_manager/AssetImportData.h>
-#include <assets/asset_manager/AssetManager.h>
-#include <assets/asset_manager/AssetRegistry.h>
-#include <core/utils/Log.h>
-#include <scene/Project.h>
+#include <rapture/app/Application.h>
+#include <rapture/assets/asset_manager/AssetImportData.h>
+#include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/assets/asset_manager/AssetRegistry.h>
+#include <rapture/core/utils/Log.h>
+#include <rapture/scene/Project.h>
 
 static std::string s_uniqueScriptName(const std::filesystem::path &folder)
 {

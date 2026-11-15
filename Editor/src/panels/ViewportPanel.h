@@ -6,8 +6,8 @@
 #include <components/radio_button.h>
 #include <components/ui_scope.h>
 
-#include "core/ecs/entity_accessor.h"
-#include "core/events/EventSignal.h"
+#include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/events/EventSignal.h>
 #include "gizmos/TransformGizmo.h"
 #include "panels/Panel.h"
 

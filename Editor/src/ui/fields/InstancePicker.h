@@ -1,7 +1,7 @@
 #ifndef RAPTURE__INSTANCE_PICKER_H
 #define RAPTURE__INSTANCE_PICKER_H
 
-#include "core/events/EventSignal.h"
+#include <rapture/core/events/EventSignal.h>
 
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>

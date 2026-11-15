@@ -1,17 +1,17 @@
-#include "AssetImporter.h"
+#include "assets/asset_manager/AssetImporter.h"
 
-#include "AssetHelpers.h"
-#include "assets/loaders/gltf/glTFCommon.h"
-#include "assets/scripts/AScript.h"
-#include "assets/shaders/AShader.h"
-#include "assets/textures/ATexture.h"
-#include "core/events/AssetEvents.h"
+#include "assets/asset_manager/AssetHelpers.h"
+#include <rapture/assets/loaders/gltf/glTFCommon.h>
+#include <rapture/assets/scripts/AScript.h>
+#include <rapture/assets/shaders/AShader.h>
+#include <rapture/assets/textures/ATexture.h>
+#include <rapture/core/events/AssetEvents.h>
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobSystem.h"
-#include "core/utils/Log.h"
-#include "gpu/shaders/Shader.h"
-#include "gpu/textures/Texture.h"
+#include <rapture/core/utils/Log.h>
+#include <rapture/gpu/shaders/Shader.h>
+#include <rapture/gpu/textures/Texture.h>
 #include "renderer/generators/textures/TextureCompressor.h"
 
 #include <filesystem>

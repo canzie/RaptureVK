@@ -1,4 +1,4 @@
-#include "LuaEventSignal.h"
+#include "scripting/lua/LuaEventSignal.h"
 
 namespace Rapture::scripting {
 
