@@ -295,7 +295,7 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
     auto &vc = Application::getInstance().getVulkanContext();
 
     auto &rc = vc.getRenderContext();
-    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getGraphicsQueueIndex());
     CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -357,7 +357,7 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
 
     commandBuffer->end();
 
-    auto queue = vc.getComputeQueue();
+    auto queue = vc.getGraphicsQueue();
     queue->submitQueue(commandBuffer);
 }
 

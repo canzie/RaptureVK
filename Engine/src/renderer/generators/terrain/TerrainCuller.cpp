@@ -100,7 +100,7 @@ void TerrainCuller::runCull(TerrainCullBuffers &buffers, uint32_t frustumBindles
     auto &vc = Application::getInstance().getVulkanContext();
 
     auto &rc = vc.getRenderContext();
-    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getGraphicsQueueIndex());
     CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -157,7 +157,7 @@ void TerrainCuller::runCull(TerrainCullBuffers &buffers, uint32_t frustumBindles
 
     commandBuffer->end();
 
-    auto queue = vc.getComputeQueue();
+    auto queue = vc.getGraphicsQueue();
     queue->submitQueue(commandBuffer);
 }
 

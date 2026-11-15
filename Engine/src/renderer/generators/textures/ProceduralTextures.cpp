@@ -315,7 +315,7 @@ void ProceduralTexture::generate()
 
     auto &vc = Application::getInstance().getVulkanContext();
     auto &rc = vc.getRenderContext();
-    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
+    CommandBufferLease commandBufferLease = rc.commandPoolManager->leasePrimary(vc.getGraphicsQueueIndex());
     CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -377,7 +377,7 @@ void ProceduralTexture::generate()
 
     auto &app = Application::getInstance();
     auto &vulkanContext = app.getVulkanContext();
-    auto queue = vulkanContext.getComputeQueue();
+    auto queue = vulkanContext.getGraphicsQueue();
 
     queue->submitQueue(commandBuffer);
     queue->waitIdle();

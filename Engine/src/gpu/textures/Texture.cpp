@@ -1661,7 +1661,7 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
 
     auto &app = Application::getInstance();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
-    auto transferQueue = app.getVulkanContext().getTransferQueue();
+    auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
 
     VkBuffer stagingBuffer;
     VmaAllocation stagingAllocation;
@@ -1686,7 +1686,7 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
     vmaUnmapMemory(allocator, stagingAllocation);
 
     CommandBufferLease commandBufferLease =
-        Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getTransferQueueIndex());
+        Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getGraphicsQueueIndex());
     CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -1713,7 +1713,7 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
 
     commandBuffer->end();
 
-    transferQueue->submitQueue(commandBuffer);
+    graphicsQueue->submitQueue(commandBuffer);
 
     // Fire-and-forget: staging buffer will be reused/recycled by command pool reset
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
@@ -1728,7 +1728,7 @@ void Texture::setPixels(std::span<const uint8_t> data)
 
     auto &app = Application::getInstance();
     VmaAllocator allocator = app.getVulkanContext().getVmaAllocator();
-    auto transferQueue = app.getVulkanContext().getTransferQueue();
+    auto graphicsQueue = app.getVulkanContext().getGraphicsQueue();
 
     VkBuffer stagingBuffer;
     VmaAllocation stagingAllocation;
@@ -1753,7 +1753,7 @@ void Texture::setPixels(std::span<const uint8_t> data)
     vmaUnmapMemory(allocator, stagingAllocation);
 
     CommandBufferLease commandBufferLease =
-        Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getTransferQueueIndex());
+        Application::getRenderContext().commandPoolManager->leasePrimary(app.getVulkanContext().getGraphicsQueueIndex());
     CommandBuffer *commandBuffer = commandBufferLease.get();
 
     commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -1766,7 +1766,7 @@ void Texture::setPixels(std::span<const uint8_t> data)
 
     commandBuffer->end();
 
-    transferQueue->submitQueue(commandBuffer);
+    graphicsQueue->submitQueue(commandBuffer);
 
     // Fire-and-forget: staging buffer cleanup
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);

@@ -81,7 +81,7 @@ DynamicDiffuseGI::DynamicDiffuseGI(uint32_t framesInFlight)
     auto &vc = app.getVulkanContext();
     m_rc = &vc.getRenderContext();
     m_allocator = vc.getVmaAllocator();
-    m_computeQueue = vc.getComputeQueue();
+    m_graphicsQueue = vc.getGraphicsQueue();
     m_device = vc.getLogicalDevice();
 
     createPipelines();
@@ -150,7 +150,7 @@ DDGIProbeTextureIndices DynamicDiffuseGI::getPublishedProbeTextureIndices() cons
 void DynamicDiffuseGI::clearTextures()
 {
     CommandBufferLease commandBufferLease =
-        m_rc->commandPoolManager->leasePrimary(Application::getInstance().getVulkanContext().getComputeQueueIndex());
+        m_rc->commandPoolManager->leasePrimary(Application::getInstance().getVulkanContext().getGraphicsQueueIndex());
     CommandBuffer *commandBuffer = commandBufferLease.get();
 
     if (commandBuffer->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) != VK_SUCCESS) {
@@ -214,7 +214,7 @@ void DynamicDiffuseGI::clearTextures()
         return;
     }
 
-    m_computeQueue->submitQueue(commandBuffer);
+    m_graphicsQueue->submitQueue(commandBuffer);
 }
 
 void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
@@ -294,7 +294,7 @@ void DynamicDiffuseGI::recordAndSubmitProbeUpdate(Scene &scene, uint32_t frameIn
 
     auto &vc = Application::getInstance().getVulkanContext();
 
-    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leasePrimary(vc.getComputeQueueIndex());
+    CommandBufferLease commandBufferLease = m_rc->commandPoolManager->leasePrimary(vc.getGraphicsQueueIndex());
     CommandBuffer *commandBuffer = commandBufferLease.get();
 
     if (commandBuffer->begin() != VK_SUCCESS) {
@@ -350,7 +350,7 @@ void DynamicDiffuseGI::recordAndSubmitProbeUpdate(Scene &scene, uint32_t frameIn
         return;
     }
 
-    if (m_computeQueue->submitQueue(commandBuffer) == 0) {
+    if (m_graphicsQueue->submitQueue(commandBuffer) == 0) {
         return;
     }
 

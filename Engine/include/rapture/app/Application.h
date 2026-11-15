@@ -34,7 +34,7 @@ struct MainWindowConfig {
  */
 struct ApplicationConfig {
     std::optional<MainWindowConfig> mainWindow;
-    QueueFamilyAssignment queueFamilyAssignment = QueueFamilyAssignment::ONE_FAMILY;
+    QueueFamilyAssignment queueFamilyAssignment = QueueFamilyAssignment::DEDICATED_FAMILIES;
 };
 
 class Application {

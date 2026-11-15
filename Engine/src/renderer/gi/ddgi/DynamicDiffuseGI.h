@@ -162,7 +162,7 @@ class DynamicDiffuseGI {
     std::vector<glm::vec3> m_DebugProbePositions;
 
     VmaAllocator m_allocator;
-    std::shared_ptr<VulkanQueue> m_computeQueue;
+    std::shared_ptr<VulkanQueue> m_graphicsQueue;
 
     VkDevice m_device = VK_NULL_HANDLE;
 
