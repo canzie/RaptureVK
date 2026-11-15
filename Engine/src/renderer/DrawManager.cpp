@@ -392,15 +392,16 @@ bool DrawManager::submitFrame(CommandBuffer *commandBuffer, uint32_t imageIndex)
         return true;
     }
 
-    VkSemaphore waitSemaphore = m_swapChain->getImageAvailableSemaphore(m_currentFrame);
     VkSemaphore signalSemaphore = m_swapChain->getRenderFinishedSemaphore(m_currentFrame);
-    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-    std::span<VkSemaphore> waitSemaphores(&waitSemaphore, 1);
-    std::span<VkSemaphore> signalSemaphores(&signalSemaphore, 1);
+    SemaphoreWait imageAvailable{.semaphore = m_swapChain->getImageAvailableSemaphore(m_currentFrame),
+                                 .value = 0,
+                                 .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT};
+    SemaphoreSignal renderFinished{.semaphore = signalSemaphore, .value = 0};
 
-    m_graphicsQueue->submitAndFlushQueue(commandBuffer, &signalSemaphores, &waitSemaphores, &waitStage,
-                                         m_swapChain->getInFlightFence(m_currentFrame));
+    m_graphicsQueue->submitQueue(commandBuffer, SubmitSynchronization{.waits = std::span<const SemaphoreWait>(&imageAvailable, 1),
+                                                                      .signals = std::span<const SemaphoreSignal>(&renderFinished, 1),
+                                                                      .fence = m_swapChain->getInFlightFence(m_currentFrame)});
 
     VkSwapchainKHR swapChain = m_swapChain->getSwapChainVk();
 

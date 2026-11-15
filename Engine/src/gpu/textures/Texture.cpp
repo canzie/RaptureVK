@@ -527,22 +527,15 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
         internalCommandBuffer->end();
 
         // Submit the command buffer
-        std::span<VkSemaphore> *waitSemaphoresSpan = nullptr;
-        std::span<VkSemaphore> *signalSemaphoresSpan = nullptr;
-        VkPipelineStageFlags *waitStagePtr = nullptr;
+        SemaphoreWait wait{.semaphore = waitSemaphore, .value = 0, .stageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT};
+        SemaphoreSignal signal{.semaphore = signalSemaphore, .value = 0};
 
-        std::span<VkSemaphore> waitSpan;
-        std::span<VkSemaphore> signalSpan;
-        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
+        SubmitSynchronization synchronization;
         if (waitSemaphore != VK_NULL_HANDLE) {
-            waitSpan = std::span<VkSemaphore>(&waitSemaphore, 1);
-            waitSemaphoresSpan = &waitSpan;
-            waitStagePtr = &waitStage;
+            synchronization.waits = std::span<const SemaphoreWait>(&wait, 1);
         }
         if (signalSemaphore != VK_NULL_HANDLE) {
-            signalSpan = std::span<VkSemaphore>(&signalSemaphore, 1);
-            signalSemaphoresSpan = &signalSpan;
+            synchronization.signals = std::span<const SemaphoreSignal>(&signal, 1);
         }
 
         if (useInternalFence) {
@@ -552,14 +545,14 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
             fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
             vkCreateFence(app.getVulkanContext().getLogicalDevice(), &fenceInfo, nullptr, &fence);
 
-            graphicsQueue->submitQueue(internalCommandBuffer.get(), signalSemaphoresSpan, waitSemaphoresSpan, waitStagePtr, fence);
+            synchronization.fence = fence;
+            graphicsQueue->submitQueue(internalCommandBuffer.get(), synchronization);
 
             vkWaitForFences(app.getVulkanContext().getLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
             vkDestroyFence(app.getVulkanContext().getLogicalDevice(), fence, nullptr);
         } else {
             // Non-blocking approach - caller handles synchronization
-            graphicsQueue->submitQueue(internalCommandBuffer.get(), signalSemaphoresSpan, waitSemaphoresSpan, waitStagePtr,
-                                       VK_NULL_HANDLE);
+            graphicsQueue->submitQueue(internalCommandBuffer.get(), synchronization);
         }
     }
 }
@@ -733,7 +726,7 @@ std::vector<uint8_t> Texture::readbackData()
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get());
     // TODO: replace this blocking waitIdle with a fence/timeline wait once readback correctness is verified
     graphicsQueue->waitIdle();
 
@@ -808,7 +801,7 @@ std::vector<uint8_t> Texture::readbackRegion(uint32_t x, uint32_t y, uint32_t wi
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get());
     // TODO: replace this blocking waitIdle with a fence/timeline wait, and with an async ring once
     // hover highlighting or marquee selection needs a result every frame
     graphicsQueue->waitIdle();
@@ -938,7 +931,7 @@ void Texture::uploadCompressedBlob(std::span<const uint8_t> bytes)
     recordTransitionImageLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get());
     graphicsQueue->waitIdle();
 
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
@@ -1346,7 +1339,7 @@ void Texture::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLa
     recordTransitionImageLayout(commandBuffer->getCommandBufferVk(), oldLayout, newLayout);
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get());
     graphicsQueue->waitIdle();
 }
 
@@ -1451,7 +1444,7 @@ void Texture::generateMipmaps()
     recordGenerateMipmaps(commandBuffer->getCommandBufferVk());
     commandBuffer->end();
 
-    graphicsQueue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
+    graphicsQueue->submitQueue(commandBuffer.get());
     graphicsQueue->waitIdle();
 
     RP_CORE_TRACE("Generated {} mip levels for texture", m_spec.mipLevels);
@@ -1540,7 +1533,7 @@ void Texture::copyBufferToImage(VkBuffer buffer, uint32_t width, uint32_t height
     recordCopyBufferToImage(commandBuffer->getCommandBufferVk(), buffer, width, height);
     commandBuffer->end();
 
-    queue->submitQueue(commandBuffer.get(), nullptr, nullptr, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer.get());
     queue->waitIdle();
 }
 
@@ -1699,7 +1692,7 @@ void Texture::setPixel(uint32_t x, uint32_t y, uint32_t z, uint32_t rgba)
 
     commandBuffer->end();
 
-    transferQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    transferQueue->submitQueue(commandBuffer);
 
     // Fire-and-forget: staging buffer will be reused/recycled by command pool reset
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
@@ -1752,7 +1745,7 @@ void Texture::setPixels(std::span<const uint8_t> data)
 
     commandBuffer->end();
 
-    transferQueue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    transferQueue->submitQueue(commandBuffer);
 
     // Fire-and-forget: staging buffer cleanup
     vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);

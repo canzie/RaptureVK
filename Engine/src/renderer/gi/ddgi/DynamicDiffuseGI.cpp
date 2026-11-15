@@ -214,7 +214,7 @@ void DynamicDiffuseGI::clearTextures()
         return;
     }
 
-    m_computeQueue->submitQueue(commandBuffer, nullptr, nullptr);
+    m_computeQueue->submitQueue(commandBuffer);
 }
 
 void DynamicDiffuseGI::populateProbesCompute(Scene &scene, uint32_t frameIndex)
@@ -350,7 +350,7 @@ void DynamicDiffuseGI::recordAndSubmitProbeUpdate(Scene &scene, uint32_t frameIn
         return;
     }
 
-    if (!m_computeQueue->submitQueue(commandBuffer, nullptr, nullptr)) {
+    if (m_computeQueue->submitQueue(commandBuffer) == 0) {
         return;
     }
 

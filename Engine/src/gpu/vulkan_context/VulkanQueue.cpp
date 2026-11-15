@@ -41,9 +41,6 @@ VulkanQueue::~VulkanQueue()
     if (m_timelineSemaphore != VK_NULL_HANDLE) {
         vkDestroySemaphore(m_device, m_timelineSemaphore, nullptr);
     }
-    if (m_immediateTimeSema != VK_NULL_HANDLE) {
-        vkDestroySemaphore(m_device, m_immediateTimeSema, nullptr);
-    }
 }
 
 void VulkanQueue::createTimelineSemaphore()
@@ -61,229 +58,149 @@ void VulkanQueue::createTimelineSemaphore()
         RP_CORE_ERROR("VulkanQueue[{}]: Failed to create timeline semaphore", m_name);
         throw std::runtime_error("Failed to create timeline semaphore");
     }
+}
 
-    if (vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_immediateTimeSema) != VK_SUCCESS) {
-        RP_CORE_ERROR("VulkanQueue[{}]: Failed to create timeline semaphore", m_name);
-        throw std::runtime_error("Failed to create timeline semaphore");
+bool VulkanQueue::submitBatchThen(const VkSubmitInfo2 *submitAfterBatch, VkFence fence)
+{
+    std::vector<VkCommandBufferSubmitInfo> batchCommandBuffers;
+    batchCommandBuffers.reserve(m_cmdBufferBatch.size());
+    for (CommandBuffer *commandBuffer : m_cmdBufferBatch) {
+        VkCommandBufferSubmitInfo commandBufferInfo{};
+        commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandBufferInfo.commandBuffer = commandBuffer->getCommandBufferVk();
+        batchCommandBuffers.push_back(commandBufferInfo);
     }
+
+    VkSemaphoreSubmitInfo batchSignal{};
+    batchSignal.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    batchSignal.semaphore = m_timelineSemaphore;
+    batchSignal.value = m_batchSignalValue;
+    batchSignal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+    std::vector<VkSubmitInfo2> submits;
+    if (!m_cmdBufferBatch.empty()) {
+        VkSubmitInfo2 batchSubmit{};
+        batchSubmit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        batchSubmit.commandBufferInfoCount = static_cast<uint32_t>(batchCommandBuffers.size());
+        batchSubmit.pCommandBufferInfos = batchCommandBuffers.data();
+        batchSubmit.signalSemaphoreInfoCount = 1;
+        batchSubmit.pSignalSemaphoreInfos = &batchSignal;
+        submits.push_back(batchSubmit);
+    }
+    if (submitAfterBatch != nullptr) {
+        submits.push_back(*submitAfterBatch);
+    }
+
+    if (submits.empty() && fence == VK_NULL_HANDLE) {
+        return true;
+    }
+
+    VkResult result = vkQueueSubmit2(m_queue, static_cast<uint32_t>(submits.size()), submits.data(), fence);
+
+    m_cmdBufferBatch.clear();
+    m_batchSignalValue = 0;
+
+    if (result != VK_SUCCESS) {
+        RP_CORE_ERROR("VulkanQueue[{}]: submission failed (VkResult: {})", m_name, static_cast<int>(result));
+        if (result == VK_ERROR_DEVICE_LOST) {
+            Application::getInstance().getVulkanContext().logDeviceFaultInfo();
+        }
+        assert(result != VK_ERROR_DEVICE_LOST);
+        return false;
+    }
+
+    return true;
 }
 
 bool VulkanQueue::flush()
 {
-    std::lock_guard<std::mutex> lock(m_queueMutex);
-    std::lock_guard<std::mutex> lock2(m_cmdBatchMutex);
+    std::lock_guard<std::mutex> queueLock(m_queueMutex);
+    std::lock_guard<std::mutex> batchLock(m_cmdBatchMutex);
 
     if (m_cmdBufferBatch.empty()) {
         return true;
     }
 
-    std::vector<VkCommandBuffer> commandBuffers;
-    commandBuffers.reserve(m_cmdBufferBatch.size());
-
-    for (auto *cmdBuffer : m_cmdBufferBatch) {
-        commandBuffers.push_back(cmdBuffer->getCommandBufferVk());
-    }
-
-    uint64_t signalValue = m_nextTimelineValue.load() - 1;
-
-    VkTimelineSemaphoreSubmitInfo timelineInfo{};
-    timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-    timelineInfo.signalSemaphoreValueCount = 1;
-    timelineInfo.pSignalSemaphoreValues = &signalValue;
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.pNext = &timelineInfo;
-    submitInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
-    submitInfo.pCommandBuffers = commandBuffers.data();
-
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &m_timelineSemaphore;
-
-    VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE);
-    if (result != VK_SUCCESS) {
-        RP_CORE_ERROR("VulkanQueue[{}]: flush failed (VkResult: {})", m_name, static_cast<int>(result));
-        if (result == VK_ERROR_DEVICE_LOST) {
-            Application::getInstance().getVulkanContext().logDeviceFaultInfo();
-        }
-        m_cmdBufferBatch.clear();
-        assert(result != VK_ERROR_DEVICE_LOST);
-        return false;
-    }
-
-    m_cmdBufferBatch.clear();
-    return true;
+    return submitBatchThen(nullptr, VK_NULL_HANDLE);
 }
 
 uint64_t VulkanQueue::addToBatch(CommandBuffer *commandBuffer)
 {
-    std::lock_guard<std::mutex> lock(m_cmdBatchMutex);
+    std::lock_guard<std::mutex> batchLock(m_cmdBatchMutex);
 
-    uint64_t signalValue = m_nextTimelineValue.fetch_add(1);
+    // the value is reserved now, any submission reserving a later one sends the batch ahead of itself
+    if (m_cmdBufferBatch.empty()) {
+        m_batchSignalValue = m_nextTimelineValue++;
+    }
 
-    s_markCommandBufferSubmitted(commandBuffer, m_timelineSemaphore, signalValue);
+    s_markCommandBufferSubmitted(commandBuffer, m_timelineSemaphore, m_batchSignalValue);
 
     m_cmdBufferBatch.push_back(commandBuffer);
 
-    return signalValue;
+    return m_batchSignalValue;
 }
 
-bool VulkanQueue::submitQueue(CommandBuffer *commandBuffer, std::span<VkSemaphore> *signalSemaphores,
-                              std::span<VkSemaphore> *waitSemaphores, VkPipelineStageFlags *waitStage, VkFence fence)
+uint64_t VulkanQueue::submitQueue(CommandBuffer *commandBuffer, const SubmitSynchronization &synchronization)
 {
-    std::lock_guard<std::mutex> lock(m_queueMutex);
-
     if (commandBuffer == nullptr) {
         RP_CORE_CRITICAL("VulkanQueue[{}] command buffer is nullptr!", m_name);
-        return false;
+        return 0;
     }
 
-    uint64_t signalValue = m_nextImmediateTimelineValue.fetch_add(1);
-
-    std::vector<VkSemaphore> allSignalSemaphores;
-    std::vector<uint64_t> signalValues;
-
-    if (signalSemaphores && !signalSemaphores->empty()) {
-        allSignalSemaphores.assign(signalSemaphores->begin(), signalSemaphores->end());
-        // Binary semaphores use value 0
-        signalValues.resize(signalSemaphores->size(), 0);
-    }
-    allSignalSemaphores.push_back(m_immediateTimeSema);
-    signalValues.push_back(signalValue);
-
-    VkCommandBuffer commandBufferVk = commandBuffer->getCommandBufferVk();
-
-    VkTimelineSemaphoreSubmitInfo timelineInfo{};
-    timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-    timelineInfo.pSignalSemaphoreValues = signalValues.data();
-    timelineInfo.signalSemaphoreValueCount = static_cast<uint32_t>(signalValues.size());
-    timelineInfo.waitSemaphoreValueCount = 0;
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.pNext = &timelineInfo;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBufferVk;
-    submitInfo.signalSemaphoreCount = static_cast<uint32_t>(allSignalSemaphores.size());
-    submitInfo.pSignalSemaphores = allSignalSemaphores.data();
-
-    if (waitSemaphores && !waitSemaphores->empty()) {
-        submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores->size());
-        submitInfo.pWaitSemaphores = waitSemaphores->data();
-        submitInfo.pWaitDstStageMask = waitStage;
+    std::vector<VkSemaphoreSubmitInfo> waitInfos;
+    waitInfos.reserve(synchronization.waits.size());
+    for (const SemaphoreWait &wait : synchronization.waits) {
+        VkSemaphoreSubmitInfo waitInfo{};
+        waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        waitInfo.semaphore = wait.semaphore;
+        waitInfo.value = wait.value;
+        waitInfo.stageMask = wait.stageMask;
+        waitInfos.push_back(waitInfo);
     }
 
-    VkResult result = vkQueueSubmit(m_queue, 1, &submitInfo, fence);
-    if (result != VK_SUCCESS) {
-        RP_CORE_ERROR("VulkanQueue[{}] failed (VkResult: {})", m_name, static_cast<int>(result));
-        if (result == VK_ERROR_DEVICE_LOST) {
-            Application::getInstance().getVulkanContext().logDeviceFaultInfo();
-        }
-        assert(result != VK_ERROR_DEVICE_LOST);
-        return false;
+    std::vector<VkSemaphoreSubmitInfo> signalInfos;
+    signalInfos.reserve(synchronization.signals.size() + 1);
+    for (const SemaphoreSignal &signal : synchronization.signals) {
+        VkSemaphoreSubmitInfo signalInfo{};
+        signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        signalInfo.semaphore = signal.semaphore;
+        signalInfo.value = signal.value;
+        signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        signalInfos.push_back(signalInfo);
     }
 
-    s_markCommandBufferSubmitted(commandBuffer, m_immediateTimeSema, signalValue);
+    VkCommandBufferSubmitInfo commandBufferInfo{};
+    commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    commandBufferInfo.commandBuffer = commandBuffer->getCommandBufferVk();
 
-    return true;
-}
+    std::lock_guard<std::mutex> queueLock(m_queueMutex);
+    std::lock_guard<std::mutex> batchLock(m_cmdBatchMutex);
 
-bool VulkanQueue::submitAndFlushQueue(CommandBuffer *commandBuffer, std::span<VkSemaphore> *signalSemaphores,
-                                      std::span<VkSemaphore> *waitSemaphores, VkPipelineStageFlags *waitStage, VkFence fence)
-{
+    uint64_t signalValue = m_nextTimelineValue++;
 
-    // TODO: properly lock/unlock the cmd buffer mutex here, or use the lockfree queue;
-    if (commandBuffer == nullptr) {
-        if (m_cmdBufferBatch.empty()) {
-            RP_CORE_CRITICAL("Command buffer is nullptr! and nothing to flush", m_name);
-            return false;
-        }
-        RP_CORE_WARN("CommandBuffer is not valid, only flushing, your fences will be ignored");
-        return flush();
-    } else if (m_cmdBufferBatch.empty()) {
-        return submitQueue(commandBuffer, signalSemaphores, waitSemaphores, waitStage, fence);
+    VkSemaphoreSubmitInfo timelineSignal{};
+    timelineSignal.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    timelineSignal.semaphore = m_timelineSemaphore;
+    timelineSignal.value = signalValue;
+    timelineSignal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    signalInfos.push_back(timelineSignal);
+
+    VkSubmitInfo2 submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit.waitSemaphoreInfoCount = static_cast<uint32_t>(waitInfos.size());
+    submit.pWaitSemaphoreInfos = waitInfos.data();
+    submit.commandBufferInfoCount = 1;
+    submit.pCommandBufferInfos = &commandBufferInfo;
+    submit.signalSemaphoreInfoCount = static_cast<uint32_t>(signalInfos.size());
+    submit.pSignalSemaphoreInfos = signalInfos.data();
+
+    if (!submitBatchThen(&submit, synchronization.fence)) {
+        return 0;
     }
 
-    {
-        std::lock_guard<std::mutex> lock(m_queueMutex);
+    s_markCommandBufferSubmitted(commandBuffer, m_timelineSemaphore, signalValue);
 
-        uint64_t signalValue = m_nextImmediateTimelineValue.fetch_add(1);
-
-        std::vector<VkSemaphore> allSignalSemaphores;
-        std::vector<uint64_t> signalValues;
-
-        if (signalSemaphores && !signalSemaphores->empty()) {
-            allSignalSemaphores.assign(signalSemaphores->begin(), signalSemaphores->end());
-            // Binary semaphores use value 0
-            signalValues.resize(signalSemaphores->size(), 0);
-        }
-        allSignalSemaphores.push_back(m_immediateTimeSema);
-        signalValues.push_back(signalValue);
-
-        VkCommandBuffer immediateCommandBufferVk = commandBuffer->getCommandBufferVk();
-
-        std::vector<VkCommandBuffer> commandBuffers;
-        commandBuffers.reserve(m_cmdBufferBatch.size());
-
-        for (auto *cmdBuffer : m_cmdBufferBatch) {
-            commandBuffers.push_back(cmdBuffer->getCommandBufferVk());
-        }
-
-        VkTimelineSemaphoreSubmitInfo immediateTimelineInfo{};
-        immediateTimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-        immediateTimelineInfo.pSignalSemaphoreValues = signalValues.data();
-        immediateTimelineInfo.signalSemaphoreValueCount = static_cast<uint32_t>(signalValues.size());
-        immediateTimelineInfo.waitSemaphoreValueCount = 0;
-
-        VkSubmitInfo immediateSubmitInfo{};
-        immediateSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        immediateSubmitInfo.pNext = &immediateTimelineInfo;
-        immediateSubmitInfo.commandBufferCount = 1;
-        immediateSubmitInfo.pCommandBuffers = &immediateCommandBufferVk;
-        immediateSubmitInfo.signalSemaphoreCount = static_cast<uint32_t>(allSignalSemaphores.size());
-        immediateSubmitInfo.pSignalSemaphores = allSignalSemaphores.data();
-
-        if (waitSemaphores && !waitSemaphores->empty()) {
-            immediateSubmitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores->size());
-            immediateSubmitInfo.pWaitSemaphores = waitSemaphores->data();
-            immediateSubmitInfo.pWaitDstStageMask = waitStage;
-        }
-
-        uint64_t batchSignalValue = m_nextTimelineValue.load() - 1;
-
-        VkTimelineSemaphoreSubmitInfo batchTimelineInfo{};
-        batchTimelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-        batchTimelineInfo.signalSemaphoreValueCount = 1;
-        batchTimelineInfo.pSignalSemaphoreValues = &batchSignalValue;
-
-        VkSubmitInfo batchSubmitInfo{};
-        batchSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        batchSubmitInfo.pNext = &batchTimelineInfo;
-        batchSubmitInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
-        batchSubmitInfo.pCommandBuffers = commandBuffers.data();
-        batchSubmitInfo.signalSemaphoreCount = 1;
-        batchSubmitInfo.pSignalSemaphores = &m_timelineSemaphore;
-
-        std::vector<VkSubmitInfo> submits(2);
-        submits[0] = immediateSubmitInfo;
-        submits[1] = batchSubmitInfo;
-
-        VkResult result = vkQueueSubmit(m_queue, static_cast<uint32_t>(submits.size()), submits.data(), fence);
-        if (result != VK_SUCCESS) {
-            RP_CORE_ERROR("VulkanQueue[{}](1) failed (VkResult: {})", m_name, static_cast<int>(result));
-            if (result == VK_ERROR_DEVICE_LOST) {
-                Application::getInstance().getVulkanContext().logDeviceFaultInfo();
-            }
-            assert(result != VK_ERROR_DEVICE_LOST);
-            return false;
-        }
-
-        s_markCommandBufferSubmitted(commandBuffer, m_immediateTimeSema, signalValue);
-
-        m_cmdBufferBatch.clear();
-    }
-
-    return true;
+    return signalValue;
 }
 
 void VulkanQueue::waitIdle()
@@ -298,9 +215,4 @@ VkResult VulkanQueue::presentQueue(VkPresentInfoKHR &presentInfo)
     return vkQueuePresentKHR(m_queue, &presentInfo);
 }
 
-void VulkanQueue::clear()
-{
-    std::lock_guard<std::mutex> lock(m_cmdBatchMutex);
-    m_cmdBufferBatch.clear();
-}
 } // namespace Rapture

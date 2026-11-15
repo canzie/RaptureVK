@@ -112,7 +112,7 @@ void Buffer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize siz
     auto &vulkanContext = app.getVulkanContext();
 
     auto queue = vulkanContext.getGraphicsQueue();
-    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer);
     queue->waitIdle();
 }
 

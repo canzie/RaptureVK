@@ -406,7 +406,7 @@ void TLAS::submitBuild(VkBuildAccelerationStructureModeKHR mode, BuildResources 
 
     commandBuffer->end();
 
-    vulkanContext.getGraphicsQueue()->submitQueue(commandBuffer, nullptr, nullptr, nullptr, resources.fence);
+    vulkanContext.getGraphicsQueue()->submitQueue(commandBuffer, SubmitSynchronization{.fence = resources.fence});
     resources.isSubmitted = true;
 }
 

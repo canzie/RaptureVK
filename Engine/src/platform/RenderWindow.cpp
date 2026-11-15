@@ -70,7 +70,6 @@ AcquiredFrame RenderWindow::beginFrame()
     int imageIndex = m_swapChain->acquireImage(m_currentFrame);
     if (imageIndex == -1) {
         m_currentFrame = 0;
-        m_context->getGraphicsQueue()->clear();
         return {};
     }
 
@@ -98,15 +97,17 @@ void RenderWindow::endFrame()
         return;
     }
 
-    VkSemaphore imageAvailable = m_swapChain->getImageAvailableSemaphore(m_currentFrame);
     VkSemaphore renderFinished = m_swapChain->getRenderFinishedSemaphore(m_currentImageIndex);
 
-    std::span<VkSemaphore> waitSpan(&imageAvailable, 1);
-    std::span<VkSemaphore> signalSpan(&renderFinished, 1);
-    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    SemaphoreWait imageAvailableWait{.semaphore = m_swapChain->getImageAvailableSemaphore(m_currentFrame),
+                                     .value = 0,
+                                     .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT};
+    SemaphoreSignal renderFinishedSignal{.semaphore = renderFinished, .value = 0};
 
-    m_context->getGraphicsQueue()->submitAndFlushQueue(m_currentCommandBuffer.get(), &signalSpan, &waitSpan, &waitStage,
-                                                       m_swapChain->getInFlightFence(m_currentFrame));
+    m_context->getGraphicsQueue()->submitQueue(
+        m_currentCommandBuffer.get(), SubmitSynchronization{.waits = std::span<const SemaphoreWait>(&imageAvailableWait, 1),
+                                                            .signals = std::span<const SemaphoreSignal>(&renderFinishedSignal, 1),
+                                                            .fence = m_swapChain->getInFlightFence(m_currentFrame)});
 
     m_currentCommandBuffer.release();
 

@@ -358,7 +358,7 @@ void TerrainGenerator::dispatchChunkUpdate(const glm::vec3 &cameraPos)
     commandBuffer->end();
 
     auto queue = vc.getComputeQueue();
-    queue->submitQueue(commandBuffer, nullptr, nullptr);
+    queue->submitQueue(commandBuffer);
 }
 
 VkBuffer TerrainGenerator::getIndexBuffer(uint32_t lod) const

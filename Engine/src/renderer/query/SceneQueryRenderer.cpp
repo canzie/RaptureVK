@@ -261,7 +261,7 @@ SceneQueryResult SceneQueryRenderer::query(Scene &scene, ecs::EntityAccessor cam
     vkResetFences(device, 1, &m_fence);
 
     std::shared_ptr<VulkanQueue> graphicsQueue = m_rc.vulkanContext->getGraphicsQueue();
-    graphicsQueue->submitAndFlushQueue(commandBuffer, nullptr, nullptr, nullptr, m_fence);
+    graphicsQueue->submitQueue(commandBuffer, SubmitSynchronization{.fence = m_fence});
 
     {
         RAPTURE_PROFILE_SCOPE("Scene Query Wait");

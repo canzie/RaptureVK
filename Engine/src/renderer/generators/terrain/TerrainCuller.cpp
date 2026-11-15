@@ -158,7 +158,7 @@ void TerrainCuller::runCull(TerrainCullBuffers &buffers, uint32_t frustumBindles
     commandBuffer->end();
 
     auto queue = vc.getComputeQueue();
-    queue->submitQueue(commandBuffer, nullptr, nullptr, VK_NULL_HANDLE);
+    queue->submitQueue(commandBuffer);
 }
 
 } // namespace Rapture
