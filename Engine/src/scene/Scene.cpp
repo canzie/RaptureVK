@@ -162,9 +162,7 @@ void Scene::onUpdate(float dt)
         return;
     }
 
-    // Get current frame dimensions for camera updates
     auto &app = Application::getInstance();
-    auto swapChain = app.getMainWindow().getSwapChain();
     uint32_t frameCounter = app.getFrameInFlightIndex();
 
     {

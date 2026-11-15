@@ -25,9 +25,11 @@ DrawManager::DrawManager(RenderContext renderContext, const DrawManagerConfig &c
 
     auto &vc = *m_renderContext.vulkanContext;
 
-    m_swapChain = Application::getInstance().getMainWindow().getSwapChain();
     m_graphicsQueue = vc.getGraphicsQueue();
-    m_presentQueue = vc.getPresentQueue();
+    if (m_config.targetType == SceneRenderTarget::TargetType::SWAPCHAIN) {
+        m_swapChain = Application::getInstance().getMainWindow().getSwapChain();
+        m_presentQueue = vc.getPresentQueue();
+    }
 
     setupCommandResources();
     createRenderTarget();
@@ -35,7 +37,9 @@ DrawManager::DrawManager(RenderContext renderContext, const DrawManagerConfig &c
 
     m_opaqueGeometry = std::make_unique<SceneGeometryDraw>(m_renderContext, m_config.framesInFlight);
 
-    m_swapChainRecreatedConn = m_swapChain->onRecreated.connect([this]() { onSwapChainRecreated(); });
+    if (m_swapChain != nullptr) {
+        m_swapChainRecreatedConn = m_swapChain->onRecreated.connect([this]() { onSwapChainRecreated(); });
+    }
 }
 
 DrawManager::~DrawManager()
