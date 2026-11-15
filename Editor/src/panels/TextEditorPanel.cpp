@@ -1,4 +1,5 @@
 #include "TextEditorPanel.h"
+#include "context/WindowManager.h"
 
 #include "core/utils/Log.h"
 

@@ -24,7 +24,8 @@ class RenderWindow;
 } // namespace Rapture
 
 class ProjectLauncher;
-class WorkspaceHost;
+class WindowManager;
+class WorkspaceManager;
 
 class AmethystLayer : public Rapture::Layer {
   public:
@@ -34,36 +35,6 @@ class AmethystLayer : public Rapture::Layer {
     virtual void onAttach(void) override;
     virtual void onDetach(void) override;
     virtual void onUpdate(float dt) override;
-
-  private:
-    /**
-     * @brief Opens the editor's secondary windows and dialogs through the layer that draws them
-     */
-    class LayerWindowHost : public WindowHostBase {
-      public:
-        explicit LayerWindowHost(AmethystLayer &layer) : m_layer(&layer) {}
-
-        void openSecondaryWindow(int32_t width, int32_t height, std::string_view title,
-                                 std::function<void(Amethyst::Window &)> build) override;
-        void openFileDialog(FileDialogMode mode, std::function<void(const std::filesystem::path &)> onConfirm) override;
-        void openImportPanel(const std::filesystem::path &source, const std::filesystem::path &outputFolder) override;
-
-      private:
-        AmethystLayer *m_layer = nullptr;
-    };
-
-    struct SecondaryWindowContext {
-        Rapture::RenderWindow *renderWindow = nullptr;
-        Amethyst::Window window;
-        Rapture::EventConnection swapchainRecreatedConn;
-        // Declared last so it is destroyed while the Window it built into is still alive.
-        std::shared_ptr<void> content;
-    };
-
-    /**
-     * @brief Fills a secondary window, returning whatever must stay alive for as long as it is open
-     */
-    using SecondaryWindowBuilder = std::function<std::shared_ptr<void>(Amethyst::Window &, const std::function<void()> &close)>;
 
   private:
     void setupMenuBar(void);
@@ -116,12 +87,14 @@ class AmethystLayer : public Rapture::Layer {
 
     void updateShortcuts();
 
-    void openSecondaryWindow(int32_t width, int32_t height, std::string_view title, SecondaryWindowBuilder build);
-    void openFileDialog(FileDialogMode mode, std::function<void(const std::filesystem::path &)> onConfirm);
-    void openImportPanel(const std::filesystem::path &source, const std::filesystem::path &outputFolder);
     void openDemoWindow(void);
-    void drawSecondaryWindow(SecondaryWindowContext &context, Rapture::RenderWindow &window);
-    void closeSecondaryWindow(SecondaryWindowContext *context);
+
+    /**
+     * @brief Draws a window other than the main one into its render window
+     * @param window The UI window to draw
+     * @param renderWindow The render window it is presented through
+     */
+    void drawSecondaryWindow(Amethyst::Window &window, Rapture::RenderWindow &renderWindow);
 
   private:
     // Amethyst components
@@ -137,17 +110,13 @@ class AmethystLayer : public Rapture::Layer {
 
     EditorConfig m_config;
     UiTextures m_textures{m_backend};
-    LayerWindowHost m_windowHost{*this};
     EditorContext m_editorContext;
 
-    std::unique_ptr<WorkspaceHost> m_workspaceHost;
+    std::unique_ptr<WindowManager> m_windowManager;
+    std::unique_ptr<WorkspaceManager> m_workspaceManager;
     std::unique_ptr<ProjectLauncher> m_startupLauncher;
     std::unique_ptr<BottomBar> m_bottomBar;
     Rapture::EventConnection m_activeWorkspaceChangedConn;
-
-    std::vector<std::unique_ptr<SecondaryWindowContext>> m_secondaryWindows;
-
-    std::filesystem::path m_lastExplorerDirectory;
 
     Rapture::EventConnection m_mainSwapchainRecreatedConn;
 };

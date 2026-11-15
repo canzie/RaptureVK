@@ -1,5 +1,7 @@
 #include "ContentBrowserPanel.h"
 #include "Icons.h"
+#include "context/WindowManager.h"
+#include "context/WorkspaceManager.h"
 #include "assets/asset_manager/AssetRegistry.h"
 #include "assets/asset_manager/AssetManager.h"
 #include "scene/instances/SceneObject.h"
@@ -269,7 +271,7 @@ void ContentBrowserPanel::setupTopBar()
                         [this](Amethyst::TextButtonScope &b) {
                             m_importBtn = &b.component;
                             m_importBtn->onMouseButton1ClickCb = [this]() {
-                                WindowHostBase *windows = m_context.editor->windows;
+                                WindowManager *windows = m_context.editor->windows;
                                 windows->openFileDialog(FILE_DIALOG_OPEN, [this, windows](const std::filesystem::path &path) {
                                     windows->openImportPanel(path, m_currentDirectory);
                                 });

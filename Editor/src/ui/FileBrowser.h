@@ -1,7 +1,7 @@
 #ifndef RAPTURE__FILE_BROWSER_H
 #define RAPTURE__FILE_BROWSER_H
 
-#include "context/EditorContext.h"
+#include "context/WindowManager.h"
 
 #include <amethyst/Amethyst.h>
 #include <components/table.h>
