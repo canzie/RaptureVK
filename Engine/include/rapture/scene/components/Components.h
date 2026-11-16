@@ -106,6 +106,21 @@ struct CameraComponent {
     }
 
     /**
+     * @brief Rebuilds the view so the camera sees from a world placement, ignoring its scale
+     * @param world The world transform the camera sits at
+     */
+    void updateViewMatrix(const glm::mat4 &world)
+    {
+        glm::mat4 placement(1.0f);
+        placement[0] = glm::vec4(glm::normalize(glm::vec3(world[0])), 0.0f);
+        placement[1] = glm::vec4(glm::normalize(glm::vec3(world[1])), 0.0f);
+        placement[2] = glm::vec4(glm::normalize(glm::vec3(world[2])), 0.0f);
+        placement[3] = world[3];
+        camera.setViewMatrix(glm::inverse(placement));
+        frustum.update(camera.getProjectionMatrix(), camera.getViewMatrix());
+    }
+
+    /**
      * @brief Rebuilds the view from a position and direction directly
      * @param position Where the camera sits in the world
      * @param front The direction it looks along

@@ -23,6 +23,9 @@ class Camera3D : public Node3D {
 
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
+
+  protected:
+    void onWorldTransformChanged() override;
 };
 
 } // namespace Rapture

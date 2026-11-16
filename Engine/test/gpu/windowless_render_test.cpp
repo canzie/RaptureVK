@@ -12,7 +12,6 @@
 #include <rapture/scene/instances/DirectionalLight3D.h>
 #include <rapture/scene/instances/SceneObject.h>
 #include <rapture/scene/instances/StaticMesh3D.h>
-#include <rapture/scene/instances/controllers/CameraController.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
@@ -35,8 +34,7 @@ static constexpr uint32_t FRAMES_TO_RENDER_WITH_GLOBAL_ILLUMINATION = 16;
 static constexpr float FRAME_DELTA_TIME = 1.0f / 60.0f;
 
 static constexpr glm::vec3 SPHERE_CENTRE = glm::vec3(0.0f);
-static constexpr float SPHERE_RADIUS = 1.0f;
-static constexpr glm::vec3 CAMERA_LOOK_DIRECTION = glm::vec3(0.0f, 0.0f, -1.0f);
+static constexpr glm::vec3 CAMERA_POSITION = glm::vec3(0.0f, 0.0f, 3.0f);
 static constexpr float CAMERA_FIELD_OF_VIEW = 60.0f;
 static constexpr float CAMERA_NEAR_PLANE = 0.1f;
 static constexpr float CAMERA_FAR_PLANE = 100.0f;
@@ -96,11 +94,8 @@ class WindowlessRender : public WindowlessGpuTest {
         camera->setFieldOfView(CAMERA_FIELD_OF_VIEW);
         camera->setNearPlane(CAMERA_NEAR_PLANE);
         camera->setFarPlane(CAMERA_FAR_PLANE);
-
-        Rapture::CameraController controller(scene, "Camera Controller");
-        controller.setTickEnabled(false);
-        controller.possess(camera);
-        controller.focusOn(SPHERE_CENTRE, SPHERE_RADIUS, CAMERA_LOOK_DIRECTION);
+        camera->setPosition(CAMERA_POSITION);
+        camera->lookAt(SPHERE_CENTRE);
 
         auto *light = scene.root()->add<Rapture::DirectionalLight3D>("Light");
         light->setRotation(LIGHT_ROTATION);
@@ -124,7 +119,6 @@ class WindowlessRender : public WindowlessGpuTest {
 
         const uint32_t frameCount = withGlobalIllumination ? FRAMES_TO_RENDER_WITH_GLOBAL_ILLUMINATION : FRAMES_TO_RENDER;
         for (uint32_t frame = 0; frame < frameCount; frame++) {
-            controller.onUpdate(FRAME_DELTA_TIME);
             scene.onUpdate(FRAME_DELTA_TIME);
             app.runFrame();
         }

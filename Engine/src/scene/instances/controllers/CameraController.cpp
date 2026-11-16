@@ -3,7 +3,6 @@
 #include <rapture/core/utils/Log.h>
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/Camera3D.h>
-#include <rapture/scene/systems/Transforms.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -51,6 +50,7 @@ void CameraController::possess(SceneObject *subject)
     Controller::possess(camera);
     setViewCamera(camera);
     recalcForward();
+    turnViewCameraToForward();
 }
 
 void CameraController::setMode(CameraControlMode mode)
@@ -72,11 +72,6 @@ void CameraController::onUpdate(float dt)
         return;
     }
 
-    if (!m_viewCamera->accessor().has<CameraComponent>()) {
-        return;
-    }
-    auto camera = m_viewCamera->accessor().write<CameraComponent>();
-
     if (m_intent.releaseControl) {
         setMode(CameraControlMode::ORBIT);
     }
@@ -87,19 +82,15 @@ void CameraController::onUpdate(float dt)
         updateOrbit(*m_viewCamera);
     }
 
-    camera->updateViewMatrix(transform::translation(m_viewCamera->worldTransform()), m_forward);
+    turnViewCameraToForward();
 }
 
-void CameraController::updateViewCamera()
+void CameraController::turnViewCameraToForward()
 {
-    if (m_viewCamera == nullptr || !m_viewCamera->accessor().has<CameraComponent>()) {
+    if (m_viewCamera == nullptr) {
         return;
     }
-
-    // this controller turns itself rather than the object it sits on, so where it looks is its own
-    // forward and not anything the transform carries
-    m_viewCamera->accessor().write<CameraComponent>()->updateViewMatrix(transform::translation(m_viewCamera->worldTransform()),
-                                                                        m_forward);
+    m_viewCamera->lookAt(m_viewCamera->worldPosition() + m_forward, WORLD_UP);
 }
 
 void CameraController::updateFly(float dt, Node3D &node)
@@ -217,8 +208,8 @@ void CameraController::focusOn(const glm::vec3 &center, float radius)
     m_focusDistance = distance;
     m_recenterFocus = false;
 
+    turnViewCameraToForward();
     m_viewCamera->setPosition(center - m_forward * distance);
-    updateViewCamera();
 }
 
 void CameraController::recalcForward()

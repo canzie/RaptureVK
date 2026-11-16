@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__PERSPECTIVECAMERA_H
+#define RAPTURE__PERSPECTIVECAMERA_H
 
 #include <glm/glm.hpp>
 
@@ -13,6 +14,7 @@ class PerspectiveCamera {
     void updateProjectionMatrix(float radians, float ratio, float nearPlane, float farPlane);
     void updateViewMatrix(glm::vec3 translation, glm::vec3 cameraFront);
     void updateViewMatrix(glm::vec3 translation);
+    void setViewMatrix(const glm::mat4 &view) { m_viewMatrix = view; }
 
     inline glm::mat4 getViewMatrix() const { return m_viewMatrix; }
     inline glm::mat4 getProjectionMatrix() const { return m_projectionMatrix; }
@@ -23,3 +25,5 @@ class PerspectiveCamera {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__PERSPECTIVECAMERA_H

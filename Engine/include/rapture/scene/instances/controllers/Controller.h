@@ -91,11 +91,6 @@ class Controller : public SceneObject {
     void onUpdate(float dt) override;
 
     /**
-     * @brief Rebuilds the view camera from where it ended up this frame
-     */
-    virtual void updateViewCamera() = 0;
-
-    /**
      * @brief Whether this controller wants the cursor captured this frame
      */
     bool capturesCursor() const { return m_capturesCursor; }

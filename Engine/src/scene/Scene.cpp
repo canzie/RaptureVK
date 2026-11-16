@@ -179,10 +179,6 @@ void Scene::onUpdate(float dt)
     glm::vec3 cameraPosition = glm::vec3(0.0f);
     Frustum *frustum = nullptr;
 
-    if (m_activeController != nullptr) {
-        m_activeController->updateViewCamera();
-    }
-
     Camera3D *activeCamera = m_activeController != nullptr ? m_activeController->viewCamera() : nullptr;
     if (activeCamera != nullptr) {
         ecs::Entity camera = activeCamera->entity();

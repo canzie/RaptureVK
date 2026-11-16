@@ -36,8 +36,6 @@ class CameraController : public Controller {
      */
     void onUpdate(float dt) override;
 
-    void updateViewCamera() override;
-
     /**
      * @brief Whether the camera wants the cursor captured this frame.
      * @return True if the cursor should be locked (DISABLED).
@@ -84,6 +82,7 @@ class CameraController : public Controller {
     void updateFly(float dt, Node3D &node);
     void updateOrbit(Node3D &node);
     void recalcForward();
+    void turnViewCameraToForward();
 
   private:
     CameraControlMode m_mode = CameraControlMode::ORBIT;

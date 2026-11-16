@@ -66,26 +66,6 @@ void PlayerController::onUpdate(float dt)
     Controller::onUpdate(dt);
 }
 
-void PlayerController::updateViewCamera()
-{
-    Camera3D *camera = viewCamera();
-    if (camera == nullptr) {
-        return;
-    }
-
-    if (!camera->accessor().has<CameraComponent>()) {
-        return;
-    }
-    auto cameraComponent = camera->accessor().write<CameraComponent>();
-
-    // the camera hangs under the arm, so where it ends up is only in its world transform
-    glm::mat4 world = camera->worldTransform();
-    glm::vec3 position = glm::vec3(world[3]);
-    glm::vec3 front = glm::normalize(glm::vec3(world[2]) * -1.0f);
-
-    cameraComponent->updateViewMatrix(position, front);
-}
-
 void PlayerController::serialize(WriteNode node) const
 {
     Controller::serialize(node);

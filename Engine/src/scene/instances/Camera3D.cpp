@@ -13,6 +13,7 @@ static constexpr std::string_view KEY_FAR_PLANE = "farPlane";
 Camera3D::Camera3D(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
     m_entity.set<CameraComponent>();
+    onWorldTransformChanged();
 }
 
 const TypeInfo &Camera3D::staticType()
@@ -72,6 +73,14 @@ void Camera3D::setFarPlane(float farPlane)
     auto camera = m_entity.write<CameraComponent>();
 
     camera->updateProjectionMatrix(camera->fov, camera->aspectRatio, camera->nearPlane, farPlane);
+}
+
+void Camera3D::onWorldTransformChanged()
+{
+    if (!m_entity.has<CameraComponent>()) {
+        return;
+    }
+    m_entity.write<CameraComponent>()->updateViewMatrix(worldTransform());
 }
 
 void Camera3D::serialize(WriteNode node) const

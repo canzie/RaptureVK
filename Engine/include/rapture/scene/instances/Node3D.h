@@ -133,6 +133,11 @@ class Node3D : public SceneObject {
      */
     virtual void onLocalTransformChanged() {}
 
+    /**
+     * @brief Called each time this node's world transform has been rebuilt
+     */
+    virtual void onWorldTransformChanged() {}
+
   private:
     /**
      * @brief Records that rotation or scale was written, staling the local matrix
