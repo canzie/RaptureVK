@@ -218,10 +218,8 @@ void ViewportPanel::setupOverlayButtons()
             },
             [this](Amethyst::TextButtonScope &b) {
                 m_transformMenuBtn = &b.component;
-                b.component.onMouseButton1ClickCb = [this]() {
-                    s_showGrownMenu(m_transformMenu, m_transformMenuBtn, m_root);
-                    return Amethyst::EventResult::CONSUMED;
-                };
+                b.component.track(b.component.onMouseButton1ClickCb.connect(
+                    [this]() { s_showGrownMenu(m_transformMenu, m_transformMenuBtn, m_root); }));
             })
         .textButton(
             {
@@ -237,10 +235,8 @@ void ViewportPanel::setupOverlayButtons()
             },
             [this](Amethyst::TextButtonScope &b) {
                 m_renderMenuBtn = &b.component;
-                b.component.onMouseButton1ClickCb = [this]() {
-                    s_showGrownMenu(m_renderMenu, m_renderMenuBtn, m_root);
-                    return Amethyst::EventResult::CONSUMED;
-                };
+                b.component.track(b.component.onMouseButton1ClickCb.connect(
+                    [this]() { s_showGrownMenu(m_renderMenu, m_renderMenuBtn, m_root); }));
             });
 }
 

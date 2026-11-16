@@ -150,12 +150,11 @@ void FileBrowser::buildNavButton(Amethyst::FrameScope &slot, const char *svg, st
     }));
 
     if (onClick) {
-        action->onMouseButton1ClickCb = [onClick = std::move(onClick), store]() {
+        action->track(action->onMouseButton1ClickCb.connect([onClick = std::move(onClick), store]() {
             if (store == nullptr || store->enabled) {
                 onClick();
             }
-            return Amethyst::EventResult::CONSUMED;
-        };
+        }));
     }
 }
 
@@ -363,10 +362,7 @@ static void s_addBookmark(Amethyst::UIScope &scope, uint32_t order, const Bookma
 
             if (!def.target.empty()) {
                 std::filesystem::path target = def.target;
-                row.component.onMouseButton1ClickCb = [navigate, target]() {
-                    navigate(target);
-                    return Amethyst::EventResult::CONSUMED;
-                };
+                row.component.track(row.component.onMouseButton1ClickCb.connect([navigate, target]() { navigate(target); }));
             }
 
             auto *iconLabel = row.component.add<Amethyst::ImageLabel>();
@@ -739,12 +735,11 @@ void FileBrowser::setupFooter()
                     .label = "Cancel",
                 },
                 [this](Amethyst::TextButtonScope &btn) {
-                    btn.component.onMouseButton1ClickCb = [this]() {
+                    btn.component.track(btn.component.onMouseButton1ClickCb.connect([this]() {
                         if (onClose) {
                             onClose();
                         }
-                        return Amethyst::EventResult::CONSUMED;
-                    };
+                    }));
                 });
 
             foot.textButton(
@@ -759,7 +754,7 @@ void FileBrowser::setupFooter()
                     .label = m_mode == FILE_DIALOG_SAVE ? "Save" : "Open",
                 },
                 [this](Amethyst::TextButtonScope &btn) {
-                    btn.component.onMouseButton1ClickCb = [this]() {
+                    btn.component.track(btn.component.onMouseButton1ClickCb.connect([this]() {
                         if (m_selectedRow >= 0 && m_selectedRow < static_cast<int>(m_visibleEntries.size())) {
                             const Entry &e = m_visibleEntries[m_selectedRow];
                             if (e.isDir) {
@@ -773,8 +768,7 @@ void FileBrowser::setupFooter()
                                 confirm(m_currentDirectory / name);
                             }
                         }
-                        return Amethyst::EventResult::CONSUMED;
-                    };
+                    }));
                 });
         });
 }

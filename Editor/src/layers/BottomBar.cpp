@@ -51,10 +51,7 @@ BottomBar::BottomBar(Amethyst::Window *window, const EditorContext &context) : m
         [this](Amethyst::TextButtonScope &b) {
             m_contentBrowserBtn = &b.component;
             m_contentBrowserBtn->addClass("bottom-bar-button");
-            m_contentBrowserBtn->onMouseButton1ClickCb = [this]() {
-                toggleContentBrowser();
-                return Amethyst::EventResult::CONSUMED;
-            };
+            m_contentBrowserBtn->track(m_contentBrowserBtn->onMouseButton1ClickCb.connect([this]() { toggleContentBrowser(); }));
         });
 
     rootScope.frame(

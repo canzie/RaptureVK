@@ -81,7 +81,7 @@ ColorField::ColorField(Amethyst::UIScope &parent, const Amethyst::Color3 &initia
 {
     buildField(parent);
 
-    m_swatch->onMouseButton1ClickCb = [this]() {
+    m_swatch->track(m_swatch->onMouseButton1ClickCb.connect([this]() {
         if (m_popup == nullptr) {
             m_popup = s_createPopup(*m_root, m_classes);
             Amethyst::UIScope(*m_popup).color3Picker(
@@ -109,8 +109,7 @@ ColorField::ColorField(Amethyst::UIScope &parent, const Amethyst::Color3 &initia
             Amethyst::vec2 anchor = m_swatch->absolutePosition;
             m_popup->openAt(Amethyst::vec2(anchor.x - POPUP_WIDTH, anchor.y - POPUP_HEIGHT));
         }
-        return Amethyst::EventResult::CONSUMED;
-    };
+    }));
 
     setColor4(m_color);
 }
@@ -120,7 +119,7 @@ ColorField::ColorField(Amethyst::UIScope &parent, const Amethyst::Color4 &initia
 {
     buildField(parent);
 
-    m_swatch->onMouseButton1ClickCb = [this]() {
+    m_swatch->track(m_swatch->onMouseButton1ClickCb.connect([this]() {
         if (m_popup == nullptr) {
             m_popup = s_createPopup(*m_root, m_classes);
             Amethyst::UIScope(*m_popup).color4Picker(
@@ -148,8 +147,7 @@ ColorField::ColorField(Amethyst::UIScope &parent, const Amethyst::Color4 &initia
             Amethyst::vec2 anchor = m_swatch->absolutePosition;
             m_popup->openAt(Amethyst::vec2(anchor.x - POPUP_WIDTH, anchor.y - POPUP_HEIGHT));
         }
-        return Amethyst::EventResult::CONSUMED;
-    };
+    }));
 
     setColor4(m_color);
 }

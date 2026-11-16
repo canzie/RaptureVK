@@ -28,7 +28,6 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
                         .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
                         .position = Amethyst::UDim2(0.0f, HEADER_CONTENT_OFFSET, 0.5f, 0.0f),
                         .size = Amethyst::UDim2::fromOffset(HEADER_ICON_SIZE, HEADER_ICON_SIZE),
-                        .zindexBehavior = Amethyst::ZIndexBehavior::GLOBAL,
                     },
                 .style = {.backgroundTransparency = 1.0f},
                 .image = {.imageColor = Amethyst::Color4(0.7f, 0.7f, 0.7f, 1.0f)},
@@ -43,7 +42,6 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
                 {
                     .position = Amethyst::UDim2(0.0f, textOffset, 0.0f, 0.0f),
                     .size = Amethyst::UDim2(1.0f, -(textOffset + HEADER_LABEL_RIGHT_RESERVED), 1.0f, 0.0f),
-                    .zindexBehavior = Amethyst::ZIndexBehavior::GLOBAL,
                 },
             .style = {.backgroundTransparency = 1.0f},
             .label = label,
@@ -56,7 +54,6 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
                         .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
                         .position = Amethyst::UDim2(1.0f, -HEADER_MENU_BUTTON_RIGHT_PAD, 0.5f, 0.0f),
                         .size = Amethyst::UDim2::fromOffset(HEADER_MENU_BUTTON_SIZE, HEADER_MENU_BUTTON_SIZE),
-                        .zindexBehavior = Amethyst::ZIndexBehavior::GLOBAL,
                     },
                 .style = {.backgroundTransparency = 1.0f, .cornerRadius = 4.0f},
                 .image = {.imageColor = Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)},
@@ -69,14 +66,13 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
                                                                       : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
                     b->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.85f : 1.0f});
                 }));
-                b->onMouseButton1ClickCb = [label, onMenuClicked]() {
+                b->track(b->onMouseButton1ClickCb.connect([label, onMenuClicked]() {
                     if (onMenuClicked) {
                         onMenuClicked();
                     } else {
                         RP_INFO("{} menu clicked", label);
                     }
-                    return Amethyst::EventResult::CONSUMED;
-                };
+                }));
             });
     };
 }

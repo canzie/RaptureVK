@@ -48,6 +48,9 @@ class ContentBrowserPanel : public Panel {
         Amethyst::TextLabel *type = nullptr;
         Amethyst::Frame *typeBar = nullptr;
         Amethyst::UITooltip *tooltip = nullptr;
+        Amethyst::EventConnection clickConnection;
+        Amethyst::EventConnection doubleClickConnection;
+        Amethyst::EventConnection contextMenuConnection;
         bool attached = false;
     };
 

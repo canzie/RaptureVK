@@ -27,14 +27,13 @@ SegmentedControl::SegmentedControl(const std::vector<std::string> &options, Segm
             },
             [this, i](Amethyst::TextButtonScope &b) {
                 m_buttons.push_back(&b.component);
-                b.component.onMouseButton1ClickCb = [this, i]() {
+                b.component.track(b.component.onMouseButton1ClickCb.connect([this, i]() {
                     if (m_selection == SegmentedSelection::MULTIPLE && isSelected(i)) {
                         deselect(i);
                     } else {
                         select(i);
                     }
-                    return Amethyst::EventResult::CONSUMED;
-                };
+                }));
             });
     }
 }

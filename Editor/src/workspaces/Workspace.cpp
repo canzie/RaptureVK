@@ -226,10 +226,7 @@ Amethyst::TextButton *Workspace::addHotbarButton(std::string_view label, std::fu
         },
         [&](Amethyst::TextButtonScope &b) {
             button = &b.component;
-            b.component.onMouseButton1ClickCb = [onClick = std::move(onClick)]() {
-                onClick();
-                return Amethyst::EventResult::CONSUMED;
-            };
+            b.component.track(b.component.onMouseButton1ClickCb.connect([onClick = std::move(onClick)]() { onClick(); }));
         });
 
     const HotbarItem &item = m_hotbarItems.emplace_back(button, 0.0f, HotbarItemKind::LABELLED);

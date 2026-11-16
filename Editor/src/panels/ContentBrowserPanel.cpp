@@ -257,10 +257,8 @@ void ContentBrowserPanel::setupTopBar()
                         },
                         [this](Amethyst::TextButtonScope &b) {
                             m_addBtn = &b.component;
-                            m_addBtn->onMouseButton1ClickCb = [this]() {
-                                showAddMenu({m_addBtn->absolutePosition.x, m_addBtn->absolutePosition.y});
-                                return Amethyst::EventResult::CONSUMED;
-                            };
+                            m_addBtn->track(m_addBtn->onMouseButton1ClickCb.connect(
+                                [this]() { showAddMenu({m_addBtn->absolutePosition.x, m_addBtn->absolutePosition.y}); }));
                         });
                     cluster.textButton(
                         {
@@ -270,13 +268,12 @@ void ContentBrowserPanel::setupTopBar()
                         },
                         [this](Amethyst::TextButtonScope &b) {
                             m_importBtn = &b.component;
-                            m_importBtn->onMouseButton1ClickCb = [this]() {
+                            m_importBtn->track(m_importBtn->onMouseButton1ClickCb.connect([this]() {
                                 WindowManager *windows = m_context.editor->windows;
                                 windows->openFileDialog(FILE_DIALOG_OPEN, [this, windows](const std::filesystem::path &path) {
                                     windows->openImportPanel(path, m_currentDirectory);
                                 });
-                                return Amethyst::EventResult::CONSUMED;
-                            };
+                            }));
                         });
                     cluster.imageButton(
                         {
@@ -288,10 +285,7 @@ void ContentBrowserPanel::setupTopBar()
                         [this](Amethyst::ImageButtonScope &b) {
                             m_goBackBtn = &b.component;
                             b.component.setBaseProperties({.rotation = Amethyst::Degrees(90.0f)});
-                            b.component.onMouseButton1ClickCb = [this]() {
-                                navigateBack();
-                                return Amethyst::EventResult::CONSUMED;
-                            };
+                            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { navigateBack(); }));
                         });
                     cluster.imageButton(
                         {
@@ -303,10 +297,7 @@ void ContentBrowserPanel::setupTopBar()
                         [this](Amethyst::ImageButtonScope &b) {
                             m_goForwardBtn = &b.component;
                             b.component.setBaseProperties({.rotation = Amethyst::Degrees(-90.0f)});
-                            b.component.onMouseButton1ClickCb = [this]() {
-                                navigateForward();
-                                return Amethyst::EventResult::CONSUMED;
-                            };
+                            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { navigateForward(); }));
                         });
                     cluster.imageLabel({
                         .base = {.layoutOrder = 4, .size = Amethyst::UDim2::fromOffset(16.0f, 16.0f)},
@@ -362,12 +353,11 @@ void ContentBrowserPanel::setupTopBar()
                         .label = "Dock in layout",
                     },
                     [this](Amethyst::TextButtonScope &b) {
-                        b.component.onMouseButton1ClickCb = [this, button = &b.component]() {
+                        b.component.track(b.component.onMouseButton1ClickCb.connect([this, button = &b.component]() {
                             button->setBaseProperties({.visible = false});
                             std::function<void()> dock = std::move(m_onDockRequested);
                             dock();
-                            return Amethyst::EventResult::CONSUMED;
-                        };
+                        }));
                     });
             }
         });
@@ -935,10 +925,7 @@ void ContentBrowserPanel::rebuildBreadcrumb()
                 .label = label,
             },
             [this, target](Amethyst::TextButtonScope &b) {
-                b.component.onMouseButton1ClickCb = [this, target]() {
-                    navigateToDirectory(target);
-                    return Amethyst::EventResult::CONSUMED;
-                };
+                b.component.track(b.component.onMouseButton1ClickCb.connect([this, target]() { navigateToDirectory(target); }));
             });
     }
 }
@@ -1043,35 +1030,32 @@ void ContentBrowserPanel::refreshFileBrowser()
         item.tooltip->build = [rows = std::move(tooltipRows)](Amethyst::Tooltip &surface) { s_fillTooltip(surface, rows); };
 
         size_t itemIndex = index;
-        item.action->onMouseButton1ClickCb = [this, itemIndex]() {
-            selectItem(itemIndex);
-            return Amethyst::EventResult::CONSUMED;
-        };
+        item.clickConnection = item.action->onMouseButton1ClickCb.connect([this, itemIndex]() { selectItem(itemIndex); });
 
         if (isDir) {
             std::filesystem::path dirPath = entry.path();
-            item.action->onMouseButton1DoubleClickCb = [this, dirPath](int32_t x, int32_t y) {
-                (void)x;
-                (void)y;
-                navigateToDirectory(dirPath);
-                return Amethyst::EventResult::CONSUMED;
-            };
+            item.doubleClickConnection =
+                item.action->onMouseButton1DoubleClickCb.connect([this, dirPath](int32_t x, int32_t y) {
+                    (void)x;
+                    (void)y;
+                    navigateToDirectory(dirPath);
+                });
         } else if (assetHandle != Rapture::INVALID_ASSET_HANDLE) {
-            item.action->onMouseButton1DoubleClickCb = [this, assetHandle](int32_t x, int32_t y) {
-                (void)x;
-                (void)y;
-                m_context.editor->workspaces->openAsset(assetHandle);
-                return Amethyst::EventResult::CONSUMED;
-            };
+            item.doubleClickConnection =
+                item.action->onMouseButton1DoubleClickCb.connect([this, assetHandle](int32_t x, int32_t y) {
+                    (void)x;
+                    (void)y;
+                    m_context.editor->workspaces->openAsset(assetHandle);
+                });
         } else {
-            item.action->onMouseButton1DoubleClickCb = nullptr;
+            item.doubleClickConnection.disconnect();
         }
 
         Rapture::AssetType assetType = metadata != nullptr ? metadata->assetType : Rapture::ASSET_NONE;
         bool isAsset = metadata != nullptr;
         std::filesystem::path itemPath = entry.path();
-        item.action->onMouseButton2DownCb = [this, isDir, isAsset, assetType, assetHandle, itemIndex, itemPath](int32_t x,
-                                                                                                                int32_t y) {
+        item.contextMenuConnection = item.action->onMouseButton2DownCb.connect([this, isDir, isAsset, assetType, assetHandle,
+                                                                                itemIndex, itemPath](int32_t x, int32_t y) {
             std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
             if (isAsset) {
                 items = assetActions(assetType, assetHandle);
@@ -1085,8 +1069,7 @@ void ContentBrowserPanel::refreshFileBrowser()
                 Amethyst::makeActionItem("Rename", [this, itemIndex, itemPath]() { beginRename(itemIndex, itemPath); }));
             items.push_back(Amethyst::makeActionItem("Delete", [] {}));
             showContextMenu(Amethyst::vec2(static_cast<float>(x), static_cast<float>(y)), std::move(items));
-            return Amethyst::EventResult::CONSUMED;
-        };
+        });
 
         index++;
     }
@@ -1094,8 +1077,8 @@ void ContentBrowserPanel::refreshFileBrowser()
     if (m_edit.kind == CONTENT_EDIT_FOLDER || m_edit.kind == CONTENT_EDIT_MODULE || m_edit.kind == CONTENT_EDIT_SCRIPT) {
         auto &item = acquirePoolItem(index);
         item.container->setBaseProperties({.layoutOrder = static_cast<uint32_t>(index)});
-        item.action->onMouseButton1ClickCb = nullptr;
-        item.action->onMouseButton2DownCb = nullptr;
+        item.clickConnection.disconnect();
+        item.contextMenuConnection.disconnect();
 
         if (m_edit.kind == CONTENT_EDIT_FOLDER) {
             item.icon->setSvg(Icons::SVG_FOLDER);
@@ -1163,10 +1146,7 @@ void ContentBrowserPanel::buildDirectoryTree()
         {
             std::filesystem::path base = m_baseDirectory;
             auto btn = s_makeTreeCell(m_baseDirectory.filename().string());
-            btn->onMouseButton1ClickCb = [this, base]() {
-                navigateToDirectory(base);
-                return Amethyst::EventResult::CONSUMED;
-            };
+            btn->track(btn->onMouseButton1ClickCb.connect([this, base]() { navigateToDirectory(base); }));
             m_directoryTree->nextCell(std::move(btn));
         }
         buildFilesSubtree(m_baseDirectory, 1);
@@ -1182,10 +1162,7 @@ void ContentBrowserPanel::buildFilesSubtree(const std::filesystem::path &path, u
 
         std::filesystem::path dirPath = entry.path();
         auto btn = s_makeTreeCell(entry.path().filename().string());
-        btn->onMouseButton1ClickCb = [this, dirPath]() {
-            navigateToDirectory(dirPath);
-            return Amethyst::EventResult::CONSUMED;
-        };
+        btn->track(btn->onMouseButton1ClickCb.connect([this, dirPath]() { navigateToDirectory(dirPath); }));
         m_directoryTree->nextCell(std::move(btn));
 
         buildFilesSubtree(entry.path(), static_cast<uint16_t>(depth + 1));
@@ -1345,7 +1322,7 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
         });
 
         item.attached = true;
-        m_contentItemPool.push_back(item);
+        m_contentItemPool.push_back(std::move(item));
     }
 
     auto &item = m_contentItemPool[index];

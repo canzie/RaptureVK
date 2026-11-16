@@ -151,12 +151,11 @@ void ProjectLauncher::addRecentRow(Amethyst::UIScope &list, const std::filesyste
                 },
         },
         [this, projectPath](Amethyst::TextButtonScope &row) {
-            row.component.onMouseButton1ClickCb = [this, projectPath]() {
+            row.component.track(row.component.onMouseButton1ClickCb.connect([this, projectPath]() {
                 if (onOpenProject) {
                     onOpenProject(projectPath);
                 }
-                return Amethyst::EventResult::CONSUMED;
-            };
+            }));
 
             auto *icon = row.component.add<Amethyst::ImageLabel>();
             icon->addClass("launcher-project-icon");
@@ -228,10 +227,7 @@ void ProjectLauncher::setupFooter(Amethyst::UIScope &root)
                     .label = "Create",
                 },
                 [this](Amethyst::TextButtonScope &button) {
-                    button.component.onMouseButton1ClickCb = [this]() {
-                        createProject();
-                        return Amethyst::EventResult::CONSUMED;
-                    };
+                    button.component.track(button.component.onMouseButton1ClickCb.connect([this]() { createProject(); }));
                 });
 
             footer.textButton(
@@ -245,12 +241,11 @@ void ProjectLauncher::setupFooter(Amethyst::UIScope &root)
                     .label = "Open...",
                 },
                 [this](Amethyst::TextButtonScope &button) {
-                    button.component.onMouseButton1ClickCb = [this]() {
+                    button.component.track(button.component.onMouseButton1ClickCb.connect([this]() {
                         if (onBrowseForProject) {
                             onBrowseForProject();
                         }
-                        return Amethyst::EventResult::CONSUMED;
-                    };
+                    }));
                 });
         });
 }

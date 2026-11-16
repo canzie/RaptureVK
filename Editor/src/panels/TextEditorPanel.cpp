@@ -73,11 +73,10 @@ void TextEditorPanel::buildToolbar(Amethyst::UIScope &scope)
                  .text = {.textXAlignment = Amethyst::TextXAlignment::CENTER, .textYAlignment = Amethyst::TextYAlignment::CENTER},
                  .label = "Open..."},
                 [this](Amethyst::TextButtonScope &b) {
-                    b.component.onMouseButton1ClickCb = [this]() {
+                    b.component.track(b.component.onMouseButton1ClickCb.connect([this]() {
                         m_context.editor->windows->openFileDialog(FILE_DIALOG_OPEN,
                                                                   [this](const std::filesystem::path &path) { openFile(path); });
-                        return Amethyst::EventResult::CONSUMED;
-                    };
+                    }));
                 });
 
             f.textLabel(

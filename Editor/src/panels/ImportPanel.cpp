@@ -197,10 +197,7 @@ void ImportPanel::build()
             .label = "Cancel",
         },
         [this](Amethyst::TextButtonScope &b) {
-            b.component.onMouseButton1ClickCb = [this]() {
-                m_closeRequested = true;
-                return Amethyst::EventResult::CONSUMED;
-            };
+            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { m_closeRequested = true; }));
         });
 
     root.textButton(
@@ -217,10 +214,7 @@ void ImportPanel::build()
             .label = "Import",
         },
         [this](Amethyst::TextButtonScope &b) {
-            b.component.onMouseButton1ClickCb = [this]() {
-                m_importRequested = true;
-                return Amethyst::EventResult::CONSUMED;
-            };
+            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { m_importRequested = true; }));
         });
 
     m_popup->addExtension<Amethyst::UIDragDetector>(m_titleBar);

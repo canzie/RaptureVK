@@ -140,14 +140,13 @@ void WorldEditorWorkspace::setupPlayControls(Amethyst::Frame &group)
         [this](Amethyst::ImageButtonScope &b) {
             m_playButton = &b.component;
             b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-            b.component.onMouseButton1ClickCb = [this]() {
+            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() {
                 if (isPlaying()) {
                     stopPlay();
                 } else {
                     startPlay();
                 }
-                return Amethyst::EventResult::CONSUMED;
-            };
+            }));
         });
 
     controls.imageButton(
@@ -159,10 +158,7 @@ void WorldEditorWorkspace::setupPlayControls(Amethyst::Frame &group)
         [this](Amethyst::ImageButtonScope &b) {
             m_pauseButton = &b.component;
             b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-            b.component.onMouseButton1ClickCb = [this]() {
-                togglePause();
-                return Amethyst::EventResult::CONSUMED;
-            };
+            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { togglePause(); }));
         });
 
     controls.imageButton(

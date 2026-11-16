@@ -80,11 +80,10 @@ void SceneObjectTreePanel::setupHeader(Amethyst::UIScope &scope)
                                .base = {.size = Amethyst::UDim2(0.0f, ADD_BUTTON_WIDTH, 1.0f, 0.0f)},
                                .label = "Add"},
                               [this](Amethyst::TextButtonScope &b) {
-                                  b.component.onMouseButton1ClickCb = [this, button = &b.component]() {
+                                  b.component.track(b.component.onMouseButton1ClickCb.connect([this, button = &b.component]() {
                                       showAddMenu(
                                           {button->absolutePosition.x, button->absolutePosition.y + button->absoluteSize.y});
-                                      return Amethyst::EventResult::CONSUMED;
-                                  };
+                                  }));
                               });
         });
 }

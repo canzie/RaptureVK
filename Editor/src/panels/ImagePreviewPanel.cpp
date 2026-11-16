@@ -51,10 +51,7 @@ void ImagePreviewPanel::build(Amethyst::UIScope &scope)
                         .label = "Refresh",
                     },
                     [this](Amethyst::TextButtonScope &b) {
-                        b.component.onMouseButton1ClickCb = [this]() {
-                            rebuildSelector();
-                            return Amethyst::EventResult::CONSUMED;
-                        };
+                        b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { rebuildSelector(); }));
                     });
             });
     }
