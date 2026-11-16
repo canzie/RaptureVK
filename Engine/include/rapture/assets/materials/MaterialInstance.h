@@ -62,7 +62,12 @@ class MaterialInstance {
     }
 
     void setParameter(const ParameterId &id, Ref<ATexture> texture);
-    void updatePendingTextures();
+
+    /**
+     * @brief Binds the texture parameters whose texture has finished loading
+     * @return Whether any texture parameter is still waiting on its texture
+     */
+    bool bindLoadedPendingTextures();
 
     /**
      * @brief The texture bound to a texture parameter, for reading a material back into a graph
@@ -93,6 +98,7 @@ class MaterialInstance {
 
     std::vector<PendingTexture> m_pendingTextures;
     std::mutex m_pendingTexturesMutex;
+    bool m_awaitingTextures = false;
 
     std::vector<std::pair<ParameterId, Ref<ATexture>>> m_textureRefs;
     std::vector<Ref<ATexture>> m_graphTextureRefs;

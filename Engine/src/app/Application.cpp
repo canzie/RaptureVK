@@ -240,6 +240,7 @@ void Application::runFrame()
     }
 
     AssetManager::onUpdate();
+    MaterialManager::bindLoadedPendingTextures();
 
     m_layerStack.updateLayers(Timestep::deltaTime());
 

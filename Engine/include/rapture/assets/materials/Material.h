@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -19,6 +20,7 @@
 namespace Rapture {
 
 class AMaterial;
+class MaterialInstance;
 class FreeListStorageBuffer;
 class SurfaceGraphManager;
 
@@ -137,6 +139,23 @@ class MaterialManager {
      */
     static SurfaceGraphManager &getSurfaceGraphManager();
 
+    /**
+     * @brief Binds every texture a material instance is waiting on that has finished loading
+     */
+    static void bindLoadedPendingTextures();
+
+    /**
+     * @brief Adds an instance to the ones whose texture parameters wait on a texture still loading
+     * @param instance The waiting instance
+     */
+    static void addInstanceAwaitingTextures(MaterialInstance *instance);
+
+    /**
+     * @brief Drops an instance from the ones waiting on a texture
+     * @param instance The instance to drop, ignored if it is not waiting
+     */
+    static void removeInstanceAwaitingTextures(MaterialInstance *instance);
+
   private:
     static void createDefaultMaterials();
 
@@ -149,6 +168,8 @@ class MaterialManager {
     static EventListenerId s_serializeListener;
     static EventListenerId s_registerListener;
     static EventListenerId s_registerCompleteListener;
+    static std::mutex s_instancesAwaitingTexturesMutex;
+    static std::vector<MaterialInstance *> s_instancesAwaitingTextures;
 };
 
 } // namespace Rapture

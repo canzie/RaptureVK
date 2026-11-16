@@ -165,17 +165,6 @@ void Scene::onUpdate(float dt)
     auto &app = Application::getInstance();
     uint32_t frameCounter = app.getFrameInFlightIndex();
 
-    {
-        RAPTURE_PROFILE_SCOPE("OldPerEntity::updateMeshes");
-        for (auto [entity, material] : m_registry.read<MaterialComponent>().with<TransformComponent, StaticMeshComponent>()) {
-            for (const Ref<AMaterialInstance> &instance : material.materials) {
-                if (instance) {
-                    instance->updatePendingTextures();
-                }
-            }
-        }
-    }
-
     glm::vec3 cameraPosition = glm::vec3(0.0f);
     Frustum *frustum = nullptr;
 

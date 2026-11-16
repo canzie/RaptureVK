@@ -4,6 +4,7 @@
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/asset_manager/ReservedAssets.h>
 #include <rapture/assets/materials/AMaterial.h>
+#include <rapture/assets/materials/MaterialInstance.h>
 #include <rapture/assets/materials/graph/MaterialGraphCompiler.h>
 #include <rapture/assets/materials/graph/SurfaceGraphManager.h>
 #include <rapture/assets/textures/ATexture.h>
@@ -16,6 +17,7 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
 #include <cstring>
 
 namespace Rapture {
@@ -61,6 +63,8 @@ std::unique_ptr<SurfaceGraphManager> MaterialManager::s_surfaceGraphManager;
 EventListenerId MaterialManager::s_serializeListener = 0;
 EventListenerId MaterialManager::s_registerListener = 0;
 EventListenerId MaterialManager::s_registerCompleteListener = 0;
+std::mutex MaterialManager::s_instancesAwaitingTexturesMutex;
+std::vector<MaterialInstance *> MaterialManager::s_instancesAwaitingTextures;
 
 BaseMaterial::BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph)
     : m_name(std::move(name)), m_graphId(graphId), m_table(std::move(table)), m_graph(std::move(graph))
@@ -555,6 +559,24 @@ void MaterialManager::printMaterialNames()
     for (const auto &[name, handle] : s_materialHandles) {
         RP_CORE_INFO("\t {}", name);
     }
+}
+
+void MaterialManager::bindLoadedPendingTextures()
+{
+    std::lock_guard<std::mutex> lock(s_instancesAwaitingTexturesMutex);
+    std::erase_if(s_instancesAwaitingTextures, [](MaterialInstance *instance) { return !instance->bindLoadedPendingTextures(); });
+}
+
+void MaterialManager::addInstanceAwaitingTextures(MaterialInstance *instance)
+{
+    std::lock_guard<std::mutex> lock(s_instancesAwaitingTexturesMutex);
+    s_instancesAwaitingTextures.push_back(instance);
+}
+
+void MaterialManager::removeInstanceAwaitingTextures(MaterialInstance *instance)
+{
+    std::lock_guard<std::mutex> lock(s_instancesAwaitingTexturesMutex);
+    std::erase(s_instancesAwaitingTextures, instance);
 }
 
 } // namespace Rapture

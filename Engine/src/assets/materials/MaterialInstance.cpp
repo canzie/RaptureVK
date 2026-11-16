@@ -50,6 +50,7 @@ MaterialInstance::MaterialInstance(Ref<AMaterial> material, const std::string &n
 
 MaterialInstance::~MaterialInstance()
 {
+    MaterialManager::removeInstanceAwaitingTextures(this);
     if (m_bindlessIndex != UINT32_MAX) {
         MaterialManager::freeSlot(m_bindlessIndex);
     }
@@ -101,16 +102,26 @@ void MaterialInstance::setParameter(const ParameterId &id, Ref<ATexture> texture
     if (texture->isReady()) {
         uint32_t bindlessIdx = texture->getBindlessIndex();
         writeSlice(id, &bindlessIdx, sizeof(uint32_t));
-    } else {
+        return;
+    }
+
+    bool startsAwaiting = false;
+    {
         std::lock_guard<std::mutex> lock(m_pendingTexturesMutex);
         m_pendingTextures.push_back({id, texture});
+        startsAwaiting = !m_awaitingTextures;
+        m_awaitingTextures = true;
+    }
+
+    // registered outside the instance lock, since the manager takes its own lock before this one
+    if (startsAwaiting) {
+        MaterialManager::addInstanceAwaitingTextures(this);
     }
 }
 
-void MaterialInstance::updatePendingTextures()
+bool MaterialInstance::bindLoadedPendingTextures()
 {
     std::lock_guard<std::mutex> lock(m_pendingTexturesMutex);
-    if (m_pendingTextures.empty()) return;
 
     m_pendingTextures.erase(std::remove_if(m_pendingTextures.begin(), m_pendingTextures.end(),
                                            [this](const PendingTexture &pending) {
@@ -123,6 +134,9 @@ void MaterialInstance::updatePendingTextures()
                                                return true;
                                            }),
                             m_pendingTextures.end());
+
+    m_awaitingTextures = !m_pendingTextures.empty();
+    return m_awaitingTextures;
 }
 
 void MaterialInstance::writeSlice(const ParameterId &id, const void *data, size_t size)
