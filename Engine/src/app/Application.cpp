@@ -241,21 +241,13 @@ void Application::runFrame()
 
     AssetManager::onUpdate();
 
-    for (auto it = m_layerStack.layerBegin(); it != m_layerStack.layerEnd(); ++it) {
-        if ((*it)->isAttached()) {
-            (*it)->onUpdate(Timestep::deltaTime());
-        }
-    }
+    m_layerStack.updateLayers(Timestep::deltaTime());
 
     m_project->onUpdate(Timestep::deltaTime());
 
     m_viewportManager->drawAll();
 
-    for (auto it = m_layerStack.overlayBegin(); it != m_layerStack.overlayEnd(); ++it) {
-        if ((*it)->isAttached()) {
-            (*it)->onUpdate(Timestep::deltaTime());
-        }
-    }
+    m_layerStack.updateOverlays(Timestep::deltaTime());
 
     if (m_mainWindow != nullptr) {
         m_mainWindow->onUpdate();
@@ -265,18 +257,20 @@ void Application::runFrame()
         }
     }
 
-    for (auto it = m_secondaryWindows.begin(); it != m_secondaryWindows.end();) {
-        if (!m_running || (*it)->getWindowContext()->shouldClose()) {
+    // by index, since a window's callbacks may open another one
+    for (size_t i = 0; i < m_secondaryWindows.size();) {
+        RenderWindow &window = *m_secondaryWindows[i];
+        if (!m_running || window.getWindowContext()->shouldClose()) {
             m_vulkanContext->waitIdle();
-            if ((*it)->onClose != nullptr) {
-                (*it)->onClose();
+            if (window.onClose != nullptr) {
+                window.onClose();
             }
-            it = m_secondaryWindows.erase(it);
+            m_secondaryWindows.erase(m_secondaryWindows.begin() + static_cast<ptrdiff_t>(i));
         } else {
-            if ((*it)->onFrame != nullptr) {
-                (*it)->onFrame(**it);
+            if (window.onFrame != nullptr) {
+                window.onFrame(window);
             }
-            ++it;
+            i++;
         }
     }
 
