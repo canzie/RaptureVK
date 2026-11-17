@@ -210,6 +210,13 @@ class Scene {
     void updateGlobalIllumination(uint32_t frameIndex);
 
     /**
+     * @brief Streams terrain chunks in and out around a view's camera, once per frame however many views draw this scene
+     * @param camera The camera of the view drawing the scene
+     * @param frameIndex The frame in flight being drawn
+     */
+    void updateTerrainStreaming(ecs::EntityAccessor camera, uint32_t frameIndex);
+
+    /**
      * @brief Get the GPU data mirror
      */
     SceneRenderData *getRenderData() { return m_renderData.get(); }
@@ -245,12 +252,8 @@ class Scene {
      * @brief Re-aims the shadow maps whose light or transform changed since this scene last looked
      */
     void updateShadowViews();
-
     /**
-     * @brief Streams terrain chunks in and out around the camera
-     * @param frameIndex The frame in flight being prepared
-     */
-    void updateTerrainStreaming(uint32_t frameIndex);
+
 
     /**
      * @brief Brings the acceleration structure up to date with the scene
@@ -292,6 +295,7 @@ class Scene {
     std::unique_ptr<DynamicDiffuseGI> m_globalIllumination;
     std::unique_ptr<Counter> m_globalIlluminationJobs;
     std::atomic<uint64_t> m_globalIlluminationUpdatedFrame{UINT64_MAX};
+    std::atomic<uint64_t> m_terrainStreamedFrame{UINT64_MAX};
 
     std::array<FreeList<Instance *>, TICK_COUNT> m_ticking;
     bool m_runningTickPhase = false;

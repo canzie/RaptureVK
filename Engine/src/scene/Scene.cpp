@@ -211,8 +211,6 @@ void Scene::onUpdate(float dt)
     auto &app = Application::getInstance();
     uint32_t frameCounter = app.getFrameInFlightIndex();
 
-    updateTerrainStreaming(frameCounter);
-
     if (m_environment != nullptr) {
         m_environment->update();
     }
@@ -224,17 +222,21 @@ void Scene::onUpdate(float dt)
     updateTLAS();
 }
 
-void Scene::updateTerrainStreaming(uint32_t frameIndex)
+void Scene::updateTerrainStreaming(ecs::EntityAccessor camera, uint32_t frameIndex)
 {
-    // TODO: stream around every view drawing the scene instead of the active controller's camera, with the terrain sweep
-    Camera3D *activeCamera = m_activeController != nullptr ? m_activeController->viewCamera() : nullptr;
-    if (activeCamera == nullptr || !m_registry.hasAll<TransformComponent, CameraComponent>(activeCamera->entity())) {
+    if (!camera.isValid() || !camera.hasAll<TransformComponent, CameraComponent>()) {
         return;
     }
 
-    glm::vec3 cameraPosition = transform::translation(activeCamera->worldTransform());
+    // TODO: stream around the union of every view drawing the scene, with the terrain sweep
+    const uint64_t frame = Application::getInstance().getMonotonicFrameCount();
+    if (m_terrainStreamedFrame.exchange(frame) == frame) {
+        return;
+    }
+
+    glm::vec3 cameraPosition = transform::translation(camera.read<TransformComponent>().world);
     // the frustum holds GPU upload state, so touching it is bookkeeping rather than a camera change
-    Frustum &frustum = m_registry.write<CameraComponent>(activeCamera->entity(), 0)->frustum;
+    Frustum &frustum = m_registry.write<CameraComponent>(camera.getEntity(), 0)->frustum;
 
     // the chunk grid is scene wide, so it follows one camera rather than each view that draws it
     for (auto [entity, terrain] : m_registry.mutableView<TerrainComponent>()) {

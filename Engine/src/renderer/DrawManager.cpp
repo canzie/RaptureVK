@@ -362,6 +362,7 @@ void DrawManager::recordFrame(CommandBuffer *commandBuffer, Scene &scene, ecs::E
 
         m_sharedTargets.depthStencil = m_depthTextures[m_currentFrame].get();
         m_sharedTargets.sceneColorHdr = m_sceneColorHdrTextures[m_currentFrame].get();
+        scene.updateTerrainStreaming(camera, m_currentFrame);
         populateOpaqueGeometry(scene, camera);
         m_cascadedShadows->update(scene, camera, m_currentFrame);
 
