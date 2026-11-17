@@ -113,7 +113,7 @@ TEST_F(SceneDestroy, ListenersFindTheDyingSubtreeIntactAndUnchangeable)
 
     size_t childrenSeen = 0;
     bool secondAliveSeen = false;
-    bool removeRefused = false;
+    bool moveRefused = false;
     bool addRefused = false;
     int secondFires = 0;
 
@@ -121,7 +121,7 @@ TEST_F(SceneDestroy, ListenersFindTheDyingSubtreeIntactAndUnchangeable)
         childrenSeen = parent->children().size();
         secondAliveSeen = *secondAlive;
         scene.destroyInstance(second);
-        removeRefused = parent->removeChild(second) == nullptr;
+        moveRefused = !second->setParent(scene.root());
         addRefused = parent->add<Rapture::Node3D>("Late") == nullptr;
     });
     Rapture::EventConnection secondConnection = second->onDestroy.connect([&secondFires](Rapture::Instance *) { secondFires++; });
@@ -130,7 +130,7 @@ TEST_F(SceneDestroy, ListenersFindTheDyingSubtreeIntactAndUnchangeable)
 
     EXPECT_EQ(childrenSeen, 2u);
     EXPECT_TRUE(secondAliveSeen);
-    EXPECT_TRUE(removeRefused);
+    EXPECT_TRUE(moveRefused);
     EXPECT_TRUE(addRefused);
     EXPECT_EQ(secondFires, 1);
     EXPECT_FALSE(*secondAlive);

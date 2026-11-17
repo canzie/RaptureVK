@@ -72,17 +72,25 @@ class SceneObject : public Instance {
     SceneObject *addChild(std::unique_ptr<SceneObject> child, InternalMode internalMode = InternalMode::DISABLED);
 
     /**
-     * @brief Unlinks a child and hands its ownership back
-     * @param child The child to release
-     * @return The child, or nullptr if it is not a child of this object, is internal, or either is being destroyed
-     */
-    [[nodiscard]] std::unique_ptr<SceneObject> removeChild(SceneObject *child);
-
-    /**
      * @brief Destroys a child and its subtree, telling every listener in the subtree before any of it is torn down
      * @param child The child to destroy, internal or not
      */
-    void destroyChild(SceneObject *child);
+    void removeChild(SceneObject *child);
+
+    /**
+     * @brief Moves this object and its subtree under another object
+     * @param parent The object to move under
+     * @return True if this object now sits under the parent, false if it is internal, has no parent to leave, is being
+     *         destroyed, or the parent is this object or sits below it
+     */
+    bool setParent(SceneObject *parent);
+
+    /**
+     * @brief Whether this object is a subtree's root or sits below it
+     * @param root The root of the subtree
+     * @return True if the object is in the subtree
+     */
+    bool isInSubtreeOf(const SceneObject &root) const;
 
     bool isInternal() const { return (m_flags & SCENE_OBJECT_FLAG_INTERNAL) != 0; }
 
@@ -164,7 +172,7 @@ class SceneObject : public Instance {
 
         auto created = std::make_unique<T>(*scene(), T::staticType().name);
         T *raw = created.get();
-        if (attachComponent(std::move(created)) == nullptr) {
+        if (addComponent(std::move(created)) == nullptr) {
             return nullptr;
         }
         raw->ready();
@@ -199,20 +207,13 @@ class SceneObject : public Instance {
 
     /**
      * @brief Takes ownership of a component and attaches it to this object
-     * @param component The component to attach
+     * @param component The component to add
      * @return The component, or nullptr if this object is being destroyed, in which case the component is destroyed too
      */
-    SceneComponent *attachComponent(std::unique_ptr<SceneComponent> component);
+    SceneComponent *addComponent(std::unique_ptr<SceneComponent> component);
 
     /**
-     * @brief Detaches a component and hands its ownership back
-     * @param component The component to release
-     * @return The component, or nullptr if it is not attached to this object or this object is being destroyed
-     */
-    [[nodiscard]] std::unique_ptr<SceneComponent> detachComponent(SceneComponent *component);
-
-    /**
-     * @brief Detaches and destroys a component, telling its listeners before it is torn down
+     * @brief Destroys a component, telling its listeners while it is still attached
      * @param component The component to remove
      */
     void removeComponent(SceneComponent *component);
@@ -308,6 +309,19 @@ class SceneObject : public Instance {
     ecs::EntityAccessor m_entity;
 
   private:
+    /**
+     * @brief Takes ownership of a child, placing it among the internal or authored children by its flag
+     * @param child The child to link
+     */
+    void linkChild(std::unique_ptr<SceneObject> child);
+
+    /**
+     * @brief Takes a child out of this object's children and hands its ownership back
+     * @param child The child to unlink
+     * @return The child
+     */
+    std::unique_ptr<SceneObject> unlinkChild(SceneObject *child);
+
     /**
      * @brief Reads the components a document names onto this object
      * @param header The header of this object's document

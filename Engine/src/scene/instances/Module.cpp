@@ -26,7 +26,7 @@ const TypeInfo &Module::type() const
 bool Module::setAssetHandle(AssetHandle handle)
 {
     if (m_contentRoot != nullptr) {
-        destroyChild(m_contentRoot);
+        removeChild(m_contentRoot);
         m_contentRoot = nullptr;
     }
 

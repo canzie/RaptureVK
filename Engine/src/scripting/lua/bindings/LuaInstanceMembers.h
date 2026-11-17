@@ -62,34 +62,11 @@ inline SceneObject *findDescendantOfType(const SceneObject &object, std::string_
     return nullptr;
 }
 
-inline bool isDescendantOf(const SceneObject &object, const SceneObject &ancestor)
-{
-    for (const SceneObject *walk = &object; walk != nullptr; walk = walk->parent()) {
-        if (walk == &ancestor) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 inline void reparentObject(SceneObject &object, SceneObject &parent, lua_State *state)
 {
-    if (&object == &parent || isDescendantOf(parent, object)) {
-        luaL_error(state, "cannot parent an object below itself");
+    if (!object.setParent(&parent)) {
+        luaL_error(state, "this object cannot be moved there");
     }
-
-    SceneObject *previous = object.parent();
-    if (previous == nullptr) {
-        luaL_error(state, "cannot reparent the scene root");
-    }
-
-    std::unique_ptr<SceneObject> released = previous->removeChild(&object);
-    if (released == nullptr) {
-        luaL_error(state, "this object cannot be moved out of its parent");
-    }
-
-    parent.addChild(std::move(released));
 }
 
 inline sol::table snapshotHandles(sol::state_view lua, std::span<const std::unique_ptr<SceneObject>> objects)
@@ -202,7 +179,7 @@ void addSceneObjectMembers(sol::usertype<LuaHandle<T>> &type)
             luaL_error(state, "no component class is registered under that name");
         }
 
-        SceneComponent *raw = object->attachComponent(std::move(created));
+        SceneComponent *raw = object->addComponent(std::move(created));
         if (raw == nullptr) {
             luaL_error(state, "the object is being destroyed");
         }

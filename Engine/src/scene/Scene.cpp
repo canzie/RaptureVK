@@ -377,7 +377,7 @@ void Scene::destroyInstance(SceneObject *instance)
         return;
     }
 
-    parent->destroyChild(instance);
+    parent->removeChild(instance);
 }
 
 void Scene::serialize(WriteNode node) const
@@ -397,7 +397,7 @@ void Scene::serialize(WriteNode node) const
 void Scene::clearInstances()
 {
     while (!m_root->children().empty()) {
-        m_root->destroyChild(m_root->children().front().get());
+        m_root->removeChild(m_root->children().front().get());
     }
 }
 
@@ -492,7 +492,7 @@ static bool s_restoreSubtree(SceneObject &parent, ReadNode instances, std::unord
             live.erase(found);
 
             if (instance->parent() != &parent) {
-                parent.addChild(instance->parent()->removeChild(instance));
+                instance->setParent(&parent);
             }
         } else {
             std::unique_ptr<SceneObject> created = InstanceRegistry::createObject(header.className, *parent.scene(), header.name);
@@ -528,7 +528,7 @@ static void s_destroyInstancesNotInSnapshot(SceneObject &parent, const std::unor
         SceneObject *child = parent.children()[i - 1].get();
 
         if (gained.contains(child->id())) {
-            parent.destroyChild(child);
+            parent.removeChild(child);
             continue;
         }
 

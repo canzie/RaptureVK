@@ -311,7 +311,9 @@ void OutlinerPanel::applyPendingDelete()
         Rapture::SceneObject *parent = instance->parent();
         while (parent != nullptr && !instance->children().empty()) {
             Rapture::SceneObject *child = instance->children().front().get();
-            parent->addChild(instance->removeChild(child));
+            if (!child->setParent(parent)) {
+                break;
+            }
         }
     }
 

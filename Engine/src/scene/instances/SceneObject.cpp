@@ -110,7 +110,6 @@ SceneObject *SceneObject::addChild(std::unique_ptr<SceneObject> child, InternalM
         return nullptr;
     }
 
-    child->m_parent = this;
     if (internalMode == InternalMode::ENABLED) {
         child->m_flags |= SCENE_OBJECT_FLAG_INTERNAL;
     } else {
@@ -118,65 +117,98 @@ SceneObject *SceneObject::addChild(std::unique_ptr<SceneObject> child, InternalM
     }
 
     SceneObject *adopted = child.get();
-
-    if (adopted->isInternal()) {
-        m_children.push_back(std::move(child));
-        m_internalCount++;
-    } else {
-        m_children.insert(m_children.end() - static_cast<ptrdiff_t>(m_internalCount), std::move(child));
-    }
+    linkChild(std::move(child));
 
     adopted->onParentChanged();
     return adopted;
 }
 
-std::unique_ptr<SceneObject> SceneObject::removeChild(SceneObject *child)
+void SceneObject::removeChild(SceneObject *child)
 {
-    RP_ASSERT(child != nullptr, "a scene object cannot release nothing");
+    RP_ASSERT(child != nullptr, "a scene object cannot remove nothing");
 
-    if (child->isInternal()) {
-        RP_CORE_ERROR("'{}' is internal to '{}' and cannot be taken from it", child->name(), name());
-        return nullptr;
-    }
-
-    if (isBeingDestroyed() || child->isBeingDestroyed()) {
-        RP_CORE_ERROR("'{}' is being destroyed and cannot be taken from '{}'", child->name(), name());
-        return nullptr;
-    }
-
-    for (size_t i = 0; i < m_children.size(); i++) {
-        if (m_children[i].get() != child) {
-            continue;
-        }
-
-        std::unique_ptr<SceneObject> owned = std::move(m_children[i]);
-        m_children.erase(m_children.begin() + static_cast<ptrdiff_t>(i));
-        owned->m_parent = nullptr;
-
-        owned->onParentChanged();
-        return owned;
-    }
-
-    return nullptr;
-}
-
-void SceneObject::destroyChild(SceneObject *child)
-{
-    RP_ASSERT(child != nullptr, "a scene object cannot destroy nothing");
-
-    if (child->parent() != this || child->isBeingDestroyed()) {
+    if (child->m_parent != this || child->isBeingDestroyed()) {
         return;
     }
 
     beginSubtreeDestruction(*child);
 
-    // looked up after the listeners ran, since they may have changed the other children
+    // unlinked after the listeners ran, since they may have changed the other children
+    unlinkChild(child).reset();
+}
+
+bool SceneObject::setParent(SceneObject *parent)
+{
+    RP_ASSERT(parent != nullptr, "a scene object cannot be moved under nothing");
+
+    if (m_parent == parent) {
+        return true;
+    }
+
+    if (m_parent == nullptr) {
+        RP_CORE_ERROR("'{}' has no parent to be moved away from", name());
+        return false;
+    }
+
+    if (isInternal()) {
+        RP_CORE_ERROR("'{}' is internal to '{}' and cannot be moved out of it", name(), m_parent->name());
+        return false;
+    }
+
+    if (isBeingDestroyed() || parent->isBeingDestroyed()) {
+        RP_CORE_ERROR("'{}' cannot be moved under '{}' while either is being destroyed", name(), parent->name());
+        return false;
+    }
+
+    if (parent->isInSubtreeOf(*this)) {
+        RP_CORE_ERROR("'{}' cannot be moved under itself", name());
+        return false;
+    }
+
+    parent->linkChild(m_parent->unlinkChild(this));
+
+    onParentChanged();
+    return true;
+}
+
+bool SceneObject::isInSubtreeOf(const SceneObject &root) const
+{
+    for (const SceneObject *walk = this; walk != nullptr; walk = walk->m_parent) {
+        if (walk == &root) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void SceneObject::linkChild(std::unique_ptr<SceneObject> child)
+{
+    child->m_parent = this;
+
+    if (child->isInternal()) {
+        m_children.push_back(std::move(child));
+        m_internalCount++;
+        return;
+    }
+
+    m_children.insert(m_children.end() - static_cast<ptrdiff_t>(m_internalCount), std::move(child));
+}
+
+std::unique_ptr<SceneObject> SceneObject::unlinkChild(SceneObject *child)
+{
     auto found = std::find_if(m_children.begin(), m_children.end(),
                               [child](const std::unique_ptr<SceneObject> &owned) { return owned.get() == child; });
+    RP_ASSERT(found != m_children.end(), "'{}' is not a child of '{}'", child->name(), name());
+
     if (child->isInternal()) {
         m_internalCount--;
     }
+
+    std::unique_ptr<SceneObject> owned = std::move(*found);
     m_children.erase(found);
+    owned->m_parent = nullptr;
+    return owned;
 }
 
 void SceneObject::onParentChanged()
@@ -224,7 +256,7 @@ SceneObject *SceneObject::findDescendant(std::string_view path, bool includeInte
     return found;
 }
 
-SceneComponent *SceneObject::attachComponent(std::unique_ptr<SceneComponent> component)
+SceneComponent *SceneObject::addComponent(std::unique_ptr<SceneComponent> component)
 {
     if (component == nullptr) {
         return nullptr;
@@ -235,44 +267,29 @@ SceneComponent *SceneObject::attachComponent(std::unique_ptr<SceneComponent> com
         return nullptr;
     }
 
-    SceneComponent *attached = component.get();
+    SceneComponent *added = component.get();
     m_components.push_back(std::move(component));
 
-    attached->attachTo(this);
-    return attached;
-}
-
-std::unique_ptr<SceneComponent> SceneObject::detachComponent(SceneComponent *component)
-{
-    if (isBeingDestroyed()) {
-        RP_CORE_ERROR("'{}' is being destroyed and cannot give up its components", name());
-        return nullptr;
-    }
-
-    for (size_t i = 0; i < m_components.size(); i++) {
-        if (m_components[i].get() != component) {
-            continue;
-        }
-
-        std::unique_ptr<SceneComponent> owned = std::move(m_components[i]);
-        m_components.erase(m_components.begin() + static_cast<ptrdiff_t>(i));
-        owned->detach();
-        return owned;
-    }
-
-    return nullptr;
+    added->attachTo(this);
+    return added;
 }
 
 void SceneObject::removeComponent(SceneComponent *component)
 {
-    if (component == nullptr || component->owner() != this || isBeingDestroyed()) {
+    if (component == nullptr || component->owner() != this || component->isBeingDestroyed()) {
         return;
     }
 
     component->m_isBeingDestroyed = true;
     component->onDestroy.fire(component);
 
-    std::unique_ptr<SceneComponent> removed = detachComponent(component);
+    // found after the listeners ran, since they may have changed the other components
+    auto found = std::find_if(m_components.begin(), m_components.end(),
+                              [component](const std::unique_ptr<SceneComponent> &owned) { return owned.get() == component; });
+    std::unique_ptr<SceneComponent> owned = std::move(*found);
+    m_components.erase(found);
+
+    owned->detach();
 }
 
 void SceneObject::serialize(WriteNode node) const
@@ -356,7 +373,7 @@ bool SceneObject::loadComponents(const DocumentHeader &header, SceneLoadContext 
             raw->remintId();
         }
 
-        if (attachComponent(std::move(component)) == nullptr) {
+        if (addComponent(std::move(component)) == nullptr) {
             return false;
         }
     }
@@ -409,7 +426,7 @@ SceneObject *SceneObject::loadSubtree(SceneObject &parent, ReadNode node, SceneL
 
     if (!self->loadContents(header, context)) {
         // what was read before the failure is not left behind, and the parent takes itself out in turn
-        parent.destroyChild(self);
+        parent.removeChild(self);
         return nullptr;
     }
 
