@@ -84,7 +84,12 @@ inline void reparentObject(SceneObject &object, SceneObject &parent, lua_State *
         luaL_error(state, "cannot reparent the scene root");
     }
 
-    parent.addChild(previous->removeChild(&object));
+    std::unique_ptr<SceneObject> released = previous->removeChild(&object);
+    if (released == nullptr) {
+        luaL_error(state, "this object cannot be moved out of its parent");
+    }
+
+    parent.addChild(std::move(released));
 }
 
 inline sol::table snapshotHandles(sol::state_view lua, std::span<const std::unique_ptr<SceneObject>> objects)
@@ -197,8 +202,10 @@ void addSceneObjectMembers(sol::usertype<LuaHandle<T>> &type)
             luaL_error(state, "no component class is registered under that name");
         }
 
-        SceneComponent *raw = created.get();
-        object->attachComponent(std::move(created));
+        SceneComponent *raw = object->attachComponent(std::move(created));
+        if (raw == nullptr) {
+            luaL_error(state, "the object is being destroyed");
+        }
         raw->ready();
         return LuaHandleBase::push(sol::state_view(state), raw);
     };

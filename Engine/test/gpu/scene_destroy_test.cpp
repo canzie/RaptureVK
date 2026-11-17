@@ -2,6 +2,7 @@
 
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/scene_components/VisibilityComponent.h>
 
 #include <memory>
 #include <string_view>
@@ -76,4 +77,80 @@ TEST_F(SceneDestroy, DestroyingOutsideTickIsImmediate)
     scene.destroyInstance(node);
 
     EXPECT_FALSE(*alive);
+}
+
+TEST_F(SceneDestroy, OnDestroyFiresOncePerInstance)
+{
+    Rapture::Scene scene("SceneDestroy");
+
+    auto *parent = scene.root()->add<Rapture::Node3D>("Parent");
+    auto *child = parent->add<Rapture::Node3D>("Child");
+    auto *component = child->addComponent<Rapture::VisibilityComponent>();
+
+    int parentFires = 0;
+    int childFires = 0;
+    int componentFires = 0;
+    std::vector<Rapture::EventConnection> connections;
+    connections.push_back(parent->onDestroy.connect([&parentFires](Rapture::Instance *) { parentFires++; }));
+    connections.push_back(child->onDestroy.connect([&childFires](Rapture::Instance *) { childFires++; }));
+    connections.push_back(component->onDestroy.connect([&componentFires](Rapture::Instance *) { componentFires++; }));
+
+    scene.destroyInstance(parent);
+
+    EXPECT_EQ(parentFires, 1);
+    EXPECT_EQ(childFires, 1);
+    EXPECT_EQ(componentFires, 1);
+}
+
+TEST_F(SceneDestroy, ListenersFindTheDyingSubtreeIntactAndUnchangeable)
+{
+    Rapture::Scene scene("SceneDestroy");
+
+    auto *parent = scene.root()->add<Rapture::Node3D>("Parent");
+    auto *first = parent->add<Rapture::Node3D>("First");
+    auto *second = parent->add<Rapture::Node3D>("Second");
+    std::shared_ptr<bool> secondAlive = second->aliveFlag();
+
+    size_t childrenSeen = 0;
+    bool secondAliveSeen = false;
+    bool removeRefused = false;
+    bool addRefused = false;
+    int secondFires = 0;
+
+    Rapture::EventConnection firstConnection = first->onDestroy.connect([&](Rapture::Instance *) {
+        childrenSeen = parent->children().size();
+        secondAliveSeen = *secondAlive;
+        scene.destroyInstance(second);
+        removeRefused = parent->removeChild(second) == nullptr;
+        addRefused = parent->add<Rapture::Node3D>("Late") == nullptr;
+    });
+    Rapture::EventConnection secondConnection = second->onDestroy.connect([&secondFires](Rapture::Instance *) { secondFires++; });
+
+    scene.destroyInstance(parent);
+
+    EXPECT_EQ(childrenSeen, 2u);
+    EXPECT_TRUE(secondAliveSeen);
+    EXPECT_TRUE(removeRefused);
+    EXPECT_TRUE(addRefused);
+    EXPECT_EQ(secondFires, 1);
+    EXPECT_FALSE(*secondAlive);
+}
+
+TEST_F(SceneDestroy, RemovingComponentTellsListenersWhileItIsAttached)
+{
+    Rapture::Scene scene("SceneDestroy");
+
+    auto *node = scene.root()->add<Rapture::Node3D>("Node");
+    auto *component = node->addComponent<Rapture::VisibilityComponent>();
+    std::shared_ptr<bool> alive = component->aliveFlag();
+
+    Rapture::SceneObject *ownerSeen = nullptr;
+    Rapture::EventConnection connection =
+        component->onDestroy.connect([&ownerSeen, component](Rapture::Instance *) { ownerSeen = component->owner(); });
+
+    node->removeComponent(component);
+
+    EXPECT_EQ(ownerSeen, node);
+    EXPECT_FALSE(*alive);
+    EXPECT_EQ(node->component<Rapture::VisibilityComponent>(), nullptr);
 }

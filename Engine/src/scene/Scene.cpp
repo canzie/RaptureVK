@@ -356,7 +356,7 @@ SceneObject *Scene::instanceFor(ecs::Entity entity) const
 
 void Scene::destroyInstance(SceneObject *instance)
 {
-    if (instance == nullptr || instance == m_root.get()) {
+    if (instance == nullptr || instance == m_root.get() || instance->isBeingDestroyed()) {
         return;
     }
 
@@ -377,7 +377,7 @@ void Scene::destroyInstance(SceneObject *instance)
         return;
     }
 
-    parent->removeChild(instance);
+    SceneObject::destroy(parent->removeChild(instance));
 }
 
 void Scene::serialize(WriteNode node) const
@@ -397,7 +397,7 @@ void Scene::serialize(WriteNode node) const
 void Scene::clearInstances()
 {
     while (!m_root->children().empty()) {
-        m_root->removeChild(m_root->children().front().get());
+        SceneObject::destroy(m_root->removeChild(m_root->children().front().get()));
     }
 }
 
@@ -508,6 +508,11 @@ static bool s_restoreSubtree(SceneObject &parent, ReadNode instances, std::unord
         instance->deserialize(node);
         context.addInstance(header.id, instance);
 
+        // components are read fresh rather than reconciled, so nothing a run did to them survives it
+        if (!instance->replaceComponents(header, context)) {
+            return false;
+        }
+
         if (!s_restoreSubtree(*instance, header.children, live, context)) {
             return false;
         }
@@ -523,7 +528,7 @@ static void s_destroyInstancesNotInSnapshot(SceneObject &parent, const std::unor
         SceneObject *child = parent.children()[i - 1].get();
 
         if (gained.contains(child->id())) {
-            parent.removeChild(child);
+            SceneObject::destroy(parent.removeChild(child));
             continue;
         }
 

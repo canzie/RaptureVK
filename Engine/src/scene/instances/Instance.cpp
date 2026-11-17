@@ -17,11 +17,26 @@ Instance::~Instance()
 {
     setTickEnabled(false);
 
+    m_isBeingDestroyed = true;
+    notifyDestroy();
+    markDead();
+}
+
+void Instance::notifyDestroy()
+{
+    if (m_destroyNotified) {
+        return;
+    }
+
+    m_destroyNotified = true;
+    onDestroy.fire(this);
+}
+
+void Instance::markDead()
+{
     if (m_alive != nullptr) {
         *m_alive = false;
     }
-
-    onDestroy.fire(this);
 }
 
 bool Instance::isTickEnabled() const

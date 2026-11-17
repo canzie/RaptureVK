@@ -33,8 +33,10 @@ void registerInstanceBindings(sol::state_view lua)
             luaL_error(state, "no scene object class is registered under that name");
         }
 
-        SceneObject *raw = created.get();
-        parent->addChild(std::move(created));
+        SceneObject *raw = parent->addChild(std::move(created));
+        if (raw == nullptr) {
+            luaL_error(state, "the parent is being destroyed");
+        }
         raw->ready();
         return LuaHandleBase::push(lua, raw);
     };

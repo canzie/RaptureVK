@@ -56,7 +56,9 @@ class SceneObject : public Instance {
     {
         auto child = std::make_unique<T>(*scene(), name);
         T *raw = child.get();
-        addChild(std::move(child), internalMode);
+        if (addChild(std::move(child), internalMode) == nullptr) {
+            return nullptr;
+        }
         raw->ready();
         return raw;
     }
@@ -65,15 +67,22 @@ class SceneObject : public Instance {
      * @brief Takes ownership of a child and links it to this object
      * @param child The child to adopt
      * @param internalMode Whether the child is added as internal
+     * @return The child, or nullptr if this object is being destroyed, in which case the child is destroyed too
      */
-    void addChild(std::unique_ptr<SceneObject> child, InternalMode internalMode = InternalMode::DISABLED);
+    SceneObject *addChild(std::unique_ptr<SceneObject> child, InternalMode internalMode = InternalMode::DISABLED);
 
     /**
      * @brief Unlinks a child and hands its ownership back
      * @param child The child to release
-     * @return The child, or nullptr if it is not a child of this object
+     * @return The child, or nullptr if it is not a child of this object, is internal, or either is being destroyed
      */
     std::unique_ptr<SceneObject> removeChild(SceneObject *child);
+
+    /**
+     * @brief Destroys a scene object and its subtree, telling every listener in the subtree before any of it is torn down
+     * @param object The object to destroy, which may be null
+     */
+    static void destroy(std::unique_ptr<SceneObject> object);
 
     bool isInternal() const { return (m_flags & SCENE_OBJECT_FLAG_INTERNAL) != 0; }
 
@@ -155,7 +164,9 @@ class SceneObject : public Instance {
 
         auto created = std::make_unique<T>(*scene(), T::staticType().name);
         T *raw = created.get();
-        attachComponent(std::move(created));
+        if (attachComponent(std::move(created)) == nullptr) {
+            return nullptr;
+        }
         raw->ready();
         return raw;
     }
@@ -189,18 +200,19 @@ class SceneObject : public Instance {
     /**
      * @brief Takes ownership of a component and attaches it to this object
      * @param component The component to attach
+     * @return The component, or nullptr if this object is being destroyed, in which case the component is destroyed too
      */
-    void attachComponent(std::unique_ptr<SceneComponent> component);
+    SceneComponent *attachComponent(std::unique_ptr<SceneComponent> component);
 
     /**
      * @brief Detaches a component and hands its ownership back
      * @param component The component to release
-     * @return The component, or nullptr if it is not attached to this object
+     * @return The component, or nullptr if it is not attached to this object or this object is being destroyed
      */
     std::unique_ptr<SceneComponent> detachComponent(SceneComponent *component);
 
     /**
-     * @brief Detaches and destroys a component
+     * @brief Detaches and destroys a component, telling its listeners before it is torn down
      * @param component The component to remove
      */
     void removeComponent(SceneComponent *component);
@@ -249,6 +261,14 @@ class SceneObject : public Instance {
      */
     static SceneObject *spawnSubtree(SceneObject &parent, ReadNode node, InternalMode internalMode = InternalMode::DISABLED);
 
+    /**
+     * @brief Destroys every component this object has and reads the ones a document names in their place
+     * @param header The header of this object's document
+     * @param context The read the components belong to
+     * @return True if every component was read
+     */
+    bool replaceComponents(const DocumentHeader &header, SceneLoadContext &context);
+
     SceneObject *parent() const { return m_parent; }
 
     /**
@@ -292,6 +312,21 @@ class SceneObject : public Instance {
 
   protected:
     ecs::EntityAccessor m_entity;
+
+  private:
+    /**
+     * @brief Reads the components a document names onto this object
+     * @param header The header of this object's document
+     * @param context The read the components belong to
+     * @return True if every component was read
+     */
+    bool loadComponents(const DocumentHeader &header, SceneLoadContext &context);
+
+    /**
+     * @brief Marks a subtree as being destroyed, tells every listener in it, then marks it dead
+     * @param object The root of the subtree
+     */
+    static void beginSubtreeDestruction(SceneObject &object);
 
   private:
     SceneObject *m_parent = nullptr;

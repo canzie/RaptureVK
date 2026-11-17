@@ -106,6 +106,11 @@ class Instance : public Typed {
     EventSignal<void(Instance *)> onDestroy;
 
     /**
+     * @brief Whether this instance's destruction has begun, from the moment its listeners are told
+     */
+    bool isBeingDestroyed() const { return m_isBeingDestroyed; }
+
+    /**
      * @brief This instance's stable identity, what another instance stores to refer to it
      */
     InstanceId id() const { return m_id; }
@@ -144,13 +149,28 @@ class Instance : public Typed {
     virtual void onReady();
 
   private:
+    /**
+     * @brief Fires onDestroy, once however often it is asked
+     */
+    void notifyDestroy();
+
+    /**
+     * @brief Clears the alive flag every unowned reference to this instance holds
+     */
+    void markDead();
+
+  private:
     Scene *m_scene;
     InstanceId m_id;
     std::string m_name;
     TickPhase m_tickPhase = TICK_PRE_PHYSICS;
     uint32_t m_tickSlot;
     bool m_isReady = false;
+    bool m_isBeingDestroyed = false;
+    bool m_destroyNotified = false;
     std::shared_ptr<bool> m_alive;
+
+    friend class SceneObject;
 };
 
 } // namespace Rapture

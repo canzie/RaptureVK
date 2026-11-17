@@ -20,9 +20,26 @@ SceneObject::SceneObject(Scene &scene, std::string_view name) : Instance(scene, 
     m_entity.set<InstanceComponent>(this);
 }
 
+static void s_collectSubtree(SceneObject &object, std::vector<Instance *> &out)
+{
+    out.push_back(&object);
+
+    for (const auto &component : object.components()) {
+        out.push_back(component.get());
+    }
+
+    const bool includeInternal = true;
+    for (const auto &child : object.children(includeInternal)) {
+        s_collectSubtree(*child, out);
+    }
+}
+
 SceneObject::~SceneObject()
 {
-    onDestroy.fire(this);
+    // reached without destroy() when an owner simply drops the object
+    if (!m_destroyNotified) {
+        beginSubtreeDestruction(*this);
+    }
 
     for (const auto &component : m_components) {
         component->detach();
@@ -56,6 +73,35 @@ void SceneObject::setName(std::string_view name)
     }
 }
 
+void SceneObject::beginSubtreeDestruction(SceneObject &object)
+{
+    std::vector<Instance *> dying;
+    s_collectSubtree(object, dying);
+
+    for (Instance *instance : dying) {
+        instance->m_isBeingDestroyed = true;
+    }
+
+    // all of the subtree is told before any of it dies, so a listener still finds the rest intact
+    for (Instance *instance : dying) {
+        instance->notifyDestroy();
+    }
+
+    for (Instance *instance : dying) {
+        instance->markDead();
+    }
+}
+
+void SceneObject::destroy(std::unique_ptr<SceneObject> object)
+{
+    if (object == nullptr) {
+        return;
+    }
+
+    beginSubtreeDestruction(*object);
+    object.reset();
+}
+
 void SceneObject::setSerialized(bool serialized)
 {
     if (serialized) {
@@ -71,9 +117,15 @@ std::span<const std::unique_ptr<SceneObject>> SceneObject::children(bool include
     return std::span<const std::unique_ptr<SceneObject>>(m_children.data(), count);
 }
 
-void SceneObject::addChild(std::unique_ptr<SceneObject> child, InternalMode internalMode)
+SceneObject *SceneObject::addChild(std::unique_ptr<SceneObject> child, InternalMode internalMode)
 {
     RP_ASSERT(child != nullptr, "a scene object cannot adopt nothing");
+
+    if (isBeingDestroyed()) {
+        RP_CORE_ERROR("'{}' is being destroyed and cannot adopt '{}'", name(), child->name());
+        destroy(std::move(child));
+        return nullptr;
+    }
 
     child->m_parent = this;
     if (internalMode == InternalMode::ENABLED) {
@@ -92,6 +144,7 @@ void SceneObject::addChild(std::unique_ptr<SceneObject> child, InternalMode inte
     }
 
     adopted->onParentChanged();
+    return adopted;
 }
 
 std::unique_ptr<SceneObject> SceneObject::removeChild(SceneObject *child)
@@ -100,6 +153,11 @@ std::unique_ptr<SceneObject> SceneObject::removeChild(SceneObject *child)
 
     if (child->isInternal()) {
         RP_CORE_ERROR("'{}' is internal to '{}' and cannot be taken from it", child->name(), name());
+        return nullptr;
+    }
+
+    if (isBeingDestroyed() || child->isBeingDestroyed()) {
+        RP_CORE_ERROR("'{}' is being destroyed and cannot be taken from '{}'", child->name(), name());
         return nullptr;
     }
 
@@ -132,7 +190,9 @@ void SceneObject::destroyChild(SceneObject *child)
             m_internalCount--;
         }
 
+        std::unique_ptr<SceneObject> owned = std::move(m_children[i]);
         m_children.erase(m_children.begin() + static_cast<ptrdiff_t>(i));
+        destroy(std::move(owned));
         return;
     }
 }
@@ -182,20 +242,31 @@ SceneObject *SceneObject::findDescendant(std::string_view path, bool includeInte
     return found;
 }
 
-void SceneObject::attachComponent(std::unique_ptr<SceneComponent> component)
+SceneComponent *SceneObject::attachComponent(std::unique_ptr<SceneComponent> component)
 {
     if (component == nullptr) {
-        return;
+        return nullptr;
+    }
+
+    if (isBeingDestroyed()) {
+        RP_CORE_ERROR("'{}' is being destroyed and cannot take on '{}'", name(), component->name());
+        return nullptr;
     }
 
     SceneComponent *attached = component.get();
     m_components.push_back(std::move(component));
 
     attached->attachTo(this);
+    return attached;
 }
 
 std::unique_ptr<SceneComponent> SceneObject::detachComponent(SceneComponent *component)
 {
+    if (isBeingDestroyed()) {
+        RP_CORE_ERROR("'{}' is being destroyed and cannot give up its components", name());
+        return nullptr;
+    }
+
     for (size_t i = 0; i < m_components.size(); i++) {
         if (m_components[i].get() != component) {
             continue;
@@ -212,6 +283,14 @@ std::unique_ptr<SceneComponent> SceneObject::detachComponent(SceneComponent *com
 
 void SceneObject::removeComponent(SceneComponent *component)
 {
+    if (component == nullptr || component->owner() != this || isBeingDestroyed()) {
+        return;
+    }
+
+    component->m_isBeingDestroyed = true;
+    component->notifyDestroy();
+    component->markDead();
+
     detachComponent(component);
 }
 
@@ -252,6 +331,30 @@ SceneObject::DocumentHeader SceneObject::readHeader(ReadNode node)
 
 bool SceneObject::loadContents(const DocumentHeader &header, SceneLoadContext &context)
 {
+    if (!loadComponents(header, context)) {
+        return false;
+    }
+
+    for (size_t i = 0; i < header.children.size(); i++) {
+        if (loadSubtree(*this, header.children.at(i), context) == nullptr) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool SceneObject::replaceComponents(const DocumentHeader &header, SceneLoadContext &context)
+{
+    while (!m_components.empty()) {
+        removeComponent(m_components.back().get());
+    }
+
+    return loadComponents(header, context);
+}
+
+bool SceneObject::loadComponents(const DocumentHeader &header, SceneLoadContext &context)
+{
     for (size_t i = 0; i < header.components.size(); i++) {
         ReadNode entry = header.components.at(i);
         std::string_view className = readClassName(entry);
@@ -272,11 +375,7 @@ bool SceneObject::loadContents(const DocumentHeader &header, SceneLoadContext &c
             raw->remintId();
         }
 
-        attachComponent(std::move(component));
-    }
-
-    for (size_t i = 0; i < header.children.size(); i++) {
-        if (loadSubtree(*this, header.children.at(i), context) == nullptr) {
+        if (attachComponent(std::move(component)) == nullptr) {
             return false;
         }
     }
@@ -315,8 +414,11 @@ SceneObject *SceneObject::loadSubtree(SceneObject &parent, ReadNode node, SceneL
         return nullptr;
     }
 
-    SceneObject *self = created.get();
-    parent.addChild(std::move(created), internalMode);
+    SceneObject *self = parent.addChild(std::move(created), internalMode);
+    if (self == nullptr) {
+        return nullptr;
+    }
+
     context.addInstance(header.id, self);
     self->deserialize(node);
 
