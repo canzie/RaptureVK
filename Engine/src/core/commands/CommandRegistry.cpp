@@ -501,8 +501,15 @@ void CommandGroup::add(CommandDescription command)
 {
     RP_ASSERT(findGroup(command.name) == nullptr && findCommand(command.name) == nullptr, "'{}' is already taken in this group",
               command.name);
+    RP_ASSERT(!command.name.empty(), "a command needs a name");
     RP_ASSERT(!command.description.empty(), "command '{}' needs a description", command.name);
     RP_ASSERT(command.run != nullptr, "command '{}' runs nothing", command.name);
+    for (const CommandParameter &parameter : command.parameters) {
+        RP_ASSERT(!parameter.name.empty() && !parameter.description.empty(), "every parameter of '{}' needs a name and a description",
+                  command.name);
+        RP_ASSERT(parameter.type != COMMAND_ARGUMENT_TYPE_CHOICE || !parameter.choices.empty(), "'{}' of '{}' offers no choices",
+                  parameter.name, command.name);
+    }
 
     std::string name = command.name;
     m_commands.emplace(std::move(name), std::move(command));

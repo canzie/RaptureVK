@@ -89,10 +89,10 @@ using CommandCompleter = std::function<std::vector<std::string>(const CommandArg
  * @brief A parameter a command declares
  */
 struct CommandParameter {
-    std::string name = {};
+    std::string name;
     CommandArgumentType type = COMMAND_ARGUMENT_TYPE_STRING;
     CommandParameterKind kind = COMMAND_PARAMETER_KIND_POSITIONAL;
-    std::string description = {};
+    std::string description;
     std::vector<std::string> choices = {};
     CommandCompleter complete = {};
 };
@@ -161,10 +161,10 @@ using CommandHandler = std::function<void(const CommandArguments &arguments, Com
  * @brief Everything a command is: what it is called, what it does, what it takes and what runs it
  */
 struct CommandDescription {
-    std::string name = {};
-    std::string description = {};
+    std::string name;
+    std::string description;
     std::vector<CommandParameter> parameters = {};
-    CommandHandler run = {};
+    CommandHandler run;
 };
 
 /**
