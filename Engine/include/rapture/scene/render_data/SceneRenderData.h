@@ -16,7 +16,6 @@
 namespace Rapture {
 class Scene;
 class ShadowMap;
-class CascadedShadowMap;
 
 /**
  * @brief GPU-side mirror of a scene's ECS data
@@ -67,13 +66,6 @@ class SceneRenderData {
     void setShadowMobility(ecs::Entity entityId, Mobility mobility);
 
     /**
-     * @brief Moves a cascaded shadow's slot into the partition its new mobility belongs to
-     * @param entityId The entity whose cascaded shadow is changing mobility
-     * @param mobility The mobility to move to
-     */
-    void setCascadedShadowMobility(ecs::Entity entityId, Mobility mobility);
-
-    /**
      * @brief Where an entity's mesh data was packed
      * @param entityId Entity holding the StaticMeshComponent
      * @return The slot, or UINT32_MAX if the entity owns none
@@ -95,7 +87,7 @@ class SceneRenderData {
     uint32_t getCameraSlot(ecs::Entity entityId) const;
 
     /**
-     * @brief Where an entity's shadow data was packed, whether cascaded or not
+     * @brief Where an entity's shadow data was packed
      * @param entityId Entity holding a shadow component
      * @return The slot, or UINT32_MAX if the entity owns none
      */
@@ -107,13 +99,6 @@ class SceneRenderData {
      * @return The shadow map, or nullptr if the entity has none
      */
     ShadowMap *getShadowMap(ecs::Entity entityId) const;
-
-    /**
-     * @brief Get the cascaded shadow map owned on behalf of an entity
-     * @param entityId Entity holding the CascadedShadowComponent
-     * @return The cascaded shadow map, or nullptr if the entity has none
-     */
-    CascadedShadowMap *getCascadedShadowMap(ecs::Entity entityId) const;
 
     SkeletonInstanceManager &getSkeletonInstanceManager() { return m_skeletonInstanceManager; }
 
@@ -142,13 +127,9 @@ class SceneRenderData {
     void onCameraRemoved(ecs::Entity entityId);
     void onShadowAdded(ecs::Entity entityId);
     void onShadowRemoved(ecs::Entity entityId);
-    void onCascadedShadowAdded(ecs::Entity entityId);
-    void onCascadedShadowRemoved(ecs::Entity entityId);
 
     void createShadowMap(ecs::Entity entityId);
     void destroyShadowMap(ecs::Entity entityId);
-    void createCascadedShadowMap(ecs::Entity entityId);
-    void destroyCascadedShadowMap(ecs::Entity entityId);
 
     void updateMeshes(uint32_t frameIndex);
     void updateLights(uint32_t frameIndex);
@@ -168,7 +149,6 @@ class SceneRenderData {
     std::unordered_map<ecs::Entity, uint32_t> m_shadowSlots;
 
     std::unordered_map<ecs::Entity, std::unique_ptr<ShadowMap>> m_shadowMaps;
-    std::unordered_map<ecs::Entity, std::unique_ptr<CascadedShadowMap>> m_cascadedShadowMaps;
 
     SkeletonInstanceManager m_skeletonInstanceManager;
 

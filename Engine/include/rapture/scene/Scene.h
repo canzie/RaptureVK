@@ -244,9 +244,8 @@ class Scene {
     /**
      * @brief Re-aims the shadow maps whose light or transform changed since this scene last looked
      * @param cameraPosition Where the directional shadow volume is centred
-     * @param activeCamera The camera the cascade splits are built from, may be nullptr
      */
-    void updateShadowViews(const glm::vec3 &cameraPosition, Camera3D *activeCamera);
+    void updateShadowViews(const glm::vec3 &cameraPosition);
 
     /**
      * @brief Brings the acceleration structure up to date with the scene

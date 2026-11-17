@@ -832,7 +832,7 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             if (!m_entity.isValid() || !m_entity.has<Rapture::CascadedShadowComponent>()) {
                 return;
             }
-            m_scene->getRenderData()->setCascadedShadowMobility(m_entity.getEntity(), m);
+            m_entity.write<Rapture::CascadedShadowComponent>()->mobility = m;
             if (m_mobilityDropdown != nullptr) {
                 m_mobilityDropdown->setText(Rapture::mobilityToString(m));
             }

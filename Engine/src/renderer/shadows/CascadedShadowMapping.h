@@ -53,7 +53,16 @@ class CascadedShadowMap {
     CascadedShadowMap(float width, float height, uint32_t numCascades, float lambda);
     ~CascadedShadowMap();
 
-    CommandBufferLease recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain);
+    /**
+     * @brief Records the cascades' depth for a frame
+     * @param activeScene The scene being drawn
+     * @param currentFrame The frame in flight
+     * @param terrain The scene's terrain, may be nullptr
+     * @param cameraPosition Where the view's camera sits, which picks the terrain's level of detail
+     * @return The recorded secondary command buffer
+     */
+    CommandBufferLease recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain,
+                                       const glm::vec3 &cameraPosition);
 
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);
@@ -83,7 +92,8 @@ class CascadedShadowMap {
      */
     void enableDebugTexture(bool enabled);
 
-    uint32_t getTextureHandle() { return m_shadowTextureArray->getBindlessIndex(); }
+    uint32_t getTextureHandle() const { return m_shadowTextureArray->getBindlessIndex(); }
+    uint32_t getResolution() const { return static_cast<uint32_t>(m_width); }
 
     std::vector<glm::mat4> getLightViewProjections() const { return m_lightViewProjections; }
 

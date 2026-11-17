@@ -1,6 +1,5 @@
 #include <rapture/scene/render_data/SceneRenderData.h>
 
-#include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
 #include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/core/utils/TracyProfiler.h>
@@ -67,10 +66,6 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
     auto shadowSwapCb = [this, &registry](ecs::Entity entity, uint32_t newSlot) {
         if (const ShadowComponent *shadow = registry.tryRead<ShadowComponent>(entity)) {
             m_shadowSlots[entity] = m_shadows.getGlobalSlot(shadow->mobility, newSlot);
-            return;
-        }
-        if (const CascadedShadowComponent *cascaded = registry.tryRead<CascadedShadowComponent>(entity)) {
-            m_shadowSlots[entity] = m_shadows.getGlobalSlot(cascaded->mobility, newSlot);
         }
     };
 
@@ -103,15 +98,6 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
         onShadowRemoved(entity);
     }));
 
-    m_connections.push_back(registry.onConstructScoped<CascadedShadowComponent>([this](ecs::Entity entity) {
-        onCascadedShadowAdded(entity);
-        createCascadedShadowMap(entity);
-    }));
-    m_connections.push_back(registry.onDestroyScoped<CascadedShadowComponent>([this](ecs::Entity entity) {
-        destroyCascadedShadowMap(entity);
-        onCascadedShadowRemoved(entity);
-    }));
-
     for (auto [entity, mesh] : registry.read<StaticMeshComponent>()) {
         onMeshAdded(entity);
     }
@@ -133,10 +119,6 @@ SceneRenderData::SceneRenderData(const RenderContext &renderContext, Scene &scen
     for (auto [entity, shadow] : registry.read<ShadowComponent>()) {
         onShadowAdded(entity);
         createShadowMap(entity);
-    }
-    for (auto [entity, shadow] : registry.read<CascadedShadowComponent>()) {
-        onCascadedShadowAdded(entity);
-        createCascadedShadowMap(entity);
     }
 }
 
@@ -214,19 +196,6 @@ void SceneRenderData::setShadowMobility(ecs::Entity entityId, Mobility mobility)
     onShadowAdded(entityId);
 }
 
-void SceneRenderData::setCascadedShadowMobility(ecs::Entity entityId, Mobility mobility)
-{
-    ecs::Registry &registry = m_scene->getRegistry();
-    const CascadedShadowComponent *shadow = registry.tryRead<CascadedShadowComponent>(entityId);
-    if (shadow == nullptr || shadow->mobility == mobility) {
-        return;
-    }
-
-    onCascadedShadowRemoved(entityId);
-    registry.write<CascadedShadowComponent>(entityId)->mobility = mobility;
-    onCascadedShadowAdded(entityId);
-}
-
 void SceneRenderData::onLightAdded(ecs::Entity entityId)
 {
     const LightComponent *light = Light_tryReadLight(ecs::EntityAccessor(entityId, &m_scene->getRegistry()));
@@ -295,30 +264,6 @@ void SceneRenderData::onShadowRemoved(ecs::Entity entityId)
     m_shadowSlots.erase(entityId);
 }
 
-void SceneRenderData::onCascadedShadowAdded(ecs::Entity entityId)
-{
-    const CascadedShadowComponent *shadow = m_scene->getRegistry().tryRead<CascadedShadowComponent>(entityId);
-    if (shadow == nullptr) {
-        return;
-    }
-
-    uint32_t localSlot = m_shadows.getPartition(shadow->mobility).allocateSlot(entityId);
-    m_shadowSlots[entityId] = m_shadows.getGlobalSlot(shadow->mobility, localSlot);
-}
-
-void SceneRenderData::onCascadedShadowRemoved(ecs::Entity entityId)
-{
-    const CascadedShadowComponent *shadow = m_scene->getRegistry().tryRead<CascadedShadowComponent>(entityId);
-    uint32_t globalSlot = getShadowSlot(entityId);
-    if (shadow == nullptr || globalSlot == UINT32_MAX) {
-        return;
-    }
-
-    uint32_t localSlot = m_shadows.getLocalSlot(shadow->mobility, globalSlot);
-    m_shadows.getPartition(shadow->mobility).freeSlot(localSlot);
-    m_shadowSlots.erase(entityId);
-}
-
 void SceneRenderData::createShadowMap(ecs::Entity entityId)
 {
     const ShadowComponent *shadow = m_scene->getRegistry().tryRead<ShadowComponent>(entityId);
@@ -333,24 +278,6 @@ void SceneRenderData::createShadowMap(ecs::Entity entityId)
 void SceneRenderData::destroyShadowMap(ecs::Entity entityId)
 {
     m_shadowMaps.erase(entityId);
-}
-
-void SceneRenderData::createCascadedShadowMap(ecs::Entity entityId)
-{
-    const CascadedShadowComponent *shadow = m_scene->getRegistry().tryRead<CascadedShadowComponent>(entityId);
-    if (shadow == nullptr) {
-        return;
-    }
-
-    float resolution = static_cast<float>(shadow->resolution);
-    auto map = std::make_unique<CascadedShadowMap>(resolution, resolution, shadow->numCascades, shadow->lambda);
-    map->setShadowDistance(shadow->shadowDistance);
-    m_cascadedShadowMaps[entityId] = std::move(map);
-}
-
-void SceneRenderData::destroyCascadedShadowMap(ecs::Entity entityId)
-{
-    m_cascadedShadowMaps.erase(entityId);
 }
 
 static uint32_t s_lookupSlot(const std::unordered_map<ecs::Entity, uint32_t> &slots, ecs::Entity entityId)
@@ -383,12 +310,6 @@ ShadowMap *SceneRenderData::getShadowMap(ecs::Entity entityId) const
 {
     auto it = m_shadowMaps.find(entityId);
     return it != m_shadowMaps.end() ? it->second.get() : nullptr;
-}
-
-CascadedShadowMap *SceneRenderData::getCascadedShadowMap(ecs::Entity entityId) const
-{
-    auto it = m_cascadedShadowMaps.find(entityId);
-    return it != m_cascadedShadowMaps.end() ? it->second.get() : nullptr;
 }
 
 void SceneRenderData::consumeChanges(StoreBookmarks &bookmarks, SceneChannel paramsChannel,
@@ -639,28 +560,6 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
             data.cascadeSplitsViewSpace[0] = glm::vec4(0.0f);
             return;
         }
-
-        const CascadedShadowComponent *cascaded = registry.tryRead<CascadedShadowComponent>(entityId);
-        CascadedShadowMap *cascadedMap = getCascadedShadowMap(entityId);
-        if (cascaded != nullptr && cascadedMap != nullptr && cascaded->isActive) {
-            data.type = static_cast<int>(Light_getLightType(entity));
-            data.lightIndex = entityId;
-            data.textureHandle = cascadedMap->getTextureHandle();
-
-            // both are filled by the first cascade update, which a light packed before its shadow
-            // pass has ever run has not had yet
-            std::vector<glm::mat4> matrices = cascadedMap->getLightViewProjections();
-            std::vector<float> splits = cascadedMap->getCascadeSplits();
-            size_t count = std::min<size_t>(cascadedMap->getNumCascades(), matrices.size());
-            count = std::min<size_t>(count, splits.empty() ? 0 : splits.size() - 1);
-            count = std::min<size_t>(count, MAX_CASCADES);
-
-            data.cascadeCount = static_cast<uint32_t>(count);
-            for (size_t c = 0; c < count; c++) {
-                data.cascadeMatrices[c] = matrices[c];
-                data.cascadeSplitsViewSpace[c] = glm::vec4(splits[c], splits[c + 1], 0.0f, -1.0f);
-            }
-        }
     };
 
     for (uint32_t m = 0; m < MOBILITY_COUNT; m++) {
@@ -676,8 +575,6 @@ void SceneRenderData::updateShadows(uint32_t frameIndex)
 
         if (const ShadowComponent *shadow = registry.tryRead<ShadowComponent>(entityId)) {
             mobility = shadow->mobility;
-        } else if (const CascadedShadowComponent *cascaded = registry.tryRead<CascadedShadowComponent>(entityId)) {
-            mobility = cascaded->mobility;
         } else {
             return;
         }

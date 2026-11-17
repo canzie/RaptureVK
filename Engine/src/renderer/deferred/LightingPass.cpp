@@ -1,5 +1,7 @@
 #include "renderer/deferred/LightingPass.h"
 
+#include "renderer/shadows/ViewCascadedShadows.h"
+
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/EnginePaths.h>
 
@@ -49,6 +51,8 @@ struct LightingPushConstants {
     uint32_t prefilteredEnvHandle;
     float prefilteredEnvMipCount;
     float skyIntensity;
+    uint32_t viewShadowDataSSBOIndex;
+    uint32_t viewShadowCount;
 };
 
 LightingPass::LightingPass(float width, float height, VkFormat colorFormat)
@@ -189,6 +193,10 @@ CommandBufferLease LightingPass::record(const RenderPassContext &context, const 
     pushConstants.shadowStaticCount = shadowStore.getPartition(MOBILITY_STATIC).getCount();
     pushConstants.shadowDynamicOffset = shadowStore.getGlobalSlot(MOBILITY_DYNAMIC, 0);
     pushConstants.shadowDynamicCount = shadowStore.getPartition(MOBILITY_DYNAMIC).getCount();
+
+    const ViewCascadedShadows *cascadedShadows = context.cascadedShadows;
+    pushConstants.viewShadowCount = cascadedShadows != nullptr ? cascadedShadows->getShadowCount() : 0;
+    pushConstants.viewShadowDataSSBOIndex = cascadedShadows != nullptr ? cascadedShadows->getDescriptorIndex(frameIndex) : 0;
 
     // Get probe texture indices from DDGI system
     if (ddgi != nullptr) {

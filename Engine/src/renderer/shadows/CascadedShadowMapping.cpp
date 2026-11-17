@@ -9,8 +9,6 @@
 #include <rapture/core/utils/TracyProfiler.h>
 #include <rapture/renderer/generators/terrain/TerrainTypes.h>
 #include <rapture/scene/components/Components.h>
-#include <rapture/scene/instances/Camera3D.h>
-#include <rapture/scene/instances/controllers/Controller.h>
 #include <rapture/scene/render_data/SceneRenderData.h>
 #include <rapture/scene/systems/Transforms.h>
 
@@ -275,7 +273,8 @@ std::vector<CascadeData> CascadedShadowMap::calculateCascades(const glm::vec3 &l
     return cascadeData;
 }
 
-CommandBufferLease CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain)
+CommandBufferLease CascadedShadowMap::recordSecondary(Scene &activeScene, uint32_t currentFrame, TerrainGenerator *terrain,
+                                                      const glm::vec3 &cameraPosition)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -412,16 +411,7 @@ CommandBufferLease CascadedShadowMap::recordSecondary(Scene &activeScene, uint32
         }
     }
 
-    // the chunk grid was generated around the scene's camera, so its LODs have to be picked from there too
-    glm::vec3 cameraPos(0.0f);
-    if (Controller *controller = activeScene.activeController()) {
-        Camera3D *camera = controller->viewCamera();
-        if (camera != nullptr) {
-            cameraPos = transform::translation(camera->worldTransform());
-        }
-    }
-
-    recordTerrainCommands(commandBuffer, terrain, cameraPos);
+    recordTerrainCommands(commandBuffer, terrain, cameraPosition);
 
     commandBuffer->end();
 

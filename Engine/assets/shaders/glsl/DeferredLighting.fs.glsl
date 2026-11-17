@@ -133,6 +133,8 @@ layout(push_constant) uniform PushConstants {
     uint prefilteredEnvHandle;
     float prefilteredEnvMipCount;
     float skyIntensity;
+    uint viewShadowDataSSBOIndex;
+    uint viewShadowCount;
 } pc;
 
 float calculateAttenuation(vec3 lightPos, vec3 fragPos, float range) {
@@ -551,6 +553,7 @@ void main() {
 
         float shadowFactor = 1.0;
         int currentCascadeIndex = -1;
+        bool shadowFound = false;
         uint shadowCount = pc.shadowStaticCount + pc.shadowDynamicCount;
         for (uint sj = 0u; sj < shadowCount; sj++) {
             uint shadowSlot = (sj < pc.shadowStaticCount) ? sj : (pc.shadowDynamicOffset + sj - pc.shadowStaticCount);
@@ -561,7 +564,20 @@ void main() {
                 if (debugCascadeIndex == -1) {
                    debugCascadeIndex = currentCascadeIndex;
                 }
+                shadowFound = true;
                 break; 
+            }
+        }
+
+        // cascades are fitted per view, so they live in this view's own shadow buffer
+        for (uint sj = 0u; !shadowFound && sj < pc.viewShadowCount; sj++) {
+            ShadowGPUData shadowInfo = u_shadowSSBO[pc.viewShadowDataSSBOIndex].shadows[sj];
+            if (shadowInfo.lightIndex == light.spotAngles.z && shadowInfo.type >= 0) {
+                shadowFactor = calculateShadow(fragPos, viewDepth, N, lightDirWorld, shadowInfo, currentCascadeIndex);
+                if (debugCascadeIndex == -1) {
+                    debugCascadeIndex = currentCascadeIndex;
+                }
+                shadowFound = true;
             }
         }
 

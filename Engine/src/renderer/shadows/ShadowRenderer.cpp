@@ -2,6 +2,7 @@
 
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
+#include "renderer/shadows/ViewCascadedShadows.h"
 #include <rapture/core/utils/TracyProfiler.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/components/Components.h>
@@ -72,14 +73,13 @@ void ShadowRenderer::recordSecondaries(const RenderPassContext &context, JobCont
     }
 
     // a cascade follows the camera, so it is re-rendered every frame regardless
-    for (auto [entity, lightComp, transformComp, shadowComp] :
-         registry.read<DirectionalLightComponent, TransformComponent, CascadedShadowComponent>()) {
-        CascadedShadowMap *cascadedShadowMap = renderData->getCascadedShadowMap(entity);
-        if (cascadedShadowMap == nullptr) {
-            continue;
-        }
+    if (context.cascadedShadows == nullptr) {
+        return;
+    }
 
-        CommandBufferLease shadowBuffer = cascadedShadowMap->recordSecondary(activeScene, context.frameInFlight, context.terrain);
+    for (CascadedShadowMap *cascadedShadowMap : context.cascadedShadows->getMaps()) {
+        CommandBufferLease shadowBuffer = cascadedShadowMap->recordSecondary(activeScene, context.frameInFlight, context.terrain,
+                                                                             context.cascadedShadows->getCameraPosition());
         if (shadowBuffer.isValid()) {
             m_recordedCascades.push_back({cascadedShadowMap, std::move(shadowBuffer)});
         }

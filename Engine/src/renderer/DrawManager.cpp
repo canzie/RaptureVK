@@ -1,5 +1,7 @@
 #include <rapture/renderer/DrawManager.h>
 
+#include "renderer/shadows/ViewCascadedShadows.h"
+
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobCommon.h"
@@ -35,6 +37,7 @@ DrawManager::DrawManager(RenderContext renderContext, const DrawManagerConfig &c
     createSharedTextures();
 
     m_opaqueGeometry = std::make_unique<SceneGeometryDraw>(m_renderContext, m_config.framesInFlight);
+    m_cascadedShadows = std::make_unique<ViewCascadedShadows>(m_renderContext, m_config.framesInFlight);
 
     if (m_swapChain != nullptr) {
         m_swapChainRecreatedConn = m_swapChain->onRecreated.connect([this]() { onSwapChainRecreated(); });
@@ -50,6 +53,7 @@ DrawManager::~DrawManager()
     }
 
     m_opaqueGeometry.reset();
+    m_cascadedShadows.reset();
     m_depthTextures.clear();
     m_sceneRenderTarget.reset();
 
@@ -359,6 +363,7 @@ void DrawManager::recordFrame(CommandBuffer *commandBuffer, Scene &scene, ecs::E
         m_sharedTargets.depthStencil = m_depthTextures[m_currentFrame].get();
         m_sharedTargets.sceneColorHdr = m_sceneColorHdrTextures[m_currentFrame].get();
         populateOpaqueGeometry(scene, camera);
+        m_cascadedShadows->update(scene, camera, m_currentFrame);
 
         RenderPassContext context;
         context.scene = &scene;
@@ -368,6 +373,7 @@ void DrawManager::recordFrame(CommandBuffer *commandBuffer, Scene &scene, ecs::E
         context.settings = &settings;
         context.terrain = findTerrain(scene);
         context.opaqueGeometry = m_opaqueGeometry.get();
+        context.cascadedShadows = m_cascadedShadows.get();
         context.frameInFlight = m_currentFrame;
         context.imageIndex = imageIndex;
 

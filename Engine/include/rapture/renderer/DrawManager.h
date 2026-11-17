@@ -21,6 +21,7 @@ namespace Rapture {
 class Renderer;
 class Scene;
 class TerrainGenerator;
+class ViewCascadedShadows;
 struct RenderSettings;
 
 /**
@@ -214,6 +215,7 @@ class DrawManager {
     std::vector<std::unique_ptr<Texture>> m_sceneColorHdrTextures;
     std::unique_ptr<CompositePass> m_compositePass;
     std::unique_ptr<SceneGeometryDraw> m_opaqueGeometry;
+    std::unique_ptr<ViewCascadedShadows> m_cascadedShadows;
     RenderPassTargets m_sharedTargets;
 
     std::shared_ptr<VulkanQueue> m_graphicsQueue;
