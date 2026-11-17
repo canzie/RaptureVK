@@ -55,7 +55,7 @@ class Viewport {
     Viewport &operator=(const Viewport &) = delete;
 
     /**
-     * @brief Draws a scene from now on, giving it global illumination if this viewport traces rays
+     * @brief Draws a scene from now on
      * @param scene The scene to draw, may be nullptr
      */
     void setScene(Scene *scene);
