@@ -122,8 +122,7 @@ static constexpr std::array<AssetClass, ASSET_TYPE_COUNT> ASSET_CLASSES = {{
      .fileMagic = Asset_fourCC("LUA "),
      .fileExtension = ".rscript",
      .displayName = "Script",
-     .import = Asset_importScript,
-     .contentIsSourceFile = true},
+     .import = Asset_importScript},
 }};
 
 // the table is read by indexing it with an AssetType, so an entry in the wrong slot would answer for another class
@@ -183,12 +182,6 @@ std::string_view AssetRegistry::displayName(AssetType type)
 {
     const AssetClass *entry = find(type);
     return entry != nullptr ? entry->displayName : "Unknown";
-}
-
-bool AssetRegistry::contentIsSourceFile(AssetType type)
-{
-    const AssetClass *entry = find(type);
-    return entry != nullptr && entry->contentIsSourceFile;
 }
 
 bool AssetRegistry::isRaptureExtension(std::string_view extension)

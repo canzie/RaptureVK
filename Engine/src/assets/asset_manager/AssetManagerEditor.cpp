@@ -135,44 +135,6 @@ static std::unique_ptr<Asset> s_buildImportData(AssetImportDataVariant &data, st
     return nullptr;
 }
 
-/**
- * @brief Where an imported file lives when it is the asset's content, which is beside the asset file
- * @param source The file being imported
- * @param outputFolder The folder the asset file goes into
- * @return The file beside the asset file
- */
-static std::filesystem::path s_contentBesideAssetFile(const std::filesystem::path &source, const std::filesystem::path &outputFolder)
-{
-    std::filesystem::path destination = outputFolder / source.filename();
-
-    std::error_code ec;
-    return (std::filesystem::equivalent(source, destination, ec) ? source : destination).lexically_normal();
-}
-
-/**
- * @brief Copies an imported file to where it lives as the asset's content
- * @param source The file being imported
- * @param destination Where the content lives
- * @return True if the content is now at the destination
- */
-static bool s_copyContentBesideAssetFile(const std::filesystem::path &source, const std::filesystem::path &destination)
-{
-    if (std::filesystem::exists(destination)) {
-        RP_CORE_ERROR("'{}' already exists, so '{}' cannot be imported beside it", destination.string(), source.string());
-        return false;
-    }
-
-    std::error_code ec;
-    std::filesystem::create_directories(destination.parent_path(), ec);
-    std::filesystem::copy_file(source, destination, ec);
-    if (ec) {
-        RP_CORE_ERROR("Could not copy '{}' to '{}': {}", source.string(), destination.string(), ec.message());
-        return false;
-    }
-
-    return true;
-}
-
 struct AssetManagerEditor::UnloadCheckQueue {
     moodycamel::ConcurrentQueue<AssetHandle> handles;
 };
@@ -265,33 +227,24 @@ Asset *AssetManagerEditor::importAsset(const AssetImportFileRequest &request)
 
     AssetType assetType = determineAssetType(request.source.string());
 
-    std::filesystem::path source = request.source;
-    if (AssetRegistry::contentIsSourceFile(assetType) && !request.output.empty()) {
-        source = s_contentBesideAssetFile(request.source, request.output);
-    }
-
     // A reimport of the same source with the same config lands on the same type, so only that bucket can hold it
     for (const AssetSlot &slot : m_assets.ofType(assetType)) {
-        if (slot.metadata->getSourcePath() == source && slot.metadata->importConfig == request.config) {
+        if (slot.metadata->getSourcePath() == request.source && slot.metadata->importConfig == request.config) {
             return getAsset(slot.handle);
         }
     }
 
-    if (source != request.source && !s_copyContentBesideAssetFile(request.source, source)) {
-        return nullptr;
-    }
-
     auto metadata = std::make_unique<AssetMetadata>();
     metadata->storageType = AssetStorageType::DISK;
-    metadata->provenance = AssetProvenance{.sourcePath = source};
-    metadata->name = request.name.empty() ? source.stem().string() : request.name;
+    metadata->provenance = AssetProvenance{.sourcePath = request.source};
+    metadata->name = request.name.empty() ? request.source.stem().string() : request.name;
     metadata->assetType = assetType;
     metadata->importConfig = request.config;
 
     AssetHandle handle = UUIDGenerator::Generate();
     std::unique_ptr<Asset> asset = s_importFromSource(*metadata, handle);
     if (asset == nullptr) {
-        RP_CORE_ERROR("Failed to import asset: {}", source.string());
+        RP_CORE_ERROR("Failed to import asset: {}", request.source.string());
         return nullptr;
     }
 
@@ -527,8 +480,10 @@ Asset *AssetManagerEditor::registerReservedAsset(AssetHandle handle, std::unique
 
 std::unique_ptr<Asset> AssetManagerEditor::loadFromMetadata(AssetHandle handle, AssetMetadata &metadata)
 {
-    const bool hasPayload = !AssetRegistry::contentIsSourceFile(metadata.assetType);
-    if (hasPayload && !metadata.assetPath.empty() && std::filesystem::exists(metadata.assetPath)) {
+    // a class without a payload reader is read from its source file every time
+    const AssetClass *assetClass = AssetRegistry::find(metadata.assetType);
+    if (assetClass != nullptr && assetClass->deserialize != nullptr && !metadata.assetPath.empty() &&
+        std::filesystem::exists(metadata.assetPath)) {
         std::vector<uint8_t> payload = AssetCodec::readRaptureAssetPayload(metadata.assetPath);
         if (std::unique_ptr<Asset> asset = s_deserializeAsset(metadata, payload)) {
             asset->setHandle(handle);

@@ -32,11 +32,6 @@ struct AssetClass {
      * @brief Builds an asset of this class from the external file its metadata names
      */
     std::unique_ptr<Asset> (*import)(AssetMetadata &metadata, AssetHandle handle) = nullptr;
-
-    /**
-     * @brief Whether the source file is the asset's content, leaving the asset file only its identity
-     */
-    bool contentIsSourceFile = false;
 };
 
 /**
@@ -66,13 +61,6 @@ class AssetRegistry {
      * @return The name, or "Unknown" for a type no class answers for
      */
     static std::string_view displayName(AssetType type);
-
-    /**
-     * @brief Whether a type's source file is its content, leaving its asset file only its identity
-     * @param type The type to look up
-     * @return True if the source file is the content, false for a type no class answers for
-     */
-    static bool contentIsSourceFile(AssetType type);
 
     /**
      * @brief The class whose files carry a magic
