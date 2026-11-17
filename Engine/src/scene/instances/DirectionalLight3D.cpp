@@ -17,7 +17,6 @@ static constexpr std::string_view KEY_NUM_CASCADES = "numCascades";
 static constexpr std::string_view KEY_LAMBDA = "lambda";
 static constexpr std::string_view KEY_SHADOW_DISTANCE = "shadowDistance";
 static constexpr std::string_view KEY_ACTIVE = "active";
-static constexpr std::string_view KEY_MOBILITY = "mobility";
 
 DirectionalLight3D::DirectionalLight3D(Scene &scene, std::string_view name) : Light3D(scene, name)
 {
@@ -89,7 +88,6 @@ void DirectionalLight3D::serialize(WriteNode node) const
     shadowNode.set(KEY_LAMBDA, shadow->lambda);
     shadowNode.set(KEY_SHADOW_DISTANCE, shadow->shadowDistance);
     shadowNode.set(KEY_ACTIVE, shadow->isActive);
-    shadowNode.set(KEY_MOBILITY, static_cast<uint64_t>(shadow->mobility));
 }
 
 void DirectionalLight3D::deserialize(ReadNode node)
@@ -117,7 +115,6 @@ void DirectionalLight3D::applyShadowSettings(ReadNode node)
     shadow.lambda = static_cast<float>(shadowNode.child(KEY_LAMBDA).asF64(shadow.lambda));
     shadow.shadowDistance = static_cast<float>(shadowNode.child(KEY_SHADOW_DISTANCE).asF64(shadow.shadowDistance));
     shadow.isActive = shadowNode.child(KEY_ACTIVE).asBool(shadow.isActive);
-    shadow.mobility = static_cast<Mobility>(shadowNode.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(shadow.mobility)));
 
     // the cascades are built on construction, so the settings they are built from only take effect if
     // the component is detached and reattached
