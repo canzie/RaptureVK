@@ -296,10 +296,27 @@ void Scene::runTickPhase(TickPhase phase, float dt)
 {
     RAPTURE_PROFILE_SCOPE("Scene::runTickPhase");
 
+    m_runningTickPhase = true;
     m_ticking[phase].forEach([dt](uint32_t slot, Instance *instance) {
         (void)slot;
         instance->onUpdate(dt);
     });
+    m_runningTickPhase = false;
+
+    destroyPendingInstances();
+}
+
+void Scene::destroyPendingInstances()
+{
+    std::vector<PendingDestroy> pending = std::move(m_pendingDestroys);
+    m_pendingDestroys.clear();
+
+    for (const PendingDestroy &request : pending) {
+        // a request can outlive its instance when an ancestor was destroyed ahead of it
+        if (*request.alive) {
+            destroyInstance(request.instance);
+        }
+    }
 }
 
 void Scene::unregisterTick(uint32_t slot, TickPhase phase)
@@ -327,6 +344,12 @@ void Scene::destroyInstance(SceneObject *instance)
 
     if (instance->isInternal()) {
         RP_CORE_ERROR("cannot destroy instance '{}' because it is internal to '{}'", instance->name(), parent->name());
+        return;
+    }
+
+    // the instance being updated, or one it reaches, must outlive the update that asked for it
+    if (m_runningTickPhase) {
+        m_pendingDestroys.push_back({instance, instance->aliveFlag()});
         return;
     }
 

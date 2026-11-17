@@ -112,7 +112,7 @@ class Scene {
     SceneObject *instanceFor(ecs::Entity entity) const;
 
     /**
-     * @brief Destroys an instance along with its subtree
+     * @brief Destroys an instance along with its subtree, once the running tick phase has finished if one is running
      * @param instance The instance to destroy, ignored if it is the root
      */
     void destroyInstance(SceneObject *instance);
@@ -242,6 +242,11 @@ class Scene {
      */
     void clearInstances();
 
+    /**
+     * @brief Destroys every instance whose destruction was requested while a tick phase ran
+     */
+    void destroyPendingInstances();
+
   private:
     ecs::Registry m_registry{CHANNEL_COUNT};
     Environment *m_environment = nullptr;
@@ -259,6 +264,13 @@ class Scene {
     ecs::Bookmark m_tlasTransformBookmark;
 
     std::array<FreeList<Instance *>, TICK_COUNT> m_ticking;
+    bool m_runningTickPhase = false;
+
+    struct PendingDestroy {
+        SceneObject *instance;
+        std::shared_ptr<bool> alive;
+    };
+    std::vector<PendingDestroy> m_pendingDestroys;
 
     std::unique_ptr<scripting::LuaRuntime> m_scriptRuntime;
 
