@@ -18,8 +18,8 @@ enum class QueueAffinity {
 };
 
 enum class FiberStackSize {
-    REGULAR,
-    LARGE
+    SIZE_64_KB,
+    SIZE_512_KB
 };
 
 } // namespace Rapture

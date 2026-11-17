@@ -45,8 +45,8 @@ void JoltFiberJobSystem::QueueJob(Job *inJob)
             inJob->Release();
         },
         JobPriority::HIGH, QueueAffinity::ANY, nullptr, "Jolt");
-    // collision detection keeps whole contact manifolds on the stack, well past a regular fiber
-    declaration.stackSize = FiberStackSize::LARGE;
+    // collision detection keeps whole contact manifolds on the stack, well past 64 KB
+    declaration.stackSize = FiberStackSize::SIZE_512_KB;
     jobs().run(declaration);
 }
 

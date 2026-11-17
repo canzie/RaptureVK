@@ -55,10 +55,10 @@ Fiber *createSchedulerFiber();
 
 class FiberPool {
   public:
-    static constexpr size_t FIBER_STACK_SIZE = 64 * 1024;
-    static constexpr size_t FIBER_STACK_SIZE_LARGE = 512 * 1024;
-    static constexpr size_t MAX_FIBERS = 128;
-    static constexpr size_t MAX_LARGE_FIBERS = 32;
+    static constexpr size_t FIBER_STACK_SIZE_64_KB = 64 * 1024;
+    static constexpr size_t FIBER_STACK_SIZE_512_KB = 512 * 1024;
+    static constexpr size_t MAX_64_KB_FIBERS = 128;
+    static constexpr size_t MAX_512_KB_FIBERS = 32;
 
     FiberPool() = default;
     ~FiberPool();
@@ -68,7 +68,7 @@ class FiberPool {
     FiberPool(FiberPool &&) = delete;
     FiberPool &operator=(FiberPool &&) = delete;
 
-    static constexpr size_t FIBER_COUNT = MAX_FIBERS + MAX_LARGE_FIBERS;
+    static constexpr size_t FIBER_COUNT = MAX_64_KB_FIBERS + MAX_512_KB_FIBERS;
 
     /**
      * @brief Takes a free fiber, waiting until one with the requested stack is free
@@ -97,7 +97,7 @@ class FiberPool {
         std::atomic<bool> inUse{false};
     };
 
-    // the regular fibers first, the large ones after them
+    // the 64 KB fibers first, the 512 KB ones after them
     std::array<FiberSlot, FIBER_COUNT> m_fibers;
     std::atomic<uint32_t> m_availableCount{FIBER_COUNT};
 };

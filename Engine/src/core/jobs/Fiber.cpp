@@ -155,8 +155,8 @@ Fiber *FiberPool::acquire(FiberStackSize stackSize)
 
 bool FiberPool::tryAcquire(FiberStackSize stackSize, Fiber **out)
 {
-    size_t first = stackSize == FiberStackSize::LARGE ? MAX_FIBERS : 0;
-    size_t end = stackSize == FiberStackSize::LARGE ? FIBER_COUNT : MAX_FIBERS;
+    size_t first = stackSize == FiberStackSize::SIZE_512_KB ? MAX_64_KB_FIBERS : 0;
+    size_t end = stackSize == FiberStackSize::SIZE_512_KB ? FIBER_COUNT : MAX_64_KB_FIBERS;
     for (size_t i = first; i < end; ++i) {
         bool expected = false;
         if (m_fibers[i].inUse.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
@@ -188,7 +188,7 @@ void FiberPool::initializeFiberStacks()
 {
     for (size_t i = 0; i < FIBER_COUNT; ++i) {
         Fiber &fiber = m_fibers[i].fiber;
-        fiber.stackSize = i < MAX_FIBERS ? FIBER_STACK_SIZE : FIBER_STACK_SIZE_LARGE;
+        fiber.stackSize = i < MAX_64_KB_FIBERS ? FIBER_STACK_SIZE_64_KB : FIBER_STACK_SIZE_512_KB;
 
 #ifdef RAPTURE_FIBER_GUARD_PAGE
         size_t guardSize = s_fiberGuardSize();
